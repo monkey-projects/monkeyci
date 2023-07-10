@@ -24,6 +24,7 @@ workaround could be to run a script that waits for the repository to have filled
 but we would have to investigate whether the billing is counted towards the entire
 container instance, or each container separately.  I assume the former, if I read
 the [pricing page](https://www.oracle.com/cloud/cloud-native/container-instances/pricing/?source=:ow:o:h:nav:092121OCISiteFooter) correctly.
+
 Alternatively it's also possible to mount configfiles as a volume.  We could
 prepare the source information as a tarball and then inject it as a config file.
 Docs don't specify a max size, and it's not sure this will be cheaper though.  This
