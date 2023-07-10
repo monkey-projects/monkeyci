@@ -1,13 +1,14 @@
 ;; Basic build script that uses Docker
 (require '[monkey.ci.build.core :as core])
-(require '[monkey.ci.build.docker :as docker])
+(require '[monkey.ci.build.container :as container])
 (require '[monkey.ci.build.shell :as shell])
 
-;; Pipeline with a single step that just prints a message to stdout
+;; Should run using a step runner that supports docker images
 (core/pipeline
  {:name "test pipeline"
-  ;; Run this pipeline in Docker, with default image
-  :runner (docker/runner {:image "debian:latest"})
-  :steps [(shell/bash "echo" "I'm running from Debian")
+  ;; Run this pipeline in containers, with default image
+  :runner (container/runner {:image "debian:latest"})
+  :steps [(-> (shell/bash "echo" "I'm running from Debian")
+              (container/image "debian"))
           (-> (shell/bash "echo" "And I'm running from Alpine")
-              (docker/image "alpine"))]})
+              (container/image "alpine"))]})
