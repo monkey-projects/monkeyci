@@ -1,0 +1,81 @@
+version: 2.1
+
+orbs:
+  terraform: circleci/terraform@3.2.0
+
+executors:
+  clj:
+    docker:
+      - image: cimg/clojure:1.11.1-openjdk-17.0
+        auth:
+          username: $DOCKER_USER
+          password: $DOCKER_PASS
+  cljs:
+    docker:
+      - image: cimg/clojure:1.11.1-node
+        auth:
+          username: $DOCKER_USER
+          password: $DOCKER_PASS
+        
+jobs:
+  test-builder:
+    executor: clj
+    steps:
+      - checkout
+      # Download and cache dependencies
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "builder/deps.edn" }}
+            # fallback to using the latest cache if no exact match is found
+            - v1-dependencies-
+      - run:
+          name: Dependencies
+          command: clojure -X:test:junit:deps prep
+          working_directory: builder
+      - save_cache:
+          paths:
+            - ~/.m2
+          key: v1-dependencies-{{ checksum "builder/deps.edn" }}
+      - run:
+          name: Unit tests
+          command: clojure -M:test:junit
+          working_directory: builder
+      - store_test_results:
+          path: builder/junit.xml
+
+  test-hook:
+    executor: cljs
+    steps:
+      - checkout
+      # Download and cache dependencies
+      - restore_cache:
+          keys:
+            - v1-dependencies-hook-{{ checksum "hook/shadow-cljs.edn" }}
+            # fallback to using the latest cache if no exact match is found
+            - v1-dependencies-hook-
+      - run:
+          name: Dependencies
+          command: npm install
+          working_directory: hook
+      - save_cache:
+          paths:
+            - hook/node-modules
+          key: v1-dependencies-hook-{{ checksum "hook/shadow-cljs.edn" }}
+      - run:
+          name: Compile
+          command: npx shadow-cljs compile test
+          working_directory: hook
+      - run:
+          name: Unit tests
+          command: node out/node-tests.js
+          working_directory: hook
+        # TODO Output as junit or another format CircleCI can understand
+          
+workflows:
+  version: 2
+  full-build:
+    jobs:
+      - test-builder:
+          context: docker
+      - test-hook:
+          context: docker

@@ -1,0 +1,24 @@
+;; shadow-cljs configuration
+{:source-paths
+ ["src/dev"
+  "src/main"
+  "src/test"]
+
+ :dependencies
+ []
+
+ :builds
+ {:hook {:target :node-script
+         :output-to "compiled/index.js"
+         :main monkey.ci.hook.index/main
+         :release {:compiler-options
+                   {:optimizations :advanced}}}
+
+  :test {:target :node-test
+         :output-to "out/node-tests.js"
+         :ns-regexp "-test$"}}
+
+  :tdd  {:target :node-test
+         :output-to "out/node-tests.js"
+         :ns-regexp "-test$"
+         :autorun   true}}}

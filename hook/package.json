@@ -1,0 +1,16 @@
+{
+    "name": "webhook-fn",
+    "version": "0.0.1",
+    "private": true,
+    "main": "compiled/index.js",
+    "dependencies": {
+	"@google-cloud/functions-framework": "^3.0.0",
+	"@google-cloud/run": "^0.4.1"
+    },
+    "devDependencies": {
+	"shadow-cljs": "2.22.8"
+    },
+    "scripts": {
+	"start": "functions-framework --target=buildTrigger"
+    }
+}
