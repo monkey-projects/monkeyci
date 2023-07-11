@@ -13,6 +13,8 @@
     (clojure.core/use 'clojure.core)
     (try
       (load-file (str (io/file dir "build.clj")))
+      (catch Exception ex
+        (println "Failed to execute script" ex))
       (finally
         ;; Return
         (in-ns 'monkey.ci.script)

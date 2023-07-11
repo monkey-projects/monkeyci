@@ -8,6 +8,8 @@
             [monkey.ci.script :as script]
             [monkey.ci.build.core :as bc]))
 
+(def version "0.1.0-SNAPSHOT")
+
 (defn- cwd []
   (System/getProperty "user.dir"))
 
@@ -25,7 +27,7 @@
   []
   (cs/join " " ["{:paths [\".\"]"
                 ":aliases {:build {:exec-fn monkey.ci.process/run"
-                (format ":extra-deps {monkey.ci/build {:local/root \"%s\"}}" (cwd))
+                (format ":extra-deps {com.monkeyci/build {:mvn/version \"%s\"}}" version)
                 "}}}"]))
 
 (defn execute!
