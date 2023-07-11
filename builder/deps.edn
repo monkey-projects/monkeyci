@@ -19,14 +19,18 @@
   
   :test
   {:extra-paths [:test-paths]
-   :extra-deps {com.monkeyprojects/build
-                {:mvn/version "0.1.0-SNAPSHOT"}}
-   :exec-fn monkey.test/all}
+   :extra-deps {lambdaisland/kaocha
+                {:mvn/version "1.80.1274"}}
+   :main-opts ["-m" "kaocha.runner"]}
 
   :junit ; Use this in conjunction with :test
   {:extra-deps {lambdaisland/kaocha-junit-xml
                 {:mvn/version "1.17.101"}}
-   :main-opts ["-m" "kaocha.runner" "--plugin" "kaocha.plugin/junit-xml" "--junit-xml-file" "junit.xml"]}
+   :main-opts ["-m" "kaocha.runner"
+               "--plugin" "kaocha.plugin/junit-xml"
+               "--junit-xml-file" "junit.xml"
+               ;; Skip docker integration tests, they require access to the socket
+               "--skip-meta" ":docker"]}
 
   :coverage
   {:extra-deps {lambdaisland/kaocha-cloverage

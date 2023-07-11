@@ -9,3 +9,4 @@
 
   (testing "executes script shell from location"
     (is (bc/success? (sut/exec-script! "examples/basic-script")))))
+
