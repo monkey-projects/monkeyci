@@ -26,7 +26,11 @@
   :junit ; Use this in conjunction with :test
   {:extra-deps {lambdaisland/kaocha-junit-xml
                 {:mvn/version "1.17.101"}}
-   :main-opts ["-m" "kaocha.runner" "--plugin" "kaocha.plugin/junit-xml" "--junit-xml-file" "junit.xml"]}
+   :main-opts ["-m" "kaocha.runner"
+               "--plugin" "kaocha.plugin/junit-xml"
+               "--junit-xml-file" "junit.xml"
+               ;; Skip docker integration tests, they require access to the socket
+               "--skip-meta" ":docker"]}
 
   :coverage
   {:extra-deps {lambdaisland/kaocha-cloverage
