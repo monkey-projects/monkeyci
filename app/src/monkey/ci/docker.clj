@@ -69,6 +69,7 @@
       {:message l})))
 
 (defn stream->lines [s]
+  ;; FIXME Close the reader when done
   (-> (io/reader s)
       (line-seq)))
 

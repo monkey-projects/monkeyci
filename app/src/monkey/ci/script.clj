@@ -3,6 +3,10 @@
             [clojure.tools.logging :as log]
             [monkey.ci.build.core :as bc]))
 
+(defn run-pipelines []
+  (let [p @bc/pipelines]
+    (log/info "Found" (count p) "pipelines")))
+
 (defn exec-script!
   "Loads a script from a directory and executes it.  The script is
    executed in this same process (but in a randomly generated namespace)."
@@ -15,7 +19,8 @@
     (try
       (let [path (io/file dir "build.clj")]
         (log/info "Loading script:" path)
-        (load-file (str path)))
+        (load-file (str path))
+        (monkey.ci.script/run-pipelines))
       (catch Exception ex
         (println "Failed to execute script" ex)
         (assoc bc/failure :exception ex))

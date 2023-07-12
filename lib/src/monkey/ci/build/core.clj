@@ -4,7 +4,7 @@
    runner is configured or active depends on the configuration of the MonkeyCI
    application that executes the script."
   (:require [clojure.spec.alpha :as s]
-            [clojure.tools.logging :as log]
+            ;;[clojure.tools.logging :as log]
             [monkey.ci.build.spec]))
 
 (defn status [v]
@@ -54,8 +54,14 @@
           (initial-context p)
           steps))
 
+(defrecord Pipeline [config])
+
+(defonce pipelines (atom []))
+
 (defn pipeline
   "Runs the pipeline with given config"
   [config]
   {:pre [(s/valid? :ci/pipeline config)]}
-  #_(run-steps! config))
+  (let [p (->Pipeline config)]
+    (swap! pipelines conj p)
+    p))

@@ -27,7 +27,7 @@
   []
   (cs/join " " ["{:paths [\".\"]"
                 ":aliases {:build {:exec-fn monkey.ci.process/run"
-                (format ":extra-deps {com.monkeyci/build {:mvn/version \"%s\"}}" version)
+                (format ":extra-deps {com.monkeyci/script {:mvn/version \"%s\"}}" version)
                 "}}}"]))
 
 (defn execute!
@@ -39,7 +39,7 @@
     (let [result (bp/shell {:dir dir
                             :out :string}
                            "clojure" "-Sdeps" (generate-deps) "-X:build" ":workdir" (str "\"" dir "\""))]
-      (log/info "Success!")
+      (log/info "Script executed with exit code" (:exit result))
       result)
     (catch Exception ex
       (log/error "Failed to execute build script" ex)
