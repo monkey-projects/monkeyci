@@ -3,4 +3,17 @@
  :aliases
  {:test
   {:extra-deps {com.monkeyprojects/build {:mvn/version "0.1.0-SNAPSHOT"}}
-   :exec-fn monkey.test/all}}}
+   :exec-fn monkey.test/all}
+
+  :junit
+  {:exec-fn monkey.test/junit}
+
+  :jar
+  {:extra-deps {com.monkeyprojects/build {:mvn/version "0.1.0-SNAPSHOT"}}
+   :exec-fn monkey.build/jar
+   :exec-args {:jar "target/monkeci-script.jar"
+               :version "0.1.0-SNAPSHOT"
+               :lib "com.monkeyci/script"}}
+
+  :deploy
+  {:exec-fn monkey.build/deploy}}}

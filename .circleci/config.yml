@@ -18,30 +18,82 @@ executors:
           password: $DOCKER_PASS
         
 jobs:
-  test-builder:
+  test-script-lib:
     executor: clj
     steps:
       - checkout
       # Download and cache dependencies
       - restore_cache:
           keys:
-            - v1-dependencies-{{ checksum "builder/deps.edn" }}
+            - v1-dependencies-{{ checksum "lib/deps.edn" }}
             # fallback to using the latest cache if no exact match is found
             - v1-dependencies-
       - run:
           name: Dependencies
           command: clojure -X:test:junit:deps prep
-          working_directory: builder
+          working_directory: lib
       - save_cache:
           paths:
             - ~/.m2
-          key: v1-dependencies-{{ checksum "builder/deps.edn" }}
+          key: v1-dependencies-{{ checksum "lib/deps.edn" }}
+      - run:
+          name: Unit tests
+          command: clojure -X:test:junit
+          working_directory: lib
+      - store_test_results:
+          path: lib/junit.xml
+
+  deploy-script-lib:
+    executor: clj
+    steps:
+      - checkout
+      # Download and cache dependencies
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "lib/deps.edn" }}
+            # fallback to using the latest cache if no exact match is found
+            - v1-dependencies-
+      - run:
+          name: Dependencies
+          command: clojure -X:jar:deps prep
+          working_directory: lib
+      - save_cache:
+          paths:
+            - ~/.m2
+          key: v1-dependencies-{{ checksum "lib/deps.edn" }}
+      - run:
+          name: Build Jar
+          command: clojure -X:jar
+          working_directory: lib
+      - run:
+          name: Deploy to Clojars
+          command: clojure -X:jar:deploy
+          working_directory: lib
+
+  test-app:
+    executor: clj
+    steps:
+      - checkout
+      # Download and cache dependencies
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "app/deps.edn" }}
+            # fallback to using the latest cache if no exact match is found
+            - v1-dependencies-
+      - run:
+          name: Dependencies
+          command: clojure -X:test:junit:deps prep
+          working_directory: app
+      - save_cache:
+          paths:
+            - ~/.m2
+          key: v1-dependencies-{{ checksum "app/deps.edn" }}
       - run:
           name: Unit tests
           command: clojure -M:test:junit
-          working_directory: builder
+          working_directory: app
       - store_test_results:
-          path: builder/junit.xml
+          path: app/junit.xml
 
   test-hook:
     executor: cljs
@@ -75,7 +127,14 @@ workflows:
   version: 2
   full-build:
     jobs:
-      - test-builder:
+      - test-script-lib
+      - deploy-script-lib:
+          context: clojars
+          requires:
+            - test-script-lib
+      - test-app:
           context: docker
+          requires:
+            - deploy-script-lib
       - test-hook:
           context: docker
