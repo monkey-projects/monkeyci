@@ -1,6 +1,7 @@
 (ns monkey.ci.script
   (:require [clojure.java.io :as io]
-            [clojure.tools.logging :as log]))
+            [clojure.tools.logging :as log]
+            [monkey.ci.build.core :as bc]))
 
 (defn exec-script!
   "Loads a script from a directory and executes it.  The script is
@@ -16,7 +17,8 @@
         (log/info "Loading script:" path)
         (load-file (str path)))
       (catch Exception ex
-        (println "Failed to execute script" ex))
+        (println "Failed to execute script" ex)
+        (assoc bc/failure :exception ex))
       (finally
         ;; Return
         (in-ns 'monkey.ci.script)

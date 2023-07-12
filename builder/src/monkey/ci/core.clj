@@ -13,9 +13,8 @@
       (if (.exists dir)
         (do
           (log/info "Running build script at" dir)
-          (let [{:keys [exit]} (proc/execute! (.getAbsolutePath dir))]
-            (log/info "No build script found at" dir)
-            exit)))
+          (:exit (proc/execute! (.getAbsolutePath dir))))
+        (log/info "No build script found at" dir))
       (finally
         ;; Shutdown the agents otherwise the app will block for a while here
         (shutdown-agents)))))
