@@ -34,7 +34,11 @@
   "Executes the build script located in given directory."
   [dir]
   (log/info "Executing process in" dir)
-  ;; Run the clojure cli with the "build" command
-  (bp/shell {:dir dir
-             :out :string}
-            "clojure" "-Sdeps" (generate-deps) "-X:build" ":workdir" (str "\"" dir "\"")))
+  (try 
+    ;; Run the clojure cli with the "build" command
+    (bp/shell {:dir dir
+               :out :string}
+              "clojure" "-Sdeps" (generate-deps) "-X:build" ":workdir" (str "\"" dir "\""))
+    (log/info "Success!")
+    (catch Exception ex
+      (log/error "Failed to execute build script" ex))))

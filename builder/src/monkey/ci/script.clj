@@ -12,7 +12,9 @@
     (in-ns tmp-ns)
     (clojure.core/use 'clojure.core)
     (try
-      (load-file (str (io/file dir "build.clj")))
+      (let [path (io/file dir "build.clj")]
+        (log/info "Loading script:" path)
+        (load-file (str path)))
       (catch Exception ex
         (println "Failed to execute script" ex))
       (finally

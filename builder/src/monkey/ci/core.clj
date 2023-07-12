@@ -10,9 +10,11 @@
   [& [dir]]
   (let [dir (io/file (or dir ".monkeyci"))]
     (try
-      (when (.exists dir)
-        (log/info "Running build script at" dir)
-        (:exit (proc/execute! (.getAbsolutePath dir))))
+      (if (.exists dir)
+        (do
+          (log/info "Running build script at" dir)
+          (:exit (proc/execute! (.getAbsolutePath dir))))
+        (log/info "No build script found at" dir))
       (finally
         ;; Shutdown the agents otherwise the app will block for a while here
         (shutdown-agents)))))
