@@ -5,16 +5,19 @@
             [clojure.tools.logging :as log]
             [monkey.ci.process :as proc]))
 
+(defn- run-script [dir]
+  (if (.exists dir)
+    (do
+      (log/info "Running build script at" dir)
+      (:exit (proc/execute! (.getAbsolutePath dir))))
+    (log/info "No build script found at" dir)))
+
 (defn -main
   "Main entry point for the application."
   [& [dir]]
   (let [dir (io/file (or dir ".monkeyci"))]
     (try
-      (if (.exists dir)
-        (do
-          (log/info "Running build script at" dir)
-          (:exit (proc/execute! (.getAbsolutePath dir))))
-        (log/info "No build script found at" dir))
+      (run-script dir)
       (finally
         ;; Shutdown the agents otherwise the app will block for a while here
         (shutdown-agents)))))

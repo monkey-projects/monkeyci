@@ -5,7 +5,9 @@
         io.github.lispyclouds/contajners
         {:git/sha "ad4ffbb5f1972de9815c00f4c6d59b70101ec0a5"}
         camel-snake-kebab/camel-snake-kebab
-        {:mvn/version "0.4.3"}}
+        {:mvn/version "0.4.3"}
+        yogthos/config
+        {:mvn/version "1.2.0"}}
  
  :paths ["src" "resources"]
  
