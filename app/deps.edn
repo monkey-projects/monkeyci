@@ -1,33 +1,27 @@
-{:deps {org.clojure/tools.logging
-        {:mvn/version "1.2.4"}
-        babashka/process
-        {:mvn/version "0.4.13"}
-        io.github.lispyclouds/contajners
-        {:git/sha "ad4ffbb5f1972de9815c00f4c6d59b70101ec0a5"}
-        camel-snake-kebab/camel-snake-kebab
-        {:mvn/version "0.4.3"}
-        yogthos/config
-        {:mvn/version "1.2.0"}}
+{:deps {org.clojure/tools.logging {:mvn/version "1.2.4"}
+        babashka/process {:mvn/version "0.4.13"}
+        io.github.lispyclouds/contajners {:git/sha "ad4ffbb5f1972de9815c00f4c6d59b70101ec0a5"}
+        camel-snake-kebab/camel-snake-kebab {:mvn/version "0.4.3"}
+        cli-matic/cli-matic {:mvn/version "0.5.4"}
+        com.monkeyci/script {:local/root "../lib"}
+        yogthos/config {:mvn/version "1.2.0"}}
  
  :paths ["src" "resources"]
  
  :aliases
  {:dev
-  {:extra-deps {ch.qos.logback/logback-classic
-                {:mvn/version "1.4.6"}}
+  {:extra-deps {ch.qos.logback/logback-classic {:mvn/version "1.4.6"}}
    :extra-paths ["dev-resources"]}
 
   :test-paths ["test"]
   
   :test
   {:extra-paths [:test-paths]
-   :extra-deps {lambdaisland/kaocha
-                {:mvn/version "1.80.1274"}}
-   :main-opts ["-m" "kaocha.runner"]}
+   :extra-deps {com.monkeyprojects/build {:mvn/version "0.1.0-SNAPSHOT"}}
+   :exec-fn monkey.test/all}
 
   :junit ; Use this in conjunction with :test
-  {:extra-deps {lambdaisland/kaocha-junit-xml
-                {:mvn/version "1.17.101"}}
+  {:extra-deps {lambdaisland/kaocha-junit-xml {:mvn/version "1.17.101"}}
    :main-opts ["-m" "kaocha.runner"
                "--plugin" "kaocha.plugin/junit-xml"
                "--junit-xml-file" "junit.xml"
@@ -35,13 +29,11 @@
                "--skip-meta" ":docker"]}
 
   :coverage
-  {:extra-deps {lambdaisland/kaocha-cloverage
-                {:mvn/version "1.1.89"}}
+  {:extra-deps {lambdaisland/kaocha-cloverage {:mvn/version "1.1.89"}}
    :main-opts ["-m" "kaocha.runner" "--plugin" "cloverage"]}
 
   :watch ; Use in combination with :test, watches for changes
-  {:extra-deps {org.clojure/tools.namespace
-                {:mvn/version "1.4.4"}}
+  {:extra-deps {org.clojure/tools.namespace {:mvn/version "1.4.4"}}
    ;; Skip integration tests
    :main-opts ["-m" "kaocha.runner" "--watch" "--skip-meta" ":integration"]}
   
@@ -49,16 +41,14 @@
   {:main-opts ["-m" "monkey.ci.core"]}
 
   :install
-  {:extra-deps {com.monkeyprojects/build
-                {:mvn/version "0.1.0-SNAPSHOT"}}
+  {:extra-deps {com.monkeyprojects/build {:mvn/version "0.1.0-SNAPSHOT"}}
    :exec-fn monkey.build/jar+install
    :exec-args {:jar "target/monkeyci-build.jar"
                :version "0.1.0-SNAPSHOT"
                :lib "com.monkeyci/build"}}
 
   :uberjar
-  {:extra-deps {com.monkeyprojects/build
-                {:mvn/version "0.1.0-SNAPSHOT"}}
+  {:extra-deps {com.monkeyprojects/build {:mvn/version "0.1.0-SNAPSHOT"}}
    :exec-fn monkey.build/uberjar
    :exec-args {:jar "target/monkeyci.jar"
                :main "monkey.ci.core"}}}}

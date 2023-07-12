@@ -1,4 +1,4 @@
-(ns monkey.ci.spec
+(ns monkey.ci.build.spec
   (:require [clojure.spec.alpha :as s]))
 
 (s/def :ci/name string?)

@@ -1,10 +1,11 @@
 (ns monkey.ci.build.core
-  "Core build script functionality"
+  "Core build script functionality.  This is used by build scripts to create
+   the configuration which is then executed by the configured runner.  Which
+   runner is configured or active depends on the configuration of the MonkeyCI
+   application that executes the script."
   (:require [clojure.spec.alpha :as s]
             [clojure.tools.logging :as log]
-            [monkey.ci
-             [spec]
-             [step-runner :as sr]]))
+            [monkey.ci.build.spec]))
 
 (defn status [v]
   {:status v})
@@ -22,20 +23,20 @@
 
 (def failed? (complement success?))
 
-(defrecord LocalRunner []
+#_(defrecord LocalRunner []
   sr/StepRunner
   (run-step [this {:keys [step] :as ctx}]
     (step ctx)))
 
-(def default-runner (->LocalRunner))
+#_(def default-runner (->LocalRunner))
 
-(defn- run-step
+#_(defn- run-step
   "Runs a single step using the configured runner"
   [ctx]
   (let [runner (get-in ctx [:pipeline :runner] default-runner)]
     (sr/run-step runner ctx)))
 
-(defn- run-steps!
+#_(defn- run-steps!
   "Runs all steps in sequence, stopping at the first failure.
    Returns the execution context."
   [{:keys [steps] :as p}]
@@ -57,4 +58,4 @@
   "Runs the pipeline with given config"
   [config]
   {:pre [(s/valid? :ci/pipeline config)]}
-  (run-steps! config))
+  #_(run-steps! config))

@@ -1,5 +1,8 @@
 (ns monkey.ci.core
-  "Core namespace for the Monkey CI app"
+  "Core namespace for the Monkey CI app.  This contains the entrypoint which
+   processes the configuration.  This configuration determines whether the
+   application runs as a server, execute a single script, which type of runner
+   is enabled, etc..."
   (:gen-class)
   (:require [clojure.java.io :as io]
             [clojure.tools.logging :as log]

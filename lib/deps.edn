@@ -1,0 +1,6 @@
+{:deps {babashka/process {:mvn/version "0.4.13"}}
+ 
+ :aliases
+ {:test
+  {:extra-deps {com.monkeyprojects/build {:mvn/version "0.1.0-SNAPSHOT"}}
+   :exec-fn monkey.test/all}}}
