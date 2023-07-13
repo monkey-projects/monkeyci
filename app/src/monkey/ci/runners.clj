@@ -12,7 +12,7 @@
   (if (.exists dir)
     (do
       (log/info "Running build script at" dir)
-      (:exit (proc/execute! (.getAbsolutePath dir))))
+      (:exit (proc/execute! {:work-dir (.getAbsolutePath dir)})))
     (log/info "No build script found at" dir)))
 
 (defn local-runner [ctx]

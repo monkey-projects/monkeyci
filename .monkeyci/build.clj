@@ -1,5 +1,6 @@
 ;; Build script for Monkey-ci itself
 (require '[monkey.ci.build.core :as core])
+(require '[clojure.tools.logging :as log])
 
 #_(core/pipeline
  {:name "monkey-ci"
@@ -8,7 +9,9 @@
            :container/image "clojure:temurin-20-tools-deps-alpine"
            :clojure/cli ["-X:test"]}]})
 
-(println "Hi there!")
+(defn test-step [ctx]
+  (println "Hi there! I should fail.")
+  core/failure)
  
 (comment
   ;; Maybe above could be abbreviated into:
@@ -19,4 +22,6 @@
                     :container/image "clojure:temurin-20-tools-deps-alpine"
                     :clojure/cli ["-X:test"])))
 
-core/success
+(core/pipeline
+ {:name "build"
+  :steps [test-step]})

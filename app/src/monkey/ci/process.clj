@@ -24,33 +24,50 @@
 (defn- pwd []
   (System/getProperty "user.dir"))
 
+(defn- local-script-lib-dir
+  "Calculates the local script directory as a sibling dir of the
+   current (app) directory."
+  []
+  (-> (.. (io/file (pwd))
+          (getAbsoluteFile)
+          (getParentFile))
+      (io/file "lib")
+      (str)))
+
 (defn- generate-deps
   "Generates a string that will be added as a commandline argument
    to the clojure process when running the script.  Any existing `deps.edn`
    should be used as well."
-  []
+  [{:keys [dev-mode]}]
   (pr-str {:paths "."
            :aliases
            {:monkeyci/build
             {:exec-fn 'monkey.ci.process/run
-             :extra-deps {'com.monkeyci/script {:mvn/version version}
-                          'com.monkeyci/app {:local/root (pwd)}}}}}))
+             :extra-deps {'com.monkeyci/script
+                          (if dev-mode
+                            {:local/root (local-script-lib-dir)}
+                            {:mvn/version version})
+                          'com.monkeyci/app
+                          (if dev-mode
+                            {:local/root (pwd)}
+                            {:mvn/version version})}}}}))
 
 (defn execute!
   "Executes the build script located in given directory.  This actually runs the
    clojure cli with a generated `build` alias."
-  [dir]
-  (log/info "Executing process in" dir)
+  [{:keys [work-dir] :as config}]
+  (log/info "Executing process in" work-dir)
   (try 
     ;; Run the clojure cli with the "build" alias
-    (let [result (bp/shell {:dir dir
+    (let [result (bp/shell {:dir work-dir
                             :out :string
                             :err :string}
                            "clojure"
-                           "-Sdeps" (generate-deps)
+                           "-Sdeps" (generate-deps config)
                            "-X:monkeyci/build"
-                           ":workdir" (str "\"" dir "\""))]
+                           ":workdir" (str "\"" work-dir "\""))]
       (log/info "Script executed with exit code" (:exit result))
+      (log/info "Output:" (:out result))
       result)
     (catch Exception ex
       (log/error "Failed to execute build script" ex)

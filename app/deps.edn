@@ -40,8 +40,19 @@
   :run
   {:main-opts ["-m" "monkey.ci.core"]}
 
-  :uberjar
+  :jar
   {:extra-deps {com.monkeyprojects/build {:mvn/version "0.1.0-SNAPSHOT"}}
-   :exec-fn monkey.build/uberjar
    :exec-args {:jar "target/monkeyci.jar"
-               :main "monkey.ci.core"}}}}
+               :lib com.monkeyci/app
+               :version "0.1.0-SNAPSHOT"
+               :main "monkey.ci.core"}}
+  
+  :install
+  {:exec-fn monkey.build/jar+install}
+
+  :deploy
+  {:exec-fn monkey.build/deploy}
+
+  :uber
+  {:exec-fn monkey.build/uberjar
+   :exec-args {:jar "target/monkeyci-standalone.jar"}}}}

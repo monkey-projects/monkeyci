@@ -95,6 +95,33 @@ jobs:
       - store_test_results:
           path: app/junit.xml
 
+  deploy-app-lib:
+    executor: clj
+    steps:
+      - checkout
+      # Download and cache dependencies
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "app/deps.edn" }}
+            # fallback to using the latest cache if no exact match is found
+            - v1-dependencies-
+      - run:
+          name: Dependencies
+          command: clojure -X:jar:deps prep
+          working_directory: app
+      - save_cache:
+          paths:
+            - ~/.m2
+          key: v1-dependencies-{{ checksum "app/deps.edn" }}
+      - run:
+          name: Build Jar
+          command: clojure -X:jar
+          working_directory: app
+      - run:
+          name: Deploy to Clojars
+          command: clojure -X:jar:deploy
+          working_directory: app
+
   test-hook:
     executor: cljs
     steps:
@@ -136,5 +163,9 @@ workflows:
           context: docker
           requires:
             - deploy-script-lib
+      - deploy-app-lib:
+          context: clojars-monkeyci
+          requires:
+            - test-app
       - test-hook:
           context: docker

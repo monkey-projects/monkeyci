@@ -4,10 +4,13 @@
 
 (deftest ^:slow execute!
   (testing "executes build script in separate process"
-    (is (zero? (:exit (sut/execute! "examples/basic-clj")))))
+    (is (zero? (:exit (sut/execute! {:dev-mode true
+                                     :work-dir "examples/basic-clj"})))))
 
   (testing "fails when script fails"
-    (is (thrown? Exception (sut/execute! "examples/failing"))))
+    (is (thrown? Exception (sut/execute! {:dev-mode true
+                                          :work-dir "examples/failing"}))))
 
   (testing "throws when script not found"
-    (is (thrown? java.io.IOException (sut/execute! "examples/non-existing")))))
+    (is (thrown? java.io.IOException (sut/execute! {:dev-mode true
+                                                    :work-dir "examples/non-existing"})))))
