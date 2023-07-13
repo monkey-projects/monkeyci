@@ -2,7 +2,7 @@
   (:require [clojure.test :refer :all]
             [monkey.ci.process :as sut]))
 
-(deftest ^:integration execute!
+(deftest ^:slow execute!
   (testing "executes build script in separate process"
     (is (zero? (:exit (sut/execute! "examples/basic-clj")))))
 

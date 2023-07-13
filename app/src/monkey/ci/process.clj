@@ -17,9 +17,12 @@
   "Run function for when a build task is executed using clojure tools.  This function
    is run in a child process by the `execute!` function below."
   [args]
-  (log/info "Executing script with args" args)
+  (log/debug "Executing script with args" args)
   (when (bc/failed? (script/exec-script! (cwd)))
     (System/exit 1)))
+
+(defn- pwd []
+  (System/getProperty "user.dir"))
 
 (defn- generate-deps
   "Generates a string that will be added as a commandline argument
@@ -28,7 +31,11 @@
   []
   (cs/join " " ["{:paths [\".\"]"
                 ":aliases {:monkeyci/build {:exec-fn monkey.ci.process/run"
-                (format ":extra-deps {com.monkeyci/script {:mvn/version \"%s\"}}" version)
+                ;; Include both the script and app libs
+                (format (str ":extra-deps {com.monkeyci/script {:mvn/version \"%s\"} "
+                             "com.monkeyci/app {:local/root \"%s\"}}")
+                        version
+                        (pwd))
                 "}}}"]))
 
 (defn execute!
@@ -37,10 +44,14 @@
   [dir]
   (log/info "Executing process in" dir)
   (try 
-    ;; Run the clojure cli with the "build" command
+    ;; Run the clojure cli with the "build" alias
     (let [result (bp/shell {:dir dir
-                            :out :string}
-                           "clojure" "-Sdeps" (generate-deps) "-X:monkeyci/build" ":workdir" (str "\"" dir "\""))]
+                            :out :string
+                            :err :string}
+                           "clojure"
+                           "-Sdeps" (generate-deps)
+                           "-X:monkeyci/build"
+                           ":workdir" (str "\"" dir "\""))]
       (log/info "Script executed with exit code" (:exit result))
       result)
     (catch Exception ex

@@ -3,9 +3,45 @@
             [clojure.tools.logging :as log]
             [monkey.ci.build.core :as bc]))
 
-(defn run-pipelines []
-  (let [p @bc/pipelines]
-    (log/info "Found" (count p) "pipelines")))
+(defn initial-context [p]
+  (assoc bc/success
+         :env {}
+         :pipeline p))
+
+(defn- run-step
+  "Runs a single step using the configured runner"
+  [{:keys [step] :as ctx}]
+  (log/debug "Running step:" step)
+  (if (fn? step)
+    (step ctx)
+    bc/failure))
+
+(defn- run-steps!
+  "Runs all steps in sequence, stopping at the first failure.
+   Returns the execution context."
+  [{:keys [steps] :as p}]
+  (log/debug "Running pipeline steps:" p)
+  (reduce (fn [ctx s]
+            (let [r (-> ctx
+                        (assoc :step s)
+                        (run-step))]
+              (log/debug "Result:" r)
+              (when-let [o (:output r)]
+                (log/info "Output:" o))
+              (cond-> ctx
+                true (assoc :status (:status r)
+                            :last-result r)
+                (bc/failed? r) (reduced))))
+          (initial-context p)
+          steps))
+
+(defn run-pipelines [p]
+  (let [p (if (vector? p) p [p])]
+    (log/debug "Found" (count p) "pipelines")
+    (let [result (->> p
+                      (map run-steps!)
+                      (doall))]
+      {:status (if (every? bc/success? result) :success :failure)})))
 
 (defn- load-pipelines [dir]
   (let [tmp-ns (symbol (str "build-" (random-uuid)))]
@@ -29,8 +65,7 @@
   "Loads a script from a directory and executes it.  The script is
    executed in this same process (but in a randomly generated namespace)."
   [dir]
-  (log/info "Executing script at:" dir)
+  (log/debug "Executing script at:" dir)
   (let [p (load-pipelines dir)]
-    (log/info "Loaded pipelines:" p)
-    ;; TODO Actually run them
-    {:status :success}))
+    (log/debug "Loaded pipelines:" p)
+    (run-pipelines p)))
