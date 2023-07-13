@@ -29,14 +29,12 @@
    to the clojure process when running the script.  Any existing `deps.edn`
    should be used as well."
   []
-  (cs/join " " ["{:paths [\".\"]"
-                ":aliases {:monkeyci/build {:exec-fn monkey.ci.process/run"
-                ;; Include both the script and app libs
-                (format (str ":extra-deps {com.monkeyci/script {:mvn/version \"%s\"} "
-                             "com.monkeyci/app {:local/root \"%s\"}}")
-                        version
-                        (pwd))
-                "}}}"]))
+  (pr-str {:paths "."
+           :aliases
+           {:monkeyci/build
+            {:exec-fn 'monkey.ci.process/run
+             :extra-deps {'com.monkeyci/script {:mvn/version version}
+                          'com.monkeyci/app {:local/root (pwd)}}}}}))
 
 (defn execute!
   "Executes the build script located in given directory.  This actually runs the
