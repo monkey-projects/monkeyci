@@ -10,5 +10,5 @@
 
 (deftest build
   (testing "runs build script"
-    (is (some? (sut/build {:runner {:type :noop}}
+    (is (some? (sut/build {:monkeyci-runner-type :noop}
                           {:dir "examples/basic-clj"})))))

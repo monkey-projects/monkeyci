@@ -3,7 +3,7 @@
             [monkey.ci.script :as sut]
             [monkey.ci.build.core :as bc]))
 
-(deftest ^:integration exec-script!
+(deftest ^:slow exec-script!
   (testing "executes basic clj script from location"
     (is (bc/success? (sut/exec-script! "examples/basic-clj"))))
 
