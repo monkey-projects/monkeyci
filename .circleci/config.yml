@@ -129,7 +129,7 @@ workflows:
     jobs:
       - test-script-lib
       - deploy-script-lib:
-          context: clojars
+          context: clojars-monkeyci
           requires:
             - test-script-lib
       - test-app:
