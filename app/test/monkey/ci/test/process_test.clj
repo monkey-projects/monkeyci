@@ -8,8 +8,8 @@
                                      :work-dir "examples/basic-clj"})))))
 
   (testing "fails when script fails"
-    (is (thrown? Exception (sut/execute! {:dev-mode true
-                                          :work-dir "examples/failing"}))))
+    (is (pos? (:exit (sut/execute! {:dev-mode true
+                                    :work-dir "examples/failing"})))))
 
   (testing "throws when script not found"
     (is (thrown? java.io.IOException (sut/execute! {:dev-mode true

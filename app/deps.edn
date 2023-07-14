@@ -1,4 +1,5 @@
 {:deps {org.clojure/tools.logging {:mvn/version "1.2.4"}
+        ch.qos.logback/logback-classic {:mvn/version "1.4.6"}
         babashka/process {:mvn/version "0.4.13"}
         io.github.lispyclouds/contajners {:git/sha "ad4ffbb5f1972de9815c00f4c6d59b70101ec0a5"}
         camel-snake-kebab/camel-snake-kebab {:mvn/version "0.4.3"}
@@ -10,7 +11,7 @@
  
  :aliases
  {:dev
-  {:extra-deps {ch.qos.logback/logback-classic {:mvn/version "1.4.6"}}
+  {:extra-deps {}
    :extra-paths ["dev-resources"]}
 
   :test-paths ["test"]

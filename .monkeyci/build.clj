@@ -9,7 +9,11 @@
            :container/image "clojure:temurin-20-tools-deps-alpine"
            :clojure/cli ["-X:test"]}]})
 
-(defn test-step [ctx]
+(defn success-step [ctx]
+  (println "I'm sure I'll succeed!")
+  core/success)
+
+(defn failing-step [ctx]
   (println "Hi there! I should fail.")
   core/failure)
  
@@ -24,4 +28,4 @@
 
 (core/pipeline
  {:name "build"
-  :steps [test-step]})
+  :steps [success-step]})
