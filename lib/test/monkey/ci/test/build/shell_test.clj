@@ -23,5 +23,11 @@
     (with-redefs-fn {#'bp/shell (fn [& _]
                                   (throw (ex-info "test error" {})))}
       (let [b (sut/bash "test")]
-        #(is (some? (:error (b {}))))))))
+        #(is (some? (:exception (b {})))))))
+
+  (testing "handles work dir"
+    (with-redefs-fn {#'bp/shell (fn [opts & _]
+                                  {:out (:work-dir opts)})}
+      (let [b (sut/bash "test")]
+        #(is (= "test-dir" (:output (b {:step {:work-dir "test-dir"}}))))))))
 

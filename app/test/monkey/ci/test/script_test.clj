@@ -25,4 +25,10 @@
   
   (testing "fails if a step fails"
     (is (bc/failed? (-> [(bc/pipeline {:steps [(constantly bc/failure)]})]
-                        (sut/run-pipelines))))))
+                        (sut/run-pipelines)))))
+
+  (testing "success if step returns `nil`"
+    (is (bc/success? (-> (bc/pipeline {:name "nil"
+                                       :steps [(constantly nil)]})
+                         (sut/run-pipelines))))))
+

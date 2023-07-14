@@ -8,13 +8,28 @@
          :env {}
          :pipeline p))
 
-(defn- run-step
+(defprotocol PipelineStep
+  (run-step [s ctx]))
+
+(extend-protocol PipelineStep
+  clojure.lang.Fn
+  (run-step [f ctx]
+    (log/debug "Executing function:" f)
+    ;; If a step returns nil, treat it as success
+    (or (f ctx) bc/success))
+
+  clojure.lang.IPersistentMap
+  (run-step [{:keys [action]} ctx]
+    (run-step action ctx)))
+
+(defn- run-step*
   "Runs a single step using the configured runner"
   [{:keys [step] :as ctx}]
-  (log/debug "Running step:" step)
-  (if (fn? step)
-    (step ctx)
-    bc/failure))
+  (try
+    (log/debug "Running step:" step)
+    (run-step step ctx)
+    (catch Exception ex
+      (assoc bc/failure :exception ex))))
 
 (defn- run-steps!
   "Runs all steps in sequence, stopping at the first failure.
@@ -24,7 +39,7 @@
   (reduce (fn [ctx s]
             (let [r (-> ctx
                         (assoc :step s)
-                        (run-step))]
+                        (run-step*))]
               (log/debug "Result:" r)
               (when-let [o (:output r)]
                 (log/info "Output:" o))

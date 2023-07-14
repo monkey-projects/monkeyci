@@ -7,9 +7,9 @@
   (:require [cli-matic.core :as cli]
             [clojure.tools.logging :as log]
             [config.core :refer [env]]
-            [monkey.ci.runners :as r]))
-
-(def version "0.1.0-SNAPSHOT")
+            [monkey.ci
+             [process :refer [version]]
+             [runners :as r]]))
 
 (defn make-config [env args]
   ;; TODO

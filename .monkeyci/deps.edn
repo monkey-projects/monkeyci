@@ -1,0 +1,1 @@
+{:deps {ch.qos.logback/logback-classic {:mvn/version "1.4.6"}}}

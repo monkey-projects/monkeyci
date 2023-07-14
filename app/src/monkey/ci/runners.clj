@@ -3,7 +3,9 @@
    A runner is able to execute a build script."
   (:require [clojure.java.io :as io]
             [clojure.tools.logging :as log]
-            [monkey.ci.process :as proc])
+            [monkey.ci
+             [process :as proc]
+             [utils :as u]])
   (:import java.io.File))
 
 (defmulti new-runner (comp :type :runner))
@@ -12,7 +14,8 @@
   (if (.exists dir)
     (do
       (log/info "Running build script at" dir)
-      (:exit (proc/execute! {:work-dir (.getAbsolutePath dir)})))
+      (:exit (proc/execute! {:script-dir (.getAbsolutePath dir)
+                             :work-dir (u/cwd)})))
     (log/info "No build script found at" dir)))
 
 (defn local-runner [ctx]

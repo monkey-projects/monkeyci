@@ -4,12 +4,18 @@
             [monkey.ci.build.core :as core]))
 
 (defn bash [& args]
-  (fn [ctx]
+  (fn [{{:keys [work-dir]} :step}]
     (log/debug "Executing shell script with args" args)
     (try
-      (assoc core/success
-             :output (:out (apply bp/shell {:out :string} args)))
+      (let [opts (cond-> {:out :string
+                          :err :string}
+                   ;; Add work dir if specified in the context
+                   work-dir (assoc :work-dir work-dir))]
+        (assoc core/success
+               :output (:out (apply bp/shell opts args))))
       (catch Exception ex
-        ;; Report the error
-        (assoc core/failure
-               :error ex)))))
+        (let [{:keys [out err]} (ex-data ex)]
+          ;; Report the error
+          (assoc core/failure
+                 :output (or out err)
+                 :exception ex))))))

@@ -5,30 +5,27 @@
             [clojure.java.io :as io]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
-            [monkey.ci.script :as script]
+            [monkey.ci
+             [script :as script]
+             [utils :as utils]]
             [monkey.ci.build.core :as bc]))
 
 (def version "0.1.0-SNAPSHOT")
 
-(defn- cwd []
-  (System/getProperty "user.dir"))
-
 (defn run
   "Run function for when a build task is executed using clojure tools.  This function
-   is run in a child process by the `execute!` function below."
+   is run in a child process by the `execute!` function below.  This exists the VM
+   with a nonzero value on failure."
   [args]
   (log/debug "Executing script with args" args)
-  (when (bc/failed? (script/exec-script! (cwd)))
+  (when (bc/failed? (script/exec-script! (utils/cwd)))
     (System/exit 1)))
-
-(defn- pwd []
-  (System/getProperty "user.dir"))
 
 (defn- local-script-lib-dir
   "Calculates the local script directory as a sibling dir of the
    current (app) directory."
   []
-  (-> (.. (io/file (pwd))
+  (-> (.. (io/file (utils/cwd))
           (getAbsoluteFile)
           (getParentFile))
       (io/file "lib")
@@ -49,23 +46,23 @@
                             {:mvn/version version})
                           'com.monkeyci/app
                           (if dev-mode
-                            {:local/root (pwd)}
+                            {:local/root (utils/cwd)}
                             {:mvn/version version})}}}}))
 
 (defn execute!
   "Executes the build script located in given directory.  This actually runs the
    clojure cli with a generated `build` alias."
-  [{:keys [work-dir] :as config}]
+  [{:keys [work-dir script-dir] :as config}]
   (log/info "Executing process in" work-dir)
   (try 
     ;; Run the clojure cli with the "build" alias
-    (let [result (bp/shell {:dir work-dir
+    (let [result (bp/shell {:dir script-dir
                             :out :string
                             :err :string}
                            "clojure"
                            "-Sdeps" (generate-deps config)
                            "-X:monkeyci/build"
-                           ":workdir" (str "\"" work-dir "\""))]
+                           ":workdir" (str "\"" (or work-dir script-dir) "\""))]
       (log/info "Script executed with exit code" (:exit result))
       (log/info "Output:" (:out result))
       result)
@@ -79,4 +76,3 @@
           data
           ;; It's some other kind of error
           (throw ex))))))
-      
