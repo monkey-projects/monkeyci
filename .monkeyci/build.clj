@@ -10,10 +10,14 @@
   (println "Hi there! I should fail.")
   core/failure)
 
+(defn print-wd [ctx]
+  (println "Current working directory:" (System/getProperty "user.dir"))
+  core/success)
+
 (def test-script
   "Runs unit tests on the script library"
   {:work-dir "lib"
-   :action (shell/bash "clojure -X:test")})
+   :action (shell/bash "clojure" "-X:test")})
  
 (comment
   ;; Maybe above could be abbreviated into:
@@ -27,4 +31,6 @@
 ;; Return the pipelines
 (core/pipeline
  {:name "build"
-  :steps [test-script]})
+  :steps [{:work-dir "lib"
+           :action print-wd}
+          test-script]})

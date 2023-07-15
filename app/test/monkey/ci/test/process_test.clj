@@ -11,6 +11,6 @@
     (is (pos? (:exit (sut/execute! {:dev-mode true
                                     :script-dir "examples/failing"})))))
 
-  (testing "throws when script not found"
-    (is (thrown? java.io.IOException (sut/execute! {:dev-mode true
-                                                    :script-dir "examples/non-existing"})))))
+  (testing "fails when script not found"
+    (is (pos? (:exit (sut/execute! {:dev-mode true
+                                    :script-dir "examples/non-existing"}))))))

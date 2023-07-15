@@ -5,7 +5,7 @@
 
 (defn bash [& args]
   (fn [{{:keys [work-dir]} :step}]
-    (log/debug "Executing shell script with args" args)
+    (log/debug "Executing shell script with args" args "in work dir" work-dir)
     (try
       (let [opts (cond-> {:out :string
                           :err :string}

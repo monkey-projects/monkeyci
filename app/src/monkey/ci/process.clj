@@ -18,7 +18,7 @@
    with a nonzero value on failure."
   [args]
   (log/debug "Executing script with args" args)
-  (when (bc/failed? (script/exec-script! (utils/cwd)))
+  (when (bc/failed? (script/exec-script! args))
     (System/exit 1)))
 
 (defn- local-script-lib-dir
@@ -35,8 +35,8 @@
   "Generates a string that will be added as a commandline argument
    to the clojure process when running the script.  Any existing `deps.edn`
    should be used as well."
-  [{:keys [dev-mode]}]
-  (pr-str {:paths "."
+  [{:keys [dev-mode script-dir]}]
+  (pr-str {:paths [script-dir]
            :aliases
            {:monkeyci/build
             {:exec-fn 'monkey.ci.process/run
@@ -56,13 +56,14 @@
   (log/info "Executing process in" work-dir)
   (try 
     ;; Run the clojure cli with the "build" alias
-    (let [result (bp/shell {:dir script-dir
+    (let [result (bp/shell {:dir work-dir
                             :out :string
                             :err :string}
                            "clojure"
                            "-Sdeps" (generate-deps config)
                            "-X:monkeyci/build"
-                           ":workdir" (str "\"" (or work-dir script-dir) "\""))]
+                           ":work-dir" (pr-str work-dir)
+                           ":script-dir" (pr-str script-dir))]
       (log/info "Script executed with exit code" (:exit result))
       (log/info "Output:" (:out result))
       result)

@@ -4,7 +4,7 @@
       <level>DEBUG</level>
     </filter>		
     <encoder>
-      <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+      <pattern>script - %d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
     </encoder>
   </appender>
   
@@ -12,9 +12,8 @@
   <logger name="com" level="WARN"/>
   <logger name="net" level="WARN"/>
   <logger name="io" level="WARN"/>
-  <logger name="monkey.ci" level="DEBUG"/>
 
-  <root level="WARN">
+  <root level="DEBUG">
     <appender-ref ref="STDOUT" />
   </root>
 </configuration>

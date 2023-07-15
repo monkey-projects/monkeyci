@@ -5,30 +5,30 @@
 
 (deftest exec-script!
   (testing "executes basic clj script from location"
-    (is (bc/success? (sut/exec-script! "examples/basic-clj"))))
+    (is (bc/success? (sut/exec-script! {:script-dir "examples/basic-clj"}))))
 
   (testing "executes script shell from location"
-    (is (bc/success? (sut/exec-script! "examples/basic-script")))))
+    (is (bc/success? (sut/exec-script! {:script-dir "examples/basic-script"})))))
 
 (deftest run-pipelines
   (testing "success if no pipelines"
-    (is (bc/success? (sut/run-pipelines []))))
+    (is (bc/success? (sut/run-pipelines {} []))))
 
   (testing "success if all steps succeed"
-    (is (bc/success? (-> [(bc/pipeline {:steps [(constantly bc/success)]})]
-                         (sut/run-pipelines)))))
+    (is (bc/success? (->> [(bc/pipeline {:steps [(constantly bc/success)]})]
+                          (sut/run-pipelines {})))))
 
   (testing "runs a single pipline"
-    (is (bc/success? (-> (bc/pipeline {:name "single"
-                                       :steps [(constantly bc/success)]})
-                         (sut/run-pipelines)))))
+    (is (bc/success? (->> (bc/pipeline {:name "single"
+                                        :steps [(constantly bc/success)]})
+                          (sut/run-pipelines {})))))
   
   (testing "fails if a step fails"
-    (is (bc/failed? (-> [(bc/pipeline {:steps [(constantly bc/failure)]})]
-                        (sut/run-pipelines)))))
+    (is (bc/failed? (->> [(bc/pipeline {:steps [(constantly bc/failure)]})]
+                         (sut/run-pipelines {})))))
 
   (testing "success if step returns `nil`"
-    (is (bc/success? (-> (bc/pipeline {:name "nil"
-                                       :steps [(constantly nil)]})
-                         (sut/run-pipelines))))))
+    (is (bc/success? (->> (bc/pipeline {:name "nil"
+                                        :steps [(constantly nil)]})
+                          (sut/run-pipelines {}))))))
 
