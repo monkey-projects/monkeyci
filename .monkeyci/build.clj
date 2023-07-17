@@ -2,35 +2,26 @@
 (require '[monkey.ci.build.core :as core])
 (require '[monkey.ci.build.shell :as shell])
 
-(defn success-step [ctx]
-  (println "I'm sure I'll succeed!")
-  core/success)
+(defn clj [& args]
+  (apply shell/bash "clojure" args))
 
-(defn failing-step [ctx]
-  (println "Hi there! I should fail.")
-  core/failure)
+(defn clj-dir
+  "Runs `clojure` command in the given working dir"
+  [dir args]
+  {:work-dir dir
+   :action (apply clj args)})
 
-(defn print-wd [{{:keys [work-dir]} :step}]
-  (println "Given working directory:" work-dir)
-  core/success)
+(defn clj-lib [& args]
+  (clj-dir "lib" args))
 
-(def test-script
-  "Runs unit tests on the script library"
-  {:work-dir "lib"
-   :action (shell/bash "clojure" "-X:test")})
- 
-(comment
-  ;; Maybe above could be abbreviated into:
-  (core/simple-pipeline
-   "monkey-ci"
-   (core/named-step "builder-test"
-                    :work-dir "lib"
-                    :container/image "clojure:temurin-20-tools-deps-alpine"
-                    :clojure/cli ["-X:test"])))
+(defn clj-app [& args]
+  (clj-dir "app" args))
+
+(def test-script (clj-lib "-X:test:junit"))
+(def test-app (clj-app "-M:test:junit"))
 
 ;; Return the pipelines
 (core/pipeline
  {:name "build"
-  :steps [{:work-dir "lib"
-           :action print-wd}
-          test-script]})
+  :steps [test-script
+          test-app]})
