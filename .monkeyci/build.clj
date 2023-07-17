@@ -10,8 +10,8 @@
   (println "Hi there! I should fail.")
   core/failure)
 
-(defn print-wd [ctx]
-  (println "Current working directory:" (System/getProperty "user.dir"))
+(defn print-wd [{{:keys [work-dir]} :step}]
+  (println "Given working directory:" work-dir)
   core/success)
 
 (def test-script

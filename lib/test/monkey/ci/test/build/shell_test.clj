@@ -27,7 +27,7 @@
 
   (testing "handles work dir"
     (with-redefs-fn {#'bp/shell (fn [opts & _]
-                                  {:out (:work-dir opts)})}
+                                  {:out (:dir opts)})}
       (let [b (sut/bash "test")]
         #(is (= "test-dir" (:output (b {:step {:work-dir "test-dir"}}))))))))
 

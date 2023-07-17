@@ -10,7 +10,7 @@
       (let [opts (cond-> {:out :string
                           :err :string}
                    ;; Add work dir if specified in the context
-                   work-dir (assoc :work-dir work-dir))]
+                   work-dir (assoc :dir work-dir))]
         (assoc core/success
                :output (:out (apply bp/shell opts args))))
       (catch Exception ex
