@@ -48,6 +48,7 @@
                           (if dev-mode
                             {:local/root (utils/cwd)}
                             {:mvn/version version})}
+             ;; TODO Only add this if the file actually exists
              :jvm-opts [(str "-Dlogback.configurationFile=" (io/file script-dir "logback.xml"))]}}}))
 
 (defn execute!
