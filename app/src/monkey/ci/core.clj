@@ -18,7 +18,7 @@
    :script args})
 
 (defn print-version [_]
-  (println "MonkeyCI version:" version))
+  (println version))
 
 (defn build [env args]
   (println "Building")

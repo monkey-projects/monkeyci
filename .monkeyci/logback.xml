@@ -4,7 +4,7 @@
       <level>DEBUG</level>
     </filter>		
     <encoder>
-      <pattern>script - %d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+      <pattern>[%yellow(BUILD SCRIPT)] %d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
     </encoder>
   </appender>
   

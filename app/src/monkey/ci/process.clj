@@ -47,7 +47,9 @@
                           'com.monkeyci/app
                           (if dev-mode
                             {:local/root (utils/cwd)}
-                            {:mvn/version version})}}}}))
+                            {:mvn/version version})}
+             ;; TODO Only add this if the file actually exists
+             :jvm-opts [(str "-Dlogback.configurationFile=" (io/file script-dir "logback.xml"))]}}}))
 
 (defn execute!
   "Executes the build script located in given directory.  This actually runs the
@@ -65,7 +67,7 @@
                            ":work-dir" (pr-str work-dir)
                            ":script-dir" (pr-str script-dir))]
       (log/info "Script executed with exit code" (:exit result))
-      (log/info "Output:" (:out result))
+      (log/debug "Output:" (:out result))
       result)
     (catch Exception ex
       (let [{:keys [out err] :as data} (ex-data ex)]

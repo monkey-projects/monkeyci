@@ -10,13 +10,15 @@
 
 (defmulti new-runner (comp :type :runner))
 
-(defn- run-script [^File dir]
+(defn- run-script
+  "Runs the script in the given directory locally.  This is used by the local runner."
+  [^File dir]
   (if (.exists dir)
     (do
       (log/info "Running build script at" dir)
       (:exit (proc/execute! {:script-dir (.getAbsolutePath dir)
                              :work-dir (u/cwd)})))
-    (log/info "No build script found at" dir)))
+    (log/warn "No build script found at" dir)))
 
 (defn local-runner [ctx]
   (-> (get-in ctx [:script :dir])

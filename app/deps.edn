@@ -1,5 +1,5 @@
 {:deps {org.clojure/tools.logging {:mvn/version "1.2.4"}
-        ch.qos.logback/logback-classic {:mvn/version "1.4.6"}
+        ch.qos.logback/logback-classic {:mvn/version "1.4.11"}
         babashka/process {:mvn/version "0.4.13"}
         io.github.lispyclouds/contajners {:git/sha "ad4ffbb5f1972de9815c00f4c6d59b70101ec0a5"}
         camel-snake-kebab/camel-snake-kebab {:mvn/version "0.4.3"}
@@ -19,7 +19,9 @@
   :test
   {:extra-paths [:test-paths]
    :extra-deps {com.monkeyprojects/build {:mvn/version "0.1.0-SNAPSHOT"}}
-   :exec-fn monkey.test/all}
+   :exec-fn monkey.test/all
+   ;; Add this to avoid falling back to the default logger
+   :jvm-opts ["-Dlogback.configurationFile=resources/logback.xml"]}
 
   :junit ; Use this in conjunction with :test
   {:extra-deps {lambdaisland/kaocha-junit-xml {:mvn/version "1.17.101"}}
@@ -42,12 +44,15 @@
   {:main-opts ["-m" "monkey.ci.core"]}
 
   :jar
-  {:extra-deps {com.monkeyprojects/build {:mvn/version "0.1.0-SNAPSHOT"}}
+  {:extra-deps {com.monkeyprojects/build {:mvn/version "0.1.0-SNAPSHOT"
+                                          :exclusions [org.slf4j/slfj4-nop]}}
    :exec-fn monkey.build/jar
    :exec-args {:jar "target/monkeyci.jar"
                :lib com.monkeyci/app
                :version "0.1.0-SNAPSHOT"
-               :main "monkey.ci.core"}}
+               :main "monkey.ci.core"}
+   ;; Add this to avoid falling back to the default logger
+   :jvm-opts ["-Dlogback.configurationFile=resources/logback.xml"]}
   
   :install
   {:exec-fn monkey.build/jar+install}
