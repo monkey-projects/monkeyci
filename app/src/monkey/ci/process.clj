@@ -47,7 +47,8 @@
                           'com.monkeyci/app
                           (if dev-mode
                             {:local/root (utils/cwd)}
-                            {:mvn/version version})}}}}))
+                            {:mvn/version version})}
+             :jvm-opts [(str "-Dlogback.configurationFile=" (io/file script-dir "logback.xml"))]}}}))
 
 (defn execute!
   "Executes the build script located in given directory.  This actually runs the
