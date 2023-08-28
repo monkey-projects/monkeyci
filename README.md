@@ -71,6 +71,7 @@ with everything I need or want.  So what I want to add:
  - Ability to unit test your pipeline (simulate scenarios)
  - Run it locally (e.g. using a local dev server)
  - Compatibility with other tools (can read or generate scripts from existing tools)
+ - Some way to show custom information (like coverage percentage)
 
 ### What is this repository for? ###
 
@@ -83,6 +84,9 @@ between the modules is done using events (probably using [Kafka](https://kafka.a
 or maybe [Artemis](https://activemq.apache.org/components/artemis/)).
 
 ### How do I get set up? ###
+
+The code consists of several modules.  `lib` contains the library included in the scripts,
+and `app` contains the code for the application itself.
 
 * Install [Clojure tools](https://clojure.org/guides/deps_and_cli)
 * Running tests once: `clojure -M:test`

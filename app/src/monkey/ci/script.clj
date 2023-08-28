@@ -54,7 +54,7 @@
                         (run-step*))]
               (log/debug "Result:" r)
               (when-let [o (:output r)]
-                (log/info "Output:" o))
+                (log/debug "Output:" o))
               (cond-> ctx
                 true (assoc :status (:status r)
                             :last-result r)
@@ -72,12 +72,12 @@
 
 (defn- load-pipelines [dir]
   (let [tmp-ns (symbol (str "build-" (random-uuid)))]
-    ;; I don't think this is a very good approach
+    ;; FIXME I don't think this is a very good approach, find a better way.
     (in-ns tmp-ns)
     (clojure.core/use 'clojure.core)
     (try
       (let [path (io/file dir "build.clj")]
-        (log/info "Loading script:" path)
+        (log/debug "Loading script:" path)
         ;; This should return pipelines to run
         (load-file (str path)))
       (finally

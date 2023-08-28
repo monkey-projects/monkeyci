@@ -10,7 +10,7 @@
              [utils :as utils]]
             [monkey.ci.build.core :as bc]))
 
-(def version "0.1.0-SNAPSHOT")
+(def version (or (System/getenv "MONKEYCI_VERSION") "0.1.0-SNAPSHOT"))
 
 (defn run
   "Run function for when a build task is executed using clojure tools.  This function
