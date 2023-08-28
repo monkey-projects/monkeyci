@@ -65,7 +65,7 @@
                            ":work-dir" (pr-str work-dir)
                            ":script-dir" (pr-str script-dir))]
       (log/info "Script executed with exit code" (:exit result))
-      (log/info "Output:" (:out result))
+      (log/debug "Output:" (:out result))
       result)
     (catch Exception ex
       (let [{:keys [out err] :as data} (ex-data ex)]

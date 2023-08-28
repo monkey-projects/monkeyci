@@ -4,10 +4,11 @@
       <level>DEBUG</level>
     </filter>		
     <encoder>
-      <pattern>app - %d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+      <pattern>[%cyan(APP)] %d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
     </encoder>
   </appender>
   
+  <logger name="ch" level="ERROR"/>
   <logger name="org" level="WARN"/>
   <logger name="com" level="WARN"/>
   <logger name="net" level="WARN"/>
