@@ -35,6 +35,11 @@
   {:name "monkey-ci"
    :description "MonkeyCI: Powerful build script runner"
    :version version
+   :opts [{:as "Working directory"
+           :option "workdir"
+           :short "w"
+           :type :string
+           :default "."}]
    :subcommands [{:command "version"
                   :description "Prints current version"
                   :runs print-version}

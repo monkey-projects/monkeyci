@@ -46,7 +46,8 @@
 (defn- run-steps!
   "Runs all steps in sequence, stopping at the first failure.
    Returns the execution context."
-  [initial-ctx {:keys [steps] :as p}]
+  [initial-ctx {:keys [name steps] :as p}]
+  (log/info "Running pipeline:" name)
   (log/debug "Running pipeline steps:" p)
   (reduce (fn [ctx s]
             (let [r (-> ctx

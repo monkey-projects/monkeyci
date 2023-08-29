@@ -4,9 +4,12 @@
 
 (deftest main-test
   (with-redefs [clojure.core/shutdown-agents (constantly nil)
-                cli-matic.platform/exit-script (constantly nil)]
+                cli-matic.platform/exit-script (constantly :exit)]
     (testing "main returns nil"
-      (is (nil? (sut/-main "version"))))))
+      (is (= :exit (sut/-main "version"))))
+
+    (testing "accepts working directory"
+      (is (= :exit (sut/-main "-w" "test" "version"))))))
 
 (deftest build
   (testing "runs build script"

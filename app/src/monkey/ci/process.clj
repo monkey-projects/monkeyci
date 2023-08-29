@@ -53,14 +53,16 @@
 
 (defn execute!
   "Executes the build script located in given directory.  This actually runs the
-   clojure cli with a generated `build` alias."
+   clojure cli with a generated `build` alias.  This expects absolute directories."
   [{:keys [work-dir script-dir] :as config}]
   (log/info "Executing process in" work-dir)
   (try 
     ;; Run the clojure cli with the "build" alias
-    (let [result (bp/shell {:dir work-dir
+    (let [result (bp/shell {:dir script-dir
+                            ;; TODO Stream output or write to file
                             :out :string
-                            :err :string}
+                            :err :string
+                            :continue true}
                            "clojure"
                            "-Sdeps" (generate-deps config)
                            "-X:monkeyci/build"
@@ -68,6 +70,8 @@
                            ":script-dir" (pr-str script-dir))]
       (log/info "Script executed with exit code" (:exit result))
       (log/debug "Output:" (:out result))
+      (when-not (zero? (:exit result))
+        (log/warn "Error output:" (:err result)))
       result)
     (catch Exception ex
       (let [{:keys [out err] :as data} (ex-data ex)]
