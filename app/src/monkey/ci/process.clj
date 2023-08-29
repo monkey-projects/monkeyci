@@ -70,6 +70,7 @@
                            ":script-dir" (pr-str script-dir))]
       (log/info "Script executed with exit code" (:exit result))
       (log/debug "Output:" (:out result))
+      ;; If the process has a nonzero exit code, print the stderr output
       (when-not (zero? (:exit result))
         (log/warn "Error output:" (:err result)))
       result)

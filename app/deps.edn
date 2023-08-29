@@ -27,6 +27,8 @@
   {:extra-deps {lambdaisland/kaocha-junit-xml {:mvn/version "1.17.101"}}
    :main-opts ["-m" "kaocha.runner"
                "--plugin" "kaocha.plugin/junit-xml"
+               ;; Plugin added for timing
+               "--plugin" "kaocha.plugin/profiling"
                "--junit-xml-file" "junit.xml"
                ;; Skip docker integration tests, they require access to the socket
                "--skip-meta" ":docker"]}
@@ -38,8 +40,8 @@
 
   :watch ; Use in combination with :test, watches for changes
   {:extra-deps {org.clojure/tools.namespace {:mvn/version "1.4.4"}}
-   ;; Skip integration tests
-   :main-opts ["-m" "kaocha.runner" "--watch" "--skip-meta" ":integration"]}
+   ;; Skip integration and slow tests
+   :main-opts ["-m" "kaocha.runner" "--watch" "--skip-meta" ":integration" "--skip-meta" ":slow"]}
   
   :run
   {:main-opts ["-m" "monkey.ci.core"]}
