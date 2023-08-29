@@ -29,5 +29,14 @@
     (with-redefs-fn {#'bp/shell (fn [opts & _]
                                   {:out (:dir opts)})}
       (let [b (sut/bash "test")]
-        #(is (= "test-dir" (:output (b {:step {:work-dir "test-dir"}}))))))))
+        #(is (= "test-dir" (:output (b {:step {:work-dir "test-dir"}})))))))
 
+  (testing "uses context work dir if no step dir specified"
+    (with-redefs-fn {#'bp/shell (fn [opts & _]
+                                  {:out (:dir opts)})}
+      (let [b (sut/bash "test")]
+        #(is (= "test-dir" (:output (b {:work-dir "test-dir"}))))))))
+
+(deftest home
+  (testing "provides home directory"
+    (is (string? sut/home))))

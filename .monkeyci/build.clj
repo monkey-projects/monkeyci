@@ -2,7 +2,6 @@
 (require '[monkey.ci.build.core :as core])
 (require '[monkey.ci.build.shell :as shell])
 (require '[clojure.java.io :as io])
-;;(require '[clojure.tools.build.api :as b])
 (import 'org.apache.commons.io.FileUtils)
 
 (defn clj [& args]
@@ -23,15 +22,19 @@
 (def app-uberjar (clj-app "-X:jar:uber"))
 
 ;; TODO Add these utility functions to the build lib
-(def home (System/getProperty "user.home"))
 (defn cp [from to]
   (FileUtils/copyFile from to))
+
+#_(defn wd
+  "Construct absolute path relative to working directory"
+  [{:keys [work-dir]} path]
+  (.getCanonicalPath (io/file work-dir path)))
 
 (defn install-app
   "Installs the application in the user's home directory by copying the
    uberjar to ~/lib and generating a script in ~/bin"
   [{:keys [work-dir]}]
-  (let [lib (io/file home "lib/monkeyci")
+  (let [lib (io/file shell/home "lib/monkeyci")
         dest (io/file lib "monkeyci.jar")]
     (println "Installing application to" lib)
     (if (or (.exists lib) (true? (.mkdirs lib)))
@@ -39,12 +42,15 @@
         ;; Copy the uberjar
         (cp (io/file work-dir "app/target/monkeyci-standalone.jar") dest)
         ;; Generate script
-        (let [script (io/file home "bin/monkeyci")]
+        (let [script (io/file shell/home "bin/monkeyci")]
           (println "Generating script at" script)
           (spit script (format "#!/bin/sh\njava -jar %s $*\n" (.getCanonicalPath dest)))
           (.setExecutable script true))
         core/success)
       core/failure)))
+
+(def docker-image
+  (shell/bash "docker" "build" "-t" "monkeyci" "-f" "docker/Dockerfile" "."))
 
 ;; Return the pipelines
 [(core/pipeline
@@ -55,4 +61,5 @@
  (core/pipeline
   {:name "install"
    :steps [app-uberjar
-           install-app]})]
+           install-app
+           docker-image]})]
