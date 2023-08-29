@@ -59,8 +59,10 @@
   (try 
     ;; Run the clojure cli with the "build" alias
     (let [result (bp/shell {:dir work-dir
+                            ;; TODO Stream output or write to file
                             :out :string
-                            :err :string}
+                            :err :string
+                            :continue true}
                            "clojure"
                            "-Sdeps" (generate-deps config)
                            "-X:monkeyci/build"
@@ -68,6 +70,8 @@
                            ":script-dir" (pr-str script-dir))]
       (log/info "Script executed with exit code" (:exit result))
       (log/debug "Output:" (:out result))
+      (when-not (zero? (:exit result))
+        (log/warn "Error output:" (:err result)))
       result)
     (catch Exception ex
       (let [{:keys [out err] :as data} (ex-data ex)]

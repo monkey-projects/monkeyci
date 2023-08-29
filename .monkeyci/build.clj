@@ -7,21 +7,28 @@
 
 (defn clj-dir
   "Runs `clojure` command in the given working dir"
-  [dir args]
+  [dir & args]
   {:work-dir dir
    :action (apply clj args)})
 
-(defn clj-lib [& args]
-  (clj-dir "lib" args))
-
-(defn clj-app [& args]
-  (clj-dir "app" args))
+(def clj-lib (partial clj-dir "lib"))
+(def clj-app (partial clj-dir "app"))
 
 (def test-script (clj-lib "-X:test:junit"))
 (def test-app (clj-app "-M:test:junit"))
 
+(def app-uberjar (clj-app "-X:jar:uber"))
+
+(defn install-app [ctx]
+  (println "Installing application"))
+
 ;; Return the pipelines
-(core/pipeline
- {:name "build"
-  :steps [test-script
-          test-app]})
+[(core/pipeline
+  {:name "build"
+   :steps [test-script
+           test-app]})
+
+ (core/pipeline
+  {:name "install"
+   :steps [app-uberjar
+           install-app]})]
