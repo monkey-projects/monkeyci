@@ -11,6 +11,10 @@
   :junit
   {:exec-fn monkey.test/junit}
 
+  :coverage
+  {:exec-fn monkey.test/coverage
+   :exec-args {:ns-regex ["monkey.ci.build.*"]}}
+
   :jar
   {:extra-deps {com.monkeyprojects/build {:mvn/version "0.1.0-SNAPSHOT"}}
    :exec-fn monkey.build/jar
