@@ -63,8 +63,10 @@
           (merge (initial-context p) initial-ctx)
           steps))
 
-(defn run-pipelines [ctx p]
-  (let [p (if (vector? p) p [p])]
+(defn run-pipelines [{:keys [pipeline] :as ctx} p]
+  (let [p (cond->> (if (vector? p) p [p])
+            ;; Filter pipeline by name, if given
+            pipeline (filter (comp (partial = pipeline) :name)))]
     (log/debug "Found" (count p) "pipelines")
     (let [result (->> p
                       (map (partial run-steps! ctx))
@@ -89,7 +91,7 @@
 (defn exec-script!
   "Loads a script from a directory and executes it.  The script is
    executed in this same process (but in a randomly generated namespace)."
-  [{:keys [work-dir script-dir] :as ctx}]
+  [{:keys [script-dir] :as ctx}]
   (log/debug "Executing script at:" script-dir)
   (let [p (load-pipelines script-dir)]
     (log/debug "Loaded pipelines:" p)

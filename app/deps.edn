@@ -5,7 +5,8 @@
         camel-snake-kebab/camel-snake-kebab {:mvn/version "0.4.3"}
         cli-matic/cli-matic {:mvn/version "0.5.4"}
         com.monkeyci/script {:local/root "../lib"}
-        yogthos/config {:mvn/version "1.2.0"}}
+        yogthos/config {:mvn/version "1.2.0"}
+        medley/medley {:mvn/version "1.4.0"}}
  
  :paths ["src" "resources"]
  
