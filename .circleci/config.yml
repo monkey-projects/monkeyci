@@ -183,7 +183,7 @@ jobs:
       # Build the image, tag it with the current job number
       - run:
           name: Build image
-          command: docker build -t $IMAGE_TAG -f docker/Dockerfile app
+          command: docker build -t $IMAGE_TAG -f docker/Dockerfile .
       - run:
           name: Docker login
           command: echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
