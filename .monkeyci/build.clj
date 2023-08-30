@@ -25,11 +25,6 @@
 (defn cp [from to]
   (FileUtils/copyFile from to))
 
-#_(defn wd
-  "Construct absolute path relative to working directory"
-  [{:keys [work-dir]} path]
-  (.getCanonicalPath (io/file work-dir path)))
-
 (defn install-app
   "Installs the application in the user's home directory by copying the
    uberjar to ~/lib and generating a script in ~/bin"

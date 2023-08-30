@@ -95,6 +95,32 @@ jobs:
       - store_test_results:
           path: app/junit.xml
 
+  app-uberjar:
+    executor: clj
+    steps:
+      - checkout
+      # Download and cache dependencies
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "app/deps.edn" }}
+            # fallback to using the latest cache if no exact match is found
+            - v1-dependencies-
+      - run:
+          name: Dependencies
+          command: clojure -X:jar:deps prep
+          working_directory: app
+      - save_cache:
+          paths:
+            - ~/.m2
+          key: v1-dependencies-{{ checksum "app/deps.edn" }}
+      - run:
+          name: Build Uberjar
+          command: clojure -X:jar:uber
+          working_directory: app
+      - store_artifacts:
+          path: app/target/*-standalone.jar
+
+  # DEPRECATED
   deploy-app-lib:
     executor: clj
     steps:
@@ -159,13 +185,14 @@ workflows:
           context: clojars-monkeyci
           requires:
             - test-script-lib
-      - test-app:
-          context: docker
-          requires:
-            - deploy-script-lib
-      - deploy-app-lib:
-          context: clojars-monkeyci
+          filters:
+            branches:
+              only: [main]
+      - test-app
+      - app-uberjar:
           requires:
             - test-app
-      - test-hook:
-          context: docker
+          filters:
+            branches:
+              only: [main]
+      - test-hook
