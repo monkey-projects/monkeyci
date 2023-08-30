@@ -31,19 +31,13 @@
   (println "Starting server (TODO)")
   :todo)
 
-(defn run-cmd [cmd args]
-  (cmd args))
-
-(defn cmd-invoker
+(defn default-invoker
   "Wrap the command in a fn to enable better testing"
-  [cmd]
+  [cmd env]
   (fn [args]
-    (run-cmd cmd args)))
+    (cmd env args)))
 
-(defn cmd-env-invoker [cmd]
-  (cmd-invoker (partial cmd env)))
-
-(def cli-config
+(defn make-cli-config [{:keys [env cmd-invoker] :or {cmd-invoker default-invoker}}]
   {:name "monkey-ci"
    :description "MonkeyCI: Powerful build script runner"
    :version version
@@ -54,7 +48,7 @@
            :default "."}]
    :subcommands [{:command "version"
                   :description "Prints current version"
-                  :runs (cmd-invoker print-version)}
+                  :runs (cmd-invoker print-version env)}
                  {:command "build"
                   :description "Runs build locally"
                   :opts [{:as "Script location"
@@ -62,13 +56,16 @@
                           :short "d"
                           :type :string
                           :default ".monkeyci/"}]
-                  :runs (cmd-env-invoker build)}
+                  :runs (cmd-invoker build env)}
                  {:command "server"
                   :description "Start MonkeyCI server"
-                  :runs (cmd-invoker server)}]})
+                  :runs (cmd-invoker server env)}]})
 
-(defn run-cli [args]
-  (cli/run-cmd args cli-config))
+(defn run-cli
+  ([config args]
+   (cli/run-cmd args config))
+  ([args]
+   (run-cli (make-cli-config {:env env}) args)))
 
 (defn -main
   "Main entry point for the application."
