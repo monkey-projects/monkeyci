@@ -25,7 +25,9 @@
     (if (some-> (io/file script-dir) (.exists))
       (do
         (log/info "Running build script at" script-dir)
-        (let [{:keys [exit] :as out} (proc/execute! dirs)]
+        (let [{:keys [exit] :as out} (-> dirs
+                                         (assoc :pipeline (get-in ctx [:script :pipeline]))
+                                         (proc/execute!))]
           (cond-> out
             true (assoc :result :error)
             (zero? exit) (assoc :result :success))))

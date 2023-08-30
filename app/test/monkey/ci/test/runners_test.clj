@@ -55,4 +55,14 @@
         (h/with-tmp-dir base
           (is (= base (-> (sut/child-runner {:script {:dir base}})
                           :args
-                          :script-dir))))))))
+                          :script-dir)))))))
+
+  (testing "passes pipeline to process"
+    (with-redefs [p/execute! (fn [args]
+                               {:exit 0
+                                :args args})]
+      (h/with-tmp-dir base
+        (is (= "test-pipeline" (-> (sut/child-runner {:script {:dir base
+                                                               :pipeline "test-pipeline"}})
+                                   :args
+                                   :pipeline)))))))

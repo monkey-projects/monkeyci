@@ -64,7 +64,11 @@
                             :option "dir"
                             :short "d"
                             :type :string
-                            :default ".monkeyci/"}]
+                            :default ".monkeyci/"}
+                           {:as "Pipeline name"
+                            :option "pipeline"
+                            :short "p"
+                            :type :string}]
                     :runs (invoker build)}
                    {:command "server"
                     :description "Start MonkeyCI server"
