@@ -28,8 +28,20 @@
     (runner ctx)))
 
 (defn server [args]
-  (println "Starting server")
+  (println "Starting server (TODO)")
   :todo)
+
+(defn run-cmd [cmd args]
+  (cmd args))
+
+(defn cmd-invoker
+  "Wrap the command in a fn to enable better testing"
+  [cmd]
+  (fn [args]
+    (run-cmd cmd args)))
+
+(defn cmd-env-invoker [cmd]
+  (cmd-invoker (partial cmd env)))
 
 (def cli-config
   {:name "monkey-ci"
@@ -42,7 +54,7 @@
            :default "."}]
    :subcommands [{:command "version"
                   :description "Prints current version"
-                  :runs print-version}
+                  :runs (cmd-invoker print-version)}
                  {:command "build"
                   :description "Runs build locally"
                   :opts [{:as "Script location"
@@ -50,16 +62,19 @@
                           :short "d"
                           :type :string
                           :default ".monkeyci/"}]
-                  :runs (partial build env)}
+                  :runs (cmd-env-invoker build)}
                  {:command "server"
                   :description "Start MonkeyCI server"
-                  :runs server}]})
+                  :runs (cmd-invoker server)}]})
+
+(defn run-cli [args]
+  (cli/run-cmd args cli-config))
 
 (defn -main
   "Main entry point for the application."
   [& args]
   (try
-    (cli/run-cmd args cli-config)
+    (run-cli args)
     (finally
       ;; Shutdown the agents otherwise the app will block for a while here
       (shutdown-agents))))

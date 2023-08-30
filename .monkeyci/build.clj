@@ -54,7 +54,7 @@
 
 ;; Return the pipelines
 [(core/pipeline
-  {:name "build"
+  {:name "test"
    :steps [test-script
            test-app]})
 
