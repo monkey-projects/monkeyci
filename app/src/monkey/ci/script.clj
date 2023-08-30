@@ -41,6 +41,7 @@
       (log/debug "Running step:" step)
       (run-step step ctx)
       (catch Exception ex
+        (log/warn "Step failed:" (.getMessage ex))
         (assoc bc/failure :exception ex)))))
 
 (defn- run-steps!

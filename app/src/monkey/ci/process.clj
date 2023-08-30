@@ -69,24 +69,24 @@
           result (apply bp/shell
                         {:dir script-dir
                          ;; TODO Stream output or write to file
-                         :out :string
-                         :err :string
+                         :out :inherit
+                         :err :inherit
                          :continue true}
                         "clojure"
                         "-Sdeps" (generate-deps config)
                         "-X:monkeyci/build"
                         args)]
       (log/info "Script executed with exit code" (:exit result))
-      (log/debug "Output:" (:out result))
+      ;;(log/debug "Output:" (:out result))
       ;; If the process has a nonzero exit code, print the stderr output
-      (when-not (zero? (:exit result))
+      #_(when-not (zero? (:exit result))
         (log/warn "Error output:" (:err result)))
       result)
     (catch Exception ex
       (let [{:keys [out err] :as data} (ex-data ex)]
         (log/error "Failed to execute build script")
-        (log/error "Output:" out)
-        (log/error "Error:" err)
+        ;;(log/error "Output:" out)
+        ;;(log/error "Error:" err)
         (if (number? (:exit data))
           ;; Return process error with exit code
           data
