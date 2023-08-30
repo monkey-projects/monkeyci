@@ -17,20 +17,30 @@
   (testing "supports noop runner"
     (let [r (sut/make-runner {:runner {:type :noop}})]
       (is (fn? r))
-      (is (= :noop (r {}))))))
+      (is (= :noop (-> (r {})
+                       :runner))))))
 
 (deftest child-runner
-  (testing "runs script locally in child process, returns exit code"
-    (with-redefs [p/execute! (constantly {:exit ::ok})]
-      (is (= ::ok (sut/child-runner {:script {:dir "examples/basic-clj"}})))))
+  (let [args {:script {:dir "examples/basic-clj"}}]
+    (testing "runs script locally in child process, returns result"
+      (with-redefs [p/execute! (constantly {:exit 654})]
+        (is (map? (sut/child-runner args)))))
+
+    (testing "adds success result on zero exit code"
+      (with-redefs [p/execute! (constantly {:exit 0})]
+        (is (= :success (-> (sut/child-runner args)
+                            :result))))))
 
   (testing "with workdir"
-    (with-redefs [p/execute! (partial hash-map :exit)]
+    (with-redefs [p/execute! (fn [args]
+                               {:exit 0
+                                :args args})]
       (testing "passes work dir to process"
         (h/with-tmp-dir base
           (is (true? (.mkdir (io/file base "local"))))
           (is (= base (-> (sut/child-runner {:script {:dir "local"
                                                       :workdir base}})
+                          :args
                           :work-dir)))))
       
       (testing "combine relative script dir with workdir"
@@ -38,9 +48,11 @@
           (is (true? (.mkdir (io/file base "local"))))
           (is (= (str base "/local") (-> (sut/child-runner {:script {:dir "local"
                                                                      :workdir base}})
+                                         :args
                                          :script-dir)))))
 
       (testing "leave absolute script dir as is"
         (h/with-tmp-dir base
           (is (= base (-> (sut/child-runner {:script {:dir base}})
+                          :args
                           :script-dir))))))))

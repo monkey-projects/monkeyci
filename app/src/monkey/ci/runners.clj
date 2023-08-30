@@ -12,23 +12,33 @@
 
 (defn- get-absolute-dirs [{:keys [dir workdir]}]
   (let [wd (io/file (or workdir (u/cwd)))]
-    {:script-dir (.getCanonicalPath (io/file (u/abs-path wd dir)))
-     :work-dir (.getCanonicalPath wd)}))
+    {:script-dir (some->> dir
+                          (u/abs-path wd)
+                          (io/file)
+                          (.getCanonicalPath))
+     :work-dir (some-> wd (.getCanonicalPath))}))
 
 (defn child-runner
   "Creates a new runner that executes the script locally in a child process"
   [ctx]
   (let [{:keys [script-dir work-dir] :as dirs} (get-absolute-dirs (:script ctx))]
-    (if (.exists (io/file script-dir))
+    (if (some-> (io/file script-dir) (.exists))
       (do
         (log/info "Running build script at" script-dir)
-        (:exit (proc/execute! dirs)))
-      (log/warn "No build script found at" script-dir))))
+        (let [{:keys [exit] :as out} (proc/execute! dirs)]
+          (cond-> out
+            true (assoc :result :error)
+            (zero? exit) (assoc :result :success))))
+      (do
+        (log/warn "No build script found at" script-dir)
+        {:exit 1
+         :result :warning}))))
 
 (defmethod new-runner :noop
   ;; Provided for testing purposes
   [_]
-  (constantly :noop))
+  (constantly {:runner :noop
+               :exit 0}))
 
 (defmethod new-runner :local [_]
   child-runner)

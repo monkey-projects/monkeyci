@@ -24,8 +24,15 @@
   (println "Building")
   (log/debug "Arguments:" args)
   (let [ctx (make-config env args)
-        runner (r/make-runner ctx)]
-    (runner ctx)))
+        runner (r/make-runner ctx)
+        {:keys [result exit] :as output} (runner ctx)]
+    (condp = (or result :unknown)
+      :success (log/info "Success!")
+      :warning (log/warn "Exited with warnings.")
+      :error   (log/error "Failure.")
+      :unknown (log/warn "Unknown result."))
+    ;; Return exit code, this will be the process exit code as well
+    exit))
 
 (defn server [& _]
   (println "Starting server (TODO)")
