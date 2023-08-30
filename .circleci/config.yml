@@ -121,7 +121,7 @@ jobs:
           path: app/target/monkeyci-standalone.jar
       - persist_to_workspace:
           root: app/target
-          paths: [*.jar]
+          paths: ['*.jar']
 
   test-self:
     executor: clj
