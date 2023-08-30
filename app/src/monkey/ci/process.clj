@@ -5,6 +5,7 @@
             [clojure.java.io :as io]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
+            [medley.core :as mc]
             [monkey.ci
              [script :as script]
              [utils :as utils]]
@@ -57,29 +58,33 @@
   [{:keys [work-dir script-dir] :as config}]
   (log/info "Executing process in" work-dir)
   (try 
-    ;; Run the clojure cli with the "build" alias
-    (let [result (bp/shell {:dir script-dir
-                            ;; TODO Stream output or write to file
-                            :out :string
-                            :err :string
-                            :continue true}
-                           "clojure"
-                           "-Sdeps" (generate-deps config)
-                           "-X:monkeyci/build"
-                           ":work-dir" (pr-str work-dir)
-                           ":script-dir" (pr-str script-dir))]
+    ;; Run the clojure cli with the "build" alias. Add some parameters to the script
+    ;; in the form of edn.
+    (let [args (->> (select-keys config [:work-dir :script-dir :pipeline])
+                    (mc/remove-vals nil?)
+                    (mc/map-keys str)
+                    (mc/map-vals pr-str)
+                    (into [])
+                    (flatten))
+          result (apply bp/shell
+                        {:dir script-dir
+                         ;; TODO Stream output or write to file
+                         :out :inherit
+                         :err :inherit
+                         :continue true}
+                        "clojure"
+                        "-Sdeps" (generate-deps config)
+                        "-X:monkeyci/build"
+                        args)]
       (log/info "Script executed with exit code" (:exit result))
-      (log/debug "Output:" (:out result))
-      (when-not (zero? (:exit result))
+      ;;(log/debug "Output:" (:out result))
+      ;; If the process has a nonzero exit code, print the stderr output
+      #_(when-not (zero? (:exit result))
         (log/warn "Error output:" (:err result)))
       result)
     (catch Exception ex
       (let [{:keys [out err] :as data} (ex-data ex)]
         (log/error "Failed to execute build script")
-        (log/error "Output:" out)
-        (log/error "Error:" err)
-        (if (number? (:exit data))
-          ;; Return process error with exit code
-          data
-          ;; It's some other kind of error
-          (throw ex))))))
+        ;;(log/error "Output:" out)
+        ;;(log/error "Error:" err)
+        (throw ex)))))

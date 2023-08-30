@@ -30,5 +30,12 @@
   (testing "success if step returns `nil`"
     (is (bc/success? (->> (bc/pipeline {:name "nil"
                                         :steps [(constantly nil)]})
-                          (sut/run-pipelines {}))))))
+                          (sut/run-pipelines {})))))
+
+  (testing "runs pipeline by name, if given"
+    (is (bc/success? (->> [(bc/pipeline {:name "first"
+                                         :steps [(constantly bc/success)]})
+                           (bc/pipeline {:name "second"
+                                         :steps [(constantly bc/failure)]})]
+                          (sut/run-pipelines {:pipeline "first"}))))))
 

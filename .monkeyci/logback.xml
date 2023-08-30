@@ -13,6 +13,7 @@
   <logger name="net" level="WARN"/>
   <logger name="io" level="WARN"/>
   <logger name="monkey.ci" level="INFO"/>
+  <logger name="monkey.ci.build" level="DEBUG"/>
 
   <root level="WARN">
     <appender-ref ref="STDOUT" />

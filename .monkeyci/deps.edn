@@ -1,2 +1,2 @@
-{:deps {ch.qos.logback/logback-classic {:mvn/version "1.4.6"}
+{:deps {ch.qos.logback/logback-classic {:mvn/version "1.4.11"}
         commons-io/commons-io {:mvn/version "2.13.0"}}}

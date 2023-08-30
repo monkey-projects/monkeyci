@@ -5,7 +5,8 @@
         camel-snake-kebab/camel-snake-kebab {:mvn/version "0.4.3"}
         cli-matic/cli-matic {:mvn/version "0.5.4"}
         com.monkeyci/script {:local/root "../lib"}
-        yogthos/config {:mvn/version "1.2.0"}}
+        yogthos/config {:mvn/version "1.2.0"}
+        medley/medley {:mvn/version "1.4.0"}}
  
  :paths ["src" "resources"]
  
@@ -27,6 +28,8 @@
   {:extra-deps {lambdaisland/kaocha-junit-xml {:mvn/version "1.17.101"}}
    :main-opts ["-m" "kaocha.runner"
                "--plugin" "kaocha.plugin/junit-xml"
+               ;; Plugin added for timing
+               "--plugin" "kaocha.plugin/profiling"
                "--junit-xml-file" "junit.xml"
                ;; Skip docker integration tests, they require access to the socket
                "--skip-meta" ":docker"]}
@@ -38,8 +41,8 @@
 
   :watch ; Use in combination with :test, watches for changes
   {:extra-deps {org.clojure/tools.namespace {:mvn/version "1.4.4"}}
-   ;; Skip integration tests
-   :main-opts ["-m" "kaocha.runner" "--watch" "--skip-meta" ":integration"]}
+   ;; Skip integration and slow tests
+   :main-opts ["-m" "kaocha.runner" "--watch" "--skip-meta" ":integration" "--skip-meta" ":slow"]}
   
   :run
   {:main-opts ["-m" "monkey.ci.core"]}

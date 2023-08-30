@@ -12,6 +12,10 @@
       (is (= :exit (sut/-main "-w" "test" "version"))))))
 
 (deftest build
-  (testing "runs build script"
+  (testing "invokes runner"
     (is (some? (sut/build {:monkeyci-runner-type :noop}
-                          {:dir "examples/basic-clj"})))))
+                          {:dir "examples/basic-clj"}))))
+
+  (testing "returns exit code"
+    (is (number? (sut/build {:monkeyci-runner-type :noop}
+                            {:dir "examples/basic-clj"})))))
