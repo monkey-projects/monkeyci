@@ -8,7 +8,7 @@
             [clojure.tools.logging :as log]
             [config.core :refer [env]]
             [monkey.ci
-             [process :refer [version]]
+             [process :as p]
              [runners :as r]]))
 
 (defn make-config [env args]
@@ -18,7 +18,7 @@
    :script args})
 
 (defn print-version [& _]
-  (println version))
+  (println (p/version)))
 
 (defn build [env args]
   (println "Building")
@@ -49,7 +49,7 @@
             (cmd-invoker cmd env))]
     {:name "monkey-ci"
      :description "MonkeyCI: Powerful build script runner"
-     :version version
+     :version (p/version)
      :opts [{:as "Working directory"
              :option "workdir"
              :short "w"

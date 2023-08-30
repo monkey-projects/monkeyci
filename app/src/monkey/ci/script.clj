@@ -57,6 +57,8 @@
               (log/debug "Result:" r)
               (when-let [o (:output r)]
                 (log/debug "Output:" o))
+              (when-let [o (:error r)]
+                (log/warn "Error output:" o))
               (cond-> ctx
                 true (assoc :status (:status r)
                             :last-result r)

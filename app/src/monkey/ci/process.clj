@@ -11,7 +11,9 @@
              [utils :as utils]]
             [monkey.ci.build.core :as bc]))
 
-(def version (or (System/getenv "MONKEYCI_VERSION") "0.1.0-SNAPSHOT"))
+;; Determine version at compile time
+(defmacro version []
+  `(or (System/getenv "MONKEYCI_VERSION") "0.1.0-SNAPSHOT"))
 
 (defn run
   "Run function for when a build task is executed using clojure tools.  This function
@@ -44,11 +46,11 @@
              :extra-deps {'com.monkeyci/script
                           (if dev-mode
                             {:local/root (local-script-lib-dir)}
-                            {:mvn/version version})
+                            {:mvn/version (version)})
                           'com.monkeyci/app
                           (if dev-mode
                             {:local/root (utils/cwd)}
-                            {:mvn/version version})}
+                            {:mvn/version (version)})}
              ;; TODO Only add this if the file actually exists
              :jvm-opts [(str "-Dlogback.configurationFile=" (io/file script-dir "logback.xml"))]}}}))
 

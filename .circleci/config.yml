@@ -216,3 +216,6 @@ workflows:
           requires:
             - app-uberjar
           context: docker
+          filters:
+            branches:
+              only: [main]

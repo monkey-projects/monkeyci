@@ -15,7 +15,7 @@
   <logger name="monkey.ci" level="INFO"/>
   <logger name="monkey.ci.build" level="DEBUG"/>
 
-  <root level="WARN">
+  <root level="INFO">
     <appender-ref ref="STDOUT" />
   </root>
 </configuration>

@@ -18,7 +18,8 @@
           (let [{:keys [out err]} (ex-data ex)]
             ;; Report the error
             (assoc core/failure
-                   :output (or out err)
+                   :output out
+                   :error err
                    :exception ex)))))))
 
 (def home (System/getProperty "user.home"))

@@ -53,16 +53,9 @@
    :exec-fn monkey.build/jar
    :exec-args {:jar "target/monkeyci.jar"
                :lib com.monkeyci/app
-               :version "0.1.0-SNAPSHOT"
                :main "monkey.ci.core"}
    ;; Add this to avoid falling back to the default logger
    :jvm-opts ["-Dlogback.configurationFile=resources/logback.xml"]}
-  
-  :install
-  {:exec-fn monkey.build/jar+install}
-
-  :deploy
-  {:exec-fn monkey.build/deploy}
 
   :uber
   {:exec-fn monkey.build/uberjar
