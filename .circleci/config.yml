@@ -173,7 +173,7 @@ jobs:
   docker:
     executor: clj
     environment:
-      IMAGE_TAG: dormeur/monkey-ci:build-$CIRCLE_BUILD_NUM
+      IMAGE_TAG: dormeur/monkey-ci:build-<< pipeline.number >>
     steps:
       - checkout
       - setup_remote_docker
@@ -183,8 +183,7 @@ jobs:
       # Build the image, tag it with the current job number
       - run:
           name: Build image
-          command: docker build -t $IMAGE_TAG .
-          working_directory: app
+          command: docker build -t $IMAGE_TAG -f docker/Dockerfile app
       - run:
           name: Docker login
           command: echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
