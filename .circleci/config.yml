@@ -50,9 +50,9 @@ jobs:
       # Download and cache dependencies
       - restore_cache:
           keys:
-            - v1-dependencies-{{ checksum "lib/deps.edn" }}
+            - lib-deps-{{ checksum "lib/deps.edn" }}
             # fallback to using the latest cache if no exact match is found
-            - v1-dependencies-
+            - lib-deps-
       - run:
           name: Dependencies
           command: clojure -X:jar:deps prep
@@ -60,7 +60,7 @@ jobs:
       - save_cache:
           paths:
             - ~/.m2
-          key: v1-dependencies-{{ checksum "lib/deps.edn" }}
+          key: lib-deps-{{ checksum "lib/deps.edn" }}
       - run:
           name: Build Jar
           command: clojure -X:jar
@@ -77,9 +77,9 @@ jobs:
       # Download and cache dependencies
       - restore_cache:
           keys:
-            - v1-dependencies-{{ checksum "app/deps.edn" }}
+            - app-deps-{{ checksum "app/deps.edn" }}
             # fallback to using the latest cache if no exact match is found
-            - v1-dependencies-
+            - app-deps-
       - run:
           name: Dependencies
           command: clojure -X:test:junit:deps prep
@@ -87,7 +87,7 @@ jobs:
       - save_cache:
           paths:
             - ~/.m2
-          key: v1-dependencies-{{ checksum "app/deps.edn" }}
+          key: app-deps-{{ checksum "app/deps.edn" }}
       - run:
           name: Unit tests
           command: clojure -M:test:junit
@@ -102,9 +102,9 @@ jobs:
       # Download and cache dependencies
       - restore_cache:
           keys:
-            - v1-dependencies-{{ checksum "app/deps.edn" }}
+            - uberjar-deps-{{ checksum "app/deps.edn" }}
             # fallback to using the latest cache if no exact match is found
-            - v1-dependencies-
+            - uberjar-deps-
       - run:
           name: Dependencies
           command: clojure -X:jar:deps prep
@@ -112,41 +112,35 @@ jobs:
       - save_cache:
           paths:
             - ~/.m2
-          key: v1-dependencies-{{ checksum "app/deps.edn" }}
+          key: uberjar-deps-{{ checksum "app/deps.edn" }}
       - run:
           name: Build Uberjar
           command: clojure -X:jar:uber
           working_directory: app
       - store_artifacts:
-          path: app/target/*-standalone.jar
+          path: app/target/monkeyci-standalone.jar
+      - persist_to_workspace:
+          root: app/target
+          paths: ['*.jar']
 
-  # DEPRECATED
-  deploy-app-lib:
+  test-self:
     executor: clj
     steps:
       - checkout
       # Download and cache dependencies
       - restore_cache:
           keys:
-            - v1-dependencies-{{ checksum "app/deps.edn" }}
+            - self-deps-{{ checksum "app/deps.edn" }}
             # fallback to using the latest cache if no exact match is found
-            - v1-dependencies-
+            - self-deps-
       - run:
-          name: Dependencies
-          command: clojure -X:jar:deps prep
+          name: Build using MonkeyCI
+          command: clojure -M:run -w .. build -p test
           working_directory: app
       - save_cache:
           paths:
             - ~/.m2
-          key: v1-dependencies-{{ checksum "app/deps.edn" }}
-      - run:
-          name: Build Jar
-          command: clojure -X:jar
-          working_directory: app
-      - run:
-          name: Deploy to Clojars
-          command: clojure -X:jar:deploy
-          working_directory: app
+          key: self-deps-{{ checksum "app/deps.edn" }}
 
   test-hook:
     executor: cljs
@@ -176,6 +170,28 @@ jobs:
           working_directory: hook
         # TODO Output as junit or another format CircleCI can understand
           
+  docker:
+    executor: clj
+    environment:
+      IMAGE_TAG: dormeur/monkey-ci:build-$CIRCLE_BUILD_NUM
+    steps:
+      - checkout
+      - setup_remote_docker
+      # Restore the uberjar file
+      - attach_workspace:
+          at: app/target
+      # Build the image, tag it with the current job number
+      - run:
+          name: Build image
+          command: docker build -t $IMAGE_TAG .
+          working_directory: app
+      - run:
+          name: Docker login
+          command: echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+      - run:
+          name: Push image
+          command: docker push $IMAGE_TAG
+          
 workflows:
   version: 2
   full-build:
@@ -196,3 +212,8 @@ workflows:
             branches:
               only: [main]
       - test-hook
+      - test-self
+      - docker:
+          requires:
+            - app-uberjar
+          context: docker
