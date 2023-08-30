@@ -119,8 +119,11 @@ jobs:
           working_directory: app
       - store_artifacts:
           path: app/target/monkeyci-standalone.jar
+      - persist_to_workspace:
+          root: app/target
+          paths: [*.jar]
 
-  build-self:
+  test-self:
     executor: clj
     steps:
       - checkout
@@ -167,6 +170,28 @@ jobs:
           working_directory: hook
         # TODO Output as junit or another format CircleCI can understand
           
+  docker:
+    executor: clj
+    environment:
+      IMAGE_TAG: dormeur/monkey-ci:build-$CIRCLE_BUILD_NUM
+    steps:
+      - checkout
+      - setup_remote_docker
+      # Restore the uberjar file
+      - attach_workspace:
+          at: app/target
+      # Build the image, tag it with the current job number
+      - run:
+          name: Build image
+          command: docker build -t $IMAGE_TAG .
+          working_directory: app
+      - run:
+          name: Docker login
+          command: echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+      - run:
+          name: Push image
+          command: docker push $IMAGE_TAG
+          
 workflows:
   version: 2
   full-build:
@@ -187,4 +212,8 @@ workflows:
             branches:
               only: [main]
       - test-hook
-      - build-self
+      - test-self
+      - docker:
+          requires:
+            - app-uberjar
+          context: docker
