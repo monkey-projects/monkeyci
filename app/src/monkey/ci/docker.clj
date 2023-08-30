@@ -1,6 +1,7 @@
 (ns monkey.ci.docker
   (:require [camel-snake-kebab.core :as csk]
             [clojure.java.io :as io]
+            [clojure.tools.logging :as log]
             [clojure.walk :as cw]
             [contajners.core :as c]
             [monkey.ci.step-runner :as sr]))
@@ -32,6 +33,16 @@
   (c/invoke client {:op :ContainerCreate
                     :params {:name name}
                     :data (convert-body config)}))
+
+(defn delete-container
+  [client id]
+  (c/invoke client {:op :ContainerDelete
+                    :params {:id id}}))
+
+(defn list-containers
+  [client args]
+  (c/invoke client {:op :ContainerList
+                    :params args}))
 
 (defn start-container
   "Starts the container, returns the output as a stream"
@@ -65,6 +76,7 @@
        :size (arr->int (subs l 4 8))
        :message (subs l 8)})
     (catch Exception ex
+      (log/warn "Failed to parse log line" l ex)
       ;; Fallback
       {:message l})))
 
@@ -83,7 +95,7 @@
          (stream->lines)
          (map (comp :message parse-log-line)))))
 
-(defrecord DockerConfig [opts]
+(defrecord DockerConfig [config]
   sr/StepRunner
   (run-step [this ctx]
     :todo))
