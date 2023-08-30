@@ -17,7 +17,7 @@
    :env env
    :script args})
 
-(defn print-version [_]
+(defn print-version [& _]
   (println version))
 
 (defn build [env args]
@@ -27,7 +27,7 @@
         runner (r/make-runner ctx)]
     (runner ctx)))
 
-(defn server [args]
+(defn server [& _]
   (println "Starting server (TODO)")
   :todo)
 
@@ -38,28 +38,30 @@
     (cmd env args)))
 
 (defn make-cli-config [{:keys [env cmd-invoker] :or {cmd-invoker default-invoker}}]
-  {:name "monkey-ci"
-   :description "MonkeyCI: Powerful build script runner"
-   :version version
-   :opts [{:as "Working directory"
-           :option "workdir"
-           :short "w"
-           :type :string
-           :default "."}]
-   :subcommands [{:command "version"
-                  :description "Prints current version"
-                  :runs (cmd-invoker print-version env)}
-                 {:command "build"
-                  :description "Runs build locally"
-                  :opts [{:as "Script location"
-                          :option "dir"
-                          :short "d"
-                          :type :string
-                          :default ".monkeyci/"}]
-                  :runs (cmd-invoker build env)}
-                 {:command "server"
-                  :description "Start MonkeyCI server"
-                  :runs (cmd-invoker server env)}]})
+  (letfn [(invoker [cmd]
+            (cmd-invoker cmd env))]
+    {:name "monkey-ci"
+     :description "MonkeyCI: Powerful build script runner"
+     :version version
+     :opts [{:as "Working directory"
+             :option "workdir"
+             :short "w"
+             :type :string
+             :default "."}]
+     :subcommands [{:command "version"
+                    :description "Prints current version"
+                    :runs (invoker print-version)}
+                   {:command "build"
+                    :description "Runs build locally"
+                    :opts [{:as "Script location"
+                            :option "dir"
+                            :short "d"
+                            :type :string
+                            :default ".monkeyci/"}]
+                    :runs (invoker build)}
+                   {:command "server"
+                    :description "Start MonkeyCI server"
+                    :runs (invoker server)}]}))
 
 (defn run-cli
   ([config args]

@@ -87,8 +87,4 @@
         (log/error "Failed to execute build script")
         ;;(log/error "Output:" out)
         ;;(log/error "Error:" err)
-        (if (number? (:exit data))
-          ;; Return process error with exit code
-          data
-          ;; It's some other kind of error
-          (throw ex))))))
+        (throw ex)))))

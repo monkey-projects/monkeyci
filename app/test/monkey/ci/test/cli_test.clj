@@ -23,6 +23,10 @@
           (is (= core/print-version (:cmd lc)))))
 
       (testing "`build` command"
+        (testing "runs `build` command"
+          (let [lc (run-cli "build")]
+            (is (= core/build (:cmd lc)))))
+        
         (testing "accepts script dir `-d`"
           (let [lc (run-cli "build" "-d" "test-dir")]
             (is (= "test-dir" (get-in lc [:args :dir])))))
