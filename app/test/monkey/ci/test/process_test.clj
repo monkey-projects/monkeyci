@@ -2,13 +2,25 @@
   (:require [babashka.process :as bp]
             [clojure.test :refer :all]
             [clojure.java.io :as io]
-            [monkey.ci.process :as sut]
-            [monkey.ci.utils :as u]))
+            [monkey.ci
+             [process :as sut]
+             [script :as script]]
+            [monkey.ci.utils :as u]
+            [monkey.ci.build.core :as bc]))
 
 (def cwd (u/cwd))
 
 (defn example [subdir]
   (.getAbsolutePath (io/file cwd "examples" subdir)))
+
+(deftest run
+  (testing "executes script with given args"
+    (let [captured-args (atom nil)]
+      (with-redefs [script/exec-script! (fn [args]
+                                          (reset! captured-args args)
+                                          bc/success)]
+        (is (nil? (sut/run :test-args)))
+        (is (= :test-args @captured-args))))))
 
 (deftest ^:slow execute-slow!
   (testing "executes build script in separate process"
