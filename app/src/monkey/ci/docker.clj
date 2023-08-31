@@ -6,7 +6,8 @@
             [contajners.core :as c]
             [medley.core :as mc]
             [monkey.ci.containers :as mcc])
-  (:import org.apache.commons.io.IOUtils))
+  (:import org.apache.commons.io.IOUtils
+           [java.io PrintWriter]))
 
 (def default-conn {:uri "unix:///var/run/docker.sock"})
 (def api-version "v1.41")
@@ -79,6 +80,24 @@
   (invoke-and-convert client
                       {:op :ContainerStart
                        :params {:id id}}))
+
+(defn stop-container
+  "Stops the container"
+  [client id]
+  (c/invoke client
+            {:op :ContainerStop
+             :params {:id id}}))
+
+(defn attach-container
+  "Attaches to given container.  Returns a socket that can be used to communicate with it."
+  [client id]
+  (c/invoke client {:op :ContainerAttach
+                    :params {:id id
+                             :stream true
+                             :stdin true
+                             :stdout true
+                             :stderr true}
+                    :as :socket}))
 
 (defn container-logs
   "Attaches to the container in order to read logs"
@@ -186,13 +205,44 @@
   (let [cn (str "build-" (random-uuid))
         conn (get-in ctx [:env :docker-connection])
         client (make-client :containers conn)
-        {:keys [image] :as conf} (ctx->container-config ctx)]
+        {:keys [image] :as conf} (merge (ctx->container-config ctx)
+                                        {:cmd ["/bin/sh" "-e"]
+                                         :attach-stdin true
+                                         :open-stdin true})
+        print-logs (fn []
+                     (->> (container-logs client cn)
+                          (parse-log-stream)
+                          (map (comp (memfn trim) :message))
+                          (map (fn [l] (log/info l)))
+                          (doall)))]
+    ;; Just messing around here
     (log/debug "Container configuration:" conf)
     (log/info "Pulling" image)
     (pull-image (make-client :images conn) image)
     (let [cont (create-container client cn conf)]
+      (log/debug "Container created:" cont)
       (log/info "Starting container" cn)
       (start-container client cn)
-      ;; TODO Attach to container and execute the script
-      ;; When script has been executed, stop the container
-      cont)))
+      ;; Start a thread to print the output
+      (doto (Thread. print-logs)
+        (.start))
+      ;; Attach to container and execute the script
+      (let [socket (attach-container client cn)
+            script (get-in ctx [:step :script])
+            pw (PrintWriter. (.getOutputStream socket) true)]
+        ;; When script has been executed, stop the container
+        (log/debug "Executing" (count script) "commands in container")
+        (doseq [s script]
+          (log/info "Executing:" s)
+          (.println pw s))
+        ;; Stop the container by exiting
+        (log/debug "Exiting")
+        (.println pw "exit")
+        (log/debug "Closing socket")
+        (.close socket)
+        (log/debug "Stopping container")
+        (stop-container client cn)
+        (log/info "Done.")
+        ;; Return container details
+        (let [res (inspect-container client cn)]
+          {:exit (get-in res [:state :exit-code])})))))
