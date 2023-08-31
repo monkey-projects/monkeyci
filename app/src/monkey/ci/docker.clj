@@ -4,7 +4,8 @@
             [clojure.tools.logging :as log]
             [clojure.walk :as cw]
             [contajners.core :as c]
-            [monkey.ci.step-runner :as sr]))
+            [monkey.ci.step-runner :as sr])
+  (:import org.apache.commons.io.IOUtils))
 
 (def default-conn {:uri "unix:///var/run/docker.sock"})
 (def api-version "v1.41")
@@ -69,21 +70,42 @@
           0
           arr))
 
-(defn parse-log-line [l]
-  (try
-    (let [h (take 8 l)]
-      {:stream-type (get stream-types (int (first h)))
-       :size (arr->int (subs l 4 8))
-       :message (subs l 8)})
-    (catch Exception ex
-      (log/warn "Failed to parse log line" l ex)
-      ;; Fallback
-      {:message l})))
+(defn- read-into-buf
+  "Reads up to the buffer size bytes from the stream.  Returns the buffer,
+   or `nil` if EOF was reached before the buffer was filled up."
+  [s buf]
+  (when (= (IOUtils/read s buf) (count buf))
+    buf))
 
-(defn stream->lines [s]
-  ;; FIXME Close the reader when done
-  (-> (io/reader s)
-      (line-seq)))
+(defn- read-exactly
+  "Reads exactly `n` bytes from input stream, or `nil` if EOF was reached
+   before that."
+  [in n]
+  (read-into-buf in (byte-array n)))
+
+(defn- parse-next-line
+  "Parses the next line from the input stream, or returns `nil` if the
+   stream is at an end."
+  [in]
+  (let [buf (byte-array 4)]
+    (when-let [t (some->> (read-into-buf in buf)
+                          (first)
+                          (int)
+                          (get stream-types))]
+      (when-let [s (some-> (read-into-buf in buf)
+                           (arr->int))]
+        (when-let [msg (some-> (read-exactly in s)
+                               (String.))]
+          {:stream-type t
+           :size s
+           :message msg})))))
+
+(defn parse-log-stream
+  "Given a Docker input stream, parses it in to lines and returns it as
+   a lazy seq of parsed maps, containing the stream type, size and message."
+  [s]
+  (->> (repeatedly #(parse-next-line s))
+       (take-while some?)))
 
 (defn run-container
   "Utility function that creates and starts a container, and then reads the logs
@@ -92,8 +114,8 @@
   (let [{id :Id :as co} (create-container c name config)]
     (start-container c id)
     (->> (container-logs c id)
-         (stream->lines)
-         (map (comp :message parse-log-line)))))
+         (parse-log-stream)
+         (map (comp (memfn trim) :message)))))
 
 (defrecord DockerConfig [config]
   sr/StepRunner
