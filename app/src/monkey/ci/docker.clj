@@ -35,6 +35,11 @@
                     :params {:name name}
                     :data (convert-body config)}))
 
+(defn inspect-container
+  [client id]
+  (c/invoke client {:op :ContainerInspect
+                    :params {:id id}}))
+
 (defn delete-container
   [client id]
   (c/invoke client {:op :ContainerDelete
@@ -53,11 +58,12 @@
 
 (defn container-logs
   "Attaches to the container in order to read logs"
-  [client id]
+  [client id & [opts]]
   (c/invoke client {:op :ContainerLogs
-                    :params {:id id
-                             :follow true
-                             :stdout true}
+                    :params (merge {:id id
+                                    :follow true
+                                    :stdout true}
+                                   opts)
                     :as :stream}))
 
 (def stream-types [:stdin :stdout :stderr])
@@ -66,7 +72,7 @@
   "Given a char seq that is actually a byte array, converts it to an integer"
   [arr]
   (reduce (fn [r b]
-            (+ (* 16 r) (int b)))
+            (+ (* 0x100 r) (mod (+ 0x100 (int b)) 0x100)))
           0
           arr))
 
@@ -85,20 +91,32 @@
 
 (defn- parse-next-line
   "Parses the next line from the input stream, or returns `nil` if the
-   stream is at an end."
+   stream is at an end.  Closes the stream if no more information could
+   be read."
   [in]
-  (let [buf (byte-array 4)]
-    (when-let [t (some->> (read-into-buf in buf)
-                          (first)
-                          (int)
-                          (get stream-types))]
-      (when-let [s (some-> (read-into-buf in buf)
-                           (arr->int))]
-        (when-let [msg (some-> (read-exactly in s)
-                               (String.))]
-          {:stream-type t
-           :size s
-           :message msg})))))
+  (let [buf (byte-array 4)
+        read-type (fn []
+                    (let [st (some->> (read-into-buf in buf)
+                                      (first)
+                                      (int)
+                                      (get stream-types))]
+                      (if (every? zero? (->> buf (seq) (rest)))
+                        st
+                        (log/warn "Invalid header, expected all zeroes:" (seq buf)))))
+        read-size (fn [t]
+                    (when-let [s (some-> (read-into-buf in buf)
+                                         (arr->int))]
+                      {:stream-type t
+                       :size s}))
+        read-msg (fn [{:keys [size] :as r}]
+                   (when-let [msg (some-> (read-exactly in size)
+                                          (String.))]
+                     (assoc r :message msg)))]
+    ;; Either return the parsed line, or close the stream
+    (or (some-> (read-type)
+                (read-size)
+                (read-msg))
+        (.close in))))
 
 (defn parse-log-stream
   "Given a Docker input stream, parses it in to lines and returns it as
