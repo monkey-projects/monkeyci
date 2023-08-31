@@ -11,8 +11,10 @@
              [process :as p]
              [runners :as r]]))
 
-(defn make-config [env args]
-  ;; TODO
+(defn make-config
+  "Creates a build configuration that includes the environment and any args passed in.
+   This is then used to create a build runner."
+  [env args]
   {:runner {:type (keyword (:monkeyci-runner-type env))}
    :env env
    :script args})

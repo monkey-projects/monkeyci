@@ -17,7 +17,7 @@
 
 (defn run
   "Run function for when a build task is executed using clojure tools.  This function
-   is run in a child process by the `execute!` function below.  This exists the VM
+   is run in a child process by the `execute!` function below.  This exits the VM
    with a nonzero value on failure."
   [args]
   (log/debug "Executing script with args" args)
@@ -68,6 +68,7 @@
                     (mc/map-vals pr-str)
                     (into [])
                     (flatten))
+          ;; TODO Pass additional config through env
           result (apply bp/shell
                         {:dir script-dir
                          ;; TODO Stream output or write to file

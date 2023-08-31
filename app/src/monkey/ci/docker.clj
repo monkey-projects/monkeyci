@@ -4,7 +4,8 @@
             [clojure.tools.logging :as log]
             [clojure.walk :as cw]
             [contajners.core :as c]
-            [monkey.ci.step-runner :as sr])
+            [medley.core :as mc]
+            [monkey.ci.containers :as mcc])
   (:import org.apache.commons.io.IOUtils))
 
 (def default-conn {:uri "unix:///var/run/docker.sock"})
@@ -38,6 +39,13 @@
 (defn- invoke-and-convert [client & args]
   (-> (apply c/invoke client args)
       (->kebab-case)))
+
+(defn pull-image
+  "Pulls image from given url.  Requires a client for category `:images`."
+  [client url]
+  (invoke-and-convert client
+                      {:op :ImageCreate
+                       :params {:fromImage url}}))
 
 (defn create-container
   "Creates a container with given name and configuration.  `client` must
@@ -80,7 +88,8 @@
                                     :follow true
                                     :stdout true}
                                    opts)
-                    :as :stream}))
+                    :as :stream
+                    :throw-exceptions true}))
 
 (def stream-types [:stdin :stdout :stderr])
 
@@ -147,13 +156,43 @@
   "Utility function that creates and starts a container, and then reads the logs
    and returns them as a seq of strings."
   [c name config]
-  (let [{id :Id :as co} (create-container c name config)]
+  (let [{:keys [id] :as co} (create-container c name config)]
     (start-container c id)
     (->> (container-logs c id)
          (parse-log-stream)
          (map (comp (memfn trim) :message)))))
 
-(defrecord DockerConfig [config]
-  sr/StepRunner
-  (run-step [this ctx]
-    :todo))
+(defn ctx->container-config
+  "Extracts all keys from the context step that have the `container` namespace,
+   and drops that namespace."
+  [ctx]
+  (->> ctx
+       :step
+       (mc/filter-keys (comp (partial = "container") namespace))
+       (mc/map-keys (comp keyword name))))
+
+(defn make-docker-runner [config]
+  (let [client (make-client :containers (get-in config [:env :docker-connection]))]
+    (fn [ctx]
+      (let [cn (str "build-" (random-uuid))
+            conf (ctx->container-config ctx)
+            cont (create-container client cn conf)]
+        (log/debug "Container configuration:" conf)
+        (log/info "Starting container" cn)
+        (start-container client cn)
+        cont))))
+
+(defmethod mcc/run-container :docker [ctx]
+  (let [cn (str "build-" (random-uuid))
+        conn (get-in ctx [:env :docker-connection])
+        client (make-client :containers conn)
+        {:keys [image] :as conf} (ctx->container-config ctx)]
+    (log/debug "Container configuration:" conf)
+    (log/info "Pulling" image)
+    (pull-image (make-client :images conn) image)
+    (let [cont (create-container client cn conf)]
+      (log/info "Starting container" cn)
+      (start-container client cn)
+      ;; TODO Attach to container and execute the script
+      ;; When script has been executed, stop the container
+      cont)))

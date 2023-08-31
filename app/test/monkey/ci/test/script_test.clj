@@ -1,6 +1,8 @@
 (ns monkey.ci.test.script-test
   (:require [clojure.test :refer :all]
-            [monkey.ci.script :as sut]
+            [monkey.ci
+             [containers :as c]
+             [script :as sut]]
             [monkey.ci.build.core :as bc]))
 
 (deftest exec-script!
@@ -39,3 +41,16 @@
                                          :steps [(constantly bc/failure)]})]
                           (sut/run-pipelines {:pipeline "first"}))))))
 
+(defmethod c/run-container :test [ctx]
+  :run-from-test)
+
+(deftest pipeline-run-step
+  (testing "executes function directly"
+    (is (= :ok (sut/run-step (constantly :ok) {}))))
+
+  (testing "executes action from map"
+    (is (= :ok (sut/run-step {:action (constantly :ok)} {}))))
+
+  (testing "executes in container if configured"
+    (let [config {:container/image "test-image"}]
+      (is (= :run-from-test (sut/run-step config {:container-runner :test}))))))
