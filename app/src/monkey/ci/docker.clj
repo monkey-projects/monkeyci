@@ -18,27 +18,41 @@
              :version api-version
              :conn (or conn default-conn)}))
 
-(defn- convert-body
-  "Converts body to PascalCase as required by Docker api."
-  [b]
+(defn- convert-keys [obj f]
   (cw/postwalk (fn [x]
                  (if (map-entry? x)
-                   [(csk/->PascalCaseKeyword (first x)) (second x)]
+                   [(f (first x)) (second x)]
                    x))
-               b))
+               obj))
+
+(defn- ->pascal-case
+  "Converts body to PascalCase as required by Docker api."
+  [b]
+  (convert-keys b csk/->PascalCaseKeyword))
+
+(defn- ->kebab-case
+  "Converts object to kebab-case."
+  [b]
+  (convert-keys b csk/->kebab-case-keyword))
+
+(defn- invoke-and-convert [client & args]
+  (-> (apply c/invoke client args)
+      (->kebab-case)))
 
 (defn create-container
   "Creates a container with given name and configuration.  `client` must
    be for category `:containers`."
   [client name config]
-  (c/invoke client {:op :ContainerCreate
-                    :params {:name name}
-                    :data (convert-body config)}))
+  (invoke-and-convert client
+                      {:op :ContainerCreate
+                       :params {:name name}
+                       :data (->pascal-case config)}))
 
 (defn inspect-container
   [client id]
-  (c/invoke client {:op :ContainerInspect
-                    :params {:id id}}))
+  (invoke-and-convert client
+                      {:op :ContainerInspect
+                       :params {:id id}}))
 
 (defn delete-container
   [client id]
@@ -47,14 +61,16 @@
 
 (defn list-containers
   [client args]
-  (c/invoke client {:op :ContainerList
-                    :params args}))
+  (invoke-and-convert client
+                      {:op :ContainerList
+                       :params args}))
 
 (defn start-container
   "Starts the container, returns the output as a stream"
   [client id]
-  (c/invoke client {:op :ContainerStart
-                    :params {:id id}}))
+  (invoke-and-convert client
+                      {:op :ContainerStart
+                       :params {:id id}}))
 
 (defn container-logs
   "Attaches to the container in order to read logs"
@@ -116,7 +132,9 @@
     (or (some-> (read-type)
                 (read-size)
                 (read-msg))
-        (.close in))))
+        (do
+          (log/debug "Closing log input stream")
+          (.close in)))))
 
 (defn parse-log-stream
   "Given a Docker input stream, parses it in to lines and returns it as
