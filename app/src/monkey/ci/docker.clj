@@ -7,7 +7,7 @@
             [medley.core :as mc]
             [monkey.ci.containers :as mcc])
   (:import org.apache.commons.io.IOUtils
-           [java.io InputStreamReader PrintWriter PushbackReader]))
+           [java.io PrintWriter]))
 
 (def default-conn {:uri "unix:///var/run/docker.sock"})
 (def api-version "v1.41")
@@ -201,95 +201,92 @@
         (start-container client cn)
         cont))))
 
-(defn read-until-match
-  "Reads from the pushback reader until the given value is encountered.  Pushes
-   back all the characters read after that.  Returns all characters read until
-   the value was seen, or `nil` if the value has not been encountered before EOF."
-  [^PushbackReader r p]
-;;  (log/debug "Scanning for:" p)
-  (let [buf (char-array (count p))]
-    (loop [acc ""
-           n (.read r buf)]
-      (log/debug "Read" n "chars")
-      (if (neg? n)
-        ;; EOF reached
-        nil
-        ;; Otherwise some data was read, check if the value has been found
-        (let [s (String. buf 0 n)
-              all (str acc s)
-              idx (.indexOf all p)]
-          (if (neg? idx)
-            ;; Value not encountered yet, try again
-            (recur all (.read r buf))
-            ;; Match found, push back any leftover chars and return
-            (let [leftover (- (count all) idx (count p))
-                  offs (- n leftover)]
-              ;; FIXME Something's wrong here.  Leftover is always 4 even though the string is at an end.
-              (when (and (pos? leftover) (< offs (count s)))
-                (log/debug "Pushing back" leftover "chars from offset" offs ":"
-                           (subs s offs (+ offs leftover)) "from" s)
-                (.unread r buf offs leftover))
-              (subs all 0 idx))))))))
-
 (defmethod mcc/run-container :docker [ctx]
   (let [cn (str "build-" (random-uuid))
         job-id (get ctx :job-id (str (random-uuid)))
         prompt (str job-id "$")
         conn (get-in ctx [:env :docker-connection])
         client (make-client :containers conn)
+        output-dir (doto (io/file "tmp" job-id)
+                     (.mkdirs))
+        internal-log-dir "/var/log/monkeyci"
+        log-path (fn [s]
+                   (.getAbsolutePath (io/file internal-log-dir s)))
         {:keys [image] :as conf} (merge (ctx->container-config ctx)
-                                        {:cmd ["/bin/sh" "-e"]
+                                        {:cmd ["/bin/sh"]
                                          :open-stdin true
                                          :attach-stdin false
                                          :attach-stdout true
                                          :attach-stderr true
-                                         :tty true
-                                         ;; Specify custom prompt
-                                         :env [(str "PS1=" prompt)]})
-        print-logs (fn []
-                     (->> (container-logs client cn)
-                          (parse-log-stream)
-                          (map (comp (memfn trim) :message))
-                          (map (fn [l] (log/info l)))
-                          (doall)))
+                                         ;; Mount a dir where we will pipe the outputs to
+                                         :host-config
+                                         {:binds [(str (.getAbsolutePath output-dir) ":" internal-log-dir)]}})
+        
         pull   (fn [{:keys [image]}]
                  (log/debug "Pulling image")
                  (:id (pull-image (make-client :images conn) image)))
+        
         create (fn [_]
                  (log/debug "Creating container with configuration" conf)
                  (create-container client cn conf))
+        
         start  (fn [{:keys [id] :as cont}]
                  (log/info "Starting container" cn "(id " id ")")
                  (when (start-container client id)
                    (log/debug "Container started")
                    cont))
+        
         attach (fn [{:keys [id] :as cont}]
                  (log/debug "Attaching to container" id)
                  (some->> (attach-container client id)
                           (hash-map :container cont :socket)))
-        wait-for-prompt (fn [r]
-                          (log/debug "Waiting for prompt...")
-                          ;; Wait for prompt but wrap in a future to allow for timeout
-                          ;; For longer running tasks we'll need to increase this timeout.
-                          (deref (future (read-until-match r prompt)) 10000 :timeout))
+        
+        execute-step (fn [pw in idx s]
+                       (log/info "Executing:" s)
+                       (let [out (str idx "-out")
+                             err (str idx "-err")]
+                         ;; Execute command with output redirection and then print the exit code
+                         (.println pw (format "%s >%s 2>%s; echo $?"
+                                              s
+                                              (log-path out)
+                                              (log-path err)))
+                         ;; Read exit code
+                         (->> (parse-next-line in)
+                              :message
+                              (.trim)
+                              (Integer/parseInt)
+                              (hash-map :idx idx
+                                        :cmd s
+                                        :stdin (io/file output-dir out)
+                                        :stderr (io/file output-dir err)
+                                        :exit))))
+        
         execute (fn [{:keys [socket container] :as state}]
                   (let [script (get-in ctx [:step :script])
                         pw (PrintWriter. (.getOutputStream socket) true)
-                        r (PushbackReader. (InputStreamReader. (.getInputStream socket)) (count prompt))
-                        execute-step (fn [s]
-                                       (log/info "Executing:" s)
-                                       (.println pw s)
-                                       (wait-for-prompt r))]
-                    ;; When script has been executed, stop the container
+                        in (.getInputStream socket)]
+                    ;; Run all steps until one returns nonzero
                     (log/debug "Executing" (count script) "commands in container")
-                    (let [logs (->> script
-                                    (map execute-step)
-                                    (doall))]
-                      ;; Stop the container by exiting
-                      (log/debug "Exiting")
-                      (.println pw "exit")
-                      (.close r)
-                      (assoc state :logs logs))))
+                    (try
+                      (->> (loop [s script
+                                  idx 0
+                                  results []]
+                             (if (empty? s)
+                               results
+                               (let [{:keys [exit] :as r} (execute-step pw in idx (first s))
+                                     acc (conj results r)]
+                                 (if (zero? exit)
+                                   ;; Continue with next command
+                                   (recur (rest s) (inc idx) acc)
+                                   (do
+                                     (log/warn "Step" (:idx r) "failed with exit code" exit)
+                                     acc)))))
+                           (assoc state :results))
+                      (finally
+                        ;; Stop the container by exiting
+                        (log/debug "Exiting")
+                        (.println pw "exit")))))
+        
         shutdown (fn [{:keys [socket container] :as state}]
                    (log/debug "Closing socket")
                    (.close socket)
@@ -297,10 +294,12 @@
                    (stop-container client (:id container))
                    (log/info "Done.")
                    state)
-        return (fn [{:keys [logs]}]
+        
+        return (fn [{:keys [results]}]
+                 ;; Get the container exit code and add the script logs
                  (let [res (inspect-container client cn)]
                    {:exit (get-in res [:state :exit-code])
-                    :logs logs}))]
+                    :results results}))]
     (some-> conf
             (pull)
             (create)
