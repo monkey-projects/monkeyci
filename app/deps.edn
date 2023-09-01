@@ -21,9 +21,7 @@
   :test
   {:extra-paths [:test-paths]
    :extra-deps {com.monkeyprojects/build {:mvn/version "0.1.0-SNAPSHOT"}}
-   :exec-fn monkey.test/all
-   ;; Add this to avoid falling back to the default logger
-   :jvm-opts ["-Dlogback.configurationFile=resources/logback.xml"]}
+   :exec-fn monkey.test/all}
 
   :junit ; Use this in conjunction with :test
   {:extra-deps {lambdaisland/kaocha-junit-xml {:mvn/version "1.17.101"}}
@@ -33,7 +31,9 @@
                "--plugin" "kaocha.plugin/profiling"
                "--junit-xml-file" "junit.xml"
                ;; Skip docker integration tests, they require access to the socket
-               "--skip-meta" ":docker"]}
+               "--skip-meta" ":docker"]
+   ;; Add this to avoid falling back to the default logger
+   :jvm-opts ["-Dlogback.configurationFile=resources/logback.xml"]}
 
   :coverage
   {:exec-fn monkey.test/coverage

@@ -7,7 +7,7 @@
             [medley.core :as mc]
             [monkey.ci.containers :as mcc])
   (:import org.apache.commons.io.IOUtils
-           [java.io PrintWriter]))
+           [java.io InputStreamReader PrintWriter PushbackReader]))
 
 (def default-conn {:uri "unix:///var/run/docker.sock"})
 (def api-version "v1.41")
@@ -201,48 +201,111 @@
         (start-container client cn)
         cont))))
 
+(defn read-until-match
+  "Reads from the pushback reader until the given value is encountered.  Pushes
+   back all the characters read after that.  Returns all characters read until
+   the value was seen, or `nil` if the value has not been encountered before EOF."
+  [^PushbackReader r p]
+;;  (log/debug "Scanning for:" p)
+  (let [buf (char-array (count p))]
+    (loop [acc ""
+           n (.read r buf)]
+      (log/debug "Read" n "chars")
+      (if (neg? n)
+        ;; EOF reached
+        nil
+        ;; Otherwise some data was read, check if the value has been found
+        (let [s (String. buf 0 n)
+              all (str acc s)
+              idx (.indexOf all p)]
+          (if (neg? idx)
+            ;; Value not encountered yet, try again
+            (recur all (.read r buf))
+            ;; Match found, push back any leftover chars and return
+            (let [leftover (- (count all) idx (count p))
+                  offs (- n leftover)]
+              ;; FIXME Something's wrong here.  Leftover is always 4 even though the string is at an end.
+              (when (and (pos? leftover) (< offs (count s)))
+                (log/debug "Pushing back" leftover "chars from offset" offs ":"
+                           (subs s offs (+ offs leftover)) "from" s)
+                (.unread r buf offs leftover))
+              (subs all 0 idx))))))))
+
 (defmethod mcc/run-container :docker [ctx]
   (let [cn (str "build-" (random-uuid))
+        job-id (get ctx :job-id (str (random-uuid)))
+        prompt (str job-id "$")
         conn (get-in ctx [:env :docker-connection])
         client (make-client :containers conn)
         {:keys [image] :as conf} (merge (ctx->container-config ctx)
                                         {:cmd ["/bin/sh" "-e"]
-                                         :attach-stdin true
-                                         :open-stdin true})
+                                         :open-stdin true
+                                         :attach-stdin false
+                                         :attach-stdout true
+                                         :attach-stderr true
+                                         :tty true
+                                         ;; Specify custom prompt
+                                         :env [(str "PS1=" prompt)]})
         print-logs (fn []
                      (->> (container-logs client cn)
                           (parse-log-stream)
                           (map (comp (memfn trim) :message))
                           (map (fn [l] (log/info l)))
-                          (doall)))]
-    ;; Just messing around here
-    (log/debug "Container configuration:" conf)
-    (log/info "Pulling" image)
-    (pull-image (make-client :images conn) image)
-    (let [cont (create-container client cn conf)]
-      (log/debug "Container created:" cont)
-      (log/info "Starting container" cn)
-      (start-container client cn)
-      ;; Start a thread to print the output
-      (doto (Thread. print-logs)
-        (.start))
-      ;; Attach to container and execute the script
-      (let [socket (attach-container client cn)
-            script (get-in ctx [:step :script])
-            pw (PrintWriter. (.getOutputStream socket) true)]
-        ;; When script has been executed, stop the container
-        (log/debug "Executing" (count script) "commands in container")
-        (doseq [s script]
-          (log/info "Executing:" s)
-          (.println pw s))
-        ;; Stop the container by exiting
-        (log/debug "Exiting")
-        (.println pw "exit")
-        (log/debug "Closing socket")
-        (.close socket)
-        (log/debug "Stopping container")
-        (stop-container client cn)
-        (log/info "Done.")
-        ;; Return container details
-        (let [res (inspect-container client cn)]
-          {:exit (get-in res [:state :exit-code])})))))
+                          (doall)))
+        pull   (fn [{:keys [image]}]
+                 (log/debug "Pulling image")
+                 (:id (pull-image (make-client :images conn) image)))
+        create (fn [_]
+                 (log/debug "Creating container with configuration" conf)
+                 (create-container client cn conf))
+        start  (fn [{:keys [id] :as cont}]
+                 (log/info "Starting container" cn "(id " id ")")
+                 (when (start-container client id)
+                   (log/debug "Container started")
+                   cont))
+        attach (fn [{:keys [id] :as cont}]
+                 (log/debug "Attaching to container" id)
+                 (some->> (attach-container client id)
+                          (hash-map :container cont :socket)))
+        wait-for-prompt (fn [r]
+                          (log/debug "Waiting for prompt...")
+                          ;; Wait for prompt but wrap in a future to allow for timeout
+                          ;; For longer running tasks we'll need to increase this timeout.
+                          (deref (future (read-until-match r prompt)) 10000 :timeout))
+        execute (fn [{:keys [socket container] :as state}]
+                  (let [script (get-in ctx [:step :script])
+                        pw (PrintWriter. (.getOutputStream socket) true)
+                        r (PushbackReader. (InputStreamReader. (.getInputStream socket)) (count prompt))
+                        execute-step (fn [s]
+                                       (log/info "Executing:" s)
+                                       (.println pw s)
+                                       (wait-for-prompt r))]
+                    ;; When script has been executed, stop the container
+                    (log/debug "Executing" (count script) "commands in container")
+                    (let [logs (->> script
+                                    (map execute-step)
+                                    (doall))]
+                      ;; Stop the container by exiting
+                      (log/debug "Exiting")
+                      (.println pw "exit")
+                      (.close r)
+                      (assoc state :logs logs))))
+        shutdown (fn [{:keys [socket container] :as state}]
+                   (log/debug "Closing socket")
+                   (.close socket)
+                   (log/debug "Stopping container" (:id container))
+                   (stop-container client (:id container))
+                   (log/info "Done.")
+                   state)
+        return (fn [{:keys [logs]}]
+                 (let [res (inspect-container client cn)]
+                   {:exit (get-in res [:state :exit-code])
+                    :logs logs}))]
+    (some-> conf
+            (pull)
+            (create)
+            (start)
+            (attach)
+            (execute)
+            (shutdown)
+            (return))))
