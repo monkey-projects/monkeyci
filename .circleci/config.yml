@@ -234,7 +234,7 @@ workflows:
       - deploy-app-lib:
           context: clojars-monkeyci
           requires:
-            - test-app-lib
+            - test-app
           filters:
             branches:
               only: [main]
