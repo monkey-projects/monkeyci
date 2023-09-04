@@ -52,7 +52,10 @@
 ;; Return the pipelines
 [(core/pipeline
   {:name "test"
-   :steps [test-script
+   :steps [;;test-script
+           {:container/image "clojure:temurin-20-tools-deps-alpine"
+            :script ["clojure -X:test:junit"]
+            :action (constantly "unused")}
            test-app]})
 
  (core/pipeline

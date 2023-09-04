@@ -56,7 +56,11 @@
              :option "workdir"
              :short "w"
              :type :string
-             :default "."}]
+             :default "."}
+            {:as "Development mode"
+             :option "dev-mode"
+             :type :with-flag
+             :default false}]
      :subcommands [{:command "version"
                     :description "Prints current version"
                     :runs (invoker print-version)}

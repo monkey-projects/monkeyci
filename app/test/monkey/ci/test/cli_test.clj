@@ -41,4 +41,8 @@
 
         (testing "allows specifying pipeline name"
           (let [lc (run-cli "build" "-p" "test-pipeline")]
-            (is (= "test-pipeline" (get-in lc [:args :pipeline])))))))))
+            (is (= "test-pipeline" (get-in lc [:args :pipeline])))))
+                
+        (testing "accepts dev mode"
+          (let [lc (run-cli "--dev-mode" "build" "test-dir")]
+            (is (true? (get-in lc [:args :dev-mode])))))))))

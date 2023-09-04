@@ -5,7 +5,9 @@
             [clojure.walk :as cw]
             [contajners.core :as c]
             [medley.core :as mc]
-            [monkey.ci.containers :as mcc])
+            [monkey.ci
+             [containers :as mcc]
+             [utils :as u]])
   (:import org.apache.commons.io.IOUtils
            [java.io PrintWriter]))
 
@@ -201,7 +203,7 @@
         (start-container client cn)
         cont))))
 
-(defmethod mcc/run-container :docker [ctx]
+(defmethod mcc/run-container :docker [{:keys [work-dir] :as ctx}]
   (let [cn (str "build-" (random-uuid))
         job-id (get ctx :job-id (str (random-uuid)))
         prompt (str job-id "$")
@@ -209,18 +211,26 @@
         client (make-client :containers conn)
         output-dir (doto (io/file "tmp" job-id)
                      (.mkdirs))
+        work-dir (or work-dir (u/cwd))
+        remote-wd "/home/build"
         internal-log-dir "/var/log/monkeyci"
+        ->abs-path (fn [s]
+                     (str (.getAbsolutePath (io/file s))))
         log-path (fn [s]
-                   (.getAbsolutePath (io/file internal-log-dir s)))
+                   (->abs-path (io/file internal-log-dir s)))
         {:keys [image] :as conf} (merge (ctx->container-config ctx)
                                         {:cmd ["/bin/sh"]
                                          :open-stdin true
                                          :attach-stdin false
                                          :attach-stdout true
                                          :attach-stderr true
-                                         ;; Mount a dir where we will pipe the outputs to
+                                         :working-dir remote-wd
                                          :host-config
-                                         {:binds [(str (.getAbsolutePath output-dir) ":" internal-log-dir)]}})
+                                         {:binds
+                                          ;; Mount a dir where we will pipe the outputs to
+                                          [(str (->abs-path output-dir) ":" internal-log-dir)
+                                           ;; The working dir
+                                           (str (->abs-path work-dir) ":" remote-wd)]}})
         
         pull   (fn [{:keys [image]}]
                  (log/debug "Pulling image")
@@ -246,6 +256,7 @@
                        (let [out (str idx "-out")
                              err (str idx "-err")]
                          ;; Execute command with output redirection and then print the exit code
+                         ;; TODO Find a better way.  This is brittle.
                          (.println pw (format "%s >%s 2>%s; echo $?"
                                               s
                                               (log-path out)
@@ -257,7 +268,7 @@
                               (Integer/parseInt)
                               (hash-map :idx idx
                                         :cmd s
-                                        :stdin (io/file output-dir out)
+                                        :stdout (io/file output-dir out)
                                         :stderr (io/file output-dir err)
                                         :exit))))
         

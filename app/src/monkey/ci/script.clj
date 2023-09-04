@@ -30,11 +30,12 @@
 
   clojure.lang.IPersistentMap
   (run-step [{:keys [action] :as step} ctx]
+    ;; TODO Make more generic
     (cond
-      (some? action)
-      (run-step action ctx)
       (some? (:container/image step))
       (run-container-step ctx)
+      (some? action)
+      (run-step action ctx)
       :else
       (throw (ex-info "invalid step configuration" {:step step})))))
 

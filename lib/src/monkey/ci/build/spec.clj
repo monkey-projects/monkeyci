@@ -4,10 +4,15 @@
 (s/def :ci/name string?)
 (s/def :ci/action fn?)
 (s/def :ci/status #{:success :failure})
+(s/def :ci/script-step string?)
+(s/def :ci/script (s/coll-of :ci/script-step))
+
+(s/def :container/image string?)
 
 (s/def :ci/step (s/or :fn fn?
                       :map (s/keys :req-un [:ci/action]
-                                   :opt-un [:ci/name])))
+                                   :opt-un [:ci/name :ci/script]
+                                   :opt [:container/image])))
 (s/def :ci/output string?)
 (s/def :ci/exception (partial instance? java.lang.Exception))
 
