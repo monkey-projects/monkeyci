@@ -20,9 +20,10 @@
    is run in a child process by the `execute!` function below.  This exits the VM
    with a nonzero value on failure."
   [args]
-  (log/debug "Executing script with args" args)
-  (when (bc/failed? (script/exec-script! args))
-    (System/exit 1)))
+  (let [ctx (assoc args :container-runner :docker)]
+    (log/debug "Executing script with context" ctx)
+    (when (bc/failed? (script/exec-script! ctx))
+      (System/exit 1))))
 
 (defn- local-script-lib-dir
   "Calculates the local script directory as a sibling dir of the
@@ -84,7 +85,7 @@
       ;; If the process has a nonzero exit code, print the stderr output
       #_(when-not (zero? (:exit result))
         (log/warn "Error output:" (:err result)))
-      (bp/shell {:dir script-dir} "clojure" "-Stree" "-Sdeps" (generate-deps config) "-A:monkeyci/build")
+      #_(bp/shell {:dir script-dir} "clojure" "-Stree" "-Sdeps" (generate-deps config) "-A:monkeyci/build")
       result)
     (catch Exception ex
       (let [{:keys [out err] :as data} (ex-data ex)]

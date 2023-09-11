@@ -203,7 +203,7 @@
         (start-container client cn)
         cont))))
 
-(defmethod mcc/run-container :docker [{:keys [work-dir] :as ctx}]
+(defmethod mcc/run-container :docker [ctx]
   (let [cn (str "build-" (random-uuid))
         job-id (get ctx :job-id (str (random-uuid)))
         prompt (str job-id "$")
@@ -211,7 +211,9 @@
         client (make-client :containers conn)
         output-dir (doto (io/file "tmp" job-id)
                      (.mkdirs))
-        work-dir (or work-dir (u/cwd))
+        work-dir ((some-fn (comp :work-dir :step)
+                           :work-dir
+                           (constantly (u/cwd))) ctx)
         remote-wd "/home/build"
         internal-log-dir "/var/log/monkeyci"
         ->abs-path (fn [s]
@@ -308,8 +310,8 @@
         
         return (fn [{:keys [results]}]
                  ;; Get the container exit code and add the script logs
-                 (let [res (inspect-container client cn)]
-                   {:exit (get-in res [:state :exit-code])
+                 (let [exit-code (get-in (inspect-container client cn) [:state :exit-code])]
+                   {:exit exit-code
                     :results results}))]
     (some-> conf
             (pull)

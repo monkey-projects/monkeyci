@@ -19,7 +19,10 @@
   "Runs the step in a new container.  How this container is executed depends on
    the configuration passed in from the parent process, specified in the context."
   [ctx]
-  (c/run-container ctx))
+  (let [{:keys [exit] :as r} (->> (c/run-container ctx)
+                                  (merge bc/failure))]
+    (cond-> r
+      (zero? exit) (merge bc/success))))
 
 (extend-protocol PipelineStep
   clojure.lang.Fn

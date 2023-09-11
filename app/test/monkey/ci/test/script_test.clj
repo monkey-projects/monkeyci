@@ -42,7 +42,8 @@
                           (sut/run-pipelines {:pipeline "first"}))))))
 
 (defmethod c/run-container :test [ctx]
-  :run-from-test)
+  {:test-result :run-from-test
+   :exit 0})
 
 (deftest pipeline-run-step
   (testing "executes function directly"
@@ -52,5 +53,7 @@
     (is (= :ok (sut/run-step {:action (constantly :ok)} {}))))
 
   (testing "executes in container if configured"
-    (let [config {:container/image "test-image"}]
-      (is (= :run-from-test (sut/run-step config {:container-runner :test}))))))
+    (let [config {:container/image "test-image"}
+          r (sut/run-step config {:container-runner :test})]
+      (is (= :run-from-test (:test-result r)))
+      (is (bc/success? r)))))

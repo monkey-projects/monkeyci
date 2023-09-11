@@ -43,8 +43,7 @@
 (defn default-invoker
   "Wrap the command in a fn to enable better testing"
   [cmd env]
-  (fn [args]
-    (cmd env args)))
+  (partial cmd env))
 
 (defn make-cli-config [{:keys [env cmd-invoker] :or {cmd-invoker default-invoker}}]
   (letfn [(invoker [cmd]

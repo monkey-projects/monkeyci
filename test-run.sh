@@ -6,4 +6,4 @@ cd ../app
 clojure -X:jar:install
 clojure -X:jar:uber
 cd ..
-java -jar app/target/monkeyci-standalone.jar build
+java -jar app/target/monkeyci-standalone.jar build -p test

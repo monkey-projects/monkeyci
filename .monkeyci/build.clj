@@ -17,7 +17,7 @@
 (def clj-lib (partial clj-dir "lib"))
 (def clj-app (partial clj-dir "app"))
 
-(def test-script (clj-lib "-X:test:junit"))
+(def test-lib (clj-lib "-X:test:junit"))
 (def test-app (clj-app "-M:test:junit"))
 
 (def app-uberjar (clj-app "-X:jar:uber"))
@@ -52,10 +52,11 @@
 ;; Return the pipelines
 [(core/pipeline
   {:name "test"
-   :steps [;;test-script
+   :steps [;;test-lib
            {:container/image "clojure:temurin-20-tools-deps-alpine"
             :script ["clojure -X:test:junit"]
-            :action (constantly "unused")}
+            :action (constantly "unused")
+            :work-dir "lib"}
            test-app]})
 
  (core/pipeline
