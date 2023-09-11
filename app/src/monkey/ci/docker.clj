@@ -206,7 +206,6 @@
 (defmethod mcc/run-container :docker [ctx]
   (let [cn (str "build-" (random-uuid))
         job-id (get ctx :job-id (str (random-uuid)))
-        prompt (str job-id "$")
         conn (get-in ctx [:env :docker-connection])
         client (make-client :containers conn)
         output-dir (doto (io/file "tmp" job-id)
