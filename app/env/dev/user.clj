@@ -6,7 +6,7 @@
 (defn stop-server []
   (swap! server (fn [s]
                   (when s
-                    (s))
+                    (wh/stop-server s))
                   nil)))
 
 (defn start-server []

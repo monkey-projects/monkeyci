@@ -33,7 +33,23 @@
            (ring/redirect-trailing-slash-handler)
            (ring/create-default-handler))))
 
-(defn start-server [opts]
+(defn start-server
+  "Starts http server.  Returns a server object that can be passed to
+   `stop-server`."
+  [opts]
   (let [opts (merge {:port 3000} opts)]
     (log/info "Starting HTTP server at port" (:port opts))
-    (http/run-server app opts)))
+    (http/run-server app (assoc opts :legacy-return-value? false))))
+
+(defn stop-server [s]
+  (when s
+    (log/info "Shutting down HTTP server...")
+    (http/server-stop! s)))
+
+(defn wait-until-stopped
+  "Loops until the web server has stopped."
+  [s]
+  (loop [st (http/server-status s)]
+    (when (not= :stopped st)
+      (Thread/sleep 100)
+      (recur (http/server-status s)))))

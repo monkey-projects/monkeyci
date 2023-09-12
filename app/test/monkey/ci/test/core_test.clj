@@ -1,6 +1,7 @@
 (ns monkey.ci.test.core-test
   (:require [clojure.test :refer :all]
-            [monkey.ci.core :as sut]))
+            [monkey.ci.core :as sut]
+            [monkey.ci.web.handler :as web]))
 
 (deftest main-test
   (with-redefs [clojure.core/shutdown-agents (constantly nil)
@@ -19,3 +20,14 @@
   (testing "returns exit code"
     (is (number? (sut/build {:monkeyci-runner-type :noop}
                             {:dir "examples/basic-clj"})))))
+
+(deftest server
+  (with-redefs [web/start-server (constantly :test-server)
+                web/wait-until-stopped identity]
+    
+    (testing "starts http server and blocks"
+      (is (= :test-server (sut/server {} {}))))
+
+    (testing "registers shutdown hook"
+      ;; TODO
+      )))

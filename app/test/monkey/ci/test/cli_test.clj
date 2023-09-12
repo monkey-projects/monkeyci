@@ -41,4 +41,13 @@
 
         (testing "allows specifying pipeline name"
           (let [lc (run-cli "build" "-p" "test-pipeline")]
-            (is (= "test-pipeline" (get-in lc [:args :pipeline])))))))))
+            (is (= "test-pipeline" (get-in lc [:args :pipeline]))))))
+
+      (testing "`server` command"
+        (testing "runs `server` command"
+          (is (= core/server (:cmd (run-cli "server")))))
+
+        (testing "accepts listening port `-p`"
+          (is (= 1234 (-> (run-cli "server" "-p" "1234")
+                          :args
+                          :port))))))))
