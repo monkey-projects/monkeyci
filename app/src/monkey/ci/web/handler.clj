@@ -33,13 +33,18 @@
            (ring/redirect-trailing-slash-handler)
            (ring/create-default-handler))))
 
+(def default-http-opts
+  ;; Virtual threads are still a preview feature
+  { ;;:worker-pool (java.util.concurrent.Executors/newVirtualThreadPerTaskExecutor)
+   :legacy-return-value? false})
+
 (defn start-server
   "Starts http server.  Returns a server object that can be passed to
    `stop-server`."
   [opts]
   (let [opts (merge {:port 3000} opts)]
     (log/info "Starting HTTP server at port" (:port opts))
-    (http/run-server app (assoc opts :legacy-return-value? false))))
+    (http/run-server app (merge opts default-http-opts))))
 
 (defn stop-server [s]
   (when s
