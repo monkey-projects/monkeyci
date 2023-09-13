@@ -33,7 +33,7 @@
                        :port))))
 
     (testing "passes args as opts"
-      (is (= 1234 (-> (sut/start-server {:port 1234})
+      (is (= 1234 (-> (sut/start-server {:http {:port 1234}})
                       :opts
                       :port))))
 

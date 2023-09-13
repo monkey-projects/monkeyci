@@ -80,10 +80,10 @@
   "Starts http server.  Returns a server object that can be passed to
    `stop-server`."
   [opts]
-  (let [opts (merge {:port 3000} opts)]
-    (log/info "Starting HTTP server at port" (:port opts))
+  (let [http-opts (merge {:port 3000} (:http opts))]
+    (log/info "Starting HTTP server at port" (:port http-opts))
     (http/run-server (make-app opts)
-                     (merge opts default-http-opts))))
+                     (merge http-opts default-http-opts))))
 
 (defn stop-server [s]
   (when s
