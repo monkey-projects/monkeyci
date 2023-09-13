@@ -1,13 +1,22 @@
 (ns monkey.ci.test.web.handler-test
-  (:require [clojure.test :refer [deftest testing is]]
+  (:require [buddy.core
+             [codecs :as codecs]
+             [mac :as mac]]
+            [clojure.test :refer [deftest testing is]]
             [clojure.core.async :as ca]
             [monkey.ci.web.handler :as sut]
             [org.httpkit.server :as http]
             [ring.mock.request :as mock]))
 
-(deftest app
-  (testing "is a fn"
-    (is (fn? sut/app))))
+(deftest make-app
+  (testing "creates a fn"
+    (is (fn? (sut/make-app {})))))
+
+(def github-secret "github-secret")
+
+(def test-app (sut/make-app
+               {:github
+                {:secret github-secret}}))
 
 (deftest start-server
   (with-redefs [http/run-server (fn [h opts]
@@ -38,18 +47,30 @@
 (deftest http-routes
   (testing "health check at `/health`"
     (is (= 200 (-> (mock/request :get "/health")
-                   (sut/app)
+                   (test-app)
                    :status))))
 
   (testing "404 when not found"
     (is (= 404 (-> (mock/request :get "/nonexisting")
-                   (sut/app)
+                   (test-app)
                    :status))))
 
-  (testing "`POST /webhook/github` accepts"
-    (is (= 200 (-> (mock/request :post "/webhook/github")
-                   (sut/app)
-                   :status)))))
+  (testing "`POST /webhook/github`"
+    (testing "accepts with valid security header"
+      (let [payload "test body"
+            signature (-> (mac/hash payload {:key github-secret
+                                             :alg :hmac+sha256})
+                          (codecs/bytes->hex))]
+        (is (= 200 (-> (mock/request :post "/webhook/github")
+                       (mock/body payload)
+                       (mock/header :x-hub-signature-256 (str "sha256=" signature))
+                       (test-app)
+                       :status)))))
+
+    (testing "returns 401 if invalid security"
+      (is (= 401 (-> (mock/request :post "/webhook/github")
+                     (test-app)
+                     :status))))))
 
 (defn- try-take [ch timeout timeout-val]
   (let [t (ca/timeout timeout)

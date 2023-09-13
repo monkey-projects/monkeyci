@@ -1,6 +1,8 @@
 (ns monkey.ci.web.handler
   "Handler for the web server"
   (:require [clojure.tools.logging :as log]
+            [medley.core :refer [update-existing]]
+            [monkey.ci.web.github :as github]
             [muuntaja.core :as mc]
             [org.httpkit.server :as http]
             [reitit.ring :as ring]
@@ -19,19 +21,45 @@
   (log/info "Body params:" (:body-params req))
   {:status 200})
 
-(def router
-  (ring/router
-   [["/health" {:get health}]
-    ["/webhook/github" {:post github-webhook}]]
-   {:data {:middleware [rrmp/parameters-middleware
-                        rrmm/format-middleware]
-           :muuntaja mc/instance}}))
+(defn- maybe-generate [s g]
+  (if (some? s)
+    s
+    (let [gen (g)]
+      (log/info "Generated secret key:" gen)
+      gen)))
 
-(def app (ring/ring-handler
-          router
-          (ring/routes
-           (ring/redirect-trailing-slash-handler)
-           (ring/create-default-handler))))
+(def routes
+  [["/health" {:get health}]
+   ["/webhook/github" {:post github-webhook
+                       :middleware [:github-security]}]])
+
+(defn- stringify-body
+  "Since the raw body could be read more than once (security, content negotation...),
+   this interceptor replaces it with a string that can be read multiple times."
+  [h]
+  (fn [req]
+    (-> req
+        (update-existing :body slurp)
+        (h))))
+
+(defn make-router [opts]
+  (ring/router
+   routes
+   {:data {:middleware [stringify-body
+                        rrmp/parameters-middleware
+                        rrmm/format-middleware]
+           :muuntaja mc/instance}
+    :reitit.middleware/registry
+    {:github-security [github/validate-security (maybe-generate
+                                                 (get-in opts [:github :secret])
+                                                 github/generate-secret-key)]}}))
+
+(defn make-app [opts]
+  (ring/ring-handler
+   (make-router opts)
+   (ring/routes
+    (ring/redirect-trailing-slash-handler)
+    (ring/create-default-handler))))
 
 (def default-http-opts
   ;; Virtual threads are still a preview feature
@@ -44,7 +72,8 @@
   [opts]
   (let [opts (merge {:port 3000} opts)]
     (log/info "Starting HTTP server at port" (:port opts))
-    (http/run-server app (merge opts default-http-opts))))
+    (http/run-server (make-app opts)
+                     (merge opts default-http-opts))))
 
 (defn stop-server [s]
   (when s

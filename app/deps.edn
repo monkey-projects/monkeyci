@@ -10,7 +10,8 @@
         http-kit/http-kit {:mvn/version "2.7.0"}
         metosin/reitit-ring {:mvn/version "0.7.0-alpha5"}
         metosin/reitit-middleware {:mvn/version "0.7.0-alpha5"}
-        commons-io/commons-io {:mvn/version "2.13.0"}}
+        commons-io/commons-io {:mvn/version "2.13.0"}
+        buddy/buddy-core {:mvn/version "1.11.423"}}
  
  :paths ["src" "resources"]
  
