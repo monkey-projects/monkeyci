@@ -2,7 +2,10 @@
   (:require [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [monkey.ci.build.core :as bc]
-            [monkey.ci.utils :as u]))
+            [monkey.ci
+             [containers :as c]
+             [docker :as d]
+             [utils :as u]]))
 
 (defn initial-context [p]
   (assoc bc/success
@@ -12,6 +15,15 @@
 (defprotocol PipelineStep
   (run-step [s ctx]))
 
+(defn- run-container-step
+  "Runs the step in a new container.  How this container is executed depends on
+   the configuration passed in from the parent process, specified in the context."
+  [ctx]
+  (let [{:keys [exit] :as r} (->> (c/run-container ctx)
+                                  (merge bc/failure))]
+    (cond-> r
+      (zero? exit) (merge bc/success))))
+
 (extend-protocol PipelineStep
   clojure.lang.Fn
   (run-step [f ctx]
@@ -20,8 +32,15 @@
     (or (f ctx) bc/success))
 
   clojure.lang.IPersistentMap
-  (run-step [{:keys [action]} ctx]
-    (run-step action ctx)))
+  (run-step [{:keys [action] :as step} ctx]
+    ;; TODO Make more generic
+    (cond
+      (some? (:container/image step))
+      (run-container-step ctx)
+      (some? action)
+      (run-step action ctx)
+      :else
+      (throw (ex-info "invalid step configuration" {:step step})))))
 
 (defn- make-step-dir-absolute [{:keys [work-dir step] :as ctx}]
   ;; TODO Make more generic
@@ -57,6 +76,8 @@
               (log/debug "Result:" r)
               (when-let [o (:output r)]
                 (log/debug "Output:" o))
+              (when-let [o (:error r)]
+                (log/warn "Error output:" o))
               (cond-> ctx
                 true (assoc :status (:status r)
                             :last-result r)

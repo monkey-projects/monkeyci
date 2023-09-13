@@ -11,16 +11,19 @@
              [utils :as utils]]
             [monkey.ci.build.core :as bc]))
 
-(def version (or (System/getenv "MONKEYCI_VERSION") "0.1.0-SNAPSHOT"))
+;; Determine version at compile time
+(defmacro version []
+  `(or (System/getenv "MONKEYCI_VERSION") "0.1.0-SNAPSHOT"))
 
 (defn run
   "Run function for when a build task is executed using clojure tools.  This function
-   is run in a child process by the `execute!` function below.  This exists the VM
+   is run in a child process by the `execute!` function below.  This exits the VM
    with a nonzero value on failure."
   [args]
-  (log/debug "Executing script with args" args)
-  (when (bc/failed? (script/exec-script! args))
-    (System/exit 1)))
+  (let [ctx (assoc args :container-runner :docker)]
+    (log/debug "Executing script with context" ctx)
+    (when (bc/failed? (script/exec-script! ctx))
+      (System/exit 1))))
 
 (defn- local-script-lib-dir
   "Calculates the local script directory as a sibling dir of the
@@ -44,11 +47,11 @@
              :extra-deps {'com.monkeyci/script
                           (if dev-mode
                             {:local/root (local-script-lib-dir)}
-                            {:mvn/version version})
+                            {:mvn/version (version)})
                           'com.monkeyci/app
                           (if dev-mode
                             {:local/root (utils/cwd)}
-                            {:mvn/version version})}
+                            {:mvn/version (version)})}
              ;; TODO Only add this if the file actually exists
              :jvm-opts [(str "-Dlogback.configurationFile=" (io/file script-dir "logback.xml"))]}}}))
 
@@ -66,6 +69,7 @@
                     (mc/map-vals pr-str)
                     (into [])
                     (flatten))
+          ;; TODO Pass additional config through env
           result (apply bp/shell
                         {:dir script-dir
                          ;; TODO Stream output or write to file
@@ -81,6 +85,7 @@
       ;; If the process has a nonzero exit code, print the stderr output
       #_(when-not (zero? (:exit result))
         (log/warn "Error output:" (:err result)))
+      #_(bp/shell {:dir script-dir} "clojure" "-Stree" "-Sdeps" (generate-deps config) "-A:monkeyci/build")
       result)
     (catch Exception ex
       (let [{:keys [out err] :as data} (ex-data ex)]

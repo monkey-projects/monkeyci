@@ -1,6 +1,9 @@
 (ns monkey.ci.test.build.core-test
   (:require [clojure.test :refer :all]
-            [monkey.ci.build.core :as sut]))
+            [clojure.spec.alpha :as s]
+            [monkey.ci.build
+             [core :as sut]
+             [spec :as spec]]))
 
 (defn pipeline? [x]
   (instance? monkey.ci.build.core.Pipeline x))
@@ -27,4 +30,17 @@
     (is (pipeline? (sut/pipeline {:steps []}))))
 
   (testing "fails if config not conforming to spec"
-    (is (thrown? AssertionError (sut/pipeline {})))))
+    (is (thrown? AssertionError (sut/pipeline {}))))
+
+  (testing "function is valid step"
+    (is (s/valid? :ci/step (constantly "ok"))))
+
+  (testing "map is valid step"
+    (is (s/valid? :ci/step {:action (constantly "ok")})))
+
+  (testing "accepts container image"
+    (let [p {:steps [{:container/image "test-image"
+                      :script ["first" "second"]
+                      :action (constantly "unused")}]}]
+      (is (s/valid? :ci/step (-> p :steps (first))))
+      (is (pipeline? (sut/pipeline p))))))

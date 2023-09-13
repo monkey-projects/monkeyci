@@ -19,8 +19,9 @@
       (with-redefs [script/exec-script! (fn [args]
                                           (reset! captured-args args)
                                           bc/success)]
-        (is (nil? (sut/run :test-args)))
-        (is (= :test-args @captured-args))))))
+        (is (nil? (sut/run {:key :test-args})))
+        (is (= {:key :test-args} (-> @captured-args
+                                     (select-keys [:key]))))))))
 
 (deftest ^:slow execute-slow!
   (testing "executes build script in separate process"

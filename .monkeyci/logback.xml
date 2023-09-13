@@ -12,10 +12,10 @@
   <logger name="com" level="WARN"/>
   <logger name="net" level="WARN"/>
   <logger name="io" level="WARN"/>
-  <logger name="monkey.ci" level="INFO"/>
+  <logger name="monkey.ci" level="DEBUG"/>
   <logger name="monkey.ci.build" level="DEBUG"/>
 
-  <root level="WARN">
+  <root level="INFO">
     <appender-ref ref="STDOUT" />
   </root>
 </configuration>
