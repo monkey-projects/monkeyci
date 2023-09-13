@@ -9,7 +9,8 @@
             [config.core :refer [env]]
             [monkey.ci
              [process :as p]
-             [runners :as r]]))
+             [runners :as r]]
+            [monkey.ci.web.handler :as web]))
 
 (defn make-config
   "Creates a build configuration that includes the environment and any args passed in.
@@ -36,9 +37,10 @@
     ;; Return exit code, this will be the process exit code as well
     exit))
 
-(defn server [& _]
-  (println "Starting server (TODO)")
-  :todo)
+(defn server [_ args]
+  (println "Starting HTTP server")
+  (-> (web/start-server args)
+      (web/wait-until-stopped)))
 
 (defn default-invoker
   "Wrap the command in a fn to enable better testing"
@@ -77,6 +79,11 @@
                     :runs (invoker build)}
                    {:command "server"
                     :description "Start MonkeyCI server"
+                    :opts [{:as "Listening port"
+                            :option "port"
+                            :short "p"
+                            :type :int
+                            :default 3000}]
                     :runs (invoker server)}]}))
 
 (defn run-cli

@@ -15,3 +15,9 @@
       b
       (str (io/file a b)))
     b))
+
+(defn add-shutdown-hook!
+  "Executes `h` when the JVM shuts down."
+  [h]
+  (.. (Runtime/getRuntime)
+      (addShutdownHook (Thread. h))))

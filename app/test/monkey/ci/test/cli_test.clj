@@ -45,4 +45,13 @@
                 
         (testing "accepts dev mode"
           (let [lc (run-cli "--dev-mode" "build" "test-dir")]
-            (is (true? (get-in lc [:args :dev-mode])))))))))
+            (is (true? (get-in lc [:args :dev-mode]))))))
+
+      (testing "`server` command"
+        (testing "runs `server` command"
+          (is (= core/server (:cmd (run-cli "server")))))
+
+        (testing "accepts listening port `-p`"
+          (is (= 1234 (-> (run-cli "server" "-p" "1234")
+                          :args
+                          :port))))))))
