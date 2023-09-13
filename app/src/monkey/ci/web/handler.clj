@@ -1,6 +1,7 @@
 (ns monkey.ci.web.handler
   "Handler for the web server"
-  (:require [clojure.tools.logging :as log]
+  (:require [camel-snake-kebab.core :as csk]
+            [clojure.tools.logging :as log]
             [medley.core :refer [update-existing]]
             [monkey.ci.web.github :as github]
             [muuntaja.core :as mc]
@@ -40,20 +41,28 @@
   (fn [req]
     (-> req
         (update-existing :body (fn [s]
-                                 (when s (slurp s))))
+                                 (when (instance? java.io.InputStream s)
+                                   (slurp s))))
         (h))))
 
-(defn make-router [opts]
-  (ring/router
-   routes
-   {:data {:middleware [stringify-body
-                        rrmp/parameters-middleware
-                        rrmm/format-middleware]
-           :muuntaja mc/instance}
-    :reitit.middleware/registry
-    {:github-security [github/validate-security (maybe-generate
-                                                 (get-in opts [:github :secret])
-                                                 github/generate-secret-key)]}}))
+(defn make-router
+  ([opts routes]
+   (ring/router
+    routes
+    {:data {:middleware [stringify-body
+                         rrmp/parameters-middleware
+                         rrmm/format-middleware]
+            :muuntaja (mc/create
+                       (assoc-in mc/default-options
+                                 ;; Convert keys to kebab-case
+                                 [:formats "application/json" :decoder-opts]
+                                 {:decode-key-fn csk/->kebab-case-keyword}))}
+     :reitit.middleware/registry
+     {:github-security [github/validate-security (maybe-generate
+                                                  (get-in opts [:github :secret])
+                                                  github/generate-secret-key)]}}))
+  ([opts]
+   (make-router opts routes)))
 
 (defn make-app [opts]
   (ring/ring-handler
@@ -71,10 +80,10 @@
   "Starts http server.  Returns a server object that can be passed to
    `stop-server`."
   [opts]
-  (let [opts (merge {:port 3000} opts)]
-    (log/info "Starting HTTP server at port" (:port opts))
+  (let [http-opts (merge {:port 3000} (:http opts))]
+    (log/info "Starting HTTP server at port" (:port http-opts))
     (http/run-server (make-app opts)
-                     (merge opts default-http-opts))))
+                     (merge http-opts default-http-opts))))
 
 (defn stop-server [s]
   (when s

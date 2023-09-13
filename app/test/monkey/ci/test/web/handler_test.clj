@@ -6,6 +6,7 @@
             [clojure.core.async :as ca]
             [monkey.ci.web.handler :as sut]
             [org.httpkit.server :as http]
+            [reitit.ring :as ring]
             [ring.mock.request :as mock]))
 
 (deftest make-app
@@ -14,9 +15,12 @@
 
 (def github-secret "github-secret")
 
-(def test-app (sut/make-app
-               {:github
-                {:secret github-secret}}))
+(defn- make-test-app []
+  (sut/make-app
+   {:github
+    {:secret github-secret}}))
+
+(def test-app (make-test-app))
 
 (deftest start-server
   (with-redefs [http/run-server (fn [h opts]
@@ -29,7 +33,7 @@
                        :port))))
 
     (testing "passes args as opts"
-      (is (= 1234 (-> (sut/start-server {:port 1234})
+      (is (= 1234 (-> (sut/start-server {:http {:port 1234}})
                       :opts
                       :port))))
 
@@ -76,6 +80,20 @@
       (is (= 401 (-> (mock/request :post "/webhook/github")
                      (test-app)
                      :status))))))
+
+(deftest routing-middleware
+  (testing "converts json bodies to kebab-case"
+    (let [app (ring/ring-handler
+               (sut/make-router
+                {}
+                ["/test" {:post (fn [{:keys [body-params] :as req}]
+                                  {:status 200
+                                   :body (:test-key body-params)})}]))]
+      (is (= "test value" (-> (mock/request :post "/test")
+                              (mock/body "{\"test_key\":\"test value\"}")
+                              (mock/header :content-type "application/json")
+                              (app)
+                              :body))))))
 
 (defn- try-take [ch timeout timeout-val]
   (let [t (ca/timeout timeout)

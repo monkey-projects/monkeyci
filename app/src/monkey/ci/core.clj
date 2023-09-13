@@ -8,6 +8,7 @@
             [clojure.tools.logging :as log]
             [config.core :refer [env]]
             [monkey.ci
+             [config :as config]
              [process :as p]
              [runners :as r]]
             [monkey.ci.web.handler :as web]))
@@ -37,9 +38,9 @@
     ;; Return exit code, this will be the process exit code as well
     exit))
 
-(defn server [_ args]
+(defn server [env args]
   (println "Starting HTTP server")
-  (-> (web/start-server args)
+  (-> (web/start-server (config/build-config env args))
       (web/wait-until-stopped)))
 
 (defn default-invoker
