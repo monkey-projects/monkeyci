@@ -39,7 +39,8 @@
   [h]
   (fn [req]
     (-> req
-        (update-existing :body slurp)
+        (update-existing :body (fn [s]
+                                 (when s (slurp s))))
         (h))))
 
 (defn make-router [opts]

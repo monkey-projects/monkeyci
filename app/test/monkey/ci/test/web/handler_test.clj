@@ -50,6 +50,11 @@
                    (test-app)
                    :status))))
 
+  (testing "handles `nil` bodies"
+    (is (= 200 (-> (mock/request :get "/health")
+                   (mock/body nil)
+                   (test-app)
+                   :status))))  
   (testing "404 when not found"
     (is (= 404 (-> (mock/request :get "/nonexisting")
                    (test-app)
