@@ -52,8 +52,8 @@
 ;; Return the pipelines
 [(core/pipeline
   {:name "test"
-   :steps [;;test-lib
-           {:container/image "clojure:temurin-20-tools-deps-alpine"
+   :steps [test-lib
+           #_{:container/image "clojure:temurin-20-tools-deps-alpine"
             :script ["clojure -X:test:junit"]
             :action (constantly "unused")
             :work-dir "lib"}
