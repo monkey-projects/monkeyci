@@ -12,8 +12,10 @@
              [runners :as r]]
             [monkey.ci.web.handler :as web]))
 
-(defn make-config [env args]
-  ;; TODO
+(defn make-config
+  "Creates a build configuration that includes the environment and any args passed in.
+   This is then used to create a build runner."
+  [env args]
   {:runner {:type (keyword (:monkeyci-runner-type env))}
    :env env
    :script args})
@@ -43,8 +45,7 @@
 (defn default-invoker
   "Wrap the command in a fn to enable better testing"
   [cmd env]
-  (fn [args]
-    (cmd env args)))
+  (partial cmd env))
 
 (defn make-cli-config [{:keys [env cmd-invoker] :or {cmd-invoker default-invoker}}]
   (letfn [(invoker [cmd]
@@ -56,7 +57,11 @@
              :option "workdir"
              :short "w"
              :type :string
-             :default "."}]
+             :default "."}
+            {:as "Development mode"
+             :option "dev-mode"
+             :type :with-flag
+             :default false}]
      :subcommands [{:command "version"
                     :description "Prints current version"
                     :runs (invoker print-version)}

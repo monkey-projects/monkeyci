@@ -1,7 +1,7 @@
 {:deps {org.clojure/tools.logging {:mvn/version "1.2.4"}
         ch.qos.logback/logback-classic {:mvn/version "1.4.11"}
         babashka/process {:mvn/version "0.4.13"}
-        io.github.lispyclouds/contajners {:git/sha "ad4ffbb5f1972de9815c00f4c6d59b70101ec0a5"}
+        org.clojars.lispyclouds/contajners {:mvn/version "1.0.1"}
         camel-snake-kebab/camel-snake-kebab {:mvn/version "0.4.3"}
         cli-matic/cli-matic {:mvn/version "0.5.4"}
         com.monkeyci/script {:local/root "../lib"}
@@ -10,6 +10,7 @@
         http-kit/http-kit {:mvn/version "2.7.0"}
         metosin/reitit-ring {:mvn/version "0.7.0-alpha5"}
         metosin/reitit-middleware {:mvn/version "0.7.0-alpha5"}}
+        commons-io/commons-io {:mvn/version "2.13.0"}}
  
  :paths ["src" "resources"]
  
@@ -36,7 +37,9 @@
                "--plugin" "kaocha.plugin/profiling"
                "--junit-xml-file" "junit.xml"
                ;; Skip docker integration tests, they require access to the socket
-               "--skip-meta" ":docker"]}
+               "--skip-meta" ":docker"]
+   ;; Add this to avoid falling back to the default logger
+   :jvm-opts ["-Dlogback.configurationFile=resources/logback.xml"]}
 
   :coverage
   {:exec-fn monkey.test/coverage
@@ -57,9 +60,16 @@
    :exec-fn monkey.build/jar
    :exec-args {:jar "target/monkeyci.jar"
                :lib com.monkeyci/app
+               :version "0.1.0-SNAPSHOT"
                :main "monkey.ci.core"}
    ;; Add this to avoid falling back to the default logger
    :jvm-opts ["-Dlogback.configurationFile=resources/logback.xml"]}
+  
+  :install
+  {:exec-fn monkey.build/jar+install}
+
+  :deploy
+  {:exec-fn monkey.build/deploy}
 
   :uber
   {:exec-fn monkey.build/uberjar

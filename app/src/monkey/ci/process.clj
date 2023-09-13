@@ -17,12 +17,13 @@
 
 (defn run
   "Run function for when a build task is executed using clojure tools.  This function
-   is run in a child process by the `execute!` function below.  This exists the VM
+   is run in a child process by the `execute!` function below.  This exits the VM
    with a nonzero value on failure."
   [args]
-  (log/debug "Executing script with args" args)
-  (when (bc/failed? (script/exec-script! args))
-    (System/exit 1)))
+  (let [ctx (assoc args :container-runner :docker)]
+    (log/debug "Executing script with context" ctx)
+    (when (bc/failed? (script/exec-script! ctx))
+      (System/exit 1))))
 
 (defn- local-script-lib-dir
   "Calculates the local script directory as a sibling dir of the
@@ -68,6 +69,7 @@
                     (mc/map-vals pr-str)
                     (into [])
                     (flatten))
+          ;; TODO Pass additional config through env
           result (apply bp/shell
                         {:dir script-dir
                          ;; TODO Stream output or write to file
@@ -83,6 +85,7 @@
       ;; If the process has a nonzero exit code, print the stderr output
       #_(when-not (zero? (:exit result))
         (log/warn "Error output:" (:err result)))
+      #_(bp/shell {:dir script-dir} "clojure" "-Stree" "-Sdeps" (generate-deps config) "-A:monkeyci/build")
       result)
     (catch Exception ex
       (let [{:keys [out err] :as data} (ex-data ex)]
