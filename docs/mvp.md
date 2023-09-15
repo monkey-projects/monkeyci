@@ -19,3 +19,10 @@ with existing CI reporting tools (e.g. to display in the application bar).
 
 Next up would be a basic web user interface.  We would need some kind of
 design for this.  Preferably this is done by a professional designer.
+
+## Approach
+
+Instead of taking one step (or "module") at a time and fleshing it out completely,
+I will do smaller steps on each front.  This is because I want to reach a full
+end-to-end functionality as soon as possible, and also because building one
+thing completely very often results in building the wrong thing.

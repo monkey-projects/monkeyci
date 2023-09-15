@@ -20,7 +20,7 @@
    is run in a child process by the `execute!` function below.  This exits the VM
    with a nonzero value on failure."
   [args]
-  (let [ctx (assoc args :container-runner :docker)]
+  (let [ctx (assoc args :container-runner :docker)] ; Force docker container runner for now
     (log/debug "Executing script with context" ctx)
     (when (bc/failed? (script/exec-script! ctx))
       (System/exit 1))))
