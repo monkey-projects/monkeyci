@@ -68,3 +68,11 @@
    `true` once the event has been posted."
   [bus evt]
   (ca/put! (:channel bus) evt))
+
+(defn wait-for
+  "Returns a channel that will hold the first match for the given
+   type and transducer `tx`."
+  [bus type tx]
+  (let [r (ca/promise-chan tx)]
+    (ca/sub (:pub bus) type r)
+    r))

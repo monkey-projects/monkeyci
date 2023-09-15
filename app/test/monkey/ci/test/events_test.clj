@@ -75,3 +75,12 @@
           (is (not= :timeout (wait-until #(pos? (count @errors)))))
           (is (= 1 (count @errors)))
           (is (= :error (-> @errors (first) :type))))))))
+
+(deftest wait-for
+  (testing "returns a channel that holds the first match for the given transducer"
+    (with-bus
+      (fn [bus]
+        (let [c (sut/wait-for bus :test-event (map identity))]
+          (is (= :timeout (read-or-timeout c 100)) "channel should not hold a value initially")
+          (is (true? (sut/post-event bus {:type :test-event})))
+          (is (not= :timeout (read-or-timeout c))))))))
