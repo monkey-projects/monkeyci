@@ -85,7 +85,11 @@
           (merge (initial-context p) initial-ctx)
           steps))
 
-(defn run-pipelines [{:keys [pipeline] :as ctx} p]
+(defn run-pipelines
+  "Executes the pipelines by running all steps sequentially.  Currently,
+   pipelines are executed sequentially too, but this could be converted 
+   into parallel processing."
+  [{:keys [pipeline] :as ctx} p]
   (let [p (cond->> (if (vector? p) p [p])
             ;; Filter pipeline by name, if given
             pipeline (filter (comp (partial = pipeline) :name)))]

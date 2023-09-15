@@ -7,13 +7,10 @@
             [clojure.tools.logging :as log]
             [medley.core :as mc]
             [monkey.ci
+             [config :refer [version]]
              [script :as script]
              [utils :as utils]]
             [monkey.ci.build.core :as bc]))
-
-;; Determine version at compile time
-(defmacro version []
-  `(or (System/getenv "MONKEYCI_VERSION") "0.1.0-SNAPSHOT"))
 
 (defn run
   "Run function for when a build task is executed using clojure tools.  This function

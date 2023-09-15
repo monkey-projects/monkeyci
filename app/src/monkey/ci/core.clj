@@ -9,7 +9,6 @@
             [config.core :refer [env]]
             [monkey.ci
              [config :as config]
-             [process :as p]
              [runners :as r]]
             [monkey.ci.web.handler :as web]))
 
@@ -22,7 +21,7 @@
    :script args})
 
 (defn print-version [& _]
-  (println (p/version)))
+  (println (config/version)))
 
 (defn build [env args]
   (println "Building")
@@ -52,8 +51,8 @@
   (letfn [(invoker [cmd]
             (cmd-invoker cmd env))]
     {:name "monkey-ci"
-     :description "MonkeyCI: Powerful build script runner"
-     :version (p/version)
+     :description "MonkeyCI: Powerful build pipeline runner"
+     :version (config/version)
      :opts [{:as "Working directory"
              :option "workdir"
              :short "w"

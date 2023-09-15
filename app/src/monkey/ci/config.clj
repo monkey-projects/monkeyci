@@ -1,6 +1,10 @@
 (ns monkey.ci.config
   (:require [medley.core :as mc]))
 
+;; Determine version at compile time
+(defmacro version []
+  `(or (System/getenv "MONKEYCI_VERSION") "0.1.0-SNAPSHOT"))
+
 (def default-config
   {:http
    {:port 3000}})
