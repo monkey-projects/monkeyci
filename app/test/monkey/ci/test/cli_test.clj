@@ -1,6 +1,7 @@
 (ns monkey.ci.test.cli-test
   "Tests for the CLI configuration"
   (:require [clojure.test :refer :all]
+            [cli-matic.core :as cli]
             [monkey.ci.core :as core]))
 
 (deftest cli
@@ -14,7 +15,7 @@
         test-config (core/make-cli-config {:env {:monkeyci-runner-type :noop}
                                            :cmd-invoker test-invoker})
         run-cli (fn [& args]
-                  (is (= :exit (core/run-cli test-config args)))
+                  (is (= :exit (cli/run-cmd args test-config)))
                   @last-cmd)]
     (with-redefs [cli-matic.platform/exit-script (constantly :exit)]
 

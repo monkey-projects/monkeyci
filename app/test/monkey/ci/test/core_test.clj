@@ -1,7 +1,15 @@
 (ns monkey.ci.test.core-test
   (:require [clojure.test :refer :all]
+            [com.stuartsierra.component :as c]
             [monkey.ci.core :as sut]
             [monkey.ci.web.handler :as web]))
+
+(deftest cli-config
+  (testing "creates cli configuration on start"
+    (is (some? (-> (sut/new-cli {})
+                   (c/start)
+                   :cli-config
+                   :subcommands)))))
 
 (deftest main-test
   (with-redefs [clojure.core/shutdown-agents (constantly nil)

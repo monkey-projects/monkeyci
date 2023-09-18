@@ -101,6 +101,17 @@
                        ;; Wrap the run functions in the invoker
                        (mapv (fn [c] (update c :runs invoker))))}))
 
+(defrecord CliConfig [env]
+  sc/Lifecycle
+  (start [this]
+    (assoc this :cli-config (make-cli-config this)))
+
+  (stop [this]
+    (dissoc this :cli-config)))
+
+(defn new-cli [env]
+  (->CliConfig env))
+
 (defn run-command-async
   "Runs the command in an async fashion by sending an event, and waiting
    for the 'complete' event to arrive."
@@ -110,21 +121,18 @@
                      :command cmd})
       (e/wait-for :command/completed (filter (comp (partial = cmd) :command)))))
 
-(defn run-cli
-  ([config args]
-   (cli/run-cmd args config))
-  ([args]
-   (run-cli (make-cli-config {:env env}) args)))
-
-(defn run-system [config]
+(defn make-system [config]
   (sc/system-map
-   {:bus (co/new-bus)}))
+   :bus (co/new-bus)
+   :cli (new-cli config)))
 
 (defn -main
   "Main entry point for the application."
   [& args]
   (try
-    (run-cli args)
+    (let [sys (make-system env)
+          cli (get-in sys [:cli :cli-config])]
+      (cli/run-cmd args cli))
     (finally
       ;; Shutdown the agents otherwise the app will block for a while here
       (shutdown-agents))))
