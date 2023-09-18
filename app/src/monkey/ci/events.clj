@@ -17,10 +17,10 @@
   "Validates events.  Logs a warning if an event does not conform to spec, but
    does not block the event from being processed."
   []
-  (fn [evt]
-    (when-not (s/valid? ::spec/event evt)
-      (log/warn "Event is not according to spec:" evt))
-    evt))
+  (map (fn [evt]
+         (when-not (s/valid? ::spec/event evt)
+           (log/warn "Event is not according to spec:" evt))
+         evt)))
 
 (defn make-channel
   "Creates default event processing channel, that can then be used to make a bus."

@@ -129,10 +129,12 @@
 (defn -main
   "Main entry point for the application."
   [& args]
-  (try
-    (let [sys (make-system env)
-          cli (get-in sys [:cli :cli-config])]
-      (cli/run-cmd args cli))
-    (finally
-      ;; Shutdown the agents otherwise the app will block for a while here
-      (shutdown-agents))))
+  (let [sys (-> (make-system env)
+                (sc/start))]
+    (try
+      (let [cli (get-in sys [:cli :cli-config])]
+        (cli/run-cmd args cli))
+      (finally
+        (sc/stop sys)
+        ;; Shutdown the agents otherwise the app will block for a while here
+        (shutdown-agents)))))
