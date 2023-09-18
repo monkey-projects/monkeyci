@@ -101,7 +101,7 @@
 
 (defn- load-pipelines [dir]
   (let [tmp-ns (symbol (str "build-" (random-uuid)))]
-    ;; FIXME I don't think this is a very good approach, find a better way.
+    ;; FIXME I don't think this is a very robust approach, find a better way.
     (in-ns tmp-ns)
     (clojure.core/use 'clojure.core)
     (try

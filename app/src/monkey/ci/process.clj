@@ -78,15 +78,8 @@
                         "-X:monkeyci/build"
                         args)]
       (log/info "Script executed with exit code" (:exit result))
-      ;;(log/debug "Output:" (:out result))
-      ;; If the process has a nonzero exit code, print the stderr output
-      #_(when-not (zero? (:exit result))
-        (log/warn "Error output:" (:err result)))
-      #_(bp/shell {:dir script-dir} "clojure" "-Stree" "-Sdeps" (generate-deps config) "-A:monkeyci/build")
       result)
     (catch Exception ex
       (let [{:keys [out err] :as data} (ex-data ex)]
         (log/error "Failed to execute build script")
-        ;;(log/error "Output:" out)
-        ;;(log/error "Error:" err)
         (throw ex)))))

@@ -15,22 +15,12 @@
              [runners :as r]]
             [monkey.ci.web.handler :as web]))
 
-(defn make-config
-  "Creates a build configuration that includes the environment and any args passed in.
-   This is then used to create a build runner."
-  [env args]
-  {:runner {:type (keyword (:monkeyci-runner-type env))}
-   :env env
-   :script args})
-
 (defn print-version [& _]
   (println (config/version)))
 
-(defn build [env args]
+(defn build [ctx]
   (println "Building")
-  (log/debug "Arguments:" args)
-  (let [ctx (make-config env args)
-        runner (r/make-runner ctx)
+  (let [runner (r/make-runner ctx)
         {:keys [result exit] :as output} (runner ctx)]
     (condp = (or result :unknown)
       :success (log/info "Success!")
@@ -40,15 +30,18 @@
     ;; Return exit code, this will be the process exit code as well
     exit))
 
-(defn server [env args]
+(defn server [ctx]
   (println "Starting HTTP server")
-  (-> (web/start-server (config/build-config env args))
+  (-> (web/start-server ctx)
       (web/wait-until-stopped)))
 
 (defn default-invoker
   "Wrap the command in a fn to enable better testing"
-  [cmd env]
-  (partial cmd env))
+  [cmd {:keys [env] :as ctx}]
+  (fn [args]
+    (cmd (-> ctx
+             (merge (config/build-config env args))
+             (assoc :args args)))))
 
 (def version-cmd
   {:command "version"
@@ -80,9 +73,9 @@
            :env "PORT"}]
    :runs server})
 
-(defn make-cli-config [{:keys [env cmd-invoker] :or {cmd-invoker default-invoker}}]
+(defn make-cli-config [{:keys [cmd-invoker] :or {cmd-invoker default-invoker} :as ctx}]
   (letfn [(invoker [cmd]
-            (cmd-invoker cmd env))]
+            (cmd-invoker cmd ctx))]
     {:name "monkey-ci"
      :description "MonkeyCI: Powerful build pipeline runner"
      :version (config/version)
@@ -101,7 +94,7 @@
                        ;; Wrap the run functions in the invoker
                        (mapv (fn [c] (update c :runs invoker))))}))
 
-(defrecord CliConfig [env]
+(defrecord CliConfig [env bus]
   sc/Lifecycle
   (start [this]
     (assoc this :cli-config (make-cli-config this)))
@@ -110,7 +103,7 @@
     (dissoc this :cli-config)))
 
 (defn new-cli [env]
-  (->CliConfig env))
+  (map->CliConfig {:env env}))
 
 (defn run-command-async
   "Runs the command in an async fashion by sending an event, and waiting
@@ -124,7 +117,7 @@
 (defn make-system [config]
   (sc/system-map
    :bus (co/new-bus)
-   :cli (new-cli config)))
+   :cli (sc/using (new-cli config) [:bus])))
 
 (defn -main
   "Main entry point for the application."

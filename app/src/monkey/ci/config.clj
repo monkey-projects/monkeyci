@@ -7,7 +7,9 @@
 
 (def default-config
   {:http
-   {:port 3000}})
+   {:port 3000}
+   :runner
+   {:type :child}})
 
 (def deep-merge (partial merge-with merge))
 
@@ -39,7 +41,8 @@
   [env]
   (->> env
        (filter-and-strip-keys :monkeyci)
-       (group-keys :github)))
+       (group-keys :github)
+       (group-keys :runner)))
 
 (defn build-config
   "Combines app environment with command-line args into a unified 
@@ -48,4 +51,5 @@
   [env args]
   (-> default-config
       (deep-merge (config-from-env env))
-      (update-in [:http :port] #(or (:port args) %))))
+      (update-in [:http :port] #(or (:port args) %))
+      (update-in [:runner :type] keyword)))

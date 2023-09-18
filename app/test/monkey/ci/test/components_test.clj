@@ -8,11 +8,10 @@
 (deftest bus-component
   (testing "`start` creates a bus"
     (is (e/bus? (-> (sut/new-bus)
-                    (c/start)
-                    :bus))))
+                    (c/start)))))
 
   (testing "`stop` destroys the bus"
     (is (nil? (-> (sut/new-bus)
                   (c/start)
                   (c/stop)
-                  :bus)))))
+                  :pub)))))

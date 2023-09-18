@@ -17,4 +17,10 @@
     (is (= "test-secret" (-> {:monkeyci-github-secret "test-secret"}
                              (sut/build-config {})
                              :github
-                             :secret)))))
+                             :secret))))
+
+  (testing "sets runner type"
+    (is (= :test-type (-> {:monkeyci-runner-type "test-type"}
+                          (sut/build-config {})
+                          :runner
+                          :type)))))

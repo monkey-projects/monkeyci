@@ -13,11 +13,12 @@
   c/Lifecycle
   (start [this]
     (log/debug "Creating event bus")
-    (assoc this :bus (e/make-bus)))
+    (merge this (e/make-bus)))
   
   (stop [this]
     (log/debug "Stopping event bus")
-    (stop-and-dissoc this :bus e/close-bus)))
+    (e/close-bus this)
+    (dissoc this :pub :channel)))
 
 (defn new-bus []
   (->BusComponent))

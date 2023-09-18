@@ -21,12 +21,12 @@
 (defn child-runner
   "Creates a new runner that executes the script locally in a child process"
   [ctx]
-  (let [{:keys [script-dir work-dir] :as dirs} (get-absolute-dirs (:script ctx))]
+  (let [{:keys [script-dir work-dir] :as dirs} (get-absolute-dirs (:args ctx))]
     (if (some-> (io/file script-dir) (.exists))
       (do
         (log/info "Running build script at" script-dir)
         (let [{:keys [exit] :as out} (-> dirs
-                                         (assoc :pipeline (get-in ctx [:script :pipeline]))
+                                         (assoc :pipeline (get-in ctx [:args :pipeline]))
                                          (proc/execute!))]
           (cond-> out
             true (assoc :result :error)
