@@ -52,31 +52,39 @@
              ;; TODO Only add this if the file actually exists
              :jvm-opts [(str "-Dlogback.configurationFile=" (io/file script-dir "logback.xml"))]}}}))
 
+(defn- build-args
+  "Builds command-line args vector for script process"
+  [config]
+  (->> (select-keys config [:work-dir :script-dir :pipeline])
+       (mc/remove-vals nil?)
+       (mc/map-keys str)
+       (mc/map-vals pr-str)
+       (into [])
+       (flatten)))
+
 (defn execute!
   "Executes the build script located in given directory.  This actually runs the
    clojure cli with a generated `build` alias.  This expects absolute directories."
-  [{:keys [work-dir script-dir] :as config}]
+  [{:keys [work-dir script-dir] :as ctx}]
   (log/info "Executing process in" work-dir)
   (try 
     ;; Run the clojure cli with the "build" alias. Add some parameters to the script
     ;; in the form of edn.
-    (let [args (->> (select-keys config [:work-dir :script-dir :pipeline])
-                    (mc/remove-vals nil?)
-                    (mc/map-keys str)
-                    (mc/map-vals pr-str)
-                    (into [])
-                    (flatten))
-          ;; TODO Pass additional config through env
-          result (apply bp/shell
-                        {:dir script-dir
-                         ;; TODO Stream output or write to file
-                         :out :inherit
-                         :err :inherit
-                         :continue true}
-                        "clojure"
-                        "-Sdeps" (generate-deps config)
-                        "-X:monkeyci/build"
-                        args)]
+    (let [result (-> (bp/process
+                      ;; TODO Pass additional config through env
+                      {:dir script-dir
+                       ;; TODO Stream output or write to file
+                       ;; Use a UDS to receive events
+                       :out :inherit
+                       :err :inherit
+                       :cmd (-> ["clojure"
+                                 "-Sdeps" (generate-deps ctx)
+                                 "-X:monkeyci/build"]
+                                (concat (build-args ctx))
+                                (vec))
+                       :exit-fn (fn [_]
+                                  (log/debug "Script process exited"))})
+                     (deref))]
       (log/info "Script executed with exit code" (:exit result))
       result)
     (catch Exception ex

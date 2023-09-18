@@ -40,13 +40,14 @@
   "Finds the argument value for given key"
   [{:keys [args]} k]
   (->> args
+       :cmd
        (drop-while (partial not= (str k)))
        (second)))
 
 (deftest execute!
-  (with-redefs [bp/shell (fn [& args]
-                           {:args args
-                            :exit 1234})]
+  (with-redefs [bp/process (fn [args]
+                             (future {:args args
+                                      :exit 1234}))]
     
     (testing "returns exit code"
       (is (= 1234 (:exit (sut/execute! {:dev-mode true
@@ -55,7 +56,6 @@
     (testing "invokes in script dir"
       (is (= "test-dir" (-> (sut/execute! {:script-dir "test-dir"})
                             :args
-                            (first)
                             :dir))))
 
     (testing "passes work dir in edn"
