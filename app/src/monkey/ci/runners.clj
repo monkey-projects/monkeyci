@@ -25,7 +25,8 @@
     (if (some-> (io/file script-dir) (.exists))
       (do
         (log/info "Running build script at" script-dir)
-        (let [{:keys [exit] :as out} (-> dirs
+        (let [{:keys [exit] :as out} (-> ctx
+                                         (merge dirs)
                                          (assoc :pipeline (get-in ctx [:args :pipeline]))
                                          (proc/execute!))]
           (cond-> out

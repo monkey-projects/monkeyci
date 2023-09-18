@@ -42,6 +42,8 @@
 (defn bus? [x]
   (s/valid? ::spec/event-bus x))
 
+(def channel :channel)
+
 (defn register-handler
   "Registers a handler for events of the given type."
   [bus type handler]

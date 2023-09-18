@@ -10,7 +10,10 @@
              [config :refer [version]]
              [script :as script]
              [utils :as utils]]
-            [monkey.ci.build.core :as bc]))
+            [monkey.ci.build.core :as bc]
+            [monkey.socket-async
+             [core :as sa]
+             [uds :as uds]]))
 
 (defn run
   "Run function for when a build task is executed using clojure tools.  This function
@@ -62,19 +65,38 @@
        (into [])
        (flatten)))
 
+(defn- events-to-bus
+  "Creates a listening socket (a uds) that will receive any events generated
+   by the child script.  These events will then be sent to the bus."
+  [{:keys [channel] :as bus}]
+  (let [path (utils/tmp-file "events-" ".sock")
+        listener (uds/listen-socket (uds/make-address path))]
+    {:socket-path path
+     :socket listener
+     ;; Accept connection in separate thread
+     :accept-thread (doto (Thread.
+                           (fn []
+                             (log/debug "Waiting for child process to connect")
+                             (try 
+                               (let [sock (uds/accept listener)]
+                                 (log/debug "Incoming connection from child process accepted")
+                                 (sa/read-onto-channel sock channel))
+                               (catch Exception ex
+                                 (log/warn "No incoming connection from child could be accepted" ex)))))
+                      (.start))}))
+
 (defn execute!
   "Executes the build script located in given directory.  This actually runs the
    clojure cli with a generated `build` alias.  This expects absolute directories."
-  [{:keys [work-dir script-dir] :as ctx}]
+  [{:keys [work-dir script-dir bus] :as ctx}]
   (log/info "Executing process in" work-dir)
   (try 
     ;; Run the clojure cli with the "build" alias. Add some parameters to the script
     ;; in the form of edn.
-    (let [result (-> (bp/process
-                      ;; TODO Pass additional config through env
+    (let [{:keys [socket-path socket]} (when bus
+                                         (events-to-bus bus))
+          result (-> (bp/process
                       {:dir script-dir
-                       ;; TODO Stream output or write to file
-                       ;; Use a UDS to receive events
                        :out :inherit
                        :err :inherit
                        :cmd (-> ["clojure"
@@ -82,8 +104,12 @@
                                  "-X:monkeyci/build"]
                                 (concat (build-args ctx))
                                 (vec))
+                       :extra-env {:monkeyci-event-socket socket-path}
                        :exit-fn (fn [_]
-                                  (log/debug "Script process exited"))})
+                                  (log/debug "Script process exited, cleaning up")
+                                  (when socket-path 
+                                    (uds/close socket)
+                                    (uds/delete-address socket-path)))})
                      (deref))]
       (log/info "Script executed with exit code" (:exit result))
       result)

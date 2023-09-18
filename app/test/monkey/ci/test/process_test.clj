@@ -3,6 +3,7 @@
             [clojure.test :refer :all]
             [clojure.java.io :as io]
             [monkey.ci
+             [events :as events]
              [process :as sut]
              [script :as script]]
             [monkey.ci.utils :as u]
@@ -45,10 +46,12 @@
        (second)))
 
 (deftest execute!
-  (with-redefs [bp/process (fn [args]
-                             (future {:args args
-                                      :exit 1234}))]
-    
+  (with-redefs [bp/process (fn [{:keys [exit-fn] :as args}]
+                             (future
+                               (when (fn? exit-fn)
+                                 (exit-fn {}))
+                               {:args args
+                                :exit 1234}))]
     (testing "returns exit code"
       (is (= 1234 (:exit (sut/execute! {:dev-mode true
                                         :script-dir (example "failing")})))))
@@ -71,4 +74,20 @@
     (testing "passes pipeline in edn"
       (is (= "\"test-pipeline\"" (-> {:pipeline "test-pipeline"}
                                      (sut/execute!)
-                                     (find-arg :pipeline)))))))
+                                     (find-arg :pipeline)))))
+
+    (testing "passes socket path in env when bus exists"
+      (let [bus (events/make-bus)]
+        (is (string? (-> {:script-dir "test-dir"
+                          :bus bus}
+                         (sut/execute!)
+                         :args
+                         :extra-env
+                         :monkeyci-event-socket)))))
+
+    (testing "no socket path when no bus exists"
+        (is (nil? (-> {:script-dir "test-dir"}
+                      (sut/execute!)
+                      :args
+                      :extra-env
+                      :monkeyci-event-socket))))))
