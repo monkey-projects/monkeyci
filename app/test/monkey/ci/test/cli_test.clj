@@ -8,7 +8,7 @@
   (let [last-cmd (atom nil)
         test-invoker (fn [cmd env]
                        (fn [args]
-                         (reset! last-cmd {:cmd cmd
+                         (reset! last-cmd {:cmd (:command cmd)
                                            :env env
                                            :args args})
                          0))
@@ -19,14 +19,10 @@
                   @last-cmd)]
     (with-redefs [cli-matic.platform/exit-script (constantly :exit)]
 
-      (testing "`version` command prints version"
-        (let [lc (run-cli "version")]
-          (is (= core/print-version (:cmd lc)))))
-
       (testing "`build` command"
         (testing "runs `build` command"
           (let [lc (run-cli "build")]
-            (is (= core/build (:cmd lc)))))
+            (is (= :build (:cmd lc)))))
         
         (testing "accepts script dir `-d`"
           (let [lc (run-cli "build" "-d" "test-dir")]
@@ -50,7 +46,7 @@
 
       (testing "`server` command"
         (testing "runs `server` command"
-          (is (= core/server (:cmd (run-cli "server")))))
+          (is (= :http (:cmd (run-cli "server")))))
 
         (testing "accepts listening port `-p`"
           (is (= 1234 (-> (run-cli "server" "-p" "1234")

@@ -45,7 +45,9 @@
 (def channel :channel)
 
 (defn register-handler
-  "Registers a handler for events of the given type."
+  "Registers a handler for events of the given type.  The handler should
+   not perform any blocking operations.  In that case, it should start a
+   thread and park."
   [bus type handler]
   (let [ch (ca/chan)]
     (ca/sub (:pub bus) type ch)

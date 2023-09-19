@@ -1,29 +1,38 @@
 (ns monkey.ci.test.core-test
   (:require [clojure.test :refer :all]
+            [clojure.core.async :as ca]
             [com.stuartsierra.component :as c]
-            [monkey.ci.core :as sut]
-            [monkey.ci.web.handler :as web]))
-
-(deftest cli-config
-  (testing "creates cli configuration on start"
-    (is (some? (-> (sut/new-cli {})
-                   (c/start)
-                   :cli-config
-                   :subcommands))))
-
-  (testing "removes cli config on stop"
-    (is (nil? (-> (sut/map->CliConfig {:cli-config :test-config})
-                  (c/stop)
-                  :cli-config)))))
+            [monkey.ci
+             [core :as sut]
+             [events :as e]]
+            [monkey.ci.web.handler :as web]
+            [monkey.ci.test.helpers :as h]))
 
 (deftest main-test
   (with-redefs [clojure.core/shutdown-agents (constantly nil)
                 cli-matic.platform/exit-script (constantly :exit)]
-    (testing "main returns nil"
-      (is (= :exit (sut/-main "version"))))
+    (testing "runs cli"
+      (is (= :exit (sut/-main "-h"))))))
 
-    (testing "accepts working directory"
-      (is (= :exit (sut/-main "-w" "test" "version"))))))
+(deftest default-invoker
+  (testing "does nothing when no bus"
+    (is (nil? ((sut/default-invoker {:command :test} {}) {}))))
+
+  (testing "posts `command/invoked` event and waits for `command/completed`"
+    (let [cmd {:command :test
+               :requires [:bus]}
+          bus (e/make-bus)
+          inv (sut/default-invoker cmd {} (c/system-map :bus bus))
+          _ (e/register-handler bus
+                                :command/invoked
+                                (fn [{:keys [command]}]
+                                  (when (= :test command)
+                                    ;; Complete immediately
+                                    (e/post-event bus {:type :command/completed
+                                                       :command command}))))
+          out (inv {})]
+      (is (some? out))
+      (is (not= :timeout (h/try-take out 500 :timeout))))))
 
 (deftest build
   (testing "invokes runner"
