@@ -26,9 +26,13 @@
   [ctx before-evt after-evt f]
   (try
     (post-event ctx before-evt)
-    (f)
-    (finally
-      (post-event ctx after-evt))))
+    (let [r (f)]
+      (post-event ctx (if (fn? after-evt)
+                        (after-evt r)
+                        after-evt))
+      r)
+    (catch Exception ex
+      (post-event ctx (assoc after-evt :exception ex)))))
 
 (defprotocol PipelineStep
   (run-step [s ctx]))
@@ -72,13 +76,16 @@
 
 (defn- run-step*
   "Runs a single step using the configured runner"
-  [ctx]
+  [{{:keys [name]} :step :as ctx}]
   (wrap-events
    ctx
-   {:type :step/start
-    :message "Step started"}
-   {:type :step/end
-    :message "Step completed"}
+   (cond-> {:type :step/start
+            :message "Step started"}
+     (some? name) (assoc :name name))
+   (fn [{:keys [status]}]
+     {:type :step/end
+      :message "Step completed"
+      :status status})
    (fn []
      (let [{:keys [work-dir step] :as ctx} (make-step-dir-absolute ctx)]
        (try
@@ -191,10 +198,10 @@
       (let [p (load-pipelines script-dir)]
         (wrap-events
          ctx
-         {:type :script/started
+         {:type :script/start
           :message "Script started"
           :dir script-dir}
-         {:type :script/finished
+         {:type :script/end
           :message "Script completed"
           :dir script-dir}
          (fn []

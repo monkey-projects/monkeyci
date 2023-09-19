@@ -21,3 +21,14 @@
      (fn [d#]
        (let [~dir d#]
          ~@body))))
+
+(defn wait-until [f timeout]
+  (let [end (+ (System/currentTimeMillis) timeout)]
+    (loop [r (f)]
+      (if r
+        r
+        (if (> (System/currentTimeMillis) end)
+          :timeout
+          (do
+            (Thread/sleep 100)
+            (recur (f))))))))

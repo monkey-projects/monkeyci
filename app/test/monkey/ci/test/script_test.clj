@@ -4,9 +4,11 @@
             [clojure.tools.logging :as log]
             [monkey.ci
              [containers :as c]
+             [events :as e]
              [script :as sut]
              [utils :as u]]
             [monkey.ci.build.core :as bc]
+            [monkey.ci.test.helpers :as h]
             [monkey.socket-async
              [core :as sa]
              [uds :as uds]]))
@@ -74,7 +76,29 @@
                                          :steps [(constantly bc/success)]})
                            (bc/pipeline {:name "second"
                                          :steps [(constantly bc/failure)]})]
-                          (sut/run-pipelines {:pipeline "first"}))))))
+                          (sut/run-pipelines {:pipeline "first"})))))
+
+  (testing "posts events"
+    (letfn [(verify-evt [expected-type]
+              (let [bus (e/make-bus)
+                    pipelines [(bc/pipeline {:name "test"
+                                             :steps [(constantly bc/success)]})]
+                    ctx {:events {:bus bus}}
+                    recv (atom [])]
+                (e/register-handler bus expected-type (partial swap! recv conj))
+                (is (bc/success? (sut/run-pipelines ctx pipelines)))
+                (is (true? (h/wait-until #(pos? (count @recv)) 500)))
+                (is (= 1 (count @recv)))))]
+
+      ;; Run a test for each type
+      (->> [:pipeline/start
+            :pipeline/end
+            :step/start
+            :step/end]
+           (map (fn [t]
+                  (testing (str t)
+                    (verify-evt t))))
+           (doall)))))
 
 (defmethod c/run-container :test [ctx]
   {:test-result :run-from-test
