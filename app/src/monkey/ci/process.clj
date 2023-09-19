@@ -43,7 +43,7 @@
   "Generates a string that will be added as a commandline argument
    to the clojure process when running the script.  Any existing `deps.edn`
    should be used as well."
-  [{:keys [dev-mode script-dir]}]
+  [{:keys [script-dir] {:keys [dev-mode]} :args}]
   (pr-str {:paths [script-dir]
            :aliases
            {:monkeyci/build
@@ -116,6 +116,8 @@
                                     (uds/delete-address socket-path)))})
                      (deref))]
       (log/info "Script executed with exit code" (:exit result))
+      (when (pos? (:exit result))
+        (log/debug "Result:" result))
       result)
     (catch Exception ex
       (let [{:keys [out err] :as data} (ex-data ex)]

@@ -18,7 +18,17 @@
          :pipeline p))
 
 (defn- post-event [ctx evt]
-  (e/post-event (get-in ctx [:events :bus]) (assoc evt :src :script)))
+  (some-> (get-in ctx [:events :bus]) 
+          (e/post-event (assoc evt :src :script))))
+
+(defn- wrap-events
+  "Posts event before and after invoking `f`"
+  [ctx before-evt after-evt f]
+  (try
+    (post-event ctx before-evt)
+    (f)
+    (finally
+      (post-event ctx after-evt))))
 
 (defprotocol PipelineStep
   (run-step [s ctx]))
@@ -63,35 +73,51 @@
 (defn- run-step*
   "Runs a single step using the configured runner"
   [ctx]
-  (let [{:keys [work-dir step] :as ctx} (make-step-dir-absolute ctx)]
-    (try
-      (log/debug "Running step:" step)
-      (run-step step ctx)
-      (catch Exception ex
-        (log/warn "Step failed:" (.getMessage ex))
-        (assoc bc/failure :exception ex)))))
+  (wrap-events
+   ctx
+   {:type :step/start
+    :message "Step started"}
+   {:type :step/end
+    :message "Step completed"}
+   (fn []
+     (let [{:keys [work-dir step] :as ctx} (make-step-dir-absolute ctx)]
+       (try
+         (log/debug "Running step:" step)
+         (run-step step ctx)
+         (catch Exception ex
+           (log/warn "Step failed:" (.getMessage ex))
+           (assoc bc/failure :exception ex)))))))
 
 (defn- run-steps!
   "Runs all steps in sequence, stopping at the first failure.
    Returns the execution context."
   [initial-ctx {:keys [name steps] :as p}]
-  (log/info "Running pipeline:" name)
-  (log/debug "Running pipeline steps:" p)
-  (reduce (fn [ctx s]
-            (let [r (-> ctx
-                        (assoc :step s)
-                        (run-step*))]
-              (log/debug "Result:" r)
-              (when-let [o (:output r)]
-                (log/debug "Output:" o))
-              (when-let [o (:error r)]
-                (log/warn "Error output:" o))
-              (cond-> ctx
-                true (assoc :status (:status r)
-                            :last-result r)
-                (bc/failed? r) (reduced))))
-          (merge (initial-context p) initial-ctx)
-          steps))
+  (wrap-events
+   initial-ctx
+   {:type :pipeline/start
+    :pipeline name
+    :message "Starting pipeline"}
+   {:type :pipeline/end
+    :pipeline name
+    :message "Completed pipeline"}
+   (fn []
+     (log/info "Running pipeline:" name)
+     (log/debug "Running pipeline steps:" p)
+     (reduce (fn [ctx s]
+               (let [r (-> ctx
+                           (assoc :step s)
+                           (run-step*))]
+                 (log/debug "Result:" r)
+                 (when-let [o (:output r)]
+                   (log/debug "Output:" o))
+                 (when-let [o (:error r)]
+                   (log/warn "Error output:" o))
+                 (cond-> ctx
+                   true (assoc :status (:status r)
+                               :last-result r)
+                   (bc/failed? r) (reduced))))
+             (merge (initial-context p) initial-ctx)
+             steps))))
 
 (defn run-pipelines
   "Executes the pipelines by running all steps sequentially.  Currently,
@@ -136,7 +162,7 @@
   (log/debug "No event socket configured, events will not be passed to controlling process")
   {:bus (e/make-bus (ca/chan (ca/sliding-buffer 1)))})
 
-(defn setup-event-bus
+(defn- setup-event-bus
   "Configures the event bus for the event socket.  If no socket is specified,
    then the bus will still be configured, but it will drop all events."
   [{:keys [event-socket] :as ctx}]
@@ -144,7 +170,7 @@
                        (make-socket-bus event-socket)
                        (make-dummy-bus))))
 
-(defn close-socket [ctx]
+(defn- close-socket [ctx]
   (when-let [s (get-in ctx [:events :socket])]
     (uds/close s)))
 
@@ -163,8 +189,14 @@
     (fn [ctx]
       (log/debug "Executing script at:" script-dir)
       (let [p (load-pipelines script-dir)]
-        (post-event ctx {:type :script/started
-                         :message "Script started"
-                         :dir script-dir})
-        (log/debug "Loaded pipelines:" p)
-        (run-pipelines ctx p)))))
+        (wrap-events
+         ctx
+         {:type :script/started
+          :message "Script started"
+          :dir script-dir}
+         {:type :script/finished
+          :message "Script completed"
+          :dir script-dir}
+         (fn []
+           (log/debug "Loaded pipelines:" p)
+           (run-pipelines ctx p)))))))
