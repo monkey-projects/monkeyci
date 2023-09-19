@@ -5,13 +5,18 @@
 (defmacro version []
   `(or (System/getenv "MONKEYCI_VERSION") "0.1.0-SNAPSHOT"))
 
-(def default-config
+(def default-app-config
   {:http
    {:port 3000}
    :runner
    {:type :child}})
 
-(def deep-merge (partial merge-with merge))
+(defn- merge-if-map [a b]
+  (if (map? a)
+    (merge a b)
+    b))
+
+(def deep-merge (partial merge-with merge-if-map))
 
 (defn- key-filter [prefix]
   (let [exp (str (name prefix) "-")]
@@ -44,12 +49,23 @@
        (group-keys :github)
        (group-keys :runner)))
 
-(defn build-config
+(defn app-config
   "Combines app environment with command-line args into a unified 
    configuration structure.  Args have precedence over env vars,
    which in turn override default values."
   [env args]
-  (-> default-config
+  (-> default-app-config
       (deep-merge (config-from-env env))
       (update-in [:http :port] #(or (:port args) %))
       (update-in [:runner :type] keyword)))
+
+(def default-script-config
+  {:container-runner :docker})
+
+(defn script-config
+  "Builds config map used by the child script process"
+  [env args]
+  (-> default-script-config
+      (deep-merge (config-from-env env))
+      (merge args)
+      (update :container-runner keyword)))

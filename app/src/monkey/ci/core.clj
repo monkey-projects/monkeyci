@@ -40,7 +40,7 @@
   [cmd {:keys [env] :as ctx}]
   (fn [args]
     (cmd (-> ctx
-             (merge (config/build-config env args))
+             (merge (config/app-config env args))
              (assoc :args args)))))
 
 (def version-cmd

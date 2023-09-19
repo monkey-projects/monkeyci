@@ -22,7 +22,22 @@
                                           bc/success)]
         (is (nil? (sut/run {:key :test-args})))
         (is (= {:key :test-args} (-> @captured-args
-                                     (select-keys [:key]))))))))
+                                     (select-keys [:key])))))))
+
+  (testing "merges args with env vars"
+    (let [captured-args (atom nil)]
+      (with-redefs [script/exec-script! (fn [args]
+                                          (reset! captured-args args)
+                                          bc/success)]
+        (is (nil? (sut/run
+                    {:key :test-args}
+                    {:monkeyci-container-runner "docker"
+                     :monkeyci-event-socket "/tmp/test.sock"})))
+        (is (= {:container-runner :docker
+                :event-socket "/tmp/test.sock"}
+               (-> @captured-args
+                   (select-keys [:container-runner
+                                 :event-socket]))))))))
 
 (deftest ^:slow execute-slow!
   (testing "executes build script in separate process"

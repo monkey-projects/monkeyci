@@ -5,9 +5,10 @@
             [clojure.java.io :as io]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
+            [config.core :as cc]
             [medley.core :as mc]
             [monkey.ci
-             [config :refer [version]]
+             [config :refer [version] :as config]
              [script :as script]
              [utils :as utils]]
             [monkey.ci.build.core :as bc]
@@ -19,11 +20,14 @@
   "Run function for when a build task is executed using clojure tools.  This function
    is run in a child process by the `execute!` function below.  This exits the VM
    with a nonzero value on failure."
-  [args]
-  (let [ctx (assoc args :container-runner :docker)] ; Force docker container runner for now
-    (log/debug "Executing script with context" ctx)
-    (when (bc/failed? (script/exec-script! ctx))
-      (System/exit 1))))
+  ([args env]
+   (let [ctx (config/script-config env args)]
+     (log/debug "Executing script with context" ctx)
+     (when (bc/failed? (script/exec-script! ctx))
+       (System/exit 1))))
+
+  ([args]
+   (run args cc/env)))
 
 (defn- local-script-lib-dir
   "Calculates the local script directory as a sibling dir of the

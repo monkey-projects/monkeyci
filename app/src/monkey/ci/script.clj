@@ -1,16 +1,24 @@
 (ns monkey.ci.script
   (:require [clojure.java.io :as io]
             [clojure.tools.logging :as log]
+            [clojure.core.async :as ca]
             [monkey.ci.build.core :as bc]
             [monkey.ci
              [containers :as c]
              [docker :as d]
-             [utils :as u]]))
+             [events :as e]
+             [utils :as u]]
+            [monkey.socket-async
+             [core :as sa]
+             [uds :as uds]]))
 
 (defn initial-context [p]
   (assoc bc/success
          :env {}
          :pipeline p))
+
+(defn- post-event [ctx evt]
+  (e/post-event (get-in ctx [:events :bus]) (assoc evt :src :script)))
 
 (defprotocol PipelineStep
   (run-step [s ctx]))
@@ -114,11 +122,49 @@
         (in-ns 'monkey.ci.script)
         (remove-ns tmp-ns)))))
 
+(defn- make-socket-bus [p]
+  (log/debug "Sending events to socket at" p)
+  (let [addr (uds/make-address p)
+        conn (uds/connect-socket addr)
+        {:keys [channel] :as bus} (e/make-bus)]
+    (sa/write-from-channel channel conn)
+    {:addr addr
+     :socket conn
+     :bus bus}))
+
+(defn- make-dummy-bus []
+  (log/debug "No event socket configured, events will not be passed to controlling process")
+  {:bus (e/make-bus (ca/chan (ca/sliding-buffer 1)))})
+
+(defn setup-event-bus
+  "Configures the event bus for the event socket.  If no socket is specified,
+   then the bus will still be configured, but it will drop all events."
+  [{:keys [event-socket] :as ctx}]
+  (assoc ctx :events (if event-socket
+                       (make-socket-bus event-socket)
+                       (make-dummy-bus))))
+
+(defn close-socket [ctx]
+  (when-let [s (get-in ctx [:events :socket])]
+    (uds/close s)))
+
+(defn- with-event-bus [ctx f]
+  (let [ctx (setup-event-bus ctx)]
+    (try
+      (f ctx)
+      (finally
+        (close-socket ctx)))))
+
 (defn exec-script!
   "Loads a script from a directory and executes it.  The script is
    executed in this same process (but in a randomly generated namespace)."
   [{:keys [script-dir] :as ctx}]
-  (log/debug "Executing script at:" script-dir)
-  (let [p (load-pipelines script-dir)]
-    (log/debug "Loaded pipelines:" p)
-    (run-pipelines ctx p)))
+  (with-event-bus ctx
+    (fn [ctx]
+      (log/debug "Executing script at:" script-dir)
+      (let [p (load-pipelines script-dir)]
+        (post-event ctx {:type :script/started
+                         :message "Script started"
+                         :dir script-dir})
+        (log/debug "Loaded pipelines:" p)
+        (run-pipelines ctx p)))))

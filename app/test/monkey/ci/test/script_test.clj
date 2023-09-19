@@ -1,16 +1,51 @@
 (ns monkey.ci.test.script-test
   (:require [clojure.test :refer :all]
+            [clojure.core.async :as ca]
+            [clojure.tools.logging :as log]
             [monkey.ci
              [containers :as c]
-             [script :as sut]]
-            [monkey.ci.build.core :as bc]))
+             [script :as sut]
+             [utils :as u]]
+            [monkey.ci.build.core :as bc]
+            [monkey.socket-async
+             [core :as sa]
+             [uds :as uds]]))
+
+(defn with-listening-socket [f]
+  (let [p (u/tmp-file "test-" ".sock")]
+    (try
+      (let [a (uds/make-address p)
+            l (uds/listen-socket a)]
+        (try
+          (f a l)
+          (finally
+            (uds/close l))))
+      (finally
+        (uds/delete-address p)))))
 
 (deftest exec-script!
   (testing "executes basic clj script from location"
     (is (bc/success? (sut/exec-script! {:script-dir "examples/basic-clj"}))))
 
   (testing "executes script shell from location"
-    (is (bc/success? (sut/exec-script! {:script-dir "examples/basic-script"})))))
+    (is (bc/success? (sut/exec-script! {:script-dir "examples/basic-script"}))))
+  
+  (testing "connects to listening socket if specified"
+    (with-listening-socket
+      (fn [addr listener]
+        (let [in (ca/chan 1)]
+          ;; Accept connection and read into the channel
+          (doto (Thread. (fn []
+                           (-> (uds/accept listener)
+                               (sa/read-onto-channel in))
+                           (log/debug "Incoming connection accepted")))
+            (.start))
+          ;; Execute the script, we expect at least one incoming event
+          (is (bc/success? (sut/exec-script! {:script-dir "examples/basic-clj"
+                                              :event-socket (str (.getPath addr))})))
+          ;; Try to read a message on the channel
+          (is (= in (-> (ca/alts!! [in (ca/timeout 500)])
+                        (second)))))))))
 
 (deftest run-pipelines
   (testing "success if no pipelines"
