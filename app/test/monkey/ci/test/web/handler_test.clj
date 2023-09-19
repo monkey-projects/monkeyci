@@ -4,7 +4,9 @@
              [mac :as mac]]
             [clojure.test :refer [deftest testing is]]
             [clojure.core.async :as ca]
+            [monkey.ci.events :as events]
             [monkey.ci.web.handler :as sut]
+            [monkey.ci.test.helpers :refer [try-take] :as h]
             [org.httpkit.server :as http]
             [reitit.ring :as ring]
             [ring.mock.request :as mock]))
@@ -18,7 +20,8 @@
 (defn- make-test-app []
   (sut/make-app
    {:github
-    {:secret github-secret}}))
+    {:secret github-secret}
+    :bus (events/make-bus)}))
 
 (def test-app (make-test-app))
 
@@ -74,6 +77,7 @@
                        (mock/body payload)
                        (mock/header :x-hub-signature-256 (str "sha256=" signature))
                        (test-app)
+                       (h/try-take 500 :timeout)
                        :status)))))
 
     (testing "returns 401 if invalid security"
@@ -95,11 +99,6 @@
                               (app)
                               :body))))))
 
-(defn- try-take [ch timeout timeout-val]
-  (let [t (ca/timeout timeout)
-        [v c] (ca/alts!! [ch t])]
-    (if (= t c) timeout-val v)))
-
 (deftest wait-until-stopped
   (testing "blocks until the server has stopped"
     (let [ch (ca/chan)]
@@ -114,3 +113,15 @@
             (is (nil? (try-take t 200 :timeout)))))
         (finally
           (ca/close! ch))))))
+
+(deftest github-webhook
+  (testing "posts event"
+    (let [bus (events/make-bus)
+          ctx {:reitit.core/match {:data {::sut/context {:bus bus}}}}
+          req (-> (mock/request :post "/webhook/github")
+                  (mock/body "test body")
+                  (merge ctx))
+          recv (atom [])
+          _ (events/register-handler bus :webhook/github (partial swap! recv conj))]
+      (is (some? (sut/github-webhook req)))
+      (is (not= :timeout (h/wait-until #(pos? (count @recv)) 500))))))

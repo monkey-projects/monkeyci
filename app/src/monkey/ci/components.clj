@@ -4,7 +4,7 @@
             [com.stuartsierra.component :as c]
             [monkey.ci.events :as e]))
 
-(defn- stop-and-dissoc [c key f]
+#_(defn- call-and-dissoc [c key f]
   (when-let [x (key c)]
     (f x))
   (dissoc c key))
