@@ -21,7 +21,7 @@
                        :runner))))))
 
 (deftest child-runner
-  (let [args {:script {:dir "examples/basic-clj"}}]
+  (let [args {:args {:dir "examples/basic-clj"}}]
     (testing "runs script locally in child process, returns result"
       (with-redefs [p/execute! (constantly {:exit 654})]
         (is (map? (sut/child-runner args)))))
@@ -38,22 +38,22 @@
       (testing "passes work dir to process"
         (h/with-tmp-dir base
           (is (true? (.mkdir (io/file base "local"))))
-          (is (= base (-> (sut/child-runner {:script {:dir "local"
-                                                      :workdir base}})
+          (is (= base (-> (sut/child-runner {:args {:dir "local"
+                                                    :workdir base}})
                           :args
                           :work-dir)))))
       
       (testing "combine relative script dir with workdir"
         (h/with-tmp-dir base
           (is (true? (.mkdir (io/file base "local"))))
-          (is (= (str base "/local") (-> (sut/child-runner {:script {:dir "local"
-                                                                     :workdir base}})
+          (is (= (str base "/local") (-> (sut/child-runner {:args {:dir "local"
+                                                                   :workdir base}})
                                          :args
                                          :script-dir)))))
 
       (testing "leave absolute script dir as is"
         (h/with-tmp-dir base
-          (is (= base (-> (sut/child-runner {:script {:dir base}})
+          (is (= base (-> (sut/child-runner {:args {:dir base}})
                           :args
                           :script-dir)))))))
 
@@ -62,7 +62,7 @@
                                {:exit 0
                                 :args args})]
       (h/with-tmp-dir base
-        (is (= "test-pipeline" (-> (sut/child-runner {:script {:dir base
-                                                               :pipeline "test-pipeline"}})
+        (is (= "test-pipeline" (-> (sut/child-runner {:args {:dir base
+                                                             :pipeline "test-pipeline"}})
                                    :args
                                    :pipeline)))))))

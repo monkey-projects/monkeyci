@@ -21,3 +21,9 @@
   [h]
   (.. (Runtime/getRuntime)
       (addShutdownHook (Thread. h))))
+
+(defn tmp-file
+  "Generates a new temporary path"
+  [prefix suffix]
+  (-> (io/file (System/getProperty "java.io.tmpdir") (str prefix (random-uuid) suffix))
+      (.getAbsolutePath)))

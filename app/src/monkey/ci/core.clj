@@ -6,29 +6,21 @@
   (:gen-class)
   (:require [cli-matic.core :as cli]
             [clojure.tools.logging :as log]
+            [com.stuartsierra.component :as sc]
             [config.core :refer [env]]
             [monkey.ci
+             [components :as co]
              [config :as config]
-             [process :as p]
+             [events :as e]
              [runners :as r]]
             [monkey.ci.web.handler :as web]))
 
-(defn make-config
-  "Creates a build configuration that includes the environment and any args passed in.
-   This is then used to create a build runner."
-  [env args]
-  {:runner {:type (keyword (:monkeyci-runner-type env))}
-   :env env
-   :script args})
-
 (defn print-version [& _]
-  (println (p/version)))
+  (println (config/version)))
 
-(defn build [env args]
+(defn build [ctx]
   (println "Building")
-  (log/debug "Arguments:" args)
-  (let [ctx (make-config env args)
-        runner (r/make-runner ctx)
+  (let [runner (r/make-runner ctx)
         {:keys [result exit] :as output} (runner ctx)]
     (condp = (or result :unknown)
       :success (log/info "Success!")
@@ -38,22 +30,55 @@
     ;; Return exit code, this will be the process exit code as well
     exit))
 
-(defn server [env args]
+(defn server [ctx]
   (println "Starting HTTP server")
-  (-> (web/start-server (config/build-config env args))
+  (-> (web/start-server ctx)
       (web/wait-until-stopped)))
 
 (defn default-invoker
   "Wrap the command in a fn to enable better testing"
-  [cmd env]
-  (partial cmd env))
+  [cmd {:keys [env] :as ctx}]
+  (fn [args]
+    (cmd (-> ctx
+             (merge (config/app-config env args))
+             (assoc :args args)))))
 
-(defn make-cli-config [{:keys [env cmd-invoker] :or {cmd-invoker default-invoker}}]
+(def version-cmd
+  {:command "version"
+   :description "Prints current version"
+   :runs print-version})
+
+(def build-cmd
+  {:command "build"
+   :description "Runs build locally"
+   :opts [{:as "Script location"
+           :option "dir"
+           :short "d"
+           :type :string
+           :default ".monkeyci/"}
+          {:as "Pipeline name"
+           :option "pipeline"
+           :short "p"
+           :type :string}]
+   :runs build})
+
+(def server-cmd
+  {:command "server"
+   :description "Start MonkeyCI server"
+   :opts [{:as "Listening port"
+           :option "port"
+           :short "p"
+           :type :int
+           :default 3000
+           :env "PORT"}]
+   :runs server})
+
+(defn make-cli-config [{:keys [cmd-invoker] :or {cmd-invoker default-invoker} :as ctx}]
   (letfn [(invoker [cmd]
-            (cmd-invoker cmd env))]
+            (cmd-invoker cmd ctx))]
     {:name "monkey-ci"
-     :description "MonkeyCI: Powerful build script runner"
-     :version (p/version)
+     :description "MonkeyCI: Powerful build pipeline runner"
+     :version (config/version)
      :opts [{:as "Working directory"
              :option "workdir"
              :short "w"
@@ -63,41 +88,46 @@
              :option "dev-mode"
              :type :with-flag
              :default false}]
-     :subcommands [{:command "version"
-                    :description "Prints current version"
-                    :runs (invoker print-version)}
-                   {:command "build"
-                    :description "Runs build locally"
-                    :opts [{:as "Script location"
-                            :option "dir"
-                            :short "d"
-                            :type :string
-                            :default ".monkeyci/"}
-                           {:as "Pipeline name"
-                            :option "pipeline"
-                            :short "p"
-                            :type :string}]
-                    :runs (invoker build)}
-                   {:command "server"
-                    :description "Start MonkeyCI server"
-                    :opts [{:as "Listening port"
-                            :option "port"
-                            :short "p"
-                            :type :int
-                            :default 3000}]
-                    :runs (invoker server)}]}))
+     :subcommands (->> [version-cmd
+                        build-cmd
+                        server-cmd]
+                       ;; Wrap the run functions in the invoker
+                       (mapv (fn [c] (update c :runs invoker))))}))
 
-(defn run-cli
-  ([config args]
-   (cli/run-cmd args config))
-  ([args]
-   (run-cli (make-cli-config {:env env}) args)))
+(defrecord CliConfig [env bus]
+  sc/Lifecycle
+  (start [this]
+    (assoc this :cli-config (make-cli-config this)))
+
+  (stop [this]
+    (dissoc this :cli-config)))
+
+(defn new-cli [env]
+  (map->CliConfig {:env env}))
+
+(defn run-command-async
+  "Runs the command in an async fashion by sending an event, and waiting
+   for the 'complete' event to arrive."
+  [bus cmd]
+  (-> bus 
+      (e/post-event {:type :command/invoked
+                     :command cmd})
+      (e/wait-for :command/completed (filter (comp (partial = cmd) :command)))))
+
+(defn make-system [config]
+  (sc/system-map
+   :bus (co/new-bus)
+   :cli (sc/using (new-cli config) [:bus])))
 
 (defn -main
   "Main entry point for the application."
   [& args]
-  (try
-    (run-cli args)
-    (finally
-      ;; Shutdown the agents otherwise the app will block for a while here
-      (shutdown-agents))))
+  (let [sys (-> (make-system env)
+                (sc/start))]
+    (try
+      (let [cli (get-in sys [:cli :cli-config])]
+        (cli/run-cmd args cli))
+      (finally
+        (sc/stop sys)
+        ;; Shutdown the agents otherwise the app will block for a while here
+        (shutdown-agents)))))

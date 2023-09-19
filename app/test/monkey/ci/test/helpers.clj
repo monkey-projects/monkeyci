@@ -1,6 +1,7 @@
 (ns monkey.ci.test.helpers
   "Helper functions for testing"
-  (:require [clojure.java.io :as io])
+  (:require [clojure.java.io :as io]
+            [clojure.core.async :as ca])
   (:import org.apache.commons.io.FileUtils))
 
 (defn ^java.io.File create-tmp-dir []
@@ -21,3 +22,20 @@
      (fn [d#]
        (let [~dir d#]
          ~@body))))
+
+(defn wait-until [f timeout]
+  (let [end (+ (System/currentTimeMillis) timeout)]
+    (loop [r (f)]
+      (if r
+        r
+        (if (> (System/currentTimeMillis) end)
+          :timeout
+          (do
+            (Thread/sleep 100)
+            (recur (f))))))))
+
+(defn try-take [ch timeout timeout-val]
+  (let [t (ca/timeout timeout)
+        [v c] (ca/alts!! [ch t])]
+    (if (= t c) timeout-val v)))
+

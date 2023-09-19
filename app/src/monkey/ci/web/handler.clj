@@ -1,8 +1,10 @@
 (ns monkey.ci.web.handler
   "Handler for the web server"
   (:require [camel-snake-kebab.core :as csk]
+            [clojure.core.async :refer [go <! >!]]
             [clojure.tools.logging :as log]
             [medley.core :refer [update-existing]]
+            [monkey.ci.events :as e]
             [monkey.ci.web.github :as github]
             [muuntaja.core :as mc]
             [org.httpkit.server :as http]
@@ -11,16 +13,31 @@
              [muuntaja :as rrmm]
              [parameters :as rrmp]]))
 
+(defn- post-event
+  "Posts event to the bus found in the request data.  Returns an async channel
+   holding `true` if the event is posted."
+  [req evt]
+  (go (some-> (get-in req [:reitit.core/match :data ::context :bus])
+              (e/channel)
+              (>! evt))))
+
 (defn health [_]
   ;; TODO Make this more meaningful
   {:status 200
    :body "ok"
    :headers {"Content-Type" "text/plain"}})
 
-(defn github-webhook [req]
-  ;; TODO
+(defn github-webhook
+  "Receives an incoming webhook from Github.  This actually just posts
+   the event on the internal bus and returns a 200 OK response."
+  [req]
   (log/info "Body params:" (:body-params req))
-  {:status 200})
+  (log/debug "Request data:" (get-in req [:reitit.core/match :data]))
+  (go
+    {:status (if (<! (post-event req {:type :webhook/github
+                                      :payload (:body-params req)}))
+               200
+               500)}))
 
 (defn- maybe-generate [s g]
   (if (some? s)
@@ -56,7 +73,8 @@
                        (assoc-in mc/default-options
                                  ;; Convert keys to kebab-case
                                  [:formats "application/json" :decoder-opts]
-                                 {:decode-key-fn csk/->kebab-case-keyword}))}
+                                 {:decode-key-fn csk/->kebab-case-keyword}))
+            ::context opts}
      :reitit.middleware/registry
      {:github-security [github/validate-security (maybe-generate
                                                   (get-in opts [:github :secret])
