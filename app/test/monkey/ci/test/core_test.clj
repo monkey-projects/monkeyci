@@ -26,8 +26,7 @@
       (testing "does nothing when no bus"
         (is (nil? ((sut/default-invoker {:command :no-bus-test} {} {}) {}))))
 
-      #_(testing "posts `command/invoked` event and waits for `command/completed`"
-        ;; FIXME For unknown reasons this test (and this test alone) sometimes fails with timeout
+      (testing "posts `command/invoked` event and waits for `command/completed`"
         (h/with-bus
           (fn [bus]
             (let [cmd {:command :test-1
@@ -36,7 +35,7 @@
                   inv (sut/default-invoker cmd {} (c/system-map :bus bus))
                   _ (e/register-handler bus
                                         :command/invoked
-                                        (fn [{:keys [command] :as evt}]
+                                        (fn [{:keys [command bus] :as evt}]
                                           (log/debug "Received event:" evt)
                                           (when (= :test-1 command)
                                             ;; Complete immediately
@@ -44,7 +43,7 @@
                                             (e/post-event bus {:type :command/completed
                                                                :command command}))))
                   out (inv {})]
-              (is (= 0 (h/try-take out 1000 :timeout)))))))
+              (is (= 0 (h/try-take out 5000 :timeout)))))))
 
       (testing "returns exit code"
         (h/with-bus
@@ -55,7 +54,7 @@
                   inv (sut/default-invoker cmd {} (c/system-map :bus bus))
                   _ (e/register-handler bus
                                         :command/invoked
-                                        (fn [{:keys [command]}]
+                                        (fn [{:keys [command bus]}]
                                           (when (= :test-2 command)
                                             ;; Complete immediately
                                             (e/post-event bus {:type :command/completed
@@ -73,7 +72,7 @@
                   inv (sut/default-invoker cmd {} (c/system-map :bus bus))
                   _ (e/register-handler bus
                                         :command/invoked
-                                        (fn [{:keys [command config]}]
+                                        (fn [{:keys [command config bus]}]
                                           (when (= :test command)
                                             ;; Complete immediately
                                             (e/post-event bus {:type :command/completed

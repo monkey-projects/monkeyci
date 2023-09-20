@@ -42,12 +42,18 @@
 
 (deftest ^:slow execute-slow!
   (testing "executes build script in separate process"
-    (is (zero? (:exit (sut/execute! {:dev-mode true
-                                     :script-dir (example "basic-clj")})))))
+    (is (zero? (-> {:dev-mode true
+                    :script-dir (example "basic-clj")}
+                   sut/execute!
+                   deref
+                   :exit))))
 
   (testing "fails when script fails"
-    (is (pos? (:exit (sut/execute! {:dev-mode true
-                                    :script-dir (example "failing")})))))
+    (is (pos? (-> {:dev-mode true
+                   :script-dir (example "failing")}
+                  sut/execute!
+                  deref
+                  :exit))))
 
   (testing "fails when script not found"
     (is (thrown? java.io.IOException (sut/execute! {:dev-mode true
