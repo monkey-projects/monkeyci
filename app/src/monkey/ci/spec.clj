@@ -8,4 +8,5 @@
 
 (s/def ::event-bus (s/keys ::req-un [::channel ::pub]))
 (s/def ::handler fn?)
-(s/def ::event-handler (s/keys ::req-un [::channel ::handler ::type]))
+(s/def ::event-handler (s/keys ::req-un [::channel ::type]
+                               ::opt-un [::handler ::tx]))

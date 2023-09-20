@@ -26,7 +26,7 @@ In the code, we could model these events using
 can then either communicate internally, when the modules are running inside the
 same process.  Or they could use a JMS implementation like [Artemis](https://activemq.apache.org/components/artemis/documentation/),
 or use some form of [cloud queues](https://docs.oracle.com/en-us/iaas/Content/queue/home.htm).
-An extra advantage of this approache would be that the code could be made a lot more
+An extra advantage of this approach would be that the code could be made a lot more
 flexible, and testable.  Instead of having to mock out entire parts, we would just
 inspect the messages that are posted on certain channels.  We could also log the
 messages that pass through channels to improve monitoring.

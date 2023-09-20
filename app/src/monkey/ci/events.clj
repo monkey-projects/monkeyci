@@ -43,6 +43,7 @@
   (s/valid? ::spec/event-bus x))
 
 (def channel :channel)
+(def pub :pub)
 
 (defn register-handler
   "Registers a handler for events of the given type.  The handler should
@@ -64,6 +65,19 @@
                                            :event e
                                            :exception ex}))))
                (recur (<! ch))))}))
+
+(defn register-pipeline
+  "Registers a pipeline handler in the bus.  This pipeline will subscribe to all
+   events of given type, pass them through the transducer `tx` and then send the
+   resulting event back to the bus.  Returns a handler object that contains the
+   intermediate channel for the pipeline."
+  [bus type tx]
+  (let [ch (ca/chan)]
+    (ca/sub (pub bus) type ch)
+    (ca/pipeline 1 (channel bus) tx ch)
+    {:type :type
+     :channel ch
+     :tx tx}))
 
 (defn unregister-handler
   "Unregisters the handler (as returned from `register-handler`) from the

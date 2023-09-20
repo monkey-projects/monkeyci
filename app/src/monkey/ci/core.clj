@@ -13,13 +13,15 @@
              [config :as config]
              [events :as e]
              [runners :as r]
-             [utils :as u]]
-            [monkey.ci.web.handler :as web]))
+             [utils :as u]]))
 
 (def base-system
   (sc/system-map
    :bus (co/new-bus)
-   :http (sc/using (co/new-http-server) [:bus])))
+   :http (-> (co/new-http-server)
+             (sc/using [:bus]))
+   :commands (-> (co/new-command-handler)
+                 (sc/using [:bus]))))
 
 (defn build [ctx]
   (println "Building")
@@ -44,16 +46,17 @@
      ;; This is probably over-engineered, but let's see where it leads us...
      (let [{:keys [bus] :as sys} (-> base-system
                                      (assoc :config (config/app-config env args))
-                                     (sc/subsystem requires)
+                                     (sc/subsystem (concat requires [:bus :commands]))
                                      (sc/start-system))]
        ;; Register shutdown hook to stop the system
        (u/add-shutdown-hook! #(sc/stop-system sys))
        (if (some? bus)
          (do
-           ;; TODO Add any components required by the command to the event
-           (e/post-event bus {:type :command/invoked
-                              :command command
-                              :config (:config sys)})
+           (e/post-event bus (-> sys
+                                 ;; Add any required components to the event
+                                 (select-keys requires)
+                                 (merge {:type :command/invoked
+                                         :command command})))
            (e/wait-for bus :command/completed (filter (comp (partial = command) :command))))
          (log/warn "Unable to invoke command, event bus has not been configured.")))))
   ([cmd env]

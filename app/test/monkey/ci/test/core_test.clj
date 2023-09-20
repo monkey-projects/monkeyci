@@ -18,9 +18,12 @@
 (deftest default-invoker
   (let [hooks (atom [])]
     (with-redefs [u/add-shutdown-hook! (partial swap! hooks conj)]
+
+      (testing "creates a fn"
+        (is (fn? (sut/default-invoker {} {}))))
       
       (testing "does nothing when no bus"
-        (is (nil? ((sut/default-invoker {:command :test} {}) {}))))
+        (is (nil? ((sut/default-invoker {:command :no-bus-test} {} {}) {}))))
 
       (testing "posts `command/invoked` event and waits for `command/completed`"
         (let [cmd {:command :test
@@ -39,9 +42,29 @@
           (is (some? out))
           (is (not= :timeout (h/try-take out 500 :timeout)))))
 
+      (testing "passes dependent components in event"
+        (let [cmd {:command :test
+                   :requires [:bus :config]}
+              bus (e/make-bus)
+              ;; Setup a system with a custom bus
+              inv (sut/default-invoker cmd {} (c/system-map :bus bus))
+              _ (e/register-handler bus
+                                    :command/invoked
+                                    (fn [{:keys [command config]}]
+                                      (when (= :test command)
+                                        ;; Complete immediately
+                                        (e/post-event bus {:type :command/completed
+                                                           :command command
+                                                           :config config}))))
+              out (inv {})
+              recv (h/try-take out 500 :timeout)]
+          (is (some? out))
+          (is (not= :timeout recv))
+          (is (some? (:config recv)))))
+
       (testing "registers shutdown hook"
         (let [cmd {:command :test
-                   :requires [:bus]}  ; Test command, only requires a bus
+                   :requires [:bus]} ; Test command, only requires a bus
               bus (e/make-bus)
               ;; Setup a system with a custom bus
               inv (sut/default-invoker cmd {} (c/system-map :bus bus))

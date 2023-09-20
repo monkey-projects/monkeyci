@@ -1,6 +1,7 @@
 (ns monkey.ci.components
   "Defines components for system startup and integration"
-  (:require [clojure.tools.logging :as log]
+  (:require [clojure.core.async :as ca]
+            [clojure.tools.logging :as log]
             [com.stuartsierra.component :as c]
             [monkey.ci
              [commands :as co]
@@ -29,7 +30,9 @@
 (defrecord CommandHandler [bus]
   c/Lifecycle
   (start [this]
-    (assoc this :handler (e/register-handler bus :command/invoked co/handle-command)))
+    ;; Set up a pipeline that handles events through the command tx,
+    ;; then sends the results back to the bus
+    (assoc this :handler (e/register-pipeline bus :command/invoked co/command-tx)))
 
   (stop [this]
     (call-and-dissoc this :handler (partial e/unregister-handler bus))))
