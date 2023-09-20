@@ -20,12 +20,10 @@
   [evt]
   (let [{:keys [script-dir work-dir] :as dirs} (get-absolute-dirs evt)]
     (if (some-> (io/file script-dir) (.exists))
-      (do
-        (log/info "Running build script at" script-dir)
-        (-> evt
-            (assoc :type :build/local)
-            (merge dirs)
-            (dissoc :dir :workdir)))
+      (-> evt
+          (assoc :type :build/local)
+          (merge dirs)
+          (dissoc :dir :workdir))
       {:type :build/completed
        :exit 1
        :message (str "No build script found at " script-dir)
@@ -35,7 +33,7 @@
   ;; Do some logging depending on the result
   (condp = (or result :unknown)
     :success (log/info "Success!")
-    :warning (log/warn "Exited with warnings.")
+    :warning (log/warn "Exited with warnings:" (:message evt))
     :error   (log/error "Failure.")
     :unknown (log/warn "Unknown result."))
   {:type :command/completed

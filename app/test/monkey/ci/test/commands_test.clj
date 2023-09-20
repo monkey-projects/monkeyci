@@ -15,6 +15,6 @@
 
   (testing "adds args as root properties"
     (is (= "test-pipeline" (-> {:command :build
-                                :args {:pipeline "test-pipeline"}}
+                                :pipeline "test-pipeline"}
                                (sut/handle-command)
                                :pipeline)))))

@@ -38,6 +38,7 @@
    system, but you can specify your own for testing purposes."
   ([{:keys [command requires]} env base-system]
    (fn [args]
+     (log/debug "Invoking command with arguments:" args)
      ;; This is probably over-engineered, but let's see where it leads us...
      (let [{:keys [bus] :as sys} (-> base-system
                                      (assoc :config (config/app-config env args))
@@ -51,7 +52,8 @@
                                  ;; Add any required components to the event
                                  (select-keys requires)
                                  (merge {:type :command/invoked
-                                         :command command})))
+                                         :command command})
+                                 (merge args)))
            ;; Wait for the complete event to arrive.  This returns a channel that cli-matic
            ;; will wait for before exiting.  The channel will hold the exit code for the
            ;; event, or zero if no exit code is found.

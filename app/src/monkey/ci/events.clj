@@ -50,6 +50,7 @@
    not perform any blocking operations.  In that case, it should start a
    thread and park."
   [bus type handler]
+  (log/debug "Registering handler for" type)
   (let [ch (ca/chan)]
     (ca/sub (:pub bus) type ch)
     {:channel ch
@@ -72,6 +73,7 @@
    resulting event back to the bus.  Returns a handler object that contains the
    intermediate channel for the pipeline."
   [bus type tx]
+  (log/debug "Registering pipeline handler for" type)
   (let [ch (ca/chan)]
     (ca/sub (pub bus) type ch)
     (ca/pipeline 1 (channel bus) tx ch)

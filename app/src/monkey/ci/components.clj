@@ -6,6 +6,7 @@
             [monkey.ci
              [commands :as co]
              [events :as e]
+             [process :as p]
              [runners :as r]]
             [monkey.ci.web.handler :as web]))
 
@@ -52,13 +53,21 @@
 (defn new-http-server []
   (map->HttpServer {}))
 
+(defn- register-tx-runners [bus]
+  (->> {:build/started (comp (map r/build-local)
+                             (remove nil?))
+        :build/completed (map r/build-completed)}
+       (mapv (partial apply e/register-pipeline bus))))
+
+(defn- register-fn-handlers [bus]
+  [(e/register-handler bus :build/local p/execute!)])
+
 (defrecord BuildRunners [config bus]
   c/Lifecycle
   (start [this]
-    (->> {:build/started (map r/build-local)
-          :build/completed (map r/build-completed)}
-         (map (partial apply e/register-pipeline bus))
-         (assoc this :handlers)))
+    (log/debug "Registering build runner handlers")
+    (assoc this :handlers (concat (register-tx-runners bus)
+                                  (register-fn-handlers bus))))
 
   (stop [this]
     (call-and-dissoc this :handlers (partial map (partial e/unregister-handler bus)))))

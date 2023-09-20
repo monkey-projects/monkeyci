@@ -2,6 +2,7 @@
   "Process execution functions.  Executes build scripts in a separate process,
    using clojure cli tools."
   (:require [babashka.process :as bp]
+            [clojure.core.async :as ca]
             [clojure.java.io :as io]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
@@ -9,6 +10,7 @@
             [medley.core :as mc]
             [monkey.ci
              [config :refer [version] :as config]
+             [events :as e]
              [script :as script]
              [utils :as utils]]
             [monkey.ci.build.core :as bc]
@@ -74,7 +76,8 @@
    by the child script.  These events will then be sent to the bus."
   [{:keys [channel] :as bus}]
   (let [path (utils/tmp-file "events-" ".sock")
-        listener (uds/listen-socket (uds/make-address path))]
+        listener (uds/listen-socket (uds/make-address path))
+        inter-ch (ca/chan)]
     {:socket-path path
      :socket listener
      ;; Accept connection in separate thread
@@ -84,42 +87,40 @@
                              (try 
                                (let [sock (uds/accept listener)]
                                  (log/debug "Incoming connection from child process accepted")
-                                 (sa/read-onto-channel sock channel))
+                                 ;; Set up a pipeline to avoid the bus closing
+                                 (ca/pipe inter-ch channel false)
+                                 (sa/read-onto-channel sock inter-ch))
                                (catch Exception ex
                                  (log/warn "No incoming connection from child could be accepted" ex)))))
                       (.start))}))
 
 (defn execute!
   "Executes the build script located in given directory.  This actually runs the
-   clojure cli with a generated `build` alias.  This expects absolute directories."
+   clojure cli with a generated `build` alias.  This expects absolute directories.
+   Returns an object that can be `deref`ed to wait for the process to exit.  Will
+   post a `build/completed` event on process exit."
   [{:keys [work-dir script-dir bus] :as ctx}]
   (log/info "Executing process in" work-dir)
-  (try 
-    ;; Run the clojure cli with the "build" alias. Add some parameters to the script
-    ;; in the form of edn.
-    (let [{:keys [socket-path socket]} (when bus
-                                         (events-to-bus bus))
-          result (-> (bp/process
-                      {:dir script-dir
-                       :out :inherit
-                       :err :inherit
-                       :cmd (-> ["clojure"
-                                 "-Sdeps" (generate-deps ctx)
-                                 "-X:monkeyci/build"]
-                                (concat (build-args ctx))
-                                (vec))
-                       :extra-env {:monkeyci-event-socket socket-path}
-                       :exit-fn (fn [_]
-                                  (log/debug "Script process exited, cleaning up")
-                                  (when socket-path 
-                                    (uds/close socket)
-                                    (uds/delete-address socket-path)))})
-                     (deref))]
-      (log/info "Script executed with exit code" (:exit result))
-      (when (pos? (:exit result))
-        (log/debug "Result:" result))
-      result)
-    (catch Exception ex
-      (let [{:keys [out err] :as data} (ex-data ex)]
-        (log/error "Failed to execute build script")
-        (throw ex)))))
+  (let [{:keys [socket-path socket]} (when bus
+                                       (events-to-bus bus))]
+    (bp/process
+     {:dir script-dir
+      :out :inherit
+      :err :inherit
+      :cmd (-> ["clojure"
+                "-Sdeps" (generate-deps ctx)
+                "-X:monkeyci/build"]
+               (concat (build-args ctx))
+               (vec))
+      :extra-env {:monkeyci-event-socket socket-path}
+      :exit-fn (fn [{:keys [process] :as p}]
+                 (let [exit (or (some-> process (.exitValue)) 0)]
+                   (log/debug "Script process exited with code" exit ", cleaning up")
+                   (when socket-path 
+                     (uds/close socket)
+                     (uds/delete-address socket-path))
+                   (when bus
+                     (e/post-event bus {:type :build/completed
+                                        :exit exit
+                                        :result (if (zero? exit) :success :error)
+                                        :process p}))))})))

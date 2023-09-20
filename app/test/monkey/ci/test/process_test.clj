@@ -7,7 +7,8 @@
              [process :as sut]
              [script :as script]]
             [monkey.ci.utils :as u]
-            [monkey.ci.build.core :as bc]))
+            [monkey.ci.build.core :as bc]
+            [monkey.ci.test.helpers :as h]))
 
 (def cwd (u/cwd))
 
@@ -62,7 +63,7 @@
 
 (deftest execute!
   (with-redefs [bp/process (fn [{:keys [exit-fn] :as args}]
-                             (future
+                             (do
                                (when (fn? exit-fn)
                                  (exit-fn {}))
                                {:args args

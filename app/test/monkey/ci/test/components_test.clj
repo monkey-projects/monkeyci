@@ -75,7 +75,7 @@
   (testing "registers handlers on start for local"
     (h/with-bus
       (fn [bus]
-        (is (= 2 (-> (sut/new-build-runners)
+        (is (= 3 (-> (sut/new-build-runners)
                      (assoc :config {:runner {:type :local}}
                             :bus bus)
                      (c/start)
