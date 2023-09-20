@@ -52,6 +52,7 @@
   (let [ch (ca/chan)]
     (ca/sub (:pub bus) type ch)
     {:channel ch
+     :type type
      :handler handler
      :loop (ca/go-loop [e (<! ch)]
              (when e
@@ -63,6 +64,13 @@
                                            :event e
                                            :exception ex}))))
                (recur (<! ch))))}))
+
+(defn unregister-handler
+  "Unregisters the handler (as returned from `register-handler`) from the
+   bus.  It will no longer receive events."
+  [bus handler]
+  (ca/unsub (:pub bus) (:type handler) (:channel handler))
+  bus)
 
 (defn handler? [x]
   (s/valid? ::spec/event-handler x))

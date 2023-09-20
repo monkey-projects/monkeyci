@@ -2,9 +2,12 @@
   "Defines components for system startup and integration"
   (:require [clojure.tools.logging :as log]
             [com.stuartsierra.component :as c]
-            [monkey.ci.events :as e]))
+            [monkey.ci
+             [commands :as co]
+             [events :as e]]
+            [monkey.ci.web.handler :as web]))
 
-#_(defn- call-and-dissoc [c key f]
+(defn- call-and-dissoc [c key f]
   (when-let [x (key c)]
     (f x))
   (dissoc c key))
@@ -22,3 +25,25 @@
 
 (defn new-bus []
   (->BusComponent))
+
+(defrecord CommandHandler [bus]
+  c/Lifecycle
+  (start [this]
+    (assoc this :handler (e/register-handler bus :command/invoked co/handle-command)))
+
+  (stop [this]
+    (call-and-dissoc this :handler (partial e/unregister-handler bus))))
+
+(defn new-command-handler []
+  (map->CommandHandler {}))
+
+(defrecord HttpServer [bus config]
+  c/Lifecycle
+  (start [this]
+    (assoc this :server (web/start-server (assoc config :bus bus))))
+
+  (stop [this]
+    (call-and-dissoc this :server web/stop-server)))
+
+(defn new-http-server []
+  (map->HttpServer {}))

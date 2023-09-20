@@ -1,7 +1,8 @@
 (ns monkey.ci.test.helpers
   "Helper functions for testing"
   (:require [clojure.java.io :as io]
-            [clojure.core.async :as ca])
+            [clojure.core.async :as ca]
+            [monkey.ci.events :as e])
   (:import org.apache.commons.io.FileUtils))
 
 (defn ^java.io.File create-tmp-dir []
@@ -39,3 +40,9 @@
         [v c] (ca/alts!! [ch t])]
     (if (= t c) timeout-val v)))
 
+(defn with-bus [f]
+  (let [bus (e/make-bus)]
+    (try
+      (f bus)
+      (finally
+        (e/close-bus bus)))))

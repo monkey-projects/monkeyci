@@ -4,7 +4,8 @@
             [com.stuartsierra.component :as c]
             [monkey.ci
              [core :as sut]
-             [events :as e]]
+             [events :as e]
+             [utils :as u]]
             [monkey.ci.web.handler :as web]
             [monkey.ci.test.helpers :as h]))
 
@@ -15,24 +16,37 @@
       (is (= :exit (sut/-main "-h"))))))
 
 (deftest default-invoker
-  (testing "does nothing when no bus"
-    (is (nil? ((sut/default-invoker {:command :test} {}) {}))))
+  (let [hooks (atom [])]
+    (with-redefs [u/add-shutdown-hook! (partial swap! hooks conj)]
+      
+      (testing "does nothing when no bus"
+        (is (nil? ((sut/default-invoker {:command :test} {}) {}))))
 
-  (testing "posts `command/invoked` event and waits for `command/completed`"
-    (let [cmd {:command :test
-               :requires [:bus]}
-          bus (e/make-bus)
-          inv (sut/default-invoker cmd {} (c/system-map :bus bus))
-          _ (e/register-handler bus
-                                :command/invoked
-                                (fn [{:keys [command]}]
-                                  (when (= :test command)
-                                    ;; Complete immediately
-                                    (e/post-event bus {:type :command/completed
-                                                       :command command}))))
-          out (inv {})]
-      (is (some? out))
-      (is (not= :timeout (h/try-take out 500 :timeout))))))
+      (testing "posts `command/invoked` event and waits for `command/completed`"
+        (let [cmd {:command :test
+                   :requires [:bus]}  ; Test command, only requires a bus
+              bus (e/make-bus)
+              ;; Setup a system with a custom bus
+              inv (sut/default-invoker cmd {} (c/system-map :bus bus))
+              _ (e/register-handler bus
+                                    :command/invoked
+                                    (fn [{:keys [command]}]
+                                      (when (= :test command)
+                                        ;; Complete immediately
+                                        (e/post-event bus {:type :command/completed
+                                                           :command command}))))
+              out (inv {})]
+          (is (some? out))
+          (is (not= :timeout (h/try-take out 500 :timeout)))))
+
+      (testing "registers shutdown hook"
+        (let [cmd {:command :test
+                   :requires [:bus]}  ; Test command, only requires a bus
+              bus (e/make-bus)
+              ;; Setup a system with a custom bus
+              inv (sut/default-invoker cmd {} (c/system-map :bus bus))
+              out (inv {})]
+          (is (pos? (count @hooks))))))))
 
 (deftest build
   (testing "invokes runner"
@@ -47,13 +61,3 @@
                              :runner
                              {:type :noop}})))))
 
-(deftest server
-  (with-redefs [web/start-server (constantly :test-server)
-                web/wait-until-stopped identity]
-    
-    (testing "starts http server and blocks"
-      (is (= :test-server (sut/server {}))))
-
-    (testing "registers shutdown hook"
-      ;; TODO
-      )))

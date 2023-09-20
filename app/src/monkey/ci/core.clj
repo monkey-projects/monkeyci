@@ -12,12 +12,14 @@
              [components :as co]
              [config :as config]
              [events :as e]
-             [runners :as r]]
+             [runners :as r]
+             [utils :as u]]
             [monkey.ci.web.handler :as web]))
 
 (def base-system
   (sc/system-map
-   :bus (co/new-bus)))
+   :bus (co/new-bus)
+   :http (sc/using (co/new-http-server) [:bus])))
 
 (defn build [ctx]
   (println "Building")
@@ -31,11 +33,6 @@
     ;; Return exit code, this will be the process exit code as well
     exit))
 
-(defn server [ctx]
-  (println "Starting HTTP server")
-  (-> (web/start-server ctx)
-      (web/wait-until-stopped)))
-
 (defn default-invoker
   "The default invoker starts a subsystem according to the command requirements,
    and posts the `command/invoked` event.  This event should be picked up by a
@@ -44,14 +41,19 @@
    system, but you can specify your own for testing purposes."
   ([{:keys [command requires]} env base-system]
    (fn [args]
-     (let [{:keys [bus] :as sys} (-> (sc/subsystem base-system requires)
+     ;; This is probably over-engineered, but let's see where it leads us...
+     (let [{:keys [bus] :as sys} (-> base-system
+                                     (assoc :config (config/app-config env args))
+                                     (sc/subsystem requires)
                                      (sc/start-system))]
+       ;; Register shutdown hook to stop the system
+       (u/add-shutdown-hook! #(sc/stop-system sys))
        (if (some? bus)
          (do
+           ;; TODO Add any components required by the command to the event
            (e/post-event bus {:type :command/invoked
                               :command command
-                              :env env
-                              :args args})
+                              :config (:config sys)})
            (e/wait-for bus :command/completed (filter (comp (partial = command) :command))))
          (log/warn "Unable to invoke command, event bus has not been configured.")))))
   ([cmd env]
@@ -70,7 +72,7 @@
            :short "p"
            :type :string}]
    :runs {:command :build
-          :requires [:bus]}})
+          :requires [:bus :config]}})
 
 (def server-cmd
   {:command "server"
@@ -82,7 +84,7 @@
            :default 3000
            :env "PORT"}]
    :runs {:command :http
-          :requires [:bus]}})
+          :requires [:bus :config :http]}})
 
 (def base-config
   {:name "monkey-ci"
