@@ -10,7 +10,7 @@
   "Transducer that simply logs events.  Useful for debugging."
   []
   (map (fn [evt]
-         (log/debug "Event:" evt)
+         (log/trace "Event:" evt)
          evt)))
 
 (defn validator
@@ -81,10 +81,27 @@
 
 (defn unregister-handler
   "Unregisters the handler (as returned from `register-handler`) from the
-   bus.  It will no longer receive events."
+   bus.  It will no longer receive events.  Returns the bus."
   [bus handler]
   (ca/unsub (:pub bus) (:type handler) (:channel handler))
   bus)
+
+(defn register-ns-handlers
+  "Finds all public objects in the ns, and registers all that have the appropriate
+   metadata.  Returns all registered handlers.  Everything that has an `:event/handles`
+   or an `:event/tx` metadata will be registered.  The former will be registered
+   as a regular handler for the given type, the latter as a pipeline."
+  [bus ns]
+  (let [event-handler? (some-fn :event/handles :event/tx)
+        register (fn [obj]
+                   (let [{:keys [event/handles event/tx]} (meta obj)]
+                     (if handles
+                       (register-handler bus handles obj)
+                       (register-pipeline bus tx obj))))]
+    (->> (ns-publics ns)
+         (vals)
+         (filter (comp event-handler? meta))
+         (map register))))
 
 (defn handler? [x]
   (s/valid? ::spec/event-handler x))

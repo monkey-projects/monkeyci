@@ -1,68 +1,58 @@
 (ns monkey.ci.test.runners-test
   (:require [clojure.test :refer :all]
             [clojure.java.io :as io]
-            [monkey.ci
-             [process :as p]
-             [runners :as sut]]
+            [monkey.ci.runners :as sut]
             [monkey.ci.test.helpers :as h]))
 
-(deftest make-runner
-  (testing "creates child runner"
-    (is (= sut/child-runner (sut/make-runner {:runner {:type :child}})))
-    (is (= sut/child-runner (sut/make-runner {:runner {:type :local}}))))
+(deftest build-local
+  (testing "when script not found, launches complete event with warnings"
+    (is (= {:type :build/completed
+            :exit 1
+            :result :warning}
+           (-> (sut/build-local {:dir "nonexisting"})
+               (select-keys [:type :exit :result])))))
 
-  (testing "creates child  runner by default"
-    (is (= sut/child-runner (sut/make-runner {}))))
-
-  (testing "supports noop runner"
-    (let [r (sut/make-runner {:runner {:type :noop}})]
-      (is (fn? r))
-      (is (= :noop (-> (r {})
-                       :runner))))))
-
-(deftest child-runner
-  (let [args {:args {:dir "examples/basic-clj"}}]
-    (testing "runs script locally in child process, returns result"
-      (with-redefs [p/execute! (constantly {:exit 654})]
-        (is (map? (sut/child-runner args)))))
-
-    (testing "adds success result on zero exit code"
-      (with-redefs [p/execute! (constantly {:exit 0})]
-        (is (= :success (-> (sut/child-runner args)
-                            :result))))))
-
-  (testing "with workdir"
-    (with-redefs [p/execute! (fn [args]
-                               {:exit 0
-                                :args args})]
-      (testing "passes work dir to process"
-        (h/with-tmp-dir base
-          (is (true? (.mkdir (io/file base "local"))))
-          (is (= base (-> (sut/child-runner {:args {:dir "local"
-                                                    :workdir base}})
-                          :args
-                          :work-dir)))))
-      
-      (testing "combine relative script dir with workdir"
-        (h/with-tmp-dir base
-          (is (true? (.mkdir (io/file base "local"))))
-          (is (= (str base "/local") (-> (sut/child-runner {:args {:dir "local"
-                                                                   :workdir base}})
-                                         :args
-                                         :script-dir)))))
-
-      (testing "leave absolute script dir as is"
-        (h/with-tmp-dir base
-          (is (= base (-> (sut/child-runner {:args {:dir base}})
-                          :args
-                          :script-dir)))))))
+  (testing "launches local build event with absolute script and work dirs"
+    (let [r (sut/build-local {:dir "examples/basic-clj"})]
+      (is (= :build/local (:type r)))
+      (is (true? (some-> r :script-dir (io/file) (.isAbsolute))))))
 
   (testing "passes pipeline to process"
-    (with-redefs [p/execute! (fn [args]
-                               {:exit 0
-                                :args args})]
+    (is (= "test-pipeline" (-> {:dir "examples/basic-clj"
+                                :pipeline "test-pipeline"}
+                               sut/build-local
+                               :pipeline))))
+
+  (testing "with workdir"
+    (testing "passes work dir to process"
       (h/with-tmp-dir base
-        (is (= "test-pipeline" (-> (sut/child-runner {:args {:dir base
-                                                             :pipeline "test-pipeline"}})
-                                   :args
-                                   :pipeline)))))))
+        (is (true? (.mkdir (io/file base "local"))))
+        (is (= base (-> (sut/build-local {:dir "local"
+                                          :workdir base})
+                        :work-dir)))))
+    
+    (testing "combine relative script dir with workdir"
+      (h/with-tmp-dir base
+        (is (true? (.mkdir (io/file base "local"))))
+        (is (= (str base "/local") (-> (sut/build-local {:dir "local"
+                                                         :workdir base})
+                                       :script-dir)))))
+
+    (testing "leave absolute script dir as is"
+      (h/with-tmp-dir base
+        (is (= base (-> (sut/build-local {:dir base})
+                        :script-dir)))))))
+
+(deftest build-completed
+  (testing "returns `command/completed` event for each type"
+    (->> [:success :warning :error nil]
+         (map (fn [t]
+                (is (= {:type :command/completed
+                        :command :build}
+                       (-> (sut/build-completed {:result t})
+                           (select-keys [:type :command]))))))
+         (doall)))
+
+  (testing "adds exit code"
+    (is (= 1 (-> (sut/build-completed {:exit 1})
+                 :exit)))))

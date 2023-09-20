@@ -40,7 +40,24 @@
                                                            :command command}))))
               out (inv {})]
           (is (some? out))
-          (is (not= :timeout (h/try-take out 500 :timeout)))))
+          (is (= 0 (h/try-take out 1000 :timeout)))))
+
+      (testing "returns exit code"
+        (let [cmd {:command :test
+                   :requires [:bus]}  ; Test command, only requires a bus
+              bus (e/make-bus)
+              ;; Setup a system with a custom bus
+              inv (sut/default-invoker cmd {} (c/system-map :bus bus))
+              _ (e/register-handler bus
+                                    :command/invoked
+                                    (fn [{:keys [command]}]
+                                      (when (= :test command)
+                                        ;; Complete immediately
+                                        (e/post-event bus {:type :command/completed
+                                                           :command command
+                                                           :exit 5}))))
+              out (inv {})]
+          (is (= 5 (h/try-take out 500 :timeout)))))
 
       (testing "passes dependent components in event"
         (let [cmd {:command :test
@@ -55,12 +72,10 @@
                                         ;; Complete immediately
                                         (e/post-event bus {:type :command/completed
                                                            :command command
-                                                           :config config}))))
+                                                           :exit (if (some? config) 0 1)}))))
               out (inv {})
               recv (h/try-take out 500 :timeout)]
-          (is (some? out))
-          (is (not= :timeout recv))
-          (is (some? (:config recv)))))
+          (is (zero? recv))))
 
       (testing "registers shutdown hook"
         (let [cmd {:command :test
@@ -70,17 +85,4 @@
               inv (sut/default-invoker cmd {} (c/system-map :bus bus))
               out (inv {})]
           (is (pos? (count @hooks))))))))
-
-(deftest build
-  (testing "invokes runner"
-    (is (some? (sut/build {:args
-                           {:dir "examples/basic-clj"}
-                           :runner
-                           {:type :noop}}))))
-
-  (testing "returns exit code"
-    (is (number? (sut/build {:args 
-                             {:dir "examples/basic-clj"}
-                             :runner
-                             {:type :noop}})))))
 

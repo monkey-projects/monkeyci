@@ -5,9 +5,10 @@
 (defmulti handle-command :command)
 
 (defmethod handle-command :build [evt]
-  ;; TODO Start the build
-  {:type :command/completed
-   :command :build})
+  ;; Create a new event that will start the build.  Depending on
+  ;; configuration, a runner will handle this event.
+  (-> {:type :build/started}
+      (merge (:args evt))))
 
 (defmethod handle-command :http [_]
   ;; This command does nothing, the http server is started by the component

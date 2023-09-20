@@ -5,12 +5,6 @@
 (defmacro version []
   `(or (System/getenv "MONKEYCI_VERSION") "0.1.0-SNAPSHOT"))
 
-(def default-app-config
-  {:http
-   {:port 3000}
-   :runner
-   {:type :child}})
-
 (defn- merge-if-map [a b]
   (if (map? a)
     (merge a b)
@@ -48,6 +42,12 @@
        (filter-and-strip-keys :monkeyci)
        (group-keys :github)
        (group-keys :runner)))
+
+(def default-app-config
+  {:http
+   {:port 3000}
+   :runner
+   {:type :child}})
 
 (defn app-config
   "Combines app environment with command-line args into a unified 

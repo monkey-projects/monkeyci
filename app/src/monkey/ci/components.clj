@@ -5,7 +5,8 @@
             [com.stuartsierra.component :as c]
             [monkey.ci
              [commands :as co]
-             [events :as e]]
+             [events :as e]
+             [runners :as r]]
             [monkey.ci.web.handler :as web]))
 
 (defn- call-and-dissoc [c key f]
@@ -50,3 +51,17 @@
 
 (defn new-http-server []
   (map->HttpServer {}))
+
+(defrecord BuildRunners [config bus]
+  c/Lifecycle
+  (start [this]
+    (->> {:build/started (map r/build-local)
+          :build/completed (map r/build-completed)}
+         (map (partial apply e/register-pipeline bus))
+         (assoc this :handlers)))
+
+  (stop [this]
+    (call-and-dissoc this :handlers (partial map (partial e/unregister-handler bus)))))
+
+(defn new-build-runners []
+  (map->BuildRunners {}))

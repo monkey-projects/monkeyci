@@ -80,3 +80,18 @@
           (is (= :timeout (read-or-timeout c 100)) "channel should not hold a value initially")
           (is (true? (sut/post-event bus {:type :test-event})))
           (is (not= :timeout (read-or-timeout c))))))))
+
+(defn ^{:event/handles ::test-event} test-handler [_]
+  "nothing here")
+
+(def ^{:event/tx ::test-event} test-tx 
+  (map (constantly {:handled? true
+                    :type :event/handled})))
+
+(deftest register-ns-handlers
+  (testing "registers all handlers with meta for the ns"
+    (with-bus
+      (fn [bus]
+        (let [h (sut/register-ns-handlers bus (find-ns 'monkey.ci.test.events-test))]
+          (is (every? sut/handler? h))
+          (is (= 2 (count h))))))))

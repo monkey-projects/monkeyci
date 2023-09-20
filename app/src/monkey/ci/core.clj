@@ -5,6 +5,7 @@
    is enabled, etc..."
   (:gen-class)
   (:require [cli-matic.core :as cli]
+            [clojure.core.async :as ca :refer [<!]]
             [clojure.tools.logging :as log]
             [com.stuartsierra.component :as sc]
             [config.core :refer [env]]
@@ -15,25 +16,19 @@
              [runners :as r]
              [utils :as u]]))
 
+;; The base system components.  Depending on the command that's being
+;; executed, a subsystem will be created and initialized.
 (def base-system
   (sc/system-map
    :bus (co/new-bus)
    :http (-> (co/new-http-server)
              (sc/using [:bus]))
    :commands (-> (co/new-command-handler)
-                 (sc/using [:bus]))))
+                 (sc/using [:bus]))
+   :runners (-> (co/new-build-runners)
+                (sc/using [:bus]))))
 
-(defn build [ctx]
-  (println "Building")
-  (let [runner (r/make-runner ctx)
-        {:keys [result exit] :as output} (runner ctx)]
-    (condp = (or result :unknown)
-      :success (log/info "Success!")
-      :warning (log/warn "Exited with warnings.")
-      :error   (log/error "Failure.")
-      :unknown (log/warn "Unknown result."))
-    ;; Return exit code, this will be the process exit code as well
-    exit))
+(def always-required-components [:bus :commands :runners])
 
 (defn default-invoker
   "The default invoker starts a subsystem according to the command requirements,
@@ -46,7 +41,7 @@
      ;; This is probably over-engineered, but let's see where it leads us...
      (let [{:keys [bus] :as sys} (-> base-system
                                      (assoc :config (config/app-config env args))
-                                     (sc/subsystem (concat requires [:bus :commands]))
+                                     (sc/subsystem (concat requires always-required-components))
                                      (sc/start-system))]
        ;; Register shutdown hook to stop the system
        (u/add-shutdown-hook! #(sc/stop-system sys))
@@ -57,7 +52,14 @@
                                  (select-keys requires)
                                  (merge {:type :command/invoked
                                          :command command})))
-           (e/wait-for bus :command/completed (filter (comp (partial = command) :command))))
+           ;; Wait for the complete event to arrive.  This returns a channel that cli-matic
+           ;; will wait for before exiting.  The channel will hold the exit code for the
+           ;; event, or zero if no exit code is found.
+           (ca/go
+             (-> (e/wait-for bus :command/completed (filter (comp (partial = command) :command)))
+                 (<!)
+                 :exit
+                 (or 0))))
          (log/warn "Unable to invoke command, event bus has not been configured.")))))
   ([cmd env]
    (default-invoker cmd env base-system)))
