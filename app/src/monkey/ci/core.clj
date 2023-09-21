@@ -47,21 +47,21 @@
        ;; Register shutdown hook to stop the system
        (u/add-shutdown-hook! #(sc/stop-system sys))
        (if (some? bus)
-         (do
+         ;; Wait for the complete event to arrive.  This returns a channel that cli-matic
+         ;; will wait for before exiting.  The channel will hold the exit code for the
+         ;; event, or zero if no exit code is found.  We have to register the listener first,
+         ;; otherwise it could happen that the command has completed before we subscribe
+         ;; to the event, in which case we will never receive the result.
+         (let [w (e/wait-for bus :command/completed (comp (filter (comp (partial = command) :command))
+                                                          (map (comp #(or % 0) :exit))))]
            (e/post-event bus (-> sys
                                  ;; Add any required components to the event
                                  (select-keys requires)
                                  (merge {:type :command/invoked
                                          :command command})
                                  (merge args)))
-           ;; Wait for the complete event to arrive.  This returns a channel that cli-matic
-           ;; will wait for before exiting.  The channel will hold the exit code for the
-           ;; event, or zero if no exit code is found.
-           (ca/go
-             (-> (e/wait-for bus :command/completed (filter (comp (partial = command) :command)))
-                 (<!)
-                 :exit
-                 (or 0))))
+           ;; Return the channel that will hold the exit code.
+           w)
          (log/warn "Unable to invoke command, event bus has not been configured.")))))
   ([cmd env]
    (default-invoker cmd env base-system)))
@@ -79,7 +79,7 @@
            :short "p"
            :type :string}]
    :runs {:command :build
-          :requires [:bus :config]}})
+          :requires [:config]}})
 
 (def server-cmd
   {:command "server"
@@ -91,7 +91,7 @@
            :default 3000
            :env "PORT"}]
    :runs {:command :http
-          :requires [:bus :config :http]}})
+          :requires [:config :http]}})
 
 (def base-config
   {:name "monkey-ci"

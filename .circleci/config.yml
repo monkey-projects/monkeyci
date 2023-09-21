@@ -10,13 +10,15 @@ executors:
         auth:
           username: $DOCKER_USER
           password: $DOCKER_PASS
+    resource_class: small
   cljs:
     docker:
       - image: cimg/clojure:1.11.1-node
         auth:
           username: $DOCKER_USER
           password: $DOCKER_PASS
-        
+    resource_class: small
+         
 jobs:
   test-script-lib:
     executor: clj

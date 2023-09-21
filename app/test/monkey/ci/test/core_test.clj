@@ -36,14 +36,13 @@
                   _ (e/register-handler bus
                                         :command/invoked
                                         (fn [{:keys [command bus] :as evt}]
-                                          (log/debug "Received event:" evt)
                                           (when (= :test-1 command)
                                             ;; Complete immediately
                                             (log/debug "Posting complete event")
                                             (e/post-event bus {:type :command/completed
                                                                :command command}))))
                   out (inv {})]
-              (is (= 0 (h/try-take out 5000 :timeout)))))))
+              (is (= 0 (h/try-take out 500 :timeout)))))))
 
       (testing "returns exit code"
         (h/with-bus
