@@ -1,23 +1,14 @@
 (ns monkey.ci.test.events-test
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.core.async :as ca]
-            [monkey.ci.events :as sut]))
+            [monkey.ci.events :as sut]
+            [monkey.ci.test.helpers :as h :refer [with-bus]]))
 
 (defn read-or-timeout [c & [timeout]]
-  (let [[v p] (ca/alts!! [c (ca/timeout (or timeout 1000))])]
-    (if (= c p) v :timeout)))
+  (h/try-take c (or timeout 1000) :timeout))
 
 (defn wait-until [p & [timeout]]
-  (let [timeout (or timeout 1000)
-        start (System/currentTimeMillis)]
-    (loop [v (p)]
-      (if v
-        v
-        (if (> (System/currentTimeMillis) (+ start timeout))
-          :timeout
-          (do
-            (Thread/sleep 100)
-            (recur (p))))))))
+  (h/wait-until p (or timeout 1000)))
 
 (deftest make-bus
   (testing "creates pub"
@@ -33,13 +24,6 @@
       (is (true? (ca/>!! c evt)))
       (is (= evt (read-or-timeout c)))
       (is (nil? (ca/close! c))))))
-
-(defn with-bus [f]
-  (let [bus (sut/make-bus)]
-    (try
-      (f bus)
-      (finally
-        (sut/close-bus bus)))))
 
 (deftest register-handler
   (testing "registers a handler for given type"
@@ -76,6 +60,18 @@
           (is (= 1 (count @errors)))
           (is (= :error (-> @errors (first) :type))))))))
 
+(deftest unregister-handler
+  (testing "removes sub from the bus, receives no events"
+    (with-bus
+      (fn [bus]
+        (let [received (atom [])
+              h (sut/register-handler bus :test (partial swap! received conj))
+              evt {:type :test
+                   :index 0}]
+          (is (= bus (sut/unregister-handler bus h)))
+          (is (true? (sut/post-event bus evt)))
+          (is (= :timeout (h/wait-until #(pos? (count @received)) 200))))))))
+
 (deftest wait-for
   (testing "returns a channel that holds the first match for the given transducer"
     (with-bus
@@ -84,3 +80,18 @@
           (is (= :timeout (read-or-timeout c 100)) "channel should not hold a value initially")
           (is (true? (sut/post-event bus {:type :test-event})))
           (is (not= :timeout (read-or-timeout c))))))))
+
+(defn ^{:event/handles ::test-event} test-handler [_]
+  "nothing here")
+
+(def ^{:event/tx ::test-event} test-tx 
+  (map (constantly {:handled? true
+                    :type :event/handled})))
+
+(deftest register-ns-handlers
+  (testing "registers all handlers with meta for the ns"
+    (with-bus
+      (fn [bus]
+        (let [h (sut/register-ns-handlers bus (find-ns 'monkey.ci.test.events-test))]
+          (is (every? sut/handler? h))
+          (is (= 2 (count h))))))))

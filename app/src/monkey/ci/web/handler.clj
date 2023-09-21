@@ -108,10 +108,3 @@
     (log/info "Shutting down HTTP server...")
     (http/server-stop! s)))
 
-(defn wait-until-stopped
-  "Loops until the web server has stopped."
-  [s]
-  (loop [st (http/server-status s)]
-    (when (not= :stopped st)
-      (Thread/sleep 100)
-      (recur (http/server-status s)))))

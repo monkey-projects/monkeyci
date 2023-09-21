@@ -99,21 +99,6 @@
                               (app)
                               :body))))))
 
-(deftest wait-until-stopped
-  (testing "blocks until the server has stopped"
-    (let [ch (ca/chan)]
-      (try
-        (with-redefs [http/server-status (fn [_]
-                                           (try-take ch 1000 :running))]
-          (let [t (ca/thread (sut/wait-until-stopped :test-server))]
-            (is (= :timeout (try-take t 200 :timeout)))
-            ;; Send stop command to the channel
-            (ca/>!! ch :stopped)
-            ;; Thread should have stopped by now
-            (is (nil? (try-take t 200 :timeout)))))
-        (finally
-          (ca/close! ch))))))
-
 (deftest github-webhook
   (testing "posts event"
     (let [bus (events/make-bus)

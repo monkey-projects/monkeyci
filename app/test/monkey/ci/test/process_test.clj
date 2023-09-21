@@ -7,7 +7,8 @@
              [process :as sut]
              [script :as script]]
             [monkey.ci.utils :as u]
-            [monkey.ci.build.core :as bc]))
+            [monkey.ci.build.core :as bc]
+            [monkey.ci.test.helpers :as h]))
 
 (def cwd (u/cwd))
 
@@ -41,12 +42,18 @@
 
 (deftest ^:slow execute-slow!
   (testing "executes build script in separate process"
-    (is (zero? (:exit (sut/execute! {:dev-mode true
-                                     :script-dir (example "basic-clj")})))))
+    (is (zero? (-> {:dev-mode true
+                    :script-dir (example "basic-clj")}
+                   sut/execute!
+                   deref
+                   :exit))))
 
   (testing "fails when script fails"
-    (is (pos? (:exit (sut/execute! {:dev-mode true
-                                    :script-dir (example "failing")})))))
+    (is (pos? (-> {:dev-mode true
+                   :script-dir (example "failing")}
+                  sut/execute!
+                  deref
+                  :exit))))
 
   (testing "fails when script not found"
     (is (thrown? java.io.IOException (sut/execute! {:dev-mode true
@@ -62,7 +69,7 @@
 
 (deftest execute!
   (with-redefs [bp/process (fn [{:keys [exit-fn] :as args}]
-                             (future
+                             (do
                                (when (fn? exit-fn)
                                  (exit-fn {}))
                                {:args args

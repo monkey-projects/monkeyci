@@ -17,10 +17,13 @@
     b))
 
 (defn add-shutdown-hook!
-  "Executes `h` when the JVM shuts down."
+  "Executes `h` when the JVM shuts down.  Returns the thread that will
+   execute the hook."
   [h]
-  (.. (Runtime/getRuntime)
-      (addShutdownHook (Thread. h))))
+  (let [t (Thread. h)]
+    (.. (Runtime/getRuntime)
+        (addShutdownHook t))
+    t))
 
 (defn tmp-file
   "Generates a new temporary path"

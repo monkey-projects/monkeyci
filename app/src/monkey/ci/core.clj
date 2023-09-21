@@ -5,6 +5,7 @@
    is enabled, etc..."
   (:gen-class)
   (:require [cli-matic.core :as cli]
+            [clojure.core.async :as ca :refer [<!]]
             [clojure.tools.logging :as log]
             [com.stuartsierra.component :as sc]
             [config.core :refer [env]]
@@ -12,41 +13,58 @@
              [components :as co]
              [config :as config]
              [events :as e]
-             [runners :as r]]
-            [monkey.ci.web.handler :as web]))
+             [runners :as r]
+             [utils :as u]]))
 
-(defn print-version [& _]
-  (println (config/version)))
+;; The base system components.  Depending on the command that's being
+;; executed, a subsystem will be created and initialized.
+(def base-system
+  (sc/system-map
+   :bus (co/new-bus)
+   :http (-> (co/new-http-server)
+             (sc/using [:bus]))
+   :commands (-> (co/new-command-handler)
+                 (sc/using [:bus]))
+   :runners (-> (co/new-build-runners)
+                (sc/using [:bus]))))
 
-(defn build [ctx]
-  (println "Building")
-  (let [runner (r/make-runner ctx)
-        {:keys [result exit] :as output} (runner ctx)]
-    (condp = (or result :unknown)
-      :success (log/info "Success!")
-      :warning (log/warn "Exited with warnings.")
-      :error   (log/error "Failure.")
-      :unknown (log/warn "Unknown result."))
-    ;; Return exit code, this will be the process exit code as well
-    exit))
-
-(defn server [ctx]
-  (println "Starting HTTP server")
-  (-> (web/start-server ctx)
-      (web/wait-until-stopped)))
+(def always-required-components [:bus :commands :runners])
 
 (defn default-invoker
-  "Wrap the command in a fn to enable better testing"
-  [cmd {:keys [env] :as ctx}]
-  (fn [args]
-    (cmd (-> ctx
-             (merge (config/app-config env args))
-             (assoc :args args)))))
-
-(def version-cmd
-  {:command "version"
-   :description "Prints current version"
-   :runs print-version})
+  "The default invoker starts a subsystem according to the command requirements,
+   and posts the `command/invoked` event.  This event should be picked up by a
+   handler in the system.  When the command is complete, it should post a
+   `command/completed` event for the same command.  By default it uses the base
+   system, but you can specify your own for testing purposes."
+  ([{:keys [command requires]} env base-system]
+   (fn [args]
+     (log/debug "Invoking command with arguments:" args)
+     ;; This is probably over-engineered, but let's see where it leads us...
+     (let [{:keys [bus] :as sys} (-> base-system
+                                     (assoc :config (config/app-config env args))
+                                     (sc/subsystem (concat requires always-required-components))
+                                     (sc/start-system))]
+       ;; Register shutdown hook to stop the system
+       (u/add-shutdown-hook! #(sc/stop-system sys))
+       (if (some? bus)
+         ;; Wait for the complete event to arrive.  This returns a channel that cli-matic
+         ;; will wait for before exiting.  The channel will hold the exit code for the
+         ;; event, or zero if no exit code is found.  We have to register the listener first,
+         ;; otherwise it could happen that the command has completed before we subscribe
+         ;; to the event, in which case we will never receive the result.
+         (let [w (e/wait-for bus :command/completed (comp (filter (comp (partial = command) :command))
+                                                          (map (comp #(or % 0) :exit))))]
+           (e/post-event bus (-> sys
+                                 ;; Add any required components to the event
+                                 (select-keys requires)
+                                 (merge {:type :command/invoked
+                                         :command command})
+                                 (merge args)))
+           ;; Return the channel that will hold the exit code.
+           w)
+         (log/warn "Unable to invoke command, event bus has not been configured.")))))
+  ([cmd env]
+   (default-invoker cmd env base-system)))
 
 (def build-cmd
   {:command "build"
@@ -60,7 +78,8 @@
            :option "pipeline"
            :short "p"
            :type :string}]
-   :runs build})
+   :runs {:command :build
+          :requires [:bus :config]}})
 
 (def server-cmd
   {:command "server"
@@ -71,63 +90,36 @@
            :type :int
            :default 3000
            :env "PORT"}]
-   :runs server})
+   :runs {:command :http
+          :requires [:bus :config :http]}})
 
-(defn make-cli-config [{:keys [cmd-invoker] :or {cmd-invoker default-invoker} :as ctx}]
+(def base-config
+  {:name "monkey-ci"
+   :description "MonkeyCI: Powerful build pipeline runner"
+   :version (config/version)
+   :opts [{:as "Working directory"
+           :option "workdir"
+           :short "w"
+           :type :string
+           :default "."}
+          {:as "Development mode"
+           :option "dev-mode"
+           :type :with-flag
+           :default false}]
+   :subcommands [build-cmd
+                 server-cmd]})
+
+(defn make-cli-config [{:keys [cmd-invoker env] :or {cmd-invoker default-invoker}}]
   (letfn [(invoker [cmd]
-            (cmd-invoker cmd ctx))]
-    {:name "monkey-ci"
-     :description "MonkeyCI: Powerful build pipeline runner"
-     :version (config/version)
-     :opts [{:as "Working directory"
-             :option "workdir"
-             :short "w"
-             :type :string
-             :default "."}
-            {:as "Development mode"
-             :option "dev-mode"
-             :type :with-flag
-             :default false}]
-     :subcommands (->> [version-cmd
-                        build-cmd
-                        server-cmd]
-                       ;; Wrap the run functions in the invoker
-                       (mapv (fn [c] (update c :runs invoker))))}))
-
-(defrecord CliConfig [env bus]
-  sc/Lifecycle
-  (start [this]
-    (assoc this :cli-config (make-cli-config this)))
-
-  (stop [this]
-    (dissoc this :cli-config)))
-
-(defn new-cli [env]
-  (map->CliConfig {:env env}))
-
-(defn run-command-async
-  "Runs the command in an async fashion by sending an event, and waiting
-   for the 'complete' event to arrive."
-  [bus cmd]
-  (-> bus 
-      (e/post-event {:type :command/invoked
-                     :command cmd})
-      (e/wait-for :command/completed (filter (comp (partial = cmd) :command)))))
-
-(defn make-system [config]
-  (sc/system-map
-   :bus (co/new-bus)
-   :cli (sc/using (new-cli config) [:bus])))
+            (cmd-invoker cmd env))]
+    ;; Wrap the run functions in the invoker
+    (update base-config :subcommands (partial mapv (fn [c] (update c :runs invoker))))))
 
 (defn -main
   "Main entry point for the application."
   [& args]
-  (let [sys (-> (make-system env)
-                (sc/start))]
-    (try
-      (let [cli (get-in sys [:cli :cli-config])]
-        (cli/run-cmd args cli))
-      (finally
-        (sc/stop sys)
-        ;; Shutdown the agents otherwise the app will block for a while here
-        (shutdown-agents)))))
+  (try
+    (cli/run-cmd args (make-cli-config env))
+    (finally
+      ;; Shutdown the agents otherwise the app will block for a while here
+      (shutdown-agents))))

@@ -10,7 +10,7 @@
   "Transducer that simply logs events.  Useful for debugging."
   []
   (map (fn [evt]
-         (log/debug "Event:" evt)
+         (log/trace "Event:" evt)
          evt)))
 
 (defn validator
@@ -43,13 +43,18 @@
   (s/valid? ::spec/event-bus x))
 
 (def channel :channel)
+(def pub :pub)
 
 (defn register-handler
-  "Registers a handler for events of the given type."
+  "Registers a handler for events of the given type.  The handler should
+   not perform any blocking operations.  In that case, it should start a
+   thread and park."
   [bus type handler]
+  (log/debug "Registering handler for" type)
   (let [ch (ca/chan)]
     (ca/sub (:pub bus) type ch)
     {:channel ch
+     :type type
      :handler handler
      :loop (ca/go-loop [e (<! ch)]
              (when e
@@ -61,6 +66,44 @@
                                            :event e
                                            :exception ex}))))
                (recur (<! ch))))}))
+
+(defn register-pipeline
+  "Registers a pipeline handler in the bus.  This pipeline will subscribe to all
+   events of given type, pass them through the transducer `tx` and then send the
+   resulting event back to the bus.  Returns a handler object that contains the
+   intermediate channel for the pipeline."
+  [bus type tx]
+  (log/debug "Registering pipeline handler for" type)
+  (let [ch (ca/chan)]
+    (ca/sub (pub bus) type ch)
+    (ca/pipeline 1 (channel bus) tx ch)
+    {:type :type
+     :channel ch
+     :tx tx}))
+
+(defn unregister-handler
+  "Unregisters the handler (as returned from `register-handler`) from the
+   bus.  It will no longer receive events.  Returns the bus."
+  [bus handler]
+  (ca/unsub (:pub bus) (:type handler) (:channel handler))
+  bus)
+
+(defn register-ns-handlers
+  "Finds all public objects in the ns, and registers all that have the appropriate
+   metadata.  Returns all registered handlers.  Everything that has an `:event/handles`
+   or an `:event/tx` metadata will be registered.  The former will be registered
+   as a regular handler for the given type, the latter as a pipeline."
+  [bus ns]
+  (let [event-handler? (some-fn :event/handles :event/tx)
+        register (fn [obj]
+                   (let [{:keys [event/handles event/tx]} (meta obj)]
+                     (if handles
+                       (register-handler bus handles obj)
+                       (register-pipeline bus tx obj))))]
+    (->> (ns-publics ns)
+         (vals)
+         (filter (comp event-handler? meta))
+         (map register))))
 
 (defn handler? [x]
   (s/valid? ::spec/event-handler x))
