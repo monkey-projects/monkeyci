@@ -79,7 +79,7 @@
            :short "p"
            :type :string}]
    :runs {:command :build
-          :requires [:config]}})
+          :requires [:bus :config]}})
 
 (def server-cmd
   {:command "server"
@@ -91,7 +91,7 @@
            :default 3000
            :env "PORT"}]
    :runs {:command :http
-          :requires [:config :http]}})
+          :requires [:bus :config :http]}})
 
 (def base-config
   {:name "monkey-ci"

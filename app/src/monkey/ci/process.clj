@@ -119,7 +119,10 @@
                    (when socket-path 
                      (uds/close socket)
                      (uds/delete-address socket-path))
+                   ;; FIXME When there is no bus, the complete event cannot be sent
+                   ;; and the command will never finish.
                    (when bus
+                     (log/debug "Posting build/completed event")
                      (e/post-event bus {:type :build/completed
                                         :exit exit
                                         :result (if (zero? exit) :success :error)
