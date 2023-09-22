@@ -1,6 +1,8 @@
 (ns monkey.ci.test.utils-test
   (:require [clojure.test :refer :all]
-            [monkey.ci.utils :as sut]))
+            [clojure.java.io :as io]
+            [monkey.ci.utils :as sut]
+            [monkey.ci.test.helpers :as h]))
 
 (deftest abs-path
   (testing "returns abs path as is"
@@ -17,3 +19,10 @@
     (let [t (sut/add-shutdown-hook! (constantly :ok))]
       ;; We can only verify this by removing it and checking the return value
       (is (true? (.removeShutdownHook (Runtime/getRuntime) t))))))
+
+(deftest delete-dir
+  (testing "deletes all files in directory recursively"
+    (h/with-tmp-dir dir
+      (is (nil? (spit (io/file dir "test.txt") "some test")))
+      (is (nil? (sut/delete-dir dir)))
+      (is (false? (.exists (io/file dir)))))))

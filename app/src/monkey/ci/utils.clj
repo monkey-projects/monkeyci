@@ -1,5 +1,6 @@
 (ns monkey.ci.utils
-  (:require [clojure.java.io :as io]))
+  (:require [clojure.java.io :as io])
+  (:import org.apache.commons.io.FileUtils))
 
 (defn cwd
   "Returns current directory"
@@ -30,3 +31,8 @@
   [prefix suffix]
   (-> (io/file (System/getProperty "java.io.tmpdir") (str prefix (random-uuid) suffix))
       (.getAbsolutePath)))
+
+(defn delete-dir
+  "Deletes directory recursively"
+  [dir]
+  (FileUtils/deleteDirectory (io/file dir)))

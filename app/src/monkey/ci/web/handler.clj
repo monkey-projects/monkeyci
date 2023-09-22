@@ -31,7 +31,7 @@
   "Receives an incoming webhook from Github.  This actually just posts
    the event on the internal bus and returns a 200 OK response."
   [req]
-  (log/info "Body params:" (:body-params req))
+  (log/info "Body params:" (prn (:body-params req)))
   (log/debug "Request data:" (get-in req [:reitit.core/match :data]))
   (go
     {:status (if (<! (post-event req {:type :webhook/github
@@ -63,7 +63,7 @@
         (h))))
 
 (defn- passthrough-middleware
-  "Noop middleware, just passes the request to the parent handler."
+  "No-op middleware, just passes the request to the parent handler."
   [h]
   (fn [req]
     (h req)))
