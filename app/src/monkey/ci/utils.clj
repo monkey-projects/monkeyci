@@ -28,9 +28,11 @@
 
 (defn tmp-file
   "Generates a new temporary path"
-  [prefix suffix]
-  (-> (io/file (System/getProperty "java.io.tmpdir") (str prefix (random-uuid) suffix))
-      (.getAbsolutePath)))
+  ([prefix suffix]
+   (tmp-file (str prefix (random-uuid) suffix)))
+  ([name]
+   (-> (io/file (System/getProperty "java.io.tmpdir") name)
+       (.getAbsolutePath))))
 
 (defn delete-dir
   "Deletes directory recursively"

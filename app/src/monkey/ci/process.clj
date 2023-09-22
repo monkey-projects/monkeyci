@@ -74,8 +74,8 @@
 (defn- events-to-bus
   "Creates a listening socket (a uds) that will receive any events generated
    by the child script.  These events will then be sent to the bus."
-  [{:keys [channel] :as bus}]
-  (let [path (utils/tmp-file "events-" ".sock")
+  [{:keys [channel] :as bus} build-id]
+  (let [path (utils/tmp-file (str "events-" build-id ".sock"))
         listener (uds/listen-socket (uds/make-address path))
         inter-ch (ca/chan)]
     {:socket-path path
@@ -91,7 +91,8 @@
                                  (ca/pipe inter-ch channel false)
                                  (sa/read-onto-channel sock inter-ch))
                                (catch Exception ex
-                                 (log/warn "No incoming connection from child could be accepted" ex)))))
+                                 (log/warn "No incoming connection from child could be accepted" ex))))
+                           (str build-id "-connector"))
                       (.start))}))
 
 (defn execute!
@@ -99,10 +100,10 @@
    clojure cli with a generated `build` alias.  This expects absolute directories.
    Returns an object that can be `deref`ed to wait for the process to exit.  Will
    post a `build/completed` event on process exit."
-  [{:keys [work-dir script-dir bus] :as ctx}]
-  (log/info "Executing process in" work-dir)
+  [{:keys [work-dir script-dir bus build-id] :as ctx}]
+  (log/info "Executing build process for" build-id "in" work-dir)
   (let [{:keys [socket-path socket]} (when bus
-                                       (events-to-bus bus))]
+                                       (events-to-bus bus build-id))]
     (bp/process
      {:dir script-dir
       :out :inherit
@@ -112,9 +113,10 @@
                 "-X:monkeyci/build"]
                (concat (build-args ctx))
                (vec))
-      :extra-env (config/config->env
-                  {:event
-                   {:socket socket-path}})
+      :extra-env (-> (config/config->env
+                      {:event
+                       {:socket socket-path}})
+                     (merge (select-keys [:build-id] ctx)))
       :exit-fn (fn [{:keys [process] :as p}]
                  (let [exit (or (some-> process (.exitValue)) 0)]
                    (log/debug "Script process exited with code" exit ", cleaning up")
@@ -125,6 +127,7 @@
                    (when bus
                      (log/debug "Posting build/completed event")
                      (e/post-event bus {:type :build/completed
+                                        :build-id build-id
                                         :exit exit
                                         :result (if (zero? exit) :success :error)
                                         :process p}))))})))

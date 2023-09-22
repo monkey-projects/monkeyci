@@ -17,4 +17,11 @@
     (is (= "test-pipeline" (-> {:command :build
                                 :pipeline "test-pipeline"}
                                (sut/handle-command)
-                               :pipeline)))))
+                               :pipeline))))
+
+  (testing "adds build id"
+    (is (re-matches #"build-\d+"
+                    (-> {:command :build
+                         :pipeline "test-pipeline"}
+                        (sut/handle-command)
+                        :build-id)))))
