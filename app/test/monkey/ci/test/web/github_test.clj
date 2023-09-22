@@ -41,3 +41,7 @@
           _ (events/register-handler bus :webhook/github (partial swap! recv conj))]
       (is (some? (sut/webhook req)))
       (is (not= :timeout (h/wait-until #(pos? (count @recv)) 500))))))
+
+(deftest ^:kaocha/skip prepare-build
+  (testing "clones and checks out repo"
+    (is (some? (sut/prepare-build {})))))

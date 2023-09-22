@@ -48,7 +48,8 @@
 (defn register-handler
   "Registers a handler for events of the given type.  The handler should
    not perform any blocking operations.  In that case, it should start a
-   thread and park."
+   thread and park.  The bus is always added as an extra property in the
+   event."
   [bus type handler]
   (log/debug "Registering handler for" type)
   (let [ch (ca/chan)]
@@ -59,7 +60,7 @@
      :loop (ca/go-loop [e (<! ch)]
              (when e
                (try
-                 (handler e)
+                 (handler (assoc e :bus bus))
                  (catch Exception ex
                    (go (>! (:channel bus) {:type :error
                                            :handler handler
@@ -71,12 +72,13 @@
   "Registers a pipeline handler in the bus.  This pipeline will subscribe to all
    events of given type, pass them through the transducer `tx` and then send the
    resulting event back to the bus.  Returns a handler object that contains the
-   intermediate channel for the pipeline."
+   intermediate channel for the pipeline.  It's imperative that the transducer
+   changes the event type, otherwise you'll have a feedback loop."
   [bus type tx]
   (log/debug "Registering pipeline handler for" type)
   (let [ch (ca/chan)]
     (ca/sub (pub bus) type ch)
-    (ca/pipeline 1 (channel bus) tx ch)
+    (ca/pipeline 1 (channel bus) (comp (map #(assoc % :bus bus)) tx) ch)
     {:type :type
      :channel ch
      :tx tx}))

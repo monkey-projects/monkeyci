@@ -42,7 +42,19 @@
           (is (true? (sut/post-event bus evt)))
           (is (not= :timeout (wait-until #(pos? (count @received)))))
           (is (= 1 (count @received)))
-          (is (= evt (first @received)))))))
+          (is (= evt (-> (first @received)
+                         (select-keys (keys evt)))))))))
+
+  (testing "bus is added as additional event key"
+    (with-bus
+      (fn [bus]
+        (let [received (atom [])
+              h (sut/register-handler bus :test (partial swap! received conj))
+              evt {:type :test}]
+          (is (true? (sut/post-event bus evt)))
+          (is (not= :timeout (wait-until #(pos? (count @received)))))
+          (is (= bus (-> (first @received)
+                         :bus)))))))  
 
   (testing "handler exceptions are sent as error events to the bus"
     (with-bus
@@ -59,6 +71,38 @@
           (is (not= :timeout (wait-until #(pos? (count @errors)))))
           (is (= 1 (count @errors)))
           (is (= :error (-> @errors (first) :type))))))))
+
+(defn register-test-handler
+  "Registers a test handler on the bus that will receive all events
+   of the given `type` and will filter them by `pred`.  Returns an
+   atom that can be `deref`ed to check the received events."
+  [bus type pred]
+  (let [recv (atom [])]
+    (sut/register-handler bus type
+                          (fn [evt]
+                            (when (pred evt)
+                              (swap! recv conj evt))))
+    recv))
+
+(deftest register-pipeline
+  (testing "passes events back to the bus after applying transducer"
+    (with-bus
+      (fn [bus]
+        (let [tx (map #(assoc % :type :result))
+              recv (register-test-handler bus :result identity)]
+          (is (sut/handler? (sut/register-pipeline bus :input tx)))
+          (is (true? (sut/post-event bus {:type :input})))
+          (is (not= :timeout (h/wait-until #(pos? (count @recv)) 200)))))))
+
+  (testing "adds bus as key to the event"
+    (with-bus
+      (fn [bus]
+        (let [tx (map #(assoc % :type :result))
+              recv (register-test-handler bus :result identity)]
+          (is (sut/handler? (sut/register-pipeline bus :input tx)))
+          (is (true? (sut/post-event bus {:type :input})))
+          (is (not= :timeout (h/wait-until #(pos? (count @recv)) 200)))
+          (is (= bus (-> @recv first :bus))))))))
 
 (deftest unregister-handler
   (testing "removes sub from the bus, receives no events"

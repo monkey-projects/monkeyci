@@ -29,3 +29,15 @@
     (is (true? (->> {:dev-mode true}
                     (sut/app-config {})
                     :dev-mode)))))
+
+(deftest config->env
+  (testing "empty for empty input"
+    (is (empty? (sut/config->env {}))))
+
+  (testing "prefixes config entries with `monkeyci-`"
+    (is (= {:monkeyci-key "value"}
+           (sut/config->env {:key "value"}))))
+
+  (testing "flattens nested config maps"
+    (is (= {:monkeyci-http-port 8080}
+           (sut/config->env {:http {:port 8080}})))))

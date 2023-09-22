@@ -112,15 +112,16 @@
                 "-X:monkeyci/build"]
                (concat (build-args ctx))
                (vec))
-      :extra-env {:monkeyci-event-socket socket-path}
+      :extra-env (config/config->env
+                  {:event
+                   {:socket socket-path}})
       :exit-fn (fn [{:keys [process] :as p}]
                  (let [exit (or (some-> process (.exitValue)) 0)]
                    (log/debug "Script process exited with code" exit ", cleaning up")
                    (when socket-path 
                      (uds/close socket)
                      (uds/delete-address socket-path))
-                   ;; FIXME When there is no bus, the complete event cannot be sent
-                   ;; and the command will never finish.
+                   ;; Bus should always be present.  This check is only for testing purposes.
                    (when bus
                      (log/debug "Posting build/completed event")
                      (e/post-event bus {:type :build/completed
