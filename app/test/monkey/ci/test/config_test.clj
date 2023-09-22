@@ -23,4 +23,9 @@
     (is (= :test-type (-> {:monkeyci-runner-type "test-type"}
                           (sut/app-config {})
                           :runner
-                          :type)))))
+                          :type))))
+
+  (testing "sets `dev-mode` from args"
+    (is (true? (->> {:dev-mode true}
+                    (sut/app-config {})
+                    :dev-mode)))))

@@ -83,7 +83,15 @@
     (testing "returns 401 if invalid security"
       (is (= 401 (-> (mock/request :post "/webhook/github")
                      (test-app)
-                     :status))))))
+                     :status))))
+
+    (testing "disables security check when in dev mode"
+      (let [dev-app (sut/make-app {:dev-mode true
+                                   :bus (events/make-bus)})]
+        (is (= 200 (-> (mock/request :post "/webhook/github")
+                       (dev-app)
+                       (h/try-take 500 :timeout)
+                       :status)))))))
 
 (deftest routing-middleware
   (testing "converts json bodies to kebab-case"

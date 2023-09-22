@@ -62,8 +62,14 @@
                                    (slurp s))))
         (h))))
 
+(defn- passthrough-middleware
+  "Noop middleware, just passes the request to the parent handler."
+  [h]
+  (fn [req]
+    (h req)))
+
 (defn make-router
-  ([opts routes]
+  ([{:keys [dev-mode] :as opts} routes]
    (ring/router
     routes
     {:data {:middleware [stringify-body
@@ -76,9 +82,12 @@
                                  {:decode-key-fn csk/->kebab-case-keyword}))
             ::context opts}
      :reitit.middleware/registry
-     {:github-security [github/validate-security (maybe-generate
-                                                  (get-in opts [:github :secret])
-                                                  github/generate-secret-key)]}}))
+     {:github-security (if dev-mode
+                         ;; Disable security in dev mode
+                         [passthrough-middleware]
+                         [github/validate-security (maybe-generate
+                                                    (get-in opts [:github :secret])
+                                                    github/generate-secret-key)])}}))
   ([opts]
    (make-router opts routes)))
 
