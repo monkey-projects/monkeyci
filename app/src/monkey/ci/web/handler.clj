@@ -1,7 +1,6 @@
 (ns monkey.ci.web.handler
   "Handler for the web server"
   (:require [camel-snake-kebab.core :as csk]
-            [clojure.core.async :refer [go <! >!]]
             [clojure.tools.logging :as log]
             [medley.core :refer [update-existing]]
             [monkey.ci.events :as e]
@@ -13,31 +12,11 @@
              [muuntaja :as rrmm]
              [parameters :as rrmp]]))
 
-(defn- post-event
-  "Posts event to the bus found in the request data.  Returns an async channel
-   holding `true` if the event is posted."
-  [req evt]
-  (go (some-> (get-in req [:reitit.core/match :data ::context :bus])
-              (e/channel)
-              (>! evt))))
-
 (defn health [_]
   ;; TODO Make this more meaningful
   {:status 200
    :body "ok"
    :headers {"Content-Type" "text/plain"}})
-
-(defn github-webhook
-  "Receives an incoming webhook from Github.  This actually just posts
-   the event on the internal bus and returns a 200 OK response."
-  [req]
-  (log/info "Body params:" (prn (:body-params req)))
-  (log/debug "Request data:" (get-in req [:reitit.core/match :data]))
-  (go
-    {:status (if (<! (post-event req {:type :webhook/github
-                                      :payload (:body-params req)}))
-               200
-               500)}))
 
 (defn- maybe-generate [s g]
   (if (some? s)
@@ -48,7 +27,7 @@
 
 (def routes
   [["/health" {:get health}]
-   ["/webhook/github" {:post github-webhook
+   ["/webhook/github" {:post github/webhook
                        :middleware [:github-security]}]])
 
 (defn- stringify-body

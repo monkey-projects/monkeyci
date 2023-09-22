@@ -4,7 +4,9 @@
              [codecs :as codecs]
              [mac :as mac]
              [nonce :as nonce]]
-            [clojure.tools.logging :as log]))
+            [clojure.core.async :refer [go <!]]
+            [clojure.tools.logging :as log]
+            [monkey.ci.web.common :as c]))
 
 (defn extract-signature [s]
   (when s
@@ -34,3 +36,15 @@
 (defn generate-secret-key []
   (-> (nonce/random-nonce 32)
       (codecs/bytes->hex)))
+
+(defn webhook
+  "Receives an incoming webhook from Github.  This actually just posts
+   the event on the internal bus and returns a 200 OK response."
+  [req]
+  (log/info "Body params:" (prn-str (:body-params req)))
+  (log/debug "Request data:" (get-in req [:reitit.core/match :data]))
+  (go
+    {:status (if (<! (c/post-event req {:type :webhook/github
+                                        :payload (:body-params req)}))
+               200
+               500)}))

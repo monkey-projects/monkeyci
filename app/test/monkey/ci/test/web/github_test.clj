@@ -1,6 +1,9 @@
 (ns monkey.ci.test.web.github-test
   (:require [clojure.test :refer [deftest testing is]]
-            [monkey.ci.web.github :as sut]))
+            [monkey.ci.events :as events]
+            [monkey.ci.web.github :as sut]
+            [monkey.ci.test.helpers :as h]
+            [ring.mock.request :as mock]))
 
 (deftest valid-security?
   (testing "false if nil"
@@ -26,3 +29,15 @@
 (deftest generate-secret-key
   (testing "generates random string"
     (is (string? (sut/generate-secret-key)))))
+
+(deftest webhook
+  (testing "posts event"
+    (let [bus (events/make-bus)
+          ctx {:reitit.core/match {:data {:monkey.ci.web.handler/context {:bus bus}}}}
+          req (-> (mock/request :post "/webhook/github")
+                  (mock/body "test body")
+                  (merge ctx))
+          recv (atom [])
+          _ (events/register-handler bus :webhook/github (partial swap! recv conj))]
+      (is (some? (sut/webhook req)))
+      (is (not= :timeout (h/wait-until #(pos? (count @recv)) 500))))))

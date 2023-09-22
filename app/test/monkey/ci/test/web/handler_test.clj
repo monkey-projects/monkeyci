@@ -107,14 +107,4 @@
                               (app)
                               :body))))))
 
-(deftest github-webhook
-  (testing "posts event"
-    (let [bus (events/make-bus)
-          ctx {:reitit.core/match {:data {::sut/context {:bus bus}}}}
-          req (-> (mock/request :post "/webhook/github")
-                  (mock/body "test body")
-                  (merge ctx))
-          recv (atom [])
-          _ (events/register-handler bus :webhook/github (partial swap! recv conj))]
-      (is (some? (sut/github-webhook req)))
-      (is (not= :timeout (h/wait-until #(pos? (count @recv)) 500))))))
+
