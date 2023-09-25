@@ -8,7 +8,7 @@
   (log/info "Running example at" path)
   (let [inv (-> core/build-cmd
                 :runs
-                (core/default-invoker {}))]
+                (core/system-invoker {}))]
     (inv {:workdir "examples"
           :dir path
           :dev-mode true})))

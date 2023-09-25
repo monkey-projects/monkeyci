@@ -1,4 +1,11 @@
 (ns monkey.ci.config
+  "Configuration functionality.  This reads the application configuration from various
+   sources, like environment vars or command-line args.  The configuration is structured
+   in a hierarchy and optionally some values are converted.  Then this configuration is
+   used to add any 'constructor functions', that are then used to create new functions to
+   to some actual work.  This allows us to change the behaviour of the application with
+   configuration, but also makes it possible to inject dummy functions for testing 
+   purposes."
   (:require [camel-snake-kebab.core :as csk]
             [clojure.string :as cs]
             [medley.core :as mc]))
@@ -42,12 +49,17 @@
 (defn- config-from-env
   "Takes configuration from env vars"
   [env]
-  (->> env
-       (filter-and-strip-keys (keyword env-prefix))
-       (group-keys :github)
-       (group-keys :runner)))
+  (letfn [(group-all-keys [c]
+            (reduce (fn [r v]
+                      (group-keys v r))
+                    c
+                    [:github :runner :containers]))]
+    (->> env
+         (filter-and-strip-keys :monkeyci)
+         (group-all-keys))))
 
 (def default-app-config
+  "Default configuration for the application, without env vars or args applied."
   {:http
    {:port 3000}
    :runner
@@ -65,7 +77,8 @@
       (update-in [:runner :type] keyword)))
 
 (def default-script-config
-  {:container-runner :docker})
+  "Default configuration for the script runner."
+  {:containers {:type :docker}})
 
 (defn script-config
   "Builds config map used by the child script process"
@@ -73,7 +86,7 @@
   (-> default-script-config
       (deep-merge (config-from-env env))
       (merge args)
-      (update :container-runner keyword)))
+      (update-in [:containers :type] keyword)))
 
 (defn- flatten-nested
   "Recursively flattens a map of maps.  Each key in the resulting map is a

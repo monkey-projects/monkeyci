@@ -79,7 +79,7 @@
   (let [ch (ca/chan)]
     (ca/sub (pub bus) type ch)
     (ca/pipeline 1 (channel bus) (comp (map #(assoc % :bus bus)) tx) ch)
-    {:type :type
+    {:type type
      :channel ch
      :tx tx}))
 
@@ -98,17 +98,18 @@
   [bus ns]
   (let [event-handler? (some-fn :event/handles :event/tx)
         register (fn [obj]
-                   (let [{:keys [event/handles event/tx]} (meta obj)]
+                   (let [{:keys [event/handles event/tx]} (meta obj)
+                         f (var-get obj)]
                      (if handles
-                       (register-handler bus handles obj)
-                       (register-pipeline bus tx obj))))]
+                       (register-handler bus handles f)
+                       (register-pipeline bus tx f))))]
     (->> (ns-publics ns)
          (vals)
          (filter (comp event-handler? meta))
          (map register))))
 
 (defn handler? [x]
-  (s/valid? ::spec/event-handler x))
+  (true? (s/valid? ::spec/event-handler x)))
 
 (defn post-event
   "Asynchronously posts the event to the bus.  Returns a channel that will hold

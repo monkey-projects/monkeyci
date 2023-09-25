@@ -1,6 +1,9 @@
 (ns monkey.ci.test.config-test
   (:require [clojure.test :refer [deftest testing is]]
-            [monkey.ci.config :as sut]))
+            [clojure.spec.alpha :as s]
+            [monkey.ci
+             [config :as sut]
+             [spec :as spec]]))
 
 (deftest app-config
   (testing "provides default values"
@@ -28,7 +31,10 @@
   (testing "sets `dev-mode` from args"
     (is (true? (->> {:dev-mode true}
                     (sut/app-config {})
-                    :dev-mode)))))
+                    :dev-mode))))
+
+  (testing "matches app config spec"
+    (is (true? (s/valid? ::spec/app-config (sut/app-config {} {}))))))
 
 (deftest config->env
   (testing "empty for empty input"
@@ -41,3 +47,13 @@
   (testing "flattens nested config maps"
     (is (= {:monkeyci-http-port 8080}
            (sut/config->env {:http {:port 8080}})))))
+
+(deftest script-config
+  (testing "sets containers type"
+    (is (= :test-type (-> {:monkeyci-containers-type "test-type"}
+                          (sut/script-config {})
+                          :containers
+                          :type))))
+
+  (testing "matches spec"
+    (is (true? (s/valid? ::spec/script-config (sut/script-config {} {}))))))
