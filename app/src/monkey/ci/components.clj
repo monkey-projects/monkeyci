@@ -48,15 +48,11 @@
         :build/completed (map r/build-completed)}
        (mapv (partial apply e/register-pipeline bus))))
 
-(defn- register-fn-handlers [bus]
-  [(e/register-handler bus :build/local p/execute!)])
-
 (defrecord BuildRunners [config bus]
   c/Lifecycle
   (start [this]
     (log/debug "Registering build runner handlers")
-    (assoc this :handlers (concat (register-tx-runners bus)
-                                  (register-fn-handlers bus))))
+    (assoc this :handlers (register-tx-runners bus)))
 
   (stop [this]
     (call-and-dissoc this :handlers (partial map (partial e/unregister-handler bus)))))

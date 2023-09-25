@@ -21,6 +21,15 @@
   (log/warn "No build script found at" script-dir)
   1)
 
+(defn build-completed [{:keys [result exit] :as evt}]
+  ;; Do some logging depending on the result
+  (condp = (or result :unknown)
+    :success (log/info "Success!")
+    :warning (log/warn "Exited with warnings:" (:message evt))
+    :error   (log/error "Failure.")
+    :unknown (log/warn "Unknown result."))
+  exit)
+
 (defn build-local
   "Locates the build script locally and dispatches another event with the
    script details in them.  If no build script is found, dispatches a build
@@ -32,20 +41,8 @@
     (if (some-> (io/file script-dir) (.exists))
       (do
         (p/execute! ctx)
-        (e/wait-for event-bus :command/completed (map :exit)))
+        (e/wait-for event-bus :build/completed (map build-completed)))
       (script-not-found ctx))))
-
-(defn build-completed [{:keys [result exit] :as evt}]
-  ;; Do some logging depending on the result
-  (condp = (or result :unknown)
-    :success (log/info "Success!")
-    :warning (log/warn "Exited with warnings:" (:message evt))
-    :error   (log/error "Failure.")
-    :unknown (log/warn "Unknown result."))
-  {:type :command/completed
-   :command :build
-   :result evt
-   :exit exit})
 
 ;; Creates a runner fn according to its type
 (defmulti make-runner :type)

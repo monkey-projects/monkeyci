@@ -17,7 +17,7 @@
     (fn [bus]
       (with-redefs [p/execute! (fn [v]
                                  (e/post-event bus
-                                               {:type :command/completed
+                                               {:type :build/completed
                                                 :exit v}))]
 
         (testing "returns a channel that waits for build to complete"
@@ -70,18 +70,12 @@
                               :script-dir))))))))))
 
 (deftest build-completed
-  (testing "returns `command/completed` event for each type"
+  (testing "returns exit code for each type"
     (->> [:success :warning :error nil]
          (map (fn [t]
-                (is (= {:type :command/completed
-                        :command :build}
-                       (-> (sut/build-completed {:result t})
-                           (select-keys [:type :command]))))))
-         (doall)))
-
-  (testing "adds exit code"
-    (is (= 1 (-> (sut/build-completed {:exit 1})
-                 :exit)))))
+                (is (number? (sut/build-completed {:result t
+                                                   :exit 0})))))
+         (doall))))
 
 (deftest make-runner
   (testing "provides child type"

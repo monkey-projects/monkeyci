@@ -1,8 +1,10 @@
 (ns monkey.ci.spec
-  (:require [clojure.spec.alpha :as s]))
+  (:require [clojure.spec.alpha :as s]
+            [clojure.core.async.impl.protocols :as ap]))
 
-;; Unfortunately, there seems to be no clean way to determine if something is a channel.
-(def channel? (partial satisfies? clojure.core.async.impl.protocols/Channel))
+;; Unfortunately, there seems to be no clean way to determine
+;; if something is a channel apart from accessing impl details.
+(def channel? (partial satisfies? ap/Channel))
 
 (s/def ::type keyword?)
 (s/def ::message string?)
