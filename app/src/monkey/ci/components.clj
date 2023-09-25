@@ -29,22 +29,11 @@
 (defn new-bus []
   (->BusComponent))
 
-(defrecord CommandHandler [bus]
-  c/Lifecycle
-  (start [this]
-    ;; Set up a pipeline that handles events through the command tx,
-    ;; then sends the results back to the bus
-    (assoc this :handler (e/register-pipeline bus :command/invoked co/command-tx)))
-
-  (stop [this]
-    (call-and-dissoc this :handler (partial e/unregister-handler bus))))
-
-(defn new-command-handler []
-  (map->CommandHandler {}))
-
 (defrecord HttpServer [bus config]
   c/Lifecycle
   (start [this]
+    ;; Alternatively we could just initialize the handler here and
+    ;; let commmands/http-server actually start it.
     (assoc this :server (web/start-server (assoc config :bus bus))))
 
   (stop [this]
@@ -53,24 +42,15 @@
 (defn new-http-server []
   (map->HttpServer {}))
 
-(defn- register-tx-runners [bus]
-  (->> {:build/started (comp (map r/build-local)
-                             (remove nil?))
-        :build/completed (map r/build-completed)}
-       (mapv (partial apply e/register-pipeline bus))))
-
-(defn- register-fn-handlers [bus]
-  [(e/register-handler bus :build/local p/execute!)])
-
-(defrecord BuildRunners [config bus]
+(defrecord Context [command config event-bus]
   c/Lifecycle
   (start [this]
-    (log/debug "Registering build runner handlers")
-    (assoc this :handlers (concat (register-tx-runners bus)
-                                  (register-fn-handlers bus))))
-
+    (-> this
+        (merge config)
+        (dissoc :config)
+        (update :runner r/make-runner)))
   (stop [this]
-    (call-and-dissoc this :handlers (partial map (partial e/unregister-handler bus)))))
+    this))
 
-(defn new-build-runners []
-  (map->BuildRunners {}))
+(defn new-context [cmd]
+  (map->Context {:command cmd}))

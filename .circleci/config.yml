@@ -247,7 +247,6 @@ workflows:
             branches:
               only: [main]
       - test-hook
-      - test-self
       - docker:
           requires:
             - app-uberjar

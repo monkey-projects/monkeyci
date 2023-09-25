@@ -1,4 +1,5 @@
 (ns monkey.ci.docker
+  "Functions for running build steps using Docker api."
   (:require [camel-snake-kebab.core :as csk]
             [clojure.java.io :as io]
             [clojure.tools.logging :as log]

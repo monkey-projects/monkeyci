@@ -2,7 +2,9 @@
   "Tests for the CLI configuration"
   (:require [clojure.test :refer :all]
             [cli-matic.core :as cli]
-            [monkey.ci.core :as core]))
+            [monkey.ci
+             [commands :as cmd]
+             [core :as core]]))
 
 (deftest cli
   (let [last-cmd (atom nil)
@@ -22,7 +24,7 @@
       (testing "`build` command"
         (testing "runs `build` command"
           (let [lc (run-cli "build")]
-            (is (= :build (:cmd lc)))))
+            (is (= cmd/build (:cmd lc)))))
         
         (testing "accepts script dir `-d`"
           (let [lc (run-cli "build" "-d" "test-dir")]
@@ -46,7 +48,7 @@
 
       (testing "`server` command"
         (testing "runs `server` command"
-          (is (= :http (:cmd (run-cli "server")))))
+          (is (= cmd/http-server (:cmd (run-cli "server")))))
 
         (testing "accepts listening port `-p`"
           (is (= 1234 (-> (run-cli "server" "-p" "1234")
