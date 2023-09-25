@@ -1,7 +1,10 @@
 (ns monkey.ci.test.events-test
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.core.async :as ca]
-            [monkey.ci.events :as sut]
+            [clojure.spec.alpha :as s]
+            [monkey.ci
+             [events :as sut]
+             [spec :as spec]]
             [monkey.ci.test.helpers :as h :refer [with-bus]]))
 
 (defn read-or-timeout [c & [timeout]]

@@ -1,4 +1,11 @@
 (ns monkey.ci.config
+  "Configuration functionality.  This reads the application configuration from various
+   sources, like environment vars or command-line args.  The configuration is structured
+   in a hierarchy and optionally some values are converted.  Then this configuration is
+   used to add any 'constructor functions', that are then used to create new functions to
+   to some actual work.  This allows us to change the behaviour of the application with
+   configuration, but also makes it possible to inject dummy functions for testing 
+   purposes."
   (:require [medley.core :as mc]))
 
 ;; Determine version at compile time
@@ -41,7 +48,8 @@
   (->> env
        (filter-and-strip-keys :monkeyci)
        (group-keys :github)
-       (group-keys :runner)))
+       (group-keys :runner)
+       (group-keys :containers)))
 
 (def default-app-config
   {:http
@@ -60,7 +68,7 @@
       (update-in [:runner :type] keyword)))
 
 (def default-script-config
-  {:container-runner :docker})
+  {:containers {:type :docker}})
 
 (defn script-config
   "Builds config map used by the child script process"
@@ -68,4 +76,4 @@
   (-> default-script-config
       (deep-merge (config-from-env env))
       (merge args)
-      (update :container-runner keyword)))
+      (update-in [:containers :type] keyword)))

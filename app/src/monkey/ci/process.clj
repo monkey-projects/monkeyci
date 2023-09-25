@@ -80,7 +80,8 @@
         inter-ch (ca/chan)]
     {:socket-path path
      :socket listener
-     ;; Accept connection in separate thread
+     ;; Accept connection in separate thread.  We can change this later to a
+     ;; virtual thread (Java 21+)
      :accept-thread (doto (Thread.
                            (fn []
                              (log/debug "Waiting for child process to connect")

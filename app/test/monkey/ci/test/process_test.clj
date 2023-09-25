@@ -32,12 +32,12 @@
                                           bc/success)]
         (is (nil? (sut/run
                     {:key :test-args}
-                    {:monkeyci-container-runner "docker"
+                    {:monkeyci-containers-type "docker"
                      :monkeyci-event-socket "/tmp/test.sock"})))
-        (is (= {:container-runner :docker
+        (is (= {:containers {:type  :docker}
                 :event-socket "/tmp/test.sock"}
                (-> @captured-args
-                   (select-keys [:container-runner
+                   (select-keys [:containers
                                  :event-socket]))))))))
 
 (deftest ^:slow execute-slow!

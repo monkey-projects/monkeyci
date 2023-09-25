@@ -30,14 +30,14 @@ An extra advantage of this approach would be that the code could be made a lot m
 flexible, and testable.  Instead of having to mock out entire parts, we would just
 inspect the messages that are posted on certain channels.  We could also log the
 messages that pass through channels to improve monitoring.
-A drawback would be the possible added complexity, so it would be important to keep
-this to a minimum.  We will have to think this thoroughly through to see if this
-is really worth the trouble, and see if we cannot solve this in another way.  Instead
-of passing a channel to send events to, we could also pass a function?  Or a multi-arity
-function, that, when called with one argument, sends a message, and when invoked without
-arguments, receives one?  On the one hand this offers more flexibility, since you
-can pass in any sort of function.  But also this reduces flexibility because the
-caller can only do two things (send and receive), where channels offer more than that.
+A drawback is the possible complexity, so it's important to keep this to a minimum.
+After some experimenting, it became clear that although events have their merits,
+they should not be overused.  The increased flexibility does not always offset the
+added complexity.  So for most parts of the application, we're using higher-order
+functions that use the app configuration to spawn other functions that do the real
+work.  This allows us to "inject" testing functions where wanted.  But events will
+still be used for the async operations, like waiting for a child process to terminate
+and receiving any messages from it.
 
 ## Scripts ##
 
