@@ -40,3 +40,6 @@
    :command :build
    :result evt
    :exit exit})
+
+;; Creates a runner fn according to its type
+(defmulti make-runner :type)

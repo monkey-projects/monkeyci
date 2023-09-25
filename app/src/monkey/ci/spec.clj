@@ -29,5 +29,9 @@
 ;; Application configuration
 (s/def ::app-config (s/keys :req-un [::http ::runner]))
 
+(s/def ::command fn?)
+(s/def ::app-context (s/keys :req-un [::http ::runner ::event-bus]
+                             :opt-un [::command ::system]))
+
 ;; Script configuration
 (s/def ::script-config (s/keys :req-un [::containers]))

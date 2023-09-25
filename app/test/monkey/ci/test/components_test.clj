@@ -1,10 +1,13 @@
 (ns monkey.ci.test.components-test
   (:require [clojure.test :refer [deftest testing is]]
+            [clojure.spec.alpha :as s]
             [com.stuartsierra.component :as c]
             [monkey.ci
              [commands :as co]
              [components :as sut]
-             [events :as e]]
+             [config :as config]
+             [events :as e]
+             [spec :as spec]]
             [monkey.ci.web.handler :as wh]
             [monkey.ci.test.helpers :as h]
             [org.httpkit.server :as http]))
@@ -19,39 +22,6 @@
                   (c/start)
                   (c/stop)
                   :pub)))))
-
-(deftest command-handler
-  (testing "`start` registers handler in the bus"
-    (h/with-bus
-      (fn [bus]
-        (is (some? (-> (sut/new-command-handler)
-                       (assoc :bus bus)
-                       (c/start)
-                       :handler))))))
-
-  (testing "handles `command/invoked` events"
-    (h/with-bus
-      (fn [bus]
-        (let [handled (atom [])
-              component (-> (sut/->CommandHandler bus)
-                            (c/start))]
-          (defmethod co/handle-command ::test [evt]
-            (swap! handled conj evt))
-          (e/post-event bus {:type :command/invoked
-                             :command ::test})
-          (is (not= :timeout (h/wait-until #(pos? (count @handled)) 500)))
-          (is (= 1 (count @handled)))
-          ;; Clean up
-          (remove-method co/handle-command ::test)
-          (is (some? (c/stop component)))))))
-
-  (testing "`stop` unregisters handler"
-    (h/with-bus
-      (fn [bus]
-        (is (nil? (-> (sut/map->CommandHandler {:bus bus})
-                      (c/start)
-                      (c/stop)
-                      :handler)))))))
 
 (defrecord TestServer []
   http/IHttpServer
@@ -91,3 +61,16 @@
                       (c/start)
                       (c/stop)
                       :handlers)))))))
+
+(deftest context
+  (testing "contains command"
+    (is (= :test-command (:command (sut/new-context :test-command)))))
+
+  (testing "results in context that is compliant to spec"
+    (h/with-bus
+      (fn [bus]
+        (is (true? (->> (sut/map->Context {:command (constantly "ok")
+                                           :event-bus bus
+                                           :config config/default-app-config})
+                        (c/start)
+                        (s/valid? ::spec/app-context))))))))

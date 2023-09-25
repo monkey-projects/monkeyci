@@ -45,13 +45,17 @@
 (defn- config-from-env
   "Takes configuration from env vars"
   [env]
-  (->> env
-       (filter-and-strip-keys :monkeyci)
-       (group-keys :github)
-       (group-keys :runner)
-       (group-keys :containers)))
+  (letfn [(group-all-keys [c]
+            (reduce (fn [r v]
+                      (group-keys v r))
+                    c
+                    [:github :runner :containers]))]
+    (->> env
+         (filter-and-strip-keys :monkeyci)
+         (group-all-keys))))
 
 (def default-app-config
+  "Default configuration for the application, without env vars or args applied."
   {:http
    {:port 3000}
    :runner
@@ -68,6 +72,7 @@
       (update-in [:runner :type] keyword)))
 
 (def default-script-config
+  "Default configuration for the script runner."
   {:containers {:type :docker}})
 
 (defn script-config

@@ -29,19 +29,6 @@
 (defn new-bus []
   (->BusComponent))
 
-(defrecord CommandHandler [bus]
-  c/Lifecycle
-  (start [this]
-    ;; Set up a pipeline that handles events through the command tx,
-    ;; then sends the results back to the bus
-    (assoc this :handler (e/register-pipeline bus :command/invoked co/command-tx)))
-
-  (stop [this]
-    (call-and-dissoc this :handler (partial e/unregister-handler bus))))
-
-(defn new-command-handler []
-  (map->CommandHandler {}))
-
 (defrecord HttpServer [bus config]
   c/Lifecycle
   (start [this]
@@ -74,3 +61,15 @@
 
 (defn new-build-runners []
   (map->BuildRunners {}))
+
+(defrecord Context [command config event-bus]
+  c/Lifecycle
+  (start [this]
+    (-> this
+        (merge config)
+        (dissoc :config)))
+  (stop [this]
+    this))
+
+(defn new-context [cmd]
+  (map->Context {:command cmd}))

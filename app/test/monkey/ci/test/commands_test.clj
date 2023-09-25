@@ -1,20 +1,14 @@
 (ns monkey.ci.test.commands-test
   (:require [clojure.test :refer [deftest testing is]]
-            [monkey.ci.commands :as sut]))
+            [monkey.ci
+             [commands :as sut]
+             [spec :as spec]]))
 
-(deftest handle-command--http
-  (testing "does nothing"
-    (is (nil? (sut/handle-command {:command :http})))))
+(deftest build
+  (testing "invokes runner from context"
+    (let [ctx {:runner {:fn (constantly :invoked)}}]
+      (is (= :invoked (sut/build ctx))))))
 
-(deftest handle-command--build
-  (testing "creates build event"
-    (is (= :build/started (-> {:command :build
-                               :args {:pipeline "test-pipeline"}}
-                              (sut/handle-command)
-                              :type))))
-
-  (testing "adds args as root properties"
-    (is (= "test-pipeline" (-> {:command :build
-                                :pipeline "test-pipeline"}
-                               (sut/handle-command)
-                               :pipeline)))))
+(deftest http-server
+  (testing "returns a channel"
+    (is (spec/channel? (sut/http-server {})))))
