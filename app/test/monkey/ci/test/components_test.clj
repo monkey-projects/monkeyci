@@ -41,27 +41,6 @@
                   (c/stop)
                   :server)))))
 
-(deftest build-runners
-  (testing "registers handlers on start for local"
-    (h/with-bus
-      (fn [bus]
-        (is (= 2 (-> (sut/new-build-runners)
-                     (assoc :config {:runner {:type :local}}
-                            :bus bus)
-                     (c/start)
-                     :handlers
-                     (count)))))))
-
-  (testing "unregisters handlers on stop"
-    (h/with-bus
-      (fn [bus]
-        (is (nil? (-> (sut/new-build-runners)
-                      (assoc :config {:runner {:type :local}}
-                             :bus bus)
-                      (c/start)
-                      (c/stop)
-                      :handlers)))))))
-
 (deftest context
   (testing "contains command"
     (is (= :test-command (:command (sut/new-context :test-command)))))

@@ -42,24 +42,6 @@
 (defn new-http-server []
   (map->HttpServer {}))
 
-(defn- register-tx-runners [bus]
-  (->> {:build/started (comp (map r/build-local)
-                             (remove nil?))
-        :build/completed (map r/build-completed)}
-       (mapv (partial apply e/register-pipeline bus))))
-
-(defrecord BuildRunners [config bus]
-  c/Lifecycle
-  (start [this]
-    (log/debug "Registering build runner handlers")
-    (assoc this :handlers (register-tx-runners bus)))
-
-  (stop [this]
-    (call-and-dissoc this :handlers (partial map (partial e/unregister-handler bus)))))
-
-(defn ^:deprecated new-build-runners []
-  (map->BuildRunners {}))
-
 (defrecord Context [command config event-bus]
   c/Lifecycle
   (start [this]

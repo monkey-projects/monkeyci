@@ -26,11 +26,9 @@
                 (sc/using {:event-bus :bus
                            :config :config}))
    :http (-> (co/new-http-server)
-             (sc/using [:bus]))
-   :runners (-> (co/new-build-runners)
-                (sc/using [:bus]))))
+             (sc/using [:bus]))))
 
-(def always-required-components [:bus :commands :runners :context])
+(def always-required-components [:bus :context])
 
 (defn system-invoker
   "The event invoker starts a subsystem according to the command requirements,
