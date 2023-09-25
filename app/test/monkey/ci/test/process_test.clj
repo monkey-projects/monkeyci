@@ -42,22 +42,23 @@
 
 (deftest ^:slow execute-slow!
   (testing "executes build script in separate process"
-    (is (zero? (-> {:dev-mode true
-                    :script-dir (example "basic-clj")}
+    (is (zero? (-> {:build {:script-dir (example "basic-clj")}
+                    :args {:dev-mode true}}
                    sut/execute!
                    deref
                    :exit))))
 
   (testing "fails when script fails"
-    (is (pos? (-> {:dev-mode true
-                   :script-dir (example "failing")}
+    (is (pos? (-> {:build {:script-dir (example "failing")}
+                   :args {:dev-mode true}}
                   sut/execute!
                   deref
                   :exit))))
 
   (testing "fails when script not found"
-    (is (thrown? java.io.IOException (sut/execute! {:dev-mode true
-                                                    :script-dir (example "non-existing")})))))
+    (is (thrown? java.io.IOException (sut/execute!
+                                      {:args {:dev-mode true}
+                                       :build {:script-dir (example "non-existing")}})))))
 
 (defn- find-arg
   "Finds the argument value for given key"
@@ -75,41 +76,42 @@
                                {:args args
                                 :exit 1234}))]
     (testing "returns exit code"
-      (is (= 1234 (:exit (sut/execute! {:dev-mode true
-                                        :script-dir (example "failing")})))))
+      (is (= 1234 (:exit (sut/execute!
+                          {:args {:dev-mode true}
+                           :build {:script-dir (example "failing")}})))))
 
     (testing "invokes in script dir"
-      (is (= "test-dir" (-> (sut/execute! {:script-dir "test-dir"})
+      (is (= "test-dir" (-> (sut/execute! {:build {:script-dir "test-dir"}})
                             :args
                             :dir))))
 
     (testing "passes work dir in edn"
-      (is (= "\"work-dir\"" (-> {:work-dir "work-dir"}
+      (is (= "\"work-dir\"" (-> {:build {:work-dir "work-dir"}}
                                 (sut/execute!)
                                 (find-arg :work-dir)))))
 
     (testing "passes script dir in edn"
-      (is (= "\"script-dir\"" (-> {:script-dir "script-dir"}
+      (is (= "\"script-dir\"" (-> {:build {:script-dir "script-dir"}}
                                   (sut/execute!)
                                   (find-arg :script-dir)))))
 
     (testing "passes pipeline in edn"
-      (is (= "\"test-pipeline\"" (-> {:pipeline "test-pipeline"}
+      (is (= "\"test-pipeline\"" (-> {:build {:pipeline "test-pipeline"}}
                                      (sut/execute!)
                                      (find-arg :pipeline)))))
 
     (testing "passes socket path in env when bus exists"
       (let [bus (events/make-bus)]
         (is (string? (-> {:script-dir "test-dir"
-                          :bus bus}
+                          :event-bus bus}
                          (sut/execute!)
                          :args
                          :extra-env
                          :monkeyci-event-socket)))))
 
     (testing "no socket path when no bus exists"
-        (is (nil? (-> {:script-dir "test-dir"}
-                      (sut/execute!)
-                      :args
-                      :extra-env
-                      :monkeyci-event-socket))))))
+      (is (nil? (-> {:build {:script-dir "test-dir"}}
+                    (sut/execute!)
+                    :args
+                    :extra-env
+                    :monkeyci-event-socket))))))

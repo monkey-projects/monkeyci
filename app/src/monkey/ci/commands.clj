@@ -6,7 +6,8 @@
 (defn build
   "Performs a build, using the runner from the context"
   [ctx]
-  (let [r (get-in ctx [:runner :fn])]
+  (let [r (:runner ctx)]
+    (log/debug "Running build with runner" r)
     (r ctx)))
 
 (defn http-server

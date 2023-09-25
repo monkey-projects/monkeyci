@@ -6,7 +6,7 @@
 
 (deftest build
   (testing "invokes runner from context"
-    (let [ctx {:runner {:fn (constantly :invoked)}}]
+    (let [ctx {:runner (constantly :invoked)}]
       (is (= :invoked (sut/build ctx))))))
 
 (deftest http-server

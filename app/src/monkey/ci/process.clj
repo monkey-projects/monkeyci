@@ -63,8 +63,8 @@
 
 (defn- build-args
   "Builds command-line args vector for script process"
-  [config]
-  (->> (select-keys config [:work-dir :script-dir :pipeline])
+  [{:keys [build]}]
+  (->> (select-keys build [:work-dir :script-dir :pipeline])
        (mc/remove-vals nil?)
        (mc/map-keys str)
        (mc/map-vals pr-str)
@@ -100,7 +100,7 @@
    clojure cli with a generated `build` alias.  This expects absolute directories.
    Returns an object that can be `deref`ed to wait for the process to exit.  Will
    post a `build/completed` event on process exit."
-  [{:keys [work-dir script-dir bus] :as ctx}]
+  [{{:keys [work-dir script-dir]} :build bus :event-bus :as ctx}]
   (log/info "Executing process in" work-dir)
   (let [{:keys [socket-path socket]} (when bus
                                        (events-to-bus bus))]

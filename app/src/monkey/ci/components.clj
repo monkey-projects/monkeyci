@@ -32,6 +32,8 @@
 (defrecord HttpServer [bus config]
   c/Lifecycle
   (start [this]
+    ;; Alternatively we could just initialize the handler here and
+    ;; let commmands/http-server actually start it.
     (assoc this :server (web/start-server (assoc config :bus bus))))
 
   (stop [this]
@@ -59,7 +61,7 @@
   (stop [this]
     (call-and-dissoc this :handlers (partial map (partial e/unregister-handler bus)))))
 
-(defn new-build-runners []
+(defn ^:deprecated new-build-runners []
   (map->BuildRunners {}))
 
 (defrecord Context [command config event-bus]
@@ -67,7 +69,8 @@
   (start [this]
     (-> this
         (merge config)
-        (dissoc :config)))
+        (dissoc :config)
+        (update :runner r/make-runner)))
   (stop [this]
     this))
 

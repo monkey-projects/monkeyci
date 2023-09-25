@@ -23,7 +23,8 @@
   (sc/system-map
    :bus (co/new-bus)
    :context (-> (co/new-context nil)
-                (sc/using {:event-bus :bus}))
+                (sc/using {:event-bus :bus
+                           :config :config}))
    :http (-> (co/new-http-server)
              (sc/using [:bus]))
    :runners (-> (co/new-build-runners)
@@ -52,7 +53,7 @@
        ;; Run the command with the context.  If this returns a channel, then
        ;; cli-matic will wait until it closes.  If this returns a number, will use
        ;; it as the process exit code.
-       (command (assoc ctx :system sys)))))
+       (command (assoc ctx :system sys :args args)))))
   ([cmd env]
    (system-invoker cmd env base-system)))
 
