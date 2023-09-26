@@ -35,6 +35,7 @@
     :warning (log/warn "Exited with warnings:" (:message evt))
     :error   (log/error "Failure.")
     :unknown (log/warn "Unknown result."))
+  ;; TODO Maybe clean up any checked out files
   exit)
 
 (defn build-local

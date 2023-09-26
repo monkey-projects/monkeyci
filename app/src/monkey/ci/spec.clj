@@ -19,6 +19,7 @@
 (s/def ::event-handler (s/keys :req-un [::channel ::type]
                                :opt-un [::handler ::tx ::loop]))
 
+(s/def ::dev-mode boolean?)
 ;; HTTP server configuration
 (s/def ::port int?)
 (s/def ::http (s/keys :req-un [::port]))
@@ -32,7 +33,8 @@
 (s/def :conf/git-url string?)
 
 ;; Application configuration
-(s/def ::app-config (s/keys :req-un [::http :conf/runner]))
+(s/def ::app-config (s/keys :req-un [::http :conf/runner]
+                            :opt-un [::dev-mode]))
 
 (s/def ::command fn?)
 (s/def :ctx/runner fn?)
@@ -54,10 +56,10 @@
                           :opt-un [::pipeline :ctx/git]))
 
 ;; Arguments as passed in from the CLI
-(s/def ::args (s/keys :opt-un [::pipeline :conf/dir :conf/workdir :conf/git-url]))
+(s/def ::args (s/keys :opt-un [::dev-mode ::pipeline :conf/dir :conf/workdir :conf/git-url]))
 
 (s/def ::app-context (s/keys :req-un [::http :ctx/runner ::event-bus :conf/git]
-                             :opt-un [::command ::system ::args :ctx/build]))
+                             :opt-un [::dev-mode ::command ::system ::args :ctx/build]))
 
 ;; Script configuration
 (s/def ::script-config (s/keys :req-un [::containers]))

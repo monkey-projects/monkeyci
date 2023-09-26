@@ -30,12 +30,12 @@
 (defn new-bus []
   (->BusComponent))
 
-(defrecord HttpServer [bus config]
+(defrecord HttpServer [context]
   c/Lifecycle
   (start [this]
     ;; Alternatively we could just initialize the handler here and
     ;; let commmands/http-server actually start it.
-    (assoc this :server (web/start-server (assoc config :bus bus))))
+    (assoc this :server (web/start-server context)))
 
   (stop [this]
     (call-and-dissoc this :server web/stop-server)))
@@ -44,7 +44,7 @@
   (map->HttpServer {}))
 
 (def default-context
-  {:git {:fn (fn [opts]
+  {:git {:fn (fn default-git-clone [opts]
                (->> ((juxt :url :branch :id :dir) opts)
                     (apply git/clone+checkout))
                ;; Return the checkout dir

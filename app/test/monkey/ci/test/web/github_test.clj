@@ -33,7 +33,7 @@
 (deftest webhook
   (testing "posts event"
     (let [bus (events/make-bus)
-          ctx {:reitit.core/match {:data {:monkey.ci.web.handler/context {:bus bus}}}}
+          ctx {:reitit.core/match {:data {:monkey.ci.web.handler/context {:event-bus bus}}}}
           req (-> (mock/request :post "/webhook/github")
                   (mock/body "test body")
                   (merge ctx))

@@ -5,7 +5,7 @@
 (defn req->bus
   "Gets the event bus from the request data"
   [req]
-  (get-in req [:reitit.core/match :data :monkey.ci.web.handler/context :bus]))
+  (get-in req [:reitit.core/match :data :monkey.ci.web.handler/context :event-bus]))
 
 (defn post-event
   "Posts event to the bus found in the request data.  Returns an async channel

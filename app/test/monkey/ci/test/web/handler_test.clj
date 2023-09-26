@@ -21,7 +21,7 @@
   (sut/make-app
    {:github
     {:secret github-secret}
-    :bus (events/make-bus)}))
+    :event-bus (events/make-bus)}))
 
 (def test-app (make-test-app))
 
@@ -87,7 +87,7 @@
 
     (testing "disables security check when in dev mode"
       (let [dev-app (sut/make-app {:dev-mode true
-                                   :bus (events/make-bus)})]
+                                   :event-bus (events/make-bus)})]
         (is (= 200 (-> (mock/request :post "/webhook/github")
                        (dev-app)
                        (h/try-take 500 :timeout)
