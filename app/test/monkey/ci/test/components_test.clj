@@ -7,6 +7,7 @@
              [components :as sut]
              [config :as config]
              [events :as e]
+             [git :as git]
              [spec :as spec]]
             [monkey.ci.web.handler :as wh]
             [monkey.ci.test.helpers :as h]
@@ -52,4 +53,18 @@
                                            :event-bus bus
                                            :config config/default-app-config})
                         (c/start)
-                        (s/valid? ::spec/app-context))))))))
+                        (s/valid? ::spec/app-context)))))))
+
+  (testing "sets git fn by default, returns checkout dir"
+    (let [git-fn (-> (sut/new-context nil)
+                     (c/start)
+                     :git
+                     :fn)
+          captured-args (atom [])]
+      (with-redefs [git/clone+checkout (fn [& args]
+                                         (reset! captured-args args))]
+        (is (= "test-dir" (git-fn {:url "test-url"
+                                   :branch "test-branch"
+                                   :dir "test-dir"
+                                   :id "test-id"})))
+        (is (= ["test-url" "test-branch" "test-id" "test-dir"] @captured-args))))))

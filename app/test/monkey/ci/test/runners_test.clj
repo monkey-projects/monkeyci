@@ -69,6 +69,49 @@
                               :build
                               :script-dir))))))))))
 
+(deftest download-src
+  (testing "no-op if the source is local"
+    (let [ctx {}]
+      (is (= ctx (sut/download-src ctx)))))
+
+  (testing "gets src using git fn"
+    (is (= "test/dir" (-> {:build
+                           {:git {:url "http://git.test"}}
+                           :git {:fn (constantly "test/dir")}}
+                          (sut/download-src)
+                          :build
+                          :work-dir))))
+
+  (testing "passes git config to git fn"
+    (let [git-config {:url "http://test"
+                      :branch "main"
+                      :id "test-id"}]
+      (is (= "ok" (-> {:build
+                       {:git git-config}
+                       :git {:fn (fn [c]
+                                   (if (= (select-keys c (keys git-config)) git-config) "ok" "failed"))}}
+                      (sut/download-src)
+                      :build
+                      :work-dir)))))
+
+  (testing "passes work dir as git checkout dir"
+    (is (= "test-work-dir" (-> {:args {:workdir "test-work-dir"}
+                                :git {:fn :work-dir}
+                                :build {:git {:url "http:/test.git"}}}
+                               (sut/download-src)
+                               :build
+                               :work-dir))))
+
+  (testing "calculates script dir"
+    (is (re-matches #".*test/dir/test-script$"
+                    (-> {:build
+                         {:git {:url "http://git.test"}}
+                         :git {:fn (constantly "test/dir")}
+                         :args {:dir "test-script"}}
+                        (sut/download-src)
+                        :build
+                        :script-dir)))))
+
 (deftest build-completed
   (testing "returns exit code for each type"
     (->> [:success :warning :error nil]

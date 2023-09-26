@@ -6,6 +6,7 @@
             [monkey.ci
              [commands :as co]
              [events :as e]
+             [git :as git]
              [process :as p]
              [runners :as r]]
             [monkey.ci.web.handler :as web]))
@@ -42,10 +43,19 @@
 (defn new-http-server []
   (map->HttpServer {}))
 
+(def default-context
+  {:git {:fn (fn [opts]
+               (->> (select-keys opts [:url :branch :id :dir])
+                    (vals)
+                    (apply git/clone+checkout))
+               ;; Return the checkout dir
+               (:dir opts))}})
+
 (defrecord Context [command config event-bus]
   c/Lifecycle
   (start [this]
     (-> this
+        (merge default-context)
         (merge config)
         (dissoc :config)
         (update :runner r/make-runner)))
