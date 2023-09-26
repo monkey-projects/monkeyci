@@ -44,7 +44,11 @@
                 
         (testing "accepts dev mode"
           (let [lc (run-cli "--dev-mode" "build" "test-dir")]
-            (is (true? (get-in lc [:args :dev-mode]))))))
+            (is (true? (get-in lc [:args :dev-mode])))))
+
+        (testing "accepts git url"
+          (let [lc (run-cli "build" "--git-url" "http://test-url")]
+            (is (= "http://test-url" (get-in lc [:args :git-url]))))))
 
       (testing "`server` command"
         (testing "runs `server` command"

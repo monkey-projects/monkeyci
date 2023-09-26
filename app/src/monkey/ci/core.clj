@@ -66,6 +66,10 @@
           {:as "Pipeline name"
            :option "pipeline"
            :short "p"
+           :type :string}
+          {:as "Git repository url"
+           :option "git-url"
+           :short "u"
            :type :string}]
    :runs {:command cmd/build}})
 
