@@ -37,7 +37,7 @@
   [{:keys [args event-bus] :as ctx}]
   (let [{:keys [script-dir work-dir] :as build} (-> (get-absolute-dirs args)
                                                     (merge (select-keys args [:pipeline])))
-        ctx (assoc ctx :build build)]
+        ctx (update ctx :build merge build)]
     (if (some-> (io/file script-dir) (.exists))
       (do
         (p/execute! ctx)
@@ -48,12 +48,15 @@
 (defmulti make-runner :type)
 
 (defmethod make-runner :child [_]
+  (log/info "Using child process runner")
   build-local)
 
 (defmethod make-runner :noop [_]
+  (log/debug "No-op runner configured")
   ;; For testing
   (constantly 1))
 
 (defmethod make-runner :default [_]
+  (log/warn "No runner configured, using fallback configuration")
   ;; Fallback
   (constantly 2))

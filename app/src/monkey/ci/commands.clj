@@ -18,4 +18,3 @@
    should already be started by the component system."
   [ctx]
   (ca/chan))
-
