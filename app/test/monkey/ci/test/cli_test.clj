@@ -48,7 +48,15 @@
 
         (testing "accepts git url"
           (let [lc (run-cli "build" "--git-url" "http://test-url")]
-            (is (= "http://test-url" (get-in lc [:args :git-url]))))))
+            (is (= "http://test-url" (get-in lc [:args :git-url])))))
+
+        (testing "accepts git branch"
+          (let [lc (run-cli "build" "--branch" "test-branch")]
+            (is (= "test-branch" (get-in lc [:args :branch])))))
+
+        (testing "accepts commit id"
+          (let [lc (run-cli "build" "--commit-id" "test-id")]
+            (is (= "test-id" (get-in lc [:args :commit-id]))))))
 
       (testing "`server` command"
         (testing "runs `server` command"

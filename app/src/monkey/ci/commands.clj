@@ -3,10 +3,11 @@
   (:require [clojure.tools.logging :as log]
             [clojure.core.async :as ca]))
 
-(defn- maybe-set-git-url [{{:keys [git-url]} :args :as ctx}]
+(defn- maybe-set-git-opts [{{:keys [git-url branch commit-id]} :args :as ctx}]
   (cond-> ctx
-    ;; TODO Also add branch and commit id
-    git-url (assoc-in [:build :git :url] git-url)))
+    git-url (assoc-in [:build :git] {:url git-url
+                                     :branch (or branch "main")
+                                     :id commit-id})))
 
 (defn build
   "Performs a build, using the runner from the context"
@@ -16,7 +17,7 @@
     (-> ctx 
         ;; TODO Generate a more useful build id
         (assoc-in [:build :build-id] (format "build-%d" (System/currentTimeMillis)))
-        (maybe-set-git-url)
+        (maybe-set-git-opts)
         (r))))
 
 (defn http-server

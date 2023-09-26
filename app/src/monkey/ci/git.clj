@@ -19,8 +19,10 @@
 (defn clone+checkout
   "Clones the repo, then performs a checkout of the given id"
   [url branch id dir]
-  (doto (clone url branch dir)
-    (checkout id)))
+  (let [repo (clone url branch dir)]
+    (when id
+      (checkout repo id))
+    repo))
 
 (defn delete-repo
   "Deletes the previously checked out local repo"

@@ -70,6 +70,13 @@
           {:as "Git repository url"
            :option "git-url"
            :short "u"
+           :type :string}
+          {:as "Repository branch"
+           :option "branch"
+           :short "b"
+           :type :string}
+          {:as "Commit id"
+           :option "commit-id"
            :type :string}]
    :runs {:command cmd/build}})
 

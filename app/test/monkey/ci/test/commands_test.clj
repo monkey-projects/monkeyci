@@ -14,10 +14,20 @@
                     (-> {:runner (comp :build-id :build)}
                         (sut/build)))))
 
-  (testing "sets git url in build config"
-    (is (= "test-url" (-> {:args {:git-url "test-url"}
-                           :runner (comp :url :git :build)}
-                          (sut/build))))))
+  (testing "sets git opts in build config"
+    (is (= {:url "test-url"
+            :branch "test-branch"
+            :id "test-id"}
+           (-> {:args {:git-url "test-url"
+                       :branch "test-branch"
+                       :commit-id "test-id"}
+                :runner (comp :git :build)}
+               (sut/build)))))
+
+  (testing "defaults to `main` branch"
+    (is (= "main" (-> {:args {:git-url "test-url"}
+                       :runner (comp :branch :git :build)}
+                      (sut/build))))))
 
 (deftest http-server
   (testing "returns a channel"
