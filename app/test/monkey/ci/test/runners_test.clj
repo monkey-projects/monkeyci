@@ -96,7 +96,7 @@
 
   (testing "passes work dir as git checkout dir"
     (is (= "test-work-dir" (-> {:args {:workdir "test-work-dir"}
-                                :git {:fn :work-dir}
+                                :git {:fn :dir}
                                 :build {:git {:url "http:/test.git"}}}
                                (sut/download-src)
                                :build

@@ -45,8 +45,7 @@
 
 (def default-context
   {:git {:fn (fn [opts]
-               (->> (select-keys opts [:url :branch :id :dir])
-                    (vals)
+               (->> ((juxt :url :branch :id :dir) opts)
                     (apply git/clone+checkout))
                ;; Return the checkout dir
                (:dir opts))}})

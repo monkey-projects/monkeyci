@@ -67,4 +67,16 @@
                                    :branch "test-branch"
                                    :dir "test-dir"
                                    :id "test-id"})))
-        (is (= ["test-url" "test-branch" "test-id" "test-dir"] @captured-args))))))
+        (is (= ["test-url" "test-branch" "test-id" "test-dir"] @captured-args)))))
+
+  (testing "passes `nil` for missing opts"
+    (let [git-fn (-> (sut/new-context nil)
+                     (c/start)
+                     :git
+                     :fn)
+          captured-args (atom [])]
+      (with-redefs [git/clone+checkout (fn [& args]
+                                         (reset! captured-args args))]
+        (is (= "test-dir" (git-fn {:url "test-url"
+                                   :dir "test-dir"})))
+        (is (= ["test-url" nil nil "test-dir"] @captured-args))))))

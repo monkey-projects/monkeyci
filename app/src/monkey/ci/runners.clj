@@ -57,7 +57,7 @@
   [ctx]
   (let [git (get-in ctx [:git :fn])
         conf (-> (get-in ctx [:build :git])
-                 (assoc :work-dir (get-in ctx [:args :workdir])))
+                 (assoc :dir (get-in ctx [:args :workdir])))
         sd (get-in ctx [:args :dir])
         add-script-dir (fn [{{:keys [work-dir]} :build :as ctx}]
                          (assoc-in ctx [:build :script-dir] (calc-script-dir work-dir sd)))]
