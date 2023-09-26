@@ -110,6 +110,15 @@
                          :args {:dir "test-script"}}
                         (sut/download-src)
                         :build
+                        :script-dir))))
+
+  (testing "uses default script dir when none specified"
+    (is (re-matches #".*test/dir/.monkeyci$"
+                    (-> {:build
+                         {:git {:url "http://git.test"}}
+                         :git {:fn (constantly "test/dir")}}
+                        (sut/download-src)
+                        :build
                         :script-dir)))))
 
 (deftest build-completed

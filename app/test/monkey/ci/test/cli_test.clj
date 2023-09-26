@@ -32,7 +32,7 @@
 
         (testing "uses default script dir when not provided"
           (let [lc (run-cli "build")]
-            (is (= ".monkeyci/" (get-in lc [:args :dir])))))
+            (is (= ".monkeyci" (get-in lc [:args :dir])))))
 
         (testing "accepts global working dir `-w`"
           (let [lc (run-cli "-w" "work-dir" "build")]

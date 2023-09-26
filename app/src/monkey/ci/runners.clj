@@ -9,14 +9,16 @@
              [process :as p]
              [utils :as u]]))
 
+(def default-script-dir ".monkeyci")
+
 (defn- calc-script-dir
   "Given an (absolute) working directory and scripting directory, determines
    the absolute script dir."
   [wd sd]
-  (some->> sd
-           (u/abs-path wd)
-           (io/file)
-           (.getCanonicalPath)))
+  (->> (or sd default-script-dir)
+       (u/abs-path wd)
+       (io/file)
+       (.getCanonicalPath)))
 
 (defn- get-absolute-dirs [{:keys [dir workdir]}]
   (let [wd (io/file (or workdir (u/cwd)))]

@@ -63,7 +63,7 @@
            :option "dir"
            :short "d"
            :type :string
-           :default ".monkeyci/"}
+           :default r/default-script-dir}
           {:as "Pipeline name"
            :option "pipeline"
            :short "p"
