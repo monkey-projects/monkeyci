@@ -26,7 +26,9 @@
                 (sc/using {:event-bus :bus
                            :config :config}))
    :http (-> (co/new-http-server)
-             (sc/using [:bus]))))
+             (sc/using [:context :listeners]))
+   :listeners (-> (co/new-listeners)
+                  (sc/using [:bus :context]))))
 
 (def always-required-components [:bus :context])
 

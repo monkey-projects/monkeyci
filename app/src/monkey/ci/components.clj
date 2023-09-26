@@ -9,7 +9,9 @@
              [git :as git]
              [process :as p]
              [runners :as r]]
-            [monkey.ci.web.handler :as web]))
+            [monkey.ci.web
+             [github :as wg]
+             [handler :as web]]))
 
 (defn- call-and-dissoc [c key f]
   (when-let [x (key c)]
@@ -63,3 +65,20 @@
 
 (defn new-context [cmd]
   (map->Context {:command cmd}))
+
+(defrecord Listeners [bus context]
+  c/Lifecycle
+  (start [this]
+    (assoc this :handlers [(e/register-handler bus
+                                               :webhook/github
+                                               (fn [evt]
+                                                 (ca/thread
+                                                   (wg/build (assoc context :event evt)))))]))
+
+  (stop [this]
+    (call-and-dissoc
+     this :handlers (comp doall
+                          (partial map (partial e/unregister-handler bus))))))
+
+(defn new-listeners []
+  (map->Listeners {}))

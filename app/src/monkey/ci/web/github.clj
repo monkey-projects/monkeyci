@@ -5,7 +5,9 @@
              [mac :as mac]
              [nonce :as nonce]]
             [clojure.core.async :refer [go <!]]
+            [clojure.java.io :as io]
             [clojure.tools.logging :as log]
+            [monkey.ci.utils :as u]
             [monkey.ci.web.common :as c]))
 
 (defn extract-signature [s]
@@ -41,15 +43,28 @@
   "Receives an incoming webhook from Github.  This actually just posts
    the event on the internal bus and returns a 200 OK response."
   [req]
-  (log/info "Body params:" (prn-str (:body-params req)))
+  (log/debug "Body params:" (prn-str (:body-params req)))
+  (log/debug "Head commit:" (get-in req [:body-params :head-commit]))
   (go
     {:status (if (<! (c/post-event req {:type :webhook/github
                                         :payload (:body-params req)}))
                200
                500)}))
 
-(defn prepare-build
+(defn build
   "Handles webhook build event by preparing the config to actually
    launch the build script.  The build runner performs the repo clone and
    checkout and runs the script."
-  [evt])
+  [{:keys [runner] :as ctx}]
+  (let [p (get-in ctx [:event :payload])
+        {:keys [master-branch clone-url]} (:repository p)
+        build-id (u/new-build-id)
+        conf {:git {:url clone-url
+                    :branch master-branch
+                    :id (get-in p [:head-commit :id])
+                    ;; Use combination of work dir and build id for checkout
+                    :dir (.getCanonicalPath (io/file (get-in ctx [:args :workdir]) build-id))}
+              :build-id build-id}]
+    (-> ctx
+        (assoc :build conf)
+        (runner))))

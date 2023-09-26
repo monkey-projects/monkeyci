@@ -1,7 +1,8 @@
 (ns monkey.ci.commands
   "Event handlers for commands"
   (:require [clojure.tools.logging :as log]
-            [clojure.core.async :as ca]))
+            [clojure.core.async :as ca]
+            [monkey.ci.utils :as u]))
 
 (defn- maybe-set-git-opts [{{:keys [git-url branch commit-id]} :args :as ctx}]
   (cond-> ctx
@@ -15,8 +16,7 @@
   (let [r (:runner ctx)]
     (log/debug "Running build with runner" r)
     (-> ctx 
-        ;; TODO Generate a more useful build id
-        (assoc-in [:build :build-id] (format "build-%d" (System/currentTimeMillis)))
+        (assoc-in [:build :build-id] (u/new-build-id))
         (maybe-set-git-opts)
         (r))))
 

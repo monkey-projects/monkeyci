@@ -38,3 +38,7 @@
   "Deletes directory recursively"
   [dir]
   (FileUtils/deleteDirectory (io/file dir)))
+
+(defn new-build-id []
+  ;; TODO Generate a more useful build id
+  (format "build-%d" (System/currentTimeMillis)))

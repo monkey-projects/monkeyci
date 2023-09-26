@@ -42,6 +42,27 @@
       (is (some? (sut/webhook req)))
       (is (not= :timeout (h/wait-until #(pos? (count @recv)) 500))))))
 
-(deftest ^:kaocha/skip prepare-build
-  (testing "clones and checks out repo"
-    (is (some? (sut/prepare-build {})))))
+(deftest build
+  (testing "converts payload and invokes runner"
+    (let [evt {:payload {:repository {:clone-url "https://test/repo.git"
+                                      :master-branch "master"}
+                         :head-commit {:message "Test commit"
+                                       :id "test-commit-id"}}}
+          ctx {:runner (comp :git :build)
+               :event evt
+               :args {:workdir "test-dir"}}]
+      (is (= {:url "https://test/repo.git"
+              :branch "master"
+              :id "test-commit-id"}
+             (-> (sut/build ctx)
+                 (select-keys [:url :branch :id]))))))
+
+  (testing "generates build id"
+    (is (string? (-> {:runner (comp :build-id :build)}
+                     (sut/build)))))
+
+  (testing "combines work dir and build id for checkout dir"
+    (let [ctx {:runner (comp :dir :git :build)
+               :args {:workdir "test-dir"}}]
+      (is (re-matches #".*test-dir/.*" 
+                      (sut/build ctx))))))
