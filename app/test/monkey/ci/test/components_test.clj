@@ -7,8 +7,11 @@
              [components :as sut]
              [config :as config]
              [events :as e]
+             [git :as git]
              [spec :as spec]]
-            [monkey.ci.web.handler :as wh]
+            [monkey.ci.web
+             [handler :as wh]
+             [github :as github]]
             [monkey.ci.test.helpers :as h]
             [org.httpkit.server :as http]))
 
@@ -52,4 +55,57 @@
                                            :event-bus bus
                                            :config config/default-app-config})
                         (c/start)
-                        (s/valid? ::spec/app-context))))))))
+                        (s/valid? ::spec/app-context)))))))
+
+  (testing "sets git fn by default, returns checkout dir"
+    (let [git-fn (-> (sut/new-context nil)
+                     (c/start)
+                     :git
+                     :fn)
+          captured-args (atom [])]
+      (with-redefs [git/clone+checkout (fn [& args]
+                                         (reset! captured-args args))]
+        (is (= "test-dir" (git-fn {:url "test-url"
+                                   :branch "test-branch"
+                                   :dir "test-dir"
+                                   :id "test-id"})))
+        (is (= ["test-url" "test-branch" "test-id" "test-dir"] @captured-args)))))
+
+  (testing "passes `nil` for missing opts"
+    (let [git-fn (-> (sut/new-context nil)
+                     (c/start)
+                     :git
+                     :fn)
+          captured-args (atom [])]
+      (with-redefs [git/clone+checkout (fn [& args]
+                                         (reset! captured-args args))]
+        (is (= "test-dir" (git-fn {:url "test-url"
+                                   :dir "test-dir"})))
+        (is (= ["test-url" nil nil "test-dir"] @captured-args))))))
+
+(deftest listeners
+  (testing "registers github webhook listener"
+    (let [invoked? (atom false)]
+      (with-redefs [github/build (fn [_]
+                                   (reset! invoked? true))]
+        (h/with-bus
+          (fn [bus]
+            (is (true? (->> (sut/map->Listeners {:bus bus})
+                            (c/start)
+                            :handlers
+                            (every? e/handler?))))
+            (is (true? (e/post-event bus {:type :webhook/github})))
+            (is (true? (h/wait-until #(deref invoked?) 200))))))))
+
+  (testing "unregisters handlers on stop"
+    (let [invoked? (atom false)]
+      (with-redefs [github/build (fn [_]
+                                   (reset! invoked? true))]
+        (h/with-bus
+          (fn [bus]
+            (is (nil? (->> (sut/map->Listeners {:bus bus})
+                           (c/start)
+                           (c/stop)
+                           :handlers)))
+            (is (true? (e/post-event bus {:type :webhook/github})))
+            (is (= :timeout (h/wait-until #(deref invoked?) 200)))))))))

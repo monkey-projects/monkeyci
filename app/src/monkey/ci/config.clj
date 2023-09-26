@@ -6,11 +6,15 @@
    to some actual work.  This allows us to change the behaviour of the application with
    configuration, but also makes it possible to inject dummy functions for testing 
    purposes."
-  (:require [medley.core :as mc]))
+  (:require [camel-snake-kebab.core :as csk]
+            [clojure.string :as cs]
+            [medley.core :as mc]))
+
+(def env-prefix "monkeyci")
 
 ;; Determine version at compile time
 (defmacro version []
-  `(or (System/getenv "MONKEYCI_VERSION") "0.1.0-SNAPSHOT"))
+  `(or (System/getenv (csk/->SCREAMING_SNAKE_CASE (str env-prefix "-version"))) "0.1.0-SNAPSHOT"))
 
 (defn- merge-if-map [a b]
   (if (map? a)
@@ -51,7 +55,7 @@
                     c
                     [:github :runner :containers]))]
     (->> env
-         (filter-and-strip-keys :monkeyci)
+         (filter-and-strip-keys env-prefix)
          (group-all-keys))))
 
 (def default-app-config
@@ -68,6 +72,7 @@
   [env args]
   (-> default-app-config
       (deep-merge (config-from-env env))
+      (merge (select-keys args [:dev-mode]))
       (update-in [:http :port] #(or (:port args) %))
       (update-in [:runner :type] keyword)))
 
@@ -82,3 +87,28 @@
       (deep-merge (config-from-env env))
       (merge args)
       (update-in [:containers :type] keyword)))
+
+(defn- flatten-nested
+  "Recursively flattens a map of maps.  Each key in the resulting map is a
+   combination of the path of the parent keys."
+  [path c]
+  (letfn [(make-key [k]
+            (->> (conj path k)
+                 (map name)
+                 (cs/join "-")
+                 (keyword)))]
+    (reduce-kv (fn [r k v]
+                 (if (map? v)
+                   (merge r (flatten-nested (conj path k) v))
+                   (assoc r (make-key k) v)))
+               {}
+               c)))
+
+(defn config->env
+  "Creates a map of env vars from the config.  This is done by flattening
+   the entries and prepending them with `monkeyci-`"
+  [c]
+  (->> c
+       (flatten-nested [])
+       (mc/map-keys (fn [k]
+                      (keyword (str env-prefix "-" (name k)))))))

@@ -26,7 +26,9 @@
                 (sc/using {:event-bus :bus
                            :config :config}))
    :http (-> (co/new-http-server)
-             (sc/using [:bus]))))
+             (sc/using [:context :listeners]))
+   :listeners (-> (co/new-listeners)
+                  (sc/using [:bus :context]))))
 
 (def always-required-components [:bus :context])
 
@@ -39,7 +41,6 @@
   ([{:keys [command requires]} env base-system]
    (fn [args]
      (log/debug "Invoking command with arguments:" args)
-     ;; This is probably over-engineered, but let's see where it leads us...
      (let [config (config/app-config env args)
            {:keys [bus] :as sys} (-> base-system
                                      (assoc :config config)
@@ -66,6 +67,17 @@
           {:as "Pipeline name"
            :option "pipeline"
            :short "p"
+           :type :string}
+          {:as "Git repository url"
+           :option "git-url"
+           :short "u"
+           :type :string}
+          {:as "Repository branch"
+           :option "branch"
+           :short "b"
+           :type :string}
+          {:as "Commit id"
+           :option "commit-id"
            :type :string}]
    :runs {:command cmd/build}})
 
@@ -107,7 +119,7 @@
   "Main entry point for the application."
   [& args]
   (try
-    (cli/run-cmd args (make-cli-config env))
+    (cli/run-cmd args (make-cli-config {:env env}))
     (finally
       ;; Shutdown the agents otherwise the app will block for a while here
       (shutdown-agents))))

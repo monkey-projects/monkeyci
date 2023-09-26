@@ -28,8 +28,25 @@
                           :runner
                           :type))))
 
+  (testing "sets `dev-mode` from args"
+    (is (true? (->> {:dev-mode true}
+                    (sut/app-config {})
+                    :dev-mode))))
+
   (testing "matches app config spec"
     (is (true? (s/valid? ::spec/app-config (sut/app-config {} {}))))))
+
+(deftest config->env
+  (testing "empty for empty input"
+    (is (empty? (sut/config->env {}))))
+
+  (testing "prefixes config entries with `monkeyci-`"
+    (is (= {:monkeyci-key "value"}
+           (sut/config->env {:key "value"}))))
+
+  (testing "flattens nested config maps"
+    (is (= {:monkeyci-http-port 8080}
+           (sut/config->env {:http {:port 8080}})))))
 
 (deftest script-config
   (testing "sets containers type"

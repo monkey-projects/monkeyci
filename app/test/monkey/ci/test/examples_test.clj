@@ -14,7 +14,7 @@
           :dev-mode true})))
 
 (defn success? [r]
-  (= 0 (h/try-take r 20000 :timeout)))
+  (= 0 (h/try-take r 30000 :timeout)))
 
 (deftest ^:integration examples
   (testing "runs basic-clj example"

@@ -1,5 +1,6 @@
 (ns monkey.ci.utils
-  (:require [clojure.java.io :as io]))
+  (:require [clojure.java.io :as io])
+  (:import org.apache.commons.io.FileUtils))
 
 (defn cwd
   "Returns current directory"
@@ -27,6 +28,17 @@
 
 (defn tmp-file
   "Generates a new temporary path"
-  [prefix suffix]
-  (-> (io/file (System/getProperty "java.io.tmpdir") (str prefix (random-uuid) suffix))
-      (.getAbsolutePath)))
+  ([prefix suffix]
+   (tmp-file (str prefix (random-uuid) suffix)))
+  ([name]
+   (-> (io/file (System/getProperty "java.io.tmpdir") name)
+       (.getAbsolutePath))))
+
+(defn delete-dir
+  "Deletes directory recursively"
+  [dir]
+  (FileUtils/deleteDirectory (io/file dir)))
+
+(defn new-build-id []
+  ;; TODO Generate a more useful build id
+  (format "build-%d" (System/currentTimeMillis)))

@@ -21,7 +21,7 @@
   (sut/make-app
    {:github
     {:secret github-secret}
-    :bus (events/make-bus)}))
+    :event-bus (events/make-bus)}))
 
 (def test-app (make-test-app))
 
@@ -83,7 +83,15 @@
     (testing "returns 401 if invalid security"
       (is (= 401 (-> (mock/request :post "/webhook/github")
                      (test-app)
-                     :status))))))
+                     :status))))
+
+    (testing "disables security check when in dev mode"
+      (let [dev-app (sut/make-app {:dev-mode true
+                                   :event-bus (events/make-bus)})]
+        (is (= 200 (-> (mock/request :post "/webhook/github")
+                       (dev-app)
+                       (h/try-take 500 :timeout)
+                       :status)))))))
 
 (deftest routing-middleware
   (testing "converts json bodies to kebab-case"
@@ -99,14 +107,4 @@
                               (app)
                               :body))))))
 
-(deftest github-webhook
-  (testing "posts event"
-    (let [bus (events/make-bus)
-          ctx {:reitit.core/match {:data {::sut/context {:bus bus}}}}
-          req (-> (mock/request :post "/webhook/github")
-                  (mock/body "test body")
-                  (merge ctx))
-          recv (atom [])
-          _ (events/register-handler bus :webhook/github (partial swap! recv conj))]
-      (is (some? (sut/github-webhook req)))
-      (is (not= :timeout (h/wait-until #(pos? (count @recv)) 500))))))
+
