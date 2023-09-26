@@ -3,7 +3,6 @@
 (require '[monkey.ci.build.shell :as shell])
 (require '[clojure.java.io :as io])
 (require '[clojure.tools.logging :refer [info] :rename {info log}])
-(import 'org.apache.commons.io.FileUtils)
 
 (defn clj [& args]
   (apply shell/bash "clojure" args))
@@ -22,11 +21,6 @@
 
 (def app-uberjar (clj-app "-X:jar:uber"))
 
-;; TODO Add these utility functions to the build lib
-(defn cp [from to]
-  (log "Copying" from "->" to)
-  (FileUtils/copyFile from to))
-
 (defn install-app
   "Installs the application in the user's home directory by copying the
    uberjar to ~/lib and generating a script in ~/bin"
@@ -37,7 +31,7 @@
     (if (or (.exists lib) (true? (.mkdirs lib)))
       (do
         ;; Copy the uberjar
-        (cp (io/file work-dir "app/target/monkeyci-standalone.jar") dest)
+        (io/copy (io/file work-dir "app/target/monkeyci-standalone.jar") dest)
         ;; Generate script
         (let [script (io/file shell/home "bin/monkeyci")]
           (log "Generating script at" script)

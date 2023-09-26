@@ -21,6 +21,24 @@ design.
 So triggering a build can be done by a poller that checks if there were any changes
 in a source repo, or a webhook, or a timer, or a manual trigger.
 
+In the code, we could model these events using
+[core.async channels](https://clojure.github.io/core.async/index.html).  These
+can then either communicate internally, when the modules are running inside the
+same process.  Or they could use a JMS implementation like [Artemis](https://activemq.apache.org/components/artemis/documentation/),
+or use some form of [cloud queues](https://docs.oracle.com/en-us/iaas/Content/queue/home.htm).
+An extra advantage of this approach would be that the code could be made a lot more
+flexible, and testable.  Instead of having to mock out entire parts, we would just
+inspect the messages that are posted on certain channels.  We could also log the
+messages that pass through channels to improve monitoring.
+A drawback is the possible complexity, so it's important to keep this to a minimum.
+After some experimenting, it became clear that although events have their merits,
+they should not be overused.  The increased flexibility does not always offset the
+added complexity.  So for most parts of the application, we're using higher-order
+functions that use the app configuration to spawn other functions that do the real
+work.  This allows us to "inject" testing functions where wanted.  But events will
+still be used for the async operations, like waiting for a child process to terminate
+and receiving any messages from it.
+
 ## Scripts ##
 
 The build scripts should be powerful.  All tools I've used up until now used either

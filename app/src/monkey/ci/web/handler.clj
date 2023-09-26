@@ -1,7 +1,9 @@
 (ns monkey.ci.web.handler
   "Handler for the web server"
-  (:require [clojure.tools.logging :as log]
+  (:require [camel-snake-kebab.core :as csk]
+            [clojure.tools.logging :as log]
             [medley.core :refer [update-existing]]
+            [monkey.ci.events :as e]
             [monkey.ci.web.github :as github]
             [muuntaja.core :as mc]
             [org.httpkit.server :as http]
@@ -16,11 +18,6 @@
    :body "ok"
    :headers {"Content-Type" "text/plain"}})
 
-(defn github-webhook [req]
-  ;; TODO
-  (log/info "Body params:" (:body-params req))
-  {:status 200})
-
 (defn- maybe-generate [s g]
   (if (some? s)
     s
@@ -30,7 +27,7 @@
 
 (def routes
   [["/health" {:get health}]
-   ["/webhook/github" {:post github-webhook
+   ["/webhook/github" {:post github/webhook
                        :middleware [:github-security]}]])
 
 (defn- stringify-body
@@ -40,20 +37,38 @@
   (fn [req]
     (-> req
         (update-existing :body (fn [s]
-                                 (when s (slurp s))))
+                                 (when (instance? java.io.InputStream s)
+                                   (slurp s))))
         (h))))
 
-(defn make-router [opts]
-  (ring/router
-   routes
-   {:data {:middleware [stringify-body
-                        rrmp/parameters-middleware
-                        rrmm/format-middleware]
-           :muuntaja mc/instance}
-    :reitit.middleware/registry
-    {:github-security [github/validate-security (maybe-generate
-                                                 (get-in opts [:github :secret])
-                                                 github/generate-secret-key)]}}))
+(defn- passthrough-middleware
+  "No-op middleware, just passes the request to the parent handler."
+  [h]
+  (fn [req]
+    (h req)))
+
+(defn make-router
+  ([{:keys [dev-mode] :as opts} routes]
+   (ring/router
+    routes
+    {:data {:middleware [stringify-body
+                         rrmp/parameters-middleware
+                         rrmm/format-middleware]
+            :muuntaja (mc/create
+                       (assoc-in mc/default-options
+                                 ;; Convert keys to kebab-case
+                                 [:formats "application/json" :decoder-opts]
+                                 {:decode-key-fn csk/->kebab-case-keyword}))
+            ::context opts}
+     :reitit.middleware/registry
+     {:github-security (if dev-mode
+                         ;; Disable security in dev mode
+                         [passthrough-middleware]
+                         [github/validate-security (maybe-generate
+                                                    (get-in opts [:github :secret])
+                                                    github/generate-secret-key)])}}))
+  ([opts]
+   (make-router opts routes)))
 
 (defn make-app [opts]
   (ring/ring-handler
@@ -71,20 +86,13 @@
   "Starts http server.  Returns a server object that can be passed to
    `stop-server`."
   [opts]
-  (let [opts (merge {:port 3000} opts)]
-    (log/info "Starting HTTP server at port" (:port opts))
+  (let [http-opts (merge {:port 3000} (:http opts))]
+    (log/info "Starting HTTP server at port" (:port http-opts))
     (http/run-server (make-app opts)
-                     (merge opts default-http-opts))))
+                     (merge http-opts default-http-opts))))
 
 (defn stop-server [s]
   (when s
     (log/info "Shutting down HTTP server...")
     (http/server-stop! s)))
 
-(defn wait-until-stopped
-  "Loops until the web server has stopped."
-  [s]
-  (loop [st (http/server-status s)]
-    (when (not= :stopped st)
-      (Thread/sleep 100)
-      (recur (http/server-status s)))))

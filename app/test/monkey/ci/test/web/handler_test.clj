@@ -4,8 +4,11 @@
              [mac :as mac]]
             [clojure.test :refer [deftest testing is]]
             [clojure.core.async :as ca]
+            [monkey.ci.events :as events]
             [monkey.ci.web.handler :as sut]
+            [monkey.ci.test.helpers :refer [try-take] :as h]
             [org.httpkit.server :as http]
+            [reitit.ring :as ring]
             [ring.mock.request :as mock]))
 
 (deftest make-app
@@ -14,9 +17,13 @@
 
 (def github-secret "github-secret")
 
-(def test-app (sut/make-app
-               {:github
-                {:secret github-secret}}))
+(defn- make-test-app []
+  (sut/make-app
+   {:github
+    {:secret github-secret}
+    :event-bus (events/make-bus)}))
+
+(def test-app (make-test-app))
 
 (deftest start-server
   (with-redefs [http/run-server (fn [h opts]
@@ -29,7 +36,7 @@
                        :port))))
 
     (testing "passes args as opts"
-      (is (= 1234 (-> (sut/start-server {:port 1234})
+      (is (= 1234 (-> (sut/start-server {:http {:port 1234}})
                       :opts
                       :port))))
 
@@ -75,24 +82,27 @@
     (testing "returns 401 if invalid security"
       (is (= 401 (-> (mock/request :post "/webhook/github")
                      (test-app)
-                     :status))))))
+                     :status))))
 
-(defn- try-take [ch timeout timeout-val]
-  (let [t (ca/timeout timeout)
-        [v c] (ca/alts!! [ch t])]
-    (if (= t c) timeout-val v)))
+    (testing "disables security check when in dev mode"
+      (let [dev-app (sut/make-app {:dev-mode true
+                                   :event-bus (events/make-bus)})]
+        (is (= 200 (-> (mock/request :post "/webhook/github")
+                       (dev-app)
+                       :status)))))))
 
-(deftest wait-until-stopped
-  (testing "blocks until the server has stopped"
-    (let [ch (ca/chan)]
-      (try
-        (with-redefs [http/server-status (fn [_]
-                                           (try-take ch 1000 :running))]
-          (let [t (ca/thread (sut/wait-until-stopped :test-server))]
-            (is (= :timeout (try-take t 200 :timeout)))
-            ;; Send stop command to the channel
-            (ca/>!! ch :stopped)
-            ;; Thread should have stopped by now
-            (is (nil? (try-take t 200 :timeout)))))
-        (finally
-          (ca/close! ch))))))
+(deftest routing-middleware
+  (testing "converts json bodies to kebab-case"
+    (let [app (ring/ring-handler
+               (sut/make-router
+                {}
+                ["/test" {:post (fn [{:keys [body-params] :as req}]
+                                  {:status 200
+                                   :body (:test-key body-params)})}]))]
+      (is (= "test value" (-> (mock/request :post "/test")
+                              (mock/body "{\"test_key\":\"test value\"}")
+                              (mock/header :content-type "application/json")
+                              (app)
+                              :body))))))
+
+

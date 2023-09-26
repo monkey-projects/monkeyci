@@ -1,0 +1,59 @@
+(ns monkey.ci.test.config-test
+  (:require [clojure.test :refer [deftest testing is]]
+            [clojure.spec.alpha :as s]
+            [monkey.ci
+             [config :as sut]
+             [spec :as spec]]))
+
+(deftest app-config
+  (testing "provides default values"
+    (is (= 3000 (-> (sut/app-config {} {})
+                    :http
+                    :port))))
+
+  (testing "takes port from args"
+    (is (= 1234 (-> (sut/app-config {} {:port 1234})
+                    :http
+                    :port))))
+
+  (testing "takes github config from env"
+    (is (= "test-secret" (-> {:monkeyci-github-secret "test-secret"}
+                             (sut/app-config {})
+                             :github
+                             :secret))))
+
+  (testing "sets runner type"
+    (is (= :test-type (-> {:monkeyci-runner-type "test-type"}
+                          (sut/app-config {})
+                          :runner
+                          :type))))
+
+  (testing "sets `dev-mode` from args"
+    (is (true? (->> {:dev-mode true}
+                    (sut/app-config {})
+                    :dev-mode))))
+
+  (testing "matches app config spec"
+    (is (true? (s/valid? ::spec/app-config (sut/app-config {} {}))))))
+
+(deftest config->env
+  (testing "empty for empty input"
+    (is (empty? (sut/config->env {}))))
+
+  (testing "prefixes config entries with `monkeyci-`"
+    (is (= {:monkeyci-key "value"}
+           (sut/config->env {:key "value"}))))
+
+  (testing "flattens nested config maps"
+    (is (= {:monkeyci-http-port 8080}
+           (sut/config->env {:http {:port 8080}})))))
+
+(deftest script-config
+  (testing "sets containers type"
+    (is (= :test-type (-> {:monkeyci-containers-type "test-type"}
+                          (sut/script-config {})
+                          :containers
+                          :type))))
+
+  (testing "matches spec"
+    (is (true? (s/valid? ::spec/script-config (sut/script-config {} {}))))))

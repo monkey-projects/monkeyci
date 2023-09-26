@@ -5,98 +5,121 @@
    is enabled, etc..."
   (:gen-class)
   (:require [cli-matic.core :as cli]
+            [clojure.core.async :as ca :refer [<!]]
             [clojure.tools.logging :as log]
+            [com.stuartsierra.component :as sc]
             [config.core :refer [env]]
             [monkey.ci
-             [process :as p]
-             [runners :as r]]
-            [monkey.ci.web.handler :as web]))
+             [components :as co]
+             [commands :as cmd]
+             [config :as config]
+             [events :as e]
+             [runners :as r]
+             [utils :as u]]))
 
-(defn make-config
-  "Creates a build configuration that includes the environment and any args passed in.
-   This is then used to create a build runner."
-  [env args]
-  {:runner {:type (keyword (:monkeyci-runner-type env))}
-   :env env
-   :script args})
+;; The base system components.  Depending on the command that's being
+;; executed, a subsystem will be created and initialized.
+(def base-system
+  (sc/system-map
+   :bus (co/new-bus)
+   :context (-> (co/new-context nil)
+                (sc/using {:event-bus :bus
+                           :config :config}))
+   :http (-> (co/new-http-server)
+             (sc/using [:context :listeners]))
+   :listeners (-> (co/new-listeners)
+                  (sc/using [:bus :context]))))
 
-(defn print-version [& _]
-  (println (p/version)))
+(def always-required-components [:bus :context])
 
-(defn build [env args]
-  (println "Building")
-  (log/debug "Arguments:" args)
-  (let [ctx (make-config env args)
-        runner (r/make-runner ctx)
-        {:keys [result exit] :as output} (runner ctx)]
-    (condp = (or result :unknown)
-      :success (log/info "Success!")
-      :warning (log/warn "Exited with warnings.")
-      :error   (log/error "Failure.")
-      :unknown (log/warn "Unknown result."))
-    ;; Return exit code, this will be the process exit code as well
-    exit))
+(defn system-invoker
+  "The event invoker starts a subsystem according to the command requirements,
+   and posts the `command/invoked` event.  This event should be picked up by a
+   handler in the system.  When the command is complete, it should post a
+   `command/completed` event for the same command.  By default it uses the base
+   system, but you can specify your own for testing purposes."
+  ([{:keys [command requires]} env base-system]
+   (fn [args]
+     (log/debug "Invoking command with arguments:" args)
+     (let [config (config/app-config env args)
+           {:keys [bus] :as sys} (-> base-system
+                                     (assoc :config config)
+                                     (sc/subsystem (concat requires always-required-components))
+                                     (sc/start-system))
+           ctx (:context sys)]
+       ;; Register shutdown hook to stop the system
+       (u/add-shutdown-hook! #(sc/stop-system sys))
+       ;; Run the command with the context.  If this returns a channel, then
+       ;; cli-matic will wait until it closes.  If this returns a number, will use
+       ;; it as the process exit code.
+       (command (assoc ctx :system sys :args args)))))
+  ([cmd env]
+   (system-invoker cmd env base-system)))
 
-(defn server [_ args]
-  (println "Starting HTTP server")
-  (-> (web/start-server args)
-      (web/wait-until-stopped)))
+(def build-cmd
+  {:command "build"
+   :description "Runs build locally"
+   :opts [{:as "Script location"
+           :option "dir"
+           :short "d"
+           :type :string
+           :default ".monkeyci/"}
+          {:as "Pipeline name"
+           :option "pipeline"
+           :short "p"
+           :type :string}
+          {:as "Git repository url"
+           :option "git-url"
+           :short "u"
+           :type :string}
+          {:as "Repository branch"
+           :option "branch"
+           :short "b"
+           :type :string}
+          {:as "Commit id"
+           :option "commit-id"
+           :type :string}]
+   :runs {:command cmd/build}})
 
-(defn default-invoker
-  "Wrap the command in a fn to enable better testing"
-  [cmd env]
-  (partial cmd env))
+(def server-cmd
+  {:command "server"
+   :description "Start MonkeyCI server"
+   :opts [{:as "Listening port"
+           :option "port"
+           :short "p"
+           :type :int
+           :default 3000
+           :env "PORT"}]
+   :runs {:command cmd/http-server
+          :requires [:http]}})
 
-(defn make-cli-config [{:keys [env cmd-invoker] :or {cmd-invoker default-invoker}}]
+(def base-config
+  {:name "monkey-ci"
+   :description "MonkeyCI: Powerful build pipeline runner"
+   :version (config/version)
+   :opts [{:as "Working directory"
+           :option "workdir"
+           :short "w"
+           :type :string
+           :default "."}
+          {:as "Development mode"
+           :option "dev-mode"
+           :type :with-flag
+           :default false}]
+   :subcommands [build-cmd
+                 server-cmd]})
+
+(defn make-cli-config [{:keys [cmd-invoker env] :or {cmd-invoker system-invoker}}]
   (letfn [(invoker [cmd]
             (cmd-invoker cmd env))]
-    {:name "monkey-ci"
-     :description "MonkeyCI: Powerful build script runner"
-     :version (p/version)
-     :opts [{:as "Working directory"
-             :option "workdir"
-             :short "w"
-             :type :string
-             :default "."}
-            {:as "Development mode"
-             :option "dev-mode"
-             :type :with-flag
-             :default false}]
-     :subcommands [{:command "version"
-                    :description "Prints current version"
-                    :runs (invoker print-version)}
-                   {:command "build"
-                    :description "Runs build locally"
-                    :opts [{:as "Script location"
-                            :option "dir"
-                            :short "d"
-                            :type :string
-                            :default ".monkeyci/"}
-                           {:as "Pipeline name"
-                            :option "pipeline"
-                            :short "p"
-                            :type :string}]
-                    :runs (invoker build)}
-                   {:command "server"
-                    :description "Start MonkeyCI server"
-                    :opts [{:as "Listening port"
-                            :option "port"
-                            :short "p"
-                            :type :int
-                            :default 3000}]
-                    :runs (invoker server)}]}))
-
-(defn run-cli
-  ([config args]
-   (cli/run-cmd args config))
-  ([args]
-   (run-cli (make-cli-config {:env env}) args)))
+    ;; Wrap the run functions in the invoker
+    (update base-config :subcommands (partial mapv (fn [c] (update c :runs invoker))))))
 
 (defn -main
   "Main entry point for the application."
   [& args]
   (try
-    (run-cli args)
+    (cli/run-cmd args (make-cli-config {:env env}))
     (finally
       ;; Shutdown the agents otherwise the app will block for a while here
       (shutdown-agents))))
