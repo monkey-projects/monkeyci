@@ -4,7 +4,7 @@
              [codecs :as codecs]
              [mac :as mac]
              [nonce :as nonce]]
-            [clojure.core.async :refer [go <!]]
+            [clojure.core.async :refer [go <!! <!]]
             [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [monkey.ci.utils :as u]
@@ -45,11 +45,13 @@
   [req]
   (log/debug "Body params:" (prn-str (:body-params req)))
   (log/debug "Head commit:" (get-in req [:body-params :head-commit]))
-  (go
-    {:status (if (<! (c/post-event req {:type :webhook/github
-                                        :payload (:body-params req)}))
-               200
-               500)}))
+  ;; Httpkit can't handle channels so read it here
+  (<!!
+   (go
+     {:status (if (<! (c/post-event req {:type :webhook/github
+                                         :payload (:body-params req)}))
+                200
+                500)})))
 
 (defn build
   "Handles webhook build event by preparing the config to actually

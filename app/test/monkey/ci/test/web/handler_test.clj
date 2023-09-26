@@ -77,7 +77,6 @@
                        (mock/body payload)
                        (mock/header :x-hub-signature-256 (str "sha256=" signature))
                        (test-app)
-                       (h/try-take 500 :timeout)
                        :status)))))
 
     (testing "returns 401 if invalid security"
@@ -90,7 +89,6 @@
                                    :event-bus (events/make-bus)})]
         (is (= 200 (-> (mock/request :post "/webhook/github")
                        (dev-app)
-                       (h/try-take 500 :timeout)
                        :status)))))))
 
 (deftest routing-middleware

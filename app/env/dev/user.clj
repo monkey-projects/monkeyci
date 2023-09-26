@@ -1,5 +1,6 @@
 (ns user
-  (:require [monkey.ci.web.handler :as wh]
+  (:require [com.stuartsierra.component :as sc]
+            [monkey.ci.core :as c]
             [buddy.core
              [codecs :as codecs]
              [mac :as mac]]))
@@ -9,14 +10,18 @@
 (defn stop-server []
   (swap! server (fn [s]
                   (when s
-                    (wh/stop-server s))
+                    (sc/stop-system s))
                   nil)))
 
 (def secret "test-secret")
 
 (defn start-server []
   (stop-server)
-  (reset! server (wh/start-server {:github {:secret secret}})))
+  (reset! server (-> c/base-system
+                     (assoc :config {:dev-mode true
+                                     :github {:secret secret}})
+                     (sc/subsystem [:http])
+                     (sc/start-system))))
 
 (defn generate-signature [payload]
   (-> payload
