@@ -41,7 +41,6 @@
   ([{:keys [command requires]} env base-system]
    (fn [args]
      (log/debug "Invoking command with arguments:" args)
-     ;; This is probably over-engineered, but let's see where it leads us...
      (let [config (config/app-config env args)
            {:keys [bus] :as sys} (-> base-system
                                      (assoc :config config)
@@ -120,7 +119,7 @@
   "Main entry point for the application."
   [& args]
   (try
-    (cli/run-cmd args (make-cli-config env))
+    (cli/run-cmd args (make-cli-config {:env env}))
     (finally
       ;; Shutdown the agents otherwise the app will block for a while here
       (shutdown-agents))))

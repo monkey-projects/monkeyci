@@ -55,7 +55,7 @@
                     c
                     [:github :runner :containers]))]
     (->> env
-         (filter-and-strip-keys :monkeyci)
+         (filter-and-strip-keys env-prefix)
          (group-all-keys))))
 
 (def default-app-config
