@@ -43,8 +43,7 @@
   "Receives an incoming webhook from Github.  This actually just posts
    the event on the internal bus and returns a 200 OK response."
   [req]
-  (log/debug "Body params:" (prn-str (:body-params req)))
-  (log/debug "Head commit:" (get-in req [:body-params :head-commit]))
+  (log/trace "Got incoming webhook with body:" (prn-str (:body-params req)))
   ;; Httpkit can't handle channels so read it here
   (<!!
    (go
@@ -61,12 +60,14 @@
   (let [p (get-in ctx [:event :payload])
         {:keys [master-branch clone-url]} (:repository p)
         build-id (u/new-build-id)
+        ;; Use combination of work dir and build id for checkout
+        workdir (.getCanonicalPath (io/file (get-in ctx [:args :workdir]) build-id))
         conf {:git {:url clone-url
                     :branch master-branch
                     :id (get-in p [:head-commit :id])
-                    ;; Use combination of work dir and build id for checkout
-                    :dir (.getCanonicalPath (io/file (get-in ctx [:args :workdir]) build-id))}
+                    :dir workdir}
               :build-id build-id}]
+    (log/debug "Starting build with config:" conf)
     (-> ctx
         (assoc :build conf)
         (runner))))
