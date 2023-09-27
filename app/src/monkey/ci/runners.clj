@@ -39,7 +39,7 @@
     :unknown (log/warn "Unknown result."))
   (let [wd (:work-dir build)
         app-wd (u/abs-path (get-in ctx [:args :workdir]))]
-    (when (and wd (not= wd app-wd))
+    (when (and wd (not= wd app-wd) (not= wd (u/cwd)))
       (log/debug "Cleaning up working dir" wd)
       (u/delete-dir wd)))
   exit)

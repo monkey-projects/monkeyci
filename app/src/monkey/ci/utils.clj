@@ -17,7 +17,9 @@
        (str (io/file a b)))
      b))
   ([p]
-   (.getCanonicalPath (io/file p))))
+   (some-> p
+           (io/file)
+           (.getCanonicalPath))))
 
 (defn add-shutdown-hook!
   "Executes `h` when the JVM shuts down.  Returns the thread that will
