@@ -73,6 +73,7 @@
   (-> default-app-config
       (deep-merge (config-from-env env))
       (merge (select-keys args [:dev-mode]))
+      (assoc :args args)
       (update-in [:http :port] #(or (:port args) %))
       (update-in [:runner :type] keyword)))
 
