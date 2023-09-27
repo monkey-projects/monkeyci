@@ -73,8 +73,8 @@
                                                :webhook/github
                                                (fn [evt]
                                                  (ca/thread
-                                                   (wg/build (assoc context :event evt)))))]))
-
+                                                   (wg/build (e/with-ctx context evt)))))]))
+  
   (stop [this]
     (call-and-dissoc
      this :handlers (comp doall

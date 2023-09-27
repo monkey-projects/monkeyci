@@ -149,9 +149,33 @@
   (testing "returns exit code for each type"
     (->> [:success :warning :error nil]
          (map (fn [t]
-                (is (number? (sut/build-completed {:result t
-                                                   :exit 0})))))
-         (doall))))
+                (is (number? (sut/build-completed {:event {:result t
+                                                           :exit 0}})))))
+         (doall)))
+
+  (testing "deletes working dir if different from app working dir"
+    (h/with-tmp-dir dir
+      (let [sub (doto (io/file dir "work")
+                  (.mkdirs))]
+        (is (true? (.exists sub)))
+        (is (some? (sut/build-completed
+                    {:event
+                     {:exit 0}
+                     :build {:work-dir (.getCanonicalPath sub)}})))
+        (is (false? (.exists sub))))))
+
+  (testing "does not delete working dir if same as app work dir"
+    (h/with-tmp-dir dir
+      (let [sub (doto (io/file dir "work")
+                  (.mkdirs))
+            wd (.getCanonicalPath sub)]
+        (is (true? (.exists sub)))
+        (is (some? (sut/build-completed
+                    {:event
+                     {:exit 0}
+                     :build {:work-dir wd}
+                     :args {:workdir wd}})))
+        (is (true? (.exists sub)))))))
 
 (deftest make-runner
   (testing "provides child type"

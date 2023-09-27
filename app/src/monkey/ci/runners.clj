@@ -30,14 +30,18 @@
   ;; Nonzero exit code
   1)
 
-(defn build-completed [{:keys [result exit] :as evt}]
+(defn build-completed [{{:keys [result exit] :as evt} :event :keys [build] :as ctx}]
   ;; Do some logging depending on the result
   (condp = (or result :unknown)
     :success (log/info "Success!")
     :warning (log/warn "Exited with warnings:" (:message evt))
     :error   (log/error "Failure.")
     :unknown (log/warn "Unknown result."))
-  ;; TODO Maybe clean up any checked out files
+  (let [wd (:work-dir build)
+        app-wd (u/abs-path (get-in ctx [:args :workdir]))]
+    (when (and wd (not= wd app-wd))
+      (log/debug "Cleaning up working dir" wd)
+      (u/delete-dir wd)))
   exit)
 
 (defn build-local
@@ -53,7 +57,8 @@
       (do
         ;; Start child process and wait for it to complete
         (p/execute! ctx)
-        (e/wait-for event-bus :build/completed (map build-completed)))
+        (e/wait-for event-bus :build/completed (map (comp build-completed
+                                                          (partial e/with-ctx ctx)))))
       (script-not-found ctx))))
 
 (defn- download-git

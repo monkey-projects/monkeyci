@@ -10,12 +10,14 @@
 (defn abs-path
   "If `b` is a relative path, will combine it with `a`, otherwise
    will just return `b`."
-  [a b]
-  (if a
-    (if (.isAbsolute (io/file b))
-      b
-      (str (io/file a b)))
-    b))
+  ([a b]
+   (if a
+     (if (.isAbsolute (io/file b))
+       b
+       (str (io/file a b)))
+     b))
+  ([p]
+   (.getCanonicalPath (io/file p))))
 
 (defn add-shutdown-hook!
   "Executes `h` when the JVM shuts down.  Returns the thread that will

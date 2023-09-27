@@ -124,3 +124,9 @@
   (let [r (ca/promise-chan tx)]
     (ca/sub (:pub bus) type r)
     r))
+
+(defn with-ctx
+  "Creates a new event that adds the context, and puts the event in the `:event` key.
+   Useful for enrichting events."
+  [ctx evt]
+  (assoc ctx :event evt))
