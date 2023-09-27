@@ -5,7 +5,8 @@
              [events :as e]
              [process :as p]
              [runners :as sut]
-             [spec :as spec]]
+             [spec :as spec]
+             [utils :as u]]
             [monkey.ci.test.helpers :as h]))
 
 (defn- build-and-wait [ctx]
@@ -153,7 +154,7 @@
                                                            :exit 0}})))))
          (doall)))
 
-  (testing "deletes working dir if different from app working dir"
+  (testing "deletes git dir if different from app working dir"
     (h/with-tmp-dir dir
       (let [sub (doto (io/file dir "work")
                   (.mkdirs))]
@@ -161,7 +162,7 @@
         (is (some? (sut/build-completed
                     {:event
                      {:exit 0}
-                     :build {:work-dir (.getCanonicalPath sub)}})))
+                     :build {:git {:dir (.getCanonicalPath sub)}}})))
         (is (false? (.exists sub))))))
 
   (testing "does not delete working dir if same as app work dir"
@@ -173,8 +174,7 @@
         (is (some? (sut/build-completed
                     {:event
                      {:exit 0}
-                     :build {:work-dir wd}
-                     :args {:workdir wd}})))
+                     :build {:git {:dir (u/cwd)}}})))
         (is (true? (.exists sub)))))))
 
 (deftest make-runner
