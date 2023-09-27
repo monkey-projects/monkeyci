@@ -3,6 +3,7 @@
 (require '[monkey.ci.build.shell :as shell])
 (require '[clojure.java.io :as io])
 (require '[clojure.tools.logging :refer [info] :rename {info log}])
+(require '[config.core :refer [env]])
 
 (defn clj [& args]
   (apply shell/bash "clojure" args))
@@ -43,18 +44,23 @@
 (def docker-image
   (shell/bash "docker" "build" "-t" "monkeyci" "-f" "docker/Dockerfile" "."))
 
-;; Return the pipelines
-[(core/pipeline
-  {:name "test"
-   :steps [test-lib
-           #_{:container/image "clojure:temurin-20-tools-deps-alpine"
-            :script ["clojure -X:test:junit"]
-            :action (constantly "unused")
-            :work-dir "lib"}
-           test-app]})
+(def test-pipeline
+  (core/pipeline
+   {:name "test"
+    :steps [test-lib
+            #_{:container/image "clojure:temurin-20-tools-deps-alpine"
+             :script ["clojure -X:test:junit"]
+             :action (constantly "unused")
+             :work-dir "lib"}
+            test-app]}))
 
- (core/pipeline
-  {:name "install"
-   :steps [app-uberjar
-           install-app
-           docker-image]})]
+(def install-pipeline
+  (core/pipeline
+   {:name "install"
+    :steps [app-uberjar
+            install-app
+            docker-image]}))
+
+;; Return the pipelines
+[test-pipeline
+ install-pipeline]

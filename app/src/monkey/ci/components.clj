@@ -66,14 +66,29 @@
 (defn new-context [cmd]
   (map->Context {:command cmd}))
 
+(defn ctx-async
+  "Creates an event handler fn that invokes `f` in a separate thread with
+   the context added to the event."
+  [ctx f]
+  (fn [evt]
+    (ca/thread
+      (f (e/with-ctx ctx evt)))))
+
+(defn logger [evt]
+  (log/info (:message evt)))
+
 (defrecord Listeners [bus context]
   c/Lifecycle
   (start [this]
-    (assoc this :handlers [(e/register-handler bus
-                                               :webhook/github
-                                               (fn [evt]
-                                                 (ca/thread
-                                                   (wg/build (e/with-ctx context evt)))))]))
+    (->> {:webhook/github (ctx-async context wg/build)
+          :script/start logger
+          :script/end logger
+          :pipeline/start logger
+          :pipeline/end logger
+          :step/start logger
+          :step/end logger}
+         (map (partial apply e/register-handler bus))
+         (assoc this :handlers)))
   
   (stop [this]
     (call-and-dissoc
