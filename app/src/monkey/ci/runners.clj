@@ -46,7 +46,8 @@
    complete event."
   [{:keys [args event-bus] :as ctx}]
   (let [{:keys [script-dir work-dir] :as build} (-> (get-absolute-dirs args)
-                                                    (merge (select-keys args [:pipeline])))
+                                                    (merge (select-keys args [:pipeline]))
+                                                    (merge (:build ctx)))
         ctx (update ctx :build merge build)]
     (if (some-> (io/file script-dir) (.exists))
       (do
@@ -60,7 +61,7 @@
   [ctx]
   (let [git (get-in ctx [:git :fn])
         conf (-> (get-in ctx [:build :git])
-                 (assoc :dir (get-in ctx [:args :workdir])))
+                 (update :dir #(or % (get-in ctx [:args :workdir]))))
         sd (get-in ctx [:args :dir])
         add-script-dir (fn [{{:keys [work-dir]} :build :as ctx}]
                          (assoc-in ctx [:build :script-dir] (calc-script-dir work-dir sd)))]

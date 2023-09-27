@@ -42,7 +42,7 @@
                                      :pipeline))))
 
         (testing "with workdir"
-          (testing "passes work dir to process"
+          (testing "passes app work dir to process"
             (h/with-tmp-dir base
               (is (true? (.mkdir (io/file base "local"))))
               (is (= base (-> {:event-bus bus
@@ -51,6 +51,19 @@
                               (build-and-wait)
                               :build
                               :work-dir)))))
+
+          (testing "uses build work dir over app work dir"
+            (h/with-tmp-dir base
+              (let [local-dir (.getCanonicalPath (io/file base "local"))]
+                (is (true? (.mkdir (io/file local-dir))))
+                (is (= local-dir
+                       (-> {:event-bus bus
+                            :args {:dir "local"
+                                   :workdir base}
+                            :build {:work-dir local-dir}}
+                           (build-and-wait)
+                           :build
+                           :work-dir))))))
           
           (testing "combine relative script dir with workdir"
             (h/with-tmp-dir base
@@ -95,12 +108,23 @@
                       :work-dir)))))
 
   (testing "passes work dir as git checkout dir"
-    (is (= "test-work-dir" (-> {:args {:workdir "test-work-dir"}
-                                :git {:fn :dir}
-                                :build {:git {:url "http:/test.git"}}}
-                               (sut/download-src)
-                               :build
-                               :work-dir))))
+    (is (= "test-work-dir"
+           (-> {:args {:workdir "test-work-dir"}
+                :git {:fn :dir}
+                :build {:git {:url "http:/test.git"}}}
+               (sut/download-src)
+               :build
+               :work-dir))))
+
+  (testing "uses dir from build config if specified"
+    (is (= "git-dir"
+           (-> {:args {:workdir "test-work-dir"}
+                :git {:fn :dir}
+                :build {:git {:url "http:/test.git"
+                              :dir "git-dir"}}}
+               (sut/download-src)
+               :build
+               :work-dir))))
 
   (testing "calculates script dir"
     (is (re-matches #".*test/dir/test-script$"
