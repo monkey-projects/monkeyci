@@ -88,6 +88,7 @@
           :step/start logger
           :step/end logger}
          (map (partial apply e/register-handler bus))
+         (doall)
          (assoc this :handlers)))
   
   (stop [this]

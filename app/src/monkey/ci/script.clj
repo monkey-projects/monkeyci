@@ -159,7 +159,7 @@
   (log/debug "Sending events to socket at" p)
   (let [addr (uds/make-address p)
         conn (uds/connect-socket addr)
-        {:keys [channel] :as bus} (e/make-bus)]
+        {:keys [channel] :as bus} {:channel (ca/chan)}]
     (sa/write-from-channel channel conn)
     {:addr addr
      :socket conn
@@ -167,7 +167,7 @@
 
 (defn- make-dummy-bus []
   (log/debug "No event socket configured, events will not be passed to controlling process")
-  {:bus (e/make-bus (ca/chan (ca/sliding-buffer 1)))})
+  {:bus {:channel (ca/chan (ca/sliding-buffer 1))}})
 
 (defn- setup-event-bus
   "Configures the event bus for the event socket.  If no socket is specified,
