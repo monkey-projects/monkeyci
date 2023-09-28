@@ -80,9 +80,7 @@
   (let [path (utils/tmp-file (str "events-" build-id ".sock"))
         listener (uds/listen-socket (uds/make-address path))
         sock (ca/promise-chan)
-        inter-ch (ca/chan 10 (map (fn [evt]
-                                    (log/debug "Received event from socket:" evt)
-                                    evt)))]
+        inter-ch (ca/chan)]
     ;; Set up a pipeline to avoid the bus closing
     (ca/pipe inter-ch channel false)
     (go
@@ -93,7 +91,7 @@
          s inter-ch
          (fn [ex]
            (log/warn "Error while receiving event from socket" ex)
-           true))))
+           false))))
     ;; Return socket path and listener so it can be closed later
     {:socket-path path
      :socket listener
