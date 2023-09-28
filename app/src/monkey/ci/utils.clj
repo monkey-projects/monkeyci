@@ -46,3 +46,13 @@
 (defn new-build-id []
   ;; TODO Generate a more useful build id
   (format "build-%d" (System/currentTimeMillis)))
+
+(def step-work-dir
+  "Given a context, determines the step working directory.  This is either the
+   work dir as configured on the step, or the context work dir, or the process dir."
+  (comp
+   (memfn getCanonicalPath)
+   io/file
+   (some-fn (comp :work-dir :step)
+            :work-dir
+            (constantly (cwd)))))

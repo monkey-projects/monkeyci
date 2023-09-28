@@ -184,43 +184,21 @@
          (parse-log-stream)
          (map (comp (memfn trim) :message)))))
 
-(defn ctx->container-config
-  "Extracts all keys from the context step that have the `container` namespace,
-   and drops that namespace."
-  [ctx]
-  (->> ctx
-       :step
-       (mc/filter-keys (comp (partial = "container") namespace))
-       (mc/map-keys (comp keyword name))))
-
-(defn make-docker-runner [config]
-  (let [client (make-client :containers (get-in config [:env :docker-connection]))]
-    (fn [ctx]
-      (let [cn (str "build-" (random-uuid))
-            conf (ctx->container-config ctx)
-            cont (create-container client cn conf)]
-        (log/debug "Container configuration:" conf)
-        (log/info "Starting container" cn)
-        (start-container client cn)
-        cont))))
-
-(defmethod mcc/run-container :docker [ctx]
-  (let [cn (str "build-" (random-uuid))
+(defmethod mcc/run-container :docker [{:keys [build-id] :as ctx}]
+  (let [cn build-id
         job-id (get ctx :job-id (str (random-uuid)))
         conn (get-in ctx [:env :docker-connection])
         client (make-client :containers conn)
         output-dir (doto (io/file "tmp" job-id)
                      (.mkdirs))
-        work-dir ((some-fn (comp :work-dir :step)
-                           :work-dir
-                           (constantly (u/cwd))) ctx)
+        work-dir (u/step-work-dir ctx)
         remote-wd "/home/build"
         internal-log-dir "/var/log/monkeyci"
         ->abs-path (fn [s]
                      (str (.getAbsolutePath (io/file s))))
         log-path (fn [s]
                    (->abs-path (io/file internal-log-dir s)))
-        {:keys [image] :as conf} (merge (ctx->container-config ctx)
+        {:keys [image] :as conf} (merge (mcc/ctx->container-config ctx)
                                         {:cmd ["/bin/sh"]
                                          :open-stdin true
                                          :attach-stdin false
@@ -285,7 +263,7 @@
                                   idx 0
                                   results []]
                              (if (empty? s)
-                               results
+                               results ; Done
                                (let [{:keys [exit] :as r} (execute-step pw in idx (first s))
                                      acc (conj results r)]
                                  (if (zero? exit)

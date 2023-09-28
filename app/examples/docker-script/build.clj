@@ -6,9 +6,9 @@
 ;; Should run using a step runner that supports docker images
 (core/pipeline
  {:name "test pipeline"
-  ;; Run this pipeline in containers, with default image
-  :runner (container/runner {:image "debian:latest"})
-  :steps [(-> (shell/bash "echo" "I'm running from Debian")
-              (container/image "debian"))
-          (-> (shell/bash "echo" "And I'm running from Alpine")
-              (container/image "alpine"))]})
+  :steps [{:container/image "debian:latest"
+           :script ["echo" "I'm running from Debian"]
+           :action (constantly nil)}
+          {:container/image "alpine:latest"
+           :script ["echo" "And I'm running from Alpine"]
+           :action (constantly nil)}]})

@@ -38,7 +38,7 @@
           (is (= "test-pipeline" (-> {:event-bus bus
                                       :args {:dir "examples/basic-clj"
                                              :pipeline "test-pipeline"}}
-                                     build-and-wait
+                                     (build-and-wait)
                                      :build
                                      :pipeline))))
 
