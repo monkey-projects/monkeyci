@@ -18,8 +18,9 @@
          :pipeline p))
 
 (defn- post-event [ctx evt]
-  (some-> (get-in ctx [:events :bus]) 
-          (e/post-event (assoc evt :src :script))))
+  (when-not (some-> (get-in ctx [:events :bus]) 
+                    (e/post-event (assoc evt :src :script)))
+    (log/warn "Unable to post event")))
 
 (defn- wrap-events
   "Posts event before and after invoking `f`"
@@ -140,8 +141,8 @@
                       (doall))]
       {:status (if (every? bc/success? result) :success :failure)})))
 
-(defn- load-pipelines [dir]
-  (let [tmp-ns (symbol (str "build-" (random-uuid)))]
+(defn- load-pipelines [dir build-id]
+  (let [tmp-ns (symbol (or build-id (str "build-" (random-uuid))))]
     ;; FIXME I don't think this is a very robust approach, find a better way.
     (in-ns tmp-ns)
     (clojure.core/use 'clojure.core)
@@ -191,11 +192,11 @@
 (defn exec-script!
   "Loads a script from a directory and executes it.  The script is
    executed in this same process (but in a randomly generated namespace)."
-  [{:keys [script-dir] :as ctx}]
+  [{:keys [script-dir build-id] :as ctx}]
   (with-event-bus ctx
     (fn [ctx]
-      (log/debug "Executing script at:" script-dir)
-      (let [p (load-pipelines script-dir)]
+      (log/debug "Executing script for build" build-id "at:" script-dir)
+      (let [p (load-pipelines script-dir build-id)]
         (wrap-events
          ctx
          {:type :script/start

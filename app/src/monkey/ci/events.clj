@@ -115,7 +115,8 @@
   "Asynchronously posts the event to the bus.  Returns a channel that will hold
    `true` once the event has been posted."
   [bus evt]
-  (ca/put! (:channel bus) evt))
+  (log/trace "Posting event:" evt)
+  (ca/put! (:channel bus) (assoc evt :time (System/currentTimeMillis))))
 
 (defn wait-for
   "Returns a channel that will hold the first match for the given

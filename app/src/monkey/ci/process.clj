@@ -2,7 +2,7 @@
   "Process execution functions.  Executes build scripts in a separate process,
    using clojure cli tools."
   (:require [babashka.process :as bp]
-            [clojure.core.async :as ca]
+            [clojure.core.async :as ca :refer [go <!]]
             [clojure.java.io :as io]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
@@ -46,6 +46,8 @@
    to the clojure process when running the script.  Any existing `deps.edn`
    should be used as well."
   [{:keys [script-dir] {:keys [dev-mode]} :args}]
+  (when dev-mode
+    (log/debug "Running in development mode, using local src instead of libs"))
   (pr-str {:paths [script-dir]
            :aliases
            {:monkeyci/build
@@ -77,7 +79,22 @@
   [{:keys [channel] :as bus} build-id]
   (let [path (utils/tmp-file (str "events-" build-id ".sock"))
         listener (uds/listen-socket (uds/make-address path))
-        inter-ch (ca/chan)]
+        sock (ca/promise-chan)
+        inter-ch (ca/chan 10 (map (fn [evt]
+                                    (log/debug "Received event from socket:" evt)
+                                    evt)))]
+    ;; Set up a pipeline to avoid the bus closing
+    (ca/pipe inter-ch channel false)
+    (go
+      ;; Wait for the socket to be connected, then send messages from the socket to the channel
+      (let [s (<! sock)]
+        (log/debug "Socket connected, sending events to it from the internal bus")
+        (sa/read-onto-channel
+         s inter-ch
+         (fn [ex]
+           (log/warn "Error while receiving event from socket" ex)
+           true))))
+    ;; Return socket path and listener so it can be closed later
     {:socket-path path
      :socket listener
      ;; Accept connection in separate thread.  We can change this later to a
@@ -85,12 +102,9 @@
      :accept-thread (doto (Thread.
                            (fn []
                              (log/debug "Waiting for child process to connect")
-                             (try 
-                               (let [sock (uds/accept listener)]
-                                 (log/debug "Incoming connection from child process accepted")
-                                 ;; Set up a pipeline to avoid the bus closing
-                                 (ca/pipe inter-ch channel false)
-                                 (sa/read-onto-channel sock inter-ch))
+                             (try
+                               (ca/>!! sock (uds/accept listener))
+                               (log/debug "Incoming connection from child process accepted")
                                (catch Exception ex
                                  (log/warn "No incoming connection from child could be accepted" ex))))
                            (str build-id "-connector"))
@@ -114,10 +128,10 @@
                 "-X:monkeyci/build"]
                (concat (build-args ctx))
                (vec))
-      :extra-env (-> (config/config->env
-                      {:event
-                       {:socket socket-path}})
-                     (merge (select-keys [:build-id] ctx)))
+      :extra-env (-> {:event
+                       {:socket socket-path}}
+                     (assoc :build-id build-id)
+                     (config/config->env))
       :exit-fn (fn [{:keys [process] :as p}]
                  (let [exit (or (some-> process (.exitValue)) 0)]
                    (log/debug "Script process exited with code" exit ", cleaning up")

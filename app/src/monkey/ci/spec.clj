@@ -8,8 +8,10 @@
 
 (s/def ::type keyword?)
 (s/def ::message string?)
-(s/def ::event (s/keys :req-un [::type]
-                       :opt-un [::message]))
+(s/def ::time int?)
+(s/def :evt/src keyword?)
+(s/def ::event (s/keys :req-un [::type ::time]
+                       :opt-un [::message :evt/src]))
 (s/def ::channel channel?)
 
 (s/def ::event-bus (s/keys :req-un [::channel ::pub]))
