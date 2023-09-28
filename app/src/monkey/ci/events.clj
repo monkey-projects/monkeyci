@@ -115,7 +115,8 @@
   "Asynchronously posts the event to the bus.  Returns a channel that will hold
    `true` once the event has been posted."
   [bus evt]
-  (ca/put! (:channel bus) evt))
+  (log/trace "Posting event:" evt)
+  (ca/put! (:channel bus) (assoc evt :time (System/currentTimeMillis))))
 
 (defn wait-for
   "Returns a channel that will hold the first match for the given
@@ -124,3 +125,9 @@
   (let [r (ca/promise-chan tx)]
     (ca/sub (:pub bus) type r)
     r))
+
+(defn with-ctx
+  "Creates a new event that adds the context, and puts the event in the `:event` key.
+   Useful for enrichting events."
+  [ctx evt]
+  (assoc ctx :event evt))

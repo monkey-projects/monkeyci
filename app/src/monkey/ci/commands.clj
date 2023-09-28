@@ -14,7 +14,6 @@
   "Performs a build, using the runner from the context"
   [ctx]
   (let [r (:runner ctx)]
-    (log/debug "Running build with runner" r)
     (-> ctx 
         (assoc-in [:build :build-id] (u/new-build-id))
         (maybe-set-git-opts)

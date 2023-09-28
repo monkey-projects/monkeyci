@@ -52,7 +52,7 @@
        ;; Run the command with the context.  If this returns a channel, then
        ;; cli-matic will wait until it closes.  If this returns a number, will use
        ;; it as the process exit code.
-       (command (assoc ctx :system sys :args args)))))
+       (command (assoc ctx :system sys)))))
   ([cmd env]
    (system-invoker cmd env base-system)))
 

@@ -5,8 +5,9 @@
             [monkey.ci.build.core :as bc]
             [monkey.ci
              [containers :as c]
-             [docker :as d]
+             [docker]
              [events :as e]
+             [podman]
              [utils :as u]]
             [monkey.socket-async
              [core :as sa]
@@ -18,8 +19,9 @@
          :pipeline p))
 
 (defn- post-event [ctx evt]
-  (some-> (get-in ctx [:events :bus]) 
-          (e/post-event (assoc evt :src :script))))
+  (when-not (some-> (get-in ctx [:events :bus]) 
+                    (e/post-event (assoc evt :src :script)))
+    (log/warn "Unable to post event")))
 
 (defn- wrap-events
   "Posts event before and after invoking `f`"
@@ -74,6 +76,11 @@
                    work-dir)))
     ctx))
 
+(defn ->map [s]
+  (if (map? s)
+    s
+    {:action s}))
+
 (defn- run-step*
   "Runs a single step using the configured runner"
   [{{:keys [name]} :step :as ctx}]
@@ -98,33 +105,40 @@
 (defn- run-steps!
   "Runs all steps in sequence, stopping at the first failure.
    Returns the execution context."
-  [initial-ctx {:keys [name steps] :as p}]
+  [initial-ctx idx {:keys [name steps] :as p}]
   (wrap-events
    initial-ctx
    {:type :pipeline/start
     :pipeline name
     :message "Starting pipeline"}
-   {:type :pipeline/end
-    :pipeline name
-    :message "Completed pipeline"}
+   (fn [r]
+     {:type :pipeline/end
+      :pipeline name
+      :message "Completed pipeline"
+      :status (:status r)})
    (fn []
      (log/info "Running pipeline:" name)
      (log/debug "Running pipeline steps:" p)
-     (reduce (fn [ctx s]
-               (let [r (-> ctx
-                           (assoc :step s)
-                           (run-step*))]
-                 (log/debug "Result:" r)
-                 (when-let [o (:output r)]
-                   (log/debug "Output:" o))
-                 (when-let [o (:error r)]
-                   (log/warn "Error output:" o))
-                 (cond-> ctx
-                   true (assoc :status (:status r)
-                               :last-result r)
-                   (bc/failed? r) (reduced))))
-             (merge (initial-context p) initial-ctx)
-             steps))))
+     (->> steps
+          (map ->map)
+          ;; Add index to each step
+          (map (fn [i s]
+                 (assoc s :index i))
+               (range))     
+          (reduce (fn [ctx s]
+                    (let [r (-> ctx
+                                (assoc :step s :pipeline (assoc p :index idx))
+                                (run-step*))]
+                      (log/debug "Result:" r)
+                      (when-let [o (:output r)]
+                        (log/debug "Output:" o))
+                      (when-let [o (:error r)]
+                        (log/warn "Error output:" o))
+                      (cond-> ctx
+                        true (assoc :status (:status r)
+                                    :last-result r)
+                        (bc/failed? r) (reduced))))
+                  (merge (initial-context p) initial-ctx))))))
 
 (defn run-pipelines
   "Executes the pipelines by running all steps sequentially.  Currently,
@@ -136,12 +150,12 @@
             pipeline (filter (comp (partial = pipeline) :name)))]
     (log/debug "Found" (count p) "pipelines")
     (let [result (->> p
-                      (map (partial run-steps! ctx))
+                      (map-indexed (partial run-steps! ctx))
                       (doall))]
       {:status (if (every? bc/success? result) :success :failure)})))
 
-(defn- load-pipelines [dir]
-  (let [tmp-ns (symbol (str "build-" (random-uuid)))]
+(defn- load-pipelines [dir build-id]
+  (let [tmp-ns (symbol (or build-id (str "build-" (random-uuid))))]
     ;; FIXME I don't think this is a very robust approach, find a better way.
     (in-ns tmp-ns)
     (clojure.core/use 'clojure.core)
@@ -159,7 +173,7 @@
   (log/debug "Sending events to socket at" p)
   (let [addr (uds/make-address p)
         conn (uds/connect-socket addr)
-        {:keys [channel] :as bus} (e/make-bus)]
+        {:keys [channel] :as bus} {:channel (ca/chan)}]
     (sa/write-from-channel channel conn)
     {:addr addr
      :socket conn
@@ -167,7 +181,7 @@
 
 (defn- make-dummy-bus []
   (log/debug "No event socket configured, events will not be passed to controlling process")
-  {:bus (e/make-bus (ca/chan (ca/sliding-buffer 1)))})
+  {:bus {:channel (ca/chan (ca/sliding-buffer 1))}})
 
 (defn- setup-event-bus
   "Configures the event bus for the event socket.  If no socket is specified,
@@ -191,11 +205,11 @@
 (defn exec-script!
   "Loads a script from a directory and executes it.  The script is
    executed in this same process (but in a randomly generated namespace)."
-  [{:keys [script-dir] :as ctx}]
+  [{:keys [script-dir build-id] :as ctx}]
   (with-event-bus ctx
     (fn [ctx]
-      (log/debug "Executing script at:" script-dir)
-      (let [p (load-pipelines script-dir)]
+      (log/debug "Executing script for build" build-id "at:" script-dir)
+      (let [p (load-pipelines script-dir build-id)]
         (wrap-events
          ctx
          {:type :script/start

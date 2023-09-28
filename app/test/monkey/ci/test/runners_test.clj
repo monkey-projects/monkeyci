@@ -5,7 +5,8 @@
              [events :as e]
              [process :as p]
              [runners :as sut]
-             [spec :as spec]]
+             [spec :as spec]
+             [utils :as u]]
             [monkey.ci.test.helpers :as h]))
 
 (defn- build-and-wait [ctx]
@@ -37,7 +38,7 @@
           (is (= "test-pipeline" (-> {:event-bus bus
                                       :args {:dir "examples/basic-clj"
                                              :pipeline "test-pipeline"}}
-                                     build-and-wait
+                                     (build-and-wait)
                                      :build
                                      :pipeline))))
 
@@ -149,9 +150,32 @@
   (testing "returns exit code for each type"
     (->> [:success :warning :error nil]
          (map (fn [t]
-                (is (number? (sut/build-completed {:result t
-                                                   :exit 0})))))
-         (doall))))
+                (is (number? (sut/build-completed {:event {:result t
+                                                           :exit 0}})))))
+         (doall)))
+
+  (testing "deletes git dir if different from app working dir"
+    (h/with-tmp-dir dir
+      (let [sub (doto (io/file dir "work")
+                  (.mkdirs))]
+        (is (true? (.exists sub)))
+        (is (some? (sut/build-completed
+                    {:event
+                     {:exit 0}
+                     :build {:git {:dir (.getCanonicalPath sub)}}})))
+        (is (false? (.exists sub))))))
+
+  (testing "does not delete working dir if same as app work dir"
+    (h/with-tmp-dir dir
+      (let [sub (doto (io/file dir "work")
+                  (.mkdirs))
+            wd (.getCanonicalPath sub)]
+        (is (true? (.exists sub)))
+        (is (some? (sut/build-completed
+                    {:event
+                     {:exit 0}
+                     :build {:git {:dir (u/cwd)}}})))
+        (is (true? (.exists sub)))))))
 
 (deftest make-runner
   (testing "provides child type"

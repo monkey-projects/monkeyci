@@ -55,12 +55,13 @@
 
 (defn post-example-webhook
   "Posts example webhook to the local server"
-  []
-  (let [url (format "http://localhost:%d/webhook/github" (get-server-port))
-        body (-> (load-example-github-webhook)
-                 (json/generate-string {:key-fn (comp csk/->camelCase name)}))]
-    (-> (client/post url
-                     {:body body
-                      :headers {"content-type" "application/json"}})
-        deref
-        :status)))
+  ([url]
+   (let [body (-> (load-example-github-webhook)
+                  (json/generate-string {:key-fn (comp csk/->camelCase name)}))]
+     (-> (client/post url
+                      {:body body
+                       :headers {"content-type" "application/json"}})
+         deref
+         :status)))
+  ([]
+   (post-example-webhook (format "http://localhost:%d/webhook/github" (get-server-port)))))

@@ -113,6 +113,6 @@
 
   (testing "executes in container if configured"
     (let [config {:container/image "test-image"}
-          r (sut/run-step config {:container-runner :test})]
+          r (sut/run-step config {:containers {:type :test}})]
       (is (= :run-from-test (:test-result r)))
       (is (bc/success? r)))))

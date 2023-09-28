@@ -10,12 +10,16 @@
 (defn abs-path
   "If `b` is a relative path, will combine it with `a`, otherwise
    will just return `b`."
-  [a b]
-  (if a
-    (if (.isAbsolute (io/file b))
-      b
-      (str (io/file a b)))
-    b))
+  ([a b]
+   (if a
+     (if (.isAbsolute (io/file b))
+       b
+       (str (io/file a b)))
+     b))
+  ([p]
+   (some-> p
+           (io/file)
+           (.getCanonicalPath))))
 
 (defn add-shutdown-hook!
   "Executes `h` when the JVM shuts down.  Returns the thread that will
@@ -42,3 +46,13 @@
 (defn new-build-id []
   ;; TODO Generate a more useful build id
   (format "build-%d" (System/currentTimeMillis)))
+
+(def step-work-dir
+  "Given a context, determines the step working directory.  This is either the
+   work dir as configured on the step, or the context work dir, or the process dir."
+  (comp
+   (memfn getCanonicalPath)
+   io/file
+   (some-fn (comp :work-dir :step)
+            :work-dir
+            (constantly (cwd)))))

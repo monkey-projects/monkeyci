@@ -40,7 +40,6 @@
 
   (testing "accepts container image"
     (let [p {:steps [{:container/image "test-image"
-                      :script ["first" "second"]
-                      :action (constantly "unused")}]}]
+                      :script ["first" "second"]}]}]
       (is (s/valid? :ci/step (-> p :steps (first))))
       (is (pipeline? (sut/pipeline p))))))
