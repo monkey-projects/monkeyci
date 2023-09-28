@@ -1,4 +1,4 @@
-FROM eclipse-temurin:20-jre
+FROM clojure:temurin-20-tools-deps
 
 WORKDIR /var/lib/monkeyci
 ENTRYPOINT ["java", "-jar", "monkeyci.jar"]
