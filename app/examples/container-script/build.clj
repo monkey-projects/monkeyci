@@ -7,8 +7,6 @@
 (core/pipeline
  {:name "test pipeline"
   :steps [{:container/image "debian:latest"
-           :script ["echo" "I'm running from Debian"]
-           :action (constantly nil)}
+           :script ["echo \"I am running from Debian\""]}
           {:container/image "alpine:latest"
-           :script ["echo" "And I'm running from Alpine"]
-           :action (constantly nil)}]})
+           :script ["echo \"And I'm running from Alpine\""]}]})

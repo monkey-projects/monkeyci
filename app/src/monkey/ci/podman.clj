@@ -11,15 +11,16 @@
              [utils :as u]]))
 
 (defn- make-script-cmd [script]
-  (->> script
-       (cs/join " && ")
-       (format "'%s'")))
+  [(cs/join " && " script)])
 
-(defmethod mcc/run-container :podman [{:keys [build-id step] :as ctx}]
+(defmethod mcc/run-container :podman [{:keys [build-id step pipeline] :as ctx}]
   (log/info "Running build step " build-id "/" (:name step) "as podman container")
   (let [conf (mcc/ctx->container-config ctx)
         cn (or build-id "unkown-build")
-        out-dir (doto (io/file (:work-dir ctx) build-id)
+        out-dir (doto (io/file (:work-dir ctx)
+                               build-id
+                               (or (:name pipeline) (str (:index pipeline)))
+                               (str (:index step)))
                   (.mkdirs))
         out-file (io/file out-dir "out.txt")
         err-file (io/file out-dir "err.txt")
@@ -28,12 +29,13 @@
     @(bp/process {:dir wd
                   :out out-file
                   :err err-file
-                  :cmd ["/usr/bin/podman" "run"
-                        "-t" "--rm"
-                        "--name" cn
-;;                        "-e" (str "PS1=" build-id "$")
-                        "-v" (str wd ":" cwd)
-                        "-w" cwd
-                        (:image conf)
-                        ;; TODO Execute script step by step
-                        "/bin/sh" "-ec" (make-script-cmd (:script step))]})))
+                  :cmd (concat
+                        ["/usr/bin/podman" "run"
+                         "-t" "--rm"
+                         "--name" cn
+                         "-v" (str wd ":" cwd)
+                         "-w" cwd
+                         (:image conf)
+                         ;; TODO Execute script step by step
+                         "/bin/sh" "-ec"]
+                        (make-script-cmd (:script step)))})))

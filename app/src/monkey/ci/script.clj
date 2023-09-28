@@ -76,6 +76,11 @@
                    work-dir)))
     ctx))
 
+(defn ->map [s]
+  (if (map? s)
+    s
+    {:action s}))
+
 (defn- run-step*
   "Runs a single step using the configured runner"
   [{{:keys [name]} :step :as ctx}]
@@ -100,33 +105,40 @@
 (defn- run-steps!
   "Runs all steps in sequence, stopping at the first failure.
    Returns the execution context."
-  [initial-ctx {:keys [name steps] :as p}]
+  [initial-ctx idx {:keys [name steps] :as p}]
   (wrap-events
    initial-ctx
    {:type :pipeline/start
     :pipeline name
     :message "Starting pipeline"}
-   {:type :pipeline/end
-    :pipeline name
-    :message "Completed pipeline"}
+   (fn [r]
+     {:type :pipeline/end
+      :pipeline name
+      :message "Completed pipeline"
+      :status (:status r)})
    (fn []
      (log/info "Running pipeline:" name)
      (log/debug "Running pipeline steps:" p)
-     (reduce (fn [ctx s]
-               (let [r (-> ctx
-                           (assoc :step s)
-                           (run-step*))]
-                 (log/debug "Result:" r)
-                 (when-let [o (:output r)]
-                   (log/debug "Output:" o))
-                 (when-let [o (:error r)]
-                   (log/warn "Error output:" o))
-                 (cond-> ctx
-                   true (assoc :status (:status r)
-                               :last-result r)
-                   (bc/failed? r) (reduced))))
-             (merge (initial-context p) initial-ctx)
-             steps))))
+     (->> steps
+          (map ->map)
+          ;; Add index to each step
+          (map (fn [i s]
+                 (assoc s :index i))
+               (range))     
+          (reduce (fn [ctx s]
+                    (let [r (-> ctx
+                                (assoc :step s :pipeline (assoc p :index idx))
+                                (run-step*))]
+                      (log/debug "Result:" r)
+                      (when-let [o (:output r)]
+                        (log/debug "Output:" o))
+                      (when-let [o (:error r)]
+                        (log/warn "Error output:" o))
+                      (cond-> ctx
+                        true (assoc :status (:status r)
+                                    :last-result r)
+                        (bc/failed? r) (reduced))))
+                  (merge (initial-context p) initial-ctx))))))
 
 (defn run-pipelines
   "Executes the pipelines by running all steps sequentially.  Currently,
@@ -138,7 +150,7 @@
             pipeline (filter (comp (partial = pipeline) :name)))]
     (log/debug "Found" (count p) "pipelines")
     (let [result (->> p
-                      (map (partial run-steps! ctx))
+                      (map-indexed (partial run-steps! ctx))
                       (doall))]
       {:status (if (every? bc/success? result) :success :failure)})))
 

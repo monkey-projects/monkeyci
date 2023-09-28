@@ -45,7 +45,7 @@
   "Generates a string that will be added as a commandline argument
    to the clojure process when running the script.  Any existing `deps.edn`
    should be used as well."
-  [{:keys [script-dir] {:keys [dev-mode]} :args}]
+  [{{:keys [script-dir]} :build {:keys [dev-mode]} :args}]
   (when dev-mode
     (log/debug "Running in development mode, using local src instead of libs"))
   (pr-str {:paths [script-dir]
@@ -132,8 +132,8 @@
                        {:socket socket-path}}
                      (assoc :build-id build-id)
                      (config/config->env))
-      :exit-fn (fn [{:keys [process] :as p}]
-                 (let [exit (or (some-> process (.exitValue)) 0)]
+      :exit-fn (fn [{:keys [proc] :as p}]
+                 (let [exit (or (some-> proc (.exitValue)) 0)]
                    (log/debug "Script process exited with code" exit ", cleaning up")
                    (when socket-path 
                      (uds/close socket)

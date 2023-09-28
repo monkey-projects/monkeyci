@@ -22,4 +22,4 @@
           (is (= "/usr/bin/podman" (-> r :cmd first)))
           (is (contains? (set (:cmd r))
                          "test-img"))
-          (is (= "'first && second'" (last (:cmd r)))))))))
+          (is (= "first && second" (last (:cmd r)))))))))
