@@ -30,12 +30,15 @@
         (addShutdownHook t))
     t))
 
+(defn tmp-dir []
+  (System/getProperty "java.io.tmpdir"))
+
 (defn tmp-file
   "Generates a new temporary path"
   ([prefix suffix]
    (tmp-file (str prefix (random-uuid) suffix)))
   ([name]
-   (-> (io/file (System/getProperty "java.io.tmpdir") name)
+   (-> (io/file (tmp-dir) name)
        (.getAbsolutePath))))
 
 (defn delete-dir

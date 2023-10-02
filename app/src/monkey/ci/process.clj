@@ -129,6 +129,7 @@
       :extra-env (-> {:event
                        {:socket socket-path}}
                      (assoc :build-id build-id)
+                     (merge (select-keys ctx [:containers]))
                      (config/config->env))
       :exit-fn (fn [{:keys [proc] :as p}]
                  (let [exit (or (some-> proc (.exitValue)) 0)]
