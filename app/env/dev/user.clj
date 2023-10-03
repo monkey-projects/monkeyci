@@ -4,7 +4,9 @@
             [clojure.edn :as edn]
             [clojure.java.io :as io]
             [com.stuartsierra.component :as sc]
-            [monkey.ci.core :as c]
+            [monkey.ci
+             [core :as c]
+             [utils :as u]]
             [buddy.core
              [codecs :as codecs]
              [mac :as mac]]
@@ -30,16 +32,19 @@
                                      :github {:secret secret}
                                      :args {:workdir "tmp"}
                                      :runner {:type :child}
-                                     :log-dir "target/logs"
+                                     :log-dir (u/abs-path "target/logs")
                                      :containers {:type :podman}})
                      (sc/subsystem [:http])
                      (sc/start-system)))
   nil)
 
-(defn generate-signature [payload]
-  (-> payload
-      (mac/hash {:key secret :alg :hmac+sha256})
-      (codecs/bytes->hex)))
+(defn generate-signature
+  ([secret payload]
+   (-> payload
+       (mac/hash {:key secret :alg :hmac+sha256})
+       (codecs/bytes->hex)))
+  ([payload]
+   (generate-signature secret payload)))
 
 (defn load-example-github-webhook []
   (with-open [r (-> "test/example-github-webhook.edn"
@@ -57,16 +62,16 @@
 
 (defn post-example-webhook
   "Posts example webhook to the local server"
-  ([url body]
-   (-> (client/post url
-                    {:body (json/generate-string body {:key-fn (comp csk/->camelCase name)})
-                     :headers {"content-type" "application/json"}})
-       deref
-       :status))
-  ([url]
-   (post-example-webhook url (load-example-github-webhook)))
-  ([]
-   (post-example-webhook (format "http://localhost:%d/webhook/github" (get-server-port)))))
+  [{:keys [url body secret]}]
+  (let [url (or url (format "http://localhost:%d/webhook/github" (get-server-port)))
+        body (or body (load-example-github-webhook))
+        json (json/generate-string body {:key-fn (comp csk/->camelCase name)})]
+    (-> (client/post url
+                     {:body json
+                      :headers (cond-> {"content-type" "application/json"}
+                                 secret (assoc "x-hub-signature-256" (str "sha256=" (generate-signature secret json))))})
+        deref
+        :status)))
 
 (defn make-webhook-body
   "Creates a body object that can be used in a webhook, that holds minimal information

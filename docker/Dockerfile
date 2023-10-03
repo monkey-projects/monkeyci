@@ -7,4 +7,6 @@ RUN apt-get update && apt-get install -y podman
 
 ENV MONKEYCI_CONTAINERS_TYPE=podman
 
+ADD docker/subuid /etc
+ADD docker/subgid /etc
 ADD app/target/monkeyci-standalone.jar monkeyci.jar
