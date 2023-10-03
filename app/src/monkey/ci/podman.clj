@@ -8,6 +8,7 @@
             [clojure.tools.logging :as log]
             [monkey.ci
              [containers :as mcc]
+             [context :as c]
              [utils :as u]]))
 
 (defn- make-script-cmd [script]
@@ -17,7 +18,7 @@
   (log/info "Running build step " build-id "/" (:name step) "as podman container")
   (let [conf (mcc/ctx->container-config ctx)
         cn (or build-id "unkown-build")
-        out-dir (doto (io/file (:work-dir ctx)
+        out-dir (doto (io/file (c/log-dir ctx)
                                build-id
                                (or (:name pipeline) (str (:index pipeline)))
                                (str (:index step)))
@@ -26,6 +27,7 @@
         err-file (io/file out-dir "err.txt")
         wd (u/step-work-dir ctx)
         cwd "/home/monkeyci"]
+    (log/debug "Writing logs to" out-dir)
     @(bp/process {:dir wd
                   :out out-file
                   :err err-file
@@ -33,7 +35,7 @@
                         ["/usr/bin/podman" "run"
                          "-t" "--rm"
                          "--name" cn
-                         "-v" (str wd ":" cwd)
+                         "-v" (str wd ":" cwd ":z,u")
                          "-w" cwd
                          (:image conf)
                          ;; TODO Execute script step by step

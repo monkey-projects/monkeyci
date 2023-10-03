@@ -3,6 +3,7 @@
             [clojure.spec.alpha :as s]
             [monkey.ci
              [config :as sut]
+             [context :as ctx]
              [spec :as spec]]))
 
 (deftest app-config
@@ -34,7 +35,12 @@
                     :dev-mode))))
 
   (testing "matches app config spec"
-    (is (true? (s/valid? ::spec/app-config (sut/app-config {} {}))))))
+    (is (true? (s/valid? ::spec/app-config (sut/app-config {} {})))))
+
+  (testing "provides log-dir as absolute path"
+    (is (re-matches #".+test-dir$" (-> {:monkeyci-log-dir "test-dir"}
+                                       (sut/app-config {})
+                                       (ctx/log-dir))))))
 
 (deftest config->env
   (testing "empty for empty input"
