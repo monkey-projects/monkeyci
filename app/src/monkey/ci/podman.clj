@@ -35,7 +35,7 @@
                         ["/usr/bin/podman" "run"
                          "-t" "--rm"
                          "--name" cn
-                         "-v" (str wd ":" cwd ":z,u")
+                         "-v" (str wd ":" cwd ":z")
                          "-w" cwd
                          (:image conf)
                          ;; TODO Execute script step by step
