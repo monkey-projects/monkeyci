@@ -29,7 +29,9 @@
                      (assoc :config {:dev-mode true
                                      :github {:secret secret}
                                      :args {:workdir "tmp"}
-                                     :runner {:type :child}})
+                                     :runner {:type :child}
+                                     :log-dir "target/logs"
+                                     :containers {:type :podman}})
                      (sc/subsystem [:http])
                      (sc/start-system)))
   nil)
@@ -55,13 +57,21 @@
 
 (defn post-example-webhook
   "Posts example webhook to the local server"
+  ([url body]
+   (-> (client/post url
+                    {:body (json/generate-string body {:key-fn (comp csk/->camelCase name)})
+                     :headers {"content-type" "application/json"}})
+       deref
+       :status))
   ([url]
-   (let [body (-> (load-example-github-webhook)
-                  (json/generate-string {:key-fn (comp csk/->camelCase name)}))]
-     (-> (client/post url
-                      {:body body
-                       :headers {"content-type" "application/json"}})
-         deref
-         :status)))
+   (post-example-webhook url (load-example-github-webhook)))
   ([]
    (post-example-webhook (format "http://localhost:%d/webhook/github" (get-server-port)))))
+
+(defn make-webhook-body
+  "Creates a body object that can be used in a webhook, that holds minimal information
+   required to trigger a build."
+  [{:keys [url branch id] :or {branch "main"}}]
+  {:repository {:master-branch branch
+                :clone-url url}
+   :head-commit {:id id}})

@@ -27,6 +27,7 @@
         err-file (io/file out-dir "err.txt")
         wd (u/step-work-dir ctx)
         cwd "/home/monkeyci"]
+    (log/debug "Writing logs to" out-dir)
     @(bp/process {:dir wd
                   :out out-file
                   :err err-file
@@ -34,7 +35,7 @@
                         ["/usr/bin/podman" "run"
                          "-t" "--rm"
                          "--name" cn
-                         "-v" (str wd ":" cwd ":z")
+                         "-v" (str wd ":" cwd ":z,u")
                          "-w" cwd
                          (:image conf)
                          ;; TODO Execute script step by step

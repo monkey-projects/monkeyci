@@ -15,7 +15,7 @@
 (defn log-dir
   "Gets the directory where to store log files"
   [ctx]
-  (or (:log-dir ctx)
+  (or (some-> (:log-dir ctx) (u/abs-path))
       (combine (u/tmp-dir) "logs")))
 
 (defn checkout-dir
