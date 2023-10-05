@@ -7,8 +7,13 @@
    configuration, but also makes it possible to inject dummy functions for testing 
    purposes."
   (:require [camel-snake-kebab.core :as csk]
+            [cheshire.core :as json]
+            [clojure.edn :as edn]
+            [clojure.java.io :as io]
             [clojure.string :as cs]
-            [medley.core :as mc]))
+            [clojure.walk :as cw]
+            [medley.core :as mc]
+            [monkey.ci.utils :as u]))
 
 (def env-prefix "monkeyci")
 
@@ -58,6 +63,29 @@
          (filter-and-strip-keys env-prefix)
          (group-all-keys))))
 
+(defn- parse-edn [p]
+  (with-open [r (java.io.PushbackReader. (io/reader p))]
+    (->> (edn/read r)
+         (cw/prewalk (fn [x]
+                       (if (map-entry? x)
+                         (let [[k v] x]
+                           [(csk/->kebab-case-keyword (name k)) v])
+                         x))))))
+
+(defn- parse-json [p]
+  (with-open [r (io/reader p)]
+    (json/parse-stream r csk/->kebab-case-keyword)))
+
+(defn load-config-file
+  "Loads configuration from given file.  This supports json and edn and converts
+   keys always to kebab-case."
+  [f]
+  (let [p (io/file (u/abs-path f))]
+    (when (.exists p)
+      (cond
+        (cs/ends-with? f ".edn") (parse-edn p)
+        (cs/ends-with? f ".json") (parse-json p)))))
+
 (def default-app-config
   "Default configuration for the application, without env vars or args applied."
   {:http
@@ -70,6 +98,7 @@
    configuration structure.  Args have precedence over env vars,
    which in turn override default values."
   [env args]
+  ;; TODO Load config from files
   (-> default-app-config
       (deep-merge (config-from-env env))
       (merge (select-keys args [:dev-mode]))

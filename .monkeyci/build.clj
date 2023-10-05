@@ -6,7 +6,6 @@
 (require '[config.core :refer [env]])
 
 (defn clj [& args]
-  #_(apply shell/bash "clojure" args)
   (apply str "clojure " args))
 
 (defn clj-container [dir script]
@@ -47,7 +46,7 @@
       core/failure)))
 
 (def docker-image
-  (shell/bash "docker" "build" "-t" "monkeyci" "-f" "docker/Dockerfile" "."))
+  (shell/bash "docker" "build" "-t" "monkeyci:latest" "-f" "docker/Dockerfile" "."))
 
 (defn set-name [s n]
   (assoc s :name n))
@@ -58,13 +57,12 @@
     :steps [(set-name test-lib "test-lib")
             (set-name test-app "test-app")]}))
 
-(def install-pipeline
+(def publish-pipeline
   (core/pipeline
-   {:name "install"
+   {:name "publish"
     :steps [app-uberjar
-            install-app
             docker-image]}))
 
 ;; Return the pipelines
 [test-pipeline
- #_install-pipeline]
+ publish-pipeline]

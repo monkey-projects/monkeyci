@@ -1,10 +1,12 @@
 (ns monkey.ci.test.config-test
   (:require [clojure.test :refer [deftest testing is]]
+            [clojure.java.io :as io]
             [clojure.spec.alpha :as s]
             [monkey.ci
              [config :as sut]
              [context :as ctx]
-             [spec :as spec]]))
+             [spec :as spec]]
+            [monkey.ci.test.helpers :as h]))
 
 (deftest app-config
   (testing "provides default values"
@@ -63,3 +65,31 @@
 
   (testing "matches spec"
     (is (true? (s/valid? ::spec/script-config (sut/script-config {} {}))))))
+
+(deftest load-config-file
+  (testing "`nil` if file does not exist"
+    (is (nil? (sut/load-config-file "nonexisting.json"))))
+
+  (testing "loads `.edn` files"
+    (h/with-tmp-dir dir
+      (let [f (io/file dir "test.edn")]
+        (spit f (pr-str {:key "value"}))
+        (is (= {:key "value"} (sut/load-config-file f))))))
+
+  (testing "loads `.json` files"
+    (h/with-tmp-dir dir
+      (let [f (io/file dir "test.json")]
+        (spit f "{\"key\":\"value\"}")
+        (is (= {:key "value"} (sut/load-config-file f))))))
+
+  (testing "converts to kebab-case for `.edn`"
+    (h/with-tmp-dir dir
+      (let [f (io/file dir "test.edn")]
+        (spit f (pr-str {:testKey "value"}))
+        (is (= {:test-key "value"} (sut/load-config-file f))))))
+
+  (testing "converts to kebab-case for `.json`"
+    (h/with-tmp-dir dir
+      (let [f (io/file dir "test.json")]
+        (spit f "{\"testKey\":\"value\"}")
+        (is (= {:test-key "value"} (sut/load-config-file f)))))))
