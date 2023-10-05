@@ -97,15 +97,18 @@
    :runner
    {:type :child}})
 
+(defn- merge-configs [configs]
+  (reduce deep-merge default-app-config configs))
+
 (defn app-config
   "Combines app environment with command-line args into a unified 
    configuration structure.  Args have precedence over env vars,
-   which in turn override default values."
+   which in turn override config loaded from files and default values."
   [env args]
-  (-> default-app-config
-      (deep-merge (load-config-file *global-config-file*))
-      (deep-merge (load-config-file (:config-file args)))
-      (deep-merge (config-from-env env))
+  (-> (map load-config-file [*global-config-file*
+                             (:config-file args)])
+      (conj (config-from-env env))
+      (merge-configs)
       (merge (select-keys args [:dev-mode]))
       (assoc :args args)
       (update-in [:http :port] #(or (:port args) %))
