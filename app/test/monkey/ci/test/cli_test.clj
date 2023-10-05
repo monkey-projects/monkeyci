@@ -56,7 +56,13 @@
 
         (testing "accepts commit id"
           (let [lc (run-cli "build" "--commit-id" "test-id")]
-            (is (= "test-id" (get-in lc [:args :commit-id]))))))
+            (is (= "test-id" (get-in lc [:args :commit-id])))))
+
+        (testing "accepts config file"
+          (is (= "test-file" (-> (run-cli "-c" "test-file" "build")
+                                 (get-in [:args :config-file]))))
+          (is (= "test-file" (-> (run-cli "--config-file" "test-file" "build")
+                                 (get-in [:args :config-file]))))))
 
       (testing "`server` command"
         (testing "runs `server` command"

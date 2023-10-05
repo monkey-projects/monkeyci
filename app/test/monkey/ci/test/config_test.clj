@@ -42,7 +42,23 @@
   (testing "provides log-dir as absolute path"
     (is (re-matches #".+test-dir$" (-> {:monkeyci-log-dir "test-dir"}
                                        (sut/app-config {})
-                                       (ctx/log-dir))))))
+                                       (ctx/log-dir)))))
+
+  (testing "loads config from `config-file` path"
+    (h/with-tmp-dir dir
+      (let [f (io/file dir "test-config.edn")]
+        (is (nil? (spit f (pr-str {:log-dir "some-log-dir"}))))
+        (let [c (sut/app-config {} {:config-file (.getCanonicalPath f)})]
+          (is (= "some-log-dir" (:log-dir c)))))))
+
+  (testing "loads global config file"
+    (h/with-tmp-dir dir
+      (let [f (-> (io/file dir "test-config.edn")
+                  (.getCanonicalPath))]
+        (binding [sut/*global-config-file* f]
+          (is (nil? (spit f (pr-str {:log-dir "some-log-dir"}))))
+          (let [c (sut/app-config {} {})]
+            (is (= "some-log-dir" (:log-dir c)))))))))
 
 (deftest config->env
   (testing "empty for empty input"

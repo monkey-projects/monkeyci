@@ -33,6 +33,7 @@
 (s/def :conf/dir string?)
 (s/def :conf/workdir string?)
 (s/def :conf/git-url string?)
+(s/def :conf/config-file string?)
 
 (s/def ::command fn?)
 (s/def :ctx/runner fn?)
@@ -54,7 +55,7 @@
                           :opt-un [::pipeline :ctx/git]))
 
 ;; Arguments as passed in from the CLI
-(s/def ::args (s/keys :opt-un [::dev-mode ::pipeline :conf/dir :conf/workdir :conf/git-url]))
+(s/def ::args (s/keys :opt-un [::dev-mode ::pipeline :conf/dir :conf/workdir :conf/git-url :conf/config-file]))
 
 ;; Application configuration
 (s/def ::app-config (s/keys :req-un [::http :conf/runner ::args]

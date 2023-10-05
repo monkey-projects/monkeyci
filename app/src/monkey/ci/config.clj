@@ -15,6 +15,8 @@
             [medley.core :as mc]
             [monkey.ci.utils :as u]))
 
+(def ^:dynamic *global-config-file* "/etc/monkeyci/config.edn")
+
 (def env-prefix "monkeyci")
 
 ;; Determine version at compile time
@@ -80,7 +82,9 @@
   "Loads configuration from given file.  This supports json and edn and converts
    keys always to kebab-case."
   [f]
-  (let [p (io/file (u/abs-path f))]
+  (when-let [p (some-> f
+                       u/abs-path
+                       io/file)]
     (when (.exists p)
       (cond
         (cs/ends-with? f ".edn") (parse-edn p)
@@ -98,8 +102,9 @@
    configuration structure.  Args have precedence over env vars,
    which in turn override default values."
   [env args]
-  ;; TODO Load config from files
   (-> default-app-config
+      (deep-merge (load-config-file *global-config-file*))
+      (deep-merge (load-config-file (:config-file args)))
       (deep-merge (config-from-env env))
       (merge (select-keys args [:dev-mode]))
       (assoc :args args)
