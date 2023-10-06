@@ -18,7 +18,7 @@
    does not block the event from being processed."
   []
   (map (fn [evt]
-         (when-not (s/valid? ::spec/event evt)
+         (when-not (s/valid? :evt/event evt)
            (log/warn "Event is not according to spec:" evt))
          evt)))
 
@@ -40,7 +40,7 @@
     (ca/close! channel)))
 
 (defn bus? [x]
-  (s/valid? ::spec/event-bus x))
+  (s/valid? :evt/event-bus x))
 
 (def channel :channel)
 (def pub :pub)
@@ -109,7 +109,7 @@
          (map register))))
 
 (defn handler? [x]
-  (true? (s/valid? ::spec/event-handler x)))
+  (true? (s/valid? :evt/event-handler x)))
 
 (defn post-event
   "Asynchronously posts the event to the bus.  Returns a channel that will hold
