@@ -58,6 +58,15 @@
         (binding [sut/*global-config-file* f]
           (is (nil? (spit f (pr-str {:log-dir "some-log-dir"}))))
           (let [c (sut/app-config {} {})]
+            (is (= "some-log-dir" (:log-dir c))))))))
+
+  (testing "loads home config file"
+    (h/with-tmp-dir dir
+      (let [f (-> (io/file dir "home-config.edn")
+                  (.getCanonicalPath))]
+        (binding [sut/*home-config-file* f]
+          (is (nil? (spit f (pr-str {:log-dir "some-log-dir"}))))
+          (let [c (sut/app-config {} {})]
             (is (= "some-log-dir" (:log-dir c)))))))))
 
 (deftest config->env

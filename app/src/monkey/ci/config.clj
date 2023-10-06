@@ -16,6 +16,9 @@
             [monkey.ci.utils :as u]))
 
 (def ^:dynamic *global-config-file* "/etc/monkeyci/config.edn")
+(def ^:dynamic *home-config-file* (-> (System/getProperty "user.dir")
+                                      (io/file ".monkeyci" "config.edn")
+                                      (.getCanonicalPath)))
 
 (def env-prefix "monkeyci")
 
@@ -106,6 +109,7 @@
    which in turn override config loaded from files and default values."
   [env args]
   (-> (map load-config-file [*global-config-file*
+                             *home-config-file*
                              (:config-file args)])
       (conj (config-from-env env))
       (merge-configs)
