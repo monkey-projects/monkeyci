@@ -5,6 +5,7 @@
             [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [monkey.ci
+             [context :as c]
              [events :as e]
              [process :as p]
              [utils :as u]]))
@@ -19,11 +20,6 @@
        (u/abs-path wd)
        (io/file)
        (.getCanonicalPath)))
-
-(defn- get-absolute-dirs [{:keys [dir workdir]}]
-  (let [wd (io/file (or workdir (u/cwd)))]
-    {:script-dir (calc-script-dir wd dir)
-     :work-dir (some-> wd (.getCanonicalPath))}))
 
 (defn- script-not-found [{{:keys [script-dir]} :build}]
   (log/warn "No build script found at" script-dir)
@@ -47,17 +43,15 @@
   "Locates the build script locally and dispatches another event with the
    script details in them.  If no build script is found, dispatches a build
    complete event."
-  [{:keys [args event-bus] :as ctx}]
-  (let [{:keys [script-dir work-dir] :as build} (-> (get-absolute-dirs args)
-                                                    (merge (select-keys args [:pipeline]))
-                                                    (merge (:build ctx)))
-        ctx (update ctx :build merge build)]
+  [{:keys [event-bus] :as ctx}]
+  (let [{:keys [script-dir]} (:build ctx)]
     (if (some-> (io/file script-dir) (.exists))
-      (do
-        ;; Start child process and wait for it to complete
+      (let [w (e/wait-for event-bus :build/completed (map (comp build-completed
+                                                                (partial e/with-ctx ctx))))]
+        ;; Start child process and wait for it to complete.  Start waiting before
+        ;; actualy executing because otherwise we may miss the event.
         (p/execute! ctx)
-        (e/wait-for event-bus :build/completed (map (comp build-completed
-                                                          (partial e/with-ctx ctx)))))
+        w)
       (script-not-found ctx))))
 
 (defn- download-git
@@ -65,13 +59,12 @@
   [ctx]
   (let [git (get-in ctx [:git :fn])
         conf (-> (get-in ctx [:build :git])
-                 (update :dir #(or % (get-in ctx [:args :workdir]))))
-        sd (get-in ctx [:args :dir])
-        add-script-dir (fn [{{:keys [work-dir]} :build :as ctx}]
-                         (assoc-in ctx [:build :script-dir] (calc-script-dir work-dir sd)))]
+                 (update :dir #(or % (c/checkout-dir ctx))))
+        add-script-dir (fn [{{:keys [script-dir checkout-dir]} :build :as ctx}]
+                         (assoc-in ctx [:build :script-dir] (calc-script-dir checkout-dir script-dir)))]
     (log/debug "Checking out git repo with config" conf)
     (-> ctx
-        (assoc-in [:build :work-dir] (git conf))
+        (assoc-in [:build :checkout-dir] (git conf))
         (add-script-dir))))
 
 (defn download-src

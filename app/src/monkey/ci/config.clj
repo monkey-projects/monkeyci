@@ -7,8 +7,18 @@
    configuration, but also makes it possible to inject dummy functions for testing 
    purposes."
   (:require [camel-snake-kebab.core :as csk]
+            [cheshire.core :as json]
+            [clojure.edn :as edn]
+            [clojure.java.io :as io]
             [clojure.string :as cs]
-            [medley.core :as mc]))
+            [clojure.walk :as cw]
+            [medley.core :as mc]
+            [monkey.ci.utils :as u]))
+
+(def ^:dynamic *global-config-file* "/etc/monkeyci/config.edn")
+(def ^:dynamic *home-config-file* (-> (System/getProperty "user.dir")
+                                      (io/file ".monkeyci" "config.edn")
+                                      (.getCanonicalPath)))
 
 (def env-prefix "monkeyci")
 
@@ -56,7 +66,33 @@
                     [:github :runner :containers]))]
     (->> env
          (filter-and-strip-keys env-prefix)
-         (group-all-keys))))
+         (group-all-keys)
+         (mc/remove-vals empty?))))
+
+(defn- parse-edn [p]
+  (with-open [r (java.io.PushbackReader. (io/reader p))]
+    (->> (edn/read r)
+         (cw/prewalk (fn [x]
+                       (if (map-entry? x)
+                         (let [[k v] x]
+                           [(csk/->kebab-case-keyword (name k)) v])
+                         x))))))
+
+(defn- parse-json [p]
+  (with-open [r (io/reader p)]
+    (json/parse-stream r csk/->kebab-case-keyword)))
+
+(defn load-config-file
+  "Loads configuration from given file.  This supports json and edn and converts
+   keys always to kebab-case."
+  [f]
+  (when-let [p (some-> f
+                       u/abs-path
+                       io/file)]
+    (when (.exists p)
+      (cond
+        (cs/ends-with? f ".edn") (parse-edn p)
+        (cs/ends-with? f ".json") (parse-json p)))))
 
 (def default-app-config
   "Default configuration for the application, without env vars or args applied."
@@ -65,17 +101,37 @@
    :runner
    {:type :child}})
 
+(defn- merge-configs [configs]
+  (reduce deep-merge default-app-config configs))
+
+(defn- set-work-dir [conf]
+  (assoc conf :work-dir (u/abs-path (or (get-in conf [:args :workdir])
+                                        (:work-dir conf)
+                                        (u/cwd)))))
+
+(defn- set-checkout-base-dir [conf]
+  (update conf :checkout-base-dir #(or % (u/combine (:work-dir conf) "checkout"))))
+
+(defn- set-log-dir [conf]
+  (update conf :log-dir #(or % (u/combine (:work-dir conf) "logs"))))
+
 (defn app-config
   "Combines app environment with command-line args into a unified 
    configuration structure.  Args have precedence over env vars,
-   which in turn override default values."
+   which in turn override config loaded from files and default values."
   [env args]
-  (-> default-app-config
-      (deep-merge (config-from-env env))
+  (-> (map load-config-file [*global-config-file*
+                             *home-config-file*
+                             (:config-file args)])
+      (conj (config-from-env env))
+      (merge-configs)
       (merge (select-keys args [:dev-mode]))
       (assoc :args args)
       (update-in [:http :port] #(or (:port args) %))
-      (update-in [:runner :type] keyword)))
+      (update-in [:runner :type] keyword)
+      (set-work-dir)
+      (set-checkout-base-dir)
+      (set-log-dir)))
 
 (def default-script-config
   "Default configuration for the script runner."

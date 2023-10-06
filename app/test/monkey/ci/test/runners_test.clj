@@ -1,6 +1,7 @@
 (ns monkey.ci.test.runners-test
   (:require [clojure.test :refer :all]
             [clojure.java.io :as io]
+            [clojure.string :as cs]
             [monkey.ci
              [events :as e]
              [process :as p]
@@ -23,65 +24,19 @@
 
         (testing "returns a channel that waits for build to complete"
           (is (spec/channel? (sut/build-local {:event-bus bus
-                                               :args {:dir "examples/basic-clj"}}))))
+                                               :build {:script-dir "examples/basic-clj"}}))))
         
         (testing "when script not found, returns exit code 1"
           (is (= 1 (sut/build-local {:event-bus bus
                                      :args {:dir "nonexisting"}}))))
 
-        (testing "launches local build process with absolute script and work dirs"
-          (let [r (build-and-wait {:event-bus bus
-                                   :args {:dir "examples/basic-clj"}})]
-            (is (true? (some-> r :build :script-dir (io/file) (.isAbsolute))))))
-
         (testing "passes pipeline to process"
           (is (= "test-pipeline" (-> {:event-bus bus
-                                      :args {:dir "examples/basic-clj"
-                                             :pipeline "test-pipeline"}}
+                                      :build {:script-dir "examples/basic-clj"
+                                              :pipeline "test-pipeline"}}
                                      (build-and-wait)
                                      :build
-                                     :pipeline))))
-
-        (testing "with workdir"
-          (testing "passes app work dir to process"
-            (h/with-tmp-dir base
-              (is (true? (.mkdir (io/file base "local"))))
-              (is (= base (-> {:event-bus bus
-                               :args {:dir "local"
-                                      :workdir base}}
-                              (build-and-wait)
-                              :build
-                              :work-dir)))))
-
-          (testing "uses build work dir over app work dir"
-            (h/with-tmp-dir base
-              (let [local-dir (.getCanonicalPath (io/file base "local"))]
-                (is (true? (.mkdir (io/file local-dir))))
-                (is (= local-dir
-                       (-> {:event-bus bus
-                            :args {:dir "local"
-                                   :workdir base}
-                            :build {:work-dir local-dir}}
-                           (build-and-wait)
-                           :build
-                           :work-dir))))))
-          
-          (testing "combine relative script dir with workdir"
-            (h/with-tmp-dir base
-              (is (true? (.mkdir (io/file base "local"))))
-              (is (= (str base "/local") (-> {:event-bus bus
-                                              :args {:dir "local"
-                                                     :workdir base}}
-                                             (build-and-wait)
-                                             :build
-                                             :script-dir)))))
-
-          (testing "leave absolute script dir as is"
-            (h/with-tmp-dir base
-              (is (= base (-> (build-and-wait {:event-bus bus
-                                               :args {:dir base}})
-                              :build
-                              :script-dir))))))))))
+                                     :pipeline))))))))
 
 (deftest download-src
   (testing "no-op if the source is local"
@@ -94,7 +49,7 @@
                            :git {:fn (constantly "test/dir")}}
                           (sut/download-src)
                           :build
-                          :work-dir))))
+                          :checkout-dir))))
 
   (testing "passes git config to git fn"
     (let [git-config {:url "http://test"
@@ -106,16 +61,17 @@
                                    (if (= (select-keys c (keys git-config)) git-config) "ok" "failed"))}}
                       (sut/download-src)
                       :build
-                      :work-dir)))))
+                      :checkout-dir)))))
 
-  (testing "passes work dir as git checkout dir"
-    (is (= "test-work-dir"
-           (-> {:args {:workdir "test-work-dir"}
-                :git {:fn :dir}
-                :build {:git {:url "http:/test.git"}}}
-               (sut/download-src)
-               :build
-               :work-dir))))
+  (testing "calculates checkout dir if not specified"
+    (is (cs/ends-with? (-> {:checkout-base-dir "test-work-dir"
+                            :git {:fn :dir}
+                            :build {:git {:url "http:/test.git"}
+                                    :build-id "test-build"}}
+                           (sut/download-src)
+                           :build
+                           :checkout-dir)
+                       "test-work-dir/test-build")))
 
   (testing "uses dir from build config if specified"
     (is (= "git-dir"
@@ -125,14 +81,14 @@
                               :dir "git-dir"}}}
                (sut/download-src)
                :build
-               :work-dir))))
+               :checkout-dir))))
 
   (testing "calculates script dir"
     (is (re-matches #".*test/dir/test-script$"
                     (-> {:build
-                         {:git {:url "http://git.test"}}
-                         :git {:fn (constantly "test/dir")}
-                         :args {:dir "test-script"}}
+                         {:git {:url "http://git.test"}
+                          :script-dir "test-script"}
+                         :git {:fn (constantly "test/dir")}}
                         (sut/download-src)
                         :build
                         :script-dir))))
@@ -140,8 +96,10 @@
   (testing "uses default script dir when none specified"
     (is (re-matches #".*test/dir/.monkeyci$"
                     (-> {:build
-                         {:git {:url "http://git.test"}}
-                         :git {:fn (constantly "test/dir")}}
+                         {:git {:url "http://git.test"}
+                          :build-id "test-build"}
+                         :git {:fn (constantly "test/dir")}
+                         :checkout-base-dir "checkout"}
                         (sut/download-src)
                         :build
                         :script-dir)))))

@@ -105,7 +105,11 @@
           {:as "Development mode"
            :option "dev-mode"
            :type :with-flag
-           :default false}]
+           :default false}
+          {:as "Configuration file"
+           :option "config-file"
+           :short "c"
+           :type :string}]
    :subcommands [build-cmd
                  server-cmd]})
 

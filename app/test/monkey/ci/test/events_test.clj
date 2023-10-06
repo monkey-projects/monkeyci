@@ -13,6 +13,20 @@
 (defn wait-until [p & [timeout]]
   (h/wait-until p (or timeout 1000)))
 
+(deftest validator
+  (testing "lets valid events pass"
+    (let [evt {:type :test/event
+               :message "This is a valid event"}]
+      (is (= evt (->> [evt]
+                      (sequence (sut/validator))
+                      first)))))
+
+  (testing "lets invalid events pass"
+    (let [evt {:message "This is an invalid event"}]
+      (is (= evt (->> [evt]
+                      (sequence (sut/validator))
+                      first))))))
+
 (deftest make-bus
   (testing "creates pub"
     (is (sut/bus? (sut/make-bus)))))

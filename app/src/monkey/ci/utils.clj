@@ -21,6 +21,11 @@
            (io/file)
            (.getCanonicalPath))))
 
+(defn combine
+  "Returns the canonical path of combining `a` and `b`"
+  [a b]
+  (.getCanonicalPath (io/file a b)))
+
 (defn add-shutdown-hook!
   "Executes `h` when the JVM shuts down.  Returns the thread that will
    execute the hook."
