@@ -66,7 +66,8 @@
                     [:github :runner :containers]))]
     (->> env
          (filter-and-strip-keys env-prefix)
-         (group-all-keys))))
+         (group-all-keys)
+         (mc/remove-vals empty?))))
 
 (defn- parse-edn [p]
   (with-open [r (java.io.PushbackReader. (io/reader p))]

@@ -1,5 +1,7 @@
 (ns monkey.ci.context
-  "Helper functions for working with the context"
+  "Helper functions for working with the context.  The context is created from the configuration
+   and possible command-line arguments, and can hold non-serializable things as well, like
+   functions.  It is used by the application to execute functionality."
   (:require [clojure.java.io :as io]
             [monkey.ci.utils :as u]))
 
