@@ -14,6 +14,11 @@
 (defn- make-script-cmd [script]
   [(cs/join " && " script)])
 
+(defn- make-entrypoint [{:keys [:container/entrypoint]}]
+  (if (some? entrypoint)
+    entrypoint
+    ["/bin/sh" "-ec"]))
+
 (defmethod mcc/run-container :podman [{:keys [build-id step pipeline] :as ctx}]
   (log/info "Running build step " build-id "/" (:name step) "as podman container")
   (let [conf (mcc/ctx->container-config ctx)
@@ -25,19 +30,20 @@
                   (.mkdirs))
         out-file (io/file out-dir "out.txt")
         err-file (io/file out-dir "err.txt")
-        wd (u/step-work-dir ctx)
+        wd (c/step-work-dir ctx)
         cwd "/home/monkeyci"]
     (log/debug "Writing logs to" out-dir)
     @(bp/process {:dir wd
                   :out out-file
                   :err err-file
                   :cmd (concat
+                        ;; TODO Allow for more options to be passed in
                         ["/usr/bin/podman" "run"
                          "-t" "--rm"
                          "--name" cn
                          "-v" (str wd ":" cwd ":z")
                          "-w" cwd
-                         (:image conf)
+                         (:image conf)]
+                        (make-entrypoint step)
                          ;; TODO Execute script step by step
-                         "/bin/sh" "-ec"]
                         (make-script-cmd (:script step)))})))

@@ -8,6 +8,7 @@
 (s/def :ci/script (s/coll-of :ci/script-step))
 
 (s/def :container/image string?)
+(s/def :container/entrypoint vector?)
 
 (s/def :ci/step (s/or :fn fn?
                       :action
@@ -16,7 +17,7 @@
                       :container
                       (s/keys :req [:container/image]
                               :req-un [:ci/script]
-                              :opt-un [:ci/name])))
+                              :opt-un [:ci/name :container/entrypoint])))
 (s/def :ci/output string?)
 (s/def :ci/exception (partial instance? java.lang.Exception))
 
