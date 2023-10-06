@@ -2,6 +2,7 @@
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.java.io :as io]
             [clojure.spec.alpha :as s]
+            [clojure.string :as cs]
             [monkey.ci
              [config :as sut]
              [context :as ctx]
@@ -67,7 +68,23 @@
         (binding [sut/*home-config-file* f]
           (is (nil? (spit f (pr-str {:log-dir "some-log-dir"}))))
           (let [c (sut/app-config {} {})]
-            (is (= "some-log-dir" (:log-dir c)))))))))
+            (is (= "some-log-dir" (:log-dir c))))))))
+
+  (testing "global `work-dir`"
+    (testing "uses current as default"
+      (is (some? (-> (sut/app-config {} {})
+                     :work-dir))))
+
+    (testing "takes work dir from env"
+      (is (cs/ends-with? (-> (sut/app-config {:monkeyci-work-dir "test-dir"} {})
+                             :work-dir)
+                         "test-dir")))
+
+    (testing "takes work dir from arg over env"
+      (is (cs/ends-with? (-> (sut/app-config {:monkeyci-work-dir "test-dir"}
+                                             {:workdir "arg-dir"})
+                             :work-dir)
+                         "arg-dir")))))
 
 (deftest config->env
   (testing "empty for empty input"

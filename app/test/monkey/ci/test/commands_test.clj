@@ -25,9 +25,30 @@
                (sut/build)))))
 
   (testing "defaults to `main` branch"
-    (is (= "main" (-> {:args {:git-url "test-url"}
-                       :runner (comp :branch :git :build)}
-                      (sut/build))))))
+    (is (= "main"
+           (-> {:args {:git-url "test-url"}
+                :runner (comp :branch :git :build)}
+               (sut/build)))))
+
+  (testing "takes global work dir as build checkout dir"
+    (is (= "global-work-dir"
+           (-> {:work-dir "global-work-dir"
+                :args {:dir ".monkeci"}
+                :runner (comp :checkout-dir :build)}
+               (sut/build)))))
+
+  (testing "adds pipeline from args"
+    (is (= "test-pipeline"
+           (-> {:args {:pipeline "test-pipeline"}
+                :runner (comp :pipeline :build)}
+               (sut/build)))))
+
+  (testing "adds script dir from args, as relative to work dir"
+    (is (= "work-dir/test-script"
+           (-> {:args {:dir "test-script"}
+                :work-dir "work-dir"
+                :runner (comp :script-dir :build)}
+               (sut/build))))))
 
 (deftest http-server
   (testing "returns a channel"

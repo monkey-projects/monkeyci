@@ -104,6 +104,14 @@
 (defn- merge-configs [configs]
   (reduce deep-merge default-app-config configs))
 
+(defn- set-work-dir [conf]
+  (assoc conf :work-dir (u/abs-path (or (get-in conf [:args :workdir])
+                                        (:work-dir conf)
+                                        (u/cwd)))))
+
+(defn- set-checkout-base-dir [conf]
+  (update conf :checkout-base-dir #(or % (u/combine (:work-dir conf) "checkout"))))
+
 (defn app-config
   "Combines app environment with command-line args into a unified 
    configuration structure.  Args have precedence over env vars,
@@ -117,7 +125,9 @@
       (merge (select-keys args [:dev-mode]))
       (assoc :args args)
       (update-in [:http :port] #(or (:port args) %))
-      (update-in [:runner :type] keyword)))
+      (update-in [:runner :type] keyword)
+      (set-work-dir)
+      (set-checkout-base-dir)))
 
 (def default-script-config
   "Default configuration for the script runner."

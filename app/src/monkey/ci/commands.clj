@@ -12,10 +12,14 @@
 
 (defn build
   "Performs a build, using the runner from the context"
-  [ctx]
+  [{:keys [work-dir] :as ctx}]
   (let [r (:runner ctx)]
-    (-> ctx 
-        (assoc-in [:build :build-id] (u/new-build-id))
+    (-> ctx
+        ;; Prepare the build properties
+        (assoc :build {:build-id (u/new-build-id)
+                       :checkout-dir work-dir
+                       :script-dir (u/abs-path work-dir (get-in ctx [:args :dir]))
+                       :pipeline (get-in ctx [:args :pipeline])})
         (maybe-set-git-opts)
         (r))))
 

@@ -29,11 +29,14 @@
 (s/def :http/port int?)
 (s/def :conf/http (s/keys :req-un [:http/port]))
 
-(s/def :conf/runner (s/keys :req-un [::type]))
+(s/def :runner/type keyword?)
+(s/def :conf/runner (s/keys :req-un [:runner/type]))
 
-(s/def :containers/type #{:docker :podman})
+(s/def :containers/type #{:docker :podman :oci})
 (s/def :conf/containers (s/keys :req-un [:containers/type]))
 (s/def :conf/log-dir string?)
+(s/def :conf/work-dir string?)
+(s/def :conf/checkout-base-dir string?)
 
 ;; Command line arguments
 (s/def :arg/pipeline string?)
@@ -56,9 +59,9 @@
 
 (s/def :ctx/runner fn?)
 (s/def :build/script-dir string?)
-(s/def :build/work-dir string?)
+(s/def :build/checkout-dir string?)
 (s/def :build/build-id string?)
-(s/def :ctx/build (s/keys :req-un [:build/script-dir :build/work-dir :build/build-id]
+(s/def :ctx/build (s/keys :req-un [:build/script-dir :build/build-id :build/checkout-dir]
                           :opt-un [:conf/pipeline :build/git]))
 
 ;; Arguments as passed in from the CLI
@@ -66,11 +69,12 @@
                                    :arg/git-url :arg/config-file]))
 
 ;; Application configuration
-(s/def ::app-config (s/keys :req-un [:conf/http :conf/runner :conf/args]
+(s/def ::app-config (s/keys :req-un [:conf/http :conf/runner :conf/args
+                                     :conf/work-dir :conf/checkout-base-dir]
                             :opt-un [:conf/dev-mode :conf/containers :conf/log-dir]))
 ;; Application context.  This is the result of processing the configuration and is passed
 ;; around internally.
-(s/def ::app-context (s/keys :req-un [:conf/http :ctx/runner ::event-bus :ctx/git]
+(s/def ::app-context (s/keys :req-un [:conf/http :ctx/runner :evt/event-bus :ctx/git]
                              :opt-un [:conf/dev-mode :arg/command ::system :conf/args :ctx/build]))
 
 ;; Script configuration
