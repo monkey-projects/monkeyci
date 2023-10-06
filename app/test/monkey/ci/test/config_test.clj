@@ -84,7 +84,17 @@
       (is (cs/ends-with? (-> (sut/app-config {:monkeyci-work-dir "test-dir"}
                                              {:workdir "arg-dir"})
                              :work-dir)
-                         "arg-dir")))))
+                         "arg-dir"))))
+
+  (testing "calculates checkout base dir from work dir"
+    (is (cs/includes? (-> (sut/app-config {:monkeyci-work-dir "test-dir"} {})
+                          :checkout-base-dir)
+                      "test-dir")))
+
+  (testing "calculates log dir from work dir"
+    (is (cs/includes? (-> (sut/app-config {:monkeyci-work-dir "test-dir"} {})
+                          :log-dir)
+                      "test-dir"))))
 
 (deftest config->env
   (testing "empty for empty input"

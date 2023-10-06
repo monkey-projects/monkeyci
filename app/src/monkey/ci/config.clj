@@ -112,6 +112,9 @@
 (defn- set-checkout-base-dir [conf]
   (update conf :checkout-base-dir #(or % (u/combine (:work-dir conf) "checkout"))))
 
+(defn- set-log-dir [conf]
+  (update conf :log-dir #(or % (u/combine (:work-dir conf) "logs"))))
+
 (defn app-config
   "Combines app environment with command-line args into a unified 
    configuration structure.  Args have precedence over env vars,
@@ -127,7 +130,8 @@
       (update-in [:http :port] #(or (:port args) %))
       (update-in [:runner :type] keyword)
       (set-work-dir)
-      (set-checkout-base-dir)))
+      (set-checkout-base-dir)
+      (set-log-dir)))
 
 (def default-script-config
   "Default configuration for the script runner."
