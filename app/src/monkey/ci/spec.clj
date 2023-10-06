@@ -34,6 +34,7 @@
 (s/def :conf/workdir string?)
 (s/def :conf/git-url string?)
 (s/def :conf/config-file string?)
+(s/def :conf/log-dir string?)
 
 (s/def ::command fn?)
 (s/def :ctx/runner fn?)
@@ -59,7 +60,7 @@
 
 ;; Application configuration
 (s/def ::app-config (s/keys :req-un [::http :conf/runner ::args]
-                            :opt-un [::dev-mode]))
+                            :opt-un [::dev-mode :conf/log-dir]))
 
 (s/def ::app-context (s/keys :req-un [::http :ctx/runner ::event-bus :conf/git]
                              :opt-un [::dev-mode ::command ::system ::args :ctx/build]))

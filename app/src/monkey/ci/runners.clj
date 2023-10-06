@@ -53,11 +53,12 @@
                                                     (merge (:build ctx)))
         ctx (update ctx :build merge build)]
     (if (some-> (io/file script-dir) (.exists))
-      (do
-        ;; Start child process and wait for it to complete
+      (let [w (e/wait-for event-bus :build/completed (map (comp build-completed
+                                                                (partial e/with-ctx ctx))))]
+        ;; Start child process and wait for it to complete.  Start waiting before
+        ;; actualy executing because otherwise we may miss the event.
         (p/execute! ctx)
-        (e/wait-for event-bus :build/completed (map (comp build-completed
-                                                          (partial e/with-ctx ctx)))))
+        w)
       (script-not-found ctx))))
 
 (defn- download-git
