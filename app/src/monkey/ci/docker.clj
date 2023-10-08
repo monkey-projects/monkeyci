@@ -8,7 +8,7 @@
             [medley.core :as mc]
             [monkey.ci
              [containers :as mcc]
-             [utils :as u]])
+             [context :as ctx]])
   (:import org.apache.commons.io.IOUtils
            [java.io PrintWriter]))
 
@@ -191,7 +191,7 @@
         client (make-client :containers conn)
         output-dir (doto (io/file "tmp" job-id)
                      (.mkdirs))
-        work-dir (u/step-work-dir ctx)
+        work-dir (ctx/step-work-dir ctx)
         remote-wd "/home/build"
         internal-log-dir "/var/log/monkeyci"
         ->abs-path (fn [s]
