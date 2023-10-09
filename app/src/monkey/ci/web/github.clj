@@ -9,6 +9,7 @@
             [clojure.tools.logging :as log]
             [monkey.ci
              [context :as ctx]
+             [storage :as s]
              [utils :as u]]
             [monkey.ci.web.common :as c]))
 
@@ -50,26 +51,28 @@
   (<!!
    (go
      {:status (if (<! (c/post-event req {:type :webhook/github
+                                         :id (get-in req [:path-params :id])
                                          :payload (:body-params req)}))
                 200
                 500)})))
 
-(defn build
-  "Handles webhook build event by preparing the config to actually
-   launch the build script.  The build runner performs the repo clone and
-   checkout and runs the script."
-  [{:keys [runner] :as ctx}]
-  (let [p (get-in ctx [:event :payload])
-        {:keys [master-branch clone-url]} (:repository p)
-        build-id (u/new-build-id)
-        ;; Use combination of work dir and build id for checkout
-        workdir (ctx/checkout-dir ctx build-id)
-        conf {:git {:url clone-url
-                    :branch master-branch
-                    :id (get-in p [:head-commit :id])
-                    :dir workdir}
-              :build-id build-id}]
-    (log/debug "Starting build with config:" conf)
-    (-> ctx
-        (assoc :build conf)
-        (runner))))
+(defn prepare-build
+  "Event handler that looks up details for the given github webhook.  If the webhook 
+   refers to a valid configuration, a build id is created and a new event is launched,
+   which in turn should start the build runner."
+  [st {:keys [id payload] :as evt}]
+  (when-let [details (s/find-details-for-webhook st id)]
+    (let [{:keys [master-branch clone-url]} (:repository payload)
+          build-id (u/new-build-id)
+          conf {:git {:url clone-url
+                      :branch master-branch
+                      :id (get-in payload [:head-commit :id])}
+                :build-id build-id}]
+      (when (s/create-build-metadata st (-> details
+                                          (dissoc :id)
+                                          (assoc :webhook-id id
+                                                 :build-id (:build-id conf)
+                                                 :commit-id (get-in conf [:git :id]))))
+        {:type :webhook/validated
+         :details details
+         :build conf}))))

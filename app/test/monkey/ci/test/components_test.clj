@@ -8,6 +8,7 @@
              [config :as config]
              [events :as e]
              [git :as git]
+             [runners :as r]
              [spec :as spec]
              [storage :as st]]
             [monkey.ci.web
@@ -84,24 +85,30 @@
                                    :dir "test-dir"})))
         (is (= ["test-url" nil nil "test-dir"] @captured-args))))))
 
+(defmacro validate-listener [type h]
+  `(let [invoked# (atom false)]
+     (with-redefs [~h (fn [_#]
+                        (reset! invoked# true))]
+       (h/with-bus
+         (fn [bus#]
+           (is (true? (->> (sut/map->Listeners {:bus bus#})
+                           (c/start)
+                           :handlers
+                           (every? e/handler?))))
+           (is (true? (e/post-event bus# {:type ~type})))
+           (is (true? (h/wait-until #(deref invoked#) 200))))))))
+
 (deftest listeners
   (testing "registers github webhook listener"
-    (let [invoked? (atom false)]
-      (with-redefs [github/build (fn [_]
-                                   (reset! invoked? true))]
-        (h/with-bus
-          (fn [bus]
-            (is (true? (->> (sut/map->Listeners {:bus bus})
-                            (c/start)
-                            :handlers
-                            (every? e/handler?))))
-            (is (true? (e/post-event bus {:type :webhook/github})))
-            (is (true? (h/wait-until #(deref invoked?) 200))))))))
+    (validate-listener :webhook/github github/prepare-build))
+
+  (testing "registers build runner listener"
+    (validate-listener :webhook/validated r/build))
 
   (testing "unregisters handlers on stop"
     (let [invoked? (atom false)]
-      (with-redefs [github/build (fn [_]
-                                   (reset! invoked? true))]
+      (with-redefs [github/prepare-build (fn [_]
+                                           (reset! invoked? true))]
         (h/with-bus
           (fn [bus]
             (is (nil? (->> (sut/map->Listeners {:bus bus})

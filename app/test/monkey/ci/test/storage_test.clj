@@ -47,3 +47,4 @@
       (h/with-tmp-dir dir 
         (is (false? (-> (sut/make-file-storage dir)
                         (sut/delete-obj "test-loc"))))))))
+

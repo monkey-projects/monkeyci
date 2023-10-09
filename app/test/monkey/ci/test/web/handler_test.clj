@@ -67,29 +67,40 @@
                    (test-app)
                    :status))))
 
-  (testing "`POST /webhook/github`"
+  (testing "`POST /webhook/github/:id`"
     (testing "accepts with valid security header"
       (let [payload "test body"
             signature (-> (mac/hash payload {:key github-secret
                                              :alg :hmac+sha256})
                           (codecs/bytes->hex))]
-        (is (= 200 (-> (mock/request :post "/webhook/github")
+        (is (= 200 (-> (mock/request :post "/webhook/github/test-hook")
                        (mock/body payload)
                        (mock/header :x-hub-signature-256 (str "sha256=" signature))
                        (test-app)
                        :status)))))
 
     (testing "returns 401 if invalid security"
-      (is (= 401 (-> (mock/request :post "/webhook/github")
+      (is (= 401 (-> (mock/request :post "/webhook/github/test-hook")
                      (test-app)
                      :status))))
 
     (testing "disables security check when in dev mode"
       (let [dev-app (sut/make-app {:dev-mode true
                                    :event-bus (events/make-bus)})]
-        (is (= 200 (-> (mock/request :post "/webhook/github")
+        (is (= 200 (-> (mock/request :post "/webhook/github/test-hook")
                        (dev-app)
-                       :status)))))))
+                       :status)))))
+
+    (testing "passes id as path parameter"
+      (h/with-bus
+        (fn [bus]
+          (let [dev-app (sut/make-app {:dev-mode true
+                                       :event-bus bus})
+                l (events/wait-for bus :webhook/github (map :id))]
+            (is (= 200 (-> (mock/request :post "/webhook/github/test-hook")
+                           (dev-app)
+                           :status)))
+            (is (= "test-hook" (h/try-take l 200 :timeoyut)))))))))
 
 (deftest routing-middleware
   (testing "converts json bodies to kebab-case"

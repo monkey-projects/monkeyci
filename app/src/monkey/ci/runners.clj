@@ -90,3 +90,17 @@
   ;; Fallback
   (log/warn "No runner configured, using fallback configuration")
   (constantly 2))
+
+(defn build
+  "Event handler that reacts to a prepared build event.  The incoming event
+   should contain the necessar information to start the build.  The build 
+   runner performs the repo clone and checkout and runs the script."
+  [{:keys [runner] :as ctx}]
+  (let [{:keys [build-id] :as build} (get-in ctx [:event :build])
+        ;; Use combination of checkout dir and build id for checkout
+        workdir (c/checkout-dir ctx build-id)
+        conf (assoc-in build [:git :dir] workdir)]
+    (log/debug "Starting build with config:" conf)
+    (-> ctx
+        (assoc :build conf)
+        (runner))))

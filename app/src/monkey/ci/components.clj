@@ -75,20 +75,30 @@
     (ca/thread
       (f (e/with-ctx ctx evt)))))
 
-(defn logger [evt]
+(defn logger
+  "Event handler that just logs the message"
+  [evt]
   (log/info (:message evt)))
+
+(defn register-handlers [ctx bus]
+  (->> {:webhook/validated (ctx-async ctx r/build)
+        :script/start logger
+        :script/end logger
+        :pipeline/start logger
+        :pipeline/end logger
+        :step/start logger
+        :step/end logger}
+       (map (partial apply e/register-handler bus))))
+
+(defn register-tx-handlers [bus]
+  (->> {:webhook/github wg/prepare-build}
+       (map (partial apply e/register-pipeline bus))))
 
 (defrecord Listeners [bus context]
   c/Lifecycle
   (start [this]
-    (->> {:webhook/github (ctx-async context wg/build)
-          :script/start logger
-          :script/end logger
-          :pipeline/start logger
-          :pipeline/end logger
-          :step/start logger
-          :step/end logger}
-         (map (partial apply e/register-handler bus))
+    (->> (concat (register-handlers context bus)
+                 (register-tx-handlers bus))
          (doall)
          (assoc this :handlers)))
   

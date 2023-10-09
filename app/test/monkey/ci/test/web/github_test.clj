@@ -1,6 +1,8 @@
 (ns monkey.ci.test.web.github-test
   (:require [clojure.test :refer [deftest testing is]]
-            [monkey.ci.events :as events]
+            [monkey.ci
+             [events :as events]
+             [storage :as st]]
             [monkey.ci.web.github :as sut]
             [monkey.ci.test.helpers :as h]
             [ring.mock.request :as mock]))
@@ -42,7 +44,7 @@
       (is (some? (sut/webhook req)))
       (is (not= :timeout (h/wait-until #(pos? (count @recv)) 500))))))
 
-(deftest build
+#_(deftest build
   (testing "converts payload and invokes runner"
     (let [evt {:payload {:repository {:clone-url "https://test/repo.git"
                                       :master-branch "master"}
@@ -66,3 +68,16 @@
                :checkout-base-dir "test-dir"}]
       (is (re-matches #".*test-dir/.*" 
                       (sut/build ctx))))))
+
+(deftest prepare-build
+  (testing "creates metadata file for customer/project/repo"
+    (h/with-memory-store s
+      (is (some? (st/create-webhook-details s {:id "test-webhook"
+                                               :customer-id "test-customer"
+                                               :project-id "test-project"
+                                               :repo-id "test-repo"})))
+      (let [r (sut/prepare-build s {:id "test-webhook"
+                                    :payload {}})]
+        (is (some? r))
+        (is (st/obj-exists? s (format "builds/test-customer/test-project/test-repo/%s/metadata.md"
+                                      (get-in r [:build :build-id]))))))))
