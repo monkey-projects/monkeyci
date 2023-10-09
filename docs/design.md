@@ -72,9 +72,9 @@ libraries.  So we could have agents that in turn run the build scripts, dependin
 on their configuration.  The following execution environments could exist:
 
 - Local (i.e. just executing on the same machine)
-- Docker (running the script in a separate image)
-- Kubernetes (creating a job in a Kubernetes cluster that runs the script)
-- Cloud functions
+- Docker/Podman (running the script in a separate image)
+- Kubernetes/Nomad (creating a job in an orchestrator that runs the script)
+- Cloud functions/cloud runs
 
 The modular nature of the design should allow for more environments should the need
 arise.
@@ -89,7 +89,9 @@ that runs the MonkeyCI application that in turn checks out the changes and runs
 the build script.  A possible problem here could be timeout: if the function performs
 the build directly, it may cause a timeout on the side of the webhook caller.  In this case
 we should find a way to let the function react to an event (that is fired by the webhook)
-instead.
+instead.  Similarly, functions themselves have a limited execution time.  Currently this
+is 5 minutes on OCI, which will probably be too short for many build jobs.  In that case,
+we'd have to resort to cloud runs (see below).
 
 ### Cloud Run
 
@@ -115,6 +117,10 @@ Should the number of build requests increase, we can move to a regular (long-run
 
 Most public clouds provide the same functionality.  See [OCI cloud run](oci-cloud.md)
 for more details on how to run this on [Oracle Cloud](https://cloud.oracle.com).
+
+## Storage ##
+
+See the [storage subsection](storage.md) for details.
 
 ## Testability ##
 
