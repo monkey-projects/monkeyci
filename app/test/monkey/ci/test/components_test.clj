@@ -93,7 +93,7 @@
 
 (defmacro validate-listener [type h]
   `(let [invoked# (atom false)]
-     (with-redefs [~h (fn [_#]
+     (with-redefs [~h (fn [& _#]
                         (reset! invoked# true))]
        (h/with-bus
          (fn [bus#]

@@ -91,15 +91,15 @@
         :step/end logger}
        (map (partial apply e/register-handler bus))))
 
-(defn register-tx-handlers [bus]
-  (->> {:webhook/github wg/prepare-build}
+(defn register-tx-handlers [ctx bus]
+  (->> {:webhook/github (map (partial wg/prepare-build ctx))}
        (map (partial apply e/register-pipeline bus))))
 
 (defrecord Listeners [bus context]
   c/Lifecycle
   (start [this]
     (->> (concat (register-handlers context bus)
-                 (register-tx-handlers bus))
+                 (register-tx-handlers context bus))
          (doall)
          (assoc this :handlers)))
   
