@@ -66,14 +66,14 @@
       :else
       (throw (ex-info "invalid step configuration" {:step step})))))
 
-(defn- make-step-dir-absolute [{:keys [work-dir step] :as ctx}]
+(defn- make-step-dir-absolute [{:keys [checkout-dir step] :as ctx}]
   ;; TODO Make more generic
   (if (map? step)
     (update-in ctx [:step :work-dir]
                (fn [d]
                  (if d
-                   (u/abs-path work-dir d)
-                   work-dir)))
+                   (u/abs-path checkout-dir d)
+                   checkout-dir)))
     ctx))
 
 (defn ->map [s]

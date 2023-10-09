@@ -21,7 +21,6 @@
   (or (some-> (:log-dir ctx) (u/abs-path))
       (u/combine (u/tmp-dir) "logs")))
 
-
 (def step-work-dir
   "Given a context, determines the step working directory.  This is either the
    work dir as configured on the step, or the context work dir, or the process dir."
@@ -29,6 +28,6 @@
    (memfn getCanonicalPath)
    io/file
    (some-fn (comp :work-dir :step)
-            :work-dir
+            :checkout-dir
             (constantly (u/cwd)))))
 

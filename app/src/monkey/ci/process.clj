@@ -66,7 +66,7 @@
 (defn- build-args
   "Builds command-line args vector for script process"
   [{:keys [build]}]
-  (->> (select-keys build [:work-dir :script-dir :pipeline])
+  (->> (select-keys build [:checkout-dir :script-dir :pipeline])
        (mc/remove-vals nil?)
        (mc/map-keys str)
        (mc/map-vals pr-str)
@@ -129,7 +129,7 @@
       :extra-env (-> {:event
                        {:socket socket-path}}
                      (assoc :build-id build-id)
-                     (merge (select-keys ctx [:containers]))
+                     (merge (select-keys ctx [:containers :log-dir]))
                      (config/config->env))
       :exit-fn (fn [{:keys [proc] :as p}]
                  (let [exit (or (some-> proc (.exitValue)) 0)]

@@ -112,10 +112,10 @@
                                         (u/cwd)))))
 
 (defn- set-checkout-base-dir [conf]
-  (update conf :checkout-base-dir #(or % (u/combine (:work-dir conf) "checkout"))))
+  (update conf :checkout-base-dir #(or (u/abs-path %) (u/combine (:work-dir conf) "checkout"))))
 
 (defn- set-log-dir [conf]
-  (update conf :log-dir #(or % (u/combine (:work-dir conf) "logs"))))
+  (update conf :log-dir #(or (u/abs-path %) (u/combine (:work-dir conf) "logs"))))
 
 (defn app-config
   "Combines app environment with command-line args into a unified 

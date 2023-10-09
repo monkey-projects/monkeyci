@@ -1,2 +1,4 @@
 {:monkeyci-containers-type "podman"
- :monkeyci-log-dir "target/logs"}
+ :monkeyci-log-dir "target/logs"
+ :monkeyci-storage-type "file"
+ :monkeyci-storage-dir "storage"}
