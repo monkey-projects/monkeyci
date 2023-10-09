@@ -135,7 +135,8 @@
 
 (def default-script-config
   "Default configuration for the script runner."
-  {:containers {:type :docker}})
+  {:containers {:type :docker}
+   :storage {:type :file}})
 
 (defn script-config
   "Builds config map used by the child script process"

@@ -8,7 +8,8 @@
              [events :as e]
              [git :as git]
              [process :as p]
-             [runners :as r]]
+             [runners :as r]
+             [storage :as st]]
             [monkey.ci.web
              [github :as wg]
              [handler :as web]]))
@@ -98,3 +99,14 @@
 
 (defn new-listeners []
   (map->Listeners {}))
+
+(defrecord Storage [context]
+  c/Lifecycle
+  (start [this]
+    (assoc this :storage (st/make-storage (:storage context))))
+  
+  (stop [this]
+    (dissoc this :storage)))
+
+(defn new-storage [ctx]
+  (->Storage ctx))

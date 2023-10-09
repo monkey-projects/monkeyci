@@ -8,7 +8,8 @@
              [config :as config]
              [events :as e]
              [git :as git]
-             [spec :as spec]]
+             [spec :as spec]
+             [storage :as st]]
             [monkey.ci.web
              [handler :as wh]
              [github :as github]]
@@ -109,3 +110,23 @@
                            :handlers)))
             (is (true? (e/post-event bus {:type :webhook/github})))
             (is (= :timeout (h/wait-until #(deref invoked?) 200)))))))))
+
+(deftest storage
+  (testing "creates file storage"
+    (h/with-tmp-dir dir
+      (let [c (-> (sut/new-storage {:storage {:type :file
+                                              :dir dir}})
+                  (c/start))]
+        (let [s (:storage c)
+              l "test.edn"]
+          (is (some? s))
+          (is (some? (st/write-obj s l {:key "value"})))
+          (is (true? (st/obj-exists? s l)))))))
+
+  (testing "`stop` removes storage"
+    (h/with-tmp-dir dir
+      (is (nil? (-> (sut/new-storage {:storage {:type :file
+                                                :dir dir}})
+                    (c/start)
+                    (c/stop)
+                    :storage))))))
