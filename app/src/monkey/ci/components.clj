@@ -53,14 +53,15 @@
                ;; Return the checkout dir
                (:dir opts))}})
 
-(defrecord Context [command config event-bus]
+(defrecord Context [command config event-bus storage]
   c/Lifecycle
   (start [this]
     (-> this
         (merge default-context)
-        (merge config)
         (dissoc :config)
-        (update :runner r/make-runner)))
+        (merge config)
+        (update :runner r/make-runner)
+        (assoc :storage (:storage storage))))
   (stop [this]
     this))
 
@@ -110,10 +111,10 @@
 (defn new-listeners []
   (map->Listeners {}))
 
-(defrecord Storage [context]
+(defrecord Storage [config]
   c/Lifecycle
   (start [this]
-    (assoc this :storage (st/make-storage (:storage context))))
+    (assoc this :storage (st/make-storage (:storage config))))
   
   (stop [this]
     (dissoc this :storage)))

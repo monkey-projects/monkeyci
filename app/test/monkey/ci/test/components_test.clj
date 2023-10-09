@@ -83,7 +83,13 @@
                                          (reset! captured-args args))]
         (is (= "test-dir" (git-fn {:url "test-url"
                                    :dir "test-dir"})))
-        (is (= ["test-url" nil nil "test-dir"] @captured-args))))))
+        (is (= ["test-url" nil nil "test-dir"] @captured-args)))))
+
+  (testing "sets storage"
+    (is (= :test-storage (-> (sut/new-context :test-cmd)
+                             (assoc :storage {:storage :test-storage})
+                             (c/start)
+                             :storage)))))
 
 (defmacro validate-listener [type h]
   `(let [invoked# (atom false)]

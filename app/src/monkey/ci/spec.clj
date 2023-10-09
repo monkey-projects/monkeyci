@@ -37,7 +37,7 @@
 (s/def :conf/containers (s/keys :req-un [:containers/type]))
 
 ;; Storage configuration
-(s/def :storage/type #{:file :oci})
+(s/def :storage/type #{:memory :file :oci})
 (s/def :storage/dir string?)
 (s/def :storage/bucket string?)
 (s/def :conf/storage (s/keys :req-un [:storage/type]
@@ -83,7 +83,7 @@
                             :opt-un [:conf/dev-mode :conf/containers :conf/log-dir :conf/storage]))
 ;; Application context.  This is the result of processing the configuration and is passed
 ;; around internally.
-(s/def ::app-context (s/keys :req-un [:conf/http :ctx/runner :evt/event-bus :ctx/git]
+(s/def ::app-context (s/keys :req-un [:conf/http :ctx/runner :evt/event-bus :ctx/git :ctx/storage]
                              :opt-un [:conf/dev-mode :arg/command ::system :conf/args :ctx/build]))
 
 ;; Script configuration

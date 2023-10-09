@@ -99,7 +99,9 @@
   {:http
    {:port 3000}
    :runner
-   {:type :child}})
+   {:type :child}
+   :storage
+   {:type :memory}})
 
 (defn- merge-configs [configs]
   (reduce deep-merge default-app-config configs))
@@ -129,6 +131,7 @@
       (assoc :args args)
       (update-in [:http :port] #(or (:port args) %))
       (update-in [:runner :type] keyword)
+      (update-in [:storage :type] keyword)
       (set-work-dir)
       (set-checkout-base-dir)
       (set-log-dir)))
@@ -136,7 +139,7 @@
 (def default-script-config
   "Default configuration for the script runner."
   {:containers {:type :docker}
-   :storage {:type :file}})
+   :storage {:type :memory}})
 
 (defn script-config
   "Builds config map used by the child script process"

@@ -60,7 +60,7 @@
   "Event handler that looks up details for the given github webhook.  If the webhook 
    refers to a valid configuration, a build id is created and a new event is launched,
    which in turn should start the build runner."
-  [st {:keys [id payload] :as evt}]
+  [{st :storage} {:keys [id payload] :as evt}]
   (when-let [details (s/find-details-for-webhook st id)]
     (let [{:keys [master-branch clone-url]} (:repository payload)
           build-id (u/new-build-id)

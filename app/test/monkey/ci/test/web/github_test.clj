@@ -44,31 +44,6 @@
       (is (some? (sut/webhook req)))
       (is (not= :timeout (h/wait-until #(pos? (count @recv)) 500))))))
 
-#_(deftest build
-  (testing "converts payload and invokes runner"
-    (let [evt {:payload {:repository {:clone-url "https://test/repo.git"
-                                      :master-branch "master"}
-                         :head-commit {:message "Test commit"
-                                       :id "test-commit-id"}}}
-          ctx {:runner (comp :git :build)
-               :event evt
-               :args {:workdir "test-dir"}}]
-      (is (= {:url "https://test/repo.git"
-              :branch "master"
-              :id "test-commit-id"}
-             (-> (sut/build ctx)
-                 (select-keys [:url :branch :id]))))))
-
-  (testing "generates build id"
-    (is (string? (-> {:runner (comp :build-id :build)}
-                     (sut/build)))))
-
-  (testing "combines checkout base dir and build id for checkout dir"
-    (let [ctx {:runner (comp :dir :git :build)
-               :checkout-base-dir "test-dir"}]
-      (is (re-matches #".*test-dir/.*" 
-                      (sut/build ctx))))))
-
 (deftest prepare-build
   (testing "creates metadata file for customer/project/repo"
     (h/with-memory-store s
@@ -76,8 +51,9 @@
                                                :customer-id "test-customer"
                                                :project-id "test-project"
                                                :repo-id "test-repo"})))
-      (let [r (sut/prepare-build s {:id "test-webhook"
-                                    :payload {}})]
+      (let [r (sut/prepare-build {:storage s}
+                                 {:id "test-webhook"
+                                  :payload {}})]
         (is (some? r))
         (is (st/obj-exists? s (format "builds/test-customer/test-project/test-repo/%s/metadata.md"
                                       (get-in r [:build :build-id]))))))))
