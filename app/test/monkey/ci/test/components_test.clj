@@ -114,8 +114,8 @@
 (deftest storage
   (testing "creates file storage"
     (h/with-tmp-dir dir
-      (let [c (-> (sut/new-storage {:storage {:type :file
-                                              :dir dir}})
+      (let [c (-> (sut/->Storage {:storage {:type :file
+                                            :dir dir}})
                   (c/start))]
         (let [s (:storage c)
               l "test.edn"]
@@ -125,8 +125,8 @@
 
   (testing "`stop` removes storage"
     (h/with-tmp-dir dir
-      (is (nil? (-> (sut/new-storage {:storage {:type :file
-                                                :dir dir}})
+      (is (nil? (-> (sut/->Storage {:storage {:type :file
+                                              :dir dir}})
                     (c/start)
                     (c/stop)
                     :storage))))))

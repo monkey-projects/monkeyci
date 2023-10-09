@@ -61,8 +61,8 @@
     (is (string? (-> {:runner (comp :build-id :build)}
                      (sut/build)))))
 
-  (testing "combines work dir and build id for checkout dir"
+  (testing "combines checkout base dir and build id for checkout dir"
     (let [ctx {:runner (comp :dir :git :build)
-               :args {:workdir "test-dir"}}]
+               :checkout-base-dir "test-dir"}]
       (is (re-matches #".*test-dir/.*" 
                       (sut/build ctx))))))

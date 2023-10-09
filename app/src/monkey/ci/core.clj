@@ -28,7 +28,9 @@
    :http (-> (co/new-http-server)
              (sc/using [:context :listeners]))
    :listeners (-> (co/new-listeners)
-                  (sc/using [:bus :context]))))
+                  (sc/using [:bus :context]))
+   :storage (-> (co/new-storage)
+                (sc/using [:context]))))
 
 (def always-required-components [:bus :context])
 

@@ -108,5 +108,5 @@
   (stop [this]
     (dissoc this :storage)))
 
-(defn new-storage [ctx]
-  (->Storage ctx))
+(defn new-storage []
+  (->Storage nil))

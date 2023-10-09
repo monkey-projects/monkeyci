@@ -7,7 +7,9 @@
             [clojure.core.async :refer [go <!! <!]]
             [clojure.java.io :as io]
             [clojure.tools.logging :as log]
-            [monkey.ci.utils :as u]
+            [monkey.ci
+             [context :as ctx]
+             [utils :as u]]
             [monkey.ci.web.common :as c]))
 
 (defn extract-signature [s]
@@ -61,7 +63,7 @@
         {:keys [master-branch clone-url]} (:repository p)
         build-id (u/new-build-id)
         ;; Use combination of work dir and build id for checkout
-        workdir (.getCanonicalPath (io/file (get-in ctx [:args :workdir]) build-id))
+        workdir (ctx/checkout-dir ctx build-id)
         conf {:git {:url clone-url
                     :branch master-branch
                     :id (get-in p [:head-commit :id])
