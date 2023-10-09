@@ -33,6 +33,10 @@
     (is (false? (-> (sut/make-file-storage "test-dir")
                     (sut/obj-exists? "test-loc")))))
 
+  (testing "read returns `nil` if object does not exist"
+    (is (nil? (-> (sut/make-file-storage "nonexisting")
+                  (sut/read-obj "nonexisting-loc")))))
+
   (testing "delete-obj"
     (testing "can delete file"
       (h/with-tmp-dir dir

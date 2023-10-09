@@ -26,6 +26,12 @@
                              :github
                              :secret))))
 
+  (testing "takes storage config from env"
+    (is (= "test-dir" (-> {:monkeyci-storage-dir "test-dir"}
+                          (sut/app-config {})
+                          :storage
+                          :dir))))
+
   (testing "sets runner type"
     (is (= :test-type (-> {:monkeyci-runner-type "test-type"}
                           (sut/app-config {})

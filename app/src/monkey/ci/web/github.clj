@@ -61,7 +61,7 @@
    refers to a valid configuration, a build id is created and a new event is launched,
    which in turn should start the build runner."
   [{st :storage} {:keys [id payload] :as evt}]
-  (when-let [details (s/find-details-for-webhook st id)]
+  (if-let [details (s/find-details-for-webhook st id)]
     (let [{:keys [master-branch clone-url]} (:repository payload)
           build-id (u/new-build-id)
           conf {:git {:url clone-url
@@ -69,10 +69,11 @@
                       :id (get-in payload [:head-commit :id])}
                 :build-id build-id}]
       (when (s/create-build-metadata st (-> details
-                                          (dissoc :id)
-                                          (assoc :webhook-id id
-                                                 :build-id (:build-id conf)
-                                                 :commit-id (get-in conf [:git :id]))))
+                                            (dissoc :id)
+                                            (assoc :webhook-id id
+                                                   :build-id (:build-id conf)
+                                                   :commit-id (get-in conf [:git :id]))))
         {:type :webhook/validated
          :details details
-         :build conf}))))
+         :build conf}))
+    (log/warn "No webhook configuration found for" id)))

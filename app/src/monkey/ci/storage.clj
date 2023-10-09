@@ -25,8 +25,10 @@
 (defrecord FileStorage [dir]
   Storage
   (read-obj [_ loc]
-    (with-open [r (PushbackReader. (io/reader (io/file dir loc)))]
-      (edn/read r)))
+    (let [f (io/file dir loc)]
+      (when (.exists f)
+        (with-open [r (PushbackReader. (io/reader f))]
+          (edn/read r)))))
 
   (write-obj [_ loc obj]
     (let [f (io/file dir loc)]
@@ -65,7 +67,7 @@
 (defmulti make-storage :type)
 
 (defmethod make-storage :file [conf]
-  (make-file-storage (:dir conf)))
+  (make-file-storage (u/abs-path (:dir conf))))
 
 (defmethod make-storage :memory [conf]
   (make-memory-storage))
@@ -75,7 +77,7 @@
 (def ->path (partial cs/join "/"))
 
 (defn global-path [type id]
-  (->path ["global" (name type) id]))
+  (->path ["global" (name type) (str id ".edn")]))
 
 (def webhook-path (partial global-path :webhooks))
 
