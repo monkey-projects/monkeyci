@@ -47,13 +47,16 @@
 (deftest prepare-build
   (testing "creates metadata file for customer/project/repo"
     (h/with-memory-store s
-      (is (some? (st/create-webhook-details s {:id "test-webhook"
-                                               :customer-id "test-customer"
-                                               :project-id "test-project"
-                                               :repo-id "test-repo"})))
-      (let [r (sut/prepare-build {:storage s}
-                                 {:id "test-webhook"
-                                  :payload {}})]
-        (is (some? r))
-        (is (st/obj-exists? s (format "builds/test-customer/test-project/test-repo/%s/metadata.md"
-                                      (get-in r [:build :build-id]))))))))
+      (let [wh {:id "test-webhook"
+                :customer-id "test-customer"
+                :project-id "test-project"
+                :repo-id "test-repo"}]
+        (is (some? (st/create-webhook-details s wh)))
+        (let [r (sut/prepare-build {:storage s}
+                                   {:id "test-webhook"
+                                    :payload {}})]
+          (is (some? r))
+          (is (st/obj-exists? s (-> wh
+                                    (select-keys [:customer-id :project-id :repo-id])
+                                    (assoc :build-id (get-in r [:build :build-id]))
+                                    (st/build-metadata-sid)))))))))

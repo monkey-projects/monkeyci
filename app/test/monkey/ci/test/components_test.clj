@@ -131,7 +131,7 @@
                                             :dir dir}})
                   (c/start))]
         (let [s (:storage c)
-              l "test.edn"]
+              l ["test.edn"]]
           (is (some? s))
           (is (some? (st/write-obj s l {:key "value"})))
           (is (true? (st/obj-exists? s l)))))))
