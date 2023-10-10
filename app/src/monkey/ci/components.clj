@@ -93,7 +93,8 @@
        (map (partial apply e/register-handler bus))))
 
 (defn register-tx-handlers [ctx bus]
-  (->> {:webhook/github (map (partial wg/prepare-build ctx))}
+  (->> {:webhook/github (comp (map (partial wg/prepare-build ctx))
+                              (remove nil?))}
        (map (partial apply e/register-pipeline bus))))
 
 (defrecord Listeners [bus context]

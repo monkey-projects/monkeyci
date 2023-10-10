@@ -28,12 +28,13 @@
 (def ext ".edn")
 
 (defn- ->file [{:keys [dir]} sid]
-  (apply io/file dir (conj (butlast sid) (str (last sid) ext))))
+  (apply io/file dir (concat (butlast sid) [(str (last sid) ext)])))
 
 (defrecord FileStorage [dir]
   Storage
   (read-obj [fs loc]
     (let [f (->file fs loc)]
+      (log/trace "Checking for file at" f)
       (when (.exists f)
         (with-open [r (PushbackReader. (io/reader f))]
           (edn/read r)))))
@@ -51,6 +52,7 @@
     (.delete (->file fs loc))))
 
 (defn make-file-storage [dir]
+  (log/debug "File storage location:" dir)
   (->FileStorage dir))
 
 ;; In-memory implementation, provider for testing/development purposes
@@ -75,9 +77,11 @@
 (defmulti make-storage :type)
 
 (defmethod make-storage :file [conf]
+  (log/info "Using file storage with configuration:" conf)
   (make-file-storage (u/abs-path (:dir conf))))
 
 (defmethod make-storage :memory [conf]
+  (log/info "Using memory storage (only for dev purposes!)")
   (make-memory-storage))
 
 ;;; Higher level functions
