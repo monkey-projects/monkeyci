@@ -9,7 +9,7 @@
     (h/with-tmp-dir dir
       (let [s (sut/make-file-storage dir)
             obj {:key "value"}
-            loc ["test.edn"]]
+            loc ["test"]]
         (is (= (sut/write-obj s loc obj) loc))
         (is (= obj (sut/read-obj s loc))))))
 
@@ -17,7 +17,7 @@
     (h/with-tmp-dir dir
       (let [s (sut/make-file-storage dir)
             obj {:key "value"}
-            loc ["test.edn"]]
+            loc ["test"]]
         (is (= (sut/write-obj s loc obj) loc))
         (is (true? (sut/obj-exists? s loc))))))
 
@@ -25,7 +25,7 @@
     (h/with-tmp-dir dir
       (let [s (sut/make-file-storage dir)
             obj {:key "value"}
-            loc ["subdir" "test.edn"]]
+            loc ["subdir" "test"]]
         (is (= (sut/write-obj s loc obj) loc))
         (is (= obj (sut/read-obj s loc))))))
 
@@ -85,7 +85,7 @@
         (is (sut/sid? (sut/create-build-results st md {:status :success})))
         (is (= :success (:status (sut/find-build-results st md))))))))
 
-(deftest ^:kaocha/skip save-build-result
+(deftest save-build-result
   (testing "writes to build result object"
     (h/with-memory-store st
       (let [ctx {:storage st}

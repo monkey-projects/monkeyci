@@ -8,11 +8,13 @@
 
 (defprotocol Storage
   "Low level storage protocol, that basically allows to store and retrieve
-   information by location."
-  (read-obj [this loc] "Read object at given location")
-  (write-obj [this loc obj] "Writes object to location")
-  (delete-obj [this loc] "Deletes object at location")
-  (obj-exists? [this loc] "Checks if object at location exists"))
+   information by location (aka storage id or sid)."
+  (read-obj [this sid] "Read object at given location")
+  (write-obj [this sid obj] "Writes object to location")
+  (delete-obj [this sid] "Deletes object at location")
+  (obj-exists? [this sid] "Checks if object at location exists"))
+
+(def sid? vector?)
 
 (defn- ensure-dir-exists
   "Given a path, creates the parent directories if they do not exist already."
@@ -22,25 +24,30 @@
       (.mkdirs p)
       true)))
 
+(def ext ".edn")
+
+(defn- ->file [{:keys [dir]} sid]
+  (apply io/file dir (conj (butlast sid) (str (last sid) ext))))
+
 (defrecord FileStorage [dir]
   Storage
-  (read-obj [_ loc]
-    (let [f (io/file dir loc)]
+  (read-obj [fs loc]
+    (let [f (->file fs loc)]
       (when (.exists f)
         (with-open [r (PushbackReader. (io/reader f))]
           (edn/read r)))))
 
-  (write-obj [_ loc obj]
-    (let [f (io/file dir loc)]
+  (write-obj [fs loc obj]
+    (let [f (->file fs loc)]
       (when (ensure-dir-exists f)
         (spit f (pr-str obj))
-        (.getCanonicalPath f))))
+        loc)))
 
-  (obj-exists? [_ loc]
-    (.exists (io/file dir loc)))
+  (obj-exists? [fs loc]
+    (.exists (->file fs loc)))
 
-  (delete-obj [_ loc]
-    (.delete (io/file dir loc))))
+  (delete-obj [fs loc]
+    (.delete (->file fs loc))))
 
 (defn make-file-storage [dir]
   (->FileStorage dir))
@@ -72,24 +79,58 @@
 (defmethod make-storage :memory [conf]
   (make-memory-storage))
 
-;;; Listeners
+;;; Higher level functions
 
-(def ->path (partial cs/join "/"))
+(defn global-sid [type id]
+  ["global" (name type) id])
 
-(defn global-path [type id]
-  (->path ["global" (name type) (str id ".edn")]))
+(def webhook-sid (partial global-sid :webhooks))
 
-(def webhook-path (partial global-path :webhooks))
-
-(def build-path
-  (comp ->path
-        (juxt (constantly "builds") :customer-id :project-id :repo-id :build-id)))
+(def build-sid-keys [:customer-id :project-id :repo-id :build-id])
+(def build-sid (apply juxt build-sid-keys))
 
 (defn create-webhook-details [s details]
-  (write-obj s (webhook-path (:id details)) details))
+  (write-obj s (webhook-sid (:id details)) details))
 
 (defn find-details-for-webhook [s id]
-  (read-obj s (webhook-path id)))
+  (read-obj s (webhook-sid id)))
 
-(defn create-build-metadata [s md]
-  (write-obj s (->path [(build-path md) "metadata.md"]) md))
+(defn- build-sub-sid [obj p]
+  (conj (build-sid obj) p))
+
+(defn- sub-sid-builder [f]
+  (fn [c]
+    (if (sid? c)
+      (conj c f)
+      (build-sub-sid c f))))
+
+(def build-metadata-sid (sub-sid-builder "metadata"))
+(def build-results-sid  (sub-sid-builder "results"))
+
+(defn create-build-metadata
+  ([s sid md]
+   (write-obj s (build-metadata-sid sid) md))
+  ([s md]
+   (create-build-metadata s md md)))
+
+(defn find-build-metadata
+  "Reads the build metadata given the build coordinates (required to build the path)"
+  [s sid]
+  (read-obj s (build-metadata-sid sid)))
+
+(defn create-build-results [s sid r]
+  (write-obj s (build-results-sid sid) r))
+
+(defn find-build-results
+  "Reads the build results given the build coordinates"
+  [s sid]
+  (read-obj s (build-results-sid sid)))
+
+;;; Listeners
+
+(defn save-build-result
+  "Handles a `build/completed` event to store the result."
+  [ctx evt]
+  (create-build-results (:storage ctx)
+                        (get-in evt [:build :sid])
+                        (select-keys evt [:exit :result])))

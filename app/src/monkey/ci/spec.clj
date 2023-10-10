@@ -69,9 +69,10 @@
 (s/def :ctx/runner fn?)
 (s/def :build/script-dir string?)
 (s/def :build/checkout-dir string?)
+(s/def :build/coords vector?)
 (s/def :build/build-id string?)
 (s/def :ctx/build (s/keys :req-un [:build/script-dir :build/build-id :build/checkout-dir]
-                          :opt-un [:conf/pipeline :build/git]))
+                          :opt-un [:conf/pipeline :build/git :build/coords]))
 
 ;; Arguments as passed in from the CLI
 (s/def :conf/args (s/keys :opt-un [:conf/dev-mode :arg/pipeline :arg/dir :arg/workdir

@@ -64,15 +64,18 @@
   (if-let [details (s/find-details-for-webhook st id)]
     (let [{:keys [master-branch clone-url]} (:repository payload)
           build-id (u/new-build-id)
+          commit-id (get-in payload [:head-commit :id])
+          md (-> details
+                 (dissoc :id)
+                 (assoc :webhook-id id
+                        :build-id build-id
+                        :commit-id commit-id))
           conf {:git {:url clone-url
                       :branch master-branch
-                      :id (get-in payload [:head-commit :id])}
+                      :id commit-id}
+                :sid (s/build-sid md) ; Build storage id
                 :build-id build-id}]
-      (when (s/create-build-metadata st (-> details
-                                            (dissoc :id)
-                                            (assoc :webhook-id id
-                                                   :build-id (:build-id conf)
-                                                   :commit-id (get-in conf [:git :id]))))
+      (when (s/create-build-metadata st md)
         {:type :webhook/validated
          :details details
          :build conf}))

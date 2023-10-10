@@ -26,17 +26,26 @@
   ;; Nonzero exit code
   1)
 
-(defn build-completed [{{:keys [result exit] :as evt} :event :keys [build] :as ctx}]
-  ;; Do some logging depending on the result
+(defn- log-build-result
+  "Do some logging depending on the result"
+  [{:keys [result] :as evt}]
   (condp = (or result :unknown)
     :success (log/info "Success!")
     :warning (log/warn "Exited with warnings:" (:message evt))
     :error   (log/error "Failure.")
-    :unknown (log/warn "Unknown result."))
+    :unknown (log/warn "Unknown result.")))
+
+(defn- cleanup-checkout-dir!
+  "Deletes the checkout dir, but only if it is not the current working directory."
+  [build]
   (let [wd (get-in build [:git :dir])]
     (when (and wd (not= wd (u/cwd)))
       (log/debug "Cleaning up checkout dir" wd)
-      (u/delete-dir wd)))
+      (u/delete-dir wd))))
+
+(defn build-completed [{{:keys [exit] :as evt} :event :keys [build]}]
+  (log-build-result evt)
+  (cleanup-checkout-dir! build)
   exit)
 
 (defn build-local
