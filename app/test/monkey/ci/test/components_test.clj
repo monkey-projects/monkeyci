@@ -91,18 +91,26 @@
                              (c/start)
                              :storage)))))
 
+(defn- verify-event-handled
+  ([ctx evt verifier]
+   (h/with-bus
+     (fn [bus]
+       (is (true? (->> (sut/map->Listeners {:bus bus
+                                            :context ctx})
+                       (c/start)
+                       :handlers
+                       (every? e/handler?))))
+       (is (true? (e/post-event bus evt)))
+       (is (true? (h/wait-until verifier 200))))))
+  ([evt verifier]
+   (verify-event-handled {} evt verifier)))
+
 (defmacro validate-listener [type h]
   `(let [invoked# (atom false)]
      (with-redefs [~h (fn [& _#]
                         (reset! invoked# true))]
-       (h/with-bus
-         (fn [bus#]
-           (is (true? (->> (sut/map->Listeners {:bus bus#})
-                           (c/start)
-                           :handlers
-                           (every? e/handler?))))
-           (is (true? (e/post-event bus# {:type ~type})))
-           (is (true? (h/wait-until #(deref invoked#) 200))))))))
+       (verify-event-handled {:type ~type}
+                             #(deref invoked#)))))
 
 (deftest listeners
   (testing "registers github webhook listener"
@@ -110,6 +118,17 @@
 
   (testing "registers build runner listener"
     (validate-listener :webhook/validated r/build))
+
+  (testing "registers build completed listener"
+    (h/with-memory-store st
+      (let [sid ["test-build"]]
+        (verify-event-handled
+         {:storage st}
+         {:type :build/completed
+          :build {:sid sid}
+          :exit 1}
+         (fn []
+           (some? (st/find-build-results st sid)))))))
 
   (testing "unregisters handlers on stop"
     (let [invoked? (atom false)]

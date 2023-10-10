@@ -3,6 +3,7 @@
   (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
             [clojure.string :as cs]
+            [clojure.tools.logging :as log]
             [monkey.ci.utils :as u])
   (:import [java.io File PushbackReader]))
 
@@ -131,6 +132,8 @@
 (defn save-build-result
   "Handles a `build/completed` event to store the result."
   [ctx evt]
-  (create-build-results (:storage ctx)
-                        (get-in evt [:build :sid])
-                        (select-keys evt [:exit :result])))
+  (let [r (select-keys evt [:exit :result])]
+    (log/debug "Saving build result:" r)
+    (create-build-results (:storage ctx)
+                          (get-in evt [:build :sid])
+                          r)))

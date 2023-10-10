@@ -83,6 +83,7 @@
 
 (defn register-handlers [ctx bus]
   (->> {:webhook/validated (ctx-async ctx r/build)
+        :build/completed (partial st/save-build-result ctx)
         :script/start logger
         :script/end logger
         :pipeline/start logger
