@@ -1,6 +1,8 @@
 (ns monkey.ci.test.web.github-test
   (:require [clojure.test :refer [deftest testing is]]
-            [monkey.ci.events :as events]
+            [monkey.ci
+             [events :as events]
+             [storage :as st]]
             [monkey.ci.web.github :as sut]
             [monkey.ci.test.helpers :as h]
             [ring.mock.request :as mock]))
@@ -42,27 +44,25 @@
       (is (some? (sut/webhook req)))
       (is (not= :timeout (h/wait-until #(pos? (count @recv)) 500))))))
 
-(deftest build
-  (testing "converts payload and invokes runner"
-    (let [evt {:payload {:repository {:clone-url "https://test/repo.git"
-                                      :master-branch "master"}
-                         :head-commit {:message "Test commit"
-                                       :id "test-commit-id"}}}
-          ctx {:runner (comp :git :build)
-               :event evt
-               :args {:workdir "test-dir"}}]
-      (is (= {:url "https://test/repo.git"
-              :branch "master"
-              :id "test-commit-id"}
-             (-> (sut/build ctx)
-                 (select-keys [:url :branch :id]))))))
+(deftest prepare-build
+  (testing "creates metadata file for customer/project/repo"
+    (h/with-memory-store s
+      (let [wh {:id "test-webhook"
+                :customer-id "test-customer"
+                :project-id "test-project"
+                :repo-id "test-repo"}]
+        (is (some? (st/create-webhook-details s wh)))
+        (let [r (sut/prepare-build {:storage s}
+                                   {:id "test-webhook"
+                                    :payload {}})]
+          (is (some? r))
+          (is (st/obj-exists? s (-> wh
+                                    (select-keys [:customer-id :project-id :repo-id])
+                                    (assoc :build-id (get-in r [:build :build-id]))
+                                    (st/build-metadata-sid))))))))
 
-  (testing "generates build id"
-    (is (string? (-> {:runner (comp :build-id :build)}
-                     (sut/build)))))
-
-  (testing "combines work dir and build id for checkout dir"
-    (let [ctx {:runner (comp :dir :git :build)
-               :args {:workdir "test-dir"}}]
-      (is (re-matches #".*test-dir/.*" 
-                      (sut/build ctx))))))
+  (testing "`nil` if no configured webhook found"
+    (h/with-memory-store s
+      (is (nil? (sut/prepare-build {:storage s}
+                                   {:id "test-webhook"
+                                    :payload {}}))))))

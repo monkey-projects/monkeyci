@@ -26,6 +26,12 @@
                              :github
                              :secret))))
 
+  (testing "takes storage config from env"
+    (is (= "test-dir" (-> {:monkeyci-storage-dir "test-dir"}
+                          (sut/app-config {})
+                          :storage
+                          :dir))))
+
   (testing "sets runner type"
     (is (= :test-type (-> {:monkeyci-runner-type "test-type"}
                           (sut/app-config {})
@@ -50,7 +56,7 @@
       (let [f (io/file dir "test-config.edn")]
         (is (nil? (spit f (pr-str {:log-dir "some-log-dir"}))))
         (let [c (sut/app-config {} {:config-file (.getCanonicalPath f)})]
-          (is (= "some-log-dir" (:log-dir c)))))))
+          (is (cs/ends-with? (:log-dir c) "some-log-dir"))))))
 
   (testing "loads global config file"
     (h/with-tmp-dir dir
@@ -59,7 +65,7 @@
         (binding [sut/*global-config-file* f]
           (is (nil? (spit f (pr-str {:log-dir "some-log-dir"}))))
           (let [c (sut/app-config {} {})]
-            (is (= "some-log-dir" (:log-dir c))))))))
+            (is (cs/ends-with? (:log-dir c) "some-log-dir")))))))
 
   (testing "loads home config file"
     (h/with-tmp-dir dir
@@ -68,7 +74,7 @@
         (binding [sut/*home-config-file* f]
           (is (nil? (spit f (pr-str {:log-dir "some-log-dir"}))))
           (let [c (sut/app-config {} {})]
-            (is (= "some-log-dir" (:log-dir c))))))))
+            (is (cs/ends-with? (:log-dir c) "some-log-dir")))))))
 
   (testing "global `work-dir`"
     (testing "uses current as default"

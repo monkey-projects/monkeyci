@@ -8,17 +8,18 @@
 (defn checkout-dir
   "Calculates the checkout directory for the build, by combining the checkout
    base directory and the build id."
-  [ctx]
-  (some-> ctx
-          :checkout-base-dir
-          (u/combine (get-in ctx [:build :build-id]))))
+  ([ctx build-id]
+   (some-> ctx
+           :checkout-base-dir
+           (u/combine build-id)))
+  ([ctx]
+   (checkout-dir ctx (get-in ctx [:build :build-id]))))
 
 (defn log-dir
   "Gets the directory where to store log files"
   [ctx]
   (or (some-> (:log-dir ctx) (u/abs-path))
       (u/combine (u/tmp-dir) "logs")))
-
 
 (def step-work-dir
   "Given a context, determines the step working directory.  This is either the
@@ -27,5 +28,6 @@
    (memfn getCanonicalPath)
    io/file
    (some-fn (comp :work-dir :step)
-            :work-dir
+            :checkout-dir
             (constantly (u/cwd)))))
+

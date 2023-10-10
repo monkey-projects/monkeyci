@@ -26,17 +26,26 @@
   ;; Nonzero exit code
   1)
 
-(defn build-completed [{{:keys [result exit] :as evt} :event :keys [build] :as ctx}]
-  ;; Do some logging depending on the result
+(defn- log-build-result
+  "Do some logging depending on the result"
+  [{:keys [result] :as evt}]
   (condp = (or result :unknown)
     :success (log/info "Success!")
     :warning (log/warn "Exited with warnings:" (:message evt))
     :error   (log/error "Failure.")
-    :unknown (log/warn "Unknown result."))
+    :unknown (log/warn "Unknown result.")))
+
+(defn- cleanup-checkout-dir!
+  "Deletes the checkout dir, but only if it is not the current working directory."
+  [build]
   (let [wd (get-in build [:git :dir])]
     (when (and wd (not= wd (u/cwd)))
       (log/debug "Cleaning up checkout dir" wd)
-      (u/delete-dir wd)))
+      (u/delete-dir wd))))
+
+(defn build-completed [{{:keys [exit] :as evt} :event :keys [build]}]
+  (log-build-result evt)
+  (cleanup-checkout-dir! build)
   exit)
 
 (defn build-local
@@ -90,3 +99,17 @@
   ;; Fallback
   (log/warn "No runner configured, using fallback configuration")
   (constantly 2))
+
+(defn build
+  "Event handler that reacts to a prepared build event.  The incoming event
+   should contain the necessar information to start the build.  The build 
+   runner performs the repo clone and checkout and runs the script."
+  [{:keys [runner] :as ctx}]
+  (let [{:keys [build-id] :as build} (get-in ctx [:event :build])
+        ;; Use combination of checkout dir and build id for checkout
+        workdir (c/checkout-dir ctx build-id)
+        conf (assoc-in build [:git :dir] workdir)]
+    (log/debug "Starting build with config:" conf)
+    (-> ctx
+        (assoc :build conf)
+        (runner))))

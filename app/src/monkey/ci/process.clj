@@ -66,7 +66,7 @@
 (defn- build-args
   "Builds command-line args vector for script process"
   [{:keys [build]}]
-  (->> (select-keys build [:work-dir :script-dir :pipeline])
+  (->> (select-keys build [:checkout-dir :script-dir :pipeline])
        (mc/remove-vals nil?)
        (mc/map-keys str)
        (mc/map-vals pr-str)
@@ -113,7 +113,7 @@
    clojure cli with a generated `build` alias.  This expects absolute directories.
    Returns an object that can be `deref`ed to wait for the process to exit.  Will
    post a `build/completed` event on process exit."
-  [{{:keys [checkout-dir script-dir build-id]} :build bus :event-bus :as ctx}]
+  [{{:keys [checkout-dir script-dir build-id] :as build} :build bus :event-bus :as ctx}]
   (log/info "Executing build process for" build-id "in" checkout-dir)
   (let [{:keys [socket-path socket]} (when bus
                                        (events-to-bus bus build-id))]
@@ -129,7 +129,7 @@
       :extra-env (-> {:event
                        {:socket socket-path}}
                      (assoc :build-id build-id)
-                     (merge (select-keys ctx [:containers]))
+                     (merge (select-keys ctx [:containers :log-dir]))
                      (config/config->env))
       :exit-fn (fn [{:keys [proc] :as p}]
                  (let [exit (or (some-> proc (.exitValue)) 0)]
@@ -141,7 +141,7 @@
                    (when bus
                      (log/debug "Posting build/completed event")
                      (e/post-event bus {:type :build/completed
-                                        :build-id build-id
+                                        :build build
                                         :exit exit
                                         :result (if (zero? exit) :success :error)
                                         :process p}))))})))

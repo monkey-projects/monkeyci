@@ -2,10 +2,13 @@
   (:require [camel-snake-kebab.core :as csk]
             [cheshire.core :as json]
             [clojure.edn :as edn]
-            [clojure.java.io :as io]
+            [clojure.java.io :as io]            
             [com.stuartsierra.component :as sc]
+            [config.core :as cc]
             [monkey.ci
+             [config :as config]
              [core :as c]
+             [storage :as s]
              [utils :as u]]
             [buddy.core
              [codecs :as codecs]
@@ -27,13 +30,10 @@
 
 (defn start-server []
   (stop-server)
-  (reset! server (-> c/base-system
-                     (assoc :config {:dev-mode true
-                                     :github {:secret secret}
-                                     :args {:workdir "tmp"}
-                                     :runner {:type :child}
-                                     :log-dir (u/abs-path "target/logs")
-                                     :containers {:type :podman}})
+  (reset! server (-> c/base-system                     
+                     (assoc :config (-> (config/app-config cc/env {:dev-mode true :workdir "tmp"})
+                                        (assoc :github {:secret secret}
+                                               :log-dir (u/abs-path "target/logs"))))
                      (sc/subsystem [:http])
                      (sc/start-system)))
   nil)
@@ -63,13 +63,14 @@
 (defn post-example-webhook
   "Posts example webhook to the local server"
   [{:keys [url body secret]}]
-  (let [url (or url (format "http://localhost:%d/webhook/github" (get-server-port)))
+  (let [url (or url (format "http://localhost:%d/webhook/github/test-hook" (get-server-port)))
         body (or body (load-example-github-webhook))
         json (json/generate-string body {:key-fn (comp csk/->camelCase name)})]
-    (-> (client/post url
-                     {:body json
-                      :headers (cond-> {"content-type" "application/json"}
-                                 secret (assoc "x-hub-signature-256" (str "sha256=" (generate-signature secret json))))})
+    (-> (client/post
+         url
+         {:body json
+          :headers (cond-> {"content-type" "application/json"}
+                     secret (assoc "x-hub-signature-256" (str "sha256=" (generate-signature secret json))))})
         deref
         :status)))
 

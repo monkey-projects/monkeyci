@@ -2,7 +2,9 @@
   "Helper functions for testing"
   (:require [clojure.java.io :as io]
             [clojure.core.async :as ca]
-            [monkey.ci.events :as e])
+            [monkey.ci
+             [events :as e]
+             [storage :as s]])
   (:import org.apache.commons.io.FileUtils))
 
 (defn ^java.io.File create-tmp-dir []
@@ -46,3 +48,11 @@
       (f bus)
       (finally
         (e/close-bus bus)))))
+
+(defn with-memory-store-fn [f]
+  (f (s/make-memory-storage)))
+
+(defmacro with-memory-store [s & body]
+  `(with-memory-store-fn
+     (fn [~s]
+       ~@body)))

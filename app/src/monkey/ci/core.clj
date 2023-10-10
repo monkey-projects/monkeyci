@@ -24,11 +24,14 @@
    :bus (co/new-bus)
    :context (-> (co/new-context nil)
                 (sc/using {:event-bus :bus
-                           :config :config}))
+                           :config :config
+                           :storage :storage}))
    :http (-> (co/new-http-server)
              (sc/using [:context :listeners]))
    :listeners (-> (co/new-listeners)
-                  (sc/using [:bus :context]))))
+                  (sc/using [:bus :context]))
+   :storage (-> (co/new-storage)
+                (sc/using [:config]))))
 
 (def always-required-components [:bus :context])
 

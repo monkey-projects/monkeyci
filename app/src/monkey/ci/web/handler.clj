@@ -27,8 +27,8 @@
 
 (def routes
   [["/health" {:get health}]
-   ["/webhook/github" {:post github/webhook
-                       :middleware [:github-security]}]])
+   ["/webhook/github/:id" {:post {:handler github/webhook}
+                           :middleware [:github-security]}]])
 
 (defn- stringify-body
   "Since the raw body could be read more than once (security, content negotation...),

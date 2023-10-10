@@ -7,7 +7,10 @@
             [clojure.core.async :refer [go <!! <!]]
             [clojure.java.io :as io]
             [clojure.tools.logging :as log]
-            [monkey.ci.utils :as u]
+            [monkey.ci
+             [context :as ctx]
+             [storage :as s]
+             [utils :as u]]
             [monkey.ci.web.common :as c]))
 
 (defn extract-signature [s]
@@ -48,26 +51,32 @@
   (<!!
    (go
      {:status (if (<! (c/post-event req {:type :webhook/github
+                                         :id (get-in req [:path-params :id])
                                          :payload (:body-params req)}))
                 200
                 500)})))
 
-(defn build
-  "Handles webhook build event by preparing the config to actually
-   launch the build script.  The build runner performs the repo clone and
-   checkout and runs the script."
-  [{:keys [runner] :as ctx}]
-  (let [p (get-in ctx [:event :payload])
-        {:keys [master-branch clone-url]} (:repository p)
-        build-id (u/new-build-id)
-        ;; Use combination of work dir and build id for checkout
-        workdir (.getCanonicalPath (io/file (get-in ctx [:args :workdir]) build-id))
-        conf {:git {:url clone-url
-                    :branch master-branch
-                    :id (get-in p [:head-commit :id])
-                    :dir workdir}
-              :build-id build-id}]
-    (log/debug "Starting build with config:" conf)
-    (-> ctx
-        (assoc :build conf)
-        (runner))))
+(defn prepare-build
+  "Event handler that looks up details for the given github webhook.  If the webhook 
+   refers to a valid configuration, a build id is created and a new event is launched,
+   which in turn should start the build runner."
+  [{st :storage} {:keys [id payload] :as evt}]
+  (if-let [details (s/find-details-for-webhook st id)]
+    (let [{:keys [master-branch clone-url]} (:repository payload)
+          build-id (u/new-build-id)
+          commit-id (get-in payload [:head-commit :id])
+          md (-> details
+                 (dissoc :id)
+                 (assoc :webhook-id id
+                        :build-id build-id
+                        :commit-id commit-id))
+          conf {:git {:url clone-url
+                      :branch master-branch
+                      :id commit-id}
+                :sid (s/build-sid md) ; Build storage id
+                :build-id build-id}]
+      (when (s/create-build-metadata st md)
+        {:type :webhook/validated
+         :details details
+         :build conf}))
+    (log/warn "No webhook configuration found for" id)))

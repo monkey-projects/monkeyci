@@ -63,7 +63,7 @@
             (reduce (fn [r v]
                       (group-keys v r))
                     c
-                    [:github :runner :containers]))]
+                    [:github :runner :containers :storage]))]
     (->> env
          (filter-and-strip-keys env-prefix)
          (group-all-keys)
@@ -99,7 +99,9 @@
   {:http
    {:port 3000}
    :runner
-   {:type :child}})
+   {:type :child}
+   :storage
+   {:type :memory}})
 
 (defn- merge-configs [configs]
   (reduce deep-merge default-app-config configs))
@@ -110,10 +112,10 @@
                                         (u/cwd)))))
 
 (defn- set-checkout-base-dir [conf]
-  (update conf :checkout-base-dir #(or % (u/combine (:work-dir conf) "checkout"))))
+  (update conf :checkout-base-dir #(or (u/abs-path %) (u/combine (:work-dir conf) "checkout"))))
 
 (defn- set-log-dir [conf]
-  (update conf :log-dir #(or % (u/combine (:work-dir conf) "logs"))))
+  (update conf :log-dir #(or (u/abs-path %) (u/combine (:work-dir conf) "logs"))))
 
 (defn app-config
   "Combines app environment with command-line args into a unified 
@@ -129,13 +131,15 @@
       (assoc :args args)
       (update-in [:http :port] #(or (:port args) %))
       (update-in [:runner :type] keyword)
+      (update-in [:storage :type] keyword)
       (set-work-dir)
       (set-checkout-base-dir)
       (set-log-dir)))
 
 (def default-script-config
   "Default configuration for the script runner."
-  {:containers {:type :docker}})
+  {:containers {:type :docker}
+   :storage {:type :memory}})
 
 (defn script-config
   "Builds config map used by the child script process"

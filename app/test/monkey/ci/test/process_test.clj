@@ -85,10 +85,10 @@
                             :args
                             :dir))))
 
-    (testing "passes work dir in edn"
-      (is (= "\"work-dir\"" (-> {:build {:work-dir "work-dir"}}
+    (testing "passes checkout dir in edn"
+      (is (= "\"work-dir\"" (-> {:build {:checkout-dir "work-dir"}}
                                 (sut/execute!)
-                                (find-arg :work-dir)))))
+                                (find-arg :checkout-dir)))))
 
     (testing "passes script dir in edn"
       (is (= "\"script-dir\"" (-> {:build {:script-dir "script-dir"}}

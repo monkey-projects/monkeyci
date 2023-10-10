@@ -148,3 +148,25 @@
     (let [r (sut/make-runner {})]
       (is (fn? r))
       (is (pos? (r {}))))))
+
+(deftest build
+  (testing "converts payload and invokes runner"
+    (let [evt {:build {:build-id "test-build"
+                       :git {:id "test-commit-id"
+                             :branch "master"
+                             :url "https://test/repo.git"}}}
+          ctx {:runner (comp :git :build)
+               :event evt
+               :checkout-base-dir "test-dir"}]
+      (is (= {:url "https://test/repo.git"
+              :branch "master"
+              :id "test-commit-id"}
+             (-> (sut/build ctx)
+                 (select-keys [:url :branch :id]))))))
+
+  (testing "combines checkout base dir and build id for checkout dir"
+    (let [ctx {:runner (comp :dir :git :build)
+               :event {:build {:build-id "test-build"}}
+               :checkout-base-dir "test-dir"}]
+      (is (re-matches #".*test-dir/test-build" 
+                      (sut/build ctx))))))

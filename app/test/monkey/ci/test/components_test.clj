@@ -8,7 +8,9 @@
              [config :as config]
              [events :as e]
              [git :as git]
-             [spec :as spec]]
+             [runners :as r]
+             [spec :as spec]
+             [storage :as st]]
             [monkey.ci.web
              [handler :as wh]
              [github :as github]]
@@ -81,26 +83,57 @@
                                          (reset! captured-args args))]
         (is (= "test-dir" (git-fn {:url "test-url"
                                    :dir "test-dir"})))
-        (is (= ["test-url" nil nil "test-dir"] @captured-args))))))
+        (is (= ["test-url" nil nil "test-dir"] @captured-args)))))
+
+  (testing "sets storage"
+    (is (= :test-storage (-> (sut/new-context :test-cmd)
+                             (assoc :storage {:storage :test-storage})
+                             (c/start)
+                             :storage)))))
+
+(defn- verify-event-handled
+  ([ctx evt verifier]
+   (h/with-bus
+     (fn [bus]
+       (is (true? (->> (sut/map->Listeners {:bus bus
+                                            :context ctx})
+                       (c/start)
+                       :handlers
+                       (every? e/handler?))))
+       (is (true? (e/post-event bus evt)))
+       (is (true? (h/wait-until verifier 200))))))
+  ([evt verifier]
+   (verify-event-handled {} evt verifier)))
+
+(defmacro validate-listener [type h]
+  `(let [invoked# (atom false)]
+     (with-redefs [~h (fn [& _#]
+                        (reset! invoked# true))]
+       (verify-event-handled {:type ~type}
+                             #(deref invoked#)))))
 
 (deftest listeners
   (testing "registers github webhook listener"
-    (let [invoked? (atom false)]
-      (with-redefs [github/build (fn [_]
-                                   (reset! invoked? true))]
-        (h/with-bus
-          (fn [bus]
-            (is (true? (->> (sut/map->Listeners {:bus bus})
-                            (c/start)
-                            :handlers
-                            (every? e/handler?))))
-            (is (true? (e/post-event bus {:type :webhook/github})))
-            (is (true? (h/wait-until #(deref invoked?) 200))))))))
+    (validate-listener :webhook/github github/prepare-build))
+
+  (testing "registers build runner listener"
+    (validate-listener :webhook/validated r/build))
+
+  (testing "registers build completed listener"
+    (h/with-memory-store st
+      (let [sid ["test-build"]]
+        (verify-event-handled
+         {:storage st}
+         {:type :build/completed
+          :build {:sid sid}
+          :exit 1}
+         (fn []
+           (some? (st/find-build-results st sid)))))))
 
   (testing "unregisters handlers on stop"
     (let [invoked? (atom false)]
-      (with-redefs [github/build (fn [_]
-                                   (reset! invoked? true))]
+      (with-redefs [github/prepare-build (fn [_]
+                                           (reset! invoked? true))]
         (h/with-bus
           (fn [bus]
             (is (nil? (->> (sut/map->Listeners {:bus bus})
@@ -109,3 +142,23 @@
                            :handlers)))
             (is (true? (e/post-event bus {:type :webhook/github})))
             (is (= :timeout (h/wait-until #(deref invoked?) 200)))))))))
+
+(deftest storage
+  (testing "creates file storage"
+    (h/with-tmp-dir dir
+      (let [c (-> (sut/->Storage {:storage {:type :file
+                                            :dir dir}})
+                  (c/start))]
+        (let [s (:storage c)
+              l ["test.edn"]]
+          (is (some? s))
+          (is (some? (st/write-obj s l {:key "value"})))
+          (is (true? (st/obj-exists? s l)))))))
+
+  (testing "`stop` removes storage"
+    (h/with-tmp-dir dir
+      (is (nil? (-> (sut/->Storage {:storage {:type :file
+                                              :dir dir}})
+                    (c/start)
+                    (c/stop)
+                    :storage))))))

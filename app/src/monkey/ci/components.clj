@@ -8,7 +8,8 @@
              [events :as e]
              [git :as git]
              [process :as p]
-             [runners :as r]]
+             [runners :as r]
+             [storage :as st]]
             [monkey.ci.web
              [github :as wg]
              [handler :as web]]))
@@ -52,14 +53,15 @@
                ;; Return the checkout dir
                (:dir opts))}})
 
-(defrecord Context [command config event-bus]
+(defrecord Context [command config event-bus storage]
   c/Lifecycle
   (start [this]
     (-> this
         (merge default-context)
-        (merge config)
         (dissoc :config)
-        (update :runner r/make-runner)))
+        (merge config)
+        (update :runner r/make-runner)
+        (assoc :storage (:storage storage))))
   (stop [this]
     this))
 
@@ -74,20 +76,32 @@
     (ca/thread
       (f (e/with-ctx ctx evt)))))
 
-(defn logger [evt]
+(defn logger
+  "Event handler that just logs the message"
+  [evt]
   (log/info (:message evt)))
+
+(defn register-handlers [ctx bus]
+  (->> {:webhook/validated (ctx-async ctx r/build)
+        :build/completed (partial st/save-build-result ctx)
+        :script/start logger
+        :script/end logger
+        :pipeline/start logger
+        :pipeline/end logger
+        :step/start logger
+        :step/end logger}
+       (map (partial apply e/register-handler bus))))
+
+(defn register-tx-handlers [ctx bus]
+  (->> {:webhook/github (comp (map (partial wg/prepare-build ctx))
+                              (remove nil?))}
+       (map (partial apply e/register-pipeline bus))))
 
 (defrecord Listeners [bus context]
   c/Lifecycle
   (start [this]
-    (->> {:webhook/github (ctx-async context wg/build)
-          :script/start logger
-          :script/end logger
-          :pipeline/start logger
-          :pipeline/end logger
-          :step/start logger
-          :step/end logger}
-         (map (partial apply e/register-handler bus))
+    (->> (concat (register-handlers context bus)
+                 (register-tx-handlers context bus))
          (doall)
          (assoc this :handlers)))
   
@@ -98,3 +112,14 @@
 
 (defn new-listeners []
   (map->Listeners {}))
+
+(defrecord Storage [config]
+  c/Lifecycle
+  (start [this]
+    (assoc this :storage (st/make-storage (:storage config))))
+  
+  (stop [this]
+    (dissoc this :storage)))
+
+(defn new-storage []
+  (->Storage nil))
