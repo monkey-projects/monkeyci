@@ -69,7 +69,10 @@
                  (dissoc :id)
                  (assoc :webhook-id id
                         :build-id build-id
-                        :commit-id commit-id))
+                        :commit-id commit-id)
+                 (merge (-> payload
+                            :head-commit
+                            (select-keys [:timestamp :message]))))
           conf {:git {:url clone-url
                       :branch master-branch
                       :id commit-id}

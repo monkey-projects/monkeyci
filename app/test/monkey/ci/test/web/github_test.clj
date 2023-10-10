@@ -61,6 +61,21 @@
                                     (assoc :build-id (get-in r [:build :build-id]))
                                     (st/build-metadata-sid))))))))
 
+  (testing "metadata contains commit timestamp and message"
+    (h/with-memory-store s
+      (let [wh {:id "test-webhook"
+                :customer-id "test-customer"
+                :project-id "test-project"
+                :repo-id "test-repo"}]
+        (is (some? (st/create-webhook-details s wh)))
+        (let [r (sut/prepare-build {:storage s}
+                                   {:id "test-webhook"
+                                    :payload {:head-commit {:message "test message"
+                                                            :timestamp "2023-10-10"}}})
+              md (st/find-build-metadata s (get-in r [:build :sid]))]
+          (is (= "test message" (:message md)))
+          (is (= "2023-10-10" (:timestamp md)))))))
+  
   (testing "`nil` if no configured webhook found"
     (h/with-memory-store s
       (is (nil? (sut/prepare-build {:storage s}
