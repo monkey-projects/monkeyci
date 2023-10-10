@@ -94,5 +94,7 @@
                  :build {:sid sid}
                  :exit 0
                  :result :success}]
-        (is (some? (sut/save-build-result ctx evt)))
-        (is (sut/obj-exists? st (sut/build-results-sid sid)))))))
+        (is (sut/sid? (sut/save-build-result ctx evt)))
+        (is (= {:exit 0
+                :result :success}
+               (sut/find-build-results st sid)))))))

@@ -59,4 +59,10 @@
           (is (st/obj-exists? s (-> wh
                                     (select-keys [:customer-id :project-id :repo-id])
                                     (assoc :build-id (get-in r [:build :build-id]))
-                                    (st/build-metadata-sid)))))))))
+                                    (st/build-metadata-sid))))))))
+
+  (testing "`nil` if no configured webhook found"
+    (h/with-memory-store s
+      (is (nil? (sut/prepare-build {:storage s}
+                                   {:id "test-webhook"
+                                    :payload {}}))))))
