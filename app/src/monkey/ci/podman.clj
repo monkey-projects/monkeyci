@@ -14,36 +14,41 @@
 (defn- make-script-cmd [script]
   [(cs/join " && " script)])
 
-(defn- make-entrypoint [{:keys [:container/entrypoint]}]
-  (if (some? entrypoint)
-    entrypoint
+(defn- make-cmd [{:keys [:container/cmd]}]
+  (if (some? cmd)
+    cmd
     ["/bin/sh" "-ec"]))
+
+(defn build-cmd-args
+  "Builds command line args for the podman executable"
+  [{:keys [build-id step] :as ctx}]
+  (let [conf (mcc/ctx->container-config ctx)
+        cn (or build-id "unkown-build")
+        wd (c/step-work-dir ctx)
+        cwd "/home/monkeyci"]
+    (concat
+     ;; TODO Allow for more options to be passed in
+     ["/usr/bin/podman" "run"
+      "-t" "--rm"
+      "--name" cn
+      "-v" (str wd ":" cwd ":z")
+      "-w" cwd
+      (:image conf)]
+     (make-cmd step)
+     ;; TODO Execute script step by step
+     (make-script-cmd (:script step)))))
 
 (defmethod mcc/run-container :podman [{:keys [build-id step pipeline] :as ctx}]
   (log/info "Running build step " build-id "/" (:name step) "as podman container")
-  (let [conf (mcc/ctx->container-config ctx)
-        cn (or build-id "unkown-build")
-        out-dir (doto (io/file (c/log-dir ctx)
+  (let [out-dir (doto (io/file (c/log-dir ctx)
                                build-id
                                (or (:name pipeline) (str (:index pipeline)))
                                (str (:index step)))
                   (.mkdirs))
         out-file (io/file out-dir "out.txt")
-        err-file (io/file out-dir "err.txt")
-        wd (c/step-work-dir ctx)
-        cwd "/home/monkeyci"]
+        err-file (io/file out-dir "err.txt")]
     (log/debug "Writing logs to" out-dir)
-    @(bp/process {:dir wd
+    @(bp/process {:dir (c/step-work-dir ctx)
                   :out out-file
                   :err err-file
-                  :cmd (concat
-                        ;; TODO Allow for more options to be passed in
-                        ["/usr/bin/podman" "run"
-                         "-t" "--rm"
-                         "--name" cn
-                         "-v" (str wd ":" cwd ":z")
-                         "-w" cwd
-                         (:image conf)]
-                        (make-entrypoint step)
-                         ;; TODO Execute script step by step
-                        (make-script-cmd (:script step)))})))
+                  :cmd (build-cmd-args ctx)})))
