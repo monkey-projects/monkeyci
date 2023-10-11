@@ -107,6 +107,7 @@ matures, it will be built "by itself" as it were.
 
 * For the general design, see [the design page](docs/design.md).  As we go along, this will probably evolve.
 * For configuration, see the [configuration page](docs/config.md).
+* Get details on the [API here](docs/api.md).
 
 ### Contribution guidelines ###
 

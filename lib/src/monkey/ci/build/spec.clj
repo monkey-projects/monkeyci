@@ -18,7 +18,7 @@
                       :container
                       (s/keys :req [:container/image]
                               :req-un [:ci/script]
-                              :opt-un [:ci/name :container/entrypoint])))
+                              :opt-un [:ci/name :container/entrypoint :container/cmd])))
 (s/def :ci/output string?)
 (s/def :ci/exception (partial instance? java.lang.Exception))
 
