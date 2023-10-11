@@ -45,8 +45,8 @@
                                (or (:name pipeline) (str (:index pipeline)))
                                (str (:index step)))
                   (.mkdirs))
-        out-file (io/file out-dir "out.txt")
-        err-file (io/file out-dir "err.txt")]
+        [out-file err-file] (->> ["out.txt" "err.txt"]
+                                 (map (partial io/file out-dir)))]
     (log/debug "Writing logs to" out-dir)
     @(bp/process {:dir (c/step-work-dir ctx)
                   :out out-file

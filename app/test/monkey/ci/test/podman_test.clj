@@ -25,21 +25,22 @@
           (is (= "first && second" (last (:cmd r)))))))))
 
 (deftest build-cmd-args
-  (testing "uses `/bin/sh` as default command"
-    (let [r (sut/build-cmd-args
-             {:build-id "test-build"
-              :work-dir "test-dir"
-              :step {:name "test-step"
-                     :container/image "test-img"
-                     :script ["first" "second"]}})]
-      (is (= "/bin/sh" (last (drop-last 2 r))))))
-  
-  (testing "cmd overrides sh command"
-    (let [r (sut/build-cmd-args
-             {:build-id "test-build"
-              :work-dir "test-dir"
-              :step {:name "test-step"
-                     :container/image "test-img"
-                     :container/cmd ["test-entry"]
-                     :script ["first" "second"]}})]
-      (is (= "test-entry" (last (drop-last r)))))))
+  (let [base-ctx {:build-id "test-build"
+                  :work-dir "test-dir"
+                  :step {:name "test-step"
+                         :container/image "test-img"
+                         :script ["first" "second"]}}]
+    
+    (testing "uses `/bin/sh` as default command"
+      (let [r (sut/build-cmd-args base-ctx)]
+        (is (= "/bin/sh" (last (drop-last 2 r))))))
+    
+    (testing "cmd overrides sh command"
+      (let [r (-> base-ctx
+                  (assoc-in [:step :container/cmd] ["test-entry"])
+                  sut/build-cmd-args)]
+        (is (= "test-entry" (last (drop-last r))))))
+
+    (testing "adds all script entries as a single arg"
+      (let [r (sut/build-cmd-args base-ctx)]
+        (is (= "first && second" (last r)))))))
