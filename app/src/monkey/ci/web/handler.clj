@@ -7,10 +7,14 @@
             [monkey.ci.web.github :as github]
             [muuntaja.core :as mc]
             [org.httpkit.server :as http]
+            [reitit.coercion :as rc]
+            [reitit.coercion.schema]
             [reitit.ring :as ring]
+            [reitit.ring.coercion :as rrc]
             [reitit.ring.middleware
              [muuntaja :as rrmm]
-             [parameters :as rrmp]]))
+             [parameters :as rrmp]]
+            [schema.core :as s]))
 
 (defn health [_]
   ;; TODO Make this more meaningful
@@ -27,7 +31,9 @@
 
 (def routes
   [["/health" {:get health}]
-   ["/webhook/github/:id" {:post {:handler github/webhook}
+   ["/webhook/github/:id" {:post {:handler github/webhook
+                                  :parameters {:path {:id s/Str}
+                                               :body s/Any}}
                            :middleware [:github-security]}]])
 
 (defn- stringify-body
@@ -53,13 +59,19 @@
     routes
     {:data {:middleware [stringify-body
                          rrmp/parameters-middleware
-                         rrmm/format-middleware]
+                         rrmm/format-middleware
+                         rrc/coerce-exceptions-middleware
+                         rrc/coerce-request-middleware
+                         rrc/coerce-response-middleware]
             :muuntaja (mc/create
                        (assoc-in mc/default-options
                                  ;; Convert keys to kebab-case
                                  [:formats "application/json" :decoder-opts]
                                  {:decode-key-fn csk/->kebab-case-keyword}))
+            :coercion reitit.coercion.schema/coercion
             ::context opts}
+     ;; Disabled, results in 405 errors for some reason
+     ;;:compile rc/compile-request-coercers
      :reitit.middleware/registry
      {:github-security (if dev-mode
                          ;; Disable security in dev mode

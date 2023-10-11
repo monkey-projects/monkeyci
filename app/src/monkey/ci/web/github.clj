@@ -51,7 +51,7 @@
   (<!!
    (go
      {:status (if (<! (c/post-event req {:type :webhook/github
-                                         :id (get-in req [:path-params :id])
+                                         :id (get-in req [:parameters :path :id])
                                          :payload (:body-params req)}))
                 200
                 500)})))
