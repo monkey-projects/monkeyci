@@ -6,6 +6,9 @@
 
 (def body (comp :body :parameters))
 
+(defn- id-getter [id-key]
+  (comp id-key :path :parameters))
+
 (defn- entity-getter [get-id getter]
   (fn [req]
     (if-let [match (some-> (c/req->storage req)
@@ -31,14 +34,25 @@
             (rur/response upd)))
         (rur/not-found nil)))))
 
-(def cust-id (comp :customer-id :path :parameters))
+(defn- make-entity-endpoints
+  "Creates default api functions for the given entity using the configuration"
+  [entity {:keys [get-id getter saver]}]
+  (intern *ns*
+          (symbol (str "get-" entity))
+          (entity-getter get-id getter))
+  (intern *ns*
+          (symbol (str "create-" entity))
+          (entity-creator saver))
+  (intern *ns*
+          (symbol (str "update-" entity))
+          (entity-updater get-id getter saver)))
 
-(def get-customer (entity-getter cust-id st/find-customer))
-(def create-customer (entity-creator st/save-customer))
-(def update-customer (entity-updater cust-id st/find-customer st/save-customer))
+(make-entity-endpoints "customer"
+                       {:get-id (id-getter :customer-id)
+                        :getter st/find-customer
+                        :saver st/save-customer})
 
-(def webhook-id (comp :webhook-id :path :parameters))
-
-(def get-webhook (entity-getter webhook-id st/find-details-for-webhook))
-(def create-webhook (entity-creator st/save-webhook-details))
-(def update-webhook (entity-updater webhook-id st/find-details-for-webhook st/save-webhook-details))
+(make-entity-endpoints "webhook"
+                       {:get-id (id-getter :webhook-id)
+                        :getter st/find-details-for-webhook
+                        :saver st/save-webhook-details})
