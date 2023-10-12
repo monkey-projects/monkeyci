@@ -60,7 +60,7 @@
     (h/with-memory-store st
       (let [id (str (random-uuid))
             d {:id id}]
-        (is (sut/sid? (sut/create-webhook-details st d)))
+        (is (sut/sid? (sut/save-webhook-details st d)))
         (is (= d (sut/find-details-for-webhook st id)))))))
 
 (deftest build-metadata

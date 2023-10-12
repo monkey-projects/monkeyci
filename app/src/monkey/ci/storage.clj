@@ -108,7 +108,7 @@
 (def build-sid-keys [:customer-id :project-id :repo-id :build-id])
 (def build-sid (apply juxt build-sid-keys))
 
-(defn create-webhook-details [s details]
+(defn save-webhook-details [s details]
   (write-obj s (webhook-sid (:id details)) details))
 
 (defn find-details-for-webhook [s id]

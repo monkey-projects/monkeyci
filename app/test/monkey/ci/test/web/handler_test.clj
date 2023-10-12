@@ -111,36 +111,47 @@
                            :status)))
             (is (= "test-hook" (h/try-take l 200 :timeout)))))))))
 
-(deftest api-routes
+(defn- verify-entity-endpoints [{:keys [path base-entity updated-entity name creator]}]
   (let [st (st/make-memory-storage)
-        app (make-test-app st)]
+        app (make-test-app st)
+        path (or path (str "/" name))]
     
-    (testing "`/customer/:customer-id`"
-      (testing "`GET` retrieves customer info"
-        (let [id (st/new-id)
-              cust {:id id
-                    :name "Test customer"}
-              _ (st/save-customer st cust)
-              r (-> (mock/request :get (str "/customer/" id))
-                    (mock/header :accept "application/json")
-                    (app))]
-          (is (= 200 (:status r)))
-          (is (= cust (h/parse-json (slurp (:body r)))))))
-
-      (testing "`POST` creates new customer"
-        (let [r (-> (h/json-request :post "/customer"
-                                    {:name "Test customer"})
+    (testing (format "`%s`" path)
+      (testing (str "`POST` creates new " name)
+        (let [r (-> (h/json-request :post path base-entity)
                     (app))]
           (is (= 201 (:status r)))))
 
-      (testing "`PUT` updates existing customer"
-        (let [id (st/new-id)
-              _ (st/save-customer st {:id id
-                                      :name "Original customer"})
-              r (-> (h/json-request :put (str "/customer/" id)
-                                    {:name "Updated customer"})
-                    (app))]
-          (is (= 200 (:status r))))))))
+      (testing "`/:id`"
+        (testing (format "`GET` retrieves %s info" name)
+          (let [id (st/new-id)
+                entity (assoc base-entity :id id)
+                _ (creator st entity)
+                r (-> (mock/request :get (str path "/" id))
+                      (mock/header :accept "application/json")
+                      (app))]
+            (is (= 200 (:status r)))
+            (is (= entity (h/parse-json (slurp (:body r)))))))
+
+        (testing (str "`PUT` updates existing " name)
+          (let [id (st/new-id)
+                _ (creator st (assoc base-entity :id id))
+                r (-> (h/json-request :put (str path "/" id) (or updated-entity base-entity))
+                      (app))]
+            (is (= 200 (:status r)))))))))
+
+(deftest api-routes
+  (verify-entity-endpoints {:name "customer"
+                            :base-entity {:name "test customer"}
+                            :updated-entity {:name "updated customer"}
+                            :creator st/save-customer})
+  
+  (verify-entity-endpoints {:name "webhook"
+                            :base-entity {:customer-id "test-cust"
+                                          :project-id "test-project"
+                                          :repo-id "test-repo"}
+                            :updated-entity {:repo-id "updated-repo"}
+                            :creator st/save-webhook-details}))
 
 (deftest routing-middleware
   (testing "converts json bodies to kebab-case"

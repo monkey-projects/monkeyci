@@ -39,12 +39,23 @@
 (s/defschema NewCustomer
   {:name s/Str})
 
+(s/defschema NewWebhook
+  {:customer-id Id
+   :project-id Id
+   :repo-id Id})
+
 (def routes
   [["/health" {:get health}]
-   ["/webhook/github/:id" {:post {:handler github/webhook
-                                  :parameters {:path {:id Id}
-                                               :body s/Any}}
-                           :middleware [:github-security]}]
+   ["/webhook"
+    [["/github/:id" {:post {:handler github/webhook
+                            :parameters {:path {:id Id}
+                                         :body s/Any}}
+                     :middleware [:github-security]}]
+     ["" {:post {:handler api/create-webhook
+                 :parameters {:body NewWebhook}}}]
+     ["/:webhook-id" {:get {:handler api/get-webhook}
+                      :put {:handler api/update-webhook}
+                      :parameters {:path {:webhook-id Id}}}]]]
    ["/customer"
     [["" {:post {:handler api/create-customer
                  :parameters {:body NewCustomer}}}]

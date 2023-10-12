@@ -51,7 +51,7 @@
                 :customer-id "test-customer"
                 :project-id "test-project"
                 :repo-id "test-repo"}]
-        (is (some? (st/create-webhook-details s wh)))
+        (is (some? (st/save-webhook-details s wh)))
         (let [r (sut/prepare-build {:storage s}
                                    {:id "test-webhook"
                                     :payload {}})]
@@ -67,7 +67,7 @@
                 :customer-id "test-customer"
                 :project-id "test-project"
                 :repo-id "test-repo"}]
-        (is (some? (st/create-webhook-details s wh)))
+        (is (some? (st/save-webhook-details s wh)))
         (let [r (sut/prepare-build {:storage s}
                                    {:id "test-webhook"
                                     :payload {:head-commit {:message "test message"
