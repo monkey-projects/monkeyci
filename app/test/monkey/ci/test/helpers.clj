@@ -1,7 +1,9 @@
 (ns monkey.ci.test.helpers
   "Helper functions for testing"
-  (:require [clojure.java.io :as io]
+  (:require [camel-snake-kebab.core :as csk]
+            [clojure.java.io :as io]
             [clojure.core.async :as ca]
+            [cheshire.core :as json]
             [monkey.ci
              [events :as e]
              [storage :as s]])
@@ -56,3 +58,6 @@
   `(with-memory-store-fn
      (fn [~s]
        ~@body)))
+
+(defn parse-json [s]
+  (json/parse-string s csk/->kebab-case-keyword))

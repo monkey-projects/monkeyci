@@ -4,7 +4,9 @@
             [clojure.tools.logging :as log]
             [medley.core :refer [update-existing]]
             [monkey.ci.events :as e]
-            [monkey.ci.web.github :as github]
+            [monkey.ci.web
+             [api :as api]
+             [github :as github]]
             [muuntaja.core :as mc]
             [org.httpkit.server :as http]
             [reitit.coercion :as rc]
@@ -22,23 +24,32 @@
    :body "ok"
    :headers {"Content-Type" "text/plain"}})
 
-(defn- maybe-generate [s g]
+(defn- maybe-generate
+  "If no secret key has been configured, generate one and log it.  Don't
+   use this in production!"
+  [s g]
   (if (some? s)
     s
     (let [gen (g)]
       (log/info "Generated secret key:" gen)
       gen)))
 
+(def Id s/Str)
+
 (def routes
   [["/health" {:get health}]
    ["/webhook/github/:id" {:post {:handler github/webhook
-                                  :parameters {:path {:id s/Str}
+                                  :parameters {:path {:id Id}
                                                :body s/Any}}
-                           :middleware [:github-security]}]])
+                           :middleware [:github-security]}]
+   ["/customer/:customer-id" {:get {:handler api/get-customer
+                                    :parameters {:path {:customer-id Id}}}}]])
 
 (defn- stringify-body
   "Since the raw body could be read more than once (security, content negotation...),
-   this interceptor replaces it with a string that can be read multiple times."
+   this interceptor replaces it with a string that can be read multiple times.  This
+   should only be used for requests that have reasonably small bodies!  In other
+   cases, the body could be written to a temp file."
   [h]
   (fn [req]
     (-> req

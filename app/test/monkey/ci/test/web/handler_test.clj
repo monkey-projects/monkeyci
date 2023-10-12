@@ -4,7 +4,9 @@
              [mac :as mac]]
             [clojure.test :refer [deftest testing is]]
             [clojure.core.async :as ca]
-            [monkey.ci.events :as events]
+            [monkey.ci
+             [events :as events]
+             [storage :as st]]
             [monkey.ci.web.handler :as sut]
             [monkey.ci.test.helpers :refer [try-take] :as h]
             [org.httpkit.server :as http]
@@ -17,11 +19,15 @@
 
 (def github-secret "github-secret")
 
-(defn- make-test-app []
-  (sut/make-app
-   {:github
-    {:secret github-secret}
-    :event-bus (events/make-bus)}))
+(defn- make-test-app
+  ([storage]
+   (sut/make-app
+    {:github
+     {:secret github-secret}
+     :event-bus (events/make-bus)
+     :storage storage}))
+  ([]
+   (make-test-app (st/make-memory-storage))))
 
 (def test-app (make-test-app))
 
@@ -102,6 +108,22 @@
                            (dev-app)
                            :status)))
             (is (= "test-hook" (h/try-take l 200 :timeout)))))))))
+
+(deftest api-routes
+  (let [st (st/make-memory-storage)
+        app (make-test-app st)]
+    
+    (testing "`/customer/:customer-id`"
+      (testing "`GET` retrieves customer info"
+        (let [id (st/new-id)
+              cust {:id id
+                    :name "Test customer"}
+              _ (st/create-customer st cust)
+              r (-> (mock/request :get (str "/customer/" id))
+                    (mock/header :accept "application/json")
+                    (app))]
+          (is (= 200 (:status r)))
+          (is (= cust (h/parse-json (slurp (:body r))))))))))
 
 (deftest routing-middleware
   (testing "converts json bodies to kebab-case"
