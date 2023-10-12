@@ -97,7 +97,7 @@
 
 (def customer-sid (partial global-sid :customers))
 
-(defn create-customer [s cust]
+(defn save-customer [s cust]
   (write-obj s (customer-sid (:id cust)) cust))
 
 (defn find-customer [s id]

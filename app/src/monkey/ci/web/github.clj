@@ -11,7 +11,8 @@
              [context :as ctx]
              [storage :as s]
              [utils :as u]]
-            [monkey.ci.web.common :as c]))
+            [monkey.ci.web.common :as c]
+            [ring.util.response :as rur]))
 
 (defn extract-signature [s]
   (when s
@@ -35,8 +36,8 @@
                           :payload (:body req)
                           :x-hub-signature (get-in req [:headers "x-hub-signature-256"])})
       (h req)
-      {:status 401
-       :body "Invalid signature header"})))
+      (-> (rur/response "Invalid signature header")
+          (rur/status 401)))))
 
 (defn generate-secret-key []
   (-> (nonce/random-nonce 32)
@@ -50,11 +51,11 @@
   ;; Httpkit can't handle channels so read it here
   (<!!
    (go
-     {:status (if (<! (c/post-event req {:type :webhook/github
-                                         :id (get-in req [:parameters :path :id])
-                                         :payload (:body-params req)}))
-                200
-                500)})))
+     (rur/status (if (<! (c/post-event req {:type :webhook/github
+                                            :id (get-in req [:parameters :path :id])
+                                            :payload (:body-params req)}))
+                   200
+                   500)))))
 
 (defn prepare-build
   "Event handler that looks up details for the given github webhook.  If the webhook 

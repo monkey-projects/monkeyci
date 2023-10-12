@@ -10,7 +10,9 @@
             [monkey.ci.web.handler :as sut]
             [monkey.ci.test.helpers :refer [try-take] :as h]
             [org.httpkit.server :as http]
-            [reitit.ring :as ring]
+            [reitit
+             [core :as rc]
+             [ring :as ring]]
             [ring.mock.request :as mock]))
 
 (deftest make-app
@@ -118,12 +120,27 @@
         (let [id (st/new-id)
               cust {:id id
                     :name "Test customer"}
-              _ (st/create-customer st cust)
+              _ (st/save-customer st cust)
               r (-> (mock/request :get (str "/customer/" id))
                     (mock/header :accept "application/json")
                     (app))]
           (is (= 200 (:status r)))
-          (is (= cust (h/parse-json (slurp (:body r))))))))))
+          (is (= cust (h/parse-json (slurp (:body r)))))))
+
+      (testing "`POST` creates new customer"
+        (let [r (-> (h/json-request :post "/customer"
+                                    {:name "Test customer"})
+                    (app))]
+          (is (= 201 (:status r)))))
+
+      (testing "`PUT` updates existing customer"
+        (let [id (st/new-id)
+              _ (st/save-customer st {:id id
+                                      :name "Original customer"})
+              r (-> (h/json-request :put (str "/customer/" id)
+                                    {:name "Updated customer"})
+                    (app))]
+          (is (= 200 (:status r))))))))
 
 (deftest routing-middleware
   (testing "converts json bodies to kebab-case"

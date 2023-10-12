@@ -22,7 +22,7 @@
           req (-> ctx
                   (->req)
                   (with-path-param :customer-id (:id cust)))]
-      (is (st/sid? (st/create-customer st cust)))
+      (is (st/sid? (st/save-customer st cust)))
       (is (= cust (:body (sut/get-customer req))))))
 
   (testing "404 not found when no match"
@@ -30,4 +30,25 @@
                    (->req)
                    (with-path-param :customer-id "nonexisting")
                    (sut/get-customer)
+                   :status)))))
+
+(deftest update-customer
+  (testing "returns customer in body"
+    (let [cust {:id "test-customer"
+                :name "Test customer"}
+          {st :storage :as ctx} (test-ctx)
+          req (-> ctx
+                  (->req)
+                  (with-path-param :customer-id (:id cust))
+                  (assoc-in [:parameters :body] {:name "updated"}))]
+      (is (st/sid? (st/save-customer st cust)))
+      (is (= {:id (:id cust)
+              :name "updated"}
+             (:body (sut/update-customer req))))))
+
+  (testing "404 not found when no match"
+    (is (= 404 (-> (test-ctx)
+                   (->req)
+                   (with-path-param :customer-id "nonexisting")
+                   (sut/update-customer)
                    :status)))))

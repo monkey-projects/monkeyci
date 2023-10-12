@@ -6,7 +6,8 @@
             [cheshire.core :as json]
             [monkey.ci
              [events :as e]
-             [storage :as s]])
+             [storage :as s]]
+            [ring.mock.request :as mock])
   (:import org.apache.commons.io.FileUtils))
 
 (defn ^java.io.File create-tmp-dir []
@@ -61,3 +62,13 @@
 
 (defn parse-json [s]
   (json/parse-string s csk/->kebab-case-keyword))
+
+(defn to-json [obj]
+  (json/generate-string obj (comp csk/->camelCase name)))
+
+(defn json-request
+  "Creates a Ring mock request with given object as json body"
+  [method path body]
+  (-> (mock/request method path)
+      (mock/body (to-json body))
+      (mock/header :content-type "application/json")))

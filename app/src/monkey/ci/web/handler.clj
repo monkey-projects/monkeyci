@@ -36,14 +36,21 @@
 
 (def Id s/Str)
 
+(s/defschema NewCustomer
+  {:name s/Str})
+
 (def routes
   [["/health" {:get health}]
    ["/webhook/github/:id" {:post {:handler github/webhook
                                   :parameters {:path {:id Id}
                                                :body s/Any}}
                            :middleware [:github-security]}]
-   ["/customer/:customer-id" {:get {:handler api/get-customer
-                                    :parameters {:path {:customer-id Id}}}}]])
+   ["/customer"
+    [["" {:post {:handler api/create-customer
+                 :parameters {:body NewCustomer}}}]
+     ["/:customer-id" {:get {:handler api/get-customer}
+                       :put {:handler api/update-customer}
+                       :parameters {:path {:customer-id Id}}}]]]])
 
 (defn- stringify-body
   "Since the raw body could be read more than once (security, content negotation...),
