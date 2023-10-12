@@ -92,6 +92,12 @@
 
 ;;; Higher level functions
 
+(defn- update-obj
+  "Reads the object at given `sid`, and then applies the updater to it, with args"
+  [s sid updater & args]
+  (let [obj (read-obj s sid)]
+    (write-obj s sid (apply updater obj args))))
+
 (defn global-sid [type id]
   ["global" (name type) id])
 
@@ -102,6 +108,17 @@
 
 (defn find-customer [s id]
   (read-obj s (customer-sid id)))
+
+(defn save-project
+  "Saves the project by updating the customer it belongs to"
+  [s {:keys [customer-id id] :as pr}]
+  (update-obj s (customer-sid customer-id) assoc-in [:projects id] pr))
+
+(defn find-project
+  "Reads the project, as part of the customer object"
+  [s [cust-id pid]]
+  (some-> (find-customer s cust-id)
+          (get-in [:projects pid])))
 
 (def webhook-sid (partial global-sid :webhooks))
 

@@ -39,29 +39,50 @@
 (s/defschema NewCustomer
   {:name s/Str})
 
+(s/defschema NewProject
+  {:customer-id Id
+   :name s/Str})
+
 (s/defschema NewWebhook
   {:customer-id Id
    :project-id Id
    :repo-id Id})
 
+(def webhook-routes
+  ["/webhook"
+   [["/github/:id" {:post {:handler github/webhook
+                           :parameters {:path {:id Id}
+                                        :body s/Any}}
+                    :middleware [:github-security]}]
+    ["" {:post {:handler api/create-webhook
+                :parameters {:body NewWebhook}}}]
+    ["/:webhook-id" {:get {:handler api/get-webhook}
+                     :put {:handler api/update-webhook}
+                     :parameters {:path {:webhook-id Id}}}]]])
+
+(def project-routes
+  ["/project"
+   [["" {:post {:handler api/create-project
+                :parameters {:body NewProject}}}]
+    ["/:project-id" {:get {:handler api/get-project}
+                     :put {:handler api/update-project}
+                     :parameters {:path {:project-id Id}}}]]])
+
+(def customer-routes
+  ["/customer"
+   [["" {:post {:handler api/create-customer
+                :parameters {:body NewCustomer}}}]
+    ["/:customer-id"
+     {:parameters {:path {:customer-id Id}}}
+     [[""
+       {:get {:handler api/get-customer}
+        :put {:handler api/update-customer}}]
+      [project-routes]]]]])
+
 (def routes
   [["/health" {:get health}]
-   ["/webhook"
-    [["/github/:id" {:post {:handler github/webhook
-                            :parameters {:path {:id Id}
-                                         :body s/Any}}
-                     :middleware [:github-security]}]
-     ["" {:post {:handler api/create-webhook
-                 :parameters {:body NewWebhook}}}]
-     ["/:webhook-id" {:get {:handler api/get-webhook}
-                      :put {:handler api/update-webhook}
-                      :parameters {:path {:webhook-id Id}}}]]]
-   ["/customer"
-    [["" {:post {:handler api/create-customer
-                 :parameters {:body NewCustomer}}}]
-     ["/:customer-id" {:get {:handler api/get-customer}
-                       :put {:handler api/update-customer}
-                       :parameters {:path {:customer-id Id}}}]]]])
+   webhook-routes
+   customer-routes])
 
 (defn- stringify-body
   "Since the raw body could be read more than once (security, content negotation...),

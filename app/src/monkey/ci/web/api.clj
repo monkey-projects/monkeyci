@@ -52,6 +52,12 @@
                         :getter st/find-customer
                         :saver st/save-customer})
 
+(make-entity-endpoints "project"
+                       ;; The project is part of the customer, so combine the ids
+                       {:get-id (comp (juxt :customer-id :project-id) :path :parameters)
+                        :getter st/find-project
+                        :saver st/save-project})
+
 (make-entity-endpoints "webhook"
                        {:get-id (id-getter :webhook-id)
                         :getter st/find-details-for-webhook

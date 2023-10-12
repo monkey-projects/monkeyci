@@ -131,7 +131,10 @@
                       (mock/header :accept "application/json")
                       (app))]
             (is (= 200 (:status r)))
-            (is (= entity (h/parse-json (slurp (:body r)))))))
+            (is (= entity (some-> r
+                                  :body
+                                  slurp
+                                  h/parse-json)))))
 
         (testing (str "`PUT` updates existing " name)
           (let [id (st/new-id)
@@ -145,6 +148,13 @@
                             :base-entity {:name "test customer"}
                             :updated-entity {:name "updated customer"}
                             :creator st/save-customer})
+
+  (verify-entity-endpoints {:name "project"
+                            :path "/customer/test-customer/project"
+                            :base-entity {:name "test project"
+                                          :customer-id "test-customer"}
+                            :updated-entity {:name "updated project"}
+                            :creator st/save-project})
   
   (verify-entity-endpoints {:name "webhook"
                             :base-entity {:customer-id "test-cust"

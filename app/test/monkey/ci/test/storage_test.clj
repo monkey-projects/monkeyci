@@ -85,6 +85,24 @@
         (is (sut/sid? (sut/create-build-results st md {:status :success})))
         (is (= :success (:status (sut/find-build-results st md))))))))
 
+(deftest projects
+  (testing "stores project in customer"
+    (h/with-memory-store st
+      (is (sut/sid? (sut/save-project st {:customer-id "test-customer"
+                                          :id "test-project"
+                                          :name "Test project"})))
+      (is (some? (:projects (sut/find-customer st "test-customer"))))))
+
+  (testing "can find project via customer"
+    (h/with-memory-store st
+      (let [cid "some-customer"
+            pid "some-project"
+            p {:customer-id cid
+               :id pid
+               :name "Test project"}]
+        (is (sut/sid? (sut/save-project st p)))
+        (is (= p (sut/find-project st [cid pid])))))))
+
 (deftest save-build-result
   (testing "writes to build result object"
     (h/with-memory-store st
