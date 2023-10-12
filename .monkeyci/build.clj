@@ -1,8 +1,5 @@
 ;; Build script for Monkey-ci itself
 (require '[monkey.ci.build.core :as core])
-(require '[monkey.ci.build.shell :as shell])
-(require '[clojure.java.io :as io])
-(require '[clojure.tools.logging :refer [info] :rename {info log}])
 (require '[config.core :refer [env]])
 
 (defn clj [& args]
@@ -26,29 +23,10 @@
 
 (def app-uberjar (clj-app "-X:jar:uber"))
 
-(defn install-app
-  "Installs the application in the user's home directory by copying the
-   uberjar to ~/lib and generating a script in ~/bin"
-  [{:keys [work-dir]}]
-  (let [lib (io/file shell/home "lib/monkeyci")
-        dest (io/file lib "monkeyci.jar")]
-    (log "Installing application to" lib)
-    (if (or (.exists lib) (true? (.mkdirs lib)))
-      (do
-        ;; Copy the uberjar
-        (io/copy (io/file work-dir "app/target/monkeyci-standalone.jar") dest)
-        ;; Generate script
-        (let [script (io/file shell/home "bin/monkeyci")]
-          (log "Generating script at" script)
-          (spit script (format "#!/bin/sh\njava -jar %s $*\n" (.getCanonicalPath dest)))
-          (.setExecutable script true))
-        core/success)
-      core/failure)))
-
 (def container-image
-  #_(shell/bash "docker" "build" "-t" "monkeyci:latest" "-f" "docker/Dockerfile" ".")
+  ;; TODO Credentials, must be mounted to /kaniko/.docker/config.json
   {:container/image "docker.io/bitnami/kaniko:latest"
-   :script ["kaniko build -t docker.io/monkeyci/app:latest -f docker/Dockerfile ."]})
+   :container/cmd ["-d" "docker.io/monkeyci/app:latest" "-f" "docker/Dockerfile" "-c" "."]})
 
 (defn set-name [s n]
   (assoc s :name n))

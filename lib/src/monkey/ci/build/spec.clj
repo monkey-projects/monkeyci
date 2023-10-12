@@ -9,6 +9,7 @@
 
 (s/def :container/image string?)
 (s/def :container/entrypoint vector?)
+(s/def :container/cmd vector?)
 
 (s/def :ci/step (s/or :fn fn?
                       :action

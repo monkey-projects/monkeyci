@@ -65,8 +65,9 @@
   (testing "404 when not found"
     (is (= 404 (-> (mock/request :get "/nonexisting")
                    (test-app)
-                   :status))))
+                   :status)))))
 
+(deftest webhook-routes
   (testing "`POST /webhook/github/:id`"
     (testing "accepts with valid security header"
       (let [payload "test body"
@@ -100,7 +101,7 @@
             (is (= 200 (-> (mock/request :post "/webhook/github/test-hook")
                            (dev-app)
                            :status)))
-            (is (= "test-hook" (h/try-take l 200 :timeoyut)))))))))
+            (is (= "test-hook" (h/try-take l 200 :timeout)))))))))
 
 (deftest routing-middleware
   (testing "converts json bodies to kebab-case"
@@ -115,5 +116,3 @@
                               (mock/header :content-type "application/json")
                               (app)
                               :body))))))
-
-
