@@ -175,4 +175,29 @@
                               (mock/body "{\"test_key\":\"test value\"}")
                               (mock/header :content-type "application/json")
                               (app)
-                              :body))))))
+                              :body)))))
+
+  (testing "returns edn if accepted"
+    (let [body {:key "value"}
+          routes ["/" {:get (constantly {:status 200
+                                         :body body})}]
+          router (sut/make-router {} routes)
+          app (ring/ring-handler router)]
+      (is (= (pr-str body) (-> (mock/request :get "/")
+                               (mock/header :accept "application/edn")
+                               (app)
+                               :body
+                               slurp)))))
+
+  (testing "converts json keys to camelCase"
+    (let [body {:test-key "value"}
+          routes ["/" {:get (constantly {:status 200
+                                         :body body})}]
+          router (sut/make-router {} routes)
+          app (ring/ring-handler router)]
+      (is (= "{\"testKey\":\"value\"}"
+             (-> (mock/request :get "/")
+                 (mock/header :accept "application/json")
+                 (app)
+                 :body
+                 slurp))))))

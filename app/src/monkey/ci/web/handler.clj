@@ -114,10 +114,14 @@
                          rrc/coerce-request-middleware
                          rrc/coerce-response-middleware]
             :muuntaja (mc/create
-                       (assoc-in mc/default-options
-                                 ;; Convert keys to kebab-case
-                                 [:formats "application/json" :decoder-opts]
-                                 {:decode-key-fn csk/->kebab-case-keyword}))
+                       (-> mc/default-options
+                           (assoc-in 
+                            ;; Convert keys to kebab-case
+                            [:formats "application/json" :decoder-opts]
+                            {:decode-key-fn csk/->kebab-case-keyword})
+                           (assoc-in
+                            [:formats "application/json" :encoder-opts]
+                            {:encode-key-fn (comp csk/->camelCase name)})))
             :coercion reitit.coercion.schema/coercion
             ::context opts}
      ;; Disabled, results in 405 errors for some reason
