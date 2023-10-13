@@ -176,26 +176,42 @@
                             :updated-entity {:repo-id "updated-repo"}
                             :creator st/save-webhook-details})
 
-  (testing "parameters"
-    (letfn [(get-params [path]
-              (some-> (mock/request :get (str path "/params"))
-                      (test-app)
-                      :body
-                      slurp
-                      (h/parse-json)))
-            (save-params [path params]
-              (-> (h/json-request :put (str path "/params") params)
-                  (test-app)))]
-      
-      (testing "`/customers/:id`"
-        (testing "`GET` retrieves parameters"
-          (let [cid (st/new-id)
-                path (str "/customer/" cid)
-                params [{:name "test-param"
-                         :value "test value"}]]
-            (is (empty? (get-params path)))
-            (is (= 200 (:status (save-params path params))))
-            (is (= params (get-params path)))))))))
+  (letfn [(get-params [path]
+            (some-> (mock/request :get path)
+                    (test-app)
+                    :body
+                    slurp
+                    (h/parse-json)))
+          (save-params [path params]
+            (-> (h/json-request :put path params)
+                (test-app)))
+          (verify-param-endpoints [desc path]
+            (testing (format "parameter endpoints at `%s/param`" desc)
+              (let [params [{:name "test-param"
+                             :value "test value"}]
+                    path (str path "/param")]
+                (testing "empty when no parameters"
+                  (is (empty? (get-params path))))
+                (testing "can write params"
+                  (is (= 200 (:status (save-params path params)))))
+                (testing "can read params"
+                  (is (= params (get-params path)))))))]
+    
+    (verify-param-endpoints
+     "/customer/:customer-id"
+     (str "/customer/" (st/new-id)))
+
+    (verify-param-endpoints
+     "/customer/:customer-id/project/:project-id"
+     (->> (repeatedly st/new-id)
+          (interleave ["/customer/" "/project/"])
+          (apply str)))
+
+    (verify-param-endpoints
+     "/customer/:customer-id/project/:project-id/repo/:repo-id"
+     (->> (repeatedly st/new-id)
+          (interleave ["/customer/" "/project/" "/repo/"])
+          (apply str)))))
 
 (deftest routing-middleware
   (testing "converts json bodies to kebab-case"

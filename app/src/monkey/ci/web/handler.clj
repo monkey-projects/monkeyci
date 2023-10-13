@@ -101,9 +101,9 @@
                              :middleware [:github-security]}]))])
 
 (def parameter-routes
-  ["/params" {:get {:handler api/get-params}
-              :put {:handler api/update-params
-                    :parameters {:body Parameters}}}])
+  ["/param" {:get {:handler api/get-params}
+             :put {:handler api/update-params
+                   :parameters {:body Parameters}}}])
 
 (def repo-routes
   ["/repo"
@@ -113,7 +113,8 @@
      :getter  api/get-repo
      :new-schema NewRepo
      :update-schema UpdateRepo
-     :id-key :repo-id})])
+     :id-key :repo-id
+     :child-routes [parameter-routes]})])
 
 (def project-routes
   ["/project"
@@ -124,7 +125,8 @@
      :new-schema NewProject
      :update-schema UpdateProject
      :id-key :project-id
-     :child-routes [repo-routes]})])
+     :child-routes [repo-routes
+                    parameter-routes]})])
 
 (def customer-routes
   ["/customer"
