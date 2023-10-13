@@ -180,7 +180,9 @@
   [s sid]
   (read-obj s (build-results-sid sid)))
 
-(def params-sid (comp vec (partial cons "params")))
+(defn params-sid [sid]
+  ;; Prepend params prefix, but also store at "params" leaf
+  (vec (concat ["params"] sid ["params"])))
 
 (defn save-params
   "Stores build parameters.  This can be done on customer, project or repo level.

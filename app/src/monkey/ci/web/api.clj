@@ -80,10 +80,18 @@
    project or repo level.  For lower levels, the parameters for the higher levels
    are merged in."
   [req]
-  (->> req
-       (params-sid)
-       (st/find-params (c/req->storage req))
-       (rur/response)))
+  ;; TODO Allow to retrieve only for the specified level using query param
+  (let [st (c/req->storage req)]
+    (->> (loop [sid (params-sid req)
+                acc []]
+           (if (empty? sid)
+             acc
+             (recur (drop-last sid)
+                    (concat acc (st/find-params st sid)))))
+         (group-by :name)
+         (vals)
+         (map first)
+         (rur/response))))
 
 (defn update-params [req]
   (let [p (body req)]
