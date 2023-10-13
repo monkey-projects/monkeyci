@@ -1,5 +1,6 @@
 (ns monkey.ci.test.runners-test
   (:require [clojure.test :refer :all]
+            [clojure.core.async :as ca]
             [clojure.java.io :as io]
             [clojure.string :as cs]
             [monkey.ci
@@ -27,8 +28,9 @@
                                                :build {:script-dir "examples/basic-clj"}}))))
         
         (testing "when script not found, returns exit code 1"
-          (is (= 1 (sut/build-local {:event-bus bus
-                                     :args {:dir "nonexisting"}}))))
+          (is (= 1 (-> {:event-bus bus
+                        :build {:script-dir "nonexisting"}}
+                       (build-and-wait)))))
 
         (testing "passes pipeline to process"
           (is (= "test-pipeline" (-> {:event-bus bus
@@ -36,7 +38,30 @@
                                               :pipeline "test-pipeline"}}
                                      (build-and-wait)
                                      :build
-                                     :pipeline))))))))
+                                     :pipeline))))
+
+        (testing "deletes checkout dir"
+          (letfn [(verify-checkout-dir-deleted [checkout-dir script-dir]
+                    (is (some? (-> {:event-bus bus
+                                    :build {:git {:dir (u/abs-path checkout-dir)}
+                                            :script-dir (u/abs-path script-dir)}}
+                                   (build-and-wait))))
+                    (is (false? (.exists checkout-dir))))]
+            
+            (testing "when script exists"
+              (h/with-tmp-dir dir
+                (let [checkout-dir (io/file dir "checkout")
+                      script-dir (doto (io/file checkout-dir "script")
+                                   (.mkdirs))]
+                  (spit (io/file script-dir "build.clj") "[]")
+                  (verify-checkout-dir-deleted checkout-dir script-dir))))
+
+            (testing "when script was not found"
+              (h/with-tmp-dir dir
+                (let [checkout-dir (doto (io/file dir "checkout")
+                                     (.mkdirs))
+                      script-dir (io/file checkout-dir "nonexisting")]
+                  (verify-checkout-dir-deleted checkout-dir script-dir))))))))))
 
 (deftest download-src
   (testing "no-op if the source is local"
@@ -155,18 +180,24 @@
                        :git {:id "test-commit-id"
                              :branch "master"
                              :url "https://test/repo.git"}}}
-          ctx {:runner (comp :git :build)
+          ctx {:runner (comp ca/to-chan! vector :git :build)
                :event evt
                :checkout-base-dir "test-dir"}]
       (is (= {:url "https://test/repo.git"
               :branch "master"
               :id "test-commit-id"}
              (-> (sut/build ctx)
+                 (h/try-take)
                  (select-keys [:url :branch :id]))))))
 
   (testing "combines checkout base dir and build id for checkout dir"
-    (let [ctx {:runner (comp :dir :git :build)
+    (let [ctx {:runner (comp ca/to-chan! vector :dir :git :build)
                :event {:build {:build-id "test-build"}}
                :checkout-base-dir "test-dir"}]
       (is (re-matches #".*test-dir/test-build" 
-                      (sut/build ctx))))))
+                      (h/try-take (sut/build ctx))))))
+
+  (testing "closes the result channel on completion"
+    (let [ch (ca/to-chan! [:failed])]
+      (is (some? (sut/build {:runner (constantly ch)})))
+      (is (nil? (h/try-take ch 1000 :timeout))))))

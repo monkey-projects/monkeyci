@@ -40,10 +40,10 @@
             (Thread/sleep 100)
             (recur (f))))))))
 
-(defn try-take [ch timeout timeout-val]
-  (let [t (ca/timeout timeout)
+(defn try-take [ch & [timeout timeout-val]]
+  (let [t (ca/timeout (or timeout 1000))
         [v c] (ca/alts!! [ch t])]
-    (if (= t c) timeout-val v)))
+    (if (= t c) (or timeout-val :timeout) v)))
 
 (defn with-bus [f]
   (let [bus (e/make-bus)]

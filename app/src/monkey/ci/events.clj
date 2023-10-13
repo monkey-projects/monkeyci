@@ -126,6 +126,16 @@
     (ca/sub (:pub bus) type r)
     r))
 
+(defn do-and-wait
+  "Invokes `f`, which is assumed to publish an event, and waits for the first event of
+   the given type that matches transducer `tx`.  Returns the waiter channel, as in
+   `wait-for`."
+  [f bus type tx]
+  ;; Starit waiting before actualy executing because otherwise we may miss the event.
+  (let [w (wait-for bus type tx)]
+    (f)
+    w))
+
 (defn with-ctx
   "Creates a new event that adds the context, and puts the event in the `:event` key.
    Useful for enrichting events."

@@ -21,10 +21,11 @@
        (io/file)
        (.getCanonicalPath)))
 
-(defn- script-not-found [{{:keys [script-dir]} :build}]
+(defn- script-not-found [{{:keys [script-dir]} :build :as ctx}]
   (log/warn "No build script found at" script-dir)
   ;; Nonzero exit code
-  1)
+  (assoc ctx :event {:result :error
+                     :exit 1}))
 
 (defn- log-build-result
   "Do some logging depending on the result"
@@ -54,14 +55,12 @@
    complete event."
   [{:keys [event-bus] :as ctx}]
   (let [{:keys [script-dir]} (:build ctx)]
-    (if (some-> (io/file script-dir) (.exists))
-      (let [w (e/wait-for event-bus :build/completed (map (comp build-completed
-                                                                (partial e/with-ctx ctx))))]
-        ;; Start child process and wait for it to complete.  Start waiting before
-        ;; actualy executing because otherwise we may miss the event.
-        (p/execute! ctx)
-        w)
-      (script-not-found ctx))))
+    (->> (if (some-> (io/file script-dir) (.exists))
+           (e/do-and-wait #(p/execute! ctx)
+                          event-bus :build/completed (map (partial e/with-ctx ctx)))
+           (ca/to-chan! [(script-not-found ctx)]))
+         (vector)
+         (ca/map build-completed))))
 
 (defn- download-git
   "Downloads from git into a temp dir, and designates that as the working dir."
@@ -100,10 +99,20 @@
   (log/warn "No runner configured, using fallback configuration")
   (constantly 2))
 
+(defn- take-and-close
+  "Takes the first value from channel `ch` and closes it.  Closing the channel
+   is necessary to ensure cleanup."
+  [ch]
+  (ca/go
+    (let [r (ca/<! ch)]
+      (ca/close! ch)
+      r)))
+
 (defn build
   "Event handler that reacts to a prepared build event.  The incoming event
-   should contain the necessar information to start the build.  The build 
-   runner performs the repo clone and checkout and runs the script."
+   should contain the necessary information to start the build.  The build 
+   runner performs the repo clone and checkout and runs the script.  Closes
+   the channel when the build has completed."
   [{:keys [runner] :as ctx}]
   (let [{:keys [build-id] :as build} (get-in ctx [:event :build])
         ;; Use combination of checkout dir and build id for checkout
@@ -112,4 +121,5 @@
     (log/debug "Starting build with config:" conf)
     (-> ctx
         (assoc :build conf)
-        (runner))))
+        (runner)
+        (take-and-close))))
