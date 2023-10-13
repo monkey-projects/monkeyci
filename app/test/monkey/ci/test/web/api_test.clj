@@ -99,4 +99,11 @@
                   :body)]
         (is (= "repo value"
                (-> (zipmap (map :name r) (map :value r))
-                   (get "param-1"))))))))
+                   (get "param-1")))))))
+
+  (testing "empty vector if no params"
+    (is (= [] (-> (test-ctx)
+                  (->req)
+                  (with-path-params {:customer-id (st/new-id)})
+                  (sut/get-params)
+                  :body)))))

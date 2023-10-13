@@ -81,6 +81,7 @@
    are merged in."
   [req]
   ;; TODO Allow to retrieve only for the specified level using query param
+  ;; TODO Return 404 if customer, project or repo not found.
   (let [st (c/req->storage req)]
     (->> (loop [sid (params-sid req)
                 acc []]
