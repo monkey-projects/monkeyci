@@ -139,7 +139,9 @@
         (testing (str "`PUT` updates existing " name)
           (let [id (st/new-id)
                 _ (creator st (assoc base-entity :id id))
-                r (-> (h/json-request :put (str path "/" id) (or updated-entity base-entity))
+                r (-> (h/json-request :put (str path "/" id)
+                                      (cond-> base-entity
+                                        updated-entity (merge updated-entity)))
                       (app))]
             (is (= 200 (:status r)))))))))
 
@@ -149,12 +151,23 @@
                             :updated-entity {:name "updated customer"}
                             :creator st/save-customer})
 
-  (verify-entity-endpoints {:name "project"
-                            :path "/customer/test-customer/project"
-                            :base-entity {:name "test project"
-                                          :customer-id "test-customer"}
-                            :updated-entity {:name "updated project"}
-                            :creator st/save-project})
+  (let [cust-id (st/new-id)]
+    (verify-entity-endpoints {:name "project"
+                              :path (format "/customer/%s/project" cust-id)
+                              :base-entity {:name "test project"
+                                            :customer-id cust-id}
+                              :updated-entity {:name "updated project"}
+                              :creator st/save-project}))
+  
+  (let [[cust-id p-id] (repeatedly st/new-id)]
+    (verify-entity-endpoints {:name "repository"
+                              :path (format "/customer/%s/project/%s/repo" cust-id p-id)
+                              :base-entity {:name "test repo"
+                                            :customer-id cust-id
+                                            :project-id p-id
+                                            :url "http://test-repo"}
+                              :updated-entity {:name "updated repo"}
+                              :creator st/save-repo}))
   
   (verify-entity-endpoints {:name "webhook"
                             :base-entity {:customer-id "test-cust"

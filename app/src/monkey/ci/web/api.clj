@@ -32,20 +32,21 @@
         (let [upd (merge match (body req))]
           (when (saver st upd)
             (rur/response upd)))
+        ;; If no entity to update is found, return a 404.  Alternatively,
+        ;; we could create it here instead and return a 201.  This could
+        ;; be useful should we ever want to restore lost data.
         (rur/not-found nil)))))
 
 (defn- make-entity-endpoints
   "Creates default api functions for the given entity using the configuration"
   [entity {:keys [get-id getter saver]}]
-  (intern *ns*
-          (symbol (str "get-" entity))
-          (entity-getter get-id getter))
-  (intern *ns*
-          (symbol (str "create-" entity))
-          (entity-creator saver))
-  (intern *ns*
-          (symbol (str "update-" entity))
-          (entity-updater get-id getter saver)))
+  (letfn [(make-ep [[p f]]
+            (intern *ns* (symbol (str p entity)) f))]
+    (->> {"get-" (entity-getter get-id getter)
+          "create-" (entity-creator saver)
+          "update-" (entity-updater get-id getter saver)}
+         (map make-ep)
+         (doall))))
 
 (make-entity-endpoints "customer"
                        {:get-id (id-getter :customer-id)
@@ -57,6 +58,12 @@
                        {:get-id (comp (juxt :customer-id :project-id) :path :parameters)
                         :getter st/find-project
                         :saver st/save-project})
+
+(make-entity-endpoints "repo"
+                       ;; The repo is part of the customer/project, so combine the ids
+                       {:get-id (comp (juxt :customer-id :project-id :repo-id) :path :parameters)
+                        :getter st/find-repo
+                        :saver st/save-repo})
 
 (make-entity-endpoints "webhook"
                        {:get-id (id-getter :webhook-id)

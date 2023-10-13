@@ -9,7 +9,7 @@
              [github :as github]]
             [muuntaja.core :as mc]
             [org.httpkit.server :as http]
-            [reitit.coercion :as rc]
+            #_[reitit.coercion :as rc]
             [reitit.coercion.schema]
             [reitit.ring :as ring]
             [reitit.ring.coercion :as rrc]
@@ -36,17 +36,38 @@
 
 (def Id s/Str)
 
+(defn- assoc-id [s]
+  (assoc s (s/optional-key :id) Id))
+
 (s/defschema NewCustomer
   {:name s/Str})
+
+(s/defschema UpdateCustomer
+  (assoc-id NewCustomer))
 
 (s/defschema NewProject
   {:customer-id Id
    :name s/Str})
 
+(s/defschema UpdateProject
+  (assoc-id NewProject))
+
 (s/defschema NewWebhook
   {:customer-id Id
    :project-id Id
    :repo-id Id})
+
+(s/defschema UpdateWebhook
+  (assoc-id NewWebhook))
+
+(s/defschema NewRepo
+  {:customer-id Id
+   :project-id Id
+   :name s/Str
+   :url s/Str})
+
+(s/defschema UpdateRepo
+  (assoc-id NewRepo))
 
 (def webhook-routes
   ["/webhook"
@@ -57,16 +78,29 @@
     ["" {:post {:handler api/create-webhook
                 :parameters {:body NewWebhook}}}]
     ["/:webhook-id" {:get {:handler api/get-webhook}
-                     :put {:handler api/update-webhook}
+                     :put {:handler api/update-webhook
+                           :parameters {:body UpdateWebhook}}
                      :parameters {:path {:webhook-id Id}}}]]])
+
+(def repo-routes
+  ["/repo"
+   [["" {:post {:handler api/create-repo
+                :parameters {:body NewRepo}}}]
+    ["/:repo-id" {:get {:handler api/get-repo}
+                  :put {:handler api/update-repo
+                        :parameters {:body UpdateRepo}}
+                  :parameters {:path {:repo-id Id}}}]]])
 
 (def project-routes
   ["/project"
    [["" {:post {:handler api/create-project
                 :parameters {:body NewProject}}}]
-    ["/:project-id" {:get {:handler api/get-project}
-                     :put {:handler api/update-project}
-                     :parameters {:path {:project-id Id}}}]]])
+    ["/:project-id"
+     {:parameters {:path {:project-id Id}}}
+     [["" {:get {:handler api/get-project}
+           :put {:handler api/update-project
+                 :parameters {:body UpdateProject}}}]
+      [repo-routes]]]]])
 
 (def customer-routes
   ["/customer"
@@ -76,7 +110,8 @@
      {:parameters {:path {:customer-id Id}}}
      [[""
        {:get {:handler api/get-customer}
-        :put {:handler api/update-customer}}]
+        :put {:handler api/update-customer
+              :parameters {:body UpdateCustomer}}}]
       [project-routes]]]]])
 
 (def routes

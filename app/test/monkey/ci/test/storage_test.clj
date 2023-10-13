@@ -93,6 +93,17 @@
                                           :name "Test project"})))
       (is (some? (:projects (sut/find-customer st "test-customer"))))))
 
+  (testing "updates existing project in customer"
+    (h/with-memory-store st
+      (let [[cid pid] (repeatedly sut/new-id)]
+        (is (sut/sid? (sut/save-project st {:customer-id cid
+                                            :id pid
+                                            :name "Test project"})))
+        (is (sut/sid? (sut/save-project st {:customer-id cid
+                                            :id pid
+                                            :name "Updated project"})))
+        (is (= "Updated project" (:name (sut/find-project st [cid pid])))))))
+
   (testing "can find project via customer"
     (h/with-memory-store st
       (let [cid "some-customer"
