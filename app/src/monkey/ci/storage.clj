@@ -4,6 +4,7 @@
             [clojure.java.io :as io]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
+            [medley.core :as mc]
             [monkey.ci.utils :as u])
   (:import [java.io File PushbackReader]))
 
@@ -65,17 +66,17 @@
 (deftype MemoryStorage [store]
   Storage
   (read-obj [_ loc]
-    (get @store loc))
+    (get-in @store loc))
   
   (write-obj [_ loc obj]
-    (swap! store assoc loc obj)
+    (swap! store assoc-in loc obj)
     loc)
 
   (obj-exists? [_ loc]
-    (contains? @store loc))
+    (some? (get-in @store loc)))
 
   (delete-obj [_ loc]
-    (swap! store dissoc loc)))
+    (swap! store mc/dissoc-in loc)))
 
 (defn make-memory-storage []
   (->MemoryStorage (atom {})))
@@ -98,8 +99,9 @@
   (let [obj (read-obj s sid)]
     (write-obj s sid (apply updater obj args))))
 
+(def global "global")
 (defn global-sid [type id]
-  ["global" (name type) id])
+  [global (name type) id])
 
 (def customer-sid (partial global-sid :customers))
 
@@ -133,19 +135,24 @@
 
 (def webhook-sid (partial global-sid :webhooks))
 
-(def build-sid-keys [:customer-id :project-id :repo-id :build-id])
-(def build-sid (apply juxt build-sid-keys))
-
 (defn save-webhook-details [s details]
   (write-obj s (webhook-sid (:id details)) details))
 
 (defn find-details-for-webhook [s id]
   (read-obj s (webhook-sid id)))
 
+(def builds "builds")
+(def build-sid-keys [:customer-id :project-id :repo-id :build-id])
+(def build-sid (comp vec
+                     #(conj % builds)
+                     (apply juxt build-sid-keys)))
+
 (defn- build-sub-sid [obj p]
   (conj (build-sid obj) p))
 
-(defn- sub-sid-builder [f]
+(defn- sub-sid-builder
+  "Creates a fn that is able to build a sid with given prefix and suffix value."
+  [f]
   (fn [c]
     (if (sid? c)
       (conj c f)
@@ -172,6 +179,20 @@
   "Reads the build results given the build coordinates"
   [s sid]
   (read-obj s (build-results-sid sid)))
+
+(def params-sid (comp vec (partial cons "params")))
+
+(defn save-params
+  "Stores build parameters.  This can be done on customer, project or repo level.
+   The `sid` is a vector that determines on which level the information is stored."
+  [s sid p]
+  (write-obj s (params-sid sid) p))
+
+(defn find-params
+  "Loads parameters on the given level.  This does not automatically include the
+   parameters of higher levels."
+  [s sid]
+  (read-obj s (params-sid sid)))
 
 ;;; Listeners
 

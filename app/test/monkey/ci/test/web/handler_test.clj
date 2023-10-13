@@ -174,7 +174,28 @@
                                           :project-id "test-project"
                                           :repo-id "test-repo"}
                             :updated-entity {:repo-id "updated-repo"}
-                            :creator st/save-webhook-details}))
+                            :creator st/save-webhook-details})
+
+  (testing "parameters"
+    (letfn [(get-params [path]
+              (some-> (mock/request :get (str path "/params"))
+                      (test-app)
+                      :body
+                      slurp
+                      (h/parse-json)))
+            (save-params [path params]
+              (-> (h/json-request :put (str path "/params") params)
+                  (test-app)))]
+      
+      (testing "`/customers/:id`"
+        (testing "`GET` retrieves parameters"
+          (let [cid (st/new-id)
+                path (str "/customer/" cid)
+                params [{:name "test-param"
+                         :value "test value"}]]
+            (is (empty? (get-params path)))
+            (is (= 200 (:status (save-params path params))))
+            (is (= params (get-params path)))))))))
 
 (deftest routing-middleware
   (testing "converts json bodies to kebab-case"

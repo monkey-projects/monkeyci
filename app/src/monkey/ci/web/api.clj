@@ -69,3 +69,23 @@
                        {:get-id (id-getter :webhook-id)
                         :getter st/find-details-for-webhook
                         :saver st/save-webhook-details})
+
+(def params-sid (comp (partial remove nil?)
+                      (juxt :customer-id :project-id :repo-id)
+                      :path
+                      :parameters))
+
+(defn get-params
+  "Retrieves build parameters for the given location.  This could be at customer, 
+   project or repo level.  For lower levels, the parameters for the higher levels
+   are merged in."
+  [req]
+  (->> req
+       (params-sid)
+       (st/find-params (c/req->storage req))
+       (rur/response)))
+
+(defn update-params [req]
+  (let [p (body req)]
+    (when (st/save-params (c/req->storage req) (params-sid req) p)
+      (rur/response p))))

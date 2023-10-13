@@ -69,6 +69,10 @@
 (s/defschema UpdateRepo
   (assoc-id NewRepo))
 
+(s/defschema Parameters
+  [{:name s/Str
+    :value s/Str}])
+
 (defn- generic-routes
   "Generates generic entity routes.  If child routes are given, they are added
    as additional routes after the full path."
@@ -80,20 +84,26 @@
     (cond-> [["" {:get {:handler getter}
                   :put {:handler updater
                         :parameters {:body update-schema}}}]]
-      child-routes (conj [child-routes]))]])
+      child-routes (concat child-routes))]])
 
 (def webhook-routes
   ["/webhook"
-   [["/github/:id" {:post {:handler github/webhook
-                           :parameters {:path {:id Id}
-                                        :body s/Any}}
-                    :middleware [:github-security]}]
-    ["" {:post {:handler api/create-webhook
-                :parameters {:body NewWebhook}}}]
-    ["/:webhook-id" {:get {:handler api/get-webhook}
-                     :put {:handler api/update-webhook
-                           :parameters {:body UpdateWebhook}}
-                     :parameters {:path {:webhook-id Id}}}]]])
+   (-> (generic-routes
+        {:creator api/create-webhook
+         :updater api/update-webhook
+         :getter  api/get-webhook
+         :new-schema NewWebhook
+         :update-schema UpdateWebhook
+         :id-key :webhook-id})
+       (conj ["/github/:id" {:post {:handler github/webhook
+                                    :parameters {:path {:id Id}
+                                                 :body s/Any}}
+                             :middleware [:github-security]}]))])
+
+(def parameter-routes
+  ["/params" {:get {:handler api/get-params}
+              :put {:handler api/update-params
+                    :parameters {:body Parameters}}}])
 
 (def repo-routes
   ["/repo"
@@ -114,7 +124,7 @@
      :new-schema NewProject
      :update-schema UpdateProject
      :id-key :project-id
-     :child-routes repo-routes})])
+     :child-routes [repo-routes]})])
 
 (def customer-routes
   ["/customer"
@@ -125,7 +135,8 @@
      :new-schema NewCustomer
      :update-schema UpdateCustomer
      :id-key :customer-id
-     :child-routes project-routes})])
+     :child-routes [project-routes
+                    parameter-routes]})])
 
 (def routes
   [["/health" {:get health}]

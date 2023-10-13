@@ -114,6 +114,17 @@
         (is (sut/sid? (sut/save-project st p)))
         (is (= p (sut/find-project st [cid pid])))))))
 
+(deftest parameters
+  (testing "can store on customer level"
+    (h/with-memory-store st
+      (let [cid (sut/new-id)
+            params [{:name "param-1"
+                     :value "value 1"}
+                    {:name "param-2"
+                     :value "value 2"}]]
+        (is (sut/sid? (sut/save-params st [cid] params)))
+        (is (= params (sut/find-params st [cid])))))))
+
 (deftest save-build-result
   (testing "writes to build result object"
     (h/with-memory-store st
