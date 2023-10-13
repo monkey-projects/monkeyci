@@ -69,6 +69,19 @@
 (s/defschema UpdateRepo
   (assoc-id NewRepo))
 
+(defn- generic-routes
+  "Generates generic entity routes.  If child routes are given, they are added
+   as additional routes after the full path."
+  [{:keys [getter creator updater id-key new-schema update-schema child-routes]}]
+  [["" {:post {:handler creator
+               :parameters {:body new-schema}}}]
+   [(str "/" id-key)
+    {:parameters {:path {id-key Id}}}
+    (cond-> [["" {:get {:handler getter}
+                  :put {:handler updater
+                        :parameters {:body update-schema}}}]]
+      child-routes (conj [child-routes]))]])
+
 (def webhook-routes
   ["/webhook"
    [["/github/:id" {:post {:handler github/webhook
@@ -84,35 +97,35 @@
 
 (def repo-routes
   ["/repo"
-   [["" {:post {:handler api/create-repo
-                :parameters {:body NewRepo}}}]
-    ["/:repo-id" {:get {:handler api/get-repo}
-                  :put {:handler api/update-repo
-                        :parameters {:body UpdateRepo}}
-                  :parameters {:path {:repo-id Id}}}]]])
+   (generic-routes
+    {:creator api/create-repo
+     :updater api/update-repo
+     :getter  api/get-repo
+     :new-schema NewRepo
+     :update-schema UpdateRepo
+     :id-key :repo-id})])
 
 (def project-routes
   ["/project"
-   [["" {:post {:handler api/create-project
-                :parameters {:body NewProject}}}]
-    ["/:project-id"
-     {:parameters {:path {:project-id Id}}}
-     [["" {:get {:handler api/get-project}
-           :put {:handler api/update-project
-                 :parameters {:body UpdateProject}}}]
-      [repo-routes]]]]])
+   (generic-routes
+    {:creator api/create-project
+     :updater api/update-project
+     :getter  api/get-project
+     :new-schema NewProject
+     :update-schema UpdateProject
+     :id-key :project-id
+     :child-routes repo-routes})])
 
 (def customer-routes
   ["/customer"
-   [["" {:post {:handler api/create-customer
-                :parameters {:body NewCustomer}}}]
-    ["/:customer-id"
-     {:parameters {:path {:customer-id Id}}}
-     [[""
-       {:get {:handler api/get-customer}
-        :put {:handler api/update-customer
-              :parameters {:body UpdateCustomer}}}]
-      [project-routes]]]]])
+   (generic-routes
+    {:creator api/create-customer
+     :updater api/update-customer
+     :getter  api/get-customer
+     :new-schema NewCustomer
+     :update-schema UpdateCustomer
+     :id-key :customer-id
+     :child-routes project-routes})])
 
 (def routes
   [["/health" {:get health}]

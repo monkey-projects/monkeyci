@@ -54,3 +54,10 @@
 (defn new-build-id []
   ;; TODO Generate a more unique build id
   (format "build-%d" (System/currentTimeMillis)))
+
+#_(defn replace-last
+  "Replaces the last item in `v` by `l`"
+  [v l]
+  (-> v
+      (drop-last)
+      (conj l)))
