@@ -51,7 +51,7 @@
                 :customer-id "test-customer"
                 :project-id "test-project"
                 :repo-id "test-repo"}]
-        (is (some? (st/create-webhook-details s wh)))
+        (is (st/sid? (st/save-webhook-details s wh)))
         (let [r (sut/prepare-build {:storage s}
                                    {:id "test-webhook"
                                     :payload {}})]
@@ -67,12 +67,15 @@
                 :customer-id "test-customer"
                 :project-id "test-project"
                 :repo-id "test-repo"}]
-        (is (some? (st/create-webhook-details s wh)))
+        (is (st/sid? (st/save-webhook-details s wh)))
         (let [r (sut/prepare-build {:storage s}
                                    {:id "test-webhook"
                                     :payload {:head-commit {:message "test message"
                                                             :timestamp "2023-10-10"}}})
-              md (st/find-build-metadata s (get-in r [:build :sid]))]
+              id (get-in r [:build :sid])
+              md (st/find-build-metadata s id)]
+          (is (st/sid? id))
+          (is (some? md))
           (is (= "test message" (:message md)))
           (is (= "2023-10-10" (:timestamp md)))))))
   

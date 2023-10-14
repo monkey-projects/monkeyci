@@ -103,7 +103,7 @@
        (is (true? (e/post-event bus evt)))
        (is (true? (h/wait-until verifier 200))))))
   ([evt verifier]
-   (verify-event-handled {} evt verifier)))
+   (verify-event-handled {:storage (st/make-memory-storage)} evt verifier)))
 
 (defmacro validate-listener [type h]
   `(let [invoked# (atom false)]

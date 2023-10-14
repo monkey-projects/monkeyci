@@ -1,10 +1,13 @@
 (ns monkey.ci.test.helpers
   "Helper functions for testing"
-  (:require [clojure.java.io :as io]
+  (:require [camel-snake-kebab.core :as csk]
+            [clojure.java.io :as io]
             [clojure.core.async :as ca]
+            [cheshire.core :as json]
             [monkey.ci
              [events :as e]
-             [storage :as s]])
+             [storage :as s]]
+            [ring.mock.request :as mock])
   (:import org.apache.commons.io.FileUtils))
 
 (defn ^java.io.File create-tmp-dir []
@@ -37,10 +40,10 @@
             (Thread/sleep 100)
             (recur (f))))))))
 
-(defn try-take [ch timeout timeout-val]
-  (let [t (ca/timeout timeout)
+(defn try-take [ch & [timeout timeout-val]]
+  (let [t (ca/timeout (or timeout 1000))
         [v c] (ca/alts!! [ch t])]
-    (if (= t c) timeout-val v)))
+    (if (= t c) (or timeout-val :timeout) v)))
 
 (defn with-bus [f]
   (let [bus (e/make-bus)]
@@ -56,3 +59,16 @@
   `(with-memory-store-fn
      (fn [~s]
        ~@body)))
+
+(defn parse-json [s]
+  (json/parse-string s csk/->kebab-case-keyword))
+
+(defn to-json [obj]
+  (json/generate-string obj (comp csk/->camelCase name)))
+
+(defn json-request
+  "Creates a Ring mock request with given object as json body"
+  [method path body]
+  (-> (mock/request method path)
+      (mock/body (to-json body))
+      (mock/header :content-type "application/json")))

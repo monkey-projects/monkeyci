@@ -60,7 +60,7 @@
     (h/with-memory-store st
       (let [id (str (random-uuid))
             d {:id id}]
-        (is (sut/sid? (sut/create-webhook-details st d)))
+        (is (sut/sid? (sut/save-webhook-details st d)))
         (is (= d (sut/find-details-for-webhook st id)))))))
 
 (deftest build-metadata
@@ -84,6 +84,46 @@
                 :customer-id "test-cust"}]
         (is (sut/sid? (sut/create-build-results st md {:status :success})))
         (is (= :success (:status (sut/find-build-results st md))))))))
+
+(deftest projects
+  (testing "stores project in customer"
+    (h/with-memory-store st
+      (is (sut/sid? (sut/save-project st {:customer-id "test-customer"
+                                          :id "test-project"
+                                          :name "Test project"})))
+      (is (some? (:projects (sut/find-customer st "test-customer"))))))
+
+  (testing "updates existing project in customer"
+    (h/with-memory-store st
+      (let [[cid pid] (repeatedly sut/new-id)]
+        (is (sut/sid? (sut/save-project st {:customer-id cid
+                                            :id pid
+                                            :name "Test project"})))
+        (is (sut/sid? (sut/save-project st {:customer-id cid
+                                            :id pid
+                                            :name "Updated project"})))
+        (is (= "Updated project" (:name (sut/find-project st [cid pid])))))))
+
+  (testing "can find project via customer"
+    (h/with-memory-store st
+      (let [cid "some-customer"
+            pid "some-project"
+            p {:customer-id cid
+               :id pid
+               :name "Test project"}]
+        (is (sut/sid? (sut/save-project st p)))
+        (is (= p (sut/find-project st [cid pid])))))))
+
+(deftest parameters
+  (testing "can store on customer level"
+    (h/with-memory-store st
+      (let [cid (sut/new-id)
+            params [{:name "param-1"
+                     :value "value 1"}
+                    {:name "param-2"
+                     :value "value 2"}]]
+        (is (sut/sid? (sut/save-params st [cid] params)))
+        (is (= params (sut/find-params st [cid])))))))
 
 (deftest save-build-result
   (testing "writes to build result object"
