@@ -115,3 +115,9 @@
                     :args
                     :extra-env
                     :monkeyci-event-socket))))))
+
+(deftest process-env
+  (testing "passes build id"
+    (is (= "test-build" (-> {:build {:build-id "test-build"}}
+                            (sut/process-env "test-socket")
+                            :monkeyci-build-id)))))

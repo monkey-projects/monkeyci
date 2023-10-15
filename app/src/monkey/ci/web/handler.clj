@@ -24,16 +24,6 @@
    :body "ok"
    :headers {"Content-Type" "text/plain"}})
 
-(defn- maybe-generate
-  "If no secret key has been configured, generate one and log it.  Don't
-   use this in production!"
-  [s g]
-  (if (some? s)
-    s
-    (let [gen (g)]
-      (log/info "Generated secret key:" gen)
-      gen)))
-
 (def Id s/Str)
 
 (defn- assoc-id [s]
@@ -191,9 +181,7 @@
      {:github-security (if dev-mode
                          ;; Disable security in dev mode
                          [passthrough-middleware]
-                         [github/validate-security (maybe-generate
-                                                    (get-in opts [:github :secret])
-                                                    github/generate-secret-key)])}}))
+                         [github/validate-security])}}))
   ([opts]
    (make-router opts routes)))
 

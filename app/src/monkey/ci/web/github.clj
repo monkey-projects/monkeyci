@@ -28,16 +28,25 @@
               (codecs/hex->bytes sign)
               {:key secret :alg :hmac+sha256})))
 
+(def req->webhook-id (comp :id :path :parameters))
+
 (defn validate-security
-  "Middleware that validates the github security header"
-  [h secret]
-  (fn [req]
-    (if (valid-security? {:secret secret
-                          :payload (:body req)
-                          :x-hub-signature (get-in req [:headers "x-hub-signature-256"])})
-      (h req)
-      (-> (rur/response "Invalid signature header")
-          (rur/status 401)))))
+  "Middleware that validates the github security header using a fn that retrieves
+   the secret for the request."
+  ([h get-secret]
+   (fn [req]
+     (if (valid-security? {:secret (get-secret req)
+                           :payload (:body req)
+                           :x-hub-signature (get-in req [:headers "x-hub-signature-256"])})
+       (h req)
+       (-> (rur/response "Invalid signature header")
+           (rur/status 401)))))
+  ([h]
+   (validate-security h (fn [req]
+                          ;; Find the secret key by looking up the webhook from storage
+                          (some-> (c/req->storage req)
+                                  (s/find-details-for-webhook (req->webhook-id req))
+                                  :secret-key)))))
 
 (defn generate-secret-key []
   (-> (nonce/random-nonce 32)
@@ -52,7 +61,7 @@
   (<!!
    (go
      (rur/status (if (<! (c/post-event req {:type :webhook/github
-                                            :id (get-in req [:parameters :path :id])
+                                            :id (req->webhook-id req)
                                             :payload (:body-params req)}))
                    200
                    500)))))

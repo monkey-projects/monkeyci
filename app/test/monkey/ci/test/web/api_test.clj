@@ -107,3 +107,26 @@
                   (with-path-params {:customer-id (st/new-id)})
                   (sut/get-params)
                   :body)))))
+
+(deftest create-webhook
+  (testing "assigns secret key"
+    (let [{st :storage :as ctx} (test-ctx)
+          r (-> ctx
+                (->req)
+                (with-body {:customer-id "test-customer"})
+                (sut/create-webhook))]
+      (is (= 201 (:status r)))
+      (is (string? (get-in r [:body :secret-key]))))))
+
+(deftest get-webhook
+  (testing "does not return the secret key"
+    (let [{st :storage :as ctx} (test-ctx)
+          wh {:id (st/new-id)
+              :secret-key "very secret key"}
+          _ (st/save-webhook-details st wh)
+          r (-> ctx
+                (->req)
+                (with-path-param :webhook-id (:id wh))
+                (sut/get-webhook))]
+      (is (= 200 (:status r)))
+      (is (nil? (get-in r [:body :secret-key]))))))

@@ -108,6 +108,15 @@
                            (str build-id "-connector"))
                       (.start))}))
 
+(defn process-env
+  "Build the environment to be passed to the child process."
+  [ctx socket-path]
+  (-> {:event
+       {:socket socket-path}}
+      (assoc :build-id (get-in ctx [:build :build-id]))
+      (merge (select-keys ctx [:containers :log-dir]))
+      (config/config->env)))
+
 (defn execute!
   "Executes the build script located in given directory.  This actually runs the
    clojure cli with a generated `build` alias.  This expects absolute directories.
@@ -126,11 +135,7 @@
                 "-X:monkeyci/build"]
                (concat (build-args ctx))
                (vec))
-      :extra-env (-> {:event
-                       {:socket socket-path}}
-                     (assoc :build-id build-id)
-                     (merge (select-keys ctx [:containers :log-dir]))
-                     (config/config->env))
+      :extra-env (process-env ctx socket-path)
       :exit-fn (fn [{:keys [proc] :as p}]
                  (let [exit (or (some-> proc (.exitValue)) 0)]
                    (log/debug "Script process exited with code" exit ", cleaning up")

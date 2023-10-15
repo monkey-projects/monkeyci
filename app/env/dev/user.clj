@@ -26,25 +26,20 @@
                     (sc/stop-system s))
                   nil)))
 
-(def secret "test-secret")
-
 (defn start-server []
   (stop-server)
   (reset! server (-> c/base-system                     
                      (assoc :config (-> (config/app-config cc/env {:dev-mode true :workdir "tmp"})
-                                        (assoc :github {:secret secret}
-                                               :log-dir (u/abs-path "target/logs"))))
+                                        (assoc :log-dir (u/abs-path "target/logs"))))
                      (sc/subsystem [:http])
                      (sc/start-system)))
   nil)
 
 (defn generate-signature
-  ([secret payload]
-   (-> payload
-       (mac/hash {:key secret :alg :hmac+sha256})
-       (codecs/bytes->hex)))
-  ([payload]
-   (generate-signature secret payload)))
+  [secret payload]
+  (-> payload
+      (mac/hash {:key secret :alg :hmac+sha256})
+      (codecs/bytes->hex)))
 
 (defn load-example-github-webhook []
   (with-open [r (-> "test/example-github-webhook.edn"
