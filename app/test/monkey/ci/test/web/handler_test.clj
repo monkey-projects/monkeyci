@@ -24,9 +24,7 @@
 (defn- make-test-app
   ([storage]
    (sut/make-app
-    {:github
-     {:secret github-secret}
-     :event-bus (events/make-bus)
+    {:event-bus (events/make-bus)
      :storage storage}))
   ([]
    (make-test-app (st/make-memory-storage))))
@@ -81,11 +79,16 @@
       (let [payload "test body"
             signature (-> (mac/hash payload {:key github-secret
                                              :alg :hmac+sha256})
-                          (codecs/bytes->hex))]
-        (is (= 200 (-> (mock/request :post "/webhook/github/test-hook")
+                          (codecs/bytes->hex))
+            hook-id (st/new-id)
+            st (st/make-memory-storage)
+            app (make-test-app st)]
+        (is (st/sid? (st/save-webhook-details st {:id hook-id
+                                                  :secret-key github-secret})))
+        (is (= 200 (-> (mock/request :post (str "/webhook/github/" hook-id))
                        (mock/body payload)
                        (mock/header :x-hub-signature-256 (str "sha256=" signature))
-                       (test-app)
+                       (app)
                        :status)))))
 
     (testing "returns 401 if invalid security"

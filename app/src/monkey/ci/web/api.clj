@@ -1,7 +1,9 @@
 (ns monkey.ci.web.api
   (:require [clojure.tools.logging :as log]
             [monkey.ci.storage :as st]
-            [monkey.ci.web.common :as c]
+            [monkey.ci.web
+             [common :as c]
+             [github :as gh]]
             [ring.util.response :as rur]))
 
 (def body (comp :body :parameters))
@@ -67,8 +69,19 @@
 
 (make-entity-endpoints "webhook"
                        {:get-id (id-getter :webhook-id)
-                        :getter st/find-details-for-webhook
+                        :getter (comp #(dissoc % :secret-key)
+                                      st/find-details-for-webhook)
                         :saver st/save-webhook-details})
+
+;; Override webhook creation
+(defn- assign-webhook-secret
+  "Updates the request body to assign a secret key, which is used to
+   validate the request."
+  [req]
+  (assoc-in req [:parameters :body :secret-key] (gh/generate-secret-key)))
+
+(def create-webhook (comp (entity-creator st/save-webhook-details)
+                          assign-webhook-secret))
 
 (def params-sid (comp (partial remove nil?)
                       (juxt :customer-id :project-id :repo-id)
