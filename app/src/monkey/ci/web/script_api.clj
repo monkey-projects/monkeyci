@@ -4,7 +4,9 @@
    script API does not have security on its own, since the implementation will
    take care of this.  The script API exposes an OpenAPI spec, which is then
    fetched by the script, so it knows which services are available."
-  (:require [clojure.tools.logging :as log]
+  (:require [clojure.core.async :as ca]
+            [clojure.tools.logging :as log]
+            [monkey.ci.events :as e]
             [monkey.ci.web.common :as c]
             [monkey.socket-async.uds :as uds]
             [org.httpkit.server :as http]
@@ -25,6 +27,15 @@
 (defn get-params [req]
   (rur/response (invoke-public-api req :get-params)))
 
+(defn post-event [req]
+  (let [evt (get-in req [:parameters :body])
+        bus (c/req->bus req)]
+    {:status (-> (ca/go
+                   (if (e/post-event bus evt)
+                     202
+                     500))
+                 (ca/<!!))}))
+
 (def routes ["/script" {:swagger {:id :monkeyci/script-api}}
              [["/swagger.json"
                {:no-doc true
@@ -33,7 +44,13 @@
                {:get get-params
                 :summary "Retrieve configured build parameters"
                 :operationId :get-params
-                :responses {200 {:body {s/Str s/Str}}}}]]])
+                :responses {200 {:body {s/Str s/Str}}}}]
+              ["/event"
+               {:post post-event
+                :summary "Post an event to the bus"
+                :operationId :post-event
+                :parameters {:body {s/Keyword s/Any}}
+                :responses {202 {}}}]]])
 
 (defn make-router
   ([opts routes]

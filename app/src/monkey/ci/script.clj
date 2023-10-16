@@ -4,7 +4,8 @@
             [clojure.core.async :as ca]
             [martian
              [core :as martian]
-             [httpkit :as mh]]
+             [httpkit :as mh]
+             [interceptors :as mi]]
             [monkey.ci.build.core :as bc]
             [monkey.ci
              [containers :as c]
@@ -15,7 +16,8 @@
             [monkey.socket-async
              [core :as sa]
              [uds :as uds]]
-            [org.httpkit.client :as http]))
+            [org.httpkit.client :as http])
+  (:import java.nio.channels.SocketChannel))
 
 (defn initial-context [p]
   (assoc bc/success
@@ -23,22 +25,27 @@
          :pipeline p))
 
 (defn- post-event [ctx evt]
-  (when-not (some-> (get-in ctx [:api :client]) 
-                    (martian/response-for :post-event (assoc evt :src :script)))
-    (log/warn "Unable to post event")))
+  (if-let [c (get-in ctx [:api :client])]
+    (let [{:keys [status] :as r} (martian/response-for c :post-event (assoc evt :src :script))]
+      (when-not (= 202 status)
+        (log/warn "Failed to post event, got status" status)
+        (log/debug "Response:" r)))
+    (log/warn "Unable to post event, no client configured")))
 
 (defn- wrap-events
   "Posts event before and after invoking `f`"
   [ctx before-evt after-evt f]
-  (try
-    (post-event ctx before-evt)
-    (let [r (f)]
-      (post-event ctx (if (fn? after-evt)
-                        (after-evt r)
-                        after-evt))
-      r)
-    (catch Exception ex
-      (post-event ctx (assoc after-evt :exception ex)))))
+  (letfn [(make-after [r]
+            (if (fn? after-evt)
+              (after-evt r)
+              after-evt))]
+    (try
+      (post-event ctx before-evt)
+      (let [r (f)]
+        (post-event ctx (make-after r))
+        r)
+      (catch Exception ex
+        (post-event ctx (assoc (make-after {}) :exception ex))))))
 
 (defprotocol PipelineStep
   (run-step [s ctx]))
@@ -176,11 +183,21 @@
 (defn- setup-api-client [ctx]
   (let [socket (get-in ctx [:api :socket])
         client (http/make-client
-                {:address-finder #(uds/make-address socket)
-                 :channel-factory uds/connect-socket})]
+                {:address-finder (fn make-addr [_]
+                                   (uds/make-address socket))
+                 :channel-factory (fn [_]
+                                    (SocketChannel/open uds/unix-proto))})
+        ;; Martian doesn't pass in the client in the requests, so do it with an interceptor.
+        client-injector {:name ::inject-client
+                         :enter (fn [ctx]
+                                  (assoc-in ctx [:request :client] client))}
+        interceptors (-> mh/default-interceptors
+                         (mi/inject client-injector :before ::mh/perform-request))]
     (cond-> ctx
       ;; In tests it could be there is no socket, so skip the initialization in that case
-      socket (assoc-in [:api :client] (mh/bootstrap-openapi "http://fake" {:client client})))))
+      socket (assoc-in [:api :client] (mh/bootstrap-openapi "http://fake/script/swagger.json"
+                                                            {:interceptors interceptors}
+                                                            {:client client})))))
 
 (defn- with-script-api [ctx f]
   (let [ctx (setup-api-client ctx)]

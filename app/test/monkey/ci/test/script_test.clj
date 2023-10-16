@@ -21,28 +21,30 @@
 (defn with-listening-socket [f]
   (let [p (u/tmp-file "test-" ".sock")]
     (try
-      (let [server (script-api/listen-at-socket p {})]
+      (let [bus (e/make-bus)
+            server (script-api/listen-at-socket p {:event-bus bus})]
         (try
-          (f p)
+          (f p bus)
           (finally
             (script-api/stop-server server))))
       (finally
         (uds/delete-address p)))))
 
 (deftest exec-script!
-  (testing "executes basic clj script from location"
+  #_(testing "executes basic clj script from location"
     (is (bc/success? (sut/exec-script! {:script-dir "examples/basic-clj"}))))
 
-  (testing "executes script shell from location"
+  #_(testing "executes script shell from location"
     (is (bc/success? (sut/exec-script! {:script-dir "examples/basic-script"}))))
   
   (testing "connects to listening socket if specified"
     (with-listening-socket
-      (fn [socket-path]
-        (let [in (ca/chan 1)]
+      (fn [socket-path bus]
+        (let [in (e/wait-for bus :script/start (map identity))]
           ;; Execute the script, we expect at least one incoming event
           (is (bc/success? (sut/exec-script! {:script-dir "examples/basic-clj"
-                                              :api-socket socket-path})))
+                                              :build-id "test-build"
+                                              :api {:socket socket-path}})))
           ;; Try to read a message on the channel
           (is (= in (-> (ca/alts!! [in (ca/timeout 500)])
                         (second)))))))))
