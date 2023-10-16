@@ -6,7 +6,7 @@
 (defn- ->req [ctx]
   {:reitit.core/match
    {:data
-    {:monkey.ci.web.handler/context ctx}}})
+    {:monkey.ci.web.common/context ctx}}})
 
 (defn- with-path-param [r k v]
   (assoc-in r [:parameters :path k] v))

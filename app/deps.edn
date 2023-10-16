@@ -5,6 +5,7 @@
         cli-matic/cli-matic {:mvn/version "0.5.4"}
         clj-jgit/clj-jgit {:mvn/version "1.0.2"
                            :exclusions [org.eclipse.jgit/org.eclipse.jgit.gpg.bc]}
+        com.github.oliyh/martian-httpkit {:mvn/version "0.1.25"}
         com.monkeyci/script {:local/root "../lib"}
         com.monkeyprojects/socket-async {:mvn/version "0.1.0"}
         com.stuartsierra/component {:mvn/version "1.1.0"}
@@ -14,6 +15,7 @@
         metosin/reitit-middleware {:mvn/version "0.7.0-alpha5"}
         metosin/reitit-ring {:mvn/version "0.7.0-alpha5"}
         metosin/reitit-schema {:mvn/version "0.7.0-alpha5"}
+        metosin/reitit-swagger {:mvn/version "0.7.0-alpha5"}
         org.clojars.lispyclouds/contajners {:mvn/version "1.0.1"}
         org.clojure/core.async {:mvn/version "1.6.681"}
         org.clojure/tools.logging {:mvn/version "1.2.4"}
@@ -31,6 +33,7 @@
   :test
   {:extra-paths [:test-paths]
    :extra-deps {com.monkeyprojects/build {:mvn/version "0.2-SNAPSHOT"}
+                com.github.oliyh/martian-test {:mvn/version "0.1.25"}
                 ring/ring-mock {:mvn/version "0.4.0"}}
    :exec-fn monkey.test/all
    ;; Add this to avoid falling back to the default logger

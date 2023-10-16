@@ -8,6 +8,7 @@
              [script :as script]]
             [monkey.ci.utils :as u]
             [monkey.ci.build.core :as bc]
+            [monkey.ci.web.script-api :as sa]
             [monkey.ci.test.helpers :as h]))
 
 (def cwd (u/cwd))
@@ -68,53 +69,60 @@
        (drop-while (partial not= (str k)))
        (second)))
 
+(defrecord TestServer []
+  org.httpkit.server.IHttpServer
+  (-server-stop! [s opts]
+    (future nil)))
+
 (deftest execute!
-  (with-redefs [bp/process (fn [{:keys [exit-fn] :as args}]
-                             (do
-                               (when (fn? exit-fn)
-                                 (exit-fn {}))
-                               {:args args
-                                :exit 1234}))]
-    (testing "returns exit code"
-      (is (= 1234 (:exit (sut/execute!
-                          {:args {:dev-mode true}
-                           :build {:script-dir (example "failing")}})))))
+  (let [server-started? (atom nil)]
+    (with-redefs [bp/process (fn [{:keys [exit-fn] :as args}]
+                               (do
+                                 (when (fn? exit-fn)
+                                   (exit-fn {}))
+                                 {:args args
+                                  :exit 1234}))
+                  sa/start-server (fn [& args]
+                                    (reset! server-started? true)
+                                    (->TestServer))]
+      
+      (testing "returns exit code"
+        (is (= 1234 (:exit (sut/execute!
+                            {:args {:dev-mode true}
+                             :build {:script-dir (example "failing")}})))))
 
-    (testing "invokes in script dir"
-      (is (= "test-dir" (-> (sut/execute! {:build {:script-dir "test-dir"}})
-                            :args
-                            :dir))))
+      (testing "invokes in script dir"
+        (is (= "test-dir" (-> (sut/execute! {:build {:script-dir "test-dir"}})
+                              :args
+                              :dir))))
 
-    (testing "passes checkout dir in edn"
-      (is (= "\"work-dir\"" (-> {:build {:checkout-dir "work-dir"}}
-                                (sut/execute!)
-                                (find-arg :checkout-dir)))))
-
-    (testing "passes script dir in edn"
-      (is (= "\"script-dir\"" (-> {:build {:script-dir "script-dir"}}
+      (testing "passes checkout dir in edn"
+        (is (= "\"work-dir\"" (-> {:build {:checkout-dir "work-dir"}}
                                   (sut/execute!)
-                                  (find-arg :script-dir)))))
+                                  (find-arg :checkout-dir)))))
 
-    (testing "passes pipeline in edn"
-      (is (= "\"test-pipeline\"" (-> {:build {:pipeline "test-pipeline"}}
-                                     (sut/execute!)
-                                     (find-arg :pipeline)))))
+      (testing "passes script dir in edn"
+        (is (= "\"script-dir\"" (-> {:build {:script-dir "script-dir"}}
+                                    (sut/execute!)
+                                    (find-arg :script-dir)))))
 
-    (testing "passes socket path in env when bus exists"
-      (let [bus (events/make-bus)]
-        (is (string? (-> {:script-dir "test-dir"
-                          :event-bus bus}
-                         (sut/execute!)
-                         :args
-                         :extra-env
-                         :monkeyci-event-socket)))))
+      (testing "passes pipeline in edn"
+        (is (= "\"test-pipeline\"" (-> {:build {:pipeline "test-pipeline"}}
+                                       (sut/execute!)
+                                       (find-arg :pipeline)))))
 
-    (testing "no socket path when no bus exists"
-      (is (nil? (-> {:build {:script-dir "test-dir"}}
-                    (sut/execute!)
-                    :args
-                    :extra-env
-                    :monkeyci-event-socket))))))
+      (testing "starts script api server"
+        (is (some? (sut/execute! {})))
+        (is (true? @server-started?)))
+
+      (testing "passes socket path in env"
+        (let [bus (events/make-bus)]
+          (is (string? (-> {:script-dir "test-dir"
+                            :event-bus bus}
+                           (sut/execute!)
+                           :args
+                           :extra-env
+                           :monkeyci-api-socket))))))))
 
 (deftest process-env
   (testing "passes build id"

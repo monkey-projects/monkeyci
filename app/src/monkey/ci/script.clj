@@ -2,6 +2,10 @@
   (:require [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [clojure.core.async :as ca]
+            [martian
+             [core :as martian]
+             [httpkit :as mh]
+             [interceptors :as mi]]
             [monkey.ci.build.core :as bc]
             [monkey.ci
              [containers :as c]
@@ -11,7 +15,9 @@
              [utils :as u]]
             [monkey.socket-async
              [core :as sa]
-             [uds :as uds]]))
+             [uds :as uds]]
+            [org.httpkit.client :as http])
+  (:import java.nio.channels.SocketChannel))
 
 (defn initial-context [p]
   (assoc bc/success
@@ -19,22 +25,27 @@
          :pipeline p))
 
 (defn- post-event [ctx evt]
-  (when-not (some-> (get-in ctx [:events :bus]) 
-                    (e/post-event (assoc evt :src :script)))
-    (log/warn "Unable to post event")))
+  (if-let [c (get-in ctx [:api :client])]
+    (let [{:keys [status] :as r} (martian/response-for c :post-event (assoc evt :src :script))]
+      (when-not (= 202 status)
+        (log/warn "Failed to post event, got status" status)
+        (log/debug "Response:" r)))
+    (log/warn "Unable to post event, no client configured")))
 
 (defn- wrap-events
   "Posts event before and after invoking `f`"
   [ctx before-evt after-evt f]
-  (try
-    (post-event ctx before-evt)
-    (let [r (f)]
-      (post-event ctx (if (fn? after-evt)
-                        (after-evt r)
-                        after-evt))
-      r)
-    (catch Exception ex
-      (post-event ctx (assoc after-evt :exception ex)))))
+  (letfn [(make-after [r]
+            (if (fn? after-evt)
+              (after-evt r)
+              after-evt))]
+    (try
+      (post-event ctx before-evt)
+      (let [r (f)]
+        (post-event ctx (make-after r))
+        r)
+      (catch Exception ex
+        (post-event ctx (assoc (make-after {}) :exception ex))))))
 
 (defprotocol PipelineStep
   (run-step [s ctx]))
@@ -169,44 +180,34 @@
         (in-ns 'monkey.ci.script)
         (remove-ns tmp-ns)))))
 
-(defn- make-socket-bus [p]
-  (log/debug "Sending events to socket at" p)
-  (let [addr (uds/make-address p)
-        conn (uds/connect-socket addr)
-        {:keys [channel] :as bus} {:channel (ca/chan)}]
-    (sa/write-from-channel channel conn)
-    {:addr addr
-     :socket conn
-     :bus bus}))
+(defn- setup-api-client [ctx]
+  (let [socket (get-in ctx [:api :socket])
+        client (http/make-client
+                {:address-finder (fn make-addr [_]
+                                   (uds/make-address socket))
+                 :channel-factory (fn [_]
+                                    (SocketChannel/open uds/unix-proto))})
+        ;; Martian doesn't pass in the client in the requests, so do it with an interceptor.
+        client-injector {:name ::inject-client
+                         :enter (fn [ctx]
+                                  (assoc-in ctx [:request :client] client))}
+        interceptors (-> mh/default-interceptors
+                         (mi/inject client-injector :before ::mh/perform-request))]
+    (cond-> ctx
+      ;; In tests it could be there is no socket, so skip the initialization in that case
+      socket (assoc-in [:api :client] (mh/bootstrap-openapi "http://fake/script/swagger.json"
+                                                            {:interceptors interceptors}
+                                                            {:client client})))))
 
-(defn- make-dummy-bus []
-  (log/debug "No event socket configured, events will not be passed to controlling process")
-  {:bus {:channel (ca/chan (ca/sliding-buffer 1))}})
-
-(defn- setup-event-bus
-  "Configures the event bus for the event socket.  If no socket is specified,
-   then the bus will still be configured, but it will drop all events."
-  [{:keys [event-socket] :as ctx}]
-  (assoc ctx :events (if event-socket
-                       (make-socket-bus event-socket)
-                       (make-dummy-bus))))
-
-(defn- close-socket [ctx]
-  (when-let [s (get-in ctx [:events :socket])]
-    (uds/close s)))
-
-(defn- with-event-bus [ctx f]
-  (let [ctx (setup-event-bus ctx)]
-    (try
-      (f ctx)
-      (finally
-        (close-socket ctx)))))
+(defn- with-script-api [ctx f]
+  (let [ctx (setup-api-client ctx)]
+    (f ctx)))
 
 (defn exec-script!
   "Loads a script from a directory and executes it.  The script is
    executed in this same process (but in a randomly generated namespace)."
   [{:keys [script-dir build-id] :as ctx}]
-  (with-event-bus ctx
+  (with-script-api ctx
     (fn [ctx]
       (log/debug "Executing script for build" build-id "at:" script-dir)
       (let [p (load-pipelines script-dir build-id)]
