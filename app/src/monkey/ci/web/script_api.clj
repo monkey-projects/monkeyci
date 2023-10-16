@@ -4,12 +4,17 @@
    script API does not have security on its own, since the implementation will
    take care of this.  The script API exposes an OpenAPI spec, which is then
    fetched by the script, so it knows which services are available."
-  (:require [monkey.ci.web.common :as c]
+  (:require [clojure.tools.logging :as log]
+            [monkey.ci.web.common :as c]
+            [monkey.socket-async.uds :as uds]
             [org.httpkit.server :as http]
+            [reitit.coercion.schema]
             [reitit
              [ring :as ring]
              [swagger :as swagger]]
-            [ring.util.response :as rur]))
+            [ring.util.response :as rur]
+            [schema.core :as s])
+  (:import java.nio.channels.ServerSocketChannel))
 
 (defn- invoke-public-api
   "Invokes given endpoint on the public api"
@@ -20,14 +25,15 @@
 (defn get-params [req]
   (rur/response (invoke-public-api req :get-params)))
 
-(def routes ["/script"
+(def routes ["/script" {:swagger {:id :monkeyci/script-api}}
              [["/swagger.json"
                {:no-doc true
                 :get (swagger/create-swagger-handler)}]
               ["/params"
                {:get get-params
                 :summary "Retrieve configured build parameters"
-                :operationId :get-params}]]])
+                :operationId :get-params
+                :responses {200 {:body {s/Str s/Str}}}}]]])
 
 (defn make-router
   ([opts routes]
@@ -46,4 +52,16 @@
 (defn start-server
   "Starts a http server using the given options to configure the routes and the server."
   [{:keys [http] :as opts}]
-  (http/run-server (make-app opts) http))
+  (->> (assoc http
+              :legacy-return-value? false)
+       (http/run-server (make-app opts))))
+
+(def stop-server (comp deref http/server-stop!))
+
+(defn listen-at-socket
+  "Starts a script api that is listening at given socket path"
+  [path ctx]
+  (log/info "Starting script API at socket" path)
+  (let [http-opts {:address-finder #(uds/make-address path)
+                   :channel-factory (fn [_] (ServerSocketChannel/open uds/unix-proto))}]
+    (start-server (assoc ctx :http http-opts))))

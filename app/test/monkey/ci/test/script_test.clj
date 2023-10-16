@@ -2,26 +2,30 @@
   (:require [clojure.test :refer :all]
             [clojure.core.async :as ca]
             [clojure.tools.logging :as log]
+            [martian
+             [core :as martian]
+             [test :as mt]]
             [monkey.ci
              [containers :as c]
              [events :as e]
              [script :as sut]
              [utils :as u]]
+            [monkey.ci.web.script-api :as script-api]
             [monkey.ci.build.core :as bc]
             [monkey.ci.test.helpers :as h]
             [monkey.socket-async
              [core :as sa]
-             [uds :as uds]]))
+             [uds :as uds]]
+            [schema.core :as s]))
 
 (defn with-listening-socket [f]
   (let [p (u/tmp-file "test-" ".sock")]
     (try
-      (let [a (uds/make-address p)
-            l (uds/listen-socket a)]
+      (let [server (script-api/listen-at-socket p {})]
         (try
-          (f a l)
+          (f p)
           (finally
-            (uds/close l))))
+            (script-api/stop-server server))))
       (finally
         (uds/delete-address p)))))
 
@@ -34,17 +38,11 @@
   
   (testing "connects to listening socket if specified"
     (with-listening-socket
-      (fn [addr listener]
+      (fn [socket-path]
         (let [in (ca/chan 1)]
-          ;; Accept connection and read into the channel
-          (doto (Thread. (fn []
-                           (-> (uds/accept listener)
-                               (sa/read-onto-channel in))
-                           (log/debug "Incoming connection accepted")))
-            (.start))
           ;; Execute the script, we expect at least one incoming event
           (is (bc/success? (sut/exec-script! {:script-dir "examples/basic-clj"
-                                              :event-socket (str (.getPath addr))})))
+                                              :api-socket socket-path})))
           ;; Try to read a message on the channel
           (is (= in (-> (ca/alts!! [in (ca/timeout 500)])
                         (second)))))))))
@@ -78,17 +76,26 @@
                                          :steps [(constantly bc/failure)]})]
                           (sut/run-pipelines {:pipeline "first"})))))
 
-  (testing "posts events"
+  (testing "posts events through api"
     (letfn [(verify-evt [expected-type]
-              (let [bus (e/make-bus)
+              (let [events-posted (atom [])
+                    ;; Set up a fake api
+                    client (-> (martian/bootstrap "http://test"
+                                                  [{:route-name :post-event
+                                                    :path-parts ["/event"]
+                                                    :method :post
+                                                    :body-schema {:event s/Any}}])
+                               (mt/respond-with {:post-event (fn [req]
+                                                               (swap! events-posted conj (:body req))
+                                                               {:status 200})}))
                     pipelines [(bc/pipeline {:name "test"
                                              :steps [(constantly bc/success)]})]
-                    ctx {:events {:bus bus}}
-                    recv (atom [])]
-                (e/register-handler bus expected-type (partial swap! recv conj))
+                    ctx {:api {:client client}}]
                 (is (bc/success? (sut/run-pipelines ctx pipelines)))
-                (is (true? (h/wait-until #(pos? (count @recv)) 500)))
-                (is (= 1 (count @recv)))))]
+                (is (pos? (count @events-posted)))
+                (is (true? (-> (map :type @events-posted)
+                               (set)
+                               (contains? expected-type))))))]
 
       ;; Run a test for each type
       (->> [:pipeline/start

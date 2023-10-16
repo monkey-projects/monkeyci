@@ -14,9 +14,8 @@
              [script :as script]
              [utils :as utils]]
             [monkey.ci.build.core :as bc]
-            [monkey.socket-async
-             [core :as sa]
-             [uds :as uds]]))
+            [monkey.ci.web.script-api :as script-api]
+            [monkey.socket-async.uds :as uds]))
 
 (defn run
   "Run function for when a build task is executed using clojure tools.  This function
@@ -73,11 +72,14 @@
        (into [])
        (flatten)))
 
-(defn- events-to-bus
+(defn- make-socket-path [build-id]
+  (utils/tmp-file (str "events-" build-id ".sock")))
+
+#_(defn- events-to-bus
   "Creates a listening socket (a uds) that will receive any events generated
    by the child script.  These events will then be sent to the bus."
   [{:keys [channel] :as bus} build-id]
-  (let [path (utils/tmp-file (str "events-" build-id ".sock"))
+  (let [path (make-socket-path build-id)
         listener (uds/listen-socket (uds/make-address path))
         sock (ca/promise-chan)
         inter-ch (ca/chan)]
@@ -108,10 +110,19 @@
                            (str build-id "-connector"))
                       (.start))}))
 
+(defn- start-script-api
+  "Starts a script API  http server that listens at a domain socket 
+   location.  Returns both the server and the socket path."
+  [ctx]
+  (let [build-id (get-in ctx [:build :build-id])
+        path (make-socket-path build-id)]
+    {:socket-path path
+     :server (script-api/listen-at-socket path ctx)}))
+
 (defn process-env
   "Build the environment to be passed to the child process."
   [ctx socket-path]
-  (-> {:event
+  (-> {:api
        {:socket socket-path}}
       (assoc :build-id (get-in ctx [:build :build-id]))
       (merge (select-keys ctx [:containers :log-dir]))
@@ -124,8 +135,7 @@
    post a `build/completed` event on process exit."
   [{{:keys [checkout-dir script-dir build-id] :as build} :build bus :event-bus :as ctx}]
   (log/info "Executing build process for" build-id "in" checkout-dir)
-  (let [{:keys [socket-path socket]} (when bus
-                                       (events-to-bus bus build-id))]
+  (let [{:keys [socket-path server]} (start-script-api ctx)]
     (bp/process
      {:dir script-dir
       :out :inherit
@@ -139,8 +149,10 @@
       :exit-fn (fn [{:keys [proc] :as p}]
                  (let [exit (or (some-> proc (.exitValue)) 0)]
                    (log/debug "Script process exited with code" exit ", cleaning up")
+                   (when server
+                     (script-api/stop-server server))
                    (when socket-path 
-                     (uds/close socket)
+                     #_(uds/close socket)
                      (uds/delete-address socket-path))
                    ;; Bus should always be present.  This check is only for testing purposes.
                    (when bus

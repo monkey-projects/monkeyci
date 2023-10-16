@@ -2,6 +2,9 @@
   (:require [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [clojure.core.async :as ca]
+            [martian
+             [core :as martian]
+             [httpkit :as mh]]
             [monkey.ci.build.core :as bc]
             [monkey.ci
              [containers :as c]
@@ -11,7 +14,8 @@
              [utils :as u]]
             [monkey.socket-async
              [core :as sa]
-             [uds :as uds]]))
+             [uds :as uds]]
+            [org.httpkit.client :as http]))
 
 (defn initial-context [p]
   (assoc bc/success
@@ -19,8 +23,8 @@
          :pipeline p))
 
 (defn- post-event [ctx evt]
-  (when-not (some-> (get-in ctx [:events :bus]) 
-                    (e/post-event (assoc evt :src :script)))
+  (when-not (some-> (get-in ctx [:api :client]) 
+                    (martian/response-for :post-event (assoc evt :src :script)))
     (log/warn "Unable to post event")))
 
 (defn- wrap-events
@@ -169,44 +173,24 @@
         (in-ns 'monkey.ci.script)
         (remove-ns tmp-ns)))))
 
-(defn- make-socket-bus [p]
-  (log/debug "Sending events to socket at" p)
-  (let [addr (uds/make-address p)
-        conn (uds/connect-socket addr)
-        {:keys [channel] :as bus} {:channel (ca/chan)}]
-    (sa/write-from-channel channel conn)
-    {:addr addr
-     :socket conn
-     :bus bus}))
+(defn- setup-api-client [ctx]
+  (let [socket (get-in ctx [:api :socket])
+        client (http/make-client
+                {:address-finder #(uds/make-address socket)
+                 :channel-factory uds/connect-socket})]
+    (cond-> ctx
+      ;; In tests it could be there is no socket, so skip the initialization in that case
+      socket (assoc-in [:api :client] (mh/bootstrap-openapi "http://fake" {:client client})))))
 
-(defn- make-dummy-bus []
-  (log/debug "No event socket configured, events will not be passed to controlling process")
-  {:bus {:channel (ca/chan (ca/sliding-buffer 1))}})
-
-(defn- setup-event-bus
-  "Configures the event bus for the event socket.  If no socket is specified,
-   then the bus will still be configured, but it will drop all events."
-  [{:keys [event-socket] :as ctx}]
-  (assoc ctx :events (if event-socket
-                       (make-socket-bus event-socket)
-                       (make-dummy-bus))))
-
-(defn- close-socket [ctx]
-  (when-let [s (get-in ctx [:events :socket])]
-    (uds/close s)))
-
-(defn- with-event-bus [ctx f]
-  (let [ctx (setup-event-bus ctx)]
-    (try
-      (f ctx)
-      (finally
-        (close-socket ctx)))))
+(defn- with-script-api [ctx f]
+  (let [ctx (setup-api-client ctx)]
+    (f ctx)))
 
 (defn exec-script!
   "Loads a script from a directory and executes it.  The script is
    executed in this same process (but in a randomly generated namespace)."
   [{:keys [script-dir build-id] :as ctx}]
-  (with-event-bus ctx
+  (with-script-api ctx
     (fn [ctx]
       (log/debug "Executing script for build" build-id "at:" script-dir)
       (let [p (load-pipelines script-dir build-id)]

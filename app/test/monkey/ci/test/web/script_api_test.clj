@@ -7,7 +7,7 @@
 (deftest routes
   (let [test-app (sut/make-app {:public-api (fn [ep]
                                               (when (= :get-params ep)
-                                                {:key "value"}))})]
+                                                {"key" "value"}))})]
 
     (testing "unknown endpoint results in 404"
       (is (= 404 (-> (mock/request :get "/unknown")
