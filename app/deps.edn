@@ -14,6 +14,7 @@
         metosin/reitit-middleware {:mvn/version "0.7.0-alpha5"}
         metosin/reitit-ring {:mvn/version "0.7.0-alpha5"}
         metosin/reitit-schema {:mvn/version "0.7.0-alpha5"}
+        metosin/reitit-swagger {:mvn/version "0.7.0-alpha5"}
         org.clojars.lispyclouds/contajners {:mvn/version "1.0.1"}
         org.clojure/core.async {:mvn/version "1.6.681"}
         org.clojure/tools.logging {:mvn/version "1.2.4"}

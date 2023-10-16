@@ -3,13 +3,14 @@
             [clojure.core.async :refer [go >!]]
             [monkey.ci.events :as e]
             [muuntaja.core :as mc]
+            [reitit.ring :as ring]
             [reitit.ring.coercion :as rrc]
             [reitit.ring.middleware
              [muuntaja :as rrmm]
              [parameters :as rrmp]]))
 
-(defn- from-context [req obj]
-  (get-in req [:reitit.core/match :data :monkey.ci.web.handler/context obj]))
+(defn from-context [req obj]
+  (get-in req [:reitit.core/match :data ::context obj]))
 
 (defn req->bus
   "Gets the event bus from the request data"
@@ -48,3 +49,10 @@
    rrc/coerce-exceptions-middleware
    rrc/coerce-request-middleware
    rrc/coerce-response-middleware])
+
+(defn make-app [router]
+  (ring/ring-handler
+   router
+   (ring/routes
+    (ring/redirect-trailing-slash-handler)
+    (ring/create-default-handler))))

@@ -157,7 +157,7 @@
                                      c/default-middleware))
             :muuntaja (c/make-muuntaja)
             :coercion reitit.coercion.schema/coercion
-            ::context opts}
+            ::c/context opts}
      ;; Disabled, results in 405 errors for some reason
      ;;:compile rc/compile-request-coercers
      :reitit.middleware/registry
@@ -169,11 +169,7 @@
    (make-router opts routes)))
 
 (defn make-app [opts]
-  (ring/ring-handler
-   (make-router opts)
-   (ring/routes
-    (ring/redirect-trailing-slash-handler)
-    (ring/create-default-handler))))
+  (c/make-app (make-router opts)))
 
 (def default-http-opts
   ;; Virtual threads are still a preview feature
