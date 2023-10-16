@@ -31,10 +31,10 @@
         (uds/delete-address p)))))
 
 (deftest exec-script!
-  #_(testing "executes basic clj script from location"
+  (testing "executes basic clj script from location"
     (is (bc/success? (sut/exec-script! {:script-dir "examples/basic-clj"}))))
 
-  #_(testing "executes script shell from location"
+  (testing "executes script shell from location"
     (is (bc/success? (sut/exec-script! {:script-dir "examples/basic-script"}))))
   
   (testing "connects to listening socket if specified"

@@ -75,41 +75,6 @@
 (defn- make-socket-path [build-id]
   (utils/tmp-file (str "events-" build-id ".sock")))
 
-#_(defn- events-to-bus
-  "Creates a listening socket (a uds) that will receive any events generated
-   by the child script.  These events will then be sent to the bus."
-  [{:keys [channel] :as bus} build-id]
-  (let [path (make-socket-path build-id)
-        listener (uds/listen-socket (uds/make-address path))
-        sock (ca/promise-chan)
-        inter-ch (ca/chan)]
-    ;; Set up a pipeline to avoid the bus closing
-    (ca/pipe inter-ch channel false)
-    (go
-      ;; Wait for the socket to be connected, then send messages from the socket to the channel
-      (let [s (<! sock)]
-        (log/debug "Socket connected, sending events to it from the internal bus")
-        (sa/read-onto-channel
-         s inter-ch
-         (fn [ex]
-           (log/warn "Error while receiving event from socket" ex)
-           false))))
-    ;; Return socket path and listener so it can be closed later
-    {:socket-path path
-     :socket listener
-     ;; Accept connection in separate thread.  We can change this later to a
-     ;; virtual thread (Java 21+)
-     :accept-thread (doto (Thread.
-                           (fn []
-                             (log/debug "Waiting for child process to connect")
-                             (try
-                               (ca/>!! sock (uds/accept listener))
-                               (log/debug "Incoming connection from child process accepted")
-                               (catch Exception ex
-                                 (log/warn "No incoming connection from child could be accepted" ex))))
-                           (str build-id "-connector"))
-                      (.start))}))
-
 (defn- start-script-api
   "Starts a script API  http server that listens at a domain socket 
    location.  Returns both the server and the socket path."
@@ -152,7 +117,6 @@
                    (when server
                      (script-api/stop-server server))
                    (when socket-path 
-                     #_(uds/close socket)
                      (uds/delete-address socket-path))
                    ;; Bus should always be present.  This check is only for testing purposes.
                    (when bus
