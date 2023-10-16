@@ -1,21 +1,16 @@
 (ns monkey.ci.web.handler
   "Handler for the web server"
-  (:require [camel-snake-kebab.core :as csk]
-            [clojure.tools.logging :as log]
+  (:require [clojure.tools.logging :as log]
             [medley.core :refer [update-existing]]
             [monkey.ci.events :as e]
             [monkey.ci.web
              [api :as api]
+             [common :as c]
              [github :as github]]
-            [muuntaja.core :as mc]
             [org.httpkit.server :as http]
             #_[reitit.coercion :as rc]
             [reitit.coercion.schema]
             [reitit.ring :as ring]
-            [reitit.ring.coercion :as rrc]
-            [reitit.ring.middleware
-             [muuntaja :as rrmm]
-             [parameters :as rrmp]]
             [schema.core :as s]))
 
 (defn health [_]
@@ -158,21 +153,9 @@
   ([{:keys [dev-mode] :as opts} routes]
    (ring/router
     routes
-    {:data {:middleware [stringify-body
-                         rrmp/parameters-middleware
-                         rrmm/format-middleware
-                         rrc/coerce-exceptions-middleware
-                         rrc/coerce-request-middleware
-                         rrc/coerce-response-middleware]
-            :muuntaja (mc/create
-                       (-> mc/default-options
-                           (assoc-in 
-                            ;; Convert keys to kebab-case
-                            [:formats "application/json" :decoder-opts]
-                            {:decode-key-fn csk/->kebab-case-keyword})
-                           (assoc-in
-                            [:formats "application/json" :encoder-opts]
-                            {:encode-key-fn (comp csk/->camelCase name)})))
+    {:data {:middleware (vec (concat [stringify-body]
+                                     c/default-middleware))
+            :muuntaja (c/make-muuntaja)
             :coercion reitit.coercion.schema/coercion
             ::context opts}
      ;; Disabled, results in 405 errors for some reason
