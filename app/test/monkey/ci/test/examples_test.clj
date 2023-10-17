@@ -17,11 +17,11 @@
   (= 0 (h/try-take r 30000 :timeout)))
 
 (deftest ^:integration examples
-  (letfn [(run-example [n]
+  (letfn [(run-example-test [n]
             (testing (format "runs %s example" n)
               (is (success? (run-example n)))))]
     (->> ["basic-clj"
           "basic-script"
           "build-params"]
-         (map run-example)
+         (map run-example-test)
          (doall))))

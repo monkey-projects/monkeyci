@@ -99,7 +99,7 @@
                                                     :body-schema {:event s/Any}}])
                                (mt/respond-with {:post-event (fn [req]
                                                                (swap! events-posted conj (:body req))
-                                                               {:status 200})}))
+                                                               (future {:status 200}))}))
                     pipelines [(bc/pipeline {:name "test"
                                              :steps [(constantly bc/success)]})]
                     ctx {:api {:client client}}]

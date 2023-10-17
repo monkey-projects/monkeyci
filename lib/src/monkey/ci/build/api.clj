@@ -5,7 +5,7 @@
 (def ctx->api-client (comp :client :api))
 
 ;; Use memoize because we'll only want to fetch them once
-(def ^:private fetch-params (memoize #(martian/response-for % :get-params {})))
+(def ^:private fetch-params (memoize (comp deref #(martian/response-for % :get-params {}))))
 
 (defn- error? [s]
   (>= s 400))

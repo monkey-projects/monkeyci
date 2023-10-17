@@ -12,7 +12,7 @@
 (deftest build-params
   (letfn [(make-client [reply]
             (-> (martian/bootstrap "http://test" test-routes)
-                (mt/respond-with {:get-params reply})))]
+                (mt/respond-with {:get-params (future reply)})))]
     
     (testing "invokes `get-params` endpoint on client"
       (let [m (make-client {:status 200
