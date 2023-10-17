@@ -151,3 +151,8 @@
       (let [f (io/file dir "test.json")]
         (spit f "{\"testKey\":\"value\"}")
         (is (= {:test-key "value"} (sut/load-config-file f)))))))
+
+(deftest home-config-file
+  (testing "is by default in the user home dir"
+    (is (= (str (System/getenv "HOME") "/.monkeyci/config.edn")
+           sut/*home-config-file*))))

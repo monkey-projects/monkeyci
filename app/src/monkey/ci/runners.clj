@@ -59,7 +59,7 @@
            (e/do-and-wait #(p/execute! ctx)
                           event-bus :build/completed (map (partial e/with-ctx ctx)))
            (ca/to-chan! [(script-not-found ctx)]))
-         (ca/take 1)
+         (ca/take 1)  ; Limit to one because `wait-for` will return a never-closing channel
          (vector)
          (ca/map build-completed))))
 

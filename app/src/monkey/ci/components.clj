@@ -56,6 +56,7 @@
 (defrecord Context [command config event-bus storage]
   c/Lifecycle
   (start [this]
+    (log/debug "Creating application context using configuration" config)
     (-> this
         (merge default-context)
         (dissoc :config)
