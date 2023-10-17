@@ -71,7 +71,9 @@
          (group-all-keys)
          (mc/remove-vals empty?))))
 
-(defn- parse-edn [p]
+(defn- parse-edn
+  "Parses the input file as `edn` and converts keys to kebab-case."
+  [p]
   (with-open [r (java.io.PushbackReader. (io/reader p))]
     (->> (edn/read r)
          (cw/prewalk (fn [x]
@@ -80,7 +82,9 @@
                            [(csk/->kebab-case-keyword (name k)) v])
                          x))))))
 
-(defn- parse-json [p]
+(defn- parse-json
+  "Parses the file as `json`, converting keys to kebab-case."
+  [p]
   (with-open [r (io/reader p)]
     (json/parse-stream r csk/->kebab-case-keyword)))
 
@@ -93,9 +97,11 @@
                        io/file)]
     (when (.exists p)
       (log/debug "Reading configuration file:" p)
-      (cond
-        (cs/ends-with? f ".edn") (parse-edn p)
-        (cs/ends-with? f ".json") (parse-json p)))))
+      (letfn [(has-ext? [ext s]
+                (cs/ends-with? s ext))]
+        (condp has-ext? f
+          ".edn" (parse-edn p)
+          ".json" (parse-json p))))))
 
 (def default-app-config
   "Default configuration for the application, without env vars or args applied."

@@ -12,7 +12,8 @@
              [storage :as st]]
             [monkey.ci.web
              [github :as wg]
-             [handler :as web]]))
+             [handler :as web]
+             [script-api :as wsa]]))
 
 (defn- call-and-dissoc [c key f]
   (when-let [x (key c)]
@@ -62,7 +63,8 @@
         (dissoc :config)
         (merge config)
         (update :runner r/make-runner)
-        (assoc :storage (:storage storage))))
+        (assoc :storage (:storage storage)
+               :public-api wsa/local-api)))
   (stop [this]
     this))
 

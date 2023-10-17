@@ -6,8 +6,12 @@
    fetched by the script, so it knows which services are available."
   (:require [clojure.core.async :as ca]
             [clojure.tools.logging :as log]
-            [monkey.ci.events :as e]
-            [monkey.ci.web.common :as c]
+            [monkey.ci
+             [events :as e]
+             [storage :as st]]
+            [monkey.ci.web
+             [api :as api]
+             [common :as c]]
             [monkey.socket-async.uds :as uds]
             [org.httpkit.server :as http]
             [reitit.coercion.schema]
@@ -52,6 +56,12 @@
                 :parameters {:body {s/Keyword s/Any}}
                 :responses {202 {}}}]]])
 
+(defn- with-api
+  "Replaces the public api factory function with its result"
+  [ctx]
+  (update ctx :public-api (fn [maker]
+                            (maker ctx))))
+
 (defn make-router
   ([opts routes]
    (ring/router
@@ -59,15 +69,16 @@
     {:data {:middleware c/default-middleware
             :muuntaja (c/make-muuntaja)
             :coercion reitit.coercion.schema/coercion
-            ::c/context opts}}))
+            ::c/context (with-api opts)}}))
   ([opts]
    (make-router opts routes)))
 
 (defn make-app [opts]
   (c/make-app (make-router opts)))
 
-(defn start-server
-  "Starts a http server using the given options to configure the routes and the server."
+(defn ^http/IHttpServer start-server
+  "Starts a http server using the given options to configure the routes and the server.
+   Returns an `org.httpkit.server.IHttpServer` object."
   [{:keys [http] :as opts}]
   (->> (assoc http
               :legacy-return-value? false)
@@ -82,3 +93,16 @@
   (let [http-opts {:address-finder #(uds/make-address path)
                    :channel-factory (fn [_] (ServerSocketChannel/open uds/unix-proto))}]
     (start-server (assoc ctx :http http-opts))))
+
+(defn local-api
+  "Local api implementation.  This is used as a backend for the script API server
+   when it is run locally.  It retrieves all information directly from local storage."
+  [{:keys [storage] :as ctx}]
+  (let [build-sid (get-in ctx [:build :sid])
+        handlers {:get-params (fn []
+                                (->> (api/fetch-all-params storage (butlast build-sid))
+                                     (map (juxt :name :value))
+                                     (into {})))}]
+    (fn [ep]
+      (when-let [h (get handlers ep)]
+        (h)))))

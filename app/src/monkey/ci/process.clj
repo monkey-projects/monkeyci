@@ -10,6 +10,7 @@
             [medley.core :as mc]
             [monkey.ci
              [config :refer [version] :as config]
+             [context :as ctx]
              [events :as e]
              [script :as script]
              [utils :as utils]]
@@ -93,6 +94,18 @@
       (merge (select-keys ctx [:containers :log-dir]))
       (config/config->env)))
 
+(defn- get-script-log-dir
+  "Determines and creates the log dir for the script output"
+  [ctx]
+  (when-let [id (get-in ctx [:build :build-id])]
+    (doto (io/file (ctx/log-dir ctx) id)
+      (.mkdirs))))
+
+(defn- script-output [ctx type]
+  (if-let [d (get-script-log-dir ctx)]
+    (io/file d (str (name type) ".log"))
+    :inherit))
+
 (defn execute!
   "Executes the build script located in given directory.  This actually runs the
    clojure cli with a generated `build` alias.  This expects absolute directories.
@@ -100,11 +113,12 @@
    post a `build/completed` event on process exit."
   [{{:keys [checkout-dir script-dir build-id] :as build} :build bus :event-bus :as ctx}]
   (log/info "Executing build process for" build-id "in" checkout-dir)
-  (let [{:keys [socket-path server]} (start-script-api ctx)]
+  (let [{:keys [socket-path server]} (start-script-api ctx)
+        log-dir (get-script-log-dir ctx)]
     (bp/process
      {:dir script-dir
-      :out :inherit
-      :err :inherit
+      :out (script-output ctx :out)
+      :err (script-output ctx :err)
       :cmd (-> ["clojure"
                 "-Sdeps" (generate-deps ctx)
                 "-X:monkeyci/build"]
