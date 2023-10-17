@@ -34,6 +34,7 @@
   {:extra-paths [:test-paths]
    :extra-deps {com.monkeyprojects/build {:mvn/version "0.2-SNAPSHOT"}
                 com.github.oliyh/martian-test {:mvn/version "0.1.25"}
+                http-kit.fake/http-kit.fake {:mvn/version "0.2.1"}
                 ring/ring-mock {:mvn/version "0.4.0"}}
    :exec-fn monkey.test/all
    ;; Add this to avoid falling back to the default logger
@@ -47,9 +48,7 @@
                "--plugin" "kaocha.plugin/profiling"
                "--junit-xml-file" "junit.xml"
                ;; Skip docker integration tests, they require access to the socket
-               "--skip-meta" ":docker"
-               ;; Skip integration tests for now, they are too slow
-               "--skip-meta" ":integration"]
+               "--skip-meta" ":docker"]
    ;; Add this to avoid falling back to the default logger
    :jvm-opts ["-Dlogback.configurationFile=resources/logback.xml"]}
 
@@ -60,8 +59,9 @@
 
   :watch ; Use in combination with :test, watches for changes
   {:extra-deps {org.clojure/tools.namespace {:mvn/version "1.4.4"}}
+   :exec-fn monkey.test/watch
    ;; Skip integration and slow tests
-   :main-opts ["-m" "kaocha.runner" "--watch" "--skip-meta" ":integration" "--skip-meta" ":slow"]}
+   :exec-args {:kaocha.filter/skip-meta [:integration :slow]}}
   
   :run
   {:main-opts ["-m" "monkey.ci.core"]}

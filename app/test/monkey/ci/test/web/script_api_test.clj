@@ -1,15 +1,18 @@
 (ns monkey.ci.test.web.script-api-test
   (:require [clojure.test :refer [deftest testing is]]
-            [monkey.ci.events :as e]
+            [monkey.ci
+             [events :as e]
+             [storage :as st]]
             [monkey.ci.web.script-api :as sut]
             [monkey.ci.test.helpers :as h]
             [ring.mock.request :as mock]))
 
 (deftest routes
   (let [bus (e/make-bus)
-        test-app (sut/make-app {:public-api (fn [ep]
-                                              (when (= :get-params ep)
-                                                {"key" "value"}))
+        test-app (sut/make-app {:public-api (fn [_]
+                                              (fn [ep]
+                                                (when (= :get-params ep)
+                                                  {"key" "value"})))
                                 :event-bus bus})]
 
     (testing "unknown endpoint results in 404"
@@ -44,4 +47,15 @@
 (deftest start-server
   (testing "runs httpkit server"
     (with-redefs [org.httpkit.server/run-server (constantly :test-server)]
-      (is (= :test-server (sut/start-server {}))))))
+      (is (= :test-server (sut/start-server {:public-api sut/local-api}))))))
+
+(deftest local-api
+  (testing "`get-params` retrieves from local db"
+    (let [sid ["test-cust" "test-proj" "test-repo" "test-build"]
+          st (st/make-memory-storage)
+          api (sut/local-api {:storage st
+                              :build {:sid sid}})
+          params [{:name "testkey" :value "testvalue"}]]
+      (is (st/sid? (st/save-params st (butlast sid) params)))
+      (is (fn? api))
+      (is (= {"testkey" "testvalue"} (api :get-params))))))

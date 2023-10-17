@@ -15,16 +15,6 @@
     (is (not (sut/failed? sut/success)))))
 
 (deftest pipeline
-  ;; (testing "stops on failed step"
-  ;;   (let [executed? (atom nil)
-  ;;         step (fn [r rv]
-  ;;                (fn [& args]
-  ;;                  (reset! executed? r)
-  ;;                  {:status rv}))
-  ;;         p {:steps [(step :first :failure)
-  ;;                    (step :second :success)]}]
-  ;;     (is (= :failure (:status (sut/pipeline p))))
-  ;;     (is (= :first @executed?)))))
 
   (testing "creates pipeline object"
     (is (pipeline? (sut/pipeline {:steps []}))))

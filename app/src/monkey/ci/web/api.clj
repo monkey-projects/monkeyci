@@ -88,6 +88,20 @@
                       :path
                       :parameters))
 
+(defn fetch-all-params
+  "Fetches all params for the given sid from storage, adding all those from
+   higher levels too."
+  [st params-sid]
+  (->> (loop [sid params-sid
+              acc []]
+         (if (empty? sid)
+           acc
+           (recur (drop-last sid)
+                  (concat acc (st/find-params st sid)))))
+       (group-by :name)
+       (vals)
+       (map first)))
+
 (defn get-params
   "Retrieves build parameters for the given location.  This could be at customer, 
    project or repo level.  For lower levels, the parameters for the higher levels
@@ -95,17 +109,9 @@
   [req]
   ;; TODO Allow to retrieve only for the specified level using query param
   ;; TODO Return 404 if customer, project or repo not found.
-  (let [st (c/req->storage req)]
-    (->> (loop [sid (params-sid req)
-                acc []]
-           (if (empty? sid)
-             acc
-             (recur (drop-last sid)
-                    (concat acc (st/find-params st sid)))))
-         (group-by :name)
-         (vals)
-         (map first)
-         (rur/response))))
+  (-> (c/req->storage req)
+      (fetch-all-params (params-sid req))
+      (rur/response)))
 
 (defn update-params [req]
   (let [p (body req)]

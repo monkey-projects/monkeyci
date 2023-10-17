@@ -1,9 +1,11 @@
 {:deps {babashka/process {:mvn/version "0.4.13"}
-        ch.qos.logback/logback-classic {:mvn/version "1.4.11"}}
+        ch.qos.logback/logback-classic {:mvn/version "1.4.11"}
+        com.github.oliyh/martian {:mvn/version "0.1.25"}}
  
  :aliases
  {:test
-  {:extra-deps {com.monkeyprojects/build {:mvn/version "0.2-SNAPSHOT"}}
+  {:extra-deps {com.monkeyprojects/build {:mvn/version "0.2-SNAPSHOT"}
+                com.github.oliyh/martian-test {:mvn/version "0.1.25"}}
    :exec-fn monkey.test/all}
 
   :watch

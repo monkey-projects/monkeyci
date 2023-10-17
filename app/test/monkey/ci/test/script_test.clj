@@ -16,13 +16,15 @@
             [monkey.socket-async
              [core :as sa]
              [uds :as uds]]
+            [org.httpkit.fake :as hf]
             [schema.core :as s]))
 
 (defn with-listening-socket [f]
   (let [p (u/tmp-file "test-" ".sock")]
     (try
       (let [bus (e/make-bus)
-            server (script-api/listen-at-socket p {:event-bus bus})]
+            server (script-api/listen-at-socket p {:event-bus bus
+                                                   :public-api script-api/local-api})]
         (try
           (f p bus)
           (finally
@@ -48,6 +50,14 @@
           ;; Try to read a message on the channel
           (is (= in (-> (ca/alts!! [in (ca/timeout 500)])
                         (second)))))))))
+
+(deftest make-client
+  (testing "creates client for domain socket"
+    (is (some? (sut/make-client {:api {:socket "test.sock"}}))))
+
+  (testing "creates client for host"
+    (hf/with-fake-http ["http://test/script/swagger.json" 200]
+      (is (some? (sut/make-client {:api {:url "http://test"}}))))))
 
 (deftest run-pipelines
   (testing "success if no pipelines"
@@ -89,7 +99,7 @@
                                                     :body-schema {:event s/Any}}])
                                (mt/respond-with {:post-event (fn [req]
                                                                (swap! events-posted conj (:body req))
-                                                               {:status 200})}))
+                                                               (future {:status 200}))}))
                     pipelines [(bc/pipeline {:name "test"
                                              :steps [(constantly bc/success)]})]
                     ctx {:api {:client client}}]

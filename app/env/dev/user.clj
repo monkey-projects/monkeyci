@@ -1,6 +1,7 @@
 (ns user
   (:require [camel-snake-kebab.core :as csk]
             [cheshire.core :as json]
+            [clojure.core.async :as ca]
             [clojure.edn :as edn]
             [clojure.java.io :as io]            
             [com.stuartsierra.component :as sc]
@@ -10,6 +11,7 @@
              [core :as c]
              [storage :as s]
              [utils :as u]]
+            [monkey.ci.test.examples-test :as et]
             [buddy.core
              [codecs :as codecs]
              [mac :as mac]]
@@ -76,3 +78,6 @@
   {:repository {:master-branch branch
                 :clone-url url}
    :head-commit {:id id}})
+
+(defn run-example [ex-name]
+  (ca/<!! (et/run-example ex-name)))
