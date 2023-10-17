@@ -1,5 +1,8 @@
 ;; Build script for Monkey-ci itself
 (require '[monkey.ci.build.core :as core])
+(require '[monkey.ci.build.api :as api])
+(require '[monkey.ci.build.shell :as shell])
+(require '[clojure.java.io :as io])
 (require '[config.core :refer [env]])
 
 (defn clj [& args]
@@ -23,6 +26,16 @@
 
 (def app-uberjar (clj-app "-X:jar:uber"))
 
+(defn dockerhub-creds
+  "Fetches docker hub credentials from the params and writes them to `docker.json`"
+  [ctx]
+  (let [creds (-> (api/build-params ctx)
+                  (get "dockerhub-creds"))
+        dir (doto (io/file shell/home ".docker")
+              (.mkdirs))]
+    (println "Writing dockerhub credentials")
+    (spit (io/file dir "docker.json") creds)))
+
 (def container-image
   ;; TODO Credentials, must be mounted to /kaniko/.docker/config.json
   {:container/image "docker.io/bitnami/kaniko:latest"
@@ -41,8 +54,9 @@
   (core/pipeline
    {:name "publish"
     :steps [app-uberjar
+            dockerhub-creds
             container-image]}))
 
 ;; Return the pipelines
 [test-pipeline
- #_publish-pipeline]
+ publish-pipeline]
