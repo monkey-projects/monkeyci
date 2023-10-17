@@ -89,9 +89,9 @@ The code consists of several modules.  `lib` contains the library included in th
 and `app` contains the code for the application itself.
 
 * Install [Clojure tools](https://clojure.org/guides/deps_and_cli)
-* Running tests once: `clojure -M:test`
-* Running tests continuously: `clojure -M:test:watch`
-* Get coverage: `clojure -M:test:coverage`
+* Running tests once: `clojure -X:test`
+* Running tests continuously: `clojure -X:test:watch`
+* Get coverage: `clojure -X:test:coverage`
 * Running the app: `clojure -M:run`
 
 The test runner used is [Kaocha](https://github.com/lambdaisland/kaocha), which
