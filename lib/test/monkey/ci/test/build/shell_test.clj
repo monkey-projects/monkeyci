@@ -1,9 +1,13 @@
 (ns monkey.ci.test.build.shell-test
   (:require [clojure.test :refer :all]
+            [clojure.java.io :as io]
+            [clojure.string :as cs]
             [babashka.process :as bp]
             [monkey.ci.build
+             [api :as api]
              [core :as core]
-             [shell :as sut]]))
+             [shell :as sut]]
+            [monkey.ci.test.build.helpers :as h]))
 
 (deftest bash
   (testing "returns fn"
@@ -40,3 +44,18 @@
 (deftest home
   (testing "provides home directory"
     (is (string? sut/home))))
+
+(deftest param-to-file
+  (h/with-tmp-dir dir
+    (with-redefs [api/build-params (fn [_]
+                                     {"test-param" "test-value"})]
+      
+      (testing "spits value to file"
+        (let [dest (io/file dir "test-file")]
+          (is (nil? (sut/param-to-file {} "test-param" dest)))
+          (is (true? (.exists dest)))))
+
+      (testing "replaces ~ with home dir"
+        (with-redefs [spit (fn [f _] f)]
+          (is (not (cs/starts-with? (sut/param-to-file {} "test-param" "~/test.txt")
+                                    "~"))))))))

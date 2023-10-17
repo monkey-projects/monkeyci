@@ -27,14 +27,10 @@
 (def app-uberjar (clj-app "-X:jar:uber"))
 
 (defn dockerhub-creds
-  "Fetches docker hub credentials from the params and writes them to `docker.json`"
+  "Fetches docker hub credentials from the params and writes them to Docker `config.json`"
   [ctx]
-  (let [creds (-> (api/build-params ctx)
-                  (get "dockerhub-creds"))
-        dir (doto (io/file shell/home ".docker")
-              (.mkdirs))]
-    (println "Writing dockerhub credentials")
-    (spit (io/file dir "docker.json") creds)))
+  (println "Writing dockerhub credentials")
+  (shell/param-to-file ctx "dockerhub-creds" "~/.docker/config.json"))
 
 (def container-image
   ;; TODO Credentials, must be mounted to /kaniko/.docker/config.json
