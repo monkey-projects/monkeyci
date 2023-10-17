@@ -47,6 +47,9 @@
 (s/def :conf/work-dir string?)
 (s/def :conf/checkout-base-dir string?)
 
+(s/def :conf/socket string?)
+(s/def :conf/api (s/keys :opt-un [:conf/socket]))
+
 ;; Command line arguments
 (s/def :arg/pipeline string?)
 (s/def :arg/dir string?)
@@ -88,4 +91,5 @@
                              :opt-un [:conf/dev-mode :arg/command ::system :conf/args :ctx/build]))
 
 ;; Script configuration
-(s/def ::script-config (s/keys :req-un [:conf/containers :conf/storage]))
+(s/def ::script-config (s/keys :req-un [:conf/containers :conf/storage]
+                               :opt-un [:conf/api]))

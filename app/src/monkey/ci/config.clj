@@ -65,7 +65,7 @@
             (reduce (fn [r v]
                       (group-keys v r))
                     c
-                    [:github :runner :containers :storage]))]
+                    [:github :runner :containers :storage :api]))]
     (->> env
          (filter-and-strip-keys env-prefix)
          (group-all-keys)

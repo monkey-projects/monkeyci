@@ -121,6 +121,12 @@
                           :containers
                           :type))))
 
+  (testing "groups api settings"
+    (is (= "test-socket" (-> {:monkeyci-api-socket "test-socket"}
+                             (sut/script-config {})
+                             :api
+                             :socket))))
+
   (testing "matches spec"
     (is (true? (s/valid? ::spec/script-config (sut/script-config {} {}))))))
 
