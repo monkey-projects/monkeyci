@@ -8,15 +8,17 @@
    purposes."
   (:require [camel-snake-kebab.core :as csk]
             [cheshire.core :as json]
-            [clojure.edn :as edn]
+            [clojure
+             [edn :as edn]
+             [string :as cs]
+             [walk :as cw]]
             [clojure.java.io :as io]
-            [clojure.string :as cs]
-            [clojure.walk :as cw]
+            [clojure.tools.logging :as log]
             [medley.core :as mc]
             [monkey.ci.utils :as u]))
 
 (def ^:dynamic *global-config-file* "/etc/monkeyci/config.edn")
-(def ^:dynamic *home-config-file* (-> (System/getProperty "user.dir")
+(def ^:dynamic *home-config-file* (-> (System/getProperty "user.home")
                                       (io/file ".monkeyci" "config.edn")
                                       (.getCanonicalPath)))
 
@@ -90,6 +92,7 @@
                        u/abs-path
                        io/file)]
     (when (.exists p)
+      (log/debug "Reading configuration file:" p)
       (cond
         (cs/ends-with? f ".edn") (parse-edn p)
         (cs/ends-with? f ".json") (parse-json p)))))
