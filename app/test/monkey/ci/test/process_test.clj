@@ -42,24 +42,27 @@
                                  :event-socket]))))))))
 
 (deftest ^:slow execute-slow!
-  (testing "executes build script in separate process"
-    (is (zero? (-> {:build {:script-dir (example "basic-clj")}
-                    :args {:dev-mode true}}
-                   sut/execute!
-                   deref
-                   :exit))))
+  (let [base-ctx {:public-api sa/local-api
+                  :args {:dev-mode true}}]
+    
+    (testing "executes build script in separate process"
+      (is (zero? (-> base-ctx
+                     (assoc :build {:script-dir (example "basic-clj")})
+                     sut/execute!
+                     deref
+                     :exit))))
 
-  (testing "fails when script fails"
-    (is (pos? (-> {:build {:script-dir (example "failing")}
-                   :args {:dev-mode true}}
-                  sut/execute!
-                  deref
-                  :exit))))
+    (testing "fails when script fails"
+      (is (pos? (-> base-ctx
+                    (assoc :build {:script-dir (example "failing")})
+                    sut/execute!
+                    deref
+                    :exit))))
 
-  (testing "fails when script not found"
-    (is (thrown? java.io.IOException (sut/execute!
-                                      {:args {:dev-mode true}
-                                       :build {:script-dir (example "non-existing")}})))))
+    (testing "fails when script not found"
+      (is (thrown? java.io.IOException (-> base-ctx
+                                           (assoc :build {:script-dir (example "non-existing")})
+                                           (sut/execute!)))))))
 
 (defn- find-arg
   "Finds the argument value for given key"
