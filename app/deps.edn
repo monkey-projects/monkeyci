@@ -60,8 +60,9 @@
 
   :watch ; Use in combination with :test, watches for changes
   {:extra-deps {org.clojure/tools.namespace {:mvn/version "1.4.4"}}
+   :exec-fn monkey.test/watch
    ;; Skip integration and slow tests
-   :main-opts ["-m" "kaocha.runner" "--watch" "--skip-meta" ":integration" "--skip-meta" ":slow"]}
+   :exec-args {:kaocha.filter/skip-meta [:integration :slow]}}
   
   :run
   {:main-opts ["-m" "monkey.ci.core"]}
