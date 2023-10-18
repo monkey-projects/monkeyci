@@ -6,6 +6,9 @@
 (require '[config.core :refer [env]])
 (require '[babashka.fs :as fs])
 
+(defn set-name [s n]
+  (assoc s :name n))
+
 (defn clj [& args]
   (apply str "clojure " args))
 
@@ -22,8 +25,8 @@
 (def clj-lib (partial clj-dir "lib"))
 (def clj-app (partial clj-dir "app"))
 
-(def test-lib (clj-lib "-X:test:junit"))
-(def test-app (clj-app "-M:test:junit"))
+(def test-lib (set-name (clj-lib "-X:test:junit") "test-lib"))
+(def test-app (set-name (clj-app "-M:test:junit") "test-app"))
 
 (def app-uberjar (clj-app "-X:jar:uber"))
 
@@ -43,14 +46,11 @@
    ;; Credentials, must be mounted to /kaniko/.docker/config.json
    :container/mounts [[(str docker-config) "/kaniko/.docker/config.json"]]})
 
-(defn set-name [s n]
-  (assoc s :name n))
-
 (def test-pipeline
   (core/pipeline
    {:name "test"
-    :steps [(set-name test-lib "test-lib")
-            (set-name test-app "test-app")]}))
+    :steps [test-lib
+            test-app]}))
 
 (def publish-pipeline
   (core/pipeline
