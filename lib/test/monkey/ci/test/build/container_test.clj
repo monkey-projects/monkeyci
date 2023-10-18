@@ -14,4 +14,8 @@
 (deftest image-spec
   (testing "allows valid steps"
     (is (s/valid? :ci/step {:container/image "test-image"
-                            :container/cmd ["test" "cmd"]}))))
+                            :container/cmd ["test" "cmd"]})))
+
+  (testing "allows mounts"
+    (is (s/valid? :ci/step {:container/image "test-image"
+                            :container/mounts [["/host/vol" "/container/vol"]]}))))

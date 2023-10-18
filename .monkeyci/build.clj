@@ -27,18 +27,21 @@
 
 (def app-uberjar (clj-app "-X:jar:uber"))
 
+;; Full path to the docker config file, used to push images
+(def docker-config (fs/expand-home "~/.docker/config.json"))
+
 (defn dockerhub-creds
   "Fetches docker hub credentials from the params and writes them to Docker `config.json`"
   [ctx]
-  (let [cf (fs/expand-home "~/.docker/config.json")]
-    (when-not (fs/exists? cf)
-      (println "Writing dockerhub credentials")
-      (shell/param-to-file ctx "dockerhub-creds" cf))))
+  (when-not (fs/exists? docker-config)
+    (println "Writing dockerhub credentials")
+    (shell/param-to-file ctx "dockerhub-creds" docker-config)))
 
 (def container-image
-  ;; TODO Credentials, must be mounted to /kaniko/.docker/config.json
   {:container/image "docker.io/bitnami/kaniko:latest"
-   :container/cmd ["-d" "docker.io/monkeyci/app:latest" "-f" "docker/Dockerfile" "-c" "."]})
+   :container/cmd ["-d" "docker.io/dormeur/monkey-ci:latest" "-f" "docker/Dockerfile" "-c" "."]
+   ;; Credentials, must be mounted to /kaniko/.docker/config.json
+   :container/mounts [[(str docker-config) "/kaniko/.docker/config.json"]]})
 
 (defn set-name [s n]
   (assoc s :name n))
