@@ -27,7 +27,7 @@
     (let [{:keys [status] :as r} @(martian/response-for c :post-event (assoc evt :src :script))]
       (when-not (= 202 status)
         (log/warn "Failed to post event, got status" status)
-        (log/debug "Response:" r)))
+        (log/debug "Full response:" r)))
     (log/warn "Unable to post event, no client configured")))
 
 (defn- wrap-events
@@ -36,14 +36,16 @@
   (letfn [(make-after [r]
             (if (fn? after-evt)
               (after-evt r)
-              after-evt))]
+              after-evt))
+          (post [e]
+            (post-event ctx e))]
     (try
-      (post-event ctx before-evt)
+      (post before-evt)
       (let [r (f)]
-        (post-event ctx (make-after r))
+        (post (make-after r))
         r)
       (catch Exception ex
-        (post-event ctx (assoc (make-after {}) :exception ex))))))
+        (post (assoc (make-after {}) :exception ex))))))
 
 (defprotocol PipelineStep
   (run-step [s ctx]))
@@ -92,24 +94,30 @@
 
 (defn- run-step*
   "Runs a single step using the configured runner"
-  [{{:keys [name]} :step :as ctx}]
-  (wrap-events
-   ctx
-   (cond-> {:type :step/start
-            :message "Step started"}
-     (some? name) (assoc :name name))
-   (fn [{:keys [status]}]
-     {:type :step/end
-      :message "Step completed"
-      :status status})
-   (fn []
-     (let [{:keys [work-dir step] :as ctx} (make-step-dir-absolute ctx)]
-       (try
-         (log/debug "Running step:" step)
-         (run-step step ctx)
-         (catch Exception ex
-           (log/warn "Step failed:" (.getMessage ex))
-           (assoc bc/failure :exception ex)))))))
+  [{{:keys [name index]} :step :keys [pipeline] :as ctx}]
+  (let [p (select-keys pipeline [:name :index])]
+    (wrap-events
+     ctx
+     (cond-> {:type :step/start
+              :message "Step started"
+              :index index
+              :pipeline p}
+       (some? name) (-> (assoc :name name)
+                        (update :message str ": " name)))
+     (fn [{:keys [status]}]
+       {:type :step/end
+        :message "Step completed"
+        :pipeline p
+        :index index
+        :status status})
+     (fn []
+       (let [{:keys [work-dir step] :as ctx} (make-step-dir-absolute ctx)]
+         (try
+           (log/debug "Running step:" step)
+           (run-step step ctx)
+           (catch Exception ex
+             (log/warn "Step failed:" (.getMessage ex))
+             (assoc bc/failure :exception ex))))))))
 
 (defn- run-steps!
   "Runs all steps in sequence, stopping at the first failure.
@@ -119,7 +127,8 @@
    initial-ctx
    {:type :pipeline/start
     :pipeline name
-    :message "Starting pipeline"}
+    :message (cond-> "Starting pipeline"
+               name (str ": " name))}
    (fn [r]
      {:type :pipeline/end
       :pipeline name
@@ -157,7 +166,7 @@
   (let [p (cond->> (if (vector? p) p [p])
             ;; Filter pipeline by name, if given
             pipeline (filter (comp (partial = pipeline) :name)))]
-    (log/debug "Found" (count p) "pipelines")
+    (log/debug "Found" (count p) "matching pipelines:" (map :name p))
     (let [result (->> p
                       (map-indexed (partial run-steps! ctx))
                       (doall))]
@@ -211,6 +220,7 @@
    connect to a domain socket, or a host.  The client is then added to the
    context, where it can be accessed by the build scripts."
   [{{:keys [url socket]} :api}]
+  (log/debug "Connecting to API at" (or url socket))
   (cond
     url (connect-to-host url)
     socket (connect-to-uds socket)))
@@ -241,5 +251,5 @@
           :message "Script completed"
           :dir script-dir}
          (fn []
-           (log/debug "Loaded pipelines:" p)
+           (log/debug "Loaded" (count p) "pipelines:" (map :name p))
            (run-pipelines ctx p)))))))

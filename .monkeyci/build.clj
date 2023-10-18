@@ -4,6 +4,7 @@
 (require '[monkey.ci.build.shell :as shell])
 (require '[clojure.java.io :as io])
 (require '[config.core :refer [env]])
+(require '[babashka.fs :as fs])
 
 (defn clj [& args]
   (apply str "clojure " args))
@@ -29,8 +30,10 @@
 (defn dockerhub-creds
   "Fetches docker hub credentials from the params and writes them to Docker `config.json`"
   [ctx]
-  (println "Writing dockerhub credentials")
-  (shell/param-to-file ctx "dockerhub-creds" "~/.docker/config.json"))
+  (let [cf (fs/expand-home "~/.docker/config.json")]
+    (when-not (fs/exists? cf)
+      (println "Writing dockerhub credentials")
+      (shell/param-to-file ctx "dockerhub-creds" cf))))
 
 (def container-image
   ;; TODO Credentials, must be mounted to /kaniko/.docker/config.json
