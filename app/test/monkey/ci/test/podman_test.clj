@@ -24,6 +24,15 @@
                          "test-img"))
           (is (= "first && second" (last (:cmd r)))))))))
 
+(defn- contains-subseq? [l expected]
+  (let [n (count expected)]
+    (loop [t l]
+      (if (= (take n t) expected)
+        true
+        (if (< (count t) n)
+          false
+          (recur (rest t)))))))
+
 (deftest build-cmd-args
   (let [base-ctx {:build-id "test-build"
                   :work-dir "test-dir"
@@ -43,4 +52,9 @@
 
     (testing "adds all script entries as a single arg"
       (let [r (sut/build-cmd-args base-ctx)]
-        (is (= "first && second" (last r)))))))
+        (is (= "first && second" (last r)))))
+
+    (testing "adds mounts if provided"
+      (let [r (sut/build-cmd-args (assoc-in base-ctx
+                                            [:step :container/mounts] [["/host/path" "/container/path"]]))]
+        (is (contains-subseq? r ["-v" "/host/path:/container/path"]))))))
