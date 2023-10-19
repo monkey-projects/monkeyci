@@ -126,6 +126,13 @@
 (defn- set-log-dir [conf]
   (update conf :log-dir #(or (u/abs-path %) (u/combine (:work-dir conf) "logs"))))
 
+(defn- set-account
+  "Updates the `:account` in the config with cli args"
+  [{:keys [args] :as conf}]
+  (let [c  (update conf :account merge (select-keys args [:customer-id :project-id :repo-id :url]))]
+    (cond-> c
+      (empty? (:account c)) (dissoc :account))))
+
 (defn app-config
   "Combines app environment with command-line args into a unified 
    configuration structure.  Args have precedence over env vars,
@@ -143,7 +150,8 @@
       (update-in [:storage :type] keyword)
       (set-work-dir)
       (set-checkout-base-dir)
-      (set-log-dir)))
+      (set-log-dir)
+      (set-account)))
 
 (def default-script-config
   "Default configuration for the script runner."

@@ -44,7 +44,9 @@
                     :dev-mode))))
 
   (testing "matches app config spec"
-    (is (true? (s/valid? ::spec/app-config (sut/app-config {} {})))))
+    (let [c (sut/app-config {} {})]
+      (is (s/valid? ::spec/app-config c)
+          (s/explain-str ::spec/app-config c))))
 
   (testing "provides log-dir as absolute path"
     (is (re-matches #".+test-dir$" (-> {:monkeyci-log-dir "test-dir"}
@@ -104,7 +106,15 @@
 
   (testing "includes account"
     (is (= {:customer-id "test-customer"}
-           (:account (sut/app-config {:monkeyci-account-customer-id "test-customer"} {}))))))
+           (:account (sut/app-config {:monkeyci-account-customer-id "test-customer"} {})))))
+
+  (testing "takes account settings from args"
+    (is (= {:customer-id "test-customer"
+            :project-id "arg-project"}
+           (-> (sut/app-config {:monkeyci-account-customer-id "test-customer"}
+                               {:project-id "arg-project"})
+               :account
+               (select-keys [:customer-id :project-id]))))))
 
 (deftest config->env
   (testing "empty for empty input"

@@ -15,6 +15,7 @@
              [config :as config]
              [events :as e]
              [runners :as r]
+             [spec :as spec]
              [utils :as u]]))
 
 ;; The base system components.  Depending on the command that's being
@@ -96,6 +97,29 @@
    :runs {:command cmd/http-server
           :requires [:http]}})
 
+(def watch-cmd
+  {:command "watch"
+   :description "Logs events for customer, project or repo"
+   :opts [{:as "Server url"
+           :option "url"
+           :short "u"
+           :type :string
+           :spec :conf/url}
+          {:as "Customer id"
+           :option "customer-id"
+           :short "c"
+           :type :string
+           :default :present}
+          {:as "Project id"
+           :option "project-id"
+           :short "p"
+           :type :string}
+          {:as "Repository id"
+           :option "repo-id"
+           :short "r"
+           :type :string}]
+   :runs {:command cmd/watch}})
+
 (def base-config
   {:name "monkey-ci"
    :description "MonkeyCI: Powerful build pipeline runner"
@@ -114,7 +138,8 @@
            :short "c"
            :type :string}]
    :subcommands [build-cmd
-                 server-cmd]})
+                 server-cmd
+                 watch-cmd]})
 
 (defn make-cli-config [{:keys [cmd-invoker env] :or {cmd-invoker system-invoker}}]
   (letfn [(invoker [cmd]
