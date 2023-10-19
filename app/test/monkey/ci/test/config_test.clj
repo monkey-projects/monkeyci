@@ -100,7 +100,11 @@
   (testing "calculates log dir from work dir"
     (is (cs/includes? (-> (sut/app-config {:monkeyci-work-dir "test-dir"} {})
                           :log-dir)
-                      "test-dir"))))
+                      "test-dir")))
+
+  (testing "includes account"
+    (is (= {:customer-id "test-customer"}
+           (:account (sut/app-config {:monkeyci-account-customer-id "test-customer"} {}))))))
 
 (deftest config->env
   (testing "empty for empty input"

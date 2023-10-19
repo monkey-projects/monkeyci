@@ -6,6 +6,11 @@
 ;; if something is a channel apart from accessing impl details.
 (def channel? (partial satisfies? ap/Channel))
 
+(def url-regex #"^(?:([A-Za-z]+):)(\/{0,3})([0-9.\-A-Za-z]+)(?::(\d+))?(?:\/([^?#]*))?(?:\?([^#]*))?(?:#(.*))?$")
+
+(defn url? [x]
+  (and (string? x) (re-matches url-regex x)))
+
 ;; Event related spec
 (s/def :evt/type keyword?)
 (s/def :evt/message string?)
@@ -46,21 +51,30 @@
 (s/def :conf/log-dir string?)
 (s/def :conf/work-dir string?)
 (s/def :conf/checkout-base-dir string?)
+(s/def :conf/url url?)
+
+;; Account configuration
+(s/def :conf/customer-id string?)
+(s/def :conf/project-id string?)
+(s/def :conf/repo-id string?)
+(s/def :conf/build-id string?)
+(s/def :conf/account (s/keys :req-un [:conf/customer-id]
+                             :opt-un [:conf/url :conf/project-id :conf/repo-id]))
 
 (s/def :conf/socket string?)
-(s/def :conf/api (s/keys :opt-un [:conf/socket]))
+(s/def :conf/api (s/keys :opt-un [:conf/socket :conf/url]))
 
 ;; Command line arguments
 (s/def :arg/pipeline string?)
 (s/def :arg/dir string?)
 (s/def :arg/workdir string?)
-(s/def :arg/git-url string?)
+(s/def :arg/git-url url?)
 (s/def :arg/config-file string?)
 
 (s/def :arg/command fn?)
 
 ;; GIT configuration
-(s/def :git/url string?)
+(s/def :git/url url?)
 (s/def :git/branch string?)
 (s/def :git/id string?)
 (s/def :git/fn fn?)
@@ -86,7 +100,8 @@
 ;; Application configuration
 (s/def ::app-config (s/keys :req-un [:conf/http :conf/runner :conf/args
                                      :conf/work-dir :conf/checkout-base-dir]
-                            :opt-un [:conf/dev-mode :conf/containers :conf/log-dir :conf/storage]))
+                            :opt-un [:conf/dev-mode :conf/containers :conf/log-dir
+                                     :conf/storage :conf/account]))
 ;; Application context.  This is the result of processing the configuration and is passed
 ;; around internally.
 (s/def ::app-context (s/keys :req-un [:conf/http :ctx/runner :evt/event-bus :ctx/git :ctx/storage :ctx/public-api]
