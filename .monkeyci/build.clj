@@ -15,7 +15,7 @@
 (def test-lib (clj-container "test-lib" "lib" "-X:test:junit"))
 (def test-app (clj-container "test-app" "app" "-M:test:junit"))
 
-(def app-uberjar (clj-app "-X:jar:uber"))
+(def app-uberjar (clj-container "uberjar" "app" "-X:jar:uber"))
 
 ;; Full path to the docker config file, used to push images
 (def docker-config (fs/expand-home "~/.docker/config.json"))
@@ -28,14 +28,15 @@
     (shell/param-to-file ctx "dockerhub-creds" docker-config)))
 
 (def container-image
-  {:container/image "docker.io/bitnami/kaniko:latest"
+  {:name "build and push image"
+   :container/image "docker.io/bitnami/kaniko:latest"
    :container/cmd ["-d" "docker.io/dormeur/monkey-ci:latest" "-f" "docker/Dockerfile" "-c" "."]
    ;; Credentials, must be mounted to /kaniko/.docker/config.json
    :container/mounts [[(str docker-config) "/kaniko/.docker/config.json"]]})
 
 (def test-pipeline
   (core/pipeline
-   {:name "test"
+   {:name "test-all"
     :steps [test-lib
             test-app]}))
 
