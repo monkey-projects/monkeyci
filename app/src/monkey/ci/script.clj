@@ -24,7 +24,10 @@
 
 (defn- post-event [ctx evt]
   (if-let [c (get-in ctx [:api :client])]
-    (let [{:keys [status] :as r} @(martian/response-for c :post-event (assoc evt :src :script))]
+    (let [{:keys [status] :as r} @(martian/response-for c :post-event
+                                                        (assoc evt
+                                                               :src :script
+                                                               :time (System/currentTimeMillis)))]
       (when-not (= 202 status)
         (log/warn "Failed to post event, got status" status)
         (log/debug "Full response:" r)))

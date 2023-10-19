@@ -216,6 +216,13 @@
           (interleave ["/customer/" "/project/" "/repo/"])
           (apply str)))))
 
+(deftest event-stream
+  (testing "'GET /events' exists"
+    (is (not= 404
+              (-> (mock/request :get "/events")
+                  (test-app)
+                  :status)))))
+
 (deftest routing-middleware
   (testing "converts json bodies to kebab-case"
     (let [app (ring/ring-handler

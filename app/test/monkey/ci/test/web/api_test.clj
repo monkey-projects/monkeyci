@@ -1,7 +1,8 @@
 (ns monkey.ci.test.web.api-test
   (:require [clojure.test :refer [deftest testing is]]
             [monkey.ci.storage :as st]
-            [monkey.ci.web.api :as sut]))
+            [monkey.ci.web.api :as sut]
+            [org.httpkit.server :as http]))
 
 (defn- ->req [ctx]
   {:reitit.core/match
@@ -130,3 +131,16 @@
                 (sut/get-webhook))]
       (is (= 200 (:status r)))
       (is (nil? (get-in r [:body :secret-key]))))))
+
+(defrecord FakeChannel [messages]
+  http/Channel
+  (send! [this msg close?]
+    (swap! messages conj {:msg msg :closed? close?})))
+
+(defn- make-fake-channel []
+  (->FakeChannel (atom [])))
+
+(deftest event-stream
+  (testing "returns stream reply"
+    (with-redefs [http/as-channel (constantly (make-fake-channel))]
+      (is (some? (sut/event-stream {}))))))
