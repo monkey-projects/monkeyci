@@ -10,6 +10,8 @@
 (s/def :container/image string?)
 (s/def :container/entrypoint (s/coll-of string?))
 (s/def :container/cmd (s/coll-of string?))
+(s/def :container/mount (s/coll-of string? :count 2))
+(s/def :container/mounts (s/coll-of :container/mount))
 
 (s/def :ci/step (s/or :fn fn?
                       :action
@@ -17,7 +19,7 @@
                               :opt-un [:ci/name])
                       :container
                       (s/keys :req [:container/image]
-                              :opt [:container/entrypoint :container/cmd]
+                              :opt [:container/entrypoint :container/cmd :container/mounts]
                               :opt-un [:ci/script :ci/name])))
 (s/def :ci/output string?)
 (s/def :ci/exception (partial instance? java.lang.Exception))

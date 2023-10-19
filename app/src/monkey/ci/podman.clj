@@ -19,21 +19,29 @@
     cmd
     ["/bin/sh" "-ec"]))
 
+(defn- mounts [{:keys [:container/mounts]}]
+  (mapcat (fn [[h c]]
+            ;; TODO Mount options
+            ["-v" (str h ":" c)])
+          mounts))
+
 (defn build-cmd-args
   "Builds command line args for the podman executable"
   [{:keys [build-id step] :as ctx}]
   (let [conf (mcc/ctx->container-config ctx)
         cn (or build-id "unkown-build")
         wd (c/step-work-dir ctx)
-        cwd "/home/monkeyci"]
+        cwd "/home/monkeyci"
+        base-cmd ["/usr/bin/podman" "run"
+                  "-t" "--rm"
+                  "--name" cn
+                  "-v" (str wd ":" cwd ":z")
+                  "-w" cwd]]
     (concat
      ;; TODO Allow for more options to be passed in
-     ["/usr/bin/podman" "run"
-      "-t" "--rm"
-      "--name" cn
-      "-v" (str wd ":" cwd ":z")
-      "-w" cwd
-      (:image conf)]
+     base-cmd
+     (mounts step)
+     [(:image conf)]
      (make-cmd step)
      ;; TODO Execute script step by step
      (make-script-cmd (:script step)))))

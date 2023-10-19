@@ -35,6 +35,7 @@
 
 (defn- wrap-events
   "Posts event before and after invoking `f`"
+  ;; TODO Find a cleaner way, it clutters up the code way too much
   [ctx before-evt after-evt f]
   (letfn [(make-after [r]
             (if (fn? after-evt)
