@@ -9,6 +9,7 @@
             [monkey.ci
              [config :as config]
              [core :as c]
+             [events :as e]
              [storage :as s]
              [utils :as u]]
             [monkey.ci.test.examples-test :as et]
@@ -81,3 +82,9 @@
 
 (defn run-example [ex-name]
   (ca/<!! (et/run-example ex-name)))
+
+(defn post-event
+  "Posts event in the current server bus"
+  [evt]
+  (-> (get-in @server [:context :event-bus])
+      (e/post-event evt)))

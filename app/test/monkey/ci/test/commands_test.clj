@@ -1,5 +1,8 @@
 (ns monkey.ci.test.commands-test
   (:require [clojure.test :refer [deftest testing is]]
+            [aleph.http :as http]
+            [clj-commons.byte-streams :as bs]
+            [manifold.deferred :as md]
             [monkey.ci
              [commands :as sut]
              [events :as e]
@@ -114,3 +117,17 @@
 (deftest http-server
   (testing "returns a channel"
     (is (spec/channel? (sut/http-server {})))))
+
+(deftest watch
+  (testing "sends request and returns channel"
+    (with-redefs [http/get (constantly (md/success-deferred nil))]
+      (is (spec/channel? (sut/watch {})))))
+
+  (testing "logs received events from reader"
+    (let [events (prn-str {:type :script/started
+                           :message "Test event"})
+          logged (atom [])]
+      (with-redefs [http/get (constantly (md/success-deferred {:body (bs/to-reader events)}))
+                    sut/log-event (partial swap! logged conj)]
+        (is (spec/channel? (sut/watch {})))
+        (is (not-empty @logged))))))
