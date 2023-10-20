@@ -1,7 +1,11 @@
 (ns monkey.ci.test.web.api-test
   (:require [clojure.test :refer [deftest testing is]]
-            [monkey.ci.storage :as st]
-            [monkey.ci.web.api :as sut]))
+            [monkey.ci
+             [events :as e]
+             [storage :as st]]
+            [monkey.ci.web.api :as sut]
+            [monkey.ci.test.helpers :as h]
+            [org.httpkit.server :as http]))
 
 (defn- ->req [ctx]
   {:reitit.core/match
@@ -130,3 +134,32 @@
                 (sut/get-webhook))]
       (is (= 200 (:status r)))
       (is (nil? (get-in r [:body :secret-key]))))))
+
+(defrecord FakeChannel [messages]
+  http/Channel
+  (send! [this msg close?]
+    (swap! messages conj {:msg msg :closed? close?})))
+
+(defn- make-fake-channel []
+  (->FakeChannel (atom [])))
+
+(deftest event-stream
+  (testing "returns stream reply"
+    (with-redefs [http/as-channel (constantly (make-fake-channel))]
+      (is (some? (sut/event-stream {})))))
+
+  (testing "sends received events on open"
+    (let [sent (atom [])
+          ch (->FakeChannel sent)]
+      (h/with-bus
+        (fn [bus]
+          (with-redefs [http/as-channel (fn [_ {:keys [on-open]}]
+                                          on-open)]
+            (let [f (sut/event-stream (->req {:event-bus bus}))]
+              (is (some? (f ch)))
+              (is (true? (e/post-event bus {:type :script/start})))
+              (is (true? (h/wait-until #(pos? (count @sent)) 500)))
+              (is (string? (-> @sent
+                               first
+                               :msg
+                               :body))))))))))

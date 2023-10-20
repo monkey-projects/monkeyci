@@ -71,4 +71,9 @@
         (testing "accepts listening port `-p`"
           (is (= 1234 (-> (run-cli "server" "-p" "1234")
                           :args
-                          :port))))))))
+                          :port)))))
+
+      (testing "`watch` command"
+        (testing "runs `watch` command"
+          (let [lc (run-cli "watch" "-c" "test-customer")]
+            (is (= cmd/watch (:cmd lc)))))))))

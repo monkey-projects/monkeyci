@@ -30,8 +30,13 @@
 
 (defn make-bus
   ([ch]
-   {:channel ch
-    :pub (ca/pub ch :type)})
+   ;; Set up a mult on the channel.  This allows us to tap all messages should we want to.
+   (let [m (ca/mult ch)
+         t (ca/chan)]
+     (ca/tap m t)
+     {:channel ch
+      :mult m
+      :pub (ca/pub t :type)}))
   ([]
    (make-bus (make-channel))))
 
@@ -43,6 +48,7 @@
   (s/valid? :evt/event-bus x))
 
 (def channel :channel)
+(def mult :mult)
 (def pub :pub)
 
 (defn register-handler

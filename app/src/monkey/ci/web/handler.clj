@@ -125,10 +125,14 @@
      :child-routes [project-routes
                     parameter-routes]})])
 
+(def event-stream-routes
+  ["/events" {:get {:handler api/event-stream}}])
+
 (def routes
   [["/health" {:get health}]
    webhook-routes
-   customer-routes])
+   customer-routes
+   event-stream-routes])
 
 (defn- stringify-body
   "Since the raw body could be read more than once (security, content negotation...),

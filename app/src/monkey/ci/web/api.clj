@@ -1,9 +1,13 @@
 (ns monkey.ci.web.api
-  (:require [clojure.tools.logging :as log]
-            [monkey.ci.storage :as st]
+  (:require [clojure.core.async :as ca]
+            [clojure.tools.logging :as log]
+            [monkey.ci
+             [events :as e]
+             [storage :as st]]
             [monkey.ci.web
              [common :as c]
              [github :as gh]]
+            [org.httpkit.server :as http]
             [ring.util.response :as rur]))
 
 (def body (comp :body :parameters))
@@ -117,3 +121,49 @@
   (let [p (body req)]
     (when (st/save-params (c/req->storage req) (params-sid req) p)
       (rur/response p))))
+
+(def allowed-events
+  #{:script/start
+    :script/end
+    :pipeline/start
+    :pipeline/end
+    :step/start
+    :step/end})
+
+(defn event-stream
+  "Sets up an event stream for the specified filter."
+  [req]
+  (let [{:keys [mult]} (c/req->bus req)
+        dest (ca/chan (ca/sliding-buffer 10)
+                      (filter (comp allowed-events :type)))
+        make-reply (fn [evt]
+                     (-> evt
+                         (prn-str)
+                         (rur/response)
+                         (rur/header "Content-Type" "text/event-stream")))
+        sender (fn [ch]
+                 (fn [msg]
+                   (when-not (http/send! ch msg false)
+                     (log/warn "Failed to send message to channel"))))
+        send-events (fn [src ch]
+                      (ca/go-loop [msg (ca/<! src)]
+                        (if msg
+                          (if (http/send! ch (make-reply msg) false)
+                            (recur (ca/<! src))
+                            (do
+                              (log/warn "Could not send message to channel, stopping event transmission")
+                              (ca/untap mult src)
+                              (ca/close! src)))
+                          (do
+                            (log/debug "Event bus was closed, stopping event transmission")
+                            (http/send! ch (rur/response "") true)))))]
+    (http/as-channel
+     req
+     {:on-open (fn [ch]
+                 (log/debug "Event stream opened:" ch)
+                 (ca/tap mult dest)
+                 ;; Pipe the messages from the tap to the channel
+                 (send-events dest ch))
+      :on-close (fn [_ status]
+                  (ca/untap mult dest)
+                  (log/debug "Event stream closed with status" status))})))
