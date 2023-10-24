@@ -25,6 +25,11 @@
             ["-v" (str h ":" c)])
           mounts))
 
+(defn- env-vars [{:keys [:container/env]}]
+  (mapcat (fn [[k v]]
+            ["-e" (str k "=" v)])
+          env))
+
 (defn build-cmd-args
   "Builds command line args for the podman executable"
   [{:keys [build-id step] :as ctx}]
@@ -41,6 +46,7 @@
      ;; TODO Allow for more options to be passed in
      base-cmd
      (mounts step)
+     (env-vars step)
      [(:image conf)]
      (make-cmd step)
      ;; TODO Execute script step by step
