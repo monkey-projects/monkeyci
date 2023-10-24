@@ -12,7 +12,7 @@
              [events :as e]
              [storage :as s]
              [utils :as u]]
-            [monkey.ci.test.examples-test :as et]
+            #_[monkey.ci.test.examples-test :as et]
             [buddy.core
              [codecs :as codecs]
              [mac :as mac]]
@@ -80,7 +80,7 @@
                 :clone-url url}
    :head-commit {:id id}})
 
-(defn run-example [ex-name]
+#_(defn run-example [ex-name]
   (ca/<!! (et/run-example ex-name)))
 
 (defn post-event
