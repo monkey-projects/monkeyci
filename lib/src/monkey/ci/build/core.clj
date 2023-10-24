@@ -25,3 +25,12 @@
   [config]
   {:pre [(s/valid? :ci/pipeline config)]}
   (map->Pipeline config))
+
+(defmacro defpipeline
+  "Convenience macro that declares a var for a pipeline with the given name 
+   with specified steps"
+  [n steps]
+  `(def ~n
+     (pipeline
+      {:name ~(name n)
+       :steps ~steps})))

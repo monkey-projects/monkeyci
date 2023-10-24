@@ -33,3 +33,12 @@
                       :script ["first" "second"]}]}]
       (is (s/valid? :ci/step (-> p :steps (first))))
       (is (pipeline? (sut/pipeline p))))))
+
+(deftest defpipeline
+  (testing "declares def with pipeline"
+    (let [steps [(constantly :test-step)]]
+      (sut/defpipeline test-pipeline steps)
+      (is (pipeline? test-pipeline))
+      (is (= "test-pipeline" (:name test-pipeline)))
+      (is (= steps (:steps test-pipeline)))
+      (ns-unalias *ns* 'test-pipeline))))
