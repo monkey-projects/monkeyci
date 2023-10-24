@@ -8,7 +8,8 @@
             [medley.core :as mc]
             [monkey.ci
              [containers :as mcc]
-             [context :as ctx]])
+             [context :as ctx]
+             [utils :as u]])
   (:import org.apache.commons.io.IOUtils
            [java.io PrintWriter]))
 
@@ -184,33 +185,36 @@
          (parse-log-stream)
          (map (comp (memfn trim) :message)))))
 
+(def ^:private internal-log-dir "/var/log/monkeyci")
+
+(defn container-opts [ctx]
+  (let [remote-wd "/home/build"
+        work-dir (ctx/step-work-dir ctx)
+        output-dir (ctx/log-dir ctx)]
+    (merge (mcc/ctx->container-config ctx)
+           {:cmd ["/bin/sh"]
+            :open-stdin true
+            :attach-stdin false
+            :attach-stdout true
+            :attach-stderr true
+            :working-dir remote-wd
+            :host-config
+            {:binds
+             ;; Mount a dir where we will pipe the outputs to
+             [(str (u/abs-path output-dir) ":" internal-log-dir)
+              ;; The working dir
+              (str (u/abs-path work-dir) ":" remote-wd)]}})))
+
 (defmethod mcc/run-container :docker [{:keys [build-id] :as ctx}]
   (let [cn build-id
         job-id (get ctx :job-id (str (random-uuid)))
         conn (get-in ctx [:env :docker-connection])
         client (make-client :containers conn)
-        output-dir (doto (io/file "tmp" job-id)
-                     (.mkdirs))
-        work-dir (ctx/step-work-dir ctx)
-        remote-wd "/home/build"
-        internal-log-dir "/var/log/monkeyci"
-        ->abs-path (fn [s]
-                     (str (.getAbsolutePath (io/file s))))
         log-path (fn [s]
-                   (->abs-path (io/file internal-log-dir s)))
-        {:keys [image] :as conf} (merge (mcc/ctx->container-config ctx)
-                                        {:cmd ["/bin/sh"]
-                                         :open-stdin true
-                                         :attach-stdin false
-                                         :attach-stdout true
-                                         :attach-stderr true
-                                         :working-dir remote-wd
-                                         :host-config
-                                         {:binds
-                                          ;; Mount a dir where we will pipe the outputs to
-                                          [(str (->abs-path output-dir) ":" internal-log-dir)
-                                           ;; The working dir
-                                           (str (->abs-path work-dir) ":" remote-wd)]}})
+                   (u/abs-path (io/file internal-log-dir s)))
+        {:keys [image] :as conf} (container-opts ctx)
+        output-dir (doto (ctx/log-dir ctx)
+                     (.mkdirs))
         
         pull   (fn [{:keys [image]}]
                  (log/debug "Pulling image")
@@ -263,7 +267,7 @@
                                   idx 0
                                   results []]
                              (if (empty? s)
-                               results ; Done
+                               results  ; Done
                                (let [{:keys [exit] :as r} (execute-step pw in idx (first s))
                                      acc (conj results r)]
                                  (if (zero? exit)
