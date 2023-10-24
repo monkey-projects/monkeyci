@@ -1,12 +1,14 @@
 (ns monkey.ci.test.examples-test
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.tools.logging :as log]
-            [monkey.ci.core :as core]
+            [monkey.ci
+             [cli :as cli]
+             [core :as core]]
             [monkey.ci.test.helpers :as h]))
 
 (defn run-example [path]
   (log/info "Running example at" path)
-  (let [inv (-> core/build-cmd
+  (let [inv (-> cli/build-cmd
                 :runs
                 (core/system-invoker {}))]
     (inv {:workdir "examples"
