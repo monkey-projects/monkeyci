@@ -49,7 +49,8 @@
         (post (make-after r))
         r)
       (catch Exception ex
-        (post (assoc (make-after {}) :exception ex))))))
+        (log/error "Got exception when executing" f ex)
+        (post (assoc (make-after {}) :exception (.getMessage ex)))))))
 
 (defprotocol PipelineStep
   (run-step [s ctx]))
