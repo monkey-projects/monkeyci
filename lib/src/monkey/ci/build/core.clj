@@ -13,6 +13,11 @@
 (def success (status :success))
 (def failure (status :failure))
 
+(defn status?
+  "Checks if the given object is a step status"
+  [x]
+  (some? (:status x)))
+
 (defn success? [{:keys [status]}]
   (= :success status))
 

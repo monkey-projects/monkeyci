@@ -68,7 +68,11 @@
   (run-step [f ctx]
     (log/debug "Executing function:" f)
     ;; If a step returns nil, treat it as success
-    (or (f ctx) bc/success))
+    (let [r (or (f ctx) bc/success)]
+      (if (bc/status? r)
+        r
+        ;; Recurse
+        (run-step r ctx))))
 
   clojure.lang.IPersistentMap
   (run-step [{:keys [action] :as step} ctx]
@@ -76,13 +80,12 @@
     (cond
       (some? (:container/image step))
       (run-container-step ctx)
-      (some? action)
+      (fn? action)
       (run-step action ctx)
       :else
       (throw (ex-info "invalid step configuration" {:step step})))))
 
 (defn- make-step-dir-absolute [{:keys [checkout-dir step] :as ctx}]
-  ;; TODO Make more generic
   (if (map? step)
     (update-in ctx [:step :work-dir]
                (fn [d]
