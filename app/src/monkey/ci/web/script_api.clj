@@ -40,6 +40,8 @@
                      500))
                  (ca/<!!))}))
 
+(def edn #{"application/edn"})
+
 (def routes ["/script" {:swagger {:id :monkeyci/script-api}}
              [["/swagger.json"
                {:no-doc true
@@ -48,13 +50,15 @@
                {:get get-params
                 :summary "Retrieve configured build parameters"
                 :operationId :get-params
-                :responses {200 {:body {s/Str s/Str}}}}]
+                :responses {200 {:body {s/Str s/Str}}}
+                :produces edn}]
               ["/event"
                {:post post-event
                 :summary "Post an event to the bus"
                 :operationId :post-event
                 :parameters {:body {s/Keyword s/Any}}
-                :responses {202 {}}}]]])
+                :responses {202 {}}
+                :consumes edn}]]])
 
 (defn- with-api
   "Replaces the public api factory function with its result"

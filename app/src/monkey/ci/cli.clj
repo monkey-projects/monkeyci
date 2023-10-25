@@ -52,8 +52,7 @@
           {:as "Customer id"
            :option "customer-id"
            :short "c"
-           :type :string
-           :default :present}
+           :type :string}
           {:as "Project id"
            :option "project-id"
            :short "p"

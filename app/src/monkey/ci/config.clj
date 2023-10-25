@@ -141,7 +141,7 @@
   (-> (map load-config-file [*global-config-file*
                              *home-config-file*
                              (:config-file args)])
-      (conj (config-from-env env))
+      (concat [(config-from-env env)])
       (merge-configs)
       (merge (select-keys args [:dev-mode]))
       (assoc :args args)

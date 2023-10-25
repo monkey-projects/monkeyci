@@ -106,7 +106,10 @@
 
   (testing "includes account"
     (is (= {:customer-id "test-customer"}
-           (:account (sut/app-config {:monkeyci-account-customer-id "test-customer"} {})))))
+           (-> {:monkeyci-account-customer-id "test-customer"}
+               (sut/app-config {})
+               :account
+               (select-keys [:customer-id])))))
 
   (testing "takes account settings from args"
     (is (= {:customer-id "test-customer"
