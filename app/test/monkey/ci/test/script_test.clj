@@ -121,17 +121,25 @@
 
 (defmethod c/run-container :test [ctx]
   {:test-result :run-from-test
+   :status :success
    :exit 0})
 
 (deftest pipeline-run-step
   (testing "executes function directly"
-    (is (= :ok (sut/run-step (constantly :ok) {}))))
+    (is (bc/success? (sut/run-step (constantly bc/success) {}))))
 
   (testing "executes action from map"
-    (is (= :ok (sut/run-step {:action (constantly :ok)} {}))))
+    (is (bc/success? (sut/run-step {:action (constantly bc/success)} {}))))
 
   (testing "executes in container if configured"
     (let [config {:container/image "test-image"}
           r (sut/run-step config {:containers {:type :test}})]
+      (is (= :run-from-test (:test-result r)))
+      (is (bc/success? r))))
+
+  (testing "executes fn that returns container config"
+    (let [step (fn [_]
+                 {:container/image "test-image"})
+          r (sut/run-step step {:containers {:type :test}})]
       (is (= :run-from-test (:test-result r)))
       (is (bc/success? r)))))

@@ -14,6 +14,12 @@
     (is (sut/failed? nil))
     (is (not (sut/failed? sut/success)))))
 
+(deftest status?
+  (testing "true if the object has a status"
+    (is (false? (sut/status? nil)))
+    (is (true? (sut/status? sut/success)))
+    (is (false? (sut/status? {:something "else"})))))
+
 (deftest pipeline
 
   (testing "creates pipeline object"
