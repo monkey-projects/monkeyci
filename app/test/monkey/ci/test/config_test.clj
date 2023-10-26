@@ -20,6 +20,11 @@
                     :http
                     :port))))
 
+  (testing "takes port from env"
+    (is (= 1234 (-> (sut/app-config {:monkeyci-http-port 1234} {})
+                    :http
+                    :port))))
+
   (testing "takes github config from env"
     (is (= "test-secret" (-> {:monkeyci-github-secret "test-secret"}
                              (sut/app-config {})

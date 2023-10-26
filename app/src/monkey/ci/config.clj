@@ -29,6 +29,7 @@
   `(or (System/getenv (csk/->SCREAMING_SNAKE_CASE (str env-prefix "-version"))) "0.1.0-SNAPSHOT"))
 
 (defn- merge-if-map [a b]
+  (log/info "Merging" a "and" b)
   (if (map? a)
     (merge a b)
     b))
@@ -65,11 +66,12 @@
             (reduce (fn [r v]
                       (group-keys v r))
                     c
-                    [:github :runner :containers :storage :api :account]))]
+                    [:github :runner :containers :storage :api :account :http]))]
     (->> env
          (filter-and-strip-keys env-prefix)
          (group-all-keys)
-         (mc/remove-vals empty?))))
+         ;; Remove nil values and empty strings
+         (mc/remove-vals (some-fn nil? (every-pred string? empty?))))))
 
 (defn- parse-edn
   "Parses the input file as `edn` and converts keys to kebab-case."

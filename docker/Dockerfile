@@ -1,4 +1,4 @@
-FROM clojure:temurin-20-tools-deps
+FROM docker.io/clojure:temurin-21-tools-deps
 
 WORKDIR /var/lib/monkeyci
 ENTRYPOINT ["java", "-jar", "monkeyci.jar"]
