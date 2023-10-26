@@ -112,9 +112,11 @@
               :pipeline p}
        (some? name) (-> (assoc :name name)
                         (update :message str ": " name)))
-     (fn [{:keys [status]}]
+     (fn [{:keys [status message exception]}]
        {:type :step/end
-        :message "Step completed"
+        :message (or (some-> exception (.getMessage))
+                     message
+                     "Step completed")
         :pipeline p
         :index index
         :status status})
@@ -182,7 +184,8 @@
 
 (defn- load-pipelines [dir build-id]
   (let [tmp-ns (symbol (or build-id (str "build-" (random-uuid))))]
-    ;; FIXME I don't think this is a very robust approach, find a better way.
+    ;; Declare a temporary namespace to load the file in, in case
+    ;; it does not declare an ns of it's own.
     (in-ns tmp-ns)
     (clojure.core/use 'clojure.core)
     (try
@@ -201,6 +204,7 @@
 (defn- open-uds-socket []
   (SocketChannel/open StandardProtocolFamily/UNIX))
 
+;; The swagger is fetched by the build script client api
 (def swagger-path "/script/swagger.json")
 
 (defn- connect-to-uds [path]

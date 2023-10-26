@@ -72,7 +72,7 @@
    which in turn should start the build runner."
   [{st :storage} {:keys [id payload] :as evt}]
   (if-let [details (s/find-details-for-webhook st id)]
-    (let [{:keys [master-branch clone-url]} (:repository payload)
+    (let [{:keys [master-branch clone-url ssh-url private]} (:repository payload)
           build-id (u/new-build-id)
           commit-id (get-in payload [:head-commit :id])
           md (-> details
@@ -83,7 +83,7 @@
                  (merge (-> payload
                             :head-commit
                             (select-keys [:timestamp :message]))))
-          conf {:git {:url clone-url
+          conf {:git {:url (if private ssh-url clone-url)
                       :branch master-branch
                       :id commit-id}
                 :sid (s/build-sid md) ; Build storage id

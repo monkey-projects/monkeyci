@@ -83,4 +83,31 @@
     (h/with-memory-store s
       (is (nil? (sut/prepare-build {:storage s}
                                    {:id "test-webhook"
-                                    :payload {}}))))))
+                                    :payload {}})))))
+
+  (testing "uses clone url for public repos"
+    (h/with-memory-store s
+      (let [wh {:id "test-webhook"
+                :customer-id "test-customer"
+                :project-id "test-project"
+                :repo-id "test-repo"}]
+        (is (st/sid? (st/save-webhook-details s wh)))
+        (let [r (sut/prepare-build {:storage s}
+                                   {:id "test-webhook"
+                                    :payload {:repository {:ssh-url "ssh-url"
+                                                           :clone-url "clone-url"}}})]
+          (is (= "clone-url" (get-in r [:build :git :url])))))))
+
+  (testing "uses ssh url if repo is private"
+    (h/with-memory-store s
+      (let [wh {:id "test-webhook"
+                :customer-id "test-customer"
+                :project-id "test-project"
+                :repo-id "test-repo"}]
+        (is (st/sid? (st/save-webhook-details s wh)))
+        (let [r (sut/prepare-build {:storage s}
+                                   {:id "test-webhook"
+                                    :payload {:repository {:ssh-url "ssh-url"
+                                                           :clone-url "clone-url"
+                                                           :private true}}})]
+          (is (= "ssh-url" (get-in r [:build :git :url]))))))))
