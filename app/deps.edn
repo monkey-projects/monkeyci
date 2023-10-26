@@ -4,8 +4,7 @@
         camel-snake-kebab/camel-snake-kebab {:mvn/version "0.4.3"}
         ch.qos.logback/logback-classic {:mvn/version "1.4.11"}
         cli-matic/cli-matic {:mvn/version "0.5.4"}
-        clj-jgit/clj-jgit {:mvn/version "1.0.2"
-                           :exclusions [org.eclipse.jgit/org.eclipse.jgit.gpg.bc]}
+        clj-jgit/clj-jgit {:mvn/version "1.0.2"}
         com.github.oliyh/martian-httpkit {:mvn/version "0.1.25"}
         com.monkeyci/script {:local/root "../lib"}
         com.monkeyprojects/socket-async {:mvn/version "0.1.0"}
