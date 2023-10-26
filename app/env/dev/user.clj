@@ -80,6 +80,14 @@
                 :clone-url url}
    :head-commit {:id id}})
 
+(defn make-private-webhook-body
+  "Creates webhook body but for private repos."
+  [{:keys [url branch id] :or {branch "main"}}]
+  {:repository {:master-branch branch
+                :ssh-url url
+                :private true}
+   :head-commit {:id id}})
+
 #_(defn run-example [ex-name]
   (ca/<!! (et/run-example ex-name)))
 
