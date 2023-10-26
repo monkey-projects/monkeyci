@@ -10,7 +10,8 @@
    files to `dir`.  Returns a repo object that can be passed to other functions."
   [url branch dir]
   (log/debug "Cloning" url "into" dir)
-  (git/git-clone url :branch branch :dir dir))
+  (git/with-identity {:trust-any-host? true}
+    (git/git-clone url :branch branch :dir dir)))
 
 (defn checkout [repo id]
   (log/debug "Checking out" id "from repo" repo)
