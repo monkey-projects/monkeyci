@@ -5,6 +5,7 @@
         ch.qos.logback/logback-classic {:mvn/version "1.4.11"}
         cli-matic/cli-matic {:mvn/version "0.5.4"}
         clj-jgit/clj-jgit {:mvn/version "1.0.2"
+                           ;; Exclude these because they conflict with buddy
                            :exclusions [org.bouncycastle/bcpg-jdk15on
                                         org.bouncycastle/bcprov-jdk15on
                                         org.bouncycastle/bcpkix-jdk15on
@@ -12,6 +13,7 @@
         com.github.oliyh/martian-httpkit {:mvn/version "0.1.25"}
         com.monkeyci/script {:local/root "../lib"}
         com.monkeyprojects/socket-async {:mvn/version "0.1.0"}
+        com.monkeyprojects/oci-os {:mvn/version "0.1.0-SNAPSHOT"}
         com.stuartsierra/component {:mvn/version "1.1.0"}
         commons-io/commons-io {:mvn/version "2.13.0"}
         http-kit/http-kit {:mvn/version "2.7.0"}
