@@ -10,6 +10,9 @@
              [process :as p]
              [runners :as r]
              [storage :as st]]
+            [monkey.ci.storage
+             [file]
+             [oci]]
             [monkey.ci.web
              [github :as wg]
              [handler :as web]

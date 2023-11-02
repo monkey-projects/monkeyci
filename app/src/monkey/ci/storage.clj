@@ -18,48 +18,9 @@
 
 (def sid? vector?)
 
-(defn- ensure-dir-exists
-  "Given a path, creates the parent directories if they do not exist already."
-  [^File f]
-  (let [p (.getParentFile f)]
-    (if-not (.exists p)
-      (.mkdirs p)
-      true)))
-
-(def ext ".edn")
-
 (def new-id
   "Generates a new random id"
   (comp str random-uuid))
-
-(defn- ->file [dir sid]
-  (apply io/file dir (concat (butlast sid) [(str (last sid) ext)])))
-
-;; Must be a type, not a record, otherwise it gets lost in reitit data processing
-(deftype FileStorage [dir]
-  Storage
-  (read-obj [_ loc]
-    (let [f (->file dir loc)]
-      (log/trace "Checking for file at" f)
-      (when (.exists f)
-        (with-open [r (PushbackReader. (io/reader f))]
-          (edn/read r)))))
-
-  (write-obj [_ loc obj]
-    (let [f (->file dir loc)]
-      (when (ensure-dir-exists f)
-        (spit f (pr-str obj))
-        loc)))
-
-  (obj-exists? [_ loc]
-    (.exists (->file dir loc)))
-
-  (delete-obj [_ loc]
-    (.delete (->file dir loc))))
-
-(defn make-file-storage [dir]
-  (log/debug "File storage location:" dir)
-  (->FileStorage dir))
 
 ;; In-memory implementation, provider for testing/development purposes.
 ;; Must be a type, not a record otherwise reitit sees it as a map.
@@ -82,10 +43,6 @@
   (->MemoryStorage (atom {})))
 
 (defmulti make-storage :type)
-
-(defmethod make-storage :file [conf]
-  (log/info "Using file storage with configuration:" conf)
-  (make-file-storage (u/abs-path (:dir conf))))
 
 (defmethod make-storage :memory [_]
   (log/info "Using memory storage (only for dev purposes!)")
