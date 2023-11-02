@@ -121,6 +121,7 @@
 
 (defmethod c/run-container :test [ctx]
   {:test-result :run-from-test
+   :context ctx
    :status :success
    :exit 0})
 
@@ -142,4 +143,11 @@
                  {:container/image "test-image"})
           r (sut/run-step step {:containers {:type :test}})]
       (is (= :run-from-test (:test-result r)))
-      (is (bc/success? r)))))
+      (is (bc/success? r))))
+
+  (testing "adds step back to context when function returns step config"
+    (let [step {:container/image "test-image"}
+          step-fn (fn [_]
+                    step)
+          r (sut/run-step step-fn {:containers {:type :test}})]
+      (is (= step (get-in r [:context :step]))))))
