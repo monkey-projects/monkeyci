@@ -84,7 +84,7 @@
   (testing "parses private key file"
     (let [creds {:tenancy-ocid "test-tenancy"
                  :user-ocid "test-user"
-                 :private-key "dev-resources/oci.key"}]
+                 :private-key "dev-resources/test/test-key.pem"}]
       (is (private-key? (-> (st/make-storage {:type :oci
                                               :region "test-region"
                                               :credentials creds})
