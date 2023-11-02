@@ -131,4 +131,9 @@
   (testing "passes build id"
     (is (= "test-build" (-> {:build {:build-id "test-build"}}
                             (sut/process-env "test-socket")
-                            :monkeyci-build-id)))))
+                            :monkeyci-build-id))))
+
+  (testing "sets `LC_CTYPE` to `UTF-8` for git clones"
+    (is (= "UTF-8" (-> {}
+                       (sut/process-env "test-socket")
+                       :lc-ctype)))))

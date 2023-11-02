@@ -11,7 +11,10 @@
   [url branch dir]
   (log/debug "Cloning" url "into" dir)
   (git/with-identity {:trust-all? true}
-    (git/git-clone url :branch branch :dir dir)))
+    (git/git-clone url
+                   :branch branch
+                   :dir dir
+                   :no-checkout? true)))
 
 (defn checkout [repo id]
   (log/debug "Checking out" id "from repo" repo)
