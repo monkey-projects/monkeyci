@@ -23,6 +23,15 @@
       (assoc :ns (get-ns client)
              :object-name (make-path sid))))
 
+(def stream? (partial instance? java.io.InputStream))
+
+(defn- to-edn [x]
+  (let [s (cond-> x
+            (stream? x) bs/to-string)]
+    (if (string? s) 
+      (parse-edn s)
+      x)))
+
 (deftype OciObjectStorage [client conf]
   st/Storage
   (read-obj [this sid]
@@ -33,8 +42,7 @@
         (fn [v]
           (when v
             (os/get-object client args)))
-        (fnil bs/to-string "")
-        parse-edn)))
+        to-edn)))
   
   (write-obj [_ sid obj]
     @(md/chain

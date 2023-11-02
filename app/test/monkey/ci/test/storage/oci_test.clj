@@ -89,7 +89,7 @@
     (-> (edn/read r)
         (update-in [:storage :credentials :private-key] load-privkey))))
 
-(deftest oci-integration
+(deftest ^:integration oci-integration
   ;; Run some integration tests on an OCI bucket
   (let [conf (:storage (load-test-config))
         s (st/make-storage conf)]
