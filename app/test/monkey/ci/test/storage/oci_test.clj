@@ -104,4 +104,4 @@
         (is (nil? (st/find-customer s id)))
         (is (st/sid? (st/save-customer s cust)))
         (is (= cust (st/find-customer s id)))
-        #_(is (true? (st/delete-obj s (st/customer-sid id))))))))
+        (is (true? (st/delete-obj s (st/customer-sid id))))))))

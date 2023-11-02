@@ -42,8 +42,7 @@
        client
        (-> (object-args client conf sid)
            (assoc :contents (->edn obj)
-                  ;; FIXME edn content type makes the reader fail
-                  :martian.core/request {:headers {"Content-Type" "application/edn"}})))
+                  :content-type "application/edn")))
       (constantly sid)))
   
   (delete-obj [this sid]
