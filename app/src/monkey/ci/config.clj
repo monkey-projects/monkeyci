@@ -112,7 +112,9 @@
    :runner
    {:type :child}
    :storage
-   {:type :memory}})
+   {:type :memory}
+   :containers
+   {:type :podman}})
 
 (defn- merge-configs [configs]
   (reduce deep-merge default-app-config configs))

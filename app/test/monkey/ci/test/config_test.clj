@@ -49,9 +49,10 @@
                     :dev-mode))))
 
   (testing "matches app config spec"
-    (let [c (sut/app-config {} {})]
-      (is (s/valid? ::spec/app-config c)
-          (s/explain-str ::spec/app-config c))))
+    (with-redefs [sut/load-config-file (constantly nil)]
+      (let [c (sut/app-config {} {})]
+        (is (s/valid? ::spec/app-config c)
+            (s/explain-str ::spec/app-config c)))))
 
   (testing "provides log-dir as absolute path"
     (is (re-matches #".+test-dir$" (-> {:monkeyci-log-dir "test-dir"}
