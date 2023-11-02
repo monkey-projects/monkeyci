@@ -3,7 +3,8 @@
             [cheshire.core :as json]
             [clojure.core.async :as ca]
             [clojure.edn :as edn]
-            [clojure.java.io :as io]            
+            [clojure.java.io :as io]
+            [clojure.tools.logging :as log]
             [com.stuartsierra.component :as sc]
             [config.core :as cc]
             [monkey.ci
@@ -12,6 +13,7 @@
              [events :as e]
              [storage :as s]
              [utils :as u]]
+            [monkey.ci.storage.oci]
             #_[monkey.ci.test.examples-test :as et]
             [buddy.core
              [codecs :as codecs]
@@ -96,3 +98,35 @@
   [evt]
   (-> (get-in @server [:context :event-bus])
       (e/post-event evt)))
+
+(defn- load-edn [f]
+  (with-open [is (PushbackReader. (io/reader f))]
+    (edn/read is)))
+
+(defn load-config [f]
+  (-> (load-edn (io/file "dev-resources" f))
+      (update-in [:storage :credentials :private-key] u/load-privkey)))
+
+(defn- migrate-dir [p sid st]
+  (let [files (seq (.listFiles p))
+        sid-name (fn [f]
+                   (let [n (.getName f)
+                         l (.lastIndexOf n ".")]
+                     (subs n 0 l)))
+        make-sid (fn [f]
+                   (concat sid [(sid-name f)]))]
+    (doseq [f files]
+      (cond
+        (.isFile f)
+        (do
+          (log/info "Migrating:" f)
+          (s/write-obj st (make-sid f) (load-edn f)))
+        (.isDirectory f)
+        (migrate-dir f (concat sid [(.getName f)]) st)))))
+
+(defn migrate-storage
+  "Migrates all files from given directory to destiny storage."
+  [dir st]
+  (let [f (io/file dir)]
+    (log/info "Migrating storage from" (.getCanonicalPath f))
+    (migrate-dir f [] st)))
