@@ -144,7 +144,7 @@
 (def builds "builds")
 (def build-sid-keys [:customer-id :project-id :repo-id :build-id])
 (def build-sid (comp vec
-                     #(conj % builds)
+                     (partial concat [builds])
                      (apply juxt build-sid-keys)))
 
 (defn- build-sub-sid [obj p]
