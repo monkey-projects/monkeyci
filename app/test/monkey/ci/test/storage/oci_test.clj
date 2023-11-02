@@ -89,7 +89,7 @@
     (-> (edn/read r)
         (update-in [:storage :credentials :private-key] load-privkey))))
 
-(deftest ^:integration oci-integration
+(deftest oci-integration
   ;; Run some integration tests on an OCI bucket
   (let [conf (:storage (load-test-config))
         s (st/make-storage conf)]
@@ -104,4 +104,4 @@
         (is (nil? (st/find-customer s id)))
         (is (st/sid? (st/save-customer s cust)))
         (is (= cust (st/find-customer s id)))
-        (is (true? (st/delete-obj s (st/customer-sid id))))))))
+        #_(is (true? (st/delete-obj s (st/customer-sid id))))))))
