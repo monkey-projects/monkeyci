@@ -73,7 +73,7 @@
       (if (bc/status? r)
         r
         ;; Recurse
-        (run-step r ctx))))
+        (run-step r (assoc ctx :step r)))))
 
   clojure.lang.IPersistentMap
   (run-step [{:keys [action] :as step} ctx]
