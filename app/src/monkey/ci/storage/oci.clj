@@ -5,7 +5,10 @@
              [string :as cs]]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
-            [monkey.ci.storage :as st]
+            [medley.core :as mc]
+            [monkey.ci
+             [storage :as st]
+             [utils :as u]]
             [monkey.oci.os.core :as os]))
 
 (def get-ns (memoize (fn [client]
@@ -71,5 +74,5 @@
 
 (defmethod st/make-storage :oci [{:keys [credentials] :as conf}]
   (make-oci-storage (-> conf
-                        (merge credentials)
+                        (merge (mc/update-existing credentials :private-key u/load-privkey))
                         (dissoc :credentials))))

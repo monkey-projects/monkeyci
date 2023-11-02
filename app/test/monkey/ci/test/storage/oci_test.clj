@@ -7,7 +7,8 @@
             [manifold.deferred :as md]
             [monkey.ci
              [spec :as s]
-             [storage :as st]]
+             [storage :as st]
+             [utils :refer [load-privkey]]]
             [monkey.ci.storage.oci :as sut]
             [monkey.oci.os.core :as os])
   (:import java.io.PushbackReader))
@@ -64,6 +65,8 @@
                                          (md/error-deferred (ex-info "Object not found" {})))]
           (is (false? (st/delete-obj s sid))))))))
 
+(def private-key? (partial instance? java.security.PrivateKey))
+
 (deftest make-storage
   (testing "can make oci storage"
     (is (some? (st/make-storage {:type :oci
@@ -76,13 +79,17 @@
                                          :region "test-region"
                                          :credentials creds})
                        (.conf)
-                       (select-keys (keys creds))))))))
+                       (select-keys (keys creds)))))))
 
-(defn- load-privkey
-  "Load private key from file"
-  [f]
-  (with-open [r (io/reader f)]
-    (pem/read-privkey r nil)))
+  (testing "parses private key file"
+    (let [creds {:tenancy-ocid "test-tenancy"
+                 :user-ocid "test-user"
+                 :private-key "dev-resources/oci.key"}]
+      (is (private-key? (-> (st/make-storage {:type :oci
+                                              :region "test-region"
+                                              :credentials creds})
+                            (.conf)
+                            :private-key))))))
 
 (defn- load-test-config []  
   (with-open [r (PushbackReader. (io/reader "dev-resources/test/config.edn"))]
