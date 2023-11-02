@@ -85,6 +85,9 @@
     {:socket-path path
      :server (script-api/listen-at-socket path ctx)}))
 
+(def default-envs
+  {:lc-ctype "UTF-8"})
+
 (defn process-env
   "Build the environment to be passed to the child process."
   [ctx socket-path]
@@ -92,7 +95,8 @@
        {:socket socket-path}}
       (assoc :build-id (get-in ctx [:build :build-id]))
       (merge (select-keys ctx [:containers :log-dir]))
-      (config/config->env)))
+      (config/config->env)
+      (merge default-envs)))
 
 (defn- get-script-log-dir
   "Determines and creates the log dir for the script output"

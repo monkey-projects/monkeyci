@@ -1,5 +1,6 @@
 (ns monkey.ci.utils
-  (:require [clojure.java.io :as io])
+  (:require [buddy.core.keys.pem :as pem]
+            [clojure.java.io :as io])
   (:import org.apache.commons.io.FileUtils))
 
 (defn cwd
@@ -61,3 +62,9 @@
   (-> v
       (drop-last)
       (conj l)))
+
+(defn load-privkey
+  "Load private key from file"
+  [f]
+  (with-open [r (io/reader f)]
+    (pem/read-privkey r nil)))

@@ -4,7 +4,9 @@
             [monkey.ci.build
              [api :as api]
              [core :as core]
-             [shell :as shell]]))
+             [shell :as shell]])
+  (:import [java.time OffsetDateTime ZoneOffset]
+           java.time.format.DateTimeFormatter))
 
 (defn clj-container [name dir & args]
   "Executes script in clojure container"
@@ -27,10 +29,19 @@
     (println "Writing dockerhub credentials")
     (shell/param-to-file ctx "dockerhub-creds" docker-config)))
 
+(def datetime-format (DateTimeFormatter/ofPattern "yyyyMMdd-HHmm"))
+
+(defn- img-tag
+  "Generates a new image tag using current time"
+  []
+  (->> (OffsetDateTime/now ZoneOffset/UTC)
+       (.format datetime-format)))
+
 (def container-image
   {:name "build and push image"
    :container/image "docker.io/bitnami/kaniko:latest"
-   :container/cmd ["-d" "docker.io/dormeur/monkey-ci:latest" "-f" "docker/Dockerfile" "-c" "."]
+   ;; TODO Use branches and tags to determine the tag
+   :container/cmd ["-d" (str "docker.io/dormeur/monkey-ci:" (img-tag)) "-f" "docker/Dockerfile" "-c" "."]
    ;; Credentials, must be mounted to /kaniko/.docker/config.json
    :container/mounts [[(str docker-config) "/kaniko/.docker/config.json"]]})
 

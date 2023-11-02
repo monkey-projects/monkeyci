@@ -4,10 +4,10 @@
             [monkey.ci.git :as sut]))
 
 (deftest clone
-  (testing "invokes `git-clone`"
+  (testing "invokes `git-clone` without checking out"
     (with-redefs [git/git-clone (fn [& args]
                                   args)]
-      (is (= ["http://url" :branch "master" :dir "tmp"]
+      (is (= ["http://url" :branch "master" :dir "tmp" :no-checkout? true]
              (sut/clone "http://url" "master" "tmp"))))))
 
 (deftest checkout

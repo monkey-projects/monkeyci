@@ -1,6 +1,7 @@
 (ns monkey.ci.spec
   (:require [clojure.spec.alpha :as s]
-            [clojure.core.async.impl.protocols :as ap]))
+            [clojure.core.async.impl.protocols :as ap]
+            [monkey.oci.sign :as oci-sign]))
 
 ;; Unfortunately, there seems to be no clean way to determine
 ;; if something is a channel apart from accessing impl details.
@@ -44,9 +45,23 @@
 ;; Storage configuration
 (s/def :storage/type #{:memory :file :oci})
 (s/def :storage/dir string?)
-(s/def :storage/bucket string?)
-(s/def :conf/storage (s/keys :req-un [:storage/type]
-                             :opt-un [:storage/dir :storage/bucket]))
+(s/def :oci/bucket-name string?)
+(s/def :oci/credentials (s/merge ::oci-sign/config))
+(s/def :oci/region string?)
+
+(defmulti storage-type :type)
+
+(defmethod storage-type :memory [_]
+  (s/keys :req-un [:storage/type]))
+
+(defmethod storage-type :file [_]
+  (s/keys :req-un [:storage/type :storage/dir]))
+
+(defmethod storage-type :oci [_]
+  (s/keys :req-un [:storage/type :oci/bucket-name :oci/region]
+          :opt-un [:oci/credentials]))
+
+(s/def :conf/storage (s/multi-spec storage-type :type))
 
 (s/def :conf/log-dir string?)
 (s/def :conf/work-dir string?)
