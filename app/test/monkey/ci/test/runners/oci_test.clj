@@ -18,7 +18,8 @@
         (is (some? (:container-instance (first @calls))))))))
 
 (deftest instance-config
-  (let [ctx {:build {:build-id "test-build-id"}}
+  (let [ctx {:build {:build-id "test-build-id"
+                     :sid ["a" "b" "c" "test-build-id"]}}
         conf {:availability-domain "test-ad"
               :compartment-id "test-compartment"
               :image-pull-secrets "test-secrets"
@@ -51,8 +52,25 @@
               :volume-type "EMPTYDIR"}
              (first (:volumes inst)))))
 
-    (testing "configures container"
-      (is (= 1 (count (:containers inst))))
+    (testing "container"
+      (is (= 1 (count (:containers inst))) "there should be exactly one")
+      
       (let [c (first (:containers inst))]
-        (is (re-matches #"test-image:.+" (:image-url c)))
-        (is (string? (:display-name c)))))))
+        
+        (testing "uses configured image"
+          (is (re-matches #"test-image:.+" (:image-url c))))
+        
+        (testing "configures basic properties"
+          (is (string? (:display-name c))))
+
+        (testing "provides arguments as to monkeyci build"
+          (is (= ["-w" "/opt/monkeyci/checkout"
+                  "build"
+                  "--sid" "a/b/c/test-build-id"]
+                 (:arguments c))))
+
+        (testing "mounts checkout dir"
+          (is (= [{:mount-path "/opt/monkeyci/checkout"
+                   :is-read-only false
+                   :volume-name "checkout"}]
+                 (:volume-mounts c))))))))
