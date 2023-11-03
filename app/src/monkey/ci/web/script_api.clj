@@ -104,6 +104,7 @@
   [{:keys [storage] :as ctx}]
   (let [build-sid (get-in ctx [:build :sid])
         handlers {:get-params (fn []
+                                (log/debug "Fetching all build params for sid" build-sid)
                                 (->> (api/fetch-all-params storage (butlast build-sid))
                                      (map (juxt :name :value))
                                      (into {})))}]

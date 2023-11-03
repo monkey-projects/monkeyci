@@ -26,6 +26,9 @@
            :type :string}
           {:as "Commit id"
            :option "commit-id"
+           :type :string}
+          {:as "Repository sid"
+           :option "sid"
            :type :string}]
    :runs {:command cmd/build}})
 

@@ -21,6 +21,13 @@
                    :runner :build}
                   (sut/build)))))
 
+  (testing "adds build sid to build config"
+    (let [{:keys [sid build-id]} (-> {:args {:sid "a/b/c"}
+                                      :runner :build}
+                                     (sut/build))]
+      (is (= build-id (last sid)))
+      (is (= ["a" "b" "c"] (take 3 sid)))))
+
   (testing "accumulates build results from events"
     (let [registered (atom [])]
       (with-redefs [e/register-handler (fn [_ t _]

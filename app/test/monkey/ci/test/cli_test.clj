@@ -62,7 +62,11 @@
           (is (= "test-file" (-> (run-cli "-c" "test-file" "build")
                                  (get-in [:args :config-file]))))
           (is (= "test-file" (-> (run-cli "--config-file" "test-file" "build")
-                                 (get-in [:args :config-file]))))))
+                                 (get-in [:args :config-file])))))
+
+        (testing "accepts build sid"
+          (is (= "test-sid" (-> (run-cli "build" "--sid" "test-sid")
+                                (get-in [:args :sid]))))))
 
       (testing "`server` command"
         (testing "runs `server` command"
