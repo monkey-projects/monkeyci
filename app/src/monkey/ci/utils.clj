@@ -1,5 +1,6 @@
 (ns monkey.ci.utils
   (:require [buddy.core.keys.pem :as pem]
+            [clojure.core.async :as ca]
             [clojure.java.io :as io])
   (:import org.apache.commons.io.FileUtils))
 
@@ -68,3 +69,18 @@
   [f]
   (with-open [r (io/reader f)]
     (pem/read-privkey r nil)))
+
+(defn future->ch
+  "Returns a channel that will hold the future value.  The future value
+   cannot be `nil` as this value cannot be sent to a channel.  If `interval`
+   is not specified, 100 milliseconds is used between checks."
+  [f & [interval]]
+  (let [poll (fn []
+               (when (future-done? f)
+                 @f))]
+    (ca/go-loop [v (poll)]
+      (if v
+        v
+        (do
+          (ca/<! (ca/timeout (or interval 100)))
+          (recur (poll)))))))

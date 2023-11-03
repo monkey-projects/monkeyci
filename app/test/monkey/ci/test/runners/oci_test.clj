@@ -1,7 +1,9 @@
 (ns monkey.ci.test.runners.oci-test
   (:require [clojure.test :refer [deftest testing is]]
+            [clojure.core.async :as ca]
             [monkey.ci.runners :as r]
             [monkey.ci.runners.oci :as sut]
+            [monkey.ci.test.helpers :as h]
             [monkey.oci.container-instance.core :as ci]))
 
 (deftest make-runner
@@ -12,10 +14,47 @@
   (testing "creates container instance"
     (let [calls (atom [])]
       (with-redefs [ci/create-container-instance (fn [_ opts]
-                                                   (swap! calls conj opts))]
+                                                   (swap! calls conj opts)
+                                                   {:status 500})]
         (is (some? (sut/oci-runner {} {} {})))
         (is (pos? (count @calls)))
-        (is (some? (:container-instance (first @calls))))))))
+        (is (some? (:container-instance (first @calls)))))))
+
+  (testing "when created succesfully, starts the instance"
+    (let [calls (atom [])]
+      (with-redefs [ci/create-container-instance (constantly {:status 200
+                                                              :body
+                                                              {:id "test-instance"}})
+                    ci/start-container-instance (fn [_ opts]
+                                                  (swap! calls conj opts)
+                                                  {:status 500})]
+        (is (some? (sut/oci-runner {} {} {})))
+        (is (pos? (count @calls)))
+        (is (= {:instance-id "test-instance"} (first @calls))))))
+
+  (testing "when creation fails, does not start the instance"
+    (let [calls (atom [])]
+      (with-redefs [ci/create-container-instance (constantly {:status 400
+                                                              :body
+                                                              {:message "test error"}})
+                    ci/start-container-instance (fn [_ opts]
+                                                  (swap! calls conj opts)
+                                                  nil)]
+        (is (some? (sut/oci-runner {} {} {})))
+        (is (zero? (count @calls))))))
+
+  (testing "when started, polls state"
+    (let [calls (atom [])]
+      (with-redefs [ci/create-container-instance (constantly {:status 200
+                                                              :body
+                                                              {:id "test-instance"}})
+                    ci/start-container-instance (fn [_ opts]
+                                                  {:status 202})
+                    sut/wait-for-completion (fn [_ opts]
+                                              (swap! calls conj opts)
+                                              nil)]
+        (is (some? (sut/oci-runner {} {} {})))
+        (is (pos? (count @calls)))))))
 
 (deftest instance-config
   (let [ctx {:build {:build-id "test-build-id"
@@ -74,3 +113,37 @@
                    :is-read-only false
                    :volume-name "checkout"}]
                  (:volume-mounts c))))))))
+
+(deftest wait-for-completion
+  (testing "returns channel that holds zero on successful completion"
+    (let [ch (sut/wait-for-completion :test-client
+                                      {:get-details (fn [_ args]
+                                                      (future
+                                                        {:status 200
+                                                         :body
+                                                         {:lifecycle-state "INACTIVE"}}))})]
+      (is (some? ch))
+      (is (= 0 (h/try-take ch 200 :timeout)))))
+
+  (testing "loops until a final state is encountered"
+    (let [results (->> ["CREATING" "ACTIVE" "INACTIVE"]
+                       (ca/to-chan!)
+                       vector
+                       (ca/map (fn [s]
+                                 {:status 200
+                                  :body {:lifecycle-state s}})))
+          ch (sut/wait-for-completion :test-client
+                                      {:get-details (fn [& _]
+                                                      (future (ca/<!! results)))
+                                       :poll-interval 100})]
+      (is (= 0 (h/try-take ch 1000 :timeout)))))
+
+  (testing "returns nonzero on error"
+    (let [ch (sut/wait-for-completion :test-client
+                                      {:get-details (fn [_ args]
+                                                      (future
+                                                        {:status 200
+                                                         :body
+                                                         {:lifecycle-state "FAILED"}}))})]
+      (is (some? ch))
+      (is (pos? (h/try-take ch 200 :timeout))))))

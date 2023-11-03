@@ -26,3 +26,13 @@
       (is (nil? (spit (io/file dir "test.txt") "some test")))
       (is (nil? (sut/delete-dir dir)))
       (is (false? (.exists (io/file dir)))))))
+
+(deftest future->ch
+  (testing "returns a channel that holds the future value"
+    (let [p (promise)
+          f (future @p)
+          c (sut/future->ch f)
+          take #(h/try-take c 200 :timeout)]
+      (is (= :timeout (take)))
+      (is (some? (deliver p :test-value)))
+      (is (= :test-value (take))))))

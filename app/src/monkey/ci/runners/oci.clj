@@ -1,9 +1,12 @@
 (ns monkey.ci.runners.oci
-  (:require [clojure.string :as cs]
+  (:require [clojure.core.async :as ca :refer [<!]]
+            [clojure.string :as cs]
+            [clojure.tools.logging :as log]
             [manifold.deferred :as md]
             [monkey.ci
              [config :as config]
-             [runners :as r]]
+             [runners :as r]
+             [utils :as u]]
             [monkey.oci.container-instance.core :as ci]))
 
 (def checkout-vol "checkout")
@@ -36,12 +39,56 @@
                         :volume-type "EMPTYDIR"}]
              :containers [(container-config conf ctx)])))
 
+(defn wait-for-completion
+  "Starts an async poll loop that waits until the container instance has completed."
+  [client {:keys [get-details poll-interval] :as c :or {poll-interval 1000}}]
+  (let [get-async (fn []
+                    (u/future->ch (get-details client (select-keys c [:instance-id]))))
+        done? #{"INACTIVE" "DELETED" "FAILED"}]
+    (ca/go-loop [state nil
+                 p (get-async)]
+      (let [r (<! p) ; Wait until the info has arrived
+            new-state (get-in r [:body :lifecycle-state])]
+        (when (not= state new-state)
+          (log/debug "State change:" state "->" new-state))
+        (if (done? new-state)
+          (if (= "INACTIVE" new-state) 0 1)
+          (do
+            ;; Wait and re-check
+            (<! (ca/timeout poll-interval))
+            (recur new-state (get-async))))))))
+
 (defn oci-runner [client conf ctx]
-  @(md/chain
-    (ci/create-container-instance
-     client
-     {:container-instance (instance-config conf ctx)})
-    (constantly 0)))
+  (letfn [(check-error [handler]
+            (fn [{:keys [body status]}]
+              (when status
+                (if (>= status 400)
+                  (log/warn "Got an error response, status" status "with message" (:message body))
+                  (handler body)))))
+          
+          (create-instance []
+            (ci/create-container-instance
+             client
+             {:container-instance (instance-config conf ctx)}))
+          
+          (start-instance [{:keys [id]}]
+            (log/info "Container instance" id "created, starting it")
+            (md/chain
+             (ci/start-container-instance client {:instance-id id})
+             #(assoc-in % [:body :instance-id] id)))
+
+          (start-polling [args]
+            (wait-for-completion client args))
+
+          (return-result [ch]
+            ;; Either return the incoming channel, or nonzero in case of error
+            (or ch (ca/to-chan! [1])))]
+    
+    @(md/chain
+      (create-instance)
+      (check-error start-instance)
+      (check-error start-polling)
+      return-result)))
 
 (defmethod r/make-runner :oci [conf]
   (let [client (ci/make-context (config/->oci-config conf))]
