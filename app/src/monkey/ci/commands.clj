@@ -2,7 +2,9 @@
   "Event handlers for commands"
   (:require [clojure.tools.logging :as log]
             [clojure.core.async :as ca]
-            [clojure.edn :as edn]
+            [clojure
+             [edn :as edn]
+             [string :as cs]]
             [monkey.ci
              [events :as e]
              [utils :as u]]
@@ -16,16 +18,23 @@
                                      :branch (or branch "main")
                                      :id commit-id})))
 
+(defn- parse-sid [s]
+  (when s
+    (cs/split s #"/")))
+
 (defn prepare-build-ctx
   "Updates the context for the build runner, by adding a `build` object"
   [{:keys [work-dir] :as ctx}]
-  (-> ctx
-      ;; Prepare the build properties
-      (assoc :build {:build-id (u/new-build-id)
-                     :checkout-dir work-dir
-                     :script-dir (u/abs-path work-dir (get-in ctx [:args :dir]))
-                     :pipeline (get-in ctx [:args :pipeline])})
-      (maybe-set-git-opts)))
+  (let [id (u/new-build-id)]
+    (-> ctx
+        ;; Prepare the build properties
+        (assoc :build {:build-id id
+                       :checkout-dir work-dir
+                       :script-dir (u/abs-path work-dir (get-in ctx [:args :dir]))
+                       :pipeline (get-in ctx [:args :pipeline])
+                       :sid (some-> (parse-sid (get-in ctx [:args :sid]))
+                                    (conj id))})
+        (maybe-set-git-opts))))
 
 (defn- print-result [state]
   (log/info "Build summary:")

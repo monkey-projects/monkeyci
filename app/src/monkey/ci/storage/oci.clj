@@ -5,10 +5,9 @@
              [string :as cs]]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
-            [medley.core :as mc]
             [monkey.ci
-             [storage :as st]
-             [utils :as u]]
+             [config :as config]
+             [storage :as st]]
             [monkey.oci.os.core :as os]))
 
 (def get-ns (memoize (fn [client]
@@ -72,7 +71,5 @@
     (throw (ex-info "Region must be specified" conf)))
   (->OciObjectStorage (os/make-client conf) conf))
 
-(defmethod st/make-storage :oci [{:keys [credentials] :as conf}]
-  (make-oci-storage (-> conf
-                        (merge (mc/update-existing credentials :private-key u/load-privkey))
-                        (dissoc :credentials))))
+(defmethod st/make-storage :oci [conf]
+  (make-oci-storage (config/->oci-config conf)))

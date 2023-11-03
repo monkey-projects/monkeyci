@@ -77,6 +77,7 @@
 
   clojure.lang.IPersistentMap
   (run-step [{:keys [action] :as step} ctx]
+    (log/debug "Running step:" step)
     ;; TODO Make more generic
     (cond
       (some? (:container/image step))
