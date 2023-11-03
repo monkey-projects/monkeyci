@@ -29,7 +29,6 @@
   `(or (System/getenv (csk/->SCREAMING_SNAKE_CASE (str env-prefix "-version"))) "0.1.0-SNAPSHOT"))
 
 (defn- merge-if-map [a b]
-  (log/info "Merging" a "and" b)
   (if (map? a)
     (merge a b)
     b))
@@ -194,3 +193,11 @@
        (flatten-nested [])
        (mc/map-keys (fn [k]
                       (keyword (str env-prefix "-" (name k)))))))
+
+(defn ->oci-config
+  "Given a configuration map with credentials, turns it into a config map
+   that can be passed to OCI context creators."
+  [{:keys [credentials] :as conf}]
+  (-> conf
+      (merge (mc/update-existing credentials :private-key u/load-privkey))
+      (dissoc :credentials)))

@@ -63,7 +63,7 @@
          (vector)
          (ca/map build-completed))))
 
-(defn- download-git
+(defn download-git
   "Downloads from git into a temp dir, and designates that as the working dir."
   [ctx]
   (let [git (get-in ctx [:git :fn])
