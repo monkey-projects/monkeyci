@@ -20,41 +20,27 @@
         (is (pos? (count @calls)))
         (is (some? (:container-instance (first @calls)))))))
 
-  (testing "when created succesfully, starts the instance"
-    (let [calls (atom [])]
-      (with-redefs [ci/create-container-instance (constantly {:status 200
-                                                              :body
-                                                              {:id "test-instance"}})
-                    ci/start-container-instance (fn [_ opts]
-                                                  (swap! calls conj opts)
-                                                  {:status 500})]
-        (is (some? (sut/oci-runner {} {} {})))
-        (is (pos? (count @calls)))
-        (is (= {:instance-id "test-instance"} (first @calls))))))
-
-  (testing "when creation fails, does not start the instance"
-    (let [calls (atom [])]
-      (with-redefs [ci/create-container-instance (constantly {:status 400
-                                                              :body
-                                                              {:message "test error"}})
-                    ci/start-container-instance (fn [_ opts]
-                                                  (swap! calls conj opts)
-                                                  nil)]
-        (is (some? (sut/oci-runner {} {} {})))
-        (is (zero? (count @calls))))))
-
   (testing "when started, polls state"
     (let [calls (atom [])]
       (with-redefs [ci/create-container-instance (constantly {:status 200
                                                               :body
                                                               {:id "test-instance"}})
-                    ci/start-container-instance (fn [_ opts]
-                                                  {:status 202})
                     sut/wait-for-completion (fn [_ opts]
                                               (swap! calls conj opts)
                                               nil)]
         (is (some? (sut/oci-runner {} {} {})))
-        (is (pos? (count @calls)))))))
+        (is (pos? (count @calls))))))
+
+  (testing "when creation fails, does not poll state"
+    (let [calls (atom [])]
+      (with-redefs [ci/create-container-instance (constantly {:status 400
+                                                              :body
+                                                              {:message "test error"}})
+                    ci/get-container-instance (fn [_ opts]
+                                                (swap! calls conj opts)
+                                                nil)]
+        (is (some? (sut/oci-runner {} {} {})))
+        (is (zero? (count @calls)))))))
 
 (deftest instance-config
   (let [ctx {:build {:build-id "test-build-id"

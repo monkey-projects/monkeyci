@@ -76,7 +76,7 @@
    is not specified, 100 milliseconds is used between checks."
   [f & [interval]]
   (let [poll (fn []
-               (when (future-done? f)
+               (when (realized? f)
                  @f))]
     (ca/go-loop [v (poll)]
       (if v

@@ -14,6 +14,8 @@
              [storage :as s]
              [utils :as u]]
             [monkey.ci.storage.oci]
+            [monkey.ci.runners.oci :as oci]
+            [monkey.oci.container-instance.core :as ci]
             #_[monkey.ci.test.examples-test :as et]
             [buddy.core
              [codecs :as codecs]
@@ -130,3 +132,17 @@
   (let [f (io/file dir)]
     (log/info "Migrating storage from" (.getCanonicalPath f))
     (migrate-dir f [] st)))
+
+(defn run-test-container []
+  (let [conf (-> (load-config "oci-config.edn")
+                 :runner
+                 (config/->oci-config))
+        ctx {:build {:build-id "test-build"}}
+        client (ci/make-context conf)
+        ic (-> (oci/instance-config conf ctx)
+               (assoc :containers [{:image-url "debian:latest"
+                                    :display-name "test"
+                                    :arguments ["echo" "hello"]}])
+               (dissoc :volumes :image-pull-secrets))]
+    (log/info "Running instance with config:" ic)
+    (oci/run-instance client ic)))

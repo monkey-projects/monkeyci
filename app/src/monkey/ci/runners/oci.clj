@@ -41,7 +41,7 @@
 
 (defn wait-for-completion
   "Starts an async poll loop that waits until the container instance has completed."
-  [client {:keys [get-details poll-interval] :as c :or {poll-interval 1000}}]
+  [client {:keys [get-details poll-interval] :as c :or {poll-interval 5000}}]
   (let [get-async (fn []
                     (u/future->ch (get-details client (select-keys c [:instance-id]))))
         done? #{"INACTIVE" "DELETED" "FAILED"}]
@@ -58,7 +58,10 @@
             (<! (ca/timeout poll-interval))
             (recur new-state (get-async))))))))
 
-(defn oci-runner [client conf ctx]
+(defn run-instance
+  "Creates and starts a container instance using the given config, and then
+   waits for it to terminate.  Returns a channel that will hold the exit value."
+  [client instance-config]
   (letfn [(check-error [handler]
             (fn [{:keys [body status]}]
               (when status
@@ -69,16 +72,11 @@
           (create-instance []
             (ci/create-container-instance
              client
-             {:container-instance (instance-config conf ctx)}))
+             {:container-instance instance-config}))
           
-          (start-instance [{:keys [id]}]
-            (log/info "Container instance" id "created, starting it")
-            (md/chain
-             (ci/start-container-instance client {:instance-id id})
-             #(assoc-in % [:body :instance-id] id)))
-
-          (start-polling [args]
-            (wait-for-completion client args))
+          (start-polling [{:keys [id]}]
+            (wait-for-completion client {:instance-id id
+                                         :get-details ci/get-container-instance}))
 
           (return-result [ch]
             ;; Either return the incoming channel, or nonzero in case of error
@@ -86,9 +84,12 @@
     
     @(md/chain
       (create-instance)
-      (check-error start-instance)
+      #_(check-error start-instance)
       (check-error start-polling)
       return-result)))
+
+(defn oci-runner [client conf ctx]
+  (run-instance client (instance-config conf ctx)))
 
 (defmethod r/make-runner :oci [conf]
   (let [client (ci/make-context (config/->oci-config conf))]
