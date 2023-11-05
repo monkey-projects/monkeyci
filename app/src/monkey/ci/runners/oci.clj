@@ -75,6 +75,7 @@
              {:container-instance instance-config}))
           
           (start-polling [{:keys [id]}]
+            ;; TODO Replace this with OCI events as soon as they become available
             (wait-for-completion client {:instance-id id
                                          :get-details ci/get-container-instance}))
 
@@ -84,7 +85,6 @@
     
     @(md/chain
       (create-instance)
-      #_(check-error start-instance)
       (check-error start-polling)
       return-result)))
 

@@ -86,7 +86,7 @@
           conf {:git {:url (if private ssh-url clone-url)
                       :branch master-branch
                       :id commit-id}
-                :sid (s/build-sid md) ; Build storage id
+                :sid (s/ext-build-sid md) ; Build storage id
                 :build-id build-id}]
       (when (s/create-build-metadata st md)
         {:type :webhook/validated

@@ -13,17 +13,22 @@
 (def get-ns (memoize (fn [client]
                        @(os/get-namespace client {}))))
 
+(def ext ".edn")
 (def ->edn pr-str)
 (def parse-edn edn/read-string)
+(def delim "/")
 
 (defn make-path [sid]
-  (cs/join "/" (concat (butlast sid) [(str (last sid) ".edn")])))
+  (cs/join delim (concat (butlast sid) [(str (last sid) ext)])))
 
-(defn- object-args [client conf sid]
+(defn- basic-args [client conf]
   (-> conf
       (select-keys [:compartment-id :bucket-name])
-      (assoc :ns (get-ns client)
-             :object-name (make-path sid))))
+      (assoc :ns (get-ns client))))
+
+(defn- object-args [client conf sid]
+  (assoc (basic-args client conf)
+         :object-name (make-path sid)))
 
 (def stream? (partial instance? java.io.InputStream))
 
@@ -33,6 +38,13 @@
     (if (string? s) 
       (parse-edn s)
       x)))
+
+(defn- strip-ext [s]
+  (cond-> s
+    (cs/ends-with? s ext) (subs 0 (- (count s) (count ext)))))
+
+(defn- strip-prefix [prefix s]
+  (subs s (count prefix)))
 
 (deftype OciObjectStorage [client conf]
   st/Storage
@@ -61,7 +73,23 @@
          (md/catch (constantly false))))
   
   (obj-exists? [_ sid]
-    @(os/head-object client (object-args client conf sid))))
+    @(os/head-object client (object-args client conf sid)))
+
+  (list-obj [_ sid]
+    (let [prefix (str (cs/join delim sid) delim)]
+      @(md/chain
+        ;; TODO Pagination in case of large resultset
+        (os/list-objects client (-> (basic-args client conf)
+                                    (assoc :prefix prefix
+                                           :delimiter delim)))
+        (fn [{:keys [objects prefixes]}]
+          (concat (map (comp strip-ext
+                             (partial strip-prefix prefix)
+                             :name)
+                       objects)
+                  (map (comp #(subs % 0 (dec (count %)))
+                             (partial strip-prefix prefix))
+                       prefixes)))))))
 
 (defn make-oci-storage
   "Creates storage object for OCI buckets, using the configuration specified.

@@ -36,3 +36,8 @@
       (is (= :timeout (take)))
       (is (some? (deliver p :test-value)))
       (is (= :test-value (take))))))
+
+(deftest load-privkey
+  (testing "returns input if it's already a private key"
+    (let [k (reify java.security.PrivateKey)]
+      (is (= k (sut/load-privkey k))))))

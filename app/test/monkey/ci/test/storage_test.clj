@@ -26,6 +26,13 @@
         (is (sut/sid? (sut/create-build-metadata st md)))
         (is (= md (sut/find-build-metadata st md)))))))
 
+(deftest build-sid
+  (testing "starts with builds"
+    (is (= "builds" (first (sut/build-sid {:customer-id "cust"
+                                           :project-id "proj"
+                                           :repo-id "repo"
+                                           :build-id "test-build"}))))))
+
 (deftest build-results
   (testing "can create and find"
     (h/with-memory-store st
@@ -90,3 +97,19 @@
         (is (= {:exit 0
                 :result :success}
                (sut/find-build-results st sid)))))))
+
+(deftest list-builds
+  (testing "lists all builds for given repo"
+    (h/with-memory-store st
+      (let [repo-sid ["test-customer" "test-project" "test-repo"]
+            builds (->> (range)
+                        (map (partial format "build-%d"))
+                        (take 2))]
+        (doseq [b builds]
+          (let [sid (conj repo-sid b)]
+            (is (sut/sid? (sut/create-build-metadata
+                           st
+                           (zipmap [:customer-id :project-id :repo-id :build-id] sid))))))
+        (let [l (sut/list-builds st repo-sid)]
+          (is (= (count builds) (count l)))
+          (is (= builds l)))))))

@@ -67,8 +67,10 @@
 (defn load-privkey
   "Load private key from file"
   [f]
-  (with-open [r (io/reader f)]
-    (pem/read-privkey r nil)))
+  (if (instance? java.security.PrivateKey f)
+    f
+    (with-open [r (io/reader f)]
+      (pem/read-privkey r nil))))
 
 (defn future->ch
   "Returns a channel that will hold the future value.  The future value

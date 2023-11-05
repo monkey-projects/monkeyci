@@ -14,7 +14,8 @@
   (read-obj [this sid] "Read object at given location")
   (write-obj [this sid obj] "Writes object to location")
   (delete-obj [this sid] "Deletes object at location")
-  (obj-exists? [this sid] "Checks if object at location exists"))
+  (obj-exists? [this sid] "Checks if object at location exists")
+  (list-obj [this sid] "Lists objects at given location"))
 
 (def sid? vector?)
 
@@ -37,7 +38,10 @@
     (some? (get-in @store loc)))
 
   (delete-obj [_ loc]
-    (swap! store mc/dissoc-in loc)))
+    (swap! store mc/dissoc-in loc))
+
+  (list-obj [_ loc]
+    (keys (get-in @store loc))))
 
 (defn make-memory-storage []
   (->MemoryStorage (atom {})))
@@ -100,9 +104,10 @@
 
 (def builds "builds")
 (def build-sid-keys [:customer-id :project-id :repo-id :build-id])
-(def build-sid (comp vec
-                     (partial concat [builds])
-                     (apply juxt build-sid-keys)))
+;; Build sid, for external representation
+(def ext-build-sid (apply juxt build-sid-keys))
+(def build-sid (comp (partial into [builds])
+                     ext-build-sid))
 
 (defn- build-sub-sid [obj p]
   (conj (build-sid obj) p))
@@ -112,7 +117,7 @@
   [f]
   (fn [c]
     (if (sid? c)
-      (conj c f)
+      (vec (concat [builds] c [f]))
       (build-sub-sid c f))))
 
 (def build-metadata-sid (sub-sid-builder "metadata"))
@@ -136,6 +141,11 @@
   "Reads the build results given the build coordinates"
   [s sid]
   (read-obj s (build-results-sid sid)))
+
+(defn list-builds
+  "Lists the ids of the builds for given repo sid"
+  [s sid]
+  (list-obj s (concat ["builds"] sid)))
 
 (defn params-sid [sid]
   ;; Prepend params prefix, but also store at "params" leaf
