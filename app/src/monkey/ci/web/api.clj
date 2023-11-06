@@ -87,10 +87,11 @@
 (def create-webhook (comp (entity-creator st/save-webhook-details)
                           assign-webhook-secret))
 
+(def repo-sid (comp (juxt :customer-id :project-id :repo-id)
+                    :path
+                    :parameters))
 (def params-sid (comp (partial remove nil?)
-                      (juxt :customer-id :project-id :repo-id)
-                      :path
-                      :parameters))
+                      repo-sid))
 
 (defn fetch-all-params
   "Fetches all params for the given sid from storage, adding all those from
@@ -121,6 +122,20 @@
   (let [p (body req)]
     (when (st/save-params (c/req->storage req) (params-sid req) p)
       (rur/response p))))
+
+(defn get-builds [req]
+  (let [s (c/req->storage req)
+        sid (repo-sid req)
+        builds (st/list-builds s sid)
+        fetch-details (fn [id]
+                        ;; TODO This could potentially be slow for many builds
+                        (let [bsid (st/->sid (concat sid [id]))
+                              r (st/find-build-results s bsid)
+                              md (st/find-build-metadata s bsid)]
+                          (merge {:id id} md r)))]
+    (->> builds
+         (map fetch-details)
+         (rur/response))))
 
 (def allowed-events
   #{:script/start

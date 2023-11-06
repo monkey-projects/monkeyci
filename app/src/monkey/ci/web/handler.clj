@@ -90,6 +90,9 @@
              :put {:handler api/update-params
                    :parameters {:body Parameters}}}])
 
+(def build-routes
+  ["/builds" {:get {:handler api/get-builds}}])
+
 (def repo-routes
   ["/repo"
    (generic-routes
@@ -99,7 +102,8 @@
      :new-schema NewRepo
      :update-schema UpdateRepo
      :id-key :repo-id
-     :child-routes [parameter-routes]})])
+     :child-routes [parameter-routes
+                    build-routes]})])
 
 (def project-routes
   ["/project"
@@ -193,4 +197,3 @@
   (when s
     (log/info "Shutting down HTTP server...")
     (http/server-stop! s)))
-

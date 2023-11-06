@@ -18,6 +18,7 @@
   (list-obj [this sid] "Lists objects at given location"))
 
 (def sid? vector?)
+(def ->sid vec)
 
 (def new-id
   "Generates a new random id"
