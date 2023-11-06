@@ -119,7 +119,31 @@
                 :work-dir "work-dir"}
                (sut/prepare-build-ctx)
                :build
-               :script-dir)))))
+               :script-dir))))
+
+  (testing "when sid specified"
+    (testing "parses on delimiter"
+      (is (= ["a" "b" "c"]
+             (->> {:args {:sid "a/b/c"}}
+                  (sut/prepare-build-ctx)
+                  :build
+                  :sid
+                  (take 3)))))
+    
+    (testing "adds build id"
+      (is (string? (-> {:args {:sid "a/b/c"}}
+                       (sut/prepare-build-ctx)
+                       :build
+                       :sid
+                       last))))
+
+    (testing "when sid includes build id, reuses it"
+      (let [sid "a/b/c/d"
+            ctx (-> {:args {:sid sid}}
+                    (sut/prepare-build-ctx)
+                    :build)]
+        (is (= "d" (:build-id ctx)))
+        (is (= "d" (last (:sid ctx))))))))
 
 (deftest http-server
   (testing "returns a channel"
