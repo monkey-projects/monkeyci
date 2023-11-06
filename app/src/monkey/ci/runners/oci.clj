@@ -15,11 +15,16 @@
   (cs/join "/" sid))
 
 (defn- container-config [conf ctx]
-  (let [checkout "/opt/monkeyci/checkout"]
+  (let [checkout "/opt/monkeyci/checkout"
+        git (get-in ctx [:build :git])]
     {:display-name "build"
      ;; The image url must point to a container running monkeyci cli
      :image-url (str (:image-url conf) ":" (config/version))
-     :arguments ["-w" checkout "build" "--sid" (format-sid (get-in ctx [:build :sid]))]
+     :arguments (cond-> ["-w" checkout "build"
+                         "--sid" (format-sid (get-in ctx [:build :sid]))]
+                  (not-empty git) (concat ["-u" (:url git)
+                                           "-b" (:branch git)
+                                           "--commit-id" (:id git)]))
      :volume-mounts [{:mount-path checkout
                       :is-read-only false
                       :volume-name checkout-vol}]}))
