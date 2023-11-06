@@ -140,9 +140,15 @@
         ctx {:build {:build-id "test-build"}}
         client (ci/make-context conf)
         ic (-> (oci/instance-config conf ctx)
-               (assoc :containers [{:image-url "debian:latest"
+               (assoc :containers [{:image-url "fra.ocir.io/frjdhmocn5qi/monkeyci:0.1.0"
                                     :display-name "test"
-                                    :arguments ["echo" "hello"]}])
-               (dissoc :volumes :image-pull-secrets))]
+                                    :arguments ["-h"]}])
+               (dissoc :volumes))]
     (log/info "Running instance with config:" ic)
     (oci/run-instance client ic)))
+
+(defn make-storage [conf]
+  (-> conf
+      (load-config)
+      :storage
+      (s/make-storage)))

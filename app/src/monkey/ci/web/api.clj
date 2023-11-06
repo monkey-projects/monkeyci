@@ -102,7 +102,7 @@
          (if (empty? sid)
            acc
            (recur (drop-last sid)
-                  (concat acc (st/find-params st sid)))))
+                  (concat acc (st/find-params st (st/->sid sid))))))
        (group-by :name)
        (vals)
        (map first)))

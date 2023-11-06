@@ -77,7 +77,8 @@
 
     (testing "adds work volume"
       (is (= {:name "checkout"
-              :volume-type "EMPTYDIR"}
+              :volume-type "EMPTYDIR"
+              :backing-store "EPHEMERAL_STORAGE"}
              (first (:volumes inst)))))
 
     (testing "container"
