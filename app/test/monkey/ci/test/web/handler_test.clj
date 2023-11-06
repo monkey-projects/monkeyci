@@ -4,6 +4,7 @@
              [mac :as mac]]
             [clojure.test :refer [deftest testing is]]
             [clojure.core.async :as ca]
+            [clojure.string :as cs]
             [monkey.ci
              [events :as events]
              [storage :as st]]
@@ -214,7 +215,31 @@
      "/customer/:customer-id/project/:project-id/repo/:repo-id"
      (->> (repeatedly st/new-id)
           (interleave ["/customer/" "/project/" "/repo/"])
-          (apply str)))))
+          (apply str))))
+
+  (testing "can list repo builds"
+    (h/with-memory-store st
+      (let [app (make-test-app st)
+            [customer-id project-id repo-id build-id :as sid] (->> (repeatedly st/new-id)
+                                                                   (take 4)
+                                                                   (st/->sid))]
+        (is (st/sid? (st/create-build-results st sid {:exit 0 :status :success})))
+        (is (st/sid? (st/create-build-metadata st sid {:message "test meta"})))
+        (let [path (str (->> sid
+                             (drop-last)
+                             (interleave ["/customer" "project" "repo"])
+                             (cs/join "/"))
+                        "/builds")
+              l (-> (mock/request :get path)
+                    (app))]
+          (is (= 200 (:status l)))
+          (let [b (-> l
+                       :body
+                       slurp
+                       h/parse-json)]
+            (is (= 1 (count b)))
+            (is (= build-id (:id (first b))) "should contain build id")
+            (is (= "test meta" (:message (first b))) "should contain build metadata")))))))
 
 (deftest event-stream
   (testing "'GET /events' exists"

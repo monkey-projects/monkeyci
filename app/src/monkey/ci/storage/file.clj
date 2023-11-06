@@ -1,6 +1,8 @@
 (ns monkey.ci.storage.file
   "File storage implementation.  Useful for local or develop runs."
-  (:require [clojure.edn :as edn]
+  (:require [clojure
+             [edn :as edn]
+             [string :as cs]]
             [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [monkey.ci
@@ -20,6 +22,13 @@
 
 (defn- ->file [dir sid]
   (apply io/file dir (concat (butlast sid) [(str (last sid) ext)])))
+
+(defn- name-without-ext [f]
+  (let [n (.getName f)]
+    (if (.isFile f)
+      (cond-> n
+        (cs/ends-with? n ext) (subs 0 (- (count n) (count ext))))
+      n)))
 
 ;; Must be a type, not a record, otherwise it gets lost in reitit data processing
 (deftype FileStorage [dir]
@@ -41,7 +50,12 @@
     (.exists (->file dir loc)))
 
   (delete-obj [_ loc]
-    (.delete (->file dir loc))))
+    (.delete (->file dir loc)))
+
+  (list-obj [_ loc]
+    (->> (.listFiles (apply io/file dir loc))
+         (seq)
+         (map name-without-ext))))
 
 (defn make-file-storage [dir]
   (log/debug "File storage location:" dir)

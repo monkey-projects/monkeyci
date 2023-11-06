@@ -51,4 +51,21 @@
     (testing "false if file does not exist"
       (h/with-tmp-dir dir 
         (is (false? (-> (sut/make-file-storage dir)
-                        (st/delete-obj ["test-loc"]))))))))
+                        (st/delete-obj ["test-loc"])))))))
+
+  (testing "list-obj"
+    (testing "lists directories at location"
+      (h/with-tmp-dir dir
+        (let [s (sut/make-file-storage dir)
+              sid ["root" "a" "b"]
+              obj {:key "value"}]
+          (is (= sid (st/write-obj s sid obj)))
+          (is (= ["a"] (st/list-obj s ["root"]))))))
+    
+    (testing "lists files at location without extension"
+      (h/with-tmp-dir dir
+        (let [s (sut/make-file-storage dir)
+              sid ["root" "child"]
+              obj {:key "value"}]
+          (is (= sid (st/write-obj s sid obj)))
+          (is (= ["child"] (st/list-obj s ["root"]))))))))

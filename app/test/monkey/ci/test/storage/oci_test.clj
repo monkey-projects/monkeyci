@@ -63,7 +63,30 @@
       (testing "false when delete fails"
         (with-redefs [os/delete-object (fn [_ args]
                                          (md/error-deferred (ex-info "Object not found" {})))]
-          (is (false? (st/delete-obj s sid))))))))
+          (is (false? (st/delete-obj s sid)))))
+
+      (testing "list objects"
+        (testing "passes sid prefix"
+          (let [inv (atom nil)]
+            (with-redefs [os/list-objects (fn [_ args]
+                                            (reset! inv args)
+                                            (md/success-deferred
+                                             {:objects []
+                                              :prefixes []}))]
+              (is (some? (st/list-obj s sid)))
+              (is (= "path/to/object/" (:prefix @inv))))))
+
+        (testing "returns files without extensions"
+          (with-redefs [os/list-objects (constantly
+                                         (md/success-deferred
+                                          {:objects [{:name "prefix/test.edn"}]}))]
+            (is (= ["test"] (st/list-obj s ["prefix"])))))
+
+        (testing "returns dirs without prefix"
+          (with-redefs [os/list-objects (constantly
+                                         (md/success-deferred
+                                          {:prefixes ["prefix/test/"]}))]
+            (is (= ["test"] (st/list-obj s ["prefix"])))))))))
 
 (def private-key? (partial instance? java.security.PrivateKey))
 
