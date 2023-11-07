@@ -7,6 +7,7 @@
              [string :as cs]]
             [monkey.ci
              [events :as e]
+             [storage :as st]
              [utils :as u]]
             [aleph.http :as http]
             [clj-commons.byte-streams :as bs]
@@ -22,18 +23,25 @@
   (when s
     (cs/split s #"/")))
 
+(defn- includes-build-id? [sid]
+  (= 4 (count sid)))
+
 (defn prepare-build-ctx
   "Updates the context for the build runner, by adding a `build` object"
   [{:keys [work-dir] :as ctx}]
-  (let [id (u/new-build-id)]
+  (let [orig-sid (take 4 (parse-sid (get-in ctx [:args :sid])))
+        ;; Either generate a new build id, or use the one given
+        sid (st/->sid (if (includes-build-id? orig-sid)
+                        orig-sid
+                        (concat orig-sid [(u/new-build-id)])))
+        id (last sid)]
     (-> ctx
         ;; Prepare the build properties
         (assoc :build {:build-id id
                        :checkout-dir work-dir
                        :script-dir (u/abs-path work-dir (get-in ctx [:args :dir]))
                        :pipeline (get-in ctx [:args :pipeline])
-                       :sid (some-> (parse-sid (get-in ctx [:args :sid]))
-                                    (conj id))})
+                       :sid sid})
         (maybe-set-git-opts))))
 
 (defn- print-result [state]

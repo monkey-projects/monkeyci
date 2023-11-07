@@ -35,11 +35,11 @@
       (let [b (sut/bash "test")]
         #(is (= "test-dir" (:output (b {:step {:work-dir "test-dir"}})))))))
 
-  (testing "uses context work dir if no step dir specified"
+  (testing "uses context checkout dir if no step dir specified"
     (with-redefs-fn {#'bp/shell (fn [opts & _]
                                   {:out (:dir opts)})}
       (let [b (sut/bash "test")]
-        #(is (= "test-dir" (:output (b {:work-dir "test-dir"}))))))))
+        #(is (= "test-dir" (:output (b {:checkout-dir "test-dir"}))))))))
 
 (deftest home
   (testing "provides home directory"
@@ -58,4 +58,10 @@
       (testing "replaces ~ with home dir"
         (with-redefs [spit (fn [f _] f)]
           (is (not (cs/starts-with? (sut/param-to-file {} "test-param" "~/test.txt")
-                                    "~"))))))))
+                                    "~")))))
+
+      (testing "writes when no dir specified"
+        (let [dest (io/file "test.txt")]
+          (is (nil? (sut/param-to-file {} "test-param" dest)))
+          (is (true? (.exists dest)))
+          (is (true? (.delete dest))))))))

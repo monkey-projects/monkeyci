@@ -122,7 +122,7 @@
         :index index
         :status status})
      (fn []
-       (let [{:keys [work-dir step] :as ctx} (make-step-dir-absolute ctx)]
+       (let [{:keys [step] :as ctx} (make-step-dir-absolute ctx)]
          (try
            (log/debug "Running step:" step)
            (run-step step ctx)

@@ -44,7 +44,10 @@
 
 (deftest instance-config
   (let [ctx {:build {:build-id "test-build-id"
-                     :sid ["a" "b" "c" "test-build-id"]}}
+                     :sid ["a" "b" "c" "test-build-id"]
+                     :git {:url "http://git-url"
+                           :branch "main"
+                           :id "test-commit"}}}
         conf {:availability-domain "test-ad"
               :compartment-id "test-compartment"
               :image-pull-secrets "test-secrets"
@@ -74,7 +77,8 @@
 
     (testing "adds work volume"
       (is (= {:name "checkout"
-              :volume-type "EMPTYDIR"}
+              :volume-type "EMPTYDIR"
+              :backing-store "EPHEMERAL_STORAGE"}
              (first (:volumes inst)))))
 
     (testing "container"
@@ -91,7 +95,10 @@
         (testing "provides arguments as to monkeyci build"
           (is (= ["-w" "/opt/monkeyci/checkout"
                   "build"
-                  "--sid" "a/b/c/test-build-id"]
+                  "--sid" "a/b/c/test-build-id"
+                  "-u" "http://git-url"
+                  "-b" "main"
+                  "--commit-id" "test-commit"]
                  (:arguments c))))
 
         (testing "mounts checkout dir"

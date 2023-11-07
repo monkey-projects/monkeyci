@@ -9,7 +9,7 @@
 
 (defn bash [& args]
   (fn [ctx]
-    (let [work-dir (or (get-in ctx [:step :work-dir]) (:work-dir ctx))]
+    (let [work-dir (or (get-in ctx [:step :work-dir]) (:checkout-dir ctx))]
       (log/debug "Executing shell script with args" args "in work dir" work-dir)
       (try
         (let [opts (cond-> {:out :string
@@ -36,7 +36,7 @@
   (let [v (get (api/build-params ctx) param)
         f (fs/file (fs/expand-home out))
         p (fs/file (fs/parent f))
-        d? (or (fs/exists? p) (.mkdirs p))]
+        d? (or (nil? p) (fs/exists? p) (.mkdirs p))]
     (if (and v d?)
       (spit f v)
       (assoc core/failure :message (if v
