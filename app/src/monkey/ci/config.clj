@@ -112,7 +112,9 @@
    :storage
    {:type :memory}
    :containers
-   {:type :podman}})
+   {:type :podman}
+   :reporter
+   {:type :print}})
 
 (defn- merge-configs [configs]
   (reduce deep-merge default-app-config configs))

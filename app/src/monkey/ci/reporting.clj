@@ -1,15 +1,17 @@
 (ns monkey.ci.reporting
   "Provides functions for reporting output.  This can be logging, or printing
    to stdout, or formatting as json, etc..."
-  (:require [clansi :as cl]
-            [clojure.tools.logging :as log]))
+  (:require [clojure.tools.logging :as log]))
 
 (defn log-reporter
   "Just logs the input object"
   [obj]
-  (log/debug obj))
+  (log/debug "Reporting:" obj))
 
-(defn print-reporter
-  "Nicely prints to stdout, using coloring"
-  [obj]
-  (println obj))
+(defmulti make-reporter :type)
+
+(defmethod make-reporter :log [_]
+  log-reporter)
+
+(defmethod make-reporter :default [_]
+  log-reporter)

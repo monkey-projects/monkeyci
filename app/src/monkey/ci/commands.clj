@@ -112,7 +112,9 @@
   "Does nothing but return a channel that will never close.  The http server 
    should already be started by the component system."
   [ctx]
-  (report ctx {:type :server/started})
+  (report ctx (-> ctx
+                  (select-keys [:http])
+                  (assoc :type :server/started)))
   (ca/chan))
 
 (defn watch

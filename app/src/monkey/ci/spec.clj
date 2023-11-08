@@ -107,6 +107,7 @@
                           :opt-un [:conf/pipeline :build/git :build/coords]))
 
 (s/def :ctx/public-api fn?)
+(s/def :ctx/reporter fn?)
 
 ;; Arguments as passed in from the CLI
 (s/def :conf/args (s/keys :opt-un [:conf/dev-mode :arg/pipeline :arg/dir :arg/workdir
@@ -120,7 +121,7 @@
 ;; Application context.  This is the result of processing the configuration and is passed
 ;; around internally.
 (s/def ::app-context (s/keys :req-un [:conf/http :ctx/runner :evt/event-bus :ctx/git :ctx/storage :ctx/public-api]
-                             :opt-un [:conf/dev-mode :arg/command ::system :conf/args :ctx/build]))
+                             :opt-un [:conf/dev-mode :arg/command ::system :conf/args :ctx/build :ctx/reporter]))
 
 ;; Script configuration
 (s/def ::script-config (s/keys :req-un [:conf/containers :conf/storage]
