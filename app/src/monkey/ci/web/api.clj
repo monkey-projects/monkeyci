@@ -28,8 +28,7 @@
   (fn [req]
     (let [body (body req)
           st (c/req->storage req)
-          c (-> body
-                (assoc :id (id-generator st body)))]
+          c (assoc body :id (id-generator st body))]
       (when (saver st c)
         ;; TODO Return full url to the created entity
         (rur/created (:id c) c)))))
@@ -69,6 +68,7 @@
                       (existing-from-cust obj)
                       (keys)
                       (set))
+        ;; TODO Check what happens with special chars
         new-id (csk/->kebab-case (:name obj))]
     (loop [id new-id
            idx 2]
