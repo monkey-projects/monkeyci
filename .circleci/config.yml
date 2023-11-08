@@ -213,7 +213,7 @@ jobs:
       # Build the image, tag it with the current job number
       - run:
           name: Build image
-          command: docker build -t $IMAGE_TAG -f docker/Dockerfile --platform linux/amd64,linux/arm64 .
+          command: docker build -t $IMAGE_TAG -f docker/Dockerfile .
       - run:
           name: Docker login
           command: echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
@@ -248,10 +248,10 @@ workflows:
             branches:
               only: [main]
       - test-hook
-      - docker:
-          requires:
-            - app-uberjar
-          context: docker
-          filters:
-            branches:
-              only: [main]
+      # - docker:
+      #     requires:
+      #       - app-uberjar
+      #     context: docker
+      #     filters:
+      #       branches:
+      #         only: [main]
