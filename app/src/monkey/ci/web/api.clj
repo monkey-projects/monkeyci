@@ -1,6 +1,8 @@
 (ns monkey.ci.web.api
-  (:require [clojure.core.async :as ca]
+  (:require [camel-snake-kebab.core :as csk]
+            [clojure.core.async :as ca]
             [clojure.tools.logging :as log]
+            [medley.core :as mc]
             [monkey.ci
              [events :as e]
              [storage :as st]]
@@ -22,11 +24,11 @@
       (rur/response match)
       (rur/not-found nil))))
 
-(defn- entity-creator [saver]
+(defn- entity-creator [saver id-generator]
   (fn [req]
-    (let [c (-> (body req)
-                (assoc :id (st/new-id)))
-          st (c/req->storage req)]
+    (let [body (body req)
+          st (c/req->storage req)
+          c (assoc body :id (id-generator st body))]
       (when (saver st c)
         ;; TODO Return full url to the created entity
         (rur/created (:id c) c)))))
@@ -43,33 +45,80 @@
         ;; be useful should we ever want to restore lost data.
         (rur/not-found nil)))))
 
+(defn- default-id [_ _]
+  (st/new-id))
+
 (defn- make-entity-endpoints
   "Creates default api functions for the given entity using the configuration"
-  [entity {:keys [get-id getter saver]}]
+  [entity {:keys [get-id getter saver new-id] :or {new-id default-id}}]
   (letfn [(make-ep [[p f]]
             (intern *ns* (symbol (str p entity)) f))]
     (->> {"get-" (entity-getter get-id getter)
-          "create-" (entity-creator saver)
+          "create-" (entity-creator saver new-id)
           "update-" (entity-updater get-id getter saver)}
          (map make-ep)
          (doall))))
 
+(defn- id-from-name
+  "Generates id from the object name.  It looks up the customer by `:customer-id`
+   and finds existing objects using `existing-from-cust` to avoid collisions."
+  [existing-from-cust st obj]
+  (let [existing? (-> (:customer-id obj)
+                      (as-> cid (st/find-customer st cid))
+                      (existing-from-cust obj)
+                      (keys)
+                      (set))
+        ;; TODO Check what happens with special chars
+        new-id (csk/->kebab-case (:name obj))]
+    (loop [id new-id
+           idx 2]
+      ;; Try a new id until we find one that does not exist yet.
+      ;; Alternatively we could parse the ids to extract the max index (but yagni)
+      (if (existing? id)
+        (recur (str new-id "-" idx)
+               (inc idx))
+        id))))
+
+(def repo-id (partial id-from-name #(get-in %1 [:projects (:project-id %2) :repos])))
+
+(defn- repo->out [r]
+  (dissoc r :customer-id :project-id))
+
+(defn- repos->out
+  "Converts the project repos into output format"
+  [p]
+  (some-> p
+          (mc/update-existing :repos (comp (partial map repo->out) vals))))
+
+(def project-id (partial id-from-name :projects))
+
+(defn- project->out [p]
+  (dissoc p :customer-id))
+
+(defn- projects->out
+  "Converts the customer projects into output format"
+  [c]
+  (some-> c
+          (mc/update-existing :projects (comp (partial map (comp project->out repos->out)) vals))))
+
 (make-entity-endpoints "customer"
                        {:get-id (id-getter :customer-id)
-                        :getter st/find-customer
+                        :getter (comp projects->out st/find-customer)
                         :saver st/save-customer})
 
 (make-entity-endpoints "project"
                        ;; The project is part of the customer, so combine the ids
                        {:get-id (comp (juxt :customer-id :project-id) :path :parameters)
                         :getter st/find-project
-                        :saver st/save-project})
+                        :saver st/save-project
+                        :new-id project-id})
 
 (make-entity-endpoints "repo"
                        ;; The repo is part of the customer/project, so combine the ids
                        {:get-id (comp (juxt :customer-id :project-id :repo-id) :path :parameters)
                         :getter st/find-repo
-                        :saver st/save-repo})
+                        :saver st/save-repo
+                        :new-id repo-id})
 
 (make-entity-endpoints "webhook"
                        {:get-id (id-getter :webhook-id)
@@ -84,7 +133,7 @@
   [req]
   (assoc-in req [:parameters :body :secret-key] (gh/generate-secret-key)))
 
-(def create-webhook (comp (entity-creator st/save-webhook-details)
+(def create-webhook (comp (entity-creator st/save-webhook-details default-id)
                           assign-webhook-secret))
 
 (def repo-sid (comp (juxt :customer-id :project-id :repo-id)
