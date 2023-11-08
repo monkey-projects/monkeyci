@@ -40,7 +40,51 @@
                    (->req)
                    (with-path-param :customer-id "nonexisting")
                    (sut/get-customer)
-                   :status)))))
+                   :status))))
+
+  (testing "converts project map into list"
+    (let [cust {:id (st/new-id)
+                :name "Customer with projects"}
+          proj {:id "test-project"
+                :customer-id (:id cust)
+                :name "Test project"}
+          {st :storage :as ctx} (test-ctx)]
+      (is (st/sid? (st/save-customer st cust)))
+      (is (st/sid? (st/save-project st proj)))
+      (let [{:keys [projects] :as r} (-> ctx
+                                         (->req)
+                                         (with-path-param :customer-id (:id cust))
+                                         (sut/get-customer)
+                                         :body)]
+        (is (some? projects))
+        (is (not (map? projects)))
+        (is (= (select-keys proj [:id :name])
+               (first projects))))))
+
+  (testing "converts repo map into list"
+    (let [cust {:id (st/new-id)
+                :name "Customer with projects"}
+          proj {:id "test-project"
+                :customer-id (:id cust)
+                :name "Test project"}
+          repo {:id "test-repo"
+                :name "Test repository"
+                :customer-id (:id cust)
+                :project-id (:id proj)}
+          {st :storage :as ctx} (test-ctx)]
+      (is (st/sid? (st/save-customer st cust)))
+      (is (st/sid? (st/save-project st proj)))
+      (is (st/sid? (st/save-repo st repo)))
+      (let [r (-> ctx
+                  (->req)
+                  (with-path-param :customer-id (:id cust))
+                  (sut/get-customer)
+                  :body)
+            repos (-> r :projects first :repos)]
+        (is (some? repos))
+        (is (not (map? repos)))
+        (is (= (select-keys repo [:id :name])
+               (first repos)))))))
 
 (deftest create-customer
   (testing "returns created customer with id"

@@ -1,6 +1,7 @@
 (ns monkey.ci.web.api
   (:require [clojure.core.async :as ca]
             [clojure.tools.logging :as log]
+            [medley.core :as mc]
             [monkey.ci
              [events :as e]
              [storage :as st]]
@@ -54,9 +55,27 @@
          (map make-ep)
          (doall))))
 
+(defn- repo->out [p]
+  (dissoc p :customer-id :project-id))
+
+(defn- repos->out
+  "Converts the project repos into output format"
+  [p]
+  (some-> p
+          (mc/update-existing :repos (comp (partial map repo->out) vals))))
+
+(defn- project->out [p]
+  (dissoc p :customer-id))
+
+(defn- projects->out
+  "Converts the customer projects into output format"
+  [c]
+  (some-> c
+          (mc/update-existing :projects (comp (partial map (comp project->out repos->out)) vals))))
+
 (make-entity-endpoints "customer"
                        {:get-id (id-getter :customer-id)
-                        :getter st/find-customer
+                        :getter (comp projects->out st/find-customer)
                         :saver st/save-customer})
 
 (make-entity-endpoints "project"
