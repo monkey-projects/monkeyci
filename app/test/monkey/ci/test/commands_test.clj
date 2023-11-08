@@ -7,24 +7,25 @@
              [commands :as sut]
              [events :as e]
              [spec :as spec]]
-            [monkey.ci.test.helpers :as h]))
+            [monkey.ci.test.helpers :as h]
+            [org.httpkit.fake :as f]))
 
-(deftest build
+(deftest run-build
   (testing "invokes runner from context"
     (let [ctx {:runner (constantly :invoked)}]
-      (is (= :invoked (sut/build ctx)))))
+      (is (= :invoked (sut/run-build ctx)))))
 
   (testing "adds `build` to context"
     (is (map? (-> {:args {:git-url "test-url"
                           :branch "test-branch"
                           :commit-id "test-id"}
                    :runner :build}
-                  (sut/build)))))
+                  (sut/run-build)))))
 
   (testing "adds build sid to build config"
     (let [{:keys [sid build-id]} (-> {:args {:sid "a/b/c"}
                                       :runner :build}
-                                     (sut/build))]
+                                     (sut/run-build))]
       (is (= build-id (last sid)))
       (is (= ["a" "b" "c"] (take 3 sid)))))
 
@@ -36,8 +37,25 @@
           (fn [bus]
             (is (some? (-> {:event-bus bus
                             :runner (constantly :ok)}
-                           (sut/build))))
+                           (sut/run-build))))
             (is (not-empty @registered))))))))
+
+(deftest list-builds
+  (testing "reports builds from server"
+    (let [reported (atom [])
+          builds {:key "value"}
+          ctx {:reporter (partial swap! reported conj)
+               :account {:url "http://server/api"
+                         :customer-id "test-cust"
+                         :project-id "test-project"
+                         :repo-id "test-repo"}}]
+      (f/with-fake-http ["http://server/api/customer/test-cust/project/test-project/repo/test-repo/builds"
+                         (pr-str builds)]
+        (is (some? (sut/list-builds ctx)))
+        (is (pos? (count @reported)))
+        (let [r (first @reported)]
+          (is (= :builds/list (:type r)))
+          (is (= builds (:builds r))))))))
 
 (deftest result-accumulator
   (testing "returns a map of type handlers"
@@ -154,11 +172,10 @@
     (with-redefs [http/get (constantly (md/success-deferred nil))]
       (is (spec/channel? (sut/watch {})))))
 
-  (testing "logs received events from reader"
+  (testing "reports received events from reader"
     (let [events (prn-str {:type :script/started
                            :message "Test event"})
-          logged (atom [])]
-      (with-redefs [http/get (constantly (md/success-deferred {:body (bs/to-reader events)}))
-                    sut/log-event (partial swap! logged conj)]
-        (is (spec/channel? (sut/watch {})))
-        (is (not-empty @logged))))))
+          reported (atom [])]
+      (with-redefs [http/get (constantly (md/success-deferred {:body (bs/to-reader events)}))]
+        (is (spec/channel? (sut/watch {:reporter (partial swap! reported conj)})))
+        (is (not-empty @reported))))))

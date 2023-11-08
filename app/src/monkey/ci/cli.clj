@@ -1,11 +1,12 @@
 (ns monkey.ci.cli
-  (:require [monkey.ci
+  (:require [clojure.walk :as w]
+            [monkey.ci
              [commands :as cmd]
              [config :as config]
              [runners :as r]]))
 
-(def build-cmd
-  {:command "build"
+(def run-build-cmd
+  {:command "run"
    :description "Runs build locally"
    :opts [{:as "Script location"
            :option "dir"
@@ -30,28 +31,25 @@
           {:as "Repository sid"
            :option "sid"
            :type :string}]
-   :runs {:command cmd/build}})
+   :runs {:command cmd/run-build}})
 
-(def server-cmd
-  {:command "server"
-   :description "Start MonkeyCI server"
-   :opts [{:as "Listening port"
-           :option "port"
-           :short "p"
-           :type :int
-           :default 3000
-           :env "PORT"}]
-   :runs {:command cmd/http-server
-          :requires [:http]}})
+(def list-build-cmd
+  {:command "list"
+   :description "Lists builds for customer, project or repo"
+   :runs {:command cmd/list-builds}})
 
 (def watch-cmd
   {:command "watch"
-   :description "Logs events for customer, project or repo"
-   :opts [{:as "Server url"
-           :option "url"
-           :short "u"
-           :type :string
-           :spec :conf/url}
+   :description "Logs build events for customer, project or repo"
+   :runs {:command cmd/watch}})
+
+(def build-cmd
+  {:command "build"
+   :description "Build commands"
+   :opts [{:option "server"
+           :short "s"
+           :as "Server URL"
+           :type :string}
           {:as "Customer id"
            :option "customer-id"
            :short "c"
@@ -64,7 +62,21 @@
            :option "repo-id"
            :short "r"
            :type :string}]
-   :runs {:command cmd/watch}})
+   :subcommands [run-build-cmd
+                 list-build-cmd
+                 watch-cmd]})
+
+(def server-cmd
+  {:command "server"
+   :description "Start MonkeyCI server"
+   :opts [{:as "Listening port"
+           :option "port"
+           :short "p"
+           :type :int
+           :default 3000
+           :env "PORT"}]
+   :runs {:command cmd/http-server
+          :requires [:http]}})
 
 (def base-config
   {:name "monkey-ci"
@@ -84,5 +96,14 @@
            :short "c"
            :type :string}]
    :subcommands [build-cmd
-                 server-cmd
-                 watch-cmd]})
+                 server-cmd]})
+
+(defn set-invoker
+  "Updates the cli config to replace the `runs` config with the given invoker."
+  [conf inv]
+  (w/prewalk
+   (fn [x]
+     (if (and (map-entry? x) (= :runs (first x)))
+       [:runs (inv (second x))]
+       x))
+   conf))

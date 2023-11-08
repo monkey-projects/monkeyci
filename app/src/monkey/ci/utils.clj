@@ -1,6 +1,7 @@
 (ns monkey.ci.utils
   (:require [buddy.core.keys.pem :as pem]
             [clojure.core.async :as ca]
+            [clojure.edn :as edn]
             [clojure.java.io :as io])
   (:import org.apache.commons.io.FileUtils))
 
@@ -86,3 +87,8 @@
         (do
           (ca/<! (ca/timeout (or interval 100)))
           (recur (poll)))))))
+
+(defn parse-edn
+  "Parses edn from the reader"
+  [r & [opts]]
+  (edn/read (or opts {}) (java.io.PushbackReader. r)))

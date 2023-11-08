@@ -2,16 +2,21 @@
   "Event handlers for commands"
   (:require [clojure.tools.logging :as log]
             [clojure.core.async :as ca]
-            [clojure
-             [edn :as edn]
-             [string :as cs]]
+            [clojure.string :as cs]
             [monkey.ci
              [events :as e]
              [storage :as st]
              [utils :as u]]
             [aleph.http :as http]
             [clj-commons.byte-streams :as bs]
-            [manifold.deferred :as md]))
+            [manifold.deferred :as md]
+            [org.httpkit.client :as hk]))
+
+(defn report
+  "Reports `obj` to the user with the reporter from the context."
+  [{:keys [reporter]} obj]
+  (when reporter
+    (reporter obj)))
 
 (defn- maybe-set-git-opts [{{:keys [git-url branch commit-id]} :args :as ctx}]
   (cond-> ctx
@@ -80,7 +85,7 @@
     (doseq [[t h] m]
       (e/register-handler bus t h))))
 
-(defn build
+(defn run-build
   "Performs a build, using the runner from the context"
   [{:keys [work-dir event-bus] :as ctx}]
   (let [r (:runner ctx)
@@ -90,20 +95,43 @@
         (prepare-build-ctx)
         (r))))
 
+(def api-url (comp :url :account))
+
+(defn list-builds [{:keys [account] :as ctx}]
+  (->> (hk/get (apply format "%s/customer/%s/project/%s/repo/%s/builds"
+                      ((juxt :url :customer-id :project-id :repo-id) account))
+               {:headers {"accept" "application/edn"}})
+       (deref)
+       :body
+       (bs/to-reader)
+       (u/parse-edn)
+       (hash-map :type :builds/list :builds)
+       (report ctx)))
+
 (defn http-server
   "Does nothing but return a channel that will never close.  The http server 
    should already be started by the component system."
   [ctx]
+  (report ctx {:type :server/started})
   (ca/chan))
-
-(defn- log-event [e]
-  (log/info (:message e)))
 
 (defn watch
   "Starts listening for events and prints the results.  The arguments determine
    the event filter (all for a customer, project, or repo)."
-  [{:keys [event-bus] {:keys [url]} :account :as ctx}]
-  (let [ch (ca/chan)]
+  [{:keys [event-bus] :as ctx}]
+  (let [url (api-url ctx)
+        ch (ca/chan)
+        pipe-events (fn [r]
+                      (let [read-next (fn [] (u/parse-edn r {:eof ::done}))]
+                        (loop [m (read-next)]
+                          (if (= ::done m)
+                            (do
+                              (log/info "Event stream closed")
+                              (ca/offer! ch 0) ; Exit code 0
+                              (ca/close! ch))
+                            (do
+                              (report ctx {:type :build/event :event m})
+                              (recur (read-next)))))))]
     (log/info "Watching the server at" url "for events...")
     ;; TODO Trailing slashes
     ;; TODO Customer and other filtering
@@ -112,18 +140,7 @@
          (http/get (str url "/events"))
          :body
          bs/to-reader)
-        (md/on-realized (fn [r]
-                          (let [pbr (java.io.PushbackReader. r)
-                                read-next (fn [] (edn/read {:eof ::done} pbr))]
-                            (loop [m (read-next)]
-                              (if (= ::done m)
-                                (do
-                                  (log/info "Event stream closed")
-                                  (ca/offer! ch 0) ; Exit code 0
-                                  (ca/close! ch))
-                                (do
-                                  (log-event m)
-                                  (recur (read-next)))))))
+        (md/on-realized pipe-events
                         (fn [err]
                           (log/error "Unable to receive server events:" err))))
     ;; cli-matic will wait for this channel to close
