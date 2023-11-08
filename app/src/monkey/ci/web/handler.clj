@@ -19,20 +19,22 @@
    :body "ok"
    :headers {"Content-Type" "text/plain"}})
 
-(def Id s/Str)
+(def not-empty-str (s/constrained s/Str not-empty))
+(def Id not-empty-str)
+(def Name not-empty-str)
 
 (defn- assoc-id [s]
   (assoc s (s/optional-key :id) Id))
 
 (s/defschema NewCustomer
-  {:name s/Str})
+  {:name Name})
 
 (s/defschema UpdateCustomer
   (assoc-id NewCustomer))
 
 (s/defschema NewProject
   {:customer-id Id
-   :name s/Str})
+   :name Name})
 
 (s/defschema UpdateProject
   (assoc-id NewProject))
@@ -48,7 +50,7 @@
 (s/defschema NewRepo
   {:customer-id Id
    :project-id Id
-   :name s/Str
+   :name Name
    :url s/Str})
 
 (s/defschema UpdateRepo

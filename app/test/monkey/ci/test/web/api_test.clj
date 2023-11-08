@@ -117,6 +117,61 @@
                    (sut/update-customer)
                    :status)))))
 
+(deftest create-project
+  (testing "generates id from project name"
+    (let [proj {:name "Test project"
+                :customer-id (st/new-id)}
+          {st :storage :as ctx} (test-ctx)
+          r (-> ctx
+                (->req)
+                (with-body proj)
+                (sut/create-project)
+                :body)]
+      (is (= "test-project" (:id r)))))
+
+  (testing "on id collision, appends index"
+    (let [proj {:name "Test project"
+                :customer-id (st/new-id)}
+          {st :storage :as ctx} (test-ctx)
+          _ (st/save-project st {:id "test-project"
+                                 :customer-id (:customer-id proj)
+                                 :name "Existing project"})
+          r (-> ctx
+                (->req)
+                (with-body proj)
+                (sut/create-project)
+                :body)]
+      (is (= "test-project-2" (:id r))))))
+
+(deftest create-repo
+  (testing "generates id from repo name"
+    (let [repo {:name "Test repo"
+                :customer-id (st/new-id)
+                :project-id (st/new-id)}
+          {st :storage :as ctx} (test-ctx)
+          r (-> ctx
+                (->req)
+                (with-body repo)
+                (sut/create-repo)
+                :body)]
+      (is (= "test-repo" (:id r)))))
+
+  (testing "on id collision, appends index"
+    (let [repo {:name "Test repo"
+                :customer-id (st/new-id)
+                :project-id (st/new-id)}
+          {st :storage :as ctx} (test-ctx)
+          _ (st/save-repo st (-> repo
+                                 (select-keys [:customer-id :project-id])
+                                 (assoc :id "test-repo"
+                                        :name "Existing repo")))
+          r (-> ctx
+                (->req)
+                (with-body repo)
+                (sut/create-repo)
+                :body)]
+      (is (= "test-repo-2" (:id r))))))
+
 (deftest get-params
   (testing "merges with higher levels"
     (let [{s :storage :as ctx} (test-ctx)
