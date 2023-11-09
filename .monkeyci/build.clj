@@ -6,7 +6,7 @@
              [api :as api]
              [core :as core]
              [shell :as shell]])
-  #_(:import [java.time OffsetDateTime ZoneOffset]
+  (:import [java.time OffsetDateTime ZoneOffset]
            java.time.format.DateTimeFormatter))
 
 (defn clj-container [name dir & args]
@@ -32,13 +32,7 @@
     (println "Writing image credentials")
     (shell/param-to-file ctx "dockerhub-creds" (podman-auth ctx))))
 
-#_(def datetime-format (DateTimeFormatter/ofPattern "yyyyMMdd-HHmm"))
-
-#_(defn- img-tag
-  "Generates a new image tag using current time"
-  []
-  (->> (OffsetDateTime/now ZoneOffset/UTC)
-       (.format datetime-format)))
+(def datetime-format (DateTimeFormatter/ofPattern "yyyyMMdd"))
 
 #_(def container-image
   {:name "build and push image"
@@ -52,7 +46,10 @@
 
 (defn image-tag [ctx]
   ;; TODO Get version from context
-  (str base-tag ":0.1.0"))
+  #_(str base-tag ":0.1.0")
+  ;; Use time-based tag for now
+  (->> (OffsetDateTime/now ZoneOffset/UTC)
+       (.format datetime-format)))
 
 (def build-image
   {:name "build image"

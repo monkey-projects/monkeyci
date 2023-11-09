@@ -135,6 +135,8 @@
                               (report ctx {:type :build/event :event m})
                               (recur (read-next)))))))]
     (log/info "Watching the server at" url "for events...")
+    (report ctx {:type :watch/started
+                 :url url})
     ;; TODO Trailing slashes
     ;; TODO Customer and other filtering
     ;; Unfortunately, http-kit can't seem to handle SSE, so we use Aleph instead

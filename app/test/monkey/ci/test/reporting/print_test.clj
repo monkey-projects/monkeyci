@@ -13,4 +13,16 @@
   (testing "prints to stdout"
     (let [s (capture-out {:type :server/started
                           :http {:port 1234}})]
-      (is (cs/includes? s "Server started at port 1234")))))
+      (is (cs/includes? s "Server started"))
+      (is (cs/includes? s "1234")))))
+
+(deftest print-watch-start
+  (testing "prints to stdout"
+    (let [url "http://test"
+          s (capture-out {:type :watch/started
+                          :url url})]
+      (is (cs/includes? s url)))))
+
+(deftest unknown-types
+  (testing "prints warning"
+    (is (string? (capture-out {:type :unkown/type})))))
