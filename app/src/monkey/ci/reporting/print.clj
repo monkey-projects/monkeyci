@@ -60,15 +60,56 @@
     ;; Other cases, just ignore
     nil))
 
+(def col-space 4)
+(def col-sep (apply str (repeat col-space \space)))
+
+(defn- col-width
+  "Calculates column with for the property `p` in items, which is
+   the max length of the properties."
+  [p items]
+  (->> items
+       (map (comp count str p))
+       (reduce max 0)))
+
+(defn- left-align [s w]
+  (cond->> s
+    (pos? w) (format (format "%%-%ds" w))))
+
+(defn build-list
+  "Generates list of strings to print to output for build list"
+  [builds]
+  (let [props [:id :timestamp :result]
+        headers ["Id" "Timestamp" "Result"]
+        widths (->> (map #(col-width % builds) props)
+                    (map max (map count headers)))
+
+        generate-title
+        (fn []
+          (cl/style 
+           (->> (map left-align
+                     headers
+                     widths)
+                (cs/join col-sep))
+           :cyan))
+
+        list-item
+        (fn [{id :id ts :timestamp res :result :as b}]
+          (->> (map left-align
+                    [id ts (str (name res) " " (if (= :success res) good bad))]
+                    widths)
+               (cs/join col-sep)))]
+    
+    (if (empty? builds)
+      [(cl/style "No builds found" :cyan)]
+      (->> (map list-item builds)
+           (into [(generate-title)])))))
+
+(defn- print-all [l]
+  (doseq [s l]
+    (println s)))
+
 (defmethod printer :build/list [{:keys [builds]}]
-  (println "Builds:" (accent (count builds)))
-  (when (not-empty builds)
-    (println "Id\tTimestamp\tResult")
-    (let [r (juxt :id :timestamp :result)]
-      (doseq [b builds]
-        (let [[id ts res] (r b)]
-          (println (->> [id ts (name res) (if (bc/success? b) good bad)]
-                        (cs/join "\t"))))))))
+  (print-all (build-list builds)))
 
 (defmethod printer :default [msg]
   (println (cl/style "Warning:" :bright :cyan) "unknown message type" (accent (str (:type msg)))))

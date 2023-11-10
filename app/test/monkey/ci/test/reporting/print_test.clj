@@ -1,5 +1,6 @@
 (ns monkey.ci.test.reporting.print-test
-  (:require [clojure.test :refer [deftest testing is]]
+  (:require [clansi :as cl]
+            [clojure.test :refer [deftest testing is]]
             [clojure.string :as cs]
             [monkey.ci.reporting.print :as sut]))
 
@@ -39,6 +40,32 @@
                   (is (not-empty s))
                   (is (not (cs/includes? s "Warning")))))))
        (doall)))
+
+(deftest build-list
+  (testing "without builds"
+    (testing "generates 'no builds' message"
+      (let [l (sut/build-list [])]
+        (is (= 1 (count l))))))
+   
+  (testing "with builds"
+    (let [builds [{:id "build1"
+                   :timestamp "ts1"
+                   :result :success}
+                  {:id "other"
+                   :timestamp "ts1"
+                   :result :success}]]
+      
+      (testing "aligns title according to item size"
+        (is (cs/includes? (-> builds
+                              (sut/build-list)
+                              (first))
+                          "Id        Timestamp    Result  ")))
+
+      (testing "aligns items to size"
+        (is (cs/starts-with? (-> builds
+                                 (sut/build-list)
+                                 (second))
+                             "build1    ts1          success"))))))
 
 (deftest print-build-list
   (testing "prints for empty list"
