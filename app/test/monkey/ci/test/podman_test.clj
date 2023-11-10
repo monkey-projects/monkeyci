@@ -40,9 +40,9 @@
                          :container/image "test-img"
                          :script ["first" "second"]}}]
     
-    (testing "uses `/bin/sh` as default command"
+    (testing "when no command given, assumes `/bin/sh` and fails on errors"
       (let [r (sut/build-cmd-args base-ctx)]
-        (is (= "/bin/sh" (last (drop-last 2 r))))))
+        (is (= "-ec" (last (drop-last r))))))
     
     (testing "cmd overrides sh command"
       (let [r (-> base-ctx
@@ -65,4 +65,14 @@
                                                     "VAR2" "value2"})
                   (sut/build-cmd-args))]
         (is (contains-subseq? r ["-e" "VAR1=value1"]))
-        (is (contains-subseq? r ["-e" "VAR2=value2"]))))))
+        (is (contains-subseq? r ["-e" "VAR2=value2"]))))
+
+    (testing "passes entrypoint as json if specified"
+      (let [r (-> base-ctx
+                  (assoc-in [:step :container/entrypoint] ["test-ep"])
+                  (sut/build-cmd-args))]
+        (is (contains-subseq? r ["--entrypoint" "'[\"test-ep\"]'"]))))
+    
+    (testing "overrides entrypoint for script"
+      (let [r (sut/build-cmd-args base-ctx)]
+        (is (contains-subseq? r ["--entrypoint" "/bin/sh"]))))))

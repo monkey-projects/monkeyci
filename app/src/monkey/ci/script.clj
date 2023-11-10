@@ -121,6 +121,7 @@
                      "Step completed")
         :pipeline p
         :index index
+        :name name
         :status status})
      (fn []
        (let [{:keys [step] :as ctx} (make-step-dir-absolute ctx)]

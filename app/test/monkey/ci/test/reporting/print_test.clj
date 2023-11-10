@@ -21,7 +21,9 @@
     (let [url "http://test"
           s (capture-out {:type :watch/started
                           :url url})]
-      (is (cs/includes? s url)))))
+      (is (cs/includes? s url))))
+
+  (testing "makes header the same size as values"))
 
 (deftest print-build-event
   (->> [:script/start
@@ -37,6 +39,11 @@
                   (is (not-empty s))
                   (is (not (cs/includes? s "Warning")))))))
        (doall)))
+
+(deftest print-build-list
+  (testing "prints for empty list"
+    (is (not-empty (capture-out {:type :build/list
+                                 :builds []})))))
 
 (deftest unknown-types
   (testing "prints warning"

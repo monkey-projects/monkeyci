@@ -113,7 +113,7 @@
        :body
        (bs/to-reader)
        (u/parse-edn)
-       (hash-map :type :builds/list :builds)
+       (hash-map :type :build/list :builds)
        (report ctx)))
 
 (defn http-server

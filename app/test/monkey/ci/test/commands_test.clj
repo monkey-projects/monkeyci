@@ -54,7 +54,7 @@
         (is (some? (sut/list-builds ctx)))
         (is (pos? (count @reported)))
         (let [r (first @reported)]
-          (is (= :builds/list (:type r)))
+          (is (= :build/list (:type r)))
           (is (= builds (:builds r))))))))
 
 (deftest result-accumulator

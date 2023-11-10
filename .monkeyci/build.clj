@@ -44,7 +44,7 @@
        (.format datetime-format)))
 
 (defn publish-image [ctx]
-  (let [tag (image-tag ctx)]
+  (let [tag (str base-tag ":" (image-tag ctx))]
     {:container/image "docker.io/dormeur/podman-qemu:latest"
      :container/mounts [[(podman-auth ctx) remote-auth]]
      :script [(format "podman build --authfile %s --platform linux/amd64,linux/arm64 -t %s -f docker/Dockerfile ."
