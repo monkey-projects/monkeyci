@@ -2,7 +2,8 @@
   (:require [buddy.core.keys.pem :as pem]
             [clojure.core.async :as ca]
             [clojure.edn :as edn]
-            [clojure.java.io :as io])
+            [clojure.java.io :as io]
+            [clojure.repl :as cr])
   (:import org.apache.commons.io.FileUtils))
 
 (defn cwd
@@ -92,3 +93,11 @@
   "Parses edn from the reader"
   [r & [opts]]
   (edn/read (or opts {}) (java.io.PushbackReader. r)))
+
+(defn fn-name
+  "If x points to a fn, returns its name without namespace"
+  [x]
+  (->> (str x)
+       (cr/demunge)
+       (re-find #".*\/(.*)[\-\-|@].*")
+       (second)))

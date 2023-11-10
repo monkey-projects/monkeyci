@@ -64,16 +64,22 @@
     (cond-> r
       (zero? exit) (merge bc/success))))
 
+(defn ->map [s]
+  (if (map? s)
+    s
+    {:action s
+     :name (u/fn-name s)}))
+
 (extend-protocol PipelineStep
   clojure.lang.Fn
-  (run-step [f ctx]
+  (run-step [f {:keys [step] :as ctx}]
     (log/debug "Executing function:" f)
     ;; If a step returns nil, treat it as success
     (let [r (or (f ctx) bc/success)]
       (if (bc/status? r)
         r
         ;; Recurse
-        (run-step r (assoc ctx :step r)))))
+        (run-step r (assoc ctx :step (merge step (->map r)))))))
 
   clojure.lang.IPersistentMap
   (run-step [{:keys [action] :as step} ctx]
@@ -95,11 +101,6 @@
                    (u/abs-path checkout-dir d)
                    checkout-dir)))
     ctx))
-
-(defn ->map [s]
-  (if (map? s)
-    s
-    {:action s}))
 
 (defn- run-step*
   "Runs a single step using the configured runner"
@@ -254,15 +255,19 @@
   (with-script-api ctx
     (fn [ctx]
       (log/debug "Executing script for build" build-id "at:" script-dir)
-      (let [p (load-pipelines script-dir build-id)]
-        (wrap-events
-         ctx
-         {:type :script/start
-          :message "Script started"
-          :dir script-dir}
-         {:type :script/end
-          :message "Script completed"
-          :dir script-dir}
-         (fn []
-           (log/debug "Loaded" (count p) "pipelines:" (map :name p))
-           (run-pipelines ctx p)))))))
+      (try 
+        (let [p (load-pipelines script-dir build-id)]
+          (wrap-events
+           ctx
+           {:type :script/start
+            :message "Script started"
+            :dir script-dir}
+           {:type :script/end
+            :message "Script completed"
+            :dir script-dir}
+           (fn []
+             (log/debug "Loaded" (count p) "pipelines:" (map :name p))
+             (run-pipelines ctx p))))
+        (catch Exception ex
+          (post-event ctx {:type :script/end
+                           :message (.getMessage ex)}))))))

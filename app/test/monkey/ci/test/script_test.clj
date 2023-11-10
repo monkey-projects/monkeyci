@@ -138,16 +138,42 @@
       (is (= :run-from-test (:test-result r)))
       (is (bc/success? r))))
 
-  (testing "executes fn that returns container config"
-    (let [step (fn [_]
-                 {:container/image "test-image"})
-          r (sut/run-step step {:containers {:type :test}})]
-      (is (= :run-from-test (:test-result r)))
-      (is (bc/success? r))))
+  (testing "function returns step config"
 
-  (testing "adds step back to context when function returns step config"
-    (let [step {:container/image "test-image"}
-          step-fn (fn [_]
-                    step)
-          r (sut/run-step step-fn {:containers {:type :test}})]
-      (is (= step (get-in r [:context :step]))))))
+    (testing "runs container config when returned"
+      (let [step (fn [_]
+                   {:container/image "test-image"})
+            r (sut/run-step step {:containers {:type :test}})]
+        (is (= :run-from-test (:test-result r)))
+        (is (bc/success? r))))
+
+    (testing "adds step back to context"
+      (let [step {:container/image "test-image"}
+            step-fn (fn [_]
+                      step)
+            r (sut/run-step step-fn {:containers {:type :test}})]
+        (is (= step (get-in r [:context :step])))))
+
+    (testing "sets index on the step"
+      (let [step-dest (fn [ctx]
+                        (when-not (number? (get-in ctx [:step :index]))
+                          (assoc bc/failure :message "Index not specified")))
+            step-fn (fn [ctx]
+                      step-dest)
+            step {:action step-fn
+                  :index 123}
+            r (sut/run-step step
+                            {:containers {:type :test}
+                             :step step})]
+        (is (bc/success? r))))))
+
+(deftest ->map
+  (testing "wraps function in map"
+    (is (map? (sut/->map (constantly "ok")))))
+
+  (testing "leaves map as-is"
+    (let [m {:key "value"}]
+      (is (= m (sut/->map m)))))
+
+  (testing "adds function name to action"
+    (is (= "->map" (:name (sut/->map sut/->map))))))

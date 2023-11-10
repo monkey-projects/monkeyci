@@ -33,16 +33,8 @@
     (shell/param-to-file ctx "dockerhub-creds" (podman-auth ctx))))
 
 (def datetime-format (DateTimeFormatter/ofPattern "yyyyMMdd"))
-
-#_(def container-image
-  {:name "build and push image"
-   :container/image "docker.io/bitnami/kaniko:latest"
-   ;; TODO Use branches and tags to determine the tag
-   :container/cmd ["-d" (str "docker.io/dormeur/monkey-ci:" (img-tag)) "-f" "docker/Dockerfile" "-c" "."]
-   ;; Credentials, must be mounted to /kaniko/.docker/config.json
-   :container/mounts [[(str docker-config) "/kaniko/.docker/config.json"]]})
-
 (def base-tag "fra.ocir.io/frjdhmocn5qi/monkeyci")
+(def remote-auth "/tmp/auth.json")
 
 (defn image-tag [ctx]
   ;; TODO Get version from context
@@ -51,23 +43,13 @@
   (->> (OffsetDateTime/now ZoneOffset/UTC)
        (.format datetime-format)))
 
-(def build-image
-  {:name "build image"
-   :action (fn [ctx]
-             (shell/bash "podman" "build"
-                         "--authfile" (podman-auth ctx)
-                         ;; QEMU needed for this
-                         "--platform" "linux/amd64,linux/arm64"
-                         "-t" (image-tag ctx)
-                         "-f" "docker/Dockerfile"
-                         "."))})
-
-(def publish-image
-  {:name "publish image"
-   :action (fn [ctx]
-             (shell/bash "podman" "push"
-                         "--authfile" (podman-auth ctx)
-                         (image-tag ctx)))})
+(defn publish-image [ctx]
+  (let [tag (image-tag ctx)]
+    {:container/image "docker.io/dormeur/podman-qemu:latest"
+     :container/mounts [[(podman-auth ctx) remote-auth]]
+     :script [(format "podman build --authfile %s --platform linux/amd64,linux/arm64 -t %s -f docker/Dockerfile ."
+                      remote-auth tag)
+              (format "podman push --authfile %s %s" remote-auth tag)]}))
 
 (def test-pipeline
   (core/pipeline
@@ -80,7 +62,6 @@
    {:name "publish"
     :steps [app-uberjar
             image-creds
-            build-image
             publish-image]}))
 
 ;; Return the pipelines

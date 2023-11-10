@@ -59,10 +59,10 @@
 
 (deftest result-accumulator
   (testing "returns a map of type handlers"
-    (is (map? (:handlers (sut/result-accumulator)))))
+    (is (map? (:handlers (sut/result-accumulator {})))))
 
   (testing "updates pipeline and step states"
-    (let [{:keys [handlers state]} (sut/result-accumulator)
+    (let [{:keys [handlers state]} (sut/result-accumulator {})
           start-step (:step/start handlers)
           end-step (:step/end handlers)]
       (is (some? (start-step {:name "step-1"
@@ -77,7 +77,7 @@
       (is (= :success (get-in @state [:pipelines "test-pipeline" :steps 0 :status])))))
 
   (testing "has build completed handler"
-    (let [acc (sut/result-accumulator)
+    (let [acc (sut/result-accumulator {})
           c (get-in acc [:handlers :build/completed])]
       (is (fn? c))
       (is (some? (reset! (:state acc) {:pipelines

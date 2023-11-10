@@ -59,21 +59,28 @@
                   ", result:" (clojure.core/name status)
                   ", elapsed:" (- end-time start-time) "ms")))))
 
+(defn- report-evt [ctx e]
+  (report ctx
+          {:type :build/event
+           :event e}))
+
 (defn result-accumulator
   "Returns a map of event types and handlers that can be registered in the bus.
    These handlers will monitor the build progress and update an internal state
    accordingly.  When the build completes, the result is logged."
-  []
+  [ctx]
   (let [state (atom {})
         now (fn [] (System/currentTimeMillis))]
     {:state state
      :handlers
      {:step/start
       (fn [{:keys [index name pipeline] :as e}]
+        (report-evt ctx e)
         (swap! state assoc-in [:pipelines (:name pipeline) :steps index] {:start-time (now)
                                                                           :name name}))
       :step/end
       (fn [{:keys [index pipeline status] :as e}]
+        (report-evt ctx e)
         (swap! state update-in [:pipelines (:name pipeline) :steps index]
                assoc :end-time (now) :status status))
       :build/completed
@@ -89,7 +96,8 @@
   "Performs a build, using the runner from the context"
   [{:keys [work-dir event-bus] :as ctx}]
   (let [r (:runner ctx)
-        acc (result-accumulator)]
+        acc (result-accumulator ctx)]
+    (report-evt ctx {:type :script/start})
     (register-all-handlers event-bus (:handlers acc))
     (-> ctx
         (prepare-build-ctx)
@@ -132,6 +140,7 @@
                               (ca/offer! ch 0) ; Exit code 0
                               (ca/close! ch))
                             (do
+                              (log/debug "Got event:" m)
                               (report ctx {:type :build/event :event m})
                               (recur (read-next)))))))]
     (log/info "Watching the server at" url "for events...")

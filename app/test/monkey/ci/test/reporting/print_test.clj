@@ -23,6 +23,21 @@
                           :url url})]
       (is (cs/includes? s url)))))
 
+(deftest print-build-event
+  (->> [:script/start
+        :pipeline/start
+        :step/start
+        :step/end
+        :pipeline/end
+        :script/end]
+       (map (fn [t]
+              (testing (format "prints build event `%s` to stdout" t)
+                (let [s (capture-out {:type :build/event
+                                      :event {:type t}})]
+                  (is (not-empty s))
+                  (is (not (cs/includes? s "Warning")))))))
+       (doall)))
+
 (deftest unknown-types
   (testing "prints warning"
     (is (string? (capture-out {:type :unkown/type})))))
