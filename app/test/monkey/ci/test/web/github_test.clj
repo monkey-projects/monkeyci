@@ -110,4 +110,20 @@
                                     :payload {:repository {:ssh-url "ssh-url"
                                                            :clone-url "clone-url"
                                                            :private true}}})]
-          (is (= "ssh-url" (get-in r [:build :git :url]))))))))
+          (is (= "ssh-url" (get-in r [:build :git :url])))))))
+
+  (testing "does not include secret key in metadata"
+    (h/with-memory-store s
+      (let [wh {:id "test-webhook"
+                :customer-id "test-customer"
+                :project-id "test-project"
+                :repo-id "test-repo"
+                :secret-key "very very secret!"}]
+        (is (st/sid? (st/save-webhook-details s wh)))
+        (let [r (sut/prepare-build {:storage s}
+                                   {:id "test-webhook"
+                                    :payload {:head-commit {:message "test message"
+                                                            :timestamp "2023-10-10"}}})
+              id (get-in r [:build :sid])
+              md (st/find-build-metadata s id)]
+          (is (not (contains? md :secret-key))))))))

@@ -76,7 +76,7 @@
           build-id (u/new-build-id)
           commit-id (get-in payload [:head-commit :id])
           md (-> details
-                 (dissoc :id)
+                 (dissoc :id :secret-key)
                  (assoc :webhook-id id
                         :build-id build-id
                         :commit-id commit-id
