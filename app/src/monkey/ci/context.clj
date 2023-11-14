@@ -23,8 +23,8 @@
   (or (some-> (:log-dir ctx) (u/abs-path))
       (u/combine (u/tmp-dir) "logs")))
 
-(defn logger [ctx]
-  (or (get-in ctx [:logging :fn])
+(defn log-maker [ctx]
+  (or (get-in ctx [:logging :maker])
       (l/make-logger {})))
 
 (def step-work-dir

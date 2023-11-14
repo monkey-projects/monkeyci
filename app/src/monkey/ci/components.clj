@@ -73,7 +73,7 @@
                :public-api wsa/local-api
                :reporter (rep/make-reporter (:reporter config)))
         (update :logging (fn [c]
-                           (assoc c :fn (l/make-logger c))))))
+                           (assoc c :maker (l/make-logger c))))))
   (stop [this]
     this))
 

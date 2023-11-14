@@ -12,6 +12,7 @@
              [config :refer [version] :as config]
              [context :as ctx]
              [events :as e]
+             [logging :as l]
              [script :as script]
              [utils :as utils]]
             [monkey.ci.build.core :as bc]
@@ -98,10 +99,9 @@
       (config/config->env)
       (merge default-envs)))
 
-(defn- script-output [ctx type]
-  (let [make-logger (ctx/logger ctx)
-        id (get-in ctx [:build :build-id])]
-    (make-logger ctx [id (str (name type) ".log")])))
+(defn- make-logger [ctx type]
+  (let [id (get-in ctx [:build :build-id])]
+    ((ctx/log-maker ctx) ctx [id (str (name type) ".log")])))
 
 (defn execute!
   "Executes the build script located in given directory.  This actually runs the
@@ -110,13 +110,14 @@
    post a `build/completed` event on process exit."
   [{{:keys [checkout-dir script-dir build-id] :as build} :build bus :event-bus :as ctx}]
   (log/info "Executing build process for" build-id "in" checkout-dir)
-  (let [{:keys [socket-path server]} (start-script-api ctx)]
+  (let [{:keys [socket-path server]} (start-script-api ctx)
+        [out err] (map (partial make-logger ctx) [:out :err])]
     ;; TODO Depending on settings, store the logs locally, pipe them to stdout
     ;; or stream them to a storage bucket
     (bp/process
      {:dir script-dir
-      :out (script-output ctx :out)
-      :err (script-output ctx :err)
+      :out (l/log-output out)
+      :err (l/log-output err)
       :cmd (-> ["clojure"
                 "-Sdeps" (generate-deps ctx)
                 "-X:monkeyci/build"]

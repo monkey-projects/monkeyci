@@ -112,7 +112,7 @@
 (s/def :logging/type #{:file :inherit :oci})
 (s/def :logging/config (s/keys :req-un [:logging/type]))
 (s/def :logging/dir string?)
-(s/def :logging/fn fn?)
+(s/def :logging/maker fn?)
 
 (defmulti logging-type :type)
 
@@ -128,7 +128,7 @@
 
 (s/def :conf/logging (s/multi-spec logging-type :type))
 (s/def :ctx/logging (s/merge :conf/logging
-                             (s/keys :req-un [:logging/fn])))
+                             (s/keys :req-un [:logging/maker])))
 
 ;; Arguments as passed in from the CLI
 (s/def :conf/args (s/keys :opt-un [:conf/dev-mode :arg/pipeline :arg/dir :arg/workdir
