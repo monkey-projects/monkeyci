@@ -136,6 +136,7 @@
           :logging
           (fn [{:keys [type] :as c}]
             (cond-> c
+              ;; FIXME This check should be centralized in logging ns
               (= :file type) (update :dir #(or (u/abs-path %) (u/combine (:work-dir conf) "logs")))))))
 
 (defn- set-account
@@ -212,11 +213,3 @@
        (flatten-nested [])
        (mc/map-keys (fn [k]
                       (keyword (str env-prefix "-" (name k)))))))
-
-(defn ->oci-config
-  "Given a configuration map with credentials, turns it into a config map
-   that can be passed to OCI context creators."
-  [{:keys [credentials] :as conf}]
-  (-> conf
-      (merge (mc/update-existing credentials :private-key u/load-privkey))
-      (dissoc :credentials)))

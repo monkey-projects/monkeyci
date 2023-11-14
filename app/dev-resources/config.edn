@@ -1,6 +1,6 @@
 {:monkeyci-containers-type "podman"
  :monkeyci-work-dir "tmp"
- :monkeyci-logging-type "file"
- :monkeyci-logging-dir "tmp/logs"
+;; :monkeyci-logging-type "file"
+;; :monkeyci-logging-dir "tmp/logs"
  :monkeyci-account-project-id "8d4c53fb-cfaa-4c94-98f0-f9ba27461bfb"
  :monkeyci-account-repo-id "30b5ddb2-024d-41fe-ae95-ced7a13eaf2e"}

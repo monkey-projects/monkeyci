@@ -5,6 +5,7 @@
             [manifold.deferred :as md]
             [monkey.ci
              [config :as config]
+             [oci :as oci]
              [runners :as r]
              [utils :as u]]
             [monkey.oci.container-instance.core :as ci]))
@@ -99,5 +100,5 @@
   (run-instance client (instance-config conf ctx)))
 
 (defmethod r/make-runner :oci [conf]
-  (let [client (ci/make-context (config/->oci-config conf))]
+  (let [client (ci/make-context (oci/->oci-config conf))]
     (partial oci-runner client conf)))

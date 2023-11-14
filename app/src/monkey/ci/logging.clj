@@ -1,6 +1,8 @@
 (ns monkey.ci.logging
   "Handles log configuration and how to process logs from a build script"
-  (:require [clojure.java.io :as io]))
+  (:require [clojure.java.io :as io]
+            [clojure.string :as cs]
+            [monkey.ci.oci :as oci]))
 
 (defprotocol LogCapturer
   (log-output [this])
@@ -37,23 +39,29 @@
 (defmethod make-logger :file [conf]
   (partial ->FileLogger conf))
 
-(deftype OciBucketLogger [conf]
+(deftype OciBucketLogger [conf ctx path]
   LogCapturer
   (log-output [_]
     :stream)
 
-  (handle-stream [_ in]))
+  (handle-stream [_ in]
+    (let [sid (get-in ctx [:build :sid])
+          prefix (:prefix conf)
+          on (cs/join "/" (->> (concat [prefix] (take 3 sid) path)
+                               (remove nil?)))]
+      (oci/stream-to-bucket (assoc conf :object-name on)
+                            in))))
 
 (defmethod make-logger :oci [conf]
-  (fn [& _]
-    (->OciBucketLogger conf)))
+  (fn [ctx path]
+    (->OciBucketLogger conf ctx path)))
 
 (defn handle-process-streams
   "Given a process return values (as from `babashka.process/process`) and two
    loggers, will invoke the `handle-stream` on each logger for out and error
    output.  Returns the process."
   [{:keys [out err] :as proc} loggers]
-  (doseq [l loggers
-          s [out err]]
-    (handle-stream l s))
+  (->> [out err]
+       (map handle-stream loggers)
+       (doall))
   proc)

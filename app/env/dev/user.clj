@@ -11,10 +11,11 @@
              [config :as config]
              [core :as c]
              [events :as e]
+             [oci :as oci]
              [storage :as s]
              [utils :as u]]
             [monkey.ci.storage.oci]
-            [monkey.ci.runners.oci :as oci]
+            [monkey.ci.runners.oci :as ro]
             [monkey.oci.container-instance.core :as ci]
             #_[monkey.ci.test.examples-test :as et]
             [buddy.core
@@ -136,16 +137,16 @@
 (defn run-test-container []
   (let [conf (-> (load-config "oci-config.edn")
                  :runner
-                 (config/->oci-config))
+                 (oci/->oci-config))
         ctx {:build {:build-id "test-build"}}
         client (ci/make-context conf)
-        ic (-> (oci/instance-config conf ctx)
+        ic (-> (ro/instance-config conf ctx)
                (assoc :containers [{:image-url "fra.ocir.io/frjdhmocn5qi/monkeyci:0.1.0"
                                     :display-name "test"
                                     :arguments ["-h"]}])
                (dissoc :volumes))]
     (log/info "Running instance with config:" ic)
-    (oci/run-instance client ic)))
+    (ro/run-instance client ic)))
 
 (defn make-storage [conf]
   (-> conf
