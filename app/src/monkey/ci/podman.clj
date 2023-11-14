@@ -70,11 +70,13 @@
         log-base [build-id
                   (or (:name pipeline) (str (:index pipeline)))
                   (str (:index step))]
-        [out-log err-log] (->> ["out.txt" "err.txt"]
-                               (map (partial conj log-base))
-                               (map (partial log-maker ctx)))]
+        [out-log err-log :as loggers] (->> ["out.txt" "err.txt"]
+                                           (map (partial conj log-base))
+                                           (map (partial log-maker ctx)))]
     (log/debug "Log base is:" log-base)
-    @(bp/process {:dir (c/step-work-dir ctx)
-                  :out (l/log-output out-log)
-                  :err (l/log-output err-log)
-                  :cmd (build-cmd-args ctx)})))
+    (-> (bp/process {:dir (c/step-work-dir ctx)
+                     :out (l/log-output out-log)
+                     :err (l/log-output err-log)
+                     :cmd (build-cmd-args ctx)})
+        (l/handle-process-streams loggers)
+        (deref))))

@@ -47,3 +47,13 @@
 (defmethod make-logger :oci [conf]
   (fn [& _]
     (->OciBucketLogger conf)))
+
+(defn handle-process-streams
+  "Given a process return values (as from `babashka.process/process`) and two
+   loggers, will invoke the `handle-stream` on each logger for out and error
+   output.  Returns the process."
+  [{:keys [out err] :as proc} loggers]
+  (doseq [l loggers
+          s [out err]]
+    (handle-stream l s))
+  proc)

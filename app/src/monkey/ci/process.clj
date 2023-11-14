@@ -96,6 +96,7 @@
        {:socket socket-path}}
       (assoc :build-id (get-in ctx [:build :build-id]))
       (merge (select-keys ctx [:containers :log-dir]))
+      (assoc :logging (dissoc (:logging ctx) :maker))
       (config/config->env)
       (merge default-envs)))
 
@@ -111,31 +112,31 @@
   [{{:keys [checkout-dir script-dir build-id] :as build} :build bus :event-bus :as ctx}]
   (log/info "Executing build process for" build-id "in" checkout-dir)
   (let [{:keys [socket-path server]} (start-script-api ctx)
-        [out err] (map (partial make-logger ctx) [:out :err])]
-    ;; TODO Depending on settings, store the logs locally, pipe them to stdout
-    ;; or stream them to a storage bucket
-    (bp/process
-     {:dir script-dir
-      :out (l/log-output out)
-      :err (l/log-output err)
-      :cmd (-> ["clojure"
-                "-Sdeps" (generate-deps ctx)
-                "-X:monkeyci/build"]
-               (concat (build-args ctx))
-               (vec))
-      :extra-env (process-env ctx socket-path)
-      :exit-fn (fn [{:keys [proc] :as p}]
-                 (let [exit (or (some-> proc (.exitValue)) 0)]
-                   (log/debug "Script process exited with code" exit ", cleaning up")
-                   (when server
-                     (script-api/stop-server server))
-                   (when socket-path 
-                     (uds/delete-address socket-path))
-                   ;; Bus should always be present.  This check is only for testing purposes.
-                   (when bus
-                     (log/debug "Posting build/completed event")
-                     (e/post-event bus {:type :build/completed
-                                        :build build
-                                        :exit exit
-                                        :result (if (zero? exit) :success :error)
-                                        :process p}))))})))
+        [out err :as loggers] (map (partial make-logger ctx) [:out :err])]
+    (-> (bp/process
+         {:dir script-dir
+          :out (l/log-output out)
+          :err (l/log-output err)
+          :cmd (-> ["clojure"
+                    "-Sdeps" (generate-deps ctx)
+                    "-X:monkeyci/build"]
+                   (concat (build-args ctx))
+                   (vec))
+          :extra-env (process-env ctx socket-path)
+          :exit-fn (fn [{:keys [proc] :as p}]
+                     (let [exit (or (some-> proc (.exitValue)) 0)]
+                       (log/debug "Script process exited with code" exit ", cleaning up")
+                       (when server
+                         (script-api/stop-server server))
+                       (when socket-path 
+                         (uds/delete-address socket-path))
+                       ;; Bus should always be present.  This check is only for testing purposes.
+                       (when bus
+                         (log/debug "Posting build/completed event")
+                         (e/post-event bus {:type :build/completed
+                                            :build build
+                                            :exit exit
+                                            :result (if (zero? exit) :success :error)
+                                            :process p}))))})
+        ;; Depending on settings, some process streams need handling
+        (l/handle-process-streams loggers))))
