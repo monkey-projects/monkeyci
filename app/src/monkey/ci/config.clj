@@ -14,7 +14,9 @@
             [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [medley.core :as mc]
-            [monkey.ci.utils :as u]))
+            [monkey.ci
+             [logging :as l]
+             [utils :as u]]))
 
 (def ^:dynamic *global-config-file* "/etc/monkeyci/config.edn")
 (def ^:dynamic *home-config-file* (-> (System/getProperty "user.home")
@@ -64,7 +66,7 @@
             (reduce (fn [r v]
                       (group-keys v r))
                     c
-                    [:github :runner :containers :storage :api :account :http]))]
+                    [:github :runner :containers :storage :api :account :http :logging]))]
     (->> env
          (filter-and-strip-keys env-prefix)
          (group-all-keys)
@@ -116,8 +118,7 @@
    :reporter
    {:type :print}
    :logging
-   {:type :file
-    :dir "logs"}})
+   {:type :inherit}})
 
 (defn- merge-configs [configs]
   (reduce deep-merge default-app-config configs))
@@ -130,8 +131,12 @@
 (defn- set-checkout-base-dir [conf]
   (update conf :checkout-base-dir #(or (u/abs-path %) (u/combine (:work-dir conf) "checkout"))))
 
-(defn- ^:deprecated set-log-dir [conf]
-  (update conf :log-dir #(or (u/abs-path %) (u/combine (:work-dir conf) "logs"))))
+(defn- set-log-dir [conf]
+  (update conf
+          :logging
+          (fn [{:keys [type] :as c}]
+            (cond-> c
+              (= :file type) (update :dir #(or (u/abs-path %) (u/combine (:work-dir conf) "logs")))))))
 
 (defn- set-account
   "Updates the `:account` in the config with cli args"
@@ -157,6 +162,7 @@
       (update-in [:http :port] #(or (:port args) %))
       (update-in [:runner :type] keyword)
       (update-in [:storage :type] keyword)
+      (update-in [:logging :type] keyword)
       (set-work-dir)
       (set-checkout-base-dir)
       (set-log-dir)
@@ -168,13 +174,19 @@
    :storage {:type :memory}
    :logging {:type :inherit}})
 
+(defn initialize-log-maker [conf]
+  (update conf :logging (fn [c]
+                          (assoc c :maker (l/make-logger c)))))
+
 (defn script-config
   "Builds config map used by the child script process"
   [env args]
   (-> default-script-config
       (deep-merge (config-from-env env))
       (merge args)
-      (update-in [:containers :type] keyword)))
+      (update-in [:containers :type] keyword)
+      (update-in [:logging :type] keyword)
+      (initialize-log-maker)))
 
 (defn- flatten-nested
   "Recursively flattens a map of maps.  Each key in the resulting map is a

@@ -55,25 +55,25 @@
             (s/explain-str ::spec/app-config c)))))
 
   (testing "provides log-dir as absolute path"
-    (is (re-matches #".+test-dir$" (-> {:monkeyci-log-dir "test-dir"}
+    (is (re-matches #".+test-dir$" (-> {:monkeyci-logging-dir "test-dir"}
                                        (sut/app-config {})
                                        (ctx/log-dir)))))
 
   (testing "loads config from `config-file` path"
     (h/with-tmp-dir dir
       (let [f (io/file dir "test-config.edn")]
-        (is (nil? (spit f (pr-str {:log-dir "some-log-dir"}))))
+        (is (nil? (spit f (pr-str {:work-dir "some-work-dir"}))))
         (let [c (sut/app-config {} {:config-file (.getCanonicalPath f)})]
-          (is (cs/ends-with? (:log-dir c) "some-log-dir"))))))
+          (is (cs/ends-with? (:work-dir c) "some-work-dir"))))))
 
   (testing "loads global config file"
     (h/with-tmp-dir dir
       (let [f (-> (io/file dir "test-config.edn")
                   (.getCanonicalPath))]
         (binding [sut/*global-config-file* f]
-          (is (nil? (spit f (pr-str {:log-dir "some-log-dir"}))))
+          (is (nil? (spit f (pr-str {:work-dir "some-work-dir"}))))
           (let [c (sut/app-config {} {})]
-            (is (cs/ends-with? (:log-dir c) "some-log-dir")))))))
+            (is (cs/ends-with? (:work-dir c) "some-work-dir")))))))
 
   (testing "loads home config file"
     (h/with-tmp-dir dir
@@ -105,11 +105,18 @@
                           :checkout-base-dir)
                       "test-dir")))
 
-  (testing "calculates log dir from work dir"
-    (is (cs/includes? (-> (sut/app-config {:monkeyci-work-dir "test-dir"} {})
-                          :log-dir)
+  (testing "calculates log dir from work dir when type is `file`"
+    (is (cs/includes? (-> (sut/app-config {:monkeyci-work-dir "test-dir"
+                                           :monkeyci-logging-type "file"}
+                                          {})
+                          :logging
+                          :dir)
                       "test-dir")))
 
+  (testing "ignores log dir from work dir when type is not `file`"
+    (is (nil? (-> (sut/app-config {:monkeyci-work-dir "test-dir"} {:logging {:type :inherit}})
+                  :logging
+                  :dir))))
   (testing "includes account"
     (is (= {:customer-id "test-customer"}
            (-> {:monkeyci-account-customer-id "test-customer"}
@@ -149,6 +156,18 @@
                           (sut/script-config {})
                           :containers
                           :type))))
+
+  (testing "sets logging config"
+    (is (= :file (-> {:monkeyci-logging-type "file"}
+                     (sut/script-config {})
+                     :logging
+                     :type))))
+
+  (testing "initializes logging maker"
+    (is (fn? (-> {:monkeyci-logging-type "file"}
+                 (sut/script-config {})
+                 :logging
+                 :maker))))
 
   (testing "groups api settings"
     (is (= "test-socket" (-> {:monkeyci-api-socket "test-socket"}

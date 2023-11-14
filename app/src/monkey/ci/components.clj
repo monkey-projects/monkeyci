@@ -5,6 +5,7 @@
             [com.stuartsierra.component :as c]
             [monkey.ci
              [commands :as co]
+             [config :as config]
              [events :as e]
              [logging :as l]
              [git :as git]
@@ -72,8 +73,7 @@
         (assoc :storage (:storage storage)
                :public-api wsa/local-api
                :reporter (rep/make-reporter (:reporter config)))
-        (update :logging (fn [c]
-                           (assoc c :maker (l/make-logger c))))))
+        (config/initialize-log-maker)))
   (stop [this]
     this))
 

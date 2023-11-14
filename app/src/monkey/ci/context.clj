@@ -20,7 +20,7 @@
 (defn ^:deprecated log-dir
   "Gets the directory where to store log files"
   [ctx]
-  (or (some-> (:log-dir ctx) (u/abs-path))
+  (or (some-> (get-in ctx [:logging :dir]) (u/abs-path))
       (u/combine (u/tmp-dir) "logs")))
 
 (defn log-maker [ctx]
