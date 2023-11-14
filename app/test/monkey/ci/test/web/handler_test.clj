@@ -234,9 +234,9 @@
                     (app))]
           (is (= 200 (:status l)))
           (let [b (-> l
-                       :body
-                       slurp
-                       h/parse-json)]
+                      :body
+                      slurp
+                      h/parse-json)]
             (is (= 1 (count b)))
             (is (= build-id (:id (first b))) "should contain build id")
             (is (= "test meta" (:message (first b))) "should contain build metadata")))))))

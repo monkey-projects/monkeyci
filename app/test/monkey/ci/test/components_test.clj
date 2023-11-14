@@ -89,7 +89,12 @@
     (is (= :test-storage (-> (sut/new-context :test-cmd)
                              (assoc :storage {:storage :test-storage})
                              (c/start)
-                             :storage)))))
+                             :storage))))
+
+  (testing "sets reporter"
+    (is (fn? (-> (sut/new-context :test-cmd)
+                 (c/start)
+                 :reporter)))))
 
 (defn- verify-event-handled
   ([ctx evt verifier]

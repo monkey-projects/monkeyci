@@ -1,7 +1,9 @@
 (ns monkey.ci.utils
   (:require [buddy.core.keys.pem :as pem]
             [clojure.core.async :as ca]
-            [clojure.java.io :as io])
+            [clojure.edn :as edn]
+            [clojure.java.io :as io]
+            [clojure.repl :as cr])
   (:import org.apache.commons.io.FileUtils))
 
 (defn cwd
@@ -86,3 +88,16 @@
         (do
           (ca/<! (ca/timeout (or interval 100)))
           (recur (poll)))))))
+
+(defn parse-edn
+  "Parses edn from the reader"
+  [r & [opts]]
+  (edn/read (or opts {}) (java.io.PushbackReader. r)))
+
+(defn fn-name
+  "If x points to a fn, returns its name without namespace"
+  [x]
+  (->> (str x)
+       (cr/demunge)
+       (re-find #".*\/(.*)[\-\-|@].*")
+       (second)))

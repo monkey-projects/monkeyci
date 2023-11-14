@@ -60,7 +60,7 @@
   (letfn [(invoker [cmd]
             (cmd-invoker cmd env))]
     ;; Wrap the run functions in the invoker
-    (update mcli/base-config :subcommands (partial mapv (fn [c] (update c :runs invoker))))))
+    (mcli/set-invoker mcli/base-config invoker)))
 
 (defn -main
   "Main entry point for the application."

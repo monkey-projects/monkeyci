@@ -117,8 +117,7 @@
    post a `build/completed` event on process exit."
   [{{:keys [checkout-dir script-dir build-id] :as build} :build bus :event-bus :as ctx}]
   (log/info "Executing build process for" build-id "in" checkout-dir)
-  (let [{:keys [socket-path server]} (start-script-api ctx)
-        log-dir (get-script-log-dir ctx)]
+  (let [{:keys [socket-path server]} (start-script-api ctx)]
     (bp/process
      {:dir script-dir
       :out (script-output ctx :out)

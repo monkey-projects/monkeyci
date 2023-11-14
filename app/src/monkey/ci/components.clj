@@ -8,8 +8,10 @@
              [events :as e]
              [git :as git]
              [process :as p]
+             [reporting :as rep]
              [runners :as r]
              [storage :as st]]
+            [monkey.ci.reporting.print]
             [monkey.ci.storage
              [file]
              [oci]]
@@ -67,7 +69,8 @@
         (merge config)
         (update :runner r/make-runner)
         (assoc :storage (:storage storage)
-               :public-api wsa/local-api)))
+               :public-api wsa/local-api
+               :reporter (rep/make-reporter (:reporter config)))))
   (stop [this]
     this))
 

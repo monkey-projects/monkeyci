@@ -9,7 +9,6 @@
   (:require [camel-snake-kebab.core :as csk]
             [cheshire.core :as json]
             [clojure
-             [edn :as edn]
              [string :as cs]
              [walk :as cw]]
             [clojure.java.io :as io]
@@ -75,8 +74,8 @@
 (defn- parse-edn
   "Parses the input file as `edn` and converts keys to kebab-case."
   [p]
-  (with-open [r (java.io.PushbackReader. (io/reader p))]
-    (->> (edn/read r)
+  (with-open [r (io/reader p)]
+    (->> (u/parse-edn r)
          (cw/prewalk (fn [x]
                        (if (map-entry? x)
                          (let [[k v] x]
@@ -113,7 +112,9 @@
    :storage
    {:type :memory}
    :containers
-   {:type :podman}})
+   {:type :podman}
+   :reporter
+   {:type :print}})
 
 (defn- merge-configs [configs]
   (reduce deep-merge default-app-config configs))
@@ -132,7 +133,9 @@
 (defn- set-account
   "Updates the `:account` in the config with cli args"
   [{:keys [args] :as conf}]
-  (let [c  (update conf :account merge (select-keys args [:customer-id :project-id :repo-id :url]))]
+  (let [c (update conf :account merge (-> args
+                                          (select-keys [:customer-id :project-id :repo-id])
+                                          (mc/assoc-some :url (:server args))))]
     (cond-> c
       (empty? (:account c)) (dissoc :account))))
 

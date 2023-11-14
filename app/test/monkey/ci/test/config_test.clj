@@ -123,7 +123,13 @@
            (-> (sut/app-config {:monkeyci-account-customer-id "test-customer"}
                                {:project-id "arg-project"})
                :account
-               (select-keys [:customer-id :project-id]))))))
+               (select-keys [:customer-id :project-id])))))
+
+  (testing "uses `server` arg as account url"
+    (is (= "http://test" (-> (sut/app-config {}
+                                             {:server "http://test"})
+                             :account
+                             :url)))))
 
 (deftest config->env
   (testing "empty for empty input"

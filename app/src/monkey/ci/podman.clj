@@ -3,6 +3,7 @@
    it requires a socket, which is not always available.  Instead, we invoke the podman
    command as a child process and communicate with it using the standard i/o streams."
   (:require [babashka.process :as bp]
+            [cheshire.core :as json]
             [clojure.java.io :as io]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
@@ -17,7 +18,8 @@
 (defn- make-cmd [{:keys [:container/cmd]}]
   (if (some? cmd)
     cmd
-    ["/bin/sh" "-ec"]))
+    ;; When no command is given, use /bin/sh as entrypoint and fail on errors
+    ["-ec"]))
 
 (defn- mounts [{:keys [:container/mounts]}]
   (mapcat (fn [[h c]]
@@ -30,6 +32,13 @@
             ["-e" (str k "=" v)])
           env))
 
+(defn- entrypoint [{ep :container/entrypoint cmd :container/cmd}]
+  (cond
+    ep
+    ["--entrypoint" (str "'" (json/generate-string ep) "'")]
+    (nil? cmd)
+    ["--entrypoint" "/bin/sh"]))
+
 (defn build-cmd-args
   "Builds command line args for the podman executable"
   [{:keys [build-id step] :as ctx}]
@@ -39,6 +48,7 @@
         cwd "/home/monkeyci"
         base-cmd ["/usr/bin/podman" "run"
                   "-t" "--rm"
+                  "--privileged"       ; TODO Find a way to avoid this
                   "--name" cn
                   "-v" (str wd ":" cwd ":z")
                   "-w" cwd]]
@@ -47,6 +57,7 @@
      base-cmd
      (mounts step)
      (env-vars step)
+     (entrypoint step)
      [(:image conf)]
      (make-cmd step)
      ;; TODO Execute script step by step
