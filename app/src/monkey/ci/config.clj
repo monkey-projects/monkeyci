@@ -114,7 +114,10 @@
    :containers
    {:type :podman}
    :reporter
-   {:type :print}})
+   {:type :print}
+   :logging
+   {:type :file
+    :dir "logs"}})
 
 (defn- merge-configs [configs]
   (reduce deep-merge default-app-config configs))
@@ -127,7 +130,7 @@
 (defn- set-checkout-base-dir [conf]
   (update conf :checkout-base-dir #(or (u/abs-path %) (u/combine (:work-dir conf) "checkout"))))
 
-(defn- set-log-dir [conf]
+(defn- ^:deprecated set-log-dir [conf]
   (update conf :log-dir #(or (u/abs-path %) (u/combine (:work-dir conf) "logs"))))
 
 (defn- set-account
@@ -162,7 +165,8 @@
 (def default-script-config
   "Default configuration for the script runner."
   {:containers {:type :docker}
-   :storage {:type :memory}})
+   :storage {:type :memory}
+   :logging {:type :inherit}})
 
 (defn script-config
   "Builds config map used by the child script process"

@@ -3,7 +3,9 @@
    and possible command-line arguments, and can hold non-serializable things as well, like
    functions.  It is used by the application to execute functionality."
   (:require [clojure.java.io :as io]
-            [monkey.ci.utils :as u]))
+            [monkey.ci
+             [logging :as l]
+             [utils :as u]]))
 
 (defn checkout-dir
   "Calculates the checkout directory for the build, by combining the checkout
@@ -15,11 +17,15 @@
   ([ctx]
    (checkout-dir ctx (get-in ctx [:build :build-id]))))
 
-(defn log-dir
+(defn ^:deprecated log-dir
   "Gets the directory where to store log files"
   [ctx]
   (or (some-> (:log-dir ctx) (u/abs-path))
       (u/combine (u/tmp-dir) "logs")))
+
+(defn logger [ctx]
+  (or (get-in ctx [:logging :fn])
+      (l/make-logger {})))
 
 (def step-work-dir
   "Given a context, determines the step working directory.  This is either the
@@ -30,4 +36,3 @@
    (some-fn (comp :work-dir :step)
             :checkout-dir
             (constantly (u/cwd)))))
-

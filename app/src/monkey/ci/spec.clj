@@ -109,20 +109,43 @@
 (s/def :ctx/public-api fn?)
 (s/def :ctx/reporter fn?)
 
+(s/def :logging/type #{:file :inherit :oci})
+(s/def :logging/config (s/keys :req-un [:logging/type]))
+(s/def :logging/dir string?)
+(s/def :logging/fn fn?)
+
+(defmulti logging-type :type)
+
+(defmethod logging-type :inherit [_]
+  (s/merge :logging/config))
+
+(defmethod logging-type :file [_]
+  (s/merge :logging/config (s/keys :opt-un [:logging/dir])))
+
+(defmethod logging-type :oci [_]
+  (s/merge :logging/config (s/keys :req-un [:logging/dir :oci/bucket-name]
+                                   :opt-un [:oci/credentials])))
+
+(s/def :conf/logging (s/multi-spec logging-type :type))
+(s/def :ctx/logging (s/merge :conf/logging
+                             (s/keys :req-un [:logging/fn])))
+
 ;; Arguments as passed in from the CLI
 (s/def :conf/args (s/keys :opt-un [:conf/dev-mode :arg/pipeline :arg/dir :arg/workdir
                                    :arg/git-url :arg/config-file]))
 
 ;; Application configuration
-(s/def ::app-config (s/keys :req-un [:conf/http :conf/runner :conf/args
+(s/def ::app-config (s/keys :req-un [:conf/http :conf/runner :conf/args :conf/logging
                                      :conf/work-dir :conf/checkout-base-dir]
                             :opt-un [:conf/dev-mode :conf/containers :conf/log-dir
                                      :conf/storage :conf/account]))
 ;; Application context.  This is the result of processing the configuration and is passed
 ;; around internally.
-(s/def ::app-context (s/keys :req-un [:conf/http :ctx/runner :evt/event-bus :ctx/git :ctx/storage :ctx/public-api]
-                             :opt-un [:conf/dev-mode :arg/command ::system :conf/args :ctx/build :ctx/reporter]))
+(s/def ::app-context (s/keys :req-un [:conf/http :ctx/runner :evt/event-bus :ctx/git :ctx/storage :ctx/public-api
+                                      :ctx/logging]
+                             :opt-un [:conf/dev-mode :arg/command ::system :conf/args :ctx/build :ctx/reporter
+                                      :conf/work-dir]))
 
 ;; Script configuration
-(s/def ::script-config (s/keys :req-un [:conf/containers :conf/storage]
+(s/def ::script-config (s/keys :req-un [:conf/containers :conf/storage :conf/logging]
                                :opt-un [:conf/api]))

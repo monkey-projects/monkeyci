@@ -53,11 +53,12 @@
   (testing "results in context that is compliant to spec"
     (h/with-bus
       (fn [bus]
-        (is (true? (->> (sut/map->Context {:command (constantly "ok")
-                                           :event-bus bus
-                                           :config config/default-app-config})
-                        (c/start)
-                        (s/valid? ::spec/app-context)))))))
+        (let [ctx (->> (sut/map->Context {:command (constantly "ok")
+                                          :event-bus bus
+                                          :config config/default-app-config})
+                       (c/start))]
+          (is (true? (s/valid? ::spec/app-context ctx))
+              (s/explain-str ::spec/app-context ctx))))))
 
   (testing "sets git fn by default, returns checkout dir"
     (let [git-fn (-> (sut/new-context nil)

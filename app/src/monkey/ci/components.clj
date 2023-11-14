@@ -6,6 +6,7 @@
             [monkey.ci
              [commands :as co]
              [events :as e]
+             [logging :as l]
              [git :as git]
              [process :as p]
              [reporting :as rep]
@@ -70,7 +71,9 @@
         (update :runner r/make-runner)
         (assoc :storage (:storage storage)
                :public-api wsa/local-api
-               :reporter (rep/make-reporter (:reporter config)))))
+               :reporter (rep/make-reporter (:reporter config)))
+        (update :logging (fn [c]
+                           (assoc c :fn (l/make-logger c))))))
   (stop [this]
     this))
 

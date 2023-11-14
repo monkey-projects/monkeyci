@@ -137,7 +137,7 @@
    the given type that matches transducer `tx`.  Returns the waiter channel, as in
    `wait-for`."
   [f bus type tx]
-  ;; Starit waiting before actualy executing because otherwise we may miss the event.
+  ;; Start waiting before actualy executing because otherwise we may miss the event.
   (let [w (wait-for bus type tx)]
     (f)
     w))

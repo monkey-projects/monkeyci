@@ -39,7 +39,8 @@
              :shape "CI.Standard.A1.Flex" ; Use ARM shape, it's cheaper
              :shape-config {:ocpus 1
                             :memory-in-g-b-s 1}
-             ;; Assign a checkout volume where the repo is checked out
+             ;; Assign a checkout volume where the repo is checked out.
+             ;; This will be the working dir.
              :volumes [{:name checkout-vol
                         :volume-type "EMPTYDIR"
                         :backing-store "EPHEMERAL_STORAGE"}]

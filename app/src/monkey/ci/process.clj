@@ -98,17 +98,10 @@
       (config/config->env)
       (merge default-envs)))
 
-(defn- get-script-log-dir
-  "Determines and creates the log dir for the script output"
-  [ctx]
-  (when-let [id (get-in ctx [:build :build-id])]
-    (doto (io/file (ctx/log-dir ctx) id)
-      (.mkdirs))))
-
 (defn- script-output [ctx type]
-  (if-let [d (get-script-log-dir ctx)]
-    (io/file d (str (name type) ".log"))
-    :inherit))
+  (let [make-logger (ctx/logger ctx)
+        id (get-in ctx [:build :build-id])]
+    (make-logger ctx [id (str (name type) ".log")])))
 
 (defn execute!
   "Executes the build script located in given directory.  This actually runs the
@@ -118,6 +111,8 @@
   [{{:keys [checkout-dir script-dir build-id] :as build} :build bus :event-bus :as ctx}]
   (log/info "Executing build process for" build-id "in" checkout-dir)
   (let [{:keys [socket-path server]} (start-script-api ctx)]
+    ;; TODO Depending on settings, store the logs locally, pipe them to stdout
+    ;; or stream them to a storage bucket
     (bp/process
      {:dir script-dir
       :out (script-output ctx :out)
