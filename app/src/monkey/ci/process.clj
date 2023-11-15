@@ -12,6 +12,7 @@
              [config :refer [version] :as config]
              [context :as ctx]
              [events :as e]
+             [logging :as l]
              [script :as script]
              [utils :as utils]]
             [monkey.ci.build.core :as bc]
@@ -94,21 +95,14 @@
   (-> {:api
        {:socket socket-path}}
       (assoc :build-id (get-in ctx [:build :build-id]))
-      (merge (select-keys ctx [:containers :log-dir]))
+      (merge (select-keys ctx [:oci :containers :log-dir]))
+      (assoc :logging (dissoc (:logging ctx) :maker))
       (config/config->env)
       (merge default-envs)))
 
-(defn- get-script-log-dir
-  "Determines and creates the log dir for the script output"
-  [ctx]
-  (when-let [id (get-in ctx [:build :build-id])]
-    (doto (io/file (ctx/log-dir ctx) id)
-      (.mkdirs))))
-
-(defn- script-output [ctx type]
-  (if-let [d (get-script-log-dir ctx)]
-    (io/file d (str (name type) ".log"))
-    :inherit))
+(defn- make-logger [ctx type]
+  (let [id (get-in ctx [:build :build-id])]
+    ((ctx/log-maker ctx) ctx [id (str (name type) ".log")])))
 
 (defn execute!
   "Executes the build script located in given directory.  This actually runs the
@@ -117,29 +111,32 @@
    post a `build/completed` event on process exit."
   [{{:keys [checkout-dir script-dir build-id] :as build} :build bus :event-bus :as ctx}]
   (log/info "Executing build process for" build-id "in" checkout-dir)
-  (let [{:keys [socket-path server]} (start-script-api ctx)]
-    (bp/process
-     {:dir script-dir
-      :out (script-output ctx :out)
-      :err (script-output ctx :err)
-      :cmd (-> ["clojure"
-                "-Sdeps" (generate-deps ctx)
-                "-X:monkeyci/build"]
-               (concat (build-args ctx))
-               (vec))
-      :extra-env (process-env ctx socket-path)
-      :exit-fn (fn [{:keys [proc] :as p}]
-                 (let [exit (or (some-> proc (.exitValue)) 0)]
-                   (log/debug "Script process exited with code" exit ", cleaning up")
-                   (when server
-                     (script-api/stop-server server))
-                   (when socket-path 
-                     (uds/delete-address socket-path))
-                   ;; Bus should always be present.  This check is only for testing purposes.
-                   (when bus
-                     (log/debug "Posting build/completed event")
-                     (e/post-event bus {:type :build/completed
-                                        :build build
-                                        :exit exit
-                                        :result (if (zero? exit) :success :error)
-                                        :process p}))))})))
+  (let [{:keys [socket-path server]} (start-script-api ctx)
+        [out err :as loggers] (map (partial make-logger ctx) [:out :err])]
+    (-> (bp/process
+         {:dir script-dir
+          :out (l/log-output out)
+          :err (l/log-output err)
+          :cmd (-> ["clojure"
+                    "-Sdeps" (generate-deps ctx)
+                    "-X:monkeyci/build"]
+                   (concat (build-args ctx))
+                   (vec))
+          :extra-env (process-env ctx socket-path)
+          :exit-fn (fn [{:keys [proc] :as p}]
+                     (let [exit (or (some-> proc (.exitValue)) 0)]
+                       (log/debug "Script process exited with code" exit ", cleaning up")
+                       (when server
+                         (script-api/stop-server server))
+                       (when socket-path 
+                         (uds/delete-address socket-path))
+                       ;; Bus should always be present.  This check is only for testing purposes.
+                       (when bus
+                         (log/debug "Posting build/completed event")
+                         (e/post-event bus {:type :build/completed
+                                            :build build
+                                            :exit exit
+                                            :result (if (zero? exit) :success :error)
+                                            :process p}))))})
+        ;; Depending on settings, some process streams need handling
+        (l/handle-process-streams loggers))))

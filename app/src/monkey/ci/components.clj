@@ -5,7 +5,9 @@
             [com.stuartsierra.component :as c]
             [monkey.ci
              [commands :as co]
+             [config :as config]
              [events :as e]
+             [logging :as l]
              [git :as git]
              [process :as p]
              [reporting :as rep]
@@ -67,10 +69,11 @@
         (merge default-context)
         (dissoc :config)
         (merge config)
-        (update :runner r/make-runner)
+        (assoc :runner (r/make-runner config))
         (assoc :storage (:storage storage)
                :public-api wsa/local-api
-               :reporter (rep/make-reporter (:reporter config)))))
+               :reporter (rep/make-reporter (:reporter config)))
+        (config/initialize-log-maker)))
   (stop [this]
     this))
 
@@ -125,7 +128,7 @@
 (defrecord Storage [config]
   c/Lifecycle
   (start [this]
-    (assoc this :storage (st/make-storage (:storage config))))
+    (assoc this :storage (st/make-storage config)))
   
   (stop [this]
     (dissoc this :storage)))

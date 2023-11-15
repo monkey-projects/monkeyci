@@ -92,15 +92,17 @@
 
 (deftest make-storage
   (testing "can make oci storage"
-    (is (some? (st/make-storage {:type :oci
-                                 :region "test-region"}))))
+    (is (some? (st/make-storage {:storage
+                                 {:type :oci
+                                  :region "test-region"}}))))
 
   (testing "merges credentials in config"
     (let [creds {:tenancy-ocid "test-tenancy"
                  :user-ocid "test-user"}]
-      (is (= creds (-> (st/make-storage {:type :oci
-                                         :region "test-region"
-                                         :credentials creds})
+      (is (= creds (-> (st/make-storage {:storage
+                                         {:type :oci
+                                          :region "test-region"
+                                          :credentials creds}})
                        (.conf)
                        (select-keys (keys creds)))))))
 
@@ -108,9 +110,10 @@
     (let [creds {:tenancy-ocid "test-tenancy"
                  :user-ocid "test-user"
                  :private-key "dev-resources/test/test-key.pem"}]
-      (is (private-key? (-> (st/make-storage {:type :oci
-                                              :region "test-region"
-                                              :credentials creds})
+      (is (private-key? (-> (st/make-storage {:storage
+                                              {:type :oci
+                                               :region "test-region"
+                                               :credentials creds}})
                             (.conf)
                             :private-key))))))
 

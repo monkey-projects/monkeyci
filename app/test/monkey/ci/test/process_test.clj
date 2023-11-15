@@ -136,4 +136,13 @@
   (testing "sets `LC_CTYPE` to `UTF-8` for git clones"
     (is (= "UTF-8" (-> {}
                        (sut/process-env "test-socket")
-                       :lc-ctype)))))
+                       :lc-ctype))))
+
+  (testing "passes log config, without maker"
+    (let [env (-> {:logging {:type :file
+                             :dir "test-dir"
+                             :maker (constantly :error)}}
+                  (sut/process-env "test-socket"))]
+      (is (= :file (:monkeyci-logging-type env)))
+      (is (= "test-dir" (:monkeyci-logging-dir env)))
+      (is (not (contains? env :monkeyci-logging-maker))))))

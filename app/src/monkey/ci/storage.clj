@@ -47,7 +47,7 @@
 (defn make-memory-storage []
   (->MemoryStorage (atom {})))
 
-(defmulti make-storage :type)
+(defmulti make-storage (comp :type :storage))
 
 (defmethod make-storage :memory [_]
   (log/info "Using memory storage (only for dev purposes!)")

@@ -6,7 +6,7 @@
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
             [monkey.ci
-             [config :as config]
+             [oci :as oci]
              [storage :as st]]
             [monkey.oci.os.core :as os]))
 
@@ -100,4 +100,7 @@
   (->OciObjectStorage (os/make-client conf) conf))
 
 (defmethod st/make-storage :oci [conf]
-  (make-oci-storage (config/->oci-config conf)))
+  (-> conf
+      (oci/ctx->oci-config :storage)
+      (oci/->oci-config)
+      (make-oci-storage)))

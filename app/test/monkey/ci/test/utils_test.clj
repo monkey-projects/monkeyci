@@ -41,3 +41,21 @@
   (testing "returns input if it's already a private key"
     (let [k (reify java.security.PrivateKey)]
       (is (= k (sut/load-privkey k))))))
+
+(deftest stack-trace
+  (testing "prints to string"
+    (is (string? (sut/stack-trace (Exception. "Test exception"))))))
+
+(deftest prune-tree
+  (testing "removes nil values"
+    (is (empty? (sut/prune-tree {:key nil}))))
+
+  (testing "removes nil values from sub"
+    (is (= {:parent {:child {:name "test"}}}
+           (sut/prune-tree {:parent {:child {:name "test"
+                                             :other nil}}}))))
+
+  (testing "removes empty sub maps"
+    (is (= {:parent {:child {:name "test"}}}
+           (sut/prune-tree {:parent {:child {:name "test"
+                                             :other {}}}})))))

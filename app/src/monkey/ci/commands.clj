@@ -34,12 +34,14 @@
 (defn prepare-build-ctx
   "Updates the context for the build runner, by adding a `build` object"
   [{:keys [work-dir] :as ctx}]
-  (let [orig-sid (take 4 (parse-sid (get-in ctx [:args :sid])))
+  (let [orig-sid (some->> (get-in ctx [:args :sid])
+                          (parse-sid)
+                          (take 4))
         ;; Either generate a new build id, or use the one given
-        sid (st/->sid (if (includes-build-id? orig-sid)
+        sid (st/->sid (if (or (empty? orig-sid) (includes-build-id? orig-sid))
                         orig-sid
                         (concat orig-sid [(u/new-build-id)])))
-        id (last sid)]
+        id (or (last sid) (u/new-build-id))]
     (-> ctx
         ;; Prepare the build properties
         (assoc :build {:build-id id

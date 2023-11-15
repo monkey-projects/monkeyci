@@ -10,6 +10,7 @@
             [monkey.ci
              [containers :as mcc]
              [context :as c]
+             [logging :as l]
              [utils :as u]]))
 
 (defn- make-script-cmd [script]
@@ -65,15 +66,17 @@
 
 (defmethod mcc/run-container :podman [{:keys [build-id step pipeline] :as ctx}]
   (log/info "Running build step " build-id "/" (:name step) "as podman container")
-  (let [out-dir (doto (io/file (c/log-dir ctx)
-                               build-id
-                               (or (:name pipeline) (str (:index pipeline)))
-                               (str (:index step)))
-                  (.mkdirs))
-        [out-file err-file] (->> ["out.txt" "err.txt"]
-                                 (map (partial io/file out-dir)))]
-    (log/debug "Writing logs to" out-dir)
-    @(bp/process {:dir (c/step-work-dir ctx)
-                  :out out-file
-                  :err err-file
-                  :cmd (build-cmd-args ctx)})))
+  (let [log-maker (c/log-maker ctx)
+        log-base [build-id
+                  (or (:name pipeline) (str (:index pipeline)))
+                  (str (:index step))]
+        [out-log err-log :as loggers] (->> ["out.txt" "err.txt"]
+                                           (map (partial conj log-base))
+                                           (map (partial log-maker ctx)))]
+    (log/debug "Log base is:" log-base)
+    (-> (bp/process {:dir (c/step-work-dir ctx)
+                     :out (l/log-output out-log)
+                     :err (l/log-output err-log)
+                     :cmd (build-cmd-args ctx)})
+        (l/handle-process-streams loggers)
+        (deref))))

@@ -14,7 +14,9 @@
             [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [medley.core :as mc]
-            [monkey.ci.utils :as u]))
+            [monkey.ci
+             [logging :as l]
+             [utils :as u]]))
 
 (def ^:dynamic *global-config-file* "/etc/monkeyci/config.edn")
 (def ^:dynamic *home-config-file* (-> (System/getProperty "user.home")
@@ -26,13 +28,6 @@
 ;; Determine version at compile time
 (defmacro version []
   `(or (System/getenv (csk/->SCREAMING_SNAKE_CASE (str env-prefix "-version"))) "0.1.0-SNAPSHOT"))
-
-(defn- merge-if-map [a b]
-  (if (map? a)
-    (merge a b)
-    b))
-
-(def deep-merge (partial merge-with merge-if-map))
 
 (defn- key-filter [prefix]
   (let [exp (str (name prefix) "-")]
@@ -57,6 +52,14 @@
     (-> (mc/remove-keys (key-filter prefix) m)
         (assoc prefix s))))
 
+(defn- group-credentials
+  "For each of the given keys, groups `credential` into subkeys"
+  [keys conf]
+  (reduce (fn [r k]
+            (update r k (partial group-keys :credentials)))
+          conf
+          keys))
+
 (defn- config-from-env
   "Takes configuration from env vars"
   [env]
@@ -64,12 +67,12 @@
             (reduce (fn [r v]
                       (group-keys v r))
                     c
-                    [:github :runner :containers :storage :api :account :http]))]
+                    [:github :runner :containers :storage :api :account :http :logging :oci]))]
     (->> env
          (filter-and-strip-keys env-prefix)
          (group-all-keys)
-         ;; Remove nil values and empty strings
-         (mc/remove-vals (some-fn nil? (every-pred string? empty?))))))
+         (group-credentials [:oci :storage :runner :logging])
+         (u/prune-tree))))
 
 (defn- parse-edn
   "Parses the input file as `edn` and converts keys to kebab-case."
@@ -114,10 +117,12 @@
    :containers
    {:type :podman}
    :reporter
-   {:type :print}})
+   {:type :print}
+   :logging
+   {:type :inherit}})
 
 (defn- merge-configs [configs]
-  (reduce deep-merge default-app-config configs))
+  (reduce u/deep-merge default-app-config configs))
 
 (defn- set-work-dir [conf]
   (assoc conf :work-dir (u/abs-path (or (get-in conf [:args :workdir])
@@ -128,7 +133,12 @@
   (update conf :checkout-base-dir #(or (u/abs-path %) (u/combine (:work-dir conf) "checkout"))))
 
 (defn- set-log-dir [conf]
-  (update conf :log-dir #(or (u/abs-path %) (u/combine (:work-dir conf) "logs"))))
+  (update conf
+          :logging
+          (fn [{:keys [type] :as c}]
+            (cond-> c
+              ;; FIXME This check should be centralized in logging ns
+              (= :file type) (update :dir #(or (u/abs-path %) (u/combine (:work-dir conf) "logs")))))))
 
 (defn- set-account
   "Updates the `:account` in the config with cli args"
@@ -154,6 +164,7 @@
       (update-in [:http :port] #(or (:port args) %))
       (update-in [:runner :type] keyword)
       (update-in [:storage :type] keyword)
+      (update-in [:logging :type] keyword)
       (set-work-dir)
       (set-checkout-base-dir)
       (set-log-dir)
@@ -162,15 +173,21 @@
 (def default-script-config
   "Default configuration for the script runner."
   {:containers {:type :docker}
-   :storage {:type :memory}})
+   :storage {:type :memory}
+   :logging {:type :inherit}})
+
+(defn initialize-log-maker [conf]
+  (assoc-in conf [:logging :maker] (l/make-logger conf)))
 
 (defn script-config
   "Builds config map used by the child script process"
   [env args]
   (-> default-script-config
-      (deep-merge (config-from-env env))
+      (u/deep-merge (config-from-env env))
       (merge args)
-      (update-in [:containers :type] keyword)))
+      (update-in [:containers :type] keyword)
+      (update-in [:logging :type] keyword)
+      (initialize-log-maker)))
 
 (defn- flatten-nested
   "Recursively flattens a map of maps.  Each key in the resulting map is a
@@ -196,11 +213,3 @@
        (flatten-nested [])
        (mc/map-keys (fn [k]
                       (keyword (str env-prefix "-" (name k)))))))
-
-(defn ->oci-config
-  "Given a configuration map with credentials, turns it into a config map
-   that can be passed to OCI context creators."
-  [{:keys [credentials] :as conf}]
-  (-> conf
-      (merge (mc/update-existing credentials :private-key u/load-privkey))
-      (dissoc :credentials)))

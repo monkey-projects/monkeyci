@@ -61,6 +61,6 @@
   (log/debug "File storage location:" dir)
   (->FileStorage dir))
 
-(defmethod s/make-storage :file [conf]
+(defmethod s/make-storage :file [{conf :storage}]
   (log/info "Using file storage with configuration:" conf)
   (make-file-storage (u/abs-path (:dir conf))))

@@ -9,6 +9,14 @@
              [spec :as spec]]
             [monkey.ci.test.helpers :as h]))
 
+(defn- with-home-config [config body]
+  (h/with-tmp-dir dir
+    (let [f (-> (io/file dir "home-config.edn")
+                (.getCanonicalPath))]
+      (binding [sut/*home-config-file* f]
+        (is (nil? (spit f (pr-str config))))
+        (body)))))
+
 (deftest app-config
   (testing "provides default values"
     (is (= 3000 (-> (sut/app-config {} {})
@@ -55,34 +63,31 @@
             (s/explain-str ::spec/app-config c)))))
 
   (testing "provides log-dir as absolute path"
-    (is (re-matches #".+test-dir$" (-> {:monkeyci-log-dir "test-dir"}
+    (is (re-matches #".+test-dir$" (-> {:monkeyci-logging-dir "test-dir"}
                                        (sut/app-config {})
                                        (ctx/log-dir)))))
 
   (testing "loads config from `config-file` path"
     (h/with-tmp-dir dir
       (let [f (io/file dir "test-config.edn")]
-        (is (nil? (spit f (pr-str {:log-dir "some-log-dir"}))))
+        (is (nil? (spit f (pr-str {:work-dir "some-work-dir"}))))
         (let [c (sut/app-config {} {:config-file (.getCanonicalPath f)})]
-          (is (cs/ends-with? (:log-dir c) "some-log-dir"))))))
+          (is (cs/ends-with? (:work-dir c) "some-work-dir"))))))
 
   (testing "loads global config file"
     (h/with-tmp-dir dir
       (let [f (-> (io/file dir "test-config.edn")
                   (.getCanonicalPath))]
         (binding [sut/*global-config-file* f]
-          (is (nil? (spit f (pr-str {:log-dir "some-log-dir"}))))
+          (is (nil? (spit f (pr-str {:work-dir "some-work-dir"}))))
           (let [c (sut/app-config {} {})]
-            (is (cs/ends-with? (:log-dir c) "some-log-dir")))))))
+            (is (cs/ends-with? (:work-dir c) "some-work-dir")))))))
 
   (testing "loads home config file"
-    (h/with-tmp-dir dir
-      (let [f (-> (io/file dir "home-config.edn")
-                  (.getCanonicalPath))]
-        (binding [sut/*home-config-file* f]
-          (is (nil? (spit f (pr-str {:log-dir "some-log-dir"}))))
-          (let [c (sut/app-config {} {})]
-            (is (cs/ends-with? (:log-dir c) "some-log-dir")))))))
+    (with-home-config
+      {:log-dir "some-log-dir"}
+      #(let [c (sut/app-config {} {})]
+         (is (cs/ends-with? (:log-dir c) "some-log-dir")))))
 
   (testing "global `work-dir`"
     (testing "uses current as default"
@@ -105,11 +110,19 @@
                           :checkout-base-dir)
                       "test-dir")))
 
-  (testing "calculates log dir from work dir"
-    (is (cs/includes? (-> (sut/app-config {:monkeyci-work-dir "test-dir"} {})
-                          :log-dir)
+  (testing "calculates log dir from work dir when type is `file`"
+    (is (cs/includes? (-> (sut/app-config {:monkeyci-work-dir "test-dir"
+                                           :monkeyci-logging-type "file"}
+                                          {})
+                          :logging
+                          :dir)
                       "test-dir")))
 
+  (testing "ignores log dir from work dir when type is not `file`"
+    (is (nil? (-> (sut/app-config {:monkeyci-work-dir "test-dir"} {:logging {:type :inherit}})
+                  :logging
+                  :dir))))
+  
   (testing "includes account"
     (is (= {:customer-id "test-customer"}
            (-> {:monkeyci-account-customer-id "test-customer"}
@@ -129,7 +142,26 @@
     (is (= "http://test" (-> (sut/app-config {}
                                              {:server "http://test"})
                              :account
-                             :url)))))
+                             :url))))
+
+  (testing "oci"
+    (testing "provides credentials from env"
+      (is (= "env-fingerprint" (-> {:monkeyci-logging-credentials-key-fingerprint "env-fingerprint"}
+                                   (sut/app-config {})
+                                   :logging
+                                   :credentials
+                                   :key-fingerprint))))
+    
+    (testing "keeps credentials from config file"
+      (with-home-config
+        {:logging
+         {:credentials
+          {:key-fingerprint "conf-fingerprint"}}}
+        #(is (= "conf-fingerprint" (->> {}
+                                        (sut/app-config {})
+                                        :logging
+                                        :credentials
+                                        :key-fingerprint)))))))
 
 (deftest config->env
   (testing "empty for empty input"
@@ -150,6 +182,18 @@
                           :containers
                           :type))))
 
+  (testing "sets logging config"
+    (is (= :file (-> {:monkeyci-logging-type "file"}
+                     (sut/script-config {})
+                     :logging
+                     :type))))
+
+  (testing "initializes logging maker"
+    (is (fn? (-> {:monkeyci-logging-type "file"}
+                 (sut/script-config {})
+                 :logging
+                 :maker))))
+
   (testing "groups api settings"
     (is (= "test-socket" (-> {:monkeyci-api-socket "test-socket"}
                              (sut/script-config {})
@@ -157,7 +201,14 @@
                              :socket))))
 
   (testing "matches spec"
-    (is (true? (s/valid? ::spec/script-config (sut/script-config {} {}))))))
+    (is (true? (s/valid? ::spec/script-config (sut/script-config {} {})))))
+
+  (testing "provides oci credentials from env"
+    (is (= "test-fingerprint" (-> {:monkeyci-logging-credentials-key-fingerprint "test-fingerprint"}
+                                  (sut/script-config {})
+                                  :logging
+                                  :credentials
+                                  :key-fingerprint)))))
 
 (deftest load-config-file
   (testing "`nil` if file does not exist"

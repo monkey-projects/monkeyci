@@ -3,13 +3,15 @@
             [babashka.process :as bp]
             [monkey.ci
              [containers :as mcc]
+             [logging :as l]
              [podman :as sut]]
             [monkey.ci.test.helpers :as h]))
 
 (deftest run-container
-  (testing "starts podman process"
-    (with-redefs [bp/process (fn [args]
-                               (future args))]
+  (with-redefs [bp/process (fn [args]
+                             (future args))]
+    
+    (testing "starts podman process"   
       (h/with-tmp-dir dir
         (let [r (mcc/run-container
                  {:containers {:type :podman}
@@ -22,7 +24,27 @@
           (is (= "/usr/bin/podman" (-> r :cmd first)))
           (is (contains? (set (:cmd r))
                          "test-img"))
-          (is (= "first && second" (last (:cmd r)))))))))
+          (is (= "first && second" (last (:cmd r)))))))
+
+    (testing "passes build, pipeline and step ids for output capturing"
+      (h/with-tmp-dir dir
+        (let [log-paths (atom [])
+              r (mcc/run-container
+                 {:containers {:type :podman}
+                  :build-id "test-build"
+                  :work-dir dir
+                  :step {:name "test-step"
+                         :index 0
+                         :container/image "test-img"
+                         :script ["first" "second"]}
+                  :pipeline {:name "test-pipeline"}
+                  :logging {:maker (fn [_ path]
+                                     (swap! log-paths conj path)
+                                     (l/->InheritLogger))}})]
+          (is (= 2 (count @log-paths)))
+          (is (= ["test-build" "test-pipeline" "0"] (->> @log-paths
+                                                         first
+                                                         (take 3)))))))))
 
 (defn- contains-subseq? [l expected]
   (let [n (count expected)]
