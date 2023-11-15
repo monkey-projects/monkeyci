@@ -56,7 +56,8 @@
       (println "Step succeeded:" (accent (step-name event)) good)
       (do
         (println "Step failed:" (accent (step-name event)) bad)
-        (println "Message:" (accent (:message event)))))
+        (println "Message:" (accent (:message event)))
+        (println "Stack trace:" (cl/style (:stack-trace event) :red))))
     ;; Other cases, just ignore
     nil))
 

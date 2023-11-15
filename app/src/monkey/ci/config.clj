@@ -30,6 +30,7 @@
   `(or (System/getenv (csk/->SCREAMING_SNAKE_CASE (str env-prefix "-version"))) "0.1.0-SNAPSHOT"))
 
 (defn- merge-if-map [a b]
+  (println "Merging:" a "and" b)
   (if (map? a)
     (merge a b)
     b))
@@ -59,6 +60,14 @@
     (-> (mc/remove-keys (key-filter prefix) m)
         (assoc prefix s))))
 
+(defn- group-credentials
+  "For each of the given keys, groups `credential` into subkeys"
+  [keys conf]
+  (reduce (fn [r k]
+            (update r k (partial group-keys :credentials)))
+          conf
+          keys))
+
 (defn- config-from-env
   "Takes configuration from env vars"
   [env]
@@ -70,8 +79,8 @@
     (->> env
          (filter-and-strip-keys env-prefix)
          (group-all-keys)
-         ;; Remove nil values and empty strings
-         (mc/remove-vals (some-fn nil? (every-pred string? empty?))))))
+         (group-credentials [:storage :runner :logging])
+         (u/prune-tree))))
 
 (defn- parse-edn
   "Parses the input file as `edn` and converts keys to kebab-case."

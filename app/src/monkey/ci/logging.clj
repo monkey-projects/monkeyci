@@ -2,6 +2,8 @@
   "Handles log configuration and how to process logs from a build script"
   (:require [clojure.java.io :as io]
             [clojure.string :as cs]
+            [clojure.tools.logging :as log]
+            [manifold.deferred :as md]
             [monkey.ci.oci :as oci]))
 
 (defprotocol LogCapturer
@@ -39,6 +41,24 @@
 (defmethod make-logger :file [conf]
   (partial ->FileLogger conf))
 
+(defn- ensure-cleanup
+  "Registers a shutdown hook to ensure the deferred is being completed, even if the
+   system shuts down.  The shutdown hook is removed on completion.  If we don't do
+   this, the multipart streams don't get committed when the vm shuts down in the
+   process."
+  [d]
+  (let [shutdown? (atom false)
+        t (Thread. (fn []
+                     (reset! shutdown? true)
+                     (log/debug "Waiting for deferred to complete...")
+                     (deref d)))
+        remove-hook (fn [& _]
+                      (when-not @shutdown?
+                        (.removeShutdownHook (Runtime/getRuntime) t)))]
+    (.addShutdownHook (Runtime/getRuntime) t)
+    (md/on-realized d remove-hook remove-hook)
+    d))
+
 (deftype OciBucketLogger [conf ctx path]
   LogCapturer
   (log-output [_]
@@ -49,8 +69,9 @@
           prefix (:prefix conf)
           on (cs/join "/" (->> (concat [prefix] (take 3 sid) path)
                                (remove nil?)))]
-      (oci/stream-to-bucket (assoc conf :object-name on)
-                            in))))
+      (-> (oci/stream-to-bucket (assoc conf :object-name on)
+                                in)
+          (ensure-cleanup)))))
 
 (defmethod make-logger :oci [conf]
   (fn [ctx path]

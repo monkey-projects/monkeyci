@@ -11,6 +11,7 @@
              [config :as config]
              [core :as c]
              [events :as e]
+             [logging :as l]
              [oci :as oci]
              [storage :as s]
              [utils :as u]]
@@ -153,3 +154,10 @@
       (load-config)
       :storage
       (s/make-storage)))
+
+(defn test-stream-to-bucket []
+  (let [c (load-config "oci-config.edn")
+        m (l/make-logger (:logging c))
+        in (java.io.ByteArrayInputStream. (.getBytes "Hi, this is a test string"))
+        logger (m c ["test.log"])]
+    @(l/handle-stream logger in)))

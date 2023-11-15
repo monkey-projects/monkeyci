@@ -1,9 +1,12 @@
 (ns monkey.ci.utils
   (:require [buddy.core.keys.pem :as pem]
             [clojure.core.async :as ca]
-            [clojure.edn :as edn]
+            [clojure
+             [edn :as edn]
+             [walk :as cw]]
             [clojure.java.io :as io]
-            [clojure.repl :as cr])
+            [clojure.repl :as cr]
+            [medley.core :as mc])
   (:import org.apache.commons.io.FileUtils))
 
 (defn cwd
@@ -101,3 +104,22 @@
        (cr/demunge)
        (re-find #".*\/(.*)[\-\-|@].*")
        (second)))
+
+(defn stack-trace
+  "Prints stack trace to a string"
+  [^Exception ex]
+  (let [sw (java.io.StringWriter.)
+        pw (java.io.PrintWriter. sw)]
+    (.printStackTrace ex pw)
+    (.flush pw)
+    (.toString sw)))
+
+(defn- prune-map [m]
+  ;; Remove nil values and empty strings
+  (mc/remove-vals (some-fn nil? (every-pred seqable? empty?) (every-pred string? empty?)) m))
+
+(defn prune-tree [t]
+  (cw/prewalk (fn [x]
+                (cond-> x
+                  (map? x) (prune-map)))
+              t))

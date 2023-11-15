@@ -1,6 +1,7 @@
 (ns monkey.ci.test.logging-test
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.java.io :as io]
+            [manifold.deferred :as md]
             [monkey.ci
              [logging :as sut]
              [oci :as oci]]
@@ -55,26 +56,28 @@
 
     (testing "handles stream by piping to bucket object"
       (with-redefs [oci/stream-to-bucket (fn [conf in]
-                                           {:config conf
-                                            :stream in})]
+                                           (md/future
+                                             {:config conf
+                                              :stream in}))]
         (let [maker (sut/make-logger {:type :oci
                                       :bucket-name "test-bucket"})
               l (maker {:build {:sid ["test-cust" "test-proj" "test-repo"]}}
                        ["test.log"])
-              r (sut/handle-stream l :test-stream)]
+              r @(sut/handle-stream l :test-stream)]
           (is (= :test-stream (:stream r)))
           (is (= "test-cust/test-proj/test-repo/test.log"
                  (get-in r [:config :object-name]))))))
 
     (testing "adds prefix to object name"
       (with-redefs [oci/stream-to-bucket (fn [conf in]
-                                           {:config conf
-                                            :stream in})]
+                                           (md/future
+                                             {:config conf
+                                              :stream in}))]
         (let [maker (sut/make-logger {:type :oci
                                       :bucket-name "test-bucket"
                                       :prefix "logs"})
               l (maker {:build {:sid ["test-cust" "test-proj" "test-repo"]}}
                        ["test.log"])
-              r (sut/handle-stream l :test-stream)]
+              r @(sut/handle-stream l :test-stream)]
           (is (= "logs/test-cust/test-proj/test-repo/test.log"
                  (get-in r [:config :object-name]))))))))

@@ -115,14 +115,15 @@
        (some? name) (-> (assoc :name name)
                         (update :message str ": " name)))
      (fn [{:keys [status message exception]}]
-       {:type :step/end
-        :message (or (some-> exception (.getMessage))
-                     message
-                     "Step completed")
-        :pipeline p
-        :index index
-        :name name
-        :status status})
+       (cond-> {:type :step/end
+                :message (or message
+                             "Step completed")
+                :pipeline p
+                :index index
+                :name name
+                :status status}
+         (some? exception) (assoc :message (.getMessage exception)
+                                  :stack-trace (u/stack-trace exception))))
      (fn []
        (let [{:keys [step] :as ctx} (make-step-dir-absolute ctx)]
          (try

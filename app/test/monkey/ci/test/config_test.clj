@@ -136,7 +136,28 @@
     (is (= "http://test" (-> (sut/app-config {}
                                              {:server "http://test"})
                              :account
-                             :url)))))
+                             :url))))
+
+  (testing "provides oci credentials from env"
+    (is (= "env-fingerprint" (-> {:monkeyci-logging-credentials-key-fingerprint "env-fingerprint"}
+                                 (sut/app-config {})
+                                 :logging
+                                 :credentials
+                                 :key-fingerprint))))
+  
+  (testing "keeps credentials from config file"
+    (h/with-tmp-dir dir
+      (let [f (-> (io/file dir "home-config.edn")
+                  (.getCanonicalPath))]
+        (binding [sut/*home-config-file* f]
+          (is (nil? (spit f (pr-str {:logging
+                                     {:credentials
+                                      {:key-fingerprint "conf-fingerprint"}}}))))
+          (is (= "conf-fingerprint" (->> {}
+                                         (sut/app-config {})
+                                         :logging
+                                         :credentials
+                                         :key-fingerprint))))))))
 
 (deftest config->env
   (testing "empty for empty input"
@@ -176,7 +197,23 @@
                              :socket))))
 
   (testing "matches spec"
-    (is (true? (s/valid? ::spec/script-config (sut/script-config {} {}))))))
+    (is (true? (s/valid? ::spec/script-config (sut/script-config {} {})))))
+
+  (testing "provides oci credentials from env"
+    (is (= "test-fingerprint" (-> {:monkeyci-logging-credentials-key-fingerprint "test-fingerprint"}
+                                  (sut/script-config {})
+                                  :logging
+                                  :credentials
+                                  :key-fingerprint))))
+
+  (testing "keeps original credentials"
+    (is (= "test-fingerprint" (-> {:monkeyci-logging-type "oci"}
+                                  (sut/script-config {:logging
+                                                      {:credentials
+                                                       {:key-fingerprint "test-fingerprint"}}})
+                                  :logging
+                                  :credentials
+                                  :key-fingerprint)))))
 
 (deftest load-config-file
   (testing "`nil` if file does not exist"

@@ -161,7 +161,14 @@
                     (sut/prepare-build-ctx)
                     :build)]
         (is (= "d" (:build-id ctx)))
-        (is (= "d" (last (:sid ctx))))))))
+        (is (= "d" (last (:sid ctx)))))))
+
+  (testing "when no sid specified"
+    (testing "leaves it unspecified"
+      (is (empty? (-> {:args {}}
+                      (sut/prepare-build-ctx)
+                      :build
+                      :sid))))))
 
 (deftest http-server
   (testing "returns a channel"
