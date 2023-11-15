@@ -95,7 +95,7 @@
   (-> {:api
        {:socket socket-path}}
       (assoc :build-id (get-in ctx [:build :build-id]))
-      (merge (select-keys ctx [:containers :log-dir]))
+      (merge (select-keys ctx [:oci :containers :log-dir]))
       (assoc :logging (dissoc (:logging ctx) :maker))
       (config/config->env)
       (merge default-envs)))
