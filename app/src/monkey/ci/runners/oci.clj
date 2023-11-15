@@ -100,5 +100,8 @@
   (run-instance client (instance-config conf ctx)))
 
 (defmethod r/make-runner :oci [conf]
-  (let [client (ci/make-context (oci/->oci-config conf))]
+  (let [client (-> conf
+                   (oci/ctx->oci-config :runner)
+                   (oci/->oci-config)
+                   (ci/make-context))]
     (partial oci-runner client conf)))

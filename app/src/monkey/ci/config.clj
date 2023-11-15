@@ -29,14 +29,6 @@
 (defmacro version []
   `(or (System/getenv (csk/->SCREAMING_SNAKE_CASE (str env-prefix "-version"))) "0.1.0-SNAPSHOT"))
 
-(defn- merge-if-map [a b]
-  (println "Merging:" a "and" b)
-  (if (map? a)
-    (merge a b)
-    b))
-
-(def deep-merge (partial merge-with merge-if-map))
-
 (defn- key-filter [prefix]
   (let [exp (str (name prefix) "-")]
     #(.startsWith (name %) exp)))
@@ -130,7 +122,7 @@
    {:type :inherit}})
 
 (defn- merge-configs [configs]
-  (reduce deep-merge default-app-config configs))
+  (reduce u/deep-merge default-app-config configs))
 
 (defn- set-work-dir [conf]
   (assoc conf :work-dir (u/abs-path (or (get-in conf [:args :workdir])
@@ -185,14 +177,13 @@
    :logging {:type :inherit}})
 
 (defn initialize-log-maker [conf]
-  (update conf :logging (fn [c]
-                          (assoc c :maker (l/make-logger c)))))
+  (assoc-in conf [:logging :maker] (l/make-logger conf)))
 
 (defn script-config
   "Builds config map used by the child script process"
   [env args]
   (-> default-script-config
-      (deep-merge (config-from-env env))
+      (u/deep-merge (config-from-env env))
       (merge args)
       (update-in [:containers :type] keyword)
       (update-in [:logging :type] keyword)

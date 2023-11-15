@@ -84,7 +84,7 @@
     (not-empty (get-in ctx [:build :git])) (download-git)))
 
 ;; Creates a runner fn according to its type
-(defmulti make-runner :type)
+(defmulti make-runner (comp :type :runner))
 
 (defmethod make-runner :child [_]
   (log/info "Using child process runner")

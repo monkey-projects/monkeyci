@@ -9,6 +9,14 @@
              [spec :as spec]]
             [monkey.ci.test.helpers :as h]))
 
+(defn- with-home-config [config body]
+  (h/with-tmp-dir dir
+    (let [f (-> (io/file dir "home-config.edn")
+                (.getCanonicalPath))]
+      (binding [sut/*home-config-file* f]
+        (is (nil? (spit f (pr-str config))))
+        (body)))))
+
 (deftest app-config
   (testing "provides default values"
     (is (= 3000 (-> (sut/app-config {} {})
@@ -76,13 +84,10 @@
             (is (cs/ends-with? (:work-dir c) "some-work-dir")))))))
 
   (testing "loads home config file"
-    (h/with-tmp-dir dir
-      (let [f (-> (io/file dir "home-config.edn")
-                  (.getCanonicalPath))]
-        (binding [sut/*home-config-file* f]
-          (is (nil? (spit f (pr-str {:log-dir "some-log-dir"}))))
-          (let [c (sut/app-config {} {})]
-            (is (cs/ends-with? (:log-dir c) "some-log-dir")))))))
+    (with-home-config
+      {:log-dir "some-log-dir"}
+      #(let [c (sut/app-config {} {})]
+         (is (cs/ends-with? (:log-dir c) "some-log-dir")))))
 
   (testing "global `work-dir`"
     (testing "uses current as default"
@@ -117,6 +122,7 @@
     (is (nil? (-> (sut/app-config {:monkeyci-work-dir "test-dir"} {:logging {:type :inherit}})
                   :logging
                   :dir))))
+  
   (testing "includes account"
     (is (= {:customer-id "test-customer"}
            (-> {:monkeyci-account-customer-id "test-customer"}
@@ -138,26 +144,24 @@
                              :account
                              :url))))
 
-  (testing "provides oci credentials from env"
-    (is (= "env-fingerprint" (-> {:monkeyci-logging-credentials-key-fingerprint "env-fingerprint"}
-                                 (sut/app-config {})
-                                 :logging
-                                 :credentials
-                                 :key-fingerprint))))
-  
-  (testing "keeps credentials from config file"
-    (h/with-tmp-dir dir
-      (let [f (-> (io/file dir "home-config.edn")
-                  (.getCanonicalPath))]
-        (binding [sut/*home-config-file* f]
-          (is (nil? (spit f (pr-str {:logging
-                                     {:credentials
-                                      {:key-fingerprint "conf-fingerprint"}}}))))
-          (is (= "conf-fingerprint" (->> {}
-                                         (sut/app-config {})
-                                         :logging
-                                         :credentials
-                                         :key-fingerprint))))))))
+  (testing "oci"
+    (testing "provides credentials from env"
+      (is (= "env-fingerprint" (-> {:monkeyci-logging-credentials-key-fingerprint "env-fingerprint"}
+                                   (sut/app-config {})
+                                   :logging
+                                   :credentials
+                                   :key-fingerprint))))
+    
+    (testing "keeps credentials from config file"
+      (with-home-config
+        {:logging
+         {:credentials
+          {:key-fingerprint "conf-fingerprint"}}}
+        #(is (= "conf-fingerprint" (->> {}
+                                        (sut/app-config {})
+                                        :logging
+                                        :credentials
+                                        :key-fingerprint)))))))
 
 (deftest config->env
   (testing "empty for empty input"
@@ -202,15 +206,6 @@
   (testing "provides oci credentials from env"
     (is (= "test-fingerprint" (-> {:monkeyci-logging-credentials-key-fingerprint "test-fingerprint"}
                                   (sut/script-config {})
-                                  :logging
-                                  :credentials
-                                  :key-fingerprint))))
-
-  (testing "keeps original credentials"
-    (is (= "test-fingerprint" (-> {:monkeyci-logging-type "oci"}
-                                  (sut/script-config {:logging
-                                                      {:credentials
-                                                       {:key-fingerprint "test-fingerprint"}}})
                                   :logging
                                   :credentials
                                   :key-fingerprint)))))

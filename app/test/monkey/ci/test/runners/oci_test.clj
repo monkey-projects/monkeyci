@@ -8,7 +8,10 @@
 
 (deftest make-runner
   (testing "provides for `:oci` type"
-    (is (some? (get-method r/make-runner :oci)))))
+    (is (some? (get-method r/make-runner :oci))))
+
+  (testing "creates oci runner"
+    (is (fn? (r/make-runner {:runner {:type :oci}})))))
 
 (deftest oci-runner
   (testing "creates container instance"

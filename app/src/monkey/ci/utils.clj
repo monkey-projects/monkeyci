@@ -123,3 +123,10 @@
                 (cond-> x
                   (map? x) (prune-map)))
               t))
+
+(defn- merge-if-map [a b]
+  (if (map? a)
+    (merge a b)
+    b))
+
+(def deep-merge (partial merge-with merge-if-map))

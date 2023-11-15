@@ -15,6 +15,13 @@
       (merge (mc/update-existing credentials :private-key u/load-privkey))
       (dissoc :credentials)))
 
+(defn ctx->oci-config
+  "Gets the oci configuration for the given key from the context.  This merges
+   in the general OCI configurationn."
+  [ctx k]
+  (u/deep-merge (:oci ctx)
+                (k ctx)))
+
 (defn stream-to-bucket
   "Pipes an input stream to a bucket object using multipart uploads.
    Returns a deferred that will resolve when the upload completes.

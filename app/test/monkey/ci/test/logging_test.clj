@@ -11,7 +11,8 @@
 
 (deftest make-logger
   (testing "type `inherit`"
-    (let [maker (sut/make-logger {:type :inherit})
+    (let [maker (sut/make-logger {:logging
+                                  {:type :inherit}})
           l (maker {} [])]
       
       (testing "creates logger that always returns `:inherit`"
@@ -22,8 +23,9 @@
 
   (testing "type `file`"
     (h/with-tmp-dir dir
-      (let [maker (sut/make-logger {:type :file
-                                    :dir dir})]
+      (let [maker (sut/make-logger {:logging
+                                    {:type :file
+                                     :dir dir}})]
         
         (testing "creates logger that returns file name"
           (let [l (maker {} ["test.txt"])
@@ -32,7 +34,8 @@
             (is (= (io/file dir "test.txt") f))))
 
         (testing "defaults to subdir from context work dir"
-          (let [maker (sut/make-logger {:type :file})
+          (let [maker (sut/make-logger {:logging
+                                        {:type :file}})
                 l (maker {:work-dir dir} ["test.txt"])
                 f (sut/log-output l)]
             (is (file? f))
@@ -49,8 +52,9 @@
 
   (testing "type `oci`"
     (testing "creates logger that outputs to streams"
-      (let [maker (sut/make-logger {:type :oci
-                                    :bucket-name "test-bucket"})
+      (let [maker (sut/make-logger {:logging
+                                    {:type :oci
+                                     :bucket-name "test-bucket"}})
             l (maker {} ["test.log"])]
         (is (= :stream (sut/log-output l)))))
 
@@ -59,8 +63,9 @@
                                            (md/future
                                              {:config conf
                                               :stream in}))]
-        (let [maker (sut/make-logger {:type :oci
-                                      :bucket-name "test-bucket"})
+        (let [maker (sut/make-logger {:logging
+                                      {:type :oci
+                                       :bucket-name "test-bucket"}})
               l (maker {:build {:sid ["test-cust" "test-proj" "test-repo"]}}
                        ["test.log"])
               r @(sut/handle-stream l :test-stream)]
@@ -73,9 +78,10 @@
                                            (md/future
                                              {:config conf
                                               :stream in}))]
-        (let [maker (sut/make-logger {:type :oci
-                                      :bucket-name "test-bucket"
-                                      :prefix "logs"})
+        (let [maker (sut/make-logger {:logging
+                                      {:type :oci
+                                       :bucket-name "test-bucket"
+                                       :prefix "logs"}})
               l (maker {:build {:sid ["test-cust" "test-proj" "test-repo"]}}
                        ["test.log"])
               r @(sut/handle-stream l :test-stream)]

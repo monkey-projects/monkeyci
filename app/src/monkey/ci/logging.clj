@@ -10,7 +10,7 @@
   (log-output [this])
   (handle-stream [this in]))
 
-(defmulti make-logger :type)
+(defmulti make-logger (comp :type :logging))
 
 (deftype InheritLogger []
   LogCapturer
@@ -39,7 +39,7 @@
     nil))
 
 (defmethod make-logger :file [conf]
-  (partial ->FileLogger conf))
+  (partial ->FileLogger (:logging conf)))
 
 (defn- ensure-cleanup
   "Registers a shutdown hook to ensure the deferred is being completed, even if the
@@ -55,8 +55,9 @@
         remove-hook (fn [& _]
                       (when-not @shutdown?
                         (.removeShutdownHook (Runtime/getRuntime) t)))]
-    (.addShutdownHook (Runtime/getRuntime) t)
-    (md/on-realized d remove-hook remove-hook)
+    (when (md/deferred? d)
+      (.addShutdownHook (Runtime/getRuntime) t)
+      (md/on-realized d remove-hook remove-hook))
     d))
 
 (deftype OciBucketLogger [conf ctx path]
@@ -75,7 +76,9 @@
 
 (defmethod make-logger :oci [conf]
   (fn [ctx path]
-    (->OciBucketLogger conf ctx path)))
+    (-> conf
+        (oci/ctx->oci-config :logging)
+        (->OciBucketLogger ctx path))))
 
 (defn handle-process-streams
   "Given a process return values (as from `babashka.process/process`) and two
