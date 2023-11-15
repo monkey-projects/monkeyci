@@ -67,11 +67,11 @@
             (reduce (fn [r v]
                       (group-keys v r))
                     c
-                    [:github :runner :containers :storage :api :account :http :logging]))]
+                    [:github :runner :containers :storage :api :account :http :logging :oci]))]
     (->> env
          (filter-and-strip-keys env-prefix)
          (group-all-keys)
-         (group-credentials [:storage :runner :logging])
+         (group-credentials [:oci :storage :runner :logging])
          (u/prune-tree))))
 
 (defn- parse-edn
