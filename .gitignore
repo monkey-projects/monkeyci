@@ -53,3 +53,4 @@ Thumbs.db
 .nrepl-port
 junit.xml
 tmp/
+/app/*.sh

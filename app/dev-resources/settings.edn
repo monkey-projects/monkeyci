@@ -1,5 +1,0 @@
-{:storage {:type :file
-           :dir "storage"}
- :work-dir "tmp"
- :log-dir "tmp/logs"
- :containers {:type :podman}}
