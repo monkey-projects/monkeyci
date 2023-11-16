@@ -92,11 +92,9 @@
 (defn process-env
   "Build the environment to be passed to the child process."
   [ctx socket-path]
-  (-> {:api
-       {:socket socket-path}}
-      (assoc :build-id (get-in ctx [:build :build-id]))
-      (merge (select-keys ctx [:oci :containers :log-dir]))
-      (assoc :logging (dissoc (:logging ctx) :maker))
+  (-> (ctx/ctx->env ctx)
+      (assoc :api
+             {:socket socket-path})
       (config/config->env)
       (merge default-envs)))
 

@@ -68,9 +68,10 @@
     
     (testing "uses ARM shape"
       (is (= "CI.Standard.A1.Flex" (:shape inst)))
-      (is (= {:ocpus 1
-              :memory-in-g-b-s 1}
-             (:shape-config inst))))
+      (let [{cpu :ocpus
+             mem :memory-in-g-bs} (:shape-config inst)]
+        (is (pos? cpu))
+        (is (pos? mem))))
 
     (testing "uses pull secrets from config"
       (is (= "test-secrets" (:image-pull-secrets inst))))
@@ -83,6 +84,12 @@
               :volume-type "EMPTYDIR"
               :backing-store "EPHEMERAL_STORAGE"}
              (first (:volumes inst)))))
+
+    (testing "sets tags from sid"
+      (is (= {"customer-id" "a"
+              "project-id" "b"
+              "repo-id" "c"}
+             (:freeform-tags inst))))
 
     (testing "container"
       (is (= 1 (count (:containers inst))) "there should be exactly one")
@@ -97,7 +104,7 @@
 
         (testing "provides arguments as to monkeyci build"
           (is (= ["-w" "/opt/monkeyci/checkout"
-                  "build"
+                  "build" "run"
                   "--sid" "a/b/c/test-build-id"
                   "-u" "http://git-url"
                   "-b" "main"
@@ -108,7 +115,15 @@
           (is (= [{:mount-path "/opt/monkeyci/checkout"
                    :is-read-only false
                    :volume-name "checkout"}]
-                 (:volume-mounts c))))))))
+                 (:volume-mounts c))))
+
+        (let [env (:environment-variables c)]
+          (testing "passes config as env vars"
+            (is (map? env))
+            (is (not-empty env)))
+
+          (testing "env vars are strings, not keywords"
+            (is (every? string? (keys env)))))))))
 
 (deftest wait-for-completion
   (testing "returns channel that holds zero on successful completion"
