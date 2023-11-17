@@ -147,3 +147,21 @@
    Useful for enrichting events."
   [ctx evt]
   (assoc ctx :event evt))
+
+(defn build-completed-evt
+  "Creates a build completed event"
+  [build exit-code & keyvals]
+  (cond-> {:type :build/completed
+           :build build
+           :exit exit-code
+           :result (if (zero? exit-code) :success :error)}
+    (not-empty keyvals) (merge (apply hash-map keyvals))))
+
+(defn then-fire
+  "When the contexts contains a bus, invokes `f` with `v` that is assumed to
+   return an event that is fired.  Returns `v`."
+  [v {:keys [event-bus]} f]
+  (when event-bus
+    (when-let [evt (f v)]
+      (post-event event-bus evt)))
+  v)

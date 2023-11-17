@@ -131,10 +131,6 @@
                        ;; Bus should always be present.  This check is only for testing purposes.
                        (when bus
                          (log/debug "Posting build/completed event")
-                         (e/post-event bus {:type :build/completed
-                                            :build build
-                                            :exit exit
-                                            :result (if (zero? exit) :success :error)
-                                            :process p}))))})
+                         (e/post-event bus (e/build-completed-evt build exit :process p)))))})
         ;; Depending on settings, some process streams need handling
         (l/handle-process-streams loggers))))
