@@ -47,9 +47,9 @@
   (let [tag (str base-tag ":" (image-tag ctx))]
     {:container/image "docker.io/dormeur/podman-qemu:latest"
      :container/mounts [[(podman-auth ctx) remote-auth]]
-     :script [(format "podman build --authfile %s --platform linux/arm64 -t %s -f docker/Dockerfile ."
+     :script [(format "podman build --authfile %s --platform linux/arm64,linux/amd64 --manifest %s -f docker/Dockerfile ."
                       remote-auth tag)
-              (format "podman push --authfile %s %s" remote-auth tag)]}))
+              (format "podman manifest push --all --authfile %s %s" remote-auth tag)]}))
 
 (def test-pipeline
   (core/pipeline
