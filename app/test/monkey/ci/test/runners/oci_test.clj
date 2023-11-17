@@ -1,6 +1,7 @@
 (ns monkey.ci.test.runners.oci-test
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.core.async :as ca]
+            [clojure.java.io :as io]
             [clojure.string :as cs]
             [manifold.deferred :as md]
             [monkey.ci
@@ -96,94 +97,127 @@
             (is (= 1 (count @received)))))))))
 
 (deftest instance-config
-  (let [ctx {:build {:build-id "test-build-id"
-                     :sid ["a" "b" "c" "test-build-id"]
-                     :git {:url "http://git-url"
-                           :branch "main"
-                           :id "test-commit"}}}
-        conf {:availability-domain "test-ad"
-              :compartment-id "test-compartment"
-              :image-pull-secrets "test-secrets"
-              :vnics "test-vnics"
-              :image-url "test-image"
-              :image-tag "test-version"}
-        inst (sut/instance-config conf ctx)]
+  (h/with-tmp-dir dir 
+    (let [priv-key (doto (io/file dir "privkey")
+                     (spit "Test private key"))
+          ctx {:build {:build-id "test-build-id"
+                       :sid ["a" "b" "c" "test-build-id"]
+                       :git {:url "http://git-url"
+                             :branch "main"
+                             :id "test-commit"}}}
+          conf {:availability-domain "test-ad"
+                :compartment-id "test-compartment"
+                :image-pull-secrets "test-secrets"
+                :vnics "test-vnics"
+                :image-url "test-image"
+                :image-tag "test-version"
+                :credentials {:private-key priv-key}}
+          inst (sut/instance-config conf ctx)]
 
-    (testing "uses settings from context"
-      (is (= "test-ad" (:availability-domain inst)))
-      (is (= "test-compartment" (:compartment-id inst)))
-      (is (= "test-build-id" (:display-name inst))))
+      (testing "uses settings from context"
+        (is (= "test-ad" (:availability-domain inst)))
+        (is (= "test-compartment" (:compartment-id inst)))
+        (is (= "test-build-id" (:display-name inst))))
 
-    (testing "never restart"
-      (is (= "NEVER" (:container-restart-policy inst))))
-    
-    (testing "uses ARM shape"
-      (is (= "CI.Standard.A1.Flex" (:shape inst)))
-      (let [{cpu :ocpus
-             mem :memory-in-g-bs} (:shape-config inst)]
-        (is (pos? cpu))
-        (is (pos? mem))))
-
-    (testing "uses pull secrets from config"
-      (is (= "test-secrets" (:image-pull-secrets inst))))
-
-    (testing "uses vnics from config"
-      (is (= "test-vnics" (:vnics inst))))
-
-    (testing "adds work volume"
-      (is (= {:name "checkout"
-              :volume-type "EMPTYDIR"
-              :backing-store "EPHEMERAL_STORAGE"}
-             (first (:volumes inst)))))
-
-    (testing "sets tags from sid"
-      (is (= {"customer-id" "a"
-              "project-id" "b"
-              "repo-id" "c"}
-             (:freeform-tags inst))))
-
-    (testing "container"
-      (is (= 1 (count (:containers inst))) "there should be exactly one")
+      (testing "never restart"
+        (is (= "NEVER" (:container-restart-policy inst))))
       
-      (let [c (first (:containers inst))]
+      (testing "uses ARM shape"
+        (is (= "CI.Standard.A1.Flex" (:shape inst)))
+        (let [{cpu :ocpus
+               mem :memory-in-g-bs} (:shape-config inst)]
+          (is (pos? cpu))
+          (is (pos? mem))))
+
+      (testing "uses pull secrets from config"
+        (is (= "test-secrets" (:image-pull-secrets inst))))
+
+      (testing "uses vnics from config"
+        (is (= "test-vnics" (:vnics inst))))
+
+      (testing "adds work volume"
+        (is (= {:name "checkout"
+                :volume-type "EMPTYDIR"
+                :backing-store "EPHEMERAL_STORAGE"}
+               (first (:volumes inst)))))
+
+      (testing "adds private key as config volume"
+        (let [v (second (:volumes inst))
+              c (first (:configs v))]
+          (is (= "private-key" (:name v)))
+          (is (= "CONFIGFILE" (:volume-type v)))
+          (is (= 1 (count (:configs v))))
+          (is (string? (:data c)))
+          (is (= "privkey" (:file-name c)))))
+
+      (testing "does not add priv key when none specified"
+        (is (= 1 (-> conf
+                     (dissoc :credentials)
+                     (sut/instance-config ctx)
+                     :volumes
+                     (count)))))
+
+      (testing "sets tags from sid"
+        (is (= {"customer-id" "a"
+                "project-id" "b"
+                "repo-id" "c"}
+               (:freeform-tags inst))))
+
+      (testing "container"
+        (is (= 1 (count (:containers inst))) "there should be exactly one")
         
-        (testing "uses configured image and tag"
-          (is (= "test-image:test-version" (:image-url c))))
+        (let [c (first (:containers inst))]
+          
+          (testing "uses configured image and tag"
+            (is (= "test-image:test-version" (:image-url c))))
 
-        (testing "uses app version if no tag configured"
-          (is (cs/ends-with? (-> conf
-                                 (dissoc :image-tag)
-                                 (sut/instance-config ctx)
-                                 :containers
-                                 first
-                                 :image-url)
-                             (mc/version))))
-        
-        (testing "configures basic properties"
-          (is (string? (:display-name c))))
+          (testing "uses app version if no tag configured"
+            (is (cs/ends-with? (-> conf
+                                   (dissoc :image-tag)
+                                   (sut/instance-config ctx)
+                                   :containers
+                                   first
+                                   :image-url)
+                               (mc/version))))
+          
+          (testing "configures basic properties"
+            (is (string? (:display-name c))))
 
-        (testing "provides arguments as to monkeyci build"
-          (is (= ["-w" "/opt/monkeyci/checkout"
-                  "build" "run"
-                  "--sid" "a/b/c/test-build-id"
-                  "-u" "http://git-url"
-                  "-b" "main"
-                  "--commit-id" "test-commit"]
-                 (:arguments c))))
+          (testing "provides arguments as to monkeyci build"
+            (is (= ["-w" "/opt/monkeyci/checkout"
+                    "build" "run"
+                    "--sid" "a/b/c/test-build-id"
+                    "-u" "http://git-url"
+                    "-b" "main"
+                    "--commit-id" "test-commit"]
+                   (:arguments c))))
 
-        (testing "mounts checkout dir"
-          (is (= [{:mount-path "/opt/monkeyci/checkout"
-                   :is-read-only false
-                   :volume-name "checkout"}]
-                 (:volume-mounts c))))
+          (let [vol-mounts (->> (:volume-mounts c)
+                                (group-by :volume-name))]
+            
+            (testing "mounts checkout dir"
+              (is (= {:mount-path "/opt/monkeyci/checkout"
+                      :is-read-only false
+                      :volume-name "checkout"}
+                     (first (get vol-mounts "checkout")))))
 
-        (let [env (:environment-variables c)]
-          (testing "passes config as env vars"
-            (is (map? env))
-            (is (not-empty env)))
+            (testing "mounts private key"
+              (is (= {:mount-path "/opt/monkeyci/keys"
+                      :is-read-only true
+                      :volume-name "private-key"}
+                     (first (get vol-mounts "private-key"))))))
 
-          (testing "env vars are strings, not keywords"
-            (is (every? string? (keys env)))))))))
+          (let [env (:environment-variables c)]
+            (testing "passes config as env vars"
+              (is (map? env))
+              (is (not-empty env)))
+
+            (testing "env vars are strings, not keywords"
+              (is (every? string? (keys env))))
+
+            (testing "points oci private key to mounted file"
+              (is (= "/opt/monkeyci/keys/privkey"
+                     (get env "monkeyci-oci-credentials-private-key"))))))))))
 
 (deftest wait-for-completion
   (testing "returns channel that holds zero on successful completion"
