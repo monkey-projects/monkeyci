@@ -36,3 +36,11 @@
    (some-fn (comp :work-dir :step)
             :checkout-dir
             (constantly (u/cwd)))))
+
+(defn ctx->env
+  "Build the environment from the context to be passed to an external process."
+  [ctx]
+  (-> ctx
+      (select-keys [:oci :containers :log-dir])
+      (assoc :build-id (get-in ctx [:build :build-id])
+             :logging (dissoc (:logging ctx) :maker))))

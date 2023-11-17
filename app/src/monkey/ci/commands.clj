@@ -18,11 +18,13 @@
   (when reporter
     (reporter obj)))
 
-(defn- maybe-set-git-opts [{{:keys [git-url branch commit-id]} :args :as ctx}]
+(defn- maybe-set-git-opts [{{:keys [git-url branch commit-id dir]} :args :as ctx}]
   (cond-> ctx
-    git-url (assoc-in [:build :git] {:url git-url
-                                     :branch (or branch "main")
-                                     :id commit-id})))
+    git-url (update :build merge {:git {:url git-url
+                                        :branch (or branch "main")
+                                        :id commit-id}
+                                  ;; Overwrite script dir cause it will be calculated by the git checkout
+                                  :script-dir dir})))
 
 (defn- parse-sid [s]
   (when s

@@ -92,11 +92,9 @@
 (defn process-env
   "Build the environment to be passed to the child process."
   [ctx socket-path]
-  (-> {:api
-       {:socket socket-path}}
-      (assoc :build-id (get-in ctx [:build :build-id]))
-      (merge (select-keys ctx [:oci :containers :log-dir]))
-      (assoc :logging (dissoc (:logging ctx) :maker))
+  (-> (ctx/ctx->env ctx)
+      (assoc :api
+             {:socket socket-path})
       (config/config->env)
       (merge default-envs)))
 
@@ -133,10 +131,6 @@
                        ;; Bus should always be present.  This check is only for testing purposes.
                        (when bus
                          (log/debug "Posting build/completed event")
-                         (e/post-event bus {:type :build/completed
-                                            :build build
-                                            :exit exit
-                                            :result (if (zero? exit) :success :error)
-                                            :process p}))))})
+                         (e/post-event bus (e/build-completed-evt build exit :process p)))))})
         ;; Depending on settings, some process streams need handling
         (l/handle-process-streams loggers))))

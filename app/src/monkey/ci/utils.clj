@@ -130,3 +130,7 @@
     b))
 
 (def deep-merge (partial merge-with merge-if-map))
+
+(defn ->base64 [s]
+  (.. (java.util.Base64/getEncoder)
+      (encodeToString (.getBytes s java.nio.charset.StandardCharsets/UTF_8))))

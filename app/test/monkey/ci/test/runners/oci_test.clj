@@ -1,7 +1,13 @@
 (ns monkey.ci.test.runners.oci-test
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.core.async :as ca]
-            [monkey.ci.runners :as r]
+            [clojure.java.io :as io]
+            [clojure.string :as cs]
+            [manifold.deferred :as md]
+            [monkey.ci
+             [config :as mc]
+             [events :as e]
+             [runners :as r]]
             [monkey.ci.runners.oci :as sut]
             [monkey.ci.test.helpers :as h]
             [monkey.oci.container-instance.core :as ci]))
@@ -20,7 +26,7 @@
                                                    (swap! calls conj opts)
                                                    {:status 500})]
         (is (some? (sut/oci-runner {} {} {})))
-        (is (pos? (count @calls)))
+        (is (not= :timeout (h/wait-until #(pos? (count @calls)) 200)))
         (is (some? (:container-instance (first @calls)))))))
 
   (testing "when started, polls state"
@@ -32,7 +38,7 @@
                                               (swap! calls conj opts)
                                               nil)]
         (is (some? (sut/oci-runner {} {} {})))
-        (is (pos? (count @calls))))))
+        (is (not= :timeout (h/wait-until #(pos? (count @calls)) 200))))))
 
   (testing "when creation fails, does not poll state"
     (let [calls (atom [])]
@@ -43,72 +49,175 @@
                                                 (swap! calls conj opts)
                                                 nil)]
         (is (some? (sut/oci-runner {} {} {})))
-        (is (zero? (count @calls)))))))
+        (is (zero? (count @calls))))))
+
+  (testing "returns build container exit code"
+    (let [cid (random-uuid)
+          exit 543]
+      (with-redefs [ci/create-container-instance
+                    (constantly
+                     (md/success-deferred
+                      {:status 200
+                       :body
+                       {:id "test-instance"
+                        :containers
+                        [{:display-name "build"
+                          :container-id cid}]}}))
+                    sut/wait-for-completion
+                    (fn [_ opts]
+                      (println "Waiting for completion:" opts)
+                      (md/success-deferred
+                       {:status 200
+                        :body
+                        {:lifecycle-state "INACTIVE"
+                         :containers [{:display-name "build"
+                                       :container-id cid}]}}))
+                    ci/get-container
+                    (fn [_ opts]
+                      (println "Retrieving container details for" opts)
+                      (md/success-deferred
+                       (if (= cid (:container-id opts))
+                         {:status 200
+                          :body
+                          {:exit-code exit}}
+                         {:status 400
+                          :body
+                          {:message "Invalid container id"}})))]
+        (is (= exit (h/try-take (sut/oci-runner {} {} {}) 200 :timeout))))))
+
+  (testing "launches `:build/completed` event"
+    (h/with-bus
+      (fn [bus]
+        (with-redefs [ci/create-container-instance (fn [_ opts]
+                                                     {:status 500})]
+          (let [received (atom [])
+                h (e/register-handler bus :build/completed (partial swap! received conj))]
+            (is (some? (sut/oci-runner {} {} {:event-bus bus})))
+            (is (not= :timeout (h/wait-until #(pos? (count @received)) 1000)))
+            (is (= 1 (count @received)))))))))
 
 (deftest instance-config
-  (let [ctx {:build {:build-id "test-build-id"
-                     :sid ["a" "b" "c" "test-build-id"]
-                     :git {:url "http://git-url"
-                           :branch "main"
-                           :id "test-commit"}}}
-        conf {:availability-domain "test-ad"
-              :compartment-id "test-compartment"
-              :image-pull-secrets "test-secrets"
-              :vnics "test-vnics"
-              :image-url "test-image"}
-        inst (sut/instance-config conf ctx)]
+  (h/with-tmp-dir dir 
+    (let [priv-key (doto (io/file dir "privkey")
+                     (spit "Test private key"))
+          ctx {:build {:build-id "test-build-id"
+                       :sid ["a" "b" "c" "test-build-id"]
+                       :git {:url "http://git-url"
+                             :branch "main"
+                             :id "test-commit"}}}
+          conf {:availability-domain "test-ad"
+                :compartment-id "test-compartment"
+                :image-pull-secrets "test-secrets"
+                :vnics "test-vnics"
+                :image-url "test-image"
+                :image-tag "test-version"
+                :credentials {:private-key priv-key}}
+          inst (sut/instance-config conf ctx)]
 
-    (testing "uses settings from context"
-      (is (= "test-ad" (:availability-domain inst)))
-      (is (= "test-compartment" (:compartment-id inst)))
-      (is (= "test-build-id" (:display-name inst))))
+      (testing "uses settings from context"
+        (is (= "test-ad" (:availability-domain inst)))
+        (is (= "test-compartment" (:compartment-id inst)))
+        (is (= "test-build-id" (:display-name inst))))
 
-    (testing "never restart"
-      (is (= "NEVER" (:container-restart-policy inst))))
-    
-    (testing "uses ARM shape"
-      (is (= "CI.Standard.A1.Flex" (:shape inst)))
-      (is (= {:ocpus 1
-              :memory-in-g-b-s 1}
-             (:shape-config inst))))
-
-    (testing "uses pull secrets from config"
-      (is (= "test-secrets" (:image-pull-secrets inst))))
-
-    (testing "uses vnics from config"
-      (is (= "test-vnics" (:vnics inst))))
-
-    (testing "adds work volume"
-      (is (= {:name "checkout"
-              :volume-type "EMPTYDIR"
-              :backing-store "EPHEMERAL_STORAGE"}
-             (first (:volumes inst)))))
-
-    (testing "container"
-      (is (= 1 (count (:containers inst))) "there should be exactly one")
+      (testing "never restart"
+        (is (= "NEVER" (:container-restart-policy inst))))
       
-      (let [c (first (:containers inst))]
-        
-        (testing "uses configured image"
-          (is (re-matches #"test-image:.+" (:image-url c))))
-        
-        (testing "configures basic properties"
-          (is (string? (:display-name c))))
+      (testing "uses ARM shape"
+        (is (= "CI.Standard.A1.Flex" (:shape inst)))
+        (let [{cpu :ocpus
+               mem :memory-in-g-bs} (:shape-config inst)]
+          (is (pos? cpu))
+          (is (pos? mem))))
 
-        (testing "provides arguments as to monkeyci build"
-          (is (= ["-w" "/opt/monkeyci/checkout"
-                  "build"
-                  "--sid" "a/b/c/test-build-id"
-                  "-u" "http://git-url"
-                  "-b" "main"
-                  "--commit-id" "test-commit"]
-                 (:arguments c))))
+      (testing "uses pull secrets from config"
+        (is (= "test-secrets" (:image-pull-secrets inst))))
 
-        (testing "mounts checkout dir"
-          (is (= [{:mount-path "/opt/monkeyci/checkout"
-                   :is-read-only false
-                   :volume-name "checkout"}]
-                 (:volume-mounts c))))))))
+      (testing "uses vnics from config"
+        (is (= "test-vnics" (:vnics inst))))
+
+      (testing "adds work volume"
+        (is (= {:name "checkout"
+                :volume-type "EMPTYDIR"
+                :backing-store "EPHEMERAL_STORAGE"}
+               (first (:volumes inst)))))
+
+      (testing "adds private key as config volume"
+        (let [v (second (:volumes inst))
+              c (first (:configs v))]
+          (is (= "private-key" (:name v)))
+          (is (= "CONFIGFILE" (:volume-type v)))
+          (is (= 1 (count (:configs v))))
+          (is (string? (:data c)))
+          (is (= "privkey" (:file-name c)))))
+
+      (testing "does not add priv key when none specified"
+        (is (= 1 (-> conf
+                     (dissoc :credentials)
+                     (sut/instance-config ctx)
+                     :volumes
+                     (count)))))
+
+      (testing "sets tags from sid"
+        (is (= {"customer-id" "a"
+                "project-id" "b"
+                "repo-id" "c"}
+               (:freeform-tags inst))))
+
+      (testing "container"
+        (is (= 1 (count (:containers inst))) "there should be exactly one")
+        
+        (let [c (first (:containers inst))]
+          
+          (testing "uses configured image and tag"
+            (is (= "test-image:test-version" (:image-url c))))
+
+          (testing "uses app version if no tag configured"
+            (is (cs/ends-with? (-> conf
+                                   (dissoc :image-tag)
+                                   (sut/instance-config ctx)
+                                   :containers
+                                   first
+                                   :image-url)
+                               (mc/version))))
+          
+          (testing "configures basic properties"
+            (is (string? (:display-name c))))
+
+          (testing "provides arguments as to monkeyci build"
+            (is (= ["-w" "/opt/monkeyci/checkout"
+                    "build" "run"
+                    "--sid" "a/b/c/test-build-id"
+                    "-u" "http://git-url"
+                    "-b" "main"
+                    "--commit-id" "test-commit"]
+                   (:arguments c))))
+
+          (let [vol-mounts (->> (:volume-mounts c)
+                                (group-by :volume-name))]
+            
+            (testing "mounts checkout dir"
+              (is (= {:mount-path "/opt/monkeyci/checkout"
+                      :is-read-only false
+                      :volume-name "checkout"}
+                     (first (get vol-mounts "checkout")))))
+
+            (testing "mounts private key"
+              (is (= {:mount-path "/opt/monkeyci/keys"
+                      :is-read-only true
+                      :volume-name "private-key"}
+                     (first (get vol-mounts "private-key"))))))
+
+          (let [env (:environment-variables c)]
+            (testing "passes config as env vars"
+              (is (map? env))
+              (is (not-empty env)))
+
+            (testing "env vars are strings, not keywords"
+              (is (every? string? (keys env))))
+
+            (testing "points oci private key to mounted file"
+              (is (= "/opt/monkeyci/keys/privkey"
+                     (get env "monkeyci-oci-credentials-private-key"))))))))))
 
 (deftest wait-for-completion
   (testing "returns channel that holds zero on successful completion"
@@ -119,7 +228,7 @@
                                                          :body
                                                          {:lifecycle-state "INACTIVE"}}))})]
       (is (some? ch))
-      (is (= 0 (h/try-take ch 200 :timeout)))))
+      (is (map? @(md/timeout! ch 200 :timeout)))))
 
   (testing "loops until a final state is encountered"
     (let [results (->> ["CREATING" "ACTIVE" "INACTIVE"]
@@ -132,14 +241,13 @@
                                       {:get-details (fn [& _]
                                                       (future (ca/<!! results)))
                                        :poll-interval 100})]
-      (is (= 0 (h/try-take ch 1000 :timeout)))))
+      (is (map? @(md/timeout! ch 1000 :timeout)))))
 
-  (testing "returns nonzero on error"
-    (let [ch (sut/wait-for-completion :test-client
+  (testing "returns last response on completion"
+    (let [r {:status 200
+             :body {:lifecycle-state "FAILED"}}
+          ch (sut/wait-for-completion :test-client
                                       {:get-details (fn [_ args]
-                                                      (future
-                                                        {:status 200
-                                                         :body
-                                                         {:lifecycle-state "FAILED"}}))})]
+                                                      (future r))})]
       (is (some? ch))
-      (is (pos? (h/try-take ch 200 :timeout))))))
+      (is (= r @(md/timeout! ch 200 :timeout))))))

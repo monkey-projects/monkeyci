@@ -97,17 +97,6 @@
                         :build
                         :build-id))))
 
-  (testing "sets git opts in build config"
-    (is (= {:url "test-url"
-            :branch "test-branch"
-            :id "test-id"}
-           (-> {:args {:git-url "test-url"
-                       :branch "test-branch"
-                       :commit-id "test-id"}}
-               (sut/prepare-build-ctx)
-               :build
-               :git))))
-
   (testing "defaults to `main` branch"
     (is (= "main"
            (-> {:args {:git-url "test-url"}}
@@ -138,6 +127,29 @@
                (sut/prepare-build-ctx)
                :build
                :script-dir))))
+
+  (testing "with git opts"
+    (testing "sets git opts in build config"
+      (is (= {:url "test-url"
+              :branch "test-branch"
+              :id "test-id"}
+             (-> {:args {:git-url "test-url"
+                         :branch "test-branch"
+                         :commit-id "test-id"}}
+                 (sut/prepare-build-ctx)
+                 :build
+                 :git))))
+
+    (testing "sets script dir to arg"
+      (is (= "test-script"
+             (-> {:args {:git-url "test-url"
+                         :branch "test-branch"
+                         :commit-id "test-id"
+                         :dir "test-script"}
+                  :work-dir "work"}
+                 (sut/prepare-build-ctx)
+                 :build
+                 :script-dir)))))
 
   (testing "when sid specified"
     (testing "parses on delimiter"
