@@ -44,3 +44,11 @@
       (select-keys [:oci :containers :log-dir])
       (assoc :build-id (get-in ctx [:build :build-id])
              :logging (dissoc (:logging ctx) :maker))))
+
+(def reporter :reporter)
+
+(defn report
+  "Reports `obj` to the user with the reporter from the context."
+  [ctx obj]
+  (when-let [r (reporter ctx)]
+    (r obj)))

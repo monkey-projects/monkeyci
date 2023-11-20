@@ -76,10 +76,12 @@
       (let [r (sut/build-cmd-args base-ctx)]
         (is (= "first && second" (last r)))))
 
-    (testing "adds mounts if provided"
-      (let [r (sut/build-cmd-args (assoc-in base-ctx
-                                            [:step :container/mounts] [["/host/path" "/container/path"]]))]
-        (is (contains-subseq? r ["-v" "/host/path:/container/path"]))))
+    (testing "mounts"
+      
+      (testing "adds mounts to args"
+        (let [r (sut/build-cmd-args (assoc-in base-ctx
+                                              [:step :container/mounts] [["/host/path" "/container/path"]]))]
+          (is (contains-subseq? r ["-v" "/host/path:/container/path"])))))
 
     (testing "adds env vars"
       (let [r (-> base-ctx

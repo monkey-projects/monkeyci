@@ -26,9 +26,11 @@
       (is (= :test-repo
              (sut/clone+checkout "http://test-url" "main" "test-id" "test-dir")))))
 
-  (testing "does not check out when no commit id"
-    (with-redefs [sut/clone (constantly :test-repo)
-                  sut/checkout (fn [& args]
-                                 (throw (ex-info "This should not be invoked" {})))]
-      (is (= :test-repo
-             (sut/clone+checkout "http://test-url" "main" nil "test-dir"))))))
+  (testing "when no commit id, checks out branch instead"
+    (let [checkout-ids (atom nil)]
+      (with-redefs [sut/clone (constantly :test-repo)
+                    sut/checkout (fn [_ id]
+                                   (reset! checkout-ids id))]
+        (is (= :test-repo
+               (sut/clone+checkout "http://test-url" "main" nil "test-dir")))
+        (is (= "origin/main" @checkout-ids))))))

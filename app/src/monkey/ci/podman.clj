@@ -49,7 +49,6 @@
         cwd "/home/monkeyci"
         base-cmd ["/usr/bin/podman" "run"
                   "-t" "--rm"
-                  "--privileged"       ; TODO Find a way to avoid this
                   "--name" cn
                   "-v" (str wd ":" cwd ":z")
                   "-w" cwd]]

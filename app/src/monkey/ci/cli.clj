@@ -85,8 +85,7 @@
    :opts [{:as "Working directory"
            :option "workdir"
            :short "w"
-           :type :string
-           :default "."}
+           :type :string}
           {:as "Development mode"
            :option "dev-mode"
            :type :with-flag

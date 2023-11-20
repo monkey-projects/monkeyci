@@ -4,6 +4,7 @@
             [clojure.core.async :as ca]
             [clojure.string :as cs]
             [monkey.ci
+             [context :refer [report]]
              [events :as e]
              [storage :as st]
              [utils :as u]]
@@ -11,12 +12,6 @@
             [clj-commons.byte-streams :as bs]
             [manifold.deferred :as md]
             [org.httpkit.client :as hk]))
-
-(defn report
-  "Reports `obj` to the user with the reporter from the context."
-  [{:keys [reporter]} obj]
-  (when reporter
-    (reporter obj)))
 
 (defn- maybe-set-git-opts [{{:keys [git-url branch commit-id dir]} :args :as ctx}]
   (cond-> ctx
