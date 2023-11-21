@@ -15,7 +15,7 @@
       (h/with-tmp-dir dir
         (let [r (mcc/run-container
                  {:containers {:type :podman}
-                  :build-id "test-build"
+                  :build {:build-id "test-build"}
                   :work-dir dir
                   :step {:name "test-step"
                          :container/image "test-img"
@@ -31,7 +31,7 @@
         (let [log-paths (atom [])
               r (mcc/run-container
                  {:containers {:type :podman}
-                  :build-id "test-build"
+                  :build {:build-id "test-build"}
                   :work-dir dir
                   :step {:name "test-step"
                          :index 0
@@ -44,7 +44,28 @@
           (is (= 2 (count @log-paths)))
           (is (= ["test-build" "test-pipeline" "0"] (->> @log-paths
                                                          first
-                                                         (take 3)))))))))
+                                                         (take 3)))))))
+
+    (testing "uses `sid` for log capturing if provided"
+      (h/with-tmp-dir dir
+        (let [log-paths (atom [])
+              r (mcc/run-container
+                 {:containers {:type :podman}
+                  :build {:build-id "test-build"
+                          :sid "a/b/c"}
+                  :work-dir dir
+                  :step {:name "test-step"
+                         :index 0
+                         :container/image "test-img"
+                         :script ["first" "second"]}
+                  :pipeline {:name "test-pipeline"}
+                  :logging {:maker (fn [_ path]
+                                     (swap! log-paths conj path)
+                                     (l/->InheritLogger))}})]
+          (is (= 2 (count @log-paths)))
+          (is (= ["a" "b" "c" "test-pipeline"] (->> @log-paths
+                                                    first
+                                                    (take 4)))))))))
 
 (defn- contains-subseq? [l expected]
   (let [n (count expected)]

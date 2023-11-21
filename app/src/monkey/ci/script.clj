@@ -253,10 +253,11 @@
 (defn exec-script!
   "Loads a script from a directory and executes it.  The script is
    executed in this same process (but in a randomly generated namespace)."
-  [{:keys [script-dir build-id] :as ctx}]
+  [{:keys [script-dir] {:keys [build-id]} :build :as ctx}]
   (with-script-api ctx
     (fn [ctx]
       (log/debug "Executing script for build" build-id "at:" script-dir)
+      (log/debug "Script context:" ctx)
       (try 
         (let [p (load-pipelines script-dir build-id)]
           (wrap-events

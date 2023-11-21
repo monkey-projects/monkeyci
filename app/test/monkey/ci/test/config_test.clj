@@ -172,7 +172,7 @@
            (sut/config->env {:key "value"}))))
 
   (testing "flattens nested config maps"
-    (is (= {:monkeyci-http-port 8080}
+    (is (= {:monkeyci-http-port "8080"}
            (sut/config->env {:http {:port 8080}})))))
 
 (deftest script-config

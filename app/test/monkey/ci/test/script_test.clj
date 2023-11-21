@@ -45,7 +45,7 @@
         (let [in (e/wait-for bus :script/start (map identity))]
           ;; Execute the script, we expect at least one incoming event
           (is (bc/success? (sut/exec-script! {:script-dir "examples/basic-clj"
-                                              :build-id "test-build"
+                                              :build {:build-id "test-build"}
                                               :api {:socket socket-path}})))
           ;; Try to read a message on the channel
           (is (= in (-> (ca/alts!! [in (ca/timeout 500)])

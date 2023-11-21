@@ -7,6 +7,7 @@
             [clojure.tools.logging :as log]
             [com.stuartsierra.component :as sc]
             [config.core :as cc]
+            [manifold.deferred :as md]
             [monkey.ci
              [config :as config]
              [core :as c]
@@ -108,8 +109,7 @@
     (edn/read is)))
 
 (defn load-config [f]
-  (-> (load-edn (io/file "dev-resources" f))
-      (update-in [:storage :credentials :private-key] u/load-privkey)))
+  (load-edn (io/file "dev-resources" f)))
 
 (defn- migrate-dir [p sid st]
   (let [files (seq (.listFiles p))
@@ -135,13 +135,15 @@
     (log/info "Migrating storage from" (.getCanonicalPath f))
     (migrate-dir f [] st)))
 
+(defn oci-runner-config []
+  (-> (load-config "oci-config.edn")
+      (oci/ctx->oci-config :runner)
+      (oci/->oci-config)))
+
 (defn run-test-container []
-  (let [conf (-> (load-config "oci-config.edn")
-                 :runner
-                 (oci/->oci-config))
-        ctx {:build {:build-id "test-build"}}
+  (let [conf (oci-runner-config)
         client (ci/make-context conf)
-        ic (-> (ro/instance-config conf ctx)
+        ic (-> (ro/instance-config conf {:build {:build-id "test-build"}})
                (assoc :containers [{:image-url "fra.ocir.io/frjdhmocn5qi/monkeyci:0.1.0"
                                     :display-name "test"
                                     :arguments ["-h"]}])
@@ -161,3 +163,40 @@
         in (java.io.ByteArrayInputStream. (.getBytes "Hi, this is a test string"))
         logger (m c ["test.log"])]
     @(l/handle-stream logger in)))
+
+(defn print-container-logs [client {{:keys [lifecycle-state] :as s} :details}]
+  (println "Got state change:" lifecycle-state)
+  (when (contains? #{"ACTIVE"} lifecycle-state)
+    (let [cid (-> s :containers first :container-id)]
+      (println "Retrieving container logs for" cid)
+      (md/chain
+       (ci/retrieve-logs client {:container-id cid})
+       :body
+       println))))
+
+(defn pinp-test []
+  (let [conf (oci-runner-config)
+        client (ci/make-context conf)
+        ic (-> (ro/instance-config conf {:build {:build-id "podman-in-container"}})
+               (assoc :containers [{:image-url "fra.ocir.io/frjdhmocn5qi/pinp:latest"
+                                    :display-name "pinp"
+                                    :arguments ["podman" "info"]
+                                    :security-context
+                                    {:security-context-type "LINUX"
+                                     :run-as-user 1000}}])
+               (dissoc :volumes))]
+    (ro/run-instance client ic (partial print-container-logs client))))
+
+(defn delete-container-instance [n]
+  (let [conf (oci-runner-config)
+        client (ci/make-context conf)]
+    (md/chain
+     (ci/list-container-instances client (select-keys conf [:compartment-id]))
+     :body
+     :items
+     (partial filter (fn [{:keys [lifecycle-state display-name]}]
+                       (and (not (contains? #{"DELETING" "DELETED"} lifecycle-state))
+                            (= n display-name))))
+     first
+     :id
+     #(ci/delete-container-instance client {:instance-id %}))))

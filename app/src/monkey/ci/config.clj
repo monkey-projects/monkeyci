@@ -67,7 +67,7 @@
             (reduce (fn [r v]
                       (group-keys v r))
                     c
-                    [:github :runner :containers :storage :api :account :http :logging :oci]))]
+                    [:github :runner :containers :storage :api :account :http :logging :oci :build]))]
     (->> env
          (filter-and-strip-keys env-prefix)
          (group-all-keys)
@@ -207,9 +207,15 @@
 
 (defn config->env
   "Creates a map of env vars from the config.  This is done by flattening
-   the entries and prepending them with `monkeyci-`"
+   the entries and prepending them with `monkeyci-`.  Values are converted 
+   to string."
   [c]
-  (->> c
-       (flatten-nested [])
-       (mc/map-keys (fn [k]
-                      (keyword (str env-prefix "-" (name k)))))))
+  (letfn [(->str [x]
+            (if (keyword? x)
+              (name x)
+              (str x)))]
+    (->> c
+         (flatten-nested [])
+         (mc/map-keys (fn [k]
+                        (keyword (str env-prefix "-" (name k)))))
+         (mc/map-vals ->str))))

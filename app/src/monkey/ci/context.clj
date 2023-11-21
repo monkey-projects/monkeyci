@@ -3,6 +3,7 @@
    and possible command-line arguments, and can hold non-serializable things as well, like
    functions.  It is used by the application to execute functionality."
   (:require [clojure.java.io :as io]
+            [medley.core :as mc]
             [monkey.ci
              [logging :as l]
              [utils :as u]]))
@@ -41,9 +42,9 @@
   "Build the environment from the context to be passed to an external process."
   [ctx]
   (-> ctx
-      (select-keys [:oci :containers :log-dir])
-      (assoc :build-id (get-in ctx [:build :build-id])
-             :logging (dissoc (:logging ctx) :maker))))
+      (select-keys [:oci :containers :log-dir :build])
+      (mc/update-existing-in [:build :sid] u/serialize-sid)
+      (assoc :logging (dissoc (:logging ctx) :maker))))
 
 (def reporter :reporter)
 

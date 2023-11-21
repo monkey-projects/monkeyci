@@ -217,8 +217,14 @@
 
             (testing "points oci private key to mounted file"
               (is (= "/opt/monkeyci/keys/privkey"
-                     (get env "monkeyci-oci-credentials-private-key"))))))))))
+                     (get env "monkeyci-oci-credentials-private-key"))))))
 
+        (testing "drops nil env vars"
+          (let [c (-> ctx
+                      (assoc-in [:build :pipeline] nil)
+                      (as-> x (sut/instance-config conf x)))]
+             (is (not (contains? (-> c :containers first :environment-variables) "monkeyci-build-pipeline")))))))))
+ 
 (deftest wait-for-completion
   (testing "returns channel that holds zero on successful completion"
     (let [ch (sut/wait-for-completion :test-client

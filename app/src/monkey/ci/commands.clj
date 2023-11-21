@@ -2,7 +2,6 @@
   "Event handlers for commands"
   (:require [clojure.tools.logging :as log]
             [clojure.core.async :as ca]
-            [clojure.string :as cs]
             [monkey.ci
              [context :refer [report]]
              [events :as e]
@@ -21,10 +20,6 @@
                                   ;; Overwrite script dir cause it will be calculated by the git checkout
                                   :script-dir dir})))
 
-(defn- parse-sid [s]
-  (when s
-    (cs/split s #"/")))
-
 (defn- includes-build-id? [sid]
   (= 4 (count sid)))
 
@@ -32,7 +27,7 @@
   "Updates the context for the build runner, by adding a `build` object"
   [{:keys [work-dir] :as ctx}]
   (let [orig-sid (some->> (get-in ctx [:args :sid])
-                          (parse-sid)
+                          (u/parse-sid)
                           (take 4))
         ;; Either generate a new build id, or use the one given
         sid (st/->sid (if (or (empty? orig-sid) (includes-build-id? orig-sid))

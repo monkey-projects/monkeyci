@@ -30,7 +30,8 @@
          ;; FIXME This will turn out wrong if the private key is specified elsewhere
          pk (assoc-in [:oci :credentials :private-key] (str key-dir "/" privkey-file)))
        (config/config->env)
-       (mc/map-keys name)))
+       (mc/map-keys name)
+       (mc/remove-vals empty?)))
 
 (defn- container-config [conf ctx pk]
   (let [git (get-in ctx [:build :git])]
@@ -89,7 +90,9 @@
 (defn wait-for-completion
   "Starts an async poll loop that waits until the container instance has completed.
    Returns a deferred that holds the last response received."
-  [client {:keys [get-details poll-interval] :as c :or {poll-interval 5000}}]
+  [client {:keys [get-details poll-interval post-event] :as c
+           :or {poll-interval 5000
+                post-event (constantly true)}}]
   (let [get-async (fn []
                     (get-details client (select-keys c [:instance-id])))
         done? #{"INACTIVE" "DELETED" "FAILED"}]
@@ -99,8 +102,9 @@
        (fn [r]
          (let [new-state (get-in r [:body :lifecycle-state])]
            (when (not= state new-state)
-             ;; TODO Fire event instead
-             (log/debug "State change:" state "->" new-state))
+             (log/debug "State change:" state "->" new-state)
+             (post-event {:type :oci-container/state-change
+                          :details (:body r)}))
            (if (done? new-state)
              r
              ;; Wait and re-check
@@ -109,7 +113,8 @@
 (defn run-instance
   "Creates and starts a container instance using the given config, and then
    waits for it to terminate.  Returns a channel that will hold the exit value."
-  [client instance-config]
+  [client instance-config & [post-event]]
+  (log/debug "Running OCI instance with config:" instance-config)
   (letfn [(check-error [handler]
             (fn [{:keys [body status]}]
               (when status
@@ -118,15 +123,19 @@
                   (handler body)))))
           
           (create-instance []
+            (log/debug "Creating instance...")
             (ci/create-container-instance
              client
              {:container-instance instance-config}))
           
           (start-polling [{:keys [id]}]
+            (log/debug "Starting polling...")
             ;; TODO Replace this with OCI events as soon as they become available.
             ;; TODO Don't wait, just let the container fire an event and react to that.
-            (wait-for-completion client {:instance-id id
-                                         :get-details ci/get-container-instance}))
+            (wait-for-completion client
+                                 (-> {:instance-id id
+                                      :get-details ci/get-container-instance}
+                                     (mc/assoc-some :post-event post-event))))
 
           (get-container-exit [r]
             (let [cid (-> (:containers r)
@@ -138,13 +147,21 @@
 
           (return-result [{{:keys [exit-code]} :body}]
             ;; Return the exit code, or nonzero when no code is specified
-            (ca/to-chan! [(or exit-code 1)]))]
+            (ca/to-chan! [(or exit-code 1)]))
+
+          (log-error [ex]
+            (log/error "Error creating container instance" ex)
+            (ca/to-chan! [1]))]
     
-    @(md/chain
-      (create-instance)
-      (check-error start-polling)
-      (check-error get-container-exit)
-      return-result)))
+    (try
+      @(-> (md/chain
+            (create-instance)
+            (check-error start-polling)
+            (check-error get-container-exit)
+            return-result)
+           (md/catch log-error))
+      (catch Exception ex
+        (log-error ex)))))
 
 (defn oci-runner [client conf ctx]
   (ca/go
