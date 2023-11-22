@@ -177,15 +177,19 @@
         interval (get-in ctx [:sidecar :poll-interval] 1000)]
     (log/info "Starting sidecar, reading events from" f)
     (ca/thread
-      (with-open [r (io/reader f)]
-        (loop [evt (read-next r)]
-          (if (not (fs/exists? f))
-            0 ;; Done when the events file is deleted
-            (when (if (= ::eof evt)
-                    (do
-                      (Thread/sleep interval)
-                      true)
-                    (do
-                      (log/debug "Read next event:" evt)
-                      (e/post-event event-bus evt)))
-              (recur (read-next r)))))))))
+      (try
+        (with-open [r (io/reader f)]
+          (loop [evt (read-next r)]
+            (if (not (fs/exists? f))
+              0 ;; Done when the events file is deleted
+              (when (if (= ::eof evt)
+                      (do
+                        (Thread/sleep interval)
+                        true)
+                      (do
+                        (log/debug "Read next event:" evt)
+                        (e/post-event event-bus evt)))
+                (recur (read-next r))))))
+        (catch Exception ex
+          (log/error "Failed to read events" ex)
+          1)))))
