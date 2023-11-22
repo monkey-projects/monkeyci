@@ -1,5 +1,7 @@
 (ns logging
-  (:require [common :as c]
+  (:require [babashka.fs :as fs]
+            [clojure.tools.logging :as log]
+            [common :as c]
             [config :as co]
             [monkey.ci.logging :as l]
             [monkey.oci.os.core :as os]))
@@ -13,5 +15,13 @@
 
 (defn get-build-logs
   "Downloads logs for a given build from log bucket"
-  [sid]
-  (let [client (os/make-client (co/oci-config :logging))]))
+  [sid dir]
+  (let [conf (co/oci-config :logging)
+        client (os/make-client conf)
+        path (l/sid->path conf nil sid)]
+    (log/info "Downloading logs for" sid "at" path "into" dir)
+    (when-not (fs/create-dirs dir)
+      (throw (ex-info "Unable to create directories" {:dir dir})))
+    @(os/list-objects client (-> conf
+                                 (select-keys [:bucket-name :ns])
+                                 (assoc :prefix path)))))
