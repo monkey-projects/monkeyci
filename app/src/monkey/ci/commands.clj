@@ -2,12 +2,14 @@
   "Event handlers for commands"
   (:require [clojure.tools.logging :as log]
             [clojure.core.async :as ca]
+            [clojure.java.io :as io]
             [monkey.ci
              [context :refer [report]]
              [events :as e]
              [storage :as st]
              [utils :as u]]
             [aleph.http :as http]
+            [babashka.fs :as fs]
             [clj-commons.byte-streams :as bs]
             [manifold.deferred :as md]
             [org.httpkit.client :as hk]))
@@ -152,3 +154,38 @@
                           (log/error "Unable to receive server events:" err))))
     ;; cli-matic will wait for this channel to close
     ch))
+
+(defn- maybe-create-file [f]
+  (when-not (fs/exists? f)
+    (fs/create-file f))
+  f)
+
+(defn sidecar
+  "Runs the application as a sidecar, that is meant to capture events 
+   and logs from a container process.  This is necessary because when
+   running containers from third-party images, we don't have control
+   over them.  Instead, we launch a sidecar and execute the commands
+   in the container in a script that writes events and output to files,
+   which are then picked up by the sidecar to dispatch or store.  
+
+   The sidecar loop will stop when the events file is deleted."
+  [{:keys [event-bus] :as ctx}]
+  (let [f (-> (get-in ctx [:args :events-file])
+              (maybe-create-file))
+        read-next (fn [r]
+                    (u/parse-edn r {:eof ::eof}))
+        interval (get-in ctx [:sidecar :poll-interval] 1000)]
+    (log/info "Starting sidecar, reading events from" f)
+    (ca/thread
+      (with-open [r (io/reader f)]
+        (loop [evt (read-next r)]
+          (if (not (fs/exists? f))
+            0 ;; Done when the events file is deleted
+            (when (if (= ::eof evt)
+                    (do
+                      (Thread/sleep interval)
+                      true)
+                    (do
+                      (log/debug "Read next event:" evt)
+                      (e/post-event event-bus evt)))
+              (recur (read-next r)))))))))

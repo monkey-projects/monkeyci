@@ -91,7 +91,19 @@
         (testing "accepts listening port `-p`"
           (is (= 1234 (-> (run-cli "server" "-p" "1234")
                           :args
-                          :port))))))))
+                          :port)))))
+
+      (testing "`sidecar` command"
+        (testing "runs `sidecar` command"
+          (is (= cmd/sidecar (:cmd (run-cli "sidecar")))))
+
+        (testing "accepts `events-file` or `-e` option"
+          (is (= "test-file" (-> (run-cli "sidecar" "-e" "test-file")
+                                 :args
+                                 :events-file)))
+          (is (= "test-file" (-> (run-cli "sidecar" "--events-file" "test-file")
+                                 :args
+                                 :events-file))))))))
 
 (deftest set-invoker
   (testing "applies invoker to `runs` in commands"
