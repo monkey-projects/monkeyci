@@ -1,6 +1,8 @@
 #!/bin/sh
 
-LOG_FILE=log.edn
+if [ $LOG_FILE = "" ]; then
+    LOG_FILE=log.edn
+fi
 
 post_event()
 {
@@ -24,7 +26,8 @@ for v in $*
 do
     run_step $v
     r=$?
-    if [ $r -gt 0 ]; then
+    if [ $r -ne 0 ]; then
+	# Nonzero return value means error, so don't proceed
 	post_event "{:type :script/failed :exit $r :step \"$v\"}"
 	exit $r
     fi
