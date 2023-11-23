@@ -17,7 +17,7 @@
   (with-redefs [clojure.core/shutdown-agents (constantly nil)
                 cli-matic.platform/exit-script (constantly :exit)]
     (testing "runs cli"
-      (is (= :exit (sut/-main "-h"))))))
+      (is (= :exit (sut/-main "-?"))))))
 
 (deftest system-invoker
   (let [hooks (atom [])]
