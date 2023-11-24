@@ -36,7 +36,7 @@
        (oci/ctx->oci-config type)
        (oci/->oci-config)))
   ([type]
-   (oci-config @c/env type)))
+   (load-oci-config @c/env type)))
 
 (defn oci-config
   "Takes global config and extracts an OCI config for given type from

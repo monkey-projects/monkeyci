@@ -44,7 +44,7 @@
        (.format datetime-format)))
 
 (defn- img-script [ctx f]
-  (let [tag (str base-tag ":" (image-tag ctx))
+  (let [img (str base-tag ":" (image-tag ctx))
         auth (podman-auth ctx)]
     (shell/bash
      (f auth img))))
