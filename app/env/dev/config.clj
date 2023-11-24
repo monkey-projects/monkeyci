@@ -25,6 +25,9 @@
 (defn reset-config! []
   (reset! global-config {}))
 
+(defn update-config! [f & args]
+  (apply swap! global-config f args))
+
 (defn load-oci-config
   "Loads config file for given env and type, or for the global env,
    and converts it to an OCI config map."
