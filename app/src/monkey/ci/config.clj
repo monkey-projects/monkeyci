@@ -187,7 +187,8 @@
       (merge args)
       (update-in [:containers :type] keyword)
       (update-in [:logging :type] keyword)
-      (initialize-log-maker)))
+      (initialize-log-maker)
+      (mc/update-existing-in [:build :sid] u/parse-sid)))
 
 (defn- flatten-nested
   "Recursively flattens a map of maps.  Each key in the resulting map is a

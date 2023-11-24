@@ -63,10 +63,11 @@
      ;; TODO Execute script step by step
      (make-script-cmd (:script step)))))
 
-(defmethod mcc/run-container :podman [{:keys [step pipeline] {:keys [build-id sid]} :build :as ctx}]
+(defmethod mcc/run-container :podman [{:keys [step pipeline] {:keys [build-id]} :build :as ctx}]
   (log/info "Running build step " build-id "/" (:name step) "as podman container")
   (let [log-maker (c/log-maker ctx)
-        log-base (into (or (some-> sid u/parse-sid) [build-id])
+        ;; Don't prefix the sid here, that's the responsability of the logger
+        log-base (into [(or build-id "no-build-id")]
                        [(or (:name pipeline) (str (:index pipeline)))
                         (str (:index step))])
         [out-log err-log :as loggers] (->> ["out.txt" "err.txt"]

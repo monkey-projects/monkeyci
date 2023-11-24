@@ -208,7 +208,13 @@
                                   (sut/script-config {})
                                   :logging
                                   :credentials
-                                  :key-fingerprint)))))
+                                  :key-fingerprint))))
+
+  (testing "parses sid"
+    (is (= ["a" "b" "c"] (-> {:monkeyci-build-sid "a/b/c"}
+                             (sut/script-config {})
+                             :build
+                             :sid)))))
 
 (deftest load-config-file
   (testing "`nil` if file does not exist"

@@ -46,13 +46,11 @@
                                                          first
                                                          (take 3)))))))
 
-    (testing "uses `sid` for log capturing if provided"
+    (testing "uses dummy build id when none given"
       (h/with-tmp-dir dir
         (let [log-paths (atom [])
               r (mcc/run-container
                  {:containers {:type :podman}
-                  :build {:build-id "test-build"
-                          :sid "a/b/c"}
                   :work-dir dir
                   :step {:name "test-step"
                          :index 0
@@ -62,10 +60,8 @@
                   :logging {:maker (fn [_ path]
                                      (swap! log-paths conj path)
                                      (l/->InheritLogger))}})]
-          (is (= 2 (count @log-paths)))
-          (is (= ["a" "b" "c" "test-pipeline"] (->> @log-paths
-                                                    first
-                                                    (take 4)))))))))
+          (is (= "no-build-id" (->> @log-paths
+                                    ffirst))))))))
 
 (defn- contains-subseq? [l expected]
   (let [n (count expected)]
