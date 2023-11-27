@@ -1,10 +1,10 @@
-(ns monkey.ci.test.podman-test
+(ns monkey.ci.test.containers.podman-test
   (:require [clojure.test :refer [deftest testing is]]
             [babashka.process :as bp]
             [monkey.ci
              [containers :as mcc]
-             [logging :as l]
-             [podman :as sut]]
+             [logging :as l]]
+            [monkey.ci.containers.podman :as sut]
             [monkey.ci.test.helpers :as h]))
 
 (deftest run-container

@@ -39,7 +39,7 @@
 
 (defn- build-id [evt]
   (let [[_ _ _ bid] (:sid evt)]
-    (cl/style (str "[" (or bid "unknown") "]" :cyan))))
+    (cl/style (str "[" (or bid "unknown") "]") :cyan)))
 
 (defmethod printer :build/event [{:keys [event]}]
   (letfn [(p [& args]

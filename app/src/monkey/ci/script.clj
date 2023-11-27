@@ -9,10 +9,11 @@
             [monkey.ci.build.core :as bc]
             [monkey.ci
              [containers :as c]
-             [docker]
              [events :as e]
-             [podman]
              [utils :as u]]
+            [monkey.ci.containers
+             [docker]
+             [podman]]
             [org.httpkit.client :as http])
   (:import java.nio.channels.SocketChannel
            [java.net UnixDomainSocketAddress StandardProtocolFamily]))

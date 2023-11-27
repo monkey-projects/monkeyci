@@ -1,4 +1,4 @@
-(ns monkey.ci.podman
+(ns monkey.ci.containers.podman
   "Functions for running containers using Podman.  We don't use the api here, because
    it requires a socket, which is not always available.  Instead, we invoke the podman
    command as a child process and communicate with it using the standard i/o streams."
@@ -50,7 +50,7 @@
         base-cmd ["/usr/bin/podman" "run"
                   "-t" "--rm"
                   "--name" cn
-                  "-v" (str wd ":" cwd ":z")
+                  "-v" (str wd ":" cwd ":Z")
                   "-w" cwd]]
     (concat
      ;; TODO Allow for more options to be passed in
