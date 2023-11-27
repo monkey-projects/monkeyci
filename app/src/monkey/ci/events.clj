@@ -165,3 +165,37 @@
     (when-let [evt (f v)]
       (post-event event-bus evt)))
   v)
+
+(defn wrapped
+  "Returns a new function that wraps `f` and posts an event before 
+   and after.  The `before` fn just receives the same arguments as 
+   `f`.  The `after` fn one more, the return value of `f`.  The first 
+   argument is assumed to be the context, which is used to get the 
+   event bus.  The return values of `before` and `after` are posted 
+   as events to the bus. Returns the return value of calling `f`.
+   Any of the event generating functions can be `nil`, in which case
+   it will be ignored."
+  [f before after & [error]]
+  (letfn [(post [{:keys [event-bus event-poster]} evt]
+            (if event-bus
+              (post-event event-bus evt)
+              (when event-poster
+                (event-poster evt))))
+          (maybe-post [f [ctx :as args] & extras]
+            (when f
+              (when-let [e (apply f (concat args extras))]
+                (post ctx e))))
+          (inv [args]
+           (let [r (apply f args)]
+             (maybe-post after args r)
+             r))]
+    (fn [& args]
+      (maybe-post before args)
+      (if error
+        (try
+          (inv args)
+          (catch Exception ex
+            ;; Post event and re-throw
+            (maybe-post error args ex)
+            (throw ex)))
+        (inv args)))))

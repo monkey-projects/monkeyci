@@ -23,36 +23,34 @@
          :env {}
          :pipeline p))
 
+(defn- script-evt [ctx evt]
+  (assoc evt
+         :src :script
+         :sid (get-in ctx [:build :sid])
+         :time (System/currentTimeMillis)))
+
 (defn- post-event [ctx evt]
+  (log/trace "Posting event:" evt)
   (if-let [c (get-in ctx [:api :client])]
-    (let [{:keys [status] :as r} @(martian/response-for c :post-event
-                                                        (assoc evt
-                                                               :src :script
-                                                               :sid (get-in ctx [:build :sid])
-                                                               :time (System/currentTimeMillis)))]
+    (let [{:keys [status] :as r} @(martian/response-for c :post-event (script-evt ctx evt))]
       (when-not (= 202 status)
         (log/warn "Failed to post event, got status" status)
         (log/debug "Full response:" r)))
     (log/warn "Unable to post event, no client configured")))
 
-(defn- wrap-events
-  "Posts event before and after invoking `f`"
-  ;; TODO Find a cleaner way, it clutters up the code way too much
-  [ctx before-evt after-evt f]
-  (letfn [(make-after [r]
-            (if (fn? after-evt)
-              (after-evt r)
-              after-evt))
-          (post [e]
-            (post-event ctx e))]
-    (try
-      (post before-evt)
-      (let [r (f)]
-        (post (make-after r))
-        r)
-      (catch Exception ex
-        (log/error "Got exception when executing" f ex)
-        (post (assoc (make-after {}) :exception (.getMessage ex)))))))
+(defn- wrapped
+  "Adds the event poster to the wrapped function.  This is necessary because the `e/wrapped`
+   assumes events are posted through the bus."
+  [f before after]
+  (let [error (fn [& args]
+                ;; On error, add the exception to the result of the 'after' event
+                (let [ex (last args)]
+                  (log/error "Got error:" ex)
+                  (assoc (apply after (concat (butlast args) [{}]))
+                         :exception (.getMessage ex))))
+        w (e/wrapped f before after error)]
+    (fn [ctx & more]
+      (apply w (assoc ctx :event-poster (partial post-event ctx)) more))))
 
 (defprotocol PipelineStep
   (run-step [s ctx]))
@@ -106,73 +104,86 @@
 
 (defn- run-step*
   "Runs a single step using the configured runner"
-  [{{:keys [name index]} :step :keys [pipeline] :as ctx}]
+  [initial-ctx]
+  (let [{:keys [step] :as ctx} (make-step-dir-absolute initial-ctx)]
+    (try
+      (log/debug "Running step:" step)
+      (run-step step ctx)
+      (catch Exception ex
+        (log/warn "Step failed:" (.getMessage ex))
+        (assoc bc/failure :exception ex)))))
+
+(defn- with-pipeline [{:keys [pipeline] :as ctx} evt]
   (let [p (select-keys pipeline [:name :index])]
-    (wrap-events
-     ctx
-     (cond-> {:type :step/start
-              :message "Step started"
-              :index index
-              :pipeline p}
-       (some? name) (-> (assoc :name name)
-                        (update :message str ": " name)))
-     (fn [{:keys [status message exception]}]
-       (cond-> {:type :step/end
-                :message (or message
-                             "Step completed")
-                :pipeline p
-                :index index
-                :name name
-                :status status}
-         (some? exception) (assoc :message (.getMessage exception)
-                                  :stack-trace (u/stack-trace exception))))
-     (fn []
-       (let [{:keys [step] :as ctx} (make-step-dir-absolute ctx)]
-         (try
-           (log/debug "Running step:" step)
-           (run-step step ctx)
-           (catch Exception ex
-             (log/warn "Step failed:" (.getMessage ex))
-             (assoc bc/failure :exception ex))))))))
+    (assoc evt
+           :index (get-in ctx [:step :index])
+           :pipeline p)))
+
+(defn- step-start-evt [{{:keys [name]} :step :as ctx}]
+  (with-pipeline ctx
+    (cond-> {:type :step/start
+             :message "Step started"}
+      (some? name) (-> (assoc :name name)
+                       (update :message str ": " name)))))
+
+(defn- step-end-evt [ctx {:keys [status message exception]}]
+  (with-pipeline ctx
+    (cond-> {:type :step/end
+             :message (or message
+                          "Step completed")
+             :name (get-in ctx [:step :name ])
+             :status status}
+      (some? exception) (assoc :message (.getMessage exception)
+                               :stack-trace (u/stack-trace exception)))))
+
+(def run-step**                         ; TODO Function naming sucks
+  (wrapped run-step*
+           step-start-evt
+           step-end-evt))
 
 (defn- run-steps!
   "Runs all steps in sequence, stopping at the first failure.
    Returns the execution context."
   [initial-ctx idx {:keys [name steps] :as p}]
-  (wrap-events
-   initial-ctx
-   {:type :pipeline/start
-    :pipeline name
-    :message (cond-> "Starting pipeline"
-               name (str ": " name))}
-   (fn [r]
-     {:type :pipeline/end
-      :pipeline name
-      :message "Completed pipeline"
-      :status (:status r)})
-   (fn []
-     (log/info "Running pipeline:" name)
-     (log/debug "Running pipeline steps:" p)
-     (->> steps
-          (map ->map)
-          ;; Add index to each step
-          (map (fn [i s]
-                 (assoc s :index i))
-               (range))     
-          (reduce (fn [ctx s]
-                    (let [r (-> ctx
-                                (assoc :step s :pipeline (assoc p :index idx))
-                                (run-step*))]
-                      (log/debug "Result:" r)
-                      (when-let [o (:output r)]
-                        (log/debug "Output:" o))
-                      (when-let [o (:error r)]
-                        (log/warn "Error output:" o))
-                      (cond-> ctx
-                        true (assoc :status (:status r)
-                                    :last-result r)
-                        (bc/failed? r) (reduced))))
-                  (merge (initial-context p) initial-ctx))))))
+  (log/info "Running pipeline:" name)
+  (log/debug "Running pipeline steps:" p)
+  (->> steps
+       (map ->map)
+       ;; Add index to each step
+       (map (fn [i s]
+              (assoc s :index i))
+            (range))     
+       (reduce (fn [ctx s]
+                 (let [r (-> ctx
+                             (assoc :step s :pipeline (assoc p :index idx))
+                             (run-step**))]
+                   (log/debug "Result:" r)
+                   (when-let [o (:output r)]
+                     (log/debug "Output:" o))
+                   (when-let [o (:error r)]
+                     (log/warn "Error output:" o))
+                   (cond-> ctx
+                     true (assoc :status (:status r)
+                                 :last-result r)
+                     (bc/failed? r) (reduced))))
+               (merge (initial-context p) initial-ctx))))
+
+(defn- pipeline-start-evt [_ _ {:keys [name]}]
+  {:type :pipeline/start
+   :pipeline name
+   :message (cond-> "Starting pipeline"
+              name (str ": " name))})
+
+(defn- pipeline-end-evt [_ _ {:keys [name]} r]
+  {:type :pipeline/end
+   :pipeline name
+   :message "Completed pipeline"
+   :status (:status r)})
+
+(def run-steps!*
+  (wrapped run-steps!
+           pipeline-start-evt
+           pipeline-end-evt))
 
 (defn run-pipelines
   "Executes the pipelines by running all steps sequentially.  Currently,
@@ -184,7 +195,7 @@
             pipeline (filter (comp (partial = pipeline) :name)))]
     (log/debug "Found" (count p) "matching pipelines:" (map :name p))
     (let [result (->> p
-                      (map-indexed (partial run-steps! ctx))
+                      (map-indexed (partial run-steps!* ctx))
                       (doall))]
       {:status (if (every? bc/success? result) :success :failure)})))
 
@@ -252,27 +263,38 @@
   (let [ctx (setup-api-client ctx)]
     (f ctx)))
 
+(defn- with-script-dir [{:keys [script-dir] :as ctx} evt]
+  (->> (assoc evt :dir script-dir)
+       (script-evt ctx)))
+
+(defn- script-started-evt [ctx _]
+  (with-script-dir ctx
+    {:type :script/start
+     :message "Script started"}))
+
+(defn- script-completed-evt [ctx & _]
+  (with-script-dir ctx
+    {:type :script/end
+     :message "Script completed"}))
+
+(def run-pipelines*
+  (wrapped run-pipelines
+           script-started-evt
+           script-completed-evt))
+
+(defn- load-and-run-pipelines [{:keys [script-dir] {:keys [build-id]} :build :as ctx}]
+  (log/debug "Executing script for build" build-id "at:" script-dir)
+  (log/debug "Script context:" ctx)
+  (try 
+    (let [p (load-pipelines script-dir build-id)]
+      (log/debug "Loaded" (count p) "pipelines:" (map :name p))
+      (run-pipelines* ctx p))
+    (catch Exception ex
+      (post-event ctx {:type :script/end
+                       :message (.getMessage ex)}))))
+
 (defn exec-script!
   "Loads a script from a directory and executes it.  The script is
    executed in this same process (but in a randomly generated namespace)."
-  [{:keys [script-dir] {:keys [build-id]} :build :as ctx}]
-  (with-script-api ctx
-    (fn [ctx]
-      (log/debug "Executing script for build" build-id "at:" script-dir)
-      (log/debug "Script context:" ctx)
-      (try 
-        (let [p (load-pipelines script-dir build-id)]
-          (wrap-events
-           ctx
-           {:type :script/start
-            :message "Script started"
-            :dir script-dir}
-           {:type :script/end
-            :message "Script completed"
-            :dir script-dir}
-           (fn []
-             (log/debug "Loaded" (count p) "pipelines:" (map :name p))
-             (run-pipelines ctx p))))
-        (catch Exception ex
-          (post-event ctx {:type :script/end
-                           :message (.getMessage ex)}))))))
+  [ctx]
+  (with-script-api ctx load-and-run-pipelines))
