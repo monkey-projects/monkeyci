@@ -27,6 +27,7 @@
     (let [{:keys [status] :as r} @(martian/response-for c :post-event
                                                         (assoc evt
                                                                :src :script
+                                                               :sid (get-in ctx [:build :sid])
                                                                :time (System/currentTimeMillis)))]
       (when-not (= 202 status)
         (log/warn "Failed to post event, got status" status)

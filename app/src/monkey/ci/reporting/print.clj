@@ -37,30 +37,36 @@
   (or (:name event)
       (str "index " (:index event))))
 
+(defn- build-id [evt]
+  (let [[_ _ _ bid] (:sid evt)]
+    (cl/style (str "[" (or bid "unknown") "]" :cyan))))
+
 (defmethod printer :build/event [{:keys [event]}]
-  (case (:type event)
-    :script/start
-    (println (cl/style "Script started" :green))
-    :script/end
-    (println (cl/style "Script completed" :green))
-    :pipeline/start
-    (println "Pipeline started:" (accent (:pipeline event)))
-    :pipeline/end
-    (if (bc/success? event)
-      (println "Pipeline" (accent (:pipeline event)) "succeeded" good)
-      (println "Pipeline" (accent (:pipeline event)) "failed" bad))
-    :step/start
-    (println "Step started:" (accent (step-name event)))
-    :step/end
-    (if (bc/success? event)
-      (println "Step succeeded:" (accent (step-name event)) good)
-      (do
-        (println "Step failed:" (accent (step-name event)) bad)
-        (println "Message:" (accent (:message event)))
-        (when-let [st (:stack-trace event)]
-          (println "Stack trace:" (cl/style st :red)))))
-    ;; Other cases, just ignore
-    nil))
+  (letfn [(p [& args]
+            (apply println (build-id event) args))]
+    (case (:type event)
+      :script/start
+      (p (cl/style "Script started" :green))
+      :script/end
+      (p (cl/style "Script completed" :green))
+      :pipeline/start
+      (p "Pipeline started:" (accent (:pipeline event)))
+      :pipeline/end
+      (if (bc/success? event)
+        (p "Pipeline" (accent (:pipeline event)) "succeeded" good)
+        (p "Pipeline" (accent (:pipeline event)) "failed" bad))
+      :step/start
+      (p "Step started:" (accent (step-name event)))
+      :step/end
+      (if (bc/success? event)
+        (p "Step succeeded:" (accent (step-name event)) good)
+        (do
+          (p "Step failed:" (accent (step-name event)) bad)
+          (p "Message:" (accent (:message event)))
+          (when-let [st (:stack-trace event)]
+            (p "Stack trace:" (cl/style st :red)))))
+      ;; Other cases, just ignore
+      nil)))
 
 (def col-space 4)
 (def col-sep (apply str (repeat col-space \space)))

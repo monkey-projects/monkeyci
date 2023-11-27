@@ -139,18 +139,19 @@
                (select-keys [:customer-id :project-id])))))
 
   (testing "uses `server` arg as account url"
-    (is (= "http://test" (-> (sut/app-config {}
-                                             {:server "http://test"})
-                             :account
-                             :url))))
+    (is (= "http://test"
+           (-> (sut/app-config {} {:server "http://test"})
+               :account
+               :url))))
 
   (testing "oci"
     (testing "provides credentials from env"
-      (is (= "env-fingerprint" (-> {:monkeyci-logging-credentials-key-fingerprint "env-fingerprint"}
-                                   (sut/app-config {})
-                                   :logging
-                                   :credentials
-                                   :key-fingerprint))))
+      (is (= "env-fingerprint"
+             (-> {:monkeyci-logging-credentials-key-fingerprint "env-fingerprint"}
+                 (sut/app-config {})
+                 :logging
+                 :credentials
+                 :key-fingerprint))))
     
     (testing "keeps credentials from config file"
       (with-home-config
@@ -177,16 +178,18 @@
 
 (deftest script-config
   (testing "sets containers type"
-    (is (= :test-type (-> {:monkeyci-containers-type "test-type"}
-                          (sut/script-config {})
-                          :containers
-                          :type))))
+    (is (= :test-type
+           (-> {:monkeyci-containers-type "test-type"}
+               (sut/script-config {})
+               :containers
+               :type))))
 
   (testing "sets logging config"
-    (is (= :file (-> {:monkeyci-logging-type "file"}
-                     (sut/script-config {})
-                     :logging
-                     :type))))
+    (is (= :file
+           (-> {:monkeyci-logging-type "file"}
+               (sut/script-config {})
+               :logging
+               :type))))
 
   (testing "initializes logging maker"
     (is (fn? (-> {:monkeyci-logging-type "file"}
@@ -195,26 +198,29 @@
                  :maker))))
 
   (testing "groups api settings"
-    (is (= "test-socket" (-> {:monkeyci-api-socket "test-socket"}
-                             (sut/script-config {})
-                             :api
-                             :socket))))
+    (is (= "test-socket"
+           (-> {:monkeyci-api-socket "test-socket"}
+               (sut/script-config {})
+               :api
+               :socket))))
 
   (testing "matches spec"
     (is (true? (s/valid? ::spec/script-config (sut/script-config {} {})))))
 
   (testing "provides oci credentials from env"
-    (is (= "test-fingerprint" (-> {:monkeyci-logging-credentials-key-fingerprint "test-fingerprint"}
-                                  (sut/script-config {})
-                                  :logging
-                                  :credentials
-                                  :key-fingerprint))))
+    (is (= "test-fingerprint"
+           (-> {:monkeyci-logging-credentials-key-fingerprint "test-fingerprint"}
+               (sut/script-config {})
+               :logging
+               :credentials
+               :key-fingerprint))))
 
   (testing "parses sid"
-    (is (= ["a" "b" "c"] (-> {:monkeyci-build-sid "a/b/c"}
-                             (sut/script-config {})
-                             :build
-                             :sid)))))
+    (is (= ["a" "b" "c"]
+           (-> {:monkeyci-build-sid "a/b/c"}
+               (sut/script-config {})
+               :build
+               :sid)))))
 
 (deftest load-config-file
   (testing "`nil` if file does not exist"

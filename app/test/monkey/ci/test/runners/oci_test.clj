@@ -227,12 +227,13 @@
  
 (deftest wait-for-completion
   (testing "returns channel that holds zero on successful completion"
-    (let [ch (sut/wait-for-completion :test-client
-                                      {:get-details (fn [_ args]
-                                                      (future
-                                                        {:status 200
-                                                         :body
-                                                         {:lifecycle-state "INACTIVE"}}))})]
+    (let [ch (sut/wait-for-completion
+              :test-client
+              {:get-details (fn [_ args]
+                              (future
+                                {:status 200
+                                 :body
+                                 {:lifecycle-state "INACTIVE"}}))})]
       (is (some? ch))
       (is (map? @(md/timeout! ch 200 :timeout)))))
 

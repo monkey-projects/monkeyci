@@ -34,11 +34,18 @@
         :pipeline/end
         :script/end]
        (map (fn [t]
-              (testing (format "prints build event `%s` to stdout" t)
-                (let [s (capture-out {:type :build/event
-                                      :event {:type t}})]
-                  (is (not-empty s))
-                  (is (not (cs/includes? s "Warning")))))))
+              (testing (format "build event `%s`" t)
+                (testing "prints to stdout"
+                  (let [s (capture-out {:type :build/event
+                                        :event {:type t}})]
+                    (is (not-empty s))
+                    (is (not (cs/includes? s "Warning")))))
+
+                (testing "prints build id"
+                  (let [s (capture-out {:type :build/event
+                                        :event {:type t
+                                                :sid ["cust" "proj" "repo" "test-build"]}})]
+                    (is (cs/includes? s "test-build")))))))
        (doall)))
 
 (deftest build-list
