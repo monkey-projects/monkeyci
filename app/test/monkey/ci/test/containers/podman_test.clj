@@ -116,4 +116,10 @@
     
     (testing "overrides entrypoint for script"
       (let [r (sut/build-cmd-args base-ctx)]
-        (is (contains-subseq? r ["--entrypoint" "/bin/sh"]))))))
+        (is (contains-subseq? r ["--entrypoint" "/bin/sh"]))))
+
+    (testing "adds platform if specified"
+      (let [r (-> base-ctx
+                  (assoc-in [:step :container/platform] "linux/arm64")
+                  (sut/build-cmd-args))]
+        (is (contains-subseq? r ["--platform" "linux/arm64"]))))))

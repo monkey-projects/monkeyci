@@ -33,6 +33,10 @@
             ["-e" (str k "=" v)])
           env))
 
+(defn- platform [{:keys [:container/platform]}]
+  (if (some? platform)
+    ["--platform" platform]))
+
 (defn- entrypoint [{ep :container/entrypoint cmd :container/cmd}]
   (cond
     ep
@@ -57,6 +61,7 @@
      base-cmd
      (mounts step)
      (env-vars step)
+     (platform step)
      (entrypoint step)
      [(:image conf)]
      (make-cmd step)
