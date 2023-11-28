@@ -18,7 +18,7 @@
   (:import java.nio.channels.SocketChannel
            [java.net UnixDomainSocketAddress StandardProtocolFamily]))
 
-(defn initial-context [p]
+(defn step-context [p]
   (assoc bc/success
          :env {}
          :pipeline p))
@@ -102,7 +102,7 @@
                    checkout-dir)))
     ctx))
 
-(defn- run-step*
+(defn- run-single-step
   "Runs a single step using the configured runner"
   [initial-ctx]
   (let [{:keys [step] :as ctx} (make-step-dir-absolute initial-ctx)]
@@ -136,10 +136,17 @@
       (some? exception) (assoc :message (.getMessage exception)
                                :stack-trace (u/stack-trace exception)))))
 
-(def run-step**                         ; TODO Function naming sucks
-  (wrapped run-step*
+(def run-single-step*
+  (wrapped run-single-step
            step-start-evt
            step-end-evt))
+
+(defn- log-result [r]
+  (log/debug "Result:" r)
+  (when-let [o (:output r)]
+    (log/debug "Output:" o))
+  (when-let [o (:error r)]
+    (log/warn "Error output:" o)))
 
 (defn- run-steps!
   "Runs all steps in sequence, stopping at the first failure.
@@ -156,17 +163,13 @@
        (reduce (fn [ctx s]
                  (let [r (-> ctx
                              (assoc :step s :pipeline (assoc p :index idx))
-                             (run-step**))]
-                   (log/debug "Result:" r)
-                   (when-let [o (:output r)]
-                     (log/debug "Output:" o))
-                   (when-let [o (:error r)]
-                     (log/warn "Error output:" o))
+                             (run-single-step*))]
+                   (log-result r)
                    (cond-> ctx
                      true (assoc :status (:status r)
                                  :last-result r)
                      (bc/failed? r) (reduced))))
-               (merge (initial-context p) initial-ctx))))
+               (merge (step-context p) initial-ctx))))
 
 (defn- pipeline-start-evt [_ _ {:keys [name]}]
   {:type :pipeline/start

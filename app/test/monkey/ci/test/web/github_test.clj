@@ -126,4 +126,16 @@
                                                             :timestamp "2023-10-10"}}})
               id (get-in r [:build :sid])
               md (st/find-build-metadata s id)]
-          (is (not (contains? md :secret-key))))))))
+          (is (not (contains? md :secret-key)))))))
+
+  (testing "adds payload ref to build"
+    (h/with-memory-store s
+      (let [wh {:id "test-webhook"
+                :customer-id "test-customer"
+                :project-id "test-project"
+                :repo-id "test-repo"}]
+        (is (st/sid? (st/save-webhook-details s wh)))
+        (let [r (sut/prepare-build {:storage s}
+                                   {:id "test-webhook"
+                                    :payload {:ref "test-ref"}})]
+          (is (= "test-ref" (get-in r [:build :git :ref]))))))))

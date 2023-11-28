@@ -103,7 +103,9 @@
         list-item
         (fn [{id :id ts :timestamp res :result :as b}]
           (->> (map left-align
-                    [id ts (str (name res) " " (if (= :success res) good bad))]
+                    [id ts (if res
+                             (str (name res) " " (if (= :success res) good bad))
+                             "unknown")]
                     widths)
                (cs/join col-sep)))]
     
