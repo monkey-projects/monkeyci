@@ -3,6 +3,7 @@
             [clojure.core.async :as ca :refer [<!]]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
+            [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
              [config :as config]
@@ -85,9 +86,17 @@
                :freeform-tags tags))))
 
 (defn oci-runner [client conf ctx]
-  (ca/go
-    (-> (ca/<! (oci/run-instance client (instance-config conf ctx)))
-        (e/then-fire ctx #(e/build-completed-evt (:build ctx) %)))))
+  (let [ch (ca/chan)
+        r (oci/run-instance client (instance-config conf ctx))]
+    (md/on-realized r
+                    (fn [v]
+                      (ca/go (ca/>! ch v)))
+                    (fn [err]
+                      (log/error "Got error from container instance:" err)
+                      (ca/go (ca/>! ch 1))))
+    (ca/go
+      (-> (ca/<! ch)
+          (e/then-fire ctx #(e/build-completed-evt (:build ctx) %))))))
 
 (defmethod r/make-runner :oci [ctx]
   (let [conf (oci/ctx->oci-config ctx :runner)

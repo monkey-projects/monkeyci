@@ -1,7 +1,6 @@
 (ns monkey.ci.oci
   "Oracle cloud specific functionality"
-  (:require [clojure.core.async :as ca]
-            [clojure.tools.logging :as log]
+  (:require [clojure.tools.logging :as log]
             [manifold
              [deferred :as md]
              [time :as mt]]
@@ -63,7 +62,7 @@
 
 (defn run-instance
   "Creates and starts a container instance using the given config, and then
-   waits for it to terminate.  Returns a channel that will hold the exit value."
+   waits for it to terminate.  Returns a deferred that will hold the exit value."
   [client instance-config & [post-event]]
   (log/debug "Running OCI instance with config:" instance-config)
   (letfn [(check-error [handler]
@@ -98,18 +97,16 @@
 
           (return-result [{{:keys [exit-code]} :body}]
             ;; Return the exit code, or nonzero when no code is specified
-            (ca/to-chan! [(or exit-code 1)]))
+            (or exit-code 1))
 
           (log-error [ex]
             (log/error "Error creating container instance" ex)
-            (ca/to-chan! [1]))]
+            ;; Nonzero exit code
+            1)]
     
-    (try
-      @(-> (md/chain
-            (create-instance)
-            (check-error start-polling)
-            (check-error get-container-exit)
-            return-result)
-           (md/catch log-error))
-      (catch Exception ex
-        (log-error ex)))))
+    (-> (md/chain
+         (create-instance)
+         (check-error start-polling)
+         (check-error get-container-exit)
+         return-result)
+        (md/catch log-error))))

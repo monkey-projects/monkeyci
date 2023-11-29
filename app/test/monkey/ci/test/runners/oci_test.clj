@@ -22,7 +22,7 @@
 
 (deftest oci-runner
   (testing "runs container instance"
-    (with-redefs [oci/run-instance (constantly (ca/to-chan! [0]))]
+    (with-redefs [oci/run-instance (constantly (md/success-deferred 0))]
       (is (= 0 (-> (sut/oci-runner {} {} {})
                    (h/try-take))))))
 

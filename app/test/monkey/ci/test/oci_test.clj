@@ -112,7 +112,6 @@
                           :container-id cid}]}}))
                     sut/wait-for-completion
                     (fn [_ opts]
-                      (println "Waiting for completion:" opts)
                       (md/success-deferred
                        {:status 200
                         :body
@@ -121,7 +120,6 @@
                                        :container-id cid}]}}))
                     ci/get-container
                     (fn [_ opts]
-                      (println "Retrieving container details for" opts)
                       (md/success-deferred
                        (if (= cid (:container-id opts))
                          {:status 200
@@ -130,4 +128,4 @@
                          {:status 400
                           :body
                           {:message "Invalid container id"}})))]
-        (is (= exit (h/try-take (sut/run-instance {} {}) 200 :timeout)))))))
+        (is (= exit (deref (sut/run-instance {} {}) 200 :timeout)))))))
