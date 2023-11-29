@@ -12,6 +12,7 @@
 
 (def success (status :success))
 (def failure (status :failure))
+(def skipped (status :skipped))
 
 (defn status?
   "Checks if the given object is a step status"
@@ -19,9 +20,14 @@
   (some? (:status x)))
 
 (defn success? [{:keys [status]}]
-  (= :success status))
+  (or (nil? status)
+      (= :success status)))
 
-(def failed? (complement success?))
+(defn failed? [{:keys [status]}]
+  (= :failure status))
+
+(defn skipped? [{:keys [status]}]
+  (= :skipped status))
 
 (defrecord Pipeline [steps name])
 

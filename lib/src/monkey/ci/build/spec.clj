@@ -3,7 +3,7 @@
 
 (s/def :ci/name string?)
 (s/def :ci/action fn?)
-(s/def :ci/status #{:success :failure})
+(s/def :ci/status #{:success :failure :skipped})
 (s/def :ci/script-step string?)
 (s/def :ci/script (s/coll-of :ci/script-step))
 
