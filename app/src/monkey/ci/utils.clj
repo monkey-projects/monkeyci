@@ -3,6 +3,7 @@
             [clojure.core.async :as ca]
             [clojure
              [edn :as edn]
+             [string :as cs]
              [walk :as cw]]
             [clojure.java.io :as io]
             [clojure.repl :as cr]
@@ -134,3 +135,9 @@
 (defn ->base64 [s]
   (.. (java.util.Base64/getEncoder)
       (encodeToString (.getBytes s java.nio.charset.StandardCharsets/UTF_8))))
+
+(defn parse-sid [s]
+  (when s
+    (cs/split s #"/")))
+
+(def serialize-sid (partial cs/join "/"))

@@ -79,12 +79,17 @@
 (s/def :conf/socket string?)
 (s/def :conf/api (s/keys :opt-un [:conf/socket :conf/url]))
 
+;; Sidecar config
+(s/def :sidecar/poll-interval int?)
+(s/def :conf/sidecar (s/keys :opt-un [:sidecar/poll-interval]))
+
 ;; Command line arguments
 (s/def :arg/pipeline string?)
 (s/def :arg/dir string?)
 (s/def :arg/workdir string?)
 (s/def :arg/git-url url?)
 (s/def :arg/config-file string?)
+(s/def :arg/events-file string?)
 
 (s/def :arg/command fn?)
 
@@ -132,19 +137,19 @@
 
 ;; Arguments as passed in from the CLI
 (s/def :conf/args (s/keys :opt-un [:conf/dev-mode :arg/pipeline :arg/dir :arg/workdir
-                                   :arg/git-url :arg/config-file]))
+                                   :arg/git-url :arg/config-file :arg/events-file]))
 
 ;; Application configuration
 (s/def ::app-config (s/keys :req-un [:conf/http :conf/runner :conf/args :conf/logging
                                      :conf/work-dir :conf/checkout-base-dir]
                             :opt-un [:conf/dev-mode :conf/containers :conf/log-dir
-                                     :conf/storage :conf/account]))
+                                     :conf/storage :conf/account :conf/sidecar]))
 ;; Application context.  This is the result of processing the configuration and is passed
 ;; around internally.
 (s/def ::app-context (s/keys :req-un [:conf/http :ctx/runner :evt/event-bus :ctx/git :ctx/storage :ctx/public-api
                                       :ctx/logging]
                              :opt-un [:conf/dev-mode :arg/command ::system :conf/args :ctx/build :ctx/reporter
-                                      :conf/work-dir]))
+                                      :conf/work-dir :conf/sidecar]))
 
 ;; Script configuration
 (s/def ::script-config (s/keys :req-un [:conf/containers :conf/storage :conf/logging]

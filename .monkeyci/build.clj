@@ -2,6 +2,7 @@
 (ns monkeyci.build.script
   (:require [babashka.fs :as fs]
             [clojure.java.io :as io]
+            [clojure.string :as cs]
             [monkey.ci.build
              [api :as api]
              [core :as core]
@@ -12,8 +13,8 @@
 (defn clj-container [name dir & args]
   "Executes script in clojure container"
   {:name name
-   :container/image "docker.io/clojure:temurin-20-tools-deps-alpine"
-   :script [(str "cd " dir) (apply str "clojure " args)]})
+   :container/image "docker.io/clojure:temurin-21-tools-deps-alpine"
+   :script [(str "cd " dir) (cs/join " " (concat ["clojure"] args))]})
 
 (def test-lib (clj-container "test-lib" "lib" "-X:test:junit"))
 (def test-app (clj-container "test-app" "app" "-M:test:junit"))
@@ -21,7 +22,6 @@
 (def app-uberjar (clj-container "uberjar" "app" "-X:jar:uber"))
 
 ;; Full path to the docker config file, used to push images
-#_(def docker-config (fs/expand-home "~/.docker/config.json"))
 (defn podman-auth [ctx]
   (io/file (:checkout-dir ctx) "podman-auth.json"))
 
@@ -43,27 +43,55 @@
   (->> (OffsetDateTime/now ZoneOffset/UTC)
        (.format datetime-format)))
 
-(defn publish-image [ctx]
-  (let [tag (str base-tag ":" (image-tag ctx))]
-    {:container/image "docker.io/dormeur/podman-qemu:latest"
-     :container/mounts [[(podman-auth ctx) remote-auth]]
-     :script [(format "podman build --authfile %s --platform linux/arm64,linux/amd64 --manifest %s -f docker/Dockerfile ."
-                      remote-auth tag)
-              (format "podman manifest push --all --authfile %s %s" remote-auth tag)]}))
+(defn- img-script [ctx f]
+  (let [img (str base-tag ":" (image-tag ctx))
+        auth (podman-auth ctx)]
+    (shell/bash
+     (f auth img))))
 
-(def test-pipeline
-  (core/pipeline
-   {:name "test-all"
-    :steps [test-lib
-            test-app]}))
+(defn build-image
+  "Build the image using podman for arm and amd platforms.  Not using containers for now,
+   because it gives problems when not running privileged (podman in podman running podman
+   is difficult)."
+  [ctx]
+  (img-script
+   ctx
+   (partial format
+            "podman build --authfile %s --platform linux/arm64,linux/amd64 --manifest %s -f docker/Dockerfile .")))
 
-(def publish-pipeline
-  (core/pipeline
-   {:name "publish"
-    :steps [app-uberjar
-            image-creds
-            publish-image]}))
+(defn push-image [ctx]
+  (img-script
+   ctx
+   (partial format "podman manifest push --all --authfile %s %s")))
+
+(defn publish-container [ctx name dir]
+  "Executes script in clojure container that has clojars publish env vars"
+  (let [env (-> (api/build-params ctx)
+                (select-keys ["CLOJARS_USERNAME" "CLOJARS_PASSWORD"]))]
+    (-> (clj-container name dir "-X:jar:deploy")
+        (assoc :container/env env))))
+
+(defn publish-lib [ctx]
+  (publish-container ctx "publish-lib" "lib"))
+
+(defn publish-app [ctx]
+  (publish-container ctx "publish-app" "app"))
+
+(core/defpipeline test-all
+  [test-lib
+   test-app])
+
+(core/defpipeline publish-libs
+  [publish-lib
+   publish-app])
+
+(core/defpipeline publish-image
+  [app-uberjar
+   image-creds
+   build-image
+   push-image])
 
 ;; Return the pipelines
-[test-pipeline
- publish-pipeline]
+[test-all
+ publish-libs
+ publish-image]

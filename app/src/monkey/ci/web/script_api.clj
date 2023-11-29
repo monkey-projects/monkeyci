@@ -35,7 +35,7 @@
   (let [evt (get-in req [:parameters :body])
         bus (c/req->bus req)]
     {:status (-> (ca/go
-                   (if (e/post-event bus evt)
+                   (if (and bus (e/post-event bus evt))
                      202
                      500))
                  (ca/<!!))}))

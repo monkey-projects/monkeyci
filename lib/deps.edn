@@ -30,4 +30,4 @@
   {:exec-fn monkey.build/jar+install}
 
   :deploy
-  {:exec-fn monkey.build/deploy}}}
+  {:exec-fn monkey.build/jar+deploy}}}

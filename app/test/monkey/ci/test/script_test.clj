@@ -38,6 +38,9 @@
 
   (testing "executes script shell from location"
     (is (bc/success? (sut/exec-script! {:script-dir "examples/basic-script"}))))
+
+  (testing "executes dynamic pipelines"
+    (is (bc/success? (sut/exec-script! {:script-dir "examples/dynamic-pipelines"}))))
   
   (testing "connects to listening socket if specified"
     (with-listening-socket
@@ -45,7 +48,7 @@
         (let [in (e/wait-for bus :script/start (map identity))]
           ;; Execute the script, we expect at least one incoming event
           (is (bc/success? (sut/exec-script! {:script-dir "examples/basic-clj"
-                                              :build-id "test-build"
+                                              :build {:build-id "test-build"}
                                               :api {:socket socket-path}})))
           ;; Try to read a message on the channel
           (is (= in (-> (ca/alts!! [in (ca/timeout 500)])
@@ -126,15 +129,16 @@
    :exit 0})
 
 (deftest pipeline-run-step
-  (testing "executes function directly"
-    (is (bc/success? (sut/run-step (constantly bc/success) {}))))
+  (testing "fails on invalid config"
+    (is (thrown? Exception (sut/run-step {:step (constantly bc/success)}))))
 
   (testing "executes action from map"
-    (is (bc/success? (sut/run-step {:action (constantly bc/success)} {}))))
+    (is (bc/success? (sut/run-step {:step {:action (constantly bc/success)}}))))
 
   (testing "executes in container if configured"
-    (let [config {:container/image "test-image"}
-          r (sut/run-step config {:containers {:type :test}})]
+    (let [ctx {:step {:container/image "test-image"}
+               :containers {:type :test}}
+          r (sut/run-step ctx)]
       (is (= :run-from-test (:test-result r)))
       (is (bc/success? r))))
 
@@ -143,7 +147,9 @@
     (testing "runs container config when returned"
       (let [step (fn [_]
                    {:container/image "test-image"})
-            r (sut/run-step step {:containers {:type :test}})]
+            ctx {:step {:action step}
+                 :containers {:type :test}}
+            r (sut/run-step ctx)]
         (is (= :run-from-test (:test-result r)))
         (is (bc/success? r))))
 
@@ -151,7 +157,9 @@
       (let [step {:container/image "test-image"}
             step-fn (fn [_]
                       step)
-            r (sut/run-step step-fn {:containers {:type :test}})]
+            ctx {:containers {:type :test}
+                 :step {:action step-fn}}
+            r (sut/run-step ctx)]
         (is (= step (get-in r [:context :step])))))
 
     (testing "sets index on the step"
@@ -162,9 +170,9 @@
                       step-dest)
             step {:action step-fn
                   :index 123}
-            r (sut/run-step step
-                            {:containers {:type :test}
-                             :step step})]
+            ctx {:containers {:type :test}
+                 :step step}
+            r (sut/run-step ctx)]
         (is (bc/success? r))))))
 
 (deftest ->map

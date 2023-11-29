@@ -3,7 +3,7 @@
 
 (s/def :ci/name string?)
 (s/def :ci/action fn?)
-(s/def :ci/status #{:success :failure})
+(s/def :ci/status #{:success :failure :skipped})
 (s/def :ci/script-step string?)
 (s/def :ci/script (s/coll-of :ci/script-step))
 
@@ -13,6 +13,7 @@
 (s/def :container/mount (s/coll-of string? :count 2))
 (s/def :container/mounts (s/coll-of :container/mount))
 (s/def :container/env (s/map-of string? string?))
+(s/def :container/platform string?)
 
 (s/def :ci/step (s/or :fn fn?
                       :action
@@ -20,7 +21,8 @@
                               :opt-un [:ci/name])
                       :container
                       (s/keys :req [:container/image]
-                              :opt [:container/entrypoint :container/cmd :container/mounts :container/env]
+                              :opt [:container/entrypoint :container/cmd :container/mounts :container/env
+                                    :container/platform]
                               :opt-un [:ci/script :ci/name])))
 (s/def :ci/output string?)
 (s/def :ci/exception (partial instance? java.lang.Exception))

@@ -2,6 +2,7 @@
   (:require [clojure.test :refer [deftest testing is]]
             [aleph.http :as http]
             [clj-commons.byte-streams :as bs]
+            [clojure.java.io :as io]
             [manifold.deferred :as md]
             [monkey.ci
              [commands :as sut]
@@ -198,3 +199,46 @@
       (with-redefs [http/get (constantly (md/success-deferred {:body (bs/to-reader events)}))]
         (is (spec/channel? (sut/watch {:reporter (partial swap! reported conj)})))
         (is (not-empty @reported))))))
+
+(deftest sidecar
+  (testing "dispatches events from file to bus"
+    (h/with-tmp-dir dir
+      (h/with-bus
+        (fn [bus]
+          (let [f (io/file dir "events.edn")
+                evt {:type :test/event
+                     :message "This is a test event"}
+                recv (atom [])
+                _ (e/register-handler bus (:type evt) (partial swap! recv conj))
+                ctx {:event-bus bus
+                     :args {:events-file f}
+                     :sidecar {:poll-interval 10}}
+                _ (spit f (prn-str evt))
+                c (sut/sidecar ctx)]
+            (is (spec/channel? c))
+            (is (not= :timeout (h/wait-until #(pos? (count @recv)) 500)))
+            (is (= evt (-> (first @recv)
+                           (select-keys (keys evt)))))
+            (is (true? (.delete f)) "delete the file to stop the sidecar")
+            (is (= 0 (h/try-take c 500 :timeout))))))))
+
+  (testing "reads events as they are posted"
+    (h/with-tmp-dir dir
+      (h/with-bus
+        (fn [bus]
+          (let [f (io/file dir "events.edn")
+                evt {:type :test/event
+                     :message "This is a test event"}
+                recv (atom [])
+                _ (e/register-handler bus (:type evt) (partial swap! recv conj))
+                ctx {:event-bus bus
+                     :args {:events-file f}
+                     :sidecar {:poll-interval 10}}
+                c (sut/sidecar ctx)]
+            ;; Post the event after sidecar has started
+            (is (nil? (spit f (prn-str evt))))
+            (is (not= :timeout (h/wait-until #(pos? (count @recv)) 500)))
+            (is (= evt (-> (first @recv)
+                           (select-keys (keys evt)))))
+            (is (true? (.delete f)))
+            (is (= 0 (h/try-take c 500 :timeout)))))))))

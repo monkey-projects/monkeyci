@@ -60,6 +60,11 @@
       (md/on-realized d remove-hook remove-hook))
     d))
 
+(defn sid->path [{:keys [prefix]} path sid]
+  (->> (concat [prefix] sid path)
+       (remove nil?)
+       (cs/join "/")))
+
 (deftype OciBucketLogger [conf ctx path]
   LogCapturer
   (log-output [_]
@@ -67,9 +72,7 @@
 
   (handle-stream [_ in]
     (let [sid (get-in ctx [:build :sid])
-          prefix (:prefix conf)
-          on (cs/join "/" (->> (concat [prefix] (take 3 sid) path)
-                               (remove nil?)))]
+          on (sid->path conf path (take 3 sid))]
       (-> (oci/stream-to-bucket (assoc conf :object-name on)
                                 in)
           (ensure-cleanup)))))

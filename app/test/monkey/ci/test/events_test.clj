@@ -156,3 +156,50 @@
         (let [h (sut/register-ns-handlers bus (find-ns 'monkey.ci.test.events-test))]
           (is (every? sut/handler? h))
           (is (= 2 (count h))))))))
+
+(deftest wrapped
+  (testing "returns fn that invokes f"
+    (let [f (constantly :ok)
+          w (sut/wrapped f
+                         (constantly nil)
+                         (constantly nil))]
+      (is (fn? f))
+      (is (= :ok (w {})))))
+
+  (testing "posts event before and after invoking f"
+    (let [invocations (atom [])
+          test-f (fn [t]
+                   (fn [& args]
+                     (swap! invocations conj (into [t] args))
+                     {:event t}))
+          w (sut/wrapped (test-f :during)
+                         (test-f :before)
+                         (test-f :after))]
+      (with-redefs [sut/post-event (fn [bus evt]
+                                     (swap! invocations conj [:event bus evt]))]
+        (is (= {:event :during}
+               (w {:event-bus :test-bus} "test-arg")))
+        (is (= 5 (count @invocations)))
+        (is (= :before (ffirst @invocations)))
+        (is (= [:event :test-bus {:event :before}] (second @invocations)))
+        (is (= :during (first (nth @invocations 2))))
+        (is (= :after (first (nth @invocations 3))))
+        (is (= [:event :test-bus {:event :after}] (nth @invocations 4))))))
+
+  (testing "invokes `on-error` fn on exception"
+    (let [inv (atom [])
+          on-error (fn [_ ex]
+                     {:exception ex})
+          w (sut/wrapped (fn [_]
+                           (throw (ex-info "test error" {})))
+                         nil
+                         nil
+                         on-error)]
+      (with-redefs [sut/post-event (fn [ctx evt]
+                                     (swap! inv conj evt))]
+        (is (thrown? Exception (w {:event-bus :test-bus})))
+        (is (= 1 (count @inv)))
+        (is (= "test error" (some-> @inv
+                                    first
+                                    :exception
+                                    (.getMessage))))))))

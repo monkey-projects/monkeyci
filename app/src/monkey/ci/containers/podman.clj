@@ -1,4 +1,4 @@
-(ns monkey.ci.podman
+(ns monkey.ci.containers.podman
   "Functions for running containers using Podman.  We don't use the api here, because
    it requires a socket, which is not always available.  Instead, we invoke the podman
    command as a child process and communicate with it using the standard i/o streams."
@@ -33,6 +33,10 @@
             ["-e" (str k "=" v)])
           env))
 
+(defn- platform [{:keys [:container/platform]}]
+  (if (some? platform)
+    ["--platform" platform]))
+
 (defn- entrypoint [{ep :container/entrypoint cmd :container/cmd}]
   (cond
     ep
@@ -49,27 +53,28 @@
         cwd "/home/monkeyci"
         base-cmd ["/usr/bin/podman" "run"
                   "-t" "--rm"
-                  "--privileged"       ; TODO Find a way to avoid this
                   "--name" cn
-                  "-v" (str wd ":" cwd ":z")
+                  "-v" (str wd ":" cwd ":Z")
                   "-w" cwd]]
     (concat
      ;; TODO Allow for more options to be passed in
      base-cmd
      (mounts step)
      (env-vars step)
+     (platform step)
      (entrypoint step)
      [(:image conf)]
      (make-cmd step)
      ;; TODO Execute script step by step
      (make-script-cmd (:script step)))))
 
-(defmethod mcc/run-container :podman [{:keys [build-id step pipeline] :as ctx}]
+(defmethod mcc/run-container :podman [{:keys [step pipeline] {:keys [build-id]} :build :as ctx}]
   (log/info "Running build step " build-id "/" (:name step) "as podman container")
   (let [log-maker (c/log-maker ctx)
-        log-base [build-id
-                  (or (:name pipeline) (str (:index pipeline)))
-                  (str (:index step))]
+        ;; Don't prefix the sid here, that's the responsability of the logger
+        log-base (into [(or build-id "no-build-id")]
+                       [(or (:name pipeline) (str (:index pipeline)))
+                        (str (:index step))])
         [out-log err-log :as loggers] (->> ["out.txt" "err.txt"]
                                            (map (partial conj log-base))
                                            (map (partial log-maker ctx)))]

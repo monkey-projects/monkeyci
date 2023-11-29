@@ -78,6 +78,15 @@
    :runs {:command cmd/http-server
           :requires [:http]}})
 
+(def sidecar-cmd
+  {:command "sidecar"
+   :description "Run as sidecar"
+   :opts [{:as "Events file"
+           :option "events-file"
+           :short "e"
+           :type :string}]
+   :runs {:command cmd/sidecar}})
+
 (def base-config
   {:name "monkey-ci"
    :description "MonkeyCI: Powerful build pipeline runner"
@@ -85,8 +94,7 @@
    :opts [{:as "Working directory"
            :option "workdir"
            :short "w"
-           :type :string
-           :default "."}
+           :type :string}
           {:as "Development mode"
            :option "dev-mode"
            :type :with-flag
@@ -96,7 +104,8 @@
            :short "c"
            :type :string}]
    :subcommands [build-cmd
-                 server-cmd]})
+                 server-cmd
+                 sidecar-cmd]})
 
 (defn set-invoker
   "Updates the cli config to replace the `runs` config with the given invoker."

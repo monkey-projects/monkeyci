@@ -11,8 +11,19 @@
 (deftest failed?
   (testing "true if not successful"
     (is (sut/failed? sut/failure))
-    (is (sut/failed? nil))
-    (is (not (sut/failed? sut/success)))))
+    (is (not (sut/failed? sut/success))))
+
+  (testing "false if skipped"
+    (is (not (sut/failed? sut/skipped)))))
+
+(deftest success?
+  (testing "true if `nil`"
+    (is (sut/success? nil))))
+
+(deftest skipped?
+  (testing "true if `:skipped`"
+    (is (sut/skipped? sut/skipped))
+    (is (not (sut/skipped? sut/success)))))
 
 (deftest status?
   (testing "true if the object has a status"

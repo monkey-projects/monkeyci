@@ -1,10 +1,10 @@
-(ns monkey.ci.test.podman-test
+(ns monkey.ci.test.containers.podman-test
   (:require [clojure.test :refer [deftest testing is]]
             [babashka.process :as bp]
             [monkey.ci
              [containers :as mcc]
-             [logging :as l]
-             [podman :as sut]]
+             [logging :as l]]
+            [monkey.ci.containers.podman :as sut]
             [monkey.ci.test.helpers :as h]))
 
 (deftest run-container
@@ -15,7 +15,7 @@
       (h/with-tmp-dir dir
         (let [r (mcc/run-container
                  {:containers {:type :podman}
-                  :build-id "test-build"
+                  :build {:build-id "test-build"}
                   :work-dir dir
                   :step {:name "test-step"
                          :container/image "test-img"
@@ -31,7 +31,7 @@
         (let [log-paths (atom [])
               r (mcc/run-container
                  {:containers {:type :podman}
-                  :build-id "test-build"
+                  :build {:build-id "test-build"}
                   :work-dir dir
                   :step {:name "test-step"
                          :index 0
@@ -44,7 +44,24 @@
           (is (= 2 (count @log-paths)))
           (is (= ["test-build" "test-pipeline" "0"] (->> @log-paths
                                                          first
-                                                         (take 3)))))))))
+                                                         (take 3)))))))
+
+    (testing "uses dummy build id when none given"
+      (h/with-tmp-dir dir
+        (let [log-paths (atom [])
+              r (mcc/run-container
+                 {:containers {:type :podman}
+                  :work-dir dir
+                  :step {:name "test-step"
+                         :index 0
+                         :container/image "test-img"
+                         :script ["first" "second"]}
+                  :pipeline {:name "test-pipeline"}
+                  :logging {:maker (fn [_ path]
+                                     (swap! log-paths conj path)
+                                     (l/->InheritLogger))}})]
+          (is (= "no-build-id" (->> @log-paths
+                                    ffirst))))))))
 
 (defn- contains-subseq? [l expected]
   (let [n (count expected)]
@@ -76,10 +93,12 @@
       (let [r (sut/build-cmd-args base-ctx)]
         (is (= "first && second" (last r)))))
 
-    (testing "adds mounts if provided"
-      (let [r (sut/build-cmd-args (assoc-in base-ctx
-                                            [:step :container/mounts] [["/host/path" "/container/path"]]))]
-        (is (contains-subseq? r ["-v" "/host/path:/container/path"]))))
+    (testing "mounts"
+      
+      (testing "adds mounts to args"
+        (let [r (sut/build-cmd-args (assoc-in base-ctx
+                                              [:step :container/mounts] [["/host/path" "/container/path"]]))]
+          (is (contains-subseq? r ["-v" "/host/path:/container/path"])))))
 
     (testing "adds env vars"
       (let [r (-> base-ctx
@@ -97,4 +116,10 @@
     
     (testing "overrides entrypoint for script"
       (let [r (sut/build-cmd-args base-ctx)]
-        (is (contains-subseq? r ["--entrypoint" "/bin/sh"]))))))
+        (is (contains-subseq? r ["--entrypoint" "/bin/sh"]))))
+
+    (testing "adds platform if specified"
+      (let [r (-> base-ctx
+                  (assoc-in [:step :container/platform] "linux/arm64")
+                  (sut/build-cmd-args))]
+        (is (contains-subseq? r ["--platform" "linux/arm64"]))))))
