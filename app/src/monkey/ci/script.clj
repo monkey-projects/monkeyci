@@ -63,8 +63,8 @@
   [{:keys [step]}]
   (cond
     ;; TODO Make more generic
-    (some? (:container/image step)) ::container
-    (some? (:action step)) ::action
+    (string? (:container/image step)) ::container
+    (fn? (:action step)) ::action
     :else
     (throw (ex-info "invalid step configuration" {:step step}))))
 
@@ -286,14 +286,27 @@
            script-started-evt
            script-completed-evt))
 
+(defn- resolve-pipelines
+  "The build script either returns a list of pipelines, or a function that
+   returns a list.  This function resolves the pipelines in case it's a function
+   or a var."
+  [p ctx]
+  (cond
+    (fn? p) (resolve-pipelines (p ctx) ctx)
+    (var? p) (resolve-pipelines (var-get p) ctx)
+    :else p))
+
 (defn- load-and-run-pipelines [{:keys [script-dir] {:keys [build-id]} :build :as ctx}]
   (log/debug "Executing script for build" build-id "at:" script-dir)
   (log/debug "Script context:" ctx)
   (try 
-    (let [p (load-pipelines script-dir build-id)]
+    (let [p (-> (load-pipelines script-dir build-id)
+                (resolve-pipelines ctx))]
+      (log/debug "Pipelines:" p)
       (log/debug "Loaded" (count p) "pipelines:" (map :name p))
       (run-pipelines* ctx p))
     (catch Exception ex
+      (log/error "Unable to load pipelines" ex)
       (post-event ctx {:type :script/end
                        :message (.getMessage ex)}))))
 

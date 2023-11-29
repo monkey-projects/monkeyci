@@ -38,6 +38,9 @@
 
   (testing "executes script shell from location"
     (is (bc/success? (sut/exec-script! {:script-dir "examples/basic-script"}))))
+
+  (testing "executes dynamic pipelines"
+    (is (bc/success? (sut/exec-script! {:script-dir "examples/dynamic-pipelines"}))))
   
   (testing "connects to listening socket if specified"
     (with-listening-socket
