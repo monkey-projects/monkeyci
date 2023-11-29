@@ -52,46 +52,47 @@
     (fn [ctx & more]
       (apply w (assoc ctx :event-poster (partial post-event ctx)) more))))
 
-(defprotocol PipelineStep
-  (run-step [s ctx]))
-
-(defn- run-container-step
-  "Runs the step in a new container.  How this container is executed depends on
-   the configuration passed in from the parent process, specified in the context."
-  [ctx]
-  (let [{:keys [exit] :as r} (->> (c/run-container ctx)
-                                  (merge bc/failure))]
-    (cond-> r
-      (zero? exit) (merge bc/success))))
-
 (defn ->map [s]
   (if (map? s)
     s
     {:action s
      :name (u/fn-name s)}))
 
-(extend-protocol PipelineStep
-  clojure.lang.Fn
-  (run-step [f {:keys [step] :as ctx}]
+(defn step-type
+  "Determines step type according to contents"
+  [{:keys [step]}]
+  (cond
+    ;; TODO Make more generic
+    (some? (:container/image step)) ::container
+    (some? (:action step)) ::action
+    :else
+    (throw (ex-info "invalid step configuration" {:step step}))))
+
+(defmulti run-step step-type)
+
+(defmethod run-step ::container
+  ;; Runs the step in a new container.  How this container is executed depends on
+  ;; the configuration passed in from the parent process, specified in the context.
+  [ctx]
+  (let [{:keys [exit] :as r} (->> (c/run-container ctx)
+                                  (merge bc/failure))]
+    (cond-> r
+      (zero? exit) (merge bc/success))))
+
+(defmethod run-step ::action
+  ;; Runs a step as an action.  The action property of a step should be a
+  ;; function that either returns a status result, or a new step configuration.
+  [{:keys [step] :as ctx}]
+  (let [f (:action step)]
     (log/debug "Executing function:" f)
     ;; If a step returns nil, treat it as success
     (let [r (or (f ctx) bc/success)]
       (if (bc/status? r)
         r
         ;; Recurse
-        (run-step r (assoc ctx :step (merge step (->map r)))))))
-
-  clojure.lang.IPersistentMap
-  (run-step [{:keys [action] :as step} ctx]
-    (log/debug "Running step:" step)
-    ;; TODO Make more generic
-    (cond
-      (some? (:container/image step))
-      (run-container-step ctx)
-      (fn? action)
-      (run-step action ctx)
-      :else
-      (throw (ex-info "invalid step configuration" {:step step})))))
+        (run-step (assoc ctx :step (-> step
+                                       (dissoc :action)
+                                       (merge (->map r)))))))))
 
 (defn- make-step-dir-absolute [{:keys [checkout-dir step] :as ctx}]
   (if (map? step)
@@ -108,7 +109,7 @@
   (let [{:keys [step] :as ctx} (make-step-dir-absolute initial-ctx)]
     (try
       (log/debug "Running step:" step)
-      (run-step step ctx)
+      (run-step ctx)
       (catch Exception ex
         (log/warn "Step failed:" (.getMessage ex))
         (assoc bc/failure :exception ex)))))
