@@ -3,6 +3,10 @@
             [monkey.ci.containers :as mcc]
             [monkey.ci.containers.oci :as sut]))
 
+(deftest instance-config
+  (testing "creates configuration map"
+    (is (map? (sut/instance-config {} {})))))
+
 (deftest run-container
   (testing "can run using type `oci`"
     (is (some? (mcc/run-container {:containers {:type :oci}})))))

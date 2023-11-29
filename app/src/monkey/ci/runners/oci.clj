@@ -14,86 +14,52 @@
              [utils :as u]]
             [monkey.oci.container-instance.core :as ci]))
 
-(def checkout-vol "checkout")
-(def checkout-dir "/opt/monkeyci/checkout")
 (def build-container "build")
-(def privkey-vol "private-key")
-(def privkey-file "privkey")
-(def key-dir "/opt/monkeyci/keys")
-
 (def format-sid (partial cs/join "/"))
 
-(defn- ->env [ctx pk]
+(defn- ->env [ctx pk?]
   (->> (cond-> (ctx/ctx->env ctx)
          ;; FIXME This will turn out wrong if the private key is specified elsewhere
-         pk (assoc-in [:oci :credentials :private-key] (str key-dir "/" privkey-file)))
+         ;; TODO Move this to oci ns
+         pk? (assoc-in [:oci :credentials :private-key] (str oci/key-dir "/" oci/privkey-file)))
        (config/config->env)
        (mc/map-keys name)
        (mc/remove-vals empty?)))
 
-(defn- container-config [conf ctx pk]
+(defn- patch-container [[conf] ctx pk?]
   (let [git (get-in ctx [:build :git])]
-    {:display-name build-container
-     ;; The image url must point to a container running monkeyci cli
-     :image-url (str (:image-url conf) ":" (or (:image-tag conf) (config/version)))
-     :arguments (cond-> ["-w" checkout-dir "build" "run"
-                         "--sid" (format-sid (get-in ctx [:build :sid]))]
-                  (not-empty git) (concat ["-u" (:url git)
-                                           "-b" (:branch git)
-                                           "--commit-id" (:id git)]))
-     :environment-variables (->env ctx pk)
-     :volume-mounts (cond-> [{:mount-path checkout-dir
-                              :is-read-only false
-                              :volume-name checkout-vol}]
-                      pk (conj {:mount-path key-dir
-                                :is-read-only true
-                                :volume-name privkey-vol}))}))
-
-(defn- privkey-base64
-  "Finds the private key referenced in the config, reads it and
-   returns it as a base64 encoded string."
-  [conf]
-  ;; TODO Allow for a private key to be specified other than the one
-  ;; used by the app itself.  Perhaps fetch it from the vault?
-  (let [f (fs/file (get-in conf [:credentials :private-key]))]
-    (when (fs/exists? f)
-      (u/->base64 (slurp f)))))
+    [(assoc conf
+            :display-name build-container
+            :arguments (cond-> ["-w" oci/checkout-dir "build" "run"
+                                "--sid" (format-sid (get-in ctx [:build :sid]))]
+                         (not-empty git) (concat ["-u" (:url git)
+                                                  "-b" (:branch git)
+                                                  "--commit-id" (:id git)]))
+            :environment-variables (->env ctx pk?))]))
 
 (defn instance-config
-  "Creates container instance configuration using the context"
+  "Creates container instance configuration using the context and the
+   skeleton config."
   [conf ctx]
   (let [tags (->> (get-in ctx [:build :sid])
                   (remove nil?)
-                  (zipmap ["customer-id" "project-id" "repo-id"]))
-        pk (privkey-base64 conf)]
+                  (zipmap ["customer-id" "project-id" "repo-id"]))]
     (-> conf
-        (select-keys [:availability-domain :compartment-id :image-pull-secrets :vnics])
-        (assoc :container-restart-policy "NEVER"
-               :display-name (get-in ctx [:build :build-id])
-               :shape "CI.Standard.A1.Flex" ; Use ARM shape, it's cheaper
-               :shape-config {:ocpus 1
-                              :memory-in-g-bs 2}
-               ;; Assign a checkout volume where the repo is checked out.
-               ;; This will be the working dir.
-               :volumes (cond-> [{:name checkout-vol
-                                  :volume-type "EMPTYDIR"
-                                  :backing-store "EPHEMERAL_STORAGE"}]
-                          pk (conj {:name privkey-vol
-                                    :volume-type "CONFIGFILE"
-                                    :configs [{:file-name privkey-file
-                                               :data pk}]}))
-               :containers [(container-config conf ctx pk)]
-               :freeform-tags tags))))
+        (update :image-tag #(or % (config/version)))
+        (oci/instance-config)
+        (assoc :display-name (get-in ctx [:build :build-id])
+               :freeform-tags tags)
+        (update :containers patch-container ctx (get-in conf [:credentials :private-key])))))
 
 (defn oci-runner [client conf ctx]
   (let [ch (ca/chan)
         r (oci/run-instance client (instance-config conf ctx))]
     (md/on-realized r
                     (fn [v]
-                      (ca/go (ca/>! ch v)))
+                      (ca/put! ch v))
                     (fn [err]
                       (log/error "Got error from container instance:" err)
-                      (ca/go (ca/>! ch 1))))
+                      (ca/put! ch 1)))
     (ca/go
       (-> (ca/<! ch)
           (e/then-fire ctx #(e/build-completed-evt (:build ctx) %))))))
