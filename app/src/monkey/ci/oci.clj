@@ -1,8 +1,13 @@
 (ns monkey.ci.oci
   "Oracle cloud specific functionality"
-  (:require [clojure.tools.logging :as log]
+  (:require [clojure.core.async :as ca]
+            [clojure.tools.logging :as log]
+            [manifold
+             [deferred :as md]
+             [time :as mt]]
             [medley.core :as mc]
             [monkey.ci.utils :as u]
+            [monkey.oci.container-instance.core :as ci]
             [monkey.oci.os
              [martian :as os]
              [stream :as s]]))
@@ -32,3 +37,79 @@
                 (->oci-config)
                 (os/make-context))]
     (s/input-stream->multipart ctx (assoc conf :input-stream in))))
+
+(defn wait-for-completion
+  "Starts an async poll loop that waits until the container instance has completed.
+   Returns a deferred that holds the last response received."
+  [client {:keys [get-details poll-interval post-event] :as c
+           :or {poll-interval 5000
+                post-event (constantly true)}}]
+  (let [get-async (fn []
+                    (get-details client (select-keys c [:instance-id])))
+        done? #{"INACTIVE" "DELETED" "FAILED"}]
+    (md/loop [state nil]
+      (md/chain
+       (get-async)
+       (fn [r]
+         (let [new-state (get-in r [:body :lifecycle-state])]
+           (when (not= state new-state)
+             (log/debug "State change:" state "->" new-state)
+             (post-event {:type :oci-container/state-change
+                          :details (:body r)}))
+           (if (done? new-state)
+             r
+             ;; Wait and re-check
+             (mt/in poll-interval #(md/recur new-state)))))))))
+
+(defn run-instance
+  "Creates and starts a container instance using the given config, and then
+   waits for it to terminate.  Returns a channel that will hold the exit value."
+  [client instance-config & [post-event]]
+  (log/debug "Running OCI instance with config:" instance-config)
+  (letfn [(check-error [handler]
+            (fn [{:keys [body status]}]
+              (when status
+                (if (>= status 400)
+                  (log/warn "Got an error response, status" status "with message" (:message body))
+                  (handler body)))))
+          
+          (create-instance []
+            (log/debug "Creating instance...")
+            (ci/create-container-instance
+             client
+             {:container-instance instance-config}))
+          
+          (start-polling [{:keys [id]}]
+            (log/debug "Starting polling...")
+            ;; TODO Replace this with OCI events as soon as they become available.
+            ;; TODO Don't wait, just let the container fire an event and react to that.
+            (wait-for-completion client
+                                 (-> {:instance-id id
+                                      :get-details ci/get-container-instance}
+                                     (mc/assoc-some :post-event post-event))))
+
+          (get-container-exit [r]
+            (let [cid (-> (:containers r)
+                          first
+                          :container-id)]
+              (ci/get-container
+               client
+               {:container-id cid})))
+
+          (return-result [{{:keys [exit-code]} :body}]
+            ;; Return the exit code, or nonzero when no code is specified
+            (ca/to-chan! [(or exit-code 1)]))
+
+          (log-error [ex]
+            (log/error "Error creating container instance" ex)
+            (ca/to-chan! [1]))]
+    
+    (try
+      @(-> (md/chain
+            (create-instance)
+            (check-error start-polling)
+            (check-error get-container-exit)
+            return-result)
+           (md/catch log-error))
+      (catch Exception ex
+        (log-error ex)))))

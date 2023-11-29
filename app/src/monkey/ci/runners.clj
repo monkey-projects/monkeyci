@@ -88,6 +88,7 @@
 
 (defmethod make-runner :child [_]
   (log/info "Using child process runner")
+  ;; TODO Upload checked out code to storage for containers
   (comp build-local download-src))
 
 (defmethod make-runner :noop [_]
