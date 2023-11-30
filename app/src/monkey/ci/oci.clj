@@ -158,3 +158,14 @@
                                     :configs [{:file-name privkey-file
                                                :data pk}]}))
                :containers [(container-config conf pk)]))))
+
+(defn sid->tags [sid]
+  (->> sid
+       (remove nil?)
+       (zipmap ["customer-id" "project-id" "repo-id"])))
+
+(defn find-mount
+  "Finds mount with given volume name in the container"
+  [c n]
+  (mc/find-first (u/prop-pred :volume-name n)
+                 (:volume-mounts c)))

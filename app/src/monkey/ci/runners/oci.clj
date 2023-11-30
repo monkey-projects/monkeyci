@@ -41,9 +41,7 @@
   "Creates container instance configuration using the context and the
    skeleton config."
   [conf ctx]
-  (let [tags (->> (get-in ctx [:build :sid])
-                  (remove nil?)
-                  (zipmap ["customer-id" "project-id" "repo-id"]))]
+  (let [tags (oci/sid->tags (get-in ctx [:build :sid]))]
     (-> conf
         (update :image-tag #(or % (config/version)))
         (oci/instance-config)
