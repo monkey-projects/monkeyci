@@ -6,7 +6,8 @@
              [containers :as mcc]
              [oci :as oci]
              [utils :as u]]
-            [monkey.ci.containers.oci :as sut]))
+            [monkey.ci.containers.oci :as sut]
+            [monkey.ci.test.helpers :as h]))
 
 (deftest instance-config
   (testing "creates configuration map"
@@ -47,8 +48,7 @@
     (let [jc (->> {:step {:script ["first" "second"]}}
                   (sut/instance-config {})
                   :containers
-                  (filter (comp (partial = "job") :display-name))
-                  (first))]
+                  (mc/find-first (u/prop-pred :display-name "job")))]
       
       (testing "uses shell mounted script"
         (is (= ["/bin/sh" (str sut/script-dir "/job.sh")] (:command jc)))
@@ -69,6 +69,19 @@
 
           (testing "sets script dir"
             (is (string? (get env "SCRIPT_DIR"))))))))
+
+  (testing "sidecar container"
+    (let [sc (->> {:step {:script ["first" "second"]}}
+                  (sut/instance-config {})
+                  :containers
+                  (mc/find-first (u/prop-pred :display-name "sidecar")))]
+      
+      (testing "starts sidecar using command"
+        (is (= ["sidecar"] (:command sc))))
+
+      (testing "passes events-file as arg"
+        (is (h/contains-subseq? (:arguments sc)
+                                ["--events-file" sut/event-file])))))
 
   (testing "script volume"
     (let [v (->> {:step {:script ["first" "second"]}}

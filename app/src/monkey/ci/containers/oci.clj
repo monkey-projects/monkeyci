@@ -38,8 +38,11 @@
                            "START_FILE" start-file
                            "EVENT_FILE" event-file}})
 
-(defn- sidecar-container [ic]
-  (-> ic :containers first (assoc :display-name "sidecar")))
+(defn- sidecar-container [{[c] :containers}]
+  (assoc c
+         :display-name "sidecar"
+         :command ["sidecar"]
+         :arguments ["--events-file" event-file]))
 
 (defn- display-name [{:keys [build step]}]
   (cs/join "-" [(:build-id build)
