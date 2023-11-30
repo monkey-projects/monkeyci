@@ -122,4 +122,8 @@
       (let [r (-> base-ctx
                   (assoc-in [:step :container/platform] "linux/arm64")
                   (sut/build-cmd-args))]
-        (is (contains-subseq? r ["--platform" "linux/arm64"]))))))
+        (is (contains-subseq? r ["--platform" "linux/arm64"]))))
+
+    (testing "adds default platform from app config"
+      (is (contains-subseq? (sut/build-cmd-args {:container {:platform "test-platform"}})
+                            ["--platform" "test-platform"])))))
