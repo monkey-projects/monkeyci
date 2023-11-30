@@ -5,7 +5,7 @@
              [containers :as mcc]
              [logging :as l]]
             [monkey.ci.containers.podman :as sut]
-            [monkey.ci.test.helpers :as h]))
+            [monkey.ci.test.helpers :as h :refer [contains-subseq?]]))
 
 (deftest run-container
   (with-redefs [bp/process (fn [args]
@@ -63,15 +63,6 @@
           (is (= "no-build-id" (->> @log-paths
                                     ffirst))))))))
 
-(defn- contains-subseq? [l expected]
-  (let [n (count expected)]
-    (loop [t l]
-      (if (= (take n t) expected)
-        true
-        (if (< (count t) n)
-          false
-          (recur (rest t)))))))
-
 (deftest build-cmd-args
   (let [base-ctx {:build-id "test-build"
                   :work-dir "test-dir"
@@ -122,4 +113,8 @@
       (let [r (-> base-ctx
                   (assoc-in [:step :container/platform] "linux/arm64")
                   (sut/build-cmd-args))]
-        (is (contains-subseq? r ["--platform" "linux/arm64"]))))))
+        (is (contains-subseq? r ["--platform" "linux/arm64"]))))
+
+    (testing "adds default platform from app config"
+      (is (contains-subseq? (sut/build-cmd-args {:container {:platform "test-platform"}})
+                            ["--platform" "test-platform"])))))

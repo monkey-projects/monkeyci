@@ -3,9 +3,7 @@
             [clojure.core.async :as ca :refer [<!]]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
-            [manifold
-             [deferred :as md]
-             [time :as mt]]
+            [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
              [config :as config]
@@ -16,157 +14,53 @@
              [utils :as u]]
             [monkey.oci.container-instance.core :as ci]))
 
-(def checkout-vol "checkout")
-(def checkout-dir "/opt/monkeyci/checkout")
 (def build-container "build")
-(def privkey-vol "private-key")
-(def privkey-file "privkey")
-(def key-dir "/opt/monkeyci/keys")
-
 (def format-sid (partial cs/join "/"))
 
-(defn- ->env [ctx pk]
+(defn- ->env [ctx pk?]
   (->> (cond-> (ctx/ctx->env ctx)
          ;; FIXME This will turn out wrong if the private key is specified elsewhere
-         pk (assoc-in [:oci :credentials :private-key] (str key-dir "/" privkey-file)))
+         ;; TODO Move this to oci ns
+         pk? (assoc-in [:oci :credentials :private-key] (str oci/key-dir "/" oci/privkey-file)))
        (config/config->env)
        (mc/map-keys name)
        (mc/remove-vals empty?)))
 
-(defn- container-config [conf ctx pk]
+(defn- patch-container [[conf] ctx pk?]
   (let [git (get-in ctx [:build :git])]
-    {:display-name build-container
-     ;; The image url must point to a container running monkeyci cli
-     :image-url (str (:image-url conf) ":" (or (:image-tag conf) (config/version)))
-     :arguments (cond-> ["-w" checkout-dir "build" "run"
-                         "--sid" (format-sid (get-in ctx [:build :sid]))]
-                  (not-empty git) (concat ["-u" (:url git)
-                                           "-b" (:branch git)
-                                           "--commit-id" (:id git)]))
-     :environment-variables (->env ctx pk)
-     :volume-mounts (cond-> [{:mount-path checkout-dir
-                              :is-read-only false
-                              :volume-name checkout-vol}]
-                      pk (conj {:mount-path key-dir
-                                :is-read-only true
-                                :volume-name privkey-vol}))}))
-
-(defn- privkey-base64
-  "Finds the private key referenced in the config, reads it and
-   returns it as a base64 encoded string."
-  [conf]
-  ;; TODO Allow for a private key to be specified other than the one
-  ;; used by the app itself.  Perhaps fetch it from the vault?
-  (let [f (fs/file (get-in conf [:credentials :private-key]))]
-    (when (fs/exists? f)
-      (u/->base64 (slurp f)))))
+    [(assoc conf
+            :display-name build-container
+            :arguments (cond-> ["-w" oci/checkout-dir "build" "run"
+                                "--sid" (format-sid (get-in ctx [:build :sid]))]
+                         (not-empty git) (concat ["-u" (:url git)
+                                                  "-b" (:branch git)
+                                                  "--commit-id" (:id git)]))
+            :environment-variables (->env ctx pk?))]))
 
 (defn instance-config
-  "Creates container instance configuration using the context"
+  "Creates container instance configuration using the context and the
+   skeleton config."
   [conf ctx]
-  (let [tags (->> (get-in ctx [:build :sid])
-                  (remove nil?)
-                  (zipmap ["customer-id" "project-id" "repo-id"]))
-        pk (privkey-base64 conf)]
+  (let [tags (oci/sid->tags (get-in ctx [:build :sid]))]
     (-> conf
-        (select-keys [:availability-domain :compartment-id :image-pull-secrets :vnics])
-        (assoc :container-restart-policy "NEVER"
-               :display-name (get-in ctx [:build :build-id])
-               :shape "CI.Standard.A1.Flex" ; Use ARM shape, it's cheaper
-               :shape-config {:ocpus 1
-                              :memory-in-g-bs 2}
-               ;; Assign a checkout volume where the repo is checked out.
-               ;; This will be the working dir.
-               :volumes (cond-> [{:name checkout-vol
-                                  :volume-type "EMPTYDIR"
-                                  :backing-store "EPHEMERAL_STORAGE"}]
-                          pk (conj {:name privkey-vol
-                                    :volume-type "CONFIGFILE"
-                                    :configs [{:file-name privkey-file
-                                               :data pk}]}))
-               :containers [(container-config conf ctx pk)]
-               :freeform-tags tags))))
-
-(defn wait-for-completion
-  "Starts an async poll loop that waits until the container instance has completed.
-   Returns a deferred that holds the last response received."
-  [client {:keys [get-details poll-interval post-event] :as c
-           :or {poll-interval 5000
-                post-event (constantly true)}}]
-  (let [get-async (fn []
-                    (get-details client (select-keys c [:instance-id])))
-        done? #{"INACTIVE" "DELETED" "FAILED"}]
-    (md/loop [state nil]
-      (md/chain
-       (get-async)
-       (fn [r]
-         (let [new-state (get-in r [:body :lifecycle-state])]
-           (when (not= state new-state)
-             (log/debug "State change:" state "->" new-state)
-             (post-event {:type :oci-container/state-change
-                          :details (:body r)}))
-           (if (done? new-state)
-             r
-             ;; Wait and re-check
-             (mt/in poll-interval #(md/recur new-state)))))))))
-
-(defn run-instance
-  "Creates and starts a container instance using the given config, and then
-   waits for it to terminate.  Returns a channel that will hold the exit value."
-  [client instance-config & [post-event]]
-  (log/debug "Running OCI instance with config:" instance-config)
-  (letfn [(check-error [handler]
-            (fn [{:keys [body status]}]
-              (when status
-                (if (>= status 400)
-                  (log/warn "Got an error response, status" status "with message" (:message body))
-                  (handler body)))))
-          
-          (create-instance []
-            (log/debug "Creating instance...")
-            (ci/create-container-instance
-             client
-             {:container-instance instance-config}))
-          
-          (start-polling [{:keys [id]}]
-            (log/debug "Starting polling...")
-            ;; TODO Replace this with OCI events as soon as they become available.
-            ;; TODO Don't wait, just let the container fire an event and react to that.
-            (wait-for-completion client
-                                 (-> {:instance-id id
-                                      :get-details ci/get-container-instance}
-                                     (mc/assoc-some :post-event post-event))))
-
-          (get-container-exit [r]
-            (let [cid (-> (:containers r)
-                          first
-                          :container-id)]
-              (ci/get-container
-               client
-               {:container-id cid})))
-
-          (return-result [{{:keys [exit-code]} :body}]
-            ;; Return the exit code, or nonzero when no code is specified
-            (ca/to-chan! [(or exit-code 1)]))
-
-          (log-error [ex]
-            (log/error "Error creating container instance" ex)
-            (ca/to-chan! [1]))]
-    
-    (try
-      @(-> (md/chain
-            (create-instance)
-            (check-error start-polling)
-            (check-error get-container-exit)
-            return-result)
-           (md/catch log-error))
-      (catch Exception ex
-        (log-error ex)))))
+        (update :image-tag #(or % (config/version)))
+        (oci/instance-config)
+        (assoc :display-name (get-in ctx [:build :build-id])
+               :freeform-tags tags)
+        (update :containers patch-container ctx (get-in conf [:credentials :private-key])))))
 
 (defn oci-runner [client conf ctx]
-  (ca/go
-    (-> (ca/<! (run-instance client (instance-config conf ctx)))
-        (e/then-fire ctx #(e/build-completed-evt (:build ctx) %)))))
+  (let [ch (ca/chan)
+        r (oci/run-instance client (instance-config conf ctx))]
+    (md/on-realized r
+                    (fn [v]
+                      (ca/put! ch v))
+                    (fn [err]
+                      (log/error "Got error from container instance:" err)
+                      (ca/put! ch 1)))
+    (ca/go
+      (-> (ca/<! ch)
+          (e/then-fire ctx #(e/build-completed-evt (:build ctx) %))))))
 
 (defmethod r/make-runner :oci [ctx]
   (let [conf (oci/ctx->oci-config ctx :runner)
