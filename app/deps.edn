@@ -97,4 +97,8 @@
 
   :uber
   {:exec-fn monkey.build/uberjar
-   :exec-args {:jar "target/monkeyci-standalone.jar"}}}}
+   :exec-args {:jar "target/monkeyci-standalone.jar"}}
+
+  :json-logging
+  {:extra-deps {ch.qos.logback.contrib/logback-json-classic {:mvn/version "0.1.5"}}
+   :jvm-opts ["-Dlogback.configurationFile=dev-resources/logback-json.xml"]}}}

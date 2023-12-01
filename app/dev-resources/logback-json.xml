@@ -1,0 +1,15 @@
+<configuration scan="true" scanPeriod="5 seconds">
+  <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder class="ch.qos.logback.classic.encoder.JsonEncoder"/>
+  </appender>
+
+  <logger name="org" level="WARN"/>
+  <logger name="com" level="WARN"/>
+  <logger name="net" level="WARN"/>
+  <logger name="io" level="WARN"/>
+  <logger name="monkey.ci" level="DEBUG"/>
+
+  <root level="WARN">
+    <appender-ref ref="JSON"/>
+  </root>
+</configuration>
