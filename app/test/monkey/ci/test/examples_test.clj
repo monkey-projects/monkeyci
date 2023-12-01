@@ -8,7 +8,7 @@
 
 (defn run-example [path]
   (log/info "Running example at" path)
-  (let [inv (-> cli/build-cmd
+  (let [inv (-> cli/run-build-cmd
                 :runs
                 (core/system-invoker {}))]
     (inv {:workdir "examples"

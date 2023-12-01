@@ -2,8 +2,12 @@
   (:require [clojure.test :refer [deftest testing is]]
             [babashka.fs :as fs]
             [clojure.java.io :as io]
-            [monkey.ci.blob :as sut]
-            [monkey.ci.test.helpers :as h]))
+            [manifold.deferred :as md]
+            [monkey.ci
+             [blob :as sut]
+             [utils :as u]]
+            [monkey.ci.test.helpers :as h]
+            [monkey.oci.os.core :as os]))
 
 (defn blob-store? [x]
   (satisfies? sut/BlobStore x))
@@ -15,7 +19,7 @@
                                         :dir (io/file ~dir "blob")}})]
        ~@body)))
 
-(deftest disk-store
+(deftest disk-blob
   (testing "compresses single file to local directory"
     (with-disk-blob dir blob
       (let [f (io/file dir "out.txt")
@@ -55,3 +59,27 @@
           (let [in (io/file restore-dir "src" f)]
             (is (fs/exists? in))
             (is (= c (slurp in)))))))))
+
+(deftest oci-blob
+  (testing "created by `make-blob-store`"
+    (is (blob-store? (sut/make-blob-store {:blob {:type :oci}}))))
+  
+  (testing "`save` writes to temp file, then uploads it"
+    (with-redefs [os/put-object (constantly (md/success-deferred nil))]
+      (h/with-tmp-dir dir
+        (let [blob (sut/make-blob-store {:blob {:type :oci
+                                                :prefix "prefix"
+                                                :tmp-dir (u/abs-path (io/file dir "tmp"))}})
+              f (io/file dir "test.txt")]
+          (is (nil? (spit f "This is a test file")))
+          (is (= "prefix/remote/path" (sut/save blob f "remote/path")))))))
+
+  (testing "`restore` reads to temp file, then unarchives it"
+    #_(with-redefs [os/get-object (constantly (md/success-deferred "restored body"))]
+      (h/with-tmp-dir dir
+        (let [blob (sut/make-blob-store {:blob {:type :oci
+                                                :prefix "prefix"
+                                                :tmp-dir (u/abs-path (io/file dir "tmp"))}})
+              f (io/file dir "test.txt")]
+          (is (nil? (spit f "This is a test file")))
+          (is (= "prefix/remote/path" (sut/save blob f "remote/path"))))))))

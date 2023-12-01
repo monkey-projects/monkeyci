@@ -7,4 +7,4 @@
   {:tenancy-ocid "ocid1.tenancy.oc1..aaaaaaaaaelsxbhoxnxwsvj6gnetml6rct3z7myetnptr5bibc3bdfbwiveq"
    :user-ocid "ocid1.user.oc1..aaaaaaaagunozd7t7fs5rqwqrnshl2bgkfjufycyavx37gflyordcmhzicxa"
    :key-fingerprint "3c:0e:fa:d9:66:00:98:fa:df:d9:5d:8a:db:b3:32:d2"
-   :private-key "dev-resources/oci.key"}}}
+   :private-key "dev-resources/test/oci.key"}}}

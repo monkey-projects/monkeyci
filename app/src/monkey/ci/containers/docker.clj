@@ -213,7 +213,7 @@
         log-path (fn [s]
                    (u/abs-path (io/file internal-log-dir s)))
         {:keys [image] :as conf} (container-opts ctx)
-        output-dir (doto (ctx/log-dir ctx)
+        output-dir (doto (io/file (ctx/log-dir ctx))
                      (.mkdirs))
         
         pull   (fn [{:keys [image]}]

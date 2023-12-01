@@ -3,11 +3,15 @@
    or entire directories."
   (:require [babashka.fs :as fs]
             [clojure.java.io :as io]
+            [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [clompress
              [archivers :as ca]
              [compression :as cc]]
-            [monkey.ci.utils :as u])
+            [monkey.ci
+             [oci :as oci]
+             [utils :as u]]
+            [monkey.oci.os.core :as os])
   (:import [java.io BufferedInputStream PipedInputStream PipedOutputStream]
            [org.apache.commons.compress.archivers ArchiveStreamFactory]))
 
@@ -116,3 +120,35 @@
 
 (defmethod make-blob-store :disk [conf]
   (->DiskBlobStore (get-in conf [:blob :dir])))
+
+(defn- tmp-dir [{:keys [tmp-dir]}]
+  (or tmp-dir (u/tmp-dir)))
+
+(deftype OciBlobStore [client conf]
+  BlobStore
+  (save [_ src dest]
+    (let [arch (io/file (tmp-dir conf) (str (random-uuid)))
+          obj-name (->> [(:prefix conf) dest]
+                        (remove nil?)
+                        (cs/join "/"))]
+      ;; Write archive to temp file first
+      (mkdirs! (.getParentFile arch))
+      (ca/archive
+       {:output-stream (io/output-stream arch)
+        :compression compression-type
+        :archive-type archive-type}
+       (u/abs-path src))
+      ;; Upload the temp file
+      (os/put-object client (-> conf
+                                (select-keys [:ns :bucket-name])
+                                (assoc :object-name obj-name)))
+      obj-name))
+
+  (restore [_ src dest]))
+
+(defmethod make-blob-store :oci [conf]
+  (let [oci-conf (oci/ctx->oci-config conf :blob)
+        client (-> oci-conf
+                   (oci/->oci-config)
+                   (os/make-client))]
+    (->OciBlobStore client oci-conf)))
