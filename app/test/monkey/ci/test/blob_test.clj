@@ -36,4 +36,22 @@
         (is (some? (sut/save blob f arch)))
         (is (some? (sut/restore blob arch dest)))
         (is (fs/exists? (io/file dest n)))
-        (is (= contents (slurp (io/file dest n))))))))
+        (is (= contents (slurp (io/file dest n)))))))
+
+  (testing "can compress and restore file tree"
+    (with-disk-blob dir blob
+      (let [files {"root.txt" "this is the root file"
+                   "dir/sub.txt" "this is a child file"}
+            arch "dest.tar.gz"
+            restore-dir (io/file dir "extract")
+            src (io/file dir "src")]
+        (doseq [[f c] files]
+          (let [af (io/file src f)]
+            (is (true? (.mkdirs (.getParentFile af))))
+            (is (nil? (spit af c)))))
+        (is (some? (sut/save blob src arch)))
+        (is (some? (sut/restore blob arch restore-dir)))
+        (doseq [[f c] files]
+          (let [in (io/file restore-dir "src" f)]
+            (is (fs/exists? in))
+            (is (= c (slurp in)))))))))

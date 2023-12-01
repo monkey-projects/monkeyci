@@ -88,16 +88,14 @@
   BlobStore
   (save [_ src dest]
     (let [f (io/file dir dest)
-          prefix (fs/file
-                  (if (fs/directory? src)
-                    src
-                    (fs/parent src)))]
+          prefix (u/abs-path
+                  (fs/file (fs/parent src)))]
       (mkdirs! (.getParentFile f))
       (ca/archive
        {:output-stream (io/output-stream f)
         :compression compression-type
         :archive-type archive-type
-        :entry-name-resolver (partial drop-prefix-resolver prefix)}
+        :entryNameResolver (partial drop-prefix-resolver prefix)}
        (u/abs-path src))
       ;; Return destination path
       (u/abs-path f)))
