@@ -150,4 +150,11 @@
                   (sut/process-env "test-socket"))]
       (is (= "file" (:monkeyci-logging-type env)))
       (is (= "test-dir" (:monkeyci-logging-dir env)))
-      (is (not (contains? env :monkeyci-logging-maker))))))
+      (is (not (contains? env :monkeyci-logging-maker)))))
+
+  (testing "passes container props"
+    (let [env (-> {:containers {:type :podman
+                                :platform "linux/amd64"}}
+                  (sut/process-env "test-socket"))]
+      (is (= "podman" (:monkeyci-containers-type env)))
+      (is (= "linux/amd64" (:monkeyci-containers-platform env))))))

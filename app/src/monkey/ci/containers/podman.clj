@@ -35,7 +35,7 @@
 
 (defn- platform [ctx]
   (when-let [p (or (get-in ctx [:step :container/platform])
-                   (get-in ctx [:container :platform]))]
+                   (get-in ctx [:containers :platform]))]
     ["--platform" p]))
 
 (defn- entrypoint [{ep :container/entrypoint cmd :container/cmd}]

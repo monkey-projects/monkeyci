@@ -116,5 +116,5 @@
         (is (contains-subseq? r ["--platform" "linux/arm64"]))))
 
     (testing "adds default platform from app config"
-      (is (contains-subseq? (sut/build-cmd-args {:container {:platform "test-platform"}})
+      (is (contains-subseq? (sut/build-cmd-args {:containers {:platform "test-platform"}})
                             ["--platform" "test-platform"])))))
