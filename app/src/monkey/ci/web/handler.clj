@@ -1,7 +1,8 @@
 (ns monkey.ci.web.handler
   "Handler for the web server"
-  (:require [clojure.tools.logging :as log]
-            [medley.core :refer [update-existing]]
+  (:require [camel-snake-kebab.core :as csk]
+            [clojure.tools.logging :as log]
+            [medley.core :refer [update-existing] :as mc]
             [monkey.ci.events :as e]
             [monkey.ci.web
              [api :as api]
@@ -93,7 +94,11 @@
                    :parameters {:body Parameters}}}])
 
 (def build-routes
-  ["/builds" {:get {:handler api/get-builds}}])
+  ["/builds"
+   [["" {:get {:handler api/get-builds}}]
+    ["/trigger" {:post {:handler api/trigger-build
+                        :parameters {:query {(s/optional-key :branch) s/Str
+                                             (s/optional-key :commit-id) s/Str}}}}]]])
 
 (def repo-routes
   ["/repo"
@@ -153,6 +158,14 @@
                                    (slurp s))))
         (h))))
 
+(defn- kebab-case-query
+  "Middleware that converts any query params to kebab-case, to make them more idiomatic."
+  [h]
+  (fn [req]
+    (-> req
+        (mc/update-existing-in [:parameters :query] (partial mc/map-keys csk/->kebab-case-keyword))
+        (h))))
+
 (defn- passthrough-middleware
   "No-op middleware, just passes the request to the parent handler."
   [h]
@@ -164,7 +177,8 @@
    (ring/router
     routes
     {:data {:middleware (vec (concat [stringify-body]
-                                     c/default-middleware))
+                                     c/default-middleware
+                                     [kebab-case-query]))
             :muuntaja (c/make-muuntaja)
             :coercion reitit.coercion.schema/coercion
             ::c/context opts}

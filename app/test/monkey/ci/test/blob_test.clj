@@ -17,7 +17,8 @@
   `(h/with-tmp-dir ~dir
      (let [~blob (sut/make-blob-store {:blob 
                                        {:type :disk
-                                        :dir (io/file ~dir "blob")}})]
+                                        :dir (io/file ~dir "blob")}}
+                                      :blob)]
        ~@body)))
 
 (deftest disk-blob
@@ -63,7 +64,7 @@
 
 (deftest oci-blob
   (testing "created by `make-blob-store`"
-    (is (blob-store? (sut/make-blob-store {:blob {:type :oci}}))))
+    (is (blob-store? (sut/make-blob-store {:blob {:type :oci}} :blob))))
   
   (testing "`save`"
       (with-redefs [os/put-object (constantly (md/success-deferred nil))]
@@ -71,7 +72,8 @@
           (let [tmp-dir (io/file dir "tmp")
                 blob (sut/make-blob-store {:blob {:type :oci
                                                   :prefix "prefix"
-                                                  :tmp-dir (u/abs-path tmp-dir)}})
+                                                  :tmp-dir (u/abs-path tmp-dir)}}
+                                          :blob)
                 f (io/file dir "test.txt")
                 _ (spit f "This is a test file")
                 r @(sut/save blob f "remote/path")]
@@ -91,7 +93,8 @@
             tmp-dir (io/file dir "tmp")
             blob (sut/make-blob-store {:blob {:type :oci
                                               :prefix "prefix"
-                                              :tmp-dir (u/abs-path tmp-dir)}})
+                                              :tmp-dir (u/abs-path tmp-dir)}}
+                                      :blob)
             r (io/file dir "restored")]
         ;; Create archive first
         (doseq [[f v] files]

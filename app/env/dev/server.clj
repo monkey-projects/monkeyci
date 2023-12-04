@@ -1,5 +1,6 @@
 (ns server
   (:require [com.stuartsierra.component :as sc]
+            [config :as co]
             [config.core :as cc]
             [monkey.ci
              [config :as config]
@@ -19,8 +20,8 @@
 (defn start-server []
   (stop-server)
   (reset! server (-> c/base-system                     
-                     (assoc :config (-> (config/app-config cc/env {:dev-mode true :workdir "tmp"})
-                                        (assoc :log-dir (u/abs-path "target/logs"))))
+                     (assoc :config (-> @co/global-config
+                                        (merge {:dev-mode true :workdir "tmp"})))
                      (sc/subsystem [:http])
                      (sc/start-system)))
   nil)

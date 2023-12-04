@@ -3,7 +3,9 @@
   (:require [clojure.core.async :as ca]
             [clojure.tools.logging :as log]
             [com.stuartsierra.component :as c]
+            [medley.core :as mc]
             [monkey.ci
+             [blob :as b]
              [commands :as co]
              [config :as config]
              [events :as e]
@@ -61,6 +63,10 @@
                ;; Return the checkout dir
                (:dir opts))}})
 
+(defn- configure-workspace [ctx]
+  (mc/update-existing ctx :workspace (fn [ws]
+                                       (assoc ws :store (b/make-blob-store ctx :workspace)))))
+
 (defrecord Context [command config event-bus storage]
   c/Lifecycle
   (start [this]
@@ -73,6 +79,7 @@
         (assoc :storage (:storage storage)
                :public-api wsa/local-api
                :reporter (rep/make-reporter (:reporter config)))
+        (configure-workspace)
         (config/initialize-log-maker)))
   (stop [this]
     this))

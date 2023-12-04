@@ -23,7 +23,8 @@
   (save [store src dest] "Saves `src` file or directory to `dest` as a blob")
   (restore [store src dest] "Restores `src` to local `dest`"))
 
-(defmulti make-blob-store (comp :type :blob))
+(defmulti make-blob-store (fn [conf k]
+                            (get-in conf [k :type])))
 
 (def blob-store? (partial satisfies? BlobStore))
 
@@ -131,8 +132,8 @@
           (mkdirs! f)
           (extract-archive is f))))))
 
-(defmethod make-blob-store :disk [conf]
-  (->DiskBlobStore (get-in conf [:blob :dir])))
+(defmethod make-blob-store :disk [conf k]
+  (->DiskBlobStore (get-in conf [k :dir])))
 
 (defn- tmp-dir [{:keys [tmp-dir]}]
   (or tmp-dir (u/tmp-dir)))
@@ -184,8 +185,8 @@
            (constantly f))
           (md/finally #(fs/delete arch))))))
 
-(defmethod make-blob-store :oci [conf]
-  (let [oci-conf (oci/ctx->oci-config conf :blob)
+(defmethod make-blob-store :oci [conf k]
+  (let [oci-conf (oci/ctx->oci-config conf k)
         client (-> oci-conf
                    (oci/->oci-config)
                    (os/make-client))]

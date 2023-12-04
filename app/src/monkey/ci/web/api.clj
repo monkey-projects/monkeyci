@@ -186,6 +186,15 @@
          (map fetch-details)
          (rur/response))))
 
+(defn trigger-build [req]
+  (c/posting-handler
+   req
+   (fn [{p :parameters}]
+     (-> (:path p)
+         (merge (:query p))
+         (assoc 
+          :type :build/triggered)))))
+
 (def allowed-events
   #{:script/start
     :script/end
