@@ -1,6 +1,7 @@
 (ns monkey.ci.spec
   (:require [clojure.spec.alpha :as s]
             [clojure.core.async.impl.protocols :as ap]
+            [monkey.ci.blob :as blob]
             [monkey.oci.sign :as oci-sign]))
 
 ;; Unfortunately, there seems to be no clean way to determine
@@ -68,6 +69,7 @@
 
 (defmulti blob-type :type)
 
+(s/def :blob/store blob/blob-store?)
 (s/def :blob/type #{:disk :oci})
 (s/def :disk-blob/dir string?)
 
@@ -81,6 +83,8 @@
           :opt-un [:oci/credentials :oci/prefix :oci-blob/tmp-dir]))
 
 (s/def :conf/blob (s/multi-spec blob-type :type))
+
+(s/def :conf/workspace (s/merge :conf/blob))
 
 (s/def :conf/log-dir string?)
 (s/def :conf/work-dir string?)
@@ -138,6 +142,9 @@
 (s/def :logging/dir string?)
 (s/def :logging/maker fn?)
 
+(s/def :ctx/workspace (s/merge :conf/workspace
+                               (s/keys :req-un [:blob/store])))
+
 (defmulti logging-type :type)
 
 (defmethod logging-type :inherit [_]
@@ -162,7 +169,7 @@
 (s/def ::app-config (s/keys :req-un [:conf/http :conf/runner :conf/args :conf/logging
                                      :conf/work-dir :conf/checkout-base-dir]
                             :opt-un [:conf/dev-mode :conf/containers :conf/log-dir
-                                     :conf/storage :conf/account :conf/sidecar :conf/blob]))
+                                     :conf/storage :conf/account :conf/sidecar :conf/workspace]))
 ;; Application context.  This is the result of processing the configuration and is passed
 ;; around internally.
 (s/def ::app-context (s/keys :req-un [:conf/http :ctx/runner :evt/event-bus :ctx/git :ctx/storage :ctx/public-api

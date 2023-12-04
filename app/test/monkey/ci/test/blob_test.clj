@@ -27,7 +27,7 @@
             dest "dest.tar.gz"]
         (is (blob-store? blob))
         (is (nil? (spit f "this is a save test")))
-        (is (some? (sut/save blob f dest)))
+        (is (some? @(sut/save blob f dest)))
         (is (fs/exists? (io/file dir "blob" dest))))))
 
   (testing "can restore single file archive"
@@ -38,8 +38,8 @@
             dest (io/file dir "extract")
             contents "this is a restore test"]
         (is (nil? (spit f contents)))
-        (is (some? (sut/save blob f arch)))
-        (is (some? (sut/restore blob arch dest)))
+        (is (some? @(sut/save blob f arch)))
+        (is (some? @(sut/restore blob arch dest)))
         (is (fs/exists? (io/file dest n)))
         (is (= contents (slurp (io/file dest n)))))))
 
@@ -54,8 +54,8 @@
           (let [af (io/file src f)]
             (is (true? (.mkdirs (.getParentFile af))))
             (is (nil? (spit af c)))))
-        (is (some? (sut/save blob src arch)))
-        (is (some? (sut/restore blob arch restore-dir)))
+        (is (some? @(sut/save blob src arch)))
+        (is (some? @(sut/restore blob arch restore-dir)))
         (doseq [[f c] files]
           (let [in (io/file restore-dir "src" f)]
             (is (fs/exists? in))
@@ -72,11 +72,12 @@
                 blob (sut/make-blob-store {:blob {:type :oci
                                                   :prefix "prefix"
                                                   :tmp-dir (u/abs-path tmp-dir)}})
-                f (io/file dir "test.txt")]
+                f (io/file dir "test.txt")
+                _ (spit f "This is a test file")
+                r @(sut/save blob f "remote/path")]
             
             (testing "writes to temp file, then uploads it"
-              (is (nil? (spit f "This is a test file")))
-              (is (= "prefix/remote/path" (sut/save blob f "remote/path"))))
+              (is (= "prefix/remote/path" r)))
 
             (testing "deletes tmp file"
               (is (empty? (fs/list-dir tmp-dir))))))))
@@ -100,15 +101,15 @@
         (is (nil? (sut/make-archive orig arch)))
         (is (fs/exists? arch))
         (is (pos? (fs/size arch)))
-        ;; Validate that the archive is downloaded and unpacked
         (with-redefs [os/get-object (constantly (md/success-deferred (fs/read-all-bytes arch)))]
-          
-          (testing " reads to temp file, then unarchives it"
-            (is (= r (sut/restore blob "remote/path" r)))
-            (doseq [[f v] files]
-              (let [p (io/file r "orig" f)]
-                (is (fs/exists? p))
-                (is (= v (slurp p))))))
+          (let [res @(sut/restore blob "remote/path" r)]
+            
+            (testing " reads to temp file, then unarchives it"
+              (is (= r res))
+              (doseq [[f v] files]
+                (let [p (io/file r "orig" f)]
+                  (is (fs/exists? p))
+                  (is (= v (slurp p))))))
 
-          (testing "deletes tmp files"
-            (is (empty? (fs/list-dir tmp-dir)))))))))
+            (testing "deletes tmp files"
+              (is (empty? (fs/list-dir tmp-dir))))))))))

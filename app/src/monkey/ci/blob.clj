@@ -25,6 +25,8 @@
 
 (defmulti make-blob-store (comp :type :blob))
 
+(def blob-store? (partial satisfies? BlobStore))
+
 (def compression-type "gz")
 (def archive-type "tar")
 
@@ -109,23 +111,25 @@
   BlobStore
   (save [_ src dest]
     (let [f (io/file dir dest)]
-      (make-archive src f)
-      ;; Return destination path
-      (u/abs-path f)))
+      (md/chain
+       (make-archive src f)
+       ;; Return destination path
+       (constantly (u/abs-path f)))))
 
   (restore [_ src dest]
     (let [f (io/file dest)
           os (PipedOutputStream.)]
-      (with-open [is (BufferedInputStream. (PipedInputStream. os))]
-        (mkdirs! f)
-        ;; Decompress to the output stream
-        (doto (Thread. #(cc/decompress
-                         (io/input-stream (io/file dir src))
-                         os
-                         compression-type))
-          (.start))
-        ;; Unarchive
-        (extract-archive is f)))))
+      (md/future
+        (with-open [is (BufferedInputStream. (PipedInputStream. os))]
+          ;; Decompress to the output stream
+          (doto (Thread. #(cc/decompress
+                           (io/input-stream (io/file dir src))
+                           os
+                           compression-type))
+            (.start))
+          ;; Unarchive
+          (mkdirs! f)
+          (extract-archive is f))))))
 
 (defmethod make-blob-store :disk [conf]
   (->DiskBlobStore (get-in conf [:blob :dir])))
@@ -155,9 +159,7 @@
                                     (select-keys [:ns :bucket-name])
                                     (assoc :object-name obj-name)))
           (md/chain (constantly obj-name))
-          (md/finally #(fs/delete arch))
-          ;; TODO Maybe it would be better if we returned the deferred instead?
-          (deref))))
+          (md/finally #(fs/delete arch)))))
 
   (restore [_ src dest]
     (let [obj-name (archive-obj-name conf dest)
@@ -180,8 +182,7 @@
              (io/input-stream arch))
            #(extract-archive % f)
            (constantly f))
-          (md/finally #(fs/delete arch))
-          (deref)))))
+          (md/finally #(fs/delete arch))))))
 
 (defmethod make-blob-store :oci [conf]
   (let [oci-conf (oci/ctx->oci-config conf :blob)
