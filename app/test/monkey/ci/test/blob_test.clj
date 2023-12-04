@@ -65,25 +65,32 @@
   (testing "created by `make-blob-store`"
     (is (blob-store? (sut/make-blob-store {:blob {:type :oci}}))))
   
-  (testing "`save` writes to temp file, then uploads it"
-    (with-redefs [os/put-object (constantly (md/success-deferred nil))]
-      (h/with-tmp-dir dir
-        (let [blob (sut/make-blob-store {:blob {:type :oci
-                                                :prefix "prefix"
-                                                :tmp-dir (u/abs-path (io/file dir "tmp"))}})
-              f (io/file dir "test.txt")]
-          (is (nil? (spit f "This is a test file")))
-          (is (= "prefix/remote/path" (sut/save blob f "remote/path")))))))
+  (testing "`save`"
+      (with-redefs [os/put-object (constantly (md/success-deferred nil))]
+        (h/with-tmp-dir dir
+          (let [tmp-dir (io/file dir "tmp")
+                blob (sut/make-blob-store {:blob {:type :oci
+                                                  :prefix "prefix"
+                                                  :tmp-dir (u/abs-path tmp-dir)}})
+                f (io/file dir "test.txt")]
+            
+            (testing "writes to temp file, then uploads it"
+              (is (nil? (spit f "This is a test file")))
+              (is (= "prefix/remote/path" (sut/save blob f "remote/path"))))
 
-  (testing "`restore` reads to temp file, then unarchives it"
+            (testing "deletes tmp file"
+              (is (empty? (fs/list-dir tmp-dir))))))))
+
+  (testing "`restore`"
     (h/with-tmp-dir dir
       (let [files {"test.txt" "This is a test file"
                    "dir/sub.txt" "This is a child file"}
             orig (io/file dir "orig")
             arch (io/file dir "archive.tgz")
+            tmp-dir (io/file dir "tmp")
             blob (sut/make-blob-store {:blob {:type :oci
                                               :prefix "prefix"
-                                              :tmp-dir (u/abs-path (io/file dir "tmp"))}})
+                                              :tmp-dir (u/abs-path tmp-dir)}})
             r (io/file dir "restored")]
         ;; Create archive first
         (doseq [[f v] files]
@@ -95,8 +102,13 @@
         (is (pos? (fs/size arch)))
         ;; Validate that the archive is downloaded and unpacked
         (with-redefs [os/get-object (constantly (md/success-deferred (fs/read-all-bytes arch)))]
-          (is (= r (sut/restore blob "remote/path" r)))
-          (doseq [[f v] files]
-            (let [p (io/file r "orig" f)]
-              (is (fs/exists? p))
-              (is (= v (slurp p))))))))))
+          
+          (testing " reads to temp file, then unarchives it"
+            (is (= r (sut/restore blob "remote/path" r)))
+            (doseq [[f v] files]
+              (let [p (io/file r "orig" f)]
+                (is (fs/exists? p))
+                (is (= v (slurp p))))))
+
+          (testing "deletes tmp files"
+            (is (empty? (fs/list-dir tmp-dir)))))))))

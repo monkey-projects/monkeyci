@@ -97,6 +97,7 @@
   (let [prefix (u/abs-path
                 (fs/file (fs/parent src)))]
     (log/debug "Archiving" src "and stripping prefix" prefix)
+    (mkdirs! (.getParentFile dest))
     (ca/archive
      {:output-stream (io/output-stream dest)
       :compression compression-type
@@ -108,7 +109,6 @@
   BlobStore
   (save [_ src dest]
     (let [f (io/file dir dest)]
-      (mkdirs! (.getParentFile f))
       (make-archive src f)
       ;; Return destination path
       (u/abs-path f)))
@@ -148,18 +148,14 @@
           obj-name (archive-obj-name conf dest)]
       ;; Write archive to temp file first
       (log/debug "Archiving" src "to" arch)
-      (mkdirs! (.getParentFile arch))
-      (ca/archive
-       {:output-stream (io/output-stream arch)
-        :compression compression-type
-        :archive-type archive-type}
-       (u/abs-path src))
+      (make-archive src arch)
       ;; Upload the temp file
       (log/debug "Uploading archive" arch "to" obj-name)
       (-> (os/put-object client (-> conf
                                     (select-keys [:ns :bucket-name])
                                     (assoc :object-name obj-name)))
           (md/chain (constantly obj-name))
+          (md/finally #(fs/delete arch))
           ;; TODO Maybe it would be better if we returned the deferred instead?
           (deref))))
 
@@ -184,6 +180,7 @@
              (io/input-stream arch))
            #(extract-archive % f)
            (constantly f))
+          (md/finally #(fs/delete arch))
           (deref)))))
 
 (defmethod make-blob-store :oci [conf]
