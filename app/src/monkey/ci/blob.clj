@@ -2,12 +2,14 @@
   "Blob storage functionality, used to store and restore large files
    or entire directories."
   (:require [babashka.fs :as fs]
+            [clj-commons.byte-streams :as bs]
             [clojure.java.io :as io]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [clompress
              [archivers :as ca]
              [compression :as cc]]
+            [manifold.deferred :as md]
             [monkey.ci
              [oci :as oci]
              [utils :as u]]
@@ -68,6 +70,7 @@
    (possibly from a decompression) and a destination directory.  Returns
    the destination directory."
   [is dest]
+  (log/debug "Extracting archive into" dest)
   (with-open [ai (.createArchiveInputStream stream-factory ArchiveStreamFactory/TAR is)]
     (loop [e (next-entry ai)]
       (if e
@@ -88,19 +91,25 @@
   ;; Skip the /
   (subs path (inc (count base-dir))))
 
+(defn make-archive
+  "Archives the `src` directory or file into `dest` file."
+  [src dest]
+  (let [prefix (u/abs-path
+                (fs/file (fs/parent src)))]
+    (log/debug "Archiving" src "and stripping prefix" prefix)
+    (ca/archive
+     {:output-stream (io/output-stream dest)
+      :compression compression-type
+      :archive-type archive-type
+      :entryNameResolver (partial drop-prefix-resolver prefix)}
+     (u/abs-path src))))
+
 (deftype DiskBlobStore [dir]
   BlobStore
   (save [_ src dest]
-    (let [f (io/file dir dest)
-          prefix (u/abs-path
-                  (fs/file (fs/parent src)))]
+    (let [f (io/file dir dest)]
       (mkdirs! (.getParentFile f))
-      (ca/archive
-       {:output-stream (io/output-stream f)
-        :compression compression-type
-        :archive-type archive-type
-        :entryNameResolver (partial drop-prefix-resolver prefix)}
-       (u/abs-path src))
+      (make-archive src f)
       ;; Return destination path
       (u/abs-path f)))
 
@@ -124,14 +133,21 @@
 (defn- tmp-dir [{:keys [tmp-dir]}]
   (or tmp-dir (u/tmp-dir)))
 
+(defn- tmp-archive [conf]
+  (io/file (tmp-dir conf) (str (random-uuid))))
+
+(defn- archive-obj-name [conf dest]
+  (->> [(:prefix conf) dest]
+       (remove nil?)
+       (cs/join "/")))
+
 (deftype OciBlobStore [client conf]
   BlobStore
   (save [_ src dest]
-    (let [arch (io/file (tmp-dir conf) (str (random-uuid)))
-          obj-name (->> [(:prefix conf) dest]
-                        (remove nil?)
-                        (cs/join "/"))]
+    (let [arch (tmp-archive conf)
+          obj-name (archive-obj-name conf dest)]
       ;; Write archive to temp file first
+      (log/debug "Archiving" src "to" arch)
       (mkdirs! (.getParentFile arch))
       (ca/archive
        {:output-stream (io/output-stream arch)
@@ -139,12 +155,36 @@
         :archive-type archive-type}
        (u/abs-path src))
       ;; Upload the temp file
-      (os/put-object client (-> conf
-                                (select-keys [:ns :bucket-name])
-                                (assoc :object-name obj-name)))
-      obj-name))
+      (log/debug "Uploading archive" arch "to" obj-name)
+      (-> (os/put-object client (-> conf
+                                    (select-keys [:ns :bucket-name])
+                                    (assoc :object-name obj-name)))
+          (md/chain (constantly obj-name))
+          ;; TODO Maybe it would be better if we returned the deferred instead?
+          (deref))))
 
-  (restore [_ src dest]))
+  (restore [_ src dest]
+    (let [obj-name (archive-obj-name conf dest)
+          f (io/file dest)
+          arch (tmp-archive conf)]
+      ;; Download to tmp file
+      (log/debug "Downloading" src "into" arch)
+      (mkdirs! (.getParentFile arch))
+      ;; FIXME Find a way to either stream the response, or write to a file without
+      ;; buffering it into memory.  Right now this will go OOM on larger archives.
+      (-> (os/get-object client (-> conf
+                                    (select-keys [:ns :bucket-name])
+                                    (assoc :object-name obj-name)))
+          (md/chain
+           bs/to-input-stream
+           (fn [is]
+             (with-open [os (io/output-stream arch)]
+               (cc/decompress is os compression-type))
+             ;; Reopen the decompressed archive as a stream
+             (io/input-stream arch))
+           #(extract-archive % f)
+           (constantly f))
+          (deref)))))
 
 (defmethod make-blob-store :oci [conf]
   (let [oci-conf (oci/ctx->oci-config conf :blob)

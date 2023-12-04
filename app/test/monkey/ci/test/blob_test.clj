@@ -2,6 +2,7 @@
   (:require [clojure.test :refer [deftest testing is]]
             [babashka.fs :as fs]
             [clojure.java.io :as io]
+            [clompress.archivers :as ca]
             [manifold.deferred :as md]
             [monkey.ci
              [blob :as sut]
@@ -75,11 +76,27 @@
           (is (= "prefix/remote/path" (sut/save blob f "remote/path")))))))
 
   (testing "`restore` reads to temp file, then unarchives it"
-    #_(with-redefs [os/get-object (constantly (md/success-deferred "restored body"))]
-      (h/with-tmp-dir dir
-        (let [blob (sut/make-blob-store {:blob {:type :oci
-                                                :prefix "prefix"
-                                                :tmp-dir (u/abs-path (io/file dir "tmp"))}})
-              f (io/file dir "test.txt")]
-          (is (nil? (spit f "This is a test file")))
-          (is (= "prefix/remote/path" (sut/save blob f "remote/path"))))))))
+    (h/with-tmp-dir dir
+      (let [files {"test.txt" "This is a test file"
+                   "dir/sub.txt" "This is a child file"}
+            orig (io/file dir "orig")
+            arch (io/file dir "archive.tgz")
+            blob (sut/make-blob-store {:blob {:type :oci
+                                              :prefix "prefix"
+                                              :tmp-dir (u/abs-path (io/file dir "tmp"))}})
+            r (io/file dir "restored")]
+        ;; Create archive first
+        (doseq [[f v] files]
+          (let [p (io/file orig f)]
+            (is (true? (.mkdirs (.getParentFile p))))
+            (spit p v)))
+        (is (nil? (sut/make-archive orig arch)))
+        (is (fs/exists? arch))
+        (is (pos? (fs/size arch)))
+        ;; Validate that the archive is downloaded and unpacked
+        (with-redefs [os/get-object (constantly (md/success-deferred (fs/read-all-bytes arch)))]
+          (is (= r (sut/restore blob "remote/path" r)))
+          (doseq [[f v] files]
+            (let [p (io/file r "orig" f)]
+              (is (fs/exists? p))
+              (is (= v (slurp p))))))))))
