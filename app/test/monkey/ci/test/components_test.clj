@@ -134,6 +134,9 @@
   (testing "registers build runner listener"
     (validate-listener :webhook/validated r/build))
 
+  (testing "registers build triggered listener"
+    (validate-listener :build/triggered r/build))
+
   (testing "registers build completed listener"
     (h/with-memory-store st
       (let [sid ["test-build"]]

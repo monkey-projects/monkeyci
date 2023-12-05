@@ -62,6 +62,8 @@
   "Handles the incoming http request by dispatching it to the handler `h`
    which returns an event, which is then posted."
   [req h]
+  ;; TODO Refactor this into an interceptor where the handler is able to
+  ;; return a custom response in addition to dispatching an event.
   ;; Httpkit can't handle channels so read it here
   (<!!
    (go

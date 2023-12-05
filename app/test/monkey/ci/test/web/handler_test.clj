@@ -259,7 +259,8 @@
                                    :status)))
                     (is (not= :timeout (h/wait-until #(pos? (count @events)) 500)))
                     (is (= (zipmap props sid)
-                           (select-keys (first @events) props)))))))
+                           (select-keys (:account (first @events)) props)))
+                    (is (some? (-> @events first :build :build-id)))))))
 
             (testing "adds branch and commit id query params"
               (h/with-bus
@@ -273,9 +274,30 @@
                                    :status)))
                     (is (not= :timeout (h/wait-until #(pos? (count @events)) 500)))
                     (is (= "test-id"
-                           (-> @events first :commit-id)))
+                           (-> @events first :build :git :commit-id)))
                     (is (= "test-branch"
-                           (-> @events first :branch)))))))))))))
+                           (-> @events first :build :git :branch)))))))
+
+            (testing "adds `sid` to build props"
+              (h/with-bus
+                (fn [bus]
+                  (let [app (sut/make-app {:storage st
+                                           :event-bus bus})
+                        events (atom [])
+                        _ (events/register-handler bus :build/triggered (partial swap! events conj))]
+                    (is (= 200 (-> (mock/request :post (str path "/trigger"))
+                                   (app)
+                                   :status)))
+                    (is (not= :timeout (h/wait-until #(pos? (count @events)) 500)))
+                    (let [bsid (get-in (first @events) [:build :sid])]
+                      (is (= 4 (count bsid)) "expected sid to contain repo path and build id")
+                      (is (= (take 3 sid) (take 3 bsid)))
+                      (is (= (get-in (first @events) [:build :build-id])
+                             (last bsid))))))))
+            
+            (testing "returns build id")
+
+            (testing "returns 404 (not found) when repo does not exist")))))))
 
 (deftest event-stream
   (testing "'GET /events' exists"
