@@ -124,11 +124,12 @@
 
 (deftest ^:integration oci-integration
   ;; Run some integration tests on an OCI bucket
-  (let [conf (:storage (load-test-config))
+  (let [conf (load-test-config)
         s (st/make-storage conf)]
 
     (testing "config is valid"
-      (is (spec/valid? :conf/storage conf) (spec/explain-str :conf/storage conf)))    
+      (is (spec/valid? :conf/storage (:storage conf))
+          (spec/explain-str :conf/storage (:storage conf))))    
 
     (testing "customer operations"
       (let [id (st/new-id)

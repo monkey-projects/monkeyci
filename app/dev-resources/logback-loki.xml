@@ -1,0 +1,27 @@
+<configuration scan="true" scanPeriod="5 seconds">
+  
+  <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
+    <http>
+      <url>http://loki.monkey-projects.be/loki/api/v1/push</url>
+    </http>
+    <format>
+      <label>
+	<pattern>env=dev,app=monkeyci,level=%level</pattern>
+      </label>
+      <message>
+	<pattern>l=%level h=${HOSTNAME} c=%logger{20} t=%thread | %msg %ex</pattern>
+      </message>
+    </format>
+    <sortByTime>true</sortByTime>
+  </appender>
+
+  <logger name="org" level="WARN"/>
+  <logger name="com" level="WARN"/>
+  <logger name="net" level="WARN"/>
+  <logger name="io" level="WARN"/>
+  <logger name="monkey.ci" level="DEBUG"/>
+
+  <root level="INFO">
+    <appender-ref ref="LOKI"/>
+  </root>
+</configuration>

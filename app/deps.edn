@@ -101,4 +101,8 @@
 
   :json-logging
   {:extra-deps {ch.qos.logback.contrib/logback-json-classic {:mvn/version "0.1.5"}}
-   :jvm-opts ["-Dlogback.configurationFile=dev-resources/logback-json.xml"]}}}
+   :jvm-opts ["-Dlogback.configurationFile=dev-resources/logback-json.xml"]}
+
+  :loki-logging
+  {:extra-deps {com.github.loki4j/loki-logback-appender {:mvn/version "1.5.0-m1"}}
+   :jvm-opts ["-Dlogback.configurationFile=dev-resources/logback-loki.xml"]}}}

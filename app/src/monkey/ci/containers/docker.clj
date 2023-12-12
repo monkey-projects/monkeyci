@@ -205,8 +205,8 @@
               ;; The working dir
               (str (u/abs-path work-dir) ":" remote-wd)]}})))
 
-(defmethod mcc/run-container :docker [{:keys [build-id] :as ctx}]
-  (let [cn build-id
+(defmethod mcc/run-container :docker [ctx]
+  (let [cn (get-in ctx [:build :build-id])
         job-id (get ctx :job-id (str (random-uuid)))
         conn (get-in ctx [:env :docker-connection])
         client (make-client :containers conn)
@@ -292,7 +292,8 @@
         
         return (fn [{:keys [results]}]
                  ;; Get the container exit code and add the script logs
-                 (let [exit-code (get-in (inspect-container client cn) [:state :exit-code])]
+                 (let [c (inspect-container client cn)
+                       exit-code (get-in c [:state :exit-code])]
                    {:exit exit-code
                     :results results}))]
     (some-> conf
