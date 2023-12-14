@@ -16,4 +16,5 @@
    :exec-args {:jar "target/braid-bot.jar"}}
 
   :uber
-  {:exec-fn monkey.build/uberjar}}}
+  {:exec-fn monkey.build/uberjar
+   :exec-args {:main monkey.ci.braid.core}}}}
