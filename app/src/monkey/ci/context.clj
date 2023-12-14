@@ -46,6 +46,18 @@
       (mc/update-existing-in [:build :sid] u/serialize-sid)
       (assoc :logging (dissoc (:logging ctx) :maker))))
 
+(def account->sid (juxt :customer-id :project-id :repo-id))
+
+(defn get-sid
+  "Gets current build sid from the context.  This is either specified directly,
+   or taken from account settings."
+  [ctx]
+  (or (get-in ctx [:build :sid])
+      (let [sid (->> (account->sid (:account ctx))
+                     (take-while some?))]
+        (when (= 3 (count sid))
+          sid))))
+
 (def reporter :reporter)
 
 (defn report

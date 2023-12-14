@@ -4,7 +4,7 @@
             [clojure.core.async :as ca]
             [clojure.java.io :as io]
             [monkey.ci
-             [context :refer [report]]
+             [context :refer [report] :as mcc]
              [events :as e]
              [storage :as st]
              [utils :as u]]
@@ -28,9 +28,10 @@
 (defn prepare-build-ctx
   "Updates the context for the build runner, by adding a `build` object"
   [{:keys [work-dir] :as ctx}]
-  (let [orig-sid (some->> (get-in ctx [:args :sid])
-                          (u/parse-sid)
-                          (take 4))
+  (let [orig-sid (or (some->> (get-in ctx [:args :sid])
+                              (u/parse-sid)
+                              (take 4))
+                     (mcc/get-sid ctx))
         ;; Either generate a new build id, or use the one given
         sid (st/->sid (if (or (empty? orig-sid) (includes-build-id? orig-sid))
                         orig-sid
