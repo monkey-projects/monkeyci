@@ -24,7 +24,9 @@ RUN chown monkeyci:monkeyci -R /home/monkeyci
 USER monkeyci
 
 WORKDIR /home/monkeyci
-ENTRYPOINT ["java", "-jar", "monkeyci.jar"]
+# Config dir, can be used to specify logback config
+VOLUME /home/monkeyci/config
+ENTRYPOINT ["java", "-Dlogback.configurationFile=config/logback.xml", "-jar", "monkeyci.jar"]
 
 VOLUME /home/monkeyci/work
 

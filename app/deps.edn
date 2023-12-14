@@ -11,6 +11,7 @@
                                         org.bouncycastle/bcprov-jdk15on
                                         org.bouncycastle/bcpkix-jdk15on
                                         org.bouncycastle/bcutil-jdk15on]}
+        com.github.loki4j/loki-logback-appender {:mvn/version "1.5.0-m1"}
         com.github.oliyh/martian-httpkit {:mvn/version "0.1.25"}
         com.monkeyci/script {:local/root "../lib"}
         com.monkeyprojects/socket-async {:mvn/version "0.1.0"}
@@ -104,5 +105,4 @@
    :jvm-opts ["-Dlogback.configurationFile=dev-resources/logback-json.xml"]}
 
   :loki-logging
-  {:extra-deps {com.github.loki4j/loki-logback-appender {:mvn/version "1.5.0-m1"}}
-   :jvm-opts ["-Dlogback.configurationFile=dev-resources/logback-loki.xml"]}}}
+  {:jvm-opts ["-Dlogback.configurationFile=dev-resources/logback-loki.xml"]}}}

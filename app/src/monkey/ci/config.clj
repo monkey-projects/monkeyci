@@ -154,9 +154,9 @@
    configuration structure.  Args have precedence over env vars,
    which in turn override config loaded from files and default values."
   [env args]
-  (-> (map load-config-file [*global-config-file*
-                             *home-config-file*
-                             (:config-file args)])
+  (-> (map load-config-file (concat [*global-config-file*
+                                     *home-config-file*]
+                                    (:config-file args)))
       (concat [(config-from-env env)])
       (merge-configs)
       (merge (select-keys args [:dev-mode]))

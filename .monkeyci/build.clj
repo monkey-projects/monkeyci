@@ -57,7 +57,7 @@
      (f auth img))))
 
 (defn- podman-build-cmd [dockerfile]
-  (format "podman build --authfile %%s --platform linux/arm64,linux/amd64 --manifest %%s -f %s ."))
+  (format "podman build --authfile %%s --platform linux/arm64,linux/amd64 --manifest %%s -f %s ." dockerfile))
 
 (defn build-image
   "Build the image using podman for arm and amd platforms.  Not using containers for now,
@@ -73,7 +73,7 @@
   (build-image ctx "docker/Dockerfile" app-img))
 
 (defn push-app-image [ctx]
-  (push-image app-img))
+  (push-image ctx app-img))
 
 (defn publish-container [ctx name dir]
   "Executes script in clojure container that has clojars publish env vars"
@@ -101,7 +101,7 @@
 
 (defn push-bot-image [ctx]
   (in-braid-bot-dir
-   (push-image bot-img)))
+   (push-image ctx bot-img)))
 
 (core/defpipeline test-all
   [test-lib
@@ -114,8 +114,8 @@
 (core/defpipeline publish-image
   [app-uberjar
    image-creds
-   build-image
-   push-image])
+   build-app-image
+   push-app-image])
 
 (core/defpipeline braid-bot
   [bot-uberjar

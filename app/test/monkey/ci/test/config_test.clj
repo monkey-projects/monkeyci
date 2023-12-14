@@ -71,8 +71,18 @@
     (h/with-tmp-dir dir
       (let [f (io/file dir "test-config.edn")]
         (is (nil? (spit f (pr-str {:work-dir "some-work-dir"}))))
-        (let [c (sut/app-config {} {:config-file (.getCanonicalPath f)})]
+        (let [c (sut/app-config {} {:config-file [(.getCanonicalPath f)]})]
           (is (cs/ends-with? (:work-dir c) "some-work-dir"))))))
+
+  (testing "can specify multiple config files"
+    (h/with-tmp-dir dir
+      (let [[a b :as f] (->> ["first" "second"]
+                             (map (partial format "%s-config.edn"))
+                             (map (partial io/file dir)))]
+        (is (nil? (spit a (pr-str {:work-dir "first-work-dir"}))))
+        (is (nil? (spit b (pr-str {:work-dir "second-work-dir"}))))
+        (let [c (sut/app-config {} {:config-file (mapv (memfn getCanonicalPath) f)})]
+          (is (cs/ends-with? (:work-dir c) "second-work-dir"))))))
 
   (testing "loads global config file"
     (h/with-tmp-dir dir

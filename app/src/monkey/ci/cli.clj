@@ -102,7 +102,8 @@
           {:as "Configuration file"
            :option "config-file"
            :short "c"
-           :type :string}]
+           :type :string
+           :multiple true}]
    :subcommands [build-cmd
                  server-cmd
                  sidecar-cmd]})

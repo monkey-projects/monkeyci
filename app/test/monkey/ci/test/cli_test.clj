@@ -61,11 +61,16 @@
               (is (= "test-id" (get-in lc [:args :commit-id])))))
 
           (testing "accepts config file"
-            (is (= "test-file" (-> (run-cli "-c" "test-file" "build" "run")
-                                   (get-in [:args :config-file]))))
-            (is (= "test-file" (-> (run-cli "--config-file" "test-file" "build" "run")
-                                   (get-in [:args :config-file])))))
-
+            (is (= ["test-file"] (-> (run-cli "-c" "test-file" "build" "run")
+                                     (get-in [:args :config-file]))))
+            (is (= ["test-file"] (-> (run-cli "--config-file" "test-file" "build" "run")
+                                     (get-in [:args :config-file])))))
+          
+          (testing "accepts multiple config files"
+            (let [lc (run-cli "-c" "first.edn" "-c" "second.edn" "build" "list")]
+              (is (= ["first.edn" "second.edn"]
+                     (get-in lc [:args :config-file])))))
+          
           (testing "accepts build sid"
             (is (= "test-sid" (-> (run-cli "build" "run" "--sid" "test-sid")
                                   (get-in [:args :sid]))))))
