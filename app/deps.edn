@@ -25,6 +25,7 @@
         metosin/reitit-ring {:mvn/version "0.7.0-alpha5"}
         metosin/reitit-schema {:mvn/version "0.7.0-alpha5"}
         metosin/reitit-swagger {:mvn/version "0.7.0-alpha5"}
+        org.clojars.alperenbayramoglu/clompress {:mvn/version "0.1.0"}
         org.clojars.lispyclouds/contajners {:mvn/version "1.0.1"}
         org.clojure/core.async {:mvn/version "1.6.681"}
         org.clojure/tools.logging {:mvn/version "1.2.4"}
@@ -96,4 +97,12 @@
 
   :uber
   {:exec-fn monkey.build/uberjar
-   :exec-args {:jar "target/monkeyci-standalone.jar"}}}}
+   :exec-args {:jar "target/monkeyci-standalone.jar"}}
+
+  :json-logging
+  {:extra-deps {ch.qos.logback.contrib/logback-json-classic {:mvn/version "0.1.5"}}
+   :jvm-opts ["-Dlogback.configurationFile=dev-resources/logback-json.xml"]}
+
+  :loki-logging
+  {:extra-deps {com.github.loki4j/loki-logback-appender {:mvn/version "1.5.0-m1"}}
+   :jvm-opts ["-Dlogback.configurationFile=dev-resources/logback-loki.xml"]}}}

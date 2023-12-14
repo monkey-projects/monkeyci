@@ -5,7 +5,8 @@
             [medley.core :as mc]
             [monkey.ci
              [events :as e]
-             [storage :as st]]
+             [storage :as st]
+             [utils :as u]]
             [monkey.ci.web
              [common :as c]
              [github :as gh]]
@@ -185,6 +186,20 @@
     (->> builds
          (map fetch-details)
          (rur/response))))
+
+(defn trigger-build [req]
+  (c/posting-handler
+   req
+   (fn [{p :parameters}]
+     (let [acc (:path p)
+           bid (u/new-build-id)]
+       {:type :build/triggered
+        :account acc
+        :build {:build-id bid
+                :git (select-keys (:query p) [:commit-id :branch])
+                :sid (-> acc
+                         (assoc :build-id bid)
+                         (st/ext-build-sid))}}))))
 
 (def allowed-events
   #{:script/start

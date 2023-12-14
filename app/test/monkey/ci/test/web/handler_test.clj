@@ -217,29 +217,87 @@
           (interleave ["/customer/" "/project/" "/repo/"])
           (apply str))))
 
-  (testing "can list repo builds"
-    (h/with-memory-store st
-      (let [app (make-test-app st)
-            [customer-id project-id repo-id build-id :as sid] (->> (repeatedly st/new-id)
-                                                                   (take 4)
-                                                                   (st/->sid))]
-        (is (st/sid? (st/create-build-results st sid {:exit 0 :status :success})))
-        (is (st/sid? (st/create-build-metadata st sid {:message "test meta"})))
-        (let [path (str (->> sid
+  (testing "/customer/:customer-id/project/:project-id/repo/:repo-id"
+
+    (testing "/builds"
+      (h/with-memory-store st
+        (let [app (make-test-app st)
+              [customer-id project-id repo-id build-id :as sid] (->> (repeatedly st/new-id)
+                                                                     (take 4)
+                                                                     (st/->sid))
+              path (str (->> sid
                              (drop-last)
                              (interleave ["/customer" "project" "repo"])
                              (cs/join "/"))
-                        "/builds")
-              l (-> (mock/request :get path)
-                    (app))]
-          (is (= 200 (:status l)))
-          (let [b (-> l
-                      :body
-                      slurp
-                      h/parse-json)]
-            (is (= 1 (count b)))
-            (is (= build-id (:id (first b))) "should contain build id")
-            (is (= "test meta" (:message (first b))) "should contain build metadata")))))))
+                        "/builds")]
+          (is (st/sid? (st/create-build-results st sid {:exit 0 :status :success})))
+          (is (st/sid? (st/create-build-metadata st sid {:message "test meta"})))
+          
+          (testing "`GET` lists repo builds"
+            (let [l (-> (mock/request :get path)
+                        (app))
+                  b (-> l
+                        :body
+                        slurp
+                        h/parse-json)]
+              (is (= 200 (:status l)))
+              (is (= 1 (count b)))
+              (is (= build-id (:id (first b))) "should contain build id")
+              (is (= "test meta" (:message (first b))) "should contain build metadata")))
+
+          (testing "`POST /trigger`"
+            (testing "triggers new build for repo"
+              (h/with-bus
+                (fn [bus]
+                  (let [app (sut/make-app {:storage st
+                                           :event-bus bus})
+                        events (atom [])
+                        props [:customer-id :project-id :repo-id]
+                        _ (events/register-handler bus :build/triggered (partial swap! events conj))]
+                    (is (= 200 (-> (mock/request :post (str path "/trigger"))
+                                   (app)
+                                   :status)))
+                    (is (not= :timeout (h/wait-until #(pos? (count @events)) 500)))
+                    (is (= (zipmap props sid)
+                           (select-keys (:account (first @events)) props)))
+                    (is (some? (-> @events first :build :build-id)))))))
+
+            (testing "adds branch and commit id query params"
+              (h/with-bus
+                (fn [bus]
+                  (let [app (sut/make-app {:storage st
+                                           :event-bus bus})
+                        events (atom [])
+                        _ (events/register-handler bus :build/triggered (partial swap! events conj))]
+                    (is (= 200 (-> (mock/request :post (str path "/trigger?commitId=test-id&branch=test-branch"))
+                                   (app)
+                                   :status)))
+                    (is (not= :timeout (h/wait-until #(pos? (count @events)) 500)))
+                    (is (= "test-id"
+                           (-> @events first :build :git :commit-id)))
+                    (is (= "test-branch"
+                           (-> @events first :build :git :branch)))))))
+
+            (testing "adds `sid` to build props"
+              (h/with-bus
+                (fn [bus]
+                  (let [app (sut/make-app {:storage st
+                                           :event-bus bus})
+                        events (atom [])
+                        _ (events/register-handler bus :build/triggered (partial swap! events conj))]
+                    (is (= 200 (-> (mock/request :post (str path "/trigger"))
+                                   (app)
+                                   :status)))
+                    (is (not= :timeout (h/wait-until #(pos? (count @events)) 500)))
+                    (let [bsid (get-in (first @events) [:build :sid])]
+                      (is (= 4 (count bsid)) "expected sid to contain repo path and build id")
+                      (is (= (take 3 sid) (take 3 bsid)))
+                      (is (= (get-in (first @events) [:build :build-id])
+                             (last bsid))))))))
+            
+            (testing "returns build id")
+
+            (testing "returns 404 (not found) when repo does not exist")))))))
 
 (deftest event-stream
   (testing "'GET /events' exists"

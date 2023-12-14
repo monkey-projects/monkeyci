@@ -1,13 +1,14 @@
 (ns monkey.ci.web.common
   (:require [camel-snake-kebab.core :as csk]
-            [clojure.core.async :refer [go >!]]
+            [clojure.core.async :refer [go <! <!! >!]]
             [monkey.ci.events :as e]
             [muuntaja.core :as mc]
             [reitit.ring :as ring]
             [reitit.ring.coercion :as rrc]
             [reitit.ring.middleware
              [muuntaja :as rrmm]
-             [parameters :as rrmp]]))
+             [parameters :as rrmp]]
+            [ring.util.response :as rur]))
 
 (defn from-context [req obj]
   (get-in req [:reitit.core/match :data ::context obj]))
@@ -56,3 +57,16 @@
    (ring/routes
     (ring/redirect-trailing-slash-handler)
     (ring/create-default-handler))))
+
+(defn posting-handler
+  "Handles the incoming http request by dispatching it to the handler `h`
+   which returns an event, which is then posted."
+  [req h]
+  ;; TODO Refactor this into an interceptor where the handler is able to
+  ;; return a custom response in addition to dispatching an event.
+  ;; Httpkit can't handle channels so read it here
+  (<!!
+   (go
+     (rur/status (if (<! (post-event req (h req)))
+                   200
+                   500)))))

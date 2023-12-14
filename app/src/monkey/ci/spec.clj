@@ -1,6 +1,7 @@
 (ns monkey.ci.spec
   (:require [clojure.spec.alpha :as s]
             [clojure.core.async.impl.protocols :as ap]
+            [monkey.ci.blob :as blob]
             [monkey.oci.sign :as oci-sign]))
 
 ;; Unfortunately, there seems to be no clean way to determine
@@ -49,6 +50,8 @@
 (s/def :oci/bucket-name string?)
 (s/def :oci/credentials (s/merge ::oci-sign/config))
 (s/def :oci/region string?)
+(s/def :oci/prefix string?)
+(s/def :oci/ns string?)
 
 (defmulti storage-type :type)
 
@@ -63,6 +66,25 @@
           :opt-un [:oci/credentials]))
 
 (s/def :conf/storage (s/multi-spec storage-type :type))
+
+(defmulti blob-type :type)
+
+(s/def :blob/store blob/blob-store?)
+(s/def :blob/type #{:disk :oci})
+(s/def :disk-blob/dir string?)
+
+(defmethod blob-type :disk [_]
+  (s/keys :req-un [:blob/type :disk-blob/dir]))
+
+(s/def :oci-blob/tmp-dir string?)
+
+(defmethod blob-type :oci [_]
+  (s/keys :req-un [:blob/type :oci/bucket-name :oci/ns]
+          :opt-un [:oci/credentials :oci/prefix :oci-blob/tmp-dir]))
+
+(s/def :conf/blob (s/multi-spec blob-type :type))
+
+(s/def :conf/workspace (s/merge :conf/blob))
 
 (s/def :conf/log-dir string?)
 (s/def :conf/work-dir string?)
@@ -120,6 +142,9 @@
 (s/def :logging/dir string?)
 (s/def :logging/maker fn?)
 
+(s/def :ctx/workspace (s/merge :conf/workspace
+                               (s/keys :req-un [:blob/store])))
+
 (defmulti logging-type :type)
 
 (defmethod logging-type :inherit [_]
@@ -129,8 +154,8 @@
   (s/merge :logging/config (s/keys :opt-un [:logging/dir])))
 
 (defmethod logging-type :oci [_]
-  (s/merge :logging/config (s/keys :req-un [:logging/dir :oci/bucket-name]
-                                   :opt-un [:oci/credentials])))
+  (s/merge :logging/config (s/keys :req-un [:oci/bucket-name :oci/ns]
+                                   :opt-un [:oci/credentials :oci/prefix])))
 
 (s/def :conf/logging (s/multi-spec logging-type :type))
 (s/def :ctx/logging (s/merge :conf/logging
@@ -144,7 +169,7 @@
 (s/def ::app-config (s/keys :req-un [:conf/http :conf/runner :conf/args :conf/logging
                                      :conf/work-dir :conf/checkout-base-dir]
                             :opt-un [:conf/dev-mode :conf/containers :conf/log-dir
-                                     :conf/storage :conf/account :conf/sidecar]))
+                                     :conf/storage :conf/account :conf/sidecar :conf/workspace]))
 ;; Application context.  This is the result of processing the configuration and is passed
 ;; around internally.
 (s/def ::app-context (s/keys :req-un [:conf/http :ctx/runner :evt/event-bus :ctx/git :ctx/storage :ctx/public-api

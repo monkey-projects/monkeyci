@@ -57,14 +57,12 @@
    the event on the internal bus and returns a 200 OK response."
   [req]
   (log/trace "Got incoming webhook with body:" (prn-str (:body-params req)))
-  ;; Httpkit can't handle channels so read it here
-  (<!!
-   (go
-     (rur/status (if (<! (c/post-event req {:type :webhook/github
-                                            :id (req->webhook-id req)
-                                            :payload (:body-params req)}))
-                   200
-                   500)))))
+  (c/posting-handler
+   req
+   (fn [req]
+     {:type :webhook/github
+      :id (req->webhook-id req)
+      :payload (:body-params req)})))
 
 (defn prepare-build
   "Event handler that looks up details for the given github webhook.  If the webhook 

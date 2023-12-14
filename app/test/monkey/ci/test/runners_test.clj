@@ -3,7 +3,9 @@
             [clojure.core.async :as ca]
             [clojure.java.io :as io]
             [clojure.string :as cs]
+            [manifold.deferred :as md]
             [monkey.ci
+             [blob :as blob]
              [events :as e]
              [process :as p]
              [runners :as sut]
@@ -128,6 +130,33 @@
                         (sut/download-src)
                         :build
                         :script-dir)))))
+
+(defrecord FakeBlobStore [stored]
+  blob/BlobStore
+  (save [_ src dest]
+    (md/success-deferred (swap! stored assoc src dest)))
+  (restore [_ src dest]
+    (md/success-deferred (swap! stored dissoc src))))
+
+(deftest store-src
+  (testing "does nothing if no workspace configured"
+    (let [ctx {}]
+      (is (= ctx (sut/store-src ctx)))))
+
+  (testing "stores src dir using blob and build id"
+    (let [stored (atom {})
+          ctx {:workspace {:store (->FakeBlobStore stored)}
+               :build {:checkout-dir "test-checkout"
+                       :build-id "test-build"}}]
+      (is (some? (sut/store-src ctx)))
+      (is (= {"test-checkout" "test-build"} @stored))))
+
+  (testing "returns updated context"
+    (let [ctx {:workspace {:store (->FakeBlobStore (atom {}))}
+               :build {:checkout-dir "test-checkout"
+                       :build-id "test-build"}}]
+      (is (= (assoc-in ctx [:build :workspace] "test-build")
+             (sut/store-src ctx))))))
 
 (deftest build-completed
   (testing "returns exit code for each type"

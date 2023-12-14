@@ -18,6 +18,7 @@
 (def start-file (str log-dir "/start"))
 (def event-file (str log-dir "/events.edn"))
 (def script-vol "scripts")
+(def job-script "job.sh")
 
 (defn- job-container
   "Configures the job container.  It runs the image as configured in
@@ -27,7 +28,7 @@
   [{:keys [step]}]
   {:image-url (:container/image step)
    :display-name "job"
-   :command ["/bin/sh" (str script-dir "/job.sh")]
+   :command ["/bin/sh" (str script-dir "/" job-script)]
    ;; One file arg per script line, with index as name
    :arguments (->> (count (:script step))
                    (range)
@@ -59,8 +60,7 @@
    :data (u/->base64 v)})
 
 (defn- job-script-entry []
-  (let [n "job.sh"]
-    (config-entry n (slurp (io/resource n)))))
+  (config-entry job-script (slurp (io/resource job-script))))
 
 (defn- script-vol-config
   "Adds the job script and a file for each script line as a configmap volume."

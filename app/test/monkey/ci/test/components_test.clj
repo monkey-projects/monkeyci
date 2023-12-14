@@ -3,6 +3,7 @@
             [clojure.spec.alpha :as s]
             [com.stuartsierra.component :as c]
             [monkey.ci
+             [blob :as b]
              [commands :as co]
              [components :as sut]
              [config :as config]
@@ -92,6 +93,14 @@
                              (c/start)
                              :storage))))
 
+  (testing "sets workspace store"
+    (is (b/blob-store? (-> (sut/new-context :test-cmd)
+                           (assoc :workspace {:type :disk
+                                              :dir "test-dir"})
+                           (c/start)
+                           :workspace
+                           :store))))
+
   (testing "sets reporter"
     (is (fn? (-> (sut/new-context :test-cmd)
                  (c/start)
@@ -124,6 +133,9 @@
 
   (testing "registers build runner listener"
     (validate-listener :webhook/validated r/build))
+
+  (testing "registers build triggered listener"
+    (validate-listener :build/triggered r/build))
 
   (testing "registers build completed listener"
     (h/with-memory-store st

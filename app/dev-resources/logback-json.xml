@@ -1,0 +1,22 @@
+<configuration scan="true" scanPeriod="5 seconds">
+  <!-- Append to file but encode in JSON -->
+  <appender name="JSON" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <encoder class="ch.qos.logback.classic.encoder.JsonEncoder"/>
+    <append>true</append>
+    <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+      <fileNamePattern>logs/json-%d{yyyy-MM-dd}.log</fileNamePattern>
+      <maxHistory>30</maxHistory>
+      <totalSizeCap>1GB</totalSizeCap>
+    </rollingPolicy>
+  </appender>
+
+  <logger name="org" level="WARN"/>
+  <logger name="com" level="WARN"/>
+  <logger name="net" level="WARN"/>
+  <logger name="io" level="WARN"/>
+  <logger name="monkey.ci" level="DEBUG"/>
+
+  <root level="WARN">
+    <appender-ref ref="JSON"/>
+  </root>
+</configuration>

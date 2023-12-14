@@ -4,7 +4,9 @@
   (:require [clojure.core.async :as ca]
             [clojure.java.io :as io]
             [clojure.tools.logging :as log]
+            [manifold.deferred :as md]
             [monkey.ci
+             [blob :as b]
              [context :as c]
              [events :as e]
              [process :as p]
@@ -82,6 +84,25 @@
   [ctx]
   (cond-> ctx
     (not-empty (get-in ctx [:build :git])) (download-git)))
+
+(defn create-workspace [ctx]
+  (let [{:keys [store]} (:workspace ctx)
+        ;; TODO For local builds, upload all workdir files according to .gitignore
+        {:keys [checkout-dir build-id]} (:build ctx)
+        dest build-id]
+    (when checkout-dir
+      (log/info "Creating workspace using files from" checkout-dir)
+      @(md/chain
+        (b/save store checkout-dir dest)
+        (constantly (assoc-in ctx [:build :workspace] dest))))))
+
+(defn store-src
+  "If a workspace configuration is present, uses it to store the source in
+   the workspace.  This can then be used by other processes to download the
+   cached files as needed."
+  [ctx]
+  (cond-> ctx
+    (not-empty (get-in ctx [:workspace :store])) (create-workspace)))
 
 ;; Creates a runner fn according to its type
 (defmulti make-runner (comp :type :runner))

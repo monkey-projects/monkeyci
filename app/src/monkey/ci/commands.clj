@@ -180,6 +180,7 @@
       (try
         (with-open [r (io/reader f)]
           (loop [evt (read-next r)]
+            ;; TODO Also stop when the process we're monitoring has terminated
             (if (not (fs/exists? f))
               0 ;; Done when the events file is deleted
               (when (if (= ::eof evt)
