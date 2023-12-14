@@ -9,7 +9,6 @@
              [common :as c]
              [github :as github]]
             [org.httpkit.server :as http]
-            #_[reitit.coercion :as rc]
             [reitit.coercion.schema]
             [reitit.ring :as ring]
             [schema.core :as s]))

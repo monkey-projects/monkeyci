@@ -1,0 +1,16 @@
+{:deps {com.monkeyprojects/braid-clj {:mvn/version "0.1.0-SNAPSHOT"}}
+ :paths ["src"]
+
+ :aliases
+ {:dev
+  {:extra-paths ["dev-resources"]}
+  
+  :run
+  {:main-opts ["-m" "monkey.ci.braid.core"]}
+
+  :jar
+  {:extra-deps {com.monkeyprojects/build {:mvn/version "0.2-SNAPSHOT"}}
+   :exec-args {:jar "target/braid-bot.jar"}}
+
+  :uber
+  {:exec-fn monkey.build/uberjar}}}
