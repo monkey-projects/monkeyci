@@ -1,4 +1,7 @@
-{:deps {com.monkeyprojects/braid-clj {:mvn/version "0.1.0-SNAPSHOT"}}
+{:deps {com.monkeyprojects/braid-clj {:mvn/version "0.1.0-SNAPSHOT"}
+        ch.qos.logback/logback-classic {:mvn/version "1.4.14"}
+        com.github.loki4j/loki-logback-appender {:mvn/version "1.5.0-m1"}
+        org.clojure/tools.logging {:mvn/version "1.2.4"}}
  :paths ["src"]
 
  :aliases

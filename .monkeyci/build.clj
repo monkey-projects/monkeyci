@@ -29,9 +29,11 @@
 (defn image-creds
   "Fetches credentials from the params and writes them to Docker `config.json`"
   [ctx]
-  (when-not (fs/exists? podman-auth)
-    (println "Writing image credentials")
-    (shell/param-to-file ctx "dockerhub-creds" (podman-auth ctx))))
+  (let [auth-file (podman-auth ctx)]
+    (when-not (fs/exists? auth-file)
+      (shell/param-to-file ctx "dockerhub-creds" auth-file)
+      (fs/delete-on-exit auth-file)
+      core/success)))
 
 (def datetime-format (DateTimeFormatter/ofPattern "yyyyMMdd"))
 (def app-img "fra.ocir.io/frjdhmocn5qi/monkeyci")
@@ -56,15 +58,15 @@
     (shell/bash
      (f auth img))))
 
-(defn- podman-build-cmd [dockerfile]
-  (format "podman build --authfile %%s --platform linux/arm64,linux/amd64 --manifest %%s -f %s ." dockerfile))
+(defn- podman-build-cmd [dockerfile dir]
+  (format "podman build --authfile %%s --platform linux/arm64,linux/amd64 --manifest %%s -f %s %s" dockerfile dir))
 
 (defn build-image
   "Build the image using podman for arm and amd platforms.  Not using containers for now,
    because it gives problems when not running privileged (podman in podman running podman
    is difficult)."
-  [ctx dockerfile img]
-  (img-script ctx (partial format (podman-build-cmd dockerfile)) img))
+  [ctx dockerfile img & [dir]]
+  (img-script ctx (partial format (podman-build-cmd dockerfile (or dir "."))) img))
 
 (defn push-image [ctx img]
   (img-script ctx (partial format "podman manifest push --all --authfile %s %s") img))
@@ -88,20 +90,13 @@
 (defn publish-app [ctx]
   (publish-container ctx "publish-app" "app"))
 
-(defn in-braid-bot-dir
-  "Executes `f` but sets work dir to the `braid-bot` dir."
-  [f]
-  (fn [ctx]
-    {:action (f ctx)
-     :work-dir "braid-bot"}))
-
 (defn build-bot-image [ctx]
-  (in-braid-bot-dir
-   (build-image ctx "Dockerfile" bot-img)))
+  (build-image ctx "braid-bot/Dockerfile" bot-img "braid-bot"))
 
 (defn push-bot-image [ctx]
-  (in-braid-bot-dir
-   (push-image ctx bot-img)))
+  (push-image ctx bot-img))
+
+(defn cleanup [ctx])
 
 (core/defpipeline test-all
   [test-lib
