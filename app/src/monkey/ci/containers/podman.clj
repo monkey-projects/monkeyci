@@ -48,9 +48,8 @@
 (defn build-cmd-args
   "Builds command line args for the podman executable"
   [{:keys [step] :as ctx}]
-  (let [build-id (c/get-build-id ctx)
-        conf (mcc/ctx->container-config ctx)
-        cn (or build-id "unkown-build")
+  (let [conf (mcc/ctx->container-config ctx)
+        cn (c/get-step-id ctx)
         wd (c/step-work-dir ctx)
         cwd "/home/monkeyci"
         base-cmd ["/usr/bin/podman" "run"
@@ -74,9 +73,7 @@
   (log/info "Running build step " build-id "/" (:name step) "as podman container")
   (let [log-maker (c/log-maker ctx)
         ;; Don't prefix the sid here, that's the responsability of the logger
-        log-base (into [(or build-id "no-build-id")]
-                       [(or (:name pipeline) (str (:index pipeline)))
-                        (str (:index step))])
+        log-base (c/get-step-sid ctx)
         [out-log err-log :as loggers] (->> ["out.txt" "err.txt"]
                                            (map (partial conj log-base))
                                            (map (partial log-maker ctx)))]

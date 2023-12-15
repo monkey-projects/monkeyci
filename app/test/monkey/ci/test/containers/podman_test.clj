@@ -60,15 +60,17 @@
                   :logging {:maker (fn [_ path]
                                      (swap! log-paths conj path)
                                      (l/->InheritLogger))}})]
-          (is (= "no-build-id" (->> @log-paths
-                                    ffirst))))))))
+          (is (= "unknown-build" (->> @log-paths
+                                      ffirst))))))))
 
 (deftest build-cmd-args
-  (let [base-ctx {:build-id "test-build"
+  (let [base-ctx {:build {:build-id "test-build"}
                   :work-dir "test-dir"
                   :step {:name "test-step"
+                         :index 0
                          :container/image "test-img"
-                         :script ["first" "second"]}}]
+                         :script ["first" "second"]}
+                  :pipeline {:name "test-pipeline"}}]
     
     (testing "when no command given, assumes `/bin/sh` and fails on errors"
       (let [r (sut/build-cmd-args base-ctx)]
@@ -117,4 +119,8 @@
 
     (testing "adds default platform from app config"
       (is (contains-subseq? (sut/build-cmd-args {:containers {:platform "test-platform"}})
-                            ["--platform" "test-platform"])))))
+                            ["--platform" "test-platform"])))
+
+    (testing "uses step id as container name"
+      (is (contains-subseq? (sut/build-cmd-args base-ctx)
+                            ["--name" "test-build-test-pipeline-0"])))))

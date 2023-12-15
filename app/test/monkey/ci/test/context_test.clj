@@ -19,3 +19,18 @@
                                       :repo-id "r"}})))
     (is (nil? (sut/get-sid {:account {:customer-id "c"
                                       :project-id "p"}})))))
+
+(deftest get-step-id
+  (testing "combines build id, pipeline and step"
+    (is (= "test-build-test-pipeline-1"
+           (-> {:build {:build-id "test-build"}
+                :pipeline {:name "test-pipeline"}
+                :step {:index 1}}
+               (sut/get-step-id)))))
+  
+  (testing "uses pipeline index when no name"
+    (is (= "test-build-0-1"
+           (-> {:build {:build-id "test-build"}
+                :pipeline {:index 0}
+                :step {:index 1}}
+               (sut/get-step-id))))))

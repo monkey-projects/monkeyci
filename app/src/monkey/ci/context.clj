@@ -3,6 +3,7 @@
    and possible command-line arguments, and can hold non-serializable things as well, like
    functions.  It is used by the application to execute functionality."
   (:require [clojure.java.io :as io]
+            [clojure.string :as cs]
             [medley.core :as mc]
             [monkey.ci
              [logging :as l]
@@ -59,7 +60,18 @@
           sid))))
 
 (defn get-build-id [ctx]
-  (get-in ctx [:build :build-id]))
+  (or (get-in ctx [:build :build-id]) "unknown-build"))
+
+(def get-step-sid
+  "Creates a unique step id using the build id, pipeline and step from the context."
+  (comp (partial mapv str)
+        (juxt get-build-id
+              (comp (some-fn :name :index) :pipeline)
+              (comp :index :step))))
+
+(def get-step-id
+  "Creates a string representation of the step sid"
+  (comp (partial cs/join "-") get-step-sid))
 
 (def reporter :reporter)
 
