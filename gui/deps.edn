@@ -5,4 +5,9 @@
  :paths ["src" "resources"]
 
  :aliases
- {:dev {:extra-paths "env/dev"}}}
+ {:dev
+  {:extra-paths ["env/dev"]}
+
+  :test
+  {:extra-paths ["test"]
+   :extra-deps {lambdaisland/kaocha-cljs2 {:mvn/version "0.2.72"}}}}}
