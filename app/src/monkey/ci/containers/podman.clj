@@ -47,8 +47,9 @@
 
 (defn build-cmd-args
   "Builds command line args for the podman executable"
-  [{:keys [build-id step] :as ctx}]
-  (let [conf (mcc/ctx->container-config ctx)
+  [{:keys [step] :as ctx}]
+  (let [build-id (c/get-build-id ctx)
+        conf (mcc/ctx->container-config ctx)
         cn (or build-id "unkown-build")
         wd (c/step-work-dir ctx)
         cwd "/home/monkeyci"

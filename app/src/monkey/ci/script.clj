@@ -9,6 +9,7 @@
             [monkey.ci.build.core :as bc]
             [monkey.ci
              [containers :as c]
+             [context :as ctx]
              [events :as e]
              [utils :as u]]
             [monkey.ci.containers
@@ -296,19 +297,20 @@
     (var? p) (resolve-pipelines (var-get p) ctx)
     :else p))
 
-(defn- load-and-run-pipelines [{:keys [script-dir] {:keys [build-id]} :build :as ctx}]
-  (log/debug "Executing script for build" build-id "at:" script-dir)
-  (log/debug "Script context:" ctx)
-  (try 
-    (let [p (-> (load-pipelines script-dir build-id)
-                (resolve-pipelines ctx))]
-      (log/debug "Pipelines:" p)
-      (log/debug "Loaded" (count p) "pipelines:" (map :name p))
-      (run-pipelines* ctx p))
-    (catch Exception ex
-      (log/error "Unable to load pipelines" ex)
-      (post-event ctx {:type :script/end
-                       :message (.getMessage ex)}))))
+(defn- load-and-run-pipelines [{:keys [script-dir] :as ctx}]
+  (let [build-id (ctx/get-build-id ctx)]
+    (log/debug "Executing script for build" build-id "at:" script-dir)
+    (log/debug "Script context:" ctx)
+    (try 
+      (let [p (-> (load-pipelines script-dir build-id)
+                  (resolve-pipelines ctx))]
+        (log/debug "Pipelines:" p)
+        (log/debug "Loaded" (count p) "pipelines:" (map :name p))
+        (run-pipelines* ctx p))
+      (catch Exception ex
+        (log/error "Unable to load pipelines" ex)
+        (post-event ctx {:type :script/end
+                         :message (.getMessage ex)})))))
 
 (defn exec-script!
   "Loads a script from a directory and executes it.  The script is

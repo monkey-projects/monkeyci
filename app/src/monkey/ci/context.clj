@@ -58,6 +58,9 @@
         (when (= 3 (count sid))
           sid))))
 
+(defn get-build-id [ctx]
+  (get-in ctx [:build :build-id]))
+
 (def reporter :reporter)
 
 (defn report
