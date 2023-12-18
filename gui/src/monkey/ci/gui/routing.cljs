@@ -13,8 +13,10 @@
  (fn [db [_ match]]
    (assoc db :route/current match)))
 
-(def router (f/router [["/" :page/root]
-                       ["/login" :page/login]]))
+(def router
+  (f/router
+   [["/" :page/root]
+    ["/login" :page/login]]))
 
 (defn on-route-change [match history]
   (println "Route changed:" match)

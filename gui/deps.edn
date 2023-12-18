@@ -12,4 +12,5 @@
 
   :test
   {:extra-paths ["test"]
-   :extra-deps {lambdaisland/kaocha-cljs2 {:mvn/version "0.2.72"}}}}}
+   :extra-deps {lambdaisland/kaocha-cljs2 {:mvn/version "0.2.72"}
+                day8.re-frame/test {:mvn/version "0.1.5"}}}}}

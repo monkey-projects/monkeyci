@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.login.views
-  (:require [re-frame.core :as rf]))
+  (:require [monkey.ci.gui.layout :as l]
+            [re-frame.core :as rf]))
 
 (defn login-form []
   [:form
@@ -10,3 +11,6 @@
     [:label.form-label {:for "password"} "Password"]
     [:input#password.form-control {:type :password}]]
    [:button.btn.btn-primary {:type :submit} "Login"]])
+
+(defn page []
+  (l/welcome [login-form]))
