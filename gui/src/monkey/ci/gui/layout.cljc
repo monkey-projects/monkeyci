@@ -5,7 +5,7 @@
 (defn curr-route []
   (let [r (rf/subscribe [:route/current])]
     [:div.alert.alert-info
-     [:p "Current route: " [:b (str (some-> @r :data :name))]]]))
+     [:div "Current route: " [:b (str (some-> @r :data :name))]]]))
 
 (defn header []
   [:div.header

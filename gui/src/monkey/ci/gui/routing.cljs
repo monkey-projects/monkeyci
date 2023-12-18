@@ -14,6 +14,10 @@
    (assoc db :route/current match)))
 
 (def router
+  ;; Instead of pointing to the views directly, we refer to a keyword, which
+  ;; is linked in another namespace (pages) to the actual view.  This allows
+  ;; us to refer to the routing namespace from views, e.g. to resolve paths
+  ;; by route names.
   (f/router
    [["/" :page/root]
     ["/login" :page/login]]))

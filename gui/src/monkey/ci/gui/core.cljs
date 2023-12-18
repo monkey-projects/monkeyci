@@ -11,6 +11,7 @@
 (defonce app-root (atom nil))
 
 (defn ^:dev/after-load reload []
+  (rf/clear-subscription-cache!)
   (rd/render @app-root [p/render]))
 
 (defn init []
