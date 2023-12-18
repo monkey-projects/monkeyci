@@ -1,6 +1,8 @@
 {:deps {thheller/shadow-cljs {:mvn/version "2.26.2"}
+        akiroz.re-frame/storage {:mvn/version "0.1.4"}
         reagent/reagent {:mvn/version "1.2.0"}
-        re-frame/re-frame {:mvn/version "1.4.2"}}
+        re-frame/re-frame {:mvn/version "1.4.2"}
+        metosin/reitit-frontend {:mvn/version "0.7.0-alpha7"}}
 
  :paths ["src" "resources"]
 
