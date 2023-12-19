@@ -11,3 +11,8 @@
  :customer/alerts
  (fn [db _]
    (db/alerts db)))
+
+(rf/reg-sub
+ :customer/loading?
+ (fn [db _]
+   (true? (db/loading? db))))

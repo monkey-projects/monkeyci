@@ -19,3 +19,23 @@
                 :message "Test alert"}]]
         (is (map? (reset! app-db (db/set-alerts {} a))))
         (is (= a @s))))))
+
+(deftest customer-info
+  (let [ci (rf/subscribe [:customer/info])]
+    (testing "exists"
+      (is (some? ci)))
+
+    (testing "holds customer info from db"
+      (is (nil? @ci))
+      (is (map? (reset! app-db (db/set-customer {} ::test-customer))))
+      (is (= ::test-customer @ci)))))
+
+(deftest customer-loading?
+  (let [l (rf/subscribe [:customer/loading?])]
+    (testing "exists"
+      (is (some? l)))
+
+    (testing "holds loading state from db"
+      (is (false? @l))
+      (is (map? (reset! app-db (db/set-loading {}))))
+      (is (true? @l)))))

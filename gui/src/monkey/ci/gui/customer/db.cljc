@@ -18,5 +18,5 @@
 (defn set-alerts [db a]
   (assoc db alerts a))
 
-(defn reset-alerts [db a]
+(defn reset-alerts [db]
   (dissoc db alerts))

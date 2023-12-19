@@ -6,7 +6,6 @@
             [martian.test :as mt]
             [monkey.ci.gui.customer.db :as db]
             [monkey.ci.gui.customer.events :as sut]
-            [monkey.ci.gui.customer.subs]
             [monkey.ci.gui.martian :as mm]
             [monkey.ci.gui.test.fixtures :as f]
             [re-frame.core :as rf]
@@ -54,7 +53,7 @@
           :customer/load--failed
           evt]
          (is (= cust (:body (second evt))) "sends martian request")
-         (is (= cust @(rf/subscribe [:customer/info])) "stored customer info"))))))
+         (is (= cust (db/customer @app-db)) "stored customer info"))))))
 
 (deftest customer-load--success
   (testing "unmarks loading"

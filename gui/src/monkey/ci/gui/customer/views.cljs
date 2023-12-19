@@ -17,6 +17,27 @@
 (defn- load-customer [id]
   (rf/dispatch [:customer/load id]))
 
+(defn- show-repo [r]
+  [:div.repo.card-body
+   [:div.float-start
+    [:b {:title (:id r)} (:name r)]
+    [:p "Url: " [:a {:href (:url r)} (:url r)]]]
+   [:button.btn.btn-primary.float-end "Details"]])
+
+(defn- show-project [p]
+  (->> (:repos p)
+       (map show-repo)
+       (into [:div.project.card.mb-3
+              [:div.card-header
+               [:h5.card-title {:title (:id p)} (:name p)]]])))
+
+(defn- customer-details []
+  (let [c (rf/subscribe [:customer/info])]
+    (->> (:projects @c)
+         (map show-project)
+         (into [:<>
+                [:h3 "Customer " (:name @c)]]))))
+
 (defn page
   "Customer overview page"
   [route]
@@ -24,7 +45,6 @@
     (load-customer id)
     (l/default
      [:div
-      [:h3 "Customer " id]
       [alerts]
       [:button.btn.btn-primary {:on-click #(load-customer id)} "Reload"]
-      [:p "Customer overview goes here"]])))
+      [customer-details]])))

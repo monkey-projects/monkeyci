@@ -24,8 +24,7 @@
    (-> db
        (db/unset-loading)
        (db/set-customer cust)
-       (db/set-alerts [{:type :success
-                        :message "Customer details fetched."}]))))
+       (db/reset-alerts))))
 
 (rf/reg-event-db
  :customer/load--failed
