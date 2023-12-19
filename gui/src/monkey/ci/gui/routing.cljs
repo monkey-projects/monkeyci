@@ -21,9 +21,9 @@
   (f/router
    [["/" :page/root]
     ["/login" :page/login]
-    ["/c/:id" :page/customer]
-    ["/c/:customer-id/p/:id" :page/project]
-    ["/c/:customer-id/p/:project-id/r/:id" :page/repo]]))
+    ["/c/:customer-id" :page/customer]
+    ["/c/:customer-id/p/:project-id" :page/project]
+    ["/c/:customer-id/p/:project-id/r/:repo-id" :page/repo]]))
 
 (defn on-route-change [match history]
   (println "Route changed:" match)

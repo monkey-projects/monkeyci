@@ -1,19 +1,10 @@
 (ns monkey.ci.gui.customer.views
-  (:require [monkey.ci.gui.customer.events]
+  (:require [monkey.ci.gui.components :as co]
+            [monkey.ci.gui.customer.events]
             [monkey.ci.gui.customer.subs]
             [monkey.ci.gui.layout :as l]
             [monkey.ci.gui.routing :as r]
             [re-frame.core :as rf]))
-
-(defn render-alert [{:keys [type message]}]
-  [:div {:class (str "alert alert-" (name type))} message])
-
-(defn alerts []
-  (let [s (rf/subscribe [:customer/alerts])]
-    (when (not-empty @s)
-      (->> @s
-           (map render-alert)
-           (into [:<>])))))
 
 (defn- load-customer [id]
   (rf/dispatch [:customer/load id]))
@@ -26,7 +17,7 @@
    [:a.btn.btn-primary.float-end
     {:href (r/path-for :page/repo {:customer-id (:id c)
                                    :project-id (:id p)
-                                   :id (:id r)})}
+                                   :repo-id (:id r)})}
     "Details"]])
 
 (defn- show-project [cust p]
@@ -47,10 +38,10 @@
 (defn page
   "Customer overview page"
   [route]
-  (let [id (get-in route [:parameters :path :id])]
+  (let [id (get-in route [:parameters :path :customer-id])]
     (load-customer id)
     (l/default
      [:div
-      [alerts]
+      [co/alerts [:customer/alerts]]
       [:button.btn.btn-primary {:on-click #(load-customer id)} "Reload"]
       [customer-details]])))

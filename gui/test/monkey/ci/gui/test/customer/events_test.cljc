@@ -2,30 +2,14 @@
   (:require #?(:cljs [cljs.test :refer-macros [deftest testing is use-fixtures async]]
                :clj [clojure.test :refer [deftest testing is use-fixtures]])
             [day8.re-frame.test :as rf-test]
-            [martian.core :as martian]
-            [martian.test :as mt]
             [monkey.ci.gui.customer.db :as db]
             [monkey.ci.gui.customer.events :as sut]
-            [monkey.ci.gui.martian :as mm]
             [monkey.ci.gui.test.fixtures :as f]
+            [monkey.ci.gui.test.helpers :refer [initialize-martian]]
             [re-frame.core :as rf]
             [re-frame.db :refer [app-db]]))
 
 (use-fixtures :each f/reset-db)
-
-#_(rf/clear-subscription-cache!)
-
-(defn catch-fx [fx]
-  (let [inv (atom [])]
-    (rf/reg-fx fx (fn [_ evt]
-                    (swap! inv conj evt)))
-    inv))
-
-(defn initialize-martian [responses]
-  (let [m (-> (martian/bootstrap mm/url mm/routes)
-              (mt/respond-as "cljs-http")
-              (mt/respond-with responses))]
-    (rf/dispatch-sync [:martian.re-frame/init m])))
 
 ;; MAJOR CAVEAT!  Beware of test ordering, because sometimes async blocks are not executed.
 ;; Seems like only one async block per test is allowed, or something.

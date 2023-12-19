@@ -2,6 +2,7 @@
   (:require #?(:cljs [cljs.test :refer-macros [deftest testing is use-fixtures]]
                :clj [clojure.test :refer [deftest testing is use-fixtures]])
             [monkey.ci.gui.customer.db :as cdb]
+            [monkey.ci.gui.repo.db :as db]
             [monkey.ci.gui.repo.subs :as sut]
             [monkey.ci.gui.test.fixtures :as f]
             [re-frame.core :as rf]
@@ -26,3 +27,21 @@
                                    [{:id "test-repo"
                                      :name "test repository"}]}]}))))
       (is (= "test repository" (:name @r))))))
+
+(deftest alerts
+  (let [a (rf/subscribe [:repo/alerts])]
+    (testing "exists"
+      (is (some? a)))
+
+    (testing "holds alerts from db"
+      (is (map? (reset! app-db (db/set-alerts {} ::test-alerts))))
+      (is (= ::test-alerts @a)))))
+
+(deftest builds
+  (let [b (rf/subscribe [:repo/builds])]
+    (testing "exists"
+      (is (some? b)))
+
+    (testing "holds builds from db"
+      (is (map? (reset! app-db (db/set-builds {} ::test-builds))))
+      (is (= ::test-builds @b)))))
