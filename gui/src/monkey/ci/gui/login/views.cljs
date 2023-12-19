@@ -19,5 +19,5 @@
         @submitting? (assoc :disabled true))
       "Login"]]))
 
-(defn page []
+(defn page [_]
   [l/welcome [login-form]])

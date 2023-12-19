@@ -15,4 +15,8 @@
    :ns-regexp ".*-test$"
    :devtools {:http-port 8001
               :http-root "target/js/test-kaocha"
-              :preloads [lambdaisland.chui.remote]}}}}
+              :preloads [lambdaisland.chui.remote]}}
+
+  :test/node
+  {:target :node-test
+   :output-to "target/js/node.js"}}}

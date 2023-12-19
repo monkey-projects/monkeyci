@@ -20,7 +20,8 @@
   ;; by route names.
   (f/router
    [["/" :page/root]
-    ["/login" :page/login]]))
+    ["/login" :page/login]
+    ["/c/:id" :page/customer]]))
 
 (defn on-route-change [match history]
   (println "Route changed:" match)

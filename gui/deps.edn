@@ -1,8 +1,10 @@
-{:deps {thheller/shadow-cljs {:mvn/version "2.26.2"}
+{:deps {org.clojure/core.async {:mvn/version "1.6.681"}
+        thheller/shadow-cljs {:mvn/version "2.26.2"}
         akiroz.re-frame/storage {:mvn/version "0.1.4"}
+        com.github.oliyh/martian-re-frame {:mvn/version "0.1.25"}
+        metosin/reitit-frontend {:mvn/version "0.7.0-alpha7"}
         reagent/reagent {:mvn/version "1.2.0"}
-        re-frame/re-frame {:mvn/version "1.4.2"}
-        metosin/reitit-frontend {:mvn/version "0.7.0-alpha7"}}
+        re-frame/re-frame {:mvn/version "1.4.2"}}
 
  :paths ["src" "resources"]
 
@@ -12,5 +14,10 @@
 
   :test
   {:extra-paths ["test"]
-   :extra-deps {lambdaisland/kaocha-cljs2 {:mvn/version "0.2.72"}
-                day8.re-frame/test {:mvn/version "0.1.5"}}}}}
+   :extra-deps {com.github.oliyh/martian-test {:mvn/version "0.1.25"}
+                lambdaisland/kaocha-cljs2 {:mvn/version "0.2.72"}
+                day8.re-frame/test {:mvn/version "0.1.5"}}}
+
+  :test/clj
+  {:extra-deps {com.monkeyprojects/build {:mvn/version "0.2-SNAPSHOT"}}
+   :exec-fn monkey.test/all}}}

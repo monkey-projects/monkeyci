@@ -28,3 +28,9 @@
     [:div.col
      subpanel]]
    [footer]])
+
+(defn default [subpanel]
+  [:div
+   [header]
+   subpanel
+   [footer]])
