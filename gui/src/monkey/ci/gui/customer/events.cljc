@@ -19,7 +19,8 @@
 
 (rf/reg-event-db
  :customer/load--success
- (fn [db [_ cust]]
+ (fn [db [_ {cust :body}]]
+   (println "Customer details loaded:" cust)
    (-> db
        (db/unset-loading)
        (db/set-customer cust)

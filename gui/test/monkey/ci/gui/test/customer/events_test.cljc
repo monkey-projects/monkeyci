@@ -24,6 +24,7 @@
 
 (defn initialize-martian [responses]
   (let [m (-> (martian/bootstrap mm/url mm/routes)
+              (mt/respond-as "cljs-http")
               (mt/respond-with responses))]
     (rf/dispatch-sync [:martian.re-frame/init m])))
 
@@ -43,14 +44,17 @@
   (testing "sends request to api and sets customer"
     (let [cust {:name "test customer"}]
       (rf-test/run-test-async
-        (initialize-martian {:get-customer {:status 200 :body cust}})
+        (initialize-martian {:get-customer {:status 200
+                                            :body cust
+                                            :error-code :no-error}})
         (is (some? (:martian.re-frame/martian @app-db)))
         (rf/dispatch [:customer/load "test-customer"])
-        (rf-test/wait-for [:customer/load--success
-                           :customer/load--failed
-                           evt]
-          (is (= :martian.re-frame/request (first evt)) "sends martian request")
-          (is (= cust @(rf/subscribe [:customer/info])) "stored customer info"))))))
+        (rf-test/wait-for
+         [:customer/load--success
+          :customer/load--failed
+          evt]
+         (is (= cust (:body (second evt))) "sends martian request")
+         (is (= cust @(rf/subscribe [:customer/info])) "stored customer info"))))))
 
 (deftest customer-load--success
   (testing "unmarks loading"

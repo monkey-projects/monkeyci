@@ -12,7 +12,8 @@
     :path-schema {:customer-id s/Str}
     :produces #{"application/edn"}}])
 
-(def url "http://monkeyci:8083")
+#_(def url "http://monkeyci:8083")
+(def url "http://localhost:3000")
 
 (defn init
   "Initializes using the fixed routes"

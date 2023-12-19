@@ -177,7 +177,11 @@
   ([{:keys [dev-mode] :as opts} routes]
    (ring/router
     routes
-    {:data {:middleware (vec (concat [stringify-body cors/wrap-cors]
+    {:data {:middleware (vec (concat [stringify-body
+                                      [cors/wrap-cors
+                                       :access-control-allow-origin #".*"
+                                       :access-control-allow-methods [:get :put :post :delete]
+                                       :access-control-allow-credentials true]]
                                      c/default-middleware
                                      [kebab-case-query]))
             :muuntaja (c/make-muuntaja)
