@@ -13,7 +13,7 @@
    [:p.lead "Welcome to MonkeyCI, the CI/CD tool that makes your life (and the planet) better!"]])
 
 (defn footer []
-  [:div.footer
+  [:div.footer.border-top.mt-3
    [:p "built by " [:a {:href "https://www.monkey-projects.be"} "Monkey Projects"]]])
 
 (defn welcome

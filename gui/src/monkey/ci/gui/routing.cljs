@@ -21,7 +21,9 @@
   (f/router
    [["/" :page/root]
     ["/login" :page/login]
-    ["/c/:id" :page/customer]]))
+    ["/c/:id" :page/customer]
+    ["/c/:customer-id/p/:id" :page/project]
+    ["/c/:customer-id/p/:project-id/r/:id" :page/repo]]))
 
 (defn on-route-change [match history]
   (println "Route changed:" match)
@@ -29,3 +31,7 @@
 
 (defn start! []
   (rfe/start! router on-route-change {:use-fragment false}))
+
+(defn path-for [id & [params]]
+  (some-> (f/match-by-name router id params)
+          :path))

@@ -2,6 +2,7 @@
   (:require [monkey.ci.gui.customer.events]
             [monkey.ci.gui.customer.subs]
             [monkey.ci.gui.layout :as l]
+            [monkey.ci.gui.routing :as r]
             [re-frame.core :as rf]))
 
 (defn render-alert [{:keys [type message]}]
@@ -17,24 +18,29 @@
 (defn- load-customer [id]
   (rf/dispatch [:customer/load id]))
 
-(defn- show-repo [r]
+(defn- show-repo [c p r]
   [:div.repo.card-body
    [:div.float-start
     [:b {:title (:id r)} (:name r)]
     [:p "Url: " [:a {:href (:url r)} (:url r)]]]
-   [:button.btn.btn-primary.float-end "Details"]])
+   [:a.btn.btn-primary.float-end
+    {:href (r/path-for :page/repo {:customer-id (:id c)
+                                   :project-id (:id p)
+                                   :id (:id r)})}
+    "Details"]])
 
-(defn- show-project [p]
+(defn- show-project [cust p]
   (->> (:repos p)
-       (map show-repo)
-       (into [:div.project.card.mb-3
-              [:div.card-header
-               [:h5.card-title {:title (:id p)} (:name p)]]])))
+       (map (partial show-repo cust p))
+       (into
+        [:div.project.card.mb-3
+         [:div.card-header
+          [:h5.card-title {:title (:id p)} (:name p)]]])))
 
 (defn- customer-details []
   (let [c (rf/subscribe [:customer/info])]
     (->> (:projects @c)
-         (map show-project)
+         (map (partial show-project @c))
          (into [:<>
                 [:h3 "Customer " (:name @c)]]))))
 

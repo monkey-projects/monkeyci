@@ -28,3 +28,21 @@
     (is (empty? (reset! app-db {})))
     (rf/dispatch-sync [:route/goto "test-match"])
     (is (= "test-match" (:route/current @app-db)))))
+
+(deftest path-for
+  (testing "`nil` if unknown path"
+    (is (nil? (sut/path-for :unkown))))
+
+  (testing "returns path string for the route"
+    (is (= "/login"
+           (sut/path-for :page/login))))
+
+  (testing "sets path parameters"
+    (is (= "/c/test-customer"
+           (sut/path-for :page/customer {:id "test-customer"}))))
+
+  (testing "sets multiple path parameters"
+    (is (= "/c/cust/p/proj/r/repo"
+           (sut/path-for :page/repo {:customer-id "cust"
+                                     :project-id "proj"
+                                     :id "repo"})))))

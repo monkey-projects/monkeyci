@@ -2,6 +2,7 @@
   "Links route names to actual components to be rendered"
   (:require [monkey.ci.gui.login.views :as login]
             [monkey.ci.gui.customer.views :as customer]
+            [monkey.ci.gui.repo.views :as repo]
             [re-frame.core :as rf]))
 
 (defn redirect []
@@ -10,7 +11,8 @@
 (def pages
   {:page/root redirect
    :page/login login/page
-   :page/customer customer/page})
+   :page/customer customer/page
+   :page/repo repo/page})
 
 (defn render-page [route]
   (if-let [p (get pages (get-in route [:data :name]))]
