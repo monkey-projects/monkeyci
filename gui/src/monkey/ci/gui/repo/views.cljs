@@ -24,20 +24,21 @@
   (rf/dispatch [:builds/load])
   (fn []
     (let [b (rf/subscribe [:repo/builds])]
-      [:<>
-       [:h4 "Builds"]
-       [:p "Found " (count @b) " builds"]
-       [:table.table.table-striped
-        [:thead
-         [:tr
-          [:th {:scope :col} "Id"]
-          [:th {:scope :col} "Time"]
-          [:th {:scope :col} "Result"]
-          [:th {:scope :col} "Commit message"]]]
-        (->> @b
-             (map build-row)
-             (into [:tbody]))]
-       [:button.btn.btn-primary {:on-click #(rf/dispatch [:builds/load])} "Reload"]])))
+      (when @b
+        [:<>
+         [:h4 "Builds"]
+         [:p "Found " (count @b) " builds"]
+         [:table.table.table-striped
+          [:thead
+           [:tr
+            [:th {:scope :col} "Id"]
+            [:th {:scope :col} "Time"]
+            [:th {:scope :col} "Result"]
+            [:th {:scope :col} "Commit message"]]]
+          (->> @b
+               (map build-row)
+               (into [:tbody]))]
+         [co/reload-btn [:builds/load]]]))))
 
 (defn page [route]
   (rf/dispatch [:repo/load (get-in route [:parameters :path :customer-id])])

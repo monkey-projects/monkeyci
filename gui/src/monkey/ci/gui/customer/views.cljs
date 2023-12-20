@@ -18,10 +18,11 @@
     {:href (r/path-for :page/repo {:customer-id (:id c)
                                    :project-id (:id p)
                                    :repo-id (:id r)})}
-    "Details"]])
+    [co/icon :three-dots-vertical] " Details"]])
 
 (defn- show-project [cust p]
   (->> (:repos p)
+       (sort-by :name)
        (map (partial show-repo cust p))
        (into
         [:div.project.card.mb-3
@@ -31,6 +32,7 @@
 (defn- customer-details []
   (let [c (rf/subscribe [:customer/info])]
     (->> (:projects @c)
+         (sort-by :name)
          (map (partial show-project @c))
          (into [:<>
                 [:h3 "Customer " (:name @c)]]))))
@@ -43,5 +45,5 @@
     (l/default
      [:div
       [co/alerts [:customer/alerts]]
-      [:button.btn.btn-primary {:on-click #(load-customer id)} "Reload"]
+      [co/reload-btn [:customer/load id]]
       [customer-details]])))

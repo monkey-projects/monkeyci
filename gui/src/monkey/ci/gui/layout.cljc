@@ -1,5 +1,5 @@
 (ns monkey.ci.gui.layout
-  (:require [monkey.ci.gui.utils :as u]
+  (:require [monkey.ci.gui.components :as co]
             [re-frame.core :as rf]))
 
 (defn curr-route []
@@ -24,7 +24,7 @@
    [curr-route]
    [:div.row
     [:div.col
-     [u/logo]]
+     [co/logo]]
     [:div.col
      subpanel]]
    [footer]])

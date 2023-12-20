@@ -24,4 +24,5 @@
 
 (defn render []
   (let [r (rf/subscribe [:route/current])]
+    (println "Route:" @r)
     [render-page @r]))
