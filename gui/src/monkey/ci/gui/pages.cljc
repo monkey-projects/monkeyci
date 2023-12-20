@@ -15,6 +15,7 @@
    :page/repo repo/page})
 
 (defn render-page [route]
+  (println "Rendering page for route:" (get-in route [:data :name]))
   (if-let [p (get pages (get-in route [:data :name]))]
     [p route]
     [:div.alert.alert-warning

@@ -6,7 +6,7 @@
 
 (defn catch-fx [fx]
   (let [inv (atom [])]
-    (rf/reg-fx fx (fn [_ evt]
+    (rf/reg-fx fx (fn [evt]
                     (swap! inv conj evt)))
     inv))
 
@@ -17,5 +17,5 @@
   (let [m (-> (martian/bootstrap mm/url mm/routes)
               (mt/respond-as "cljs-http")
               (mt/respond-with responses))]
-    (rf/dispatch-sync [:martian.re-frame/init m])))
+    (rf/dispatch [:martian.re-frame/init m])))
 

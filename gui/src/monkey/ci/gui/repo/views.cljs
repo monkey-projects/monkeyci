@@ -6,12 +6,37 @@
             [monkey.ci.gui.routing :as r]
             [re-frame.core :as rf]))
 
+(defn- build-result [r]
+  (let [type (condp = r
+               "error" :text-bg-danger
+               "success" :text-bg-success
+               :text-bg-secondary)]
+    [:span {:class (str "badge " (name type))} r]))
+
+(defn- build-row [b]
+  [:tr
+   [:td (:id b)]
+   [:td (:timestamp b)]
+   [:td [build-result (:result b)]]
+   [:td (:message b)]])
+
 (defn- builds []
   (rf/dispatch [:builds/load])
-  (let [b (rf/subscribe [:repo/builds])]
-    [:<>
-     [:h4 "Builds"]
-     [:p "Found " (count @b) " builds"]]))
+  (fn []
+    (let [b (rf/subscribe [:repo/builds])]
+      [:<>
+       [:h4 "Builds"]
+       [:p "Found " (count @b) " builds"]
+       [:table.table.table-striped
+        [:thead
+         [:tr
+          [:th {:scope :col} "Id"]
+          [:th {:scope :col} "Time"]
+          [:th {:scope :col} "Result"]
+          [:th {:scope :col} "Commit message"]]]
+        (->> @b
+             (map build-row)
+             (into [:tbody]))]])))
 
 (defn page [route]
   (rf/dispatch [:repo/load (get-in route [:parameters :path :customer-id])])

@@ -14,50 +14,49 @@
 
 (deftest repo-load
   (testing "loads customer if not existing"
-    (rft/run-test-async
-     (h/initialize-martian {:get-customer {:body {:name "test customer"}
-                                           :error-code :no-error}})
-     
-     (rf/dispatch [:repo/load "test-customer-id"])
-     (rft/wait-for
-      [:customer/load--success]
-      (is (= "test customer" (:name (cdb/customer @app-db))))))))
+    (rft/run-test-sync
+     (let [c (h/catch-fx :martian.re-frame/request)]
+       (h/initialize-martian {:get-customer {:body {:name "test customer"}
+                                             :error-code :no-error}})
+       
+       (rf/dispatch [:repo/load "test-customer-id"])
+       (is (= 1 (count @c)))
+       (is (= :get-customer (-> @c first (nth 2)))))))
 
-(deftest repo-load-when-existing
   (testing "does not load customer if already loaded"
-    (rft/run-test-async
-     (h/initialize-martian {:get-customer {:body {:name "test customer"}
-                                           :error-code :no-error}})
-     (reset! app-db (cdb/set-customer {} {:name "existing customer"}))
-     
-     (rf/dispatch [:repo/load "test-customer-id"])
-     (rft/wait-for
-      [:repo/load
-       :customer/load--success]
-      (is (= "existing customer" (:name (cdb/customer @app-db))))))))
+    (rft/run-test-sync
+     (let [c (h/catch-fx :martian.re-frame/request)]
+       (reset! app-db (cdb/set-customer {} {:name "existing customer"}))
+       (h/initialize-martian {:get-customer {:body {:name "test customer"}
+                                             :error-code :no-error}})
+       
+       (rf/dispatch [:repo/load "test-customer-id"])
+       (is (empty? @c))))))
 
-(deftest build-load
+(deftest builds-load
   (testing "sets alert"
     (rf/dispatch-sync [:builds/load])
     (is (= 1 (count (db/alerts @app-db)))))
 
   (testing "fetches builds from backend"
-    (rft/run-test-async
-     (h/initialize-martian {:get-builds {:body [{:id "test-build"}]
-                                         :error-code :no-error}})
+    (rft/run-test-sync
+     (let [c (h/catch-fx :martian.re-frame/request)]
+       (reset! app-db {:route/current
+                       {:parameters
+                        {:path 
+                         {:customer-id "test-cust"
+                          :project-id "test-proj"
+                          :repo-id "test-repo"}}}})
+       (h/initialize-martian {:get-builds {:body [{:id "test-build"}]
+                                           :error-code :no-error}})
+       (rf/dispatch [:builds/load])
+       (is (= 1 (count @c)))
+       (is (= :get-builds (-> @c first (nth 2)))))))
 
-     (reset! app-db {:route/current
-                     {:parameters
-                      {:path 
-                       {:customer-id "test-cust"
-                        :project-id "test-proj"
-                        :repo-id "test-repo"}}}})
-     (rf/dispatch [:builds/load])
-     (rft/wait-for
-      [:builds/load--success]
-      (is (= "test-build" (-> (db/builds @app-db)
-                              (first)
-                              :id)))))))
+  (testing "clears current builds"
+    (is (map? (reset! app-db (db/set-builds {} [{:id "initial-build"}]))))
+    (rf/dispatch-sync [:builds/load])
+    (is (nil? (db/builds @app-db)))))
 
 (deftest build-load-success
   (testing "clears alerts"
