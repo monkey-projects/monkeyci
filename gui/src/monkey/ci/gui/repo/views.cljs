@@ -36,7 +36,8 @@
           [:th {:scope :col} "Commit message"]]]
         (->> @b
              (map build-row)
-             (into [:tbody]))]])))
+             (into [:tbody]))]
+       [:button.btn.btn-primary {:on-click #(rf/dispatch [:builds/load])} "Reload"]])))
 
 (defn page [route]
   (rf/dispatch [:repo/load (get-in route [:parameters :path :customer-id])])
@@ -49,4 +50,5 @@
         [:p "Repository url: " [:a {:href (:url @r)} (:url @r)]]
         [co/alerts [:repo/alerts]]
         [builds]
-        [:a {:href (r/path-for :page/customer {:customer-id customer-id})} "Back to customer"]]])))
+        [:div
+         [:a {:href (r/path-for :page/customer {:customer-id customer-id})} "Back to customer"]]]])))

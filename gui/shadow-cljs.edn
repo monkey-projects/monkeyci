@@ -19,4 +19,9 @@
 
   :test/node
   {:target :node-test
-   :output-to "target/js/node.js"}}}
+   :output-to "target/js/node.js"}
+
+  :test/ci
+  {:target :node-test
+   :output-to "target/js/ci.js"
+   :autorun true}}}
