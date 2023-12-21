@@ -11,9 +11,10 @@
 (rf/reg-event-db
  :route/goto
  (fn [db [_ match]]
+   (println "Changing current route from" (:route/current db) "into" match)
    (assoc db :route/current match)))
 
-(def router
+(defonce router
   ;; Instead of pointing to the views directly, we refer to a keyword, which
   ;; is linked in another namespace (pages) to the actual view.  This allows
   ;; us to refer to the routing namespace from views, e.g. to resolve paths

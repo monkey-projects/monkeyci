@@ -35,7 +35,9 @@
          (sort-by :name)
          (map (partial show-project @c))
          (into [:<>
-                [:h3 "Customer " (:name @c)]]))))
+                [:h3.float-start "Customer " (:name @c)]
+                [co/reload-btn [:customer/load (:id @c)] {:class :float-end}]
+                [:div.clearfix.mb-3]]))))
 
 (defn page
   "Customer overview page"
@@ -45,5 +47,4 @@
     (l/default
      [:div
       [co/alerts [:customer/alerts]]
-      [co/reload-btn [:customer/load id]]
       [customer-details]])))
