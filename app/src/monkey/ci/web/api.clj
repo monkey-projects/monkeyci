@@ -202,10 +202,11 @@
   [req]
   ;; FIXME This assumes the last item in the list is the most recent one, but
   ;; this may not always be the case.
-  (-> req
-      (get-builds* (comp vector last))
-      first
-      (rur/response)))
+  (if-let [r (-> req
+                 (get-builds* (partial take-last 1))
+                 first)]
+    (rur/response r)
+    (rur/status 204)))
 
 (defn trigger-build [req]
   (c/posting-handler

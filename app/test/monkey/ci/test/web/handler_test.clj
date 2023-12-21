@@ -222,15 +222,19 @@
 
     (testing "/builds"
       (h/with-memory-store st
-        (let [app (make-test-app st)
-              [customer-id project-id repo-id build-id :as sid] (->> (repeatedly st/new-id)
-                                                                     (take 4)
-                                                                     (st/->sid))
-              path (str (->> sid
-                             (drop-last)
-                             (interleave ["/customer" "project" "repo"])
-                             (cs/join "/"))
-                        "/builds")]
+        (let [generate-build-sid (fn []
+                                   (->> (repeatedly st/new-id)
+                                        (take 4)
+                                        (st/->sid)))
+              build-path (fn [sid]
+                           (str (->> sid
+                                     (drop-last)
+                                     (interleave ["/customer" "project" "repo"])
+                                     (cs/join "/"))
+                                "/builds"))
+              app (make-test-app st)
+              [customer-id project-id repo-id build-id :as sid] (generate-build-sid)
+              path (build-path sid)]
           (is (st/sid? (st/create-build-results st sid {:exit 0 :status :success})))
           (is (st/sid? (st/create-build-metadata st sid {:message "test meta"})))
           
@@ -300,17 +304,27 @@
 
             (testing "returns 404 (not found) when repo does not exist"))
 
-          (testing "`GET /latest` retrieves latest build for repo"
-            (let [l (-> (mock/request :get (str path "/latest"))
-                        (app))
-                  b (some-> l
-                            :body
-                            slurp
-                            h/parse-json)]
-              (is (= 200 (:status l)))
-              (is (map? b))
-              (is (= build-id (:id b)) "should contain build id")
-              (is (= "test meta" (:message b)) "should contain build metadata"))))))))
+          (testing "`GET /latest`"
+            (testing "retrieves latest build for repo"
+              (let [l (-> (mock/request :get (str path "/latest"))
+                          (app))
+                    b (some-> l
+                              :body
+                              slurp
+                              h/parse-json)]
+                (is (= 200 (:status l)))
+                (is (map? b))
+                (is (= build-id (:id b)) "should contain build id")
+                (is (= "test meta" (:message b)) "should contain build metadata")))
+
+            (testing "204 when there are no builds"
+              (let [sid (generate-build-sid)
+                    path (build-path sid)
+                    l (-> (mock/request :get (str path "/latest"))
+                          (app))]
+                (is (empty? (st/list-builds st (drop-last sid))))
+                (is (= 204 (:status l)))
+                (is (nil? (:body l)))))))))))
 
 (deftest event-stream
   (testing "'GET /events' exists"

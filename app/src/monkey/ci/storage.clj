@@ -38,8 +38,12 @@
   (obj-exists? [_ loc]
     (some? (get-in @store loc)))
 
-  (delete-obj [_ loc]
-    (swap! store mc/dissoc-in loc))
+  (delete-obj [this loc]
+    (if (obj-exists? this loc)
+      (do
+        (swap! store mc/dissoc-in loc)
+        true)
+      false))
 
   (list-obj [_ loc]
     (keys (get-in @store loc))))
