@@ -173,7 +173,10 @@
     (when (st/save-params (c/req->storage req) (params-sid req) p)
       (rur/response p))))
 
-(defn get-builds [req]
+(defn- get-builds*
+  "Helper function that retrieves the builds using the request, then
+   applies `f` to the resultset and fetches the details of the remaining builds."
+  [req f]
   (let [s (c/req->storage req)
         sid (repo-sid req)
         builds (st/list-builds s sid)
@@ -184,8 +187,25 @@
                               md (st/find-build-metadata s bsid)]
                           (merge {:id id} md r)))]
     (->> builds
-         (map fetch-details)
-         (rur/response))))
+         (f)
+         (map fetch-details))))
+
+(defn get-builds
+  "Lists all builds for the repository"
+  [req]
+  (-> req
+      (get-builds* identity)
+      (rur/response)))
+
+(defn get-latest-build
+  "Retrieves the latest build for the repository."
+  [req]
+  ;; FIXME This assumes the last item in the list is the most recent one, but
+  ;; this may not always be the case.
+  (-> req
+      (get-builds* (comp vector last))
+      first
+      (rur/response)))
 
 (defn trigger-build [req]
   (c/posting-handler

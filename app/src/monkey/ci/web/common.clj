@@ -67,6 +67,8 @@
   ;; Httpkit can't handle channels so read it here
   (<!!
    (go
-     (rur/status (if (<! (post-event req (h req)))
-                   200
-                   500)))))
+     (rur/status
+      (let [evt (h req)]
+        (if (or (nil? evt) (<! (post-event req evt)))
+          200
+          500))))))

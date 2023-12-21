@@ -97,9 +97,12 @@
 (def build-routes
   ["/builds"
    [["" {:get {:handler api/get-builds}}]
-    ["/trigger" {:post {:handler api/trigger-build
-                        :parameters {:query {(s/optional-key :branch) s/Str
-                                             (s/optional-key :commit-id) s/Str}}}}]]])
+    ["/trigger"
+     {:post {:handler api/trigger-build
+             :parameters {:query {(s/optional-key :branch) s/Str
+                                  (s/optional-key :commit-id) s/Str}}}}]
+    ["/latest"
+      {:get {:handler api/get-latest-build}}]]])
 
 (def repo-routes
   ["/repo"

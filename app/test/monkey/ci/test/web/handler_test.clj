@@ -110,7 +110,8 @@
           (let [dev-app (sut/make-app {:dev-mode true
                                        :event-bus bus})
                 l (events/wait-for bus :webhook/github (map :id))]
-            (is (= 200 (-> (mock/request :post "/webhook/github/test-hook")
+            (is (= 200 (-> (h/json-request :post "/webhook/github/test-hook"
+                                           {:head-commit {:id "test-commit"}})
                            (dev-app)
                            :status)))
             (is (= "test-hook" (h/try-take l 200 :timeout)))))))))
@@ -297,7 +298,19 @@
             
             (testing "returns build id")
 
-            (testing "returns 404 (not found) when repo does not exist")))))))
+            (testing "returns 404 (not found) when repo does not exist"))
+
+          (testing "`GET /latest` retrieves latest build for repo"
+            (let [l (-> (mock/request :get (str path "/latest"))
+                        (app))
+                  b (some-> l
+                            :body
+                            slurp
+                            h/parse-json)]
+              (is (= 200 (:status l)))
+              (is (map? b))
+              (is (= build-id (:id b)) "should contain build id")
+              (is (= "test meta" (:message b)) "should contain build metadata"))))))))
 
 (deftest event-stream
   (testing "'GET /events' exists"

@@ -36,13 +36,23 @@
   (testing "posts event"
     (let [bus (events/make-bus)
           ctx {:reitit.core/match {:data {:monkey.ci.web.common/context {:event-bus bus}}}}
-          req (-> (mock/request :post "/webhook/github")
-                  (mock/body "test body")
+          req (-> {:body-params
+                   {:head-commit {:id "test-id"}}}
                   (merge ctx))
           recv (atom [])
           _ (events/register-handler bus :webhook/github (partial swap! recv conj))]
       (is (some? (sut/webhook req)))
-      (is (not= :timeout (h/wait-until #(pos? (count @recv)) 500))))))
+      (is (not= :timeout (h/wait-until #(pos? (count @recv)) 200)))))
+
+  (testing "ignores non-commit events"
+    (let [bus (events/make-bus)
+          ctx {:reitit.core/match {:data {:monkey.ci.web.common/context {:event-bus bus}}}}
+          req (-> {:body-params "not a commit"}
+                  (merge ctx))
+          recv (atom [])
+          _ (events/register-handler bus :webhook/github (partial swap! recv conj))]
+      (is (some? (sut/webhook req)))
+      (is (= :timeout (h/wait-until #(pos? (count @recv)) 200))))))
 
 (deftest prepare-build
   (testing "creates metadata file for customer/project/repo"
