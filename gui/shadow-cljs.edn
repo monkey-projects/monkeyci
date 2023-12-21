@@ -1,0 +1,27 @@
+;; shadow-cljs configuration
+{:deps {:aliases [:dev :test]}
+ :dev-http {8080 "resources/public"}
+
+ :builds
+ {:frontend
+  {:target :browser
+   :modules {:main {:init-fn monkey.ci.gui.core/init}}
+   :output-dir "resources/public/js"}
+
+  :test/browser
+  {:target :browser-test
+   :test-dir "target/js/test-kaocha"
+   :runner-ns kaocha.cljs2.shadow-runner
+   :ns-regexp ".*-test$"
+   :devtools {:http-port 8001
+              :http-root "target/js/test-kaocha"
+              :preloads [lambdaisland.chui.remote]}}
+
+  :test/node
+  {:target :node-test
+   :output-to "target/js/node.js"}
+
+  :test/ci
+  {:target :node-test
+   :output-to "target/js/ci.js"
+   :autorun true}}}

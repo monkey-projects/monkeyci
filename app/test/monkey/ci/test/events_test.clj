@@ -119,7 +119,17 @@
           (is (sut/handler? (sut/register-pipeline bus :input tx)))
           (is (true? (sut/post-event bus {:type :input})))
           (is (not= :timeout (h/wait-until #(pos? (count @recv)) 200)))
-          (is (= bus (-> @recv first :bus))))))))
+          (is (= bus (-> @recv first :bus)))))))
+
+  (testing "adds timestamp"
+    (with-bus
+      (fn [bus]
+        (let [tx (map #(assoc % :type :result))
+              recv (register-test-handler bus :result identity)]
+          (is (sut/handler? (sut/register-pipeline bus :input tx)))
+          (is (true? (ca/put! (:channel bus) {:type :input})))
+          (is (not= :timeout (h/wait-until #(pos? (count @recv)) 200)))
+          (is (number? (:time (first @recv)))))))))
 
 (deftest unregister-handler
   (testing "removes sub from the bus, receives no events"

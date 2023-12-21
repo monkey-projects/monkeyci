@@ -96,7 +96,11 @@
 (defn push-bot-image [ctx]
   (push-image ctx bot-img))
 
-(defn cleanup [ctx])
+(def test-gui
+  {:name "test-gui"
+   :container/image "docker.io/cimg/clojure:1.11-node"
+   :script ["npm install"
+            "npx shadow-cljs release :test/ci"]})
 
 (core/defpipeline test-all
   [test-lib
@@ -118,8 +122,12 @@
    build-bot-image
    push-bot-image])
 
+(core/defpipeline gui
+  [test-gui])
+
 ;; Return the pipelines
 [test-all
+ test-gui
  publish-libs
  publish-image
  braid-bot]

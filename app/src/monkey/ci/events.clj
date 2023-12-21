@@ -84,7 +84,7 @@
   (log/debug "Registering pipeline handler for" type)
   (let [ch (ca/chan)]
     (ca/sub (pub bus) type ch)
-    (ca/pipeline 1 (channel bus) (comp (map #(assoc % :bus bus)) tx) ch)
+    (ca/pipeline 1 (channel bus) (comp (map #(assoc % :bus bus :time (System/currentTimeMillis))) tx) ch)
     {:type type
      :channel ch
      :tx tx}))

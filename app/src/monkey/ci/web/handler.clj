@@ -7,10 +7,12 @@
             [monkey.ci.web
              [api :as api]
              [common :as c]
+             #_[cors :as cors]
              [github :as github]]
             [org.httpkit.server :as http]
             [reitit.coercion.schema]
             [reitit.ring :as ring]
+            [ring.middleware.cors :as cors]
             [schema.core :as s]))
 
 (defn health [_]
@@ -175,7 +177,11 @@
   ([{:keys [dev-mode] :as opts} routes]
    (ring/router
     routes
-    {:data {:middleware (vec (concat [stringify-body]
+    {:data {:middleware (vec (concat [stringify-body
+                                      [cors/wrap-cors
+                                       :access-control-allow-origin #".*"
+                                       :access-control-allow-methods [:get :put :post :delete]
+                                       :access-control-allow-credentials true]]
                                      c/default-middleware
                                      [kebab-case-query]))
             :muuntaja (c/make-muuntaja)
