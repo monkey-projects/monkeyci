@@ -1,11 +1,14 @@
 (ns monkey.ci.logging
   "Handles log configuration and how to process logs from a build script"
   (:require [babashka.fs :as fs]
+            [clj-commons.byte-streams :as bs]
             [clojure.java.io :as io]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
-            [monkey.ci.oci :as oci]))
+            [monkey.ci.oci :as oci]
+            [monkey.ci.storage.oci :as st]
+            [monkey.oci.os.core :as os]))
 
 (defprotocol LogCapturer
   "Used to allow processes to store log information.  Depending on the implementation,
@@ -121,3 +124,49 @@
     (let [f (apply io/file dir (concat build-sid [path]))]
       (when (.exists f)
         (io/input-stream f)))))
+
+(defmulti make-log-retriever (comp :type :logging))
+
+(defmethod make-log-retriever :file [conf]
+  (->FileLogRetriever (get-in conf [:logging :dir])))
+
+(deftype NoopLogRetriever []
+  LogRetriever
+  (list-logs [_ _]
+    [])
+  (fetch-log [_ _ _]
+    nil))
+
+(defmethod make-log-retriever :default [_]
+  (->NoopLogRetriever))
+
+(defn- sid->prefix [sid]
+  (str (cs/join st/delim sid) st/delim))
+
+(deftype OciBucketLogRetriever [client conf]
+  LogRetriever
+  (list-logs [_ sid]
+    (let [prefix (sid->prefix sid)]
+      @(md/chain
+        (os/list-objects client (-> conf
+                                    (select-keys [:ns :compartment-id :bucket-name])
+                                    (assoc :prefix prefix)))
+        (fn [{:keys [objects]}]
+          (->> objects
+               (map :name)
+               ;; Strip the prefix to retain the relative path
+               (map #(subs % (count prefix))))))))
+  
+  (fetch-log [_ sid path]
+    @(md/chain
+      (os/get-object client (-> conf
+                                (select-keys [:ns :compartment-id :bucket-name])
+                                (assoc :object-name (str (sid->prefix sid) path))))
+      bs/to-input-stream)))
+
+(defmethod make-log-retriever :oci [conf]
+  (let [oci-conf (-> conf
+                     (oci/ctx->oci-config :logging)
+                     (oci/->oci-config))
+        client (os/make-client oci-conf)]
+    (->OciBucketLogRetriever client oci-conf)))

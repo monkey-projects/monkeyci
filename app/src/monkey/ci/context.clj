@@ -29,6 +29,9 @@
   (or (get-in ctx [:logging :maker])
       (l/make-logger {})))
 
+(defn log-retriever [ctx]
+  (get-in ctx [:logging :retriever]))
+
 (def step-work-dir
   "Given a context, determines the step working directory.  This is either the
    work dir as configured on the step, or the context work dir, or the process dir."

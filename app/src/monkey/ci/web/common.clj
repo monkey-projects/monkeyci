@@ -10,8 +10,11 @@
              [parameters :as rrmp]]
             [ring.util.response :as rur]))
 
-(defn from-context [req obj]
-  (get-in req [:reitit.core/match :data ::context obj]))
+(defn req->ctx [req]
+  (get-in req [:reitit.core/match :data ::context]))
+
+(defn from-context [req f]
+  (f (req->ctx req)))
 
 (defn req->bus
   "Gets the event bus from the request data"

@@ -5,7 +5,8 @@
             [monkey.ci
              [logging :as sut]
              [oci :as oci]]
-            [monkey.ci.test.helpers :as h]))
+            [monkey.ci.test.helpers :as h]
+            [monkey.oci.os.core :as os]))
 
 (def file? (partial instance? java.io.File))
 
@@ -122,3 +123,29 @@
         (is (true? (.mkdirs (apply io/file dir (conj sid "sub")))))
         (is (nil? (spit (io/file (apply io/file dir sid) log-file) contents)))
         (is (= contents (slurp (sut/fetch-log l sid log-file))))))))
+
+(deftest make-log-retriever
+  (testing "can create for type `file`"
+    (is (some? (sut/make-log-retriever {:logging {:type :file}}))))
+
+  (testing "can create for type `oci`"
+    (is (some? (sut/make-log-retriever {:logging {:type :oci}})))))
+
+(deftest oci-bucket-log-retriever
+  (testing "`list-logs`"
+    (testing "lists all files with build sid prefix"
+      (let [logger (sut/make-log-retriever {:logging {:type :oci
+                                                      :bucket-name "test-bucket"}})]
+        (with-redefs [os/list-objects (constantly (md/success-deferred
+                                                   {:objects [{:name "a/b/c/out.txt"}]}))]
+          (is (= ["out.txt"]
+                 (sut/list-logs logger ["a" "b" "c"])))))))
+
+  (testing "fetches log by downloading object"
+    (let [logger (sut/make-log-retriever {:logging {:type :oci
+                                                    :bucket-name "test-bucket"}})
+          contents "this is a test object"]
+      (with-redefs [os/get-object (constantly (md/success-deferred
+                                               contents))]
+        (is (= contents
+               (slurp (sut/fetch-log logger ["a" "b" "c"] "out.txt"))))))))

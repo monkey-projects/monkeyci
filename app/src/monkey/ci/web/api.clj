@@ -4,7 +4,9 @@
             [clojure.tools.logging :as log]
             [medley.core :as mc]
             [monkey.ci
+             [context :as ctx]
              [events :as e]
+             [logging :as l]
              [storage :as st]
              [utils :as u]]
             [monkey.ci.web
@@ -233,6 +235,20 @@
                 :sid (-> acc
                          (assoc :build-id bid)
                          (st/ext-build-sid))}}))))
+
+(defn list-build-logs [req]
+  (let [build-sid (st/ext-build-sid (get-in req [:parameters :path]))
+        retriever (c/from-context req ctx/log-retriever)]
+    (rur/response (l/list-logs retriever build-sid))))
+
+(defn download-build-log [req]
+  (let [build-sid (st/ext-build-sid (get-in req [:parameters :path]))
+        path (get-in req [:parameters :query :path])
+        retriever (c/from-context req ctx/log-retriever)]
+    (if-let [r (l/fetch-log retriever build-sid path)]
+      (-> (rur/response r)
+          (rur/content-type "text/plain"))
+      (rur/not-found nil))))
 
 (def allowed-events
   #{:script/start

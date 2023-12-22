@@ -105,8 +105,15 @@
     ["/latest"
      {:get {:handler api/get-latest-build}}]
     ["/:build-id"
-     {:get {:handler api/get-build
-            :parameters {:path {:build-id Id}}}}]]])
+     {:parameters {:path {:build-id Id}}}
+     [[""
+       {:get {:handler api/get-build}}]
+      ["/logs"
+       [[""
+         {:get {:handler api/list-build-logs}}]
+        ["/download"
+         {:get {:handler api/download-build-log
+                :parameters {:query {:path s/Str}}}}]]]]]]])
 
 (def repo-routes
   ["/repo"
