@@ -87,3 +87,38 @@
               r @(sut/handle-stream l :test-stream)]
           (is (= "logs/test-cust/test-proj/test-repo/test.log"
                  (get-in r [:config :object-name]))))))))
+
+(deftest file-log-retriever
+  (testing "lists log files in dir according to sid"
+    (h/with-tmp-dir dir
+      (let [l (sut/->FileLogRetriever dir)
+            sid ["cust" "proj" "repo" (str (random-uuid))]
+            build-dir (apply io/file dir sid)
+            log-file (io/file build-dir "out.txt")]
+        (is (true? (.mkdirs build-dir)))
+        (is (nil? (spit log-file "test log file contents")))
+        (let [r (sut/list-logs l sid)]
+          (is (= 1 (count r)))
+          (is (= "out.txt" (first r)))))))
+
+  (testing "lists files recursively"
+    (h/with-tmp-dir dir
+      (let [l (sut/->FileLogRetriever dir)
+            sid ["cust" "proj" "repo" (str (random-uuid))]
+            log-dir (apply io/file dir (conj sid "sub"))
+            log-file (io/file log-dir "out.txt")]
+        (is (true? (.mkdirs log-dir)))
+        (is (nil? (spit log-file "test log file contents")))
+        (let [r (sut/list-logs l sid)]
+          (is (= 1 (count r)))
+          (is (= "sub/out.txt" (first r)))))))
+
+  (testing "fetches log from file according to sid and path"
+    (h/with-tmp-dir dir
+      (let [l (sut/->FileLogRetriever dir)
+            sid ["test" "sid"]
+            log-file "sub/out.txt"
+            contents "test log file contents"]
+        (is (true? (.mkdirs (apply io/file dir (conj sid "sub")))))
+        (is (nil? (spit (io/file (apply io/file dir sid) log-file) contents)))
+        (is (= contents (slurp (sut/fetch-log l sid log-file))))))))

@@ -173,6 +173,13 @@
     (when (st/save-params (c/req->storage req) (params-sid req) p)
       (rur/response p))))
 
+(defn- fetch-build-details [s sid]
+  (log/debug "Fetching details for build" sid)
+  (when (st/build-exists? s sid)
+    (let [r (st/find-build-results s sid)
+          md (st/find-build-metadata s sid)]
+      (merge {:id (last sid)} md r))))
+
 (defn- get-builds*
   "Helper function that retrieves the builds using the request, then
    applies `f` to the resultset and fetches the details of the remaining builds."
@@ -181,13 +188,10 @@
         sid (repo-sid req)
         builds (st/list-builds s sid)
         fetch-details (fn [id]
-                        ;; TODO This could potentially be slow for many builds
-                        (let [bsid (st/->sid (concat sid [id]))
-                              r (st/find-build-results s bsid)
-                              md (st/find-build-metadata s bsid)]
-                          (merge {:id id} md r)))]
+                        (fetch-build-details s (st/->sid (concat sid [id]))))]
     (->> builds
          (f)
+         ;; TODO This could potentially be slow for many builds
          (map fetch-details))))
 
 (defn get-builds
@@ -207,6 +211,14 @@
                  first)]
     (rur/response r)
     (rur/status 204)))
+
+(defn get-build
+  "Retrieves build by id"
+  [req]
+  (let [sid (st/ext-build-sid (get-in req [:parameters :path]))]
+    (if-let [b (fetch-build-details (c/req->storage req) sid)]
+      (rur/response b)
+      (rur/not-found nil))))
 
 (defn trigger-build [req]
   (c/posting-handler

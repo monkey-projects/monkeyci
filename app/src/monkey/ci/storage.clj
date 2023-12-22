@@ -147,6 +147,12 @@
   [s sid]
   (read-obj s (build-results-sid sid)))
 
+(defn build-exists?
+  "Checks efficiently if the build exists.  This is cheaper than trying to fetch it
+   and checking if the result is `nil`."
+  [s sid]
+  (obj-exists? s (build-metadata-sid sid)))
+
 (defn list-builds
   "Lists the ids of the builds for given repo sid"
   [s sid]

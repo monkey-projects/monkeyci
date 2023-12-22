@@ -226,15 +226,17 @@
                                    (->> (repeatedly st/new-id)
                                         (take 4)
                                         (st/->sid)))
+              repo-path (fn [sid]
+                          (str (->> sid
+                                    (drop-last)
+                                    (interleave ["/customer" "project" "repo"])
+                                    (cs/join "/"))
+                               "/builds"))
               build-path (fn [sid]
-                           (str (->> sid
-                                     (drop-last)
-                                     (interleave ["/customer" "project" "repo"])
-                                     (cs/join "/"))
-                                "/builds"))
+                           (str (repo-path sid) "/" (last sid)))
               app (make-test-app st)
               [customer-id project-id repo-id build-id :as sid] (generate-build-sid)
-              path (build-path sid)]
+              path (repo-path sid)]
           (is (st/sid? (st/create-build-results st sid {:exit 0 :status :success})))
           (is (st/sid? (st/create-build-metadata st sid {:message "test meta"})))
           
@@ -319,11 +321,29 @@
 
             (testing "204 when there are no builds"
               (let [sid (generate-build-sid)
-                    path (build-path sid)
+                    path (repo-path sid)
                     l (-> (mock/request :get (str path "/latest"))
                           (app))]
                 (is (empty? (st/list-builds st (drop-last sid))))
                 (is (= 204 (:status l)))
+                (is (nil? (:body l)))))
+
+            (testing "404 when repo does not exist"))
+
+          (testing "`GET /:build-id`"
+            (testing "retrieves build with given id"
+              (let [l (-> (mock/request :get (build-path sid))
+                          (app))
+                    b (some-> l :body slurp h/parse-json)]
+                (is (not-empty l))
+                (is (= 200 (:status l)))
+                (is (= build-id (:id b)))))
+
+            (testing "404 when build does not exist"
+              (let [sid (generate-build-sid)
+                    l (-> (mock/request :get (build-path sid))
+                          (app))]
+                (is (= 404 (:status l)))
                 (is (nil? (:body l)))))))))))
 
 (deftest event-stream
