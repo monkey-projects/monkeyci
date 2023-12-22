@@ -22,4 +22,9 @@
 (rf/reg-sub
  :repo/builds
  (fn [db _]
-   (db/builds db)))
+   (let [params (get-in db [:route/current :parameters :path])]
+     (some->> (db/builds db)
+              (sort-by :time)
+              (reverse)
+              (map #(assoc % :build-id (:id %)))
+              (map (partial merge params))))))

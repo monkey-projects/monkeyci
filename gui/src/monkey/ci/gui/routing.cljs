@@ -24,7 +24,8 @@
     ["/login" :page/login]
     ["/c/:customer-id" :page/customer]
     ["/c/:customer-id/p/:project-id" :page/project]
-    ["/c/:customer-id/p/:project-id/r/:repo-id" :page/repo]]))
+    ["/c/:customer-id/p/:project-id/r/:repo-id" :page/repo]
+    ["/c/:customer-id/p/:project-id/r/:repo-id/b/:build-id" :page/build]]))
 
 (defn on-route-change [match history]
   (println "Route changed:" match)
@@ -36,3 +37,5 @@
 (defn path-for [id & [params]]
   (some-> (f/match-by-name router id params)
           :path))
+
+(def path-params (comp :path :parameters))

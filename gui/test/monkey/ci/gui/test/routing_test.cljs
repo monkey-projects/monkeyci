@@ -39,10 +39,10 @@
 
   (testing "sets path parameters"
     (is (= "/c/test-customer"
-           (sut/path-for :page/customer {:id "test-customer"}))))
+           (sut/path-for :page/customer {:customer-id "test-customer"}))))
 
   (testing "sets multiple path parameters"
     (is (= "/c/cust/p/proj/r/repo"
            (sut/path-for :page/repo {:customer-id "cust"
                                      :project-id "proj"
-                                     :id "repo"})))))
+                                     :repo-id "repo"})))))
