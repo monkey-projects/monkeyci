@@ -129,5 +129,5 @@
 [test-all
  test-gui
  publish-libs
- publish-image
- braid-bot]
+ #_publish-image
+ #_braid-bot]
