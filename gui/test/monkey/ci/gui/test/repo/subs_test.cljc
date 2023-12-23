@@ -70,3 +70,13 @@
     (testing "`nil` when no builds"
       (is (empty? (reset! app-db {})))
       (is (nil? @b)))))
+
+(deftest repo-latest-build
+  (let [l (rf/subscribe [:repo/latest-build])]
+    (testing "exists"
+      (is (some? l)))
+
+    (testing "returns latest build info from db"
+      (is (nil? @l))
+      (is (some? (reset! app-db (db/set-latest-build {} ::latest))))
+      (is (= ::latest @l)))))

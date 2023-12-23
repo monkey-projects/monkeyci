@@ -28,3 +28,8 @@
               (reverse)
               (map #(assoc % :build-id (:id %)))
               (map (partial merge params))))))
+
+(rf/reg-sub
+ :repo/latest-build
+ (fn [db _]
+   (db/latest-build db)))
