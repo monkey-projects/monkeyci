@@ -11,3 +11,13 @@
  :build/logs
  (fn [db _]
    (db/logs db)))
+
+(rf/reg-sub
+ :build/details
+ :<- [:repo/builds]
+ :<- [:route/current]
+ (fn [[b r] _]
+   (let [id (get-in r [:parameters :path :build-id])]
+     (->> b
+          (filter (comp (partial = id) :id))
+          (first)))))

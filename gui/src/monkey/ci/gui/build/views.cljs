@@ -8,7 +8,15 @@
             [monkey.ci.gui.build.subs]
             [re-frame.core :as rf]))
 
-(def log-path-keys [])
+(defn build-details
+  "Displays the build details by looking it up in the list of repo builds."
+  []
+  (let [d (rf/subscribe [:build/details])]
+    (->> [:id :message :ref :timestamp]
+         (select-keys @d)
+         (map (fn [[k v]]
+                [:li [:b k ": "] v]))
+         (into [:ul]))))
 
 (defn- build-path [route]
   (let [p (r/path-params route)
@@ -48,6 +56,7 @@
     (let [params (r/path-params route)]
       [l/default
        [:<>
+        [build-details]
         [:h3.float-start "Logs for " (:build-id params)]
         [:div.float-end
          [co/reload-btn [:build/load-logs]]]
