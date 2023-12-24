@@ -156,6 +156,7 @@
   [initial-ctx idx {:keys [name steps] :as p}]
   (log/info "Running pipeline:" name)
   (log/debug "Running pipeline steps:" p)
+  ;; TODO If steps is a fn, then invoke it first to get the actual steps.
   (->> steps
        (map ->map)
        ;; Add index to each step
