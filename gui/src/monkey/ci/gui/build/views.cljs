@@ -22,19 +22,22 @@
   (str (build-path route)
        "/logs/download?path=" (js/encodeURIComponent l)))
 
-(defn- log-row [l]
+(defn- log-row [{:keys [name size]}]
   (let [route (rf/subscribe [:route/current])]
     [:tr
-     [:td [:a {:href (log-path @route l)
+     [:td [:a {:href (log-path @route name)
                :target "_blank"}
-           l]]]))
+           name]]
+     ;; TODO Make size human readable
+     [:td size]]))
 
 (defn logs-table []
   (let [l (rf/subscribe [:build/logs])]
     [:table.table.table-striped
      [:thead
       [:tr
-       [:th {:scope :col} "Log file"]]]
+       [:th {:scope :col} "Log file"]
+       [:th {:scope :col} "Size"]]]
      (->> @l
           (map log-row)
           (into [:tbody]))]))

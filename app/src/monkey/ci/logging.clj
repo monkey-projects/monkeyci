@@ -102,13 +102,18 @@
 (defprotocol LogRetriever
   "Interface for retrieving log files.  This is more or less the opposite of the `LogCapturer`.
    It allows to list logs and fetch a log according to path."
-  (list-logs [this build-sid])
-  (fetch-log [this build-sid path]))
+  (list-logs [this build-sid]
+    "Lists available logs for the build id, with name and size")
+  (fetch-log [this build-sid path]
+    "Retrieves log for given build id and path.  Returns a stream and its size."))
 
 (deftype FileLogRetriever [dir]
   LogRetriever
   (list-logs [_ build-sid]
-    (let [build-dir (apply io/file dir build-sid)]
+    (let [build-dir (apply io/file dir build-sid)
+          ->out (fn [p]
+                  {:name (str (fs/relativize build-dir p))
+                   :size (fs/size p)})]
       ;; Recursively list files in the build dir
       (->> (loop [dirs [build-dir]
                   r []]
@@ -118,7 +123,7 @@
                      {ffiles false fdirs true} (group-by fs/directory? f)]
                  (recur (concat (rest dirs) fdirs)
                         (concat r ffiles)))))
-           (map (comp str (partial fs/relativize build-dir))))))
+           (map ->out))))
 
   (fetch-log [_ build-sid path]
     (let [f (apply io/file dir (concat build-sid [path]))]
@@ -146,18 +151,21 @@
 (deftype OciBucketLogRetriever [client conf]
   LogRetriever
   (list-logs [_ sid]
-    (let [prefix (sid->prefix sid)]
+    (let [prefix (sid->prefix sid)
+          ->out (fn [r]
+                  ;; Strip the prefix to retain the relative path
+                  (update r :name subs (count prefix)))]
       @(md/chain
         (os/list-objects client (-> conf
                                     (select-keys [:ns :compartment-id :bucket-name])
-                                    (assoc :prefix prefix)))
+                                    (assoc :prefix prefix
+                                           :fields "name,size")))
         (fn [{:keys [objects]}]
           (->> objects
-               (map :name)
-               ;; Strip the prefix to retain the relative path
-               (map #(subs % (count prefix))))))))
+               (map ->out))))))
   
   (fetch-log [_ sid path]
+    ;; TODO Also return object size, so we can tell the client
     @(md/chain
       (os/get-object client (-> conf
                                 (select-keys [:ns :compartment-id :bucket-name])
