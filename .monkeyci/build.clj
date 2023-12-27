@@ -103,8 +103,10 @@
             "npx shadow-cljs release :test/ci"]})
 
 (core/defpipeline test-all
+  ;; TODO Run these in parallel
   [test-lib
-   test-app])
+   test-app
+   test-gui])
 
 (core/defpipeline publish-libs
   [publish-lib
@@ -122,12 +124,11 @@
    build-bot-image
    push-bot-image])
 
-(core/defpipeline gui
+#_(core/defpipeline publish-gui
   [test-gui])
 
 ;; Return the pipelines
 [test-all
- test-gui
  publish-libs
- #_publish-image
+ publish-image
  #_braid-bot]
