@@ -15,7 +15,7 @@
 
 (defn- build-row [b]
   [:tr
-   [:td (:id b)]
+   [:td [:a {:href (r/path-for :page/build b)} (:build-id b)]]
    [:td (:timestamp b)]
    [:td [build-result (:result b)]]
    [:td (:message b)]])
@@ -32,7 +32,7 @@
           [:thead
            [:tr
             [:th {:scope :col} "Id"]
-            [:th {:scope :col} "Time"]
+            [:th {:scope :col} "Time " [co/icon :caret-down-fill]]
             [:th {:scope :col} "Result"]
             [:th {:scope :col} "Commit message"]]]
           (->> @b

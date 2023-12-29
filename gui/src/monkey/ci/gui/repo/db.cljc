@@ -12,3 +12,8 @@
 
 (defn set-builds [db b]
   (assoc db builds b))
+
+(def latest-build ::latest-build)
+
+(defn set-latest-build [db b]
+  (assoc db latest-build b))

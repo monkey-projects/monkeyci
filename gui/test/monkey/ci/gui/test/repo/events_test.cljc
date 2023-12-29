@@ -31,7 +31,12 @@
                                              :error-code :no-error}})
        
        (rf/dispatch [:repo/load "test-customer-id"])
-       (is (empty? @c))))))
+       (is (empty? @c)))))
+
+  (testing "clears builds"
+    (is (some? (reset! app-db (db/set-builds {} ::test-builds))))
+    (rf/dispatch-sync [:repo/load "other-customer-id"])
+    (is (nil? (db/builds @app-db)))))
 
 (deftest builds-load
   (testing "sets alert"
@@ -60,6 +65,7 @@
 
 (deftest build-load-success
   (testing "clears alerts"
-    (is (map? (reset! app-db (db/set-alerts {} [{:type :info}]))))
+    (is (map? (reset! app-db (db/set-alerts {} [{:type :info
+                                                 :message "test notification"}]))))
     (rf/dispatch-sync [:builds/load--success {:body []}])
     (is (nil? (db/alerts @app-db)))))

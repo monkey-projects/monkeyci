@@ -95,12 +95,15 @@
       (let [l (sut/->FileLogRetriever dir)
             sid ["cust" "proj" "repo" (str (random-uuid))]
             build-dir (apply io/file dir sid)
-            log-file (io/file build-dir "out.txt")]
+            log-file (io/file build-dir "out.txt")
+            contents "test log file contents"]
         (is (true? (.mkdirs build-dir)))
-        (is (nil? (spit log-file "test log file contents")))
+        (is (nil? (spit log-file contents)))
         (let [r (sut/list-logs l sid)]
           (is (= 1 (count r)))
-          (is (= "out.txt" (first r)))))))
+          (is (= {:name "out.txt"
+                  :size (count contents)}
+                 (first r)))))))
 
   (testing "lists files recursively"
     (h/with-tmp-dir dir
@@ -112,7 +115,7 @@
         (is (nil? (spit log-file "test log file contents")))
         (let [r (sut/list-logs l sid)]
           (is (= 1 (count r)))
-          (is (= "sub/out.txt" (first r)))))))
+          (is (= "sub/out.txt" (:name (first r))))))))
 
   (testing "fetches log from file according to sid and path"
     (h/with-tmp-dir dir
@@ -137,8 +140,9 @@
       (let [logger (sut/make-log-retriever {:logging {:type :oci
                                                       :bucket-name "test-bucket"}})]
         (with-redefs [os/list-objects (constantly (md/success-deferred
-                                                   {:objects [{:name "a/b/c/out.txt"}]}))]
-          (is (= ["out.txt"]
+                                                   {:objects [{:name "a/b/c/out.txt"
+                                                               :size 100}]}))]
+          (is (= [{:name "out.txt" :size 100}]
                  (sut/list-logs logger ["a" "b" "c"])))))))
 
   (testing "fetches log by downloading object"

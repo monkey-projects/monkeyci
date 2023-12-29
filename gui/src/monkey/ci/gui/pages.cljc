@@ -1,15 +1,19 @@
 (ns monkey.ci.gui.pages
   "Links route names to actual components to be rendered"
-  (:require [monkey.ci.gui.login.views :as login]
+  (:require [monkey.ci.gui.layout :as l]
+            [monkey.ci.gui.login.views :as login]
+            [monkey.ci.gui.build.views :as build]
             [monkey.ci.gui.customer.views :as customer]
             [monkey.ci.gui.repo.views :as repo]
             [re-frame.core :as rf]))
 
 (defn redirect []
-  [:h3 "This is the root page, you should be redirected"])
+  [l/default
+   [:h3 "This is the root page, you should be redirected"]])
 
 (def pages
   {:page/root redirect
+   :page/build build/page
    :page/login login/page
    :page/customer customer/page
    :page/repo repo/page})

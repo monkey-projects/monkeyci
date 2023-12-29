@@ -42,6 +42,41 @@
     (testing "exists"
       (is (some? b)))
 
-    (testing "holds builds from db"
-      (is (map? (reset! app-db (db/set-builds {} ::test-builds))))
-      (is (= ::test-builds @b)))))
+    (testing "holds builds from db with repo info"
+      (is (map? (reset! app-db (-> {:route/current
+                                    {:parameters
+                                     {:path
+                                      {:customer-id "test-cust"
+                                       :project-id "test-proj"
+                                       :repo-id "test-repo"}}}}
+                                   (db/set-builds [{:id ::test-build}])))))
+      (is (= 1 (count @b)))
+      (is (= {:build-id ::test-build
+              :customer-id "test-cust"
+              :project-id "test-proj"
+              :repo-id "test-repo"}
+             (select-keys (first @b) [:build-id :customer-id :project-id :repo-id]))))
+
+    (testing "sorts by time descending"
+      (is (map? (reset! app-db (db/set-builds {} [{:id "old-build"
+                                                   :time "2023-12-01"}
+                                                  {:id "new-build"
+                                                   :time "2023-12-22"}
+                                                  {:id "intermediate-build"
+                                                   :time "2023-12-10"}]))))
+      (is (= ["new-build" "intermediate-build" "old-build"]
+             (->> @b (map :id)))))
+
+    (testing "`nil` when no builds"
+      (is (empty? (reset! app-db {})))
+      (is (nil? @b)))))
+
+(deftest repo-latest-build
+  (let [l (rf/subscribe [:repo/latest-build])]
+    (testing "exists"
+      (is (some? l)))
+
+    (testing "returns latest build info from db"
+      (is (nil? @l))
+      (is (some? (reset! app-db (db/set-latest-build {} ::latest))))
+      (is (= ::latest @l)))))

@@ -22,3 +22,20 @@
 
 (defn reload-btn [evt & [opts]]
   (icon-btn :arrow-clockwise "Reload" evt opts))
+
+(defn breadcrumb [parts]
+  [:nav {:aria-label "breadcrumb"}
+   (->> (loop [p parts
+               r []]
+          (let [last? (empty? (rest p))
+                v (first p)
+                n (if last?
+                    [:li.breadcrumb-item.active {:aria-current "page"}
+                     (:name v)]
+                    [:li.breadcrumb-item 
+                     [:a {:href (:url v)} (:name v)]])
+                r+ (conj r n)]
+            (if last?
+              r+
+              (recur (rest p) r+))))
+        (into [:ol.breadcrumb]))])

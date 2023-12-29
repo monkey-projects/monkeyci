@@ -7,14 +7,14 @@
  :repo/load
  (fn [{:keys [db]} [_ cust-id]]
    (let [existing (cdb/customer db)]
-     (when-not existing
-       {:dispatch [:customer/load cust-id]}))))
+     (cond-> {:db (db/set-builds db nil)}
+       (not existing)
+       (assoc :dispatch [:customer/load cust-id])))))
 
 (rf/reg-event-fx
  :builds/load
  (fn [{:keys [db]} _]
    (let [params (get-in db [:route/current :parameters :path])]
-     (println "Params:" params)
      {:db (-> db
               (db/set-alerts [{:type :info
                                :message "Loading builds for repository..."}])
@@ -35,6 +35,5 @@
 (rf/reg-event-db
  :builds/load--failed
  (fn [db [_ err op]]
-   (println "Load failed:" err)
    (db/set-alerts db [{:type :danger
                        :message (str "Could not load builds: " (or (:message err) (str err)))}])))
