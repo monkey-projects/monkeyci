@@ -104,7 +104,14 @@
   (testing "sets reporter"
     (is (fn? (-> (sut/new-context :test-cmd)
                  (c/start)
-                 :reporter)))))
+                 :reporter))))
+
+  (testing "sets log retriever"
+    (is (some? (-> (sut/new-context :test-cmd)
+                   (assoc :logging {:type :inherit})
+                   (c/start)
+                   :logging
+                   :retriever)))))
 
 (defn- verify-event-handled
   ([ctx evt verifier]

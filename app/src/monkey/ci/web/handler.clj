@@ -96,10 +96,24 @@
 
 (def build-routes
   ["/builds"
+   {:conflicting true}
    [["" {:get {:handler api/get-builds}}]
-    ["/trigger" {:post {:handler api/trigger-build
-                        :parameters {:query {(s/optional-key :branch) s/Str
-                                             (s/optional-key :commit-id) s/Str}}}}]]])
+    ["/trigger"
+     {:post {:handler api/trigger-build
+             :parameters {:query {(s/optional-key :branch) s/Str
+                                  (s/optional-key :commit-id) s/Str}}}}]
+    ["/latest"
+     {:get {:handler api/get-latest-build}}]
+    ["/:build-id"
+     {:parameters {:path {:build-id Id}}}
+     [[""
+       {:get {:handler api/get-build}}]
+      ["/logs"
+       [[""
+         {:get {:handler api/list-build-logs}}]
+        ["/download"
+         {:get {:handler api/download-build-log
+                :parameters {:query {:path s/Str}}}}]]]]]]])
 
 (def repo-routes
   ["/repo"

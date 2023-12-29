@@ -10,8 +10,11 @@
              [parameters :as rrmp]]
             [ring.util.response :as rur]))
 
-(defn from-context [req obj]
-  (get-in req [:reitit.core/match :data ::context obj]))
+(defn req->ctx [req]
+  (get-in req [:reitit.core/match :data ::context]))
+
+(defn from-context [req f]
+  (f (req->ctx req)))
 
 (defn req->bus
   "Gets the event bus from the request data"
@@ -67,6 +70,8 @@
   ;; Httpkit can't handle channels so read it here
   (<!!
    (go
-     (rur/status (if (<! (post-event req (h req)))
-                   200
-                   500)))))
+     (rur/status
+      (let [evt (h req)]
+        (if (or (nil? evt) (<! (post-event req evt)))
+          200
+          500))))))

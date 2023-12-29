@@ -80,7 +80,8 @@
                :public-api wsa/local-api
                :reporter (rep/make-reporter (:reporter config)))
         (configure-workspace)
-        (config/initialize-log-maker)))
+        (config/initialize-log-maker)
+        (config/initialize-log-retriever)))
   (stop [this]
     this))
 

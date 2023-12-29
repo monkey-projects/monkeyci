@@ -179,6 +179,9 @@
 (defn initialize-log-maker [conf]
   (assoc-in conf [:logging :maker] (l/make-logger conf)))
 
+(defn initialize-log-retriever [conf]
+  (assoc-in conf [:logging :retriever] (l/make-log-retriever conf)))
+
 (defn script-config
   "Builds config map used by the child script process"
   [env args]

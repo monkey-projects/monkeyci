@@ -5,7 +5,8 @@
             [monkey.ci
              [logging :as sut]
              [oci :as oci]]
-            [monkey.ci.test.helpers :as h]))
+            [monkey.ci.test.helpers :as h]
+            [monkey.oci.os.core :as os]))
 
 (def file? (partial instance? java.io.File))
 
@@ -87,3 +88,64 @@
               r @(sut/handle-stream l :test-stream)]
           (is (= "logs/test-cust/test-proj/test-repo/test.log"
                  (get-in r [:config :object-name]))))))))
+
+(deftest file-log-retriever
+  (testing "lists log files in dir according to sid"
+    (h/with-tmp-dir dir
+      (let [l (sut/->FileLogRetriever dir)
+            sid ["cust" "proj" "repo" (str (random-uuid))]
+            build-dir (apply io/file dir sid)
+            log-file (io/file build-dir "out.txt")]
+        (is (true? (.mkdirs build-dir)))
+        (is (nil? (spit log-file "test log file contents")))
+        (let [r (sut/list-logs l sid)]
+          (is (= 1 (count r)))
+          (is (= "out.txt" (first r)))))))
+
+  (testing "lists files recursively"
+    (h/with-tmp-dir dir
+      (let [l (sut/->FileLogRetriever dir)
+            sid ["cust" "proj" "repo" (str (random-uuid))]
+            log-dir (apply io/file dir (conj sid "sub"))
+            log-file (io/file log-dir "out.txt")]
+        (is (true? (.mkdirs log-dir)))
+        (is (nil? (spit log-file "test log file contents")))
+        (let [r (sut/list-logs l sid)]
+          (is (= 1 (count r)))
+          (is (= "sub/out.txt" (first r)))))))
+
+  (testing "fetches log from file according to sid and path"
+    (h/with-tmp-dir dir
+      (let [l (sut/->FileLogRetriever dir)
+            sid ["test" "sid"]
+            log-file "sub/out.txt"
+            contents "test log file contents"]
+        (is (true? (.mkdirs (apply io/file dir (conj sid "sub")))))
+        (is (nil? (spit (io/file (apply io/file dir sid) log-file) contents)))
+        (is (= contents (slurp (sut/fetch-log l sid log-file))))))))
+
+(deftest make-log-retriever
+  (testing "can create for type `file`"
+    (is (some? (sut/make-log-retriever {:logging {:type :file}}))))
+
+  (testing "can create for type `oci`"
+    (is (some? (sut/make-log-retriever {:logging {:type :oci}})))))
+
+(deftest oci-bucket-log-retriever
+  (testing "`list-logs`"
+    (testing "lists all files with build sid prefix"
+      (let [logger (sut/make-log-retriever {:logging {:type :oci
+                                                      :bucket-name "test-bucket"}})]
+        (with-redefs [os/list-objects (constantly (md/success-deferred
+                                                   {:objects [{:name "a/b/c/out.txt"}]}))]
+          (is (= ["out.txt"]
+                 (sut/list-logs logger ["a" "b" "c"])))))))
+
+  (testing "fetches log by downloading object"
+    (let [logger (sut/make-log-retriever {:logging {:type :oci
+                                                    :bucket-name "test-bucket"}})
+          contents "this is a test object"]
+      (with-redefs [os/get-object (constantly (md/success-deferred
+                                               contents))]
+        (is (= contents
+               (slurp (sut/fetch-log logger ["a" "b" "c"] "out.txt"))))))))

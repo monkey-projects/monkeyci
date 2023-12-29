@@ -52,6 +52,12 @@
   (-> (nonce/random-nonce 32)
       (codecs/bytes->hex)))
 
+(defn- github-commit-trigger?
+  "Checks if the incoming request is actually a commit trigger.  Github can also
+   send other types of requests."
+  [req]
+  (some? (get-in req [:body-params :head-commit])))
+
 (defn webhook
   "Receives an incoming webhook from Github.  This actually just posts
    the event on the internal bus and returns a 200 OK response."
@@ -60,9 +66,10 @@
   (c/posting-handler
    req
    (fn [req]
-     {:type :webhook/github
-      :id (req->webhook-id req)
-      :payload (:body-params req)})))
+     (when (github-commit-trigger? req)
+       {:type :webhook/github
+        :id (req->webhook-id req)
+        :payload (:body-params req)}))))
 
 (defn prepare-build
   "Event handler that looks up details for the given github webhook.  If the webhook 

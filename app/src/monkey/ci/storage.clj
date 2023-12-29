@@ -38,8 +38,12 @@
   (obj-exists? [_ loc]
     (some? (get-in @store loc)))
 
-  (delete-obj [_ loc]
-    (swap! store mc/dissoc-in loc))
+  (delete-obj [this loc]
+    (if (obj-exists? this loc)
+      (do
+        (swap! store mc/dissoc-in loc)
+        true)
+      false))
 
   (list-obj [_ loc]
     (keys (get-in @store loc))))
@@ -142,6 +146,12 @@
   "Reads the build results given the build coordinates"
   [s sid]
   (read-obj s (build-results-sid sid)))
+
+(defn build-exists?
+  "Checks efficiently if the build exists.  This is cheaper than trying to fetch it
+   and checking if the result is `nil`."
+  [s sid]
+  (obj-exists? s (build-metadata-sid sid)))
 
 (defn list-builds
   "Lists the ids of the builds for given repo sid"
