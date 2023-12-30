@@ -130,5 +130,5 @@
 ;; Return the pipelines
 [test-all
  publish-libs
- publish-image
+ #_publish-image
  #_braid-bot]
