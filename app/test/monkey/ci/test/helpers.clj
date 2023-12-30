@@ -4,7 +4,9 @@
             [clojure.java.io :as io]
             [clojure.core.async :as ca]
             [cheshire.core :as json]
+            [manifold.deferred :as md]
             [monkey.ci
+             [blob :as blob]
              [events :as e]
              [storage :as s]]
             [ring.mock.request :as mock])
@@ -84,3 +86,9 @@
           false
           (recur (rest t)))))))
 
+(defrecord FakeBlobStore [stored]
+  blob/BlobStore
+  (save [_ src dest]
+    (md/success-deferred (swap! stored assoc src dest)))
+  (restore [_ src dest]
+    (md/success-deferred (swap! stored dissoc src))))

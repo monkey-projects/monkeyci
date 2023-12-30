@@ -64,8 +64,7 @@
                (:dir opts))}})
 
 (defn- configure-workspace [ctx]
-  (mc/update-existing ctx :workspace (fn [ws]
-                                       (assoc ws :store (b/make-blob-store ctx :workspace)))))
+  (mc/update-existing ctx :workspace #(assoc % :store (b/make-blob-store ctx :workspace))))
 
 (defrecord Context [command config event-bus storage]
   c/Lifecycle

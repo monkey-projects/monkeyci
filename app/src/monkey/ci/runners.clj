@@ -93,7 +93,7 @@
     (when checkout-dir
       (log/info "Creating workspace using files from" checkout-dir)
       @(md/chain
-        (b/save store checkout-dir dest)
+        (b/save store checkout-dir dest) ; TODO Check for errors
         (constantly (assoc-in ctx [:build :workspace] dest))))))
 
 (defn store-src
@@ -109,8 +109,7 @@
 
 (defmethod make-runner :child [_]
   (log/info "Using child process runner")
-  ;; TODO Upload checked out code to storage for containers
-  (comp build-local download-src))
+  (comp build-local store-src download-src))
 
 (defmethod make-runner :noop [_]
   ;; For testing
