@@ -4,3 +4,5 @@
   (->> items
        (filter (comp (partial = id) :id))
        (first)))
+
+(def error-msg (some-fn :message :error-text str))

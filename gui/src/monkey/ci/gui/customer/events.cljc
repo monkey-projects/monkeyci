@@ -2,6 +2,7 @@
   (:require [martian.core :as martian]
             [martian.re-frame :as mrf]
             [monkey.ci.gui.customer.db :as db]
+            [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
 (rf/reg-event-fx
@@ -33,5 +34,5 @@
    (-> db
        (db/set-alerts [{:type :danger
                         :message (str "Could not load details for customer " id ": "
-                                      (or (:message err) (str err)))}])
+                                      (u/error-msg err))}])
        (db/unset-loading))))

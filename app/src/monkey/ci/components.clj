@@ -16,6 +16,7 @@
              [runners :as r]
              [storage :as st]]
             [monkey.ci.reporting.print]
+            [monkey.ci.runners.oci]
             [monkey.ci.storage
              [file]
              [oci]]

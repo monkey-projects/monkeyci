@@ -29,14 +29,14 @@
          [:div.card-header
           [:h5.card-title {:title (:id p)} (:name p)]]])))
 
-(defn- customer-details []
+(defn- customer-details [id]
   (let [c (rf/subscribe [:customer/info])]
     (->> (:projects @c)
          (sort-by :name)
          (map (partial show-project @c))
          (into [:<>
                 [:h3.float-start "Customer " (:name @c)]
-                [co/reload-btn [:customer/load (:id @c)] {:class :float-end}]
+                [co/reload-btn [:customer/load id] {:class :float-end}]
                 [:div.clearfix.mb-3]]))))
 
 (defn page
@@ -47,4 +47,4 @@
     (l/default
      [:div
       [co/alerts [:customer/alerts]]
-      [customer-details]])))
+      [customer-details id]])))

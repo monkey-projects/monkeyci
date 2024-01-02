@@ -181,6 +181,13 @@
         (mc/update-existing-in [:parameters :query] (partial mc/map-keys csk/->kebab-case-keyword))
         (h))))
 
+(defn- log-request
+  "Just logs the request, for monitoring or debugging purposes."
+  [h]
+  (fn [req]
+    (log/info "Handling request:" (select-keys req [:uri :request-method :parameters]))
+    (h req)))
+
 (defn- passthrough-middleware
   "No-op middleware, just passes the request to the parent handler."
   [h]
@@ -197,7 +204,8 @@
                                        :access-control-allow-methods [:get :put :post :delete]
                                        :access-control-allow-credentials true]]
                                      c/default-middleware
-                                     [kebab-case-query]))
+                                     [kebab-case-query
+                                      log-request]))
             :muuntaja (c/make-muuntaja)
             :coercion reitit.coercion.schema/coercion
             ::c/context opts}

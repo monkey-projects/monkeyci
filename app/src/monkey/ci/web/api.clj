@@ -22,10 +22,13 @@
 
 (defn- entity-getter [get-id getter]
   (fn [req]
-    (if-let [match (some-> (c/req->storage req)
-                           (getter (get-id req)))]
-      (rur/response match)
-      (rur/not-found nil))))
+    (let [id (get-id req)]
+      (if-let [match (some-> (c/req->storage req)
+                             (getter id))]
+        (rur/response match)
+        (do
+          (log/warn "Entity not found:" id)
+          (rur/not-found nil))))))
 
 (defn- entity-creator [saver id-generator]
   (fn [req]
