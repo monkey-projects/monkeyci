@@ -44,7 +44,8 @@
   "Returns a predicate that checks if the ref matches the given regex"
   [re]
   (fn [ctx]
-    (some? (re-matches re (get-in ctx [:build :git :ref])))))
+    (some? (some->> (get-in ctx [:build :git :ref])
+                    (re-matches re)))))
 
 (def main-branch?
   (ref? #"^refs/heads/main$"))
