@@ -40,6 +40,18 @@
 (def bot-img "fra.ocir.io/frjdhmocn5qi/monkeyci-bot")
 (def remote-auth "/tmp/auth.json")
 
+(defn ref?
+  "Returns a predicate that checks if the ref matches the given regex"
+  [re]
+  (fn [ctx]
+    (some? (re-matches re (get-in ctx [:build :git :ref])))))
+
+(def main-branch?
+  (ref? #"^refs/heads/main$"))
+
+(def release?
+  (ref? #"^refs/tags/\d{8}$"))
+
 (defn image-version
   "Retrieves image version.  Ideally from context (e.g. commit tag), but
    currently this still is the date."
@@ -59,7 +71,7 @@
      (f auth img))))
 
 (defn- podman-build-cmd [dockerfile dir]
-  (format "podman build --authfile %%s --platform linux/arm64,linux/amd64 --manifest %%s -f %s %s" dockerfile dir))
+  (format "podman build --authfile %%s --platform linux/arm64 --manifest %%s -f %s %s" dockerfile dir))
 
 (defn build-image
   "Build the image using podman for arm and amd platforms.  Not using containers for now,
@@ -76,6 +88,9 @@
 
 (defn push-app-image [ctx]
   (push-image ctx app-img))
+
+(defn delete-manifest-staging [ctx]
+  (img-script ctx "podman manifest rm %s" app-img "staging"))
 
 (defn build-app-image-staging [ctx]
   (build-image ctx "docker/Dockerfile" app-img nil "staging"))
@@ -118,7 +133,7 @@
   [publish-lib
    publish-app])
 
-(core/defpipeline publish-image
+(core/defpipeline publish-release
   [app-uberjar
    image-creds
    build-app-image
@@ -127,6 +142,7 @@
 (core/defpipeline publish-staging
   [app-uberjar
    image-creds
+   delete-manifest-staging
    build-app-image-staging
    push-app-image-staging])
 
@@ -140,7 +156,11 @@
   [test-gui])
 
 ;; Return the pipelines
-[test-all
- publish-libs
- publish-staging
- #_braid-bot]
+(defn all-pipelines [ctx]
+  [test-all
+   publish-libs
+   ;; Publish to prod if this is the main branch
+   (when (main-branch? ctx)
+     publish-staging)
+   (when (release? ctx)
+     publish-release)])
