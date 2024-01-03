@@ -13,7 +13,8 @@
 (defn clj-container [name dir & args]
   "Executes script in clojure container"
   {:name name
-   :container/image "docker.io/clojure:temurin-21-tools-deps-alpine"
+   ;; Alpine based images don't exist for arm, so use debian
+   :container/image "docker.io/clojure:temurin-21-tools-deps-bookworm-slim"
    :script [(str "cd " dir) (cs/join " " (concat ["clojure"] args))]})
 
 (def test-lib (clj-container "test-lib" "lib" "-X:test:junit"))
