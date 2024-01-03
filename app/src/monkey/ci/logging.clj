@@ -145,13 +145,14 @@
 (defmethod make-log-retriever :default [_]
   (->NoopLogRetriever))
 
-(defn- sid->prefix [sid]
-  (str (cs/join st/delim sid) st/delim))
+(defn- sid->prefix [sid {:keys [prefix]}]
+  (cond->> (str (cs/join st/delim sid) st/delim)
+    (some? prefix) (str prefix "/")))
 
 (deftype OciBucketLogRetriever [client conf]
   LogRetriever
   (list-logs [_ sid]
-    (let [prefix (sid->prefix sid)
+    (let [prefix (sid->prefix sid conf)
           ->out (fn [r]
                   ;; Strip the prefix to retain the relative path
                   (update r :name subs (count prefix)))]
@@ -169,7 +170,7 @@
     @(md/chain
       (os/get-object client (-> conf
                                 (select-keys [:ns :compartment-id :bucket-name])
-                                (assoc :object-name (str (sid->prefix sid) path))))
+                                (assoc :object-name (str (sid->prefix sid conf) path))))
       bs/to-input-stream)))
 
 (defmethod make-log-retriever :oci [conf]
