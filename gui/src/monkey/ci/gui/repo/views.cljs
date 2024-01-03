@@ -26,7 +26,10 @@
     (let [b (rf/subscribe [:repo/builds])]
       (when @b
         [:<>
-         [:h4 "Builds"]
+         [:div.clearfix
+          [:h4.float-start "Builds"]
+          [:div.float-end
+           [co/reload-btn [:builds/load]]]]
          [:p "Found " (count @b) " builds"]
          [:table.table.table-striped
           [:thead
@@ -37,8 +40,7 @@
             [:th {:scope :col} "Commit message"]]]
           (->> @b
                (map build-row)
-               (into [:tbody]))]
-         [co/reload-btn [:builds/load]]]))))
+               (into [:tbody]))]]))))
 
 (defn page [route]
   (rf/dispatch [:repo/load (get-in route [:parameters :path :customer-id])])

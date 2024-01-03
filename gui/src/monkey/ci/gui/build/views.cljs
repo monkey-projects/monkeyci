@@ -57,11 +57,11 @@
       [l/default
        [:<>
         [build-details]
-        [:h3.float-start "Logs for " (:build-id params)]
-        [:div.float-end
-         [co/reload-btn [:build/load-logs]]]
         [:div.clearfix
-         [co/alerts [:build/alerts]]]
+         [:h3.float-start "Logs for " (:build-id params)]
+         [:div.float-end
+          [co/reload-btn [:build/load-logs]]]]
+        [co/alerts [:build/alerts]]
         [logs-table]
         [:div
          [:a {:href (r/path-for :page/repo params)} "Back to repository"]]]])))

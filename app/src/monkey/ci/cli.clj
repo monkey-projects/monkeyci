@@ -84,7 +84,13 @@
    :opts [{:as "Events file"
            :option "events-file"
            :short "e"
-           :type :string}]
+           :type :string
+           :default :present}
+          {:as "Start file"
+           :option "start-file"
+           :short "s"
+           :type :string
+           :default :present}]
    :runs {:command cmd/sidecar}})
 
 (def base-config
