@@ -286,6 +286,28 @@
                        (select-keys (:account (first @events)) props)))
                 (is (some? (-> @events first :build :build-id)))))))
 
+        (testing "looks up url in repo config"
+          (h/with-bus
+            (fn [bus]
+              (let [app (sut/make-app {:storage st
+                                       :event-bus bus})
+                    events (atom [])
+                    _ (events/register-handler bus :build/triggered (partial swap! events conj))]
+                (is (some? (st/save-customer st {:id customer-id
+                                                 :projects
+                                                 {project-id
+                                                  {:id project-id
+                                                   :repos
+                                                   {repo-id
+                                                    {:id repo-id
+                                                     :url "http://test-url"}}}}})))
+                (is (= 200 (-> (mock/request :post (str path "/trigger?commitId=test-id&branch=test-branch"))
+                               (app)
+                               :status)))
+                (is (not= :timeout (h/wait-until #(pos? (count @events)) 500)))
+                (is (= "http://test-url"
+                       (-> @events first :build :git :url)))))))
+        
         (testing "adds branch and commit id query params"
           (h/with-bus
             (fn [bus]
@@ -318,6 +340,20 @@
                   (is (= (take 3 sid) (take 3 bsid)))
                   (is (= (get-in (first @events) [:build :build-id])
                          (last bsid))))))))
+
+        (testing "creates build metadata in storage"
+          (h/with-bus
+            (fn [bus]
+              (let [app (sut/make-app {:storage st
+                                       :event-bus bus})
+                    events (atom [])
+                    _ (events/register-handler bus :build/triggered (partial swap! events conj))]
+                (is (= 200 (-> (mock/request :post (str path "/trigger"))
+                               (app)
+                               :status)))
+                (is (not= :timeout (h/wait-until #(pos? (count @events)) 500)))
+                (let [bsid (get-in (first @events) [:build :sid])]
+                  (is (some? (st/find-build-metadata st bsid))))))))
         
         (testing "returns build id")
 

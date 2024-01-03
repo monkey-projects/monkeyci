@@ -94,7 +94,10 @@
   [ctx f]
   (fn [evt]
     (ca/thread
-      (f (e/with-ctx ctx evt)))))
+      (try
+        (f (e/with-ctx ctx evt))
+        (catch Exception ex
+          (log/error "Failed to handle event" evt ex))))))
 
 (defn logger
   "Event handler that just logs the message"

@@ -2,6 +2,7 @@
   (:require [camel-snake-kebab.core :as csk]
             [clojure.core.async :as ca]
             [clojure.tools.logging :as log]
+            [java-time.api :as jt]
             [medley.core :as mc]
             [monkey.ci
              [context :as ctx]
@@ -230,14 +231,27 @@
    req
    (fn [{p :parameters}]
      (let [acc (:path p)
-           bid (u/new-build-id)]
-       {:type :build/triggered
-        :account acc
-        :build {:build-id bid
-                :git (select-keys (:query p) [:commit-id :branch])
-                :sid (-> acc
-                         (assoc :build-id bid)
-                         (st/ext-build-sid))}}))))
+           bid (u/new-build-id)
+           repo-sid ((juxt :customer-id :project-id :repo-id) acc)
+           st (c/req->storage req)
+           repo (st/find-repo st repo-sid)
+           md (-> acc
+                  (select-keys [:customer-id :project-id :repo-id])
+                  (assoc :build-id bid
+                         :source :api
+                         :timestamp (str (jt/instant)))
+                  (merge (:query p)))]
+       (log/debug "Triggering build for repo sid:" repo-sid)
+       (when (st/create-build-metadata st md)
+         {:type :build/triggered
+          :account acc
+          :build {:build-id bid
+                  :git (-> (:query p)
+                           (select-keys [:commit-id :branch])
+                           (assoc :url (:url repo)))
+                  :sid (-> acc
+                           (assoc :build-id bid)
+                           (st/ext-build-sid))}})))))
 
 (defn list-build-logs [req]
   (let [build-sid (st/ext-build-sid (get-in req [:parameters :path]))

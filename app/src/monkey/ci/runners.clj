@@ -89,7 +89,7 @@
   (let [{:keys [store]} (:workspace ctx)
         ;; TODO For local builds, upload all workdir files according to .gitignore
         {:keys [checkout-dir build-id]} (:build ctx)
-        dest build-id]
+        dest (str build-id b/extension)]
     (when checkout-dir
       (log/info "Creating workspace using files from" checkout-dir)
       @(md/chain
@@ -102,7 +102,7 @@
    cached files as needed."
   [ctx]
   (cond-> ctx
-    (not-empty (get-in ctx [:workspace :store])) (create-workspace)))
+    (some? (get-in ctx [:workspace :store])) (create-workspace)))
 
 ;; Creates a runner fn according to its type
 (defmulti make-runner (comp :type :runner))

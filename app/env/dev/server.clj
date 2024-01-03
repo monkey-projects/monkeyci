@@ -21,7 +21,9 @@
   (stop-server)
   (reset! server (-> c/base-system                     
                      (assoc :config (-> @co/global-config
-                                        (merge {:dev-mode true :workdir "tmp"})))
+                                        (merge {:dev-mode true
+                                                :work-dir (u/abs-path "tmp")
+                                                :checkout-base-dir (u/abs-path "tmp/checkout")})))
                      (sc/subsystem [:http])
                      (sc/start-system)))
   nil)

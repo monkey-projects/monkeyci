@@ -134,19 +134,19 @@
     (let [ctx {}]
       (is (= ctx (sut/store-src ctx)))))
 
-  (testing "stores src dir using blob and build id"
+  (testing "stores src dir using blob and build id with extension"
     (let [stored (atom {})
           ctx {:workspace {:store (h/->FakeBlobStore stored)}
                :build {:checkout-dir "test-checkout"
                        :build-id "test-build"}}]
       (is (some? (sut/store-src ctx)))
-      (is (= {"test-checkout" "test-build"} @stored))))
+      (is (= {"test-checkout" "test-build.tgz"} @stored))))
 
   (testing "returns updated context"
     (let [ctx {:workspace {:store (h/->FakeBlobStore (atom {}))}
                :build {:checkout-dir "test-checkout"
                        :build-id "test-build"}}]
-      (is (= (assoc-in ctx [:build :workspace] "test-build")
+      (is (= (assoc-in ctx [:build :workspace] "test-build.tgz")
              (sut/store-src ctx))))))
 
 (deftest build-completed
