@@ -230,6 +230,7 @@
   (c/posting-handler
    req
    (fn [{p :parameters}]
+     ;; TODO If no branch is specified, use the default
      (let [acc (:path p)
            bid (u/new-build-id)
            repo-sid ((juxt :customer-id :project-id :repo-id) acc)
@@ -239,7 +240,8 @@
                   (select-keys [:customer-id :project-id :repo-id])
                   (assoc :build-id bid
                          :source :api
-                         :timestamp (str (jt/instant)))
+                         :timestamp (str (jt/instant))
+                         :ref (str "refs/heads/" (get-in p [:query :branch])))
                   (merge (:query p)))]
        (log/debug "Triggering build for repo sid:" repo-sid)
        (when (st/create-build-metadata st md)

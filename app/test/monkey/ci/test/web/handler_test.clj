@@ -284,84 +284,80 @@
           (is (= "test meta" (:message (first b))) "should contain build metadata")))))
   
   (testing "`POST /trigger`"
-    (testing "triggers new build for repo"
-      (with-repo
-        (fn [{:keys [bus app path sid]}]
-          (let [events (atom [])
-                props [:customer-id :project-id :repo-id]
-                _ (events/register-handler bus :build/triggered (partial swap! events conj))]
-            (is (= 200 (-> (mock/request :post (str path "/trigger"))
-                           (app)
-                           :status)))
-            (is (not= :timeout (h/wait-until #(pos? (count @events)) 500)))
-            (is (= (zipmap props sid)
-                   (select-keys (:account (first @events)) props)))
-            (is (some? (-> @events first :build :build-id)))))))
+    (letfn [(catch-build-triggered-event [p f]
+              (with-repo
+                (fn [{:keys [bus app path] :as ctx}]
+                  (let [events (atom [])
+                        props [:customer-id :project-id :repo-id]
+                        _ (events/register-handler bus :build/triggered (partial swap! events conj))]
+                    (is (= 200 (-> (mock/request :post (str path p))
+                                   (app)
+                                   :status)))
+                    (is (not= :timeout (h/wait-until #(pos? (count @events)) 500)))
+                    (f (assoc ctx :event (first @events)))))))]
+      
+      (testing "triggers new build for repo"
+        (catch-build-triggered-event
+         "/trigger"
+         (fn [{:keys [bus app path sid event]}]
+           (let [props [:customer-id :project-id :repo-id]]
+             (is (= (zipmap props sid)
+                    (select-keys (:account event) props)))
+             (is (some? (-> event :build :build-id)))))))
+      
+      (testing "looks up url in repo config"
+        (with-repo
+          (fn [{:keys [bus app path] [customer-id project-id repo-id] :sid st :storage}]
+            (let [events (atom [])
+                  _ (events/register-handler bus :build/triggered (partial swap! events conj))]
+              (is (some? (st/save-customer st {:id customer-id
+                                               :projects
+                                               {project-id
+                                                {:id project-id
+                                                 :repos
+                                                 {repo-id
+                                                  {:id repo-id
+                                                   :url "http://test-url"}}}}})))
+              (is (= 200 (-> (mock/request :post (str path "/trigger"))
+                             (app)
+                             :status)))
+              (is (not= :timeout (h/wait-until #(pos? (count @events)) 500)))
+              (is (= "http://test-url"
+                     (-> @events first :build :git :url)))))))
+      
+      (testing "adds branch and commit id query params"
+        (catch-build-triggered-event
+         "/trigger?commitId=test-id&branch=test-branch"
+         (fn [{:keys [event]}]
+           (is (= "test-id"
+                  (-> event :build :git :commit-id)))
+           (is (= "test-branch"
+                  (-> event :build :git :branch))))))
 
-    (testing "looks up url in repo config"
-      (with-repo
-        (fn [{:keys [bus app path] [customer-id project-id repo-id] :sid st :storage}]
-          (let [events (atom [])
-                _ (events/register-handler bus :build/triggered (partial swap! events conj))]
-            (is (some? (st/save-customer st {:id customer-id
-                                             :projects
-                                             {project-id
-                                              {:id project-id
-                                               :repos
-                                               {repo-id
-                                                {:id repo-id
-                                                 :url "http://test-url"}}}}})))
-            (is (= 200 (-> (mock/request :post (str path "/trigger?commitId=test-id&branch=test-branch"))
-                           (app)
-                           :status)))
-            (is (not= :timeout (h/wait-until #(pos? (count @events)) 500)))
-            (is (= "http://test-url"
-                   (-> @events first :build :git :url)))))))
-    
-    (testing "adds branch and commit id query params"
-      (with-repo
-        (fn [{:keys [bus app path]}]
-          (let [events (atom [])
-                _ (events/register-handler bus :build/triggered (partial swap! events conj))]
-            (is (= 200 (-> (mock/request :post (str path "/trigger?commitId=test-id&branch=test-branch"))
-                           (app)
-                           :status)))
-            (is (not= :timeout (h/wait-until #(pos? (count @events)) 500)))
-            (is (= "test-id"
-                   (-> @events first :build :git :commit-id)))
-            (is (= "test-branch"
-                   (-> @events first :build :git :branch)))))))
+      (testing "adds `sid` to build props"
+        (catch-build-triggered-event
+         "/trigger"
+         (fn [{:keys [sid event]}]
+           (let [bsid (get-in event [:build :sid])]
+             (is (= 4 (count bsid)) "expected sid to contain repo path and build id")
+             (is (= (take 3 sid) (take 3 bsid)))
+             (is (= (get-in event [:build :build-id])
+                    (last bsid)))))))
 
-    (testing "adds `sid` to build props"
-      (with-repo
-        (fn [{:keys [bus app path sid]}]
-          (let [events (atom [])
-                _ (events/register-handler bus :build/triggered (partial swap! events conj))]
-            (is (= 200 (-> (mock/request :post (str path "/trigger"))
-                           (app)
-                           :status)))
-            (is (not= :timeout (h/wait-until #(pos? (count @events)) 500)))
-            (let [bsid (get-in (first @events) [:build :sid])]
-              (is (= 4 (count bsid)) "expected sid to contain repo path and build id")
-              (is (= (take 3 sid) (take 3 bsid)))
-              (is (= (get-in (first @events) [:build :build-id])
-                     (last bsid))))))))
+      (testing "creates build metadata in storage"
+        (catch-build-triggered-event
+         "/trigger?branch=test-branch"
+         (fn [{:keys [event] st :storage}]
+           (let [bsid (get-in event [:build :sid])
+                 md (st/find-build-metadata st bsid)]
+             (is (some? md))
+             (is (= "refs/heads/test-branch" (:ref md)))))))
+      
+      (testing "returns build id")
 
-    (testing "creates build metadata in storage"
-      (with-repo
-        (fn [{:keys [bus app path] st :storage}]
-          (let [events (atom [])
-                _ (events/register-handler bus :build/triggered (partial swap! events conj))]
-            (is (= 200 (-> (mock/request :post (str path "/trigger"))
-                           (app)
-                           :status)))
-            (is (not= :timeout (h/wait-until #(pos? (count @events)) 500)))
-            (let [bsid (get-in (first @events) [:build :sid])]
-              (is (some? (st/find-build-metadata st bsid))))))))
-    
-    (testing "returns build id")
+      (testing "returns 404 (not found) when repo does not exist")
 
-    (testing "returns 404 (not found) when repo does not exist"))
+      (testing "when no branch specified, uses default branch")))
   
   (testing "`GET /latest`"
     (with-repo
