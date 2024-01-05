@@ -40,7 +40,7 @@
 (def img-base "fra.ocir.io/frjdhmocn5qi")
 (def app-img (str img-base "/monkeyci"))
 (def bot-img (str img-base "/monkeyci-bot"))
-(def bot-img (str img-base "/monkeyci-gui"))
+(def gui-img (str img-base "/monkeyci-gui"))
 (def remote-auth "/tmp/auth.json")
 
 (defn git-ref [ctx]

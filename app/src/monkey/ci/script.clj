@@ -311,7 +311,8 @@
       (catch Exception ex
         (log/error "Unable to load pipelines" ex)
         (post-event ctx {:type :script/end
-                         :message (.getMessage ex)})))))
+                         :message (.getMessage ex)})
+        bc/failure))))
 
 (defn exec-script!
   "Loads a script from a directory and executes it.  The script is
