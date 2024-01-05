@@ -130,11 +130,17 @@
 (defn publish-app [ctx]
   (publish ctx "publish-app" "app"))
 
-(def test-gui
-  {:name "test-gui"
+(defn- shadow-release [n build]
+  {:name n
    :container/image "docker.io/cimg/clojure:1.11-node"
    :script ["npm install"
-            "npx shadow-cljs release :test/ci"]})
+            (str "npx shadow-cljs release " build)]})
+
+(def test-gui
+  (shadow-release "test-gui" :test/ci))
+
+(def build-gui-release
+  (shadow-release "release-gui" :frontend))
 
 (core/defpipeline test-all
   ;; TODO Run these in parallel
