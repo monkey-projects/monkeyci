@@ -296,7 +296,7 @@
   (cond
     (fn? p) (resolve-pipelines (p ctx) ctx)
     (var? p) (resolve-pipelines (var-get p) ctx)
-    :else p))
+    :else (remove nil? p)))
 
 (defn- load-and-run-pipelines [{:keys [script-dir] :as ctx}]
   (let [build-id (ctx/get-build-id ctx)]
