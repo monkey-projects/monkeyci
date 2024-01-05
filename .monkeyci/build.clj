@@ -59,7 +59,7 @@
 (def release?
   (ref? #"^refs/tags/\d{8}$"))
 
-(def should-build-image?
+(def should-publish-image?
   (some-fn main-branch? release?))
 
 (defn tag-version
