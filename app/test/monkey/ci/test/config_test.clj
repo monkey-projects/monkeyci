@@ -240,7 +240,15 @@
            (-> {:monkeyci-build-sid "a/b/c"}
                (sut/script-config {})
                :build
-               :sid)))))
+               :sid))))
+
+  (testing "groups git subkeys"
+    (is (= "test-ref"
+           (-> {:monkeyci-build-git-ref "test-ref"}
+               (sut/script-config {})
+               :build
+               :git
+               :ref)))))
 
 (deftest load-config-file
   (testing "`nil` if file does not exist"

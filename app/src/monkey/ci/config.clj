@@ -68,11 +68,14 @@
                       (group-keys v r))
                     c
                     [:github :runner :containers :storage :api :account :http :logging :oci :build
-                     :sidecar]))]
+                     :sidecar]))
+          (group-build-keys [c]
+            (update c :build (partial group-keys :git)))]
     (->> env
          (filter-and-strip-keys env-prefix)
          (group-all-keys)
          (group-credentials [:oci :storage :runner :logging])
+         (group-build-keys)
          (u/prune-tree))))
 
 (defn- parse-edn

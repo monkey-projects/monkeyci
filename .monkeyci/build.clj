@@ -50,8 +50,8 @@
   "Returns a predicate that checks if the ref matches the given regex"
   [re]
   (fn [ctx]
-    (some? (->> (git-ref ctx)
-                (re-matches re)))))
+    (some? (some->> (git-ref ctx)
+                    (re-matches re)))))
 
 (def main-branch?
   (ref? #"^refs/heads/main$"))
