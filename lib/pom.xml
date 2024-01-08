@@ -21,4 +21,31 @@
   <scm>
     <url>https://github.com/monkey-projects/monkeyci</url>
   </scm>
+  <dependencies>
+    <dependency>
+      <groupId>org.clojure</groupId>
+      <artifactId>clojure</artifactId>
+      <version>1.11.1</version>
+    </dependency>
+    <dependency>
+      <groupId>babashka</groupId>
+      <artifactId>process</artifactId>
+      <version>0.5.21</version>
+    </dependency>
+    <dependency>
+      <groupId>babashka</groupId>
+      <artifactId>fs</artifactId>
+      <version>0.4.19</version>
+    </dependency>
+    <dependency>
+      <groupId>ch.qos.logback</groupId>
+      <artifactId>logback-classic</artifactId>
+      <version>1.4.11</version>
+    </dependency>
+    <dependency>
+      <groupId>com.github.oliyh</groupId>
+      <artifactId>martian</artifactId>
+      <version>0.1.25</version>
+    </dependency>
+  </dependencies>
 </project>

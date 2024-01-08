@@ -6,6 +6,7 @@
             [clojure.core.async :as ca]
             [clojure.string :as cs]
             [monkey.ci
+             [config :as config]
              [events :as events]
              [logging :as l]
              [storage :as st]]
@@ -67,6 +68,12 @@
     (is (= 200 (-> (mock/request :get "/health")
                    (test-app)
                    :status))))
+
+  (testing "version at `/version`"
+    (let [r (-> (mock/request :get "/version")
+                   (test-app))]
+      (is (= 200 (:status r)))
+      (is (= (config/version) (:body r)))))
 
   (testing "handles `nil` bodies"
     (is (= 200 (-> (mock/request :get "/health")

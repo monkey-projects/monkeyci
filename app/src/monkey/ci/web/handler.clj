@@ -3,7 +3,9 @@
   (:require [camel-snake-kebab.core :as csk]
             [clojure.tools.logging :as log]
             [medley.core :refer [update-existing] :as mc]
-            [monkey.ci.events :as e]
+            [monkey.ci
+             [config :as config]
+             [events :as e]]
             [monkey.ci.web
              [api :as api]
              [common :as c]
@@ -19,6 +21,11 @@
   ;; TODO Make this more meaningful
   {:status 200
    :body "ok"
+   :headers {"Content-Type" "text/plain"}})
+
+(defn version [_]
+  {:status 200
+   :body (config/version)
    :headers {"Content-Type" "text/plain"}})
 
 (def not-empty-str (s/constrained s/Str not-empty))
@@ -157,6 +164,7 @@
 
 (def routes
   [["/health" {:get health}]
+   ["/version" {:get version}]
    webhook-routes
    customer-routes
    event-stream-routes])
