@@ -100,15 +100,23 @@
 
       (testing "`sidecar` command"
         (testing "runs `sidecar` command"
-          (is (= cmd/sidecar (:cmd (run-cli "sidecar")))))
+          (is (= cmd/sidecar (:cmd (run-cli "sidecar" "-e" "events" "-s" "start")))))
 
         (testing "accepts `events-file` or `-e` option"
-          (is (= "test-file" (-> (run-cli "sidecar" "-e" "test-file")
+          (is (= "test-file" (-> (run-cli "sidecar" "-e" "test-file" "-s" "start-file")
                                  :args
                                  :events-file)))
-          (is (= "test-file" (-> (run-cli "sidecar" "--events-file" "test-file")
+          (is (= "test-file" (-> (run-cli "sidecar" "--events-file" "test-file" "-s" "start-file")
                                  :args
-                                 :events-file))))))))
+                                 :events-file))))
+
+        (testing "accepts `start-file` or `-s` option"
+          (is (= "test-file" (-> (run-cli "sidecar" "-s" "test-file" "-e" "events-file")
+                                 :args
+                                 :start-file)))
+          (is (= "test-file" (-> (run-cli "sidecar" "--start-file" "test-file" "-e" "events-file")
+                                 :args
+                                 :start-file))))))))
 
 (deftest set-invoker
   (testing "applies invoker to `runs` in commands"

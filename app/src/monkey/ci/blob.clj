@@ -138,8 +138,10 @@
 (defn- tmp-dir [{:keys [tmp-dir]}]
   (or tmp-dir (u/tmp-dir)))
 
+(def extension ".tgz")
+
 (defn- tmp-archive [conf]
-  (io/file (tmp-dir conf) (str (random-uuid))))
+  (io/file (tmp-dir conf) (str (random-uuid) extension)))
 
 (defn- archive-obj-name [conf dest]
   (->> [(:prefix conf) dest]
@@ -155,10 +157,11 @@
       (log/debug "Archiving" src "to" arch)
       (make-archive src arch)
       ;; Upload the temp file
-      (log/debug "Uploading archive" arch "to" obj-name)
+      (log/debugf "Uploading archive %s to %s (%d bytes)" arch obj-name (fs/size arch))
       (-> (os/put-object client (-> conf
                                     (select-keys [:ns :bucket-name])
-                                    (assoc :object-name obj-name)))
+                                    (assoc :object-name obj-name
+                                           :contents (fs/read-all-bytes arch))))
           (md/chain (constantly obj-name))
           (md/finally #(fs/delete arch)))))
 

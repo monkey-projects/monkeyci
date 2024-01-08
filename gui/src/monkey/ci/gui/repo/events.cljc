@@ -1,6 +1,7 @@
 (ns monkey.ci.gui.repo.events
   (:require [monkey.ci.gui.customer.db :as cdb]
             [monkey.ci.gui.repo.db :as db]
+            [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
 (rf/reg-event-fx
@@ -36,4 +37,4 @@
  :builds/load--failed
  (fn [db [_ err op]]
    (db/set-alerts db [{:type :danger
-                       :message (str "Could not load builds: " (or (:message err) (str err)))}])))
+                       :message (str "Could not load builds: " (u/error-msg err))}])))

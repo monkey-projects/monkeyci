@@ -39,3 +39,10 @@
               r+
               (recur (rest p) r+))))
         (into [:ol.breadcrumb]))])
+
+(defn build-result [r]
+  (let [type (condp = r
+               "error" :text-bg-danger
+               "success" :text-bg-success
+               :text-bg-secondary)]
+    [:span {:class (str "badge " (name type))} (or r "running")]))

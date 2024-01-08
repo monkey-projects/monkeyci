@@ -12,6 +12,12 @@
    (-> @c/global-config
        (s/make-storage))))
 
+(defn get-customer
+  "Retrieves customer info for the current config"
+  []
+  (s/find-customer (make-storage)
+                   (get-in @c/global-config [:account :customer-id])))
+
 (defn list-builds
   "Lists builds according to current account settings"
   []

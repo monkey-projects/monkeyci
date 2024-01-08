@@ -196,6 +196,20 @@
         (is (= :after (first (nth @invocations 3))))
         (is (= [:event :test-bus {:event :after}] (nth @invocations 4))))))
 
+  (testing "uses `event-poster` if configured"
+    (let [events (atom [])
+          test-f (fn [t]
+                   (fn [& _]
+                     {:event t}))
+          w (sut/wrapped (test-f :during)
+                         (test-f :before)
+                         (test-f :after))
+          poster (partial swap! events conj)]
+      (is (= {:event :during}
+             (w {:event-poster poster} "test-arg")))
+      (is (= 2 (count @events)))
+      (is (= {:event :before} (first @events)))))
+
   (testing "invokes `on-error` fn on exception"
     (let [inv (atom [])
           on-error (fn [_ ex]

@@ -81,7 +81,16 @@
 
       (testing "passes events-file as arg"
         (is (h/contains-subseq? (:arguments sc)
-                                ["--events-file" sut/event-file])))))
+                                ["--events-file" sut/event-file])))
+
+      (testing "passes start-file as arg"
+        (is (h/contains-subseq? (:arguments sc)
+                                ["--start-file" sut/start-file])))
+
+      (testing "includes a config volume"
+        (let [v (oci/find-mount sc "config")]
+          (is (some? v))
+          (is (= sut/config-dir (:mount-path v)))))))
 
   (testing "script volume"
     (let [v (->> {:step {:script ["first" "second"]}}

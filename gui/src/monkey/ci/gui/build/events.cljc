@@ -1,6 +1,7 @@
 (ns monkey.ci.gui.build.events
   (:require [monkey.ci.gui.build.db :as db]
             [monkey.ci.gui.routing :as r]
+            [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
 (rf/reg-event-fx
@@ -28,4 +29,4 @@
  :build/load-logs--failed
  (fn [db [_ err op]]
    (db/set-alerts db [{:type :danger
-                       :message (str "Could not load build logs: " (or (:message err) (str err)))}])))
+                       :message (str "Could not load build logs: " (u/error-msg err))}])))

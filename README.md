@@ -124,4 +124,4 @@ Copyright (c) 2023 by Monkey Projects BV
 
 [https://www.monkey-projects.be](https://www.monkey-projects.be)
 
-[https://www.monkey-ci.com](https://www.monkey-ci.com)
+[https://www.monkeyci.com](https://www.monkeyci.com)

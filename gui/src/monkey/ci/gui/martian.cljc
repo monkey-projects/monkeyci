@@ -35,6 +35,13 @@
                     js/apiRoot
                     "http://test:3000")))
 
+(def disable-with-credentials
+  "Interceptor that explicitly sets the `with-credentials?` property in the request
+   to `false`.  If this property is not provided, then `cljs-http` will enable it on
+   the outgoing request.  This in turn causes CORS issues."
+  {:enter (fn [ctx]
+            (assoc-in ctx [:request :with-credentials?] false))})
+
 (defn init
   "Initializes using the fixed routes"
   []
@@ -44,4 +51,5 @@
                url
                routes
                {:interceptors (concat martian/default-interceptors
-                                      [mh/perform-request])})]))
+                                      [disable-with-credentials
+                                       mh/perform-request])})]))

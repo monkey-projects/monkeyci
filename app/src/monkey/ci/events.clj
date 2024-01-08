@@ -74,6 +74,9 @@
                                            :exception ex}))))
                (recur (<! ch))))}))
 
+(defn add-time [evt]
+  (assoc evt :time (System/currentTimeMillis)))
+
 (defn register-pipeline
   "Registers a pipeline handler in the bus.  This pipeline will subscribe to all
    events of given type, pass them through the transducer `tx` and then send the
@@ -84,7 +87,8 @@
   (log/debug "Registering pipeline handler for" type)
   (let [ch (ca/chan)]
     (ca/sub (pub bus) type ch)
-    (ca/pipeline 1 (channel bus) (comp (map #(assoc % :bus bus :time (System/currentTimeMillis))) tx) ch)
+    (ca/pipeline 1 (channel bus) (comp (map (comp add-time
+                                                  #(assoc % :bus bus))) tx) ch)
     {:type type
      :channel ch
      :tx tx}))
@@ -122,7 +126,7 @@
    `true` once the event has been posted."
   [bus evt]
   (log/trace "Posting event:" evt)
-  (ca/put! (:channel bus) (assoc evt :time (System/currentTimeMillis))))
+  (ca/put! (:channel bus) (add-time evt)))
 
 (defn wait-for
   "Returns a channel that will hold the first match for the given

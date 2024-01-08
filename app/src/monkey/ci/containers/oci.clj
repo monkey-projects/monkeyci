@@ -19,6 +19,8 @@
 (def event-file (str log-dir "/events.edn"))
 (def script-vol "scripts")
 (def job-script "job.sh")
+(def config-vol "config")
+(def config-dir "/home/monkeyci/config")
 
 (defn- job-container
   "Configures the job container.  It runs the image as configured in
@@ -43,7 +45,8 @@
   (assoc c
          :display-name "sidecar"
          :command ["sidecar"]
-         :arguments ["--events-file" event-file]))
+         :arguments ["--events-file" event-file
+                     "--start-file" start-file]))
 
 (defn- display-name [{:keys [build step]}]
   (cs/join "-" [(:build-id build)
@@ -54,6 +57,11 @@
   {:volume-name script-vol
    :is-read-only false
    :mount-path script-dir})
+
+(defn- config-mount [_]
+  {:volume-name config-vol
+   :is-read-only true
+   :mount-path config-dir})
 
 (defn- config-entry [n v]
   {:file-name n
@@ -72,6 +80,14 @@
                                 (config-entry (str i) s)))
                  (into [(job-script-entry)]))})
 
+(defn- config-vol-config
+  "Configuration files for the sidecar (e.g. logging)"
+  [{{:keys [log-config]} :sidecar}]
+  {:name config-vol
+   :volume-type "CONFIGFILE"
+   :configs (cond-> []
+              log-config (conj (config-entry "logback.xml" (slurp log-config))))})
+
 (defn instance-config
   "Generates the configuration for the container instance.  It has 
    a container that runs the job, as configured in the `:step`, and
@@ -79,7 +95,8 @@
    and dispatching events."
   [conf ctx]
   (let [ic (oci/instance-config conf)
-        sc (sidecar-container ic)
+        sc (-> (sidecar-container ic)
+               (update :volume-mounts conj (config-mount ctx)))
         jc (-> (job-container ctx)
                ;; Use common volume for logs and events
                (assoc :volume-mounts [(oci/find-mount sc oci/checkout-vol)
@@ -88,7 +105,9 @@
         (assoc :containers [sc jc]
                :display-name (display-name ctx)
                :tags (oci/sid->tags (get-in ctx [:build :sid])))
-        (update :volumes conj (script-vol-config ctx)))))
+        (update :volumes conj
+                (script-vol-config ctx)
+                (config-vol-config ctx)))))
 
 (defmethod mcc/run-container :oci [ctx]
   ;; TODO

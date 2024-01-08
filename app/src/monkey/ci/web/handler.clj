@@ -3,7 +3,9 @@
   (:require [camel-snake-kebab.core :as csk]
             [clojure.tools.logging :as log]
             [medley.core :refer [update-existing] :as mc]
-            [monkey.ci.events :as e]
+            [monkey.ci
+             [config :as config]
+             [events :as e]]
             [monkey.ci.web
              [api :as api]
              [common :as c]
@@ -19,6 +21,11 @@
   ;; TODO Make this more meaningful
   {:status 200
    :body "ok"
+   :headers {"Content-Type" "text/plain"}})
+
+(defn version [_]
+  {:status 200
+   :body (config/version)
    :headers {"Content-Type" "text/plain"}})
 
 (def not-empty-str (s/constrained s/Str not-empty))
@@ -100,6 +107,7 @@
    [["" {:get {:handler api/get-builds}}]
     ["/trigger"
      {:post {:handler api/trigger-build
+             ;; TODO Read additional parameters from body instead
              :parameters {:query {(s/optional-key :branch) s/Str
                                   (s/optional-key :commit-id) s/Str}}}}]
     ["/latest"
@@ -156,6 +164,7 @@
 
 (def routes
   [["/health" {:get health}]
+   ["/version" {:get version}]
    webhook-routes
    customer-routes
    event-stream-routes])
@@ -181,6 +190,13 @@
         (mc/update-existing-in [:parameters :query] (partial mc/map-keys csk/->kebab-case-keyword))
         (h))))
 
+(defn- log-request
+  "Just logs the request, for monitoring or debugging purposes."
+  [h]
+  (fn [req]
+    (log/info "Handling request:" (select-keys req [:uri :request-method :parameters]))
+    (h req)))
+
 (defn- passthrough-middleware
   "No-op middleware, just passes the request to the parent handler."
   [h]
@@ -197,7 +213,8 @@
                                        :access-control-allow-methods [:get :put :post :delete]
                                        :access-control-allow-credentials true]]
                                      c/default-middleware
-                                     [kebab-case-query]))
+                                     [kebab-case-query
+                                      log-request]))
             :muuntaja (c/make-muuntaja)
             :coercion reitit.coercion.schema/coercion
             ::c/context opts}

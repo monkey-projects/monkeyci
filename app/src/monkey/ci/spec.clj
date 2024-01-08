@@ -104,7 +104,8 @@
 
 ;; Sidecar config
 (s/def :sidecar/poll-interval int?)
-(s/def :conf/sidecar (s/keys :opt-un [:sidecar/poll-interval]))
+(s/def :sidecar/log-config string?)
+(s/def :conf/sidecar (s/keys :opt-un [:sidecar/poll-interval :sidecar/log-config]))
 
 ;; Command line arguments
 (s/def :arg/pipeline string?)

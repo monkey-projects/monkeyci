@@ -49,6 +49,9 @@
 (defn oci-runner-config []
   (oci-config :runner))
 
+(defn oci-container-config []
+  (oci-config :container))
+
 (defn account->sid []
   (let [v (juxt :customer-id :project-id :repo-id)]
     (->> @global-config

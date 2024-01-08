@@ -7,6 +7,7 @@
             [monkey.ci
              [commands :as sut]
              [events :as e]
+             [sidecar :as sc]
              [spec :as spec]]
             [monkey.ci.test.helpers :as h]
             [org.httpkit.fake :as f]))
@@ -210,44 +211,14 @@
         (is (not-empty @reported))))))
 
 (deftest sidecar
-  (testing "dispatches events from file to bus"
-    (h/with-tmp-dir dir
-      (h/with-bus
-        (fn [bus]
-          (let [f (io/file dir "events.edn")
-                evt {:type :test/event
-                     :message "This is a test event"}
-                recv (atom [])
-                _ (e/register-handler bus (:type evt) (partial swap! recv conj))
-                ctx {:event-bus bus
-                     :args {:events-file f}
-                     :sidecar {:poll-interval 10}}
-                _ (spit f (prn-str evt))
-                c (sut/sidecar ctx)]
-            (is (spec/channel? c))
-            (is (not= :timeout (h/wait-until #(pos? (count @recv)) 500)))
-            (is (= evt (-> (first @recv)
-                           (select-keys (keys evt)))))
-            (is (true? (.delete f)) "delete the file to stop the sidecar")
-            (is (= 0 (h/try-take c 500 :timeout))))))))
+  (testing "polls for events"
+    (with-redefs [sc/restore-src (constantly ::restored)
+                  sc/poll-events (constantly ::polling)]
+      (is (= ::polling (sut/sidecar {})))))
 
-  (testing "reads events as they are posted"
-    (h/with-tmp-dir dir
-      (h/with-bus
-        (fn [bus]
-          (let [f (io/file dir "events.edn")
-                evt {:type :test/event
-                     :message "This is a test event"}
-                recv (atom [])
-                _ (e/register-handler bus (:type evt) (partial swap! recv conj))
-                ctx {:event-bus bus
-                     :args {:events-file f}
-                     :sidecar {:poll-interval 10}}
-                c (sut/sidecar ctx)]
-            ;; Post the event after sidecar has started
-            (is (nil? (spit f (prn-str evt))))
-            (is (not= :timeout (h/wait-until #(pos? (count @recv)) 500)))
-            (is (= evt (-> (first @recv)
-                           (select-keys (keys evt)))))
-            (is (true? (.delete f)))
-            (is (= 0 (h/try-take c 500 :timeout)))))))))
+  (testing "restores src from workspace"
+    (with-redefs [sc/restore-src (constantly ::restored)
+                  sc/poll-events (fn [ctx]
+                                   (when (= ::restored ctx)
+                                     ::polling))]
+      (is (= ::polling (sut/sidecar {}))))))
