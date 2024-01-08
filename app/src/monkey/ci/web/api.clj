@@ -197,7 +197,7 @@
                         (fetch-build-details s (st/->sid (concat sid [id]))))]
     (->> builds
          (f)
-         ;; TODO This could potentially be slow for many builds
+         ;; TODO This is slow when there are many builds
          (map fetch-details))))
 
 (defn get-builds

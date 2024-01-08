@@ -45,4 +45,4 @@
                "error" :text-bg-danger
                "success" :text-bg-success
                :text-bg-secondary)]
-    [:span {:class (str "badge " (name type))} r]))
+    [:span {:class (str "badge " (name type))} (or r "running")]))

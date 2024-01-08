@@ -125,7 +125,8 @@
 (defn publish [ctx name dir]
   "Executes script in clojure container that has clojars publish env vars"
   (let [env (-> (api/build-params ctx)
-                (select-keys ["CLOJARS_USERNAME" "CLOJARS_PASSWORD"]))]
+                (select-keys ["CLOJARS_USERNAME" "CLOJARS_PASSWORD"])
+                (assoc "MONKEYCI_VERSION" (image-version ctx)))]
     (-> (clj-container name dir "-X:jar:deploy")
         (assoc :container/env env))))
 
@@ -137,11 +138,10 @@
 
 (defn- shadow-release [n build]
   {:name n
-   :container/image "docker.io/cimg/clojure:1.11-node"
+   :container/image "docker.io/dormeur/clojure-node:1.11.1"
    :work-dir "gui"
-   ;; We need to use sudo because the image is run as non-root user
-   :script ["sudo npm install"
-            (str "sudo npx shadow-cljs release " build)]})
+   :script ["npm install"
+            (str "npx shadow-cljs release " build)]})
 
 (def test-gui
   (shadow-release "test-gui" :test/ci))
