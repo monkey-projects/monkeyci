@@ -196,7 +196,7 @@
    pipelines are executed sequentially too, but this could be converted 
    into parallel processing."
   [{:keys [pipeline] :as ctx} p]
-  (let [p (cond->> (if (vector? p) p [p])
+  (let [p (cond->> p
             ;; Filter pipeline by name, if given
             pipeline (filter (comp (partial = pipeline) :name)))]
     (log/debug "Found" (count p) "matching pipelines:" (map :name p))
