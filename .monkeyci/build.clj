@@ -133,8 +133,10 @@
 (defn- shadow-release [n build]
   {:name n
    :container/image "docker.io/cimg/clojure:1.11-node"
+   :work-dir "gui"
+   ;; We need to use sudo because the image is run as non-root user
    :script ["sudo npm install"
-            (str "npx shadow-cljs release " build)]})
+            (str "sudo npx shadow-cljs release " build)]})
 
 (def test-gui
   (shadow-release "test-gui" :test/ci))
