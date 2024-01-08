@@ -267,7 +267,7 @@
                                  :event-bus bus})
               sid (generate-build-sid)
               path (repo-path sid)]
-          (is (st/sid? (st/create-build-results st sid {:exit 0 :status :success})))
+          (is (st/sid? (st/save-build-results st sid {:exit 0 :status :success})))
           (is (st/sid? (st/create-build-metadata st sid {:message "test meta"})))
           (f {:bus bus
               :storage st

@@ -9,6 +9,7 @@
              [commands :as co]
              [config :as config]
              [events :as e]
+             [listeners :as li]
              [logging :as l]
              [git :as git]
              [process :as p]
@@ -107,11 +108,11 @@
 (defn register-handlers [ctx bus]
   (->> {:webhook/validated (ctx-async ctx r/build)
         :build/triggered (ctx-async ctx r/build)
-        :build/completed (partial st/save-build-result ctx)
+        :build/completed (partial li/save-build-result ctx)
         :script/start logger
         :script/end logger
-        :pipeline/start logger
-        :pipeline/end logger
+        :pipeline/start (juxt logger li/pipeline-started)
+        :pipeline/end (juxt logger li/pipeline-completed)
         :step/start logger
         :step/end logger}
        (map (partial apply e/register-handler bus))))

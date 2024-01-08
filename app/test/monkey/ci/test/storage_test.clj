@@ -41,7 +41,7 @@
                 :repo-id "test-repo"
                 :project-id "test-project"
                 :customer-id "test-cust"}]
-        (is (sut/sid? (sut/create-build-results st md {:status :success})))
+        (is (sut/sid? (sut/save-build-results st md {:status :success})))
         (is (= :success (:status (sut/find-build-results st md))))))))
 
 (deftest projects
@@ -84,18 +84,12 @@
         (is (sut/sid? (sut/save-params st [cid] params)))
         (is (= params (sut/find-params st [cid])))))))
 
-(deftest save-build-result
-  (testing "writes to build result object"
+(deftest patch-build-results
+  (testing "reads result, applies f with args, then writes result back"
     (h/with-memory-store st
-      (let [ctx {:storage st}
-            sid ["test-customer" "test-project" "test-repo" "test-build"]
-            evt {:type :build/completed
-                 :build {:sid sid}
-                 :exit 0
-                 :result :success}]
-        (is (sut/sid? (sut/save-build-result ctx evt)))
-        (is (= {:exit 0
-                :result :success}
+      (let [sid (repeatedly 4 (comp str random-uuid))]
+        (is (sut/sid? (sut/patch-build-results st sid assoc :key "value")))
+        (is (= {:key "value"}
                (sut/find-build-results st sid)))))))
 
 (deftest list-builds

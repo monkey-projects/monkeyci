@@ -24,7 +24,7 @@
          :env {}
          :pipeline p))
 
-(defn- script-evt [ctx evt]
+(defn- script-evt [evt ctx]
   (assoc evt
          :src :script
          :sid (get-in ctx [:build :sid])
@@ -33,7 +33,7 @@
 (defn- post-event [ctx evt]
   (log/trace "Posting event:" evt)
   (if-let [c (get-in ctx [:api :client])]
-    (let [{:keys [status] :as r} @(martian/response-for c :post-event (script-evt ctx evt))]
+    (let [{:keys [status] :as r} @(martian/response-for c :post-event (script-evt evt ctx))]
       (when-not (= 202 status)
         (log/warn "Failed to post event, got status" status)
         (log/debug "Full response:" r)))
@@ -117,9 +117,10 @@
 
 (defn- with-pipeline [{:keys [pipeline] :as ctx} evt]
   (let [p (select-keys pipeline [:name :index])]
-    (assoc evt
-           :index (get-in ctx [:step :index])
-           :pipeline p)))
+    (-> evt
+        (assoc :index (get-in ctx [:step :index])
+               :pipeline p)
+        (script-evt ctx))))
 
 (defn- step-start-evt [{{:keys [name]} :step :as ctx}]
   (with-pipeline ctx
@@ -174,17 +175,21 @@
                      (bc/failed? r) (reduced))))
                (merge (step-context p) initial-ctx))))
 
-(defn- pipeline-start-evt [_ _ {:keys [name]}]
-  {:type :pipeline/start
-   :pipeline name
-   :message (cond-> "Starting pipeline"
-              name (str ": " name))})
+(defn- pipeline-start-evt [ctx _ {:keys [name]}]
+  (script-evt
+   {:type :pipeline/start
+    :pipeline name
+    :message (cond-> "Starting pipeline"
+               name (str ": " name))}
+   ctx))
 
-(defn- pipeline-end-evt [_ _ {:keys [name]} r]
-  {:type :pipeline/end
-   :pipeline name
-   :message "Completed pipeline"
-   :status (:status r)})
+(defn- pipeline-end-evt [ctx _ {:keys [name]} r]
+  (script-evt
+   {:type :pipeline/end
+    :pipeline name
+    :message "Completed pipeline"
+    :status (:status r)}
+   ctx))
 
 (def run-steps!*
   (wrapped run-steps!
@@ -275,8 +280,8 @@
     (f ctx)))
 
 (defn- with-script-dir [{:keys [script-dir] :as ctx} evt]
-  (->> (assoc evt :dir script-dir)
-       (script-evt ctx)))
+  (-> (assoc evt :dir script-dir)
+      (script-evt ctx)))
 
 (defn- script-started-evt [ctx _]
   (with-script-dir ctx

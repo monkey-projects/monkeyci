@@ -139,13 +139,21 @@
   [s sid]
   (read-obj s (build-metadata-sid sid)))
 
-(defn create-build-results [s sid r]
+(defn save-build-results [s sid r]
   (write-obj s (build-results-sid sid) r))
 
 (defn find-build-results
   "Reads the build results given the build coordinates"
   [s sid]
   (read-obj s (build-results-sid sid)))
+
+(defn patch-build-results
+  "Finds the build result with given sid, then applies `f` to it with arguments
+   and saves the return value back into the result."
+  [st sid f & args]
+  (let [r (find-build-results st sid)]
+    (->> (apply f r args)
+         (save-build-results st sid))))
 
 (defn build-exists?
   "Checks efficiently if the build exists.  This is cheaper than trying to fetch it
@@ -173,14 +181,3 @@
    parameters of higher levels."
   [s sid]
   (read-obj s (params-sid sid)))
-
-;;; Listeners
-
-(defn save-build-result
-  "Handles a `build/completed` event to store the result."
-  [ctx evt]
-  (let [r (select-keys evt [:exit :result])]
-    (log/debug "Saving build result:" r)
-    (create-build-results (:storage ctx)
-                          (get-in evt [:build :sid])
-                          r)))
