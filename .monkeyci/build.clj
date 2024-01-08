@@ -10,6 +10,9 @@
   (:import [java.time OffsetDateTime ZoneOffset]
            java.time.format.DateTimeFormatter))
 
+(defn git-ref [ctx]
+  (get-in ctx [:build :git :ref]))
+
 (defn tag-version
   "Extracts the version from the tag"
   [ctx]
@@ -60,9 +63,6 @@
 (def bot-img (str img-base "/monkeyci-bot"))
 (def gui-img (str img-base "/monkeyci-gui"))
 (def remote-auth "/tmp/auth.json")
-
-(defn git-ref [ctx]
-  (get-in ctx [:build :git :ref]))
 
 (defn ref?
   "Returns a predicate that checks if the ref matches the given regex"

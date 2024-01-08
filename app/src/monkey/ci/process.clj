@@ -1,7 +1,9 @@
 (ns monkey.ci.process
   "Process execution functions.  Executes build scripts in a separate process,
    using clojure cli tools."
-  (:require [babashka.process :as bp]
+  (:require [babashka
+             [fs :as fs]
+             [process :as bp]]
             [clojure.core.async :as ca :refer [go <!]]
             [clojure.java.io :as io]
             [clojure.string :as cs]
@@ -49,20 +51,22 @@
   [{{:keys [script-dir]} :build {:keys [dev-mode]} :args}]
   (when dev-mode
     (log/debug "Running in development mode, using local src instead of libs"))
-  (pr-str {:paths [script-dir]
-           :aliases
-           {:monkeyci/build
-            {:exec-fn 'monkey.ci.process/run
-             :extra-deps {'com.monkeyci/script
-                          (if dev-mode
-                            {:local/root (local-script-lib-dir)}
-                            {:mvn/version (version)})
-                          'com.monkeyci/app
-                          (if dev-mode
-                            {:local/root (utils/cwd)}
-                            {:mvn/version (version)})}
-             ;; TODO Only add this if the file actually exists
-             :jvm-opts [(str "-Dlogback.configurationFile=" (io/file script-dir "logback.xml"))]}}}))
+  (let [version-or (fn [f]
+                     (if dev-mode
+                       {:local/root (f)}
+                       {:mvn/version (version)}))
+        log-config (io/file script-dir "logback.xml")]
+    (pr-str
+     (cond-> {:paths [script-dir]
+              :aliases
+              {:monkeyci/build
+               {:exec-fn 'monkey.ci.process/run
+                :extra-deps {'com.monkeyci/script
+                             (version-or local-script-lib-dir)
+                             'com.monkeyci/app
+                             (version-or utils/cwd)}}}}
+       (fs/exists? log-config) (assoc-in [:aliases :monkeyci/build :jvm-opts]
+                                         [(str "-Dlogback.configurationFile=" log-config)])))))
 
 (defn- build-args
   "Builds command-line args vector for script process"
