@@ -291,12 +291,15 @@
            script-started-evt
            script-completed-evt))
 
-(defn- resolve-pipelines
+(def pipeline? (partial instance? monkey.ci.build.core.Pipeline))
+
+(defn resolve-pipelines
   "The build script either returns a list of pipelines, or a function that
    returns a list.  This function resolves the pipelines in case it's a function
    or a var."
   [p ctx]
   (cond
+    (pipeline? p) [p]
     (fn? p) (resolve-pipelines (p ctx) ctx)
     (var? p) (resolve-pipelines (var-get p) ctx)
     :else (remove nil? p)))

@@ -32,6 +32,17 @@
       (finally
         (uds/delete-address p)))))
 
+(deftest resolve-pipelines
+  (testing "returns vector as-is"
+    (is (= [::pipelines] (sut/resolve-pipelines [::pipelines] {}))))
+
+  (testing "invokes fn"
+    (is (= [::pipelines] (sut/resolve-pipelines (constantly [::pipelines]) {}))))
+
+  (testing "wraps single pipeline"
+    (let [p (bc/map->Pipeline {})]
+      (is (= [p] (sut/resolve-pipelines p {}))))))
+
 (deftest exec-script!
   (testing "executes basic clj script from location"
     (is (bc/success? (sut/exec-script! {:script-dir "examples/basic-clj"}))))

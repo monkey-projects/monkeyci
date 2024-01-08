@@ -164,17 +164,9 @@
    image-creds
    build-bot-image])
 
-(core/defpipeline log-context
-  [{:name "log-context"
-    :action (fn [ctx]
-              (println "Context:")
-              (prn ctx)
-              core/success)}])
-
 ;; Return the pipelines
 (defn all-pipelines [ctx]
-  [log-context
-   test-all
+  [test-all
    publish-libs
    ;; Publish image if necessary
    (when (should-publish-image? ctx)
