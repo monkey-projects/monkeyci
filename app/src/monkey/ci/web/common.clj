@@ -32,9 +32,9 @@
   "Posts event to the bus found in the request data.  Returns an async channel
    holding `true` if the event is posted."
   [req evt]
-  (go (some-> (req->bus (e/add-time req))
+  (go (some-> (req->bus req)
               (e/channel)
-              (>! evt))))
+              (>! (e/add-time evt)))))
 
 (defn make-muuntaja
   "Creates muuntaja instance with custom settings"
