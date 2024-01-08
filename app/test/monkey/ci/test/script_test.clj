@@ -41,6 +41,9 @@
 
   (testing "executes dynamic pipelines"
     (is (bc/success? (sut/exec-script! {:script-dir "examples/dynamic-pipelines"}))))
+
+  (testing "skips `nil` pipelines"
+    (is (bc/success? (sut/exec-script! {:script-dir "examples/conditional-pipelines"}))))
   
   (testing "fails when invalid script"
     (is (bc/failed? (sut/exec-script! {:script-dir "examples/invalid-script"}))))

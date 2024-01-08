@@ -6,18 +6,11 @@
             [monkey.ci.gui.routing :as r]
             [re-frame.core :as rf]))
 
-(defn- build-result [r]
-  (let [type (condp = r
-               "error" :text-bg-danger
-               "success" :text-bg-success
-               :text-bg-secondary)]
-    [:span {:class (str "badge " (name type))} r]))
-
 (defn- build-row [b]
   [:tr
    [:td [:a {:href (r/path-for :page/build b)} (:build-id b)]]
    [:td (:timestamp b)]
-   [:td [build-result (:result b)]]
+   [:td [co/build-result (:result b)]]
    [:td (:message b)]])
 
 (defn- builds []

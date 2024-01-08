@@ -205,7 +205,10 @@
                       (doall))]
       {:status (if (every? bc/success? result) :success :failure)})))
 
-(defn- load-pipelines [dir build-id]
+(defn- load-script
+  "Loads the pipelines from the build script, by reading the script
+   files dynamically."
+  [dir build-id]
   (let [tmp-ns (symbol (or build-id (str "build-" (random-uuid))))]
     ;; Declare a temporary namespace to load the file in, in case
     ;; it does not declare an ns of it's own.
@@ -303,7 +306,7 @@
     (log/debug "Executing script for build" build-id "at:" script-dir)
     (log/debug "Script context:" ctx)
     (try 
-      (let [p (-> (load-pipelines script-dir build-id)
+      (let [p (-> (load-script script-dir build-id)
                   (resolve-pipelines ctx))]
         (log/debug "Pipelines:" p)
         (log/debug "Loaded" (count p) "pipelines:" (map :name p))

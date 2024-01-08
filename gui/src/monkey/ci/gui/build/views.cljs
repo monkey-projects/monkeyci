@@ -16,6 +16,7 @@
          (select-keys @d)
          (map (fn [[k v]]
                 [:li [:b k ": "] v]))
+         (concat [[:li [:b "Result: "] [co/build-result (:result @d)]]])
          (into [:ul]))))
 
 (defn- build-path [route]
