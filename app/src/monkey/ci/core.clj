@@ -66,6 +66,7 @@
   "Main entry point for the application."
   [& args]
   (try
+    (log/info "Starting MonkeyCI version" (config/version))
     (cli/run-cmd args (make-cli-config {:env env}))
     (catch Exception ex
       (log/error "Failed to run application" ex)

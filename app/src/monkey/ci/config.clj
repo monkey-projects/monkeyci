@@ -27,7 +27,7 @@
 
 ;; Determine version at compile time
 (defmacro version []
-  `(or (System/getenv (csk/->SCREAMING_SNAKE_CASE (str env-prefix "-version"))) "0.1.0-SNAPSHOT"))
+  (or (System/getenv (csk/->SCREAMING_SNAKE_CASE (str env-prefix "-version"))) "0.1.0-SNAPSHOT"))
 
 (defn- key-filter [prefix]
   (let [exp (str (name prefix) "-")]

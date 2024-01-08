@@ -196,14 +196,16 @@
    pipelines are executed sequentially too, but this could be converted 
    into parallel processing."
   [{:keys [pipeline] :as ctx} p]
-  (let [p (cond->> p
-            ;; Filter pipeline by name, if given
-            pipeline (filter (comp (partial = pipeline) :name)))]
-    (log/debug "Found" (count p) "matching pipelines:" (map :name p))
-    (let [result (->> p
+  (let [pf (cond->> p
+             ;; Filter pipeline by name, if given
+             pipeline (filter (comp (partial = pipeline) :name)))]
+    (log/debug "Found" (count pf) "matching pipelines:" (map :name pf))
+    (log/debug "Pipelines after filtering:" pf)
+    (let [result (->> pf
                       (map-indexed (partial run-steps!* ctx))
                       (doall))]
-      {:status (if (every? bc/success? result) :success :failure)})))
+      {:status (if (every? bc/success? result) :success :failure)
+       :pipelines pf})))
 
 (defn- load-script
   "Loads the pipelines from the build script, by reading the script

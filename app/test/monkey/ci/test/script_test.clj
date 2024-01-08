@@ -137,7 +137,19 @@
            (map (fn [t]
                   (testing (str t)
                     (verify-evt t))))
-           (doall)))))
+           (doall))))
+
+  (testing "skips `nil` pipelines"
+    (is (bc/success? (->> [(bc/pipeline {:steps [(constantly bc/success)]})
+                           nil]
+                          (sut/run-pipelines {})))))
+
+  (testing "handles pipeline seq that's not a vector"
+    (let [r (->> '((bc/pipeline {:steps [(constantly bc/success)]})
+                   (bc/pipeline {:steps [(constantly bc/success)]}))
+                 (sut/run-pipelines {}))]
+      (is (bc/success? r))
+      (is (= 2 (count (:pipelines r)))))))
 
 (defmethod c/run-container :test [ctx]
   {:test-result :run-from-test
