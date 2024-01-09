@@ -106,16 +106,17 @@
   (log/info (:message evt)))
 
 (defn register-handlers [ctx bus]
-  (->> {:webhook/validated (ctx-async ctx r/build)
-        :build/triggered (ctx-async ctx r/build)
-        :build/completed (partial li/save-build-result ctx)
-        :script/start logger
-        :script/end logger
-        :pipeline/start (juxt logger (partial li/pipeline-started ctx))
-        :pipeline/end (juxt logger (partial li/pipeline-completed ctx))
-        :step/start (juxt logger (partial li/step-started ctx))
-        :step/end (juxt logger (partial li/step-completed ctx))}
-       (map (partial apply e/register-handler bus))))
+  (let [update-handler (li/build-update-handler ctx)]
+    (->> {:webhook/validated (ctx-async ctx r/build)
+          :build/triggered (ctx-async ctx r/build)
+          :build/completed update-handler
+          :script/start logger
+          :script/end logger
+          :pipeline/start (juxt logger update-handler)
+          :pipeline/end (juxt logger update-handler)
+          :step/start (juxt logger update-handler)
+          :step/end (juxt logger update-handler)}
+         (map (partial apply e/register-handler bus)))))
 
 (defn register-tx-handlers [ctx bus]
   (->> {:webhook/github (comp (map (partial wg/prepare-build ctx))
