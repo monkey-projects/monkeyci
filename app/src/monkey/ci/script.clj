@@ -134,7 +134,7 @@
     (cond-> {:type :step/end
              :message (or message
                           "Step completed")
-             :name (get-in ctx [:step :name ])
+             :name (get-in ctx [:step :name])
              :status status}
       (some? exception) (assoc :message (.getMessage exception)
                                :stack-trace (u/stack-trace exception)))))
@@ -175,18 +175,20 @@
                      (bc/failed? r) (reduced))))
                (merge (step-context p) initial-ctx))))
 
-(defn- pipeline-start-evt [ctx _ {:keys [name]}]
+(defn- pipeline-start-evt [ctx idx {:keys [name]}]
   (script-evt
    {:type :pipeline/start
-    :pipeline name
+    :pipeline {:name name
+               :index idx}
     :message (cond-> "Starting pipeline"
                name (str ": " name))}
    ctx))
 
-(defn- pipeline-end-evt [ctx _ {:keys [name]} r]
+(defn- pipeline-end-evt [ctx idx {:keys [name]} r]
   (script-evt
    {:type :pipeline/end
-    :pipeline name
+    :pipeline {:name name
+               :index idx}
     :message "Completed pipeline"
     :status (:status r)}
    ctx))

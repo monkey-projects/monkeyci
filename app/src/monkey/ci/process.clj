@@ -48,7 +48,7 @@
   "Generates a string that will be added as a commandline argument
    to the clojure process when running the script.  Any existing `deps.edn`
    should be used as well."
-  [{{:keys [script-dir]} :build {:keys [dev-mode]} :args}]
+  [{{:keys [script-dir]} :build :keys [dev-mode]}]
   (when dev-mode
     (log/debug "Running in development mode, using local src instead of libs"))
   (let [version-or (fn [f]
@@ -57,16 +57,16 @@
                        {:mvn/version (version)}))
         log-config (io/file script-dir "logback.xml")]
     (pr-str
-     (cond-> {:paths [script-dir]
-              :aliases
-              {:monkeyci/build
-               {:exec-fn 'monkey.ci.process/run
+     {:paths [script-dir]
+      :aliases
+      {:monkeyci/build
+       (cond-> {:exec-fn 'monkey.ci.process/run
                 :extra-deps {'com.monkeyci/script
                              (version-or local-script-lib-dir)
                              'com.monkeyci/app
-                             (version-or utils/cwd)}}}}
-       (fs/exists? log-config) (assoc-in [:aliases :monkeyci/build :jvm-opts]
-                                         [(str "-Dlogback.configurationFile=" log-config)])))))
+                             (version-or utils/cwd)}}
+         (fs/exists? log-config) (assoc :jvm-opts
+                                        [(str "-Dlogback.configurationFile=" log-config)]))}})))
 
 (defn- build-args
   "Builds command-line args vector for script process"

@@ -23,3 +23,16 @@
   []
   (s/list-builds (make-storage)
                  (c/account->sid)))
+
+(defn get-build [id]
+  (let [b (make-storage)
+        sid (vec (concat (c/account->sid) [id]))]
+    (merge (s/find-build-metadata b sid)
+           (s/find-build-results b sid))))
+
+(defn delete-build [id]
+  (let [b (make-storage)
+        sid (vec (concat (c/account->sid) [id]))
+        d (juxt (comp (partial s/delete-obj b) s/build-metadata-sid)
+                (comp (partial s/delete-obj b) s/build-results-sid))]
+    (d sid)))

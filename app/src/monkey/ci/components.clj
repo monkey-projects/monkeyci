@@ -111,10 +111,10 @@
         :build/completed (partial li/save-build-result ctx)
         :script/start logger
         :script/end logger
-        :pipeline/start (juxt logger li/pipeline-started)
-        :pipeline/end (juxt logger li/pipeline-completed)
-        :step/start logger
-        :step/end logger}
+        :pipeline/start (juxt logger (partial li/pipeline-started ctx))
+        :pipeline/end (juxt logger (partial li/pipeline-completed ctx))
+        :step/start (juxt logger (partial li/step-started ctx))
+        :step/end (juxt logger (partial li/step-completed ctx))}
        (map (partial apply e/register-handler bus))))
 
 (defn register-tx-handlers [ctx bus]
