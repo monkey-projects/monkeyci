@@ -29,21 +29,31 @@
                     :port))))
 
   (testing "takes port from env"
-    (is (= 1234 (-> (sut/app-config {:monkeyci-http-port 1234} {})
-                    :http
-                    :port))))
+    (is (= 1234
+           (-> (sut/app-config {:monkeyci-http-port 1234} {})
+               :http
+               :port))))
 
   (testing "takes github config from env"
-    (is (= "test-secret" (-> {:monkeyci-github-secret "test-secret"}
-                             (sut/app-config {})
-                             :github
-                             :secret))))
+    (is (= "test-secret"
+           (-> {:monkeyci-github-secret "test-secret"}
+               (sut/app-config {})
+               :github
+               :secret))))
 
   (testing "takes storage config from env"
-    (is (= "test-dir" (-> {:monkeyci-storage-dir "test-dir"}
-                          (sut/app-config {})
-                          :storage
-                          :dir))))
+    (is (= "test-dir"
+           (-> {:monkeyci-storage-dir "test-dir"}
+               (sut/app-config {})
+               :storage
+               :dir))))
+
+  (testing "takes sidecar config from env"
+    (is (= "test-file"
+           (-> {:monkeyci-sidecar-log-config "test-file"}
+               (sut/app-config {})
+               :sidecar
+               :log-config))))
 
   (testing "sets runner type"
     (is (= :test-type (-> {:monkeyci-runner-type "test-type"}
@@ -230,7 +240,15 @@
            (-> {:monkeyci-build-sid "a/b/c"}
                (sut/script-config {})
                :build
-               :sid)))))
+               :sid))))
+
+  (testing "groups git subkeys"
+    (is (= "test-ref"
+           (-> {:monkeyci-build-git-ref "test-ref"}
+               (sut/script-config {})
+               :build
+               :git
+               :ref)))))
 
 (deftest load-config-file
   (testing "`nil` if file does not exist"

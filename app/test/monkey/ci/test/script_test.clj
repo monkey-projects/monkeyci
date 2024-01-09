@@ -32,6 +32,17 @@
       (finally
         (uds/delete-address p)))))
 
+(deftest resolve-pipelines
+  (testing "returns vector as-is"
+    (is (= [::pipelines] (sut/resolve-pipelines [::pipelines] {}))))
+
+  (testing "invokes fn"
+    (is (= [::pipelines] (sut/resolve-pipelines (constantly [::pipelines]) {}))))
+
+  (testing "wraps single pipeline"
+    (let [p (bc/map->Pipeline {})]
+      (is (= [p] (sut/resolve-pipelines p {}))))))
+
 (deftest exec-script!
   (testing "executes basic clj script from location"
     (is (bc/success? (sut/exec-script! {:script-dir "examples/basic-clj"}))))
@@ -41,6 +52,12 @@
 
   (testing "executes dynamic pipelines"
     (is (bc/success? (sut/exec-script! {:script-dir "examples/dynamic-pipelines"}))))
+
+  (testing "skips `nil` pipelines"
+    (is (bc/success? (sut/exec-script! {:script-dir "examples/conditional-pipelines"}))))
+  
+  (testing "fails when invalid script"
+    (is (bc/failed? (sut/exec-script! {:script-dir "examples/invalid-script"}))))
   
   (testing "connects to listening socket if specified"
     (with-listening-socket
@@ -120,7 +137,19 @@
            (map (fn [t]
                   (testing (str t)
                     (verify-evt t))))
-           (doall)))))
+           (doall))))
+
+  (testing "skips `nil` pipelines"
+    (is (bc/success? (->> [(bc/pipeline {:steps [(constantly bc/success)]})
+                           nil]
+                          (sut/run-pipelines {})))))
+
+  (testing "handles pipeline seq that's not a vector"
+    (let [r (->> '((bc/pipeline {:steps [(constantly bc/success)]})
+                   (bc/pipeline {:steps [(constantly bc/success)]}))
+                 (sut/run-pipelines {}))]
+      (is (bc/success? r))
+      (is (= 2 (count (:pipelines r)))))))
 
 (defmethod c/run-container :test [ctx]
   {:test-result :run-from-test

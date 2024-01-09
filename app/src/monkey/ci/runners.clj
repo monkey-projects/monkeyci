@@ -89,11 +89,11 @@
   (let [{:keys [store]} (:workspace ctx)
         ;; TODO For local builds, upload all workdir files according to .gitignore
         {:keys [checkout-dir build-id]} (:build ctx)
-        dest build-id]
+        dest (str build-id b/extension)]
     (when checkout-dir
       (log/info "Creating workspace using files from" checkout-dir)
       @(md/chain
-        (b/save store checkout-dir dest)
+        (b/save store checkout-dir dest) ; TODO Check for errors
         (constantly (assoc-in ctx [:build :workspace] dest))))))
 
 (defn store-src
@@ -102,15 +102,14 @@
    cached files as needed."
   [ctx]
   (cond-> ctx
-    (not-empty (get-in ctx [:workspace :store])) (create-workspace)))
+    (some? (get-in ctx [:workspace :store])) (create-workspace)))
 
 ;; Creates a runner fn according to its type
 (defmulti make-runner (comp :type :runner))
 
 (defmethod make-runner :child [_]
   (log/info "Using child process runner")
-  ;; TODO Upload checked out code to storage for containers
-  (comp build-local download-src))
+  (comp build-local store-src download-src))
 
 (defmethod make-runner :noop [_]
   ;; For testing

@@ -9,6 +9,7 @@
              [commands :as co]
              [config :as config]
              [events :as e]
+             [listeners :as li]
              [logging :as l]
              [git :as git]
              [process :as p]
@@ -16,6 +17,7 @@
              [runners :as r]
              [storage :as st]]
             [monkey.ci.reporting.print]
+            [monkey.ci.runners.oci]
             [monkey.ci.storage
              [file]
              [oci]]
@@ -64,8 +66,7 @@
                (:dir opts))}})
 
 (defn- configure-workspace [ctx]
-  (mc/update-existing ctx :workspace (fn [ws]
-                                       (assoc ws :store (b/make-blob-store ctx :workspace)))))
+  (mc/update-existing ctx :workspace #(assoc % :store (b/make-blob-store ctx :workspace))))
 
 (defrecord Context [command config event-bus storage]
   c/Lifecycle
@@ -94,7 +95,10 @@
   [ctx f]
   (fn [evt]
     (ca/thread
-      (f (e/with-ctx ctx evt)))))
+      (try
+        (f (e/with-ctx ctx evt))
+        (catch Exception ex
+          (log/error "Failed to handle event" evt ex))))))
 
 (defn logger
   "Event handler that just logs the message"
@@ -104,13 +108,13 @@
 (defn register-handlers [ctx bus]
   (->> {:webhook/validated (ctx-async ctx r/build)
         :build/triggered (ctx-async ctx r/build)
-        :build/completed (partial st/save-build-result ctx)
+        :build/completed (partial li/save-build-result ctx)
         :script/start logger
         :script/end logger
-        :pipeline/start logger
-        :pipeline/end logger
-        :step/start logger
-        :step/end logger}
+        :pipeline/start (juxt logger (partial li/pipeline-started ctx))
+        :pipeline/end (juxt logger (partial li/pipeline-completed ctx))
+        :step/start (juxt logger (partial li/step-started ctx))
+        :step/end (juxt logger (partial li/step-completed ctx))}
        (map (partial apply e/register-handler bus))))
 
 (defn register-tx-handlers [ctx bus]

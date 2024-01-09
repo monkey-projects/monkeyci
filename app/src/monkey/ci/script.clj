@@ -24,7 +24,7 @@
          :env {}
          :pipeline p))
 
-(defn- script-evt [ctx evt]
+(defn- script-evt [evt ctx]
   (assoc evt
          :src :script
          :sid (get-in ctx [:build :sid])
@@ -33,7 +33,7 @@
 (defn- post-event [ctx evt]
   (log/trace "Posting event:" evt)
   (if-let [c (get-in ctx [:api :client])]
-    (let [{:keys [status] :as r} @(martian/response-for c :post-event (script-evt ctx evt))]
+    (let [{:keys [status] :as r} @(martian/response-for c :post-event (script-evt evt ctx))]
       (when-not (= 202 status)
         (log/warn "Failed to post event, got status" status)
         (log/debug "Full response:" r)))
@@ -117,9 +117,10 @@
 
 (defn- with-pipeline [{:keys [pipeline] :as ctx} evt]
   (let [p (select-keys pipeline [:name :index])]
-    (assoc evt
-           :index (get-in ctx [:step :index])
-           :pipeline p)))
+    (-> evt
+        (assoc :index (get-in ctx [:step :index])
+               :pipeline p)
+        (script-evt ctx))))
 
 (defn- step-start-evt [{{:keys [name]} :step :as ctx}]
   (with-pipeline ctx
@@ -133,7 +134,7 @@
     (cond-> {:type :step/end
              :message (or message
                           "Step completed")
-             :name (get-in ctx [:step :name ])
+             :name (get-in ctx [:step :name])
              :status status}
       (some? exception) (assoc :message (.getMessage exception)
                                :stack-trace (u/stack-trace exception)))))
@@ -174,17 +175,23 @@
                      (bc/failed? r) (reduced))))
                (merge (step-context p) initial-ctx))))
 
-(defn- pipeline-start-evt [_ _ {:keys [name]}]
-  {:type :pipeline/start
-   :pipeline name
-   :message (cond-> "Starting pipeline"
-              name (str ": " name))})
+(defn- pipeline-start-evt [ctx idx {:keys [name]}]
+  (script-evt
+   {:type :pipeline/start
+    :pipeline {:name name
+               :index idx}
+    :message (cond-> "Starting pipeline"
+               name (str ": " name))}
+   ctx))
 
-(defn- pipeline-end-evt [_ _ {:keys [name]} r]
-  {:type :pipeline/end
-   :pipeline name
-   :message "Completed pipeline"
-   :status (:status r)})
+(defn- pipeline-end-evt [ctx idx {:keys [name]} r]
+  (script-evt
+   {:type :pipeline/end
+    :pipeline {:name name
+               :index idx}
+    :message "Completed pipeline"
+    :status (:status r)}
+   ctx))
 
 (def run-steps!*
   (wrapped run-steps!
@@ -196,16 +203,21 @@
    pipelines are executed sequentially too, but this could be converted 
    into parallel processing."
   [{:keys [pipeline] :as ctx} p]
-  (let [p (cond->> (if (vector? p) p [p])
-            ;; Filter pipeline by name, if given
-            pipeline (filter (comp (partial = pipeline) :name)))]
-    (log/debug "Found" (count p) "matching pipelines:" (map :name p))
-    (let [result (->> p
+  (let [pf (cond->> p
+             ;; Filter pipeline by name, if given
+             pipeline (filter (comp (partial = pipeline) :name)))]
+    (log/debug "Found" (count pf) "matching pipelines:" (map :name pf))
+    (log/debug "Pipelines after filtering:" pf)
+    (let [result (->> pf
                       (map-indexed (partial run-steps!* ctx))
                       (doall))]
-      {:status (if (every? bc/success? result) :success :failure)})))
+      {:status (if (every? bc/success? result) :success :failure)
+       :pipelines pf})))
 
-(defn- load-pipelines [dir build-id]
+(defn- load-script
+  "Loads the pipelines from the build script, by reading the script
+   files dynamically."
+  [dir build-id]
   (let [tmp-ns (symbol (or build-id (str "build-" (random-uuid))))]
     ;; Declare a temporary namespace to load the file in, in case
     ;; it does not declare an ns of it's own.
@@ -270,8 +282,8 @@
     (f ctx)))
 
 (defn- with-script-dir [{:keys [script-dir] :as ctx} evt]
-  (->> (assoc evt :dir script-dir)
-       (script-evt ctx)))
+  (-> (assoc evt :dir script-dir)
+      (script-evt ctx)))
 
 (defn- script-started-evt [ctx _]
   (with-script-dir ctx
@@ -288,22 +300,25 @@
            script-started-evt
            script-completed-evt))
 
-(defn- resolve-pipelines
+(def pipeline? (partial instance? monkey.ci.build.core.Pipeline))
+
+(defn resolve-pipelines
   "The build script either returns a list of pipelines, or a function that
    returns a list.  This function resolves the pipelines in case it's a function
    or a var."
   [p ctx]
   (cond
+    (pipeline? p) [p]
     (fn? p) (resolve-pipelines (p ctx) ctx)
     (var? p) (resolve-pipelines (var-get p) ctx)
-    :else p))
+    :else (remove nil? p)))
 
 (defn- load-and-run-pipelines [{:keys [script-dir] :as ctx}]
   (let [build-id (ctx/get-build-id ctx)]
     (log/debug "Executing script for build" build-id "at:" script-dir)
     (log/debug "Script context:" ctx)
     (try 
-      (let [p (-> (load-pipelines script-dir build-id)
+      (let [p (-> (load-script script-dir build-id)
                   (resolve-pipelines ctx))]
         (log/debug "Pipelines:" p)
         (log/debug "Loaded" (count p) "pipelines:" (map :name p))
@@ -311,7 +326,8 @@
       (catch Exception ex
         (log/error "Unable to load pipelines" ex)
         (post-event ctx {:type :script/end
-                         :message (.getMessage ex)})))))
+                         :message (.getMessage ex)})
+        bc/failure))))
 
 (defn exec-script!
   "Loads a script from a directory and executes it.  The script is

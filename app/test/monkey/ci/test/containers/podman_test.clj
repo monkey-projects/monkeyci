@@ -88,7 +88,7 @@
 
     (testing "mounts"
       
-      (testing "adds mounts to args"
+      (testing "adds shared mounts to args"
         (let [r (sut/build-cmd-args (assoc-in base-ctx
                                               [:step :container/mounts] [["/host/path" "/container/path"]]))]
           (is (contains-subseq? r ["-v" "/host/path:/container/path"])))))

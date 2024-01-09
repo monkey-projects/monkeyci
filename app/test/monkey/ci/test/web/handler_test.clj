@@ -6,6 +6,7 @@
             [clojure.core.async :as ca]
             [clojure.string :as cs]
             [monkey.ci
+             [config :as config]
              [events :as events]
              [logging :as l]
              [storage :as st]]
@@ -67,6 +68,12 @@
     (is (= 200 (-> (mock/request :get "/health")
                    (test-app)
                    :status))))
+
+  (testing "version at `/version`"
+    (let [r (-> (mock/request :get "/version")
+                   (test-app))]
+      (is (= 200 (:status r)))
+      (is (= (config/version) (:body r)))))
 
   (testing "handles `nil` bodies"
     (is (= 200 (-> (mock/request :get "/health")
@@ -237,27 +244,41 @@
           (interleave ["/customer/" "/project/" "/repo/"])
           (apply str)))))
 
-(deftest build-endpoints
+(defn- generate-build-sid []
+  (->> (repeatedly st/new-id)
+       (take 4)
+       (st/->sid)))
+
+(defn- repo-path [sid]
+  (str (->> sid
+            (drop-last)
+            (interleave ["/customer" "project" "repo"])
+            (cs/join "/"))
+       "/builds"))
+
+(defn- build-path [sid]
+  (str (repo-path sid) "/" (last sid)))
+
+(defn- with-repo [f]
   (h/with-memory-store st
-    (let [generate-build-sid (fn []
-                               (->> (repeatedly st/new-id)
-                                    (take 4)
-                                    (st/->sid)))
-          repo-path (fn [sid]
-                      (str (->> sid
-                                (drop-last)
-                                (interleave ["/customer" "project" "repo"])
-                                (cs/join "/"))
-                           "/builds"))
-          build-path (fn [sid]
-                       (str (repo-path sid) "/" (last sid)))
-          app (make-test-app st)
-          [customer-id project-id repo-id build-id :as sid] (generate-build-sid)
-          path (repo-path sid)]
-      (is (st/sid? (st/create-build-results st sid {:exit 0 :status :success})))
-      (is (st/sid? (st/create-build-metadata st sid {:message "test meta"})))
-      
-      (testing "`GET` lists repo builds"
+    (h/with-bus
+      (fn [bus]
+        (let [app (sut/make-app {:storage st
+                                 :event-bus bus})
+              sid (generate-build-sid)
+              path (repo-path sid)]
+          (is (st/sid? (st/save-build-results st sid {:exit 0 :status :success})))
+          (is (st/sid? (st/create-build-metadata st sid {:message "test meta"})))
+          (f {:bus bus
+              :storage st
+              :sid sid
+              :path path
+              :app app}))))))
+
+(deftest build-endpoints
+  (testing "`GET` lists repo builds"
+    (with-repo
+      (fn [{:keys [path app] [_ _ _ build-id] :sid}]
         (let [l (-> (mock/request :get path)
                     (app))
               b (-> l
@@ -267,63 +288,87 @@
           (is (= 200 (:status l)))
           (is (= 1 (count b)))
           (is (= build-id (:id (first b))) "should contain build id")
-          (is (= "test meta" (:message (first b))) "should contain build metadata")))
+          (is (= "test meta" (:message (first b))) "should contain build metadata")))))
+  
+  (testing "`POST /trigger`"
+    (letfn [(catch-build-triggered-event [p f]
+              (with-repo
+                (fn [{:keys [bus app path] :as ctx}]
+                  (let [events (atom [])
+                        props [:customer-id :project-id :repo-id]
+                        _ (events/register-handler bus :build/triggered (partial swap! events conj))]
+                    (is (= 200 (-> (mock/request :post (str path p))
+                                   (app)
+                                   :status)))
+                    (is (not= :timeout (h/wait-until #(pos? (count @events)) 500)))
+                    (f (assoc ctx :event (first @events)))))))]
+      
+      (testing "triggers new build for repo"
+        (catch-build-triggered-event
+         "/trigger"
+         (fn [{:keys [bus app path sid event]}]
+           (let [props [:customer-id :project-id :repo-id]]
+             (is (= (zipmap props sid)
+                    (select-keys (:account event) props)))
+             (is (some? (-> event :build :build-id)))))))
+      
+      (testing "looks up url in repo config"
+        (with-repo
+          (fn [{:keys [bus app path] [customer-id project-id repo-id] :sid st :storage}]
+            (let [events (atom [])
+                  _ (events/register-handler bus :build/triggered (partial swap! events conj))]
+              (is (some? (st/save-customer st {:id customer-id
+                                               :projects
+                                               {project-id
+                                                {:id project-id
+                                                 :repos
+                                                 {repo-id
+                                                  {:id repo-id
+                                                   :url "http://test-url"}}}}})))
+              (is (= 200 (-> (mock/request :post (str path "/trigger"))
+                             (app)
+                             :status)))
+              (is (not= :timeout (h/wait-until #(pos? (count @events)) 500)))
+              (is (= "http://test-url"
+                     (-> @events first :build :git :url)))))))
+      
+      (testing "adds branch and commit id query params"
+        (catch-build-triggered-event
+         "/trigger?commitId=test-id&branch=test-branch"
+         (fn [{:keys [event]}]
+           (is (= "test-id"
+                  (-> event :build :git :commit-id)))
+           (is (= "test-branch"
+                  (-> event :build :git :branch))))))
 
-      (testing "`POST /trigger`"
-        (testing "triggers new build for repo"
-          (h/with-bus
-            (fn [bus]
-              (let [app (sut/make-app {:storage st
-                                       :event-bus bus})
-                    events (atom [])
-                    props [:customer-id :project-id :repo-id]
-                    _ (events/register-handler bus :build/triggered (partial swap! events conj))]
-                (is (= 200 (-> (mock/request :post (str path "/trigger"))
-                               (app)
-                               :status)))
-                (is (not= :timeout (h/wait-until #(pos? (count @events)) 500)))
-                (is (= (zipmap props sid)
-                       (select-keys (:account (first @events)) props)))
-                (is (some? (-> @events first :build :build-id)))))))
+      (testing "adds `sid` to build props"
+        (catch-build-triggered-event
+         "/trigger"
+         (fn [{:keys [sid event]}]
+           (let [bsid (get-in event [:build :sid])]
+             (is (= 4 (count bsid)) "expected sid to contain repo path and build id")
+             (is (= (take 3 sid) (take 3 bsid)))
+             (is (= (get-in event [:build :build-id])
+                    (last bsid)))))))
 
-        (testing "adds branch and commit id query params"
-          (h/with-bus
-            (fn [bus]
-              (let [app (sut/make-app {:storage st
-                                       :event-bus bus})
-                    events (atom [])
-                    _ (events/register-handler bus :build/triggered (partial swap! events conj))]
-                (is (= 200 (-> (mock/request :post (str path "/trigger?commitId=test-id&branch=test-branch"))
-                               (app)
-                               :status)))
-                (is (not= :timeout (h/wait-until #(pos? (count @events)) 500)))
-                (is (= "test-id"
-                       (-> @events first :build :git :commit-id)))
-                (is (= "test-branch"
-                       (-> @events first :build :git :branch)))))))
+      (testing "creates build metadata in storage"
+        (catch-build-triggered-event
+         "/trigger?branch=test-branch"
+         (fn [{:keys [event] st :storage}]
+           (let [bsid (get-in event [:build :sid])
+                 md (st/find-build-metadata st bsid)]
+             (is (some? md))
+             (is (= "refs/heads/test-branch" (:ref md)))))))
+      
+      (testing "returns build id")
 
-        (testing "adds `sid` to build props"
-          (h/with-bus
-            (fn [bus]
-              (let [app (sut/make-app {:storage st
-                                       :event-bus bus})
-                    events (atom [])
-                    _ (events/register-handler bus :build/triggered (partial swap! events conj))]
-                (is (= 200 (-> (mock/request :post (str path "/trigger"))
-                               (app)
-                               :status)))
-                (is (not= :timeout (h/wait-until #(pos? (count @events)) 500)))
-                (let [bsid (get-in (first @events) [:build :sid])]
-                  (is (= 4 (count bsid)) "expected sid to contain repo path and build id")
-                  (is (= (take 3 sid) (take 3 bsid)))
-                  (is (= (get-in (first @events) [:build :build-id])
-                         (last bsid))))))))
-        
-        (testing "returns build id")
+      (testing "returns 404 (not found) when repo does not exist")
 
-        (testing "returns 404 (not found) when repo does not exist"))
-
-      (testing "`GET /latest`"
+      (testing "when no branch specified, uses default branch")))
+  
+  (testing "`GET /latest`"
+    (with-repo
+      (fn [{:keys [path app] [_ _ _ build-id :as sid] :sid st :storage}]
         (testing "retrieves latest build for repo"
           (let [l (-> (mock/request :get (str path "/latest"))
                       (app))
@@ -345,9 +390,11 @@
             (is (= 204 (:status l)))
             (is (nil? (:body l)))))
 
-        (testing "404 when repo does not exist"))
+        (testing "404 when repo does not exist"))))
 
-      (testing "`GET /:build-id`"
+  (testing "`GET /:build-id`"
+    (with-repo
+      (fn [{:keys [app] [_ _ _ build-id :as sid] :sid}]
         (testing "retrieves build with given id"
           (let [l (-> (mock/request :get (build-path sid))
                       (app))

@@ -1,11 +1,13 @@
 (ns monkey.ci.web.common
   (:require [camel-snake-kebab.core :as csk]
             [clojure.core.async :refer [go <! <!! >!]]
+            [clojure.tools.logging :as log]
             [monkey.ci.events :as e]
             [muuntaja.core :as mc]
             [reitit.ring :as ring]
             [reitit.ring.coercion :as rrc]
             [reitit.ring.middleware
+             [exception :as rrme]
              [muuntaja :as rrmm]
              [parameters :as rrmp]]
             [ring.util.response :as rur]))
@@ -32,7 +34,7 @@
   [req evt]
   (go (some-> (req->bus req)
               (e/channel)
-              (>! evt))))
+              (>! (e/add-time evt)))))
 
 (defn make-muuntaja
   "Creates muuntaja instance with custom settings"
@@ -47,9 +49,20 @@
         [:formats "application/json" :encoder-opts]
         {:encode-key-fn (comp csk/->camelCase name)}))))
 
+(defn- exception-logger [h]
+  (fn [req]
+    (try
+      (h req)
+      (catch Exception ex
+        ;; Log and rethrow
+        (log/error (str "Got error while handling request" (:uri req)) ex)
+        (throw ex)))))
+
 (def default-middleware
   [rrmp/parameters-middleware
    rrmm/format-middleware
+   rrme/exception-middleware
+   exception-logger
    rrc/coerce-exceptions-middleware
    rrc/coerce-request-middleware
    rrc/coerce-response-middleware])

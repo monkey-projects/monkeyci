@@ -27,7 +27,7 @@
 
 ;; Determine version at compile time
 (defmacro version []
-  `(or (System/getenv (csk/->SCREAMING_SNAKE_CASE (str env-prefix "-version"))) "0.1.0-SNAPSHOT"))
+  (or (System/getenv (csk/->SCREAMING_SNAKE_CASE (str env-prefix "-version"))) "0.1.0-SNAPSHOT"))
 
 (defn- key-filter [prefix]
   (let [exp (str (name prefix) "-")]
@@ -67,11 +67,15 @@
             (reduce (fn [r v]
                       (group-keys v r))
                     c
-                    [:github :runner :containers :storage :api :account :http :logging :oci :build]))]
+                    [:github :runner :containers :storage :api :account :http :logging :oci :build
+                     :sidecar]))
+          (group-build-keys [c]
+            (update c :build (partial group-keys :git)))]
     (->> env
          (filter-and-strip-keys env-prefix)
          (group-all-keys)
          (group-credentials [:oci :storage :runner :logging])
+         (group-build-keys)
          (u/prune-tree))))
 
 (defn- parse-edn

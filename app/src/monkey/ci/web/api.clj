@@ -2,6 +2,7 @@
   (:require [camel-snake-kebab.core :as csk]
             [clojure.core.async :as ca]
             [clojure.tools.logging :as log]
+            [java-time.api :as jt]
             [medley.core :as mc]
             [monkey.ci
              [context :as ctx]
@@ -22,10 +23,13 @@
 
 (defn- entity-getter [get-id getter]
   (fn [req]
-    (if-let [match (some-> (c/req->storage req)
-                           (getter (get-id req)))]
-      (rur/response match)
-      (rur/not-found nil))))
+    (let [id (get-id req)]
+      (if-let [match (some-> (c/req->storage req)
+                             (getter id))]
+        (rur/response match)
+        (do
+          (log/warn "Entity not found:" id)
+          (rur/not-found nil))))))
 
 (defn- entity-creator [saver id-generator]
   (fn [req]
@@ -193,7 +197,7 @@
                         (fetch-build-details s (st/->sid (concat sid [id]))))]
     (->> builds
          (f)
-         ;; TODO This could potentially be slow for many builds
+         ;; TODO This is slow when there are many builds
          (map fetch-details))))
 
 (defn get-builds
@@ -226,15 +230,30 @@
   (c/posting-handler
    req
    (fn [{p :parameters}]
+     ;; TODO If no branch is specified, use the default
      (let [acc (:path p)
-           bid (u/new-build-id)]
-       {:type :build/triggered
-        :account acc
-        :build {:build-id bid
-                :git (select-keys (:query p) [:commit-id :branch])
-                :sid (-> acc
-                         (assoc :build-id bid)
-                         (st/ext-build-sid))}}))))
+           bid (u/new-build-id)
+           repo-sid ((juxt :customer-id :project-id :repo-id) acc)
+           st (c/req->storage req)
+           repo (st/find-repo st repo-sid)
+           md (-> acc
+                  (select-keys [:customer-id :project-id :repo-id])
+                  (assoc :build-id bid
+                         :source :api
+                         :timestamp (str (jt/instant))
+                         :ref (str "refs/heads/" (get-in p [:query :branch])))
+                  (merge (:query p)))]
+       (log/debug "Triggering build for repo sid:" repo-sid)
+       (when (st/create-build-metadata st md)
+         {:type :build/triggered
+          :account acc
+          :build {:build-id bid
+                  :git (-> (:query p)
+                           (select-keys [:commit-id :branch])
+                           (assoc :url (:url repo)))
+                  :sid (-> acc
+                           (assoc :build-id bid)
+                           (st/ext-build-sid))}})))))
 
 (defn list-build-logs [req]
   (let [build-sid (st/ext-build-sid (get-in req [:parameters :path]))

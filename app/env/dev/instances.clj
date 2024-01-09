@@ -1,6 +1,9 @@
 (ns instances
   (:require [clojure.tools.logging :as log]
             [config :as co]
+            [monkey.ci.containers :as c]
+            [monkey.ci.containers.oci :as oci-cont]
+            [monkey.ci.oci :as oci]
             [monkey.ci.runners.oci :as ro]
             [monkey.oci.container-instance.core :as ci]
             [manifold.deferred :as md]))
@@ -14,7 +17,7 @@
                                     :arguments ["-h"]}])
                (dissoc :volumes))]
     (log/info "Running instance with config:" ic)
-    (ro/run-instance client ic)))
+    (oci/run-instance client ic)))
 
 (defn print-container-logs [client {{:keys [lifecycle-state] :as s} :details}]
   (println "Got state change:" lifecycle-state)
@@ -26,7 +29,9 @@
        :body
        println))))
 
-(defn pinp-test []
+(defn pinp-test
+  "Trying to get podman-in-podman to run on a container instance."
+  []
   (let [conf (co/oci-runner-config)
         client (ci/make-context conf)
         ic (-> (ro/instance-config conf {:build {:build-id "podman-in-container"}})
@@ -37,9 +42,11 @@
                                     {:security-context-type "LINUX"
                                      :run-as-user 1000}}])
                (dissoc :volumes))]
-    (ro/run-instance client ic (partial print-container-logs client))))
+    (oci/run-instance client ic (partial print-container-logs client))))
 
-(defn delete-container-instance [n]
+(defn delete-container-instance
+  "Deletes container instance with given name"
+  [n]
   (let [conf (co/oci-runner-config)
         client (ci/make-context conf)]
     (md/chain
@@ -52,3 +59,16 @@
      first
      :id
      #(ci/delete-container-instance client {:instance-id %}))))
+
+(defn run-container-with-sidecar
+  "Runs a container in OCI that deploys a sidecar"
+  []
+  (let [ctx (-> @co/global-config
+                (assoc :step
+                       {:container/image "docker.io/alpine:latest"
+                        :script ["echo 'Hi, this is a simple test'"]}
+                       :build
+                       {:build-id (str "test-build-" (System/currentTimeMillis))
+                        :pipeline "test-pipe"
+                        :index "0"}))]
+    (c/run-container ctx)))
