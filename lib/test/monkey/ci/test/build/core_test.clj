@@ -59,3 +59,33 @@
       (is (= "test-pipeline" (:name test-pipeline)))
       (is (= steps (:steps test-pipeline)))
       (ns-unalias *ns* 'test-pipeline))))
+
+(deftest git-ref
+  (testing "gets git ref from build context"
+    (is (= ::test-ref (sut/git-ref {:build
+                                    {:git
+                                     {:ref ::test-ref}}})))))
+
+(deftest branch
+  (testing "gets branch from context"
+    (is (= "test-branch"
+           (sut/branch {:build
+                        {:git
+                         {:ref "refs/heads/test-branch"}}}))))
+
+  (testing "`nil` when no branch"
+    (is (nil? (sut/branch {})))
+    (is (nil? (sut/branch {:build {:git {:ref nil}}})))
+    (is (nil? (sut/branch {:build {:git {:ref "refs/tags/some-tag"}}})))))
+
+(deftest tag
+  (testing "gets tag from context"
+    (is (= "test-tag"
+           (sut/tag {:build
+                        {:git
+                         {:ref "refs/tags/test-tag"}}}))))
+
+  (testing "`nil` when no tag"
+    (is (nil? (sut/tag {})))
+    (is (nil? (sut/tag {:build {:git {:ref nil}}})))
+    (is (nil? (sut/tag {:build {:git {:ref "refs/heads/some-branch"}}})))))

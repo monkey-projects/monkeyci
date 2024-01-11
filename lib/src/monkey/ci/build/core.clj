@@ -45,3 +45,25 @@
      (pipeline
       {:name ~(name n)
        :steps ~steps})))
+
+(defn git-ref
+  "Gets the git ref from the context"
+  [ctx]
+  (get-in ctx [:build :git :ref]))
+
+(def branch-regex #"^refs/heads/(.*)$")
+(def tag-regex #"^refs/tags/(.*)$")
+
+(defn ref-regex
+  "Applies the given regex on the ref from the context, returns the matching groups."
+  [ctx re]
+  (some->> (git-ref ctx)
+           (re-matches re)))
+
+(def branch
+  "Gets the commit branch from the context"
+  (comp second #(ref-regex % branch-regex)))
+
+(def tag
+  "Gets the commit tag from the context"
+  (comp second #(ref-regex % tag-regex)))
