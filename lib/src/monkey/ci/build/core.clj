@@ -64,6 +64,12 @@
   "Gets the commit branch from the context"
   (comp second #(ref-regex % branch-regex)))
 
+(def main-branch (comp :main-branch :git :build))
+
+(defn main-branch? [ctx]
+  (= (main-branch ctx)
+     (branch ctx)))
+
 (def tag
   "Gets the commit tag from the context"
   (comp second #(ref-regex % tag-regex)))

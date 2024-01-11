@@ -89,3 +89,24 @@
     (is (nil? (sut/tag {})))
     (is (nil? (sut/tag {:build {:git {:ref nil}}})))
     (is (nil? (sut/tag {:build {:git {:ref "refs/heads/some-branch"}}})))))
+
+(deftest main-branch
+  (testing "gets main branch from context"
+    (is (= "main" (sut/main-branch {:build
+                                    {:git
+                                     {:main-branch "main"}}})))))
+
+(deftest main-branch?
+  (testing "false if ref branch does not equal main branch"
+    (is (false? (sut/main-branch?
+                 {:build
+                  {:git
+                   {:main-branch "main"
+                    :ref "refs/heads/other"}}}))))
+
+  (testing "true if ref branch equals main branch"
+    (is (true? (sut/main-branch?
+                {:build
+                 {:git
+                  {:main-branch "main"
+                   :ref "refs/heads/main"}}})))))
