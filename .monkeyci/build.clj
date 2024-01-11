@@ -17,7 +17,7 @@
   "Extracts the version from the tag"
   [ctx]
   (some->> (git-ref ctx)
-           (re-matches #"^refs/tags/(\d{8})$")
+           (re-matches #"^refs/tags/(\d+\.\d+(\.\d+)?$)")
            (second)))
 
 (defn image-version
@@ -31,7 +31,7 @@
   [ctx]
   (or (tag-version ctx)
       ;; TODO Determine automatically
-      "0.1.1-SNAPSHOT"))
+      "0.1.2-SNAPSHOT"))
 
 (defn clj-container [name dir & args]
   "Executes script in clojure container"

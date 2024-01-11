@@ -27,11 +27,14 @@
          (into [m/url])
          (cs/join "/"))))
 
+(defn- elapsed [v]
+  (str (- (:endTime v) (:startTime v)) " ms"))
+
 (defn- render-step [s]
   [:tr
    [:td (or (:name s) (:index s))]
    [:td [co/build-result (:status s)]]
-   [:td (- (:endTime s) (:startTime s)) " ms"]])
+   [:td (elapsed s)]])
 
 (defn- render-pipeline [p]
   [:div.accordion-item
@@ -44,7 +47,7 @@
        [:b "Elapsed: "]
        [:span
         {:title "Each pipeline incurs a small startup time, that's why the elapsed time is higher than the sum of the steps' times."}
-        (- (:endTime p) (:startTime p))] " ms"]
+        (elapsed p)]]
       [:li [:b "Steps: "] (count (:steps p))]]
      [:table.table.table-striped
       [:thead
