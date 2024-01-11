@@ -27,6 +27,43 @@
          (into [m/url])
          (cs/join "/"))))
 
+(defn- render-step [s]
+  [:tr
+   [:td (or (:name s) (:index s))]
+   [:td [co/build-result (:status s)]]
+   [:td (- (:endTime s) (:startTime s)) " ms"]])
+
+(defn- render-pipeline [p]
+  [:div.accordion-item
+   [:h4
+    [:button.accordion-button {:type :button} (or (:name p) (str "Pipeline " (:index p)))]]
+   [:div.accordion-collapse.collapse.show
+    [:div.accordion-body
+     [:ul
+      [:li
+       [:b "Elapsed: "]
+       [:span
+        {:title "Each pipeline incurs a small startup time, that's why the elapsed time is higher than the sum of the steps' times."}
+        (- (:endTime p) (:startTime p))] " ms"]
+      [:li [:b "Steps: "] (count (:steps p))]]
+     [:table.table.table-striped
+      [:thead
+       [:tr
+        [:th "Step"]
+        [:th "Result"]
+        [:th "Elapsed"]]]
+      (->> (:steps p)
+           (map render-step)
+           (into [:tbody]))]]]])
+
+(defn- build-pipelines []
+  (let [d (rf/subscribe [:build/details])]
+    [:div
+     [:h3 "Pipelines: " (count (:pipelines @d))]
+     (->> (:pipelines @d)
+          (map render-pipeline)
+          (into [:div.accordion.mb-2]))]))
+
 (defn- log-path [route l]
   (str (build-path route)
        "/logs/download?path=" (js/encodeURIComponent l)))
@@ -51,18 +88,23 @@
           (map log-row)
           (into [:tbody]))]))
 
+(defn- build-logs [params]
+  [:<>
+   [:div.clearfix
+    [:h3.float-start "Logs for " (:build-id params)]
+    [:div.float-end
+     [co/reload-btn [:build/load-logs]]]]
+   [logs-table]])
+
 (defn page [route]
   (rf/dispatch [:build/load-logs])
   (fn [route]
     (let [params (r/path-params route)]
       [l/default
        [:<>
-        [build-details]
-        [:div.clearfix
-         [:h3.float-start "Logs for " (:build-id params)]
-         [:div.float-end
-          [co/reload-btn [:build/load-logs]]]]
         [co/alerts [:build/alerts]]
-        [logs-table]
+        [build-details]
+        [build-pipelines]
+        [build-logs params]
         [:div
          [:a {:href (r/path-for :page/repo params)} "Back to repository"]]]])))

@@ -164,7 +164,7 @@
 (defn list-builds
   "Lists the ids of the builds for given repo sid"
   [s sid]
-  (list-obj s (concat ["builds"] sid)))
+  (list-obj s (concat [builds] sid)))
 
 (defn params-sid [sid]
   ;; Prepend params prefix, but also store at "params" leaf

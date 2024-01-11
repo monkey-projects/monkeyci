@@ -186,6 +186,9 @@
           md (st/find-build-metadata s sid)]
       (merge {:id (last sid)} md r))))
 
+(defn- add-index [[idx p]]
+  (assoc p :index idx))
+
 (defn- get-builds*
   "Helper function that retrieves the builds using the request, then
    applies `f` to the resultset and fetches the details of the remaining builds."
@@ -193,8 +196,16 @@
   (let [s (c/req->storage req)
         sid (repo-sid req)
         builds (st/list-builds s sid)
+        with-index (fn [v]
+                     (->> v
+                          (map add-index)
+                          (sort-by :index)))
+        pipelines->out (fn [p]
+                         (->> (with-index p)
+                              (map #(mc/update-existing % :steps with-index))))
         fetch-details (fn [id]
-                        (fetch-build-details s (st/->sid (concat sid [id]))))]
+                        (-> (fetch-build-details s (st/->sid (concat sid [id])))
+                            (update :pipelines pipelines->out)))]
     (->> builds
          (f)
          ;; TODO This is slow when there are many builds

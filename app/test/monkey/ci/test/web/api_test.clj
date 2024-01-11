@@ -234,6 +234,56 @@
       (is (= 200 (:status r)))
       (is (nil? (get-in r [:body :secret-key]))))))
 
+(deftest get-latest-build
+  (testing "converts pipelines to list sorted by index"
+    (let [{st :storage :as ctx} (test-ctx)
+          id (st/new-id)
+          md {:customer-id "test-cust"
+              :project-id "test-project"
+              :repo-id "test-repo"}
+          sid (st/->sid (concat (vals md) [id]))
+          _ (st/create-build-metadata st sid md)
+          _ (st/save-build-results st sid
+                                   {:pipelines {0 {:name "pipeline 1"}
+                                                1 {:name "pipeline 2"}}})
+          r (-> ctx
+                (->req)
+                (with-path-params md)
+                (sut/get-latest-build))]
+      (is (= 200 (:status r)))
+      (is (= 2 (-> r :body :pipelines count)))
+      (is (= [{:index 0
+               :name "pipeline 1"}
+              {:index 1
+               :name "pipeline 2"}]
+             (-> r :body :pipelines)))))
+
+  (testing "converts pipeline steps to list sorted by index"
+    (let [{st :storage :as ctx} (test-ctx)
+          id (st/new-id)
+          md {:customer-id "test-cust"
+              :project-id "test-project"
+              :repo-id "test-repo"}
+          sid (st/->sid (concat (vals md) [id]))
+          _ (st/create-build-metadata st sid md)
+          _ (st/save-build-results st sid
+                                   {:pipelines {0
+                                                {:name "pipeline 1"
+                                                 :steps
+                                                 {0 {:name "step 1"}
+                                                  1 {:name "step 2"}}}}})
+          r (-> ctx
+                (->req)
+                (with-path-params md)
+                (sut/get-latest-build))]
+      (is (= 200 (:status r)))
+      (is (= 2 (-> r :body :pipelines first :steps count)))
+      (is (= [{:index 0
+               :name "step 1"}
+              {:index 1
+               :name "step 2"}]
+             (-> r :body :pipelines first :steps))))))
+
 (defrecord FakeChannel [messages]
   http/Channel
   (send! [this msg close?]
