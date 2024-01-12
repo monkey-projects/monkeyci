@@ -47,4 +47,3 @@
                "success" :text-bg-success
                :text-bg-secondary)]
     [:span {:class (str "badge " (name type))} (or r "running")]))
-

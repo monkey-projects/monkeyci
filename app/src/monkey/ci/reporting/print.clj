@@ -43,18 +43,20 @@
 
 (defmethod printer :build/event [{:keys [event]}]
   (letfn [(p [& args]
-            (apply println (build-id event) args))]
+            (apply println (build-id event) args))
+          (pn [evt]
+            (get-in evt [:pipeline :name]))]
     (case (:type event)
       :script/start
       (p (cl/style "Script started" :green))
       :script/end
       (p (cl/style "Script completed" :green))
       :pipeline/start
-      (p "Pipeline started:" (accent (:pipeline event)))
+      (p "Pipeline started:" (accent (pn event)))
       :pipeline/end
       (if (bc/success? event)
-        (p "Pipeline" (accent (:pipeline event)) "succeeded" good)
-        (p "Pipeline" (accent (:pipeline event)) "failed" bad))
+        (p "Pipeline" (accent (pn event)) "succeeded" good)
+        (p "Pipeline" (accent (pn event)) "failed" bad))
       :step/start
       (p "Step started:" (accent (step-name event)))
       :step/end

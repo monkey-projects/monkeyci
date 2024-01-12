@@ -1,9 +1,11 @@
 (ns monkey.ci.gui.repo.views
-  (:require [monkey.ci.gui.components :as co]
+  (:require [monkey.ci.gui.clipboard :as cl]
+            [monkey.ci.gui.components :as co]
             [monkey.ci.gui.layout :as l]
             [monkey.ci.gui.repo.events]
             [monkey.ci.gui.repo.subs]
             [monkey.ci.gui.routing :as r]
+            [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
 (defn- build-row [b]
@@ -38,11 +40,14 @@
 (defn page [route]
   (rf/dispatch [:repo/load (get-in route [:parameters :path :customer-id])])
   (fn [route]
-    (let [{:keys [customer-id project-id repo-id]} (get-in route [:parameters :path])
+    (let [{:keys [customer-id project-id repo-id] :as p} (get-in route [:parameters :path])
           r (rf/subscribe [:repo/info project-id repo-id])]
       [l/default
        [:<>
-        [:h3 (:name @r)]
+        [:h3
+         (:name @r)
+         [:span.fs-6.p-1
+          [cl/clipboard-copy (u/->sid p :customer-id :project-id :repo-id) "Click to save the sid to clipboard"]]]
         [:p "Repository url: " [:a {:href (:url @r)} (:url @r)]]
         [co/alerts [:repo/alerts]]
         [builds]

@@ -27,8 +27,9 @@
          (into [m/url])
          (cs/join "/"))))
 
-(defn- elapsed [v]
-  (str (- (:endTime v) (:startTime v)) " ms"))
+(defn- elapsed [{s :startTime e :endTime}]
+  (when (and s e)
+    (str (- e s) " ms")))
 
 (defn- render-step [s]
   [:tr
@@ -92,22 +93,24 @@
           (into [:tbody]))]))
 
 (defn- build-logs [params]
-  [:<>
-   [:div.clearfix
-    [:h3.float-start "Logs for " (:build-id params)]
-    [:div.float-end
-     [co/reload-btn [:build/load-logs]]]]
-   [logs-table]])
+  (rf/dispatch [:build/load-logs])
+  (fn [params]
+    [:<>
+     [:div.clearfix
+      [:h3.float-start "Captured Logs"]
+      [:div.float-end
+       [co/reload-btn [:build/load-logs]]]]
+     [logs-table]]))
 
 (defn page [route]
-  (rf/dispatch [:build/load-logs])
-  (fn [route]
-    (let [params (r/path-params route)]
-      [l/default
-       [:<>
-        [co/alerts [:build/alerts]]
-        [build-details]
-        [build-pipelines]
-        [build-logs params]
-        [:div
-         [:a {:href (r/path-for :page/repo params)} "Back to repository"]]]])))
+  (let [params (r/path-params route)
+        repo (rf/subscribe [:repo/info (:project-id params) (:repo-id params)])]
+    [l/default
+     [:<>
+      [:h2 (:name @repo) " - " (:build-id params)]
+      [co/alerts [:build/alerts]]
+      [build-details]
+      [build-pipelines]
+      [build-logs params]
+      [:div
+       [:a {:href (r/path-for :page/repo params)} "Back to repository"]]]]))
