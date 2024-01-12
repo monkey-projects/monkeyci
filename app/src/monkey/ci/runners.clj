@@ -51,6 +51,13 @@
   (cleanup-checkout-dir! build)
   exit)
 
+(defn build-completed-tx [ctx]
+  ;; Filter by build id to avoid deleting the wrong checkout dir
+  (comp (filter (comp (partial = (get-in ctx [:build :build-id]))
+                      :build-id
+                      :build))
+        (map (partial e/with-ctx ctx))))
+
 (defn build-local
   "Locates the build script locally and dispatches another event with the
    script details in them.  If no build script is found, dispatches a build
@@ -59,9 +66,9 @@
   (let [{:keys [script-dir]} (:build ctx)]
     (->> (if (some-> (io/file script-dir) (.exists))
            (e/do-and-wait #(p/execute! ctx)
-                          event-bus :build/completed (map (partial e/with-ctx ctx)))
+                          event-bus :build/completed (build-completed-tx ctx))
            (ca/to-chan! [(script-not-found ctx)]))
-         (ca/take 1)  ; Limit to one because `wait-for` will return a never-closing channel
+         (ca/take 1) ; Limit to one because `wait-for` will return a never-closing channel
          (vector)
          (ca/map build-completed))))
 

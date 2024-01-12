@@ -63,6 +63,20 @@
                       script-dir (io/file checkout-dir "nonexisting")]
                   (verify-checkout-dir-deleted checkout-dir script-dir))))))))))
 
+(deftest build-completed-tx
+  (testing "adds context"
+    (is (= {:key "value"
+            :event {:type :test-event}}
+           (-> (sut/build-completed-tx {:key "value"})
+               (sequence [{:type :test-event}])
+               (first)))))
+
+  (testing "filters by build id"
+    (let [build-id (random-uuid)]
+      (is (empty? (-> (sut/build-completed-tx {:build {:build-id "other-id"}})
+                      (sequence [{:type :build/completed
+                                  :build {:build-id build-id}}])))))))
+
 (deftest download-src
   (testing "no-op if the source is local"
     (let [ctx {}]
