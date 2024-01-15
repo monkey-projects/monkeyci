@@ -237,15 +237,15 @@
       (rur/response b)
       (rur/not-found nil))))
 
-(defn- params->ref
+(defn- as-ref [k v]
+  (fn [p]
+    (when-let [r (get-in p [:query k])]
+      (format "refs/%s/%s" v r))))
+
+(def params->ref
   "Creates a git ref from the query parameters (either branch or tag)"
-  [p]
-  (let [{{:keys [branch tag]} :query} p]
-    (cond
-      (some? branch)
-      (str "refs/heads/" branch)
-      (some? tag)
-      (str "refs/tags/" tag))))
+  (some-fn (as-ref :branch "heads")
+           (as-ref :tag "tags")))
 
 (defn trigger-build-event [{acc :path :as p} bid repo]
   {:type :build/triggered
@@ -274,7 +274,7 @@
                   (assoc :build-id bid
                          :source :api
                          :timestamp (str (jt/instant))
-                         :ref (str "refs/heads/" (get-in p [:query :branch])))
+                         :ref (params->ref p))
                   (merge (:query p)))]
        (log/debug "Triggering build for repo sid:" repo-sid)
        (when (st/create-build-metadata st md)

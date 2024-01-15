@@ -17,7 +17,7 @@
   "Extracts the version from the tag"
   [ctx]
   (some->> (git-ref ctx)
-           (re-matches #"^refs/tags/(\d+\.\d+(\.\d+)?$)")
+           (re-matches #"^refs/tags/(\d+\.\d+\.\d+(\.\d+)?$)")
            (second)))
 
 (defn image-version
@@ -30,7 +30,7 @@
   "Retrieves lib/jar version from the tag, or the next snapshot if this is the main branch."
   [ctx]
   (or (tag-version ctx)
-      ;; TODO Determine automatically
+      ;; TODO Determine automatically (e.g. by inspecting pom.xml?)
       "0.1.2-SNAPSHOT"))
 
 (defn clj-container [name dir & args]
