@@ -96,10 +96,7 @@
   (rf/dispatch [:build/load-logs])
   (fn [params]
     [:<>
-     [:div.clearfix
-      [:h3.float-start "Captured Logs"]
-      [:div.float-end
-       [co/reload-btn [:build/load-logs]]]]
+     [:h3.float-start "Captured Logs"]
      [logs-table]]))
 
 (defn page [route]
@@ -107,7 +104,10 @@
         repo (rf/subscribe [:repo/info (:project-id params) (:repo-id params)])]
     [l/default
      [:<>
-      [:h2 (:name @repo) " - " (:build-id params)]
+      [:div.clearfix
+       [:h2.float-start (:name @repo) " - " (:build-id params)]
+       [:div.float-end
+        [co/reload-btn [:build/reload]]]]
       [co/alerts [:build/alerts]]
       [build-details]
       [build-pipelines]

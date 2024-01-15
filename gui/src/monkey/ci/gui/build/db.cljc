@@ -12,3 +12,8 @@
 
 (defn set-logs [db l]
   (assoc db logs l))
+
+(def build ::build)
+
+(defn set-build [db l]
+  (assoc db build l))

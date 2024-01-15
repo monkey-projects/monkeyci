@@ -5,29 +5,46 @@
             [re-frame.core :as rf]
             [schema.core :as s]))
 
+(def customer-path ["/customer/" :customer-id])
+(def repo-path (into customer-path ["/project/" :project-id "/repo/" :repo-id]))
+(def build-path (into repo-path ["/builds/" :build-id]))
+
+(def customer-schema
+  {:customer-id s/Str})
+
+(def repo-schema
+  (assoc customer-schema
+         :project-id s/Str
+         :repo-id s/Str))
+
+(def build-schema
+  (assoc repo-schema :build-id s/Str))
+
+(defn api-route [conf]
+  (merge {:method :get
+          :produces #{"application/edn"}}
+         conf))
+
 (def routes
-  [{:route-name :get-customer
-    :path-parts ["/customer/" :customer-id]
-    :method :get
-    :path-schema {:customer-id s/Str}
-    :produces #{"application/edn"}}
+  [(api-route
+    {:route-name :get-customer
+     :path-parts customer-path
+     :path-schema customer-schema})
 
-   {:route-name :get-builds
-    :path-parts ["/customer/" :customer-id "/project/" :project-id "/repo/" :repo-id "/builds"]
-    :method :get
-    :path-schema {:customer-id s/Str
-                  :project-id s/Str
-                  :repo-id s/Str}
-    :produces #{"application/edn"}}
+   (api-route
+    {:route-name :get-builds
+     :path-parts (into repo-path ["/builds"])
+     :path-schema repo-schema})
 
-   {:route-name :get-build-logs
-    :path-parts ["/customer/" :customer-id "/project/" :project-id "/repo/" :repo-id "/builds/" :build-id "/logs"]
-    :method :get
-    :path-schema {:customer-id s/Str
-                  :project-id s/Str
-                  :repo-id s/Str
-                  :build-id s/Str}
-    :produces #{"application/edn"}}])
+   (api-route
+    {:route-name :get-build
+     :path-parts build-path
+     :path-schema build-schema})
+
+   (api-route
+    {:route-name :get-build-logs
+     :path-parts (into build-path ["/logs"])
+     :path-schema build-schema})])
 
 ;; The api url.  This should be configured in a `config.js`.
 (def url #?(:clj "http://localhost:3000"

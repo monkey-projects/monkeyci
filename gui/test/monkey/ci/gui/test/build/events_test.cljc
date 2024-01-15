@@ -51,3 +51,43 @@
     (is (= :danger (-> (db/alerts @app-db)
                        (first)
                        :type)))))
+
+(deftest build-load
+  (testing "sets alert"
+    (rf/dispatch-sync [:build/load])
+    (is (= 1 (count (db/alerts @app-db)))))
+
+  (testing "fetches builds from backend"
+    (rft/run-test-sync
+     (let [c (h/catch-fx :martian.re-frame/request)]
+       (reset! app-db {:route/current
+                       {:parameters
+                        {:path 
+                         {:customer-id "test-cust"
+                          :project-id "test-proj"
+                          :repo-id "test-repo"
+                          :build-id "test-build"}}}})
+       (h/initialize-martian {:get-build {:body "test-build"
+                                          :error-code :no-error}})
+       (rf/dispatch [:build/load])
+       (is (= 1 (count @c)))
+       (is (= :get-build (-> @c first (nth 2)))))))
+
+  (testing "clears current build"
+    (is (map? (reset! app-db (db/set-build {} "test-build"))))
+    (rf/dispatch-sync [:build/load])
+    (is (nil? (db/logs @app-db)))))
+
+(deftest build-load--success
+  (testing "clears alerts"
+    (is (map? (reset! app-db (db/set-alerts {} [{:type :info
+                                                 :message "test notification"}]))))
+    (rf/dispatch-sync [:build/load--success {:body []}])
+    (is (nil? (db/alerts @app-db)))))
+
+(deftest build-load--failed
+  (testing "sets error"
+    (rf/dispatch-sync [:build/load--failed "test-error"])
+    (is (= :danger (-> (db/alerts @app-db)
+                       (first)
+                       :type)))))

@@ -100,7 +100,7 @@
     <dependency>
       <groupId>com.monkeyprojects</groupId>
       <artifactId>oci-container-instance</artifactId>
-      <version>0.1.0-SNAPSHOT</version>
+      <version>0.1.0</version>
     </dependency>
     <dependency>
       <groupId>com.monkeyprojects</groupId>
@@ -178,7 +178,7 @@
     <dependency>
       <groupId>com.monkeyprojects</groupId>
       <artifactId>oci-sign</artifactId>
-      <version>0.1.3-SNAPSHOT</version>
+      <version>0.1.3</version>
     </dependency>
     <dependency>
       <groupId>org.clojure</groupId>
