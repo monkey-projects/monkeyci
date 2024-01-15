@@ -18,6 +18,10 @@
   (s/find-customer (make-storage)
                    (get-in @c/global-config [:account :customer-id])))
 
+(defn update-customer
+  [upd]
+  (s/save-customer (make-storage) upd))
+
 (defn list-builds
   "Lists builds according to current account settings"
   []

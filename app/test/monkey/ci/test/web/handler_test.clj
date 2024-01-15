@@ -194,7 +194,8 @@
                               :base-entity {:name "test repo"
                                             :customer-id cust-id
                                             :project-id p-id
-                                            :url "http://test-repo"}
+                                            :url "http://test-repo"
+                                            :labels [{:name "app" :value "test-app"}]}
                               :updated-entity {:name "updated repo"}
                               :creator st/save-repo})))
 

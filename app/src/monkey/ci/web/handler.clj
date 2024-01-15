@@ -35,6 +35,10 @@
 (defn- assoc-id [s]
   (assoc s (s/optional-key :id) Id))
 
+(s/defschema Label
+  {:name Name
+   :value not-empty-str})
+
 (s/defschema NewCustomer
   {:name Name})
 
@@ -60,7 +64,8 @@
   {:customer-id Id
    :project-id Id
    :name Name
-   :url s/Str})
+   :url s/Str
+   (s/optional-key :labels) [Label]})
 
 (s/defschema UpdateRepo
   (assoc-id NewRepo))
