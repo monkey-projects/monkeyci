@@ -312,3 +312,22 @@
                                first
                                :msg
                                :body))))))))))
+
+(deftest trigger-build-event
+  (testing "adds ref to build from branch query param"
+    (is (= "refs/heads/test-branch"
+           (-> {:query
+                {:branch "test-branch"}}
+               (sut/trigger-build-event "test-build" {})
+               :build
+               :git
+               :ref))))
+
+  (testing "adds ref to build from tag query param"
+    (is (= "refs/tags/test-tag"
+           (-> {:query
+                {:tag "test-tag"}}
+               (sut/trigger-build-event "test-build" {})
+               :build
+               :git
+               :ref)))))

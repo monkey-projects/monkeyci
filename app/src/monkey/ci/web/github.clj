@@ -91,7 +91,7 @@
                             (select-keys [:timestamp :message :author])))
                  (merge (select-keys payload [:ref])))
           conf {:git {:url (if private ssh-url clone-url)
-                      :branch master-branch
+                      :main-branch master-branch
                       :ref (:ref payload)
                       :id commit-id}
                 :sid (s/ext-build-sid md) ; Build storage id

@@ -332,14 +332,19 @@
               (is (= "http://test-url"
                      (-> @events first :build :git :url)))))))
       
-      (testing "adds branch and commit id query params"
+      (testing "adds commit id from query params"
         (catch-build-triggered-event
-         "/trigger?commitId=test-id&branch=test-branch"
+         "/trigger?commitId=test-id"
          (fn [{:keys [event]}]
            (is (= "test-id"
-                  (-> event :build :git :commit-id)))
-           (is (= "test-branch"
-                  (-> event :build :git :branch))))))
+                  (-> event :build :git :commit-id))))))
+
+      (testing "adds branch from query params as ref"
+        (catch-build-triggered-event
+         "/trigger?branch=test-branch"
+         (fn [{:keys [event]}]
+           (is (= "refs/heads/test-branch"
+                  (-> event :build :git :ref))))))
 
       (testing "adds `sid` to build props"
         (catch-build-triggered-event

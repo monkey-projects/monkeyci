@@ -148,4 +148,18 @@
         (let [r (sut/prepare-build {:storage s}
                                    {:id "test-webhook"
                                     :payload {:ref "test-ref"}})]
-          (is (= "test-ref" (get-in r [:build :git :ref]))))))))
+          (is (= "test-ref" (get-in r [:build :git :ref])))))))
+
+  (testing "sets `main-branch`"
+    (h/with-memory-store s
+      (let [wh {:id "test-webhook"
+                :customer-id "test-customer"
+                :project-id "test-project"
+                :repo-id "test-repo"}]
+        (is (st/sid? (st/save-webhook-details s wh)))
+        (let [r (sut/prepare-build {:storage s}
+                                   {:id "test-webhook"
+                                    :payload {:ref "test-ref"
+                                              :repository {:master-branch "test-main"}}})]
+          (is (= "test-main"
+                 (get-in r [:build :git :main-branch]))))))))
