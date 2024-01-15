@@ -19,6 +19,7 @@
             [monkey.ci.reporting.print]
             [monkey.ci.runners.oci]
             [monkey.ci.storage
+             [cached :as cs]
              [file]
              [oci]]
             [monkey.ci.web
@@ -142,7 +143,8 @@
 (defrecord Storage [config]
   c/Lifecycle
   (start [this]
-    (assoc this :storage (st/make-storage config)))
+    ;; Use cached storage
+    (assoc this :storage (cs/make-cached-storage (st/make-storage config))))
   
   (stop [this]
     (dissoc this :storage)))
