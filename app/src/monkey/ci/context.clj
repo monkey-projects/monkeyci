@@ -42,6 +42,11 @@
             :checkout-dir
             (constantly (u/cwd)))))
 
+(defn step-relative-dir
+  "Calculates path `p` as relative to the work dir for the current step"
+  [ctx p]
+  (u/abs-path (step-work-dir ctx) p))
+
 (defn ctx->env
   "Build the environment from the context to be passed to an external process."
   [ctx]
