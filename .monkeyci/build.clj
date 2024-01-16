@@ -81,7 +81,7 @@
   (ref? #"^refs/heads/main$"))
 
 (def release?
-  (ref? #"^refs/tags/\d{8}$"))
+  (ref? #"^refs/tags/\d+\.\d+\.\d+(\.\d+)?$"))
 
 (def should-publish?
   (some-fn main-branch? release?))
