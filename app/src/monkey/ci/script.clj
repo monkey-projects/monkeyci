@@ -140,6 +140,7 @@
                                :stack-trace (u/stack-trace exception)))))
 
 (def run-single-step*
+  ;; TODO Send the start event only when the step has been fully resolved
   (wrapped run-single-step
            step-start-evt
            step-end-evt))

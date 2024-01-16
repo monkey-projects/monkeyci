@@ -7,6 +7,11 @@
 (s/def :ci/script-step string?)
 (s/def :ci/script (s/coll-of :ci/script-step))
 
+(s/def :cache/id string?)
+(s/def :cache/path string?)
+(s/def :ci/cache-config (s/keys :req-un [:cache/id :cache/path]))
+(s/def :ci/caches (s/coll-of :ci/cache-config))
+
 (s/def :container/image string?)
 (s/def :container/entrypoint (s/coll-of string?))
 (s/def :container/cmd (s/coll-of string?))
@@ -18,12 +23,12 @@
 (s/def :ci/step (s/or :fn fn?
                       :action
                       (s/keys :req-un [:ci/action]
-                              :opt-un [:ci/name])
+                              :opt-un [:ci/name :ci/caches])
                       :container
                       (s/keys :req [:container/image]
                               :opt [:container/entrypoint :container/cmd :container/mounts :container/env
                                     :container/platform]
-                              :opt-un [:ci/script :ci/name])))
+                              :opt-un [:ci/script :ci/name :ci/caches])))
 (s/def :ci/output string?)
 (s/def :ci/exception (partial instance? java.lang.Exception))
 
