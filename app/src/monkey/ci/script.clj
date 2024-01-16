@@ -273,9 +273,10 @@
     socket (connect-to-uds socket)))
 
 (defn- setup-api-client [ctx]
-  (cond-> ctx
-    ;; In tests it could be there is no socket, so skip the initialization in that case
-    (get-in ctx [:api :socket]) (assoc-in [:api :client] (make-client ctx))))
+  (let [api? (some-fn :socket :url)]
+    (cond-> ctx
+      ;; In tests it could be there is no api configuration, so skip the initialization in that case
+      (api? (:api ctx)) (assoc-in [:api :client] (make-client ctx)))))
 
 (defn- with-script-api [ctx f]
   (let [ctx (setup-api-client ctx)]

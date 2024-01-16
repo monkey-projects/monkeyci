@@ -50,10 +50,12 @@
               0 ;; Done when the events file is deleted
               (when (if (= ::eof evt)
                       (do
+                        ;; EOF reached, wait a bit and retry
                         (Thread/sleep interval)
                         true)
                       (do
                         (log/debug "Read next event:" evt)
+                        ;; TODO Dispatch to API instead?
                         (e/post-event event-bus evt)))
                 (recur (read-next r))))))
         (catch Exception ex

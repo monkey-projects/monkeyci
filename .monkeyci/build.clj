@@ -6,18 +6,18 @@
             [monkey.ci.build
              [api :as api]
              [core :as core]
-             [shell :as shell]])
-  (:import [java.time OffsetDateTime ZoneOffset]
-           java.time.format.DateTimeFormatter))
+             [shell :as shell]]))
 
 (defn git-ref [ctx]
   (get-in ctx [:build :git :ref]))
+
+(def tag-regex #"^refs/tags/(\d+\.\d+\.\d+(\.\d+)?$)")
 
 (defn tag-version
   "Extracts the version from the tag"
   [ctx]
   (some->> (git-ref ctx)
-           (re-matches #"^refs/tags/(\d+\.\d+(\.\d+)?$)")
+           (re-matches tag-regex)
            (second)))
 
 (defn image-version
@@ -64,7 +64,6 @@
       (fs/delete-on-exit auth-file)
       core/success)))
 
-(def datetime-format (DateTimeFormatter/ofPattern "yyyyMMdd"))
 (def img-base "fra.ocir.io/frjdhmocn5qi")
 (def app-img (str img-base "/monkeyci"))
 (def bot-img (str img-base "/monkeyci-bot"))
@@ -81,7 +80,7 @@
   (ref? #"^refs/heads/main$"))
 
 (def release?
-  (ref? #"^refs/tags/\d{8}$"))
+  (ref? tag-regex))
 
 (def should-publish?
   (some-fn main-branch? release?))
