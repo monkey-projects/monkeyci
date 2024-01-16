@@ -51,9 +51,10 @@
   "Build the environment from the context to be passed to an external process."
   [ctx]
   (-> ctx
-      (select-keys [:oci :containers :log-dir :build])
+      (select-keys [:oci :containers :log-dir :build :cache])
       (mc/update-existing-in [:build :sid] u/serialize-sid)
-      (assoc :logging (dissoc (:logging ctx) :maker))))
+      (assoc :logging (dissoc (:logging ctx) :maker))
+      (update :cache dissoc :store)))
 
 (def account->sid (juxt :customer-id :project-id :repo-id))
 

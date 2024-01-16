@@ -10,7 +10,9 @@
 (def cache-store (comp :store :cache))
 
 (defn cache-archive-path [{:keys [build]} id]
-  (cs/join "/" (concat (:sid build) [id])))
+  ;; The cache archive path is the repo sid with the cache id added.
+  ;; Build id is not used since caches are meant to supersede builds.
+  (str (cs/join "/" (concat (butlast (:sid build)) [id])) ".tgz"))
 
 (defn- step-caches [ctx]
   (let [c (get-in ctx [:step :caches])]

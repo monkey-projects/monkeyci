@@ -2,12 +2,14 @@
   (:require [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [clojure.core.async :as ca]
+            [manifold.deferred :as md]
             [martian
              [core :as martian]
              [httpkit :as mh]
              [interceptors :as mi]]
             [monkey.ci.build.core :as bc]
             [monkey.ci
+             [cache :as cache]
              [containers :as c]
              [context :as ctx]
              [events :as e]
@@ -80,6 +82,18 @@
     (cond-> r
       (zero? exit) (merge bc/success))))
 
+(defn- with-apply-caches
+  "If the current step has caches configured, restores/saves them as needed."
+  [f ctx]
+  @(md/chain
+    (cache/restore-caches ctx)
+    (fn [c]
+      (assoc-in ctx [:step :caches] c))
+    f
+    (fn [r]
+      (cache/save-caches ctx)
+      r)))
+
 (defmethod run-step ::action
   ;; Runs a step as an action.  The action property of a step should be a
   ;; function that either returns a status result, or a new step configuration.
@@ -87,7 +101,7 @@
   (let [f (:action step)]
     (log/debug "Executing function:" f)
     ;; If a step returns nil, treat it as success
-    (let [r (or (f ctx) bc/success)]
+    (let [r (or (with-apply-caches f ctx) bc/success)]
       (if (bc/status? r)
         r
         ;; Recurse
@@ -140,7 +154,7 @@
                                :stack-trace (u/stack-trace exception)))))
 
 (def run-single-step*
-  ;; TODO Send the start event only when the step has been fully resolved
+  ;; TODO Send the start event only when the step has been fully resolved?
   (wrapped run-single-step
            step-start-evt
            step-end-evt))

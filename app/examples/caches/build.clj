@@ -8,7 +8,8 @@
 (def caching-step
   {:name "restore-and-save-cache"
    :action (fn [ctx]
-             (fs/create-dir cache-dir)
+             (when-not (fs/exists? cache-dir)
+               (fs/create-dir cache-dir))
              (let [f (fs/list-dir cache-dir)]
                (println "There currently are" (count f) "files in cache")
                ;; Write to cache

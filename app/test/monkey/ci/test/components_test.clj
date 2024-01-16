@@ -101,6 +101,14 @@
                            :workspace
                            :store))))
 
+  (testing "sets cache store"
+    (is (b/blob-store? (-> (sut/new-context :test-cmd)
+                           (assoc :cache {:type :disk
+                                          :dir "cache-dir"})
+                           (c/start)
+                           :cache
+                           :store))))
+
   (testing "sets reporter"
     (is (fn? (-> (sut/new-context :test-cmd)
                  (c/start)

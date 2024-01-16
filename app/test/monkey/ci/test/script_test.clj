@@ -6,6 +6,7 @@
              [core :as martian]
              [test :as mt]]
             [monkey.ci
+             [cache :as cache]
              [containers :as c]
              [events :as e]
              [script :as sut]
@@ -170,6 +171,25 @@
           r (sut/run-step ctx)]
       (is (= :run-from-test (:test-result r)))
       (is (bc/success? r))))
+
+  (testing "restores/saves cache if configured"
+    (let [saved (atom false)]
+      (with-redefs [cache/save-caches
+                    (fn [ctx]
+                      (reset! saved true)
+                      ctx)
+                    cache/restore-caches
+                    (fn [ctx]
+                      (->> (get-in ctx [:step :caches])
+                           (mapv :id)))]
+        (let [ctx {:step {:action (fn [ctx]
+                                    (when-not (= [:test-cache] (get-in ctx [:step :caches]))
+                                      bc/failure))
+                          :caches [{:id :test-cache
+                                    :path "test-cache"}]}}
+              r (sut/run-step ctx)]
+          (is (bc/success? r))
+          (is (true? @saved))))))
 
   (testing "function returns step config"
 

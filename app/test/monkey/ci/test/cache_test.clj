@@ -18,7 +18,7 @@
       (is (some? @(sut/save-caches ctx)))
       (is (= 1 (count @stored)))
       (is (cs/ends-with? (-> @stored first second)
-                         "test-build/test-cache"))))
+                         "test-cust/test-cache.tgz"))))
 
   (testing "nothing if no cache store"
     (is (empty? @(sut/save-caches {:step {:caches [{:id "test-cache"
@@ -26,7 +26,7 @@
 
 (deftest restore-caches
   (testing "restores path using blob store"
-    (let [stored (atom {"test-cust/test-build/test-cache" ::dest})
+    (let [stored (atom {"test-cust/test-cache.tgz" ::dest})
           bs (h/->FakeBlobStore stored)
           ctx {:cache {:store bs}
                :build {:sid ["test-cust" "test-build"]}

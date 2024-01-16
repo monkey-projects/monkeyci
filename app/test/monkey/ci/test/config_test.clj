@@ -48,6 +48,13 @@
                :storage
                :dir))))
 
+  (testing "takes cache config from env"
+    (is (= "test-dir"
+           (-> {:monkeyci-cache-dir "test-dir"}
+               (sut/app-config {})
+               :cache
+               :dir))))
+
   (testing "takes sidecar config from env"
     (is (= "test-file"
            (-> {:monkeyci-sidecar-log-config "test-file"}
@@ -216,6 +223,12 @@
                  (sut/script-config {})
                  :logging
                  :maker))))
+
+  (testing "initializes cache store"
+    (is (some? (-> {:monkeyci-cache-type "disk"}
+                   (sut/script-config {})
+                   :cache
+                   :store))))
 
   (testing "groups api settings"
     (is (= "test-socket"

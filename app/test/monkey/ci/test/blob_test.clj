@@ -104,10 +104,11 @@
         (is (nil? (sut/make-archive orig arch)))
         (is (fs/exists? arch))
         (is (pos? (fs/size arch)))
-        (with-redefs [os/get-object (constantly (md/success-deferred (fs/read-all-bytes arch)))]
+        (with-redefs [os/head-object (constantly true)
+                      os/get-object (constantly (md/success-deferred (fs/read-all-bytes arch)))]
           (let [res @(sut/restore blob "remote/path" r)]
             
-            (testing " reads to temp file, then unarchives it"
+            (testing "reads to temp file, then unarchives it"
               (is (= r res))
               (doseq [[f v] files]
                 (let [p (io/file r "orig" f)]
@@ -115,4 +116,12 @@
                   (is (= v (slurp p))))))
 
             (testing "deletes tmp files"
-              (is (empty? (fs/list-dir tmp-dir))))))))))
+              (is (empty? (fs/list-dir tmp-dir))))))
+
+        (with-redefs [os/head-object (constantly false)
+                      os/get-object (fn [& args]
+                                      (throw (ex-info "This should not be invoked" {:args args})))]
+          (let [res @(sut/restore blob "remote/path" r)]
+            
+            (testing "returns `nil` if src does not exist"
+              (is (nil? res)))))))))
