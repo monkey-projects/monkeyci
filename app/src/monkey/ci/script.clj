@@ -2,7 +2,6 @@
   (:require [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [clojure.core.async :as ca]
-            [manifold.deferred :as md]
             [martian
              [core :as martian]
              [httpkit :as mh]
@@ -80,19 +79,7 @@
   (let [{:keys [exit] :as r} (->> (c/run-container ctx)
                                   (merge bc/failure))]
     (cond-> r
-      (zero? exit) (merge bc/success))))
-
-(defn- with-apply-caches
-  "If the current step has caches configured, restores/saves them as needed."
-  [f ctx]
-  @(md/chain
-    (cache/restore-caches ctx)
-    (fn [c]
-      (assoc-in ctx [:step :caches] c))
-    f
-    (fn [r]
-      (cache/save-caches ctx)
-      r)))
+      (= 0 exit) (merge bc/success))))
 
 (defmethod run-step ::action
   ;; Runs a step as an action.  The action property of a step should be a
@@ -101,7 +88,7 @@
   (let [f (:action step)]
     (log/debug "Executing function:" f)
     ;; If a step returns nil, treat it as success
-    (let [r (or (with-apply-caches f ctx) bc/success)]
+    (let [r (or (cache/with-apply-caches f ctx) bc/success)]
       (if (bc/status? r)
         r
         ;; Recurse

@@ -52,3 +52,16 @@
 (defn restore-caches
   [ctx]
   (do-with-caches ctx restore-cache))
+
+(defn with-apply-caches
+  "Executes `f`.  If the current step has caches configured, restores/saves 
+   them as needed."
+  [f ctx]
+  @(md/chain
+    (restore-caches ctx)
+    (fn [c]
+      (assoc-in ctx [:step :caches] c))
+    f
+    (fn [r]
+      (save-caches ctx)
+      r)))
