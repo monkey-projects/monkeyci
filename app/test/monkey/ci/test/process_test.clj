@@ -35,7 +35,7 @@
                     {:key :test-args}
                     {:monkeyci-containers-type "docker"
                      :monkeyci-event-socket "/tmp/test.sock"})))
-        (is (= {:containers {:type  :docker}
+        (is (= {:containers {:type :docker}
                 :event-socket "/tmp/test.sock"}
                (-> @captured-args
                    (select-keys [:containers

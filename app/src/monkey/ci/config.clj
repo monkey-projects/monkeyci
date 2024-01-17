@@ -15,6 +15,7 @@
             [clojure.tools.logging :as log]
             [medley.core :as mc]
             [monkey.ci
+             [blob :as b]
              [logging :as l]
              [utils :as u]]))
 
@@ -68,7 +69,7 @@
                       (group-keys v r))
                     c
                     [:github :runner :containers :storage :api :account :http :logging :oci :build
-                     :sidecar]))
+                     :sidecar :cache]))
           (group-build-keys [c]
             (update c :build (partial group-keys :git)))]
     (->> env
@@ -174,6 +175,14 @@
       (set-log-dir)
       (set-account)))
 
+(defn- configure-blob [k ctx]
+  (mc/update-existing ctx k (fn [c]
+                              (when (some? (:type c))
+                                (assoc c :store (b/make-blob-store ctx k))))))
+
+(def configure-workspace (partial configure-blob :workspace))
+(def configure-cache     (partial configure-blob :cache))
+
 (def default-script-config
   "Default configuration for the script runner."
   {:containers {:type :docker}
@@ -194,7 +203,9 @@
       (merge args)
       (update-in [:containers :type] keyword)
       (update-in [:logging :type] keyword)
+      (update-in [:cache :type] keyword)
       (initialize-log-maker)
+      (configure-cache)
       (mc/update-existing-in [:build :sid] u/parse-sid)))
 
 (defn- flatten-nested

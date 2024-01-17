@@ -26,9 +26,14 @@
    is run in a child process by the `execute!` function below.  This exits the VM
    with a nonzero value on failure."
   ([args env]
-   (let [ctx (config/script-config env args)]
-     (log/debug "Executing script with context" ctx)
-     (when (bc/failed? (script/exec-script! ctx))
+   (try 
+     (let [ctx (config/script-config env args)]
+       (log/debug "Executing script with context" ctx)
+       (when (bc/failed? (script/exec-script! ctx))
+         (System/exit 1)))
+     (catch Exception ex
+       ;; This could happen if there is an error loading or initializing the child process
+       (log/error "Failed to run child process" ex)
        (System/exit 1))))
 
   ([args]

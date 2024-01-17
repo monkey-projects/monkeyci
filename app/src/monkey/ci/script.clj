@@ -8,6 +8,7 @@
              [interceptors :as mi]]
             [monkey.ci.build.core :as bc]
             [monkey.ci
+             [cache :as cache]
              [containers :as c]
              [context :as ctx]
              [events :as e]
@@ -78,7 +79,7 @@
   (let [{:keys [exit] :as r} (->> (c/run-container ctx)
                                   (merge bc/failure))]
     (cond-> r
-      (zero? exit) (merge bc/success))))
+      (= 0 exit) (merge bc/success))))
 
 (defmethod run-step ::action
   ;; Runs a step as an action.  The action property of a step should be a
@@ -87,7 +88,7 @@
   (let [f (:action step)]
     (log/debug "Executing function:" f)
     ;; If a step returns nil, treat it as success
-    (let [r (or (f ctx) bc/success)]
+    (let [r (or (cache/with-apply-caches f ctx) bc/success)]
       (if (bc/status? r)
         r
         ;; Recurse
@@ -140,6 +141,7 @@
                                :stack-trace (u/stack-trace exception)))))
 
 (def run-single-step*
+  ;; TODO Send the start event only when the step has been fully resolved?
   (wrapped run-single-step
            step-start-evt
            step-end-evt))

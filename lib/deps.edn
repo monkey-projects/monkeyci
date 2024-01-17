@@ -5,7 +5,7 @@
  
  :aliases
  {:test
-  {:extra-deps {com.monkeyprojects/build {:mvn/version "0.2-SNAPSHOT"}
+  {:extra-deps {com.monkeyprojects/build {:mvn/version "0.2.0"}
                 com.github.oliyh/martian-test {:mvn/version "0.1.25"}}
    :exec-fn monkey.test/all}
 
@@ -20,7 +20,7 @@
    :exec-args {:ns-regex ["monkey.ci.build.*"]}}
 
   :jar
-  {:extra-deps {com.monkeyprojects/build {:mvn/version "0.2-SNAPSHOT"}}
+  {:extra-deps {com.monkeyprojects/build {:mvn/version "0.2.0"}}
    :exec-fn monkey.build/jar
    :exec-args {:jar "target/monkeyci-script.jar"
                :version-env "MONKEYCI_VERSION"

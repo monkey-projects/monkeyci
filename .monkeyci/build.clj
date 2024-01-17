@@ -44,9 +44,11 @@
 (def test-app (clj-container "test-app" "app" "-M:test:junit"))
 
 (defn uberjar [name dir]
-  (fn [ctx]
-    (assoc (clj-container name dir "-X:jar:uber")
-           :container/env {"MONKEYCI_VERSION" (lib-version ctx)})))
+  {:name name
+   :action
+   (fn [ctx]
+     (assoc (clj-container name dir "-X:jar:uber")
+            :container/env {"MONKEYCI_VERSION" (lib-version ctx)}))})
 
 (def app-uberjar (uberjar "app-uberjar" "app"))
 (def bot-uberjar (uberjar "braid-bot-uberjar" "braid-bot"))
@@ -92,14 +94,15 @@
 (defn kaniko-build-img
   "Creates a step that builds and uploads an image using kaniko"
   [{:keys [name dockerfile context image tag]}]
-  (fn [ctx]
-    {:name name
-     :container/image "gcr.io/kaniko-project/executor:latest"
-     :container/cmd ["--dockerfile" (str "/workspace/" (or dockerfile "Dockerfile"))
-                     "--destination" (str image ":" (or tag (image-version ctx)))
-                     "--context" "dir:///workspace"]
-     :container/mounts [[(make-context ctx context) "/workspace"]
-                        [(podman-auth ctx) "/kaniko/.docker/config.json"]]}))
+  {:name name
+   :action
+   (fn [ctx]
+     {:container/image "gcr.io/kaniko-project/executor:latest"
+      :container/cmd ["--dockerfile" (str "/workspace/" (or dockerfile "Dockerfile"))
+                      "--destination" (str image ":" (or tag (image-version ctx)))
+                      "--context" "dir:///workspace"]
+      :container/mounts [[(make-context ctx context) "/workspace"]
+                         [(podman-auth ctx) "/kaniko/.docker/config.json"]]})})
 
 (def build-app-image
   (kaniko-build-img

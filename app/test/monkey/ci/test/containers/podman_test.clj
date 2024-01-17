@@ -61,7 +61,23 @@
                                      (swap! log-paths conj path)
                                      (l/->InheritLogger))}})]
           (is (= "unknown-build" (->> @log-paths
-                                      ffirst))))))))
+                                      ffirst))))))
+
+    (testing "restores and saves caches if configured"
+      (h/with-tmp-dir dir
+        (let [stored (atom {})
+              cache (h/->FakeBlobStore stored)
+              r (mcc/run-container
+                 {:containers {:type :podman}
+                  :build {:build-id "test-build"}
+                  :work-dir dir
+                  :step {:name "test-step"
+                         :container/image "test-img"
+                         :script ["first" "second"]
+                         :caches [{:id "test-cache"
+                                   :path "test-path"}]}
+                  :cache {:store cache}})]
+          (is (not-empty @stored)))))))
 
 (deftest build-cmd-args
   (let [base-ctx {:build {:build-id "test-build"}
