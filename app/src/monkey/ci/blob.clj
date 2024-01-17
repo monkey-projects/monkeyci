@@ -112,6 +112,7 @@
   BlobStore
   (save [_ src dest]
     (let [f (io/file dir dest)]
+      (log/debug "Saving archive" src "to" f)
       (md/chain
        (make-archive src f)
        ;; Return destination path
@@ -119,18 +120,26 @@
 
   (restore [_ src dest]
     (let [f (io/file dest)
-          os (PipedOutputStream.)]
+          os (PipedOutputStream.)
+          srcf (io/file dir src)]
       (md/future
-        (with-open [is (BufferedInputStream. (PipedInputStream. os))]
-          ;; Decompress to the output stream
-          (doto (Thread. #(cc/decompress
-                           (io/input-stream (io/file dir src))
-                           os
-                           compression-type))
-            (.start))
-          ;; Unarchive
-          (mkdirs! f)
-          (extract-archive is f))))))
+        (when (fs/exists? srcf)
+          (with-open [is (BufferedInputStream. (PipedInputStream. os))]
+            ;; Decompress to the output stream
+            (doto (Thread. (fn []
+                             (try 
+                               (cc/decompress
+                                (io/input-stream srcf)
+                                os
+                                compression-type)
+                               (catch Exception ex
+                                 (log/error "Unable to decompress archive" ex))
+                               (finally
+                                 (.close os)))))
+              (.start))
+            ;; Unarchive
+            (mkdirs! f)
+            (extract-archive is f)))))))
 
 (defmethod make-blob-store :disk [conf k]
   (->DiskBlobStore (get-in conf [k :dir])))

@@ -73,3 +73,5 @@
 (def tag
   "Gets the commit tag from the context"
   (comp second #(ref-regex % tag-regex)))
+
+(def work-dir "The step work dir" (comp :work-dir :step))

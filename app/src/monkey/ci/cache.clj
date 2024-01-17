@@ -1,6 +1,7 @@
 (ns monkey.ci.cache
   "Functionality for saving/restoring caches.  This uses blobs."
-  (:require [clojure.string :as cs]
+  (:require [babashka.fs :as fs]
+            [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
             [monkey.ci
@@ -42,7 +43,11 @@
   (log/debug "Restoring cache:" id "to path" path)
   (blob/restore (cache-store ctx)
                 (cache-archive-path ctx id)
-                (c/step-relative-dir ctx path)))
+                ;; Restore to the parent path because the dir name will be in the archive
+                (-> (c/step-relative-dir ctx path)
+                    (fs/parent)
+                    (fs/canonicalize)
+                    (str))))
 
 (defn restore-caches
   [ctx]
