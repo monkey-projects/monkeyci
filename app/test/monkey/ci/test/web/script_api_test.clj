@@ -50,12 +50,12 @@
       (is (= :test-server (sut/start-server {:public-api sut/local-api}))))))
 
 (deftest local-api
-  (testing "`get-params` retrieves from local db"
+  (testing "`get-params` retrieves legacy params from local db"
     (let [sid ["test-cust" "test-proj" "test-repo" "test-build"]
           st (st/make-memory-storage)
           api (sut/local-api {:storage st
                               :build {:sid sid}})
           params [{:name "testkey" :value "testvalue"}]]
-      (is (st/sid? (st/save-params st (butlast sid) params)))
+      (is (st/sid? (st/save-legacy-params st (butlast sid) params)))
       (is (fn? api))
       (is (= {"testkey" "testvalue"} (api :get-params))))))

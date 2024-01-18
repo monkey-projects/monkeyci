@@ -219,15 +219,21 @@
                 (test-app)))
           (verify-param-endpoints [desc path]
             (testing (format "parameter endpoints at `%s/param`" desc)
-              (let [params [{:name "test-param"
-                             :value "test value"}]
+              (let [params [{:parameters
+                             [{:name "test-param"
+                               :value "test value"}]
+                             :label-filters []}]
                     path (str path "/param")]
                 (testing "empty when no parameters"
                   (is (empty? (get-params path))))
                 (testing "can write params"
                   (is (= 200 (:status (save-params path params)))))
                 (testing "can read params"
-                  (is (= params (get-params path)))))))]
+                  ;; TODO Refactor this (will be changed anyway when we remove projects)
+                  (is (get-params path)
+                      (= (if (cs/includes? path "project")
+                           (:parameters params)
+                           params)))))))]
     
     (verify-param-endpoints
      "/customer/:customer-id"

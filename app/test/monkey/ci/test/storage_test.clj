@@ -77,12 +77,15 @@
   (testing "can store on customer level"
     (h/with-memory-store st
       (let [cid (sut/new-id)
-            params [{:name "param-1"
-                     :value "value 1"}
-                    {:name "param-2"
-                     :value "value 2"}]]
-        (is (sut/sid? (sut/save-params st [cid] params)))
-        (is (= params (sut/find-params st [cid])))))))
+            params {:parameters
+                    [{:name "param-1"
+                      :value "value 1"}
+                     {:name "param-2"
+                      :value "value 2"}]
+                    :label-filters
+                    [[{:label "test-label" :value "test-value"}]]}]
+        (is (sut/sid? (sut/save-params st cid params)))
+        (is (= params (sut/find-params st cid)))))))
 
 (deftest patch-build-results
   (testing "reads result, applies f with args, then writes result back"

@@ -147,35 +147,83 @@
                     :parameters))
 (def params-sid (comp (partial remove nil?)
                       repo-sid))
+(def customer-id (comp :customer-id :path :parameters))
 
-(defn fetch-all-params
-  "Fetches all params for the given sid from storage, adding all those from
-   higher levels too."
+(defn- fetch-legacy-params
+  "Fetches parameters at the given level, and any higher level.  This is 
+   for backwards compatibility, for parameters without labels.  Project
+   and repo labels are implicitly added."
   [st params-sid]
   (->> (loop [sid params-sid
               acc []]
          (if (empty? sid)
            acc
            (recur (drop-last sid)
-                  (concat acc (st/find-params st (st/->sid sid))))))
+                  (concat acc (st/find-legacy-params st (st/->sid sid))))))
        (group-by :name)
        (vals)
        (map first)))
 
+(defn- apply-label-filters
+  "Given a single set of parameters with label filters, checks if the given
+   labels match.  If there is at least one filter in the params' `:label-filters`
+   for which all labels in the conjunction match, this returns `true`.  If
+   the params don't have any labels, this assumes all labels match."
+  [labels params]
+  (letfn [(filter-applies? [{:keys [label value]}]
+            ;; TODO Add support for regexes
+            (= value (get labels label)))
+          (conjunction-applies? [parts]
+            (every? filter-applies? parts))
+          (disjunction-applies? [parts]
+            (or (empty? parts)
+                (some conjunction-applies? parts)))]
+    (disjunction-applies? (:label-filters params))))
+
+(defn- sid->labels
+  "Constructs auto-generated labels for the given project or repo sid.  Later on
+   this will be replaced with actual labels configured on the repo (project will
+   be removed)."
+  [sid]
+  (let [labels ["monkeyci/project"
+                "monkeyci/repo"]]
+    (zipmap labels (rest sid))))
+
+(defn fetch-all-params
+  "Fetches all params that apply to the given sid from storage.  For legacy
+   parameters, this adds all those from higher levels too.  For label-filtered
+   parameters, adds those where the repo labels apply.  For a project, the
+   label `monkeyci/project` is used.  Parameters that don't have any filters
+   are applied to all projects and repos."
+  [st params-sid]
+  (concat
+   (fetch-legacy-params st params-sid)
+   (->> (st/find-params st (first params-sid))
+        (filter (partial apply-label-filters (sid->labels params-sid)))
+        (map :parameters))))
+
 (defn get-params
   "Retrieves build parameters for the given location.  This could be at customer, 
-   project or repo level.  For lower levels, the parameters for the higher levels
-   are merged in."
+   project or repo level.  This returns all parameters that are available for the
+   given entity."
   [req]
   ;; TODO Allow to retrieve only for the specified level using query param
   ;; TODO Return 404 if customer, project or repo not found.
-  (-> (c/req->storage req)
-      (fetch-all-params (params-sid req))
-      (rur/response)))
+  ;; TODO Split this up in a method for customer params and one for repo params.
+  (let [psid (params-sid req)]
+    (if (= 1 (count psid))
+      (-> (c/req->storage req)
+          (st/find-params (customer-id req))
+          (or [])
+          (rur/response))
+      (-> (c/req->storage req)
+          (fetch-all-params psid)
+          (rur/response)))))
 
 (defn update-params [req]
   (let [p (body req)]
-    (when (st/save-params (c/req->storage req) (params-sid req) p)
+    ;; TODO Allow patching parameters so we don't have to send back all secrets to client
+    (when (st/save-params (c/req->storage req) (customer-id req) p)
       (rur/response p))))
 
 (defn- fetch-build-details [s sid]

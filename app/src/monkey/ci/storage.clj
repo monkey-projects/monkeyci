@@ -166,18 +166,32 @@
   [s sid]
   (list-obj s (concat [builds] sid)))
 
-(defn params-sid [sid]
+(defn ^:deprecated legacy-params-sid [sid]
   ;; Prepend params prefix, but also store at "params" leaf
   (vec (concat ["params"] sid ["params"])))
 
-(defn save-params
+(defn ^:deprecated save-legacy-params
   "Stores build parameters.  This can be done on customer, project or repo level.
    The `sid` is a vector that determines on which level the information is stored."
   [s sid p]
-  (write-obj s (params-sid sid) p))
+  (write-obj s (legacy-params-sid sid) p))
 
-(defn find-params
+(defn ^:deprecated find-legacy-params
   "Loads parameters on the given level.  This does not automatically include the
    parameters of higher levels."
   [s sid]
-  (read-obj s (params-sid sid)))
+  (read-obj s (legacy-params-sid sid)))
+
+;; (def params-sid legacy-params-sid)
+;; (def find-params find-legacy-params)
+;; (def save-params save-legacy-params)
+
+(defn params-sid [customer-id]
+  ;; All parameters for a customer are stored together
+  ["build-params" customer-id])
+
+(defn find-params [s cust-id]
+  (read-obj s (params-sid cust-id)))
+
+(defn save-params [s cust-id p]
+  (write-obj s (params-sid cust-id) p))

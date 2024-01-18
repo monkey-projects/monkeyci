@@ -70,9 +70,20 @@
 (s/defschema UpdateRepo
   (assoc-id NewRepo))
 
+(s/defschema ParameterValue
+  {:name s/Str
+   :value s/Str})
+
+(s/defschema LabelFilterConjunction
+  {:label s/Str
+   :value s/Str})
+
+(s/defschema LabelFilter
+  [LabelFilterConjunction])
+
 (s/defschema Parameters
-  [{:name s/Str
-    :value s/Str}])
+  {:parameters [ParameterValue]
+   :label-filters [LabelFilter]})
 
 (defn- generic-routes
   "Generates generic entity routes.  If child routes are given, they are added
@@ -104,7 +115,7 @@
 (def parameter-routes
   ["/param" {:get {:handler api/get-params}
              :put {:handler api/update-params
-                   :parameters {:body Parameters}}}])
+                   :parameters {:body [Parameters]}}}])
 
 (def build-routes
   ["/builds"
