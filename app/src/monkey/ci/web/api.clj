@@ -2,7 +2,6 @@
   (:require [camel-snake-kebab.core :as csk]
             [clojure.core.async :as ca]
             [clojure.tools.logging :as log]
-            [java-time.api :as jt]
             [medley.core :as mc]
             [monkey.ci
              [context :as ctx]
@@ -273,7 +272,7 @@
                   (select-keys [:customer-id :project-id :repo-id])
                   (assoc :build-id bid
                          :source :api
-                         :timestamp (str (jt/instant))
+                         :timestamp (System/currentTimeMillis)
                          :ref (str "refs/heads/" (get-in p [:query :branch])))
                   (merge (:query p)))]
        (log/debug "Triggering build for repo sid:" repo-sid)
