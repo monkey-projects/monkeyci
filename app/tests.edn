@@ -1,3 +1,4 @@
 #kaocha/v1
-{:kaocha.plugin.junit-xml/omit-system-out? true
- :kaocha.watch/ignore ["\\.#*.clj"]}
+{:omit-system-out? true
+ :ignore ["\\.#*.clj"]
+ :fail-fast? true}

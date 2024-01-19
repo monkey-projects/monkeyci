@@ -6,6 +6,7 @@
             [monkey.ci
              [context :as ctx]
              [events :as e]
+             [labels :as lbl]
              [logging :as l]
              [storage :as st]
              [utils :as u]]
@@ -131,77 +132,53 @@
                       repo-sid))
 (def customer-id (comp :customer-id :path :parameters))
 
-(defn apply-label-filters
-  "Given a single set of parameters with label filters, checks if the given
-   labels match.  If there is at least one filter in the params' `:label-filters`
-   for which all labels in the conjunction match, this returns `true`.  If
-   the params don't have any labels, this assumes all labels match."
-  [labels params]
-  (letfn [(filter-applies? [{:keys [label value]}]
-            ;; TODO Add support for regexes
-            (= value (get labels label)))
-          (conjunction-applies? [parts]
-            (every? filter-applies? parts))
-          (disjunction-applies? [parts]
-            (or (empty? parts)
-                (some conjunction-applies? parts)))]
-    (disjunction-applies? (:label-filters params))))
-
-(defn labels->map [l]
-  (->> (map (juxt :name :value) l)
-       (into {})))
-
-(defn fetch-all-params
-  "Fetches all params that apply to the given sid from storage.  For legacy
-   parameters, this adds all those from higher levels too.  For label-filtered
-   parameters, adds those where the repo labels apply.  For a project, the
-   label `monkeyci/project` is used.  Parameters that don't have any filters
-   are applied to all projects and repos."
-  ([st cust-id repo]
-   (->> (st/find-params st cust-id)
-        (filter (partial apply-label-filters (labels->map (:labels repo))))
-        (mapcat :parameters)))
-  ([st [cust-id repo-id]]
-   (fetch-all-params st cust-id (st/find-repo st [cust-id repo-id]))))
-
-(defn get-customer-params
-  "Retrieves all parameters configured on the customer.  This is for administration purposes."
-  [req]
+(defn- get-list-for-customer [finder req]
   (-> (c/req->storage req)
-      (st/find-params (customer-id req))
+      (finder (customer-id req))
       (or [])
       (rur/response)))
 
-(defn get-repo-params
-  "Retrieves the parameters that are available for the given repository.  This depends
-   on the parameter label filters and the repository labels."
-  [req]
+(defn- update-for-customer [updater req]
+  (let [p (body req)]
+    ;; TODO Allow patching values so we don't have to send back all secrets to client
+    (when (updater (c/req->storage req) (customer-id req) p)
+      (rur/response p))))
+
+(defn- get-for-repo-by-label
+  "Uses the finder to retrieve a list of entities for the repository specified
+   by the request.  Then filters them using the repo labels and their configured
+   label filters.  Applies the transducer `tx` before constructing the response."
+  [finder tx req]
   (let [st (c/req->storage req)
         repo-sid ((juxt :customer-id :repo-id) (get-in req [:parameters :path]))
         repo (st/find-repo st repo-sid)]
     (if repo
-      (-> st
-          (fetch-all-params (customer-id req) repo)
-          (rur/response))
+      (->> (finder st (customer-id req))
+           (lbl/filter-by-label repo)
+           (into [] tx)
+           (rur/response))
       (rur/not-found {:message (format "Repository %s does not exist" repo-sid)}))))
 
-(defn ^:deprecated get-params
-  "Retrieves build parameters for the given location.  This could be at customer, 
-   project or repo level.  This returns all parameters that are available for the
-   given entity."
-  [req]
-  ;; TODO Allow to retrieve only for the specified level using query param
-  ;; TODO Return 404 if customer, project or repo not found.
-  ;; TODO Split this up in a method for customer params and one for repo params.
-  (if (= 1 (count (params-sid req)))
-    (get-customer-params req)
-    (get-repo-params req)))
+(def get-customer-params
+  "Retrieves all parameters configured on the customer.  This is for administration purposes."
+  (partial get-list-for-customer st/find-params))
 
-(defn update-params [req]
-  (let [p (body req)]
-    ;; TODO Allow patching parameters so we don't have to send back all secrets to client
-    (when (st/save-params (c/req->storage req) (customer-id req) p)
-      (rur/response p))))
+(def get-repo-params
+  "Retrieves the parameters that are available for the given repository.  This depends
+   on the parameter label filters and the repository labels."
+  (partial get-for-repo-by-label st/find-params (mapcat :parameters)))
+
+(def update-params
+  (partial update-for-customer st/save-params))
+
+(def get-customer-ssh-keys
+  (partial get-list-for-customer st/find-ssh-keys))
+
+(def get-repo-ssh-keys
+  (partial get-for-repo-by-label st/find-ssh-keys (map :private-key)))
+
+(def update-ssh-keys
+  (partial update-for-customer st/save-ssh-keys))
 
 (defn- fetch-build-details [s sid]
   (log/debug "Fetching details for build" sid)

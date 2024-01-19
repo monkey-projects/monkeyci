@@ -21,7 +21,6 @@
       (let [build-id (str (random-uuid))
             md {:build-id build-id
                 :repo-id "test-repo"
-                :project-id "test-project"
                 :customer-id "test-cust"}]
         (is (sut/sid? (sut/create-build-metadata st md)))
         (is (= md (sut/find-build-metadata st md)))))))
@@ -29,7 +28,6 @@
 (deftest build-sid
   (testing "starts with builds"
     (is (= "builds" (first (sut/build-sid {:customer-id "cust"
-                                           :project-id "proj"
                                            :repo-id "repo"
                                            :build-id "test-build"}))))))
 
@@ -39,39 +37,9 @@
       (let [build-id (str (random-uuid))
             md {:build-id build-id
                 :repo-id "test-repo"
-                :project-id "test-project"
                 :customer-id "test-cust"}]
         (is (sut/sid? (sut/save-build-results st md {:status :success})))
         (is (= :success (:status (sut/find-build-results st md))))))))
-
-(deftest ^:deprecated projects
-  (testing "stores project in customer"
-    (h/with-memory-store st
-      (is (sut/sid? (sut/save-project st {:customer-id "test-customer"
-                                          :id "test-project"
-                                          :name "Test project"})))
-      (is (some? (:projects (sut/find-customer st "test-customer"))))))
-
-  (testing "updates existing project in customer"
-    (h/with-memory-store st
-      (let [[cid pid] (repeatedly sut/new-id)]
-        (is (sut/sid? (sut/save-project st {:customer-id cid
-                                            :id pid
-                                            :name "Test project"})))
-        (is (sut/sid? (sut/save-project st {:customer-id cid
-                                            :id pid
-                                            :name "Updated project"})))
-        (is (= "Updated project" (:name (sut/find-project st [cid pid])))))))
-
-  (testing "can find project via customer"
-    (h/with-memory-store st
-      (let [cid "some-customer"
-            pid "some-project"
-            p {:customer-id cid
-               :id pid
-               :name "Test project"}]
-        (is (sut/sid? (sut/save-project st p)))
-        (is (= p (sut/find-project st [cid pid])))))))
 
 (deftest parameters
   (testing "can store on customer level"
@@ -110,3 +78,13 @@
         (let [l (sut/list-builds st repo-sid)]
           (is (= (count builds) (count l)))
           (is (= builds l)))))))
+
+(deftest save-ssh-keys
+  (testing "writes ssh keys object"
+    (h/with-memory-store st
+      (let [cid (sut/new-id)
+            ssh-keys [{:id (sut/new-id)
+                       :description "test ssh key"
+                       :private-key "test-key"}]]
+        (is (sut/sid? (sut/save-ssh-keys st cid ssh-keys)))
+        (is (= ssh-keys (sut/find-ssh-keys st cid)))))))

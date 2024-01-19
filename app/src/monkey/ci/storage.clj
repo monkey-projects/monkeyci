@@ -77,17 +77,6 @@
 (defn find-customer [s id]
   (read-obj s (customer-sid id)))
 
-(defn ^:deprecated save-project
-  "Saves the project by updating the customer it belongs to"
-  [s {:keys [customer-id id] :as pr}]
-  (update-obj s (customer-sid customer-id) assoc-in [:projects id] pr))
-
-(defn ^:deprecated find-project
-  "Reads the project, as part of the customer object"
-  [s [cust-id pid]]
-  (some-> (find-customer s cust-id)
-          (get-in [:projects pid])))
-
 (defn save-repo
   "Saves the repository by updating the customer it belongs to"
   [s {:keys [customer-id id] :as r}]
@@ -191,3 +180,12 @@
 
 (defn save-params [s cust-id p]
   (write-obj s (params-sid cust-id) p))
+
+(defn ssh-keys-sid [cust-id]
+  ["ssh-keys" cust-id])
+
+(defn save-ssh-keys [s cust-id key]
+  (write-obj s (ssh-keys-sid cust-id) key))
+
+(defn find-ssh-keys [s cust-id]
+  (read-obj s (ssh-keys-sid cust-id)))
