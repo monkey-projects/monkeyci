@@ -44,7 +44,7 @@
         (is (sut/sid? (sut/save-build-results st md {:status :success})))
         (is (= :success (:status (sut/find-build-results st md))))))))
 
-(deftest projects
+(deftest ^:deprecated projects
   (testing "stores project in customer"
     (h/with-memory-store st
       (is (sut/sid? (sut/save-project st {:customer-id "test-customer"
@@ -98,7 +98,7 @@
 (deftest list-builds
   (testing "lists all builds for given repo"
     (h/with-memory-store st
-      (let [repo-sid ["test-customer" "test-project" "test-repo"]
+      (let [repo-sid ["test-customer" "test-repo"]
             builds (->> (range)
                         (map (partial format "build-%d"))
                         (take 2))]
@@ -106,7 +106,7 @@
           (let [sid (conj repo-sid b)]
             (is (sut/sid? (sut/create-build-metadata
                            st
-                           (zipmap [:customer-id :project-id :repo-id :build-id] sid))))))
+                           (zipmap [:customer-id :repo-id :build-id] sid))))))
         (let [l (sut/list-builds st repo-sid)]
           (is (= (count builds) (count l)))
           (is (= builds l)))))))

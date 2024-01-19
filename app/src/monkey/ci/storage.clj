@@ -77,27 +77,27 @@
 (defn find-customer [s id]
   (read-obj s (customer-sid id)))
 
-(defn save-project
+(defn ^:deprecated save-project
   "Saves the project by updating the customer it belongs to"
   [s {:keys [customer-id id] :as pr}]
   (update-obj s (customer-sid customer-id) assoc-in [:projects id] pr))
 
-(defn find-project
+(defn ^:deprecated find-project
   "Reads the project, as part of the customer object"
   [s [cust-id pid]]
   (some-> (find-customer s cust-id)
           (get-in [:projects pid])))
 
 (defn save-repo
-  "Saves the repository by updating the customer and project it belongs to"
-  [s {:keys [customer-id project-id id] :as r}]
-  (update-obj s (customer-sid customer-id) assoc-in [:projects project-id :repos id] r))
+  "Saves the repository by updating the customer it belongs to"
+  [s {:keys [customer-id id] :as r}]
+  (update-obj s (customer-sid customer-id) assoc-in [:repos id] r))
 
 (defn find-repo
   "Reads the repo, as part of the customer object's projects"
-  [s [cust-id p-id id]]
+  [s [cust-id id]]
   (some-> (find-customer s cust-id)
-          (get-in [:projects p-id :repos id])))
+          (get-in [:repos id])))
 
 (def webhook-sid (partial global-sid :webhooks))
 
@@ -108,7 +108,7 @@
   (read-obj s (webhook-sid id)))
 
 (def builds "builds")
-(def build-sid-keys [:customer-id :project-id :repo-id :build-id])
+(def build-sid-keys [:customer-id :repo-id :build-id])
 ;; Build sid, for external representation
 (def ext-build-sid (apply juxt build-sid-keys))
 (def build-sid (comp (partial into [builds])
@@ -181,10 +181,6 @@
    parameters of higher levels."
   [s sid]
   (read-obj s (legacy-params-sid sid)))
-
-;; (def params-sid legacy-params-sid)
-;; (def find-params find-legacy-params)
-;; (def save-params save-legacy-params)
 
 (defn params-sid [customer-id]
   ;; All parameters for a customer are stored together

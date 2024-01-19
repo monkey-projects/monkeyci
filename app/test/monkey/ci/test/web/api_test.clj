@@ -42,45 +42,21 @@
                    (sut/get-customer)
                    :status))))
 
-  (testing "converts project map into list"
-    (let [cust {:id (st/new-id)
-                :name "Customer with projects"}
-          proj {:id "test-project"
-                :customer-id (:id cust)
-                :name "Test project"}
-          {st :storage :as ctx} (test-ctx)]
-      (is (st/sid? (st/save-customer st cust)))
-      (is (st/sid? (st/save-project st proj)))
-      (let [{:keys [projects] :as r} (-> ctx
-                                         (->req)
-                                         (with-path-param :customer-id (:id cust))
-                                         (sut/get-customer)
-                                         :body)]
-        (is (some? projects))
-        (is (not (map? projects)))
-        (is (= (select-keys proj [:id :name])
-               (first projects))))))
-
   (testing "converts repo map into list"
     (let [cust {:id (st/new-id)
                 :name "Customer with projects"}
-          proj {:id "test-project"
-                :customer-id (:id cust)
-                :name "Test project"}
           repo {:id "test-repo"
                 :name "Test repository"
-                :customer-id (:id cust)
-                :project-id (:id proj)}
+                :customer-id (:id cust)}
           {st :storage :as ctx} (test-ctx)]
       (is (st/sid? (st/save-customer st cust)))
-      (is (st/sid? (st/save-project st proj)))
       (is (st/sid? (st/save-repo st repo)))
       (let [r (-> ctx
                   (->req)
                   (with-path-param :customer-id (:id cust))
                   (sut/get-customer)
                   :body)
-            repos (-> r :projects first :repos)]
+            repos (-> r :repos)]
         (is (some? repos))
         (is (not (map? repos)))
         (is (= (select-keys repo [:id :name])
@@ -117,37 +93,10 @@
                    (sut/update-customer)
                    :status)))))
 
-(deftest create-project
-  (testing "generates id from project name"
-    (let [proj {:name "Test project"
-                :customer-id (st/new-id)}
-          {st :storage :as ctx} (test-ctx)
-          r (-> ctx
-                (->req)
-                (with-body proj)
-                (sut/create-project)
-                :body)]
-      (is (= "test-project" (:id r)))))
-
-  (testing "on id collision, appends index"
-    (let [proj {:name "Test project"
-                :customer-id (st/new-id)}
-          {st :storage :as ctx} (test-ctx)
-          _ (st/save-project st {:id "test-project"
-                                 :customer-id (:customer-id proj)
-                                 :name "Existing project"})
-          r (-> ctx
-                (->req)
-                (with-body proj)
-                (sut/create-project)
-                :body)]
-      (is (= "test-project-2" (:id r))))))
-
 (deftest create-repo
   (testing "generates id from repo name"
     (let [repo {:name "Test repo"
-                :customer-id (st/new-id)
-                :project-id (st/new-id)}
+                :customer-id (st/new-id)}
           {st :storage :as ctx} (test-ctx)
           r (-> ctx
                 (->req)
@@ -158,11 +107,10 @@
 
   (testing "on id collision, appends index"
     (let [repo {:name "Test repo"
-                :customer-id (st/new-id)
-                :project-id (st/new-id)}
+                :customer-id (st/new-id)}
           {st :storage :as ctx} (test-ctx)
           _ (st/save-repo st (-> repo
-                                 (select-keys [:customer-id :project-id])
+                                 (select-keys [:customer-id])
                                  (assoc :id "test-repo"
                                         :name "Existing repo")))
           r (-> ctx
@@ -172,45 +120,115 @@
                 :body)]
       (is (= "test-repo-2" (:id r))))))
 
-(deftest get-params
-  (testing "for legacy params"
-    (testing "merges with higher levels"
-      (let [{s :storage :as ctx} (test-ctx)
-            [cid pid] (repeatedly st/new-id)]
-        (is (some? (st/save-legacy-params s [cid] [{:name "param-1" :value "value 1"}])))
-        (is (some? (st/save-legacy-params s [cid pid] [{:name "param-2" :value "value 2"}])))
-        (is (= ["param-1" "param-2"]
-               (->> (-> ctx
-                        (->req)
-                        (with-path-params {:customer-id cid
-                                           :project-id pid})
-                        (sut/get-params)
-                        :body)
-                    (map :name)
-                    (sort))))))
-
-    (testing "gives priority to lower levels"
-      (let [{s :storage :as ctx} (test-ctx)
-            [cid pid rid] (repeatedly st/new-id)]
-        (is (some? (st/save-legacy-params s [cid] [{:name "param-1" :value "customer value"}])))
-        (is (some? (st/save-legacy-params s [cid pid rid] [{:name "param-1" :value "repo value"}])))
-        (let [r (-> ctx
-                    (->req)
-                    (with-path-params {:customer-id cid
-                                       :project-id pid
-                                       :repo-id rid})
-                    (sut/get-params)
-                    :body)]
-          (is (= "repo value"
-                 (-> (zipmap (map :name r) (map :value r))
-                     (get "param-1"))))))))
-
+(deftest get-customer-params
   (testing "empty vector if no params"
     (is (= [] (-> (test-ctx)
                   (->req)
                   (with-path-params {:customer-id (st/new-id)})
-                  (sut/get-params)
-                  :body)))))
+                  (sut/get-customer-params)
+                  :body))))
+
+  (testing "returns stored parameters"
+    (let [{st :storage :as ctx} (test-ctx)
+          cust-id (st/new-id)
+          params [{:parameters [{:name "test-param"
+                                 :value "test-value"}]
+                   :label-filters [[{:label "test-label"
+                                     :value "test-value"}]]}]
+          _ (st/save-params st cust-id params)]
+      (is (= params
+             (-> ctx
+                 (->req)
+                 (with-path-params {:customer-id cust-id})
+                 (sut/get-customer-params)
+                 :body))))))
+
+(deftest get-repo-params
+  (let [{st :storage :as ctx} (test-ctx)
+        [cust-id repo-id] (repeatedly st/new-id)
+        _ (st/save-customer st {:id cust-id
+                                :repos {repo-id
+                                        {:id repo-id
+                                         :name "test repo"
+                                         :labels [{:name "test-label"
+                                                   :value "test-value"}]}}})]
+
+    (testing "empty list if no params"
+      (is (= [] (-> ctx
+                    (->req)
+                    (with-path-params {:customer-id cust-id
+                                       :repo-id repo-id})
+                    (sut/get-repo-params)
+                    :body))))
+
+    (testing "returns matching parameters according to label filters"
+      (let [params [{:parameters [{:name "test-param"
+                                   :value "test-value"}]
+                     :label-filters [[{:label "test-label"
+                                       :value "test-value"}]]}]
+            _ (st/save-params st cust-id params)]
+
+        (is (= [{:name "test-param" :value "test-value"}]
+               (-> ctx
+                   (->req)
+                   (with-path-params {:customer-id cust-id
+                                      :repo-id repo-id})
+                   (sut/get-repo-params)
+                   :body)))))
+
+    (testing "returns `404 not found` if repo does not exist"
+      (is (= 404
+             (-> ctx
+                 (->req)
+                 (with-path-params {:customer-id cust-id
+                                    :repo-id "other-repo"})
+                 (sut/get-repo-params)
+                 :status))))))
+
+(deftest apply-label-filters
+  (testing "matches params with empty filter"
+    (is (true? (sut/apply-label-filters
+                {"test-label" "test-value"}
+                {:label-filters []}))))
+
+  (testing "matches params with single matching filter"
+    (is (true? (sut/apply-label-filters
+                {"test-label" "test-value"}
+                {:label-filters [[{:label "test-label"
+                                   :value "test-value"}]]}))))
+
+  (testing "does not match when no matching filter"
+    (is (not (sut/apply-label-filters
+              {"test-label" "test-value"}
+              {:label-filters [[{:label "test-label"
+                                 :value "other-value"}]]}))))
+
+  (testing "matches conjunction filter"
+    (is (true? (sut/apply-label-filters
+                {"first-label" "first-value"
+                 "second-label" "second-value"}
+                {:label-filters [[{:label "first-label"
+                                   :value "first-value"}
+                                  {:label "second-label"
+                                   :value "second-value"}]]}))))
+
+  (testing "does not conjunction filter when only one value matches"
+    (is (not (sut/apply-label-filters
+              {"first-label" "first-value"
+               "second-label" "other-value"}
+              {:label-filters [[{:label "first-label"
+                                 :value "first-value"}
+                                {:label "second-label"
+                                 :value "second-value"}]]}))))
+  
+  (testing "matches disjunction filter"
+    (is (true? (sut/apply-label-filters
+                {"first-label" "first-value"
+                 "second-label" "second-value"}
+                {:label-filters [[{:label "first-label"
+                                   :value "first-value"}]
+                                 [{:label "other-label"
+                                   :value "other-value"}]]})))))
 
 (deftest create-webhook
   (testing "assigns secret key"
@@ -240,7 +258,6 @@
     (let [{st :storage :as ctx} (test-ctx)
           id (st/new-id)
           md {:customer-id "test-cust"
-              :project-id "test-project"
               :repo-id "test-repo"}
           sid (st/->sid (concat (vals md) [id]))
           _ (st/create-build-metadata st sid md)
@@ -263,7 +280,6 @@
     (let [{st :storage :as ctx} (test-ctx)
           id (st/new-id)
           md {:customer-id "test-cust"
-              :project-id "test-project"
               :repo-id "test-repo"}
           sid (st/->sid (concat (vals md) [id]))
           _ (st/create-build-metadata st sid md)

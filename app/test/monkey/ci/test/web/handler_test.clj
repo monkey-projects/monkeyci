@@ -178,22 +178,12 @@
                             :updated-entity {:name "updated customer"}
                             :creator st/save-customer}))
 
-(deftest project-endpoints
-  (let [cust-id (st/new-id)]
-    (verify-entity-endpoints {:name "project"
-                              :path (format "/customer/%s/project" cust-id)
-                              :base-entity {:name "test project"
-                                            :customer-id cust-id}
-                              :updated-entity {:name "updated project"}
-                              :creator st/save-project})))
-
 (deftest repository-endpoints
-  (let [[cust-id p-id] (repeatedly st/new-id)]
+  (let [cust-id (st/new-id)]
     (verify-entity-endpoints {:name "repository"
-                              :path (format "/customer/%s/project/%s/repo" cust-id p-id)
+                              :path (format "/customer/%s/repo" cust-id)
                               :base-entity {:name "test repo"
                                             :customer-id cust-id
-                                            :project-id p-id
                                             :url "http://test-repo"
                                             :labels [{:name "app" :value "test-app"}]}
                               :updated-entity {:name "updated repo"}
@@ -202,64 +192,74 @@
 (deftest webhook-endpoints
   (verify-entity-endpoints {:name "webhook"
                             :base-entity {:customer-id "test-cust"
-                                          :project-id "test-project"
                                           :repo-id "test-repo"}
                             :updated-entity {:repo-id "updated-repo"}
                             :creator st/save-webhook-details}))
 
 (deftest parameter-endpoints
-  (letfn [(get-params [path]
-            (some-> (mock/request :get path)
-                    (test-app)
-                    :body
-                    slurp
-                    (h/parse-json)))
-          (save-params [path params]
-            (-> (h/json-request :put path params)
-                (test-app)))
-          (verify-param-endpoints [desc path]
-            (testing (format "parameter endpoints at `%s/param`" desc)
-              (let [params [{:parameters
-                             [{:name "test-param"
-                               :value "test value"}]
-                             :label-filters []}]
-                    path (str path "/param")]
-                (testing "empty when no parameters"
-                  (is (empty? (get-params path))))
-                (testing "can write params"
-                  (is (= 200 (:status (save-params path params)))))
-                (testing "can read params"
-                  ;; TODO Refactor this (will be changed anyway when we remove projects)
-                  (is (get-params path)
-                      (= (if (cs/includes? path "project")
-                           (:parameters params)
-                           params)))))))]
-    
-    (verify-param-endpoints
-     "/customer/:customer-id"
-     (str "/customer/" (st/new-id)))
+  (let [st (st/make-memory-storage)
+        app (make-test-app st)
+        get-params
+        (fn [path]
+          (some-> (mock/request :get path)
+                  (app)
+                  :body
+                  slurp
+                  (h/parse-json)))
+        save-params
+        (fn [path params]
+          (-> (h/json-request :put path params)
+              (app)))]
 
-    (verify-param-endpoints
-     "/customer/:customer-id/project/:project-id"
-     (->> (repeatedly st/new-id)
-          (interleave ["/customer/" "/project/"])
-          (apply str)))
+    (testing "/customer/:customer-id"
+      
+      (testing "/params"
+        (let [params [{:parameters
+                       [{:name "test-param"
+                         :value "test value"}]
+                       :label-filters []}]
+              cust-id (st/new-id)
+              path (format "/customer/%s/param" cust-id)]
+          
+          (testing "empty when no parameters"
+            (is (empty? (get-params path))))
+          
+          (testing "can write params"
+            (is (= 200 (:status (save-params path params)))))
+          
+          (testing "can read params"
+            (is (get-params path)
+                params))))
 
-    (verify-param-endpoints
-     "/customer/:customer-id/project/:project-id/repo/:repo-id"
-     (->> (repeatedly st/new-id)
-          (interleave ["/customer/" "/project/" "/repo/"])
-          (apply str)))))
+      (testing "/repo/:repo-id/params"
+        (let [params [{:parameters
+                       [{:name "test-repo-param"
+                         :value "test value"}]
+                       :label-filters []}]
+              [cust-id repo-id] (repeatedly st/new-id)
+              path (format "/customer/%s/repo/%s/param" cust-id repo-id)
+              _ (st/save-customer st {:id cust-id
+                                      :repos {repo-id {:name "test repo"}}})]
+          
+          (testing "empty when no parameters"
+            (is (empty? (get-params path))))
+          
+          (testing "can not write params"
+            (is (= 405 (:status (save-params path params)))))
+          
+          (testing "can read params"
+            (is (get-params path)
+                (:parameters params))))))))
 
 (defn- generate-build-sid []
   (->> (repeatedly st/new-id)
-       (take 4)
+       (take 3)
        (st/->sid)))
 
 (defn- repo-path [sid]
   (str (->> sid
             (drop-last)
-            (interleave ["/customer" "project" "repo"])
+            (interleave ["/customer" "repo"])
             (cs/join "/"))
        "/builds"))
 
@@ -285,7 +285,7 @@
 (deftest build-endpoints
   (testing "`GET` lists repo builds"
     (with-repo
-      (fn [{:keys [path app] [_ _ _ build-id] :sid}]
+      (fn [{:keys [path app] [_ _ build-id] :sid}]
         (let [l (-> (mock/request :get path)
                     (app))
               b (-> l
@@ -302,7 +302,7 @@
               (with-repo
                 (fn [{:keys [bus app path] :as ctx}]
                   (let [events (atom [])
-                        props [:customer-id :project-id :repo-id]
+                        props [:customer-id :repo-id]
                         _ (events/register-handler bus :build/triggered (partial swap! events conj))]
                     (is (= 200 (-> (mock/request :post (str path p))
                                    (app)
@@ -314,24 +314,21 @@
         (catch-build-triggered-event
          "/trigger"
          (fn [{:keys [bus app path sid event]}]
-           (let [props [:customer-id :project-id :repo-id]]
+           (let [props [:customer-id :repo-id]]
              (is (= (zipmap props sid)
                     (select-keys (:account event) props)))
              (is (some? (-> event :build :build-id)))))))
       
       (testing "looks up url in repo config"
         (with-repo
-          (fn [{:keys [bus app path] [customer-id project-id repo-id] :sid st :storage}]
+          (fn [{:keys [bus app path] [customer-id repo-id] :sid st :storage}]
             (let [events (atom [])
                   _ (events/register-handler bus :build/triggered (partial swap! events conj))]
               (is (some? (st/save-customer st {:id customer-id
-                                               :projects
-                                               {project-id
-                                                {:id project-id
-                                                 :repos
-                                                 {repo-id
-                                                  {:id repo-id
-                                                   :url "http://test-url"}}}}})))
+                                               :repos
+                                               {repo-id
+                                                {:id repo-id
+                                                 :url "http://test-url"}}})))
               (is (= 200 (-> (mock/request :post (str path "/trigger"))
                              (app)
                              :status)))
@@ -358,8 +355,8 @@
          "/trigger"
          (fn [{:keys [sid event]}]
            (let [bsid (get-in event [:build :sid])]
-             (is (= 4 (count bsid)) "expected sid to contain repo path and build id")
-             (is (= (take 3 sid) (take 3 bsid)))
+             (is (= 3 (count bsid)) "expected sid to contain repo path and build id")
+             (is (= (take 2 sid) (take 2 bsid)))
              (is (= (get-in event [:build :build-id])
                     (last bsid)))))))
 
@@ -380,7 +377,7 @@
   
   (testing "`GET /latest`"
     (with-repo
-      (fn [{:keys [path app] [_ _ _ build-id :as sid] :sid st :storage}]
+      (fn [{:keys [path app] [_ _ build-id :as sid] :sid st :storage}]
         (testing "retrieves latest build for repo"
           (let [l (-> (mock/request :get (str path "/latest"))
                       (app))
@@ -406,7 +403,7 @@
 
   (testing "`GET /:build-id`"
     (with-repo
-      (fn [{:keys [app] [_ _ _ build-id :as sid] :sid}]
+      (fn [{:keys [app] [_ _ build-id :as sid] :sid}]
         (testing "retrieves build with given id"
           (let [l (-> (mock/request :get (build-path sid))
                       (app))
