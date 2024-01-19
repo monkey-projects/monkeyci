@@ -23,9 +23,8 @@
    [["/" :page/root]
     ["/login" :page/login]
     ["/c/:customer-id" :page/customer]
-    ["/c/:customer-id/p/:project-id" :page/project]
-    ["/c/:customer-id/p/:project-id/r/:repo-id" :page/repo]
-    ["/c/:customer-id/p/:project-id/r/:repo-id/b/:build-id" :page/build]]))
+    ["/c/:customer-id/r/:repo-id" :page/repo]
+    ["/c/:customer-id/r/:repo-id/b/:build-id" :page/build]]))
 
 (defn on-route-change [match history]
   (println "Route changed:" match)

@@ -21,9 +21,9 @@
 
 (defn- build-path [route]
   (let [p (r/path-params route)
-        get-p (juxt :customer-id :project-id :repo-id :build-id)]
+        get-p (juxt :customer-id :repo-id :build-id)]
     (->> (get-p p)
-         (interleave ["customer" "project" "repo" "builds"])
+         (interleave ["customer" "repo" "builds"])
          (into [m/url])
          (cs/join "/"))))
 
@@ -101,7 +101,7 @@
 
 (defn page [route]
   (let [params (r/path-params route)
-        repo (rf/subscribe [:repo/info (:project-id params) (:repo-id params)])]
+        repo (rf/subscribe [:repo/info (:repo-id params)])]
     [l/default
      [:<>
       [:div.clearfix

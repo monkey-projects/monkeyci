@@ -22,7 +22,7 @@
               (db/set-builds nil))
       :dispatch [:martian.re-frame/request
                  :get-builds
-                 (select-keys params [:customer-id :project-id :repo-id])
+                 (select-keys params [:customer-id :repo-id])
                  [:builds/load--success]
                  [:builds/load--failed]]})))
 
