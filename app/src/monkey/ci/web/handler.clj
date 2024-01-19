@@ -45,16 +45,8 @@
 (s/defschema UpdateCustomer
   (assoc-id NewCustomer))
 
-(s/defschema NewProject
-  {:customer-id Id
-   :name Name})
-
-(s/defschema UpdateProject
-  (assoc-id NewProject))
-
 (s/defschema NewWebhook
   {:customer-id Id
-   :project-id Id
    :repo-id Id})
 
 (s/defschema UpdateWebhook
@@ -62,7 +54,6 @@
 
 (s/defschema NewRepo
   {:customer-id Id
-   :project-id Id
    :name Name
    :url s/Str
    (s/optional-key :labels) [Label]})
@@ -70,9 +61,20 @@
 (s/defschema UpdateRepo
   (assoc-id NewRepo))
 
+(s/defschema ParameterValue
+  {:name s/Str
+   :value s/Str})
+
+(s/defschema LabelFilterConjunction
+  {:label s/Str
+   :value s/Str})
+
+(s/defschema LabelFilter
+  [LabelFilterConjunction])
+
 (s/defschema Parameters
-  [{:name s/Str
-    :value s/Str}])
+  {:parameters [ParameterValue]
+   :label-filters [LabelFilter]})
 
 (defn- generic-routes
   "Generates generic entity routes.  If child routes are given, they are added
@@ -101,10 +103,13 @@
                                                  :body s/Any}}
                              :middleware [:github-security]}]))])
 
-(def parameter-routes
-  ["/param" {:get {:handler api/get-params}
+(def customer-parameter-routes
+  ["/param" {:get {:handler api/get-customer-params}
              :put {:handler api/update-params
-                   :parameters {:body Parameters}}}])
+                   :parameters {:body [Parameters]}}}])
+
+(def repo-parameter-routes
+  ["/param" {:get {:handler api/get-repo-params}}])
 
 (def build-routes
   ["/builds"
@@ -137,20 +142,8 @@
      :new-schema NewRepo
      :update-schema UpdateRepo
      :id-key :repo-id
-     :child-routes [parameter-routes
+     :child-routes [repo-parameter-routes
                     build-routes]})])
-
-(def project-routes
-  ["/project"
-   (generic-routes
-    {:creator api/create-project
-     :updater api/update-project
-     :getter  api/get-project
-     :new-schema NewProject
-     :update-schema UpdateProject
-     :id-key :project-id
-     :child-routes [repo-routes
-                    parameter-routes]})])
 
 (def customer-routes
   ["/customer"
@@ -161,8 +154,8 @@
      :new-schema NewCustomer
      :update-schema UpdateCustomer
      :id-key :customer-id
-     :child-routes [project-routes
-                    parameter-routes]})])
+     :child-routes [repo-routes
+                    customer-parameter-routes]})])
 
 (def event-stream-routes
   ["/events" {:get {:handler api/event-stream}}])

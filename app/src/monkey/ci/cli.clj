@@ -35,12 +35,12 @@
 
 (def list-build-cmd
   {:command "list"
-   :description "Lists builds for customer, project or repo"
+   :description "Lists builds for customer or repo"
    :runs {:command cmd/list-builds}})
 
 (def watch-cmd
   {:command "watch"
-   :description "Logs build events for customer, project or repo"
+   :description "Logs build events for customer or repo"
    :runs {:command cmd/watch}})
 
 (def build-cmd
@@ -53,10 +53,6 @@
           {:as "Customer id"
            :option "customer-id"
            :short "c"
-           :type :string}
-          {:as "Project id"
-           :option "project-id"
-           :short "p"
            :type :string}
           {:as "Repository id"
            :option "repo-id"

@@ -44,7 +44,7 @@
         (is (sut/sid? (sut/save-build-results st md {:status :success})))
         (is (= :success (:status (sut/find-build-results st md))))))))
 
-(deftest projects
+(deftest ^:deprecated projects
   (testing "stores project in customer"
     (h/with-memory-store st
       (is (sut/sid? (sut/save-project st {:customer-id "test-customer"
@@ -77,12 +77,15 @@
   (testing "can store on customer level"
     (h/with-memory-store st
       (let [cid (sut/new-id)
-            params [{:name "param-1"
-                     :value "value 1"}
-                    {:name "param-2"
-                     :value "value 2"}]]
-        (is (sut/sid? (sut/save-params st [cid] params)))
-        (is (= params (sut/find-params st [cid])))))))
+            params {:parameters
+                    [{:name "param-1"
+                      :value "value 1"}
+                     {:name "param-2"
+                      :value "value 2"}]
+                    :label-filters
+                    [[{:label "test-label" :value "test-value"}]]}]
+        (is (sut/sid? (sut/save-params st cid params)))
+        (is (= params (sut/find-params st cid)))))))
 
 (deftest patch-build-results
   (testing "reads result, applies f with args, then writes result back"
@@ -95,7 +98,7 @@
 (deftest list-builds
   (testing "lists all builds for given repo"
     (h/with-memory-store st
-      (let [repo-sid ["test-customer" "test-project" "test-repo"]
+      (let [repo-sid ["test-customer" "test-repo"]
             builds (->> (range)
                         (map (partial format "build-%d"))
                         (take 2))]
@@ -103,7 +106,7 @@
           (let [sid (conj repo-sid b)]
             (is (sut/sid? (sut/create-build-metadata
                            st
-                           (zipmap [:customer-id :project-id :repo-id :build-id] sid))))))
+                           (zipmap [:customer-id :repo-id :build-id] sid))))))
         (let [l (sut/list-builds st repo-sid)]
           (is (= (count builds) (count l)))
           (is (= builds l)))))))

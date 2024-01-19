@@ -77,27 +77,27 @@
 (defn find-customer [s id]
   (read-obj s (customer-sid id)))
 
-(defn save-project
+(defn ^:deprecated save-project
   "Saves the project by updating the customer it belongs to"
   [s {:keys [customer-id id] :as pr}]
   (update-obj s (customer-sid customer-id) assoc-in [:projects id] pr))
 
-(defn find-project
+(defn ^:deprecated find-project
   "Reads the project, as part of the customer object"
   [s [cust-id pid]]
   (some-> (find-customer s cust-id)
           (get-in [:projects pid])))
 
 (defn save-repo
-  "Saves the repository by updating the customer and project it belongs to"
-  [s {:keys [customer-id project-id id] :as r}]
-  (update-obj s (customer-sid customer-id) assoc-in [:projects project-id :repos id] r))
+  "Saves the repository by updating the customer it belongs to"
+  [s {:keys [customer-id id] :as r}]
+  (update-obj s (customer-sid customer-id) assoc-in [:repos id] r))
 
 (defn find-repo
   "Reads the repo, as part of the customer object's projects"
-  [s [cust-id p-id id]]
+  [s [cust-id id]]
   (some-> (find-customer s cust-id)
-          (get-in [:projects p-id :repos id])))
+          (get-in [:repos id])))
 
 (def webhook-sid (partial global-sid :webhooks))
 
@@ -108,7 +108,7 @@
   (read-obj s (webhook-sid id)))
 
 (def builds "builds")
-(def build-sid-keys [:customer-id :project-id :repo-id :build-id])
+(def build-sid-keys [:customer-id :repo-id :build-id])
 ;; Build sid, for external representation
 (def ext-build-sid (apply juxt build-sid-keys))
 (def build-sid (comp (partial into [builds])
@@ -166,18 +166,28 @@
   [s sid]
   (list-obj s (concat [builds] sid)))
 
-(defn params-sid [sid]
+(defn ^:deprecated legacy-params-sid [sid]
   ;; Prepend params prefix, but also store at "params" leaf
   (vec (concat ["params"] sid ["params"])))
 
-(defn save-params
+(defn ^:deprecated save-legacy-params
   "Stores build parameters.  This can be done on customer, project or repo level.
    The `sid` is a vector that determines on which level the information is stored."
   [s sid p]
-  (write-obj s (params-sid sid) p))
+  (write-obj s (legacy-params-sid sid) p))
 
-(defn find-params
+(defn ^:deprecated find-legacy-params
   "Loads parameters on the given level.  This does not automatically include the
    parameters of higher levels."
   [s sid]
-  (read-obj s (params-sid sid)))
+  (read-obj s (legacy-params-sid sid)))
+
+(defn params-sid [customer-id]
+  ;; All parameters for a customer are stored together
+  ["build-params" customer-id])
+
+(defn find-params [s cust-id]
+  (read-obj s (params-sid cust-id)))
+
+(defn save-params [s cust-id p]
+  (write-obj s (params-sid cust-id) p))

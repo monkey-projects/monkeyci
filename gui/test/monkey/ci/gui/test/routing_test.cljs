@@ -42,7 +42,6 @@
            (sut/path-for :page/customer {:customer-id "test-customer"}))))
 
   (testing "sets multiple path parameters"
-    (is (= "/c/cust/p/proj/r/repo"
+    (is (= "/c/cust/r/repo"
            (sut/path-for :page/repo {:customer-id "cust"
-                                     :project-id "proj"
                                      :repo-id "repo"})))))

@@ -40,14 +40,14 @@
 (defn page [route]
   (rf/dispatch [:repo/load (get-in route [:parameters :path :customer-id])])
   (fn [route]
-    (let [{:keys [customer-id project-id repo-id] :as p} (get-in route [:parameters :path])
-          r (rf/subscribe [:repo/info project-id repo-id])]
+    (let [{:keys [customer-id repo-id] :as p} (get-in route [:parameters :path])
+          r (rf/subscribe [:repo/info repo-id])]
       [l/default
        [:<>
         [:h3
          (:name @r)
          [:span.fs-6.p-1
-          [cl/clipboard-copy (u/->sid p :customer-id :project-id :repo-id) "Click to save the sid to clipboard"]]]
+          [cl/clipboard-copy (u/->sid p :customer-id :repo-id) "Click to save the sid to clipboard"]]]
         [:p "Repository url: " [:a {:href (:url @r)} (:url @r)]]
         [co/alerts [:repo/alerts]]
         [builds]

@@ -16,23 +16,29 @@
     [:p "Url: " [:a {:href (:url r)} (:url r)]]]
    [:a.btn.btn-primary.float-end
     {:href (r/path-for :page/repo {:customer-id (:id c)
-                                   :project-id (:id p)
                                    :repo-id (:id r)})}
     [co/icon :three-dots-vertical] " Details"]])
 
-(defn- show-project [cust p]
-  (->> (:repos p)
+(defn- show-project [cust [p repos]]
+  (->> repos
        (sort-by :name)
        (map (partial show-repo cust p))
        (into
         [:div.project.card.mb-3
          [:div.card-header
-          [:h5.card-title {:title (:id p)} (:name p)]]])))
+          [:h5.card-title p]]])))
+
+(defn- project-lbl [r]
+  (->> (:labels r)
+       (filter (partial = "project" :name))
+       (map :value)
+       (first)))
 
 (defn- customer-details [id]
   (let [c (rf/subscribe [:customer/info])]
-    (->> (:projects @c)
-         (sort-by :name)
+    (->> (:repos @c)
+         (group-by project-lbl)
+         (sort-by first)
          (map (partial show-project @c))
          (into [:<>
                 [:div.clearfix.mb-3

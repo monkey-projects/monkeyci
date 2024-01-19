@@ -6,7 +6,7 @@
             [schema.core :as s]))
 
 (def customer-path ["/customer/" :customer-id])
-(def repo-path (into customer-path ["/project/" :project-id "/repo/" :repo-id]))
+(def repo-path (into customer-path ["/repo/" :repo-id]))
 (def build-path (into repo-path ["/builds/" :build-id]))
 
 (def customer-schema
@@ -14,7 +14,6 @@
 
 (def repo-schema
   (assoc customer-schema
-         :project-id s/Str
          :repo-id s/Str))
 
 (def build-schema

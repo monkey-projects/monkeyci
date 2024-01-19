@@ -2,7 +2,6 @@
   (:require [camel-snake-kebab.core :as csk]
             [clojure.core.async :as ca]
             [clojure.tools.logging :as log]
-            [java-time.api :as jt]
             [medley.core :as mc]
             [monkey.ci
              [context :as ctx]
@@ -86,10 +85,10 @@
                (inc idx))
         id))))
 
-(def repo-id (partial id-from-name #(get-in %1 [:projects (:project-id %2) :repos])))
+(def repo-id (partial id-from-name :repos))
 
 (defn- repo->out [r]
-  (dissoc r :customer-id :project-id))
+  (dissoc r :customer-id))
 
 (defn- repos->out
   "Converts the project repos into output format"
@@ -97,32 +96,14 @@
   (some-> p
           (mc/update-existing :repos (comp (partial map repo->out) vals))))
 
-(def project-id (partial id-from-name :projects))
-
-(defn- project->out [p]
-  (dissoc p :customer-id))
-
-(defn- projects->out
-  "Converts the customer projects into output format"
-  [c]
-  (some-> c
-          (mc/update-existing :projects (comp (partial map (comp project->out repos->out)) vals))))
-
 (make-entity-endpoints "customer"
                        {:get-id (id-getter :customer-id)
-                        :getter (comp projects->out st/find-customer)
+                        :getter (comp repos->out st/find-customer)
                         :saver st/save-customer})
 
-(make-entity-endpoints "project"
-                       ;; The project is part of the customer, so combine the ids
-                       {:get-id (comp (juxt :customer-id :project-id) :path :parameters)
-                        :getter st/find-project
-                        :saver st/save-project
-                        :new-id project-id})
-
 (make-entity-endpoints "repo"
-                       ;; The repo is part of the customer/project, so combine the ids
-                       {:get-id (comp (juxt :customer-id :project-id :repo-id) :path :parameters)
+                       ;; The repo is part of the customer, so combine the ids
+                       {:get-id (comp (juxt :customer-id :repo-id) :path :parameters)
                         :getter st/find-repo
                         :saver st/save-repo
                         :new-id repo-id})
@@ -143,40 +124,83 @@
 (def create-webhook (comp (entity-creator st/save-webhook-details default-id)
                           assign-webhook-secret))
 
-(def repo-sid (comp (juxt :customer-id :project-id :repo-id)
+(def repo-sid (comp (juxt :customer-id :repo-id)
                     :path
                     :parameters))
 (def params-sid (comp (partial remove nil?)
                       repo-sid))
+(def customer-id (comp :customer-id :path :parameters))
+
+(defn apply-label-filters
+  "Given a single set of parameters with label filters, checks if the given
+   labels match.  If there is at least one filter in the params' `:label-filters`
+   for which all labels in the conjunction match, this returns `true`.  If
+   the params don't have any labels, this assumes all labels match."
+  [labels params]
+  (letfn [(filter-applies? [{:keys [label value]}]
+            ;; TODO Add support for regexes
+            (= value (get labels label)))
+          (conjunction-applies? [parts]
+            (every? filter-applies? parts))
+          (disjunction-applies? [parts]
+            (or (empty? parts)
+                (some conjunction-applies? parts)))]
+    (disjunction-applies? (:label-filters params))))
+
+(defn labels->map [l]
+  (->> (map (juxt :name :value) l)
+       (into {})))
 
 (defn fetch-all-params
-  "Fetches all params for the given sid from storage, adding all those from
-   higher levels too."
-  [st params-sid]
-  (->> (loop [sid params-sid
-              acc []]
-         (if (empty? sid)
-           acc
-           (recur (drop-last sid)
-                  (concat acc (st/find-params st (st/->sid sid))))))
-       (group-by :name)
-       (vals)
-       (map first)))
+  "Fetches all params that apply to the given sid from storage.  For legacy
+   parameters, this adds all those from higher levels too.  For label-filtered
+   parameters, adds those where the repo labels apply.  For a project, the
+   label `monkeyci/project` is used.  Parameters that don't have any filters
+   are applied to all projects and repos."
+  ([st cust-id repo]
+   (->> (st/find-params st cust-id)
+        (filter (partial apply-label-filters (labels->map (:labels repo))))
+        (mapcat :parameters)))
+  ([st [cust-id repo-id]]
+   (fetch-all-params st cust-id (st/find-repo st [cust-id repo-id]))))
 
-(defn get-params
+(defn get-customer-params
+  "Retrieves all parameters configured on the customer.  This is for administration purposes."
+  [req]
+  (-> (c/req->storage req)
+      (st/find-params (customer-id req))
+      (or [])
+      (rur/response)))
+
+(defn get-repo-params
+  "Retrieves the parameters that are available for the given repository.  This depends
+   on the parameter label filters and the repository labels."
+  [req]
+  (let [st (c/req->storage req)
+        repo-sid ((juxt :customer-id :repo-id) (get-in req [:parameters :path]))
+        repo (st/find-repo st repo-sid)]
+    (if repo
+      (-> st
+          (fetch-all-params (customer-id req) repo)
+          (rur/response))
+      (rur/not-found {:message (format "Repository %s does not exist" repo-sid)}))))
+
+(defn ^:deprecated get-params
   "Retrieves build parameters for the given location.  This could be at customer, 
-   project or repo level.  For lower levels, the parameters for the higher levels
-   are merged in."
+   project or repo level.  This returns all parameters that are available for the
+   given entity."
   [req]
   ;; TODO Allow to retrieve only for the specified level using query param
   ;; TODO Return 404 if customer, project or repo not found.
-  (-> (c/req->storage req)
-      (fetch-all-params (params-sid req))
-      (rur/response)))
+  ;; TODO Split this up in a method for customer params and one for repo params.
+  (if (= 1 (count (params-sid req)))
+    (get-customer-params req)
+    (get-repo-params req)))
 
 (defn update-params [req]
   (let [p (body req)]
-    (when (st/save-params (c/req->storage req) (params-sid req) p)
+    ;; TODO Allow patching parameters so we don't have to send back all secrets to client
+    (when (st/save-params (c/req->storage req) (customer-id req) p)
       (rur/response p))))
 
 (defn- fetch-build-details [s sid]
@@ -266,14 +290,14 @@
      ;; TODO If no branch is specified, use the default
      (let [acc (:path p)
            bid (u/new-build-id)
-           repo-sid ((juxt :customer-id :project-id :repo-id) acc)
+           repo-sid ((juxt :customer-id :repo-id) acc)
            st (c/req->storage req)
            repo (st/find-repo st repo-sid)
            md (-> acc
-                  (select-keys [:customer-id :project-id :repo-id])
+                  (select-keys [:customer-id :repo-id])
                   (assoc :build-id bid
                          :source :api
-                         :timestamp (str (jt/instant))
+                         :timestamp (System/currentTimeMillis)
                          :ref (str "refs/heads/" (get-in p [:query :branch])))
                   (merge (:query p)))]
        (log/debug "Triggering build for repo sid:" repo-sid)
