@@ -13,7 +13,7 @@
 (rf/clear-subscription-cache!)
 
 (deftest repo-info
-  (let [r (rf/subscribe [:repo/info "test-project" "test-repo"])]
+  (let [r (rf/subscribe [:repo/info "test-repo"])]
     (testing "exists"
       (is (some? r)))
     
@@ -21,11 +21,9 @@
       (is (nil? @r))
       (is (map? (reset! app-db (cdb/set-customer
                                 {}
-                                {:projects
-                                 [{:id "test-project"
-                                   :repos
-                                   [{:id "test-repo"
-                                     :name "test repository"}]}]}))))
+                                {:repos
+                                 [{:id "test-repo"
+                                   :name "test repository"}]}))))
       (is (= "test repository" (:name @r))))))
 
 (deftest alerts
@@ -47,15 +45,13 @@
                                     {:parameters
                                      {:path
                                       {:customer-id "test-cust"
-                                       :project-id "test-proj"
                                        :repo-id "test-repo"}}}}
                                    (db/set-builds [{:id ::test-build}])))))
       (is (= 1 (count @b)))
       (is (= {:build-id ::test-build
               :customer-id "test-cust"
-              :project-id "test-proj"
               :repo-id "test-repo"}
-             (select-keys (first @b) [:build-id :customer-id :project-id :repo-id]))))
+             (select-keys (first @b) [:build-id :customer-id :repo-id]))))
 
     (testing "sorts by time descending"
       (is (map? (reset! app-db (db/set-builds {} [{:id "old-build"
