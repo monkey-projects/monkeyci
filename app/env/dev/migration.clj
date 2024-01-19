@@ -37,7 +37,9 @@
                  (->> p
                       :repos
                       (map (fn [[rid r]]
-                             (assoc r :project-id pid))))))))
+                             (assoc r
+                                    :project-id pid
+                                    :project-name (:name p)))))))))
 
 (defn- unique-repo-ids? [l]
   (->> l
@@ -51,8 +53,8 @@
 
 (defn- add-project-label [r]
   (-> r
-      (update :labels conj {:name "project" :value (:project-id r)})
-      (dissoc :project-id)))
+      (update :labels (comp vec conj) {:name "project" :value (:project-name r)})
+      (dissoc :project-id :project-name)))
 
 (defn- remove-build-projects
   "Looks up all builds for the repo and rewrites them to remove project from the sid.
@@ -93,16 +95,15 @@
                      :label-filters []}
         project-params (->> cust
                             :projects
-                            (keys)
-                            (map (fn [pid]
+                            (map (fn [[pid {:keys [name]}]]
                                    [pid {:parameters (s/find-legacy-params st [cid pid])
-                                         :label-filters [[{:label "project" :value pid}]]}]))
+                                         :label-filters [[{:label "project" :value name}]]}]))
                             (filter (comp not-empty :parameters second))
                             (into {}))
         repo-params (->> repos
-                         (map (fn [{:keys [project-id id] :as r}]
+                         (map (fn [{:keys [project-id project-name id] :as r}]
                                 [r {:parameters (s/find-legacy-params st [cid project-id id])
-                                    :label-filters [[{:label "project" :value project-id}
+                                    :label-filters [[{:label "project" :value project-name}
                                                      {:label "repo" :value id}]]}]))
                          (filter (comp not-empty :parameters second))
                          (into {}))
