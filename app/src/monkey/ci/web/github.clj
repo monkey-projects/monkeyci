@@ -7,8 +7,10 @@
             [clojure.core.async :refer [go <!! <!]]
             [clojure.java.io :as io]
             [clojure.tools.logging :as log]
+            [medley.core :as mc]
             [monkey.ci
              [context :as ctx]
+             [labels :as lbl]
              [storage :as s]
              [utils :as u]]
             [monkey.ci.web.common :as c]
@@ -71,6 +73,13 @@
         :id (req->webhook-id req)
         :payload (:body-params req)}))))
 
+(defn- find-ssh-keys [st {:keys [customer-id repo-id]}]
+  (let [repo (s/find-repo st [customer-id repo-id])
+        ssh-keys (s/find-ssh-keys st customer-id)]
+    (->> ssh-keys
+         (lbl/filter-by-label repo)
+         (map :private-key))))
+
 (defn prepare-build
   "Event handler that looks up details for the given github webhook.  If the webhook 
    refers to a valid configuration, a build id is created and a new event is launched,
@@ -90,10 +99,12 @@
                             :head-commit
                             (select-keys [:timestamp :message :author])))
                  (merge (select-keys payload [:ref])))
-          conf {:git {:url (if private ssh-url clone-url)
-                      :main-branch master-branch
-                      :ref (:ref payload)
-                      :id commit-id}
+          ssh-keys (find-ssh-keys st details)
+          conf {:git (-> {:url (if private ssh-url clone-url)
+                          :main-branch master-branch
+                          :ref (:ref payload)
+                          :id commit-id}
+                         (mc/assoc-some :ssh-keys ssh-keys))
                 :sid (s/ext-build-sid md) ; Build storage id
                 :build-id build-id}]
       (when (s/create-build-metadata st md)
