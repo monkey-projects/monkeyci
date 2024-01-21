@@ -279,6 +279,7 @@
                   (merge (:query p)))]
        (log/debug "Triggering build for repo sid:" repo-sid)
        (when (st/create-build-metadata st md)
+         ;; TODO Add ssh keys
          (trigger-build-event p bid repo))))))
 
 (defn list-build-logs [req]

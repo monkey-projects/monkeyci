@@ -60,8 +60,7 @@
 
 (def default-context
   {:git {:fn (fn default-git-clone [opts]
-               (->> ((juxt :url :branch :id :dir) opts)
-                    (apply git/clone+checkout))
+               (git/clone+checkout opts)
                ;; Return the checkout dir
                (:dir opts))}})
 

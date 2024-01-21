@@ -6,12 +6,20 @@
             [clojure.tools.logging :as log]
             [monkey.ci.utils :as u]))
 
+(defn prepare-ssh-keys
+  "Writes any ssh keys in the options to a temp directory and returns their
+   file names and key dir to be used by clj-jgit."
+  [opts]
+  ;; TODO
+  )
+
 (defn clone
   "Clones the repo at given url, and checks out the given branch.  Writes the
    files to `dir`.  Returns a repo object that can be passed to other functions."
-  [url branch dir]
+  [{:keys [url branch dir] :as opts}]
   (log/debug "Cloning" url "into" dir)
-  (git/with-identity {:trust-all? true}
+  (git/with-identity (merge {:trust-all? true}
+                            (prepare-ssh-keys opts))
     (git/git-clone url
                    :branch branch
                    :dir dir
@@ -32,8 +40,8 @@
 
 (defn clone+checkout
   "Clones the repo, then performs a checkout of the given id"
-  [url branch id dir]
-  (let [repo (clone url branch dir)]
+  [{:keys [branch id] :as opts}]
+  (let [repo (clone opts)]
     (when-let [id-or-branch (or id (prefix-origin branch))]
       (checkout repo id-or-branch))
     repo))

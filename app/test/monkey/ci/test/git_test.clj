@@ -8,7 +8,9 @@
     (with-redefs [git/git-clone (fn [& args]
                                   args)]
       (is (= ["http://url" :branch "master" :dir "tmp" :no-checkout? true]
-             (sut/clone "http://url" "master" "tmp"))))))
+             (sut/clone {:url "http://url"
+                         :branch "master"
+                         :dir "tmp"}))))))
 
 (deftest checkout
   (testing "invokes `git-checkout`"
@@ -24,7 +26,10 @@
                                  {:repo repo
                                   :id id})]
       (is (= :test-repo
-             (sut/clone+checkout "http://test-url" "main" "test-id" "test-dir")))))
+             (sut/clone+checkout {:url "http://test-url"
+                                  :branch "main"
+                                  :id "test-id"
+                                  :dir "test-dir"})))))
 
   (testing "when no commit id, checks out branch instead"
     (let [checkout-ids (atom nil)]
@@ -32,5 +37,13 @@
                     sut/checkout (fn [_ id]
                                    (reset! checkout-ids id))]
         (is (= :test-repo
-               (sut/clone+checkout "http://test-url" "main" nil "test-dir")))
+               (sut/clone+checkout {:url "http://test-url"
+                                    :branch "main"
+                                    :dir "test-dir"})))
         (is (= "origin/main" @checkout-ids))))))
+
+(deftest prepare-ssh-keys
+  (testing "empty if no keys configured"
+    (is (empty? (sut/prepare-ssh-keys {}))))
+
+  (testing "writes keys to configured dir"))
