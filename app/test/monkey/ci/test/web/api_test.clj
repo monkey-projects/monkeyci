@@ -288,18 +288,35 @@
 (deftest trigger-build-event
   (testing "adds ref to build from branch query param"
     (is (= "refs/heads/test-branch"
-           (-> {:query
-                {:branch "test-branch"}}
-               (sut/trigger-build-event "test-build" {})
+           (-> (test-ctx)
+               (->req)
+               (assoc-in [:parameters :query :branch] "test-branch")
+               (sut/trigger-build-event "test-build")
                :build
                :git
                :ref))))
 
   (testing "adds ref to build from tag query param"
     (is (= "refs/tags/test-tag"
-           (-> {:query
-                {:tag "test-tag"}}
-               (sut/trigger-build-event "test-build" {})
+           (-> (test-ctx)
+               (->req)
+               (assoc-in [:parameters :query :tag] "test-tag")
+               (sut/trigger-build-event "test-build")
                :build
                :git
-               :ref)))))
+               :ref))))
+
+  (testing "adds configured ssh keys"
+    (let [{st :storage :as ctx} (test-ctx)
+          [cid rid] (repeatedly st/new-id)
+          ssh-key {:private-key "private-key"
+                   :public-key "public-key"}]
+      (is (st/sid? (st/save-ssh-keys st cid [ssh-key])))
+      (is (= [ssh-key]
+             (-> (->req ctx)
+                 (assoc-in [:parameters :path] {:customer-id cid
+                                                :repo-id rid})
+                 (sut/trigger-build-event "test-build")
+                 :build
+                 :git
+                 :ssh-keys))))))

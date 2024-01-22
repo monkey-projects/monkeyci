@@ -150,14 +150,14 @@
    label filters.  Applies the transducer `tx` before constructing the response."
   [finder tx req]
   (let [st (c/req->storage req)
-        repo-sid ((juxt :customer-id :repo-id) (get-in req [:parameters :path]))
-        repo (st/find-repo st repo-sid)]
+        sid (repo-sid req)
+        repo (st/find-repo st sid)]
     (if repo
       (->> (finder st (customer-id req))
            (lbl/filter-by-label repo)
            (into [] tx)
            (rur/response))
-      (rur/not-found {:message (format "Repository %s does not exist" repo-sid)}))))
+      (rur/not-found {:message (format "Repository %s does not exist" sid)}))))
 
 (def get-customer-params
   "Retrieves all parameters configured on the customer.  This is for administration purposes."
@@ -248,17 +248,25 @@
       (some? tag)
       (str "refs/tags/" tag))))
 
-(defn trigger-build-event [{acc :path :as p} bid repo]
-  {:type :build/triggered
-   :account acc
-   :build {:build-id bid
-           :git (-> (:query p)
-                    (select-keys [:commit-id])
-                    (assoc :url (:url repo))
-                    (mc/assoc-some :ref (params->ref p)))
-           :sid (-> acc
-                    (assoc :build-id bid)
-                    (st/ext-build-sid))}})
+(defn trigger-build-event [{p :parameters :as req} bid]
+  (let [acc (:path p)
+        st (c/req->storage req)
+        repo-sid (repo-sid req)
+        repo (st/find-repo st repo-sid)
+        ssh-keys (->> (st/find-ssh-keys st (first repo-sid))
+                      (lbl/filter-by-label repo))]
+    {:type :build/triggered
+     :account acc
+     :build {:build-id bid
+             :git (-> (:query p)
+                      (select-keys [:commit-id])
+                      (assoc :url (:url repo)
+                             :ssh-keys-dir (c/from-context req :ssh-keys-dir))
+                      (mc/assoc-some :ref (params->ref p))
+                      (mc/assoc-some :ssh-keys ssh-keys))
+             :sid (-> acc
+                      (assoc :build-id bid)
+                      (st/ext-build-sid))}}))
 
 (defn trigger-build [req]
   (c/posting-handler
@@ -267,9 +275,7 @@
      ;; TODO If no branch is specified, use the default
      (let [acc (:path p)
            bid (u/new-build-id)
-           repo-sid ((juxt :customer-id :repo-id) acc)
            st (c/req->storage req)
-           repo (st/find-repo st repo-sid)
            md (-> acc
                   (select-keys [:customer-id :repo-id])
                   (assoc :build-id bid
@@ -277,10 +283,10 @@
                          :timestamp (System/currentTimeMillis)
                          :ref (str "refs/heads/" (get-in p [:query :branch])))
                   (merge (:query p)))]
-       (log/debug "Triggering build for repo sid:" repo-sid)
+       (log/debug "Triggering build for repo sid:" (repo-sid req))
        (when (st/create-build-metadata st md)
          ;; TODO Add ssh keys
-         (trigger-build-event p bid repo))))))
+         (trigger-build-event req bid))))))
 
 (defn list-build-logs [req]
   (let [build-sid (st/ext-build-sid (get-in req [:parameters :path]))
