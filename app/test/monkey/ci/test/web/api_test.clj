@@ -185,51 +185,6 @@
                  (sut/get-repo-params)
                  :status))))))
 
-(deftest apply-label-filters
-  (testing "matches params with empty filter"
-    (is (true? (sut/apply-label-filters
-                {"test-label" "test-value"}
-                {:label-filters []}))))
-
-  (testing "matches params with single matching filter"
-    (is (true? (sut/apply-label-filters
-                {"test-label" "test-value"}
-                {:label-filters [[{:label "test-label"
-                                   :value "test-value"}]]}))))
-
-  (testing "does not match when no matching filter"
-    (is (not (sut/apply-label-filters
-              {"test-label" "test-value"}
-              {:label-filters [[{:label "test-label"
-                                 :value "other-value"}]]}))))
-
-  (testing "matches conjunction filter"
-    (is (true? (sut/apply-label-filters
-                {"first-label" "first-value"
-                 "second-label" "second-value"}
-                {:label-filters [[{:label "first-label"
-                                   :value "first-value"}
-                                  {:label "second-label"
-                                   :value "second-value"}]]}))))
-
-  (testing "does not conjunction filter when only one value matches"
-    (is (not (sut/apply-label-filters
-              {"first-label" "first-value"
-               "second-label" "other-value"}
-              {:label-filters [[{:label "first-label"
-                                 :value "first-value"}
-                                {:label "second-label"
-                                 :value "second-value"}]]}))))
-  
-  (testing "matches disjunction filter"
-    (is (true? (sut/apply-label-filters
-                {"first-label" "first-value"
-                 "second-label" "second-value"}
-                {:label-filters [[{:label "first-label"
-                                   :value "first-value"}]
-                                 [{:label "other-label"
-                                   :value "other-value"}]]})))))
-
 (deftest create-webhook
   (testing "assigns secret key"
     (let [{st :storage :as ctx} (test-ctx)
@@ -333,18 +288,35 @@
 (deftest trigger-build-event
   (testing "adds ref to build from branch query param"
     (is (= "refs/heads/test-branch"
-           (-> {:query
-                {:branch "test-branch"}}
-               (sut/trigger-build-event "test-build" {})
+           (-> (test-ctx)
+               (->req)
+               (assoc-in [:parameters :query :branch] "test-branch")
+               (sut/trigger-build-event "test-build")
                :build
                :git
                :ref))))
 
   (testing "adds ref to build from tag query param"
     (is (= "refs/tags/test-tag"
-           (-> {:query
-                {:tag "test-tag"}}
-               (sut/trigger-build-event "test-build" {})
+           (-> (test-ctx)
+               (->req)
+               (assoc-in [:parameters :query :tag] "test-tag")
+               (sut/trigger-build-event "test-build")
                :build
                :git
-               :ref)))))
+               :ref))))
+
+  (testing "adds configured ssh keys"
+    (let [{st :storage :as ctx} (test-ctx)
+          [cid rid] (repeatedly st/new-id)
+          ssh-key {:private-key "private-key"
+                   :public-key "public-key"}]
+      (is (st/sid? (st/save-ssh-keys st cid [ssh-key])))
+      (is (= [ssh-key]
+             (-> (->req ctx)
+                 (assoc-in [:parameters :path] {:customer-id cid
+                                                :repo-id rid})
+                 (sut/trigger-build-event "test-build")
+                 :build
+                 :git
+                 :ssh-keys))))))

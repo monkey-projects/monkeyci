@@ -38,3 +38,7 @@
 (defn get-log [path]
   (-> @(call-os os/get-object {:object-name path})
       (bs/to-string)))
+
+(defn move-log [from to]
+  @(call-os os/rename-object {:rename {:source-name from
+                                       :new-name to}}))

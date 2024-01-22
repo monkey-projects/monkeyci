@@ -76,6 +76,12 @@
   {:parameters [ParameterValue]
    :label-filters [LabelFilter]})
 
+(s/defschema SshKeys
+  {:private-key s/Str
+   :public-key s/Str ; TODO It may be possible to extract public key from private
+   (s/optional-key :description) s/Str
+   :label-filters [LabelFilter]})
+
 (defn- generic-routes
   "Generates generic entity routes.  If child routes are given, they are added
    as additional routes after the full path."
@@ -111,6 +117,14 @@
 (def repo-parameter-routes
   ["/param" {:get {:handler api/get-repo-params}}])
 
+(def customer-ssh-keys-routes
+  ["/ssh-keys" {:get {:handler api/get-customer-ssh-keys}
+                :put {:handler api/update-ssh-keys
+                      :parameters {:body [SshKeys]}}}])
+
+(def repo-ssh-keys-routes
+  ["/ssh-keys" {:get {:handler api/get-repo-ssh-keys}}])
+
 (def build-routes
   ["/builds"
    {:conflicting true}
@@ -143,6 +157,7 @@
      :update-schema UpdateRepo
      :id-key :repo-id
      :child-routes [repo-parameter-routes
+                    repo-ssh-keys-routes
                     build-routes]})])
 
 (def customer-routes
@@ -155,7 +170,8 @@
      :update-schema UpdateCustomer
      :id-key :customer-id
      :child-routes [repo-routes
-                    customer-parameter-routes]})])
+                    customer-parameter-routes
+                    customer-ssh-keys-routes]})])
 
 (def event-stream-routes
   ["/events" {:get {:handler api/event-stream}}])

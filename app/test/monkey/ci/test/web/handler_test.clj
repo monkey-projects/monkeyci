@@ -196,60 +196,71 @@
                             :updated-entity {:repo-id "updated-repo"}
                             :creator st/save-webhook-details}))
 
-(deftest parameter-endpoints
+(defn- verify-label-filter-like-endpoints [path desc entity prep-match]
   (let [st (st/make-memory-storage)
         app (make-test-app st)
-        get-params
+        get-entity
         (fn [path]
           (some-> (mock/request :get path)
                   (app)
                   :body
                   slurp
                   (h/parse-json)))
-        save-params
+        save-entity
         (fn [path params]
-          (-> (h/json-request :put path params)
+          (-> (h/json-request :put path entity)
               (app)))]
 
     (testing "/customer/:customer-id"
       
-      (testing "/params"
-        (let [params [{:parameters
-                       [{:name "test-param"
-                         :value "test value"}]
-                       :label-filters []}]
-              cust-id (st/new-id)
-              path (format "/customer/%s/param" cust-id)]
+      (testing path
+        (let [cust-id (st/new-id)
+              full-path (format "/customer/%s%s" cust-id path)]
           
-          (testing "empty when no parameters"
-            (is (empty? (get-params path))))
+          (testing (str "empty when no " desc)
+            (is (empty? (get-entity full-path))))
           
-          (testing "can write params"
-            (is (= 200 (:status (save-params path params)))))
+          (testing (str "can write " desc)
+            (is (= 200 (:status (save-entity full-path entity)))))
           
-          (testing "can read params"
-            (is (get-params path)
-                params))))
+          (testing (str "can read " desc)
+            (is (get-entity full-path)
+                entity))))
 
-      (testing "/repo/:repo-id/params"
-        (let [params [{:parameters
-                       [{:name "test-repo-param"
-                         :value "test value"}]
-                       :label-filters []}]
-              [cust-id repo-id] (repeatedly st/new-id)
-              path (format "/customer/%s/repo/%s/param" cust-id repo-id)
+      (testing (str "/repo/:repo-id" path)
+        (let [[cust-id repo-id] (repeatedly st/new-id)
+              full-path (format "/customer/%s/repo/%s%s" cust-id repo-id path)
               _ (st/save-customer st {:id cust-id
                                       :repos {repo-id {:name "test repo"}}})]
           
-          (testing "empty when no parameters"
-            (is (empty? (get-params path))))
+          (testing (str "empty when no " desc)
+            (is (empty? (get-entity full-path))))
           
-          (testing "can not write params"
-            (is (= 405 (:status (save-params path params)))))
+          (testing (str "can not write " desc)
+            (is (= 405 (:status (save-entity full-path entity)))))
           
-          (testing "can read params"
-            (is (get-params path)
-                (:parameters params))))))))
+          (testing (str "can read " desc)
+            (is (get-entity full-path)
+                (prep-match entity))))))))
+
+(deftest parameter-endpoints
+  (verify-label-filter-like-endpoints
+   "/param"
+   "params"
+   [{:parameters
+     [{:name "test-param"
+       :value "test value"}]
+     :label-filters []}]
+   :parameters))
+
+(deftest ssh-keys-endpoints
+  (verify-label-filter-like-endpoints
+   "/ssh-keys"
+   "ssh keys"
+   [{:private-key "private-test-key"
+     :public-key "public-test-key"
+     :label-filters []}]
+   :private-key))
 
 (defn- generate-build-sid []
   (->> (repeatedly st/new-id)

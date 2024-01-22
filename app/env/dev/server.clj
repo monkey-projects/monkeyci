@@ -23,7 +23,8 @@
                      (assoc :config (-> @co/global-config
                                         (merge {:dev-mode true
                                                 :work-dir (u/abs-path "tmp")
-                                                :checkout-base-dir (u/abs-path "tmp/checkout")})))
+                                                :checkout-base-dir (u/abs-path "tmp/checkout")
+                                                :ssh-keys-dir (u/abs-path "tmp/ssh-keys")})))
                      (sc/subsystem [:http])
                      (sc/start-system)))
   nil)

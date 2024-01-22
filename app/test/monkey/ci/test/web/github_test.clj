@@ -54,16 +54,16 @@
       (is (some? (sut/webhook req)))
       (is (= :timeout (h/wait-until #(pos? (count @recv)) 200))))))
 
+(defn- test-webhook []
+  (zipmap [:id :dustomer-id :repo-id] (repeatedly st/new-id)))
+
 (deftest prepare-build
   (testing "creates metadata file for customer/project/repo"
     (h/with-memory-store s
-      (let [wh {:id "test-webhook"
-                :customer-id "test-customer"
-                :project-id "test-project"
-                :repo-id "test-repo"}]
+      (let [wh (test-webhook)]
         (is (st/sid? (st/save-webhook-details s wh)))
         (let [r (sut/prepare-build {:storage s}
-                                   {:id "test-webhook"
+                                   {:id (:id wh)
                                     :payload {}})]
           (is (some? r))
           (is (st/obj-exists? s (-> wh
@@ -73,13 +73,10 @@
 
   (testing "metadata contains commit timestamp and message"
     (h/with-memory-store s
-      (let [wh {:id "test-webhook"
-                :customer-id "test-customer"
-                :project-id "test-project"
-                :repo-id "test-repo"}]
+      (let [wh (test-webhook)]
         (is (st/sid? (st/save-webhook-details s wh)))
         (let [r (sut/prepare-build {:storage s}
-                                   {:id "test-webhook"
+                                   {:id (:id wh)
                                     :payload {:head-commit {:message "test message"
                                                             :timestamp "2023-10-10"}}})
               id (get-in r [:build :sid])
@@ -97,26 +94,20 @@
 
   (testing "uses clone url for public repos"
     (h/with-memory-store s
-      (let [wh {:id "test-webhook"
-                :customer-id "test-customer"
-                :project-id "test-project"
-                :repo-id "test-repo"}]
+      (let [wh (test-webhook)]
         (is (st/sid? (st/save-webhook-details s wh)))
         (let [r (sut/prepare-build {:storage s}
-                                   {:id "test-webhook"
+                                   {:id (:id wh)
                                     :payload {:repository {:ssh-url "ssh-url"
                                                            :clone-url "clone-url"}}})]
           (is (= "clone-url" (get-in r [:build :git :url])))))))
 
   (testing "uses ssh url if repo is private"
     (h/with-memory-store s
-      (let [wh {:id "test-webhook"
-                :customer-id "test-customer"
-                :project-id "test-project"
-                :repo-id "test-repo"}]
+      (let [wh (test-webhook)]
         (is (st/sid? (st/save-webhook-details s wh)))
         (let [r (sut/prepare-build {:storage s}
-                                   {:id "test-webhook"
+                                   {:id (:id wh)
                                     :payload {:repository {:ssh-url "ssh-url"
                                                            :clone-url "clone-url"
                                                            :private true}}})]
@@ -124,14 +115,10 @@
 
   (testing "does not include secret key in metadata"
     (h/with-memory-store s
-      (let [wh {:id "test-webhook"
-                :customer-id "test-customer"
-                :project-id "test-project"
-                :repo-id "test-repo"
-                :secret-key "very very secret!"}]
+      (let [wh (assoc (test-webhook) :secret-key "very very secret!")]
         (is (st/sid? (st/save-webhook-details s wh)))
         (let [r (sut/prepare-build {:storage s}
-                                   {:id "test-webhook"
+                                   {:id (:id wh)
                                     :payload {:head-commit {:message "test message"
                                                             :timestamp "2023-10-10"}}})
               id (get-in r [:build :sid])
@@ -140,26 +127,40 @@
 
   (testing "adds payload ref to build"
     (h/with-memory-store s
-      (let [wh {:id "test-webhook"
-                :customer-id "test-customer"
-                :project-id "test-project"
-                :repo-id "test-repo"}]
+      (let [wh (test-webhook)]
         (is (st/sid? (st/save-webhook-details s wh)))
         (let [r (sut/prepare-build {:storage s}
-                                   {:id "test-webhook"
+                                   {:id (:id wh)
                                     :payload {:ref "test-ref"}})]
           (is (= "test-ref" (get-in r [:build :git :ref])))))))
 
   (testing "sets `main-branch`"
     (h/with-memory-store s
-      (let [wh {:id "test-webhook"
-                :customer-id "test-customer"
-                :project-id "test-project"
-                :repo-id "test-repo"}]
+      (let [wh (test-webhook)]
         (is (st/sid? (st/save-webhook-details s wh)))
         (let [r (sut/prepare-build {:storage s}
-                                   {:id "test-webhook"
+                                   {:id (:id wh)
                                     :payload {:ref "test-ref"
                                               :repository {:master-branch "test-main"}}})]
           (is (= "test-main"
-                 (get-in r [:build :git :main-branch]))))))))
+                 (get-in r [:build :git :main-branch])))))))
+
+  (testing "adds configured ssh key matching repo labels"
+    (h/with-memory-store s
+      (let [wh (test-webhook)
+            cid (:customer-id wh)
+            rid (:repo-id wh)
+            ssh-key {:id "test-key"
+                     :private-key "test-ssh-key"}]
+        (is (st/sid? (st/save-webhook-details s wh)))
+        (is (st/sid? (st/save-repo s {:customer cid
+                                      :id rid
+                                      :labels [{:name "ssh-lbl"
+                                                :value "lbl-val"}]})))
+        (is (st/sid? (st/save-ssh-keys s cid [ssh-key])))
+        (let [r (sut/prepare-build {:storage s}
+                                   {:id (:id wh)
+                                    :payload {:ref "test-ref"
+                                              :repository {:master-branch "test-main"}}})]
+          (is (= [ssh-key]
+                 (get-in r [:build :git :ssh-keys]))))))))

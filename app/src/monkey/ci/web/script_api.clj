@@ -8,9 +8,9 @@
             [clojure.tools.logging :as log]
             [monkey.ci
              [events :as e]
+             [labels :as lbl]
              [storage :as st]]
             [monkey.ci.web
-             [api :as api]
              [common :as c]]
             [monkey.socket-async.uds :as uds]
             [org.httpkit.server :as http]
@@ -98,6 +98,14 @@
                    :channel-factory (fn [_] (ServerSocketChannel/open uds/unix-proto))}]
     (start-server (assoc ctx :http http-opts))))
 
+(defn- fetch-all-params
+  "Looks up the repo and fetches all parameters for that repo, filtered by label."
+  [st [cust-id :as sid]]
+  (let [repo (st/find-repo st sid)]
+    (->> (st/find-params st cust-id)
+         (lbl/filter-by-label repo)
+         (mapcat :parameters))))
+
 (defn local-api
   "Local api implementation.  This is used as a backend for the script API server
    when it is run locally.  It retrieves all information directly from local storage."
@@ -105,7 +113,7 @@
   (let [build-sid (get-in ctx [:build :sid])
         handlers {:get-params (fn []
                                 (log/debug "Fetching all build params for sid" build-sid)
-                                (->> (api/fetch-all-params storage (butlast build-sid))
+                                (->> (fetch-all-params storage (butlast build-sid))
                                      (map (juxt :name :value))
                                      (into {})))}]
     (fn [ep]
