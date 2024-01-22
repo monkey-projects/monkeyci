@@ -3,6 +3,7 @@
    A runner is able to execute a build script."
   (:require [clojure.core.async :as ca]
             [clojure.java.io :as io]
+            [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
             [monkey.ci
@@ -23,8 +24,10 @@
        (io/file)
        (.getCanonicalPath)))
 
-(defn- script-not-found [{{:keys [script-dir]} :build :as ctx}]
+(defn- script-not-found [{{:keys [script-dir] :as b} :build :as ctx}]
   (log/warn "No build script found at" script-dir)
+  ;; Post build completed event so the failure is registered
+  (e/post-event (:event-bus ctx) (e/build-completed-evt b 1 :reason :script-not-found))
   ;; Nonzero exit code
   (assoc ctx :event {:result :error
                      :exit 1}))
@@ -98,8 +101,8 @@
 (defn create-workspace [ctx]
   (let [{:keys [store]} (:workspace ctx)
         ;; TODO For local builds, upload all workdir files according to .gitignore
-        {:keys [checkout-dir build-id]} (:build ctx)
-        dest (str build-id b/extension)]
+        {:keys [checkout-dir sid]} (:build ctx)
+        dest (str (cs/join "/" sid) b/extension)]
     (when checkout-dir
       (log/info "Creating workspace using files from" checkout-dir)
       @(md/chain

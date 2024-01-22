@@ -258,7 +258,7 @@
      :account acc
      :build {:build-id bid
              :git (-> (:query p)
-                      (select-keys [:commit-id])
+                      (select-keys [:commit-id :branch])
                       (assoc :url (:url repo)
                              :ssh-keys-dir (ctx/ssh-keys-dir (c/req->ctx req) bid))
                       (mc/assoc-some :ref (params->ref p))

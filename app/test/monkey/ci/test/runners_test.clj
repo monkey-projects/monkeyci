@@ -27,10 +27,21 @@
           (is (spec/channel? (sut/build-local {:event-bus bus
                                                :build {:script-dir "examples/basic-clj"}}))))
         
-        (testing "when script not found, returns exit code 1"
-          (is (= 1 (-> {:event-bus bus
-                        :build {:script-dir "nonexisting"}}
-                       (build-and-wait)))))
+        (testing "when script not found"
+          (testing "returns exit code 1"
+            (is (= 1 (-> {:event-bus bus
+                          :build {:script-dir "nonexisting"}}
+                         (build-and-wait)))))
+
+          (testing "fires `:build/completed` event with error result"
+            (let [events (atom [])
+                  h (e/register-handler bus :build/completed
+                                        #(swap! events conj %))]
+              (is (some? (-> {:event-bus bus
+                              :build {:script-dir "nonexisting"}}
+                             (build-and-wait))))
+              (is (not= :timeout (h/wait-until #(pos? (count @events)) 1000)))
+              (is (= :error (:result (first @events)))))))
 
         (testing "passes pipeline to process"
           (is (= "test-pipeline" (-> {:event-bus bus
@@ -152,14 +163,14 @@
     (let [stored (atom {})
           ctx {:workspace {:store (h/->FakeBlobStore stored)}
                :build {:checkout-dir "test-checkout"
-                       :build-id "test-build"}}]
+                       :sid ["test-cust" "test-repo" "test-build"]}}]
       (is (some? (sut/store-src ctx)))
-      (is (= {"test-checkout" "test-build.tgz"} @stored))))
+      (is (= {"test-checkout" "test-cust/test-repo/test-build.tgz"} @stored))))
 
   (testing "returns updated context"
     (let [ctx {:workspace {:store (h/->FakeBlobStore (atom {}))}
                :build {:checkout-dir "test-checkout"
-                       :build-id "test-build"}}]
+                       :sid ["test-build"]}}]
       (is (= (assoc-in ctx [:build :workspace] "test-build.tgz")
              (sut/store-src ctx))))))
 
@@ -180,6 +191,17 @@
                     {:event
                      {:exit 0}
                      :build {:git {:dir (.getCanonicalPath sub)}}})))
+        (is (false? (.exists sub))))))
+
+  (testing "deletes ssh keys dir"
+    (h/with-tmp-dir dir
+      (let [sub (doto (io/file dir "ssh-keys")
+                  (.mkdirs))]
+        (is (true? (.exists sub)))
+        (is (some? (sut/build-completed
+                    {:event
+                     {:exit 0}
+                     :build {:git {:ssh-keys-dir (.getCanonicalPath sub)}}})))
         (is (false? (.exists sub))))))
 
   (testing "does not delete working dir if same as app work dir"

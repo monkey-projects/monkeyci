@@ -11,8 +11,10 @@
 (defn- build-row [b]
   [:tr
    [:td [:a {:href (r/path-for :page/build b)} (:build-id b)]]
+   ;; TODO Format timestamp
    [:td (:timestamp b)]
    [:td [co/build-result (:result b)]]
+   ;; TODO Truncate long messages
    [:td (:message b)]])
 
 (defn- builds []
@@ -31,6 +33,7 @@
            [:tr
             [:th {:scope :col} "Id"]
             [:th {:scope :col} "Time " [co/icon :caret-down-fill]]
+            ;; TODO Add elapsed time
             [:th {:scope :col} "Result"]
             [:th {:scope :col} "Commit message"]]]
           (->> @b

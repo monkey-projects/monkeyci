@@ -36,12 +36,14 @@
    files to `dir`.  Returns a repo object that can be passed to other functions."
   [{:keys [url branch dir] :as opts}]
   (log/debug "Cloning" url "into" dir)
-  (git/with-identity (merge {:trust-all? true}
-                            (prepare-ssh-keys opts))
-    (git/git-clone url
-                   :branch branch
-                   :dir dir
-                   :no-checkout? true)))
+  ;; Precalculate id config otherwise it gets called multiple times by the `with-identity` macro.
+  (let [id-config (merge {:trust-all? true}
+                         (prepare-ssh-keys opts))]
+    (git/with-identity id-config
+      (git/git-clone url
+                     :branch branch
+                     :dir dir
+                     :no-checkout? true))))
 
 (defn checkout [repo id]
   (log/debug "Checking out" id "from repo" repo)
@@ -58,9 +60,9 @@
 
 (defn clone+checkout
   "Clones the repo, then performs a checkout of the given id"
-  [{:keys [branch id] :as opts}]
+  [{:keys [branch commit-id] :as opts}]
   (let [repo (clone opts)]
-    (when-let [id-or-branch (or id (prefix-origin branch))]
+    (when-let [id-or-branch (or commit-id (prefix-origin branch))]
       (checkout repo id-or-branch))
     repo))
 

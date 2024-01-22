@@ -25,15 +25,17 @@
 
 (deftest clone+checkout
   (testing "clones, then checks out"
-    (with-redefs [sut/clone (constantly :test-repo)
-                  sut/checkout (fn [repo id]
-                                 {:repo repo
-                                  :id id})]
-      (is (= :test-repo
-             (sut/clone+checkout {:url "http://test-url"
-                                  :branch "main"
-                                  :id "test-id"
-                                  :dir "test-dir"})))))
+    (let [checkout-args (atom nil)]
+      (with-redefs [sut/clone (constantly :test-repo)
+                    sut/checkout (fn [repo id]
+                                   (reset! checkout-args {:repo repo
+                                                          :commit-id id}))]
+        (is (= :test-repo
+               (sut/clone+checkout {:url "http://test-url"
+                                    :branch "main"
+                                    :commit-id "test-id"
+                                    :dir "test-dir"})))
+        (is (= "test-id" (:commit-id @checkout-args))))))
 
   (testing "when no commit id, checks out branch instead"
     (let [checkout-ids (atom nil)]

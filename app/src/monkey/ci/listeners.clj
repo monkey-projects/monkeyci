@@ -49,8 +49,7 @@
                   :pipeline/end    pipeline-completed
                   :step/start      step-started
                   :step/end        step-completed
-                  :build/completed save-build-result
-                  }
+                  :build/completed save-build-result}
         ch (ca/chan 10)
         p nil #_(ca/pub ch :type)
         ch-per-build (atom {})
