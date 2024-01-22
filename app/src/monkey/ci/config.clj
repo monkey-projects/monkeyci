@@ -134,8 +134,14 @@
                                         (:work-dir conf)
                                         (u/cwd)))))
 
+(defn- dir-or-work-sub [conf k d]
+  (update conf k #(or (u/abs-path %) (u/combine (:work-dir conf) d))))
+
 (defn- set-checkout-base-dir [conf]
-  (update conf :checkout-base-dir #(or (u/abs-path %) (u/combine (:work-dir conf) "checkout"))))
+  (dir-or-work-sub conf :checkout-base-dir "checkout"))
+
+(defn- set-ssh-keys-dir [conf]
+  (dir-or-work-sub conf :ssh-keys-dir "ssh-keys"))
 
 (defn- set-log-dir [conf]
   (update conf
@@ -173,6 +179,7 @@
       (set-work-dir)
       (set-checkout-base-dir)
       (set-log-dir)
+      (set-ssh-keys-dir)
       (set-account)))
 
 (defn- configure-blob [k ctx]

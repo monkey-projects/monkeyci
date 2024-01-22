@@ -1,6 +1,7 @@
 (ns monkey.ci.git
   "Clone and checkout git repos.  This is mostly a wrapper for `clj-jgit`"
-  (:require [clj-jgit.porcelain :as git]
+  (:require [babashka.fs :as fs]
+            [clj-jgit.porcelain :as git]
             [clojure.java.io :as io]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
@@ -9,9 +10,26 @@
 (defn prepare-ssh-keys
   "Writes any ssh keys in the options to a temp directory and returns their
    file names and key dir to be used by clj-jgit."
-  [opts]
-  ;; TODO
-  )
+  [{:keys [ssh-keys ssh-key-dir]}]
+  (when-let [f (io/file ssh-key-dir)]
+    (when-not (or (.exists f) (.mkdirs f))
+      (throw (ex-info "Unable to create ssh key dir" {:dir ssh-key-dir})))
+    (log/debug "Writing" (count ssh-keys) "ssh keys to" f)
+    (->> ssh-keys
+         (map-indexed (fn [idx r]
+                        (let [keys ((juxt :public-key :private-key) r)
+                              names (->> [".pub" ""]
+                                         (map (partial format "key-%d%s" idx)))
+                              paths (map (partial io/file f) names)]
+                          (->> (map (fn [n k]
+                                      (spit n k)
+                                      (fs/set-posix-file-permissions n "rw-------"))
+                                    paths keys)
+                               (doall))
+                          (merge r (zipmap [:public-key-file :private-key-file] (map str names))))))
+         (doall)
+         (mapv :private-key-file)
+         (hash-map :key-dir ssh-key-dir :name))))
 
 (defn clone
   "Clones the repo at given url, and checks out the given branch.  Writes the

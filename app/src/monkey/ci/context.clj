@@ -9,15 +9,21 @@
              [logging :as l]
              [utils :as u]]))
 
+(defn- build-related-dir
+  ([ctx base-dir-key build-id]
+   (some-> ctx
+           (base-dir-key)
+           (u/combine build-id)))
+  ([ctx base-dir-key]
+   (build-related-dir ctx base-dir-key (get-in ctx [:build :build-id]))))
+
 (defn checkout-dir
   "Calculates the checkout directory for the build, by combining the checkout
    base directory and the build id."
-  ([ctx build-id]
-   (some-> ctx
-           :checkout-base-dir
-           (u/combine build-id)))
   ([ctx]
-   (checkout-dir ctx (get-in ctx [:build :build-id]))))
+   (build-related-dir ctx :checkout-base-dir))
+  ([ctx build-id]
+   (build-related-dir ctx :checkout-base-dir build-id)))
 
 (defn ^:deprecated log-dir
   "Gets the directory where to store log files"

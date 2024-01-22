@@ -257,7 +257,8 @@
   (verify-label-filter-like-endpoints
    "/ssh-keys"
    "ssh keys"
-   [{:private-key "test-key"
+   [{:private-key "private-test-key"
+     :public-key "public-test-key"
      :label-filters []}]
    :private-key))
 

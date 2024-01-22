@@ -150,17 +150,17 @@
       (let [wh (test-webhook)
             cid (:customer-id wh)
             rid (:repo-id wh)
-            ssh-key "test-ssh-key"]
+            ssh-key {:id "test-key"
+                     :private-key "test-ssh-key"}]
         (is (st/sid? (st/save-webhook-details s wh)))
         (is (st/sid? (st/save-repo s {:customer cid
                                       :id rid
                                       :labels [{:name "ssh-lbl"
                                                 :value "lbl-val"}]})))
-        (is (st/sid? (st/save-ssh-keys s cid [{:id "test-key"
-                                               :private-key "test-ssh-key"}])))
+        (is (st/sid? (st/save-ssh-keys s cid [ssh-key])))
         (let [r (sut/prepare-build {:storage s}
                                    {:id (:id wh)
                                     :payload {:ref "test-ref"
                                               :repository {:master-branch "test-main"}}})]
-          (is (= ["test-ssh-key"]
+          (is (= [ssh-key]
                  (get-in r [:build :git :ssh-keys]))))))))

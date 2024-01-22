@@ -89,6 +89,7 @@
 (s/def :conf/log-dir string?)
 (s/def :conf/work-dir string?)
 (s/def :conf/checkout-base-dir string?)
+(s/def :conf/ssh-keys-dir string?)
 (s/def :conf/url url?)
 
 ;; Account configuration
@@ -168,7 +169,7 @@
 
 ;; Application configuration
 (s/def ::app-config (s/keys :req-un [:conf/http :conf/runner :conf/args :conf/logging
-                                     :conf/work-dir :conf/checkout-base-dir]
+                                     :conf/work-dir :conf/checkout-base-dir :conf/ssh-keys-dir]
                             :opt-un [:conf/dev-mode :conf/containers :conf/log-dir
                                      :conf/storage :conf/account :conf/sidecar :conf/workspace]))
 ;; Application context.  This is the result of processing the configuration and is passed

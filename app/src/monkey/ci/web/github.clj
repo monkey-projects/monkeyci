@@ -76,15 +76,13 @@
 (defn- find-ssh-keys [st {:keys [customer-id repo-id]}]
   (let [repo (s/find-repo st [customer-id repo-id])
         ssh-keys (s/find-ssh-keys st customer-id)]
-    (->> ssh-keys
-         (lbl/filter-by-label repo)
-         (map :private-key))))
+    (lbl/filter-by-label repo ssh-keys)))
 
 (defn prepare-build
   "Event handler that looks up details for the given github webhook.  If the webhook 
    refers to a valid configuration, a build id is created and a new event is launched,
    which in turn should start the build runner."
-  [{st :storage} {:keys [id payload] :as evt}]
+  [{st :storage :as ctx} {:keys [id payload] :as evt}]
   (if-let [details (s/find-details-for-webhook st id)]
     (let [{:keys [master-branch clone-url ssh-url private]} (:repository payload)
           build-id (u/new-build-id)
@@ -103,7 +101,8 @@
           conf {:git (-> {:url (if private ssh-url clone-url)
                           :main-branch master-branch
                           :ref (:ref payload)
-                          :id commit-id}
+                          :id commit-id
+                          :ssh-keys-dir (:ssh-keys-dir ctx)}
                          (mc/assoc-some :ssh-keys ssh-keys))
                 :sid (s/ext-build-sid md) ; Build storage id
                 :build-id build-id}]
