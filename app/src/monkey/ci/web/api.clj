@@ -280,11 +280,10 @@
                   (assoc :build-id bid
                          :source :api
                          :timestamp (System/currentTimeMillis)
-                         :ref (str "refs/heads/" (get-in p [:query :branch])))
+                         :ref (params->ref p))
                   (merge (:query p)))]
        (log/debug "Triggering build for repo sid:" (repo-sid req))
        (when (st/create-build-metadata st md)
-         ;; TODO Add ssh keys
          (trigger-build-event req bid))))))
 
 (defn list-build-logs [req]

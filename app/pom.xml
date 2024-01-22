@@ -4,7 +4,7 @@
   <packaging>jar</packaging>
   <groupId>com.monkeyci</groupId>
   <artifactId>app</artifactId>
-  <version>0.1.2-SNAPSHOT</version>
+  <version>0.2.1.1</version>
   <name>app</name>
   <repositories>
     <repository>
@@ -105,7 +105,7 @@
     <dependency>
       <groupId>com.monkeyprojects</groupId>
       <artifactId>oci-os</artifactId>
-      <version>0.1.0-SNAPSHOT</version>
+      <version>0.1.1</version>
     </dependency>
     <dependency>
       <groupId>clojure.java-time</groupId>

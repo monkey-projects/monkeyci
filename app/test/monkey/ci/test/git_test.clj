@@ -37,7 +37,18 @@
                                     :dir "test-dir"})))
         (is (= "test-id" (:commit-id @checkout-args))))))
 
-  (testing "when no commit id, checks out branch instead"
+  (testing "when no commit id, checks out ref instead"
+    (let [checkout-ids (atom nil)]
+      (with-redefs [sut/clone (constantly :test-repo)
+                    sut/checkout (fn [_ id]
+                                   (reset! checkout-ids id))]
+        (is (= :test-repo
+               (sut/clone+checkout {:url "http://test-url"
+                                    :ref "refs/heads/main"
+                                    :dir "test-dir"})))
+        (is (= "refs/heads/main" @checkout-ids)))))
+
+  (testing "when no commit id or ref, uses branch"
     (let [checkout-ids (atom nil)]
       (with-redefs [sut/clone (constantly :test-repo)
                     sut/checkout (fn [_ id]

@@ -60,9 +60,9 @@
 
 (defn clone+checkout
   "Clones the repo, then performs a checkout of the given id"
-  [{:keys [branch commit-id] :as opts}]
+  [{:keys [branch commit-id ref] :as opts}]
   (let [repo (clone opts)]
-    (when-let [id-or-branch (or commit-id (prefix-origin branch))]
+    (when-let [id-or-branch (or commit-id ref (prefix-origin branch))]
       (checkout repo id-or-branch))
     repo))
 

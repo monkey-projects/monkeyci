@@ -365,6 +365,13 @@
            (is (= "refs/heads/test-branch"
                   (-> event :build :git :ref))))))
 
+      (testing "adds tag from query params as ref"
+        (catch-build-triggered-event
+         "/trigger?tag=test-tag"
+         (fn [{:keys [event]}]
+           (is (= "refs/tags/test-tag"
+                  (-> event :build :git :ref))))))
+
       (testing "adds `sid` to build props"
         (catch-build-triggered-event
          "/trigger"
