@@ -31,7 +31,7 @@
   [ctx]
   (or (tag-version ctx)
       ;; TODO Determine automatically
-      "0.1.2-SNAPSHOT"))
+      "0.2.2-SNAPSHOT"))
 
 (defn clj-container [name dir & args]
   "Executes script in clojure container"
@@ -151,6 +151,29 @@
 (def build-gui-release
   (shadow-release "release-gui" :frontend))
 
+(defn oci-config-file [{:keys [checkout-dir]}]
+  (io/file checkout-dir "oci-config"))
+
+(defn upload-app-artifact
+  "If this is a release build, uploads the uberjar to the OCI artifact registry."
+  [ctx]
+  (when (release? ctx)
+    (let [config (oci-config-file ctx)
+          repo-ocid (-> (api/build-params ctx)
+                        (get "repo-ocid"))]
+      ;; Write the config to a file, that will be mounted in the container
+      (shell/param-to-file ctx "oci-config" config)
+      (fs/set-posix-file-permissions config "rw-------")
+      (fs/delete-on-exit auth-file)
+      {:container/image "ghcr.io/oracle/oci-cli:latest"
+       :work-dir "app"
+       :script [(str "oci artifacts generic artifact upload-by-path"
+                     " --repository-id=" repo-ocid
+                     " --artifact-path=monkeyci/app/monkeyci.jar"
+                     " --artifact-version=" (tag-version ctx)
+                     " --content-body=target/monkeyci-standalone.jar")]
+       :container/mounts [[config "/oracle/.oci/config"]]})))
+
 (core/defpipeline test-all
   ;; TODO Run these in parallel
   [test-lib
@@ -166,12 +189,14 @@
    build-gui-release
    image-creds
    build-app-image
-   build-gui-image])
+   build-gui-image
+   upload-app-artifact])
 
-(core/defpipeline braid-bot
-  [bot-uberjar
-   image-creds
-   build-bot-image])
+;; Unused
+#_(core/defpipeline braid-bot
+    [bot-uberjar
+     image-creds
+     build-bot-image])
 
 ;; Return the pipelines
 (defn all-pipelines [ctx]

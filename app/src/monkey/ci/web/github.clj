@@ -101,7 +101,7 @@
           conf {:git (-> {:url (if private ssh-url clone-url)
                           :main-branch master-branch
                           :ref (:ref payload)
-                          :id commit-id
+                          :commit-id commit-id
                           :ssh-keys-dir (ctx/ssh-keys-dir ctx build-id)}
                          (mc/assoc-some :ssh-keys ssh-keys))
                 :sid (s/ext-build-sid md) ; Build storage id

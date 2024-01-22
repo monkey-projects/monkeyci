@@ -32,6 +32,7 @@
           [:thead
            [:tr
             [:th {:scope :col} "Id"]
+            ;; TODO Add ref (branch or tag)
             [:th {:scope :col} "Time " [co/icon :caret-down-fill]]
             ;; TODO Add elapsed time
             [:th {:scope :col} "Result"]

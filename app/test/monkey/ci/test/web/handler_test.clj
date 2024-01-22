@@ -222,6 +222,8 @@
           
           (testing (str "can write " desc)
             (is (= 200 (:status (save-entity full-path entity)))))
+
+          (testing (str "can partially update using `PATCH`"))
           
           (testing (str "can read " desc)
             (is (get-entity full-path)
@@ -250,6 +252,7 @@
    [{:parameters
      [{:name "test-param"
        :value "test value"}]
+     :description "test params"
      :label-filters []}]
    :parameters))
 
@@ -259,6 +262,7 @@
    "ssh keys"
    [{:private-key "private-test-key"
      :public-key "public-test-key"
+     :description "test ssh key"
      :label-filters []}]
    :private-key))
 

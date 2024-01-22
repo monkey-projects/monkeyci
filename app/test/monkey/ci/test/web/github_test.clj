@@ -145,6 +145,16 @@
           (is (= "test-main"
                  (get-in r [:build :git :main-branch])))))))
 
+  (testing "sets `commit-id`"
+    (h/with-memory-store s
+      (let [wh (test-webhook)]
+        (is (st/sid? (st/save-webhook-details s wh)))
+        (let [r (sut/prepare-build {:storage s}
+                                   {:id (:id wh)
+                                    :payload {:head-commit {:id "test-commit-id"}}})]
+          (is (= "test-commit-id"
+                 (get-in r [:build :git :commit-id])))))))
+
   (testing "adds configured ssh key matching repo labels"
     (h/with-memory-store s
       (let [wh (test-webhook)
