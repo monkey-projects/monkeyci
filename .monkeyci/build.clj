@@ -164,7 +164,7 @@
       ;; Write the config to a file, that will be mounted in the container
       (shell/param-to-file ctx "oci-config" config)
       (fs/set-posix-file-permissions config "rw-------")
-      (fs/delete-on-exit auth-file)
+      (fs/delete-on-exit config)
       {:container/image "ghcr.io/oracle/oci-cli:latest"
        :work-dir "app"
        :script [(str "oci artifacts generic artifact upload-by-path"
