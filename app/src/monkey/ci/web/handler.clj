@@ -9,7 +9,6 @@
             [monkey.ci.web
              [api :as api]
              [common :as c]
-             #_[cors :as cors]
              [github :as github]]
             [org.httpkit.server :as http]
             [reitit.coercion.schema]
@@ -74,6 +73,7 @@
 
 (s/defschema Parameters
   {:parameters [ParameterValue]
+   (s/optional-key :description) s/Str
    :label-filters [LabelFilter]})
 
 (s/defschema SshKeys
