@@ -38,17 +38,20 @@
     :error   (log/error "Failure.")
     :unknown (log/warn "Unknown result.")))
 
-(defn- cleanup-checkout-dir!
+(defn- cleanup-dir! [dir]
+  (when (and dir (not= dir (u/cwd)))
+    (log/debug "Cleaning up dir" dir)
+    (u/delete-dir dir)))
+
+(defn- cleanup-checkout-dirs!
   "Deletes the checkout dir, but only if it is not the current working directory."
   [build]
-  (let [wd (get-in build [:git :dir])]
-    (when (and wd (not= wd (u/cwd)))
-      (log/debug "Cleaning up checkout dir" wd)
-      (u/delete-dir wd))))
+  (doseq [k [:dir :ssh-keys-dir]]
+    (cleanup-dir! (get-in build [:git k]))))
 
 (defn build-completed [{{:keys [exit] :as evt} :event :keys [build]}]
   (log-build-result evt)
-  (cleanup-checkout-dir! build)
+  (cleanup-checkout-dirs! build)
   exit)
 
 (defn build-completed-tx [ctx]

@@ -10,10 +10,10 @@
 (defn prepare-ssh-keys
   "Writes any ssh keys in the options to a temp directory and returns their
    file names and key dir to be used by clj-jgit."
-  [{:keys [ssh-keys ssh-key-dir]}]
-  (when-let [f (io/file ssh-key-dir)]
+  [{:keys [ssh-keys ssh-keys-dir]}]
+  (when-let [f (io/file ssh-keys-dir)]
     (when-not (or (.exists f) (.mkdirs f))
-      (throw (ex-info "Unable to create ssh key dir" {:dir ssh-key-dir})))
+      (throw (ex-info "Unable to create ssh key dir" {:dir ssh-keys-dir})))
     (log/debug "Writing" (count ssh-keys) "ssh keys to" f)
     (->> ssh-keys
          (map-indexed (fn [idx r]
@@ -29,7 +29,7 @@
                           (merge r (zipmap [:public-key-file :private-key-file] (map str names))))))
          (doall)
          (mapv :private-key-file)
-         (hash-map :key-dir ssh-key-dir :name))))
+         (hash-map :key-dir ssh-keys-dir :name))))
 
 (defn clone
   "Clones the repo at given url, and checks out the given branch.  Writes the

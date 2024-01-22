@@ -30,7 +30,7 @@
 
 (defn- project-lbl [r]
   (->> (:labels r)
-       (filter (partial = "project" :name))
+       (filter (comp (partial = "project") :name))
        (map :value)
        (first)))
 

@@ -8,6 +8,6 @@
               :dir (str dir "/checkout")
               :ssh-keys [{:private-key priv
                           :public-key pub}]
-              :ssh-key-dir (str dir "/keys")}]
+              :ssh-keys-dir (str dir "/keys")}]
     (println "Cloning from" url "using private key" pk)
     (g/clone opts)))

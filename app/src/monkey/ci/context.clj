@@ -10,20 +10,21 @@
              [utils :as u]]))
 
 (defn- build-related-dir
-  ([ctx base-dir-key build-id]
+  ([base-dir-key ctx build-id]
    (some-> ctx
            (base-dir-key)
            (u/combine build-id)))
-  ([ctx base-dir-key]
+  ([base-dir-key ctx]
    (build-related-dir ctx base-dir-key (get-in ctx [:build :build-id]))))
 
-(defn checkout-dir
+(def checkout-dir
   "Calculates the checkout directory for the build, by combining the checkout
    base directory and the build id."
-  ([ctx]
-   (build-related-dir ctx :checkout-base-dir))
-  ([ctx build-id]
-   (build-related-dir ctx :checkout-base-dir build-id)))
+  (partial build-related-dir :checkout-base-dir))
+
+(def ssh-keys-dir
+  "Calculates ssh keys dir for the build"
+  (partial build-related-dir :ssh-keys-dir))
 
 (defn ^:deprecated log-dir
   "Gets the directory where to store log files"

@@ -251,9 +251,8 @@
 (defn trigger-build-event [{p :parameters :as req} bid]
   (let [acc (:path p)
         st (c/req->storage req)
-        repo-sid (repo-sid req)
-        repo (st/find-repo st repo-sid)
-        ssh-keys (->> (st/find-ssh-keys st (first repo-sid))
+        repo (st/find-repo st (repo-sid req))
+        ssh-keys (->> (st/find-ssh-keys st (customer-id req))
                       (lbl/filter-by-label repo))]
     {:type :build/triggered
      :account acc
@@ -261,7 +260,7 @@
              :git (-> (:query p)
                       (select-keys [:commit-id])
                       (assoc :url (:url repo)
-                             :ssh-keys-dir (c/from-context req :ssh-keys-dir))
+                             :ssh-keys-dir (ctx/ssh-keys-dir (c/req->ctx req) bid))
                       (mc/assoc-some :ref (params->ref p))
                       (mc/assoc-some :ssh-keys ssh-keys))
              :sid (-> acc

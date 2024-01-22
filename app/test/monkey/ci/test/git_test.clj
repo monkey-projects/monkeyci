@@ -75,6 +75,6 @@
         (is (= {:key-dir ssh-dir
                 :name ["key-0"]}
                (sut/prepare-ssh-keys {:ssh-keys [keys]
-                                      :ssh-key-dir ssh-dir})))
+                                      :ssh-keys-dir ssh-dir})))
         (is (fs/exists? (fs/path ssh-dir "key-0")))
         (is (fs/exists? (fs/path ssh-dir "key-0.pub")))))))
