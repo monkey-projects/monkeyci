@@ -67,11 +67,11 @@
         (let [maker (sut/make-logger {:logging
                                       {:type :oci
                                        :bucket-name "test-bucket"}})
-              l (maker {:build {:sid ["test-cust" "test-proj" "test-repo"]}}
-                       ["test.log"])
+              l (maker {:build {:sid ["test-cust" "test-repo" "test-build"]}}
+                       ["test-build" "test.log"])
               r @(sut/handle-stream l :test-stream)]
           (is (= :test-stream (:stream r)))
-          (is (= "test-cust/test-proj/test-repo/test.log"
+          (is (= "test-cust/test-repo/test-build/test.log"
                  (get-in r [:config :object-name]))))))
 
     (testing "adds prefix to object name"
@@ -83,10 +83,10 @@
                                       {:type :oci
                                        :bucket-name "test-bucket"
                                        :prefix "logs"}})
-              l (maker {:build {:sid ["test-cust" "test-proj" "test-repo"]}}
-                       ["test.log"])
+              l (maker {:build {:sid ["test-cust" "test-repo" "test-build"]}}
+                       ["test-build" "test.log"])
               r @(sut/handle-stream l :test-stream)]
-          (is (= "logs/test-cust/test-proj/test-repo/test.log"
+          (is (= "logs/test-cust/test-repo/test-build/test.log"
                  (get-in r [:config :object-name]))))))))
 
 (deftest file-log-retriever

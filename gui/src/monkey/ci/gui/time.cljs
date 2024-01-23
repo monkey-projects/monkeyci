@@ -66,3 +66,7 @@
   ([s e]
    (when (and s e)
      (format-interval (interval s e)))))
+
+(defn reformat [x]
+  (some-> (parse x)
+          (format-datetime)))

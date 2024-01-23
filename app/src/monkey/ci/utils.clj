@@ -140,6 +140,9 @@
   (when s
     (cs/split s #"/")))
 
+(defn sid->repo-sid [s]
+  (take 2 s))
+
 (def serialize-sid (partial cs/join "/"))
 
 (defn prop-pred

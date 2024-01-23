@@ -6,14 +6,17 @@
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.build.events]
             [monkey.ci.gui.build.subs]
+            [monkey.ci.gui.time :as t]
             [re-frame.core :as rf]))
 
 (defn build-details
   "Displays the build details by looking it up in the list of repo builds."
   []
-  (let [d (rf/subscribe [:build/details])]
-    (->> [:id :message :ref :timestamp]
-         (select-keys @d)
+  (let [d (rf/subscribe [:build/details])
+        v (-> @d
+              (select-keys [:id :message :ref :timestamp])
+              (update :timestamp t/reformat))]
+    (->> v
          (map (fn [[k v]]
                 [:li [:b k ": "] v]))
          (concat [[:li [:b "Result: "] [co/build-result (:result @d)]]])

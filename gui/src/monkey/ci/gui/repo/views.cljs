@@ -9,17 +9,13 @@
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
-(defn- reformat [x]
-  (some-> (t/parse x)
-          (t/format-datetime)))
-
 (defn- elapsed [b]
   (t/format-seconds (int (/ (u/build-elapsed b) 1000))))
 
 (defn- build-row [b]
   [:tr
    [:td [:a {:href (r/path-for :page/build b)} (:build-id b)]]
-   [:td.text-end (reformat (:timestamp b))]
+   [:td.text-end (t/reformat (:timestamp b))]
    [:td (elapsed b)]
    [:td (:source b)]
    [:td (:ref b)]

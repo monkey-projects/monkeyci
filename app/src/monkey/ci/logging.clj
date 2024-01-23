@@ -8,6 +8,7 @@
             [manifold.deferred :as md]
             [monkey.ci.oci :as oci]
             [monkey.ci.storage.oci :as st]
+            [monkey.ci.utils :as u]
             [monkey.oci.os.core :as os]))
 
 (defprotocol LogCapturer
@@ -78,7 +79,9 @@
 
   (handle-stream [_ in]
     (let [sid (get-in ctx [:build :sid])
-          on (sid->path conf path (take 3 sid))]
+          ;; Since the configured path already includes the build id,
+          ;; we only use repo id to build the path
+          on (sid->path conf path (u/sid->repo-sid sid))]
       (-> (oci/stream-to-bucket (assoc conf :object-name on)
                                 in)
           (ensure-cleanup)))))
