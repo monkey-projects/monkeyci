@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.utils
   (:require [clojure.string :as cs]
+            [monkey.ci.gui.time :as t]
             [re-frame.core :as rf]))
 
 (defn find-by-id [id items]
@@ -19,3 +20,20 @@
 (defn ->sid [m & keys]
   (let [g (apply juxt keys)]
     (cs/join "/" (g m))))
+
+(defn build-elapsed
+  "Calculates elapsed time for the build.  This is the difference between the start
+   time and the latest pipeline step end time."
+  [b]
+  (let [s (some-> b
+                  :timestamp
+                  (t/parse)
+                  (t/to-epoch))
+        e (->> b
+               :pipelines
+               (mapcat (fn [p]
+                         (map :endTime (:steps p))))
+               (apply max))]
+    (if (and s e)
+      (- e s)
+      0)))

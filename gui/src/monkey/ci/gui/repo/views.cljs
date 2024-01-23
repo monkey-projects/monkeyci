@@ -5,17 +5,26 @@
             [monkey.ci.gui.repo.events]
             [monkey.ci.gui.repo.subs]
             [monkey.ci.gui.routing :as r]
+            [monkey.ci.gui.time :as t]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
+
+(defn- reformat [x]
+  (some-> (t/parse x)
+          (t/format-datetime)))
+
+(defn- elapsed [b]
+  (t/format-seconds (int (/ (u/build-elapsed b) 1000))))
 
 (defn- build-row [b]
   [:tr
    [:td [:a {:href (r/path-for :page/build b)} (:build-id b)]]
-   ;; TODO Format timestamp
-   [:td (:timestamp b)]
-   [:td [co/build-result (:result b)]]
-   ;; TODO Truncate long messages
-   [:td (:message b)]])
+   [:td.text-end (reformat (:timestamp b))]
+   [:td (elapsed b)]
+   [:td (:source b)]
+   [:td (:ref b)]
+   [:td.text-center [co/build-result (:result b)]]
+   [:td (some-> (:message b) (subs 0 20))]])
 
 (defn- builds []
   (rf/dispatch [:builds/load])
@@ -32,9 +41,10 @@
           [:thead
            [:tr
             [:th {:scope :col} "Id"]
-            ;; TODO Add ref (branch or tag)
             [:th {:scope :col} "Time " [co/icon :caret-down-fill]]
-            ;; TODO Add elapsed time
+            [:th {:scope :col} "Elapsed"]
+            [:th {:scope :col} "Trigger"]
+            [:th {:scope :col} "Ref"]
             [:th {:scope :col} "Result"]
             [:th {:scope :col} "Commit message"]]]
           (->> @b
