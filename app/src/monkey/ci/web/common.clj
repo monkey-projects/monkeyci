@@ -1,6 +1,8 @@
 (ns monkey.ci.web.common
   (:require [camel-snake-kebab.core :as csk]
+            [cheshire.core :as json]
             [clojure.core.async :refer [go <! <!! >!]]
+            [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [monkey.ci.events :as e]
             [muuntaja.core :as mc]
@@ -88,3 +90,9 @@
         (if (or (nil? evt) (<! (post-event req evt)))
           200
           500))))))
+
+(defn parse-json [s]
+  (if (string? s)
+    (json/parse-string s csk/->kebab-case-keyword)
+    (with-open [r (io/reader s)]
+      (json/parse-stream r csk/->kebab-case-keyword))))

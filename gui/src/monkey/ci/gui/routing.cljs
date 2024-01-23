@@ -9,7 +9,7 @@
    (:route/current db)))
 
 (rf/reg-event-db
- :route/goto
+ :route/changed
  (fn [db [_ match]]
    (println "Changing current route from" (:route/current db) "into" match)
    (assoc db :route/current match)))
@@ -24,11 +24,12 @@
     ["/login" :page/login]
     ["/c/:customer-id" :page/customer]
     ["/c/:customer-id/r/:repo-id" :page/repo]
-    ["/c/:customer-id/r/:repo-id/b/:build-id" :page/build]]))
+    ["/c/:customer-id/r/:repo-id/b/:build-id" :page/build]
+    ["/github/callback" :page/github-callback]]))
 
 (defn on-route-change [match history]
   (println "Route changed:" match)
-  (rf/dispatch [:route/goto match]))
+  (rf/dispatch [:route/changed match]))
 
 (defn start! []
   (rfe/start! router on-route-change {:use-fragment false}))
@@ -38,3 +39,16 @@
           :path))
 
 (def path-params (comp :path :parameters))
+
+(defn set-path! [p]
+  (set! (.-pathname js/location) p))
+
+(rf/reg-fx
+ :route/goto
+ (fn [p]
+   (set-path! p)))
+
+(rf/reg-event-fx
+ :route/goto
+ (fn [_ [_ p]]
+   {:route/goto p}))

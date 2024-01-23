@@ -154,17 +154,22 @@
 (defn oci-config-file [{:keys [checkout-dir]}]
   (io/file checkout-dir "oci-config"))
 
+(defn oci-creds
+  "Creates oci credentials file"
+  [ctx]
+  (let [config (oci-config-file ctx)]
+    ;; Write the config to a file, that will be mounted in the container
+    (shell/param-to-file ctx "oci-config" config)
+    (fs/set-posix-file-permissions config "rw-------")
+    (fs/delete-on-exit config)
+    core/success))
+
 (defn upload-app-artifact
   "If this is a release build, uploads the uberjar to the OCI artifact registry."
   [ctx]
   (when (release? ctx)
-    (let [config (oci-config-file ctx)
-          repo-ocid (-> (api/build-params ctx)
+    (let [repo-ocid (-> (api/build-params ctx)
                         (get "repo-ocid"))]
-      ;; Write the config to a file, that will be mounted in the container
-      (shell/param-to-file ctx "oci-config" config)
-      (fs/set-posix-file-permissions config "rw-------")
-      (fs/delete-on-exit config)
       {:container/image "ghcr.io/oracle/oci-cli:latest"
        :work-dir "app"
        :script [(str "oci artifacts generic artifact upload-by-path"
@@ -172,7 +177,7 @@
                      " --artifact-path=monkeyci/app/monkeyci.jar"
                      " --artifact-version=" (tag-version ctx)
                      " --content-body=target/monkeyci-standalone.jar")]
-       :container/mounts [[config "/oracle/.oci/config"]]})))
+       :container/mounts [[(oci-config-file ctx) "/oracle/.oci/config"]]})))
 
 (core/defpipeline test-all
   ;; TODO Run these in parallel
@@ -190,6 +195,7 @@
    image-creds
    build-app-image
    build-gui-image
+   oci-creds
    upload-app-artifact])
 
 ;; Unused

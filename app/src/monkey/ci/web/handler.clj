@@ -176,12 +176,18 @@
 (def event-stream-routes
   ["/events" {:get {:handler api/event-stream}}])
 
+(def github-routes
+  ["/github" [["/exchange-code" {:post
+                                 {:handler github/exchange-code
+                                  :parameters {:query {:code s/Str}}}}]]])
+
 (def routes
   [["/health" {:get health}]
    ["/version" {:get version}]
    webhook-routes
    customer-routes
-   event-stream-routes])
+   event-stream-routes
+   github-routes])
 
 (defn- stringify-body
   "Since the raw body could be read more than once (security, content negotation...),

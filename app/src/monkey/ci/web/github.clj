@@ -14,6 +14,7 @@
              [storage :as s]
              [utils :as u]]
             [monkey.ci.web.common :as c]
+            [org.httpkit.client :as http]
             [ring.util.response :as rur]))
 
 (defn extract-signature [s]
@@ -111,3 +112,38 @@
          :details details
          :build conf}))
     (log/warn "No webhook configuration found for" id)))
+
+(defn- process-reply [{:keys [status] :as r}]
+  (log/debug "Got github reply:" r)
+  (update r :body c/parse-json))
+
+(defn- request-access-token [req]
+  (let [code (get-in req [:parameters :query :code])
+        {:keys [client-secret client-id]} (c/from-context req :github)]
+    (-> @(http/post "https://github.com/login/oauth/access_token"
+                    {:query-params {:client_id client-id
+                                    :client_secret client-secret
+                                    :code code}
+                     :headers {"Accept" "application/json"}})
+        (process-reply))))
+
+(defn- request-user-info [token]
+  (-> @(http/get "https://api.github.com/user"
+                 {:headers {"Accept" "application/json"
+                            "Authorization" (str "Bearer " token)}})
+      (process-reply)
+      :body
+      ;; TODO Create or lookup user in database according to github id
+      (select-keys [:id :avatar-url :email :name])
+      (rur/response)))
+
+(defn exchange-code
+  "Invoked by the frontend during OAuth2 login flow.  It requests a Github
+   user access token using the given authorization code."
+  [req]
+  (let [token-reply (request-access-token req)]
+    (if (= 200 (:status token-reply))
+      ;; Request user info, return it as-is
+      (request-user-info (get-in token-reply [:body :access-token]))
+      ;; Failure
+      (select-keys token-reply [:status :body]))))
