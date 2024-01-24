@@ -553,18 +553,24 @@
                  slurp))))))
 
 (deftest auth-endpoints
-  (testing "`GET /auth/jwks` retrieves JWK structure according to context"
-    (let [kp (auth/generate-keypair)
-          ctx {:jwk (auth/keypair->ctx kp)}
-          app (sut/make-app ctx)
-          r (-> (mock/request :get "/auth/jwks")
-                (app))
-          k (some-> r
-                    :body
-                    (slurp)
-                    (h/parse-json)
-                    :keys
-                    (first))]
-      (is (= 200 (:status r)))
-      (is (string? (:n k)))
-      (is (nil? (:d k)) "should not contain private exponent"))))
+  (testing "`GET /auth/jwks`"
+    (testing "retrieves JWK structure according to context"
+      (let [kp (auth/generate-keypair)
+            ctx {:jwk (auth/keypair->ctx kp)}
+            app (sut/make-app ctx)
+            r (-> (mock/request :get "/auth/jwks")
+                  (app))
+            k (some-> r
+                      :body
+                      (slurp)
+                      (h/parse-json)
+                      :keys
+                      (first))]
+        (is (= 200 (:status r)))
+        (is (string? (:n k)))
+        (is (nil? (:d k)) "should not contain private exponent")))
+
+    (testing "404 when no jwk configured"
+      (is (= 404 (-> (mock/request :get "/auth/jwks")
+                     (test-app)
+                     :status))))))

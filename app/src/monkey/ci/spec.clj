@@ -109,6 +109,10 @@
 (s/def :sidecar/log-config string?)
 (s/def :conf/sidecar (s/keys :opt-un [:sidecar/poll-interval :sidecar/log-config]))
 
+(s/def :conf-jwk/public-key string?)
+(s/def :conf-jwk/private-key string?)
+(s/def :conf/jwk (s/keys :req-un [:conf-jwk/public-key :conf-jwk/private-key]))
+
 ;; Command line arguments
 (s/def :arg/pipeline string?)
 (s/def :arg/dir string?)
@@ -175,7 +179,7 @@
 ;; Application configuration
 (s/def ::app-config (s/keys :req-un [:conf/http :conf/runner :conf/args :conf/logging
                                      :conf/work-dir :conf/checkout-base-dir :conf/ssh-keys-dir]
-                            :opt-un [:conf/dev-mode :conf/containers :conf/log-dir
+                            :opt-un [:conf/dev-mode :conf/containers :conf/log-dir :conf/jwk
                                      :conf/storage :conf/account :conf/sidecar :conf/workspace]))
 ;; Application context.  This is the result of processing the configuration and is passed
 ;; around internally.

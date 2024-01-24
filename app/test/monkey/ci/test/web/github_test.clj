@@ -32,10 +32,6 @@
   (testing "nil if key is not sha256"
     (is (nil? (sut/extract-signature "key=value")))))
 
-(deftest generate-secret-key
-  (testing "generates random string"
-    (is (string? (sut/generate-secret-key)))))
-
 (deftest webhook
   (testing "posts event"
     (let [bus (events/make-bus)

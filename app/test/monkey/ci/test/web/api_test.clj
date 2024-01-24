@@ -11,7 +11,7 @@
   (testing "returns customer in body"
     (let [cust {:id "test-customer"
                 :name "Test customer"}
-          {st :storage :as ctx} (test-ctx)
+          {st :storage :as ctx} (h/test-ctx)
           req (-> ctx
                   (h/->req)
                   (h/with-path-param :customer-id (:id cust)))]
@@ -19,7 +19,7 @@
       (is (= cust (:body (sut/get-customer req))))))
 
   (testing "404 not found when no match"
-    (is (= 404 (-> (test-ctx)
+    (is (= 404 (-> (h/test-ctx)
                    (h/->req)
                    (h/with-path-param :customer-id "nonexisting")
                    (sut/get-customer)
@@ -31,7 +31,7 @@
           repo {:id "test-repo"
                 :name "Test repository"
                 :customer-id (:id cust)}
-          {st :storage :as ctx} (test-ctx)]
+          {st :storage :as ctx} (h/test-ctx)]
       (is (st/sid? (st/save-customer st cust)))
       (is (st/sid? (st/save-repo st repo)))
       (let [r (-> ctx
@@ -47,7 +47,7 @@
 
 (deftest create-customer
   (testing "returns created customer with id"
-    (let [r (-> (test-ctx)
+    (let [r (-> (h/test-ctx)
                 (h/->req)
                 (h/with-body {:name "new customer"})
                 (sut/create-customer)
@@ -59,7 +59,7 @@
   (testing "returns customer in body"
     (let [cust {:id "test-customer"
                 :name "Test customer"}
-          {st :storage :as ctx} (test-ctx)
+          {st :storage :as ctx} (h/test-ctx)
           req (-> ctx
                   (h/->req)
                   (h/with-path-param :customer-id (:id cust))
@@ -70,7 +70,7 @@
              (:body (sut/update-customer req))))))
 
   (testing "404 not found when no match"
-    (is (= 404 (-> (test-ctx)
+    (is (= 404 (-> (h/test-ctx)
                    (h/->req)
                    (h/with-path-param :customer-id "nonexisting")
                    (sut/update-customer)
@@ -80,7 +80,7 @@
   (testing "generates id from repo name"
     (let [repo {:name "Test repo"
                 :customer-id (st/new-id)}
-          {st :storage :as ctx} (test-ctx)
+          {st :storage :as ctx} (h/test-ctx)
           r (-> ctx
                 (h/->req)
                 (h/with-body repo)
@@ -91,7 +91,7 @@
   (testing "on id collision, appends index"
     (let [repo {:name "Test repo"
                 :customer-id (st/new-id)}
-          {st :storage :as ctx} (test-ctx)
+          {st :storage :as ctx} (h/test-ctx)
           _ (st/save-repo st (-> repo
                                  (select-keys [:customer-id])
                                  (assoc :id "test-repo"
@@ -105,14 +105,14 @@
 
 (deftest get-customer-params
   (testing "empty vector if no params"
-    (is (= [] (-> (test-ctx)
+    (is (= [] (-> (h/test-ctx)
                   (h/->req)
                   (h/with-path-params {:customer-id (st/new-id)})
                   (sut/get-customer-params)
                   :body))))
 
   (testing "returns stored parameters"
-    (let [{st :storage :as ctx} (test-ctx)
+    (let [{st :storage :as ctx} (h/test-ctx)
           cust-id (st/new-id)
           params [{:parameters [{:name "test-param"
                                  :value "test-value"}]
@@ -127,7 +127,7 @@
                  :body))))))
 
 (deftest get-repo-params
-  (let [{st :storage :as ctx} (test-ctx)
+  (let [{st :storage :as ctx} (h/test-ctx)
         [cust-id repo-id] (repeatedly st/new-id)
         _ (st/save-customer st {:id cust-id
                                 :repos {repo-id
@@ -170,7 +170,7 @@
 
 (deftest create-webhook
   (testing "assigns secret key"
-    (let [{st :storage :as ctx} (test-ctx)
+    (let [{st :storage :as ctx} (h/test-ctx)
           r (-> ctx
                 (h/->req)
                 (h/with-body {:customer-id "test-customer"})
@@ -180,7 +180,7 @@
 
 (deftest get-webhook
   (testing "does not return the secret key"
-    (let [{st :storage :as ctx} (test-ctx)
+    (let [{st :storage :as ctx} (h/test-ctx)
           wh {:id (st/new-id)
               :secret-key "very secret key"}
           _ (st/save-webhook-details st wh)
@@ -193,7 +193,7 @@
 
 (deftest get-latest-build
   (testing "converts pipelines to list sorted by index"
-    (let [{st :storage :as ctx} (test-ctx)
+    (let [{st :storage :as ctx} (h/test-ctx)
           id (st/new-id)
           md {:customer-id "test-cust"
               :repo-id "test-repo"}
@@ -215,7 +215,7 @@
              (-> r :body :pipelines)))))
 
   (testing "converts pipeline steps to list sorted by index"
-    (let [{st :storage :as ctx} (test-ctx)
+    (let [{st :storage :as ctx} (h/test-ctx)
           id (st/new-id)
           md {:customer-id "test-cust"
               :repo-id "test-repo"}
@@ -271,7 +271,7 @@
 (deftest trigger-build-event
   (testing "adds ref to build from branch query param"
     (is (= "refs/heads/test-branch"
-           (-> (test-ctx)
+           (-> (h/test-ctx)
                (h/->req)
                (assoc-in [:parameters :query :branch] "test-branch")
                (sut/trigger-build-event "test-build")
@@ -281,7 +281,7 @@
 
   (testing "adds ref to build from tag query param"
     (is (= "refs/tags/test-tag"
-           (-> (test-ctx)
+           (-> (h/test-ctx)
                (h/->req)
                (assoc-in [:parameters :query :tag] "test-tag")
                (sut/trigger-build-event "test-build")
@@ -290,7 +290,7 @@
                :ref))))
 
   (testing "adds configured ssh keys"
-    (let [{st :storage :as ctx} (test-ctx)
+    (let [{st :storage :as ctx} (h/test-ctx)
           [cid rid] (repeatedly st/new-id)
           ssh-key {:private-key "private-key"
                    :public-key "public-key"}]

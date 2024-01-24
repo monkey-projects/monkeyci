@@ -111,13 +111,19 @@
                    :logging
                    :retriever))))
 
-  (testing "generates JWK keys"
-    (let [jwk (-> (sut/new-context :test-cmd)
+  (testing "loads JWK keys"
+    (let [[priv pub :as keypaths] (->> ["priv" "pub"]
+                                       (map (partial format "dev-resources/test/jwk/%skey.pem")))
+          privkey (bk/private-key priv)
+          pubkey (bk/public-key pub)
+          jwk (-> (sut/new-context :test-cmd)
+                  (assoc :jwk (zipmap [:private-key :public-key] keypaths))
                   (c/start)
                   :jwk)]
       (is (not-empty jwk))
-      (is (bk/private-key? (:priv jwk)))
-      (is (bk/public-key? (:pub jwk))))))
+      (is (= 2 (count jwk)))
+      (is (= privkey (:priv jwk)))
+      (is (= pubkey (:pub jwk))))))
 
 (defn- verify-event-handled
   ([ctx evt verifier]

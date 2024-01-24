@@ -76,9 +76,8 @@
         (assoc :runner (r/make-runner config)
                :storage (:storage storage)
                :public-api wsa/local-api
-               :reporter (rep/make-reporter (:reporter config))
-               ;; TODO Load keys using config
-               :jwk (auth/keypair->ctx (auth/generate-keypair)))
+               :reporter (rep/make-reporter (:reporter config)))
+        (mc/assoc-some :jwk (auth/config->keypair this))
         (config/configure-workspace)
         (config/configure-cache)
         (config/initialize-log-maker)
