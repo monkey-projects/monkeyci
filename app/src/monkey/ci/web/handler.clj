@@ -8,6 +8,7 @@
              [events :as e]]
             [monkey.ci.web
              [api :as api]
+             [auth :as auth]
              [common :as c]
              [github :as github]]
             [org.httpkit.server :as http]
@@ -181,13 +182,19 @@
                          {:handler github/login
                           :parameters {:query {:code s/Str}}}}]]])
 
+(def auth-routes
+  ["/auth/jwks" {:get
+                 {:handler auth/jwks
+                  :produces #{"application/json"}}}])
+
 (def routes
   [["/health" {:get health}]
    ["/version" {:get version}]
    webhook-routes
    customer-routes
    event-stream-routes
-   github-routes])
+   github-routes
+   auth-routes])
 
 (defn- stringify-body
   "Since the raw body could be read more than once (security, content negotation...),

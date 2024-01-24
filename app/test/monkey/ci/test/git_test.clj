@@ -5,6 +5,7 @@
             [clj-jgit.porcelain :as git]
             [monkey.ci.git :as sut]
             [monkey.ci.test.helpers :as h]
+            [monkey.ci.web.auth :as auth]
             [monkey.oci.common.utils :as ocu]))
 
 (deftest clone
@@ -59,16 +60,11 @@
                                     :dir "test-dir"})))
         (is (= "origin/main" @checkout-ids))))))
 
-(defn- make-keypair []
-  (-> (doto (java.security.KeyPairGenerator/getInstance "RSA")
-        (.initialize 2048))
-      (.generateKeyPair)))
-
 (defn- keypair-base64
   "Generates a new RSA keypair and returns the public and private keys as base64
    encoded strings."
   []
-  (let [r (->> (make-keypair)
+  (let [r (->> (auth/generate-keypair)
                ((juxt (memfn getPrivate) (memfn getPublic)))
                (map (comp #(String. %) bcc/bytes->b64 (memfn getEncoded)))
                (zipmap [:private-key :public-key]))]

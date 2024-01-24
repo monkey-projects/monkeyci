@@ -11,8 +11,8 @@
              [storage :as st]
              [utils :as u]]
             [monkey.ci.web
-             [common :as c]
-             [github :as gh]]
+             [auth :as auth]
+             [common :as c]]
             [org.httpkit.server :as http]
             [ring.util.response :as rur]))
 
@@ -120,7 +120,7 @@
   "Updates the request body to assign a secret key, which is used to
    validate the request."
   [req]
-  (assoc-in req [:parameters :body :secret-key] (gh/generate-secret-key)))
+  (assoc-in req [:parameters :body :secret-key] (auth/generate-secret-key)))
 
 (def create-webhook (comp (entity-creator st/save-webhook-details default-id)
                           assign-webhook-secret))

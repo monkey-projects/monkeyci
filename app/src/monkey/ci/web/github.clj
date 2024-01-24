@@ -2,9 +2,7 @@
   "Functionality specific for Github"
   (:require [buddy.core
              [codecs :as codecs]
-             [mac :as mac]
-             [nonce :as nonce]]
-            [buddy.sign.jwt :as jwt]
+             [mac :as mac]]
             [clojure.core.async :refer [go <!! <!]]
             [clojure.java.io :as io]
             [clojure.tools.logging :as log]
@@ -14,7 +12,9 @@
              [labels :as lbl]
              [storage :as s]
              [utils :as u]]
-            [monkey.ci.web.common :as c]
+            [monkey.ci.web
+             [auth :as auth]
+             [common :as c]]
             [org.httpkit.client :as http]
             [ring.util.response :as rur]))
 
@@ -51,10 +51,6 @@
                           (some-> (c/req->storage req)
                                   (s/find-details-for-webhook (req->webhook-id req))
                                   :secret-key)))))
-
-(defn generate-secret-key []
-  (-> (nonce/random-nonce 32)
-      (codecs/bytes->hex)))
 
 (defn- github-commit-trigger?
   "Checks if the incoming request is actually a commit trigger.  Github can also
@@ -138,8 +134,9 @@
       ;; TODO Create or lookup user in database according to github id
       (select-keys [:id :avatar-url :email :name])))
 
-(defn- generate-jwt [req payload]
-  (jwt/sign payload (c/from-context req :jwt-secret)))
+(defn- generate-jwt [req user]
+  (auth/generate-jwt req {:type "github"
+                          :user-id (:id user)}))
 
 (defn login
   "Invoked by the frontend during OAuth2 login flow.  It requests a Github

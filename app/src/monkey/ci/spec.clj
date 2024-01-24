@@ -1,5 +1,6 @@
 (ns monkey.ci.spec
-  (:require [clojure.spec.alpha :as s]
+  (:require [buddy.core.keys :as bk]
+            [clojure.spec.alpha :as s]
             [clojure.core.async.impl.protocols :as ap]
             [monkey.ci.blob :as blob]
             [monkey.oci.sign :as oci-sign]))
@@ -163,7 +164,9 @@
 (s/def :ctx/logging (s/merge :conf/logging
                              (s/keys :req-un [:logging/maker])))
 
-(s/def :ctx/jwt-secret string?)
+(s/def :jwk/priv bk/private-key?)
+(s/def :jwk/pub bk/public-key?)
+(s/def :ctx/jwk (s/keys :req-un [:jwk/priv :jwk/pub]))
 
 ;; Arguments as passed in from the CLI
 (s/def :conf/args (s/keys :opt-un [:conf/dev-mode :arg/pipeline :arg/dir :arg/workdir
@@ -179,7 +182,7 @@
 (s/def ::app-context (s/keys :req-un [:conf/http :ctx/runner :evt/event-bus :ctx/git :ctx/storage :ctx/public-api
                                       :ctx/logging]
                              :opt-un [:conf/dev-mode :arg/command ::system :conf/args :ctx/build :ctx/reporter
-                                      :conf/work-dir :conf/sidecar :ctx/jwt-secret]))
+                                      :conf/work-dir :conf/sidecar :ctx/jwk]))
 
 ;; Script configuration
 (s/def ::script-config (s/keys :req-un [:conf/containers :conf/storage :conf/logging]

@@ -10,7 +10,9 @@
              [events :as events]
              [logging :as l]
              [storage :as st]]
-            [monkey.ci.web.handler :as sut]
+            [monkey.ci.web
+             [auth :as auth]
+             [handler :as sut]]
             [monkey.ci.test.helpers :refer [try-take] :as h]
             [org.httpkit
              [fake :as hf]
@@ -499,12 +501,17 @@
                                                                  :other-key "other-value"})}
                               {:status 400 :body (str "invalid auth header: " auth)})))]
       (let [app (-> (test-ctx {:github {:client-id "test-client-id"
-                                        :client-secret "test-secret"}})
+                                        :client-secret "test-secret"}
+                               :jwk (auth/keypair->ctx (auth/generate-keypair))})
                     (sut/make-app))
             r (-> (mock/request :post "/github/login?code=1234")
                   (app))]
         (is (= 200 (:status r)) (:body r))
-        (is (= {:name "test-user"} (some-> (:body r) (slurp) (h/parse-json))))))))
+        (is (= "test-user"
+               (some-> (:body r)
+                       (slurp)
+                       (h/parse-json)
+                       :name)))))))
 
 (deftest routing-middleware
   (testing "converts json bodies to kebab-case"
@@ -544,3 +551,20 @@
                  (app)
                  :body
                  slurp))))))
+
+(deftest auth-endpoints
+  (testing "`GET /auth/jwks` retrieves JWK structure according to context"
+    (let [kp (auth/generate-keypair)
+          ctx {:jwk (auth/keypair->ctx kp)}
+          app (sut/make-app ctx)
+          r (-> (mock/request :get "/auth/jwks")
+                (app))
+          k (some-> r
+                    :body
+                    (slurp)
+                    (h/parse-json)
+                    :keys
+                    (first))]
+      (is (= 200 (:status r)))
+      (is (string? (:n k)))
+      (is (nil? (:d k)) "should not contain private exponent"))))

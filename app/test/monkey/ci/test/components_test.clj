@@ -108,7 +108,12 @@
                    (assoc :logging {:type :inherit})
                    (c/start)
                    :logging
-                   :retriever)))))
+                   :retriever))))
+
+  (testing "generates JWT secret"
+    (is (string? (-> (sut/new-context :test-cmd)
+                     (c/start)
+                     :jwt-secret)))))
 
 (defn- verify-event-handled
   ([ctx evt verifier]

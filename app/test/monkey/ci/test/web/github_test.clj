@@ -4,7 +4,9 @@
             [monkey.ci
              [events :as events]
              [storage :as st]]
-            [monkey.ci.web.github :as sut]
+            [monkey.ci.web
+             [auth :as auth]
+             [github :as sut]]
             [monkey.ci.test.helpers :as h]
             [org.httpkit.fake :as hf]
             [ring.mock.request :as mock]))
@@ -195,9 +197,9 @@
                         "https://api.github.com/user"
                         {:status 200
                          :body (h/to-json {:name "test user"})}]
-      (let [secret "test-secret"
+      (let [kp (auth/generate-keypair)
             req (-> (h/test-ctx)
-                    (assoc :jwt-secret secret)
+                    (assoc :jwk {:priv (.getPrivate kp)})
                     (h/->req)
                     (assoc :parameters
                            {:query
@@ -207,4 +209,4 @@
                       :body
                       :token)]
         (is (string? token))
-        (is (map? (jwt/unsign token secret)))))))
+        (is (map? (jwt/unsign token (.getPublic kp) {:alg :rs256})))))))
