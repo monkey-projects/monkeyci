@@ -480,7 +480,7 @@
                   :status)))))
 
 (deftest github-endpoints
-  (testing "`POST /github/exchange-code` requests token from github and fetches user info"
+  (testing "`POST /github/login` requests token from github and fetches user info"
     (hf/with-fake-http [{:url "https://github.com/login/oauth/access_token"
                          :method :post}
                         (fn [_ req _]
@@ -501,7 +501,7 @@
       (let [app (-> (test-ctx {:github {:client-id "test-client-id"
                                         :client-secret "test-secret"}})
                     (sut/make-app))
-            r (-> (mock/request :post "/github/exchange-code?code=1234")
+            r (-> (mock/request :post "/github/login?code=1234")
                   (app))]
         (is (= 200 (:status r)) (:body r))
         (is (= {:name "test-user"} (some-> (:body r) (slurp) (h/parse-json))))))))

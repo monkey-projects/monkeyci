@@ -3,11 +3,11 @@
             [re-frame.core :as rf]))
 
 (defn user-home [u]
-  (println "Current user:" u)
-  [:div
-   [:h3 "Welcome, " (:name u)]
-   (when-let [a (:avatarUrl u)]
-     [:img.img-thumbnail {:width "100px" :src a :alt "Avatar"}])])
+  [:<>
+   [:div.clearfix
+    [:h3.float-start "Customers for " (:name u)]
+    (when-let [a (:avatarUrl u)]
+      [:img.img-thumbnail.float-end {:width "50px" :src a :alt "Avatar"}])]])
 
 (defn redirect-to-login []
   [:p "One moment, redirecting you to the login page"]

@@ -19,7 +19,7 @@
  :login/github-code-received
  (fn [{:keys [db]} [_ code]]
    {:dispatch [:martian.re-frame/request
-               :github-exchange-code
+               :github-login
                {:code code}
                [:login/github-code-received--success]
                [:login/github-code-received--failed]]

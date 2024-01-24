@@ -177,9 +177,9 @@
   ["/events" {:get {:handler api/event-stream}}])
 
 (def github-routes
-  ["/github" [["/exchange-code" {:post
-                                 {:handler github/exchange-code
-                                  :parameters {:query {:code s/Str}}}}]]])
+  ["/github" [["/login" {:post
+                         {:handler github/login
+                          :parameters {:query {:code s/Str}}}}]]])
 
 (def routes
   [["/health" {:get health}]

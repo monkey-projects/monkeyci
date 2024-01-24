@@ -163,6 +163,8 @@
 (s/def :ctx/logging (s/merge :conf/logging
                              (s/keys :req-un [:logging/maker])))
 
+(s/def :ctx/jwt-secret string?)
+
 ;; Arguments as passed in from the CLI
 (s/def :conf/args (s/keys :opt-un [:conf/dev-mode :arg/pipeline :arg/dir :arg/workdir
                                    :arg/git-url :arg/config-file :arg/events-file]))
@@ -177,7 +179,7 @@
 (s/def ::app-context (s/keys :req-un [:conf/http :ctx/runner :evt/event-bus :ctx/git :ctx/storage :ctx/public-api
                                       :ctx/logging]
                              :opt-un [:conf/dev-mode :arg/command ::system :conf/args :ctx/build :ctx/reporter
-                                      :conf/work-dir :conf/sidecar]))
+                                      :conf/work-dir :conf/sidecar :ctx/jwt-secret]))
 
 ;; Script configuration
 (s/def ::script-config (s/keys :req-un [:conf/containers :conf/storage :conf/logging]

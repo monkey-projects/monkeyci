@@ -32,9 +32,9 @@
   (testing "sends exchange request to backend"
     (rf-test/run-test-sync
      (let [c (h/catch-fx :martian.re-frame/request)]
-       (h/initialize-martian {:github-exchange-code {:status 200
-                                                     :body "ok"
-                                                     :error-code :no-error}})
+       (h/initialize-martian {:github-login {:status 200
+                                             :body "ok"
+                                             :error-code :no-error}})
        (rf/dispatch [:login/github-code-received "test-code"])
        (is (= 1 (count @c))))))
 

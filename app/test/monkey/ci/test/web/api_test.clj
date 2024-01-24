@@ -7,38 +7,21 @@
             [monkey.ci.test.helpers :as h]
             [org.httpkit.server :as http]))
 
-(defn- ->req [ctx]
-  {:reitit.core/match
-   {:data
-    {:monkey.ci.web.common/context ctx}}})
-
-(defn- with-path-param [r k v]
-  (assoc-in r [:parameters :path k] v))
-
-(defn- with-path-params [r p]
-  (update-in r [:parameters :path] merge p))
-
-(defn- with-body [r v]
-  (assoc-in r [:parameters :body] v))
-
-(defn- test-ctx []
-  {:storage (st/make-memory-storage)})
-
 (deftest get-customer
   (testing "returns customer in body"
     (let [cust {:id "test-customer"
                 :name "Test customer"}
           {st :storage :as ctx} (test-ctx)
           req (-> ctx
-                  (->req)
-                  (with-path-param :customer-id (:id cust)))]
+                  (h/->req)
+                  (h/with-path-param :customer-id (:id cust)))]
       (is (st/sid? (st/save-customer st cust)))
       (is (= cust (:body (sut/get-customer req))))))
 
   (testing "404 not found when no match"
     (is (= 404 (-> (test-ctx)
-                   (->req)
-                   (with-path-param :customer-id "nonexisting")
+                   (h/->req)
+                   (h/with-path-param :customer-id "nonexisting")
                    (sut/get-customer)
                    :status))))
 
@@ -52,8 +35,8 @@
       (is (st/sid? (st/save-customer st cust)))
       (is (st/sid? (st/save-repo st repo)))
       (let [r (-> ctx
-                  (->req)
-                  (with-path-param :customer-id (:id cust))
+                  (h/->req)
+                  (h/with-path-param :customer-id (:id cust))
                   (sut/get-customer)
                   :body)
             repos (-> r :repos)]
@@ -65,8 +48,8 @@
 (deftest create-customer
   (testing "returns created customer with id"
     (let [r (-> (test-ctx)
-                (->req)
-                (with-body {:name "new customer"})
+                (h/->req)
+                (h/with-body {:name "new customer"})
                 (sut/create-customer)
                 :body)]
       (is (= "new customer" (:name r)))
@@ -78,9 +61,9 @@
                 :name "Test customer"}
           {st :storage :as ctx} (test-ctx)
           req (-> ctx
-                  (->req)
-                  (with-path-param :customer-id (:id cust))
-                  (with-body {:name "updated"}))]
+                  (h/->req)
+                  (h/with-path-param :customer-id (:id cust))
+                  (h/with-body {:name "updated"}))]
       (is (st/sid? (st/save-customer st cust)))
       (is (= {:id (:id cust)
               :name "updated"}
@@ -88,8 +71,8 @@
 
   (testing "404 not found when no match"
     (is (= 404 (-> (test-ctx)
-                   (->req)
-                   (with-path-param :customer-id "nonexisting")
+                   (h/->req)
+                   (h/with-path-param :customer-id "nonexisting")
                    (sut/update-customer)
                    :status)))))
 
@@ -99,8 +82,8 @@
                 :customer-id (st/new-id)}
           {st :storage :as ctx} (test-ctx)
           r (-> ctx
-                (->req)
-                (with-body repo)
+                (h/->req)
+                (h/with-body repo)
                 (sut/create-repo)
                 :body)]
       (is (= "test-repo" (:id r)))))
@@ -114,8 +97,8 @@
                                  (assoc :id "test-repo"
                                         :name "Existing repo")))
           r (-> ctx
-                (->req)
-                (with-body repo)
+                (h/->req)
+                (h/with-body repo)
                 (sut/create-repo)
                 :body)]
       (is (= "test-repo-2" (:id r))))))
@@ -123,8 +106,8 @@
 (deftest get-customer-params
   (testing "empty vector if no params"
     (is (= [] (-> (test-ctx)
-                  (->req)
-                  (with-path-params {:customer-id (st/new-id)})
+                  (h/->req)
+                  (h/with-path-params {:customer-id (st/new-id)})
                   (sut/get-customer-params)
                   :body))))
 
@@ -138,8 +121,8 @@
           _ (st/save-params st cust-id params)]
       (is (= params
              (-> ctx
-                 (->req)
-                 (with-path-params {:customer-id cust-id})
+                 (h/->req)
+                 (h/with-path-params {:customer-id cust-id})
                  (sut/get-customer-params)
                  :body))))))
 
@@ -155,8 +138,8 @@
 
     (testing "empty list if no params"
       (is (= [] (-> ctx
-                    (->req)
-                    (with-path-params {:customer-id cust-id
+                    (h/->req)
+                    (h/with-path-params {:customer-id cust-id
                                        :repo-id repo-id})
                     (sut/get-repo-params)
                     :body))))
@@ -170,8 +153,8 @@
 
         (is (= [{:name "test-param" :value "test-value"}]
                (-> ctx
-                   (->req)
-                   (with-path-params {:customer-id cust-id
+                   (h/->req)
+                   (h/with-path-params {:customer-id cust-id
                                       :repo-id repo-id})
                    (sut/get-repo-params)
                    :body)))))
@@ -179,8 +162,8 @@
     (testing "returns `404 not found` if repo does not exist"
       (is (= 404
              (-> ctx
-                 (->req)
-                 (with-path-params {:customer-id cust-id
+                 (h/->req)
+                 (h/with-path-params {:customer-id cust-id
                                     :repo-id "other-repo"})
                  (sut/get-repo-params)
                  :status))))))
@@ -189,8 +172,8 @@
   (testing "assigns secret key"
     (let [{st :storage :as ctx} (test-ctx)
           r (-> ctx
-                (->req)
-                (with-body {:customer-id "test-customer"})
+                (h/->req)
+                (h/with-body {:customer-id "test-customer"})
                 (sut/create-webhook))]
       (is (= 201 (:status r)))
       (is (string? (get-in r [:body :secret-key]))))))
@@ -202,8 +185,8 @@
               :secret-key "very secret key"}
           _ (st/save-webhook-details st wh)
           r (-> ctx
-                (->req)
-                (with-path-param :webhook-id (:id wh))
+                (h/->req)
+                (h/with-path-param :webhook-id (:id wh))
                 (sut/get-webhook))]
       (is (= 200 (:status r)))
       (is (nil? (get-in r [:body :secret-key]))))))
@@ -220,8 +203,8 @@
                                    {:pipelines {0 {:name "pipeline 1"}
                                                 1 {:name "pipeline 2"}}})
           r (-> ctx
-                (->req)
-                (with-path-params md)
+                (h/->req)
+                (h/with-path-params md)
                 (sut/get-latest-build))]
       (is (= 200 (:status r)))
       (is (= 2 (-> r :body :pipelines count)))
@@ -245,8 +228,8 @@
                                                  {0 {:name "step 1"}
                                                   1 {:name "step 2"}}}}})
           r (-> ctx
-                (->req)
-                (with-path-params md)
+                (h/->req)
+                (h/with-path-params md)
                 (sut/get-latest-build))]
       (is (= 200 (:status r)))
       (is (= 2 (-> r :body :pipelines first :steps count)))
@@ -276,7 +259,7 @@
         (fn [bus]
           (with-redefs [http/as-channel (fn [_ {:keys [on-open]}]
                                           on-open)]
-            (let [f (sut/event-stream (->req {:event-bus bus}))]
+            (let [f (sut/event-stream (h/->req {:event-bus bus}))]
               (is (some? (f ch)))
               (is (true? (e/post-event bus {:type :script/start})))
               (is (true? (h/wait-until #(pos? (count @sent)) 500)))
@@ -289,7 +272,7 @@
   (testing "adds ref to build from branch query param"
     (is (= "refs/heads/test-branch"
            (-> (test-ctx)
-               (->req)
+               (h/->req)
                (assoc-in [:parameters :query :branch] "test-branch")
                (sut/trigger-build-event "test-build")
                :build
@@ -299,7 +282,7 @@
   (testing "adds ref to build from tag query param"
     (is (= "refs/tags/test-tag"
            (-> (test-ctx)
-               (->req)
+               (h/->req)
                (assoc-in [:parameters :query :tag] "test-tag")
                (sut/trigger-build-event "test-build")
                :build
@@ -313,7 +296,7 @@
                    :public-key "public-key"}]
       (is (st/sid? (st/save-ssh-keys st cid [ssh-key])))
       (is (= [ssh-key]
-             (-> (->req ctx)
+             (-> (h/->req ctx)
                  (assoc-in [:parameters :path] {:customer-id cid
                                                 :repo-id rid})
                  (sut/trigger-build-event "test-build")

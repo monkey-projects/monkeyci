@@ -4,6 +4,7 @@
              [codecs :as codecs]
              [mac :as mac]
              [nonce :as nonce]]
+            [buddy.sign.jwt :as jwt]
             [clojure.core.async :refer [go <!! <!]]
             [clojure.java.io :as io]
             [clojure.tools.logging :as log]
@@ -132,18 +133,24 @@
                  {:headers {"Accept" "application/json"
                             "Authorization" (str "Bearer " token)}})
       (process-reply)
+      ;; TODO Check for failures
       :body
       ;; TODO Create or lookup user in database according to github id
-      (select-keys [:id :avatar-url :email :name])
-      (rur/response)))
+      (select-keys [:id :avatar-url :email :name])))
 
-(defn exchange-code
+(defn- generate-jwt [req payload]
+  (jwt/sign payload (c/from-context req :jwt-secret)))
+
+(defn login
   "Invoked by the frontend during OAuth2 login flow.  It requests a Github
    user access token using the given authorization code."
   [req]
   (let [token-reply (request-access-token req)]
     (if (= 200 (:status token-reply))
-      ;; Request user info, return it as-is
-      (request-user-info (get-in token-reply [:body :access-token]))
+      ;; Request user info, generate JWT
+      (let [user (request-user-info (get-in token-reply [:body :access-token]))]
+        (-> user
+            (assoc :token (generate-jwt req user))
+            (rur/response)))
       ;; Failure
       (select-keys token-reply [:status :body]))))

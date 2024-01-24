@@ -45,9 +45,9 @@
      :path-parts (into build-path ["/logs"])
      :path-schema build-schema})
 
-   {:route-name :github-exchange-code
+   {:route-name :github-login
     :method :post
-    :path-parts ["/github/exchange-code"]
+    :path-parts ["/github/login"]
     :query-schema {:code s/Str}
     :consumes #{"application/json"}
     :produces #{"application/json"}}])

@@ -99,3 +99,23 @@
     (md/success-deferred (swap! stored assoc src dest)))
   (restore [_ src dest]
     (md/success-deferred (swap! stored dissoc src))))
+
+(defn ->req
+  "Takes a context and creates a request object from it that can be passed to
+   an api handler function."
+  [ctx]
+  {:reitit.core/match
+   {:data
+    {:monkey.ci.web.common/context ctx}}})
+
+(defn with-path-param [r k v]
+  (assoc-in r [:parameters :path k] v))
+
+(defn with-path-params [r p]
+  (update-in r [:parameters :path] merge p))
+
+(defn with-body [r v]
+  (assoc-in r [:parameters :body] v))
+
+(defn test-ctx []
+  {:storage (s/make-memory-storage)})

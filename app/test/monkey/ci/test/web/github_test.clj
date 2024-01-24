@@ -1,10 +1,12 @@
 (ns monkey.ci.test.web.github-test
   (:require [clojure.test :refer [deftest testing is]]
+            [buddy.sign.jwt :as jwt]
             [monkey.ci
              [events :as events]
              [storage :as st]]
             [monkey.ci.web.github :as sut]
             [monkey.ci.test.helpers :as h]
+            [org.httpkit.fake :as hf]
             [ring.mock.request :as mock]))
 
 (deftest valid-security?
@@ -35,10 +37,10 @@
 (deftest webhook
   (testing "posts event"
     (let [bus (events/make-bus)
-          ctx {:reitit.core/match {:data {:monkey.ci.web.common/context {:event-bus bus}}}}
-          req (-> {:body-params
-                   {:head-commit {:id "test-id"}}}
-                  (merge ctx))
+          req (-> {:event-bus bus}
+                  (h/->req)
+                  (assoc :body-params
+                         {:head-commit {:id "test-id"}}))
           recv (atom [])
           _ (events/register-handler bus :webhook/github (partial swap! recv conj))]
       (is (some? (sut/webhook req)))
@@ -46,9 +48,9 @@
 
   (testing "ignores non-commit events"
     (let [bus (events/make-bus)
-          ctx {:reitit.core/match {:data {:monkey.ci.web.common/context {:event-bus bus}}}}
-          req (-> {:body-params "not a commit"}
-                  (merge ctx))
+          req (-> {:event-bus bus}
+                  (h/->req)
+                  (assoc :body-params "not a commit"))
           recv (atom [])
           _ (events/register-handler bus :webhook/github (partial swap! recv conj))]
       (is (some? (sut/webhook req)))
@@ -174,3 +176,35 @@
                                               :repository {:master-branch "test-main"}}})]
           (is (= [ssh-key]
                  (get-in r [:build :git :ssh-keys]))))))))
+
+(deftest login
+  (testing "when exchange fails at github, returns body and status code"
+    (hf/with-fake-http ["https://github.com/login/oauth/access_token"
+                        {:status 401
+                         :body (h/to-json {:message "invalid access code"})}]
+      (is (= 401 (-> {:parameters
+                      {:query
+                       {:code "test-code"}}}
+                     (sut/login)
+                     :status)))))
+
+  (testing "generates new token and returns it"
+    (hf/with-fake-http ["https://github.com/login/oauth/access_token"
+                        {:status 200
+                         :body (h/to-json {:access-token "test-token"})}
+                        "https://api.github.com/user"
+                        {:status 200
+                         :body (h/to-json {:name "test user"})}]
+      (let [secret "test-secret"
+            req (-> (h/test-ctx)
+                    (assoc :jwt-secret secret)
+                    (h/->req)
+                    (assoc :parameters
+                           {:query
+                            {:code "test-code"}}))
+            token (-> req
+                      (sut/login)
+                      :body
+                      :token)]
+        (is (string? token))
+        (is (map? (jwt/unsign token secret)))))))
