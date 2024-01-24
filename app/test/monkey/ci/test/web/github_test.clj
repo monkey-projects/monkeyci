@@ -176,11 +176,11 @@
                  (get-in r [:build :git :ssh-keys]))))))))
 
 (deftest login
-  (testing "when exchange fails at github, returns body and status code"
+  (testing "when exchange fails at github, returns body and 400 status code"
     (hf/with-fake-http ["https://github.com/login/oauth/access_token"
                         {:status 401
                          :body (h/to-json {:message "invalid access code"})}]
-      (is (= 401 (-> {:parameters
+      (is (= 400 (-> {:parameters
                       {:query
                        {:code "test-code"}}}
                      (sut/login)
