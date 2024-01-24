@@ -11,3 +11,8 @@
  :login/user
  (fn [db _]
    (db/user db)))
+
+(rf/reg-sub
+ :login/alerts
+ (fn [db _]
+   (db/alerts db)))

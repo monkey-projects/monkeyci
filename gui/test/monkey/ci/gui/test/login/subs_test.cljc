@@ -28,3 +28,13 @@
       (is (nil? @s))
       (is (map? (reset! app-db (db/set-user {} "test-user"))))
       (is (= "test-user" @s)))))
+
+(deftest alerts
+  (let [s (rf/subscribe [:login/alerts])]
+    (testing "exists"
+      (is (some? s)))
+
+    (testing "returns alerts from db"
+      (is (nil? @s))
+      (is (map? (reset! app-db (db/set-alerts {} "test-alerts"))))
+      (is (= "test-alerts" @s)))))

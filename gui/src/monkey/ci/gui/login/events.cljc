@@ -21,21 +21,24 @@
    {:dispatch [:martian.re-frame/request
                :github-login
                {:code code}
-               [:login/github-code-received--success]
-               [:login/github-code-received--failed]]
+               [:login/github-login--success]
+               [:login/github-login--failed]]
     :db (-> db
             (db/clear-alerts)
             (db/set-user nil))}))
 
 (rf/reg-event-fx
- :login/github-code-received--success
+ :login/github-login--success
  (fn [{:keys [db]} [_ {u :body}]]
    (println "Got user details:" u)
-   {:db (db/set-user db u)
+   {:db (-> db
+            (db/set-user (dissoc u :token))
+            (db/set-token (:token u)))
     :dispatch [:route/goto :page/root]}))
 
 (rf/reg-event-db
- :login/github-code-received--failed
+ :login/github-login--failed
  (fn [db [_ err]]
+   (println "Got error:" err)
    (db/set-alerts db [{:type :danger
                        :message (str "Unable to fetch Github user token: " (u/error-msg err))}])))

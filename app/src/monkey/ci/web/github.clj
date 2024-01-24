@@ -143,11 +143,12 @@
    user access token using the given authorization code."
   [req]
   (let [token-reply (request-access-token req)]
-    (if (= 200 (:status token-reply))
+    (if (and (= 200 (:status token-reply)) (nil? (get-in token-reply [:body :error])))
       ;; Request user info, generate JWT
       (let [user (request-user-info (get-in token-reply [:body :access-token]))]
         (-> user
             (assoc :token (generate-jwt req user))
             (rur/response)))
       ;; Failure
-      (select-keys token-reply [:status :body]))))
+      ;; TODO Don't treat all responses as client errors
+      (rur/bad-request (:body token-reply)))))

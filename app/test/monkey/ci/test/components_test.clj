@@ -117,7 +117,7 @@
           privkey (bk/private-key priv)
           pubkey (bk/public-key pub)
           jwk (-> (sut/new-context :test-cmd)
-                  (assoc :jwk (zipmap [:private-key :public-key] keypaths))
+                  (assoc-in [:config :jwk] (zipmap [:private-key :public-key] keypaths))
                   (c/start)
                   :jwk)]
       (is (not-empty jwk))

@@ -5,6 +5,7 @@
              [keys :as bk]
              [nonce :as nonce]]
             [buddy.sign.jwt :as jwt]
+            [clojure.tools.logging :as log]
             [java-time.api :as jt]
             [monkey.ci.web.common :as c]
             [ring.util.response :as rur]))
@@ -22,6 +23,7 @@
   [req payload]
   (let [pk (c/from-context req (comp :priv :jwk))]
     (-> payload
+        ;; TODO Make token expiration configurable
         (assoc :exp (-> (jt/plus (jt/instant) (jt/hours 1))
                         (jt/to-millis-from-epoch)))
         (jwt/sign pk {:alg :rs256 :header {:kid kid}}))))
@@ -47,6 +49,7 @@
                             (when-let [v (get-in conf [:jwk k])]
                               (f v)))
                           m)]
+    (log/debug "Configured JWK:" (:jwk conf))
     (when (every? some? loaded-keys)
       (zipmap [:priv :pub] loaded-keys))))
 

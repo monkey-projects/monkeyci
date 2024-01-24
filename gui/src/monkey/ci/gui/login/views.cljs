@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.login.views
-  (:require [monkey.ci.gui.forms :as f]
+  (:require [monkey.ci.gui.components :as c]
+            [monkey.ci.gui.forms :as f]
             [monkey.ci.gui.layout :as l]
             [monkey.ci.gui.login.events]
             [monkey.ci.gui.login.subs]
@@ -33,5 +34,8 @@
 
 (defn github-callback [req]
   (let [code (get-in req [:parameters :query :code])]
-    [:p "This is the github callback page"]
-    (rf/dispatch [:login/github-code-received code])))
+     (rf/dispatch [:login/github-code-received code])
+     [l/default
+      [:<>
+       [:p "Authentication succeeded, logging in to MonkeyCI..."]
+       [c/alerts [:login/alerts]]]]))

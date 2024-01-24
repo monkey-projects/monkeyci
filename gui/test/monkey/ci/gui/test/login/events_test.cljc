@@ -48,23 +48,27 @@
     (rf/dispatch-sync [:login/github-code-received "test-code"])
     (is (nil? (db/user @app-db)))))
 
-(deftest github-code-received--success
+(deftest github-login--success
   ;; Failsafe
   (h/catch-fx :route/goto)
   
   (testing "sets user in db"
-    (rf/dispatch-sync [:login/github-code-received--success {:body ::test-user}])
-    (is (= ::test-user (db/user @app-db))))
+    (rf/dispatch-sync [:login/github-login--success {:body {:id ::test-user}}])
+    (is (= {:id ::test-user} (db/user @app-db))))
+
+  (testing "sets token in db"
+    (rf/dispatch-sync [:login/github-login--success {:body {:token "test-token"}}])
+    (is (= "test-token" (db/token @app-db))))
 
   (testing "redirects to root page"
     (rf-test/run-test-sync
      (let [c (h/catch-fx :route/goto)]
-       (rf/dispatch [:login/github-code-received--success {:body ::test-user}])
+       (rf/dispatch [:login/github-login--success {:body {}}])
        (is (= "/" (first @c)))))))
 
-(deftest github-code-received--failed
+(deftest github-login--failed
   (testing "sets error alert"
-    (rf/dispatch-sync [:login/github-code-received--failed {:message "test error"}])
+    (rf/dispatch-sync [:login/github-login--failed {:message "test error"}])
     (is (= :danger (-> (db/alerts @app-db)
                        (first)
                        :type)))))

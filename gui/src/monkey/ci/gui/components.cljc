@@ -42,8 +42,8 @@
 
 (defn build-result [r]
   (let [type (condp = r
-               "error" :text-bg-danger
-               "failure" :text-bg-danger
-               "success" :text-bg-success
+               :error :text-bg-danger
+               :failure :text-bg-danger
+               :success :text-bg-success
                :text-bg-secondary)]
     [:span {:class (str "badge " (name type))} (or r "running")]))

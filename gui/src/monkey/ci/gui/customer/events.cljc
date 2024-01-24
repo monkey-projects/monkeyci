@@ -1,6 +1,5 @@
 (ns monkey.ci.gui.customer.events
-  (:require [martian.core :as martian]
-            [martian.re-frame :as mrf]
+  (:require [monkey.ci.gui.martian]
             [monkey.ci.gui.customer.db :as db]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
@@ -12,7 +11,7 @@
    {:db (-> db (db/set-loading)
             (db/set-alerts [{:type :info
                              :message "Retrieving customer information..."}]))
-    :dispatch [::mrf/request
+    :dispatch [:secure-request
                :get-customer
                {:customer-id id}
                [:customer/load--success]

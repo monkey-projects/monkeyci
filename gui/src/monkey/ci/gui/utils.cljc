@@ -8,7 +8,7 @@
        (filter (comp (partial = id) :id))
        (first)))
 
-(def error-msg (some-fn :message :error-text str))
+(def error-msg (some-fn :message (comp :error-description :body) :error-text str))
 
 (defn link-evt-handler
   "Creates an event handler that dispatches an event when the user clicks a link"
@@ -32,7 +32,7 @@
         e (->> b
                :pipelines
                (mapcat (fn [p]
-                         (map :endTime (:steps p))))
+                         (map :end-time (:steps p))))
                (apply max))]
     (if (and s e)
       (- e s)

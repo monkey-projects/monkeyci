@@ -1,6 +1,7 @@
 (ns monkey.ci.gui.martian
   (:require [martian.core :as martian]
             [martian.cljs-http :as mh]
+            [martian.interceptors :as mi]
             [martian.re-frame :as mr]
             [re-frame.core :as rf]
             [schema.core :as s]))
@@ -21,6 +22,7 @@
 
 (defn api-route [conf]
   (merge {:method :get
+          :headers-schema {(s/optional-key :authorization) s/Str}
           :produces #{"application/edn"}}
          conf))
 
@@ -74,5 +76,17 @@
                url
                routes
                {:interceptors (concat martian/default-interceptors
-                                      [disable-with-credentials
+                                      [mi/default-coerce-response
+                                       disable-with-credentials
                                        mh/perform-request])})]))
+
+(defn- add-token [db opts]
+  (let [t (get db :auth/token)]
+    (cond-> opts
+      t (assoc :authorization (str "Bearer " t)))))
+
+;; Takes the token from the db and adds it to the martian request
+(rf/reg-event-fx
+ :secure-request
+ (fn [{:keys [db]} [_ req args & extras]]
+   {:dispatch (into [:martian.re-frame/request req (add-token db args)] extras)}))
