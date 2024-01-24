@@ -12,5 +12,12 @@
 (defn set-user [db u]
   (assoc db ::user u))
 
-(defn user [db]
-  (::user db))
+(def user ::user)
+
+(def alerts ::alerts)
+
+(defn set-alerts [db a]
+  (assoc db alerts a))
+
+(defn clear-alerts [db]
+  (dissoc db alerts))

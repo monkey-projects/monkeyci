@@ -11,7 +11,7 @@
   [:div.header
    [:div.row
     [:div.col-1
-     [:div.mt-2 [co/logo]]]
+     [:div.mt-2 [:a {:href "/"} [co/logo]]]]
     [:div.col-11
      [:h1 "MonkeyCI"]
      [:p.lead "Welcome to MonkeyCI, the CI/CD tool that makes your life (and the planet) better!"]]]])

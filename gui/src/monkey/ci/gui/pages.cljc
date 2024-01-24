@@ -2,19 +2,18 @@
   "Links route names to actual components to be rendered"
   (:require [monkey.ci.gui.layout :as l]
             [monkey.ci.gui.login.views :as login]
+            [monkey.ci.gui.login.subs]
             [monkey.ci.gui.build.views :as build]
             [monkey.ci.gui.customer.views :as customer]
+            [monkey.ci.gui.home.views :as home]
             [monkey.ci.gui.repo.views :as repo]
             [re-frame.core :as rf]))
 
-(defn redirect []
-  [l/default
-   [:h3 "This is the root page, you should be redirected"]])
-
 (def pages
-  {:page/root redirect
+  {:page/root home/page
    :page/build build/page
    :page/login login/page
+   :page/github-callback login/github-callback
    :page/customer customer/page
    :page/repo repo/page})
 

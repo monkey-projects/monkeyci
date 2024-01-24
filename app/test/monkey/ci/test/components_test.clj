@@ -1,5 +1,6 @@
 (ns monkey.ci.test.components-test
   (:require [clojure.test :refer [deftest testing is]]
+            [buddy.core.keys :as bk]
             [clojure.spec.alpha :as s]
             [com.stuartsierra.component :as c]
             [monkey.ci
@@ -108,7 +109,21 @@
                    (assoc :logging {:type :inherit})
                    (c/start)
                    :logging
-                   :retriever)))))
+                   :retriever))))
+
+  (testing "loads JWK keys"
+    (let [[priv pub :as keypaths] (->> ["priv" "pub"]
+                                       (map (partial format "dev-resources/test/jwk/%skey.pem")))
+          privkey (bk/private-key priv)
+          pubkey (bk/public-key pub)
+          jwk (-> (sut/new-context :test-cmd)
+                  (assoc :jwk (zipmap [:private-key :public-key] keypaths))
+                  (c/start)
+                  :jwk)]
+      (is (not-empty jwk))
+      (is (= 2 (count jwk)))
+      (is (= privkey (:priv jwk)))
+      (is (= pubkey (:pub jwk))))))
 
 (defn- verify-event-handled
   ([ctx evt verifier]

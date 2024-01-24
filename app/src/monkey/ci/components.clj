@@ -22,6 +22,7 @@
              [file]
              [oci]]
             [monkey.ci.web
+             [auth :as auth]
              [github :as wg]
              [handler :as web]
              [script-api :as wsa]]))
@@ -72,10 +73,11 @@
         (merge default-context)
         (dissoc :config)
         (merge config)
-        (assoc :runner (r/make-runner config))
-        (assoc :storage (:storage storage)
+        (assoc :runner (r/make-runner config)
+               :storage (:storage storage)
                :public-api wsa/local-api
                :reporter (rep/make-reporter (:reporter config)))
+        (mc/assoc-some :jwk (auth/config->keypair this))
         (config/configure-workspace)
         (config/configure-cache)
         (config/initialize-log-maker)

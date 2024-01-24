@@ -69,7 +69,7 @@
                       (group-keys v r))
                     c
                     [:github :runner :containers :storage :api :account :http :logging :oci :build
-                     :sidecar :cache]))
+                     :sidecar :cache :jwk]))
           (group-build-keys [c]
             (update c :build (partial group-keys :git)))]
     (->> env

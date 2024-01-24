@@ -43,7 +43,14 @@
    (api-route
     {:route-name :get-build-logs
      :path-parts (into build-path ["/logs"])
-     :path-schema build-schema})])
+     :path-schema build-schema})
+
+   {:route-name :github-login
+    :method :post
+    :path-parts ["/github/login"]
+    :query-schema {:code s/Str}
+    :consumes #{"application/json"}
+    :produces #{"application/json"}}])
 
 ;; The api url.  This should be configured in a `config.js`.
 (def url #?(:clj "http://localhost:3000"

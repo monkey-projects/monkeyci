@@ -10,9 +10,13 @@
              [events :as events]
              [logging :as l]
              [storage :as st]]
-            [monkey.ci.web.handler :as sut]
+            [monkey.ci.web
+             [auth :as auth]
+             [handler :as sut]]
             [monkey.ci.test.helpers :refer [try-take] :as h]
-            [org.httpkit.server :as http]
+            [org.httpkit
+             [fake :as hf]
+             [server :as http]]
             [reitit
              [core :as rc]
              [ring :as ring]]
@@ -477,6 +481,38 @@
                   (test-app)
                   :status)))))
 
+(deftest github-endpoints
+  (testing "`POST /github/login` requests token from github and fetches user info"
+    (hf/with-fake-http [{:url "https://github.com/login/oauth/access_token"
+                         :method :post}
+                        (fn [_ req _]
+                          (if (= {:client_id "test-client-id"
+                                  :client_secret "test-secret"
+                                  :code "1234"}
+                                 (:query-params req))
+                            {:status 200 :body (h/to-raw-json {:access_token "test-token"})}
+                            {:status 400 :body (str "invalid query params:" (:query-params req))}))
+                        {:url "https://api.github.com/user"
+                         :method :get}
+                        (fn [_ req _]
+                          (let [auth (get-in req [:headers "Authorization"])]
+                            (if (= "Bearer test-token" auth)
+                              {:status 200 :body (h/to-raw-json {:name "test-user"
+                                                                 :other-key "other-value"})}
+                              {:status 400 :body (str "invalid auth header: " auth)})))]
+      (let [app (-> (test-ctx {:github {:client-id "test-client-id"
+                                        :client-secret "test-secret"}
+                               :jwk (auth/keypair->ctx (auth/generate-keypair))})
+                    (sut/make-app))
+            r (-> (mock/request :post "/github/login?code=1234")
+                  (app))]
+        (is (= 200 (:status r)) (:body r))
+        (is (= "test-user"
+               (some-> (:body r)
+                       (slurp)
+                       (h/parse-json)
+                       :name)))))))
+
 (deftest routing-middleware
   (testing "converts json bodies to kebab-case"
     (let [app (ring/ring-handler
@@ -515,3 +551,26 @@
                  (app)
                  :body
                  slurp))))))
+
+(deftest auth-endpoints
+  (testing "`GET /auth/jwks`"
+    (testing "retrieves JWK structure according to context"
+      (let [kp (auth/generate-keypair)
+            ctx {:jwk (auth/keypair->ctx kp)}
+            app (sut/make-app ctx)
+            r (-> (mock/request :get "/auth/jwks")
+                  (app))
+            k (some-> r
+                      :body
+                      (slurp)
+                      (h/parse-json)
+                      :keys
+                      (first))]
+        (is (= 200 (:status r)))
+        (is (string? (:n k)))
+        (is (nil? (:d k)) "should not contain private exponent")))
+
+    (testing "404 when no jwk configured"
+      (is (= 404 (-> (mock/request :get "/auth/jwks")
+                     (test-app)
+                     :status))))))
