@@ -5,27 +5,12 @@
             [monkey.ci.gui.login.subs]
             [monkey.ci.gui.build.views :as build]
             [monkey.ci.gui.customer.views :as customer]
+            [monkey.ci.gui.home.views :as home]
             [monkey.ci.gui.repo.views :as repo]
-            [monkey.ci.gui.routing :as r]
             [re-frame.core :as rf]))
 
-(defn user-home [u]
-  [:h3 "Welcome, " (:name u)])
-
-(defn redirect-to-login []
-  [:p "One moment, redirecting you to the login page"]
-  (rf/dispatch [:route/goto (r/path-for :page/login)]))
-
-(defn home []
-  (let [u (rf/subscribe [:login/user])]
-    [l/default
-     [:<>
-      (if @u
-        [user-home u]
-        [redirect-to-login])]]))
-
 (def pages
-  {:page/root home
+  {:page/root home/page
    :page/build build/page
    :page/login login/page
    :page/github-callback login/github-callback

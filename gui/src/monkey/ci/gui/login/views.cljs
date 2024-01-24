@@ -9,15 +9,9 @@
 ;; TODO Get from backend
 (def github-client-id "Iv1.9b303bbea88afe94")
 
-(defn origin []
-  (.-origin js/location))
-
-(defn uri-encode [s]
-  (js/encodeURIComponent s))
-
 (defn login-form []
   (let [submitting? (rf/subscribe [:login/submitting?])
-        callback-url (str (origin) (r/path-for :page/github-callback))]
+        callback-url (str (r/origin) (r/path-for :page/github-callback))]
     [:form#login-form {:on-submit (f/submit-handler [:login/submit])}
      [:div.mb-1
       [:label.form-label {:for "username"} "Username"]
@@ -31,7 +25,7 @@
       "Login"]
      [:a.btn.btn-secondary
       {:href (str "https://github.com/login/oauth/authorize?client_id=" github-client-id
-                  "&redirect_uri=" (uri-encode callback-url))}
+                  "&redirect_uri=" (r/uri-encode callback-url))}
       "Login with GitHub"]]))
 
 (defn page [_]
@@ -39,6 +33,5 @@
 
 (defn github-callback [req]
   (let [code (get-in req [:parameters :query :code])]
-    (println "Github authorization code:" code)
     [:p "This is the github callback page"]
     (rf/dispatch [:login/github-code-received code])))

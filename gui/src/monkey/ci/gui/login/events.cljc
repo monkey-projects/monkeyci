@@ -1,6 +1,6 @@
 (ns monkey.ci.gui.login.events
   (:require [monkey.ci.gui.login.db :as db]
-            [monkey.ci.gui.routing :as r]
+            [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
 (rf/reg-event-db
@@ -17,23 +17,25 @@
 
 (rf/reg-event-fx
  :login/github-code-received
- (fn [_ [_ code]]
+ (fn [{:keys [db]} [_ code]]
    {:dispatch [:martian.re-frame/request
                :github-exchange-code
                {:code code}
                [:login/github-code-received--success]
-               [:login/github-code-received--failed]]}))
+               [:login/github-code-received--failed]]
+    :db (-> db
+            (db/clear-alerts)
+            (db/set-user nil))}))
 
 (rf/reg-event-fx
  :login/github-code-received--success
  (fn [{:keys [db]} [_ {u :body}]]
    (println "Got user details:" u)
    {:db (db/set-user db u)
-    ;; TODO Store user in browser local storage, because the redirect loses the memory db
-    :dispatch [:route/goto (r/path-for :page/root)]}))
+    :dispatch [:route/goto :page/root]}))
 
 (rf/reg-event-db
  :login/github-code-received--failed
  (fn [db [_ err]]
-   (println "Failed to exchange github code:" err)
-   db))
+   (db/set-alerts db [{:type :danger
+                       :message (str "Unable to fetch Github user token: " (u/error-msg err))}])))
