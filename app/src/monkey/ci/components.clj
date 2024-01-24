@@ -77,7 +77,8 @@
                :storage (:storage storage)
                :public-api wsa/local-api
                :reporter (rep/make-reporter (:reporter config))
-               :jwt-secret (auth/generate-secret-key))
+               ;; TODO Load keys using config
+               :jwk (auth/keypair->ctx (auth/generate-keypair)))
         (config/configure-workspace)
         (config/configure-cache)
         (config/initialize-log-maker)

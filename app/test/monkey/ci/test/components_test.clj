@@ -1,5 +1,6 @@
 (ns monkey.ci.test.components-test
   (:require [clojure.test :refer [deftest testing is]]
+            [buddy.core.keys :as bk]
             [clojure.spec.alpha :as s]
             [com.stuartsierra.component :as c]
             [monkey.ci
@@ -110,10 +111,13 @@
                    :logging
                    :retriever))))
 
-  (testing "generates JWT secret"
-    (is (string? (-> (sut/new-context :test-cmd)
-                     (c/start)
-                     :jwt-secret)))))
+  (testing "generates JWK keys"
+    (let [jwk (-> (sut/new-context :test-cmd)
+                  (c/start)
+                  :jwk)]
+      (is (not-empty jwk))
+      (is (bk/private-key? (:priv jwk)))
+      (is (bk/public-key? (:pub jwk))))))
 
 (defn- verify-event-handled
   ([ctx evt verifier]
