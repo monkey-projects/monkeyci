@@ -32,9 +32,11 @@
   (let [pk (c/from-context req (comp :priv :jwk))]
     (-> payload
         ;; TODO Make token expiration configurable
-        ;; TODO Add iss (issuer) and aud (audiences)
         (assoc :exp (-> (jt/plus (jt/instant) (jt/hours 1))
-                        (jt/to-millis-from-epoch)))
+                        (jt/to-millis-from-epoch))
+               ;; TODO Make issuer and audiences configurable
+               :iss "https://app.monkeyci.com"
+               :aud ["https://api.monkeyci.com"])
         (sign-jwt pk))))
 
 (defn generate-keypair
