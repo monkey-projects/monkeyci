@@ -18,13 +18,13 @@
   (testing "total millis between start time and last step end time"
     (let [b {:timestamp 10
              :pipelines
-             [{:startTime 11
+             [{:start-time 11
                :steps
-               [{:startTime 12
-                 :endTime 100}]}
-              {:startTime 110
+               [{:start-time 12
+                 :end-time 100}]}
+              {:start-time 110
                :steps
-               [{:startTime 120
-                 :endTime 200}]}]}
+               [{:start-time 120
+                 :end-time 200}]}]}
           e (sut/build-elapsed b)]
       (is (= 190 e)))))

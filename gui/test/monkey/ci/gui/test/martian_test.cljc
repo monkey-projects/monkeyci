@@ -1,10 +1,14 @@
 (ns monkey.ci.gui.test.martian-test
   (:require #?(:cljs [cljs.test :refer-macros [deftest testing is use-fixtures]]
                :clj [clojure.test :refer [deftest testing is use-fixtures]])
+            [day8.re-frame.test :as rf-test]
             [monkey.ci.gui.martian :as sut]
+            [monkey.ci.gui.test.fixtures :as f]
             [monkey.ci.gui.test.helpers :as h]
             [re-frame.core :as rf]
             [re-frame.db :refer [app-db]]))
+
+(use-fixtures :each (f/reset-re-frame))
 
 (deftest init
   (testing "initializes default martian in db"
@@ -17,14 +21,19 @@
 
 (deftest secure-request
   (testing "dispatches martian request"
-    (let [e (h/catch-fx :dispatch)]
-      (rf/dispatch-sync [:secure-request :test-evt {:key "value"} ::on-success ::on-failure])
-      (is (= 1 (count @e)))
-      (is (= [:martian.re-frame/request :test-evt {:key "value"} ::on-success ::on-failure]))))
+    (rf-test/run-test-sync
+     (let [e (h/catch-fx :martian.re-frame/request)]
+       (h/initialize-martian {:get-customer {:status 200}})
+       (rf/dispatch [:secure-request :get-customer {:key "value"} [::on-success] [::on-failure]])
+       (is (= 1 (count @e)))
+       (is (= :get-customer (-> @e first (nth 2)))))))
 
   (testing "adds auth token as authorization header"
-    (let [e (h/catch-fx :dispatch)]
-      (is (map? (reset! app-db {:auth/token "test-token"})))
-      (rf/dispatch-sync [:secure-request :test-evt {}])
-      (is (= {:authorization "Bearer test-token"}
-             (-> @e first (nth 2)))))))
+    (rf-test/run-test-sync
+     (let [e (h/catch-fx :martian.re-frame/request)]
+       (is (map? (swap! app-db assoc :auth/token "test-token")))
+       (h/initialize-martian {:get-customer {:status 200}})
+       (rf/dispatch [:secure-request :get-customer {} [::on-success] [::on-failure]])
+       (is (= 1 (count @e)))
+       (is (= {:authorization "Bearer test-token"}
+              (-> @e first (nth 3))))))))

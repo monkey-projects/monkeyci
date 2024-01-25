@@ -29,8 +29,8 @@
      (let [cust {:name "test customer"}
            c (h/catch-fx :martian.re-frame/request)]
        (h/initialize-martian {:get-customer {:status 200
-                                           :body cust
-                                           :error-code :no-error}})
+                                             :body cust
+                                             :error-code :no-error}})
        (is (some? (:martian.re-frame/martian @app-db)))
        (rf/dispatch [:customer/load "test-customer"])
        (is (= 1 (count @c)))

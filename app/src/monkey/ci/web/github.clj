@@ -138,6 +138,19 @@
   (auth/generate-jwt req {:type "github"
                           :type-id (:id user)}))
 
+(defn- add-jwt [user req]
+  (assoc user :token (generate-jwt req user)))
+
+(defn- fetch-or-create-user [user req]
+  (let [st (c/req->storage req)]
+    (or (s/find-user st [:github (:id user)])
+        (let [u {:type "github"
+                 :type-id (:id user)
+                 :name (:name user)
+                 :email (:email user)}]
+          (s/save-user st u)
+          u))))
+
 (defn login
   "Invoked by the frontend during OAuth2 login flow.  It requests a Github
    user access token using the given authorization code."
@@ -145,10 +158,10 @@
   (let [token-reply (request-access-token req)]
     (if (and (= 200 (:status token-reply)) (nil? (get-in token-reply [:body :error])))
       ;; Request user info, generate JWT
-      (let [user (request-user-info (get-in token-reply [:body :access-token]))]
-        (-> user
-            (assoc :token (generate-jwt req user))
-            (rur/response)))
+      (-> (request-user-info (get-in token-reply [:body :access-token]))
+          (fetch-or-create-user req)
+          (add-jwt req)
+          (rur/response))
       ;; Failure
       ;; TODO Don't treat all responses as client errors
       (rur/bad-request (:body token-reply)))))
