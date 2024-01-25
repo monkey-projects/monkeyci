@@ -20,7 +20,7 @@
               (db/set-alerts [{:type :info
                                :message "Loading builds for repository..."}])
               (db/set-builds nil))
-      :dispatch [:martian.re-frame/request
+      :dispatch [:secure-request
                  :get-builds
                  (select-keys params [:customer-id :repo-id])
                  [:builds/load--success]

@@ -88,3 +88,14 @@
                        :private-key "test-key"}]]
         (is (sut/sid? (sut/save-ssh-keys st cid ssh-keys)))
         (is (= ssh-keys (sut/find-ssh-keys st cid)))))))
+
+(deftest users
+  (testing "can save and find github user"
+    (h/with-memory-store st
+      (let [u {:type "github"
+               :type-id 1234
+               :id (sut/new-id)
+               :name "test user"
+               :email "test@monkeyci.com"}]
+        (is (sut/sid? (sut/save-user st u)))
+        (is (= u (sut/find-user st [:github 1234])) "can retrieve user by github id")))))

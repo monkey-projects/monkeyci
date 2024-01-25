@@ -176,11 +176,11 @@
                  (get-in r [:build :git :ssh-keys]))))))))
 
 (deftest login
-  (testing "when exchange fails at github, returns body and status code"
+  (testing "when exchange fails at github, returns body and 400 status code"
     (hf/with-fake-http ["https://github.com/login/oauth/access_token"
                         {:status 401
                          :body (h/to-json {:message "invalid access code"})}]
-      (is (= 401 (-> {:parameters
+      (is (= 400 (-> {:parameters
                       {:query
                        {:code "test-code"}}}
                      (sut/login)
@@ -205,4 +205,47 @@
                       :body
                       :token)]
         (is (string? token))
-        (is (map? (jwt/unsign token (.getPublic kp) {:alg :rs256})))))))
+        (is (map? (jwt/unsign token (.getPublic kp) {:alg :rs256}))))))
+
+  (testing "finds existing github user in storage"
+    (hf/with-fake-http ["https://github.com/login/oauth/access_token"
+                        {:status 200
+                         :body (h/to-json {:access-token "test-token"})}
+                        "https://api.github.com/user"
+                        {:status 200
+                         :body (h/to-json {:id 345
+                                           :name "test user"})}]
+      (let [{st :storage :as ctx} (h/test-ctx)
+            _ (st/save-user st {:type "github"
+                                :type-id 345
+                                :customers ["test-cust"]})
+            req (-> ctx
+                    (h/->req)
+                    (assoc :parameters
+                           {:query
+                            {:code "test-code"}}))]
+        (is (= ["test-cust"]
+               (-> req
+                   (sut/login)
+                   :body
+                   :customers))))))
+
+  (testing "creates user when none found in storage"
+    (hf/with-fake-http ["https://github.com/login/oauth/access_token"
+                        {:status 200
+                         :body (h/to-json {:access-token "test-token"})}
+                        "https://api.github.com/user"
+                        {:status 200
+                         :body (h/to-json {:id 345
+                                           :name "test user"})}]
+      (let [{st :storage :as ctx} (h/test-ctx)
+            req (-> ctx
+                    (h/->req)
+                    (assoc :parameters
+                           {:query
+                            {:code "test-code"}}))]
+        (is (= 200
+               (-> req
+                   (sut/login)
+                   :status)))
+        (is (some? (st/find-user st [:github 345])))))))

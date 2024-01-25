@@ -1,5 +1,6 @@
 (ns monkey.ci.web.common
-  (:require [camel-snake-kebab.core :as csk]
+  (:require [buddy.auth :as ba]
+            [camel-snake-kebab.core :as csk]
             [cheshire.core :as json]
             [clojure.core.async :refer [go <! <!! >!]]
             [clojure.java.io :as io]
@@ -60,10 +61,20 @@
         (log/error (str "Got error while handling request" (:uri req)) ex)
         (throw ex)))))
 
+(def exception-middleware
+  (rrme/create-exception-middleware
+   (merge rrme/default-handlers
+          {:auth/unauthorized (fn [e req]
+                                (if (ba/authenticated? req)
+                                  {:status 403
+                                   :body (.getMessage e)}
+                                  {:status 401
+                                   :body "Unauthenticated"}))})))
+
 (def default-middleware
   [rrmp/parameters-middleware
    rrmm/format-middleware
-   rrme/exception-middleware
+   exception-middleware
    exception-logger
    rrc/coerce-exceptions-middleware
    rrc/coerce-request-middleware

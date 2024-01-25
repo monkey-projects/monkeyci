@@ -21,3 +21,8 @@
 
 (defn clear-alerts [db]
   (dissoc db alerts))
+
+(def token :auth/token)
+
+(defn set-token [db t]
+  (assoc db token t))

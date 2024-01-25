@@ -9,6 +9,7 @@
              [blob :as blob]
              [events :as e]
              [storage :as s]]
+            [monkey.ci.web.auth :as auth]
             [ring.mock.request :as mock])
   (:import org.apache.commons.io.FileUtils))
 
@@ -118,4 +119,5 @@
   (assoc-in r [:parameters :body] v))
 
 (defn test-ctx []
-  {:storage (s/make-memory-storage)})
+  {:storage (s/make-memory-storage)
+   :jwk (auth/keypair->ctx (auth/generate-keypair))})

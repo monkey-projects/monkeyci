@@ -104,7 +104,7 @@
 
 (make-entity-endpoints "repo"
                        ;; The repo is part of the customer, so combine the ids
-                       {:get-id (comp (juxt :customer-id :repo-id) :path :parameters)
+                       {:get-id (id-getter (juxt :customer-id :repo-id))
                         :getter st/find-repo
                         :saver st/save-repo
                         :new-id repo-id})
@@ -114,6 +114,11 @@
                         :getter (comp #(dissoc % :secret-key)
                                       st/find-details-for-webhook)
                         :saver st/save-webhook-details})
+
+(make-entity-endpoints "user"
+                       {:get-id (id-getter (juxt :user-type :type-id))
+                        :getter st/find-user
+                        :saver st/save-user})
 
 ;; Override webhook creation
 (defn- assign-webhook-secret

@@ -303,3 +303,20 @@
                  :build
                  :git
                  :ssh-keys))))))
+
+(deftest update-user
+  (testing "updates user in storage"
+    (let [{st :storage :as ctx} (h/test-ctx)]
+      (is (st/sid? (st/save-user st {:type "github"
+                                     :type-id 543
+                                     :name "test user"})))
+      (is (= 200 (-> (h/->req ctx)
+                     (assoc :parameters {:path
+                                         {:user-type "github"
+                                          :type-id 543}
+                                         :body
+                                         {:name "updated user"}})
+                     (sut/update-user)
+                     :status)))
+      (is (= "updated user" (-> (st/find-user st [:github 543])
+                                :name))))))

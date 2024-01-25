@@ -77,7 +77,7 @@
                :storage (:storage storage)
                :public-api wsa/local-api
                :reporter (rep/make-reporter (:reporter config)))
-        (mc/assoc-some :jwk (auth/config->keypair this))
+        (mc/assoc-some :jwk (auth/config->keypair config))
         (config/configure-workspace)
         (config/configure-cache)
         (config/initialize-log-maker)

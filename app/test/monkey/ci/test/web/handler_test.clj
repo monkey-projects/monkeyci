@@ -29,7 +29,8 @@
 (def github-secret "github-secret")
 
 (defn- test-ctx [& [opts]]
-  (-> (merge {:event-bus (events/make-bus)}
+  (-> (merge {:event-bus (events/make-bus)
+              :dev-mode true}
              opts)
       (update :storage #(or % (st/make-memory-storage)))))
 
@@ -98,7 +99,7 @@
                           (codecs/bytes->hex))
             hook-id (st/new-id)
             st (st/make-memory-storage)
-            app (make-test-app st)]
+            app (sut/make-app (test-ctx {:storage st :dev-mode false}))]
         (is (st/sid? (st/save-webhook-details st {:id hook-id
                                                   :secret-key github-secret})))
         (is (= 200 (-> (mock/request :post (str "/webhook/github/" hook-id))
@@ -108,9 +109,10 @@
                        :status)))))
 
     (testing "returns 401 if invalid security"
-      (is (= 401 (-> (mock/request :post "/webhook/github/test-hook")
-                     (test-app)
-                     :status))))
+      (let [app (sut/make-app (test-ctx {:dev-mode false}))]
+        (is (= 401 (-> (mock/request :post "/webhook/github/test-hook")
+                       (app)
+                       :status)))))
 
     (testing "disables security check when in dev mode"
       (let [dev-app (sut/make-app {:dev-mode true
@@ -180,7 +182,39 @@
   (verify-entity-endpoints {:name "customer"
                             :base-entity {:name "test customer"}
                             :updated-entity {:name "updated customer"}
-                            :creator st/save-customer}))
+                            :creator st/save-customer})
+
+  (h/with-memory-store st
+    (let [kp (auth/generate-keypair)
+          ctx (test-ctx {:storage st
+                         :dev-mode false
+                         :jwk (auth/keypair->ctx kp)})
+          cust-id (st/new-id)
+          github-id 6453
+          app (sut/make-app ctx)
+          token (auth/sign-jwt {:sub (str "github/" github-id)} (.getPrivate kp))
+          _ (st/save-customer st {:id cust-id
+                                  :name "test customer"})
+          _ (st/save-user st {:type "github"
+                              :type-id github-id
+                              :customers [cust-id]})]
+
+      (testing "ok if user has access to customer"
+        (is (= 200 (-> (mock/request :get (str "/customer/" cust-id))
+                       (mock/header "authorization" (str "Bearer " token))
+                       (app)
+                       :status))))
+
+      (testing "unauthorized if user does not have access to customer"
+        (is (= 403 (-> (mock/request :get (str "/customer/" (st/new-id)))
+                       (mock/header "authorization" (str "Bearer " token))
+                       (app)
+                       :status))))
+      
+      (testing "unauthenticated if no user credentials"
+        (is (= 401 (-> (mock/request :get (str "/customer/" cust-id))
+                       (app)
+                       :status)))))))
 
 (deftest repository-endpoints
   (let [cust-id (st/new-id)]
@@ -199,6 +233,40 @@
                                           :repo-id "test-repo"}
                             :updated-entity {:repo-id "updated-repo"}
                             :creator st/save-webhook-details}))
+
+(deftest user-endpoints
+  (testing "/user"
+    (let [user {:type "github"
+                :type-id 456
+                :name "test user"}]
+      
+      (testing "`POST` creates new user"
+        (let [st (st/make-memory-storage)
+              app (make-test-app st)
+              r (-> (h/json-request :post "/user" user)
+                    (app))]
+          (is (= 201 (:status r)))
+          (is (= user (-> (st/find-user st [:github 456])
+                          (select-keys (keys user)))))))
+
+      (testing "`GET /:type/:id` retrieves existing user"
+        (let [st (st/make-memory-storage)
+              _ (st/save-user st user)
+              app (make-test-app st)
+              r (-> (mock/request :get (str "/user/github/" (:type-id user)))
+                    (app))]
+          (is (= 200 (:status r)))
+          (is (= (:type-id user) (some-> r :body slurp (h/parse-json) :type-id)))))
+
+      (testing "`PUT /:type/:id` updates existing user"
+        (let [st (st/make-memory-storage)
+              _ (st/save-user st user)
+              app (make-test-app st)
+              r (-> (h/json-request :put (str "/user/github/" (:type-id user))
+                                    (assoc user :name "updated user"))
+                    (app))]
+          (is (= 200 (:status r)))
+          (is (= "updated user" (some-> r :body slurp (h/parse-json) :name))))))))
 
 (defn- verify-label-filter-like-endpoints [path desc entity prep-match]
   (let [st (st/make-memory-storage)
@@ -290,7 +358,8 @@
     (h/with-bus
       (fn [bus]
         (let [app (sut/make-app {:storage st
-                                 :event-bus bus})
+                                 :event-bus bus
+                                 :dev-mode true})
               sid (generate-build-sid)
               path (repo-path sid)]
           (is (st/sid? (st/save-build-results st sid {:exit 0 :status :success})))
