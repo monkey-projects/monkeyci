@@ -1,7 +1,7 @@
 FROM docker.io/alpine:latest
 
 # Install podman, fuse overlay, qemu (for multi-platform)
-RUN apk update && apk add podman fuse-overlayfs qemu-system-arm qemu-system-x86_64 qemu-arm qemu-x86_64 qemu-tools openjdk17 curl bash
+RUN apk update && apk add podman fuse-overlayfs qemu-system-arm qemu-system-x86_64 qemu-arm qemu-x86_64 qemu-tools openjdk21 curl bash
 # Manually install clojure cli, cause the one from alpine is no good
 RUN curl -sLO https://github.com/clojure/brew-install/releases/latest/download/linux-install.sh && chmod a+x ./linux-install.sh && ./linux-install.sh && rm ./linux-install.sh
 # We'll run the whole thing as non-root user
