@@ -136,7 +136,7 @@
 
 (defn- generate-jwt [req user]
   (auth/generate-jwt req {:type "github"
-                          :user-id (:id user)}))
+                          :type-id (:id user)}))
 
 (defn login
   "Invoked by the frontend during OAuth2 login flow.  It requests a Github

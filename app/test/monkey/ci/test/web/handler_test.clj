@@ -200,6 +200,40 @@
                             :updated-entity {:repo-id "updated-repo"}
                             :creator st/save-webhook-details}))
 
+(deftest user-endpoints
+  (testing "/user"
+    (let [user {:type "github"
+                :type-id 456
+                :name "test user"}]
+      
+      (testing "`POST` creates new user"
+        (let [st (st/make-memory-storage)
+              app (make-test-app st)
+              r (-> (h/json-request :post "/user" user)
+                    (app))]
+          (is (= 201 (:status r)))
+          (is (= user (-> (st/find-user st [:github 456])
+                          (select-keys (keys user)))))))
+
+      (testing "`GET /:type/:id` retrieves existing user"
+        (let [st (st/make-memory-storage)
+              _ (st/save-user st user)
+              app (make-test-app st)
+              r (-> (mock/request :get (str "/user/github/" (:type-id user)))
+                    (app))]
+          (is (= 200 (:status r)))
+          (is (= (:type-id user) (some-> r :body slurp (h/parse-json) :type-id)))))
+
+      (testing "`PUT /:type/:id` updates existing user"
+        (let [st (st/make-memory-storage)
+              _ (st/save-user st user)
+              app (make-test-app st)
+              r (-> (h/json-request :put (str "/user/github/" (:type-id user))
+                                    (assoc user :name "updated user"))
+                    (app))]
+          (is (= 200 (:status r)))
+          (is (= "updated user" (some-> r :body slurp (h/parse-json) :name))))))))
+
 (defn- verify-label-filter-like-endpoints [path desc entity prep-match]
   (let [st (st/make-memory-storage)
         app (make-test-app st)

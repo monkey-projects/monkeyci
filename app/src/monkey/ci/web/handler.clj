@@ -83,6 +83,14 @@
    (s/optional-key :description) s/Str
    :label-filters [LabelFilter]})
 
+(s/defschema User
+  {:type s/Str
+   :type-id s/Any
+   :name s/Str
+   (s/optional-key :id) Id
+   (s/optional-key :email) s/Str
+   (s/optional-key :customers) [Id]})
+
 (defn- generic-routes
   "Generates generic entity routes.  If child routes are given, they are added
    as additional routes after the full path."
@@ -187,6 +195,22 @@
                  {:handler auth/jwks
                   :produces #{"application/json"}}}])
 
+(def user-routes
+  ["/user"
+   [[""
+     {:post
+      {:handler api/create-user
+       :parameters {:body User}}}]
+    ["/:user-type/:type-id"
+     {:parameters
+      {:path {:user-type s/Str
+              :type-id s/Str}}
+      :get
+      {:handler api/get-user}
+      :put
+      {:handler api/update-user
+       :parameters {:body User}}}]]])
+
 (def routes
   [["/health" {:get health}]
    ["/version" {:get version}]
@@ -194,7 +218,8 @@
    customer-routes
    event-stream-routes
    github-routes
-   auth-routes])
+   auth-routes
+   user-routes])
 
 (defn- stringify-body
   "Since the raw body could be read more than once (security, content negotation...),

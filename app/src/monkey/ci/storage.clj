@@ -189,3 +189,16 @@
 
 (defn find-ssh-keys [s cust-id]
   (read-obj s (ssh-keys-sid cust-id)))
+
+(def users "users")
+
+(defn user-sid [[type id]]
+  [global users (name type) (str id)])
+
+(def user->sid (comp user-sid (juxt :type :type-id)))
+
+(defn save-user [s u]
+  (write-obj s (user->sid u) u))
+
+(defn find-user [s id]
+  (read-obj s (user-sid id)))

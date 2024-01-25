@@ -51,8 +51,8 @@
     :method :post
     :path-parts ["/github/login"]
     :query-schema {:code s/Str}
-    :consumes #{"application/json"}
-    :produces #{"application/json"}}])
+    :consumes #{"application/json" "application/edn"}
+    :produces #{"application/edn"}}])
 
 ;; The api url.  This should be configured in a `config.js`.
 (def url #?(:clj "http://localhost:3000"
