@@ -135,8 +135,9 @@
       (select-keys [:id :avatar-url :email :name])))
 
 (defn- generate-jwt [req user]
-  (auth/generate-jwt req {:type "github"
-                          :type-id (:id user)}))
+  ;; Perhaps we should use the internal user id instead?
+  ;; TODO Add user permissions
+  (auth/generate-jwt req {:sub (str "github/" (:id user))}))
 
 (defn- add-jwt [user req]
   (assoc user :token (generate-jwt req user)))

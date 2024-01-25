@@ -171,6 +171,7 @@
 
 (def customer-routes
   ["/customer"
+   {:middleware [:customer-check]}
    (generic-routes
     {:creator api/create-customer
      :updater api/update-customer
@@ -265,6 +266,7 @@
                                        :access-control-allow-methods [:get :put :post :delete]
                                        :access-control-allow-credentials true]]
                                      c/default-middleware
+                                     ;; TODO Authorization checks
                                      [kebab-case-query
                                       log-request]))
             :muuntaja (c/make-muuntaja)
@@ -276,12 +278,17 @@
      {:github-security (if dev-mode
                          ;; Disable security in dev mode
                          [passthrough-middleware]
-                         [github/validate-security])}}))
+                         [github/validate-security])
+      :customer-check (if dev-mode
+                        [passthrough-middleware]
+                        [auth/customer-authorization])}}))
   ([opts]
    (make-router opts routes)))
 
 (defn make-app [opts]
-  (c/make-app (make-router opts)))
+  (-> (make-router opts)
+      (c/make-app)
+      (auth/secure-ring-app opts)))
 
 (def default-http-opts
   ;; Virtual threads are still a preview feature

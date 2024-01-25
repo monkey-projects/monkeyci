@@ -12,7 +12,7 @@
               (db/set-alerts [{:type :info
                                :message "Loading logs for build..."}])
               (db/set-logs nil))
-      :dispatch [:martian.re-frame/request
+      :dispatch [:secure-request
                  :get-build-logs
                  p
                  [:build/load-logs--success]
@@ -39,7 +39,7 @@
               (db/set-alerts [{:type :info
                                :message "Loading build details..."}])
               (db/set-build nil))
-      :dispatch [:martian.re-frame/request
+      :dispatch [:secure-request
                  :get-build
                  p
                  [:build/load--success]
