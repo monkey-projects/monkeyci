@@ -193,9 +193,9 @@
   [app-uberjar
    build-gui-release
    image-creds
+   oci-creds
    build-app-image
    build-gui-image
-   oci-creds
    upload-app-artifact])
 
 ;; Unused

@@ -56,6 +56,7 @@
         base-cmd ["/usr/bin/podman" "run"
                   "-t" "--rm"
                   "--name" cn
+                  ;; FIXME Some containers (notably kaniko) change ownership of the mount dir
                   "-v" (str wd ":" cwd ":Z")
                   "-w" cwd]]
     (concat
