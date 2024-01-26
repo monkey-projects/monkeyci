@@ -72,3 +72,18 @@
     (is (= :danger (-> (db/alerts @app-db)
                        (first)
                        :type)))))
+
+(deftest load-github-config
+  (testing "sends request to backend to fetch config"
+    (rf-test/run-test-sync
+      (let [c (h/catch-fx :martian.re-frame/request)]
+        (h/initialize-martian {:get-github-config {:status 200
+                                                   :body "ok"
+                                                   :error-code :no-error}})
+        (rf/dispatch [:login/load-github-config])
+        (is (= 1 (count @c)))))))
+
+(deftest load-github-config--success
+  (testing "sets github config in db"
+    (rf/dispatch-sync [:login/load-github-config--success {:body ::test-config}])
+    (is (= ::test-config (db/github-config @app-db)))))

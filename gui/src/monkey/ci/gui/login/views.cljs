@@ -7,29 +7,30 @@
             [monkey.ci.gui.routing :as r]
             [re-frame.core :as rf]))
 
-;; TODO Get from backend
-(def github-client-id "Iv1.9b303bbea88afe94")
-
 (defn login-form []
-  (let [submitting? (rf/subscribe [:login/submitting?])
-        callback-url (str (r/origin) (r/path-for :page/github-callback))]
-    [:form#login-form {:on-submit (f/submit-handler [:login/submit])}
-     [:div.mb-1
-      [:label.form-label {:for "username"} "Username"]
-      [:input#username.form-control {:name :username}]]
-     [:div.mb-3
-      [:label.form-label {:for "password"} "Password"]
-      [:input#password.form-control {:name :password :type :password}]]
-     [:button.btn.btn-primary.me-1
-      (cond-> {:type :submit}
-        @submitting? (assoc :disabled true))
-      "Login"]
-     [:a.btn.btn-outline-dark
-      {:href (str "https://github.com/login/oauth/authorize?client_id=" github-client-id
-                  "&redirect_uri=" (r/uri-encode callback-url))
-       :title "Redirects you to GitHub for authentication, then takes you back here."}
-      [:img.me-2 {:src "/img/github-mark.svg" :height "20px"}]
-      "Login with GitHub"]]))
+  (rf/dispatch [:login/load-github-config])
+  (fn []
+    (let [submitting? (rf/subscribe [:login/submitting?])
+          callback-url (str (r/origin) (r/path-for :page/github-callback))
+          github-client-id (rf/subscribe [:login/github-client-id])]
+      [:form#login-form {:on-submit (f/submit-handler [:login/submit])}
+       [:div.mb-1
+        [:label.form-label {:for "username"} "Username"]
+        [:input#username.form-control {:name :username}]]
+       [:div.mb-3
+        [:label.form-label {:for "password"} "Password"]
+        [:input#password.form-control {:name :password :type :password}]]
+       [:button.btn.btn-primary.me-1
+        (cond-> {:type :submit}
+          @submitting? (assoc :disabled true))
+        "Login"]
+       [:a.btn.btn-outline-dark
+        (cond-> {:href (str "https://github.com/login/oauth/authorize?client_id=" @github-client-id
+                            "&redirect_uri=" (r/uri-encode callback-url))
+                 :title "Redirects you to GitHub for authentication, then takes you back here."}
+          (nil? @github-client-id) (assoc :class :disabled))
+        [:img.me-2 {:src "/img/github-mark.svg" :height "20px"}]
+        "Login with GitHub"]])))
 
 (defn page [_]
   [l/welcome [login-form]])

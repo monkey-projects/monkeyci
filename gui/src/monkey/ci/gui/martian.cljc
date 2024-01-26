@@ -20,11 +20,15 @@
 (def build-schema
   (assoc repo-schema :build-id s/Str))
 
-(defn api-route [conf]
+(defn public-route [conf]
   (merge {:method :get
-          :headers-schema {(s/optional-key :authorization) s/Str}
           :produces #{"application/edn"}}
          conf))
+
+(defn api-route [conf]
+  (-> conf
+      (assoc :headers-schema {(s/optional-key :authorization) s/Str})
+      (public-route)))
 
 (def routes
   [(api-route
@@ -47,12 +51,15 @@
      :path-parts (into build-path ["/logs"])
      :path-schema build-schema})
 
-   {:route-name :github-login
-    :method :post
-    :path-parts ["/github/login"]
-    :query-schema {:code s/Str}
-    :consumes #{"application/json" "application/edn"}
-    :produces #{"application/edn"}}])
+   (public-route
+    {:route-name :github-login
+     :method :post
+     :path-parts ["/github/login"]
+     :query-schema {:code s/Str}})
+
+   (public-route
+    {:route-name :get-github-config
+     :path-parts ["/github/config"]})])
 
 ;; The api url.  This should be configured in a `config.js`.
 (def url #?(:clj "http://localhost:3000"

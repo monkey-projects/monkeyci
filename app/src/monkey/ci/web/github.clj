@@ -170,3 +170,8 @@
       ;; Failure
       ;; TODO Don't treat all responses as client errors
       (rur/bad-request (:body token-reply)))))
+
+(defn get-config
+  "Lists public github configuration to use"
+  [req]
+  (rur/response {:client-id (c/from-context req (comp :client-id :github))}))
