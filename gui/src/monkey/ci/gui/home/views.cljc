@@ -10,7 +10,7 @@
   [:<>
    [:div.clearfix
     [:h3.float-start "Customers for " (:name u)]
-    (when-let [a (:avatarUrl u)]
+    (when-let [a (:avatar-url u)]
       [:img.img-thumbnail.float-end {:width "50px" :src a :alt "Avatar"}])]
    (->> (:customers u)
         (map cust-item)

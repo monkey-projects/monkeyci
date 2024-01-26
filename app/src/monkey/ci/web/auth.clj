@@ -33,9 +33,7 @@
                   (jt/to-millis-from-epoch))
          ;; TODO Make issuer and audiences configurable
          :iss "https://app.monkeyci.com"
-         :aud ["https://api.monkeyci.com"]
-         ;; Required by oci api gateway
-         :use "sig"))
+         :aud ["https://api.monkeyci.com"]))
 
 (defn generate-jwt
   "Signs a JWT using the keypair from the request context."
@@ -77,7 +75,9 @@
   (-> (bk/public-key->jwk pub)
       (assoc :kid kid
              ;; RS256 is currently the only algorithm supported by OCI api gateway
-             :alg "RS256")))
+             :alg "RS256"
+             ;; Required by oci api gateway
+             :use "sig")))
 
 (def ctx->pub-key (comp :pub :jwk))
 

@@ -142,15 +142,19 @@
 (defn- add-jwt [user req]
   (assoc user :token (generate-jwt req user)))
 
-(defn- fetch-or-create-user [user req]
+(defn- fetch-or-create-user
+  "Given the github user info, finds the matching user in the database, or creates
+   a new one."
+  [user req]
   (let [st (c/req->storage req)]
-    (or (s/find-user st [:github (:id user)])
-        (let [u {:type "github"
-                 :type-id (:id user)
-                 :name (:name user)
-                 :email (:email user)}]
-          (s/save-user st u)
-          u))))
+    (-> (or (s/find-user st [:github (:id user)])
+            (let [u {:type "github"
+                     :type-id (:id user)
+                     ;; Keep track of email for reporting purposes
+                     :email (:email user)}]
+              (s/save-user st u)
+              u))
+        (merge (select-keys user [:avatar-url :name])))))
 
 (defn login
   "Invoked by the frontend during OAuth2 login flow.  It requests a Github

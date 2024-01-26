@@ -86,8 +86,7 @@
 (s/defschema User
   {:type s/Str
    :type-id s/Any
-   :name s/Str
-   (s/optional-key :id) Id
+   (s/optional-key :id) Id ; Internal id
    (s/optional-key :email) s/Str
    (s/optional-key :customers) [Id]})
 
