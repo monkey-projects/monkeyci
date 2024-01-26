@@ -1,5 +1,6 @@
 (ns monkey.ci.test.web.github-test
   (:require [clojure.test :refer [deftest testing is]]
+            [clojure.math :as cm]
             [buddy.sign.jwt :as jwt]
             [monkey.ci
              [events :as events]
@@ -175,6 +176,21 @@
           (is (= [ssh-key]
                  (get-in r [:build :git :ssh-keys]))))))))
 
+(defn- with-github-user
+  "Sets up fake http communication with github to return the given user"
+  ([u f]
+   (hf/with-fake-http ["https://github.com/login/oauth/access_token"
+                       {:status 200
+                        :body (h/to-json {:access-token "test-token"})}
+                       "https://api.github.com/user"
+                       {:status 200
+                        :body (h/to-json u)}]
+     (f u)))
+  ([f]
+   (with-github-user {:name "test user"
+                      :id (int (* (cm/random) 10000))}
+     f)))
+
 (deftest login
   (testing "when exchange fails at github, returns body and 400 status code"
     (hf/with-fake-http ["https://github.com/login/oauth/access_token"
@@ -187,65 +203,74 @@
                      :status)))))
 
   (testing "generates new token and returns it"
-    (hf/with-fake-http ["https://github.com/login/oauth/access_token"
-                        {:status 200
-                         :body (h/to-json {:access-token "test-token"})}
-                        "https://api.github.com/user"
-                        {:status 200
-                         :body (h/to-json {:name "test user"})}]
-      (let [kp (auth/generate-keypair)
-            req (-> (h/test-ctx)
-                    (assoc :jwk {:priv (.getPrivate kp)})
-                    (h/->req)
-                    (assoc :parameters
-                           {:query
-                            {:code "test-code"}}))
-            token (-> req
-                      (sut/login)
-                      :body
-                      :token)]
-        (is (string? token))
-        (is (map? (jwt/unsign token (.getPublic kp) {:alg :rs256}))))))
+    (with-github-user
+      (fn [_]
+        (let [kp (auth/generate-keypair)
+              req (-> (h/test-ctx)
+                      (assoc :jwk {:priv (.getPrivate kp)})
+                      (h/->req)
+                      (assoc :parameters
+                             {:query
+                              {:code "test-code"}}))
+              token (-> req
+                        (sut/login)
+                        :body
+                        :token)]
+          (is (string? token))
+          (is (map? (jwt/unsign token (.getPublic kp) {:alg :rs256})))))))
 
   (testing "finds existing github user in storage"
-    (hf/with-fake-http ["https://github.com/login/oauth/access_token"
-                        {:status 200
-                         :body (h/to-json {:access-token "test-token"})}
-                        "https://api.github.com/user"
-                        {:status 200
-                         :body (h/to-json {:id 345
-                                           :name "test user"})}]
-      (let [{st :storage :as ctx} (h/test-ctx)
-            _ (st/save-user st {:type "github"
-                                :type-id 345
-                                :customers ["test-cust"]})
-            req (-> ctx
-                    (h/->req)
-                    (assoc :parameters
-                           {:query
-                            {:code "test-code"}}))]
-        (is (= ["test-cust"]
-               (-> req
-                   (sut/login)
-                   :body
-                   :customers))))))
+    (with-github-user
+      (fn [u]
+        (let [{st :storage :as ctx} (h/test-ctx)
+              _ (st/save-user st {:type "github"
+                                  :type-id (:id u)
+                                  :customers ["test-cust"]})
+              req (-> ctx
+                      (h/->req)
+                      (assoc :parameters
+                             {:query
+                              {:code "test-code"}}))]
+          (is (= ["test-cust"]
+                 (-> req
+                     (sut/login)
+                     :body
+                     :customers)))))))
 
   (testing "creates user when none found in storage"
-    (hf/with-fake-http ["https://github.com/login/oauth/access_token"
-                        {:status 200
-                         :body (h/to-json {:access-token "test-token"})}
-                        "https://api.github.com/user"
-                        {:status 200
-                         :body (h/to-json {:id 345
-                                           :name "test user"})}]
-      (let [{st :storage :as ctx} (h/test-ctx)
-            req (-> ctx
-                    (h/->req)
-                    (assoc :parameters
-                           {:query
-                            {:code "test-code"}}))]
-        (is (= 200
-               (-> req
-                   (sut/login)
-                   :status)))
-        (is (some? (st/find-user st [:github 345])))))))
+    (with-github-user
+      (fn [u]
+        (let [{st :storage :as ctx} (h/test-ctx)
+              req (-> ctx
+                      (h/->req)
+                      (assoc :parameters
+                             {:query
+                              {:code "test-code"}}))]
+          (is (= 200
+                 (-> req
+                     (sut/login)
+                     :status)))
+          (is (some? (st/find-user st [:github (:id u)])))))))
+
+  (testing "sets user id in token"
+    (with-github-user
+      (fn [u]
+        (let [{st :storage :as ctx} (h/test-ctx)
+              pubkey (auth/ctx->pub-key ctx)
+              req (-> ctx
+                      (h/->req)
+                      (assoc :parameters
+                             {:query
+                              {:code "test-code"}}))
+              _ (st/save-user st {:type "github"
+                                  :type-id (:id u)
+                                  :id (st/new-id)})
+              token (-> req
+                        (sut/login)
+                        :body
+                        :token)]
+          (is (string? token))
+          (is (= (str "github/" (:id u))
+                 (-> token
+                     (jwt/unsign pubkey {:alg :rs256})
+                     :sub))))))))

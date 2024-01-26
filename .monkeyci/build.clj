@@ -31,7 +31,7 @@
   [ctx]
   (or (tag-version ctx)
       ;; TODO Determine automatically
-      "0.2.2-SNAPSHOT"))
+      "0.2.3-SNAPSHOT"))
 
 (defn clj-container [name dir & args]
   "Executes script in clojure container"
@@ -171,8 +171,8 @@
     (let [repo-ocid (-> (api/build-params ctx)
                         (get "repo-ocid"))]
       {:container/image "ghcr.io/oracle/oci-cli:latest"
-       :work-dir "app"
-       :script [(str "oci artifacts generic artifact upload-by-path"
+       :script ["cd app" ; FIXME Use work-dir instead, but's relative to the script dir
+                (str "oci artifacts generic artifact upload-by-path"
                      " --repository-id=" repo-ocid
                      " --artifact-path=monkeyci/app/monkeyci.jar"
                      " --artifact-version=" (tag-version ctx)
