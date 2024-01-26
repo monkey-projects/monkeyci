@@ -1,6 +1,7 @@
 ;; shadow-cljs configuration
 {:deps {:aliases [:dev :test]}
- :dev-http {8080 "resources/public"}
+ :dev-http {8080 "resources/public"
+            8002 ["target/devcards" "resources/public"]}
 
  :builds
  {:frontend
@@ -20,4 +21,15 @@
   ;; Autorun disabled, because it always returns a zero exit code
   :test/node
   {:target :node-test
-   :output-to "target/js/node.js"}}}
+   :output-to "target/js/node.js"}
+
+  :cards
+  {:target :browser-test
+   :ns-regexp "-cards$" ;; Pick up all files that end with -cards
+   :test-dir "target/devcards"
+   :runner-ns monkey.ci.gui.test.cards
+   :compiler-options {:devcards true}
+   :js-options {:resolve {"devcards-marked"
+                          {:target :npm :require "marked"}
+                          "devcards-syntax-highlighter"
+                          {:target :npm :require "highlight.js"}}}}}}
