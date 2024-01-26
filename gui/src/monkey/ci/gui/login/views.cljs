@@ -24,9 +24,11 @@
       (cond-> {:type :submit}
         @submitting? (assoc :disabled true))
       "Login"]
-     [:a.btn.btn-secondary
+     [:a.btn.btn-outline-dark
       {:href (str "https://github.com/login/oauth/authorize?client_id=" github-client-id
-                  "&redirect_uri=" (r/uri-encode callback-url))}
+                  "&redirect_uri=" (r/uri-encode callback-url))
+       :title "Redirects you to GitHub for authentication, then takes you back here."}
+      [:img.me-2 {:src "/img/github-mark.svg" :height "20px"}]
       "Login with GitHub"]]))
 
 (defn page [_]

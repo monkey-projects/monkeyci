@@ -17,11 +17,7 @@
               :http-root "target/js/test-kaocha"
               :preloads [lambdaisland.chui.remote]}}
 
+  ;; Autorun disabled, because it always returns a zero exit code
   :test/node
   {:target :node-test
-   :output-to "target/js/node.js"}
-
-  :test/ci
-  {:target :node-test
-   :output-to "target/js/ci.js"
-   :autorun true}}}
+   :output-to "target/js/node.js"}}}

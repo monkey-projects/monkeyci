@@ -20,7 +20,7 @@
    [:td (:source b)]
    [:td (:ref b)]
    [:td.text-center [co/build-result (:result b)]]
-   [:td (some-> (:message b) (subs 0 20))]])
+   [:td (some-> (:message b) (subs 0 30))]])
 
 (defn- builds []
   (rf/dispatch [:builds/load])

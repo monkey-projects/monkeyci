@@ -146,7 +146,9 @@
             (str "npx shadow-cljs release " build)]})
 
 (def test-gui
-  (shadow-release "test-gui" :test/ci))
+  (-> (shadow-release "test-gui" :test/node)
+      ;; Explicitly run the tests, since :autorun always return zero
+      (update :script conj "node target/js/node.js")))
 
 (def build-gui-release
   (shadow-release "release-gui" :frontend))

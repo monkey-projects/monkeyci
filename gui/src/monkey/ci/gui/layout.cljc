@@ -2,11 +2,6 @@
   (:require [monkey.ci.gui.components :as co]
             [re-frame.core :as rf]))
 
-(defn curr-route []
-  (let [r (rf/subscribe [:route/current])]
-    [:div.alert.alert-info
-     [:div "Current route: " [:b (str (some-> @r :data :name))]]]))
-
 (defn header []
   [:div.header
    [:div.row
@@ -25,7 +20,6 @@
   [subpanel]
   [:div
    [header]
-   [curr-route]
    [:div.row
     [:div.col
      [co/logo]]
