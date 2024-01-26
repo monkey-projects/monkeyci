@@ -7,6 +7,7 @@
              [core :as c]
              [events :as e]
              [utils :as u]]
+            [monkey.ci.web.auth :as auth]
             [org.httpkit.server :as http]))
 
 (defonce server (atom nil))
@@ -41,3 +42,11 @@
   [evt]
   (-> (get-in @server [:context :event-bus])
       (e/post-event evt)))
+
+(defn private-key []
+  (some-> @server :context :jwk :priv))
+
+(defn generate-jwt [uid]
+  (-> {:sub uid}
+      (auth/augment-payload)
+      (auth/sign-jwt (private-key))))

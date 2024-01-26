@@ -26,17 +26,23 @@
 (defn sign-jwt [payload pk]
   (jwt/sign payload pk {:alg :rs256 :header {:kid kid}}))
 
+(defn augment-payload [payload]
+  ;; TODO Make token expiration configurable
+  (assoc payload
+         :exp (-> (jt/plus (jt/instant) (jt/hours 1))
+                  (jt/to-millis-from-epoch))
+         ;; TODO Make issuer and audiences configurable
+         :iss "https://app.monkeyci.com"
+         :aud ["https://api.monkeyci.com"]
+         ;; Required by oci api gateway
+         :use "sig"))
+
 (defn generate-jwt
   "Signs a JWT using the keypair from the request context."
   [req payload]
   (let [pk (c/from-context req (comp :priv :jwk))]
     (-> payload
-        ;; TODO Make token expiration configurable
-        (assoc :exp (-> (jt/plus (jt/instant) (jt/hours 1))
-                        (jt/to-millis-from-epoch))
-               ;; TODO Make issuer and audiences configurable
-               :iss "https://app.monkeyci.com"
-               :aud ["https://api.monkeyci.com"])
+        (augment-payload)
         (sign-jwt pk))))
 
 (defn generate-keypair
