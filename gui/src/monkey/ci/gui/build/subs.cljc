@@ -21,3 +21,8 @@
      (->> b
           (filter (comp (partial = id) :id))
           (first)))))
+
+(rf/reg-sub
+ :build/reloading?
+ (fn [db _]
+   (some? (db/reloading? db))))

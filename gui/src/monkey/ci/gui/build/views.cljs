@@ -104,13 +104,14 @@
 
 (defn page [route]
   (let [params (r/path-params route)
-        repo (rf/subscribe [:repo/info (:repo-id params)])]
+        repo (rf/subscribe [:repo/info (:repo-id params)])
+        reloading? (rf/subscribe [:build/reloading?])]
     [l/default
      [:<>
       [:div.clearfix
        [:h2.float-start (:name @repo) " - " (:build-id params)]
        [:div.float-end
-        [co/reload-btn [:build/reload]]]]
+        [co/reload-btn [:build/reload] (when @reloading? {:disabled true})]]]
       [co/alerts [:build/alerts]]
       [build-details]
       [build-pipelines]
