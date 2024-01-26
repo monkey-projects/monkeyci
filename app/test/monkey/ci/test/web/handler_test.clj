@@ -238,7 +238,7 @@
   (testing "/user"
     (let [user {:type "github"
                 :type-id 456
-                :name "test user"}]
+                :email "testuser@monkeyci.com"}]
       
       (testing "`POST` creates new user"
         (let [st (st/make-memory-storage)
@@ -263,10 +263,10 @@
               _ (st/save-user st user)
               app (make-test-app st)
               r (-> (h/json-request :put (str "/user/github/" (:type-id user))
-                                    (assoc user :name "updated user"))
+                                    (assoc user :email "updated@monkeyci.com"))
                     (app))]
           (is (= 200 (:status r)))
-          (is (= "updated user" (some-> r :body slurp (h/parse-json) :name))))))))
+          (is (= "updated@monkeyci.com" (some-> r :body slurp (h/parse-json) :email))))))))
 
 (defn- verify-label-filter-like-endpoints [path desc entity prep-match]
   (let [st (st/make-memory-storage)
