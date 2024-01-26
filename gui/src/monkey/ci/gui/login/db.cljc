@@ -26,3 +26,8 @@
 
 (defn set-token [db t]
   (assoc db token t))
+
+(def github-config :auth/github-config)
+
+(defn set-github-config [db c]
+  (assoc db github-config c))

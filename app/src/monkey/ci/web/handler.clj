@@ -188,7 +188,9 @@
 (def github-routes
   ["/github" [["/login" {:post
                          {:handler github/login
-                          :parameters {:query {:code s/Str}}}}]]])
+                          :parameters {:query {:code s/Str}}}}]
+              ["/config" {:get
+                          {:handler github/get-config}}]]])
 
 (def auth-routes
   ["/auth/jwks" {:get

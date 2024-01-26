@@ -43,14 +43,24 @@
     (is (map? (reset! app-db (db/set-alerts {} [{:type :info
                                                  :message "test notification"}]))))
     (rf/dispatch-sync [:build/load-logs--success {:body []}])
-    (is (nil? (db/alerts @app-db)))))
+    (is (nil? (db/alerts @app-db))))
+
+  (testing "clears logs reload flag"
+    (is (map? (reset! app-db (db/set-reloading {} #{:logs}))))
+    (rf/dispatch-sync [:build/load-logs--success {:body []}])
+    (is (not (db/reloading? @app-db)))))
 
 (deftest build-load-logs--failed
   (testing "sets error"
     (rf/dispatch-sync [:build/load-logs--failed "test-error"])
     (is (= :danger (-> (db/alerts @app-db)
                        (first)
-                       :type)))))
+                       :type))))
+
+  (testing "clears logs reload flag"
+    (is (map? (reset! app-db (db/set-reloading {} #{:logs}))))
+    (rf/dispatch-sync [:build/load-logs--failed {:body {}}])
+    (is (not (db/reloading? @app-db)))))
 
 (deftest build-load
   (testing "sets alert"
@@ -83,11 +93,46 @@
     (is (map? (reset! app-db (db/set-alerts {} [{:type :info
                                                  :message "test notification"}]))))
     (rf/dispatch-sync [:build/load--success {:body []}])
-    (is (nil? (db/alerts @app-db)))))
+    (is (nil? (db/alerts @app-db))))
+
+  (testing "clears build reload flag"
+    (is (map? (reset! app-db (db/set-reloading {} #{:build}))))
+    (rf/dispatch-sync [:build/load--success {:body []}])
+    (is (not (db/reloading? @app-db)))))
 
 (deftest build-load--failed
   (testing "sets error"
     (rf/dispatch-sync [:build/load--failed "test-error"])
     (is (= :danger (-> (db/alerts @app-db)
                        (first)
-                       :type)))))
+                       :type))))
+  
+  (testing "clears build reload flag"
+    (is (map? (reset! app-db (db/set-reloading {} #{:build}))))
+    (rf/dispatch-sync [:build/load--failed {:body {}}])
+    (is (not (db/reloading? @app-db)))))
+
+(deftest build-reload
+  (testing "loads build and logs from backend"
+    (rft/run-test-sync
+     (let [c (h/catch-fx :martian.re-frame/request)]
+       (reset! app-db {:route/current
+                       {:parameters
+                        {:path 
+                         {:customer-id "test-cust"
+                          :project-id "test-proj"
+                          :repo-id "test-repo"
+                          :build-id "test-build"}}}})
+       (h/initialize-martian {:get-build
+                              {:body "test-build"
+                               :error-code :no-error}
+                              :get-build-logs
+                              {:body "test-build-logs"
+                               :error-code :no-error}})
+       (rf/dispatch [:build/reload])
+       (is (= 2 (count @c)))
+       (is (= [:get-build :get-build-logs] (->> @c (map #(nth % 2))))))))
+
+  (testing "marks reloading"
+    (rf/dispatch-sync [:build/reload])
+    (is (some? (db/reloading? @app-db)))))

@@ -102,15 +102,22 @@
      [:h3.float-start "Captured Logs"]
      [logs-table]]))
 
+(defn- auto-reload-check []
+  [:div.form-check
+   [:input#auto-reload.form-check-input {:type :checkbox}]
+   [:label.form-check-label {:for :auto-reload} "Auto reload"]])
+
 (defn page [route]
   (let [params (r/path-params route)
-        repo (rf/subscribe [:repo/info (:repo-id params)])]
+        repo (rf/subscribe [:repo/info (:repo-id params)])
+        reloading? (rf/subscribe [:build/reloading?])]
     [l/default
      [:<>
       [:div.clearfix
        [:h2.float-start (:name @repo) " - " (:build-id params)]
        [:div.float-end
-        [co/reload-btn [:build/reload]]]]
+        [co/reload-btn [:build/reload] (when @reloading? {:disabled true})]
+        [auto-reload-check]]]
       [co/alerts [:build/alerts]]
       [build-details]
       [build-pipelines]

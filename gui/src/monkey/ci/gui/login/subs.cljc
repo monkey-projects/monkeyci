@@ -16,3 +16,18 @@
  :login/alerts
  (fn [db _]
    (db/alerts db)))
+
+(rf/reg-sub
+ :login/token
+ (fn [db _]
+   (db/token db)))
+
+(rf/reg-sub
+ :login/token
+ (fn [db _]
+   (db/token db)))
+
+(rf/reg-sub
+ :login/github-client-id
+ (fn [db _]
+   (:client-id (db/github-config db))))

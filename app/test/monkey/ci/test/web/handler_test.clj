@@ -580,7 +580,15 @@
                (some-> (:body r)
                        (slurp)
                        (h/parse-json)
-                       :name)))))))
+                       :name))))))
+
+  (testing "`GET /github/config` returns client id"
+    (let [app (-> (test-ctx {:github {:client-id "test-client-id"}})
+                  (sut/make-app))
+          r (-> (mock/request :get "/github/config")
+                (app))]
+      (is (= 200 (:status r)))
+      (is (= "test-client-id" (some-> r :body slurp h/parse-json :client-id))))))
 
 (deftest routing-middleware
   (testing "converts json bodies to kebab-case"

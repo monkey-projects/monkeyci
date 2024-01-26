@@ -42,3 +42,25 @@
    (println "Got error:" err)
    (db/set-alerts db [{:type :danger
                        :message (str "Unable to fetch Github user token: " (u/error-msg err))}])))
+
+(rf/reg-event-fx
+ :login/load-github-config
+ (fn [{:keys [db]} [_ code]]
+   {:dispatch [:martian.re-frame/request
+               :get-github-config
+               {}
+               [:login/load-github-config--success]
+               [:login/load-github-config--failed]]}))
+
+(rf/reg-event-db
+ :login/load-github-config--success
+ (fn [db [_ {config :body}]]
+   (println "Got github config:" config)
+   (db/set-github-config db config)))
+
+(rf/reg-event-db
+ :login/load-github-config--failed
+ (fn [db [_ err]]
+   ;; Nothing (yet?)
+   (println "Unable to load github config:" err)
+   db))

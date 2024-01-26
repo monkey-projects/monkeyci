@@ -17,3 +17,24 @@
 
 (defn set-build [db l]
   (assoc db build l))
+
+(def reloading ::reloading)
+
+(defn set-reloading
+  "Sets the set of reloading things"
+  ([db r]
+   (assoc db reloading r))
+  ([db]
+   (set-reloading db #{:build :logs})))
+
+(defn clear-reloading [db r]
+  (update db reloading disj r))
+
+(defn clear-build-reloading [db]
+  (clear-reloading db :build))
+
+(defn clear-logs-reloading [db]
+  (clear-reloading db :logs))
+
+(defn reloading? [db]
+  (not-empty (reloading db)))

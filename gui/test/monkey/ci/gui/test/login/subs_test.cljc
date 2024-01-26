@@ -7,6 +7,8 @@
             [re-frame.core :as rf]
             [re-frame.db :refer [app-db]]))
 
+(rf/clear-subscription-cache!)
+
 (use-fixtures :each f/reset-db)
 
 (deftest submitting?
@@ -38,3 +40,23 @@
       (is (nil? @s))
       (is (map? (reset! app-db (db/set-alerts {} "test-alerts"))))
       (is (= "test-alerts" @s)))))
+
+(deftest token
+  (let [s (rf/subscribe [:login/token])]
+    (testing "exists"
+      (is (some? s)))
+
+    (testing "returns token from db"
+      (is (nil? @s))
+      (is (map? (reset! app-db (db/set-token {} "test-token"))))
+      (is (= "test-token" @s)))))
+
+(deftest github-client-id
+  (let [s (rf/subscribe [:login/github-client-id])]
+    (testing "exists"
+      (is (some? s)))
+
+    (testing "returns client-id from db"
+      (is (nil? @s))
+      (is (map? (reset! app-db (db/set-github-config {} {:client-id "test-github-client-id"}))))
+      (is (= "test-github-client-id" @s)))))

@@ -17,8 +17,11 @@
    :page/customer customer/page
    :page/repo repo/page})
 
+(def route-name (comp :name :data))
+(def public? #{:page/login :page/github-callback})
+
 (defn render-page [route]
-  (println "Rendering page for route:" (get-in route [:data :name]))
+  (println "Rendering page for route:" (route-name route))
   (if-let [p (get pages (get-in route [:data :name]))]
     [p route]
     [:div.alert.alert-warning
@@ -26,5 +29,9 @@
      [:p "No page exists for route " [:b (str (get-in route [:data :name]))]]]))
 
 (defn render []
-  (let [r (rf/subscribe [:route/current])]
-    [render-page @r]))
+  (let [r (rf/subscribe [:route/current])
+        t (rf/subscribe [:login/token])]
+    ;; If no token found, redirect to login
+    (if (or @t (public? (route-name @r)))
+      [render-page @r]
+      (rf/dispatch [:route/goto :page/login]))))

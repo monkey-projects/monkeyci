@@ -50,3 +50,13 @@
       (is (= {:id "this-build"
               :message "Test build"}
              (select-keys @d [:id :message]))))))
+
+(deftest reloading?
+  (let [r (rf/subscribe [:build/reloading?])]
+    (testing "exists"
+      (is (some? r)))
+
+    (testing "returns reloading status from db"
+      (is (false? @r))
+      (is (map? (reset! app-db (db/set-reloading {}))))
+      (is (true? @r)))))
