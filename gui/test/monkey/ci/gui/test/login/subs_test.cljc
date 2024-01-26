@@ -38,3 +38,13 @@
       (is (nil? @s))
       (is (map? (reset! app-db (db/set-alerts {} "test-alerts"))))
       (is (= "test-alerts" @s)))))
+
+(deftest token
+  (let [s (rf/subscribe [:login/token])]
+    (testing "exists"
+      (is (some? s)))
+
+    (testing "returns token from db"
+      (is (nil? @s))
+      (is (map? (reset! app-db (db/set-token {} "test-token"))))
+      (is (= "test-token" @s)))))
