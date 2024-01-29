@@ -1,7 +1,7 @@
 ;; shadow-cljs configuration
 {:deps {:aliases [:dev :test]}
  :dev-http {8080 "resources/public"
-            8002 ["target/devcards" "resources/public"]}
+            8002 ["dev-resources/devcards" "resources/public"]}
 
  :builds
  {:frontend
@@ -26,7 +26,7 @@
   :cards
   {:target :browser-test
    :ns-regexp "-cards$" ;; Pick up all files that end with -cards
-   :test-dir "target/devcards"
+   :test-dir "dev-resources/devcards"
    :runner-ns monkey.ci.gui.test.cards
    :compiler-options {:devcards true}
    :js-options {:resolve {"devcards-marked"

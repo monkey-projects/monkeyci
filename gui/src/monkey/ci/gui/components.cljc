@@ -47,3 +47,33 @@
                :success :text-bg-success
                :text-bg-secondary)]
     [:span {:class (str "badge " (name type))} (or r "running")]))
+
+(defn- item-id [id idx]
+  (str (name id) "-" idx))
+
+(defn- ->dom-id [id]
+  (str "#" (name id)))
+
+(defn- accordion-item [id idx {:keys [title contents collapsed]}]
+  (let [iid (item-id id idx)] 
+    [:div.accordion-item
+     [:h2.accordion-header
+      [:button.accordion-button (cond-> {:type :button
+                                         :data-bs-toggle :collapse
+                                         :data-bs-target (->dom-id iid)
+                                         :aria-expanded true
+                                         :aria-controls iid}
+                                  collapsed (assoc :class :collapsed
+                                                   :aria-expanded false))
+       title]]
+     [:div.accordion-collapse.collapse (cond-> {:id iid
+                                                :data-bs-parent (->dom-id id)}
+                                         (not collapsed) (assoc :class :show))
+      [:div.accordion-body
+       contents]]]))
+
+(defn accordion
+  "Accordion component.  This uses the Bootstrap Javascript for functionality."
+  [id items]
+  (->> (map-indexed (partial accordion-item id) items)
+       (into [:div.accordion {:id id}])))
