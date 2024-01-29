@@ -4,10 +4,22 @@
             [monkey.ci.gui.layout :as l]
             [monkey.ci.gui.martian :as m]
             [monkey.ci.gui.routing :as r]
+            [monkey.ci.gui.utils :as u]
             [monkey.ci.gui.build.events]
             [monkey.ci.gui.build.subs]
             [monkey.ci.gui.time :as t]
             [re-frame.core :as rf]))
+
+(def log-modal-id :log-dialog)
+
+(defn log-modal []
+  (let [c (rf/subscribe [:build/current-log])]
+    (when @c
+      [co/modal
+       log-modal-id
+       [:h5 "Log for " (:path @c)]
+       [:textarea.form-control {:columns 80}
+        (:contents @c)]])))
 
 (defn build-details
   "Displays the build details by looking it up in the list of repo builds."
@@ -30,13 +42,17 @@
          (into [m/url])
          (cs/join "/"))))
 
-(defn- elapsed [{s :startTime e :endTime}]
+(defn- elapsed [{s :start-time e :end-time}]
   (when (and s e)
     (str (- e s) " ms")))
 
-(defn- render-log-link [{:keys [name size]}]
-  ;; TODO Load log file and display inline on click
-  [:span.me-1 [:a.me-1 {:href "TODO"} name] (str "(" size " bytes)")])
+(defn- render-log-link [{:keys [name size path]}]
+  [:span.me-1
+   [:a.me-1 {:href (u/->dom-id log-modal-id)
+             :data-bs-toggle "modal"
+             :on-click (u/link-evt-handler [:build/download-log path])}
+    name]
+   (str "(" size " bytes)")])
 
 (defn- render-step [s]
   [:tr
@@ -134,5 +150,6 @@
       [build-details]
       [build-pipelines]
       [build-logs params]
+      [log-modal]
       [:div
        [:a {:href (r/path-for :page/repo params)} "Back to repository"]]]]))

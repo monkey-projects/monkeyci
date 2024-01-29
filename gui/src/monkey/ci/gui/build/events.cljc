@@ -74,3 +74,9 @@
    {:dispatch-n [(load-build-req db)
                  (load-logs-req db)]
     :db (db/set-reloading db)}))
+
+(rf/reg-event-fx
+ :build/download-log
+ (fn [{:keys [db]} [_ path]]
+   ;; TODO
+   ))

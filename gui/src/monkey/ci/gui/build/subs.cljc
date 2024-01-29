@@ -24,7 +24,9 @@
    (let [id (get-in r [:parameters :path :build-id])
          logs-by-id (group-by (comp vec (partial take 2) split-log-path :name) l)
          strip-prefix (fn [l]
-                        (update l :name (comp last split-log-path)))
+                        (-> l
+                            (assoc :path (:name l))
+                            (update :name (comp last split-log-path))))
          add-step-logs (fn [pn s]
                          (assoc s :logs (->> (get logs-by-id [pn (str (:index s))])
                                              (map strip-prefix))))
@@ -38,3 +40,9 @@
  :build/reloading?
  (fn [db _]
    (some? (db/reloading? db))))
+
+(rf/reg-sub
+ :build/current-log
+ (fn [db _]
+   ;; TODO
+   {}))

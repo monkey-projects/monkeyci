@@ -37,3 +37,6 @@
     (if (and s e)
       (- e s)
       0)))
+
+(defn ->dom-id [id]
+  (str "#" (name id)))

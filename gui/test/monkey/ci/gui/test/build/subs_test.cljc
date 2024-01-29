@@ -69,8 +69,8 @@
                                           {:parameters
                                            {:path
                                             {:build-id "test-build"}}})))))
-      (is (= [{:name "out.txt" :size 100}
-              {:name "err.txt" :size 50}]
+      (is (= [{:name "out.txt" :size 100 :path "test-pipeline/0/out.txt"}
+              {:name "err.txt" :size 50 :path "test-pipeline/0/err.txt"}]
              (-> @d :pipelines first :steps first :logs))))))
 
 (deftest reloading?
