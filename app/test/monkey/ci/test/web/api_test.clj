@@ -239,6 +239,33 @@
                :name "step 2"}]
              (-> r :body :pipelines first :steps))))))
 
+(deftest get-build
+  (testing "retrieves build by id, with pipelines as vector"
+    (let [{st :storage :as ctx} (h/test-ctx)
+          id (st/new-id)
+          md {:customer-id "test-cust"
+              :repo-id "test-repo"}
+          sid (st/->sid (concat (vals md) [id]))
+          _ (st/create-build-metadata st sid md)
+          _ (st/save-build-results st sid
+                                   {:pipelines
+                                    {0
+                                     {:name "pipeline 1"
+                                      :steps
+                                      {0 {:name "step 1"}
+                                       1 {:name "step 2"}}}}})
+          r (-> ctx
+                (h/->req)
+                (h/with-path-params (assoc md :build-id id))
+                (sut/get-build))]
+      (is (= 200 (:status r)))
+      (is (= [{:index 0
+               :name "pipeline 1"
+               :steps
+               [{:index 0 :name "step 1"}
+                {:index 1 :name "step 2"}]}]
+             (get-in r [:body :pipelines]))))))
+
 (defrecord FakeChannel [messages]
   http/Channel
   (send! [this msg close?]

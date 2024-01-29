@@ -34,42 +34,54 @@
   (when (and s e)
     (str (- e s) " ms")))
 
+(defn- render-log-link [{:keys [name size]}]
+  ;; TODO Load log file and display inline on click
+  [:a.mr-1 {:href "TODO"} (str name " (" size " bytes)") ])
+
 (defn- render-step [s]
   [:tr
    [:td (or (:name s) (:index s))]
    [:td [co/build-result (:status s)]]
-   [:td (elapsed s)]])
+   [:td (elapsed s)]
+   [:td (->> (:logs s)
+             (map render-log-link)
+             (into [:span]))]])
 
-(defn- render-pipeline [p]
-  [:div.accordion-item
-   [:h4
-    [:button.accordion-button {:type :button} (or (:name p) (str "Pipeline " (:index p)))]]
-   [:div.accordion-collapse.collapse.show
-    [:div.accordion-body
-     [:ul
-      [:li
-       [:b "Elapsed: "]
-       [:span
-        {:title "Each pipeline incurs a small startup time, that's why the elapsed time is higher than the sum of the steps' times."}
-        (elapsed p)]]
-      [:li [:b "Steps: "] (count (:steps p))]]
-     [:table.table.table-striped
-      [:thead
-       [:tr
-        [:th "Step"]
-        [:th "Result"]
-        [:th "Elapsed"]]]
-      (->> (:steps p)
-           (map render-step)
-           (into [:tbody]))]]]])
+(defn- pipeline-details [p]
+  [:<>
+   [:ul
+    [:li
+     [:b "Elapsed: "]
+     [:span
+      {:title "Each pipeline incurs a small startup time, that's why the elapsed time is higher than the sum of the steps' times."}
+      (elapsed p)]]
+    [:li [:b "Steps: "] (count (:steps p))]]
+   [:table.table.table-striped
+    [:thead
+     [:tr
+      [:th "Step"]
+      [:th "Result"]
+      [:th "Elapsed"]
+      [:th "Logs"]]]
+    (->> (:steps p)
+         (map render-step)
+         (into [:tbody]))]])
+
+(defn- as-accordion-item [p]
+  {:title [:span
+           [:b.me-1 (or (:name p) (str "Pipeline " (:index p)))]
+           [:span.badge.text-bg-secondary.me-1 (str (count (:steps p)))]
+           [co/build-result (:status p)]]
+   :collapsed true
+   :contents [pipeline-details p]})
 
 (defn- build-pipelines []
   (let [d (rf/subscribe [:build/details])]
-    [:div
-     [:h3 "Pipelines: " (count (:pipelines @d))]
-     (->> (:pipelines @d)
-          (map render-pipeline)
-          (into [:div.accordion.mb-2]))]))
+    [:div.mb-2
+     [:h3 "Pipelines"]
+     [co/accordion ::pipelines
+      (->> (:pipelines @d)
+           (map as-accordion-item))]]))
 
 (defn- log-path [route l]
   (str (build-path route)

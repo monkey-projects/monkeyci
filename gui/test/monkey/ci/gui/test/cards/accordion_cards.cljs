@@ -29,7 +29,7 @@
       [:ul
        [:li "Here we can"]
        [:li "Add more complicated things"]]]}
-    {:title "Details"
+    {:title [:span "Details" [:span.ms-1.badge.text-bg-success "success"]]
      :collapsed true
      :contents
      [:div

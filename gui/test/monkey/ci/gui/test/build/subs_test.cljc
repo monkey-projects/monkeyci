@@ -49,7 +49,29 @@
                                              {:build-id "this-build"}}})))))
       (is (= {:id "this-build"
               :message "Test build"}
-             (select-keys @d [:id :message]))))))
+             (select-keys @d [:id :message]))))
+
+    (testing "adds logs for step according to path"
+      (is (map? (reset! app-db (-> {}
+                                   (rdb/set-builds
+                                    [{:id "test-build"
+                                      :pipelines
+                                      [{:index 0
+                                        :name "test-pipeline"
+                                        :steps
+                                        [{:index 0}]}]}])
+                                   (db/set-logs
+                                    [{:name "test-pipeline/0/out.txt"
+                                      :size 100}
+                                     {:name "test-pipeline/0/err.txt"
+                                      :size 50}])
+                                   (assoc :route/current
+                                          {:parameters
+                                           {:path
+                                            {:build-id "test-build"}}})))))
+      (is (= [{:name "out.txt" :size 100}
+              {:name "err.txt" :size 50}]
+             (-> @d :pipelines first :steps first :logs))))))
 
 (deftest reloading?
   (let [r (rf/subscribe [:build/reloading?])]
