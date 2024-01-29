@@ -148,9 +148,9 @@
    should contain the necessary information to start the build.  The build 
    runner performs the repo clone and checkout and runs the script.  Closes
    the channel when the build has completed."
-  [{:keys [runner] :as ctx}]
+  [{:keys [runner] {:keys [build]} :event :as ctx}]
   (try 
-    (let [{:keys [build-id] :as build} (get-in ctx [:event :build])
+    (let [{:keys [build-id]} build
           ;; Use combination of checkout dir and build id for checkout
           workdir (c/checkout-dir ctx build-id)
           conf (assoc-in build [:git :dir] workdir)]
@@ -160,9 +160,10 @@
           (runner)
           (take-and-close)))
     (catch Exception ex
-      (log/error "Failed to build" ex)
+      (log/error "Failed to build" (:sid build) ex)
       (e/post-event (:event-bus ctx)
                     {:type :build/completed
+                     :build build
                      :result :error
                      :exit 2
                      :exception ex}))))

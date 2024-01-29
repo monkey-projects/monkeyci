@@ -256,4 +256,17 @@
   (testing "closes the result channel on completion"
     (let [ch (ca/to-chan! [:failed])]
       (is (some? (sut/build {:runner (constantly ch)})))
-      (is (nil? (h/try-take ch 1000 :timeout))))))
+      (is (nil? (h/try-take ch 1000 :timeout)))))
+
+  (testing "on error, fires `:build/completed` event"
+    (h/with-bus
+      (fn [bus]
+        (let [events (atom [])
+              _ (e/register-handler bus :build/completed (partial swap! events conj))
+              ctx {:runner (fn [_]
+                             (throw (ex-info "test error" {})))
+                   :event {:build {:build-id ::test-build}}
+                   :event-bus bus}]
+          (is (true? (sut/build ctx)))
+          (is (not= :timeout (h/wait-until #(pos? (count @events)) 1000)))
+          (is (= ::test-build (-> @events first :build :build-id))))))))

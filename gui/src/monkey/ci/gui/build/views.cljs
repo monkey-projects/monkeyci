@@ -36,7 +36,7 @@
 
 (defn- render-log-link [{:keys [name size]}]
   ;; TODO Load log file and display inline on click
-  [:a.mr-1 {:href "TODO"} (str name " (" size " bytes)") ])
+  [:span.me-1 [:a.me-1 {:href "TODO"} name] (str "(" size " bytes)")])
 
 (defn- render-step [s]
   [:tr
