@@ -156,7 +156,7 @@
 (defn oci-config-file [{:keys [checkout-dir]}]
   (io/file checkout-dir "oci-config"))
 
-(defn- param-to-secure-file [{:keys [checkout-dir]} p]
+(defn- param-to-secure-file [{:keys [checkout-dir] :as ctx} p]
   (let [f (io/file checkout-dir p)]
     (shell/param-to-file ctx p f)
     (fs/set-posix-file-permissions f "rw-------")
