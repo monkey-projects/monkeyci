@@ -24,7 +24,6 @@
                        {:parameters
                         {:path 
                          {:customer-id "test-cust"
-                          :project-id "test-proj"
                           :repo-id "test-repo"
                           :build-id "test-build"}}}})
        (h/initialize-martian {:get-build-logs {:body ["test-log"]
@@ -74,7 +73,6 @@
                        {:parameters
                         {:path 
                          {:customer-id "test-cust"
-                          :project-id "test-proj"
                           :repo-id "test-repo"
                           :build-id "test-build"}}}})
        (h/initialize-martian {:get-build {:body "test-build"
@@ -120,7 +118,6 @@
                        {:parameters
                         {:path 
                          {:customer-id "test-cust"
-                          :project-id "test-proj"
                           :repo-id "test-repo"
                           :build-id "test-build"}}}})
        (h/initialize-martian {:get-build
@@ -136,3 +133,55 @@
   (testing "marks reloading"
     (rf/dispatch-sync [:build/reload])
     (is (some? (db/reloading? @app-db)))))
+
+(deftest build-download-log
+  (testing "sets downloading"
+    (rf/dispatch-sync [:build/download-log "test/log"])
+    (is (db/downloading? @app-db)))
+
+  (testing "sets current log path"
+    (rf/dispatch-sync [:build/download-log "test/log"])
+    (is (= "test/log" (db/log-path @app-db))))
+
+  (testing "fetches builds from backend"
+    (rft/run-test-sync
+     (let [c (h/catch-fx :martian.re-frame/request)]
+       (reset! app-db {:route/current
+                       {:parameters
+                        {:path 
+                         {:customer-id "test-cust"
+                          :repo-id "test-repo"
+                          :build-id "test-build"}}}})
+       (h/initialize-martian {:download-log {:body "test-log"
+                                             :error-code :no-error}})
+       (rf/dispatch [:build/download-log "test/log/path"])
+       (is (= 1 (count @c)))
+       (is (= :download-log (-> @c first (nth 2)))))))
+
+  (testing "clears alerts"
+    (is (some? (reset! app-db (db/set-log-alerts {} [{:type :danger}]))))
+    (rf/dispatch-sync [:build/download-log "test/log"])
+    (is (empty? (db/log-alerts @app-db)))))
+
+(deftest build-download-log--success
+  (testing "sets log in db"
+    (rf/dispatch-sync [:build/download-log--success {:body "test-log"}])
+    (is (= "test-log" (db/current-log @app-db))))
+
+  (testing "resets downloading? flag"
+    (is (some? (reset! app-db (db/mark-downloading {}))))
+    (rf/dispatch-sync [:build/download-log--success {:body "test-log"}])
+    (is (not (db/downloading? @app-db)))))
+
+(deftest build-download-log--failed
+  (testing "resets downloading? flag"
+    (is (some? (reset! app-db (db/mark-downloading {}))))
+    (rf/dispatch-sync [:build/download-log--failed {:body {:message "test error"}}])
+    (is (not (db/downloading? @app-db))))
+
+  (testing "sets alert"
+    (rf/dispatch-sync [:build/download-log--failed {:body {:message "test error"}}])
+    (is (= :danger (-> @app-db
+                       (db/log-alerts)
+                       first
+                       :type)))))

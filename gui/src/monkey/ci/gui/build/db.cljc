@@ -38,3 +38,29 @@
 
 (defn reloading? [db]
   (not-empty (reloading db)))
+
+(def downloading? ::downloading?)
+
+(defn mark-downloading [db]
+  (assoc db downloading? true))
+
+(defn reset-downloading [db]
+  (dissoc db downloading?))
+
+(def current-log ::current-log)
+
+(defn set-current-log [db l]
+  (assoc db current-log l))
+
+(def log-path ::log-path)
+
+(defn set-log-path [db p]
+  (assoc db log-path p))
+
+(def log-alerts ::log-alerts)
+
+(defn set-log-alerts [db a]
+  (assoc db log-alerts a))
+
+(defn reset-log-alerts [db]
+  (dissoc db log-alerts))

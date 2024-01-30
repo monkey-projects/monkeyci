@@ -78,5 +78,29 @@
 (rf/reg-event-fx
  :build/download-log
  (fn [{:keys [db]} [_ path]]
-   ;; TODO
-   ))
+   {:db (-> db
+            (db/set-current-log nil)
+            (db/mark-downloading)
+            (db/reset-log-alerts)
+            (db/set-log-path path))
+    :dispatch [:secure-request
+               :download-log
+               (-> (r/path-params (:route/current db))
+                   (assoc :path path))
+               [:build/download-log--success]
+               [:build/download-log--failed]]}))
+
+(rf/reg-event-db
+ :build/download-log--success
+ (fn [db [_ {log-contents :body}]]
+   (-> db
+       (db/reset-downloading)
+       (db/set-current-log log-contents))))
+
+(rf/reg-event-db
+ :build/download-log--failed
+ (fn [db [_ {err :body}]]
+   (-> db
+       (db/reset-downloading)
+       (db/set-log-alerts [{:type :danger
+                            :message (u/error-msg err)}]))))

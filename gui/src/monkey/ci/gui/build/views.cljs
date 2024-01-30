@@ -12,14 +12,29 @@
 
 (def log-modal-id :log-dialog)
 
-(defn log-modal []
+(defn- modal-title []
+  (let [p (rf/subscribe [:build/log-path])]
+    [:h5 "Log for " @p]))
+
+(defn- show-downloading []
+  (let [d? (rf/subscribe [:build/downloading?])]
+    (when @d?
+      [co/render-alert {:type :info
+                        :message "Downloading log file, one moment..."}])))
+
+(defn- log-contents []
   (let [c (rf/subscribe [:build/current-log])]
-    (when @c
-      [co/modal
-       log-modal-id
-       [:h5 "Log for " (:path @c)]
-       [:textarea.form-control {:columns 80}
-        (:contents @c)]])))
+    (into [:p.text-bg-dark.font-monospace.overflow-auto.text-nowrap.h-100] @c)))
+
+(defn log-modal []
+  (let [a (rf/subscribe [:build/log-alerts])]
+    [co/modal
+     log-modal-id
+     [modal-title]
+     [:div {:style {:min-height "100px"}}
+      [co/alerts [:build/log-alerts]]
+      [show-downloading]
+      [log-contents]]]))
 
 (defn build-details
   "Displays the build details by looking it up in the list of repo builds."
@@ -99,15 +114,12 @@
       (->> (:pipelines @d)
            (map as-accordion-item))]]))
 
-(defn- log-path [route l]
-  (str (build-path route)
-       "/logs/download?path=" (js/encodeURIComponent l)))
-
-(defn- log-row [{:keys [name size]}]
+(defn- log-row [{:keys [name size] :as l}]
   (let [route (rf/subscribe [:route/current])]
     [:tr
-     [:td [:a {:href (log-path @route name)
-               :target "_blank"}
+     [:td [:a {:href (u/->dom-id log-modal-id)
+               :data-bs-toggle "modal"
+               :on-click (u/link-evt-handler [:build/download-log name])}
            name]]
      ;; TODO Make size human readable
      [:td size]]))

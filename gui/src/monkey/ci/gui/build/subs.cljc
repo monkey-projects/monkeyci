@@ -1,17 +1,16 @@
 (ns monkey.ci.gui.build.subs
   (:require [clojure.string :as cs]
             [monkey.ci.gui.build.db :as db]
+            [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
-(rf/reg-sub
- :build/alerts
- (fn [db _]
-   (db/alerts db)))
+(u/db-sub :build/alerts db/alerts)
+(u/db-sub :build/logs db/logs)
+(u/db-sub :build/reloading? (comp some? db/reloading?))
 
-(rf/reg-sub
- :build/logs
- (fn [db _]
-   (db/logs db)))
+(u/db-sub :build/log-alerts db/log-alerts)
+(u/db-sub :build/downloading? (comp some? db/downloading?))
+(u/db-sub :build/log-path db/log-path)
 
 (def split-log-path #(cs/split % #"/"))
 
@@ -36,13 +35,12 @@
              (first)
              (update :pipelines (partial map add-logs))))))
 
-(rf/reg-sub
- :build/reloading?
- (fn [db _]
-   (some? (db/reloading? db))))
+(defn- add-line-breaks [s]
+  (->> (cs/split-lines s)
+       (interpose [:br])))
 
 (rf/reg-sub
  :build/current-log
  (fn [db _]
-   ;; TODO
-   {}))
+   (-> (db/current-log db)
+       (add-line-breaks))))

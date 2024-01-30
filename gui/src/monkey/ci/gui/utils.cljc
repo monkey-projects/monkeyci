@@ -40,3 +40,8 @@
 
 (defn ->dom-id [id]
   (str "#" (name id)))
+
+(defn db-sub
+  "Registers a sub that returns a single value from db"
+  [id f]
+  (rf/reg-sub id (fn [db _] (f db))))
