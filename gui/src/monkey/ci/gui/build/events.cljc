@@ -104,3 +104,8 @@
        (db/reset-downloading)
        (db/set-log-alerts [{:type :danger
                             :message (u/error-msg err)}]))))
+
+(rf/reg-event-db
+ :build/auto-reload-changed
+ (fn [db [_ v]]
+   (db/set-auto-reload db v)))

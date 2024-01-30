@@ -7,6 +7,7 @@
 (u/db-sub :build/alerts db/alerts)
 (u/db-sub :build/logs db/logs)
 (u/db-sub :build/reloading? (comp some? db/reloading?))
+(u/db-sub :build/auto-reload? db/auto-reload?)
 
 (u/db-sub :build/log-alerts db/log-alerts)
 (u/db-sub :build/downloading? (comp some? db/downloading?))

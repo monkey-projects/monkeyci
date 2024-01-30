@@ -8,6 +8,7 @@
             [monkey.ci.gui.build.events]
             [monkey.ci.gui.build.subs]
             [monkey.ci.gui.time :as t]
+            [monkey.ci.gui.timer :as timer]
             [re-frame.core :as rf]
             ["ansi_up" :refer [AnsiUp]]))
 
@@ -157,9 +158,14 @@
      [logs-table]]))
 
 (defn- auto-reload-check []
-  [:div.form-check
-   [:input#auto-reload.form-check-input {:type :checkbox}]
-   [:label.form-check-label {:for :auto-reload} "Auto reload"]])
+  (let [r (rf/subscribe [:build/auto-reload?])]
+    [:div.form-check
+     [:input#auto-reload.form-check-input
+      {:type :checkbox
+       :on-change (u/form-evt-handler [:build/auto-reload-changed] u/evt->checked)}]
+     [:label.form-check-label {:for :auto-reload} "Auto reload"]
+     (when @r
+       [timer/timer ::auto-reload 5000 [:build/reload]])]))
 
 (defn page [route]
   (let [params (r/path-params route)

@@ -185,3 +185,9 @@
                        (db/log-alerts)
                        first
                        :type)))))
+
+(deftest build-auto-reload-changed
+  (testing "toggles auto-reload in db"
+    (is (not (db/auto-reload? @app-db)))
+    (rf/dispatch-sync [:build/auto-reload-changed true])
+    (is (db/auto-reload? @app-db))))

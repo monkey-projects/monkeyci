@@ -122,3 +122,12 @@
     (testing "holds current log path from db"
       (is (map? (reset! app-db (db/set-log-path {} "test-path"))))
       (is (= "test-path" @c)))))
+
+(deftest auto-reload?
+  (let [c (rf/subscribe [:build/auto-reload?])]
+    (testing "exists"
+      (is (some? c)))
+
+    (testing "holds current log path from db"
+      (is (map? (reset! app-db (db/set-auto-reload {} true))))
+      (is (true? @c)))))

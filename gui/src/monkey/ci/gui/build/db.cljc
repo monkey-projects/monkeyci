@@ -64,3 +64,8 @@
 
 (defn reset-log-alerts [db]
   (dissoc db log-alerts))
+
+(def auto-reload? ::auto-reload)
+
+(defn set-auto-reload [db v]
+  (assoc db auto-reload? v))
