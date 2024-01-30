@@ -156,15 +156,19 @@
 (defn oci-config-file [{:keys [checkout-dir]}]
   (io/file checkout-dir "oci-config"))
 
+(defn- param-to-secure-file [{:keys [checkout-dir]} p]
+  (let [f (io/file checkout-dir p)]
+    (shell/param-to-file ctx p f)
+    (fs/set-posix-file-permissions f "rw-------")
+    (fs/delete-on-exit f)
+    f))
+
 (defn oci-creds
   "Creates oci credentials file"
   [ctx]
-  (let [config (oci-config-file ctx)]
-    ;; Write the config to a file, that will be mounted in the container
-    (shell/param-to-file ctx "oci-config" config)
-    (fs/set-posix-file-permissions config "rw-------")
-    (fs/delete-on-exit config)
-    core/success))
+  (doseq [p ["oci-config" "oci.pem"]]
+    (param-to-secure-file p))
+  core/success)
 
 (defn upload-app-artifact
   "If this is a release build, uploads the uberjar to the OCI artifact registry."
