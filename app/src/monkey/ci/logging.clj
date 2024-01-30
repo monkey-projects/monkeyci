@@ -170,6 +170,7 @@
   
   (fetch-log [_ sid path]
     ;; TODO Also return object size, so we can tell the client
+    ;; FIXME Return nil if file does not exist, instead of throwing an error
     @(md/chain
       (os/get-object client (-> conf
                                 (select-keys [:ns :compartment-id :bucket-name])

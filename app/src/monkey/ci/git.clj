@@ -31,24 +31,6 @@
          (mapv :private-key-file)
          (hash-map :key-dir ssh-keys-dir :name))))
 
-(defn clone
-  "Clones the repo at given url, and checks out the given branch.  Writes the
-   files to `dir`.  Returns a repo object that can be passed to other functions."
-  [{:keys [url branch dir] :as opts}]
-  (log/debug "Cloning" url "into" dir)
-  ;; Precalculate id config otherwise it gets called multiple times by the `with-identity` macro.
-  (let [id-config (merge {:trust-all? true}
-                         (prepare-ssh-keys opts))]
-    (git/with-identity id-config
-      (git/git-clone url
-                     :branch branch
-                     :dir dir
-                     :no-checkout? true))))
-
-(defn checkout [repo id]
-  (log/debug "Checking out" id "from repo" repo)
-  (git/git-checkout repo {:name id}))
-
 (def origin-prefix "origin/")
 
 (defn- prefix-origin
@@ -58,7 +40,28 @@
     (cond->> b
       (not (cs/starts-with? b origin-prefix)) (str origin-prefix))))
 
-(defn clone+checkout
+(defn- opts->branch [{:keys [branch commit-id ref]}]
+  (or commit-id ref (prefix-origin branch)))
+
+(defn clone
+  "Clones the repo at given url, and checks out the given branch.  Writes the
+   files to `dir`.  Returns a repo object that can be passed to other functions."
+  [{:keys [url dir] :as opts}]
+  ;; Precalculate id config otherwise it gets called multiple times by the `with-identity` macro.
+  (let [id-config (merge {:trust-all? true}
+                         (prepare-ssh-keys opts))
+        branch (opts->branch opts)]
+    (git/with-identity id-config
+      (log/debug "Cloning" url "and branch" branch "into" dir)
+      (git/git-clone url
+                     :branch branch
+                     :dir dir))))
+
+(defn checkout [repo id]
+  (log/debug "Checking out" id "from repo" repo)
+  (git/git-checkout repo {:name id}))
+
+(defn ^:deprecated clone+checkout
   "Clones the repo, then performs a checkout of the given id"
   [{:keys [branch commit-id ref] :as opts}]
   (let [repo (clone opts)]

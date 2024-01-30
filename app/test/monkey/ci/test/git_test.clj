@@ -12,7 +12,7 @@
   (testing "invokes `git-clone` without checking out"
     (with-redefs [git/git-clone (fn [& args]
                                   args)]
-      (is (= ["http://url" :branch "master" :dir "tmp" :no-checkout? true]
+      (is (= ["http://url" :branch "origin/master" :dir "tmp"]
              (sut/clone {:url "http://url"
                          :branch "master"
                          :dir "tmp"}))))))

@@ -1,28 +1,47 @@
 (ns monkey.ci.gui.build.subs
-  (:require [monkey.ci.gui.build.db :as db]
+  (:require [clojure.string :as cs]
+            [monkey.ci.gui.build.db :as db]
+            [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
-(rf/reg-sub
- :build/alerts
- (fn [db _]
-   (db/alerts db)))
+(u/db-sub :build/alerts db/alerts)
+(u/db-sub :build/logs db/logs)
+(u/db-sub :build/reloading? (comp some? db/reloading?))
+(u/db-sub :build/auto-reload? db/auto-reload?)
 
-(rf/reg-sub
- :build/logs
- (fn [db _]
-   (db/logs db)))
+(u/db-sub :build/log-alerts db/log-alerts)
+(u/db-sub :build/downloading? (comp some? db/downloading?))
+(u/db-sub :build/log-path db/log-path)
+
+(def split-log-path #(cs/split % #"/"))
 
 (rf/reg-sub
  :build/details
  :<- [:repo/builds]
  :<- [:route/current]
- (fn [[b r] _]
-   (let [id (get-in r [:parameters :path :build-id])]
-     (->> b
-          (filter (comp (partial = id) :id))
-          (first)))))
+ :<- [:build/logs]
+ (fn [[b r l] _]
+   (let [id (get-in r [:parameters :path :build-id])
+         logs-by-id (group-by (comp vec (partial take 2) split-log-path :name) l)
+         strip-prefix (fn [l]
+                        (-> l
+                            (assoc :path (:name l))
+                            (update :name (comp last split-log-path))))
+         add-step-logs (fn [pn s]
+                         (assoc s :logs (->> (get logs-by-id [pn (str (:index s))])
+                                             (map strip-prefix))))
+         add-logs (fn [p]
+                    (update p :steps (partial map (partial add-step-logs (:name p)))))]
+     (some-> (filter (comp (partial = id) :id) b)
+             (first)
+             (update :pipelines (partial map add-logs))))))
+
+(defn- add-line-breaks [s]
+  (->> (cs/split-lines s)
+       (interpose [:br])))
 
 (rf/reg-sub
- :build/reloading?
+ :build/current-log
  (fn [db _]
-   (some? (db/reloading? db))))
+   (-> (db/current-log db)
+       (add-line-breaks))))

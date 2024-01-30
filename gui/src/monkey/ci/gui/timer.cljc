@@ -19,6 +19,7 @@
   [id timeout evt]
   (let [ticks (rf/subscribe [::timer-ticks id])]
     ;; We could also use an fx handler for this
-    (js/setTimeout #(rf/dispatch [::timer-tick id (conj evt @ticks)]) timeout)
+    #?(:cljs
+       (js/setTimeout #(rf/dispatch [::timer-tick id (conj evt @ticks)]) timeout))
     ;; We need this otherwise component won't be rendered and timer not activated
     [:div {:style {:display :none}} @ticks]))

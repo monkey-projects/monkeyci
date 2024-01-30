@@ -51,6 +51,13 @@
      :path-parts (into build-path ["/logs"])
      :path-schema build-schema})
 
+   (api-route
+    {:route-name :download-log
+     :path-parts (into build-path ["/logs/download"])
+     :path-schema build-schema
+     :query-schema {:path s/Str}
+     :produces #{"text/plain"}})
+
    (public-route
     {:route-name :github-login
      :method :post

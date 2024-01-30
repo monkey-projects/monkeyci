@@ -195,6 +195,14 @@
 (defn- add-index [[idx p]]
   (assoc p :index idx))
 
+(defn- pipelines->out [p]
+  (letfn [(with-index [v]
+            (->> v
+                 (map add-index)
+                 (sort-by :index)))]
+    (->> (with-index p)
+         (map #(mc/update-existing % :steps with-index)))))
+
 (defn- get-builds*
   "Helper function that retrieves the builds using the request, then
    applies `f` to the resultset and fetches the details of the remaining builds."
@@ -202,13 +210,6 @@
   (let [s (c/req->storage req)
         sid (repo-sid req)
         builds (st/list-builds s sid)
-        with-index (fn [v]
-                     (->> v
-                          (map add-index)
-                          (sort-by :index)))
-        pipelines->out (fn [p]
-                         (->> (with-index p)
-                              (map #(mc/update-existing % :steps with-index))))
         fetch-details (fn [id]
                         (-> (fetch-build-details s (st/->sid (concat sid [id])))
                             (update :pipelines pipelines->out)))]
@@ -239,7 +240,8 @@
   "Retrieves build by id"
   [req]
   (let [sid (st/ext-build-sid (get-in req [:parameters :path]))]
-    (if-let [b (fetch-build-details (c/req->storage req) sid)]
+    (if-let [b (some-> (fetch-build-details (c/req->storage req) sid)
+                       (update :pipelines pipelines->out))]
       (rur/response b)
       (rur/not-found nil))))
 
