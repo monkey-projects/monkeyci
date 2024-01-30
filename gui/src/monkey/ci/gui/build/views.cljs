@@ -8,7 +8,8 @@
             [monkey.ci.gui.build.events]
             [monkey.ci.gui.build.subs]
             [monkey.ci.gui.time :as t]
-            [re-frame.core :as rf]))
+            [re-frame.core :as rf]
+            ["ansi_up" :refer [AnsiUp]]))
 
 (def log-modal-id :log-dialog)
 
@@ -22,9 +23,22 @@
       [co/render-alert {:type :info
                         :message "Downloading log file, one moment..."}])))
 
+(def ansi-up (AnsiUp.))
+
+(defn- ansi->html [l]
+  (.ansi_to_html ansi-up l))
+
+(defn- ->html [l]
+  (if (string? l)
+    [:span
+     {:dangerouslySetInnerHTML {:__html (ansi->html l)}}]
+    l))
+
 (defn- log-contents []
   (let [c (rf/subscribe [:build/current-log])]
-    (into [:p.text-bg-dark.font-monospace.overflow-auto.text-nowrap.h-100] @c)))
+    (->> @c
+         (map ->html)
+         (into [:p.text-bg-dark.font-monospace.overflow-auto.text-nowrap.h-100]))))
 
 (defn log-modal []
   (let [a (rf/subscribe [:build/log-alerts])]
