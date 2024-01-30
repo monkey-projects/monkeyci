@@ -132,7 +132,13 @@
 
   (testing "marks reloading"
     (rf/dispatch-sync [:build/reload])
-    (is (some? (db/reloading? @app-db)))))
+    (is (some? (db/reloading? @app-db))))
+
+  (testing "sets reload time"
+    (rf/reg-cofx :time/now (fn [cofx]
+                             (assoc cofx :time/now 444)))
+    (rf/dispatch-sync [:build/reload])
+    (is (= 444 (db/last-reload-time @app-db)))))
 
 (deftest build-download-log
   (testing "sets downloading"

@@ -1,6 +1,7 @@
 (ns monkey.ci.gui.time
   (:require ["luxon" :refer [DateTime Interval]]
-            [clojure.string :as cs]))
+            [clojure.string :as cs]
+            [re-frame.core :as rf]))
 
 (defn now []
   (.now DateTime))
@@ -70,3 +71,9 @@
 (defn reformat [x]
   (some-> (parse x)
           (format-datetime)))
+
+;; Adds current epoch time to the cofx
+(rf/reg-cofx
+ :time/now
+ (fn [cofx]
+   (assoc cofx :time/now (to-epoch (now)))))

@@ -79,8 +79,11 @@
          (cs/join "/"))))
 
 (defn- elapsed [{s :start-time e :end-time}]
-  (when (and s e)
-    (t/format-seconds (int (/ (- e s) 1000)))))
+  (when s
+    ;; FIXME This does not re-render on auto-reload as long as
+    ;; the pipeline data remains unchanged.  Use last reload time for this.
+    (let [e (or e (t/to-epoch (t/now)))]
+      (t/format-seconds (int (/ (- e s) 1000))))))
 
 (defn- render-log-link [{:keys [name size path]}]
   [:span.me-1

@@ -69,3 +69,8 @@
 
 (defn set-auto-reload [db v]
   (assoc db auto-reload? v))
+
+(def last-reload-time ::last-reload-time)
+
+(defn set-last-reload-time [db t]
+  (assoc db last-reload-time t))
