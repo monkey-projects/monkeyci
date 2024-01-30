@@ -80,7 +80,6 @@
 
 (defn- elapsed [{s :start-time e :end-time}]
   (when (and s e)
-    #_(str (- e s) " ms")
     (t/format-seconds (int (/ (- e s) 1000)))))
 
 (defn- render-log-link [{:keys [name size path]}]
@@ -176,20 +175,21 @@
 
 (defn page [route]
   (rf/dispatch [:build/load])
-  (let [params (r/path-params route)
-        repo (rf/subscribe [:repo/info (:repo-id params)])
-        reloading? (rf/subscribe [:build/reloading?])]
-    [l/default
-     [:<>
-      [:div.clearfix
-       [:h2.float-start (:name @repo) " - " (:build-id params)]
-       [:div.float-end
-        [co/reload-btn [:build/reload] (when @reloading? {:disabled true})]
-        [auto-reload-check]]]
-      [co/alerts [:build/alerts]]
-      [build-details]
-      [build-pipelines]
-      [build-logs params]
-      [log-modal]
-      [:div
-       [:a {:href (r/path-for :page/repo params)} "Back to repository"]]]]))
+  (fn [route]
+    (let [params (r/path-params route)
+          repo (rf/subscribe [:repo/info (:repo-id params)])
+          reloading? (rf/subscribe [:build/reloading?])]
+      [l/default
+       [:<>
+        [:div.clearfix
+         [:h2.float-start (:name @repo) " - " (:build-id params)]
+         [:div.float-end
+          [co/reload-btn [:build/reload] (when @reloading? {:disabled true})]
+          [auto-reload-check]]]
+        [co/alerts [:build/alerts]]
+        [build-details]
+        [build-pipelines]
+        [build-logs params]
+        [log-modal]
+        [:div
+         [:a {:href (r/path-for :page/repo params)} "Back to repository"]]]])))
