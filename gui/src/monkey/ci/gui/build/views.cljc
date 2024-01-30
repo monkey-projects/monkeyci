@@ -80,7 +80,8 @@
 
 (defn- elapsed [{s :start-time e :end-time}]
   (when (and s e)
-    (str (- e s) " ms")))
+    #_(str (- e s) " ms")
+    (t/format-seconds (int (/ (- e s) 1000)))))
 
 (defn- render-log-link [{:keys [name size path]}]
   [:span.me-1
@@ -174,6 +175,7 @@
        [timer/timer ::auto-reload 5000 [:build/reload]])]))
 
 (defn page [route]
+  (rf/dispatch [:build/load])
   (let [params (r/path-params route)
         repo (rf/subscribe [:repo/info (:repo-id params)])
         reloading? (rf/subscribe [:build/reloading?])]

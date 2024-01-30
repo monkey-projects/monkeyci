@@ -36,9 +36,16 @@
   [l/welcome [login-form]])
 
 (defn github-callback [req]
-  (let [code (get-in req [:parameters :query :code])]
-     (rf/dispatch [:login/github-code-received code])
-     [l/default
-      [:<>
-       [:p "Authentication succeeded, logging in to MonkeyCI..."]
-       [c/alerts [:login/alerts]]]]))
+  (let [q (get-in req [:parameters :query])]
+    (if-let [code (:code q)]
+      (do
+        (rf/dispatch [:login/github-code-received code])
+        [l/default
+         [:<>
+          [:p "Authentication succeeded, logging in to MonkeyCI..."]
+          [c/alerts [:login/alerts]]]])
+      [l/default
+       [c/render-alert {:type :danger
+                        :message [:<>
+                                  [:h4 "Unable to Authenticate"]
+                                  [:p (:error_description q)]]}]])))

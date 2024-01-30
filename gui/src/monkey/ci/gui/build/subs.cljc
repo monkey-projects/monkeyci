@@ -5,6 +5,7 @@
             [re-frame.core :as rf]))
 
 (u/db-sub :build/alerts db/alerts)
+(u/db-sub :build/current db/build)
 (u/db-sub :build/logs db/logs)
 (u/db-sub :build/reloading? (comp some? db/reloading?))
 (u/db-sub :build/auto-reload? db/auto-reload?)
@@ -17,7 +18,7 @@
 
 (rf/reg-sub
  :build/details
- :<- [:repo/builds]
+ :<- [:build/current]
  :<- [:route/current]
  :<- [:build/logs]
  (fn [[b r l] _]
@@ -32,8 +33,7 @@
                                              (map strip-prefix))))
          add-logs (fn [p]
                     (update p :steps (partial map (partial add-step-logs (:name p)))))]
-     (some-> (filter (comp (partial = id) :id) b)
-             (first)
+     (some-> b
              (update :pipelines (partial map add-logs))))))
 
 (defn- add-line-breaks [s]

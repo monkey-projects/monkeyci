@@ -36,13 +36,12 @@
     (testing "exists"
       (is (some? d)))
 
-    (testing "returns build details from build list according to current route"
+    (testing "returns build details from current build"
       (is (nil? @d))
       (is (some? (reset! app-db (-> {}
-                                    (rdb/set-builds
-                                     [{:id "some-build"}
-                                      {:id "this-build"
-                                       :message "Test build"}])
+                                    (db/set-build
+                                     {:id "this-build"
+                                      :message "Test build"})
                                     (assoc :route/current
                                            {:parameters
                                             {:path
@@ -53,13 +52,13 @@
 
     (testing "adds logs for step according to path"
       (is (map? (reset! app-db (-> {}
-                                   (rdb/set-builds
-                                    [{:id "test-build"
-                                      :pipelines
-                                      [{:index 0
-                                        :name "test-pipeline"
-                                        :steps
-                                        [{:index 0}]}]}])
+                                   (db/set-build
+                                    {:id "test-build"
+                                     :pipelines
+                                     [{:index 0
+                                       :name "test-pipeline"
+                                       :steps
+                                       [{:index 0}]}]})
                                    (db/set-logs
                                     [{:name "test-pipeline/0/out.txt"
                                       :size 100}
@@ -71,26 +70,26 @@
                                             {:build-id "test-build"}}})))))
       (is (= [{:name "out.txt" :size 100 :path "test-pipeline/0/out.txt"}
               {:name "err.txt" :size 50 :path "test-pipeline/0/err.txt"}]
-             (-> @d :pipelines first :steps first :logs))))))
+             (-> @d :pipelines first :steps first :logs))))
 
-(deftest reloading?
-  (let [r (rf/subscribe [:build/reloading?])]
-    (testing "exists"
-      (is (some? r)))
+    (deftest reloading?
+      (let [r (rf/subscribe [:build/reloading?])]
+        (testing "exists"
+          (is (some? r)))
 
-    (testing "returns reloading status from db"
-      (is (false? @r))
-      (is (map? (reset! app-db (db/set-reloading {}))))
-      (is (true? @r)))))
+        (testing "returns reloading status from db"
+          (is (false? @r))
+          (is (map? (reset! app-db (db/set-reloading {}))))
+          (is (true? @r)))))
 
-(deftest log-alerts
-  (let [a (rf/subscribe [:build/log-alerts])]
-    (testing "exists"
-      (is (some? a)))
+    (deftest log-alerts
+      (let [a (rf/subscribe [:build/log-alerts])]
+        (testing "exists"
+          (is (some? a)))
 
-    (testing "holds alerts from db"
-      (is (map? (reset! app-db (db/set-log-alerts {} ::test-alerts))))
-      (is (= ::test-alerts @a)))))
+        (testing "holds alerts from db"
+          (is (map? (reset! app-db (db/set-log-alerts {} ::test-alerts))))
+          (is (= ::test-alerts @a)))))))
 
 (deftest current-log
   (let [c (rf/subscribe [:build/current-log])]
