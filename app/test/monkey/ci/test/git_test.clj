@@ -25,7 +25,7 @@
              (sut/checkout :test-repo "test-id"))))))
 
 (deftest clone+checkout
-  (testing "clones, then checks out"
+  (testing "clones, then checks out commit id"
     (let [checkout-args (atom nil)]
       (with-redefs [sut/clone (constantly :test-repo)
                     sut/checkout (fn [repo id]
@@ -38,7 +38,7 @@
                                     :dir "test-dir"})))
         (is (= "test-id" (:commit-id @checkout-args))))))
 
-  (testing "when no commit id, checks out ref instead"
+  (testing "when no commit id, just clones"
     (let [checkout-ids (atom nil)]
       (with-redefs [sut/clone (constantly :test-repo)
                     sut/checkout (fn [_ id]
@@ -47,18 +47,7 @@
                (sut/clone+checkout {:url "http://test-url"
                                     :ref "refs/heads/main"
                                     :dir "test-dir"})))
-        (is (= "refs/heads/main" @checkout-ids)))))
-
-  (testing "when no commit id or ref, uses branch"
-    (let [checkout-ids (atom nil)]
-      (with-redefs [sut/clone (constantly :test-repo)
-                    sut/checkout (fn [_ id]
-                                   (reset! checkout-ids id))]
-        (is (= :test-repo
-               (sut/clone+checkout {:url "http://test-url"
-                                    :branch "main"
-                                    :dir "test-dir"})))
-        (is (= "origin/main" @checkout-ids))))))
+        (is (empty? @checkout-ids))))))
 
 (defn- keypair-base64
   "Generates a new RSA keypair and returns the public and private keys as base64

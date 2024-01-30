@@ -72,8 +72,8 @@
                 :dir "test-dir"
                 :id "test-id"}
           captured-args (atom [])]
-      (with-redefs [git/clone (fn [& args]
-                                (reset! captured-args args))]
+      (with-redefs [git/clone+checkout (fn [& args]
+                                         (reset! captured-args args))]
         (is (= "test-dir" (git-fn opts)))
         (is (= [opts] @captured-args)))))
 

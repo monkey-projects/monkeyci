@@ -40,8 +40,7 @@
     (cond->> b
       (not (cs/starts-with? b origin-prefix)) (str origin-prefix))))
 
-(defn- opts->branch [{:keys [branch commit-id ref]}]
-  (or commit-id ref (prefix-origin branch)))
+(def opts->branch (some-fn :ref (comp prefix-origin :branch)))
 
 (defn clone
   "Clones the repo at given url, and checks out the given branch.  Writes the
@@ -61,12 +60,12 @@
   (log/debug "Checking out" id "from repo" repo)
   (git/git-checkout repo {:name id}))
 
-(defn ^:deprecated clone+checkout
-  "Clones the repo, then performs a checkout of the given id"
-  [{:keys [branch commit-id ref] :as opts}]
+(defn clone+checkout
+  "Clones the repo, then performs a checkout of the given commit id"
+  [{:keys [commit-id] :as opts}]
   (let [repo (clone opts)]
-    (when-let [id-or-branch (or commit-id ref (prefix-origin branch))]
-      (checkout repo id-or-branch))
+    (when commit-id
+      (checkout repo commit-id))
     repo))
 
 (defn delete-repo

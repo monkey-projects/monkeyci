@@ -61,7 +61,7 @@
 
 (def default-context
   {:git {:fn (fn default-git-clone [opts]
-               (git/clone opts)
+               (git/clone+checkout opts)
                ;; Return the checkout dir
                (:dir opts))}})
 
