@@ -90,10 +90,13 @@
                  (assoc :webhook-id id
                         :build-id build-id
                         :commit-id commit-id
-                        :source :github)
+                        :source :github
+                        ;; Do not use the commit timestamp, because when triggered from a tag
+                        ;; this is still the time of the last commit, not of the tag creation.
+                        :timestamp (System/currentTimeMillis))
                  (merge (-> payload
                             :head-commit
-                            (select-keys [:timestamp :message :author])))
+                            (select-keys [:message :author])))
                  (merge (select-keys payload [:ref])))
           ssh-keys (find-ssh-keys st details)
           conf {:git (-> {:url (if private ssh-url clone-url)
