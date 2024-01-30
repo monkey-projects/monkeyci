@@ -167,7 +167,7 @@
   "Creates oci credentials file"
   [ctx]
   (doseq [p ["oci-config" "oci.pem"]]
-    (param-to-secure-file p))
+    (param-to-secure-file ctx p))
   core/success)
 
 (defn upload-app-artifact
