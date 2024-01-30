@@ -10,7 +10,8 @@
             [monkey.ci.gui.time :as t]
             [monkey.ci.gui.timer :as timer]
             [re-frame.core :as rf]
-            ["ansi_up" :refer [AnsiUp]]))
+            #?@(:node [] ; Exclude ansi_up when building for node
+                :cljs [["ansi_up" :refer [AnsiUp]]])))
 
 (def log-modal-id :log-dialog)
 
@@ -24,10 +25,15 @@
       [co/render-alert {:type :info
                         :message "Downloading log file, one moment..."}])))
 
-(def ansi-up (AnsiUp.))
-
-(defn- ansi->html [l]
-  (.ansi_to_html ansi-up l))
+;; Node does not support ESM modules, so we need to apply this workaround
+#?(:node
+   (defn ansi->html [l]
+     l)
+   :cljs
+   (do
+     (def ansi-up (AnsiUp.))
+     (defn- ansi->html [l]
+       (.ansi_to_html ansi-up l))))
 
 (defn- ->html [l]
   (if (string? l)

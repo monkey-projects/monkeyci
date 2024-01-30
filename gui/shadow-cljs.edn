@@ -21,7 +21,9 @@
   ;; Autorun disabled, because it always returns a zero exit code
   :test/node
   {:target :node-test
-   :output-to "target/js/node.js"}
+   :output-to "target/js/node.js"
+   :compiler-options
+   {:reader-features #{:node}}}
 
   :cards
   {:target :browser-test
