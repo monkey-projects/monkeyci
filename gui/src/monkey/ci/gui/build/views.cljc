@@ -78,12 +78,9 @@
          (into [m/url])
          (cs/join "/"))))
 
-(defn- elapsed [{s :start-time e :end-time}]
-  (when s
-    ;; FIXME This does not re-render on auto-reload as long as
-    ;; the pipeline data remains unchanged.  Use last reload time for this.
-    (let [e (or e (t/to-epoch (t/now)))]
-      (t/format-seconds (int (/ (- e s) 1000))))))
+(defn- calc-elapsed [{s :start-time e :end-time}]
+  (when (and s e)
+    (t/format-seconds (int (/ (- e s) 1000)))))
 
 (defn- render-log-link [{:keys [name size path]}]
   [:span.me-1
@@ -92,6 +89,18 @@
              :on-click (u/link-evt-handler [:build/download-log path])}
     name]
    (str "(" size " bytes)")])
+
+(defn- elapsed-final [s]
+  [:span (calc-elapsed s)])
+
+(defn- elapsed-running [s]
+  (let [t (rf/subscribe [:build/last-reload-time])]
+    [:span (calc-elapsed (assoc s :end-time @t))]))
+
+(defn- elapsed [x]
+  (if (u/running? x)
+    [elapsed-running x]
+    [elapsed-final x]))
 
 (defn- render-step [s]
   [:tr

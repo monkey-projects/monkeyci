@@ -51,6 +51,11 @@
       (- e s)
       0)))
 
+(defn running?
+  "True if step or pipeline is still running"
+  [x]
+  (nil? (:end-time x)))
+
 (defn ->dom-id [id]
   (str "#" (name id)))
 
