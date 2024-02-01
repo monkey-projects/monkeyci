@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.utils
   (:require [clojure.string :as cs]
+            [goog.string :as gstring]
             [monkey.ci.gui.time :as t]
             [re-frame.core :as rf]))
 
@@ -63,3 +64,6 @@
   "Registers a sub that returns a single value from db"
   [id f]
   (rf/reg-sub id (fn [db _] (f db))))
+
+(defn unescape-entity [e]
+  (gstring/unescapeEntities e))
