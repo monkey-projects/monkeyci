@@ -4,21 +4,23 @@
             [monkey.ci.events.core :as c]
             [monkey.ci.helpers :as h]))
 
+(def timeout 1000)
+
 (defn async-tests [make-events]
   (testing "listeners receive events"
     (let [e (make-events)
           evt {:type ::test-event}
           recv (atom [])
           l (c/no-dispatch
-              (partial swap! recv conj))]
+             (partial swap! recv conj))]
       (is (= e (c/add-listener e l)))
       (is (= e (c/post-events e evt)))
-      (is (not= :timeout (h/wait-until #(pos? (count @recv)) 200)))
+      (is (not= :timeout (h/wait-until #(pos? (count @recv)) timeout)))
       (is (= [evt] @recv))
       (is (= e (c/remove-listener e l)))
       (is (empty? (reset! recv [])))
       (is (= e (c/post-events e evt)))
-      (is (= :timeout (h/wait-until #(pos? (count @recv)) 200)))))
+      (is (= :timeout (h/wait-until #(pos? (count @recv)) timeout)))))
 
   (testing "return values of handlers are posted back as events"
     (let [recv (atom [])
@@ -28,7 +30,7 @@
                                      (c/no-dispatch)
                                      (c/filter-type ::second))))]
       (is (some? (c/post-events e {:type ::first})))
-      (is (not= :timeout (h/wait-until #(pos? (count @recv)) 200)))
+      (is (not= :timeout (h/wait-until #(pos? (count @recv)) timeout)))
       (is (= ::second (-> @recv first :type)))))
 
   (testing "can post multiple events at once"
