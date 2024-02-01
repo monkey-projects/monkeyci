@@ -5,6 +5,7 @@
             [monkey.ci.gui.repo.events]
             [monkey.ci.gui.repo.subs]
             [monkey.ci.gui.routing :as r]
+            [monkey.ci.gui.table :as table]
             [monkey.ci.gui.time :as t]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
@@ -33,7 +34,24 @@
           [:div.float-end
            [co/reload-btn [:builds/load]]]]
          [:p "Found " (count @b) " builds"]
-         [:table.table.table-striped
+         [table/paged-table
+          {:id ::builds
+           :items-sub [:repo/builds]
+           :columns [{:label "Id"
+                      :value (fn [b] [:a {:href (r/path-for :page/build b)} (:build-id b)])}
+                     {:label "Time"
+                      :value #(t/reformat (:timestamp %))}
+                     {:label "Elapsed"
+                      :value elapsed}
+                     {:label "Trigger"
+                      :value :source}
+                     {:label "Ref"
+                      :value :ref}
+                     {:label "Result"
+                      :value (fn [b] [co/build-result (:result b)])}
+                     {:label "Commit message"
+                      :value #(some-> (:message %) (subs 0 30))}]}]
+         #_[:table.table.table-striped
           [:thead
            [:tr
             [:th {:scope :col} "Id"]

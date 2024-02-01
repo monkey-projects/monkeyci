@@ -1,6 +1,7 @@
 (ns monkey.ci.gui.table
   "Table functionality"
-  (:require [monkey.ci.gui.utils :as u]
+  (:require [clojure.math :as cm]
+            [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
 (defn nav-link [item-opts link-opts content]
@@ -99,9 +100,44 @@
    information in db."
   [id]
   (let [pi (rf/subscribe [:pagination/info id])]
-    (when @pi
+    (when (and @pi (pos? (:count @pi)))
       [render-pagination id (:count @pi) (:current @pi)])))
 
-(defn paged-table [conf]
-  ;; TODO
-  )
+(defn- render-thead [columns]
+  (letfn [(render-col [l]
+            [:th {:scope :col} l])]
+    [:thead
+     (->> columns
+          (map (comp render-col :label))
+          (into [:tr]))]))
+
+(defn- render-tbody [cols items]
+  (letfn [(render-cell [v]
+            [:td v])
+          (render-item [it]
+            (->> cols
+                 (map (fn [{:keys [value]}]
+                        (value it)))
+                 (map render-cell)
+                 (into [:tr])))]
+    (->> items
+         (map render-item)
+         (into [:tbody]))))
+
+(defn paged-table [{:keys [id items-sub columns page-size]
+                    :or {page-size 10}}]
+  (when-let [items (rf/subscribe items-sub)]
+    (let [pag (rf/subscribe [:pagination/info id])
+          pc (int (cm/ceil (/ (count @items) page-size)))
+          cp (or (some-> pag (deref) :current) 0)
+          l (->> @items
+                 (drop (* cp page-size))
+                 (take page-size))]
+      (when (or (nil? @pag) (not= (:count pag) pc))
+        (rf/dispatch [:pagination/set id {:count pc :current cp}]))
+      [:<>
+       [:table.table.table-striped
+        (render-thead columns)
+        (render-tbody columns l)]
+       (when (> pc 1)
+         [render-pagination id pc cp])])))
