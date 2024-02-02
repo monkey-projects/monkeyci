@@ -1,52 +1,75 @@
 (ns monkey.ci.events.http
   "Implementation for events that connect to a HTTP server as a client, or that
    function as a HTTP server where clients connect to."
-  (:require [clojure.java.io :as io]
+  (:require [clj-commons.byte-streams :as bs]
+            [clojure.edn :as edn]
+            [clojure.java.io :as io]
             [clojure.tools.logging :as log]
+            [manifold.deferred :as md]
             [monkey.ci.events.core :as c]
             [monkey.ci.utils :as u]
-            [org.httpkit.client :as http])
+            [aleph.http :as ah])
   (:import java.io.PushbackReader))
 
-(defn- pipe-events [r l]
-  (let [read-next (fn [] (u/parse-edn r {:eof ::done}))]
-    (loop [m (read-next)]
-      (if (= ::done m)
-        (do
-          (log/info "Event stream closed"))
-        (do
-          (log/debug "Got event:" m)
-          (l m)
-          (recur (read-next)))))))
+(defn- start-thread [f]
+  (doto (Thread. f)
+    (.start)))
 
-(deftype HttpClientEvents [url listening-streams]
+(defn- pipe-events [r l]
+  (try 
+    (let [pr (PushbackReader. r)
+          read-next (fn [] (edn/read {:eof ::done} pr))]
+      (loop [m (read-next)]
+        (if (= ::done m)
+          (do
+            (log/info "Event stream closed"))
+          (do
+            (log/debug "Got event:" m)
+            (l m)
+            (recur (read-next)))))
+      (log/debug "Done piping events"))
+    (catch InterruptedException ex
+      (log/debug "Event piping interrupted"))
+    (catch Exception ex
+      (log/error "Failed to pipe events:" ex))))
+
+(deftype HttpClientEvents [url pool listening-streams]
   c/EventPoster
   (post-events [this evt]
     (let [b (prn-str evt)]
-      @(http/post url {:body b
-                       :headers {"content-type" "application/edn"
-                                 "content-length" (str (count b))}
-                       :method :post}))
+      @(ah/post url {:body b
+                     :headers {"content-type" "application/edn"
+                               "content-length" (str (count b))}
+                     :method :post}))
     this)
 
   c/EventReceiver
   (add-listener [this l]
-    (http/get url {:as :stream}
-              (fn [{:keys [body status]}]
-                (if (not= 200 status)
-                  (log/warn "Request failed with status" status)
-                  (do
-                    (log/debug "Processing event stream...")
-                    (swap! listening-streams assoc l body)
-                    (with-open [r (-> body io/reader (PushbackReader.))]
-                      (pipe-events r l))
-                    (log/debug "Done processing event stream")))))
+    (-> (md/chain
+         (ah/get url {:pool pool})
+         :body
+         bs/to-reader)
+        (md/on-realized
+         (fn [r]
+           (log/debug "Processing event stream...")
+           (swap! listening-streams assoc l {:reader r
+                                             :thread (start-thread #(pipe-events r l))}))
+         (fn [err]
+           (log/error "Unable to receive server events:" err))))
+    (log/debug "Listener added")
     this)
 
   (remove-listener [this l]
-    (when-let [s (get @listening-streams l)]
-      (.close s)
+    (when-let [{r :reader t :thread :as m} (get @listening-streams l)]
+      (future
+        (log/debug "Closing reader:" r)
+        ;; Closing this reader blocks, so we do it in a separate thread and interrupt the
+        ;; pipe thread as well.
+        (.close r)
+        (log/debug "Reader closed"))
+      (.interrupt t)
       (swap! listening-streams dissoc l))
+    (log/debug "Listener removed")
     this))
 
 (defn make-http-client
@@ -54,7 +77,9 @@
    to the remote HTTP server using a request.  When adding a listener, it will
    open a streamed HTTP request to the remote server."
   [url]
-  (->HttpClientEvents url (atom {})))
+  (->HttpClientEvents url
+                      (ah/connection-pool {:connection-options {:raw-stream? true}})
+                      (atom {})))
 
 ;; (deftype SocketClientEvents [socket]
 ;;   c/EventPoster

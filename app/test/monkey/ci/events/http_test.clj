@@ -7,7 +7,8 @@
             [monkey.ci.events
              [async-tests :as ast]
              [core :as c]
-             [http :as sut]]
+             [http :as sut]
+             [manifold :as em]]
             [monkey.ci.helpers :as h]
             [monkey.ci.web
              [common :as wc]
@@ -60,7 +61,8 @@
                   (ms/consume (send-events ch) stream)
                   (fn [_]
                     (cleanup ch)))
-                 (c/add-listener events listener))
+                 (c/add-listener events listener)
+                 (log/debug "Stream listener added"))
       :on-close (fn [_ status]
                   (ms/close! stream)
                   (log/debug "Event stream closed with status" status))})))
@@ -89,19 +91,21 @@
 
 (defn start-server [events]
   (http/run-server (make-app {:events events})
-                   {:legacy-return-value? false}))
+                   {:legacy-return-value? false
+                    :port 3003}))
 
 (def server-url (atom nil))
 
 (use-fixtures :once
   (fn [t]
     ;; Set up fake http server
-    (let [events (c/make-sync-events)
+    (let [events (em/make-events)
           server (start-server events)]
       (reset! server-url (format "http://localhost:%d/events" (http/server-port server)))
       (try
         (t)
         (finally
+          (log/debug "Stopping server")
           (http/server-stop! server))))))
 
 (deftest http-client-events
@@ -121,7 +125,7 @@
       (is (= [evt] @recv))
       (is (= e (c/remove-listener e l)))
       (is (empty? (reset! recv [])))
-      (is (= e (c/post-events e evt)))
+      (is (= e (c/post-events e {:type ::other-event})))
       (is (= :timeout (h/wait-until #(pos? (count @recv)) 500))))))
 
 #_(deftest socket-client-events
