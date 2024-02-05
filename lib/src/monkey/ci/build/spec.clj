@@ -12,6 +12,14 @@
 (s/def :ci/cache-config (s/keys :req-un [:cache/id :cache/path]))
 (s/def :ci/caches (s/coll-of :ci/cache-config))
 
+(s/def :artifact/id string?)
+(s/def :artifact/path string?)
+(s/def :ci/artifact-config (s/keys :req-un [:artifact/id :artifact/path]))
+(s/def :ci/artifacts (s/coll-of :ci/artifact-config))
+
+(s/def :ci/save-artifacts (s/merge :ci/artifacts))
+(s/def :ci/restore-artifacts (s/merge :ci/artifacts))
+
 (s/def :container/image string?)
 (s/def :container/entrypoint (s/coll-of string?))
 (s/def :container/cmd (s/coll-of string?))
@@ -20,15 +28,19 @@
 (s/def :container/env (s/map-of string? string?))
 (s/def :container/platform string?)
 
+(s/def :ci/basic-step (s/keys :opt-un [:ci/name :ci/caches :ci/restore-artifacts :ci/save-artifacts]))
+
 (s/def :ci/step (s/or :fn fn?
                       :action
-                      (s/keys :req-un [:ci/action]
-                              :opt-un [:ci/name :ci/caches])
+                      (-> (s/keys :req-un [:ci/action])
+                          (s/merge :ci/basic-step))
                       :container
-                      (s/keys :req [:container/image]
-                              :opt [:container/entrypoint :container/cmd :container/mounts :container/env
-                                    :container/platform]
-                              :opt-un [:ci/script :ci/name :ci/caches])))
+                      (-> (s/keys :req [:container/image]
+                                  :opt [:container/entrypoint :container/cmd :container/mounts :container/env
+                                        :container/platform]
+                                  :opt-un [:ci/script])
+                          (s/merge :ci/basic-step))))
+
 (s/def :ci/output string?)
 (s/def :ci/exception (partial instance? java.lang.Exception))
 
