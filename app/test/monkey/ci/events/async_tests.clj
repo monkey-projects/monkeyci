@@ -19,7 +19,7 @@
       (is (= [evt] @recv))
       (is (= e (c/remove-listener e l)))
       (is (empty? (reset! recv [])))
-      (is (= e (c/post-events e evt)))
+      (is (= e (c/post-events e {:type ::other-event})))
       (is (= :timeout (h/wait-until #(pos? (count @recv)) timeout)))))
 
   (testing "return values of handlers are posted back as events"

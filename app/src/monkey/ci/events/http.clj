@@ -11,11 +11,13 @@
             [aleph.http :as ah])
   (:import java.io.PushbackReader))
 
+;; This is rediculously complicated.  Better throw it away.
+
 (defn- start-thread [f]
   (doto (Thread. f)
     (.start)))
 
-(defn- pipe-events [r l]
+(defn- pipe-events [r l poster]
   (try 
     (let [pr (PushbackReader. r)
           read-next (fn [] (edn/read {:eof ::done} pr))]
@@ -25,7 +27,10 @@
             (log/info "Event stream closed"))
           (do
             (log/debug "Got event:" m)
-            (l m)
+            (let [res (l m)]
+              ;; Send back any return values as new events
+              (when (and res poster)
+                (poster res)))
             (recur (read-next)))))
       (log/debug "Done piping events"))
     (catch InterruptedException ex
@@ -36,7 +41,9 @@
 (deftype HttpClientEvents [url pool listening-streams]
   c/EventPoster
   (post-events [this evt]
-    (let [b (prn-str evt)]
+    (let [v (if (sequential? evt) evt [evt])
+          b (prn-str v)]
+      (log/debug "Posting" (count v) "events")
       @(ah/post url {:body b
                      :headers {"content-type" "application/edn"
                                "content-length" (str (count b))}
@@ -53,7 +60,10 @@
          (fn [r]
            (log/debug "Processing event stream...")
            (swap! listening-streams assoc l {:reader r
-                                             :thread (start-thread #(pipe-events r l))}))
+                                             :thread (start-thread #(pipe-events
+                                                                     r l
+                                                                     (fn [e]
+                                                                       (c/post-events this e))))}))
          (fn [err]
            (log/error "Unable to receive server events:" err))))
     (log/debug "Listener added")

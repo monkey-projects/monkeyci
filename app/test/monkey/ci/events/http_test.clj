@@ -23,11 +23,11 @@
 
 (def req->events (comp :events wc/req->ctx))
 
-(defn- post-event [req]
+(defn- recv-events [req]
   (let [events (req->events req)
-        evt (get-in req [:parameters :body])]
-    (log/debug "Received event from client:" evt)
-    (c/post-events events evt)
+        p (get-in req [:parameters :body])]
+    (log/debug "Received events from client:" p)
+    (c/post-events events p)
     (rur/response "ok")))
 
 (defn event-stream
@@ -69,8 +69,8 @@
 
 (def routes [["/events"
               {:post
-               {:handler post-event
-                :parameters {:body {s/Keyword s/Any}}
+               {:handler recv-events
+                :parameters {:body [{s/Keyword s/Any}]}
                 :consumes edn}
                :get
                {:handler event-stream}}]])
@@ -112,8 +112,8 @@
   (testing "has server url"
     (is (string? @server-url)))
   
-  #_(ast/async-tests #(sut/make-http-client @server-url))
-  (testing "listeners receive events"
+  (ast/async-tests #(sut/make-http-client @server-url))
+  #_(testing "listeners receive events"
     (let [e (sut/make-http-client @server-url)
           evt {:type ::test-event}
           recv (atom [])
