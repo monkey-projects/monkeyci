@@ -77,6 +77,40 @@
                          :caches [{:id "test-cache"
                                    :path "test-path"}]}
                   :cache {:store cache}})]
+          (is (not-empty @stored)))))
+    
+    (testing "restores artifacts if configured"
+      (h/with-tmp-dir dir
+        (let [stored (atom {"test-cust/test-build/test-artifact.tgz" ::test})
+              store (h/->FakeBlobStore stored)
+              r (mcc/run-container
+                 {:containers {:type :podman}
+                  :build {:build-id "test-build"
+                          :sid ["test-cust" "test-build"]}
+                  :work-dir dir
+                  :step {:name "test-step"
+                         :container/image "test-img"
+                         :script ["first" "second"]
+                         :restore-artifacts [{:id "test-artifact"
+                                              :path "test-path"}]}
+                  :artifacts {:store store}})]
+          (is (empty? @stored)))))
+
+    (testing "saves artifacts if configured"
+      (h/with-tmp-dir dir
+        (let [stored (atom {})
+              store (h/->FakeBlobStore stored)
+              r (mcc/run-container
+                 {:containers {:type :podman}
+                  :build {:build-id "test-build"
+                          :sid ["test-cust" "test-build"]}
+                  :work-dir dir
+                  :step {:name "test-step"
+                         :container/image "test-img"
+                         :script ["first" "second"]
+                         :save-artifacts [{:id "test-artifact"
+                                           :path "test-path"}]}
+                  :artifacts {:store store}})]
           (is (not-empty @stored)))))))
 
 (deftest build-cmd-args

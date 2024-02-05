@@ -11,47 +11,60 @@
              [blob :as blob]
              [context :as c]]))
 
-(def artifact-store (comp :store :artifacts))
+(defn- get-store [ctx k]
+  (get-in ctx [k :store]))
 
 (defn artifact-archive-path [{:keys [build]} id]
   ;; The artifact archive path is the build sid with the artifact id added.
   (str (cs/join "/" (concat (:sid build) [id])) ".tgz"))
 
-(defn- step-artifacts [ctx p]
-  (let [c (get-in ctx [:step p])]
-    (when (artifact-store ctx) c)))
+(defn- step-artifacts [ctx {:keys [store-key step-key]}]
+  (let [c (get-in ctx [:step step-key])]
+    (when (get-store ctx store-key) c)))
 
-(defn- do-with-artifacts [ctx p f]
-  (->> (step-artifacts ctx p)
+(defn- do-with-artifacts [ctx conf f]
+  (->> (step-artifacts ctx conf)
        (map (partial f ctx))
        (apply md/zip)))
 
 (defn save-artifact
   "Saves a single artifact path"
-  [ctx {:keys [path id]}]
+  [{:keys [build-path store-key]} ctx {:keys [path id]}]
   (log/debug "Saving artifact:" id "at path" path)
-  (blob/save (artifact-store ctx)
+  (blob/save (get-store ctx store-key)
              (c/step-relative-dir ctx path)
-             (artifact-archive-path ctx id)))
+             (build-path ctx id)))
+
+(defn save-generic [ctx conf]
+  (do-with-artifacts ctx conf (partial save-artifact conf)))
 
 (defn save-artifacts
   "Saves all artifacts according to the step configuration."
   [ctx]
-  (do-with-artifacts ctx :save-artifacts save-artifact))
+  (save-generic ctx
+                {:step-key :save-artifacts
+                 :store-key :artifacts
+                 :build-path artifact-archive-path}))
 
-(defn restore-artifact [ctx {:keys [id path]}]
+(defn restore-artifact [{:keys [store-key build-path ]} ctx {:keys [id path]}]
   (log/debug "Restoring artifact:" id "to path" path)
-  (blob/restore (artifact-store ctx)
-                (artifact-archive-path ctx id)
+  (blob/restore (get-store ctx store-key)
+                (build-path ctx id)
                 ;; Restore to the parent path because the dir name will be in the archive
                 (-> (c/step-relative-dir ctx path)
                     (fs/parent)
                     (fs/canonicalize)
                     (str))))
 
+(defn restore-generic [ctx conf]
+  (do-with-artifacts ctx conf (partial restore-artifact conf)))
+
 (defn restore-artifacts
   [ctx]
-  (do-with-artifacts ctx :restore-artifacts restore-artifact))
+  (restore-generic ctx
+                   {:step-key :restore-artifacts
+                    :store-key :artifacts
+                    :build-path artifact-archive-path}))
 
 (defn wrap-artifacts [f]
   (fn [ctx]
@@ -63,9 +76,3 @@
       (fn [r]
         (save-artifacts ctx)
         r))))
-
-(defn with-apply-artifacts
-  "Executes `f`.  If the current step has artifacts configured, restores/saves 
-   them as needed."
-  [f ctx]
-  ((wrap-artifacts f) ctx))

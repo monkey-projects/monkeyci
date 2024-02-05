@@ -35,4 +35,4 @@
                       :restore-artifacts [{:id "test-artifact"
                                            :path "test-path"}]}}]
       (is (some? @(sut/restore-artifacts ctx)))
-      (is (empty? @stored)))))
+      (is (empty? @stored) "expected entry to be restored"))))
