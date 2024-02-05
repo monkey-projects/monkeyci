@@ -65,3 +65,14 @@
           (is (nil? (sut/param-to-file {} "test-param" dest)))
           (is (true? (.exists dest)))
           (is (true? (.delete dest))))))))
+
+(deftest in-work
+  (testing "returns relative to step work dir"
+    (is (= "/script/sub"
+           (sut/in-work {:step {:work-dir "/script"}}
+                        "sub"))))
+
+  (testing "fails with absolute path"
+    (is (thrown? Exception
+                 (sut/in-work {:step {:work-dir "/script"}}
+                              "/abs")))))

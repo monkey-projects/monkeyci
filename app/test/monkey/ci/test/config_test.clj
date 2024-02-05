@@ -237,6 +237,12 @@
                    :cache
                    :store))))
 
+  (testing "initializes artifacts store"
+    (is (some? (-> {:monkeyci-artifacts-type "disk"}
+                   (sut/script-config {})
+                   :artifacts
+                   :store))))
+
   (testing "groups api settings"
     (is (= "test-socket"
            (-> {:monkeyci-api-socket "test-socket"}

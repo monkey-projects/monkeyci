@@ -34,7 +34,7 @@
 (def stream-factory (ArchiveStreamFactory.))
 
 (defn- mkdirs! [f]
-  (if (fs/exists? f)
+  (if (and f (fs/exists? f))
     (when-not (.isDirectory f)
       (throw (ex-info "Directory cannot be created, already exists as a file" {:dir f})))
     (when-not (.mkdirs f)
@@ -189,7 +189,7 @@
       (md/chain
        (os/head-object client params)
        (fn [exists?]
-         (when exists?
+         (if exists?
            (-> (os/get-object client params)
                (md/chain
                 bs/to-input-stream
@@ -200,7 +200,9 @@
                   (io/input-stream arch))
                 #(extract-archive % f)
                 (constantly f))
-               (md/finally #(fs/delete-if-exists arch)))))))))
+               (md/finally #(fs/delete-if-exists arch)))
+           ;; FIXME It may occur that a file is not yet available if it is read immediately after writing
+           (log/warn "Blob not found in bucket:" obj-name)))))))
 
 (defmethod make-blob-store :oci [conf k]
   (let [oci-conf (oci/ctx->oci-config conf k)

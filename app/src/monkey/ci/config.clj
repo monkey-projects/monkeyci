@@ -203,17 +203,22 @@
 (defn initialize-log-retriever [conf]
   (assoc-in conf [:logging :retriever] (l/make-log-retriever conf)))
 
+(defn- keywordize-types [ctx & k]
+  (reduce (fn [r kt]
+            (update-in r [kt :type] keyword))
+          ctx
+          k))
+
 (defn script-config
   "Builds config map used by the child script process"
   [env args]
   (-> default-script-config
       (u/deep-merge (config-from-env env))
       (merge args)
-      (update-in [:containers :type] keyword)
-      (update-in [:logging :type] keyword)
-      (update-in [:cache :type] keyword)
+      (keywordize-types :containers :logging :cache :artifacts)
       (initialize-log-maker)
       (configure-cache)
+      (configure-artifacts)
       (mc/update-existing-in [:build :sid] u/parse-sid)))
 
 (defn- flatten-nested

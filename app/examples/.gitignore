@@ -1,1 +1,3 @@
 deps.edn
+*.txt
+log/

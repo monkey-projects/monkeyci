@@ -152,6 +152,20 @@
       (is (= "test-dir" (:monkeyci-logging-dir env)))
       (is (not (contains? env :monkeyci-logging-maker)))))
 
+  (testing "passes artifacts config"
+    (let [env (-> {:artifacts {:type :disk
+                               :dir "test-dir"}}
+                  (sut/process-env "test-socket"))]
+      (is (= "disk" (:monkeyci-artifacts-type env)))
+      (is (= "test-dir" (:monkeyci-artifacts-dir env)))))
+
+  (testing "passes cache config"
+    (let [env (-> {:cache {:type :disk
+                           :dir "test-dir"}}
+                  (sut/process-env "test-socket"))]
+      (is (= "disk" (:monkeyci-cache-type env)))
+      (is (= "test-dir" (:monkeyci-cache-dir env)))))
+
   (testing "passes container props"
     (let [env (-> {:containers {:type :podman
                                 :platform "linux/amd64"}}

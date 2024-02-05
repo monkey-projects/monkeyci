@@ -20,7 +20,8 @@
 
 (defn- step-artifacts [ctx {:keys [store-key step-key]}]
   (let [c (get-in ctx [:step step-key])]
-    (when (get-store ctx store-key) c)))
+    (when (get-store ctx store-key)
+      c)))
 
 (defn- do-with-artifacts [ctx conf f]
   (->> (step-artifacts ctx conf)
@@ -46,7 +47,7 @@
                  :store-key :artifacts
                  :build-path artifact-archive-path}))
 
-(defn restore-artifact [{:keys [store-key build-path ]} ctx {:keys [id path]}]
+(defn restore-artifact [{:keys [store-key build-path]} ctx {:keys [id path]}]
   (log/debug "Restoring artifact:" id "to path" path)
   (blob/restore (get-store ctx store-key)
                 (build-path ctx id)
