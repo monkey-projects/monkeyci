@@ -55,6 +55,13 @@
                :cache
                :dir))))
 
+  (testing "takes artifact config from env"
+    (is (= "test-dir"
+           (-> {:monkeyci-artifacts-dir "test-dir"}
+               (sut/app-config {})
+               :artifacts
+               :dir))))
+
   (testing "takes sidecar config from env"
     (is (= "test-file"
            (-> {:monkeyci-sidecar-log-config "test-file"}

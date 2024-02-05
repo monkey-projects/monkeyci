@@ -69,7 +69,7 @@
                       (group-keys v r))
                     c
                     [:github :runner :containers :storage :api :account :http :logging :oci :build
-                     :sidecar :cache :jwk]))
+                     :sidecar :cache :artifacts :jwk]))
           (group-build-keys [c]
             (update c :build (partial group-keys :git)))]
     (->> env
@@ -189,6 +189,7 @@
 
 (def configure-workspace (partial configure-blob :workspace))
 (def configure-cache     (partial configure-blob :cache))
+(def configure-artifacts (partial configure-blob :artifacts))
 
 (def default-script-config
   "Default configuration for the script runner."
