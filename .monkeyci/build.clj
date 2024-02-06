@@ -159,7 +159,7 @@
              :path "node_modules"}]})
 
 (def test-gui
-  (-> (shadow-release "test-gui": test/node)
+  (-> (shadow-release "test-gui" :test/node)
       ;; Explicitly run the tests, since :autorun always return zero
       (update :script conj "node target/js/node.js")))
 
