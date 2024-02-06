@@ -1,4 +1,4 @@
-(ns monkey.ci.test.artifacts-test
+(ns monkey.ci.artifacts-test
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.string :as cs]
             [monkey.ci
