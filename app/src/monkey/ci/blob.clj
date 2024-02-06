@@ -54,7 +54,7 @@
         (throw ex)))))
 
 (defn- extract-entry [ai e dest]
-  (log/debug "Extracting entry from archive:" (.getName e))
+  (log/trace "Extracting entry from archive:" (.getName e))
   (let [f (io/file dest (.getName e))]
     (cond
       (.isDirectory e)

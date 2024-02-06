@@ -121,7 +121,7 @@
 (defn handler? [x]
   (true? (s/valid? :evt/event-handler x)))
 
-(defn post-event
+(defn ^:deprecated post-event
   "Asynchronously posts the event to the bus.  Returns a channel that will hold
    `true` once the event has been posted."
   [bus evt]

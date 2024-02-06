@@ -17,7 +17,8 @@
             [monkey.ci
              [blob :as b]
              [logging :as l]
-             [utils :as u]]))
+             [utils :as u]]
+            [monkey.ci.events.core :as ec]))
 
 (def ^:dynamic *global-config-file* "/etc/monkeyci/config.edn")
 (def ^:dynamic *home-config-file* (-> (System/getProperty "user.home")
@@ -115,6 +116,8 @@
   "Default configuration for the application, without env vars or args applied."
   {:http
    {:port 3000}
+   :events
+   {:type :manifold}
    :runner
    {:type :child}
    :storage
@@ -202,6 +205,11 @@
 
 (defn initialize-log-retriever [conf]
   (assoc-in conf [:logging :retriever] (l/make-log-retriever conf)))
+
+(defn initialize-events [conf]
+  (let [evt (when (:events conf) (ec/make-events conf))]
+    (cond-> conf
+      evt (assoc :event-poster (partial ec/post-events evt)))))
 
 (defn- keywordize-types [ctx & k]
   (reduce (fn [r kt]

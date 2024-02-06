@@ -116,7 +116,7 @@
    clojure cli with a generated `build` alias.  This expects absolute directories.
    Returns an object that can be `deref`ed to wait for the process to exit.  Will
    post a `build/completed` event on process exit."
-  [{{:keys [checkout-dir script-dir build-id] :as build} :build bus :event-bus :as ctx}]
+  [{{:keys [checkout-dir script-dir build-id] :as build} :build :as ctx}]
   (log/info "Executing build process for" build-id "in" checkout-dir)
   (let [{:keys [socket-path server]} (start-script-api ctx)
         [out err :as loggers] (map (partial make-logger ctx) [:out :err])]
@@ -137,9 +137,7 @@
                          (script-api/stop-server server))
                        (when socket-path 
                          (uds/delete-address socket-path))
-                       ;; Bus should always be present.  This check is only for testing purposes.
-                       (when bus
-                         (log/debug "Posting build/completed event")
-                         (e/post-event bus (e/build-completed-evt build exit :process p)))))})
+                       (log/debug "Posting build/completed event")
+                       (ctx/post-events ctx (e/build-completed-evt build exit :process p))))})
         ;; Depending on settings, some process streams need handling
         (l/handle-process-streams loggers))))

@@ -7,7 +7,7 @@
   (:require [clojure.core.async :as ca]
             [clojure.tools.logging :as log]
             [monkey.ci
-             [events :as e]
+             [context :as ctx]
              [labels :as lbl]
              [storage :as st]]
             [monkey.ci.web
@@ -32,10 +32,9 @@
   (rur/response (invoke-public-api req :get-params)))
 
 (defn post-event [req]
-  (let [evt (get-in req [:parameters :body])
-        bus (c/req->bus req)]
+  (let [evt (get-in req [:parameters :body])]
     {:status (-> (ca/go
-                   (if (and bus (e/post-event bus evt))
+                   (if (ctx/post-events (c/req->ctx req) evt)
                      202
                      500))
                  (ca/<!!))}))
