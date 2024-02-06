@@ -131,7 +131,13 @@
       (is (not-empty jwk))
       (is (= 2 (count jwk)))
       (is (= privkey (:priv jwk)))
-      (is (= pubkey (:pub jwk))))))
+      (is (= pubkey (:pub jwk)))))
+
+  (testing "adds event poster"
+    (is (fn? (-> (sut/new-context :test-cmd)
+                 (assoc :events {:type :sync})
+                 (c/start)
+                 :event-poster)))))
 
 (defn- verify-event-handled
   ([ctx evt verifier]

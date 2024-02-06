@@ -56,3 +56,7 @@
 
   (testing "ignores nil"
     (is (empty? (sut/post-one [(constantly nil)] [:test-event])))))
+
+(deftest make-events
+  (testing "can make sync events"
+    (is (some? (sut/make-events {:events {:type :sync}})))))

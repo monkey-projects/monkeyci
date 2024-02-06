@@ -152,13 +152,14 @@
    :work-dir "gui"
    :script ["npm install"
             (str "npx shadow-cljs release " build)]
-   :caches [{:id "mvn-repo"
-             :path "/root/.m2"}
+   :caches [;; Disabled for now, problem with permissions
+            #_{:id "mvn-repo"
+               :path "/root/.m2"}
             {:id "node-modules"
              :path "node_modules"}]})
 
 (def test-gui
-  (-> (shadow-release "test-gui" :test/node)
+  (-> (shadow-release "test-gui": test/node)
       ;; Explicitly run the tests, since :autorun always return zero
       (update :script conj "node target/js/node.js")))
 

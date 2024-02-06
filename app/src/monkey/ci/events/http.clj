@@ -1,8 +1,7 @@
 (ns monkey.ci.events.http
-  "Implementation for events that connect to a HTTP server as a client, or that
-   function as a HTTP server where clients connect to."
+  "Implementation for events that connect to a HTTP server as a client.  These
+   cannot be used to receive events from, use websockets instead."
   (:require [clojure.tools.logging :as log]
-            [manifold.deferred :as md]
             [monkey.ci.events.core :as c]
             [aleph.http :as ah]))
 
@@ -25,3 +24,6 @@
    open a streamed HTTP request to the remote server."
   [url]
   (->HttpClientEvents url))
+
+(defmethod c/make-events :http [{{:keys [url]} :events}]
+  (make-http-client url))

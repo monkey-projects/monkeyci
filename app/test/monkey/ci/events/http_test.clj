@@ -75,3 +75,9 @@
   (testing "posts multiple events to remote http server"
     (validate-events-received [{:type ::first}
                                {:type ::second}])))
+
+(deftest make-events
+  (testing "can make http events"
+    (is (some? (c/make-events {:events
+                               {:type :http
+                                :url "http://test"}})))))

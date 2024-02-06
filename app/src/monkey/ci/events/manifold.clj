@@ -37,6 +37,9 @@
          (doall))
     this))
 
-(defn make-events []
+(defn make-manifold-events []
   (->ManifoldEvents (ms/stream* {:permanent? true
                                  :description #(assoc % ::desc "Event bus")})))
+
+(defmethod c/make-events :manifold [_]
+  (make-manifold-events))

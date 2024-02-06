@@ -81,6 +81,7 @@
         (config/configure-workspace)
         (config/configure-cache)
         (config/configure-artifacts)
+        (config/initialize-events)
         (config/initialize-log-maker)
         (config/initialize-log-retriever)))
   (stop [this]

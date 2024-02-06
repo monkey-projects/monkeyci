@@ -22,7 +22,7 @@
   EventPoster
   (post-events [this evt]
     ;; Re-dispatch all events that were the result of the listeners
-    (loop [all [evt]]
+    (loop [all (if (sequential? evt) evt [evt])]
       (when-not (empty? all)
         (recur (post-one @listeners all))))
     this)
@@ -52,3 +52,8 @@
   (fn [evt]
     (f evt)
     nil))
+
+(defmulti make-events (comp :type :events))
+
+(defmethod make-events :sync [_]
+  (make-sync-events))
