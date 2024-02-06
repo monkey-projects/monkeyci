@@ -55,6 +55,13 @@
                :cache
                :dir))))
 
+  (testing "takes artifact config from env"
+    (is (= "test-dir"
+           (-> {:monkeyci-artifacts-dir "test-dir"}
+               (sut/app-config {})
+               :artifacts
+               :dir))))
+
   (testing "takes sidecar config from env"
     (is (= "test-file"
            (-> {:monkeyci-sidecar-log-config "test-file"}
@@ -228,6 +235,12 @@
     (is (some? (-> {:monkeyci-cache-type "disk"}
                    (sut/script-config {})
                    :cache
+                   :store))))
+
+  (testing "initializes artifacts store"
+    (is (some? (-> {:monkeyci-artifacts-type "disk"}
+                   (sut/script-config {})
+                   :artifacts
                    :store))))
 
   (testing "groups api settings"

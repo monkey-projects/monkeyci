@@ -45,12 +45,17 @@
 (def test-lib (clj-container "test-lib" "lib" "-X:test:junit"))
 (def test-app (clj-container "test-app" "app" "-M:test:junit"))
 
+(def uberjar-artifact
+  {:id "uberjar"
+   :path "target/monkeyci-standalone.jar"})
+
 (defn uberjar [name dir]
   {:name name
    :action
    (fn [ctx]
      (assoc (clj-container name dir "-X:jar:uber")
-            :container/env {"MONKEYCI_VERSION" (lib-version ctx)}))})
+            :container/env {"MONKEYCI_VERSION" (lib-version ctx)}
+            :save-artifacts [uberjar-artifact]))})
 
 (def app-uberjar (uberjar "app-uberjar" "app"))
 (def bot-uberjar (uberjar "braid-bot-uberjar" "braid-bot"))
@@ -95,22 +100,25 @@
 
 (defn kaniko-build-img
   "Creates a step that builds and uploads an image using kaniko"
-  [{:keys [name dockerfile context image tag]}]
+  [{:keys [name dockerfile context image tag opts]}]
   {:name name
    :action
    (fn [ctx]
-     {:container/image "gcr.io/kaniko-project/executor:latest"
-      :container/cmd ["--dockerfile" (str "/workspace/" (or dockerfile "Dockerfile"))
-                      "--destination" (str image ":" (or tag (image-version ctx)))
-                      "--context" "dir:///workspace"]
-      :container/mounts [[(make-context ctx context) "/workspace"]
-                         [(podman-auth ctx) "/kaniko/.docker/config.json"]]})})
+     (merge
+      {:container/image "gcr.io/kaniko-project/executor:latest"
+       :container/cmd ["--dockerfile" (str "/workspace/" (or dockerfile "Dockerfile"))
+                       "--destination" (str image ":" (or tag (image-version ctx)))
+                       "--context" "dir:///workspace"]
+       :container/mounts [[(make-context ctx context) "/workspace"]
+                          [(podman-auth ctx) "/kaniko/.docker/config.json"]]}
+      opts))})
 
 (def build-app-image
   (kaniko-build-img
    {:name "publish-app-img"
     :dockerfile "docker/Dockerfile"
-    :image app-img}))
+    :image app-img
+    :opts {:restore-artifacts [uberjar-artifact]}}))
 
 (def build-bot-image
   (kaniko-build-img
@@ -187,7 +195,8 @@
                      " --artifact-path=monkeyci/app/monkeyci.jar"
                      " --artifact-version=" (tag-version ctx)
                      " --content-body=target/monkeyci-standalone.jar")]
-       :container/mounts [[(oci-config-file ctx) "/oracle/.oci/config"]]})))
+       :container/mounts [[(oci-config-file ctx) "/oracle/.oci/config"]]
+       :restore-artifacts [uberjar-artifact]})))
 
 (core/defpipeline test-all
   ;; TODO Run these in parallel

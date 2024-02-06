@@ -58,7 +58,7 @@
   "Build the environment from the context to be passed to an external process."
   [ctx]
   (-> ctx
-      (select-keys [:oci :containers :log-dir :build :cache])
+      (select-keys [:oci :containers :log-dir :build :cache :artifacts])
       (mc/update-existing-in [:build :sid] u/serialize-sid)
       (assoc :logging (dissoc (:logging ctx) :maker))
       (update :cache dissoc :store)))

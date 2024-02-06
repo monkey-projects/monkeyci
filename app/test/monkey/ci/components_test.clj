@@ -99,6 +99,14 @@
                            :cache
                            :store))))
 
+  (testing "sets artifact store"
+    (is (b/blob-store? (-> (sut/new-context :test-cmd)
+                           (assoc :artifacts {:type :disk
+                                              :dir "artifact-dir"})
+                           (c/start)
+                           :artifacts
+                           :store))))
+
   (testing "sets reporter"
     (is (fn? (-> (sut/new-context :test-cmd)
                  (c/start)

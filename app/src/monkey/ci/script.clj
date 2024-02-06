@@ -8,6 +8,7 @@
              [interceptors :as mi]]
             [monkey.ci.build.core :as bc]
             [monkey.ci
+             [artifacts :as art]
              [cache :as cache]
              [containers :as c]
              [context :as ctx]
@@ -88,7 +89,10 @@
   (let [f (:action step)]
     (log/debug "Executing function:" f)
     ;; If a step returns nil, treat it as success
-    (let [r (or (cache/with-apply-caches f ctx) bc/success)]
+    (let [r (or ((-> f
+                     (art/wrap-artifacts)
+                     (cache/wrap-caches)) ctx)
+                bc/success)]
       (if (bc/status? r)
         r
         ;; Recurse

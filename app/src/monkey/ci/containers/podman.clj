@@ -8,6 +8,7 @@
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [monkey.ci
+             [artifacts :as art]
              [cache :as cache]
              [containers :as mcc]
              [context :as c]
@@ -80,12 +81,13 @@
                                            (map (partial conj log-base))
                                            (map (partial log-maker ctx)))]
     (log/debug "Log base is:" log-base)
-    (cache/with-apply-caches
-      (fn [_]
-        (-> (bp/process {:dir (c/step-work-dir ctx)
-                         :out (l/log-output out-log)
-                         :err (l/log-output err-log)
-                         :cmd (build-cmd-args ctx)})
-            (l/handle-process-streams loggers)
-            (deref)))
-      ctx)))
+    ((-> (fn [_]
+           (-> (bp/process {:dir (c/step-work-dir ctx)
+                            :out (l/log-output out-log)
+                            :err (l/log-output err-log)
+                            :cmd (build-cmd-args ctx)})
+               (l/handle-process-streams loggers)
+               (deref)))
+         (cache/wrap-caches)
+         (art/wrap-artifacts))
+     ctx)))

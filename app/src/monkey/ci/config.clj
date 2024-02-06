@@ -69,7 +69,7 @@
                       (group-keys v r))
                     c
                     [:github :runner :containers :storage :api :account :http :logging :oci :build
-                     :sidecar :cache :jwk]))
+                     :sidecar :cache :artifacts :jwk]))
           (group-build-keys [c]
             (update c :build (partial group-keys :git)))]
     (->> env
@@ -189,6 +189,7 @@
 
 (def configure-workspace (partial configure-blob :workspace))
 (def configure-cache     (partial configure-blob :cache))
+(def configure-artifacts (partial configure-blob :artifacts))
 
 (def default-script-config
   "Default configuration for the script runner."
@@ -202,17 +203,22 @@
 (defn initialize-log-retriever [conf]
   (assoc-in conf [:logging :retriever] (l/make-log-retriever conf)))
 
+(defn- keywordize-types [ctx & k]
+  (reduce (fn [r kt]
+            (update-in r [kt :type] keyword))
+          ctx
+          k))
+
 (defn script-config
   "Builds config map used by the child script process"
   [env args]
   (-> default-script-config
       (u/deep-merge (config-from-env env))
       (merge args)
-      (update-in [:containers :type] keyword)
-      (update-in [:logging :type] keyword)
-      (update-in [:cache :type] keyword)
+      (keywordize-types :containers :logging :cache :artifacts)
       (initialize-log-maker)
       (configure-cache)
+      (configure-artifacts)
       (mc/update-existing-in [:build :sid] u/parse-sid)))
 
 (defn- flatten-nested

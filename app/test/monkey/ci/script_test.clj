@@ -6,6 +6,7 @@
              [core :as martian]
              [test :as mt]]
             [monkey.ci
+             [artifacts :as art]
              [cache :as cache]
              [containers :as c]
              [events :as e]
@@ -190,6 +191,40 @@
               r (sut/run-step ctx)]
           (is (bc/success? r))
           (is (true? @saved))))))
+
+  (testing "saves artifacts if configured"
+    (let [saved (atom false)]
+      (with-redefs [art/save-artifacts
+                    (fn [ctx]
+                      (reset! saved true)
+                      ctx)]
+        (let [ctx {:step {:action (fn [ctx]
+                                    (when-not (= :test-artifact (-> (get-in ctx [:step :save-artifacts])
+                                                                    first
+                                                                    :id))
+                                      (assoc bc/failure)))
+                          :save-artifacts [{:id :test-artifact
+                                            :path "test-artifact"}]}}
+              r (sut/run-step ctx)]
+          (is (bc/success? r))
+          (is (true? @saved))))))
+
+  (testing "restores artifacts if configured"
+    (let [restored (atom false)]
+      (with-redefs [art/restore-artifacts
+                    (fn [ctx]
+                      (reset! restored true)
+                      ctx)]
+        (let [ctx {:step {:action (fn [ctx]
+                                    (when-not (= :test-artifact (-> (get-in ctx [:step :restore-artifacts])
+                                                                    first
+                                                                    :id))
+                                      (assoc bc/failure)))
+                          :restore-artifacts [{:id :test-artifact
+                                               :path "test-artifact"}]}}
+              r (sut/run-step ctx)]
+          (is (bc/success? r))
+          (is (true? @restored))))))
 
   (testing "function returns step config"
 

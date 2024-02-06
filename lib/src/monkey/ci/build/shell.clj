@@ -42,3 +42,10 @@
       (assoc core/failure :message (if v
                                      (str "Unable to create directory " p)
                                      (str "No parameter value found for " param))))))
+
+(defn in-work
+  "Given a relative path `p`, returns it as a subpath to the step working directory.
+   Fails if an absolute path is given."
+  [ctx p]
+  (let [wd (core/work-dir ctx)]
+    (str (fs/normalize (fs/path wd p)))))
