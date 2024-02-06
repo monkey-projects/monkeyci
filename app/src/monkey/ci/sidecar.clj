@@ -7,6 +7,7 @@
             [manifold.deferred :as md]
             [monkey.ci
              [blob :as blob]
+             [config :as c]
              [context :as ctx]
              [utils :as u]]))
 
@@ -66,3 +67,6 @@
       (restore-src)
       (mark-start)
       (poll-events)))
+
+(defmethod c/normalize-key :sidecar [_ conf]
+  conf)

@@ -7,9 +7,12 @@
             [clojure.tools.logging :as log]
             [medley.core :as mc]
             [monkey.ci
+             [blob :as b]
+             [config :as c]
              [events :as legacy-events]
              [logging :as l]
-             [utils :as u]]))
+             [utils :as u]]
+            [monkey.ci.events.core :as ec]))
 
 (defn post-events
   "Posts one or more events using the event poster in the context"
@@ -112,3 +115,41 @@
   [ctx obj]
   (when-let [r (reporter ctx)]
     (r obj)))
+
+(defn- configure-blob [k ctx]
+  (mc/update-existing ctx k (fn [c]
+                              (when (some? (:type c))
+                                (assoc c :store (b/make-blob-store ctx k))))))
+
+(def configure-workspace (partial configure-blob :workspace))
+(def configure-cache     (partial configure-blob :cache))
+(def configure-artifacts (partial configure-blob :artifacts))
+
+(def default-script-config
+  "Default configuration for the script runner."
+  {:containers {:type :docker}
+   :storage {:type :memory}
+   :logging {:type :inherit}})
+
+(defn initialize-log-maker [conf]
+  (assoc-in conf [:logging :maker] (l/make-logger conf)))
+
+(defn initialize-log-retriever [conf]
+  (assoc-in conf [:logging :retriever] (l/make-log-retriever conf)))
+
+(defn initialize-events [conf]
+  (let [evt (when (:events conf) (ec/make-events conf))]
+    (cond-> conf
+      evt (assoc :event-poster (partial ec/post-events evt)))))
+
+(defn script-context
+  "Builds context used by the child script process"
+  [env args]
+  (-> default-script-config
+      (u/deep-merge (c/env->config env))
+      (merge args)
+      (c/keywordize-all-types)
+      (initialize-log-maker)
+      (configure-cache)
+      (configure-artifacts)
+      (mc/update-existing-in [:build :sid] u/parse-sid)))

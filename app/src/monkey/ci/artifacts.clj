@@ -9,7 +9,9 @@
             [manifold.deferred :as md]
             [monkey.ci
              [blob :as blob]
-             [context :as c]]))
+             [config :as config]
+             [context :as c]
+             [oci :as oci]]))
 
 (defn- get-store [ctx k]
   (get-in ctx [k :store]))
@@ -77,3 +79,6 @@
       (fn [r]
         (save-artifacts ctx)
         r))))
+
+(defmethod config/normalize-key :artifacts [_ conf]
+  (oci/group-credentials conf))

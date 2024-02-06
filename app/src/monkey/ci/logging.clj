@@ -6,7 +6,9 @@
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
-            [monkey.ci.oci :as oci]
+            [monkey.ci
+             [config :as c]
+             [oci :as oci]]
             [monkey.ci.storage.oci :as st]
             [monkey.ci.utils :as u]
             [monkey.oci.os.core :as os]))
@@ -183,3 +185,6 @@
                      (oci/->oci-config))
         client (os/make-client oci-conf)]
     (->OciBucketLogRetriever client oci-conf)))
+
+(defmethod c/normalize-key :logging [_ conf]
+  (oci/group-credentials conf))

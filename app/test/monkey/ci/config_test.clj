@@ -7,6 +7,7 @@
              [config :as sut]
              [context :as ctx]
              [spec :as spec]]
+            [monkey.ci.web.github]
             [monkey.ci.helpers :as h]))
 
 (defn- with-home-config [config body]
@@ -210,72 +211,6 @@
     (is (= {:monkeyci-http-port "8080"}
            (sut/config->env {:http {:port 8080}})))))
 
-(deftest script-config
-  (testing "sets containers type"
-    (is (= :test-type
-           (-> {:monkeyci-containers-type "test-type"}
-               (sut/script-config {})
-               :containers
-               :type))))
-
-  (testing "sets logging config"
-    (is (= :file
-           (-> {:monkeyci-logging-type "file"}
-               (sut/script-config {})
-               :logging
-               :type))))
-
-  (testing "initializes logging maker"
-    (is (fn? (-> {:monkeyci-logging-type "file"}
-                 (sut/script-config {})
-                 :logging
-                 :maker))))
-
-  (testing "initializes cache store"
-    (is (some? (-> {:monkeyci-cache-type "disk"}
-                   (sut/script-config {})
-                   :cache
-                   :store))))
-
-  (testing "initializes artifacts store"
-    (is (some? (-> {:monkeyci-artifacts-type "disk"}
-                   (sut/script-config {})
-                   :artifacts
-                   :store))))
-
-  (testing "groups api settings"
-    (is (= "test-socket"
-           (-> {:monkeyci-api-socket "test-socket"}
-               (sut/script-config {})
-               :api
-               :socket))))
-
-  (testing "matches spec"
-    (is (true? (s/valid? ::spec/script-config (sut/script-config {} {})))))
-
-  (testing "provides oci credentials from env"
-    (is (= "test-fingerprint"
-           (-> {:monkeyci-logging-credentials-key-fingerprint "test-fingerprint"}
-               (sut/script-config {})
-               :logging
-               :credentials
-               :key-fingerprint))))
-
-  (testing "parses sid"
-    (is (= ["a" "b" "c"]
-           (-> {:monkeyci-build-sid "a/b/c"}
-               (sut/script-config {})
-               :build
-               :sid))))
-
-  (testing "groups git subkeys"
-    (is (= "test-ref"
-           (-> {:monkeyci-build-git-ref "test-ref"}
-               (sut/script-config {})
-               :build
-               :git
-               :ref)))))
-
 (deftest load-config-file
   (testing "`nil` if file does not exist"
     (is (nil? (sut/load-config-file "nonexisting.json"))))
@@ -308,3 +243,38 @@
   (testing "is by default in the user home dir"
     (is (= (str (System/getenv "HOME") "/.monkeyci/config.edn")
            sut/*home-config-file*))))
+
+(deftest normalize-config
+  (testing "drops env and default keys"
+    (let [n (sut/normalize-config {} {} {})]
+      (is (not (contains? n :env)))
+      (is (not (contains? n :default)))))
+  
+  (testing "github"
+    (testing "adds config from env"
+      (is (= {:client-id "test-id"
+              :client-secret "test-secret"}
+             (-> (sut/normalize-config
+                  {:github {:client-id "orig-id"}}
+                  {:github-client-id "test-id"
+                   :github-client-secret "test-secret"}
+                  {})
+                 :github))))
+
+    (testing "adds config if not specified in env"
+      (is (= {:client-id "test-id"
+              :client-secret "test-secret"}
+             (-> (sut/normalize-config
+                  {:github {:client-id "test-id"
+                            :client-secret "test-secret"}}
+                  {}
+                  {})
+                 :github)))))
+
+  (testing "http config"
+    (is (= {:port 3000}
+           (-> (sut/normalize-config
+                {}
+                {:http-port 3000}
+                {})
+               :http)))))

@@ -8,6 +8,7 @@
             [clojure.tools.logging :as log]
             [medley.core :as mc]
             [monkey.ci
+             [config :as config]
              [context :as ctx]
              [labels :as lbl]
              [storage :as s]
@@ -178,3 +179,6 @@
   "Lists public github configuration to use"
   [req]
   (rur/response {:client-id (c/from-context req (comp :client-id :github))}))
+
+(defmethod config/normalize-key :github [_ conf]
+  conf)

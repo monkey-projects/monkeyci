@@ -7,7 +7,9 @@
             [monkey.ci
              [artifacts :as art]
              [blob :as blob]
-             [context :as c]]))
+             [config :as config]
+             [context :as c]
+             [oci :as oci]]))
 
 (defn cache-archive-path [{:keys [build]} id]
   ;; The cache archive path is the repo sid with the cache id added.
@@ -40,3 +42,6 @@
       (fn [r]
         (save-caches ctx)
         r))))
+
+(defmethod config/normalize-key :cache [_ conf]
+  (oci/group-credentials conf))

@@ -6,11 +6,19 @@
              [deferred :as md]
              [time :as mt]]
             [medley.core :as mc]
-            [monkey.ci.utils :as u]
+            [monkey.ci
+             [config :as c]
+             [utils :as u]]
             [monkey.oci.container-instance.core :as ci]
             [monkey.oci.os
              [martian :as os]
              [stream :as s]]))
+
+(defn group-credentials
+  "Assuming the conf is taken from env, groups all keys that start with `credentials-`
+   into the `:credentials` submap."
+  [conf]
+  (c/group-keys :credentials conf))
 
 (defn ->oci-config
   "Given a configuration map with credentials, turns it into a config map

@@ -8,6 +8,7 @@
             [manifold.deferred :as md]
             [monkey.ci
              [blob :as b]
+             [config :as config]
              [context :as c]
              [events :as e]
              [process :as p]
@@ -133,6 +134,9 @@
   ;; Fallback
   (log/warn "No runner configured, using fallback configuration")
   (constantly 2))
+
+(defmethod config/normalize-key :runner [_ conf]
+  conf)
 
 (defn- take-and-close
   "Takes the first value from channel `ch` and closes it.  Closing the channel

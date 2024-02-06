@@ -14,10 +14,7 @@
             [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [medley.core :as mc]
-            [monkey.ci
-             [blob :as b]
-             [logging :as l]
-             [utils :as u]]
+            [monkey.ci.utils :as u]
             [monkey.ci.events.core :as ec]))
 
 (def ^:dynamic *global-config-file* "/etc/monkeyci/config.edn")
@@ -44,7 +41,7 @@
        (mc/filter-keys (key-filter prefix))
        (mc/map-keys (strip-prefix prefix))))
 
-(defn- group-keys
+(defn group-keys
   "Takes all keys in given map `m` that start with `:prefix-` and
    moves them to a submap with the prefix name, and the prefix 
    stripped from the keys.  E.g. `{:test-key 100}` with prefix `:test`
@@ -54,7 +51,7 @@
     (-> (mc/remove-keys (key-filter prefix) m)
         (assoc prefix s))))
 
-(defn- group-credentials
+(defn- ^:deprecated group-credentials
   "For each of the given keys, groups `credential` into subkeys"
   [keys conf]
   (reduce (fn [r k]
@@ -62,7 +59,12 @@
           conf
           keys))
 
-(defn- config-from-env
+(defn- keywordize-type [v]
+  (if (map? v)
+    (mc/update-existing v :type keyword)
+    v))
+
+(defn ^:deprecated env->config
   "Takes configuration from env vars"
   [env]
   (letfn [(group-all-keys [c]
@@ -132,6 +134,28 @@
 (defn- merge-configs [configs]
   (reduce u/deep-merge default-app-config configs))
 
+(defn load-raw-config
+  "Loads raw (not normalized) configuration from its various sources"
+  [extra-files]
+  (-> (map load-config-file (concat [*global-config-file*
+                                     *home-config-file*]
+                                    extra-files))
+      #_(concat [(env->config env)])
+      (merge-configs)))
+
+(defn keywordize-all-types [conf]
+  (reduce-kv (fn [r k v]
+               (assoc r k (keywordize-type v)))
+             {}
+             conf))
+
+(defn- add-args [conf args]
+  (-> (assoc conf :args args)
+      (mc/assoc-some :dev-mode (:dev-mode args))))
+
+(defn- set-http [{:keys [args] :as conf}]
+  (update-in conf [:http :port] #(or (:port args) %)))
+
 (defn- set-work-dir [conf]
   (assoc conf :work-dir (u/abs-path (or (get-in conf [:args :workdir])
                                         (:work-dir conf)
@@ -163,71 +187,57 @@
     (cond-> c
       (empty? (:account c)) (dissoc :account))))
 
+(defmulti normalize-key
+  "Normalizes the config as read from files and env, for the specific key.
+   The method receives the entire config, that also holds the env and args
+   and should return the updated config."
+  (fn [k _] k))
+
+(defmethod normalize-key :default [_ c]
+  (mc/update-existing c :default keywordize-type))
+
+(defmethod normalize-key :http [_ {:keys [args] :as conf}]
+  (update-in conf [:http :port] #(or (:port args) %)))
+
+(defmethod normalize-key :dev-mode [_ conf]
+  (let [r (mc/assoc-some conf :dev-mode (get-in conf [:args :dev-mode]))]
+    (cond-> r
+      (not (boolean? (:dev-mode r))) (dissoc :dev-mode))))
+
+(defn normalize-config
+  "Given a configuration map loaded from file, environment variables and command-line
+   args, applies all registered normalizers to it and returns the result.  Since the 
+   order of normalizers is undefined, they should not be dependent on each other."
+  [conf env args]
+  (-> (methods normalize-key)
+      (keys)
+      (as-> keys-to-normalize
+          (reduce (fn [r k]
+                    (->> env
+                         (filter-and-strip-keys k)
+                         (merge (get conf k))
+                         (assoc r k)
+                         (normalize-key k)))
+                  {:env env
+                   :args args}
+                  keys-to-normalize))
+      (dissoc :default :env)))
+
 (defn app-config
   "Combines app environment with command-line args into a unified 
    configuration structure.  Args have precedence over env vars,
    which in turn override config loaded from files and default values."
   [env args]
-  (-> (map load-config-file (concat [*global-config-file*
-                                     *home-config-file*]
-                                    (:config-file args)))
-      (concat [(config-from-env env)])
-      (merge-configs)
-      (merge (select-keys args [:dev-mode]))
-      (assoc :args args)
-      (update-in [:http :port] #(or (:port args) %))
-      (update-in [:runner :type] keyword)
-      (update-in [:storage :type] keyword)
-      (update-in [:logging :type] keyword)
+  (-> (load-raw-config (:config-file args))
+      #_(add-args args)
+      (normalize-config (filter-and-strip-keys env-prefix env) args)
+      (keywordize-all-types)
+      #_(set-http)
       (set-work-dir)
       (set-checkout-base-dir)
       (set-log-dir)
       (set-ssh-keys-dir)
       (set-account)))
-
-(defn- configure-blob [k ctx]
-  (mc/update-existing ctx k (fn [c]
-                              (when (some? (:type c))
-                                (assoc c :store (b/make-blob-store ctx k))))))
-
-(def configure-workspace (partial configure-blob :workspace))
-(def configure-cache     (partial configure-blob :cache))
-(def configure-artifacts (partial configure-blob :artifacts))
-
-(def default-script-config
-  "Default configuration for the script runner."
-  {:containers {:type :docker}
-   :storage {:type :memory}
-   :logging {:type :inherit}})
-
-(defn initialize-log-maker [conf]
-  (assoc-in conf [:logging :maker] (l/make-logger conf)))
-
-(defn initialize-log-retriever [conf]
-  (assoc-in conf [:logging :retriever] (l/make-log-retriever conf)))
-
-(defn initialize-events [conf]
-  (let [evt (when (:events conf) (ec/make-events conf))]
-    (cond-> conf
-      evt (assoc :event-poster (partial ec/post-events evt)))))
-
-(defn- keywordize-types [ctx & k]
-  (reduce (fn [r kt]
-            (update-in r [kt :type] keyword))
-          ctx
-          k))
-
-(defn script-config
-  "Builds config map used by the child script process"
-  [env args]
-  (-> default-script-config
-      (u/deep-merge (config-from-env env))
-      (merge args)
-      (keywordize-types :containers :logging :cache :artifacts)
-      (initialize-log-maker)
-      (configure-cache)
-      (configure-artifacts)
-      (mc/update-existing-in [:build :sid] u/parse-sid)))
 
 (defn- flatten-nested
   "Recursively flattens a map of maps.  Each key in the resulting map is a
