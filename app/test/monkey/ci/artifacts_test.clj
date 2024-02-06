@@ -4,7 +4,7 @@
             [monkey.ci
              [artifacts :as sut]
              [blob :as blob]]
-            [monkey.ci.test.helpers :as h]))
+            [monkey.ci.helpers :as h]))
 
 (deftest save-artifacts
   (testing "saves path using blob store"
