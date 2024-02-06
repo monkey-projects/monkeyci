@@ -1,18 +1,12 @@
 (ns monkey.ci.events.http-test
-  (:require [clojure.test :refer [deftest testing is use-fixtures]]
+  (:require [clojure.test :refer [deftest testing is]]
             [clojure.tools.logging :as log]
-            [manifold
-             [deferred :as md]
-             [stream :as ms]]
             [monkey.ci.events
-             [async-tests :as ast]
              [core :as c]
              [http :as sut]
              [manifold :as em]]
             [monkey.ci.helpers :as h]
-            [monkey.ci.web
-             [common :as wc]
-             [script-api :as sa]]
+            [monkey.ci.web.common :as wc]
             [org.httpkit.server :as http]
             [reitit.coercion.schema]
             [reitit.ring :as ring]
@@ -27,53 +21,14 @@
   (let [events (req->events req)
         p (get-in req [:parameters :body])]
     (log/debug "Received events from client:" p)
-    (c/post-events events p)
+    (swap! events conj p)
     (rur/response "ok")))
-
-(defn event-stream
-  "Sets up an event stream for the specified filter."
-  [req]
-  (let [events (req->events req)
-        stream (ms/stream 10)
-        listener (fn [evt]
-                   @(ms/put! stream evt)
-                   nil)
-        make-reply (fn [evt]
-                     (-> evt
-                         (prn-str)
-                         (rur/response)
-                         (rur/header "Content-Type" "text/event-stream")))
-        send-events (fn send-events [ch]
-                      (fn send-single-event [evt]
-                        (log/debug "Sending event through channel:" evt)
-                        (when-not (http/send! ch (make-reply evt) false)
-                          (log/warn "Could not send message to channel, stopping event transmission")
-                          (ms/close! stream))))
-        cleanup (fn [ch]
-                  (log/debug "Event bus was closed, stopping event transmission")
-                  (c/remove-listener events listener)
-                  (http/send! ch (rur/response "") true))]
-    (http/as-channel
-     req
-     {:on-open (fn [ch]
-                 (log/debug "Event stream opened:" ch)
-                 (md/chain
-                  (ms/consume (send-events ch) stream)
-                  (fn [_]
-                    (cleanup ch)))
-                 (c/add-listener events listener)
-                 (log/debug "Stream listener added"))
-      :on-close (fn [_ status]
-                  (ms/close! stream)
-                  (log/debug "Event stream closed with status" status))})))
 
 (def routes [["/events"
               {:post
                {:handler recv-events
                 :parameters {:body [{s/Keyword s/Any}]}
-                :consumes edn}
-               :get
-               {:handler event-stream}}]])
+                :consumes edn}}]])
 
 (defn make-router
   ([opts routes]
@@ -94,39 +49,29 @@
                    {:legacy-return-value? false
                     :port 3003}))
 
-(def server-url (atom nil))
+(defn with-server [events f]
+  (let [server (start-server events)
+        url (format "http://localhost:%d/events" (http/server-port server))]
+    (try
+      (f url)
+      (finally
+        (log/debug "Stopping server")
+        (http/server-stop! server)))))
 
-(use-fixtures :once
-  (fn [t]
-    ;; Set up fake http server
-    (let [events (em/make-events)
-          server (start-server events)]
-      (reset! server-url (format "http://localhost:%d/events" (http/server-port server)))
-      (try
-        (t)
-        (finally
-          (log/debug "Stopping server")
-          (http/server-stop! server))))))
+(defn- validate-events-received [act & [exp]]
+  (let [events (atom [])]
+    (with-server events
+      (fn [url]
+        (let [evt (sut/make-http-client url)]
+          (is (some? (c/post-events evt act)))
+          (is (not= :timeout (h/wait-until #(pos? (count @events)) 1000)))
+          (is (= [(or exp act)] @events)))))))
 
 (deftest http-client-events
-  (testing "has server url"
-    (is (string? @server-url)))
-  
-  (ast/async-tests #(sut/make-http-client @server-url))
-  #_(testing "listeners receive events"
-    (let [e (sut/make-http-client @server-url)
-          evt {:type ::test-event}
-          recv (atom [])
-          l (c/no-dispatch
-             (partial swap! recv conj))]
-      (is (= e (c/add-listener e l)))
-      (is (= e (c/post-events e evt)))
-      (is (not= :timeout (h/wait-until #(pos? (count @recv)) 500)))
-      (is (= [evt] @recv))
-      (is (= e (c/remove-listener e l)))
-      (is (empty? (reset! recv [])))
-      (is (= e (c/post-events e {:type ::other-event})))
-      (is (= :timeout (h/wait-until #(pos? (count @recv)) 500))))))
+  (testing "posts single event to remote http server"
+    (let [e {:type ::test-event}]
+      (validate-events-received e [e])))
 
-#_(deftest socket-client-events
-  (ast/async-tests #(sut/make-socket-client "test.sock")))
+  (testing "posts multiple events to remote http server"
+    (validate-events-received [{:type ::first}
+                               {:type ::second}])))

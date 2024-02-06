@@ -6,6 +6,8 @@
 
 (def timeout 1000)
 
+(defn recv-tests [make-events])
+
 (defn async-tests [make-events]
   (testing "listeners receive events"
     (let [e (make-events)
@@ -37,6 +39,6 @@
     (let [recv (atom [])
           e (-> (make-events)
                 (c/add-listener (c/no-dispatch (partial swap! recv conj))))]
-      (is (some? (c/post-events e [::first ::second])))
+      (is (some? (c/post-events e [{:type ::first} {:type ::second}])))
       (is (not= :timeout (h/wait-until #(= 2 (count @recv)) 1000)))
-      (is (= [::first ::second] @recv)))))
+      (is (= [{:type ::first} {:type ::second}] @recv)))))
