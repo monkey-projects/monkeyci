@@ -27,7 +27,7 @@
 (defn- script-not-found [{{:keys [script-dir] :as b} :build :as ctx}]
   (log/warn "No build script found at" script-dir)
   ;; Post build completed event so the failure is registered
-  (e/post-event (:event-bus ctx) (e/build-completed-evt b 1 :reason :script-not-found))
+  (c/post-events ctx (e/build-completed-evt b 1 :reason :script-not-found))
   ;; Nonzero exit code
   (assoc ctx :event {:result :error
                      :exit 1}))
@@ -161,9 +161,9 @@
           (take-and-close)))
     (catch Exception ex
       (log/error "Failed to build" (:sid build) ex)
-      (e/post-event (:event-bus ctx)
-                    {:type :build/completed
-                     :build build
-                     :result :error
-                     :exit 2
-                     :exception ex}))))
+      (c/post-events ctx
+                     {:type :build/completed
+                      :build build
+                      :result :error
+                      :exit 2
+                      :exception ex}))))

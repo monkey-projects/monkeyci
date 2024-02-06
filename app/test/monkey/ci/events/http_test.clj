@@ -47,7 +47,7 @@
 (defn start-server [events]
   (http/run-server (make-app {:events events})
                    {:legacy-return-value? false
-                    :port 3003}))
+                    :port 3001}))
 
 (defn with-server [events f]
   (let [server (start-server events)

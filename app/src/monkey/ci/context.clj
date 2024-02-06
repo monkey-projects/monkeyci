@@ -4,10 +4,26 @@
    functions.  It is used by the application to execute functionality."
   (:require [clojure.java.io :as io]
             [clojure.string :as cs]
+            [clojure.tools.logging :as log]
             [medley.core :as mc]
             [monkey.ci
+             [events :as legacy-events]
              [logging :as l]
              [utils :as u]]))
+
+(defn post-events
+  "Posts one or more events using the event poster in the context"
+  [{:keys [event-bus event-poster]} evt]
+  (letfn [(post-legacy [evt]
+            (if (sequential? evt)
+              (doseq [e evt]
+                (legacy-events/post-event event-bus e))
+              (legacy-events/post-event event-bus evt)))]
+    (cond
+      (some? event-poster) (event-poster evt)
+      ;; Backwards compatibility
+      (some? event-bus) (post-legacy evt)
+      :else (log/warn "Unable to post events, no event poster or bus in context"))))
 
 (defn- build-related-dir
   ([base-dir-key ctx build-id]

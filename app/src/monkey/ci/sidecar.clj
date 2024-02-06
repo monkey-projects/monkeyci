@@ -7,7 +7,7 @@
             [manifold.deferred :as md]
             [monkey.ci
              [blob :as blob]
-             [events :as e]
+             [context :as ctx]
              [utils :as u]]))
 
 (defn restore-src [{:keys [build] :as ctx}]
@@ -34,7 +34,7 @@
     (fs/create-file f))
   f)
 
-(defn poll-events [{:keys [event-bus] :as ctx}]
+(defn poll-events [ctx]
   (let [f (-> (get-in ctx [:args :events-file])
               (maybe-create-file))
         read-next (fn [r]
@@ -55,8 +55,7 @@
                         true)
                       (do
                         (log/debug "Read next event:" evt)
-                        ;; TODO Dispatch to API instead?
-                        (e/post-event event-bus evt)))
+                        (ctx/post-events ctx evt)))
                 (recur (read-next r))))))
         (catch Exception ex
           (log/error "Failed to read events" ex)

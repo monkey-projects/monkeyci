@@ -5,7 +5,7 @@
             [clojure.core.async :refer [go <! <!! >!]]
             [clojure.java.io :as io]
             [clojure.tools.logging :as log]
-            [monkey.ci.events :as e]
+            [monkey.ci.context :as ctx]
             [muuntaja.core :as mc]
             [reitit.ring :as ring]
             [reitit.ring.coercion :as rrc]
@@ -30,14 +30,6 @@
   "Retrieves storage object from the request context"
   [req]
   (from-context req :storage))
-
-(defn post-event
-  "Posts event to the bus found in the request data.  Returns an async channel
-   holding `true` if the event is posted."
-  [req evt]
-  (go (some-> (req->bus req)
-              (e/channel)
-              (>! (e/add-time evt)))))
 
 (defn make-muuntaja
   "Creates muuntaja instance with custom settings"
@@ -98,7 +90,7 @@
    (go
      (rur/status
       (let [evt (h req)]
-        (if (or (nil? evt) (<! (post-event req evt)))
+        (if (or (nil? evt) (ctx/post-events (req->ctx req) evt))
           200
           500))))))
 
