@@ -186,5 +186,20 @@
         client (os/make-client oci-conf)]
     (->OciBucketLogRetriever client oci-conf)))
 
+;;; Configuration handling
+
+(defmulti normalize-logging-config (comp :type :logging))
+
+(defmethod normalize-logging-config :default [conf]
+  conf)
+
+(defmethod normalize-logging-config :file [conf]
+  (update-in conf [:logging :dir] #(or (u/abs-path %) (u/combine (c/abs-work-dir conf) "logs"))))
+
+(defmethod normalize-logging-config :oci [conf]
+  (oci/normalize-config conf :logging))
+
 (defmethod c/normalize-key :logging [_ conf]
-  (oci/group-credentials conf))
+  (-> conf
+      (update :logging c/keywordize-type)
+      (normalize-logging-config)))

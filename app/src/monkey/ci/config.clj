@@ -59,7 +59,7 @@
           conf
           keys))
 
-(defn- keywordize-type [v]
+(defn keywordize-type [v]
   (if (map? v)
     (mc/update-existing v :type keyword)
     v))
@@ -140,52 +140,14 @@
   (-> (map load-config-file (concat [*global-config-file*
                                      *home-config-file*]
                                     extra-files))
-      #_(concat [(env->config env)])
-      (merge-configs)))
+      (merge-configs)
+      (u/prune-tree)))
 
-(defn keywordize-all-types [conf]
+(defn ^:deprecated keywordize-all-types [conf]
   (reduce-kv (fn [r k v]
                (assoc r k (keywordize-type v)))
              {}
              conf))
-
-(defn- add-args [conf args]
-  (-> (assoc conf :args args)
-      (mc/assoc-some :dev-mode (:dev-mode args))))
-
-(defn- set-http [{:keys [args] :as conf}]
-  (update-in conf [:http :port] #(or (:port args) %)))
-
-(defn- set-work-dir [conf]
-  (assoc conf :work-dir (u/abs-path (or (get-in conf [:args :workdir])
-                                        (:work-dir conf)
-                                        (u/cwd)))))
-
-(defn- dir-or-work-sub [conf k d]
-  (update conf k #(or (u/abs-path %) (u/combine (:work-dir conf) d))))
-
-(defn- set-checkout-base-dir [conf]
-  (dir-or-work-sub conf :checkout-base-dir "checkout"))
-
-(defn- set-ssh-keys-dir [conf]
-  (dir-or-work-sub conf :ssh-keys-dir "ssh-keys"))
-
-(defn- set-log-dir [conf]
-  (update conf
-          :logging
-          (fn [{:keys [type] :as c}]
-            (cond-> c
-              ;; FIXME This check should be centralized in logging ns
-              (= :file type) (update :dir #(or (u/abs-path %) (u/combine (:work-dir conf) "logs")))))))
-
-(defn- set-account
-  "Updates the `:account` in the config with cli args"
-  [{:keys [args] :as conf}]
-  (let [c (update conf :account merge (-> args
-                                          (select-keys [:customer-id :project-id :repo-id])
-                                          (mc/assoc-some :url (:server args))))]
-    (cond-> c
-      (empty? (:account c)) (dissoc :account))))
 
 (defmulti normalize-key
   "Normalizes the config as read from files and env, for the specific key.
@@ -193,8 +155,8 @@
    and should return the updated config."
   (fn [k _] k))
 
-(defmethod normalize-key :default [_ c]
-  (mc/update-existing c :default keywordize-type))
+(defmethod normalize-key :default [k c]
+  (mc/update-existing c k keywordize-type))
 
 (defmethod normalize-key :http [_ {:keys [args] :as conf}]
   (update-in conf [:http :port] #(or (:port args) %)))
@@ -204,24 +166,57 @@
     (cond-> r
       (not (boolean? (:dev-mode r))) (dissoc :dev-mode))))
 
+(defn abs-work-dir [conf]
+  (u/abs-path (or (get-in conf [:args :workdir])
+                  (:work-dir conf)
+                  (u/cwd))))
+
+(defmethod normalize-key :work-dir [_ conf]
+  (assoc conf :work-dir (abs-work-dir conf)))
+
+(defmethod normalize-key :account [_ {:keys [args] :as conf}]
+  (let [c (update conf :account merge (-> args
+                                          (select-keys [:customer-id :project-id :repo-id])
+                                          (mc/assoc-some :url (:server args))))]
+    (cond-> c
+      (empty? (:account c)) (dissoc :account))))
+
+(defn- dir-or-work-sub [conf k d]
+  (update conf k #(or (u/abs-path %) (u/combine (abs-work-dir conf) d))))
+
+(defmethod normalize-key :checkout-base-dir [k conf]
+  (dir-or-work-sub conf k "checkout"))
+
+(defmethod normalize-key :ssh-keys-dir [k conf]
+  (dir-or-work-sub conf k "ssh-keys"))
+
 (defn normalize-config
   "Given a configuration map loaded from file, environment variables and command-line
    args, applies all registered normalizers to it and returns the result.  Since the 
    order of normalizers is undefined, they should not be dependent on each other."
   [conf env args]
-  (-> (methods normalize-key)
-      (keys)
-      (as-> keys-to-normalize
-          (reduce (fn [r k]
-                    (->> env
-                         (filter-and-strip-keys k)
-                         (merge (get conf k))
-                         (assoc r k)
-                         (normalize-key k)))
-                  {:env env
-                   :args args}
-                  keys-to-normalize))
-      (dissoc :default :env)))
+  (letfn [(merge-if-map [d m]
+            (if (map? d)
+              (merge d m)
+              (or m d)))
+          (nil-if-empty [x]
+            (when-not (empty? x)
+              x))]
+    (-> (methods normalize-key)
+        (keys)
+        (as-> keys-to-normalize
+            (reduce (fn [r k]
+                      (->> (or (get env k)
+                               (filter-and-strip-keys k env))
+                           (nil-if-empty)
+                           (merge-if-map (get conf k))
+                           (mc/assoc-some r k)
+                           (u/prune-tree)
+                           (normalize-key k)))
+                    {:env env
+                     :args args}
+                    keys-to-normalize))
+        (dissoc :default :env))))
 
 (defn app-config
   "Combines app environment with command-line args into a unified 
@@ -229,15 +224,7 @@
    which in turn override config loaded from files and default values."
   [env args]
   (-> (load-raw-config (:config-file args))
-      #_(add-args args)
-      (normalize-config (filter-and-strip-keys env-prefix env) args)
-      (keywordize-all-types)
-      #_(set-http)
-      (set-work-dir)
-      (set-checkout-base-dir)
-      (set-log-dir)
-      (set-ssh-keys-dir)
-      (set-account)))
+      (normalize-config (filter-and-strip-keys env-prefix env) args)))
 
 (defn- flatten-nested
   "Recursively flattens a map of maps.  Each key in the resulting map is a

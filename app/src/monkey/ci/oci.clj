@@ -17,8 +17,17 @@
 (defn group-credentials
   "Assuming the conf is taken from env, groups all keys that start with `credentials-`
    into the `:credentials` submap."
-  [conf]
-  (c/group-keys :credentials conf))
+  [{orig :credentials :as conf}]
+  (let [u (c/group-keys :credentials conf)]
+    (update u :credentials (fn [c]
+                             (merge orig c)))))
+
+(defn normalize-config
+  "Normalizes the given OCI config key, by grouping the credentials both in the given key
+   and in the `oci` key, and merging them."
+  [conf k]
+  (assoc conf k (u/deep-merge (group-credentials (:oci conf))
+                              (group-credentials (k conf)))))
 
 (defn ->oci-config
   "Given a configuration map with credentials, turns it into a config map

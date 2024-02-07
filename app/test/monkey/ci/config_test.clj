@@ -6,6 +6,7 @@
             [monkey.ci
              [config :as sut]
              [context :as ctx]
+             [logging]
              [spec :as spec]]
             [monkey.ci.web.github]
             [monkey.ci.helpers :as h]))
@@ -120,9 +121,9 @@
 
   (testing "loads home config file"
     (with-home-config
-      {:log-dir "some-log-dir"}
+      {:work-dir "some-work-dir"}
       #(let [c (sut/app-config {} {})]
-         (is (cs/ends-with? (:log-dir c) "some-log-dir")))))
+         (is (cs/ends-with? (:work-dir c) "some-work-dir")))))
 
   (testing "global `work-dir`"
     (testing "uses current as default"
@@ -167,11 +168,11 @@
 
   (testing "takes account settings from args"
     (is (= {:customer-id "test-customer"
-            :project-id "arg-project"}
+            :repo-id "arg-repo"}
            (-> (sut/app-config {:monkeyci-account-customer-id "test-customer"}
-                               {:project-id "arg-project"})
+                               {:repo-id "arg-repo"})
                :account
-               (select-keys [:customer-id :project-id])))))
+               (select-keys [:customer-id :repo-id])))))
 
   (testing "uses `server` arg as account url"
     (is (= "http://test"
@@ -182,7 +183,8 @@
   (testing "oci"
     (testing "provides credentials from env"
       (is (= "env-fingerprint"
-             (-> {:monkeyci-logging-credentials-key-fingerprint "env-fingerprint"}
+             (-> {:monkeyci-logging-credentials-key-fingerprint "env-fingerprint"
+                  :monkeyci-logging-type "oci"}
                  (sut/app-config {})
                  :logging
                  :credentials
@@ -191,10 +193,10 @@
     (testing "keeps credentials from config file"
       (with-home-config
         {:logging
-         {:credentials
+         {:type :oci
+          :credentials
           {:key-fingerprint "conf-fingerprint"}}}
-        #(is (= "conf-fingerprint" (->> {}
-                                        (sut/app-config {})
+        #(is (= "conf-fingerprint" (->> (sut/app-config {} {})
                                         :logging
                                         :credentials
                                         :key-fingerprint)))))))
