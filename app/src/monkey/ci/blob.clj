@@ -210,3 +210,11 @@
                    (oci/->oci-config)
                    (os/make-client))]
     (->OciBlobStore client oci-conf)))
+
+(defmulti normalize-blob-config (fn [t conf] (get-in conf [t :type])))
+
+(defmethod normalize-blob-config :default [_ config]
+  config)
+
+(defmethod normalize-blob-config :oci [t config]
+  (oci/normalize-config config t))

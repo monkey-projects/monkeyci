@@ -59,8 +59,13 @@
   (log/info "Using memory storage (only for dev purposes!)")
   (make-memory-storage))
 
-(defmethod c/normalize-key :storage [_ conf]
+(defmulti normalize-storage-config (comp :type :storage))
+
+(defmethod normalize-storage-config :default [conf]
   conf)
+
+(defmethod c/normalize-key :storage [k conf]
+  (c/normalize-typed k conf normalize-storage-config))
 
 ;;; Higher level functions
 

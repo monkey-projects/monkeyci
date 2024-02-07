@@ -199,7 +199,5 @@
 (defmethod normalize-logging-config :oci [conf]
   (oci/normalize-config conf :logging))
 
-(defmethod c/normalize-key :logging [_ conf]
-  (-> conf
-      (update :logging c/keywordize-type)
-      (normalize-logging-config)))
+(defmethod c/normalize-key :logging [k conf]
+  (c/normalize-typed k conf normalize-logging-config))

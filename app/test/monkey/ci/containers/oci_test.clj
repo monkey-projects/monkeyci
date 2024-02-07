@@ -3,6 +3,7 @@
             [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
+             [config :as c]
              [containers :as mcc]
              [oci :as oci]
              [utils :as u]]
@@ -119,3 +120,13 @@
     (with-redefs [oci/run-instance (constantly (md/success-deferred 123))]
       (is (= 123 (-> (mcc/run-container {:containers {:type :oci}})
                      :exit))))))
+
+(deftest normalize-key
+  (testing "merges with oci"
+    (is (= {:type :oci
+            :key "value"
+            :credentials {}}
+           (->> {:containers {:type :oci}
+                 :oci {:key "value"}}
+                (c/normalize-key :containers)
+                :containers)))))

@@ -64,4 +64,3 @@
 (defmethod s/make-storage :file [{conf :storage}]
   (log/info "Using file storage with configuration:" conf)
   (make-file-storage (u/abs-path (:dir conf))))
-

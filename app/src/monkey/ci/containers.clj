@@ -1,6 +1,7 @@
 (ns monkey.ci.containers
   "Generic functionality for running containers"
-  (:require [medley.core :as mc]))
+  (:require [medley.core :as mc]
+            [monkey.ci.config :as c]))
 
 (defmulti run-container (comp :type :containers))
 
@@ -17,3 +18,13 @@
        (mc/filter-keys (comp (partial = "container") namespace))
        (mc/map-keys (comp keyword name))
        (update-env)))
+
+;;; Configuration handling
+
+(defmulti normalize-containers-config (comp :type :containers))
+
+(defmethod normalize-containers-config :default [conf]
+  conf)
+
+(defmethod c/normalize-key :containers [k conf]
+  (c/normalize-typed k conf normalize-containers-config))

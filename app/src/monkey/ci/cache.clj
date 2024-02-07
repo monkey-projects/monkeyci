@@ -43,5 +43,7 @@
         (save-caches ctx)
         r))))
 
-(defmethod config/normalize-key :cache [_ conf]
-  (oci/group-credentials conf))
+;;; Config handling
+
+(defmethod config/normalize-key :cache [k conf]
+  (config/normalize-typed k conf (partial blob/normalize-blob-config k)))

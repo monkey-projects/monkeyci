@@ -1,7 +1,9 @@
 (ns monkey.ci.storage-test
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.string :as cs]
-            [monkey.ci.storage :as sut]
+            [monkey.ci
+             [config :as c]
+             [storage :as sut]]
             [monkey.ci.helpers :as h]))
 
 (deftest webhook-details
@@ -99,3 +101,17 @@
                :email "test@monkeyci.com"}]
         (is (sut/sid? (sut/save-user st u)))
         (is (= u (sut/find-user st [:github 1234])) "can retrieve user by github id")))))
+
+(deftest normalize-key
+  (testing "normalizes string type"
+    (is (= :memory (-> (c/normalize-key :storage {:storage {:type "memory"}})
+                       :storage
+                       :type))))
+
+  (testing "normalizes oci credentials"
+    (is (map? (-> (c/normalize-key :storage {:storage
+                                             {:type :oci}
+                                             :oci
+                                             {:credentials {:fingerprint "test-fingerprint"}}})
+                  :storage
+                  :credentials)))))

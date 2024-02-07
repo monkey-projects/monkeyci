@@ -256,3 +256,8 @@
          (mc/map-keys (fn [k]
                         (keyword (str env-prefix "-" (name k)))))
          (mc/map-vals ->str))))
+
+(defn normalize-typed [k conf f]
+  (-> conf
+      (update k keywordize-type)
+      (f)))

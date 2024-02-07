@@ -12,7 +12,8 @@
              [cli :as mcli]
              [components :as co]
              [config :as config]
-             [utils :as u]]))
+             [utils :as u]
+             [workspace]]))
 
 ;; The base system components.  Depending on the command that's being
 ;; executed, a subsystem will be created and initialized.

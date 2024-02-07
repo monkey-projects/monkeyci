@@ -135,16 +135,6 @@
   (log/warn "No runner configured, using fallback configuration")
   (constantly 2))
 
-(defmulti normalize-runner-config (comp :type :runner))
-
-(defmethod normalize-runner-config :default [conf]
-  conf)
-
-(defmethod config/normalize-key :runner [_ conf]
-  (-> conf
-      (update :runner config/keywordize-type)
-      (normalize-runner-config)))
-
 (defn- take-and-close
   "Takes the first value from channel `ch` and closes it.  Closing the channel
    is necessary to ensure cleanup."
@@ -178,3 +168,13 @@
                       :result :error
                       :exit 2
                       :exception ex}))))
+
+;;; Configuration handling
+
+(defmulti normalize-runner-config (comp :type :runner))
+
+(defmethod normalize-runner-config :default [conf]
+  conf)
+
+(defmethod config/normalize-key :runner [k conf]
+  (config/normalize-typed k conf normalize-runner-config))

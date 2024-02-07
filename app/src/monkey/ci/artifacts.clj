@@ -80,5 +80,7 @@
         (save-artifacts ctx)
         r))))
 
-(defmethod config/normalize-key :artifacts [_ conf]
-  (oci/group-credentials conf))
+;;; Config handling
+
+(defmethod config/normalize-key :artifacts [k conf]
+  (config/normalize-typed k conf (partial blob/normalize-blob-config k)))

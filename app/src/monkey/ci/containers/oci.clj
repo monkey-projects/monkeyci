@@ -126,3 +126,6 @@
     (-> (oci/run-instance client ic)
         (md/chain (partial hash-map :exit))
         (deref))))
+
+(defmethod mcc/normalize-containers-config :oci [conf]
+  (oci/normalize-config conf :containers))
