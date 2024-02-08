@@ -86,6 +86,8 @@
 (s/def :conf/blob (s/multi-spec blob-type :type))
 
 (s/def :conf/workspace (s/merge :conf/blob))
+(s/def :conf/artifacts (s/merge :conf/blob))
+(s/def :conf/cache (s/merge :conf/blob))
 
 (s/def :conf/log-dir string?)
 (s/def :conf/work-dir string?)
@@ -165,8 +167,7 @@
                                    :opt-un [:oci/credentials :oci/prefix])))
 
 (s/def :conf/logging (s/multi-spec logging-type :type))
-(s/def :ctx/logging (s/merge :conf/logging
-                             (s/keys :req-un [:logging/maker])))
+(s/def :ctx/logging (s/keys :req-un [:logging/maker :logging/retriever]))
 
 (s/def :jwk/priv bk/private-key?)
 (s/def :jwk/pub bk/public-key?)
@@ -177,16 +178,16 @@
                                    :arg/git-url :arg/config-file :arg/events-file]))
 
 ;; Application configuration
-(s/def ::app-config (s/keys :req-un [:conf/http :conf/runner :conf/logging :conf/work-dir
-                                     :conf/checkout-base-dir :conf/ssh-keys-dir]
-                            :opt-un [:conf/dev-mode :conf/args :conf/containers :conf/log-dir :conf/jwk
-                                     :conf/storage :conf/account :conf/sidecar :conf/workspace]))
+(s/def ::app-config (s/keys :req-un [:conf/http :conf/runner :conf/logging :conf/containers
+                                     :conf/storage :conf/workspace :conf/artifacts :conf/cache]
+                            :opt-un [:conf/work-dir :conf/checkout-base-dir :conf/ssh-keys-dir
+                                     :conf/dev-mode :conf/args :conf/jwk :conf/account :conf/sidecar]))
 ;; Application context.  This is the result of processing the configuration and is passed
 ;; around internally.
-(s/def ::app-context (s/keys :req-un [:conf/http :ctx/runner :evt/event-bus :ctx/git :ctx/storage :ctx/public-api
+(s/def ::app-context (s/keys :req-un [:conf/http :ctx/runner :ctx/git :ctx/storage :ctx/public-api
                                       :ctx/logging]
-                             :opt-un [:conf/dev-mode :arg/command ::system :conf/args :ctx/build :ctx/reporter
-                                      :conf/work-dir :conf/sidecar :ctx/jwk]))
+                             :opt-un [:conf/dev-mode :arg/command ::system :evt/event-bus :conf/args
+                                      :ctx/build :ctx/reporter :conf/work-dir :conf/sidecar :ctx/jwk]))
 
 ;; Script configuration
 (s/def ::script-config (s/keys :req-un [:conf/containers :conf/storage :conf/logging]

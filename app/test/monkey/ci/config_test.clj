@@ -19,6 +19,11 @@
         (is (nil? (spit f (pr-str config))))
         (body)))))
 
+(deftest default-app-config
+  (testing "default config is valid config according to spec"
+    (is (s/valid? ::spec/app-config sut/default-app-config)
+        (s/explain-str ::spec/app-config sut/default-app-config))))
+
 (deftest group-keys
   (testing "groups according to prefix, removes existing"
     (is (= {:test {:key "value"}}

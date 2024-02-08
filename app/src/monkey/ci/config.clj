@@ -3,7 +3,7 @@
    sources, like environment vars or command-line args.  The configuration is structured
    in a hierarchy and optionally some values are converted.  Then this configuration is
    used to add any 'constructor functions', that are then used to create new functions to
-   to some actual work.  This allows us to change the behaviour of the application with
+   do some actual work.  This allows us to change the behaviour of the application with
    configuration, but also makes it possible to inject dummy functions for testing 
    purposes."
   (:require [camel-snake-kebab.core :as csk]
@@ -14,8 +14,7 @@
             [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [medley.core :as mc]
-            [monkey.ci.utils :as u]
-            [monkey.ci.events.core :as ec]))
+            [monkey.ci.utils :as u]))
 
 (def ^:dynamic *global-config-file* "/etc/monkeyci/config.edn")
 (def ^:dynamic *home-config-file* (-> (System/getProperty "user.home")
@@ -117,7 +116,13 @@
    :reporter
    {:type :print}
    :logging
-   {:type :inherit}})
+   {:type :inherit}
+   :workspace
+   {:type :disk :dir "tmp/workspace"}
+   :artifacts
+   {:type :disk :dir "tmp/artifacts"}
+   :cache
+   {:type :disk :dir "tmp/cache"}})
 
 (defn- merge-configs [configs]
   (reduce u/deep-merge default-app-config configs))
