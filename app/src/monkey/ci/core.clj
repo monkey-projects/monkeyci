@@ -19,6 +19,7 @@
              [utils :as u]
              [workspace]]
             [monkey.ci.events
+             [legacy]
              [manifold]]
             [monkey.ci.storage
              [cached]
@@ -53,10 +54,10 @@
    (fn [args]
      (log/debug "Invoking command with arguments:" args)
      (let [config (config/app-config env args)
-           {:keys [bus] :as sys} (-> base-system
-                                     (assoc :config config)
-                                     (sc/subsystem (concat requires always-required-components))
-                                     (sc/start-system))
+           sys (-> base-system
+                   (assoc :config config)
+                   (sc/subsystem (concat requires always-required-components))
+                   (sc/start-system))
            ctx (:context sys)]
        ;; Register shutdown hook to stop the system
        (u/add-shutdown-hook! #(sc/stop-system sys))
