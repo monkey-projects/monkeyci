@@ -68,3 +68,6 @@
                    (oci/->oci-config)
                    (ci/make-context))]
     (partial oci-runner client conf)))
+
+(defmethod r/normalize-runner-config :oci [conf]
+  (oci/normalize-config conf :runner))

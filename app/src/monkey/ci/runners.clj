@@ -8,6 +8,7 @@
             [manifold.deferred :as md]
             [monkey.ci
              [blob :as b]
+             [config :as config]
              [context :as c]
              [events :as e]
              [process :as p]
@@ -167,3 +168,13 @@
                       :result :error
                       :exit 2
                       :exception ex}))))
+
+;;; Configuration handling
+
+(defmulti normalize-runner-config (comp :type :runner))
+
+(defmethod normalize-runner-config :default [conf]
+  conf)
+
+(defmethod config/normalize-key :runner [k conf]
+  (config/normalize-typed k conf normalize-runner-config))

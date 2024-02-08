@@ -7,6 +7,7 @@
             [monkey.ci
              [commands :as co]
              [config :as config]
+             [context :as ctx]
              [events :as e]
              [listeners :as li]
              [logging :as l]
@@ -78,12 +79,12 @@
                :public-api wsa/local-api
                :reporter (rep/make-reporter (:reporter config)))
         (mc/assoc-some :jwk (auth/config->keypair config))
-        (config/configure-workspace)
-        (config/configure-cache)
-        (config/configure-artifacts)
-        (config/initialize-events)
-        (config/initialize-log-maker)
-        (config/initialize-log-retriever)))
+        (ctx/configure-workspace)
+        (ctx/configure-cache)
+        (ctx/configure-artifacts)
+        (ctx/initialize-events)
+        (ctx/initialize-log-maker)
+        (ctx/initialize-log-retriever)))
   (stop [this]
     this))
 

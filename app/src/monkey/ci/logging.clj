@@ -6,7 +6,9 @@
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
-            [monkey.ci.oci :as oci]
+            [monkey.ci
+             [config :as c]
+             [oci :as oci]]
             [monkey.ci.storage.oci :as st]
             [monkey.ci.utils :as u]
             [monkey.oci.os.core :as os]))
@@ -183,3 +185,19 @@
                      (oci/->oci-config))
         client (os/make-client oci-conf)]
     (->OciBucketLogRetriever client oci-conf)))
+
+;;; Configuration handling
+
+(defmulti normalize-logging-config (comp :type :logging))
+
+(defmethod normalize-logging-config :default [conf]
+  conf)
+
+(defmethod normalize-logging-config :file [conf]
+  (update-in conf [:logging :dir] #(or (u/abs-path %) (u/combine (c/abs-work-dir conf) "logs"))))
+
+(defmethod normalize-logging-config :oci [conf]
+  (oci/normalize-config conf :logging))
+
+(defmethod c/normalize-key :logging [k conf]
+  (c/normalize-typed k conf normalize-logging-config))

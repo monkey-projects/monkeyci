@@ -155,7 +155,7 @@
    :caches [;; Disabled for now, problem with permissions
             #_{:id "mvn-repo"
                :path "/root/.m2"}
-            {:id "node-modules"
+            #_{:id "node-modules"
              :path "node_modules"}]})
 
 (def test-gui

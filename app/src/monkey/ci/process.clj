@@ -27,7 +27,7 @@
    with a nonzero value on failure."
   ([args env]
    (try 
-     (let [ctx (config/script-config env args)]
+     (let [ctx (ctx/script-context env args)]
        (log/debug "Executing script with context" ctx)
        (when (bc/failed? (script/exec-script! ctx))
          (System/exit 1)))

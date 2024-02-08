@@ -1,6 +1,11 @@
 (ns monkey.ci.context-test
   (:require [clojure.test :refer [deftest testing is]]
-            [monkey.ci.context :as sut]))
+            [clojure.spec.alpha :as s]
+            [monkey.ci
+             [blob]
+             [context :as sut]
+             [logging]
+             [spec :as spec]]))
 
 (deftest get-sid
   (testing "returns build sid"
@@ -34,3 +39,75 @@
                 :pipeline {:index 0}
                 :step {:index 1}}
                (sut/get-step-id))))))
+
+(deftest script-context
+  (testing "sets containers type"
+    (is (= :test-type
+           (-> {:monkeyci-containers-type "test-type"}
+               (sut/script-context {})
+               :containers
+               :type))))
+
+  (testing "sets logging config"
+    (is (= :file
+           (-> {:monkeyci-logging-type "file"}
+               (sut/script-context {})
+               :logging
+               :type))))
+
+  (testing "initializes logging maker"
+    (is (fn? (-> {:monkeyci-logging-type "file"}
+                 (sut/script-context {})
+                 :logging
+                 :maker))))
+
+  (testing "initializes cache store"
+    (is (some? (-> {:monkeyci-cache-type "disk"}
+                   (sut/script-context {})
+                   :cache
+                   :store))))
+
+  (testing "initializes artifacts store"
+    (is (some? (-> {:monkeyci-artifacts-type "disk"}
+                   (sut/script-context {})
+                   :artifacts
+                   :store))))
+
+  (testing "groups api settings"
+    (is (= "test-socket"
+           (-> {:monkeyci-api-socket "test-socket"}
+               (sut/script-context {})
+               :api
+               :socket))))
+
+  (testing "matches spec"
+    (is (true? (s/valid? ::spec/script-config (sut/script-context {} {})))))
+
+  (testing "provides oci credentials from env"
+    (is (= "test-fingerprint"
+           (-> {:monkeyci-logging-credentials-key-fingerprint "test-fingerprint"
+                :monkeyci-logging-type "oci"}
+               (sut/script-context {})
+               :logging
+               :credentials
+               :key-fingerprint))))
+
+  (testing "parses sid"
+    (is (= ["a" "b" "c"]
+           (-> {:monkeyci-build-sid "a/b/c"}
+               (sut/script-context {})
+               :build
+               :sid))))
+
+  (testing "groups git subkeys"
+    (is (= "test-ref"
+           (-> {:monkeyci-build-git-ref "test-ref"}
+               (sut/script-context {})
+               :build
+               :git
+               :ref))))
+
+  (testing "merges args"
+    (is (= "test-arg"
+           (-> (sut/script-context {} {:key "test-arg"})
+               :key)))))

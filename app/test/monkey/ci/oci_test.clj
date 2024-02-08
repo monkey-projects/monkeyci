@@ -8,11 +8,42 @@
             [monkey.oci.os.stream :as os])
   (:import java.io.ByteArrayInputStream))
 
+(deftest group-credentials
+  (testing "takes credentials from env"
+    (is (= {:credentials {:fingerprint "test"}}
+           (sut/group-credentials {:credentials-fingerprint "test"}))))
+
+  (testing "merges credentials from env"
+    (is (= {:credentials {:fingerprint "test"
+                          :other "orig"}}
+           (sut/group-credentials {:credentials-fingerprint "test"
+                                   :credentials {:other "orig"}}))))
+  
+  (testing "overwrites from env"
+    (is (= {:credentials {:fingerprint "new"}}
+           (sut/group-credentials {:credentials {:fingerprint "old"}
+                                   :credentials-fingerprint "new"}))))
+
+  (testing "keeps as-is when no env"
+    (is (= {:credentials {:fingerprint "test"}}
+           (sut/group-credentials {:credentials {:fingerprint "test"}})))))
+
+(deftest normalize-config
+  (testing "combines oci and specific config from conf"
+    (is (= {:region "eu-frankfurt-1"
+            :bucket-name "test-bucket"}
+           (-> (sut/normalize-config
+                {:oci {:region "eu-frankfurt-1"}
+                 :storage {:bucket-name "test-bucket"}}
+                :storage)
+               :storage
+               (select-keys [:region :bucket-name]))))))
+
 (deftest stream-to-bucket
   (testing "pipes input stream to multipart"
     (with-redefs [os/input-stream->multipart (fn [ctx opts]
-                                                 {:context ctx
-                                                  :opts opts})]
+                                               {:context ctx
+                                                :opts opts})]
       (let [in (ByteArrayInputStream. (.getBytes "test stream"))
             r (sut/stream-to-bucket {:key "value"} in)]
         (is (some? (:context r)))

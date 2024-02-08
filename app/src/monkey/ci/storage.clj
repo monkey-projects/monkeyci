@@ -5,7 +5,9 @@
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [medley.core :as mc]
-            [monkey.ci.utils :as u])
+            [monkey.ci
+             [config :as c]
+             [utils :as u]])
   (:import [java.io File PushbackReader]))
 
 (defprotocol Storage
@@ -56,6 +58,14 @@
 (defmethod make-storage :memory [_]
   (log/info "Using memory storage (only for dev purposes!)")
   (make-memory-storage))
+
+(defmulti normalize-storage-config (comp :type :storage))
+
+(defmethod normalize-storage-config :default [conf]
+  conf)
+
+(defmethod c/normalize-key :storage [k conf]
+  (c/normalize-typed k conf normalize-storage-config))
 
 ;;; Higher level functions
 

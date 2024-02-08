@@ -14,7 +14,7 @@
   (post-events [this e]
     (post stream e)
     this)
-  
+
   c/EventReceiver
   (add-listener [this l]
     (let [s (ms/stream 10)]

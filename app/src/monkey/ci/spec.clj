@@ -177,9 +177,9 @@
                                    :arg/git-url :arg/config-file :arg/events-file]))
 
 ;; Application configuration
-(s/def ::app-config (s/keys :req-un [:conf/http :conf/runner :conf/args :conf/logging
-                                     :conf/work-dir :conf/checkout-base-dir :conf/ssh-keys-dir]
-                            :opt-un [:conf/dev-mode :conf/containers :conf/log-dir :conf/jwk
+(s/def ::app-config (s/keys :req-un [:conf/http :conf/runner :conf/logging :conf/work-dir
+                                     :conf/checkout-base-dir :conf/ssh-keys-dir]
+                            :opt-un [:conf/dev-mode :conf/args :conf/containers :conf/log-dir :conf/jwk
                                      :conf/storage :conf/account :conf/sidecar :conf/workspace]))
 ;; Application context.  This is the result of processing the configuration and is passed
 ;; around internally.
