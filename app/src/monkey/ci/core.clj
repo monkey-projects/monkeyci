@@ -15,8 +15,11 @@
              [components :as co]
              [config :as config]
              [logging]
+             [reporting]
              [utils :as u]
              [workspace]]
+            [monkey.ci.events
+             [manifold]]
             [monkey.ci.storage
              [cached]
              [file]
