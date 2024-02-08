@@ -146,10 +146,8 @@
   "Builds context used by the child script process"
   [env args]
   (-> default-script-config
-      (u/deep-merge (c/env->config env))
+      (c/normalize-config (c/strip-env-prefix env) args)
       (merge args)
-      (c/keywordize-all-types)
       (initialize-log-maker)
       (configure-cache)
-      (configure-artifacts)
-      (mc/update-existing-in [:build :sid] u/parse-sid)))
+      (configure-artifacts)))

@@ -41,6 +41,9 @@
        (mc/filter-keys (key-filter prefix))
        (mc/map-keys (strip-prefix prefix))))
 
+(defn strip-env-prefix [e]
+  (filter-and-strip-keys env-prefix e))
+
 (defn group-keys
   "Takes all keys in given map `m` that start with `:prefix-` and
    moves them to a submap with the prefix name, and the prefix 
@@ -51,36 +54,10 @@
     (-> (mc/remove-keys (key-filter prefix) m)
         (assoc prefix s))))
 
-(defn- ^:deprecated group-credentials
-  "For each of the given keys, groups `credential` into subkeys"
-  [keys conf]
-  (reduce (fn [r k]
-            (update r k (partial group-keys :credentials)))
-          conf
-          keys))
-
 (defn keywordize-type [v]
   (if (map? v)
     (mc/update-existing v :type keyword)
     v))
-
-(defn ^:deprecated env->config
-  "Takes configuration from env vars"
-  [env]
-  (letfn [(group-all-keys [c]
-            (reduce (fn [r v]
-                      (group-keys v r))
-                    c
-                    [:github :runner :containers :storage :api :account :http :logging :oci :build
-                     :sidecar :cache :artifacts :jwk]))
-          (group-build-keys [c]
-            (update c :build (partial group-keys :git)))]
-    (->> env
-         (filter-and-strip-keys env-prefix)
-         (group-all-keys)
-         (group-credentials [:oci :storage :runner :logging])
-         (group-build-keys)
-         (u/prune-tree))))
 
 (defn- parse-edn
   "Parses the input file as `edn` and converts keys to kebab-case."
@@ -143,12 +120,6 @@
       (merge-configs)
       (u/prune-tree)))
 
-(defn ^:deprecated keywordize-all-types [conf]
-  (reduce-kv (fn [r k v]
-               (assoc r k (keywordize-type v)))
-             {}
-             conf))
-
 (defmulti normalize-key
   "Normalizes the config as read from files and env, for the specific key.
    The method receives the entire config, that also holds the env and args
@@ -190,6 +161,15 @@
 (defmethod normalize-key :ssh-keys-dir [k conf]
   (dir-or-work-sub conf k "ssh-keys"))
 
+(defmethod normalize-key :api [_ conf]
+  conf)
+
+(defmethod normalize-key :build [_ conf]
+  (update conf :build (fn [b]
+                        (-> b
+                            (as-> x (group-keys :git x))
+                            (mc/update-existing :sid u/parse-sid)))))
+
 (defn normalize-config
   "Given a configuration map loaded from file, environment variables and command-line
    args, applies all registered normalizers to it and returns the result.  Since the 
@@ -213,8 +193,7 @@
                            (mc/assoc-some r k)
                            (u/prune-tree)
                            (normalize-key k)))
-                    {:env env
-                     :args args}
+                    (assoc env :args args)
                     keys-to-normalize))
         (dissoc :default :env))))
 
@@ -224,7 +203,7 @@
    which in turn override config loaded from files and default values."
   [env args]
   (-> (load-raw-config (:config-file args))
-      (normalize-config (filter-and-strip-keys env-prefix env) args)))
+      (normalize-config (strip-env-prefix env) args)))
 
 (defn- flatten-nested
   "Recursively flattens a map of maps.  Each key in the resulting map is a
@@ -257,7 +236,10 @@
                         (keyword (str env-prefix "-" (name k)))))
          (mc/map-vals ->str))))
 
-(defn normalize-typed [k conf f]
+(defn normalize-typed
+  "Convenience function that converts the `:type` of an entry into a keyword and
+   then invokes `f` on it."
+  [k conf f]
   (-> conf
       (update k keywordize-type)
       (f)))

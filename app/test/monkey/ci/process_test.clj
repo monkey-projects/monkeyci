@@ -23,8 +23,9 @@
                                           (reset! captured-args args)
                                           bc/success)]
         (is (nil? (sut/run {:key :test-args})))
-        (is (= {:key :test-args} (-> @captured-args
-                                     (select-keys [:key])))))))
+        (is (= {:key :test-args}
+               (-> @captured-args
+                   :args))))))
 
   (testing "merges args with env vars"
     (let [captured-args (atom nil)]

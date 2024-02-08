@@ -2,7 +2,9 @@
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.spec.alpha :as s]
             [monkey.ci
+             [blob]
              [context :as sut]
+             [logging]
              [spec :as spec]]))
 
 (deftest get-sid
@@ -83,7 +85,8 @@
 
   (testing "provides oci credentials from env"
     (is (= "test-fingerprint"
-           (-> {:monkeyci-logging-credentials-key-fingerprint "test-fingerprint"}
+           (-> {:monkeyci-logging-credentials-key-fingerprint "test-fingerprint"
+                :monkeyci-logging-type "oci"}
                (sut/script-context {})
                :logging
                :credentials
@@ -102,4 +105,9 @@
                (sut/script-context {})
                :build
                :git
-               :ref)))))
+               :ref))))
+
+  (testing "merges args"
+    (is (= "test-arg"
+           (-> (sut/script-context {} {:key "test-arg"})
+               :key)))))
