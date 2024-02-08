@@ -19,6 +19,35 @@
         (is (nil? (spit f (pr-str config))))
         (body)))))
 
+(deftest group-keys
+  (testing "groups according to prefix, removes existing"
+    (is (= {:test {:key "value"}}
+           (sut/group-keys {:test-key "value"} :test))))
+
+  (testing "leaves unchanged if no matches"
+    (is (= {:other "value"}
+           (sut/group-keys {:other "value"} :test)))))
+
+(deftest group-and-merge
+  (testing "merges existing with grouped"
+    (is (= {:test
+            {:key "value"
+             :other-key "other-value"}}
+           (sut/group-and-merge
+            {:test {:key "value"}
+             :test-other-key "other-value"}
+            :test))))
+
+  (testing "retains submaps"
+    (is (= {:test {:credentials {:username "test-user"}}}
+           (sut/group-and-merge
+            {:test {:credentials {:username "test-user"}}}
+            :test))))
+
+  (testing "leaves unchanged when no matches"
+    (is (= {:key "value"}
+           (sut/group-and-merge {:key "value"} :test)))))
+
 (deftest app-config
   (testing "provides default values"
     (is (= 3000 (-> (sut/app-config {} {})
@@ -279,4 +308,42 @@
                 {}
                 {:http-port 3000}
                 {})
-               :http)))))
+               :http))))
+
+  (testing "merges global oci config in type specific"
+    (is (= {:type :oci
+            :bucket-name "test-bucket"
+            :region "test-region"}
+           (-> (sut/normalize-config
+                {:oci
+                 {:region "test-region"}
+                 :storage
+                 {:type :oci
+                  :bucket-name "test-bucket"}}
+                {}
+                {})
+               :storage))))
+
+  (testing "merges global oci config in type specific from env"
+    (is (= {:type :oci
+            :bucket-name "test-bucket"
+            :region "test-region"}
+           (-> (sut/normalize-config
+                {}
+                {:oci-region "test-region"
+                 :storage-type "oci"
+                 :storage-bucket-name "test-bucket"}
+                {})
+               :storage))))
+
+  (testing "adds credentials from global oci config"
+    (is (= {:user "test-user"}
+           (-> (sut/normalize-config
+                {:oci
+                 {:credentials {:user "test-user"}}
+                 :storage
+                 {:type :oci
+                  :bucket-name "test-storage-bucket"}}
+                {} {})
+               :storage
+               :credentials)))))

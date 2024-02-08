@@ -9,11 +9,18 @@
             [com.stuartsierra.component :as sc]
             [config.core :refer [env]]
             [monkey.ci
+             [artifacts]
+             [cache]
              [cli :as mcli]
              [components :as co]
              [config :as config]
+             [logging]
              [utils :as u]
-             [workspace]]))
+             [workspace]]
+            [monkey.ci.storage
+             [cached]
+             [file]
+             [oci]]))
 
 ;; The base system components.  Depending on the command that's being
 ;; executed, a subsystem will be created and initialized.

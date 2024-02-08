@@ -25,7 +25,8 @@
                                         (merge {:dev-mode true
                                                 :work-dir (u/abs-path "tmp")
                                                 :checkout-base-dir (u/abs-path "tmp/checkout")
-                                                :ssh-keys-dir (u/abs-path "tmp/ssh-keys")})))
+                                                :ssh-keys-dir (u/abs-path "tmp/ssh-keys")})
+                                        (config/normalize-config {} {})))
                      (sc/subsystem [:http])
                      (sc/start-system)))
   nil)

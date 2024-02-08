@@ -217,4 +217,6 @@
   config)
 
 (defmethod normalize-blob-config :oci [t config]
-  (oci/normalize-config config t))
+  (-> config
+      (oci/normalize-config t)
+      (update t select-keys [:type :ns :region :bucket-name :credentials :prefix])))

@@ -28,6 +28,17 @@
     (is (= {:credentials {:fingerprint "test"}}
            (sut/group-credentials {:credentials {:fingerprint "test"}})))))
 
+(deftest normalize-config
+  (testing "combines oci and specific config from conf"
+    (is (= {:region "eu-frankfurt-1"
+            :bucket-name "test-bucket"}
+           (-> (sut/normalize-config
+                {:oci {:region "eu-frankfurt-1"}
+                 :storage {:bucket-name "test-bucket"}}
+                :storage)
+               :storage
+               (select-keys [:region :bucket-name]))))))
+
 (deftest stream-to-bucket
   (testing "pipes input stream to multipart"
     (with-redefs [os/input-stream->multipart (fn [ctx opts]

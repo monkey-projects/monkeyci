@@ -49,10 +49,21 @@
    moves them to a submap with the prefix name, and the prefix 
    stripped from the keys.  E.g. `{:test-key 100}` with prefix `:test`
    would become `{:test {:key 100}}`"
-  [prefix m]
+  [m prefix]
   (let [s (filter-and-strip-keys prefix m)]
     (-> (mc/remove-keys (key-filter prefix) m)
-        (assoc prefix s))))
+        (mc/assoc-some prefix (when (not-empty s) s)))))
+
+(defn group-and-merge
+  "Given a map, takes all keys that start with the given prefix (using
+   `group-keys`) and merges them with the existing submap with same key.
+   For example, `{:test-key \"value\" :test {:other-key \"other-value\"}}` 
+   would become `{:test {:key \"value\" :other-key \"other-value\"}}`.  
+   The newly grouped values overwrite any existing values."
+  [m prefix]
+  (-> (group-keys m prefix)
+      (update prefix (partial merge (prefix m)))
+      (as-> x (mc/remove-vals nil? x))))
 
 (defn keywordize-type [v]
   (if (map? v)
@@ -167,7 +178,7 @@
 (defmethod normalize-key :build [_ conf]
   (update conf :build (fn [b]
                         (-> b
-                            (as-> x (group-keys :git x))
+                            (group-keys :git)
                             (mc/update-existing :sid u/parse-sid)))))
 
 (defn normalize-config
@@ -193,7 +204,7 @@
                            (mc/assoc-some r k)
                            (u/prune-tree)
                            (normalize-key k)))
-                    (assoc env :args args)
+                    (assoc (merge conf env) :args args)
                     keys-to-normalize))
         (dissoc :default :env))))
 
