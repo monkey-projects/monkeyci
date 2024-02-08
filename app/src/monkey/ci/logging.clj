@@ -8,9 +8,10 @@
             [manifold.deferred :as md]
             [monkey.ci
              [config :as c]
-             [oci :as oci]]
+             [oci :as oci]
+             [runtime :as rt]
+             [utils :as u]]
             [monkey.ci.storage.oci :as st]
-            [monkey.ci.utils :as u]
             [monkey.oci.os.core :as os]))
 
 (defprotocol LogCapturer
@@ -201,3 +202,7 @@
 
 (defmethod c/normalize-key :logging [k conf]
   (c/normalize-typed k conf normalize-logging-config))
+
+(defmethod rt/setup-runtime :logging [conf _]
+  {:maker (make-logger conf)
+   :retriever (make-log-retriever conf)})

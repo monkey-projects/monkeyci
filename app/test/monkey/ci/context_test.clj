@@ -5,7 +5,8 @@
              [blob]
              [context :as sut]
              [logging]
-             [spec :as spec]]))
+             [spec :as spec]]
+            [monkey.ci.events.legacy]))
 
 (deftest get-sid
   (testing "returns build sid"
@@ -111,3 +112,18 @@
     (is (= "test-arg"
            (-> (sut/script-context {} {:key "test-arg"})
                :key)))))
+
+(deftest initialize-events
+  (testing "adds event poster if events config"
+    (is (fn? (-> {:events {:type :sync}}
+                 (sut/initialize-events)
+                 :event-poster))))
+
+  (testing "does not add event poster if no config"
+    (is (nil? (:event-poster (sut/initialize-events {})))))
+
+  (testing "adds event poster for legacy"
+    (is (fn? (-> {:events {:type :legacy}
+                  :event-bus ::test-bus}
+                 (sut/initialize-events)
+                 :event-poster)))))

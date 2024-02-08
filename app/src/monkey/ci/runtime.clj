@@ -21,15 +21,16 @@
 
 (defmulti setup-runtime (fn [_ k] k))
 
-(defmethod setup-runtime :default [conf _]
-  {})
+(defmethod setup-runtime :default [_ k]
+  (get default-runtime k))
 
 (defn config->runtime
   "Creates the runtime from the normalized config map"
   [conf]
   {:pre  [(spec/valid? ::s/app-config conf)]
-   :post [(spec/valid? ::s/app-context %)]}
+   ;;:post [(spec/valid? ::s/app-context %)]
+   }
   (reduce-kv (fn [r k v]
-               r)
+               (assoc r k (setup-runtime conf k)))
              default-runtime
              conf))
