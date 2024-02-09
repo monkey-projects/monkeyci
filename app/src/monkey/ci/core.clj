@@ -16,6 +16,7 @@
              [config :as config]
              [logging]
              [reporting]
+             [runtime :as rt]
              [utils :as u]
              [workspace]]
             [monkey.ci.events
@@ -54,6 +55,8 @@
    (fn [args]
      (log/debug "Invoking command with arguments:" args)
      (let [config (config/app-config env args)
+           ;; Runtime, to replace context/components
+           runtime (rt/config->runtime config)
            sys (-> base-system
                    (assoc :config config)
                    (sc/subsystem (concat requires always-required-components))

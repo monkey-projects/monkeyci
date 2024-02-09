@@ -7,6 +7,7 @@
             [medley.core :as mc]
             [monkey.ci
              [config :as c]
+             [runtime :as rt]
              [utils :as u]])
   (:import [java.io File PushbackReader]))
 
@@ -66,6 +67,9 @@
 
 (defmethod c/normalize-key :storage [k conf]
   (c/normalize-typed k conf normalize-storage-config))
+
+(defmethod rt/setup-runtime :storage [conf _]
+  (make-storage conf))
 
 ;;; Higher level functions
 

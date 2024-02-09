@@ -12,6 +12,7 @@
              [context :as c]
              [events :as e]
              [process :as p]
+             [runtime :as rt]
              [utils :as u]]))
 
 (def default-script-dir ".monkeyci")
@@ -178,3 +179,6 @@
 
 (defmethod config/normalize-key :runner [k conf]
   (config/normalize-typed k conf normalize-runner-config))
+
+(defmethod rt/setup-runtime :runner [conf _]
+  (make-runner conf))

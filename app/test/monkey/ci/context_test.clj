@@ -13,18 +13,13 @@
     (is (= ::build-sid (sut/get-sid {:build {:sid ::build-sid}}))))
 
   (testing "constructs sid from account"
-    (is (= [:a :b :c] (sut/get-sid {:account
-                                    {:customer-id :a
-                                     :project-id :b
-                                     :repo-id :c}}))))
+    (is (= [:a :c] (sut/get-sid {:account
+                                 {:customer-id :a
+                                  :repo-id :c}}))))
 
   (testing "`nil` if incomplete account"
-    (is (nil? (sut/get-sid {:account {:project-id "p"
-                                      :repo-id "r"}})))
-    (is (nil? (sut/get-sid {:account {:customer-id "c"
-                                      :repo-id "r"}})))
-    (is (nil? (sut/get-sid {:account {:customer-id "c"
-                                      :project-id "p"}})))))
+    (is (nil? (sut/get-sid {:account {:repo-id "r"}})))
+    (is (nil? (sut/get-sid {:account {:customer-id "c"}})))))
 
 (deftest get-step-id
   (testing "combines build id, pipeline and step"

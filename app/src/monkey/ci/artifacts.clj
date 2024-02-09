@@ -11,7 +11,8 @@
              [blob :as blob]
              [config :as config]
              [context :as c]
-             [oci :as oci]]))
+             [oci :as oci]
+             [runtime :as rt]]))
 
 (defn- get-store [ctx k]
   (get-in ctx [k :store]))
@@ -84,3 +85,6 @@
 
 (defmethod config/normalize-key :artifacts [k conf]
   (config/normalize-typed k conf (partial blob/normalize-blob-config k)))
+
+(defmethod rt/setup-runtime :artifacts [conf _]
+  (blob/make-blob-store conf :artifacts))

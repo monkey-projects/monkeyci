@@ -173,6 +173,11 @@
 (s/def :jwk/pub bk/public-key?)
 (s/def :ctx/jwk (s/keys :req-un [:jwk/priv :jwk/pub]))
 
+;; TODO Refactor to put protocols in a separate ns so we can refer to them here
+;;(s/def :ctx/storage (partial satisfies? monkey.ci.storage/Storage))
+(s/def :ctx/storage some?)
+(s/def :ctx/containers (s/merge :conf/containers))
+
 ;; Arguments as passed in from the CLI
 (s/def :conf/args (s/keys :opt-un [:conf/dev-mode :arg/pipeline :arg/dir :arg/workdir
                                    :arg/git-url :arg/config-file :arg/events-file]))
@@ -184,7 +189,7 @@
                                      :conf/dev-mode :conf/args :conf/jwk :conf/account :conf/sidecar]))
 ;; Application context.  This is the result of processing the configuration and is passed
 ;; around internally.
-(s/def ::app-context (s/keys :req-un [:conf/http :ctx/runner :ctx/git :ctx/storage :ctx/public-api
+(s/def ::app-context (s/keys :req-un [:conf/http :ctx/runner :ctx/git :ctx/public-api
                                       :ctx/logging]
                              :opt-un [:conf/dev-mode :arg/command ::system :evt/event-bus :conf/args
                                       :ctx/build :ctx/reporter :conf/work-dir :conf/sidecar :ctx/jwk]))
@@ -192,3 +197,15 @@
 ;; Script configuration
 (s/def ::script-config (s/keys :req-un [:conf/containers :conf/storage :conf/logging]
                                :opt-un [:conf/api]))
+
+(s/def :rt/logging (s/merge :ctx/logging))
+(s/def :rt/runner :ctx/runner)
+(s/def :rt/logging (s/merge :ctx/logging))
+(s/def :rt/containers (s/merge :ctx/containers))
+(s/def :rt/blob (s/keys :req-un [:blob/store]))
+(s/def :rt/workspace (s/merge :rt/blob))
+(s/def :rt/artifacts (s/merge :rt/blob))
+(s/def :rt/cache (s/merge :rt/blob))
+
+(s/def ::runtime (s/keys :req-un [:rt/logging :rt/runner :rt/storage :rt/workspace :rt/artifacts :rt/cache]
+                         :opt-un [:rt/containers]))

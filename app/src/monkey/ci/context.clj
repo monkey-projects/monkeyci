@@ -82,7 +82,7 @@
       (assoc :logging (dissoc (:logging ctx) :maker))
       (update :cache dissoc :store)))
 
-(def account->sid (juxt :customer-id :project-id :repo-id))
+(def account->sid (juxt :customer-id :repo-id))
 
 (defn get-sid
   "Gets current build sid from the context.  This is either specified directly,
@@ -91,7 +91,7 @@
   (or (get-in ctx [:build :sid])
       (let [sid (->> (account->sid (:account ctx))
                      (take-while some?))]
-        (when (= 3 (count sid))
+        (when (= 2 (count sid))
           sid))))
 
 (defn get-build-id [ctx]

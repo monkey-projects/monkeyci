@@ -7,30 +7,22 @@
   (:require [clojure.spec.alpha :as spec]
             [monkey.ci.spec :as s]))
 
-(def default-runtime
-  {:http {:port 3000}
-   :runner (constantly 1)
-   :git
-   {:fn (constantly nil)}
-   :storage
-   {}
-   :logging
-   {:maker (constantly nil)
-    :retriever nil}
-   :public-api (constantly nil)})
+(def initial-runtime
+  {})
 
 (defmulti setup-runtime (fn [_ k] k))
 
 (defmethod setup-runtime :default [_ k]
-  (get default-runtime k))
+  (get initial-runtime k))
 
 (defn config->runtime
   "Creates the runtime from the normalized config map"
   [conf]
   {:pre  [(spec/valid? ::s/app-config conf)]
-   ;;:post [(spec/valid? ::s/app-context %)]
+   ;;:post [(spec/valid? ::s/runtime %)]
    }
-  (reduce-kv (fn [r k v]
-               (assoc r k (setup-runtime conf k)))
-             default-runtime
-             conf))
+  (-> (reduce-kv (fn [r k v]
+                   (assoc r k (setup-runtime conf k)))
+                 initial-runtime
+                 conf)
+      (assoc :config conf)))

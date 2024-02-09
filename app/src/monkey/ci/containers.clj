@@ -1,8 +1,11 @@
 (ns monkey.ci.containers
   "Generic functionality for running containers"
   (:require [medley.core :as mc]
-            [monkey.ci.config :as c]))
+            [monkey.ci
+             [config :as c]
+             [runtime :as rt]]))
 
+;; TODO Rework to use a container runner fn instead
 (defmulti run-container (comp :type :containers))
 
 (defn- update-env [cc]
@@ -28,3 +31,7 @@
 
 (defmethod c/normalize-key :containers [k conf]
   (c/normalize-typed k conf normalize-containers-config))
+
+(defmethod rt/setup-runtime :containers [conf _]
+  ;; Just return the config, will be reworked later to be more consistent with other runtimes
+  (get conf :containers))

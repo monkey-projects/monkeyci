@@ -5,7 +5,8 @@
             [medley.core :refer [update-existing] :as mc]
             [monkey.ci
              [config :as config]
-             [events :as e]]
+             [events :as e]
+             [runtime :as rt]]
             [monkey.ci.web
              [api :as api]
              [auth :as auth]
@@ -309,3 +310,9 @@
   (when s
     (log/info "Shutting down HTTP server...")
     (http/server-stop! s)))
+
+(defmethod rt/setup-runtime :http [conf _]
+  ;; Return a function that when invoked, returns another function to shut down the server
+  (fn []
+    (let [server (start-server conf)]
+      #(stop-server server))))

@@ -9,6 +9,7 @@
              [config :as config]
              [events :as events]
              [logging :as l]
+             [runtime :as rt]
              [storage :as st]]
             [monkey.ci.web
              [auth :as auth]
@@ -651,3 +652,25 @@
       (is (= 404 (-> (mock/request :get "/auth/jwks")
                      (test-app)
                      :status))))))
+
+(deftest setup-runtime
+  (testing "returns fn that starts http server"
+    (let [h (rt/setup-runtime {:http {:port 1234}} :http)
+          inv (atom nil)]
+      (is (fn? h))
+      (with-redefs [http/run-server (fn [handler args]
+                                      (reset! inv {:handler handler
+                                                   :opts args}))]
+        (is (some? (h)))
+        (is (= {:port 1234} (-> (:opts @inv)
+                                (select-keys [:port])))))))
+
+  (testing "start fn returns another fn that stop the server"
+    (with-redefs [http/run-server (constantly ::server)
+                  http/server-stop! (fn [arg]
+                                      (when (= ::server arg)
+                                        ::ok))]
+      (let [h (rt/setup-runtime {:http {}} :http)
+            s (h)]
+        (is (fn? s))
+        (is (= ::ok (s)))))))

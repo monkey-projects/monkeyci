@@ -1,4 +1,5 @@
-(ns monkey.ci.events.core)
+(ns monkey.ci.events.core
+  (:require [monkey.ci.runtime :as rt]))
 
 (defprotocol EventPoster
   (post-events [poster evt] "Posts one or more events"))
@@ -57,3 +58,6 @@
 
 (defmethod make-events :sync [_]
   (make-sync-events))
+
+(defmethod rt/setup-runtime :events [conf _]
+  (make-events conf))

@@ -34,11 +34,10 @@
   (testing "constructs `sid` from account settings if not specified"
     (let [{:keys [sid build-id]} (-> {:runner :build
                                       :account {:customer-id "a"
-                                                :project-id "b"
-                                                :repo-id "c"}}
+                                                :repo-id "b"}}
                                      (sut/run-build))]
       (is (= build-id (last sid)))
-      (is (= ["a" "b" "c"] (take 3 sid)))))
+      (is (= ["a" "b"] (take 2 sid)))))
 
   (testing "accumulates build results from events"
     (let [registered (atom [])]
