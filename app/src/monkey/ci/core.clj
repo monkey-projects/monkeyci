@@ -58,7 +58,8 @@
            ;; Runtime, to replace context/components
            runtime (rt/config->runtime config)
            sys (-> base-system
-                   (assoc :config config)
+                   (assoc :config config
+                          :runtime runtime)
                    (sc/subsystem (concat requires always-required-components))
                    (sc/start-system))
            ctx (:context sys)]

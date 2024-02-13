@@ -104,8 +104,8 @@
 (def api-url (comp :url :account))
 
 (defn list-builds [{:keys [account] :as ctx}]
-  (->> (hk/get (apply format "%s/customer/%s/project/%s/repo/%s/builds"
-                      ((juxt :url :customer-id :project-id :repo-id) account))
+  (->> (hk/get (apply format "%s/customer/%s/repo/%s/builds"
+                      ((juxt :url :customer-id :repo-id) account))
                {:headers {"accept" "application/edn"}})
        (deref)
        :body

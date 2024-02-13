@@ -311,8 +311,13 @@
     (log/info "Shutting down HTTP server...")
     (http/server-stop! s)))
 
+(defmethod config/normalize-key :http [_ {:keys [args] :as conf}]
+  (update-in conf [:http :port] #(or (:port args) %)))
+
 (defmethod rt/setup-runtime :http [conf _]
   ;; Return a function that when invoked, returns another function to shut down the server
+  ;; TODO See if we can change this into a component
   (fn []
+    ;; We could also use `:legacy-return-value? false` but this is more future-proof.
     (let [server (start-server conf)]
       #(stop-server server))))

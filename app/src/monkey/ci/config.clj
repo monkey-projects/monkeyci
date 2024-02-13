@@ -145,9 +145,6 @@
 (defmethod normalize-key :default [k c]
   (mc/update-existing c k keywordize-type))
 
-(defmethod normalize-key :http [_ {:keys [args] :as conf}]
-  (update-in conf [:http :port] #(or (:port args) %)))
-
 (defmethod normalize-key :dev-mode [_ conf]
   (let [r (mc/assoc-some conf :dev-mode (get-in conf [:args :dev-mode]))]
     (cond-> r

@@ -665,7 +665,7 @@
         (is (= {:port 1234} (-> (:opts @inv)
                                 (select-keys [:port])))))))
 
-  (testing "start fn returns another fn that stop the server"
+  (testing "start fn returns another fn that stops the server"
     (with-redefs [http/run-server (constantly ::server)
                   http/server-stop! (fn [arg]
                                       (when (= ::server arg)

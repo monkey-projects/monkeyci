@@ -57,9 +57,8 @@
           ctx {:reporter (partial swap! reported conj)
                :account {:url "http://server/api"
                          :customer-id "test-cust"
-                         :project-id "test-project"
                          :repo-id "test-repo"}}]
-      (f/with-fake-http ["http://server/api/customer/test-cust/project/test-project/repo/test-repo/builds"
+      (f/with-fake-http ["http://server/api/customer/test-cust/repo/test-repo/builds"
                          (pr-str builds)]
         (is (some? (sut/list-builds ctx)))
         (is (pos? (count @reported)))

@@ -5,6 +5,7 @@
    by the modules to perform work.  This allows us to change application 
    behaviour depending on configuration, but also when testing."
   (:require [clojure.spec.alpha :as spec]
+            [com.stuartsierra.component :as co]
             [monkey.ci.spec :as s]))
 
 (def initial-runtime
@@ -26,3 +27,15 @@
                  initial-runtime
                  conf)
       (assoc :config conf)))
+
+(defn start
+  "Starts the runtime by starting all parts as a component tree.  Returns a
+   component system that can be passed to `stop`."
+  [rt]
+  (-> (co/map->SystemMap rt)
+      (co/start-system)))
+
+(defn stop
+  "Stops a previously started runtime"
+  [rt]
+  (co/stop-system rt))
