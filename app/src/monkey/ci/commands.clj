@@ -4,8 +4,10 @@
             [clojure.core.async :as ca]
             [clojure.java.io :as io]
             [monkey.ci
-             [context :refer [report] :as mcc]
+             [build :as b]
+             [context :as mcc]
              [events :as e]
+             [runtime :as rt]
              [sidecar :as sidecar]
              [storage :as st]
              [utils :as u]]
@@ -15,37 +17,10 @@
             [manifold.deferred :as md]
             [org.httpkit.client :as hk]))
 
-(defn- maybe-set-git-opts [{{:keys [git-url branch commit-id dir]} :args :as ctx}]
-  (cond-> ctx
-    git-url (update :build merge {:git {:url git-url
-                                        :branch (or branch "main")
-                                        :id commit-id}
-                                  ;; Overwrite script dir cause it will be calculated by the git checkout
-                                  :script-dir dir})))
-
-(defn- includes-build-id? [sid]
-  (= 4 (count sid)))
-
 (defn prepare-build-ctx
-  "Updates the context for the build runner, by adding a `build` object"
-  [{:keys [work-dir] :as ctx}]
-  (let [orig-sid (or (some->> (get-in ctx [:args :sid])
-                              (u/parse-sid)
-                              (take 4))
-                     (mcc/get-sid ctx))
-        ;; Either generate a new build id, or use the one given
-        sid (st/->sid (if (or (empty? orig-sid) (includes-build-id? orig-sid))
-                        orig-sid
-                        (concat orig-sid [(u/new-build-id)])))
-        id (or (last sid) (u/new-build-id))]
-    (-> ctx
-        ;; Prepare the build properties
-        (assoc :build {:build-id id
-                       :checkout-dir work-dir
-                       :script-dir (u/abs-path work-dir (get-in ctx [:args :dir]))
-                       :pipeline (get-in ctx [:args :pipeline])
-                       :sid sid})
-        (maybe-set-git-opts))))
+  "Updates the runtime for the build runner, by adding a `build` object"
+  [rt]
+  (assoc rt :build (b/make-build-ctx rt)))
 
 (defn- print-result [state]
   (log/info "Build summary:")
@@ -58,9 +33,9 @@
                   ", elapsed:" (- end-time start-time) "ms")))))
 
 (defn- report-evt [ctx e]
-  (report ctx
-          {:type :build/event
-           :event e}))
+  (rt/report ctx
+             {:type :build/event
+              :event e}))
 
 (defn result-accumulator
   "Returns a map of event types and handlers that can be registered in the bus.
@@ -91,7 +66,8 @@
       (e/register-handler bus t h))))
 
 (defn run-build
-  "Performs a build, using the runner from the context"
+  "Performs a build, using the runner from the context.  Returns a deferred
+   that will complete when the build finishes."
   [{:keys [work-dir event-bus] :as ctx}]
   (let [r (:runner ctx)
         acc (result-accumulator ctx)]
@@ -101,33 +77,31 @@
         (prepare-build-ctx)
         (r))))
 
-(def api-url (comp :url :account))
-
-(defn list-builds [{:keys [account] :as ctx}]
+(defn list-builds [rt]
   (->> (hk/get (apply format "%s/customer/%s/repo/%s/builds"
-                      ((juxt :url :customer-id :repo-id) account))
+                      ((juxt :url :customer-id :repo-id) (rt/account rt)))
                {:headers {"accept" "application/edn"}})
        (deref)
        :body
        (bs/to-reader)
        (u/parse-edn)
        (hash-map :type :build/list :builds)
-       (report ctx)))
+       (rt/report rt)))
 
 (defn http-server
   "Does nothing but return a channel that will never close.  The http server 
    should already be started by the component system."
   [ctx]
-  (report ctx (-> ctx
-                  (select-keys [:http])
-                  (assoc :type :server/started)))
+  (rt/report ctx (-> ctx
+                     (select-keys [:http])
+                     (assoc :type :server/started)))
   (ca/chan))
 
 (defn watch
   "Starts listening for events and prints the results.  The arguments determine
    the event filter (all for a customer, project, or repo)."
   [{:keys [event-bus] :as ctx}]
-  (let [url (api-url ctx)
+  (let [url (rt/api-url ctx)
         ch (ca/chan)
         pipe-events (fn [r]
                       (let [read-next (fn [] (u/parse-edn r {:eof ::done}))]
@@ -139,11 +113,11 @@
                               (ca/close! ch))
                             (do
                               (log/debug "Got event:" m)
-                              (report ctx {:type :build/event :event m})
+                              (rt/report ctx {:type :build/event :event m})
                               (recur (read-next)))))))]
     (log/info "Watching the server at" url "for events...")
-    (report ctx {:type :watch/started
-                 :url url})
+    (rt/report ctx {:type :watch/started
+                    :url url})
     ;; TODO Trailing slashes
     ;; TODO Customer and other filtering
     ;; Unfortunately, http-kit can't seem to handle SSE, so we use Aleph instead
@@ -166,5 +140,5 @@
    which are then picked up by the sidecar to dispatch or store.  
 
    The sidecar loop will stop when the events file is deleted."
-  [ctx]
-  (sidecar/run ctx))
+  [rt]
+  (sidecar/run rt))

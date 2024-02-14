@@ -25,7 +25,7 @@
                   (sut/run-build)))))
 
   (testing "adds build sid to build config"
-    (let [{:keys [sid build-id]} (-> {:args {:sid "a/b/c"}
+    (let [{:keys [sid build-id]} (-> {:config {:args {:sid "a/b/c"}}
                                       :runner :build}
                                      (sut/run-build))]
       (is (= build-id (last sid)))
@@ -33,8 +33,8 @@
 
   (testing "constructs `sid` from account settings if not specified"
     (let [{:keys [sid build-id]} (-> {:runner :build
-                                      :account {:customer-id "a"
-                                                :repo-id "b"}}
+                                      :config {:account {:customer-id "a"
+                                                         :repo-id "b"}}}
                                      (sut/run-build))]
       (is (= build-id (last sid)))
       (is (= ["a" "b"] (take 2 sid)))))
@@ -54,13 +54,13 @@
   (testing "reports builds from server"
     (let [reported (atom [])
           builds {:key "value"}
-          ctx {:reporter (partial swap! reported conj)
-               :account {:url "http://server/api"
-                         :customer-id "test-cust"
-                         :repo-id "test-repo"}}]
+          rt {:reporter (partial swap! reported conj)
+              :config {:account {:url "http://server/api"
+                                 :customer-id "test-cust"
+                                 :repo-id "test-repo"}}}]
       (f/with-fake-http ["http://server/api/customer/test-cust/repo/test-repo/builds"
                          (pr-str builds)]
-        (is (some? (sut/list-builds ctx)))
+        (is (some? (sut/list-builds rt)))
         (is (pos? (count @reported)))
         (let [r (first @reported)]
           (is (= :build/list (:type r)))
@@ -100,96 +100,10 @@
       (is (nil? (c {}))))))
 
 (deftest prepare-build-ctx
-  (testing "adds build id"
-    (is (re-matches #"build-\d+"
-                    (-> (sut/prepare-build-ctx {})
-                        :build
-                        :build-id))))
-
-  (testing "defaults to `main` branch"
-    (is (= "main"
-           (-> {:args {:git-url "test-url"}}
-               (sut/prepare-build-ctx)
-               :build
-               :git
-               :branch))))
-
-  (testing "takes global work dir as build checkout dir"
-    (is (= "global-work-dir"
-           (-> {:work-dir "global-work-dir"
-                :args {:dir ".monkeci"}}
-               (sut/prepare-build-ctx)
-               :build
-               :checkout-dir))))
-
-  (testing "adds pipeline from args"
-    (is (= "test-pipeline"
-           (-> {:args {:pipeline "test-pipeline"}}
-               (sut/prepare-build-ctx)
-               :build
-               :pipeline))))
-
-  (testing "adds script dir from args, as relative to work dir"
-    (is (= "work-dir/test-script"
-           (-> {:args {:dir "test-script"}
-                :work-dir "work-dir"}
-               (sut/prepare-build-ctx)
-               :build
-               :script-dir))))
-
-  (testing "with git opts"
-    (testing "sets git opts in build config"
-      (is (= {:url "test-url"
-              :branch "test-branch"
-              :id "test-id"}
-             (-> {:args {:git-url "test-url"
-                         :branch "test-branch"
-                         :commit-id "test-id"}}
-                 (sut/prepare-build-ctx)
-                 :build
-                 :git))))
-
-    (testing "sets script dir to arg"
-      (is (= "test-script"
-             (-> {:args {:git-url "test-url"
-                         :branch "test-branch"
-                         :commit-id "test-id"
-                         :dir "test-script"}
-                  :work-dir "work"}
-                 (sut/prepare-build-ctx)
-                 :build
-                 :script-dir)))))
-
-  (testing "when sid specified"
-    (testing "parses on delimiter"
-      (is (= ["a" "b" "c"]
-             (->> {:args {:sid "a/b/c"}}
-                  (sut/prepare-build-ctx)
-                  :build
-                  :sid
-                  (take 3)))))
-    
-    (testing "adds build id"
-      (is (string? (-> {:args {:sid "a/b/c"}}
-                       (sut/prepare-build-ctx)
-                       :build
-                       :sid
-                       last))))
-
-    (testing "when sid includes build id, reuses it"
-      (let [sid "a/b/c/d"
-            ctx (-> {:args {:sid sid}}
-                    (sut/prepare-build-ctx)
-                    :build)]
-        (is (= "d" (:build-id ctx)))
-        (is (= "d" (last (:sid ctx)))))))
-
-  (testing "when no sid specified"
-    (testing "leaves it unspecified"
-      (is (empty? (-> {:args {}}
-                      (sut/prepare-build-ctx)
-                      :build
-                      :sid))))))
+  (testing "adds build object to runtime"
+    (is (some? (-> {:config {:args {:dir "test-dir"}}}
+                   (sut/prepare-build-ctx)
+                   :build)))))
 
 (deftest http-server
   (testing "returns a channel"
