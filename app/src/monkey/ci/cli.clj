@@ -74,7 +74,8 @@
            :default 3000
            :env "PORT"}]
    :runs {:command cmd/http-server
-          :requires [:http]}})
+          :requires [:http]
+          :app-mode :server}})
 
 (def sidecar-cmd
   {:command "sidecar"

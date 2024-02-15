@@ -54,7 +54,7 @@
                        :port))))
 
     (testing "passes args as opts"
-      (is (= 1234 (-> (sut/start-server {:http {:port 1234}})
+      (is (= 1234 (-> (sut/start-server {:config {:http {:port 1234}}})
                       :opts
                       :port))))
 
@@ -655,22 +655,27 @@
 
 (deftest setup-runtime
   (testing "returns fn that starts http server"
-    (let [h (rt/setup-runtime {:http {:port 1234}} :http)
+    (let [conf {:http {:port 1234}}
+          h (rt/setup-runtime conf :http)
+          rt {:http h
+              :config conf}
           inv (atom nil)]
       (is (fn? h))
       (with-redefs [http/run-server (fn [handler args]
                                       (reset! inv {:handler handler
                                                    :opts args}))]
-        (is (some? (h)))
+        (is (some? (h rt)))
         (is (= {:port 1234} (-> (:opts @inv)
                                 (select-keys [:port])))))))
 
   (testing "start fn returns another fn that stops the server"
-    (with-redefs [http/run-server (constantly ::server)
-                  http/server-stop! (fn [arg]
-                                      (when (= ::server arg)
-                                        ::ok))]
-      (let [h (rt/setup-runtime {:http {}} :http)
-            s (h)]
-        (is (fn? s))
-        (is (= ::ok (s)))))))
+    (let [stopped? (atom false)]
+      (with-redefs [http/run-server (constantly ::server)
+                    http/server-stop! (fn [arg]
+                                        (when (= ::server arg)
+                                          (reset! stopped? true)))]
+        (let [h (rt/setup-runtime {:http {}} :http)
+              s (h {})]
+          (is (ifn? s))
+          (is (some? (s)))
+          (is (true? @stopped?)))))))

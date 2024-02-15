@@ -40,7 +40,7 @@
 (defn generate-jwt
   "Signs a JWT using the keypair from the request context."
   [req payload]
-  (let [pk (c/from-context req (comp :priv :jwk))]
+  (let [pk (c/from-rt req (comp :priv :jwk))]
     (-> payload
         (augment-payload)
         (sign-jwt pk))))

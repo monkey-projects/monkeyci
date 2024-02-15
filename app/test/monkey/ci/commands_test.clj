@@ -10,6 +10,7 @@
              [sidecar :as sc]
              [spec :as spec]]
             [monkey.ci.helpers :as h]
+            [monkey.ci.web.handler :as wh]
             [org.httpkit.fake :as f]))
 
 (deftest run-build
@@ -106,8 +107,13 @@
                    :build)))))
 
 (deftest http-server
-  (testing "returns a deferred"
-    (is (md/deferred? (sut/http-server {})))))
+  (with-redefs [wh/server-status (constantly :stopped)]
+    (testing "returns a deferred"
+      (is (md/deferred? (sut/http-server {:http (constantly ::ok)}))))
+
+    (testing "starts the server using the runtime fn"
+      (let [r (sut/http-server {:http (constantly ::ok)})]
+        (is (nil? (deref r 100 :timeout)))))))
 
 (deftest watch
   (testing "sends request and returns deferred"

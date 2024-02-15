@@ -49,18 +49,22 @@
 
 (def config :config)
 
-(def app-mode (comp :app-mode config))
+(defn from-config [k]
+  (comp k config))
+
+(def app-mode (from-config :app-mode))
 (def cli-mode? (comp (partial = :cli) app-mode))
 (def server-mode? (comp (partial = :server) app-mode))
 
-(def account (comp :account config))
-(def args (comp :args config))
+(def account (from-config :account))
+(def args (from-config :args))
 (def reporter :reporter)
 (def api-url (comp :url account))
 (def log-maker (comp :maker :logging))
 (def log-retriever (comp :retriever :logging))
-(def work-dir (comp :work-dir config))
-(def dev-mode? (comp :dev-mode config))
+(def work-dir (from-config :work-dir))
+(def dev-mode? (from-config :dev-mode))
+(def ssh-keys-dir (from-config :ssh-keys-dir))
 
 (defn get-arg [rt k]
   (k (args rt)))

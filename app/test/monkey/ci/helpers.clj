@@ -104,10 +104,11 @@
 (defn ->req
   "Takes a context and creates a request object from it that can be passed to
    an api handler function."
-  [ctx]
+  [rt]
   {:reitit.core/match
    {:data
-    {:monkey.ci.web.common/context ctx}}})
+    {:monkey.ci.web.common/context rt
+     :monkey.ci.web.common/runtime rt}}})
 
 (defn with-path-param [r k v]
   (assoc-in r [:parameters :path k] v))
@@ -118,6 +119,8 @@
 (defn with-body [r v]
   (assoc-in r [:parameters :body] v))
 
-(defn test-ctx []
+(defn test-rt []
   {:storage (s/make-memory-storage)
-   :jwk (auth/keypair->ctx (auth/generate-keypair))})
+   :jwk (auth/keypair->rt (auth/generate-keypair))})
+
+(def ^:deprecated test-ctx test-rt)

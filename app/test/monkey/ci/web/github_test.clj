@@ -217,7 +217,7 @@
     (with-github-user
       (fn [_]
         (let [kp (auth/generate-keypair)
-              req (-> (h/test-ctx)
+              req (-> (h/test-rt)
                       (assoc :jwk {:priv (.getPrivate kp)})
                       (h/->req)
                       (assoc :parameters
@@ -233,11 +233,11 @@
   (testing "finds existing github user in storage"
     (with-github-user
       (fn [u]
-        (let [{st :storage :as ctx} (h/test-ctx)
+        (let [{st :storage :as rt} (h/test-rt)
               _ (st/save-user st {:type "github"
                                   :type-id (:id u)
                                   :customers ["test-cust"]})
-              req (-> ctx
+              req (-> rt
                       (h/->req)
                       (assoc :parameters
                              {:query
@@ -251,8 +251,8 @@
   (testing "creates user when none found in storage"
     (with-github-user
       (fn [u]
-        (let [{st :storage :as ctx} (h/test-ctx)
-              req (-> ctx
+        (let [{st :storage :as rt} (h/test-rt)
+              req (-> rt
                       (h/->req)
                       (assoc :parameters
                              {:query
@@ -266,9 +266,9 @@
   (testing "sets user id in token"
     (with-github-user
       (fn [u]
-        (let [{st :storage :as ctx} (h/test-ctx)
-              pubkey (auth/ctx->pub-key ctx)
-              req (-> ctx
+        (let [{st :storage :as rt} (h/test-rt)
+              pubkey (auth/rt->pub-key rt)
+              req (-> rt
                       (h/->req)
                       (assoc :parameters
                              {:query

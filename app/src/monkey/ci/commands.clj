@@ -7,9 +7,12 @@
              [runtime :as rt]
              [sidecar :as sidecar]
              [utils :as u]]
+            [monkey.ci.web.handler :as h]
             [aleph.http :as http]
             [clj-commons.byte-streams :as bs]
-            [manifold.deferred :as md]
+            [manifold
+             [deferred :as md]
+             [time :as mt]]
             [org.httpkit.client :as hk]))
 
 (defn prepare-build-ctx
@@ -84,13 +87,22 @@
        (rt/report rt)))
 
 (defn http-server
-  "Does nothing but return a deferred that will never resolve.  The http server 
-   should already be started by the component system."
-  [ctx]
-  (rt/report ctx (-> ctx
-                     (select-keys [:http])
-                     (assoc :type :server/started)))
-  (md/deferred))
+  "Starts the server by invoking the function in the runtime.  This function is supposed
+   to return another function that can be invoked to stop the http server.  Returns a 
+   deferred that resolves when the server is stopped."
+  [{:keys [http] :as rt}]
+  (rt/report rt (-> rt
+                    (rt/config)
+                    (select-keys [:http])
+                    (assoc :type :server/started)))
+  ;; Start the server
+  (let [server (http rt)
+        get-status #(h/server-status server)
+        interval 200]
+    ;; Repeatedly check if server is still running
+    (md/loop [s (get-status)]
+      (when (not= :stopped s)
+        (mt/in interval #(md/recur (get-status)))))))
 
 (defn watch
   "Starts listening for events and prints the results.  The arguments determine

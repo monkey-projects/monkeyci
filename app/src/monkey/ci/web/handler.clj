@@ -2,6 +2,7 @@
   "Handler for the web server"
   (:require [camel-snake-kebab.core :as csk]
             [clojure.tools.logging :as log]
+            [com.stuartsierra.component :as co]
             [medley.core :refer [update-existing] :as mc]
             [monkey.ci
              [config :as config]
@@ -288,10 +289,10 @@
   ([rt]
    (make-router rt routes)))
 
-(defn make-app [opts]
-  (-> (make-router opts)
+(defn make-app [rt]
+  (-> (make-router rt)
       (c/make-app)
-      (auth/secure-ring-app opts)))
+      (auth/secure-ring-app rt)))
 
 (def default-http-opts
   ;; Virtual threads are still a preview feature
@@ -301,10 +302,10 @@
 (defn start-server
   "Starts http server.  Returns a server object that can be passed to
    `stop-server`."
-  [opts]
-  (let [http-opts (merge {:port 3000} (:http opts))]
+  [rt]
+  (let [http-opts (merge {:port 3000} (:http (rt/config rt)))]
     (log/info "Starting HTTP server at port" (:port http-opts))
-    (http/run-server (make-app opts)
+    (http/run-server (make-app rt)
                      (merge http-opts default-http-opts))))
 
 (defn stop-server [s]
@@ -315,10 +316,27 @@
 (defmethod config/normalize-key :http [_ {:keys [args] :as conf}]
   (update-in conf [:http :port] #(or (:port args) %)))
 
+(defrecord HttpServer [rt]
+  co/Lifecycle
+  (start [this]
+    (assoc this :server (start-server rt)))
+  (stop [{:keys [server] :as this}]
+    (when server
+      (stop-server server))
+    (dissoc this :server))
+  
+  clojure.lang.IFn
+  (invoke [this]
+    (co/stop this)))
+
 (defmethod rt/setup-runtime :http [conf _]
   ;; Return a function that when invoked, returns another function to shut down the server
   ;; TODO See if we can change this into a component
-  (fn []
-    ;; We could also use `:legacy-return-value? false` but this is more future-proof.
-    (let [server (start-server conf)]
-      #(stop-server server))))
+  (fn [rt]
+    (-> (->HttpServer rt)
+        (co/start))))
+
+(defn server-status
+  "Returns server status, either `:running`, `:stopping` or `:stopped`"
+  [server]
+  (http/server-status (:server server)))

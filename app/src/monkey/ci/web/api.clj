@@ -4,10 +4,10 @@
             [clojure.tools.logging :as log]
             [medley.core :as mc]
             [monkey.ci
-             [context :as ctx]
              [events :as e]
              [labels :as lbl]
              [logging :as l]
+             [runtime :as rt]
              [storage :as st]
              [utils :as u]]
             [monkey.ci.web
@@ -267,7 +267,7 @@
              :git (-> (:query p)
                       (select-keys [:commit-id :branch])
                       (assoc :url (:url repo)
-                             :ssh-keys-dir (ctx/ssh-keys-dir (c/req->ctx req) bid))
+                             :ssh-keys-dir (rt/ssh-keys-dir (c/req->rt req) bid))
                       (mc/assoc-some :ref (params->ref p))
                       (mc/assoc-some :ssh-keys ssh-keys))
              :sid (-> acc
@@ -295,13 +295,13 @@
 
 (defn list-build-logs [req]
   (let [build-sid (st/ext-build-sid (get-in req [:parameters :path]))
-        retriever (c/from-context req ctx/log-retriever)]
+        retriever (c/from-rt req rt/log-retriever)]
     (rur/response (l/list-logs retriever build-sid))))
 
 (defn download-build-log [req]
   (let [build-sid (st/ext-build-sid (get-in req [:parameters :path]))
         path (get-in req [:parameters :query :path])
-        retriever (c/from-context req ctx/log-retriever)]
+        retriever (c/from-rt req rt/log-retriever)]
     (if-let [r (l/fetch-log retriever build-sid path)]
       (-> (rur/response r)
           (rur/content-type "text/plain"))

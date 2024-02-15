@@ -9,8 +9,8 @@
             [medley.core :as mc]
             [monkey.ci
              [config :as config]
-             [context :as ctx]
              [labels :as lbl]
+             [runtime :as rt]
              [storage :as s]
              [utils :as u]]
             [monkey.ci.web
@@ -81,7 +81,7 @@
   "Event handler that looks up details for the given github webhook.  If the webhook 
    refers to a valid configuration, a build id is created and a new event is launched,
    which in turn should start the build runner."
-  [{st :storage :as ctx} {:keys [id payload] :as evt}]
+  [{st :storage :as rt} {:keys [id payload] :as evt}]
   (if-let [details (s/find-details-for-webhook st id)]
     (let [{:keys [master-branch clone-url ssh-url private]} (:repository payload)
           build-id (u/new-build-id)
@@ -104,7 +104,7 @@
                           :main-branch master-branch
                           :ref (:ref payload)
                           :commit-id commit-id
-                          :ssh-keys-dir (ctx/ssh-keys-dir ctx build-id)}
+                          :ssh-keys-dir (rt/ssh-keys-dir rt build-id)}
                          (mc/assoc-some :ssh-keys ssh-keys))
                 :sid (s/ext-build-sid md) ; Build storage id
                 :build-id build-id}]
@@ -120,7 +120,7 @@
 
 (defn- request-access-token [req]
   (let [code (get-in req [:parameters :query :code])
-        {:keys [client-secret client-id]} (c/from-context req :github)]
+        {:keys [client-secret client-id]} (c/from-rt req :github)]
     (-> @(http/post "https://github.com/login/oauth/access_token"
                     {:query-params {:client_id client-id
                                     :client_secret client-secret
@@ -178,7 +178,7 @@
 (defn get-config
   "Lists public github configuration to use"
   [req]
-  (rur/response {:client-id (c/from-context req (comp :client-id :github))}))
+  (rur/response {:client-id (c/from-rt req (comp :client-id :github))}))
 
 (defmethod config/normalize-key :github [_ conf]
   conf)
