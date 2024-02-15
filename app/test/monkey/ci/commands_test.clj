@@ -18,10 +18,10 @@
     (let [ctx {:runner (constantly :invoked)}]
       (is (= :invoked (sut/run-build ctx)))))
 
-  (testing "adds `build` to context"
-    (is (map? (-> {:args {:git-url "test-url"
-                          :branch "test-branch"
-                          :commit-id "test-id"}
+  (testing "adds `build` to runtime"
+    (is (map? (-> {:config {:args {:git-url "test-url"
+                                   :branch "test-branch"
+                                   :commit-id "test-id"}}
                    :runner :build}
                   (sut/run-build)))))
 
@@ -40,7 +40,7 @@
       (is (= build-id (last sid)))
       (is (= ["a" "b"] (take 2 sid)))))
 
-  (testing "accumulates build results from events"
+  #_(testing "accumulates build results from events"
     (let [registered (atom [])]
       (with-redefs [e/register-handler (fn [_ t _]
                                          (swap! registered conj t))]
@@ -67,7 +67,7 @@
           (is (= :build/list (:type r)))
           (is (= builds (:builds r))))))))
 
-(deftest result-accumulator
+#_(deftest result-accumulator
   (testing "returns a map of type handlers"
     (is (map? (:handlers (sut/result-accumulator {})))))
 

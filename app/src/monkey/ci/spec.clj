@@ -134,6 +134,7 @@
 (s/def :git/branch string?)
 (s/def :git/id string?)
 (s/def :git/fn fn?)
+(s/def :git/clone fn?)
 (s/def :git/dir string?)
 (s/def :build/git (s/keys :req-un [:git/url :git/dir]
                           :opt-un [:git/branch :git/id]))
@@ -210,6 +211,7 @@
 (s/def :rt/workspace (s/merge :rt/blob))
 (s/def :rt/artifacts (s/merge :rt/blob))
 (s/def :rt/cache (s/merge :rt/blob))
+(s/def :rt/git (s/keys :req-un [:git/clone]))
 
 (s/def ::runtime (s/keys :req-un [:rt/logging :rt/runner :rt/storage :rt/workspace :rt/artifacts :rt/cache]
-                         :opt-un [:rt/containers]))
+                         :opt-un [:rt/containers :rt/git]))

@@ -92,3 +92,9 @@
   `(with-runtime-fn ~conf ~mode
      (fn [~r]
        ~@body)))
+
+(defn post-events
+  "Posts one or more events using the event poster in the runtime"
+  [{:keys [event-poster]} evt]
+  (when event-poster
+    (event-poster evt)))

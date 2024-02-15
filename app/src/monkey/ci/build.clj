@@ -1,7 +1,8 @@
 (ns monkey.ci.build
   "Functions for working with the build object in the runtime.  This
    represents the current build."
-  (:require [clojure.string :as cs]
+  (:require [clojure.java.io :as io]
+            [clojure.string :as cs]
             [monkey.ci
              [runtime :as rt]
              [storage :as st]
@@ -67,3 +68,17 @@
       :pipeline (rt/get-arg rt :pipeline)
       :sid sid}
      rt)))
+
+(def script-dir "Gets script dir for the build from runtime"
+  (comp :script-dir :build))
+
+(def default-script-dir ".monkeyci")
+
+(defn calc-script-dir
+  "Given an (absolute) working directory and scripting directory, determines
+   the absolute script dir."
+  [wd sd]
+  (->> (or sd default-script-dir)
+       (u/abs-path wd)
+       (io/file)
+       (.getCanonicalPath)))

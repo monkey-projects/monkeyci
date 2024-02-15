@@ -1,9 +1,9 @@
 (ns monkey.ci.cli
   (:require [clojure.walk :as w]
             [monkey.ci
+             [build :as b]
              [commands :as cmd]
-             [config :as config]
-             [runners :as r]]))
+             [config :as config]]))
 
 (def run-build-cmd
   {:command "run"
@@ -12,7 +12,7 @@
            :option "dir"
            :short "d"
            :type :string
-           :default r/default-script-dir}
+           :default b/default-script-dir}
           {:as "Pipeline name"
            :option "pipeline"
            :short "p"
