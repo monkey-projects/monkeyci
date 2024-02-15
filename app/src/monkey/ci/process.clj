@@ -4,16 +4,16 @@
   (:require [babashka
              [fs :as fs]
              [process :as bp]]
-            [clojure.core.async :as ca :refer [go <!]]
             [clojure.java.io :as io]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [config.core :as cc]
+            [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
+             [build :as b]
              [config :refer [version] :as config]
              [context :as ctx]
-             [events :as e]
              [logging :as l]
              [script :as script]
              [utils :as utils]]
@@ -114,22 +114,22 @@
 (defn execute!
   "Executes the build script located in given directory.  This actually runs the
    clojure cli with a generated `build` alias.  This expects absolute directories.
-   Returns an object that can be `deref`ed to wait for the process to exit.  Will
-   post a `build/completed` event on process exit."
-  [{{:keys [checkout-dir script-dir build-id] :as build} :build :as ctx}]
+   Returns a deferred that will hold the process result when it completes."
+  [{{:keys [checkout-dir script-dir build-id] :as build} :build :as rt}]
   (log/info "Executing build process for" build-id "in" checkout-dir)
-  (let [{:keys [socket-path server]} (start-script-api ctx)
-        [out err :as loggers] (map (partial make-logger ctx) [:out :err])]
+  (let [{:keys [socket-path server]} (start-script-api rt)
+        [out err :as loggers] (map (partial make-logger rt) [:out :err])
+        result (md/deferred)]
     (-> (bp/process
          {:dir script-dir
           :out (l/log-output out)
           :err (l/log-output err)
           :cmd (-> ["clojure"
-                    "-Sdeps" (generate-deps ctx)
+                    "-Sdeps" (generate-deps rt)
                     "-X:monkeyci/build"]
-                   (concat (build-args ctx))
+                   (concat (build-args rt))
                    (vec))
-          :extra-env (process-env ctx socket-path)
+          :extra-env (process-env rt socket-path)
           :exit-fn (fn [{:keys [proc] :as p}]
                      (let [exit (or (some-> proc (.exitValue)) 0)]
                        (log/debug "Script process exited with code" exit ", cleaning up")
@@ -138,6 +138,9 @@
                        (when socket-path 
                          (uds/delete-address socket-path))
                        (log/debug "Posting build/completed event")
-                       (ctx/post-events ctx (e/build-completed-evt build exit :process p))))})
+                       (-> (b/build-completed-result build exit)
+                           (assoc :process p)
+                           (as-> r (md/success! result r)))))})
         ;; Depending on settings, some process streams need handling
-        (l/handle-process-streams loggers))))
+        (l/handle-process-streams loggers))
+    result))

@@ -63,3 +63,33 @@
   (let [e (make-events conf)]
     (cond-> {:poster (partial post-events e)}
       (satisfies? EventReceiver e) (assoc :receiver e))))
+
+(defn wrapped
+  "Returns a new function that wraps `f` and posts an event before 
+   and after.  The `before` fn just receives the same arguments as 
+   `f`.  The `after` fn one more, the return value of `f`.  The first 
+   argument is assumed to be the runtime, which is used to get the 
+   event poster.  The return values of `before` and `after` are posted 
+   as events. Returns the return value of calling `f`.
+
+   Any of the event generating functions can be `nil`, in which case
+   it will be ignored."
+  [f before after & [error]]
+  (letfn [(maybe-post [f [rt :as args] & extras]
+            (when f
+              (when-let [e (apply f (concat args extras))]
+                (rt/post-events rt e))))
+          (inv [args]
+           (let [r (apply f args)]
+             (maybe-post after args r)
+             r))]
+    (fn [& args]
+      (maybe-post before args)
+      (if error
+        (try
+          (inv args)
+          (catch Exception ex
+            ;; Post event and re-throw
+            (maybe-post error args ex)
+            (throw ex)))
+        (inv args)))))

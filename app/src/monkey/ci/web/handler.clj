@@ -6,7 +6,6 @@
             [medley.core :refer [update-existing] :as mc]
             [monkey.ci
              [config :as config]
-             [events :as e]
              [runtime :as rt]]
             [monkey.ci.web
              [api :as api]

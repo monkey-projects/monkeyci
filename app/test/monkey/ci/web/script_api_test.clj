@@ -8,12 +8,12 @@
             [ring.mock.request :as mock]))
 
 (deftest routes
-  (let [bus (e/make-bus)
+  (let [events (atom [])
         test-app (sut/make-app {:public-api (fn [_]
                                               (fn [ep]
                                                 (when (= :get-params ep)
                                                   {"key" "value"})))
-                                :event-bus bus})]
+                                :events {:poster (partial swap! events conj)}})]
 
     (testing "unknown endpoint results in 404"
       (is (= 404 (-> (mock/request :get "/unknown")
@@ -35,13 +35,13 @@
 
     (testing "`POST /script/event` posts event to bus"
       (let [evt {:type :test-event :message "test event"}
-            w (e/wait-for bus :test-event (map identity))
             r (-> (mock/request :post "/script/event")
                   (mock/body (pr-str evt))
                   (mock/header :content-type "application/edn")
                   (test-app))]
         (is (= 202 (:status r)))
-        (is (= evt (-> (h/try-take w)
+        (is (= evt (-> @events
+                       (first)
                        (select-keys (keys evt)))))))))
 
 (deftest start-server

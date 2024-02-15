@@ -12,11 +12,11 @@
              [cache :as cache]
              [containers :as c]
              [context :as ctx]
-             [events :as e]
              [utils :as u]]
             [monkey.ci.containers
              [docker]
              [podman]]
+            [monkey.ci.events.core :as ec]
             [org.httpkit.client :as http])
   (:import java.nio.channels.SocketChannel
            [java.net UnixDomainSocketAddress StandardProtocolFamily]))
@@ -42,8 +42,7 @@
     (log/warn "Unable to post event, no client configured")))
 
 (defn- wrapped
-  "Adds the event poster to the wrapped function.  This is necessary because the `e/wrapped`
-   assumes events are posted through the bus."
+  "Sets the event poster in the runtime."
   [f before after]
   (let [error (fn [& args]
                 ;; On error, add the exception to the result of the 'after' event
@@ -51,9 +50,9 @@
                   (log/error "Got error:" ex)
                   (assoc (apply after (concat (butlast args) [{}]))
                          :exception (.getMessage ex))))
-        w (e/wrapped f before after error)]
+        w (ec/wrapped f before after error)]
     (fn [ctx & more]
-      (apply w (assoc ctx :event-poster (partial post-event ctx)) more))))
+      (apply w (assoc ctx :events {:poster (partial post-event ctx)}) more))))
 
 (defn ->map [s]
   (if (map? s)

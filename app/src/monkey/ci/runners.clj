@@ -11,18 +11,12 @@
              [build :as build]
              [config :as config]
              [context :as c]
-             [events :as e]
              [process :as p]
              [runtime :as rt]
              [utils :as u]]))
 
 (defn- script-not-found [rt]
   (log/warn "No build script found at" (build/script-dir rt))
-  ;; Post build completed event so the failure is registered
-  #_(c/post-events ctx (e/build-completed-evt b 1 :reason :script-not-found))
-  ;; Nonzero exit code
-  #_(assoc ctx :event {:result :error
-                     :exit 1})
   {:exit 1
    :result :error
    :build (:build rt)})

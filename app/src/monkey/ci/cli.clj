@@ -31,7 +31,8 @@
           {:as "Repository sid"
            :option "sid"
            :type :string}]
-   :runs {:command cmd/run-build}})
+   :runs {:command cmd/run-build
+          :app-mode :cli}})
 
 (def list-build-cmd
   {:command "list"

@@ -7,8 +7,8 @@
   (:require [clojure.core.async :as ca]
             [clojure.tools.logging :as log]
             [monkey.ci
-             [context :as ctx]
              [labels :as lbl]
+             [runtime :as rt]
              [storage :as st]]
             [monkey.ci.web
              [common :as c]]
@@ -25,7 +25,7 @@
 (defn- invoke-public-api
   "Invokes given endpoint on the public api"
   [req ep]
-  (let [f (c/from-context req :public-api)]
+  (let [f (c/from-rt req :public-api)]
     (f ep)))
 
 (defn get-params [req]
@@ -33,11 +33,9 @@
 
 (defn post-event [req]
   (let [evt (get-in req [:parameters :body])]
-    {:status (-> (ca/go
-                   (if (ctx/post-events (c/req->ctx req) evt)
-                     202
-                     500))
-                 (ca/<!!))}))
+    {:status (if (rt/post-events (c/req->rt req) evt)
+               202
+               500)}))
 
 (def edn #{"application/edn"})
 
@@ -61,9 +59,9 @@
 
 (defn- with-api
   "Replaces the public api factory function with its result"
-  [ctx]
-  (update ctx :public-api (fn [maker]
-                            (maker ctx))))
+  [rt]
+  (update rt :public-api (fn [maker]
+                           (maker rt))))
 
 (defn make-router
   ([opts routes]
@@ -72,7 +70,7 @@
     {:data {:middleware c/default-middleware
             :muuntaja (c/make-muuntaja)
             :coercion reitit.coercion.schema/coercion
-            ::c/context (with-api opts)}}))
+            ::c/runtime (with-api opts)}}))
   ([opts]
    (make-router opts routes)))
 
@@ -108,8 +106,8 @@
 (defn local-api
   "Local api implementation.  This is used as a backend for the script API server
    when it is run locally.  It retrieves all information directly from local storage."
-  [{:keys [storage] :as ctx}]
-  (let [build-sid (get-in ctx [:build :sid])
+  [{:keys [storage] :as rt}]
+  (let [build-sid (get-in rt [:build :sid])
         handlers {:get-params (fn []
                                 (log/debug "Fetching all build params for sid" build-sid)
                                 (->> (fetch-all-params storage (butlast build-sid))

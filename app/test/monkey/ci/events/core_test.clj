@@ -60,3 +60,49 @@
 (deftest make-events
   (testing "can make sync events"
     (is (some? (sut/make-events {:events {:type :sync}})))))
+
+(deftest wrapped
+  (testing "returns fn that invokes f"
+    (let [f (constantly :ok)
+          w (sut/wrapped f
+                         (constantly nil)
+                         (constantly nil))]
+      (is (fn? f))
+      (is (= :ok (w {})))))
+
+  (testing "posts event before and after invoking f"
+    (let [invocations (atom [])
+          test-f (fn [t]
+                   (fn [& args]
+                     (swap! invocations conj (into [t] args))
+                     {:event t}))
+          poster (fn [evt]
+                   (swap! invocations conj [:event evt]))
+          w (sut/wrapped (test-f :during)
+                         (test-f :before)
+                         (test-f :after))]
+      (is (= {:event :during}
+             (w {:events {:poster poster}} "test-arg")))
+      (is (= 5 (count @invocations)))
+      (is (= :before (ffirst @invocations)))
+      (is (= [:event {:event :before}] (second @invocations)))
+      (is (= :during (first (nth @invocations 2))))
+      (is (= :after (first (nth @invocations 3))))
+      (is (= [:event {:event :after}] (nth @invocations 4)))))
+
+  (testing "invokes `on-error` fn on exception"
+    (let [inv (atom [])
+          on-error (fn [_ ex]
+                     {:exception ex})
+          w (sut/wrapped (fn [_]
+                           (throw (ex-info "test error" {})))
+                         nil
+                         nil
+                         on-error)
+          poster (partial swap! inv conj)]
+      (is (thrown? Exception (w {:events {:poster poster}})))
+      (is (= 1 (count @inv)))
+      (is (= "test error" (some-> @inv
+                                  first
+                                  :exception
+                                  (.getMessage)))))))

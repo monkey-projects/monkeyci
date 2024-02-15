@@ -99,3 +99,15 @@
 (def ssh-keys-dir
   "Calculates ssh keys dir for the build"
   (partial build-related-dir :ssh-keys-dir))
+
+(defn build-completed-result [build exit-code]
+  {:build build
+   :exit exit-code
+   :result (if (zero? exit-code) :success :error)})
+
+(defn build-completed-evt
+  "Creates a build completed event"
+  [build exit-code & keyvals]
+  (cond-> (build-completed-result build exit-code)
+    true (assoc :type :build/completed)
+    (not-empty keyvals) (merge (apply hash-map keyvals))))

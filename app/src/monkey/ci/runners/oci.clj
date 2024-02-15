@@ -5,9 +5,9 @@
             [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
+             [build :as b]
              [config :as config]
              [context :as ctx]
-             [events :as e]
              [oci :as oci]
              [runners :as r]
              [runtime :as rt]
@@ -53,12 +53,12 @@
   (-> (oci/run-instance client (instance-config conf rt))
       (md/chain
        (fn [r]
-         (rt/post-events rt (e/build-completed-evt (:build rt) r))
+         (rt/post-events rt (b/build-completed-evt (:build rt) r))
          r))
       (md/catch
           (fn [ex]
             (log/error "Got error from container instance:" ex)
-            (rt/post-events rt (e/build-completed-evt (:build rt) 1))))))
+            (rt/post-events rt (b/build-completed-evt (:build rt) 1))))))
 
 (defmethod r/make-runner :oci [rt]
   (let [conf (:runner rt)

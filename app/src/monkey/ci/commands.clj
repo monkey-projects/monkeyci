@@ -3,7 +3,6 @@
   (:require [clojure.tools.logging :as log]
             [monkey.ci
              [build :as b]
-             [events :as e]
              [runtime :as rt]
              [sidecar :as sidecar]
              [utils :as u]]

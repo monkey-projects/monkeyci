@@ -2,6 +2,7 @@
   (:require [babashka.process :as bp]
             [clojure.test :refer :all]
             [clojure.java.io :as io]
+            [manifold.deferred :as md]
             [monkey.ci
              [events :as events]
              [process :as sut]
@@ -67,8 +68,11 @@
 
 (defn- find-arg
   "Finds the argument value for given key"
-  [{:keys [args]} k]
-  (->> args
+  [d k]
+  (->> d
+       deref
+       :process
+       :args
        :cmd
        (drop-while (partial not= (str k)))
        (second)))
@@ -78,25 +82,32 @@
   (-server-stop! [s opts]
     (future nil)))
 
+(deftype FakeProcess [exitValue])
+
 (deftest execute!
   (let [server-started? (atom nil)]
     (with-redefs [bp/process (fn [{:keys [exit-fn] :as args}]
                                (do
                                  (when (fn? exit-fn)
-                                   (exit-fn {}))
-                                 {:args args
-                                  :exit 1234}))
+                                   (exit-fn {:proc (->FakeProcess 1234)
+                                             :args args}))))
                   sa/start-server (fn [& args]
                                     (reset! server-started? true)
                                     (->TestServer))]
+
+      (testing "returns deferred"
+        (is (md/deferred? (sut/execute!
+                           {:args {:dev-mode true}
+                            :build {:script-dir (example "failing")}}))))
       
       (testing "returns exit code"
-        (is (= 1234 (:exit (sut/execute!
-                            {:args {:dev-mode true}
-                             :build {:script-dir (example "failing")}})))))
+        (is (= 1234 (:exit @(sut/execute!
+                             {:args {:dev-mode true}
+                              :build {:script-dir (example "failing")}})))))
 
       (testing "invokes in script dir"
-        (is (= "test-dir" (-> (sut/execute! {:build {:script-dir "test-dir"}})
+        (is (= "test-dir" (-> @(sut/execute! {:build {:script-dir "test-dir"}})
+                              :process
                               :args
                               :dir))))
 
@@ -124,6 +135,8 @@
           (is (string? (-> {:script-dir "test-dir"
                             :event-bus bus}
                            (sut/execute!)
+                           (deref)
+                           :process
                            :args
                            :extra-env
                            :monkeyci-api-socket))))))))
