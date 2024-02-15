@@ -1,15 +1,14 @@
 (ns monkey.ci.web.api
   (:require [camel-snake-kebab.core :as csk]
-            [clojure.core.async :as ca]
             [clojure.tools.logging :as log]
             [medley.core :as mc]
             [monkey.ci
-             [events :as e]
              [labels :as lbl]
              [logging :as l]
              [runtime :as rt]
              [storage :as st]
              [utils :as u]]
+            [monkey.ci.events.core :as ec]
             [monkey.ci.web
              [auth :as auth]
              [common :as c]]
@@ -321,37 +320,25 @@
 (defn event-stream
   "Sets up an event stream for the specified filter."
   [req]
-  (let [{:keys [mult]} (c/req->bus req)
-        dest (ca/chan (ca/sliding-buffer 10)
-                      (filter (comp allowed-events :type)))
+  (let [recv (c/from-rt req rt/events-receiver)
         make-reply (fn [evt]
                      (-> evt
                          (prn-str)
                          (rur/response)
                          (rur/header "Content-Type" "text/event-stream")))
-        sender (fn [ch]
-                 (fn [msg]
-                   (when-not (http/send! ch msg false)
-                     (log/warn "Failed to send message to channel"))))
-        send-events (fn [src ch]
-                      (ca/go-loop [msg (ca/<! src)]
-                        (if msg
-                          (if (http/send! ch (make-reply msg) false)
-                            (recur (ca/<! src))
-                            (do
-                              (log/warn "Could not send message to channel, stopping event transmission")
-                              (ca/untap mult src)
-                              (ca/close! src)))
-                          (do
-                            (log/debug "Event bus was closed, stopping event transmission")
-                            (http/send! ch (rur/response "") true)))))]
+        listener (atom nil)
+        make-listener (fn [ch]
+                        (let [l (fn [evt]
+                                  (when (allowed-events (:type evt))
+                                    (when-not (http/send! ch (make-reply evt) false)
+                                      (log/warn "Could not send message to channel, stopping event transmission")
+                                      (ec/remove-listener recv @listener))))]
+                          (reset! listener l)))]
     (http/as-channel
      req
      {:on-open (fn [ch]
                  (log/debug "Event stream opened:" ch)
-                 (ca/tap mult dest)
-                 ;; Pipe the messages from the tap to the channel
-                 (send-events dest ch))
+                 (ec/add-listener recv (make-listener ch)))
       :on-close (fn [_ status]
-                  (ca/untap mult dest)
+                  (ec/remove-listener recv @listener)
                   (log/debug "Event stream closed with status" status))})))

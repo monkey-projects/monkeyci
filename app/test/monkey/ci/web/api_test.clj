@@ -1,8 +1,7 @@
 (ns monkey.ci.web.api-test
   (:require [clojure.test :refer [deftest testing is]]
-            [monkey.ci
-             [events :as e]
-             [storage :as st]]
+            [monkey.ci.storage :as st]
+            [monkey.ci.events.core :as ec]
             [monkey.ci.web.api :as sut]
             [monkey.ci.helpers :as h]
             [org.httpkit.server :as http]))
@@ -281,19 +280,18 @@
 
   (testing "sends received events on open"
     (let [sent (atom [])
-          ch (->FakeChannel sent)]
-      (h/with-bus
-        (fn [bus]
-          (with-redefs [http/as-channel (fn [_ {:keys [on-open]}]
-                                          on-open)]
-            (let [f (sut/event-stream (h/->req {:event-bus bus}))]
-              (is (some? (f ch)))
-              (is (true? (e/post-event bus {:type :script/start})))
-              (is (true? (h/wait-until #(pos? (count @sent)) 500)))
-              (is (string? (-> @sent
-                               first
-                               :msg
-                               :body))))))))))
+          ch (->FakeChannel sent)
+          evt (ec/make-sync-events)]
+      (with-redefs [http/as-channel (fn [_ {:keys [on-open]}]
+                                      on-open)]
+        (let [f (sut/event-stream (h/->req {:events {:receiver evt}}))]
+          (is (some? (f ch)))
+          (is (some? (ec/post-events evt {:type :script/start})))
+          (is (not-empty @sent))
+          (is (string? (-> @sent
+                           first
+                           :msg
+                           :body))))))))
 
 (deftest make-build-ctx
   (testing "adds ref to build from branch query param"

@@ -65,6 +65,7 @@
 (def work-dir (from-config :work-dir))
 (def dev-mode? (from-config :dev-mode))
 (def ssh-keys-dir (from-config :ssh-keys-dir))
+(def events-receiver (comp :receiver :events))
 
 (defn get-arg [rt k]
   (k (args rt)))
