@@ -73,7 +73,7 @@
   [rt]
   (let [git (get-in rt [:git :clone])
         conf (-> (get-in rt [:build :git])
-                 (update :dir #(or % (c/checkout-dir rt))))
+                 (update :dir #(or % (build/checkout-dir rt))))
         add-script-dir (fn [{{:keys [script-dir checkout-dir]} :build :as rt}]
                          (assoc-in rt [:build :script-dir] (build/calc-script-dir checkout-dir script-dir)))]
     (log/debug "Checking out git repo with config" conf)

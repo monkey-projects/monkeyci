@@ -295,14 +295,13 @@
                                :msg
                                :body))))))))))
 
-(deftest trigger-build-event
+(deftest make-build-ctx
   (testing "adds ref to build from branch query param"
     (is (= "refs/heads/test-branch"
            (-> (h/test-ctx)
                (h/->req)
                (assoc-in [:parameters :query :branch] "test-branch")
-               (sut/trigger-build-event "test-build")
-               :build
+               (sut/make-build-ctx "test-build")
                :git
                :ref))))
 
@@ -311,8 +310,7 @@
            (-> (h/test-ctx)
                (h/->req)
                (assoc-in [:parameters :query :tag] "test-tag")
-               (sut/trigger-build-event "test-build")
-               :build
+               (sut/make-build-ctx "test-build")
                :git
                :ref))))
 
@@ -326,8 +324,7 @@
              (-> (h/->req ctx)
                  (assoc-in [:parameters :path] {:customer-id cid
                                                 :repo-id rid})
-                 (sut/trigger-build-event "test-build")
-                 :build
+                 (sut/make-build-ctx "test-build")
                  :git
                  :ssh-keys))))))
 

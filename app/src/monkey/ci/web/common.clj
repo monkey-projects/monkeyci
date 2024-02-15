@@ -39,7 +39,7 @@
 (defn req->storage
   "Retrieves storage object from the request context"
   [req]
-  (from-context req :storage))
+  (from-rt req :storage))
 
 (defn make-muuntaja
   "Creates muuntaja instance with custom settings"

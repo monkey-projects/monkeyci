@@ -255,43 +255,46 @@
       (some? tag)
       (str "refs/tags/" tag))))
 
-(defn trigger-build-event [{p :parameters :as req} bid]
+(defn make-build-ctx [{p :parameters :as req} bid]
   (let [acc (:path p)
         st (c/req->storage req)
         repo (st/find-repo st (repo-sid req))
         ssh-keys (->> (st/find-ssh-keys st (customer-id req))
                       (lbl/filter-by-label repo))]
-    {:type :build/triggered
-     :account acc
-     :build {:build-id bid
-             :git (-> (:query p)
-                      (select-keys [:commit-id :branch])
-                      (assoc :url (:url repo)
-                             :ssh-keys-dir (rt/ssh-keys-dir (c/req->rt req) bid))
-                      (mc/assoc-some :ref (params->ref p))
-                      (mc/assoc-some :ssh-keys ssh-keys))
-             :sid (-> acc
-                      (assoc :build-id bid)
-                      (st/ext-build-sid))}}))
+    {:build-id bid
+     :git (-> (:query p)
+              (select-keys [:commit-id :branch])
+              (assoc :url (:url repo)
+                     :ssh-keys-dir (rt/ssh-keys-dir (c/req->rt req) bid))
+              (mc/assoc-some :ref (params->ref p))
+              (mc/assoc-some :ssh-keys ssh-keys))
+     :sid (-> acc
+              (assoc :build-id bid)
+              (st/ext-build-sid))}))
 
 (defn trigger-build [req]
-  (c/posting-handler
-   req
-   (fn [{p :parameters}]
-     ;; TODO If no branch is specified, use the default
-     (let [acc (:path p)
-           bid (u/new-build-id)
-           st (c/req->storage req)
-           md (-> acc
-                  (select-keys [:customer-id :repo-id])
-                  (assoc :build-id bid
-                         :source :api
-                         :timestamp (System/currentTimeMillis)
-                         :ref (params->ref p))
-                  (merge (:query p)))]
-       (log/debug "Triggering build for repo sid:" (repo-sid req))
-       (when (st/create-build-metadata st md)
-         (trigger-build-event req bid))))))
+  (let [{p :parameters} req]
+    ;; TODO If no branch is specified, use the default
+    (let [acc (:path p)
+          bid (u/new-build-id)
+          st (c/req->storage req)
+          md (-> acc
+                 (select-keys [:customer-id :repo-id])
+                 (assoc :build-id bid
+                        :source :api
+                        :timestamp (System/currentTimeMillis)
+                        :ref (params->ref p))
+                 (merge (:query p)))
+          runner (c/from-rt req :runner)]
+      (log/debug "Triggering build for repo sid:" (repo-sid req))
+      (if (st/create-build-metadata st md)
+        (do
+          ;; Trigger the build but don't wait for the result
+          (runner (assoc (c/req->rt req) :build (make-build-ctx req bid)))
+          (-> (rur/response {:build-id bid})
+              (rur/status 202)))
+        (-> (rur/response {:message "Unable to create build metadata"})
+            (rur/status 500))))))
 
 (defn list-build-logs [req]
   (let [build-sid (st/ext-build-sid (get-in req [:parameters :path]))
