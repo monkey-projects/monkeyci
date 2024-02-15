@@ -60,4 +60,6 @@
   (make-sync-events))
 
 (defmethod rt/setup-runtime :events [conf _]
-  (make-events conf))
+  (let [e (make-events conf)]
+    (cond-> {:poster (partial post-events e)}
+      (satisfies? EventReceiver e) (assoc :receiver e))))

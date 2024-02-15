@@ -29,7 +29,7 @@
     (with-redefs [ci/create-container-instance (fn [_ opts]
                                                  {:status 500})]
       (let [received (atom [])]
-        (is (some? (sut/oci-runner {} {} {:event-poster (partial swap! received conj)})))
+        (is (some? (sut/oci-runner {} {} {:events {:poster (partial swap! received conj)}})))
         (is (not-empty @received))
         (is (= :build/completed (-> @received first :type)))))))
 

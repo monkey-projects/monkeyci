@@ -359,7 +359,7 @@
     (let [events (atom [])
           app (sut/make-app (merge
                              {:storage st
-                              :event-poster (partial swap! events conj)
+                              :events {:poster (partial swap! events conj)}
                               :config {:dev-mode true}
                               :runner (constantly nil)}
                              rt))
