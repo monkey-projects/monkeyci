@@ -11,7 +11,9 @@
             [buddy.sign.jwt :as jwt]
             [clojure.tools.logging :as log]
             [java-time.api :as jt]
-            [monkey.ci.storage :as st]
+            [monkey.ci
+             [runtime :as rt]
+             [storage :as st]]
             [monkey.ci.web.common :as c]
             [ring.util.response :as rur]))
 
@@ -50,9 +52,10 @@
         (.initialize 2048))
       (.generateKeyPair)))
 
-(defn keypair->ctx [kp]
+(defn keypair->rt [kp]
   {:pub (.getPublic kp)
    :priv (.getPrivate kp)})
+(def ^:deprecated keypair->ctx keypair->rt)
 
 (defn config->keypair
   "Loads private and public keys from the app config, returns a map that can be
@@ -79,12 +82,13 @@
              ;; Required by oci api gateway
              :use "sig")))
 
-(def ctx->pub-key (comp :pub :jwk))
+(def ^:deprecated ctx->pub-key (comp :pub :jwk))
+(def rt->pub-key (comp :pub :jwk))
 
 (defn jwks
   "JWKS endpoint handler"
   [req]
-  (if-let [k (c/from-context req ctx->pub-key)]
+  (if-let [k (c/from-rt req rt->pub-key)]
     (rur/response {:keys [(make-jwk k)]})
     (rur/not-found {:message "No JWKS configured"})))
 
@@ -99,12 +103,12 @@
 
 (defn secure-ring-app
   "Wraps the ring handler so it verifies the JWT authorization header"
-  [app ctx]
-  (let [pk (ctx->pub-key ctx)
+  [app rt]
+  (let [pk (rt->pub-key rt)
         backend (bb/jws {:secret pk
                          :token-name "Bearer"
                          :options {:alg :rs256}
-                         :authfn (partial lookup-user ctx)})]
+                         :authfn (partial lookup-user rt)})]
     (-> app
         (bmw/wrap-authentication backend))))
 
@@ -123,3 +127,6 @@
   (fn [req]
     (check-authorization! req)
     (h req)))
+
+(defmethod rt/setup-runtime :jwk [conf _]
+  (config->keypair conf))

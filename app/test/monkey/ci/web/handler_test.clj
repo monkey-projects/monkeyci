@@ -29,17 +29,17 @@
 
 (def github-secret "github-secret")
 
-(defn- test-ctx [& [opts]]
+(defn- test-rt [& [opts]]
   (-> (merge {:event-bus (events/make-bus)
-              :dev-mode true}
+              :config {:dev-mode true}}
              opts)
       (update :storage #(or % (st/make-memory-storage)))))
 
 (defn- make-test-app
   ([storage]
-   (sut/make-app (test-ctx {:storage storage})))
+   (sut/make-app (test-rt {:storage storage})))
   ([]
-   (sut/make-app (test-ctx))))
+   (sut/make-app (test-rt))))
 
 (def test-app (make-test-app))
 
@@ -100,7 +100,7 @@
                           (codecs/bytes->hex))
             hook-id (st/new-id)
             st (st/make-memory-storage)
-            app (sut/make-app (test-ctx {:storage st :dev-mode false}))]
+            app (sut/make-app (test-rt {:storage st :config {:dev-mode false}}))]
         (is (st/sid? (st/save-webhook-details st {:id hook-id
                                                   :secret-key github-secret})))
         (is (= 200 (-> (mock/request :post (str "/webhook/github/" hook-id))
@@ -110,13 +110,13 @@
                        :status)))))
 
     (testing "returns 401 if invalid security"
-      (let [app (sut/make-app (test-ctx {:dev-mode false}))]
+      (let [app (sut/make-app (test-rt {:config {:dev-mode false}}))]
         (is (= 401 (-> (mock/request :post "/webhook/github/test-hook")
                        (app)
                        :status)))))
 
     (testing "disables security check when in dev mode"
-      (let [dev-app (sut/make-app {:dev-mode true
+      (let [dev-app (sut/make-app {:config {:dev-mode true}
                                    :event-bus (events/make-bus)})]
         (is (= 200 (-> (mock/request :post "/webhook/github/test-hook")
                        (dev-app)
@@ -125,7 +125,7 @@
     (testing "passes id as path parameter"
       (h/with-bus
         (fn [bus]
-          (let [dev-app (sut/make-app {:dev-mode true
+          (let [dev-app (sut/make-app {:config {:dev-mode true}
                                        :event-bus bus})
                 l (events/wait-for bus :webhook/github (map :id))]
             (is (= 200 (-> (h/json-request :post "/webhook/github/test-hook"
@@ -187,9 +187,9 @@
 
   (h/with-memory-store st
     (let [kp (auth/generate-keypair)
-          ctx (test-ctx {:storage st
-                         :dev-mode false
-                         :jwk (auth/keypair->ctx kp)})
+          ctx (test-rt {:storage st
+                        :jwk (auth/keypair->ctx kp)
+                        :config {:dev-mode false}})
           cust-id (st/new-id)
           github-id 6453
           app (sut/make-app ctx)
@@ -360,7 +360,7 @@
       (fn [bus]
         (let [app (sut/make-app {:storage st
                                  :event-bus bus
-                                 :dev-mode true})
+                                 :config {:dev-mode true}})
               sid (generate-build-sid)
               path (repo-path sid)]
           (is (st/sid? (st/save-build-results st sid {:exit 0 :status :success})))
@@ -517,7 +517,7 @@
 
         (testing "/logs"
           (testing "`GET` retrieves list of available logs for build"
-            (let [app (sut/make-app (test-ctx {:logging {:retriever (->TestLogRetriever {})}}))
+            (let [app (sut/make-app (test-rt {:logging {:retriever (->TestLogRetriever {})}}))
                   l (->> (str (build-path sid) "/logs")
                          (mock/request :get)
                          (app))]
@@ -525,7 +525,7 @@
 
           (testing "`GET /download`"
             (testing "downloads log file by query param"
-              (let [app (sut/make-app (test-ctx
+              (let [app (sut/make-app (test-rt
                                        {:logging
                                         {:retriever
                                          (->TestLogRetriever {"out.txt" "test log file"})}}))
@@ -535,7 +535,7 @@
                 (is (= 200 (:status l)))))
 
             (testing "404 when log file not found"
-              (let [app (sut/make-app (test-ctx
+              (let [app (sut/make-app (test-rt
                                        {:logging
                                         {:retriever
                                          (->TestLogRetriever {})}}))
@@ -570,7 +570,7 @@
                               {:status 200 :body (h/to-raw-json {:name "test-user"
                                                                  :other-key "other-value"})}
                               {:status 400 :body (str "invalid auth header: " auth)})))]
-      (let [app (-> (test-ctx {:github {:client-id "test-client-id"
+      (let [app (-> (test-rt {:github {:client-id "test-client-id"
                                         :client-secret "test-secret"}
                                :jwk (auth/keypair->ctx (auth/generate-keypair))})
                     (sut/make-app))
@@ -584,7 +584,7 @@
                        :name))))))
 
   (testing "`GET /github/config` returns client id"
-    (let [app (-> (test-ctx {:github {:client-id "test-client-id"}})
+    (let [app (-> (test-rt {:github {:client-id "test-client-id"}})
                   (sut/make-app))
           r (-> (mock/request :get "/github/config")
                 (app))]

@@ -259,7 +259,7 @@
     (h req)))
 
 (defn make-router
-  ([{:keys [dev-mode] :as opts} routes]
+  ([rt routes]
    (ring/router
     routes
     {:data {:middleware (vec (concat [stringify-body
@@ -273,19 +273,20 @@
                                       log-request]))
             :muuntaja (c/make-muuntaja)
             :coercion reitit.coercion.schema/coercion
-            ::c/context opts}
+            ::c/context rt ; TODO Remove this
+            ::c/runtime rt}
      ;; Disabled, results in 405 errors for some reason
      ;;:compile rc/compile-request-coercers
      :reitit.middleware/registry
-     {:github-security (if dev-mode
+     {:github-security (if (rt/dev-mode? rt)
                          ;; Disable security in dev mode
                          [passthrough-middleware]
                          [github/validate-security])
-      :customer-check (if dev-mode
+      :customer-check (if (rt/dev-mode? rt)
                         [passthrough-middleware]
                         [auth/customer-authorization])}}))
-  ([opts]
-   (make-router opts routes)))
+  ([rt]
+   (make-router rt routes)))
 
 (defn make-app [opts]
   (-> (make-router opts)

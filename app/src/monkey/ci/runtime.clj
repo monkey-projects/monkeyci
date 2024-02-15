@@ -49,6 +49,10 @@
 
 (def config :config)
 
+(def app-mode (comp :app-mode config))
+(def cli-mode? (comp (partial = :cli) app-mode))
+(def server-mode? (comp (partial = :server) app-mode))
+
 (def account (comp :account config))
 (def args (comp :args config))
 (def reporter :reporter)
@@ -56,6 +60,7 @@
 (def log-maker (comp :maker :logging))
 (def log-retriever (comp :retriever :logging))
 (def work-dir (comp :work-dir config))
+(def dev-mode? (comp :dev-mode config))
 
 (defn get-arg [rt k]
   (k (args rt)))

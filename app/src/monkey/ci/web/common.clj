@@ -15,11 +15,21 @@
              [parameters :as rrmp]]
             [ring.util.response :as rur]))
 
-(defn req->ctx [req]
+(defn ^:deprecated req->ctx [req]
   (get-in req [:reitit.core/match :data ::context]))
 
-(defn from-context [req f]
+(defn ^:deprecated from-context [req f]
   (f (req->ctx req)))
+
+(defn req->rt
+  "Gets the runtime from the request"
+  [req]
+  (get-in req [:reitit.core/match :data ::runtime]))
+
+(defn from-rt
+  "Applies `f` to the request runtime"
+  [req f]
+  (f (req->rt req)))
 
 (defn req->bus
   "Gets the event bus from the request data"

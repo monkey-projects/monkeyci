@@ -63,7 +63,7 @@
 (defn run-build
   "Performs a build, using the runner from the context.  Returns a deferred
    that will complete when the build finishes."
-  [{:keys [work-dir event-bus] :as ctx}]
+  [{:keys [event-bus] :as ctx}]
   (let [r (:runner ctx)
         acc (result-accumulator ctx)]
     (report-evt ctx {:type :script/start})
@@ -84,7 +84,7 @@
        (rt/report rt)))
 
 (defn http-server
-  "Does nothing but return a channel that will never close.  The http server 
+  "Does nothing but return a deferred that will never resolve.  The http server 
    should already be started by the component system."
   [ctx]
   (rt/report ctx (-> ctx
