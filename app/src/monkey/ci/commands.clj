@@ -2,17 +2,13 @@
   "Event handlers for commands"
   (:require [clojure.tools.logging :as log]
             [clojure.core.async :as ca]
-            [clojure.java.io :as io]
             [monkey.ci
              [build :as b]
-             [context :as mcc]
              [events :as e]
              [runtime :as rt]
              [sidecar :as sidecar]
-             [storage :as st]
              [utils :as u]]
             [aleph.http :as http]
-            [babashka.fs :as fs]
             [clj-commons.byte-streams :as bs]
             [manifold.deferred :as md]
             [org.httpkit.client :as hk]))
@@ -100,8 +96,8 @@
 (defn watch
   "Starts listening for events and prints the results.  The arguments determine
    the event filter (all for a customer, project, or repo)."
-  [{:keys [event-bus] :as ctx}]
-  (let [url (rt/api-url ctx)
+  [rt]
+  (let [url (rt/api-url rt)
         ch (ca/chan)
         pipe-events (fn [r]
                       (let [read-next (fn [] (u/parse-edn r {:eof ::done}))]
@@ -113,11 +109,11 @@
                               (ca/close! ch))
                             (do
                               (log/debug "Got event:" m)
-                              (rt/report ctx {:type :build/event :event m})
+                              (rt/report rt {:type :build/event :event m})
                               (recur (read-next)))))))]
     (log/info "Watching the server at" url "for events...")
-    (rt/report ctx {:type :watch/started
-                    :url url})
+    (rt/report rt {:type :watch/started
+                   :url url})
     ;; TODO Trailing slashes
     ;; TODO Customer and other filtering
     ;; Unfortunately, http-kit can't seem to handle SSE, so we use Aleph instead

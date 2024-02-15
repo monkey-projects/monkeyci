@@ -46,5 +46,13 @@
                   ;; Setup a system with a custom bus
                   inv (sut/system-invoker cmd {} (c/system-map :bus bus))
                   out (inv {})]
-              (is (pos? (count @hooks))))))))))
+              (is (pos? (count @hooks)))))))
+
+      (testing "passes runtime when app-mode is specified"
+        (let [inv (sut/system-invoker {:command identity
+                                       :app-mode :cli}
+                                      {}
+                                      {})]
+          ;; Runtime has a config entry
+          (is (some? (:config (inv {})))))))))
 

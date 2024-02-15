@@ -61,7 +61,7 @@
   (k (args rt)))
 
 (defn report
-  "Reports `obj` to the user with the reporter from the runtimet."
+  "Reports `obj` to the user with the reporter from the runtime."
   [rt obj]
   (when-let [r (reporter rt)]
     (r obj)))
@@ -70,5 +70,16 @@
   "Creates a runtime for the given mode (server, cli, script) from the specified 
    configuration and passes it to `f`."
   [conf mode f]
-  ;; TODO Apply mode
-  (f (config->runtime conf)))
+  (let [rt (-> conf
+               (assoc :app-mode mode)
+               (config->runtime))]
+    ;; TODO Start/stop runtime
+    (f rt)))
+
+(defmacro with-runtime
+  "Convenience macro that wraps `with-runtime-fn` by binding runtime to `r` and 
+   invoking the body."
+  [conf mode r body]
+  `(with-runtime-fn ~conf ~mode
+     (fn [~r]
+       ~@body)))

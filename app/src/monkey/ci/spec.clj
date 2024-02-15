@@ -30,7 +30,11 @@
 (s/def :evt/event-handler (s/keys :req-un [:evt/channel :evt/type]
                                   :opt-un [:evt/handler :evt/tx :evt/loop]))
 
-;; Application configuration spec
+;;; Application configuration spec
+
+;; App mode: how is this application being run?  Mode influences how the
+;; runtime is set up.
+(s/def :conf/app-mode #{:server :cli :script})
 
 (s/def :conf/dev-mode boolean?)
 ;; HTTP server configuration
@@ -185,7 +189,7 @@
 ;; Application configuration
 (s/def ::app-config (s/keys :req-un [:conf/http :conf/runner :conf/logging :conf/containers
                                      :conf/storage :conf/workspace :conf/artifacts :conf/cache]
-                            :opt-un [:conf/work-dir :conf/checkout-base-dir :conf/ssh-keys-dir
+                            :opt-un [:conf/app-mode :conf/work-dir :conf/checkout-base-dir :conf/ssh-keys-dir
                                      :conf/dev-mode :conf/args :conf/jwk :conf/account :conf/sidecar]))
 ;; Application context.  This is the result of processing the configuration and is passed
 ;; around internally.
