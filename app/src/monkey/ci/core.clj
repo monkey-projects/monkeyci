@@ -71,6 +71,7 @@
        (if app-mode
          ;; When app mode is specified, pass the runtime for new-style invocations
          (rt/with-runtime config app-mode runtime
+           (log/info "Executing command:" command)
            (command runtime))
          ;; Legacy invocations: auto-create the system components
          (legacy-system-invoke cmd config base-system)))))

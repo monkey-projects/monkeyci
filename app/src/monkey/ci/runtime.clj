@@ -79,7 +79,7 @@
 (defmacro with-runtime
   "Convenience macro that wraps `with-runtime-fn` by binding runtime to `r` and 
    invoking the body."
-  [conf mode r body]
+  [conf mode r & body]
   `(with-runtime-fn ~conf ~mode
      (fn [~r]
        ~@body)))

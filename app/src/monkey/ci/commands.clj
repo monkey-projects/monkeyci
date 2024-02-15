@@ -1,7 +1,6 @@
 (ns monkey.ci.commands
   "Event handlers for commands"
   (:require [clojure.tools.logging :as log]
-            [clojure.core.async :as ca]
             [monkey.ci
              [build :as b]
              [events :as e]
@@ -91,22 +90,21 @@
   (rt/report ctx (-> ctx
                      (select-keys [:http])
                      (assoc :type :server/started)))
-  (ca/chan))
+  (md/deferred))
 
 (defn watch
   "Starts listening for events and prints the results.  The arguments determine
    the event filter (all for a customer, project, or repo)."
   [rt]
   (let [url (rt/api-url rt)
-        ch (ca/chan)
+        d (md/deferred)
         pipe-events (fn [r]
                       (let [read-next (fn [] (u/parse-edn r {:eof ::done}))]
                         (loop [m (read-next)]
                           (if (= ::done m)
                             (do
                               (log/info "Event stream closed")
-                              (ca/offer! ch 0) ; Exit code 0
-                              (ca/close! ch))
+                              (md/success! d 0)) ; Exit code 0
                             (do
                               (log/debug "Got event:" m)
                               (rt/report rt {:type :build/event :event m})
@@ -124,8 +122,8 @@
         (md/on-realized pipe-events
                         (fn [err]
                           (log/error "Unable to receive server events:" err))))
-    ;; cli-matic will wait for this channel to close
-    ch))
+    ;; Return a deferred that only resolves when the event stream stops
+    d))
 
 (defn sidecar
   "Runs the application as a sidecar, that is meant to capture events 

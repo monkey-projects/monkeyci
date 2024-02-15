@@ -106,20 +106,20 @@
                    :build)))))
 
 (deftest http-server
-  (testing "returns a channel"
-    (is (spec/channel? (sut/http-server {})))))
+  (testing "returns a deferred"
+    (is (md/deferred? (sut/http-server {})))))
 
 (deftest watch
-  (testing "sends request and returns channel"
+  (testing "sends request and returns deferred"
     (with-redefs [http/get (constantly (md/success-deferred nil))]
-      (is (spec/channel? (sut/watch {})))))
+      (is (md/deferred? (sut/watch {})))))
 
   (testing "reports received events from reader"
     (let [events (prn-str {:type :script/started
                            :message "Test event"})
           reported (atom [])]
       (with-redefs [http/get (constantly (md/success-deferred {:body (bs/to-reader events)}))]
-        (is (spec/channel? (sut/watch {:reporter (partial swap! reported conj)})))
+        (is (md/deferred? (sut/watch {:reporter (partial swap! reported conj)})))
         (is (not-empty @reported))))))
 
 (deftest sidecar

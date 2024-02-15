@@ -36,12 +36,14 @@
 (def list-build-cmd
   {:command "list"
    :description "Lists builds for customer or repo"
-   :runs {:command cmd/list-builds}})
+   :runs {:command cmd/list-builds
+          :app-mode :cli}})
 
 (def watch-cmd
   {:command "watch"
    :description "Logs build events for customer or repo"
-   :runs {:command cmd/watch}})
+   :runs {:command cmd/watch
+          :app-mode :cli}})
 
 (def build-cmd
   {:command "build"
@@ -87,7 +89,8 @@
            :short "s"
            :type :string
            :default :present}]
-   :runs {:command cmd/sidecar}})
+   :runs {:command cmd/sidecar
+          :app-mode :script}})
 
 (def base-config
   {:name "monkey-ci"
