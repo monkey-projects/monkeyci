@@ -92,7 +92,7 @@
 (defmethod make-logger :oci [conf]
   (fn [ctx path]
     (-> conf
-        (oci/ctx->oci-config :logging)
+        :logging
         (->OciBucketLogger ctx path))))
 
 (defn handle-process-streams
@@ -182,7 +182,7 @@
 
 (defmethod make-log-retriever :oci [conf]
   (let [oci-conf (-> conf
-                     (oci/ctx->oci-config :logging)
+                     :logging
                      (oci/->oci-config))
         client (os/make-client oci-conf)]
     (->OciBucketLogRetriever client oci-conf)))

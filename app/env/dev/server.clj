@@ -1,11 +1,12 @@
 (ns server
-  (:require [com.stuartsierra.component :as sc]
+  (:require [clojure.spec.alpha :as s]
             [config :as co]
-            [config.core :as cc]
             [monkey.ci
              [config :as config]
              [core :as c]
              [events :as e]
+             [runtime :as rt]
+             [spec :as mcs]
              [utils :as u]]
             [monkey.ci.web.auth :as auth]
             [org.httpkit.server :as http]))
@@ -15,20 +16,26 @@
 (defn stop-server []
   (swap! server (fn [s]
                   (when s
-                    (sc/stop-system s))
+                    (s))
                   nil)))
+
+(defn validate-config [c]
+  (when-not (s/valid? ::mcs/app-config c)
+    (s/explain ::mcs/app-config c))
+  c)
 
 (defn start-server []
   (stop-server)
-  (reset! server (-> c/base-system                     
-                     (assoc :config (-> @co/global-config
-                                        (merge {:dev-mode true
-                                                :work-dir (u/abs-path "tmp")
-                                                :checkout-base-dir (u/abs-path "tmp/checkout")
-                                                :ssh-keys-dir (u/abs-path "tmp/ssh-keys")})
-                                        (config/normalize-config {} {})))
-                     (sc/subsystem [:http])
-                     (sc/start-system)))
+  (let [rt (-> @co/global-config
+               (merge {:dev-mode true
+                       :http {:port 3000}
+                       :work-dir (u/abs-path "tmp")
+                       :checkout-base-dir (u/abs-path "tmp/checkout")
+                       :ssh-keys-dir (u/abs-path "tmp/ssh-keys")})
+               (config/normalize-config {} {})
+               (validate-config)
+               (rt/config->runtime))]
+    (reset! server ((:http rt) rt)))
   nil)
 
 (defn get-server-port []
@@ -37,12 +44,6 @@
           :http
           :server
           http/server-port))
-
-(defn post-event
-  "Posts event in the current server bus"
-  [evt]
-  (-> (get-in @server [:context :event-bus])
-      (e/post-event evt)))
 
 (defn private-key []
   (some-> @server :context :jwk :priv))

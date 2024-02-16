@@ -12,26 +12,26 @@
             [com.stuartsierra.component :as co]
             [monkey.ci.spec :as s]))
 
-(def initial-runtime
-  {})
-
 (defmulti setup-runtime (fn [_ k] k))
 
 (defmethod setup-runtime :default [_ k]
-  (get initial-runtime k))
+  {})
 
 (defn config->runtime
   "Creates the runtime from the normalized config map"
-  ;; TODO Add mode parameter
   [conf]
   {:pre  [(spec/valid? ::s/app-config conf)]
    ;;:post [(spec/valid? ::s/runtime %)]
    }
-  (-> (reduce-kv (fn [r k v]
-                   (assoc r k (setup-runtime conf k)))
-                 initial-runtime
-                 conf)
-      (assoc :config conf)))
+  ;; Apply each of the discovered runtime setup implementations
+  (let [m (-> (methods setup-runtime)
+              (dissoc :default)
+              (keys))]
+    (-> (reduce (fn [r k]
+                  (assoc r k (setup-runtime conf k)))
+                {}
+                m)
+        (assoc :config conf))))
 
 (defn start
   "Starts the runtime by starting all parts as a component tree.  Returns a

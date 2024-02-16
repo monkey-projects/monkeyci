@@ -14,6 +14,7 @@
              [cli :as mcli]
              [components :as co]
              [config :as config]
+             [git]
              [logging]
              [reporting]
              [runtime :as rt]
