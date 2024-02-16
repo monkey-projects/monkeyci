@@ -8,7 +8,6 @@
              [artifacts :as art]
              [blob :as blob]
              [config :as config]
-             [context :as c]
              [oci :as oci]
              [runtime :as rt]]))
 

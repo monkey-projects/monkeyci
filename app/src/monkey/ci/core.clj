@@ -6,13 +6,11 @@
   (:gen-class)
   (:require [cli-matic.core :as cli]
             [clojure.tools.logging :as log]
-            [com.stuartsierra.component :as sc]
             [config.core :refer [env]]
             [monkey.ci
              [artifacts]
              [cache]
              [cli :as mcli]
-             [components :as co]
              [config :as config]
              [git]
              [logging]
@@ -28,56 +26,20 @@
              [file]
              [oci]]))
 
-;; The base system components.  Depending on the command that's being
-;; executed, a subsystem will be created and initialized.
-(def base-system
-  (sc/system-map
-   :bus (co/new-bus)
-   :context (-> (co/new-context nil)
-                (sc/using {:event-bus :bus
-                           :config :config
-                           :storage :storage}))
-   :http (-> (co/new-http-server)
-             (sc/using [:context :listeners]))
-   :listeners (-> (co/new-listeners)
-                  (sc/using [:bus :context]))
-   :storage (-> (co/new-storage)
-                (sc/using [:config]))))
-
-(def always-required-components [:bus :context])
-
-(defn- legacy-system-invoke [{:keys [command requires]} config base-system]
-  (let [sys (-> base-system
-                (assoc :config config)
-                (sc/subsystem (concat requires always-required-components))
-                (sc/start-system))
-        ctx (:context sys)]
-    ;; Register shutdown hook to stop the system
-    (u/add-shutdown-hook! #(sc/stop-system sys))
-    ;; Run the command with the context.  If this returns a channel, then
-    ;; cli-matic will wait until it closes.  If this returns a number, will use
-    ;; it as the process exit code.
-    (command (assoc ctx :system sys))))
-
 (defn system-invoker
   "The event invoker starts a subsystem according to the command requirements,
    and posts the `command/invoked` event.  This event should be picked up by a
    handler in the system.  When the command is complete, it should post a
    `command/completed` event for the same command.  By default it uses the base
    system, but you can specify your own for testing purposes."
-  ([{:keys [command app-mode] :as cmd} env base-system]
-   (fn [args]
-     (log/debug "Invoking command with arguments:" args)
-     (let [config (config/app-config env args)]
-       (if app-mode
-         ;; When app mode is specified, pass the runtime for new-style invocations
-         (rt/with-runtime config app-mode runtime
-           (log/info "Executing command:" command)
-           (command runtime))
-         ;; Legacy invocations: auto-create the system components
-         (legacy-system-invoke cmd config base-system)))))
-  ([cmd env]
-   (system-invoker cmd env base-system)))
+  [{:keys [command app-mode] :as cmd} env]
+  (fn [args]
+    (log/debug "Invoking command with arguments:" args)
+    (let [config (config/app-config env args)]
+      ;; When app mode is specified, pass the runtime for new-style invocations
+      (rt/with-runtime config app-mode runtime
+        (log/info "Executing command:" command)
+        (command runtime)))))
 
 (defn make-cli-config [{:keys [cmd-invoker env] :or {cmd-invoker system-invoker}}]
   (letfn [(invoker [cmd]

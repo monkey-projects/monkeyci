@@ -111,3 +111,18 @@
   (cond-> (build-completed-result build exit-code)
     true (assoc :type :build/completed)
     (not-empty keyvals) (merge (apply hash-map keyvals))))
+
+(def step-work-dir
+  "Given a context, determines the step working directory.  This is either the
+   work dir as configured on the step, or the context work dir, or the process dir."
+  (comp
+   (memfn getCanonicalPath)
+   io/file
+   (some-fn (comp :work-dir :step)
+            :checkout-dir
+            (constantly (u/cwd)))))
+
+(defn step-relative-dir
+  "Calculates path `p` as relative to the work dir for the current step"
+  [rt p]
+  (u/abs-path (step-work-dir rt) p))

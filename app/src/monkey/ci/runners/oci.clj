@@ -7,7 +7,6 @@
             [monkey.ci
              [build :as b]
              [config :as config]
-             [context :as ctx]
              [oci :as oci]
              [runners :as r]
              [runtime :as rt]
@@ -18,7 +17,7 @@
 (def format-sid (partial cs/join "/"))
 
 (defn- ->env [rt pk?]
-  (->> (cond-> (ctx/ctx->env rt)
+  (->> (cond-> (rt/rt->env rt)
          ;; FIXME This will turn out wrong if the private key is specified elsewhere
          ;; TODO Move this to oci ns
          pk? (assoc-in [:oci :credentials :private-key] (str oci/key-dir "/" oci/privkey-file)))

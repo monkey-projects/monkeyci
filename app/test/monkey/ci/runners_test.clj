@@ -144,48 +144,6 @@
       (is (= (assoc-in rt [:build :workspace] "test-build.tgz")
              (sut/store-src rt))))))
 
-#_(deftest build-completed
-  (testing "returns exit code for each type"
-    (->> [:success :warning :error nil]
-         (map (fn [t]
-                (is (number? (sut/build-completed {:event {:result t
-                                                           :exit 0}})))))
-         (doall)))
-
-  (testing "deletes git dir if different from app working dir"
-    (h/with-tmp-dir dir
-      (let [sub (doto (io/file dir "work")
-                  (.mkdirs))]
-        (is (true? (.exists sub)))
-        (is (some? (sut/build-completed
-                    {:event
-                     {:exit 0}
-                     :build {:git {:dir (.getCanonicalPath sub)}}})))
-        (is (false? (.exists sub))))))
-
-  (testing "deletes ssh keys dir"
-    (h/with-tmp-dir dir
-      (let [sub (doto (io/file dir "ssh-keys")
-                  (.mkdirs))]
-        (is (true? (.exists sub)))
-        (is (some? (sut/build-completed
-                    {:event
-                     {:exit 0}
-                     :build {:git {:ssh-keys-dir (.getCanonicalPath sub)}}})))
-        (is (false? (.exists sub))))))
-
-  (testing "does not delete working dir if same as app work dir"
-    (h/with-tmp-dir dir
-      (let [sub (doto (io/file dir "work")
-                  (.mkdirs))
-            wd (.getCanonicalPath sub)]
-        (is (true? (.exists sub)))
-        (is (some? (sut/build-completed
-                    {:event
-                     {:exit 0}
-                     :build {:git {:dir (u/cwd)}}})))
-        (is (true? (.exists sub)))))))
-
 (deftest make-runner
   (testing "provides child type"
     (is (fn? (sut/make-runner {:runner {:type :child}}))))
@@ -200,43 +158,3 @@
       (is (fn? r))
       (is (pos? (r {}))))))
 
-(deftest build
-  (testing "converts payload and invokes runner"
-    (let [evt {:build {:build-id "test-build"
-                       :git {:id "test-commit-id"
-                             :branch "master"
-                             :url "https://test/repo.git"}}}
-          ctx {:runner (comp ca/to-chan! vector :git :build)
-               :event evt
-               :checkout-base-dir "test-dir"}]
-      (is (= {:url "https://test/repo.git"
-              :branch "master"
-              :id "test-commit-id"}
-             (-> (sut/build ctx)
-                 (h/try-take)
-                 (select-keys [:url :branch :id]))))))
-
-  (testing "combines checkout base dir and build id for checkout dir"
-    (let [ctx {:runner (comp ca/to-chan! vector :dir :git :build)
-               :event {:build {:build-id "test-build"}}
-               :checkout-base-dir "test-dir"}]
-      (is (re-matches #".*test-dir/test-build" 
-                      (h/try-take (sut/build ctx))))))
-
-  (testing "closes the result channel on completion"
-    (let [ch (ca/to-chan! [:failed])]
-      (is (some? (sut/build {:runner (constantly ch)})))
-      (is (nil? (h/try-take ch 1000 :timeout)))))
-
-  (testing "on error, fires `:build/completed` event"
-    (h/with-bus
-      (fn [bus]
-        (let [events (atom [])
-              _ (e/register-handler bus :build/completed (partial swap! events conj))
-              ctx {:runner (fn [_]
-                             (throw (ex-info "test error" {})))
-                   :event {:build {:build-id ::test-build}}
-                   :event-bus bus}]
-          (is (true? (sut/build ctx)))
-          (is (not= :timeout (h/wait-until #(pos? (count @events)) 1000)))
-          (is (= ::test-build (-> @events first :build :build-id))))))))

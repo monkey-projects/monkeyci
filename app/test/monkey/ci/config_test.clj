@@ -5,7 +5,6 @@
             [clojure.string :as cs]
             [monkey.ci
              [config :as sut]
-             [context :as ctx]
              [logging]
              [spec :as spec]]
             [monkey.ci.web.github]
@@ -121,11 +120,6 @@
       (let [c (sut/app-config {} {})]
         (is (s/valid? ::spec/app-config c)
             (s/explain-str ::spec/app-config c)))))
-
-  (testing "provides log-dir as absolute path"
-    (is (re-matches #".+test-dir$" (-> {:monkeyci-logging-dir "test-dir"}
-                                       (sut/app-config {})
-                                       (ctx/log-dir)))))
 
   (testing "loads config from `config-file` path"
     (h/with-tmp-dir dir

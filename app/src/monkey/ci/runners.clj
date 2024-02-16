@@ -1,8 +1,7 @@
 (ns monkey.ci.runners
   "Defines runner functionality.  These depend on the application configuration.
    A runner is able to execute a build script."
-  (:require [clojure.core.async :as ca]
-            [clojure.java.io :as io]
+  (:require [clojure.java.io :as io]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
@@ -10,7 +9,6 @@
              [blob :as b]
              [build :as build]
              [config :as config]
-             [context :as c]
              [process :as p]
              [runtime :as rt]
              [utils :as u]]))
@@ -118,40 +116,6 @@
   ;; Fallback
   (log/warn "No runner configured, using fallback configuration")
   (constantly 2))
-
-(defn- take-and-close
-  "Takes the first value from channel `ch` and closes it.  Closing the channel
-   is necessary to ensure cleanup."
-  [ch]
-  (ca/go
-    (let [r (ca/<! ch)]
-      (ca/close! ch)
-      r)))
-
-(defn ^:deprecated build
-  "Event handler that reacts to a prepared build event.  The incoming event
-   should contain the necessary information to start the build.  The build 
-   runner performs the repo clone and checkout and runs the script.  Closes
-   the channel when the build has completed."
-  [{:keys [runner] {:keys [build]} :event :as ctx}]
-  (try 
-    (let [{:keys [build-id]} build
-          ;; Use combination of checkout dir and build id for checkout
-          workdir (c/checkout-dir ctx build-id)
-          conf (assoc-in build [:git :dir] workdir)]
-      (log/debug "Starting build with config:" conf)
-      (-> ctx
-          (assoc :build conf)
-          (runner)
-          (take-and-close)))
-    (catch Exception ex
-      (log/error "Failed to build" (:sid build) ex)
-      (c/post-events ctx
-                     {:type :build/completed
-                      :build build
-                      :result :error
-                      :exit 2
-                      :exception ex}))))
 
 ;;; Configuration handling
 
