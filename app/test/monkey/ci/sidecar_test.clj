@@ -3,6 +3,7 @@
             [clojure.java.io :as io]
             [manifold.deferred :as md]
             [monkey.ci
+             [config :as c]
              [sidecar :as sut]
              [spec :as spec]]
             [monkey.ci.helpers :as h]))
@@ -15,8 +16,8 @@
                  :message "This is a test event"}
             recv (atom [])
             rt {:events {:poster (partial swap! recv conj)}
-                :config {:args {:events-file f}
-                         :sidecar {:poll-interval 10}}}
+                :config {:sidecar {:poll-interval 10
+                                   :events-file f}}}
             _ (spit f (prn-str evt))
             c (sut/poll-events rt)]
         (is (md/deferred? c))
@@ -33,8 +34,8 @@
                  :message "This is a test event"}
             recv (atom [])
             rt {:events {:poster (partial swap! recv conj)}
-                :config {:args {:events-file f}
-                         :sidecar {:poll-interval 10}}}
+                :config {:sidecar {:events-file f
+                                   :poll-interval 10}}}
             c (sut/poll-events rt)]
         ;; Post the event after sidecar has started
         (is (nil? (spit f (prn-str evt))))
@@ -53,7 +54,7 @@
     (let [stored (atom {"path/to/workspace" "local/dir"})
           store (h/->FakeBlobStore stored)
           rt {:build {:workspace "path/to/workspace"
-                      :git {:dir "local/dir"}}
+                      :checkout-dir "local/dir"}
                :workspace {:store store}}]
       (is (true? (-> (sut/restore-src rt)
                      (get-in [:workspace :restored?]))))
@@ -63,6 +64,20 @@
   (testing "creates start file"
     (h/with-tmp-dir dir
       (let [start (io/file dir "start")
-            rt {:args {:start-file (.getCanonicalPath start)}}]
+            rt {:config
+                {:sidecar {:start-file (.getCanonicalPath start)}}}]
         (is (= rt (sut/mark-start rt)))
         (is (.exists start))))))
+
+(deftest normalize-key
+  (testing "adds events file from args"
+    (is (= "test-file" (-> (c/normalize-key :sidecar {:sidecar {}
+                                                      :args {:events-file "test-file"}})
+                           :sidecar
+                           :events-file))))
+
+  (testing "adds start file from args"
+    (is (= "test-file" (-> (c/normalize-key :sidecar {:sidecar {}
+                                                      :args {:start-file "test-file"}})
+                           :sidecar
+                           :start-file)))))

@@ -10,24 +10,28 @@
              [runtime :as rt]
              [utils :as u]]))
 
-(defn restore-src [{:keys [build] :as ctx}]
-  (let [store (get-in ctx [:workspace :store])
+(defn restore-src [{:keys [build] :as rt}]
+  (let [store (get-in rt [:workspace :store])
         ws (:workspace build)
-        checkout (get-in build [:git :dir])
-        restore (fn [ctx]
+        checkout (:checkout-dir build)
+        restore (fn [rt]
                   @(md/chain
                     (blob/restore store ws checkout)
                     (fn [_]
-                      (assoc-in ctx [:workspace :restored?] true))))]
-    (cond-> ctx
+                      (assoc-in rt [:workspace :restored?] true))))]
+    (cond-> rt
       (and store ws checkout)
       (restore))))
 
-(defn mark-start [ctx]
-  (let [s (get-in ctx [:args :start-file])]
+(defn- get-config [rt k]
+  (-> rt rt/config :sidecar k))
+
+(defn mark-start [rt]
+  (let [s (get-config rt :start-file)]
     (when (not-empty s)
+      (log/debug "Creating start file:" s)
       (fs/create-file s))
-    ctx))
+    rt))
 
 (defn- maybe-create-file [f]
   (when-not (fs/exists? f)
@@ -35,7 +39,7 @@
   f)
 
 (defn poll-events [rt]
-  (let [f (-> (:events-file (rt/args rt))
+  (let [f (-> (get-config rt :events-file)
               (maybe-create-file))
         read-next (fn [r]
                     (u/parse-edn r {:eof ::eof}))
@@ -47,10 +51,8 @@
           (loop [evt (read-next r)]
             ;; TODO Also stop when the process we're monitoring has terminated
             (if (not (fs/exists? f))
-               ;; Done when the events file is deleted
-              (do
-                (log/debug "Stopped reading events")
-                0)
+              ;; Done when the events file is deleted
+              0
               (when (if (= ::eof evt)
                       (do
                         ;; EOF reached, wait a bit and retry
@@ -62,7 +64,9 @@
                 (recur (read-next r))))))
         (catch Exception ex
           (log/error "Failed to read events" ex)
-          1)))))
+          1)
+        (finally
+          (log/debug "Stopped reading events"))))))
 
 (defn run [rt]
   (-> rt
@@ -70,5 +74,10 @@
       (mark-start)
       (poll-events)))
 
+(defn- add-from-args [conf k]
+  (update-in conf [:sidecar k] #(or (get-in conf [:args k]) %)))
+
 (defmethod c/normalize-key :sidecar [_ conf]
-  conf)
+  (-> conf
+      (add-from-args :events-file)
+      (add-from-args :start-file)))
