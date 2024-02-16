@@ -63,11 +63,11 @@
   "Generates a string that will be added as a commandline argument
    to the clojure process when running the script.  Any existing `deps.edn`
    should be used as well."
-  [{{:keys [script-dir]} :build :keys [dev-mode]}]
-  (when dev-mode
+  [{{:keys [script-dir]} :build :as rt}]
+  (when (rt/dev-mode? rt)
     (log/debug "Running in development mode, using local src instead of libs"))
   (let [version-or (fn [f]
-                     (if dev-mode
+                     (if (rt/dev-mode? rt)
                        {:local/root (f)}
                        {:mvn/version (version)}))
         log-config (io/file script-dir "logback.xml")]

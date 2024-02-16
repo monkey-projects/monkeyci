@@ -6,6 +6,7 @@
             [clojure.core.async :refer [go <!! <!]]
             [clojure.java.io :as io]
             [clojure.tools.logging :as log]
+            [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
              [config :as config]
@@ -109,7 +110,8 @@
       (if-let [build (create-build rt {:id (get-in p [:path :id])
                                        :payload (:body p)})]
         (let [runner (rt/runner rt)]
-          (runner (assoc rt :build build))
+          (md/future
+            (runner (assoc rt :build build)))
           (rur/response {:build-id "todo"}))
         ;; No valid webhook found
         (rur/not-found {:message "No valid webhook configuration found"})))

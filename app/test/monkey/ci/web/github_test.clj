@@ -45,7 +45,7 @@
                                       :body
                                       {:head-commit {:id "test-id"}}}))]
       (is (= 200 (:status (sut/webhook req))))
-      (is (some? @inv))))
+      (is (not= :timeout (h/wait-until #(some? @inv) 1000)))))
 
   (testing "ignores non-commit events"
     (let [inv (atom nil)

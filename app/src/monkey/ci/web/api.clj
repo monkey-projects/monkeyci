@@ -1,6 +1,7 @@
 (ns monkey.ci.web.api
   (:require [camel-snake-kebab.core :as csk]
             [clojure.tools.logging :as log]
+            [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
              [labels :as lbl]
@@ -289,7 +290,8 @@
       (if (st/create-build-metadata st md)
         (do
           ;; Trigger the build but don't wait for the result
-          (runner (assoc (c/req->rt req) :build (make-build-ctx req bid)))
+          (md/future
+            (runner (assoc (c/req->rt req) :build (make-build-ctx req bid))))
           (-> (rur/response {:build-id bid})
               (rur/status 202)))
         (-> (rur/response {:message "Unable to create build metadata"})
