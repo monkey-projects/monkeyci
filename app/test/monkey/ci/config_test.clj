@@ -5,7 +5,6 @@
             [clojure.string :as cs]
             [monkey.ci
              [config :as sut]
-             [context :as ctx]
              [logging]
              [spec :as spec]]
             [monkey.ci.web.github]
@@ -18,6 +17,11 @@
       (binding [sut/*home-config-file* f]
         (is (nil? (spit f (pr-str config))))
         (body)))))
+
+(deftest default-app-config
+  (testing "default config is valid config according to spec"
+    (is (s/valid? ::spec/app-config sut/default-app-config)
+        (s/explain-str ::spec/app-config sut/default-app-config))))
 
 (deftest group-keys
   (testing "groups according to prefix, removes existing"
@@ -116,11 +120,6 @@
       (let [c (sut/app-config {} {})]
         (is (s/valid? ::spec/app-config c)
             (s/explain-str ::spec/app-config c)))))
-
-  (testing "provides log-dir as absolute path"
-    (is (re-matches #".+test-dir$" (-> {:monkeyci-logging-dir "test-dir"}
-                                       (sut/app-config {})
-                                       (ctx/log-dir)))))
 
   (testing "loads config from `config-file` path"
     (h/with-tmp-dir dir
@@ -280,6 +279,8 @@
     (let [n (sut/normalize-config {} {} {})]
       (is (not (contains? n :env)))
       (is (not (contains? n :default)))))
+
+  
   
   (testing "github"
     (testing "adds config from env"
@@ -346,4 +347,9 @@
                   :bucket-name "test-storage-bucket"}}
                 {} {})
                :storage
-               :credentials)))))
+               :credentials))))
+
+  (testing "adds input config to result"
+    (let [in {:key "value"}]
+      (is (= in (-> (sut/normalize-config in {} {})
+                    :original))))))

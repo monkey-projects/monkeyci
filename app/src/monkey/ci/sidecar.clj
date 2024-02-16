@@ -1,14 +1,13 @@
 (ns monkey.ci.sidecar
   "Sidecar specific functions"
   (:require [babashka.fs :as fs]
-            [clojure.core.async :as ca]
             [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
             [monkey.ci
              [blob :as blob]
              [config :as c]
-             [context :as ctx]
+             [runtime :as rt]
              [utils :as u]]))
 
 (defn restore-src [{:keys [build] :as ctx}]
@@ -35,20 +34,23 @@
     (fs/create-file f))
   f)
 
-(defn poll-events [ctx]
-  (let [f (-> (get-in ctx [:args :events-file])
+(defn poll-events [rt]
+  (let [f (-> (:events-file (rt/args rt))
               (maybe-create-file))
         read-next (fn [r]
                     (u/parse-edn r {:eof ::eof}))
-        interval (get-in ctx [:sidecar :poll-interval] 1000)]
+        interval (get-in rt [rt/config :sidecar :poll-interval] 1000)]
     (log/info "Starting sidecar, reading events from" f)
-    (ca/thread
+    (md/future
       (try
         (with-open [r (io/reader f)]
           (loop [evt (read-next r)]
             ;; TODO Also stop when the process we're monitoring has terminated
             (if (not (fs/exists? f))
-              0 ;; Done when the events file is deleted
+               ;; Done when the events file is deleted
+              (do
+                (log/debug "Stopped reading events")
+                0)
               (when (if (= ::eof evt)
                       (do
                         ;; EOF reached, wait a bit and retry
@@ -56,14 +58,14 @@
                         true)
                       (do
                         (log/debug "Read next event:" evt)
-                        (ctx/post-events ctx evt)))
+                        (rt/post-events rt evt)))
                 (recur (read-next r))))))
         (catch Exception ex
           (log/error "Failed to read events" ex)
           1)))))
 
-(defn run [ctx]
-  (-> ctx
+(defn run [rt]
+  (-> rt
       (restore-src)
       (mark-start)
       (poll-events)))

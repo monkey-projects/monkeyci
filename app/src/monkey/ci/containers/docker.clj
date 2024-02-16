@@ -7,8 +7,8 @@
             [contajners.core :as c]
             [medley.core :as mc]
             [monkey.ci
+             [build :as b]
              [containers :as mcc]
-             [context :as ctx]
              [utils :as u]])
   (:import org.apache.commons.io.IOUtils
            [java.io PrintWriter]))
@@ -187,11 +187,15 @@
 
 (def ^:private internal-log-dir "/var/log/monkeyci")
 
-(defn container-opts [ctx]
+(defn- log-dir [rt]
+  ;; TODO Rework to use logging system
+  (System/getProperty "java.io.tmpdir"))
+
+(defn container-opts [rt]
   (let [remote-wd "/home/build"
-        work-dir (ctx/step-work-dir ctx)
-        output-dir (ctx/log-dir ctx)]
-    (merge (mcc/ctx->container-config ctx)
+        work-dir (b/step-work-dir rt)
+        output-dir (log-dir rt)]
+    (merge (mcc/rt->container-config rt)
            {:cmd ["/bin/sh"]
             :open-stdin true
             :attach-stdin false
@@ -213,7 +217,7 @@
         log-path (fn [s]
                    (u/abs-path (io/file internal-log-dir s)))
         {:keys [image] :as conf} (container-opts ctx)
-        output-dir (doto (io/file (ctx/log-dir ctx))
+        output-dir (doto (io/file (log-dir ctx))
                      (.mkdirs))
         
         pull   (fn [{:keys [image]}]

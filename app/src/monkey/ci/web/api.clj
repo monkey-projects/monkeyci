@@ -1,15 +1,15 @@
 (ns monkey.ci.web.api
   (:require [camel-snake-kebab.core :as csk]
-            [clojure.core.async :as ca]
             [clojure.tools.logging :as log]
+            [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
-             [context :as ctx]
-             [events :as e]
              [labels :as lbl]
              [logging :as l]
+             [runtime :as rt]
              [storage :as st]
              [utils :as u]]
+            [monkey.ci.events.core :as ec]
             [monkey.ci.web
              [auth :as auth]
              [common :as c]]
@@ -255,53 +255,59 @@
       (some? tag)
       (str "refs/tags/" tag))))
 
-(defn trigger-build-event [{p :parameters :as req} bid]
+(defn make-build-ctx [{p :parameters :as req} bid]
   (let [acc (:path p)
         st (c/req->storage req)
         repo (st/find-repo st (repo-sid req))
         ssh-keys (->> (st/find-ssh-keys st (customer-id req))
                       (lbl/filter-by-label repo))]
-    {:type :build/triggered
-     :account acc
-     :build {:build-id bid
-             :git (-> (:query p)
-                      (select-keys [:commit-id :branch])
-                      (assoc :url (:url repo)
-                             :ssh-keys-dir (ctx/ssh-keys-dir (c/req->ctx req) bid))
-                      (mc/assoc-some :ref (params->ref p))
-                      (mc/assoc-some :ssh-keys ssh-keys))
-             :sid (-> acc
-                      (assoc :build-id bid)
-                      (st/ext-build-sid))}}))
+    {:build-id bid
+     :git (-> (:query p)
+              (select-keys [:commit-id :branch])
+              (assoc :url (:url repo)
+                     :ssh-keys-dir (rt/ssh-keys-dir (c/req->rt req) bid))
+              (mc/assoc-some :ref (params->ref p))
+              (mc/assoc-some :ssh-keys ssh-keys))
+     :sid (-> acc
+              (assoc :build-id bid)
+              (st/ext-build-sid))}))
 
 (defn trigger-build [req]
-  (c/posting-handler
-   req
-   (fn [{p :parameters}]
-     ;; TODO If no branch is specified, use the default
-     (let [acc (:path p)
-           bid (u/new-build-id)
-           st (c/req->storage req)
-           md (-> acc
-                  (select-keys [:customer-id :repo-id])
-                  (assoc :build-id bid
-                         :source :api
-                         :timestamp (System/currentTimeMillis)
-                         :ref (params->ref p))
-                  (merge (:query p)))]
-       (log/debug "Triggering build for repo sid:" (repo-sid req))
-       (when (st/create-build-metadata st md)
-         (trigger-build-event req bid))))))
+  (let [{p :parameters} req]
+    ;; TODO If no branch is specified, use the default
+    (let [acc (:path p)
+          bid (u/new-build-id)
+          st (c/req->storage req)
+          md (-> acc
+                 (select-keys [:customer-id :repo-id])
+                 (assoc :build-id bid
+                        :source :api
+                        :timestamp (System/currentTimeMillis)
+                        :ref (params->ref p))
+                 (merge (:query p)))
+          runner (c/from-rt req :runner)]
+      (log/debug "Triggering build for repo sid:" (repo-sid req))
+      (if (st/create-build-metadata st md)
+        (do
+          ;; Trigger the build but don't wait for the result
+          (-> (md/future
+                (runner (assoc (c/req->rt req) :build (make-build-ctx req bid))))
+              (md/catch (fn [ex]
+                          (log/error "Unable to start build" ex))))
+          (-> (rur/response {:build-id bid})
+              (rur/status 202)))
+        (-> (rur/response {:message "Unable to create build metadata"})
+            (rur/status 500))))))
 
 (defn list-build-logs [req]
   (let [build-sid (st/ext-build-sid (get-in req [:parameters :path]))
-        retriever (c/from-context req ctx/log-retriever)]
+        retriever (c/from-rt req rt/log-retriever)]
     (rur/response (l/list-logs retriever build-sid))))
 
 (defn download-build-log [req]
   (let [build-sid (st/ext-build-sid (get-in req [:parameters :path]))
         path (get-in req [:parameters :query :path])
-        retriever (c/from-context req ctx/log-retriever)]
+        retriever (c/from-rt req rt/log-retriever)]
     (if-let [r (l/fetch-log retriever build-sid path)]
       (-> (rur/response r)
           (rur/content-type "text/plain"))
@@ -318,37 +324,25 @@
 (defn event-stream
   "Sets up an event stream for the specified filter."
   [req]
-  (let [{:keys [mult]} (c/req->bus req)
-        dest (ca/chan (ca/sliding-buffer 10)
-                      (filter (comp allowed-events :type)))
+  (let [recv (c/from-rt req rt/events-receiver)
         make-reply (fn [evt]
                      (-> evt
                          (prn-str)
                          (rur/response)
                          (rur/header "Content-Type" "text/event-stream")))
-        sender (fn [ch]
-                 (fn [msg]
-                   (when-not (http/send! ch msg false)
-                     (log/warn "Failed to send message to channel"))))
-        send-events (fn [src ch]
-                      (ca/go-loop [msg (ca/<! src)]
-                        (if msg
-                          (if (http/send! ch (make-reply msg) false)
-                            (recur (ca/<! src))
-                            (do
-                              (log/warn "Could not send message to channel, stopping event transmission")
-                              (ca/untap mult src)
-                              (ca/close! src)))
-                          (do
-                            (log/debug "Event bus was closed, stopping event transmission")
-                            (http/send! ch (rur/response "") true)))))]
+        listener (atom nil)
+        make-listener (fn [ch]
+                        (let [l (fn [evt]
+                                  (when (allowed-events (:type evt))
+                                    (when-not (http/send! ch (make-reply evt) false)
+                                      (log/warn "Could not send message to channel, stopping event transmission")
+                                      (ec/remove-listener recv @listener))))]
+                          (reset! listener l)))]
     (http/as-channel
      req
      {:on-open (fn [ch]
                  (log/debug "Event stream opened:" ch)
-                 (ca/tap mult dest)
-                 ;; Pipe the messages from the tap to the channel
-                 (send-events dest ch))
+                 (ec/add-listener recv (make-listener ch)))
       :on-close (fn [_ status]
-                  (ca/untap mult dest)
+                  (ec/remove-listener recv @listener)
                   (log/debug "Event stream closed with status" status))})))

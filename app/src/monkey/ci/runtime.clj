@@ -3,34 +3,113 @@
    from the configuration, and is passed on to the application modules.  The
    runtime provides the information (often in the form of functions) needed
    by the modules to perform work.  This allows us to change application 
-   behaviour depending on configuration, but also when testing."
-  (:require [clojure.spec.alpha :as spec]
-            [monkey.ci.spec :as s]))
+   behaviour depending on configuration, but also when testing.
 
-(def default-runtime
-  {:http {:port 3000}
-   :runner (constantly 1)
-   :git
-   {:fn (constantly nil)}
-   :storage
-   {}
-   :logging
-   {:maker (constantly nil)
-    :retriever nil}
-   :public-api (constantly nil)})
+   Thie namespace also provides some utility functions for working with the
+   context.  This is more stable than reading properties from the runtime 
+   directly."
+  (:require [clojure.spec.alpha :as spec]
+            [com.stuartsierra.component :as co]
+            [medley.core :as mc]
+            [monkey.ci
+             [spec :as s]
+             [utils :as u]]))
 
 (defmulti setup-runtime (fn [_ k] k))
 
 (defmethod setup-runtime :default [_ k]
-  (get default-runtime k))
+  {})
 
 (defn config->runtime
   "Creates the runtime from the normalized config map"
   [conf]
-  {:pre  [(spec/valid? ::s/app-config conf)]
-   ;;:post [(spec/valid? ::s/app-context %)]
-   }
-  (reduce-kv (fn [r k v]
-               (assoc r k (setup-runtime conf k)))
-             default-runtime
-             conf))
+  ;; TODO Re-enable this but allow for more flexible checks
+  #_{:pre  [(spec/valid? ::s/app-config conf)]
+     :post [(spec/valid? ::s/runtime %)]}
+  ;; Apply each of the discovered runtime setup implementations
+  (let [m (-> (methods setup-runtime)
+              (dissoc :default)
+              (keys))]
+    (-> (reduce (fn [r k]
+                  (assoc r k (setup-runtime conf k)))
+                {}
+                m)
+        (assoc :config conf))))
+
+(defn start
+  "Starts the runtime by starting all parts as a component tree.  Returns a
+   component system that can be passed to `stop`."
+  [rt]
+  (-> (co/map->SystemMap rt)
+      (co/start-system)))
+
+(defn stop
+  "Stops a previously started runtime"
+  [rt]
+  (co/stop-system rt))
+
+;;; Accessors and utilities
+
+(def config :config)
+
+(defn from-config [k]
+  (comp k config))
+
+(def app-mode (from-config :app-mode))
+(def cli-mode? (comp (partial = :cli) app-mode))
+(def server-mode? (comp (partial = :server) app-mode))
+
+(def account (from-config :account))
+(def args (from-config :args))
+(def reporter :reporter)
+(def api-url (comp :url account))
+(def log-maker (comp :maker :logging))
+(def log-retriever (comp :retriever :logging))
+(def work-dir (from-config :work-dir))
+(def dev-mode? (from-config :dev-mode))
+(def ssh-keys-dir (from-config :ssh-keys-dir))
+(def events-receiver (comp :receiver :events))
+(def runner :runner)
+
+(defn get-arg [rt k]
+  (k (args rt)))
+
+(defn report
+  "Reports `obj` to the user with the reporter from the runtime."
+  [rt obj]
+  (when-let [r (reporter rt)]
+    (r obj)))
+
+(defn with-runtime-fn
+  "Creates a runtime for the given mode (server, cli, script) from the specified 
+   configuration and passes it to `f`."
+  [conf mode f]
+  (let [rt (-> conf
+               (assoc :app-mode mode)
+               (config->runtime))]
+    ;; TODO Start/stop runtime
+    (f rt)))
+
+(defmacro with-runtime
+  "Convenience macro that wraps `with-runtime-fn` by binding runtime to `r` and 
+   invoking the body."
+  [conf mode r & body]
+  `(with-runtime-fn ~conf ~mode
+     (fn [~r]
+       ~@body)))
+
+(defn post-events
+  "Posts one or more events using the event poster in the runtime"
+  [rt evt]
+  (when-let [p (get-in rt [:events :poster])]
+    (p evt)))
+
+(defn rt->env
+  "Returns a map that can be serialized back into env vars.  This is used
+   to pass application configuration to child processes or containers."
+  [rt]
+  ;; Return the original, non-normalized configuration
+  (-> rt
+      (get-in [:config :original])
+      (merge (select-keys rt [:build]))
+      (mc/update-existing-in [:build :sid] u/serialize-sid)))

@@ -8,8 +8,8 @@
              [artifacts :as art]
              [blob :as blob]
              [config :as config]
-             [context :as c]
-             [oci :as oci]]))
+             [oci :as oci]
+             [runtime :as rt]]))
 
 (defn cache-archive-path [{:keys [build]} id]
   ;; The cache archive path is the repo sid with the cache id added.
@@ -47,3 +47,7 @@
 
 (defmethod config/normalize-key :cache [k conf]
   (config/normalize-typed k conf (partial blob/normalize-blob-config k)))
+
+(defmethod rt/setup-runtime :cache [conf k]
+  (when (k conf)
+    (blob/make-blob-store conf k)))

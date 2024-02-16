@@ -100,9 +100,9 @@
   (->OciObjectStorage (os/make-client conf) conf))
 
 (defmethod st/make-storage :oci [conf]
-  (log/debug "Creating oci storage with config:" conf)
+  (log/debug "Creating oci storage with config:" (:storage conf))
   (-> conf
-      (oci/ctx->oci-config :storage)
+      :storage
       (oci/->oci-config)
       (make-oci-storage)))
 

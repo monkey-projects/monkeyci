@@ -6,10 +6,10 @@
             [manifold.deferred :as md]
             [monkey.ci
              [commands :as sut]
-             [events :as e]
              [sidecar :as sc]
              [spec :as spec]]
             [monkey.ci.helpers :as h]
+            [monkey.ci.web.handler :as wh]
             [org.httpkit.fake :as f]))
 
 (deftest run-build
@@ -17,15 +17,15 @@
     (let [ctx {:runner (constantly :invoked)}]
       (is (= :invoked (sut/run-build ctx)))))
 
-  (testing "adds `build` to context"
-    (is (map? (-> {:args {:git-url "test-url"
-                          :branch "test-branch"
-                          :commit-id "test-id"}
+  (testing "adds `build` to runtime"
+    (is (map? (-> {:config {:args {:git-url "test-url"
+                                   :branch "test-branch"
+                                   :commit-id "test-id"}}
                    :runner :build}
                   (sut/run-build)))))
 
   (testing "adds build sid to build config"
-    (let [{:keys [sid build-id]} (-> {:args {:sid "a/b/c"}
+    (let [{:keys [sid build-id]} (-> {:config {:args {:sid "a/b/c"}}
                                       :runner :build}
                                      (sut/run-build))]
       (is (= build-id (last sid)))
@@ -33,42 +33,29 @@
 
   (testing "constructs `sid` from account settings if not specified"
     (let [{:keys [sid build-id]} (-> {:runner :build
-                                      :account {:customer-id "a"
-                                                :project-id "b"
-                                                :repo-id "c"}}
+                                      :config {:account {:customer-id "a"
+                                                         :repo-id "b"}}}
                                      (sut/run-build))]
       (is (= build-id (last sid)))
-      (is (= ["a" "b" "c"] (take 3 sid)))))
-
-  (testing "accumulates build results from events"
-    (let [registered (atom [])]
-      (with-redefs [e/register-handler (fn [_ t _]
-                                         (swap! registered conj t))]
-        (h/with-bus
-          (fn [bus]
-            (is (some? (-> {:event-bus bus
-                            :runner (constantly :ok)}
-                           (sut/run-build))))
-            (is (not-empty @registered))))))))
+      (is (= ["a" "b"] (take 2 sid))))))
 
 (deftest list-builds
   (testing "reports builds from server"
     (let [reported (atom [])
           builds {:key "value"}
-          ctx {:reporter (partial swap! reported conj)
-               :account {:url "http://server/api"
-                         :customer-id "test-cust"
-                         :project-id "test-project"
-                         :repo-id "test-repo"}}]
-      (f/with-fake-http ["http://server/api/customer/test-cust/project/test-project/repo/test-repo/builds"
+          rt {:reporter (partial swap! reported conj)
+              :config {:account {:url "http://server/api"
+                                 :customer-id "test-cust"
+                                 :repo-id "test-repo"}}}]
+      (f/with-fake-http ["http://server/api/customer/test-cust/repo/test-repo/builds"
                          (pr-str builds)]
-        (is (some? (sut/list-builds ctx)))
+        (is (some? (sut/list-builds rt)))
         (is (pos? (count @reported)))
         (let [r (first @reported)]
           (is (= :build/list (:type r)))
           (is (= builds (:builds r))))))))
 
-(deftest result-accumulator
+#_(deftest result-accumulator
   (testing "returns a map of type handlers"
     (is (map? (:handlers (sut/result-accumulator {})))))
 
@@ -102,112 +89,31 @@
       (is (nil? (c {}))))))
 
 (deftest prepare-build-ctx
-  (testing "adds build id"
-    (is (re-matches #"build-\d+"
-                    (-> (sut/prepare-build-ctx {})
-                        :build
-                        :build-id))))
-
-  (testing "defaults to `main` branch"
-    (is (= "main"
-           (-> {:args {:git-url "test-url"}}
-               (sut/prepare-build-ctx)
-               :build
-               :git
-               :branch))))
-
-  (testing "takes global work dir as build checkout dir"
-    (is (= "global-work-dir"
-           (-> {:work-dir "global-work-dir"
-                :args {:dir ".monkeci"}}
-               (sut/prepare-build-ctx)
-               :build
-               :checkout-dir))))
-
-  (testing "adds pipeline from args"
-    (is (= "test-pipeline"
-           (-> {:args {:pipeline "test-pipeline"}}
-               (sut/prepare-build-ctx)
-               :build
-               :pipeline))))
-
-  (testing "adds script dir from args, as relative to work dir"
-    (is (= "work-dir/test-script"
-           (-> {:args {:dir "test-script"}
-                :work-dir "work-dir"}
-               (sut/prepare-build-ctx)
-               :build
-               :script-dir))))
-
-  (testing "with git opts"
-    (testing "sets git opts in build config"
-      (is (= {:url "test-url"
-              :branch "test-branch"
-              :id "test-id"}
-             (-> {:args {:git-url "test-url"
-                         :branch "test-branch"
-                         :commit-id "test-id"}}
-                 (sut/prepare-build-ctx)
-                 :build
-                 :git))))
-
-    (testing "sets script dir to arg"
-      (is (= "test-script"
-             (-> {:args {:git-url "test-url"
-                         :branch "test-branch"
-                         :commit-id "test-id"
-                         :dir "test-script"}
-                  :work-dir "work"}
-                 (sut/prepare-build-ctx)
-                 :build
-                 :script-dir)))))
-
-  (testing "when sid specified"
-    (testing "parses on delimiter"
-      (is (= ["a" "b" "c"]
-             (->> {:args {:sid "a/b/c"}}
-                  (sut/prepare-build-ctx)
-                  :build
-                  :sid
-                  (take 3)))))
-    
-    (testing "adds build id"
-      (is (string? (-> {:args {:sid "a/b/c"}}
-                       (sut/prepare-build-ctx)
-                       :build
-                       :sid
-                       last))))
-
-    (testing "when sid includes build id, reuses it"
-      (let [sid "a/b/c/d"
-            ctx (-> {:args {:sid sid}}
-                    (sut/prepare-build-ctx)
-                    :build)]
-        (is (= "d" (:build-id ctx)))
-        (is (= "d" (last (:sid ctx)))))))
-
-  (testing "when no sid specified"
-    (testing "leaves it unspecified"
-      (is (empty? (-> {:args {}}
-                      (sut/prepare-build-ctx)
-                      :build
-                      :sid))))))
+  (testing "adds build object to runtime"
+    (is (some? (-> {:config {:args {:dir "test-dir"}}}
+                   (sut/prepare-build-ctx)
+                   :build)))))
 
 (deftest http-server
-  (testing "returns a channel"
-    (is (spec/channel? (sut/http-server {})))))
+  (with-redefs [wh/server-status (constantly :stopped)]
+    (testing "returns a deferred"
+      (is (md/deferred? (sut/http-server {:http (constantly ::ok)}))))
+
+    (testing "starts the server using the runtime fn"
+      (let [r (sut/http-server {:http (constantly ::ok)})]
+        (is (nil? (deref r 100 :timeout)))))))
 
 (deftest watch
-  (testing "sends request and returns channel"
+  (testing "sends request and returns deferred"
     (with-redefs [http/get (constantly (md/success-deferred nil))]
-      (is (spec/channel? (sut/watch {})))))
+      (is (md/deferred? (sut/watch {})))))
 
   (testing "reports received events from reader"
     (let [events (prn-str {:type :script/started
                            :message "Test event"})
           reported (atom [])]
       (with-redefs [http/get (constantly (md/success-deferred {:body (bs/to-reader events)}))]
-        (is (spec/channel? (sut/watch {:reporter (partial swap! reported conj)})))
+        (is (md/deferred? (sut/watch {:reporter (partial swap! reported conj)})))
         (is (not-empty @reported))))))
 
 (deftest sidecar

@@ -205,7 +205,7 @@
            (log/warn "Blob not found in bucket:" obj-name)))))))
 
 (defmethod make-blob-store :oci [conf k]
-  (let [oci-conf (oci/ctx->oci-config conf k)
+  (let [oci-conf (get conf k)
         client (-> oci-conf
                    (oci/->oci-config)
                    (os/make-client))]

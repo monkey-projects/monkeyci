@@ -9,9 +9,10 @@
             [manifold.deferred :as md]
             [monkey.ci
              [blob :as blob]
+             [build :as b]
              [config :as config]
-             [context :as c]
-             [oci :as oci]]))
+             [oci :as oci]
+             [runtime :as rt]]))
 
 (defn- get-store [ctx k]
   (get-in ctx [k :store]))
@@ -35,7 +36,7 @@
   [{:keys [build-path store-key]} ctx {:keys [path id]}]
   (log/debug "Saving artifact:" id "at path" path)
   (blob/save (get-store ctx store-key)
-             (c/step-relative-dir ctx path)
+             (b/step-relative-dir ctx path)
              (build-path ctx id)))
 
 (defn save-generic [ctx conf]
@@ -54,7 +55,7 @@
   (blob/restore (get-store ctx store-key)
                 (build-path ctx id)
                 ;; Restore to the parent path because the dir name will be in the archive
-                (-> (c/step-relative-dir ctx path)
+                (-> (b/step-relative-dir ctx path)
                     (fs/parent)
                     (fs/canonicalize)
                     (str))))
@@ -84,3 +85,7 @@
 
 (defmethod config/normalize-key :artifacts [k conf]
   (config/normalize-typed k conf (partial blob/normalize-blob-config k)))
+
+(defmethod rt/setup-runtime :artifacts [conf k]
+  (when (k conf)
+    (blob/make-blob-store conf k)))

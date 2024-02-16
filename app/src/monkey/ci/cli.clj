@@ -1,9 +1,9 @@
 (ns monkey.ci.cli
   (:require [clojure.walk :as w]
             [monkey.ci
+             [build :as b]
              [commands :as cmd]
-             [config :as config]
-             [runners :as r]]))
+             [config :as config]]))
 
 (def run-build-cmd
   {:command "run"
@@ -12,7 +12,7 @@
            :option "dir"
            :short "d"
            :type :string
-           :default r/default-script-dir}
+           :default b/default-script-dir}
           {:as "Pipeline name"
            :option "pipeline"
            :short "p"
@@ -31,17 +31,20 @@
           {:as "Repository sid"
            :option "sid"
            :type :string}]
-   :runs {:command cmd/run-build}})
+   :runs {:command cmd/run-build
+          :app-mode :cli}})
 
 (def list-build-cmd
   {:command "list"
    :description "Lists builds for customer or repo"
-   :runs {:command cmd/list-builds}})
+   :runs {:command cmd/list-builds
+          :app-mode :cli}})
 
 (def watch-cmd
   {:command "watch"
    :description "Logs build events for customer or repo"
-   :runs {:command cmd/watch}})
+   :runs {:command cmd/watch
+          :app-mode :cli}})
 
 (def build-cmd
   {:command "build"
@@ -72,7 +75,8 @@
            :default 3000
            :env "PORT"}]
    :runs {:command cmd/http-server
-          :requires [:http]}})
+          :requires [:http]
+          :app-mode :server}})
 
 (def sidecar-cmd
   {:command "sidecar"
@@ -87,7 +91,8 @@
            :short "s"
            :type :string
            :default :present}]
-   :runs {:command cmd/sidecar}})
+   :runs {:command cmd/sidecar
+          :app-mode :script}})
 
 (def base-config
   {:name "monkey-ci"

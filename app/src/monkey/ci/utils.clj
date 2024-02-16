@@ -1,6 +1,5 @@
 (ns monkey.ci.utils
   (:require [buddy.core.keys.pem :as pem]
-            [clojure.core.async :as ca]
             [clojure
              [edn :as edn]
              [string :as cs]
@@ -63,13 +62,6 @@
   ;; TODO Generate a more unique build id
   (format "build-%d" (System/currentTimeMillis)))
 
-#_(defn replace-last
-  "Replaces the last item in `v` by `l`"
-  [v l]
-  (-> v
-      (drop-last)
-      (conj l)))
-
 (defn load-privkey
   "Load private key from file"
   [f]
@@ -77,21 +69,6 @@
     f
     (with-open [r (io/reader f)]
       (pem/read-privkey r nil))))
-
-(defn future->ch
-  "Returns a channel that will hold the future value.  The future value
-   cannot be `nil` as this value cannot be sent to a channel.  If `interval`
-   is not specified, 100 milliseconds is used between checks."
-  [f & [interval]]
-  (let [poll (fn []
-               (when (realized? f)
-                 @f))]
-    (ca/go-loop [v (poll)]
-      (if v
-        v
-        (do
-          (ca/<! (ca/timeout (or interval 100)))
-          (recur (poll)))))))
 
 (defn parse-edn
   "Parses edn from the reader"

@@ -9,10 +9,11 @@
             [clojure.tools.logging :as log]
             [monkey.ci
              [artifacts :as art]
+             [build :as b]
              [cache :as cache]
              [containers :as mcc]
-             [context :as c]
              [logging :as l]
+             [runtime :as rt]
              [utils :as u]]))
 
 (defn- make-script-cmd [script]
@@ -35,9 +36,9 @@
             ["-e" (str k "=" v)])
           env))
 
-(defn- platform [ctx]
-  (when-let [p (or (get-in ctx [:step :container/platform])
-                   (get-in ctx [:containers :platform]))]
+(defn- platform [rt]
+  (when-let [p (or (get-in rt [:step :container/platform])
+                   (get-in rt [:containers :platform]))]
     ["--platform" p]))
 
 (defn- entrypoint [{ep :container/entrypoint cmd :container/cmd}]
@@ -49,10 +50,10 @@
 
 (defn build-cmd-args
   "Builds command line args for the podman executable"
-  [{:keys [step] :as ctx}]
-  (let [conf (mcc/ctx->container-config ctx)
-        cn (c/get-step-id ctx)
-        wd (c/step-work-dir ctx)
+  [{:keys [step] :as rt}]
+  (let [conf (mcc/rt->container-config rt)
+        cn (b/get-step-id rt)
+        wd (b/step-work-dir rt)
         cwd "/home/monkeyci"
         base-cmd ["/usr/bin/podman" "run"
                   "-t" "--rm"
@@ -65,29 +66,29 @@
      base-cmd
      (mounts step)
      (env-vars step)
-     (platform ctx)
+     (platform rt)
      (entrypoint step)
      [(:image conf)]
      (make-cmd step)
      ;; TODO Execute script step by step
      (make-script-cmd (:script step)))))
 
-(defmethod mcc/run-container :podman [{:keys [step pipeline] {:keys [build-id]} :build :as ctx}]
+(defmethod mcc/run-container :podman [{:keys [step pipeline] {:keys [build-id]} :build :as rt}]
   (log/info "Running build step " build-id "/" (:name step) "as podman container")
-  (let [log-maker (c/log-maker ctx)
+  (let [log-maker (rt/log-maker rt)
         ;; Don't prefix the sid here, that's the responsability of the logger
-        log-base (c/get-step-sid ctx)
+        log-base (b/get-step-sid rt)
         [out-log err-log :as loggers] (->> ["out.txt" "err.txt"]
                                            (map (partial conj log-base))
-                                           (map (partial log-maker ctx)))]
+                                           (map (partial log-maker rt)))]
     (log/debug "Log base is:" log-base)
     ((-> (fn [_]
-           (-> (bp/process {:dir (c/step-work-dir ctx)
+           (-> (bp/process {:dir (b/step-work-dir rt)
                             :out (l/log-output out-log)
                             :err (l/log-output err-log)
-                            :cmd (build-cmd-args ctx)})
+                            :cmd (build-cmd-args rt)})
                (l/handle-process-streams loggers)
                (deref)))
          (cache/wrap-caches)
          (art/wrap-artifacts))
-     ctx)))
+     rt)))

@@ -119,7 +119,7 @@
   ;; - Wait for it to finish
   ;; - Clean up temp files from storage
   (let [conf (-> ctx
-                 (oci/ctx->oci-config :container)
+                 :container
                  (oci/->oci-config))
         client (ci/make-context conf)
         ic (instance-config conf ctx)]
