@@ -33,8 +33,8 @@
 
     (testing "deletes checkout dir"
       (letfn [(verify-checkout-dir-deleted [checkout-dir script-dir]
-                (is (some? (-> {:build {:git {:dir (u/abs-path checkout-dir)}
-                                        :script-dir (u/abs-path script-dir)}}
+                (is (some? (-> {:build {:script-dir (u/abs-path script-dir)
+                                        :checkout-dir (u/abs-path checkout-dir)}}
                                (sut/build-local)
                                (deref))))
                 (is (false? (.exists checkout-dir))))]

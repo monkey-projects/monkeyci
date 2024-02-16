@@ -1,7 +1,9 @@
 (ns monkey.ci.listeners
   (:require [clojure.core.async :as ca]
             [clojure.tools.logging :as log]
-            [monkey.ci.storage :as st]))
+            [monkey.ci
+             ;;[runtime :as rt]
+             [storage :as st]]))
 
 (defn- update-pipeline [rt evt f & args]
   (apply st/patch-build-results
@@ -11,11 +13,11 @@
 
 (defn pipeline-started [rt evt]
   (update-pipeline rt evt merge {:start-time (:time evt)
-                                  :name (get-in evt [:pipeline :name])}))
+                                 :name (get-in evt [:pipeline :name])}))
 
 (defn pipeline-completed [rt evt]
   (update-pipeline rt evt merge {:end-time (:time evt)
-                                  :status (:status evt)}))
+                                 :status (:status evt)}))
 
 (defn- update-step [rt evt f & args]
   (apply st/patch-build-results
@@ -25,11 +27,11 @@
 
 (defn step-started [rt evt]
   (update-step rt evt merge {:start-time (:time evt)
-                              :name (:name evt)}))
+                             :name (:name evt)}))
 
 (defn step-completed [rt evt]
   (update-step rt evt merge {:end-time (:time evt)
-                              :status (:status evt)}))
+                             :status (:status evt)}))
 
 (defn save-build-result
   "Handles a `build/completed` event to store the result."
@@ -66,4 +68,10 @@
                        (when-let [h (get handlers (:type evt))]
                          (h rt evt))))
     (fn [evt]
-      (ca/put! ch evt))))
+      (ca/put! ch evt)
+      nil)))
+
+;; (defrecord EventListeners [events storage])
+
+;; (defmethod rt/setup-runtime :listeners [conf _]
+;;   (map->EventListeners {}))

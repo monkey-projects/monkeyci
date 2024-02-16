@@ -13,17 +13,24 @@
              [cli :as mcli]
              [config :as config]
              [git]
+             [listeners :as l]
              [logging]
              [reporting]
              [runtime :as rt]
+             [runners]
              [utils :as u]
              [workspace]]
             [monkey.ci.events
+             [core :as ec]
              [manifold]]
             [monkey.ci.storage
              [cached]
              [file]
              [oci]]))
+
+(defn- register-listeners [runtime]
+  (ec/add-listener (get-in runtime [:events :receiver])
+                   (l/build-update-handler runtime)))
 
 (defn system-invoker
   "The event invoker starts a subsystem according to the command requirements,
@@ -37,6 +44,8 @@
     (let [config (config/app-config env args)]
       ;; When app mode is specified, pass the runtime for new-style invocations
       (rt/with-runtime config app-mode runtime
+        ;; TODO Make more generic
+        (register-listeners runtime)
         (log/info "Executing command:" command)
         (command runtime)))))
 

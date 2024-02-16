@@ -11,20 +11,17 @@
       (is (= :exit (sut/-main "-?"))))))
 
 (deftest system-invoker
-  (let [hooks (atom [])]
-    (with-redefs [u/add-shutdown-hook! (partial swap! hooks conj)]
+  (testing "creates a fn"
+    (is (fn? (sut/system-invoker {} {}))))
 
-      (testing "creates a fn"
-        (is (fn? (sut/system-invoker {} {}))))
-
-      (testing "invokes command with context"
-        (let [inv (sut/system-invoker {:command (constantly "test-result")} {})]
-          (is (= "test-result" (inv {})))))
-      
-      (testing "passes runtime when app-mode is specified"
-        (let [inv (sut/system-invoker {:command identity
-                                       :app-mode :cli}
-                                      {})]
-          ;; Runtime has a config entry
-          (is (some? (:config (inv {})))))))))
+  (testing "invokes command with context"
+    (let [inv (sut/system-invoker {:command (constantly "test-result")} {})]
+      (is (= "test-result" (inv {})))))
+  
+  (testing "passes runtime when app-mode is specified"
+    (let [inv (sut/system-invoker {:command identity
+                                   :app-mode :cli}
+                                  {})]
+      ;; Runtime has a config entry
+      (is (some? (:config (inv {})))))))
 

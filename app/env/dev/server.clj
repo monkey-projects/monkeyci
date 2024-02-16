@@ -4,7 +4,6 @@
             [monkey.ci
              [config :as config]
              [core :as c]
-             [events :as e]
              [runtime :as rt]
              [spec :as mcs]
              [utils :as u]]
