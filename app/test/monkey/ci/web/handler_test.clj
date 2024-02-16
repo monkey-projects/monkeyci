@@ -94,18 +94,22 @@
 (deftest webhook-routes
   (testing "`POST /webhook/github/:id`"
     (testing "accepts with valid security header"
-      (let [payload "test body"
+      (let [payload (h/to-json {:head-commit {:message "test"}})
             signature (-> (mac/hash payload {:key github-secret
                                              :alg :hmac+sha256})
                           (codecs/bytes->hex))
             hook-id (st/new-id)
             st (st/make-memory-storage)
-            app (sut/make-app (test-rt {:storage st :config {:dev-mode false}}))]
+            app (sut/make-app (test-rt {:storage st
+                                        :runner (constantly nil)
+                                        :config {:dev-mode false}}))]
         (is (st/sid? (st/save-webhook-details st {:id hook-id
                                                   :secret-key github-secret})))
         (is (= 200 (-> (mock/request :post (str "/webhook/github/" hook-id))
                        (mock/body payload)
                        (mock/header :x-hub-signature-256 (str "sha256=" signature))
+                       (mock/content-type "application/json")
+                       (mock/content-length (count payload))
                        (app)
                        :status)))))
 
@@ -117,22 +121,10 @@
 
     (testing "disables security check when in dev mode"
       (let [dev-app (sut/make-app {:config {:dev-mode true}
-                                   :event-bus (events/make-bus)})]
-        (is (= 200 (-> (mock/request :post "/webhook/github/test-hook")
+                                   :runner (constantly nil)})]
+        (is (= 204 (-> (mock/request :post "/webhook/github/test-hook")
                        (dev-app)
-                       :status)))))
-
-    (testing "passes id as path parameter"
-      (h/with-bus
-        (fn [bus]
-          (let [dev-app (sut/make-app {:config {:dev-mode true}
-                                       :event-bus bus})
-                l (events/wait-for bus :webhook/github (map :id))]
-            (is (= 200 (-> (h/json-request :post "/webhook/github/test-hook"
-                                           {:head-commit {:id "test-commit"}})
-                           (dev-app)
-                           :status)))
-            (is (= "test-hook" (h/try-take l 200 :timeout)))))))))
+                       :status)))))))
 
 (defn- verify-entity-endpoints [{:keys [path base-entity updated-entity name creator]}]
   (let [st (st/make-memory-storage)

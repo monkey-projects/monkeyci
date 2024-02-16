@@ -57,31 +57,18 @@
   "Checks if the incoming request is actually a commit trigger.  Github can also
    send other types of requests."
   [req]
-  (some? (get-in req [:body-params :head-commit])))
-
-(defn webhook
-  "Receives an incoming webhook from Github.  This actually just posts
-   the event on the internal bus and returns a 200 OK response."
-  [req]
-  (log/trace "Got incoming webhook with body:" (prn-str (:body-params req)))
-  (c/posting-handler
-   req
-   (fn [req]
-     (when (github-commit-trigger? req)
-       {:type :webhook/github
-        :id (req->webhook-id req)
-        :payload (:body-params req)}))))
+  (some? (get-in req [:parameters :body :head-commit])))
 
 (defn- find-ssh-keys [st {:keys [customer-id repo-id]}]
   (let [repo (s/find-repo st [customer-id repo-id])
         ssh-keys (s/find-ssh-keys st customer-id)]
     (lbl/filter-by-label repo ssh-keys)))
 
-(defn prepare-build
-  "Event handler that looks up details for the given github webhook.  If the webhook 
-   refers to a valid configuration, a build id is created and a new event is launched,
-   which in turn should start the build runner."
-  [{st :storage :as rt} {:keys [id payload] :as evt}]
+(defn create-build
+  "Looks up details for the given github webhook.  If the webhook refers to a valid 
+   configuration, a build entity is created and a build structure is returned, which
+   eventually will be passed on to the runner."
+  [{st :storage :as rt} {:keys [id payload]}]
   (if-let [details (s/find-details-for-webhook st id)]
     (let [{:keys [master-branch clone-url ssh-url private]} (:repository payload)
           build-id (u/new-build-id)
@@ -100,19 +87,36 @@
                             (select-keys [:message :author])))
                  (merge (select-keys payload [:ref])))
           ssh-keys (find-ssh-keys st details)
-          conf {:git (-> {:url (if private ssh-url clone-url)
-                          :main-branch master-branch
-                          :ref (:ref payload)
-                          :commit-id commit-id
-                          :ssh-keys-dir (rt/ssh-keys-dir rt build-id)}
-                         (mc/assoc-some :ssh-keys ssh-keys))
-                :sid (s/ext-build-sid md) ; Build storage id
-                :build-id build-id}]
+          build {:git (-> {:url (if private ssh-url clone-url)
+                           :main-branch master-branch
+                           :ref (:ref payload)
+                           :commit-id commit-id
+                           :ssh-keys-dir (rt/ssh-keys-dir rt build-id)}
+                          (mc/assoc-some :ssh-keys ssh-keys))
+                 :sid (s/ext-build-sid md) ; Build storage id
+                 :build-id build-id}]
       (when (s/create-build-metadata st md)
-        {:type :webhook/validated
-         :details details
-         :build conf}))
+        build))
     (log/warn "No webhook configuration found for" id)))
+
+(defn webhook
+  "Receives an incoming webhook from Github.  This actually just posts
+   the event on the internal bus and returns a 200 OK response."
+  [{p :parameters :as req}]
+  (log/trace "Got incoming webhook with body:" (prn-str (:body p)))
+  (if (github-commit-trigger? req)
+    (let [rt (c/req->rt req)]
+      (if-let [build (create-build rt {:id (get-in p [:path :id])
+                                       :payload (:body p)})]
+        (let [runner (rt/runner rt)]
+          (runner (assoc rt :build build))
+          (rur/response {:build-id "todo"}))
+        ;; No valid webhook found
+        (rur/not-found {:message "No valid webhook configuration found"})))
+    ;; If no build trigger, just respond with a '204 no content'
+    (rur/status 204)))
+
+(defn ^:deprecated prepare-build [_ _])
 
 (defn- process-reply [{:keys [status] :as r}]
   (log/debug "Got github reply:" r)
