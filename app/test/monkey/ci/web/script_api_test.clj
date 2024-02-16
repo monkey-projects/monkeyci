@@ -1,8 +1,6 @@
 (ns monkey.ci.web.script-api-test
   (:require [clojure.test :refer [deftest testing is]]
-            [monkey.ci
-             [events :as e]
-             [storage :as st]]
+            [monkey.ci.storage :as st]
             [monkey.ci.web.script-api :as sut]
             [monkey.ci.helpers :as h]
             [ring.mock.request :as mock]))

@@ -3,7 +3,6 @@
             [clojure.java.io :as io]
             [manifold.deferred :as md]
             [monkey.ci
-             [events :as e]
              [sidecar :as sut]
              [spec :as spec]]
             [monkey.ci.helpers :as h]))

@@ -6,7 +6,6 @@
             [manifold.deferred :as md]
             [monkey.ci
              [commands :as sut]
-             [events :as e]
              [sidecar :as sc]
              [spec :as spec]]
             [monkey.ci.helpers :as h]
@@ -38,18 +37,7 @@
                                                          :repo-id "b"}}}
                                      (sut/run-build))]
       (is (= build-id (last sid)))
-      (is (= ["a" "b"] (take 2 sid)))))
-
-  #_(testing "accumulates build results from events"
-    (let [registered (atom [])]
-      (with-redefs [e/register-handler (fn [_ t _]
-                                         (swap! registered conj t))]
-        (h/with-bus
-          (fn [bus]
-            (is (some? (-> {:event-bus bus
-                            :runner (constantly :ok)}
-                           (sut/run-build))))
-            (is (not-empty @registered))))))))
+      (is (= ["a" "b"] (take 2 sid))))))
 
 (deftest list-builds
   (testing "reports builds from server"

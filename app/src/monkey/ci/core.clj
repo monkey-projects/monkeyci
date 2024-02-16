@@ -19,7 +19,6 @@
              [utils :as u]
              [workspace]]
             [monkey.ci.events
-             [legacy]
              [manifold]]
             [monkey.ci.storage
              [cached]

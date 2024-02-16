@@ -106,7 +106,7 @@
   {:http
    {:port 3000}
    :events
-   {:type :legacy}
+   {:type :manifold}
    :runner
    {:type :child}
    :storage

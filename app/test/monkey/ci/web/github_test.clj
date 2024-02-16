@@ -3,7 +3,6 @@
             [clojure.math :as cm]
             [buddy.sign.jwt :as jwt]
             [monkey.ci
-             [events :as events]
              [storage :as st]]
             [monkey.ci.web
              [auth :as auth]

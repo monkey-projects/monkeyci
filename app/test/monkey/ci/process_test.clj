@@ -5,7 +5,6 @@
             [manifold.deferred :as md]
             [monkey.ci
              [containers]
-             [events :as events]
              [process :as sut]
              [script :as script]]
             [monkey.ci.utils :as u]
@@ -46,18 +45,20 @@
 
 (deftest ^:slow execute-slow!
   (let [base-ctx {:public-api sa/local-api
-                  :args {:dev-mode true}}]
+                  :config {:args {:dev-mode true}}}]
     
     (testing "executes build script in separate process"
       (is (zero? (-> base-ctx
-                     (assoc :build {:script-dir (example "basic-clj")})
+                     (assoc :build {:script-dir (example "basic-clj")
+                                    :build-id (u/new-build-id)})
                      sut/execute!
                      deref
                      :exit))))
 
     (testing "fails when script fails"
       (is (pos? (-> base-ctx
-                    (assoc :build {:script-dir (example "failing")})
+                    (assoc :build {:script-dir (example "failing")
+                                   :build-id (u/new-build-id)})
                     sut/execute!
                     deref
                     :exit))))
@@ -132,15 +133,13 @@
         (is (true? @server-started?)))
 
       (testing "passes socket path in env"
-        (let [bus (events/make-bus)]
-          (is (string? (-> {:script-dir "test-dir"
-                            :event-bus bus}
-                           (sut/execute!)
-                           (deref)
-                           :process
-                           :args
-                           :extra-env
-                           :monkeyci-api-socket))))))))
+        (is (string? (-> {:script-dir "test-dir"}
+                         (sut/execute!)
+                         (deref)
+                         :process
+                         :args
+                         :extra-env
+                         :monkeyci-api-socket)))))))
 
 (deftest process-env
   (testing "passes build id"

@@ -9,7 +9,6 @@
              [artifacts :as art]
              [cache :as cache]
              [containers :as c]
-             [events :as e]
              [runtime :as rt]
              [script :as sut]
              [utils :as u]]

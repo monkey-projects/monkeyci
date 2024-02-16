@@ -7,7 +7,6 @@
             [clojure.string :as cs]
             [monkey.ci
              [config :as config]
-             [events :as events]
              [logging :as l]
              [runtime :as rt]
              [storage :as st]]
@@ -30,8 +29,7 @@
 (def github-secret "github-secret")
 
 (defn- test-rt [& [opts]]
-  (-> (merge {:event-bus (events/make-bus)
-              :config {:dev-mode true}}
+  (-> (merge {:config {:dev-mode true}}
              opts)
       (update :storage #(or % (st/make-memory-storage)))))
 

@@ -7,7 +7,6 @@
             [manifold.deferred :as md]
             [monkey.ci
              [blob :as blob]
-             [events :as e]
              [storage :as s]]
             [monkey.ci.web.auth :as auth]
             [ring.mock.request :as mock])
@@ -47,13 +46,6 @@
   (let [t (ca/timeout (or timeout 1000))
         [v c] (ca/alts!! [ch t])]
     (if (= t c) (or timeout-val :timeout) v)))
-
-(defn with-bus [f]
-  (let [bus (e/make-bus)]
-    (try
-      (f bus)
-      (finally
-        (e/close-bus bus)))))
 
 (defn with-memory-store-fn [f]
   (f (s/make-memory-storage)))

@@ -1,17 +1,8 @@
 (ns monkey.ci.core-test
   (:require [clojure.test :refer :all]
-            [clojure.core.async :as ca]
-            [clojure.spec.alpha :as s]
-            [clojure.tools.logging :as log]
-            [com.stuartsierra.component :as c]
             [monkey.ci
-             [config :as config]
              [core :as sut]
-             [events :as e]
-             [spec :as spec]
-             [utils :as u]]
-            [monkey.ci.web.handler :as web]
-            [monkey.ci.helpers :as h]))
+             [utils :as u]]))
 
 (deftest main-test
   (with-redefs [clojure.core/shutdown-agents (constantly nil)

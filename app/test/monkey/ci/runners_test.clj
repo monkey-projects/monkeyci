@@ -5,58 +5,54 @@
             [clojure.string :as cs]
             [manifold.deferred :as md]
             [monkey.ci
-             [events :as e]
              [process :as p]
              [runners :as sut]
              [utils :as u]]
             [monkey.ci.helpers :as h]))
 
 (deftest build-local
-  (h/with-bus
-    (fn [bus]
-      (with-redefs [p/execute! (constantly (md/success-deferred {:exit 0}))]
+  (with-redefs [p/execute! (constantly (md/success-deferred {:exit 0}))]
 
-        (testing "returns a deferred that waits for build to complete"
-          (is (md/deferred? (sut/build-local {:build {:script-dir "examples/basic-clj"}}))))
-        
-        (testing "when script not found"
-          (testing "returns exit code 1"
-            (is (= 1 (-> {:build {:script-dir "nonexisting"}}
+    (testing "returns a deferred that waits for build to complete"
+      (is (md/deferred? (sut/build-local {:build {:script-dir "examples/basic-clj"}}))))
+    
+    (testing "when script not found"
+      (testing "returns exit code 1"
+        (is (= 1 (-> {:build {:script-dir "nonexisting"}}
+                     (sut/build-local)
+                     (deref)))))
+
+      (testing "fires `:build/completed` event with error result"
+        (let [events (atom [])]
+          (is (some? (-> {:build {:script-dir "nonexisting"}
+                          :events {:poster (partial swap! events conj)}}
                          (sut/build-local)
-                         (deref)))))
+                         (deref))))
+          (is (not-empty @events))
+          (is (= :error (:result (first @events)))))))
 
-          (testing "fires `:build/completed` event with error result"
-            (let [events (atom [])]
-              (is (some? (-> {:build {:script-dir "nonexisting"}
-                              :events {:poster (partial swap! events conj)}}
-                             (sut/build-local)
-                             (deref))))
-              (is (not-empty @events))
-              (is (= :error (:result (first @events)))))))
+    (testing "deletes checkout dir"
+      (letfn [(verify-checkout-dir-deleted [checkout-dir script-dir]
+                (is (some? (-> {:build {:git {:dir (u/abs-path checkout-dir)}
+                                        :script-dir (u/abs-path script-dir)}}
+                               (sut/build-local)
+                               (deref))))
+                (is (false? (.exists checkout-dir))))]
+        
+        (testing "when script exists"
+          (h/with-tmp-dir dir
+            (let [checkout-dir (io/file dir "checkout")
+                  script-dir (doto (io/file checkout-dir "script")
+                               (.mkdirs))]
+              (spit (io/file script-dir "build.clj") "[]")
+              (verify-checkout-dir-deleted checkout-dir script-dir))))
 
-        (testing "deletes checkout dir"
-          (letfn [(verify-checkout-dir-deleted [checkout-dir script-dir]
-                    (is (some? (-> {:event-bus bus
-                                    :build {:git {:dir (u/abs-path checkout-dir)}
-                                            :script-dir (u/abs-path script-dir)}}
-                                   (sut/build-local)
-                                   (deref))))
-                    (is (false? (.exists checkout-dir))))]
-            
-            (testing "when script exists"
-              (h/with-tmp-dir dir
-                (let [checkout-dir (io/file dir "checkout")
-                      script-dir (doto (io/file checkout-dir "script")
-                                   (.mkdirs))]
-                  (spit (io/file script-dir "build.clj") "[]")
-                  (verify-checkout-dir-deleted checkout-dir script-dir))))
-
-            (testing "when script was not found"
-              (h/with-tmp-dir dir
-                (let [checkout-dir (doto (io/file dir "checkout")
-                                     (.mkdirs))
-                      script-dir (io/file checkout-dir "nonexisting")]
-                  (verify-checkout-dir-deleted checkout-dir script-dir))))))))))
+        (testing "when script was not found"
+          (h/with-tmp-dir dir
+            (let [checkout-dir (doto (io/file dir "checkout")
+                                 (.mkdirs))
+                  script-dir (io/file checkout-dir "nonexisting")]
+              (verify-checkout-dir-deleted checkout-dir script-dir))))))))
 
 (deftest download-src
   (testing "no-op if the source is local"

@@ -64,7 +64,7 @@
                "--junit-xml-file" "junit.xml"
                ;; Skip docker integration tests, they require access to the socket
                "--skip-meta" ":docker"
-               ;; Skip integration tests for now, they are too slow (for now)
+               ;; Skip integration tests, they are too slow (for now)
                "--skip-meta" ":integration"]
    ;; Add this to avoid falling back to the default logger
    :jvm-opts ["-Dlogback.configurationFile=resources/logback.xml"]}
