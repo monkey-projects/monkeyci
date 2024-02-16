@@ -89,16 +89,16 @@
            (base-dir-key)
            (u/combine build-id)))
   ([base-dir-key rt]
-   (build-related-dir rt base-dir-key (get-in rt [:build :build-id]))))
+   (build-related-dir base-dir-key rt (get-in rt [:build :build-id]))))
 
 (def checkout-dir
   "Calculates the checkout directory for the build, by combining the checkout
    base directory and the build id."
-  (partial build-related-dir :checkout-base-dir))
+  (partial build-related-dir (rt/from-config :checkout-base-dir)))
 
 (def ssh-keys-dir
   "Calculates ssh keys dir for the build"
-  (partial build-related-dir :ssh-keys-dir))
+  (partial build-related-dir (rt/from-config :ssh-keys-dir)))
 
 (defn build-completed-result [build exit-code]
   {:build build

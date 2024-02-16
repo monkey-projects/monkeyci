@@ -9,9 +9,10 @@
             [monkey.ci.build.core :as bc]
             [monkey.ci
              [artifacts :as art]
+             [build :as build]
              [cache :as cache]
              [containers :as c]
-             [context :as ctx]
+             [runtime :as rt]
              [utils :as u]]
             [monkey.ci.containers
              [docker]
@@ -277,15 +278,22 @@
     url (connect-to-host url)
     socket (connect-to-uds socket)))
 
-(defn- setup-api-client [ctx]
+(def valid-config? (some-fn :socket :url))
+
+#_(defn- setup-api-client [ctx]
   (let [api? (some-fn :socket :url)]
     (cond-> ctx
       ;; In tests it could be there is no api configuration, so skip the initialization in that case
       (api? (:api ctx)) (assoc-in [:api :client] (make-client ctx)))))
 
-(defn- with-script-api [ctx f]
+#_(defn- with-script-api [ctx f]
   (let [ctx (setup-api-client ctx)]
     (f ctx)))
+
+(defmethod rt/setup-runtime :api [conf _]
+  (when-let [c (:api conf)]
+    (when (valid-config? c)
+      {:client (make-client conf)})))
 
 (defn- with-script-dir [{:keys [script-dir] :as ctx} evt]
   (-> (assoc evt :dir script-dir)
@@ -312,31 +320,32 @@
   "The build script either returns a list of pipelines, or a function that
    returns a list.  This function resolves the pipelines in case it's a function
    or a var."
-  [p ctx]
+  [p rt]
   (cond
     (pipeline? p) [p]
-    (fn? p) (resolve-pipelines (p ctx) ctx)
-    (var? p) (resolve-pipelines (var-get p) ctx)
+    (fn? p) (resolve-pipelines (p rt) rt)
+    (var? p) (resolve-pipelines (var-get p) rt)
     :else (remove nil? p)))
 
-(defn- load-and-run-pipelines [{:keys [script-dir] :as ctx}]
-  (let [build-id (ctx/get-build-id ctx)]
+(defn- load-and-run-pipelines [{:keys [script-dir] :as rt}]
+  (let [build-id (build/get-build-id rt)]
     (log/debug "Executing script for build" build-id "at:" script-dir)
-    (log/debug "Script context:" ctx)
+    (log/debug "Script context:" rt)
     (try 
       (let [p (-> (load-script script-dir build-id)
-                  (resolve-pipelines ctx))]
+                  (resolve-pipelines rt))]
         (log/debug "Pipelines:" p)
         (log/debug "Loaded" (count p) "pipelines:" (map :name p))
-        (run-pipelines* ctx p))
+        (run-pipelines* rt p))
       (catch Exception ex
         (log/error "Unable to load pipelines" ex)
-        (post-event ctx {:type :script/end
-                         :message (.getMessage ex)})
+        (post-event rt {:type :script/end
+                        :message (.getMessage ex)})
         bc/failure))))
 
 (defn exec-script!
   "Loads a script from a directory and executes it.  The script is
    executed in this same process (but in a randomly generated namespace)."
-  [ctx]
-  (with-script-api ctx load-and-run-pipelines))
+  [rt]
+  #_(with-script-api ctx load-and-run-pipelines)
+  (load-and-run-pipelines rt))

@@ -4,6 +4,7 @@
             [clojure.java.io :as io]
             [manifold.deferred :as md]
             [monkey.ci
+             [containers]
              [events :as events]
              [process :as sut]
              [script :as script]]
@@ -18,30 +19,30 @@
   (.getAbsolutePath (io/file cwd "examples" subdir)))
 
 (deftest run
-  (testing "executes script with given args"
-    (let [captured-args (atom nil)]
-      (with-redefs [script/exec-script! (fn [args]
-                                          (reset! captured-args args)
-                                          bc/success)]
-        (is (nil? (sut/run {:key :test-args})))
-        (is (= {:key :test-args}
-               (-> @captured-args
-                   :args))))))
+  (with-redefs [sut/exit! (constantly nil)]
+    (testing "executes script with given args"
+      (let [captured-args (atom nil)]
+        (with-redefs [script/exec-script! (fn [args]
+                                            (reset! captured-args args)
+                                            bc/success)]
+          (is (nil? (sut/run {:key :test-args})))
+          (is (= {:key :test-args}
+                 (-> @captured-args
+                     :config
+                     :args))))))
 
-  (testing "merges args with env vars"
-    (let [captured-args (atom nil)]
-      (with-redefs [script/exec-script! (fn [args]
-                                          (reset! captured-args args)
-                                          bc/success)]
-        (is (nil? (sut/run
-                    {:key :test-args}
-                    {:monkeyci-containers-type "docker"
-                     :monkeyci-event-socket "/tmp/test.sock"})))
-        (is (= {:containers {:type :docker}
-                :event-socket "/tmp/test.sock"}
-               (-> @captured-args
-                   (select-keys [:containers
-                                 :event-socket]))))))))
+    (testing "merges args with env vars"
+      (let [captured-args (atom nil)]
+        (with-redefs [script/exec-script! (fn [args]
+                                            (reset! captured-args args)
+                                            bc/success)]
+          (is (nil? (sut/run
+                      {:key :test-args}
+                      {:monkeyci-containers-type "podman"
+                       :monkeyci-api-socket "/tmp/test.sock"})))
+          (is (= {:type :podman} (:containers @captured-args)))
+          (is (= {:socket "/tmp/test.sock"} (get-in @captured-args [:config :api])))
+          (is (= {:key :test-args} (get-in @captured-args [:config :args]))))))))
 
 (deftest ^:slow execute-slow!
   (let [base-ctx {:public-api sa/local-api
@@ -157,32 +158,11 @@
                        (sut/process-env "test-socket")
                        :lc-ctype))))
 
-  (testing "passes log config, without maker"
-    (let [env (-> {:logging {:type :file
-                             :dir "test-dir"
-                             :maker (constantly :error)}}
+  (testing "passes original config"
+    (let [env (-> {:config
+                   {:original
+                    {:logging {:type :file
+                               :dir "test-dir"}}}}
                   (sut/process-env "test-socket"))]
       (is (= "file" (:monkeyci-logging-type env)))
-      (is (= "test-dir" (:monkeyci-logging-dir env)))
-      (is (not (contains? env :monkeyci-logging-maker)))))
-
-  (testing "passes artifacts config"
-    (let [env (-> {:artifacts {:type :disk
-                               :dir "test-dir"}}
-                  (sut/process-env "test-socket"))]
-      (is (= "disk" (:monkeyci-artifacts-type env)))
-      (is (= "test-dir" (:monkeyci-artifacts-dir env)))))
-
-  (testing "passes cache config"
-    (let [env (-> {:cache {:type :disk
-                           :dir "test-dir"}}
-                  (sut/process-env "test-socket"))]
-      (is (= "disk" (:monkeyci-cache-type env)))
-      (is (= "test-dir" (:monkeyci-cache-dir env)))))
-
-  (testing "passes container props"
-    (let [env (-> {:containers {:type :podman
-                                :platform "linux/amd64"}}
-                  (sut/process-env "test-socket"))]
-      (is (= "podman" (:monkeyci-containers-type env)))
-      (is (= "linux/amd64" (:monkeyci-containers-platform env))))))
+      (is (= "test-dir" (:monkeyci-logging-dir env))))))

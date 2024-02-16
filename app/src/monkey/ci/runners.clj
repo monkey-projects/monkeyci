@@ -65,7 +65,7 @@
 (defn download-git
   "Downloads from git into a temp dir, and designates that as the working dir."
   [rt]
-  (log/debug "Runtime:" rt)
+  (log/debug "Downloading from git using build config:" (:build rt))
   (let [git (get-in rt [:git :clone])
         conf (-> (get-in rt [:build :git])
                  (update :dir #(or % (build/checkout-dir rt))))

@@ -34,14 +34,6 @@
               (is (not-empty @events))
               (is (= :error (:result (first @events)))))))
 
-        #_(testing "passes pipeline to process"
-          (is (= "test-pipeline" (-> {:event-bus bus
-                                      :build {:script-dir "examples/basic-clj"
-                                              :pipeline "test-pipeline"}}
-                                     (build-and-wait)
-                                     :build
-                                     :pipeline))))
-
         (testing "deletes checkout dir"
           (letfn [(verify-checkout-dir-deleted [checkout-dir script-dir]
                     (is (some? (-> {:event-bus bus
@@ -92,7 +84,7 @@
                       :checkout-dir)))))
 
   (testing "calculates checkout dir if not specified"
-    (is (cs/ends-with? (-> {:checkout-base-dir "test-work-dir"
+    (is (cs/ends-with? (-> {:config {:checkout-base-dir "test-work-dir"}
                             :git {:clone :dir}
                             :build {:git {:url "http:/test.git"}
                                     :build-id "test-build"}}

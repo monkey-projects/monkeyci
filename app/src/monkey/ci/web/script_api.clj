@@ -116,3 +116,7 @@
     (fn [ep]
       (when-let [h (get handlers ep)]
         (h)))))
+
+(defmethod rt/setup-runtime :public-api [_ _]
+  ;; TODO Make configurable
+  local-api)

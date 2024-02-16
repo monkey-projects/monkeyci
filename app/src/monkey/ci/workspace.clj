@@ -7,5 +7,6 @@
 (defmethod c/normalize-key :workspace [k conf]
   (c/normalize-typed k conf (partial b/normalize-blob-config k)))
 
-(defmethod rt/setup-runtime :workspace [conf _]
-  (b/make-blob-store conf :workspace))
+(defmethod rt/setup-runtime :workspace [conf k]
+  (when (k conf)
+    (b/make-blob-store conf k)))

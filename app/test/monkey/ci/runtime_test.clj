@@ -66,3 +66,13 @@
 
   (testing "provides http server"
     (verify-runtime :http {:port 3000} fn?)))
+
+(deftest from-config
+  (testing "gets value from config"
+    (is (= "test-val" ((sut/from-config :test-val)
+                       {:config {:test-val "test-val"}})))))
+
+(deftest rt->env
+  (testing "returns original config"
+    (is (= {:key "value"}
+           (sut/rt->env {:config {:original {:key "value"}}})))))

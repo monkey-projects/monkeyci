@@ -208,7 +208,9 @@
                            (normalize-key k)))
                     (assoc (merge conf env) :args args)
                     keys-to-normalize))
-        (dissoc :default :env))))
+        (dissoc :default :env)
+        ;; TODO Add the config from env as well
+        (assoc :original conf))))
 
 (defn app-config
   "Combines app environment with command-line args into a unified 

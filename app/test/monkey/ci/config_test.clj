@@ -285,6 +285,8 @@
     (let [n (sut/normalize-config {} {} {})]
       (is (not (contains? n :env)))
       (is (not (contains? n :default)))))
+
+  
   
   (testing "github"
     (testing "adds config from env"
@@ -351,4 +353,9 @@
                   :bucket-name "test-storage-bucket"}}
                 {} {})
                :storage
-               :credentials)))))
+               :credentials))))
+
+  (testing "adds input config to result"
+    (let [in {:key "value"}]
+      (is (= in (-> (sut/normalize-config in {} {})
+                    :original))))))

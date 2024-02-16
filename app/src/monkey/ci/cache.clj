@@ -49,5 +49,6 @@
 (defmethod config/normalize-key :cache [k conf]
   (config/normalize-typed k conf (partial blob/normalize-blob-config k)))
 
-(defmethod rt/setup-runtime :cache [conf _]
-  (blob/make-blob-store conf :cache))
+(defmethod rt/setup-runtime :cache [conf k]
+  (when (k conf)
+    (blob/make-blob-store conf k)))

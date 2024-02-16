@@ -86,5 +86,6 @@
 (defmethod config/normalize-key :artifacts [k conf]
   (config/normalize-typed k conf (partial blob/normalize-blob-config k)))
 
-(defmethod rt/setup-runtime :artifacts [conf _]
-  (blob/make-blob-store conf :artifacts))
+(defmethod rt/setup-runtime :artifacts [conf k]
+  (when (k conf)
+    (blob/make-blob-store conf k)))

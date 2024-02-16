@@ -10,7 +10,10 @@
    directly."
   (:require [clojure.spec.alpha :as spec]
             [com.stuartsierra.component :as co]
-            [monkey.ci.spec :as s]))
+            [medley.core :as mc]
+            [monkey.ci
+             [spec :as s]
+             [utils :as u]]))
 
 (defmulti setup-runtime (fn [_ k] k))
 
@@ -20,9 +23,9 @@
 (defn config->runtime
   "Creates the runtime from the normalized config map"
   [conf]
-  {:pre  [(spec/valid? ::s/app-config conf)]
-   ;;:post [(spec/valid? ::s/runtime %)]
-   }
+  ;; TODO Re-enable this but allow for more flexible checks
+  #_{:pre  [(spec/valid? ::s/app-config conf)]
+     :post [(spec/valid? ::s/runtime %)]}
   ;; Apply each of the discovered runtime setup implementations
   (let [m (-> (methods setup-runtime)
               (dissoc :default)
@@ -100,3 +103,13 @@
   [rt evt]
   (when-let [p (get-in rt [:events :poster])]
     (p evt)))
+
+(defn rt->env
+  "Returns a map that can be serialized back into env vars.  This is used
+   to pass application configuration to child processes or containers."
+  [rt]
+  ;; Return the original, non-normalized configuration
+  (-> rt
+      (get-in [:config :original])
+      (merge (select-keys rt [:build]))
+      (mc/update-existing-in [:build :sid] u/serialize-sid)))

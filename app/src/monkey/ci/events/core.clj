@@ -60,9 +60,10 @@
   (make-sync-events))
 
 (defmethod rt/setup-runtime :events [conf _]
-  (let [e (make-events conf)]
-    (cond-> {:poster (partial post-events e)}
-      (satisfies? EventReceiver e) (assoc :receiver e))))
+  (when (:events conf)
+    (let [e (make-events conf)]
+      (cond-> {:poster (partial post-events e)}
+        (satisfies? EventReceiver e) (assoc :receiver e)))))
 
 (defn wrapped
   "Returns a new function that wraps `f` and posts an event before 

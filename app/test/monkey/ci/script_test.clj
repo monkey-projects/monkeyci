@@ -10,6 +10,7 @@
              [cache :as cache]
              [containers :as c]
              [events :as e]
+             [runtime :as rt]
              [script :as sut]
              [utils :as u]]
             [monkey.ci.web.script-api :as script-api]
@@ -59,17 +60,14 @@
     (is (bc/success? (sut/exec-script! {:script-dir "examples/conditional-pipelines"}))))
   
   (testing "fails when invalid script"
-    (is (bc/failed? (sut/exec-script! {:script-dir "examples/invalid-script"}))))
-  
+    (is (bc/failed? (sut/exec-script! {:script-dir "examples/invalid-script"})))))
+
+(deftest setup-runtime
   (testing "connects to listening socket if specified"
     (with-listening-socket
-      (fn [socket-path events]
-        ;; Execute the script, we expect at least one incoming event
-        (is (bc/success? (sut/exec-script! {:script-dir "examples/basic-clj"
-                                            :build {:build-id "test-build"}
-                                            :api {:socket socket-path}})))
-        ;; Try to read a message on the channel
-        (is (not-empty @events))))))
+      (fn [socket-path _]
+        (is (some? (-> (rt/setup-runtime {:api {:socket socket-path}} :api)
+                       :client)))))))
 
 (deftest make-client
   (testing "creates client for domain socket"
