@@ -580,7 +580,7 @@
                        :name))))))
 
   (testing "`GET /github/config` returns client id"
-    (let [app (-> (test-rt {:github {:client-id "test-client-id"}})
+    (let [app (-> (test-rt {:config {:github {:client-id "test-client-id"}}})
                   (sut/make-app))
           r (-> (mock/request :get "/github/config")
                 (app))]

@@ -184,7 +184,7 @@
 (defn get-config
   "Lists public github configuration to use"
   [req]
-  (rur/response {:client-id (c/from-rt req (comp :client-id :github))}))
+  (rur/response {:client-id (c/from-rt req (comp :client-id :github rt/config))}))
 
 (defmethod config/normalize-key :github [_ conf]
   conf)
