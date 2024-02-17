@@ -118,15 +118,13 @@
     ;; If no build trigger, just respond with a '204 no content'
     (rur/status 204)))
 
-(defn ^:deprecated prepare-build [_ _])
-
 (defn- process-reply [{:keys [status] :as r}]
   (log/debug "Got github reply:" r)
   (update r :body c/parse-json))
 
 (defn- request-access-token [req]
   (let [code (get-in req [:parameters :query :code])
-        {:keys [client-secret client-id]} (c/from-rt req :github)]
+        {:keys [client-secret client-id]} (c/from-rt req (comp :github rt/config))]
     (-> @(http/post "https://github.com/login/oauth/access_token"
                     {:query-params {:client_id client-id
                                     :client_secret client-secret
