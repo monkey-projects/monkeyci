@@ -9,7 +9,7 @@
              [artifacts :as art]
              [cache :as cache]
              [containers :as c]
-             [events :as e]
+             [runtime :as rt]
              [script :as sut]
              [utils :as u]]
             [monkey.ci.web.script-api :as script-api]
@@ -24,11 +24,11 @@
 (defn with-listening-socket [f]
   (let [p (u/tmp-file "test-" ".sock")]
     (try
-      (let [bus (e/make-bus)
-            server (script-api/listen-at-socket p {:event-bus bus
-                                                   :public-api script-api/local-api})]
+      (let [events (atom [])
+            server (script-api/listen-at-socket p {:public-api script-api/local-api
+                                                   :events {:poster (partial swap! events conj)}})]
         (try
-          (f p bus)
+          (f p events)
           (finally
             (script-api/stop-server server))))
       (finally
@@ -59,19 +59,14 @@
     (is (bc/success? (sut/exec-script! {:script-dir "examples/conditional-pipelines"}))))
   
   (testing "fails when invalid script"
-    (is (bc/failed? (sut/exec-script! {:script-dir "examples/invalid-script"}))))
-  
+    (is (bc/failed? (sut/exec-script! {:script-dir "examples/invalid-script"})))))
+
+(deftest setup-runtime
   (testing "connects to listening socket if specified"
     (with-listening-socket
-      (fn [socket-path bus]
-        (let [in (e/wait-for bus :script/start (map identity))]
-          ;; Execute the script, we expect at least one incoming event
-          (is (bc/success? (sut/exec-script! {:script-dir "examples/basic-clj"
-                                              :build {:build-id "test-build"}
-                                              :api {:socket socket-path}})))
-          ;; Try to read a message on the channel
-          (is (= in (-> (ca/alts!! [in (ca/timeout 500)])
-                        (second)))))))))
+      (fn [socket-path _]
+        (is (some? (-> (rt/setup-runtime {:api {:socket socket-path}} :api)
+                       :client)))))))
 
 (deftest make-client
   (testing "creates client for domain socket"
@@ -126,7 +121,7 @@
                                              :steps [(constantly bc/success)]})]
                     ctx {:api {:client client}}]
                 (is (bc/success? (sut/run-pipelines ctx pipelines)))
-                (is (pos? (count @events-posted)))
+                (is (not-empty @events-posted))
                 (is (true? (-> (map :type @events-posted)
                                (set)
                                (contains? expected-type))))))]

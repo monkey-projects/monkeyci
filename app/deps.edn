@@ -20,6 +20,7 @@
         com.monkeyprojects/oci-sign {:mvn/version "0.1.3"}
         com.monkeyprojects/oci-container-instance {:mvn/version "0.1.0"}
         com.monkeyprojects/oci-os {:mvn/version "0.1.1"}
+        com.monkeyprojects/zmq {:mvn/version "0.1.0-SNAPSHOT"}
         com.stuartsierra/component {:mvn/version "1.1.0"}
         commons-io/commons-io {:mvn/version "2.13.0"}
         http-kit/http-kit {:mvn/version "2.7.0"}
@@ -63,7 +64,7 @@
                "--junit-xml-file" "junit.xml"
                ;; Skip docker integration tests, they require access to the socket
                "--skip-meta" ":docker"
-               ;; Skip integration tests for now, they are too slow (for now)
+               ;; Skip integration tests, they are too slow (for now)
                "--skip-meta" ":integration"]
    ;; Add this to avoid falling back to the default logger
    :jvm-opts ["-Dlogback.configurationFile=resources/logback.xml"]}

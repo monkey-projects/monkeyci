@@ -17,6 +17,7 @@
                  {:containers {:type :podman}
                   :build {:build-id "test-build"}
                   :work-dir dir
+                  :logging {:maker (l/make-logger {})}
                   :step {:name "test-step"
                          :container/image "test-img"
                          :script ["first" "second"]}})]
@@ -76,6 +77,7 @@
                          :script ["first" "second"]
                          :caches [{:id "test-cache"
                                    :path "test-path"}]}
+                  :logging {:maker (l/make-logger {})}
                   :cache {:store cache}})]
           (is (not-empty @stored)))))
     
@@ -93,6 +95,7 @@
                          :script ["first" "second"]
                          :restore-artifacts [{:id "test-artifact"
                                               :path "test-path"}]}
+                  :logging {:maker (l/make-logger {})}
                   :artifacts {:store store}})]
           (is (empty? @stored)))))
 
@@ -110,6 +113,7 @@
                          :script ["first" "second"]
                          :save-artifacts [{:id "test-artifact"
                                            :path "test-path"}]}
+                  :logging {:maker (l/make-logger {})}
                   :artifacts {:store store}})]
           (is (not-empty @stored)))))))
 

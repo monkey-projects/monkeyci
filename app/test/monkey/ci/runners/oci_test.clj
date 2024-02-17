@@ -6,7 +6,6 @@
             [manifold.deferred :as md]
             [monkey.ci
              [config :as mc]
-             [events :as e]
              [oci :as oci]
              [runners :as r]]
             [monkey.ci.runners.oci :as sut]
@@ -24,18 +23,15 @@
   (testing "runs container instance"
     (with-redefs [oci/run-instance (constantly (md/success-deferred 0))]
       (is (= 0 (-> (sut/oci-runner {} {} {})
-                   (h/try-take))))))
+                   (deref))))))
 
   (testing "launches `:build/completed` event"
-    (h/with-bus
-      (fn [bus]
-        (with-redefs [ci/create-container-instance (fn [_ opts]
-                                                     {:status 500})]
-          (let [received (atom [])
-                h (e/register-handler bus :build/completed (partial swap! received conj))]
-            (is (some? (sut/oci-runner {} {} {:event-bus bus})))
-            (is (not= :timeout (h/wait-until #(pos? (count @received)) 1000)))
-            (is (= 1 (count @received)))))))))
+    (with-redefs [ci/create-container-instance (fn [_ opts]
+                                                 {:status 500})]
+      (let [received (atom [])]
+        (is (some? (sut/oci-runner {} {} {:events {:poster (partial swap! received conj)}})))
+        (is (not-empty @received))
+        (is (= :build/completed (-> @received first :type)))))))
 
 (deftest instance-config
   (h/with-tmp-dir dir 

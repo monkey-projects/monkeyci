@@ -92,11 +92,11 @@
 (defmethod make-logger :oci [conf]
   (fn [ctx path]
     (-> conf
-        (oci/ctx->oci-config :logging)
+        :logging
         (->OciBucketLogger ctx path))))
 
 (defn handle-process-streams
-  "Given a process return values (as from `babashka.process/process`) and two
+  "Given a process return value (as from `babashka.process/process`) and two
    loggers, will invoke the `handle-stream` on each logger for out and error
    output.  Returns the process."
   [{:keys [out err] :as proc} loggers]
@@ -182,7 +182,7 @@
 
 (defmethod make-log-retriever :oci [conf]
   (let [oci-conf (-> conf
-                     (oci/ctx->oci-config :logging)
+                     :logging
                      (oci/->oci-config))
         client (os/make-client oci-conf)]
     (->OciBucketLogRetriever client oci-conf)))

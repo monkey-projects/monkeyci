@@ -24,20 +24,24 @@
   "Normalizes the given OCI config key, by grouping the credentials both in the given key
    and in the `oci` key, and merging them."
   [conf k]
-  (->> [(:oci (c/group-and-merge conf :oci)) (k conf)]
-       (map group-credentials)
-       (apply merge)
-       (assoc conf k)))
+  (letfn [(load-key [c]
+            (mc/update-existing-in c [:credentials :private-key] u/load-privkey))]
+    (->> [(:oci (c/group-and-merge conf :oci)) (k conf)]
+         (map group-credentials)
+         (apply merge)
+         (load-key)
+         (assoc conf k))))
 
 (defn ->oci-config
   "Given a configuration map with credentials, turns it into a config map
    that can be passed to OCI context creators."
   [{:keys [credentials] :as conf}]
   (-> conf
+      ;; TODO Remove this, it's already done when normalizing the config
       (merge (mc/update-existing credentials :private-key u/load-privkey))
       (dissoc :credentials)))
 
-(defn ctx->oci-config
+(defn ^:deprecated ctx->oci-config
   "Gets the oci configuration for the given key from the context.  This merges
    in the general OCI configurationn."
   [ctx k]

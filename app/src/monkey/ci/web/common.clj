@@ -5,7 +5,6 @@
             [clojure.core.async :refer [go <! <!! >!]]
             [clojure.java.io :as io]
             [clojure.tools.logging :as log]
-            [monkey.ci.context :as ctx]
             [muuntaja.core :as mc]
             [reitit.ring :as ring]
             [reitit.ring.coercion :as rrc]
@@ -15,21 +14,20 @@
              [parameters :as rrmp]]
             [ring.util.response :as rur]))
 
-(defn req->ctx [req]
-  (get-in req [:reitit.core/match :data ::context]))
-
-(defn from-context [req f]
-  (f (req->ctx req)))
-
-(defn req->bus
-  "Gets the event bus from the request data"
+(defn req->rt
+  "Gets the runtime from the request"
   [req]
-  (from-context req :event-bus))
+  (get-in req [:reitit.core/match :data ::runtime]))
+
+(defn from-rt
+  "Applies `f` to the request runtime"
+  [req f]
+  (f (req->rt req)))
 
 (defn req->storage
   "Retrieves storage object from the request context"
   [req]
-  (from-context req :storage))
+  (from-rt req :storage))
 
 (defn make-muuntaja
   "Creates muuntaja instance with custom settings"
@@ -78,21 +76,6 @@
    (ring/routes
     (ring/redirect-trailing-slash-handler)
     (ring/create-default-handler))))
-
-(defn posting-handler
-  "Handles the incoming http request by dispatching it to the handler `h`
-   which returns an event, which is then posted."
-  [req h]
-  ;; TODO Refactor this into an interceptor where the handler is able to
-  ;; return a custom response in addition to dispatching an event.
-  ;; Httpkit can't handle channels so read it here
-  (<!!
-   (go
-     (rur/status
-      (let [evt (h req)]
-        (if (or (nil? evt) (ctx/post-events (req->ctx req) evt))
-          200
-          500))))))
 
 (defn parse-json [s]
   (if (string? s)

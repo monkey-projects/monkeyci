@@ -15,23 +15,23 @@
     (is (nil? (sut/config->keypair {}))))
 
   (testing "returns private and public keys as map"
-    (let [ctx (-> {:jwk {:private-key "dev-resources/test/jwk/privkey.pem"
-                         :public-key "dev-resources/test/jwk/pubkey.pem"}}
+    (let [rt (-> {:jwk {:private-key "dev-resources/test/jwk/privkey.pem"
+                        :public-key "dev-resources/test/jwk/pubkey.pem"}}
                   (sut/config->keypair))]
-      (is (map? ctx))
-      (is (= 2 (count ctx)))
-      (is (bk/private-key? (:priv ctx)))
-      (is (bk/public-key? (:pub ctx))))))
+      (is (map? rt))
+      (is (= 2 (count rt)))
+      (is (bk/private-key? (:priv rt)))
+      (is (bk/public-key? (:pub rt))))))
 
 (deftest secure-ring-app
   (testing "verifies bearer token using public key and puts user in request `:identity`"
     (h/with-memory-store st
       (let [app :identity
             kp (sut/generate-keypair)
-            ctx {:storage st
-                 :jwk (sut/keypair->ctx kp)}
-            sec (sut/secure-ring-app app ctx)
-            req (h/->req ctx)]
+            rt {:storage st
+                :jwk (sut/keypair->rt kp)}
+            sec (sut/secure-ring-app app rt)
+            req (h/->req rt)]
         (is (st/sid? (st/save-user st {:type "github"
                                        :type-id 456})))
         (is (nil? (sec {}))

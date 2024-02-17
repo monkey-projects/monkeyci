@@ -2,8 +2,9 @@
   (:require [babashka.process :as bp]
             [clojure.test :refer :all]
             [clojure.java.io :as io]
+            [manifold.deferred :as md]
             [monkey.ci
-             [events :as events]
+             [containers]
              [process :as sut]
              [script :as script]]
             [monkey.ci.utils :as u]
@@ -17,45 +18,47 @@
   (.getAbsolutePath (io/file cwd "examples" subdir)))
 
 (deftest run
-  (testing "executes script with given args"
-    (let [captured-args (atom nil)]
-      (with-redefs [script/exec-script! (fn [args]
-                                          (reset! captured-args args)
-                                          bc/success)]
-        (is (nil? (sut/run {:key :test-args})))
-        (is (= {:key :test-args}
-               (-> @captured-args
-                   :args))))))
+  (with-redefs [sut/exit! (constantly nil)]
+    (testing "executes script with given args"
+      (let [captured-args (atom nil)]
+        (with-redefs [script/exec-script! (fn [args]
+                                            (reset! captured-args args)
+                                            bc/success)]
+          (is (nil? (sut/run {:key :test-args})))
+          (is (= {:key :test-args}
+                 (-> @captured-args
+                     :config
+                     :args))))))
 
-  (testing "merges args with env vars"
-    (let [captured-args (atom nil)]
-      (with-redefs [script/exec-script! (fn [args]
-                                          (reset! captured-args args)
-                                          bc/success)]
-        (is (nil? (sut/run
-                    {:key :test-args}
-                    {:monkeyci-containers-type "docker"
-                     :monkeyci-event-socket "/tmp/test.sock"})))
-        (is (= {:containers {:type :docker}
-                :event-socket "/tmp/test.sock"}
-               (-> @captured-args
-                   (select-keys [:containers
-                                 :event-socket]))))))))
+    (testing "merges args with env vars"
+      (let [captured-args (atom nil)]
+        (with-redefs [script/exec-script! (fn [args]
+                                            (reset! captured-args args)
+                                            bc/success)]
+          (is (nil? (sut/run
+                      {:key :test-args}
+                      {:monkeyci-containers-type "podman"
+                       :monkeyci-api-socket "/tmp/test.sock"})))
+          (is (= {:type :podman} (:containers @captured-args)))
+          (is (= {:socket "/tmp/test.sock"} (get-in @captured-args [:config :api])))
+          (is (= {:key :test-args} (get-in @captured-args [:config :args]))))))))
 
 (deftest ^:slow execute-slow!
   (let [base-ctx {:public-api sa/local-api
-                  :args {:dev-mode true}}]
+                  :config {:args {:dev-mode true}}}]
     
     (testing "executes build script in separate process"
       (is (zero? (-> base-ctx
-                     (assoc :build {:script-dir (example "basic-clj")})
+                     (assoc :build {:script-dir (example "basic-clj")
+                                    :build-id (u/new-build-id)})
                      sut/execute!
                      deref
                      :exit))))
 
     (testing "fails when script fails"
       (is (pos? (-> base-ctx
-                    (assoc :build {:script-dir (example "failing")})
+                    (assoc :build {:script-dir (example "failing")
+                                   :build-id (u/new-build-id)})
                     sut/execute!
                     deref
                     :exit))))
@@ -67,8 +70,11 @@
 
 (defn- find-arg
   "Finds the argument value for given key"
-  [{:keys [args]} k]
-  (->> args
+  [d k]
+  (->> d
+       deref
+       :process
+       :args
        :cmd
        (drop-while (partial not= (str k)))
        (second)))
@@ -78,25 +84,32 @@
   (-server-stop! [s opts]
     (future nil)))
 
+(deftype FakeProcess [exitValue])
+
 (deftest execute!
   (let [server-started? (atom nil)]
     (with-redefs [bp/process (fn [{:keys [exit-fn] :as args}]
                                (do
                                  (when (fn? exit-fn)
-                                   (exit-fn {}))
-                                 {:args args
-                                  :exit 1234}))
+                                   (exit-fn {:proc (->FakeProcess 1234)
+                                             :args args}))))
                   sa/start-server (fn [& args]
                                     (reset! server-started? true)
                                     (->TestServer))]
+
+      (testing "returns deferred"
+        (is (md/deferred? (sut/execute!
+                           {:args {:dev-mode true}
+                            :build {:script-dir (example "failing")}}))))
       
       (testing "returns exit code"
-        (is (= 1234 (:exit (sut/execute!
-                            {:args {:dev-mode true}
-                             :build {:script-dir (example "failing")}})))))
+        (is (= 1234 (:exit @(sut/execute!
+                             {:args {:dev-mode true}
+                              :build {:script-dir (example "failing")}})))))
 
       (testing "invokes in script dir"
-        (is (= "test-dir" (-> (sut/execute! {:build {:script-dir "test-dir"}})
+        (is (= "test-dir" (-> @(sut/execute! {:build {:script-dir "test-dir"}})
+                              :process
                               :args
                               :dir))))
 
@@ -120,13 +133,13 @@
         (is (true? @server-started?)))
 
       (testing "passes socket path in env"
-        (let [bus (events/make-bus)]
-          (is (string? (-> {:script-dir "test-dir"
-                            :event-bus bus}
-                           (sut/execute!)
-                           :args
-                           :extra-env
-                           :monkeyci-api-socket))))))))
+        (is (string? (-> {:script-dir "test-dir"}
+                         (sut/execute!)
+                         (deref)
+                         :process
+                         :args
+                         :extra-env
+                         :monkeyci-api-socket)))))))
 
 (deftest process-env
   (testing "passes build id"
@@ -144,32 +157,11 @@
                        (sut/process-env "test-socket")
                        :lc-ctype))))
 
-  (testing "passes log config, without maker"
-    (let [env (-> {:logging {:type :file
-                             :dir "test-dir"
-                             :maker (constantly :error)}}
+  (testing "passes original config"
+    (let [env (-> {:config
+                   {:original
+                    {:logging {:type :file
+                               :dir "test-dir"}}}}
                   (sut/process-env "test-socket"))]
       (is (= "file" (:monkeyci-logging-type env)))
-      (is (= "test-dir" (:monkeyci-logging-dir env)))
-      (is (not (contains? env :monkeyci-logging-maker)))))
-
-  (testing "passes artifacts config"
-    (let [env (-> {:artifacts {:type :disk
-                               :dir "test-dir"}}
-                  (sut/process-env "test-socket"))]
-      (is (= "disk" (:monkeyci-artifacts-type env)))
-      (is (= "test-dir" (:monkeyci-artifacts-dir env)))))
-
-  (testing "passes cache config"
-    (let [env (-> {:cache {:type :disk
-                           :dir "test-dir"}}
-                  (sut/process-env "test-socket"))]
-      (is (= "disk" (:monkeyci-cache-type env)))
-      (is (= "test-dir" (:monkeyci-cache-dir env)))))
-
-  (testing "passes container props"
-    (let [env (-> {:containers {:type :podman
-                                :platform "linux/amd64"}}
-                  (sut/process-env "test-socket"))]
-      (is (= "podman" (:monkeyci-containers-type env)))
-      (is (= "linux/amd64" (:monkeyci-containers-platform env))))))
+      (is (= "test-dir" (:monkeyci-logging-dir env))))))

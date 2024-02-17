@@ -15,7 +15,7 @@
 
 (def edn #{"application/edn"})
 
-(def req->events (comp :events wc/req->ctx))
+(def req->events (comp :events wc/req->rt))
 
 (defn- recv-events [req]
   (let [events (req->events req)
@@ -37,7 +37,7 @@
     {:data {:middleware wc/default-middleware
             :muuntaja (wc/make-muuntaja)
             :coercion reitit.coercion.schema/coercion
-            ::wc/context opts}}))
+            ::wc/runtime opts}}))
   ([opts]
    (make-router opts routes)))
 

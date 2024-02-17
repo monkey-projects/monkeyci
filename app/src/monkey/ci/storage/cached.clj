@@ -35,4 +35,3 @@
 (defn make-cached-storage [src]
   ;; FIXME Set a limit on the cache size
   (->CachedStorage src (st/make-memory-storage)))
-

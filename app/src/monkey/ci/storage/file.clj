@@ -1,5 +1,6 @@
 (ns monkey.ci.storage.file
-  "File storage implementation.  Useful for local or develop runs."
+  "File storage implementation.  Useful for local or develop runs.  It stores all
+   information in local .edn files."
   (:require [clojure
              [edn :as edn]
              [string :as cs]]

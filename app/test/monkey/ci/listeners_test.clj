@@ -1,7 +1,6 @@
 (ns monkey.ci.listeners-test
   (:require [clojure.test :refer [deftest testing is]]
             [monkey.ci
-             [events :as e]
              [listeners :as sut]
              [storage :as st]]
             [monkey.ci.helpers :as h]))
@@ -128,32 +127,28 @@
     (is (fn? (sut/build-update-handler {}))))
 
   (testing "dispatches event by build sid"
-    (h/with-bus
-      (fn [bus]
-        (let [inv (atom {})
-              handled (atom 0)]
-          (with-redefs [sut/step-started
-                        (fn [_ {{:keys [sid]} :build}]
-                          (Thread/sleep 100)
-                          (swap! inv assoc sid [:started])
-                          (swap! handled inc))
-                        sut/step-completed
-                        (fn [_ {{:keys [sid]} :build}]
-                          (Thread/sleep 50)
-                          (swap! inv update sid conj :completed)
-                          (swap! handled inc))]
-            (let [h (sut/build-update-handler {})]
-              (->> [:step/start :step/end]
-                   (map #(e/register-handler bus % h))
-                   (doall))
-              (is (some? (e/post-event bus {:type :step/start
-                                            :build {:sid ::first}})))
-              (is (some? (e/post-event bus {:type :step/start
-                                            :build {:sid ::second}})))
-              (is (some? (e/post-event bus {:type :step/end
-                                            :build {:sid ::first}})))
-              (is (some? (e/post-event bus {:type :step/end
-                                            :build {:sid ::second}})))
-              (is (not= :timeout (h/wait-until #(= 4 @handled) 1000)))
-              (doseq [[k r] @inv]
-                (is (= [:started :completed] r) (str "for id " k))))))))))
+    (let [inv (atom {})
+          handled (atom 0)]
+      (with-redefs [sut/step-started
+                    (fn [_ {{:keys [sid]} :build}]
+                      (Thread/sleep 100)
+                      (swap! inv assoc sid [:started])
+                      (swap! handled inc))
+                    sut/step-completed
+                    (fn [_ {{:keys [sid]} :build}]
+                      (Thread/sleep 50)
+                      (swap! inv update sid conj :completed)
+                      (swap! handled inc))]
+        (let [h (sut/build-update-handler {:events {:poster (fn [_]
+                                                              (swap! handled inc))}})]
+          (h {:type :step/start
+              :build {:sid ::first}})
+          (h {:type :step/start
+              :build {:sid ::second}})
+          (h {:type :step/end
+              :build {:sid ::first}})
+          (h {:type :step/end
+              :build {:sid ::second}})
+          (is (not= :timeout (h/wait-until #(= 4 @handled) 1000)))
+          (doseq [[k r] @inv]
+            (is (= [:started :completed] r) (str "for id " k))))))))

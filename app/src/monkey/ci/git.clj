@@ -5,7 +5,9 @@
             [clojure.java.io :as io]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
-            [monkey.ci.utils :as u]))
+            [monkey.ci
+             [runtime :as rt]
+             [utils :as u]]))
 
 (defn prepare-ssh-keys
   "Writes any ssh keys in the options to a temp directory and returns their
@@ -76,3 +78,9 @@
       (.getRepository)
       (.getWorkTree)
       (u/delete-dir)))
+
+(defmethod rt/setup-runtime :git [_ _]
+  {:clone (fn default-git-clone [opts]
+            (clone+checkout opts)
+            ;; Return the checkout dir
+            (:dir opts))})

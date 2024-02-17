@@ -2,10 +2,11 @@
   "Handler for the web server"
   (:require [camel-snake-kebab.core :as csk]
             [clojure.tools.logging :as log]
+            [com.stuartsierra.component :as co]
             [medley.core :refer [update-existing] :as mc]
             [monkey.ci
              [config :as config]
-             [events :as e]]
+             [runtime :as rt]]
             [monkey.ci.web
              [api :as api]
              [auth :as auth]
@@ -258,7 +259,7 @@
     (h req)))
 
 (defn make-router
-  ([{:keys [dev-mode] :as opts} routes]
+  ([rt routes]
    (ring/router
     routes
     {:data {:middleware (vec (concat [stringify-body
@@ -272,24 +273,25 @@
                                       log-request]))
             :muuntaja (c/make-muuntaja)
             :coercion reitit.coercion.schema/coercion
-            ::c/context opts}
+            ::c/context rt ; TODO Remove this
+            ::c/runtime rt}
      ;; Disabled, results in 405 errors for some reason
      ;;:compile rc/compile-request-coercers
      :reitit.middleware/registry
-     {:github-security (if dev-mode
+     {:github-security (if (rt/dev-mode? rt)
                          ;; Disable security in dev mode
                          [passthrough-middleware]
                          [github/validate-security])
-      :customer-check (if dev-mode
+      :customer-check (if (rt/dev-mode? rt)
                         [passthrough-middleware]
                         [auth/customer-authorization])}}))
-  ([opts]
-   (make-router opts routes)))
+  ([rt]
+   (make-router rt routes)))
 
-(defn make-app [opts]
-  (-> (make-router opts)
+(defn make-app [rt]
+  (-> (make-router rt)
       (c/make-app)
-      (auth/secure-ring-app opts)))
+      (auth/secure-ring-app rt)))
 
 (def default-http-opts
   ;; Virtual threads are still a preview feature
@@ -299,13 +301,41 @@
 (defn start-server
   "Starts http server.  Returns a server object that can be passed to
    `stop-server`."
-  [opts]
-  (let [http-opts (merge {:port 3000} (:http opts))]
+  [rt]
+  (let [http-opts (merge {:port 3000} (:http (rt/config rt)))]
     (log/info "Starting HTTP server at port" (:port http-opts))
-    (http/run-server (make-app opts)
+    (http/run-server (make-app rt)
                      (merge http-opts default-http-opts))))
 
 (defn stop-server [s]
   (when s
     (log/info "Shutting down HTTP server...")
     (http/server-stop! s)))
+
+(defmethod config/normalize-key :http [_ {:keys [args] :as conf}]
+  (update-in conf [:http :port] #(or (:port args) %)))
+
+(defrecord HttpServer [rt]
+  co/Lifecycle
+  (start [this]
+    (assoc this :server (start-server rt)))
+  (stop [{:keys [server] :as this}]
+    (when server
+      (stop-server server))
+    (dissoc this :server))
+  
+  clojure.lang.IFn
+  (invoke [this]
+    (co/stop this)))
+
+(defmethod rt/setup-runtime :http [conf _]
+  ;; Return a function that when invoked, returns another function to shut down the server
+  ;; TODO See if we can change this into a component
+  (fn [rt]
+    (-> (->HttpServer rt)
+        (co/start))))
+
+(defn server-status
+  "Returns server status, either `:running`, `:stopping` or `:stopped`"
+  [server]
+  (http/server-status (:server server)))

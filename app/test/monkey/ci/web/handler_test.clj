@@ -7,8 +7,8 @@
             [clojure.string :as cs]
             [monkey.ci
              [config :as config]
-             [events :as events]
              [logging :as l]
+             [runtime :as rt]
              [storage :as st]]
             [monkey.ci.web
              [auth :as auth]
@@ -28,17 +28,16 @@
 
 (def github-secret "github-secret")
 
-(defn- test-ctx [& [opts]]
-  (-> (merge {:event-bus (events/make-bus)
-              :dev-mode true}
+(defn- test-rt [& [opts]]
+  (-> (merge {:config {:dev-mode true}}
              opts)
       (update :storage #(or % (st/make-memory-storage)))))
 
 (defn- make-test-app
   ([storage]
-   (sut/make-app (test-ctx {:storage storage})))
+   (sut/make-app (test-rt {:storage storage})))
   ([]
-   (sut/make-app (test-ctx))))
+   (sut/make-app (test-rt))))
 
 (def test-app (make-test-app))
 
@@ -53,7 +52,7 @@
                        :port))))
 
     (testing "passes args as opts"
-      (is (= 1234 (-> (sut/start-server {:http {:port 1234}})
+      (is (= 1234 (-> (sut/start-server {:config {:http {:port 1234}}})
                       :opts
                       :port))))
 
@@ -93,45 +92,37 @@
 (deftest webhook-routes
   (testing "`POST /webhook/github/:id`"
     (testing "accepts with valid security header"
-      (let [payload "test body"
+      (let [payload (h/to-json {:head-commit {:message "test"}})
             signature (-> (mac/hash payload {:key github-secret
                                              :alg :hmac+sha256})
                           (codecs/bytes->hex))
             hook-id (st/new-id)
             st (st/make-memory-storage)
-            app (sut/make-app (test-ctx {:storage st :dev-mode false}))]
+            app (sut/make-app (test-rt {:storage st
+                                        :runner (constantly nil)
+                                        :config {:dev-mode false}}))]
         (is (st/sid? (st/save-webhook-details st {:id hook-id
                                                   :secret-key github-secret})))
         (is (= 200 (-> (mock/request :post (str "/webhook/github/" hook-id))
                        (mock/body payload)
                        (mock/header :x-hub-signature-256 (str "sha256=" signature))
+                       (mock/content-type "application/json")
+                       (mock/content-length (count payload))
                        (app)
                        :status)))))
 
     (testing "returns 401 if invalid security"
-      (let [app (sut/make-app (test-ctx {:dev-mode false}))]
+      (let [app (sut/make-app (test-rt {:config {:dev-mode false}}))]
         (is (= 401 (-> (mock/request :post "/webhook/github/test-hook")
                        (app)
                        :status)))))
 
     (testing "disables security check when in dev mode"
-      (let [dev-app (sut/make-app {:dev-mode true
-                                   :event-bus (events/make-bus)})]
-        (is (= 200 (-> (mock/request :post "/webhook/github/test-hook")
+      (let [dev-app (sut/make-app {:config {:dev-mode true}
+                                   :runner (constantly nil)})]
+        (is (= 204 (-> (mock/request :post "/webhook/github/test-hook")
                        (dev-app)
-                       :status)))))
-
-    (testing "passes id as path parameter"
-      (h/with-bus
-        (fn [bus]
-          (let [dev-app (sut/make-app {:dev-mode true
-                                       :event-bus bus})
-                l (events/wait-for bus :webhook/github (map :id))]
-            (is (= 200 (-> (h/json-request :post "/webhook/github/test-hook"
-                                           {:head-commit {:id "test-commit"}})
-                           (dev-app)
-                           :status)))
-            (is (= "test-hook" (h/try-take l 200 :timeout)))))))))
+                       :status)))))))
 
 (defn- verify-entity-endpoints [{:keys [path base-entity updated-entity name creator]}]
   (let [st (st/make-memory-storage)
@@ -186,12 +177,12 @@
 
   (h/with-memory-store st
     (let [kp (auth/generate-keypair)
-          ctx (test-ctx {:storage st
-                         :dev-mode false
-                         :jwk (auth/keypair->ctx kp)})
+          rt (test-rt {:storage st
+                       :jwk (auth/keypair->rt kp)
+                       :config {:dev-mode false}})
           cust-id (st/new-id)
           github-id 6453
-          app (sut/make-app ctx)
+          app (sut/make-app rt)
           token (auth/sign-jwt {:sub (str "github/" github-id)} (.getPrivate kp))
           _ (st/save-customer st {:id cust-id
                                   :name "test customer"})
@@ -353,22 +344,24 @@
 (defn- build-path [sid]
   (str (repo-path sid) "/" (last sid)))
 
-(defn- with-repo [f]
+(defn- with-repo [f & [rt]]
   (h/with-memory-store st
-    (h/with-bus
-      (fn [bus]
-        (let [app (sut/make-app {:storage st
-                                 :event-bus bus
-                                 :dev-mode true})
-              sid (generate-build-sid)
-              path (repo-path sid)]
-          (is (st/sid? (st/save-build-results st sid {:exit 0 :status :success})))
-          (is (st/sid? (st/create-build-metadata st sid {:message "test meta"})))
-          (f {:bus bus
-              :storage st
-              :sid sid
-              :path path
-              :app app}))))))
+    (let [events (atom [])
+          app (sut/make-app (merge
+                             {:storage st
+                              :events {:poster (partial swap! events conj)}
+                              :config {:dev-mode true}
+                              :runner (constantly nil)}
+                             rt))
+          sid (generate-build-sid)
+          path (repo-path sid)]
+      (is (st/sid? (st/save-build-results st sid {:exit 0 :status :success})))
+      (is (st/sid? (st/create-build-metadata st sid {:message "test meta"})))
+      (f {:events events
+          :storage st
+          :sid sid
+          :path path
+          :app app}))))
 
 (deftest build-endpoints
   (testing "`GET` lists repo builds"
@@ -386,85 +379,89 @@
           (is (= "test meta" (:message (first b))) "should contain build metadata")))))
   
   (testing "`POST /trigger`"
-    (letfn [(catch-build-triggered-event [p f]
-              (with-repo
-                (fn [{:keys [bus app path] :as ctx}]
-                  (let [events (atom [])
-                        props [:customer-id :repo-id]
-                        _ (events/register-handler bus :build/triggered (partial swap! events conj))]
-                    (is (= 200 (-> (mock/request :post (str path p))
-                                   (app)
-                                   :status)))
-                    (is (not= :timeout (h/wait-until #(pos? (count @events)) 500)))
-                    (f (assoc ctx :event (first @events)))))))]
+    (letfn [(verify-runner [p f]
+              (let [runner-args (atom nil)
+                    runner (partial reset! runner-args)]
+                (with-repo
+                  (fn [{:keys [app path] :as ctx}]
+                    (let [props [:customer-id :repo-id]]
+                      (is (= 202 (-> (mock/request :post (str path p))
+                                     (app)
+                                     :status)))
+                      (f (assoc ctx :runner-args runner-args))))
+                  {:runner runner})))]
       
-      (testing "triggers new build for repo"
-        (catch-build-triggered-event
+      (testing "starts new build for repo using runner"
+        (verify-runner
          "/trigger"
-         (fn [{:keys [bus app path sid event]}]
-           (let [props [:customer-id :repo-id]]
-             (is (= (zipmap props sid)
-                    (select-keys (:account event) props)))
-             (is (some? (-> event :build :build-id)))))))
+         (fn [{:keys [runner-args]}]
+           (is (some? (:build @runner-args))))))
       
       (testing "looks up url in repo config"
-        (with-repo
-          (fn [{:keys [bus app path] [customer-id repo-id] :sid st :storage}]
-            (let [events (atom [])
-                  _ (events/register-handler bus :build/triggered (partial swap! events conj))]
+        (let [runner-args (atom nil)
+              runner (partial reset! runner-args)]
+          (with-repo
+            (fn [{:keys [app path] [customer-id repo-id] :sid st :storage}]
               (is (some? (st/save-customer st {:id customer-id
                                                :repos
                                                {repo-id
                                                 {:id repo-id
                                                  :url "http://test-url"}}})))
-              (is (= 200 (-> (mock/request :post (str path "/trigger"))
+              (is (= 202 (-> (mock/request :post (str path "/trigger"))
                              (app)
                              :status)))
-              (is (not= :timeout (h/wait-until #(pos? (count @events)) 500)))
+              (is (not-empty @runner-args))
               (is (= "http://test-url"
-                     (-> @events first :build :git :url)))))))
+                     (-> @runner-args :build :git :url))))
+            {:runner runner})))
       
       (testing "adds commit id from query params"
-        (catch-build-triggered-event
+        (verify-runner
          "/trigger?commitId=test-id"
-         (fn [{:keys [event]}]
+         (fn [{:keys [runner-args]}]
            (is (= "test-id"
-                  (-> event :build :git :commit-id))))))
+                  (-> @runner-args :build :git :commit-id))))))
 
       (testing "adds branch from query params as ref"
-        (catch-build-triggered-event
+        (verify-runner
          "/trigger?branch=test-branch"
-         (fn [{:keys [event]}]
+         (fn [{:keys [runner-args]}]
            (is (= "refs/heads/test-branch"
-                  (-> event :build :git :ref))))))
+                  (-> @runner-args :build :git :ref))))))
 
       (testing "adds tag from query params as ref"
-        (catch-build-triggered-event
+        (verify-runner
          "/trigger?tag=test-tag"
-         (fn [{:keys [event]}]
+         (fn [{:keys [runner-args]}]
            (is (= "refs/tags/test-tag"
-                  (-> event :build :git :ref))))))
+                  (-> @runner-args :build :git :ref))))))
 
       (testing "adds `sid` to build props"
-        (catch-build-triggered-event
+        (verify-runner
          "/trigger"
-         (fn [{:keys [sid event]}]
-           (let [bsid (get-in event [:build :sid])]
+         (fn [{:keys [sid runner-args]}]
+           (let [bsid (get-in @runner-args [:build :sid])]
              (is (= 3 (count bsid)) "expected sid to contain repo path and build id")
              (is (= (take 2 sid) (take 2 bsid)))
-             (is (= (get-in event [:build :build-id])
+             (is (= (get-in @runner-args [:build :build-id])
                     (last bsid)))))))
 
       (testing "creates build metadata in storage"
-        (catch-build-triggered-event
+        (verify-runner
          "/trigger?branch=test-branch"
-         (fn [{:keys [event] st :storage}]
-           (let [bsid (get-in event [:build :sid])
+         (fn [{:keys [runner-args] st :storage}]
+           (let [bsid (get-in @runner-args [:build :sid])
                  md (st/find-build-metadata st bsid)]
              (is (some? md))
              (is (= "refs/heads/test-branch" (:ref md)))))))
       
-      (testing "returns build id")
+      (testing "returns build id"
+        (with-repo
+          (fn [{:keys [app path] :as ctx}]
+            (let [props [:customer-id :repo-id]
+                  r (-> (mock/request :post (str path "/trigger"))
+                        (app))]
+              (is (string? (-> r :body slurp h/parse-json :build-id)))))))
 
       (testing "returns 404 (not found) when repo does not exist")
 
@@ -516,7 +513,7 @@
 
         (testing "/logs"
           (testing "`GET` retrieves list of available logs for build"
-            (let [app (sut/make-app (test-ctx {:logging {:retriever (->TestLogRetriever {})}}))
+            (let [app (sut/make-app (test-rt {:logging {:retriever (->TestLogRetriever {})}}))
                   l (->> (str (build-path sid) "/logs")
                          (mock/request :get)
                          (app))]
@@ -524,7 +521,7 @@
 
           (testing "`GET /download`"
             (testing "downloads log file by query param"
-              (let [app (sut/make-app (test-ctx
+              (let [app (sut/make-app (test-rt
                                        {:logging
                                         {:retriever
                                          (->TestLogRetriever {"out.txt" "test log file"})}}))
@@ -534,7 +531,7 @@
                 (is (= 200 (:status l)))))
 
             (testing "404 when log file not found"
-              (let [app (sut/make-app (test-ctx
+              (let [app (sut/make-app (test-rt
                                        {:logging
                                         {:retriever
                                          (->TestLogRetriever {})}}))
@@ -569,9 +566,9 @@
                               {:status 200 :body (h/to-raw-json {:name "test-user"
                                                                  :other-key "other-value"})}
                               {:status 400 :body (str "invalid auth header: " auth)})))]
-      (let [app (-> (test-ctx {:github {:client-id "test-client-id"
+      (let [app (-> (test-rt {:github {:client-id "test-client-id"
                                         :client-secret "test-secret"}
-                               :jwk (auth/keypair->ctx (auth/generate-keypair))})
+                               :jwk (auth/keypair->rt (auth/generate-keypair))})
                     (sut/make-app))
             r (-> (mock/request :post "/github/login?code=1234")
                   (app))]
@@ -583,11 +580,7 @@
                        :name))))))
 
   (testing "`GET /github/config` returns client id"
-<<<<<<< Updated upstream
-    (let [app (-> (test-ctx {:github {:client-id "test-client-id"}})
-=======
     (let [app (-> (test-rt {:config {:github {:client-id "test-client-id"}}})
->>>>>>> Stashed changes
                   (sut/make-app))
           r (-> (mock/request :get "/github/config")
                 (app))]
@@ -637,8 +630,8 @@
   (testing "`GET /auth/jwks`"
     (testing "retrieves JWK structure according to context"
       (let [kp (auth/generate-keypair)
-            ctx {:jwk (auth/keypair->ctx kp)}
-            app (sut/make-app ctx)
+            rt {:jwk (auth/keypair->rt kp)}
+            app (sut/make-app rt)
             r (-> (mock/request :get "/auth/jwks")
                   (app))
             k (some-> r
@@ -655,3 +648,30 @@
       (is (= 404 (-> (mock/request :get "/auth/jwks")
                      (test-app)
                      :status))))))
+
+(deftest setup-runtime
+  (testing "returns fn that starts http server"
+    (let [conf {:http {:port 1234}}
+          h (rt/setup-runtime conf :http)
+          rt {:http h
+              :config conf}
+          inv (atom nil)]
+      (is (fn? h))
+      (with-redefs [http/run-server (fn [handler args]
+                                      (reset! inv {:handler handler
+                                                   :opts args}))]
+        (is (some? (h rt)))
+        (is (= {:port 1234} (-> (:opts @inv)
+                                (select-keys [:port])))))))
+
+  (testing "start fn returns another fn that stops the server"
+    (let [stopped? (atom false)]
+      (with-redefs [http/run-server (constantly ::server)
+                    http/server-stop! (fn [arg]
+                                        (when (= ::server arg)
+                                          (reset! stopped? true)))]
+        (let [h (rt/setup-runtime {:http {}} :http)
+              s (h {})]
+          (is (ifn? s))
+          (is (some? (s)))
+          (is (true? @stopped?)))))))

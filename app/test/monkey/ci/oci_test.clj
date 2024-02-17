@@ -37,7 +37,18 @@
                  :storage {:bucket-name "test-bucket"}}
                 :storage)
                :storage
-               (select-keys [:region :bucket-name]))))))
+               (select-keys [:region :bucket-name])))))
+
+  (testing "loads private key from file"
+    (is (instance? java.security.PrivateKey
+                   (-> (sut/normalize-config
+                        {:storage
+                         {:credentials
+                          {:private-key "dev-resources/test/test-key.pem"}}}
+                        :storage)
+                       :storage
+                       :credentials
+                       :private-key)))))
 
 (deftest stream-to-bucket
   (testing "pipes input stream to multipart"
