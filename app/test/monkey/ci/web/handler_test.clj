@@ -583,7 +583,11 @@
                        :name))))))
 
   (testing "`GET /github/config` returns client id"
+<<<<<<< Updated upstream
     (let [app (-> (test-ctx {:github {:client-id "test-client-id"}})
+=======
+    (let [app (-> (test-rt {:config {:github {:client-id "test-client-id"}}})
+>>>>>>> Stashed changes
                   (sut/make-app))
           r (-> (mock/request :get "/github/config")
                 (app))]

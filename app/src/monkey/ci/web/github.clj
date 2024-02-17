@@ -178,7 +178,11 @@
 (defn get-config
   "Lists public github configuration to use"
   [req]
+<<<<<<< Updated upstream
   (rur/response {:client-id (c/from-context req (comp :client-id :github))}))
+=======
+  (rur/response {:client-id (c/from-rt req (comp :client-id :github rt/config))}))
+>>>>>>> Stashed changes
 
 (defmethod config/normalize-key :github [_ conf]
   conf)
