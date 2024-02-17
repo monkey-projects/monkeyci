@@ -63,12 +63,12 @@
 (defn run-container-with-sidecar
   "Runs a container in OCI that deploys a sidecar"
   []
-  (let [ctx (-> @co/global-config
-                (assoc :step
-                       {:container/image "docker.io/alpine:latest"
-                        :script ["echo 'Hi, this is a simple test'"]}
-                       :build
-                       {:build-id (str "test-build-" (System/currentTimeMillis))
-                        :pipeline "test-pipe"
-                        :index "0"}))]
-    (c/run-container ctx)))
+  (let [rt (-> @co/global-config
+               (assoc :step
+                      {:container/image "docker.io/alpine:latest"
+                       :script ["echo 'Hi, this is a simple test'"]}
+                      :build
+                      {:build-id (str "test-build-" (System/currentTimeMillis))
+                       :pipeline "test-pipe"
+                       :index "0"}))]
+    (c/run-container rt)))

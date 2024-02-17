@@ -566,8 +566,8 @@
                               {:status 200 :body (h/to-raw-json {:name "test-user"
                                                                  :other-key "other-value"})}
                               {:status 400 :body (str "invalid auth header: " auth)})))]
-      (let [app (-> (test-rt {:github {:client-id "test-client-id"
-                                        :client-secret "test-secret"}
+      (let [app (-> (test-rt {:config {:github {:client-id "test-client-id"
+                                                :client-secret "test-secret"}}
                                :jwk (auth/keypair->rt (auth/generate-keypair))})
                     (sut/make-app))
             r (-> (mock/request :post "/github/login?code=1234")
