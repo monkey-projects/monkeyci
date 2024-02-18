@@ -33,6 +33,7 @@
 
 (defn post-event [req]
   (let [evt (get-in req [:parameters :body])]
+    (log/debug "Received event from build script:" evt)
     {:status (if (rt/post-events (c/req->rt req) evt)
                202
                500)}))

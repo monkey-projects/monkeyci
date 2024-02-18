@@ -126,3 +126,7 @@
   "Calculates path `p` as relative to the work dir for the current step"
   [rt p]
   (u/abs-path (step-work-dir rt) p))
+
+(defmethod rt/setup-runtime :build [conf _]
+  ;; Just copy the build info to the runtime
+  (get conf :build))

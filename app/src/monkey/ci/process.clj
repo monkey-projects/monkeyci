@@ -23,7 +23,7 @@
 
 (def default-script-config
   "Default configuration for the script runner."
-  {:containers {:type :docker}
+  {:containers {:type :podman}
    :storage {:type :memory}
    :logging {:type :inherit}})
 

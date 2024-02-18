@@ -27,10 +27,10 @@
          :env {}
          :pipeline p))
 
-(defn- script-evt [evt ctx]
+(defn- script-evt [evt rt]
   (assoc evt
          :src :script
-         :sid (get-in ctx [:build :sid])
+         :sid (get-in rt [:build :sid])
          :time (System/currentTimeMillis)))
 
 (defn- post-event [ctx evt]

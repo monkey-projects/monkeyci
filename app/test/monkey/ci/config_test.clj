@@ -280,7 +280,9 @@
       (is (not (contains? n :env)))
       (is (not (contains? n :default)))))
 
-  
+  (testing "keeps boolean values"
+    (is (true? (-> (sut/normalize-config {} {:dev-mode true} {})
+                   :dev-mode))))
   
   (testing "github"
     (testing "adds config from env"
