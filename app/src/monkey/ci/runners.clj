@@ -63,13 +63,13 @@
 (defn download-git
   "Downloads from git into a temp dir, and designates that as the working dir."
   [rt]
-  (log/debug "Downloading from git using build config:" (:build rt))
+  ;;(log/debug "Downloading from git using build config:" (:build rt))
   (let [git (get-in rt [:git :clone])
         conf (-> (get-in rt [:build :git])
                  (update :dir #(or % (build/checkout-dir rt))))
         add-script-dir (fn [{{:keys [script-dir checkout-dir]} :build :as rt}]
                          (assoc-in rt [:build :script-dir] (build/calc-script-dir checkout-dir script-dir)))]
-    (log/debug "Checking out git repo with config" conf)
+    (log/debug "Checking out git repo:" (:url conf))
     (-> rt
         (assoc-in [:build :checkout-dir] (git conf))
         (add-script-dir))))

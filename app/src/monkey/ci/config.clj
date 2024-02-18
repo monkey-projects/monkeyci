@@ -156,6 +156,7 @@
                   (u/cwd))))
 
 (defmethod normalize-key :work-dir [_ conf]
+  (log/debug "Normalizing work dir with conf" conf)
   (assoc conf :work-dir (abs-work-dir conf)))
 
 (defmethod normalize-key :account [_ {:keys [args] :as conf}]
@@ -193,7 +194,7 @@
               (merge d m)
               (or m d)))
           (nil-if-empty [x]
-            (when-not (empty? x)
+            (when (and (seqable? x) (not-empty x))
               x))]
     (-> (methods normalize-key)
         (keys)
