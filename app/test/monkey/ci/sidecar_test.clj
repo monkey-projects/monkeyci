@@ -138,7 +138,7 @@
                                      (->TestLogger c p)))))
         (is (= [["test.txt"]] @c))))))
 
-(deftest run
+#_(deftest run
   (testing "restores required artifacts")
 
   (testing "stores generated artifacts")
