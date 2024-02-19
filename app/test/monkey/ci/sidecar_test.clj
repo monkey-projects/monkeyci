@@ -107,12 +107,19 @@
     (is (= "test-file" (-> (c/normalize-key :sidecar {:sidecar {}
                                                       :args {:start-file "test-file"}})
                            :sidecar
-                           :start-file)))))
+                           :start-file))))
 
-(defrecord TestLogger [streams]
+  (testing "adds step config from args"
+    (is (= {:key "value"}
+           (-> (c/normalize-key :sidecar {:sidecar {}
+                                          :args {:step-config {:key "value"}}})
+               :sidecar
+               :step-config)))))
+
+(defrecord TestLogger [streams path]
   l/LogCapturer
-  (handle-stream [_ in]
-    (swap! streams (fnil inc 0))))
+  (handle-stream [_ _]
+    (swap! streams conj path)))
 
 (deftest upload-logs
   (testing "does nothing if no logger"
@@ -121,15 +128,15 @@
   (testing "does nothing if no output files"
     (is (nil? (sut/upload-logs {} #(throw (ex-info "This should not be called" {}))))))
 
-  (testing "opens output file and handles stream"
+  (testing "opens output file and handles stream, stores using file name"
     (h/with-tmp-dir dir
-      (let [c (atom 0)
+      (let [c (atom [])
             f (io/file dir "test.txt")
-            _ (spit f "This is a test file") 
-            logger (->TestLogger c)]
+            _ (spit f "This is a test file")]
         (is (nil? (sut/upload-logs {:stdout (.getCanonicalPath f)}
-                                   (constantly logger))))
-        (is (= 1 @c))))))
+                                   (fn [p]
+                                     (->TestLogger c p)))))
+        (is (= [["test.txt"]] @c))))))
 
 (deftest run
   (testing "restores required artifacts")

@@ -196,3 +196,9 @@
   [c n]
   (mc/find-first (u/prop-pred :volume-name n)
                  (:volume-mounts c)))
+
+(defn find-volume
+  "Finds volume with given name in the container instance"
+  [ci n]
+  (mc/find-first (u/prop-pred :name n)
+                 (:volumes ci)))

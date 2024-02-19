@@ -11,6 +11,17 @@
             [monkey.ci.containers.oci :as sut]
             [monkey.ci.helpers :as h]))
 
+(defn- find-volume-entry [vol n]
+  (->> vol :configs (filter (comp (partial = n) :file-name)) first))
+
+(defn- parse-b64-edn
+  "Parses input string as bas64-encoded edn"
+  [s]
+  (let [b (-> (java.util.Base64/getDecoder)
+              (.decode s))]
+    (with-open [r (io/reader (java.io.ByteArrayInputStream. b))]
+      (u/parse-edn r))))
+
 (deftest instance-config
   (testing "creates configuration map"
     (let [ic (sut/instance-config {} {})]
@@ -74,10 +85,13 @@
 
   (testing "sidecar container"
     (let [pk (h/generate-private-key)
-          sc (->> {:step {:script ["first" "second"]}
+          ic (->> {:step {:script ["first" "second"]
+                          :artifacts [{:id "test-artifact"
+                                       :path "somewhere"}]}
                    :build {:build-id "test-build"}
                    :config {:original {:oci {:credentials {:private-key "local/private.key"}}}}}
-                  (sut/instance-config {:credentials {:private-key pk}})
+                  (sut/instance-config {:credentials {:private-key pk}}))
+          sc (->> ic
                   :containers
                   (mc/find-first (u/prop-pred :display-name "sidecar")))]
       
@@ -92,10 +106,24 @@
         (is (h/contains-subseq? (:arguments sc)
                                 ["--start-file" sut/start-file])))
 
-      (testing "includes a config volume"
-        (let [v (oci/find-mount sc "config")]
-          (is (some? v))
-          (is (= sut/config-dir (:mount-path v)))))
+      (testing "passes step config as arg"
+        (is (h/contains-subseq? (:arguments sc)
+                                ["--step-config" "/home/monkeyci/config/step.edn"])))
+
+      (testing "config volume"
+        (let [mnt (oci/find-mount sc "config")
+              v (oci/find-volume ic "config")]
+          
+          (testing "included in config"
+            (is (some? mnt))
+            (is (some? v))
+            (is (= sut/config-dir (:mount-path mnt))))
+
+          (testing "config volume includes script step details"
+            (let [e (find-volume-entry v "step.edn")]
+              (is (some? e))
+              (is (= {:artifacts [{:id "test-artifact" :path "somewhere"}]}
+                     (parse-b64-edn (:data e))))))))
 
       (testing "includes private key volume"
         (let [v (oci/find-mount sc "private-key")]
@@ -120,15 +148,13 @@
       (h/with-tmp-dir dir
         (let [p (io/file dir "logback.xml")]
           (spit p "test logback configuration")
-          (let [vol (->> {:step {:script ["test"]}
-                          :config {:sidecar {:log-config (.getCanonicalPath p)}}}
-                         (sut/instance-config {})
-                         :volumes
-                         (filter (comp (partial = "config") :name))
-                         (first))]
+          (let [vol (-> {:step {:script ["test"]}
+                         :config {:sidecar {:log-config (.getCanonicalPath p)}}}
+                        (as-> c (sut/instance-config {} c))
+                        (oci/find-volume "config"))]
             (is (some? vol))
-            (is (= 1 (count (:configs vol))))
-            (is (= "logback.xml" (-> vol :configs first :file-name))))))))
+            (is (not-empty(:configs vol)))
+            (is (some? (find-volume-entry vol "logback.xml"))))))))
 
   (testing "script volume"
     (let [v (->> {:step {:script ["first" "second"]}}

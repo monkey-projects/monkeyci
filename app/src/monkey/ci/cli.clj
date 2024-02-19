@@ -90,7 +90,11 @@
            :option "start-file"
            :short "s"
            :type :string
-           :default :present}]
+           :default :present}
+          {:as "Step config"
+           :option "step-config"
+           :short "t"
+           :type :ednfile}]
    :runs {:command cmd/sidecar
           :app-mode :script}})
 

@@ -6,6 +6,7 @@
             [manifold.deferred :as md]
             [monkey.ci
              [blob :as blob]
+             [build :as b]
              [config :as c]
              [logging :as l]
              [runtime :as rt]
@@ -49,9 +50,8 @@
 
 (defn- upload-log [logger path]
   (when (and path logger)
-    (let [n (fs/file-name path)
-          is (io/input-stream path)
-          capt (logger path)]
+    (let [is (io/input-stream path)
+          capt (logger [(fs/file-name path)])]
       (l/handle-stream capt is))))
 
 (defn upload-logs [evt logger]
@@ -65,7 +65,9 @@
                     (u/parse-edn r {:eof ::eof}))
         interval (get-in rt [rt/config :sidecar :poll-interval] 1000)
         log-maker (rt/log-maker rt)
-        logger (when log-maker (partial log-maker rt))]
+        log-base (b/get-step-sid rt)
+        logger (when log-maker (comp (partial log-maker rt)
+                                     (partial concat log-base)))]
     (log/info "Polling events from" f)
     (md/future
       (try
@@ -93,12 +95,32 @@
         (finally
           (log/debug "Stopped reading events"))))))
 
+(defn- restore-caches [rt]
+  ;; TODO Restore using step config
+  rt)
+
+(defn- restore-artifacts [rt]
+  ;; TODO Restore using step config
+  rt)
+
+(defn- save-caches [rt]
+  ;; TODO
+  rt)
+
+(defn- save-artifacts [rt]
+  ;; TODO
+  rt)
+
 (defn run [rt]
   (log/info "Running sidecar with configuration:" (get-in rt [rt/config :sidecar]))
   (-> rt
       (restore-src)
+      (restore-caches)
+      (restore-artifacts)
       (mark-start)
-      (poll-events)))
+      (poll-events)
+      (save-artifacts)
+      (save-caches)))
 
 (defn- add-from-args [conf k]
   (update-in conf [:sidecar k] #(or (get-in conf [:args k]) %)))
@@ -106,4 +128,5 @@
 (defmethod c/normalize-key :sidecar [_ conf]
   (-> conf
       (add-from-args :events-file)
-      (add-from-args :start-file)))
+      (add-from-args :start-file)
+      (add-from-args :step-config)))

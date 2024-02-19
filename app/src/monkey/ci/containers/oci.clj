@@ -27,6 +27,7 @@
 (def job-script "job.sh")
 (def config-vol "config")
 (def config-dir "/home/monkeyci/config")
+(def step-config-file "step.edn")
 
 (def sidecar-config (comp :sidecar rt/config))
 
@@ -54,7 +55,8 @@
          :display-name "sidecar"
          :arguments ["sidecar"
                      "--events-file" event-file
-                     "--start-file" start-file]
+                     "--start-file" start-file
+                     "--step-config" (str config-dir "/" step-config-file)]
          ;; Run as root, because otherwise we can't write to the shared volumes
          :security-context {:security-context-type "LINUX"
                             :run-as-user 0}))
@@ -91,13 +93,21 @@
                                 (config-entry (str i) s)))
                  (into [(job-script-entry)]))})
 
+(defn- step-details->edn [rt]
+  (-> rt
+      :step
+      ;; TODO Make this less arbitrary, ideally 'plugins' can decide for themselves if included here or not
+      (select-keys [:name :artifacts :caches])
+      (pr-str)))
+
 (defn- config-vol-config
   "Configuration files for the sidecar (e.g. logging)"
   [rt]
+  ;; TODO Add a config file that holds script step details like caches and artifacts
   (let [{:keys [log-config]} (sidecar-config rt)]
     {:name config-vol
      :volume-type "CONFIGFILE"
-     :configs (cond-> []
+     :configs (cond-> [(config-entry step-config-file (step-details->edn rt))]
                 log-config (conj (config-entry "logback.xml" (slurp log-config))))}))
 
 (defn- update-private-key-paths
@@ -141,14 +151,6 @@
                 (config-vol-config rt)))))
 
 (defmethod mcc/run-container :oci [rt]
-  ;; TODO
-  ;; - (Make sure the exctracted code, caches and artifacts are uploaded to storage)
-  ;; - Generate and upload script files to execute
-  ;; - Build the config struct that includes the sidecar
-  ;; - Use common volume for logs and events
-  ;; - Create a container instance
-  ;; - Wait for it to finish
-  ;; - Clean up temp files from storage
   (let [conf (:containers rt)
         client (-> conf
                    (oci/->oci-config)
