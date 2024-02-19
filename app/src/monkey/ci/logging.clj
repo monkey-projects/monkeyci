@@ -75,13 +75,13 @@
        (remove nil?)
        (cs/join "/")))
 
-(deftype OciBucketLogger [conf ctx path]
+(deftype OciBucketLogger [conf rt path]
   LogCapturer
   (log-output [_]
     :stream)
 
   (handle-stream [_ in]
-    (let [sid (get-in ctx [:build :sid])
+    (let [sid (get-in rt [:build :sid])
           ;; Since the configured path already includes the build id,
           ;; we only use repo id to build the path
           on (sid->path conf path (u/sid->repo-sid sid))]
@@ -90,10 +90,10 @@
           (ensure-cleanup)))))
 
 (defmethod make-logger :oci [conf]
-  (fn [ctx path]
+  (fn [rt path]
     (-> conf
         :logging
-        (->OciBucketLogger ctx path))))
+        (->OciBucketLogger rt path))))
 
 (defn handle-process-streams
   "Given a process return value (as from `babashka.process/process`) and two

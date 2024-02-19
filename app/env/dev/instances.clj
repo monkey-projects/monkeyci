@@ -66,18 +66,23 @@
 
 (defn run-container-with-sidecar
   "Runs a container in OCI that deploys a sidecar"
-  [& [version]]
-  (let [rt (-> @co/global-config
+  [& [{:keys [version ws] :or {version "latest"}}]]
+  (let [build-id (str "test-build-" (System/currentTimeMillis))
+        rt (-> @co/global-config
                (config/normalize-config {} {})
-               (assoc-in [:containers :image-tag] (or version "latest"))
+               (assoc-in [:containers :image-tag] version)
                (rt/config->runtime)
                (assoc :step
                       {:container/image "docker.io/alpine:latest"
-                       :script ["echo 'Hi, this is a simple test'"]}
+                       :script ["echo 'Hi, this is a simple test.  Waiting for a bit...'"
+                                "sleep 5"]}
                       :build
-                      {:build-id (str "test-build-" (System/currentTimeMillis))
-                       :pipeline "test-pipe"
-                       :index "0"}))]
+                      (cond-> {:build-id build-id
+                               :sid (str "test-customer/" build-id)
+                               :pipeline "test-pipe"
+                               :index "0"
+                               :checkout-dir oci-cont/work-dir}
+                        ws (assoc :workspace ws))))]
     (md/future (c/run-container rt))))
 
 (defn- instance-call

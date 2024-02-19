@@ -133,12 +133,20 @@
   [conf]
   ;; TODO Allow for a private key to be specified other than the one
   ;; used by the app itself.  Perhaps fetch it from the vault?
-  (let [pk (get-in conf [:credentials :private-key])]
+  (let [pk (get-in conf [:credentials :private-key])
+        read-existing (fn [f]
+                        (when (fs/exists? f)
+                          (slurp f)))]
     (some-> (cond
-              (instance? java.security.PrivateKey pk) (pem/private-key->pem pk)
-              (string? pk) (let [f (fs/file pk)]
-                             (when (fs/exists? f)
-                               (slurp f))))
+              (instance? java.security.PrivateKey pk)
+              (pem/private-key->pem pk)
+              
+              (string? pk)
+              (let [f (fs/file pk)]
+                (read-existing f))
+              
+              (instance? java.io.File pk)
+              (read-existing pk))
             (u/->base64))))
 
 (def checkout-vol "checkout")

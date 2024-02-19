@@ -4,6 +4,7 @@
             [manifold.deferred :as md]
             [monkey.ci
              [config :as c]
+             [logging :as l]
              [sidecar :as sut]
              [spec :as spec]]
             [monkey.ci.helpers :as h]))
@@ -107,3 +108,34 @@
                                                       :args {:start-file "test-file"}})
                            :sidecar
                            :start-file)))))
+
+(defrecord TestLogger [streams]
+  l/LogCapturer
+  (handle-stream [_ in]
+    (swap! streams (fnil inc 0))))
+
+(deftest upload-logs
+  (testing "does nothing if no logger"
+    (is (nil? (sut/upload-logs {} nil))))
+
+  (testing "does nothing if no output files"
+    (is (nil? (sut/upload-logs {} #(throw (ex-info "This should not be called" {}))))))
+
+  (testing "opens output file and handles stream"
+    (h/with-tmp-dir dir
+      (let [c (atom 0)
+            f (io/file dir "test.txt")
+            _ (spit f "This is a test file") 
+            logger (->TestLogger c)]
+        (is (nil? (sut/upload-logs {:stdout (.getCanonicalPath f)}
+                                   (constantly logger))))
+        (is (= 1 @c))))))
+
+(deftest run
+  (testing "restores required artifacts")
+
+  (testing "stores generated artifacts")
+
+  (testing "restores caches")
+
+  (testing "saves caches"))

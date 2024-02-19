@@ -7,6 +7,7 @@
             [monkey.ci
              [blob :as blob]
              [config :as c]
+             [logging :as l]
              [runtime :as rt]
              [utils :as u]]))
 
@@ -46,18 +47,31 @@
     (create-file-with-dirs f))
   f)
 
+(defn- upload-log [logger path]
+  (when (and path logger)
+    (let [n (fs/file-name path)
+          is (io/input-stream path)
+          capt (logger path)]
+      (l/handle-stream capt is))))
+
+(defn upload-logs [evt logger]
+  (doseq [l ((juxt :stdout :stderr) evt)]
+    (upload-log logger l)))
+
 (defn poll-events [rt]
   (let [f (-> (get-config rt :events-file)
               (maybe-create-file))
         read-next (fn [r]
                     (u/parse-edn r {:eof ::eof}))
-        interval (get-in rt [rt/config :sidecar :poll-interval] 1000)]
+        interval (get-in rt [rt/config :sidecar :poll-interval] 1000)
+        log-maker (rt/log-maker rt)
+        logger (when log-maker (partial log-maker rt))]
     (log/info "Polling events from" f)
     (md/future
       (try
         (with-open [r (io/reader f)]
           (loop [evt (read-next r)]
-            ;; TODO Also stop when the process we're monitoring has terminated
+            ;; TODO Also stop when the process we're monitoring has terminated without telling us
             (if (not (fs/exists? f))
               ;; Done when the events file is deleted
               0
@@ -68,6 +82,7 @@
                         true)
                       (do
                         (log/debug "Read next event:" evt)
+                        (upload-logs evt logger)
                         (rt/post-events rt evt)))
                 (if (:done? evt)
                   0
