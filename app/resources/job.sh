@@ -62,9 +62,9 @@ do
     if [ $r -ne 0 ]; then
 	echo "Got error at step $v: $r"
 	# Nonzero return value means error, so don't proceed
-	post_event "{:type :job/failed :exit $r :step \"$v\"}"
+	post_event "{:type :job/failed :done? true :exit $r :step \"$v\"}"
 	exit $r
     fi
 done
-post_event "{:type :job/success}"
+post_event "{:type :job/success :done? true}"
 echo "All done."

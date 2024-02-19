@@ -43,6 +43,24 @@
         (is (= evt (-> (first @recv)
                        (select-keys (keys evt)))))
         (is (true? (.delete f)))
+        (is (= 0 (deref c 500 :timeout))))))
+
+  (testing "stops when a terminating event is received"
+    (h/with-tmp-dir dir
+      (let [f (io/file dir "events.edn")
+            evt {:type :test/event
+                 :message "This is a test event"
+                 :done? true}
+            recv (atom [])
+            rt {:events {:poster (partial swap! recv conj)}
+                :config {:sidecar {:events-file f
+                                   :poll-interval 10}}}
+            c (sut/poll-events rt)]
+        ;; Post the event after sidecar has started
+        (is (nil? (spit f (prn-str evt))))
+        (is (not= :timeout (h/wait-until #(not-empty @recv) 500)))
+        (is (= evt (-> (first @recv)
+                       (select-keys (keys evt)))))
         (is (= 0 (deref c 500 :timeout)))))))
 
 (deftest restore-src
@@ -64,6 +82,14 @@
   (testing "creates start file"
     (h/with-tmp-dir dir
       (let [start (io/file dir "start")
+            rt {:config
+                {:sidecar {:start-file (.getCanonicalPath start)}}}]
+        (is (= rt (sut/mark-start rt)))
+        (is (.exists start)))))
+
+  (testing "creates start file directory"
+    (h/with-tmp-dir dir
+      (let [start (io/file dir "sub/start")
             rt {:config
                 {:sidecar {:start-file (.getCanonicalPath start)}}}]
         (is (= rt (sut/mark-start rt)))

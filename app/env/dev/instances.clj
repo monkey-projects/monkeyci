@@ -1,15 +1,19 @@
 (ns instances
-  (:require [clojure.tools.logging :as log]
+  (:require [clojure.string :as cs]
+            [clojure.tools.logging :as log]
             [config :as co]
-            [monkey.ci.containers :as c]
+            [monkey.ci
+             [config :as config]
+             [containers :as c]
+             [oci :as oci]
+             [runtime :as rt]]
             [monkey.ci.containers.oci :as oci-cont]
-            [monkey.ci.oci :as oci]
             [monkey.ci.runners.oci :as ro]
             [monkey.oci.container-instance.core :as ci]
             [manifold.deferred :as md]))
 
 (defn run-test-container []
-  (let [conf (co/oci-runner-config)
+  (let [conf (co/oci-container-config)
         client (ci/make-context conf)
         ic (-> (ro/instance-config conf {:build {:build-id "test-build"}})
                (assoc :containers [{:image-url "fra.ocir.io/frjdhmocn5qi/monkeyci:0.1.0"
@@ -32,7 +36,7 @@
 (defn pinp-test
   "Trying to get podman-in-podman to run on a container instance."
   []
-  (let [conf (co/oci-runner-config)
+  (let [conf (co/oci-container-config)
         client (ci/make-context conf)
         ic (-> (ro/instance-config conf {:build {:build-id "podman-in-container"}})
                (assoc :containers [{:image-url "fra.ocir.io/frjdhmocn5qi/pinp:latest"
@@ -47,7 +51,7 @@
 (defn delete-container-instance
   "Deletes container instance with given name"
   [n]
-  (let [conf (co/oci-runner-config)
+  (let [conf (co/oci-container-config)
         client (ci/make-context conf)]
     (md/chain
      (ci/list-container-instances client (select-keys conf [:compartment-id]))
@@ -62,8 +66,11 @@
 
 (defn run-container-with-sidecar
   "Runs a container in OCI that deploys a sidecar"
-  []
+  [& [version]]
   (let [rt (-> @co/global-config
+               (config/normalize-config {} {})
+               (assoc-in [:containers :image-tag] (or version "latest"))
+               (rt/config->runtime)
                (assoc :step
                       {:container/image "docker.io/alpine:latest"
                        :script ["echo 'Hi, this is a simple test'"]}
@@ -71,4 +78,24 @@
                       {:build-id (str "test-build-" (System/currentTimeMillis))
                        :pipeline "test-pipe"
                        :index "0"}))]
-    (c/run-container rt)))
+    (md/future (c/run-container rt))))
+
+(defn- instance-call
+  ([f conf-fn res-fn]
+   (let [conf (co/oci-container-config)
+         client (ci/make-context conf)]
+     (md/chain
+      (f client (conf-fn conf))
+      :body
+      res-fn)))
+  ([f conf-fn]
+   (instance-call f conf-fn identity)))
+
+(defn list-instances []
+  (instance-call ci/list-container-instances #(select-keys % [:compartment-id]) :items))
+
+(defn get-instance [id]
+  (instance-call ci/get-container-instance (constantly {:instance-id id})))
+
+(defn get-container [id]
+  (instance-call ci/get-container (constantly {:container-id id})))

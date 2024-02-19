@@ -10,7 +10,6 @@ RUN adduser -D monkeyci \
   && echo monkeyci:10000:5000 > /etc/subgid
 
 VOLUME /var/lib/containers
-#VOLUME /home/monkeycui/.local/share/containers
 
 ADD --chmod=644 docker/global-containers.conf /etc/containers/containers.conf
 ADD docker/local-containers.conf /home/monkeyci/.config/containers/containers.conf
@@ -21,6 +20,7 @@ RUN mkdir -p /var/lib/shared/overlay-images /var/lib/shared/overlay-layers /var/
 RUN touch /var/lib/shared/overlay-images/images.lock /var/lib/shared/overlay-layers/layers.lock /var/lib/shared/vfs-images/images.lock /var/lib/shared/vfs-layers/layers.lock
 # Make sure permissions are correct
 RUN chown monkeyci:monkeyci -R /home/monkeyci
+
 USER monkeyci
 
 WORKDIR /home/monkeyci

@@ -115,4 +115,7 @@
   {:storage (s/make-memory-storage)
    :jwk (auth/keypair->rt (auth/generate-keypair))})
 
+(defn generate-private-key []
+  (.getPrivate (auth/generate-keypair)))
+
 (def ^:deprecated test-ctx test-rt)

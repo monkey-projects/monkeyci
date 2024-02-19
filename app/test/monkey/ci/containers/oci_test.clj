@@ -1,5 +1,6 @@
 (ns monkey.ci.containers.oci-test
   (:require [clojure.test :refer [deftest testing is]]
+            [clojure.java.io :as io]
             [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
@@ -72,13 +73,16 @@
             (is (string? (get env "SCRIPT_DIR"))))))))
 
   (testing "sidecar container"
-    (let [sc (->> {:step {:script ["first" "second"]}}
-                  (sut/instance-config {})
+    (let [pk (h/generate-private-key)
+          sc (->> {:step {:script ["first" "second"]}
+                   :build {:build-id "test-build"}
+                   :config {:original {:oci {:credentials {:private-key "local/private.key"}}}}}
+                  (sut/instance-config {:credentials {:private-key pk}})
                   :containers
                   (mc/find-first (u/prop-pred :display-name "sidecar")))]
       
-      (testing "starts sidecar using command"
-        (is (= ["sidecar"] (:command sc))))
+      (testing "starts sidecar using first arg"
+        (is (= "sidecar" (first (:arguments sc)))))
 
       (testing "passes events-file as arg"
         (is (h/contains-subseq? (:arguments sc)
@@ -91,7 +95,40 @@
       (testing "includes a config volume"
         (let [v (oci/find-mount sc "config")]
           (is (some? v))
-          (is (= sut/config-dir (:mount-path v)))))))
+          (is (= sut/config-dir (:mount-path v)))))
+
+      (testing "includes private key volume"
+        (let [v (oci/find-mount sc "private-key")]
+          (is (some? v))
+          (is (= "/opt/monkeyci/keys" (:mount-path v)))))
+
+      (testing "receives env vars from runtime"
+        (is (some? (:environment-variables sc)))
+        (is (= "test-build" (-> sc
+                                :environment-variables
+                                (get "MONKEYCI_BUILD_BUILD_ID")))))
+
+      (testing "rewrites OCI credentials private key to point to mounted file"
+        (is (= "/opt/monkeyci/keys/privkey" (-> sc
+                                                :environment-variables
+                                                (get "MONKEYCI_OCI_CREDENTIALS_PRIVATE_KEY")))))
+
+      (testing "runs as root to access mount volumes"
+        (is (= 0 (-> sc :security-context :run-as-user)))))
+
+    (testing "adds logback config file to config mount"
+      (h/with-tmp-dir dir
+        (let [p (io/file dir "logback.xml")]
+          (spit p "test logback configuration")
+          (let [vol (->> {:step {:script ["test"]}
+                          :config {:sidecar {:log-config (.getCanonicalPath p)}}}
+                         (sut/instance-config {})
+                         :volumes
+                         (filter (comp (partial = "config") :name))
+                         (first))]
+            (is (some? vol))
+            (is (= 1 (count (:configs vol))))
+            (is (= "logback.xml" (-> vol :configs first :file-name))))))))
 
   (testing "script volume"
     (let [v (->> {:step {:script ["first" "second"]}}

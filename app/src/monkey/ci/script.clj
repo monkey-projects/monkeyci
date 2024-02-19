@@ -330,7 +330,7 @@
 (defn- load-and-run-pipelines [{:keys [script-dir] :as rt}]
   (let [build-id (build/get-build-id rt)]
     (log/debug "Executing script for build" build-id "at:" script-dir)
-    (log/debug "Script context:" rt)
+    (log/debug "Script runtime:" rt)
     (try 
       (let [p (-> (load-script script-dir build-id)
                   (resolve-pipelines rt))]

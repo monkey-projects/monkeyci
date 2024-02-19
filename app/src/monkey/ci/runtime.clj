@@ -109,6 +109,7 @@
    to pass application configuration to child processes or containers."
   [rt]
   ;; Return the original, non-normalized configuration
+  ;; TODO Get rid of the original config, serialize values where necessary from the normalized config instead
   (-> rt
       (get-in [:config :original])
       (merge (select-keys rt [:build]))

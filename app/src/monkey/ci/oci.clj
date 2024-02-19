@@ -8,6 +8,7 @@
             [medley.core :as mc]
             [monkey.ci
              [config :as c]
+             [pem :as pem]
              [utils :as u]]
             [monkey.oci.container-instance.core :as ci]
             [monkey.oci.os
@@ -40,13 +41,6 @@
       ;; TODO Remove this, it's already done when normalizing the config
       (merge (mc/update-existing credentials :private-key u/load-privkey))
       (dissoc :credentials)))
-
-(defn ^:deprecated ctx->oci-config
-  "Gets the oci configuration for the given key from the context.  This merges
-   in the general OCI configurationn."
-  [ctx k]
-  (u/deep-merge (:oci ctx)
-                (k ctx)))
 
 (defn stream-to-bucket
   "Pipes an input stream to a bucket object using multipart uploads.
@@ -139,9 +133,13 @@
   [conf]
   ;; TODO Allow for a private key to be specified other than the one
   ;; used by the app itself.  Perhaps fetch it from the vault?
-  (let [f (fs/file (get-in conf [:credentials :private-key]))]
-    (when (fs/exists? f)
-      (u/->base64 (slurp f)))))
+  (let [pk (get-in conf [:credentials :private-key])]
+    (some-> (cond
+              (instance? java.security.PrivateKey pk) (pem/private-key->pem pk)
+              (string? pk) (let [f (fs/file pk)]
+                             (when (fs/exists? f)
+                               (slurp f))))
+            (u/->base64))))
 
 (def checkout-vol "checkout")
 (def checkout-dir "/opt/monkeyci/checkout")

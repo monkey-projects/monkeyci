@@ -19,6 +19,7 @@
                     (blob/restore store ws checkout)
                     (fn [_]
                       (assoc-in rt [:workspace :restored?] true))))]
+    (log/info "Restoring workspace" ws)
     (cond-> rt
       (and store ws checkout)
       (restore))))
@@ -26,16 +27,23 @@
 (defn- get-config [rt k]
   (-> rt rt/config :sidecar k))
 
+(defn- create-file-with-dirs [f]
+  (let [p (fs/parent f)]
+    (when-not (fs/exists? p)
+      (log/debug "Creating directory:" p)
+      (fs/create-dirs p)))
+  (fs/create-file f))
+
 (defn mark-start [rt]
   (let [s (get-config rt :start-file)]
     (when (not-empty s)
       (log/debug "Creating start file:" s)
-      (fs/create-file s))
+      (create-file-with-dirs s))
     rt))
 
 (defn- maybe-create-file [f]
   (when-not (fs/exists? f)
-    (fs/create-file f))
+    (create-file-with-dirs f))
   f)
 
 (defn poll-events [rt]
@@ -44,7 +52,7 @@
         read-next (fn [r]
                     (u/parse-edn r {:eof ::eof}))
         interval (get-in rt [rt/config :sidecar :poll-interval] 1000)]
-    (log/info "Starting sidecar, reading events from" f)
+    (log/info "Polling events from" f)
     (md/future
       (try
         (with-open [r (io/reader f)]
@@ -61,7 +69,9 @@
                       (do
                         (log/debug "Read next event:" evt)
                         (rt/post-events rt evt)))
-                (recur (read-next r))))))
+                (if (:done? evt)
+                  0
+                  (recur (read-next r)))))))
         (catch Exception ex
           (log/error "Failed to read events" ex)
           1)
@@ -69,6 +79,7 @@
           (log/debug "Stopped reading events"))))))
 
 (defn run [rt]
+  (log/info "Running sidecar with configuration:" (get-in rt [rt/config :sidecar]))
   (-> rt
       (restore-src)
       (mark-start)

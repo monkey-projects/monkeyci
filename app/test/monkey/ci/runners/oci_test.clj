@@ -37,11 +37,11 @@
   (h/with-tmp-dir dir 
     (let [priv-key (doto (io/file dir "privkey")
                      (spit "Test private key"))
-          ctx {:build {:build-id "test-build-id"
-                       :sid ["a" "b" "c" "test-build-id"]
-                       :git {:url "http://git-url"
-                             :branch "main"
-                             :id "test-commit"}}}
+          rt {:build {:build-id "test-build-id"
+                      :sid ["a" "b" "c" "test-build-id"]
+                      :git {:url "http://git-url"
+                            :branch "main"
+                            :id "test-commit"}}}
           conf {:availability-domain "test-ad"
                 :compartment-id "test-compartment"
                 :image-pull-secrets "test-secrets"
@@ -49,7 +49,7 @@
                 :image-url "test-image"
                 :image-tag "test-version"
                 :credentials {:private-key priv-key}}
-          inst (sut/instance-config conf ctx)]
+          inst (sut/instance-config conf rt)]
 
       (testing "uses settings from context"
         (is (= "test-ad" (:availability-domain inst)))
@@ -90,7 +90,7 @@
       (testing "does not add priv key when none specified"
         (is (= 1 (-> conf
                      (dissoc :credentials)
-                     (sut/instance-config ctx)
+                     (sut/instance-config rt)
                      :volumes
                      (count)))))
 
@@ -111,7 +111,7 @@
           (testing "uses app version if no tag configured"
             (is (cs/ends-with? (-> conf
                                    (dissoc :image-tag)
-                                   (sut/instance-config ctx)
+                                   (sut/instance-config rt)
                                    :containers
                                    first
                                    :image-url)
@@ -157,7 +157,7 @@
                      (get env "monkeyci-oci-credentials-private-key"))))))
 
         (testing "drops nil env vars"
-          (let [c (-> ctx
+          (let [c (-> rt
                       (assoc-in [:build :pipeline] nil)
                       (as-> x (sut/instance-config conf x)))]
              (is (not (contains? (-> c :containers first :environment-variables) "monkeyci-build-pipeline")))))))))
