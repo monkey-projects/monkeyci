@@ -388,6 +388,7 @@
                       (is (= 202 (-> (mock/request :post (str path p))
                                      (app)
                                      :status)))
+                      (h/wait-until #(some? @runner-args) 500)
                       (f (assoc ctx :runner-args runner-args))))
                   {:runner runner})))]
       
