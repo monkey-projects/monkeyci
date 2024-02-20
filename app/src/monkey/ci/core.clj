@@ -12,6 +12,7 @@
              [cache]
              [cli :as mcli]
              [config :as config]
+             [containers]
              [git]
              [listeners :as l]
              [logging]
@@ -20,6 +21,8 @@
              [runners]
              [utils :as u]
              [workspace]]
+            [monkey.ci.containers
+             [oci]]
             [monkey.ci.events
              [core :as ec]
              [manifold]]

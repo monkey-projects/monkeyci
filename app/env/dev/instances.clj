@@ -68,6 +68,7 @@
   "Runs a container in OCI that deploys a sidecar"
   [& [{:keys [version ws] :or {version "latest"}}]]
   (let [build-id (str "test-build-" (System/currentTimeMillis))
+        pipeline "test-pipe"
         rt (-> @co/global-config
                (config/normalize-config {} {})
                (assoc-in [:containers :image-tag] version)
@@ -75,12 +76,12 @@
                (assoc :step
                       {:container/image "docker.io/alpine:latest"
                        :script ["echo 'Hi, this is a simple test.  Waiting for a bit...'"
-                                "sleep 5"]}
+                                "sleep 5"]
+                       :index 0}
+                      :pipeline {:name pipeline}
                       :build
                       (cond-> {:build-id build-id
-                               :sid (str "test-customer/" build-id)
-                               :pipeline "test-pipe"
-                               :index "0"
+                               :sid ["test-customer" "test-repo" build-id]
                                :checkout-dir oci-cont/work-dir}
                         ws (assoc :workspace ws))))]
     (md/future (c/run-container rt))))

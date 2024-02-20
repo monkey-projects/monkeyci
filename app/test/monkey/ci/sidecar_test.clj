@@ -9,6 +9,11 @@
              [spec :as spec]]
             [monkey.ci.helpers :as h]))
 
+(defrecord TestLogger [streams path]
+  l/LogCapturer
+  (handle-stream [_ _]
+    (swap! streams conj path)))
+
 (deftest poll-events
   (testing "dispatches events from file to bus"
     (h/with-tmp-dir dir
@@ -62,7 +67,31 @@
         (is (not= :timeout (h/wait-until #(not-empty @recv) 500)))
         (is (= evt (-> (first @recv)
                        (select-keys (keys evt)))))
-        (is (= 0 (deref c 500 :timeout)))))))
+        (is (= 0 (deref c 500 :timeout))))))
+
+  (testing "logs using step sid and file path"
+    (h/with-tmp-dir dir
+      (let [f (io/file dir "events.edn")
+            logfile (io/file dir "out.log")
+            _ (spit logfile "test log")
+            evt {:type :test/event
+                 :message "This is a test event"
+                 :stdout (.getCanonicalPath logfile)
+                 :done? true}
+            streams (atom [])
+            rt {:events {:poster (constantly true)}
+                :config {:sidecar {:events-file f
+                                   :poll-interval 10}}
+                :build {:build-id "test-build"}
+                :pipeline {:name "test-pipe"}
+                :step {:index 0}
+                :logging {:maker (fn [_ path]
+                                   (->TestLogger streams path))}}
+            c (sut/poll-events rt)]
+        (is (nil? (spit f (prn-str evt))))
+        (is (not= :timeout (h/wait-until #(not-empty @streams) 500)))
+        (is (= 0 (deref c 500 :timeout)))
+        (is (= ["test-build" "test-pipe" "0" "out.log"] (first @streams)))))))
 
 (deftest restore-src
   (testing "nothing if no workspace in build"
@@ -116,11 +145,6 @@
                :sidecar
                :step-config)))))
 
-(defrecord TestLogger [streams path]
-  l/LogCapturer
-  (handle-stream [_ _]
-    (swap! streams conj path)))
-
 (deftest upload-logs
   (testing "does nothing if no logger"
     (is (nil? (sut/upload-logs {} nil))))
@@ -138,11 +162,21 @@
                                      (->TestLogger c p)))))
         (is (= [["test.txt"]] @c))))))
 
-#_(deftest run
-  (testing "restores required artifacts")
+(deftest run
+  (with-redefs [sut/mark-start identity
+                sut/poll-events (fn [rt]
+                                  (md/success-deferred rt))]
+    (testing "adds step config to runtime"
+      (is (= "test-pipe" (-> {:config {:sidecar {:step-config {:pipeline {:name "test-pipe"}}}}}
+                             (sut/run)
+                             (deref)
+                             :pipeline
+                             :name))))
+    
+    (testing "restores required artifacts")
 
-  (testing "stores generated artifacts")
+    (testing "stores generated artifacts")
 
-  (testing "restores caches")
+    (testing "restores caches")
 
-  (testing "saves caches"))
+    (testing "saves caches")))

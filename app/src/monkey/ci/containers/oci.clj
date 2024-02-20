@@ -94,11 +94,8 @@
                  (into [(job-script-entry)]))})
 
 (defn- step-details->edn [rt]
-  (-> rt
-      :step
-      ;; TODO Make this less arbitrary, ideally 'plugins' can decide for themselves if included here or not
-      (select-keys [:name :artifacts :caches])
-      (pr-str)))
+  (pr-str {:step (select-keys (:step rt) [:name :index :artifacts :caches])
+           :pipeline (select-keys (:pipeline rt) [:name :index])}))
 
 (defn- config-vol-config
   "Configuration files for the sidecar (e.g. logging)"

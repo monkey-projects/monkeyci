@@ -1,4 +1,4 @@
-<configuration scan="true" scanPeriod="5 seconds">
+<configuration>
   
   <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
     <http>
@@ -13,6 +13,7 @@
       </message>
     </format>
     <sortByTime>true</sortByTime>
+    <batchTimeoutMs>1000</batchTimeoutMs>
   </appender>
 
   <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
@@ -34,4 +35,8 @@
     <appender-ref ref="LOKI"/>
     <appender-ref ref="STDOUT"/>
   </root>
+
+  <!--
+      <shutdownHook/>
+      -->
 </configuration>

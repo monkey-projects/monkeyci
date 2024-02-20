@@ -87,7 +87,9 @@
     (let [pk (h/generate-private-key)
           ic (->> {:step {:script ["first" "second"]
                           :artifacts [{:id "test-artifact"
-                                       :path "somewhere"}]}
+                                       :path "somewhere"}]
+                          :index 0}
+                   :pipeline {:name "test-pipe"}
                    :build {:build-id "test-build"}
                    :config {:original {:oci {:credentials {:private-key "local/private.key"}}}}}
                   (sut/instance-config {:credentials {:private-key pk}}))
@@ -119,10 +121,14 @@
             (is (some? v))
             (is (= sut/config-dir (:mount-path mnt))))
 
-          (testing "config volume includes script step details"
+          (testing "config volume includes script step and pipeline details"
             (let [e (find-volume-entry v "step.edn")]
               (is (some? e))
-              (is (= {:artifacts [{:id "test-artifact" :path "somewhere"}]}
+              (is (= {:step
+                      {:artifacts [{:id "test-artifact" :path "somewhere"}]
+                       :index 0}
+                      :pipeline
+                      {:name "test-pipe"}}
                      (parse-b64-edn (:data e))))))))
 
       (testing "includes private key volume"

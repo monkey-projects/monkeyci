@@ -114,6 +114,7 @@
 (defn run [rt]
   (log/info "Running sidecar with configuration:" (get-in rt [rt/config :sidecar]))
   (-> rt
+      (merge (get-in rt [rt/config :sidecar :step-config]))
       (restore-src)
       (restore-caches)
       (restore-artifacts)
