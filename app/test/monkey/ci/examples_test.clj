@@ -3,8 +3,7 @@
             [clojure.tools.logging :as log]
             [monkey.ci
              [cli :as cli]
-             [core :as core]]
-            [monkey.ci.helpers :as h]))
+             [core :as core]]))
 
 (defn run-example [path]
   (log/info "Running example at" path)
@@ -16,7 +15,7 @@
           :dev-mode true})))
 
 (defn success? [r]
-  (= 0 (h/try-take r 30000 :timeout)))
+  (= 0 (deref r 30000 :timeout)))
 
 (deftest ^:integration examples
   (letfn [(run-example-test [n]
