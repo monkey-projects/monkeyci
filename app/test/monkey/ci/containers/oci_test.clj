@@ -91,7 +91,7 @@
                           :index 0}
                    :pipeline {:name "test-pipe"}
                    :build {:build-id "test-build"}
-                   :config {:original {:oci {:credentials {:private-key "local/private.key"}}}}}
+                   :config {:oci {:credentials {:private-key pk}}}}
                   (sut/instance-config {:credentials {:private-key pk}}))
           sc (->> ic
                   :containers
@@ -151,16 +151,13 @@
         (is (= 0 (-> sc :security-context :run-as-user)))))
 
     (testing "adds logback config file to config mount"
-      (h/with-tmp-dir dir
-        (let [p (io/file dir "logback.xml")]
-          (spit p "test logback configuration")
-          (let [vol (-> {:step {:script ["test"]}
-                         :config {:sidecar {:log-config (.getCanonicalPath p)}}}
-                        (as-> c (sut/instance-config {} c))
-                        (oci/find-volume "config"))]
-            (is (some? vol))
-            (is (not-empty(:configs vol)))
-            (is (some? (find-volume-entry vol "logback.xml"))))))))
+      (let [vol (-> {:step {:script ["test"]}
+                     :config {:sidecar {:log-config "test log config"}}}
+                    (as-> c (sut/instance-config {} c))
+                    (oci/find-volume "config"))]
+        (is (some? vol))
+        (is (not-empty(:configs vol)))
+        (is (some? (find-volume-entry vol "logback.xml"))))))
 
   (testing "script volume"
     (let [v (->> {:step {:script ["first" "second"]}}

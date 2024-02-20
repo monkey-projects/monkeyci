@@ -19,7 +19,7 @@
   "Assuming the conf is taken from env, groups all keys that start with `credentials-`
    into the `:credentials` submap."
   [conf]
-  (c/group-and-merge conf :credentials))
+  (c/group-keys conf :credentials))
 
 (defn normalize-config
   "Normalizes the given OCI config key, by grouping the credentials both in the given key
@@ -27,9 +27,9 @@
   [conf k]
   (letfn [(load-key [c]
             (mc/update-existing-in c [:credentials :private-key] u/load-privkey))]
-    (->> [(:oci (c/group-and-merge conf :oci)) (k conf)]
+    (->> [(:oci (c/group-and-merge-from-env conf :oci)) (k conf)]
          (map group-credentials)
-         (apply merge)
+         (apply u/deep-merge)
          (load-key)
          (assoc conf k))))
 
@@ -47,7 +47,8 @@
    Returns a deferred that will resolve when the upload completes.
    That is, when the input stream closes, or an error occurs."
   [conf ^java.io.InputStream in]
-  (log/debug "Piping stream to bucket using config" conf)
+  (log/debug "Piping stream to bucket" (:bucket-name conf) "at" (:object-name conf))
+  (log/trace "Piping stream to bucket using config" conf)
   (let [ctx (-> conf
                 (->oci-config)
                 (os/make-context))]
@@ -133,21 +134,24 @@
   [conf]
   ;; TODO Allow for a private key to be specified other than the one
   ;; used by the app itself.  Perhaps fetch it from the vault?
-  (let [pk (get-in conf [:credentials :private-key])
-        read-existing (fn [f]
-                        (when (fs/exists? f)
-                          (slurp f)))]
-    (some-> (cond
-              (instance? java.security.PrivateKey pk)
-              (pem/private-key->pem pk)
+  (some-> (get-in conf [:credentials :private-key])
+          (pem/private-key->pem)
+          (u/->base64))
+  #_(let [pk (get-in conf [:credentials :private-key])
+          read-existing (fn [f]
+                          (when (fs/exists? f)
+                            (slurp f)))]
+      (some-> (cond
+                (instance? java.security.PrivateKey pk)
+                (pem/private-key->pem pk)
               
-              (string? pk)
-              (let [f (fs/file pk)]
-                (read-existing f))
+                (string? pk)
+                (let [f (fs/file pk)]
+                  (read-existing f))
               
-              (instance? java.io.File pk)
-              (read-existing pk))
-            (u/->base64))))
+                (instance? java.io.File pk)
+                (read-existing pk))
+              (u/->base64))))
 
 (def checkout-vol "checkout")
 (def checkout-dir "/opt/monkeyci/checkout")

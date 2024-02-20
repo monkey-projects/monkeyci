@@ -4,6 +4,7 @@
             [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
+            [medley.core :as mc]
             [monkey.ci
              [blob :as blob]
              [build :as b]
@@ -128,6 +129,7 @@
 
 (defmethod c/normalize-key :sidecar [_ conf]
   (-> conf
+      (mc/update-existing :log-config u/try-slurp)
       (add-from-args :events-file)
       (add-from-args :start-file)
       (add-from-args :step-config)))

@@ -73,6 +73,6 @@
                        {:config {:test-val "test-val"}})))))
 
 (deftest rt->env
-  (testing "returns original config"
+  (testing "returns config"
     (is (= {:key "value"}
-           (sut/rt->env {:config {:original {:key "value"}}})))))
+           (sut/rt->env {:config {:key "value"}})))))

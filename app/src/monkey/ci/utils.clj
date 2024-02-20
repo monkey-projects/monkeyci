@@ -63,12 +63,16 @@
   (format "build-%d" (System/currentTimeMillis)))
 
 (defn load-privkey
-  "Load private key from file"
+  "Load private key from file or from string"
   [f]
-  (if (instance? java.security.PrivateKey f)
-    f
-    (with-open [r (io/reader f)]
-      (pem/read-privkey r nil))))
+  (letfn [(->reader [x]
+            (if (.exists (io/file x))
+              (io/reader x)
+              (java.io.StringReader. x)))]
+    (if (instance? java.security.PrivateKey f)
+      f
+      (with-open [r (->reader f)]
+        (pem/read-privkey r nil)))))
 
 (defn parse-edn
   "Parses edn from the reader"
@@ -126,3 +130,11 @@
   "Returns a fn that is a predicate to match property `p` with value `v`"
   [p v]
   (comp (partial = v) p))
+
+(defn try-slurp
+  "Reads the file if it exists, or just returns x"
+  [x]
+  (when-let [f (some-> x (io/file))]
+    (if (.exists f)
+      (slurp f)
+      x)))

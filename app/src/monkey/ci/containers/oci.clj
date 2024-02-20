@@ -5,6 +5,7 @@
             [clojure
              [string :as cs]
              [walk :as cw]]
+            [clojure.tools.logging :as log]
             [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
@@ -100,12 +101,11 @@
 (defn- config-vol-config
   "Configuration files for the sidecar (e.g. logging)"
   [rt]
-  ;; TODO Add a config file that holds script step details like caches and artifacts
   (let [{:keys [log-config]} (sidecar-config rt)]
     {:name config-vol
      :volume-type "CONFIGFILE"
      :configs (cond-> [(config-entry step-config-file (step-details->edn rt))]
-                log-config (conj (config-entry "logback.xml" (slurp log-config))))}))
+                log-config (conj (config-entry "logback.xml" log-config)))}))
 
 (defn- update-private-key-paths
   "Updates the private key paths pointed to in the runtime env so it would refer

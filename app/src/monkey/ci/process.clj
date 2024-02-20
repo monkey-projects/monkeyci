@@ -17,6 +17,7 @@
              [logging :as l]
              [runtime :as rt]
              [script :as script]
+             [sidecar]
              [utils :as utils]]
             [monkey.ci.build.core :as bc]
             [monkey.ci.containers.oci]

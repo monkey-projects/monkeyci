@@ -157,11 +157,10 @@
                        (sut/process-env "test-socket")
                        :lc-ctype))))
 
-  (testing "passes original config"
+  (testing "passes serialized config"
     (let [env (-> {:config
-                   {:original
-                    {:logging {:type :file
-                               :dir "test-dir"}}}}
+                   {:logging {:type :file
+                              :dir "test-dir"}}}
                   (sut/process-env "test-socket"))]
       (is (= "file" (:monkeyci-logging-type env)))
       (is (= "test-dir" (:monkeyci-logging-dir env))))))
