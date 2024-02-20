@@ -34,6 +34,8 @@
                (config/normalize-config {} {})
                (validate-config)
                (rt/config->runtime))]
+    ;; TODO Use components instead
+    (c/register-listeners rt)
     (reset! server ((:http rt) rt)))
   nil)
 

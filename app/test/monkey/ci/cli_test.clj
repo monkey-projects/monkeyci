@@ -1,11 +1,13 @@
 (ns monkey.ci.cli-test
   "Tests for the CLI configuration"
   (:require [clojure.test :refer :all]
+            [clojure.java.io :as io]
             [cli-matic.core :as cli]
             [monkey.ci
              [cli :as sut]
              [commands :as cmd]
-             [core :as core]]))
+             [core :as core]
+             [helpers :as h]]))
 
 (deftest cli
   (let [last-cmd (atom nil)
@@ -116,7 +118,22 @@
                                  :start-file)))
           (is (= "test-file" (-> (run-cli "sidecar" "--start-file" "test-file" "-e" "events-file")
                                  :args
-                                 :start-file))))))))
+                                 :start-file))))
+
+        (h/with-tmp-dir dir
+          (let [script-config (io/file dir "script.edn")
+                p (.getCanonicalPath script-config)]
+            (is (nil? (spit script-config (pr-str {:key "value"}))))
+            
+            (testing "accepts `step-config` or `-t` option"
+              (is (= {:key "value"}
+                     (-> (run-cli "sidecar" "-e" "events" "-s" "start" "--step-config" p)
+                         :args
+                         :step-config)))
+              (is (= {:key "value"}
+                     (-> (run-cli "sidecar" "-e" "events" "-s" "start" "-t" p)
+                         :args
+                         :step-config))))))))))
 
 (deftest set-invoker
   (testing "applies invoker to `runs` in commands"

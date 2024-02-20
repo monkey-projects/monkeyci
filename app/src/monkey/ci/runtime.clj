@@ -110,6 +110,6 @@
   [rt]
   ;; Return the original, non-normalized configuration
   (-> rt
-      (get-in [:config :original])
+      :config
       (merge (select-keys rt [:build]))
       (mc/update-existing-in [:build :sid] u/serialize-sid)))

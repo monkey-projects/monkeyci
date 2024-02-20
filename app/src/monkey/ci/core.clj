@@ -12,14 +12,18 @@
              [cache]
              [cli :as mcli]
              [config :as config]
+             [containers]
              [git]
              [listeners :as l]
              [logging]
              [reporting]
              [runtime :as rt]
              [runners]
+             [sidecar]
              [utils :as u]
              [workspace]]
+            [monkey.ci.containers
+             [oci]]
             [monkey.ci.events
              [core :as ec]
              [manifold]]
@@ -28,7 +32,7 @@
              [file]
              [oci]]))
 
-(defn- register-listeners [runtime]
+(defn register-listeners [runtime]
   (ec/add-listener (get-in runtime [:events :receiver])
                    (l/build-update-handler runtime)))
 

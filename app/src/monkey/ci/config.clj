@@ -14,7 +14,9 @@
             [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [medley.core :as mc]
-            [monkey.ci.utils :as u]))
+            [monkey.ci
+             [pem :as pem]
+             [utils :as u]]))
 
 (def ^:dynamic *global-config-file* "/etc/monkeyci/config.edn")
 (def ^:dynamic *home-config-file* (-> (System/getProperty "user.home")
@@ -49,20 +51,24 @@
    stripped from the keys.  E.g. `{:test-key 100}` with prefix `:test`
    would become `{:test {:key 100}}`"
   [m prefix]
-  (let [s (filter-and-strip-keys prefix m)]
-    (-> (mc/remove-keys (key-filter prefix) m)
-        (mc/assoc-some prefix (when (not-empty s) s)))))
+  (let [s (filter-and-strip-keys prefix m)
+        r (mc/remove-keys (key-filter prefix) m)]
+    (cond-> r
+      (not-empty s)
+      (update prefix merge s))))
 
-(defn group-and-merge
-  "Given a map, takes all keys that start with the given prefix (using
-   `group-keys`) and merges them with the existing submap with same key.
-   For example, `{:test-key \"value\" :test {:other-key \"other-value\"}}` 
+(defn group-and-merge-from-env
+  "Given a map, takes all keys in `:env` that start with the given prefix 
+   (using `group-keys`) and merges them with the existing submap with same 
+   key.
+   For example, `{:env {:test-key \"value\"} :test {:other-key \"other-value\"}}` 
    would become `{:test {:key \"value\" :other-key \"other-value\"}}`.  
    The newly grouped values overwrite any existing values."
   [m prefix]
-  (-> (group-keys m prefix)
-      (update prefix (partial merge (prefix m)))
-      (as-> x (mc/remove-vals nil? x))))
+  (let [em (filter-and-strip-keys prefix (:env m))]
+    (-> m
+        (update prefix merge em)
+        (as-> x (mc/remove-vals nil? x)))))
 
 (defn keywordize-type [v]
   (if (map? v)
@@ -156,7 +162,6 @@
                   (u/cwd))))
 
 (defmethod normalize-key :work-dir [_ conf]
-  (log/debug "Normalizing work dir with conf" conf)
   (assoc conf :work-dir (abs-work-dir conf)))
 
 (defmethod normalize-key :account [_ {:keys [args] :as conf}]
@@ -194,7 +199,8 @@
               (merge d m)
               (or m d)))
           (nil-if-empty [x]
-            (when (and (seqable? x) (not-empty x))
+            (when (or (not (seqable? x))
+                      (and (seqable? x) (not-empty x)))
               x))]
     (-> (methods normalize-key)
         (keys)
@@ -207,11 +213,9 @@
                            (mc/assoc-some r k)
                            (u/prune-tree)
                            (normalize-key k)))
-                    (assoc (merge conf env) :args args)
+                    (assoc conf :env env :args args)
                     keys-to-normalize))
-        (dissoc :default :env)
-        ;; TODO Add the config from env as well
-        (assoc :original conf))))
+        (dissoc :default :env))))
 
 (defn app-config
   "Combines app environment with command-line args into a unified 
@@ -237,20 +241,27 @@
                {}
                c)))
 
+(defmulti serialize-config class)
+
+(defmethod serialize-config :default [x]
+  (str x))
+
+(defmethod serialize-config clojure.lang.Keyword [k]
+  (name k))
+
+(defmethod serialize-config java.security.PrivateKey [pk]
+  (pem/private-key->pem pk))
+
 (defn config->env
   "Creates a map of env vars from the config.  This is done by flattening
    the entries and prepending them with `monkeyci-`.  Values are converted 
    to string."
   [c]
-  (letfn [(->str [x]
-            (if (keyword? x)
-              (name x)
-              (str x)))]
-    (->> c
-         (flatten-nested [])
-         (mc/map-keys (fn [k]
-                        (keyword (str env-prefix "-" (name k)))))
-         (mc/map-vals ->str))))
+  (->> c
+       (flatten-nested [])
+       (mc/map-keys (fn [k]
+                      (keyword (str env-prefix "-" (name k)))))
+       (mc/map-vals serialize-config)))
 
 (defn normalize-typed
   "Convenience function that converts the `:type` of an entry into a keyword and
