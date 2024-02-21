@@ -10,6 +10,7 @@
             [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
+             [build :as b]
              [config :as c]
              [containers :as mcc]
              [oci :as oci]
@@ -35,7 +36,7 @@
 (def sidecar-config (comp :sidecar rt/config))
 
 (defn- calc-work-dir [rt]
-  (some->> (get-in rt [:build :checkout-dir])
+  (some->> (b/build-checkout-dir rt)
            (fs/file-name)
            (fs/path work-dir)
            (str)))
@@ -46,18 +47,25 @@
    custom shell script that also redirects the output and dispatches
    events to a file, that are then picked up by the sidecar."
   [{:keys [step] :as rt}]
-  {:image-url (:container/image step)
-   :display-name job-container-name
-   :command ["/bin/sh" (str script-dir "/" job-script)]
-   ;; One file arg per script line, with index as name
-   :arguments (->> (count (:script step))
-                   (range)
-                   (mapv str))
-   :environment-variables {"WORK_DIR" (calc-work-dir rt)
-                           "LOG_DIR" log-dir
-                           "SCRIPT_DIR" script-dir
-                           "START_FILE" start-file
-                           "EVENT_FILE" event-file}})
+  (let [wd (calc-work-dir rt)]
+    {:image-url (:container/image step)
+     :display-name job-container-name
+     :command ["/bin/sh" (str script-dir "/" job-script)]
+     ;; One file arg per script line, with index as name
+     :arguments (->> (count (:script step))
+                     (range)
+                     (mapv str))
+     :environment-variables (merge
+                             (:container/env step)
+                             {"MONKEYCI_WORK_DIR" wd
+                              "MONKEYCI_LOG_DIR" log-dir
+                              "MONKEYCI_SCRIPT_DIR" script-dir
+                              "MONKEYCI_START_FILE" start-file
+                              "MONKEYCI_EVENT_FILE" event-file
+                              ;; This may have unforseen consequences, so maybe we''l have to remove this later
+                              ;; but it can be useful for using caches/artifacts for processes that depend
+                              ;; on the home dir (e.g. mvn cache).
+                              "HOME" wd})}))
 
 (defn- sidecar-container [{[c] :containers}]
   (assoc c
@@ -103,7 +111,9 @@
                  (into [(job-script-entry)]))})
 
 (defn- step-details->edn [rt]
-  (pr-str {:step (select-keys (:step rt) [:name :index :save-artifacts :restore-artifacts :caches])
+  (pr-str {:step (-> (:step rt)
+                     (select-keys [:name :index :save-artifacts :restore-artifacts :caches :work-dir])
+                     (mc/update-existing :work-dir u/rebase-path (b/build-checkout-dir rt) (calc-work-dir rt)))
            :pipeline (select-keys (:pipeline rt) [:name :index])}))
 
 (defn- config-vol-config
@@ -118,12 +128,17 @@
 (defn- add-sidecar-env [sc rt]
   (let [wd (calc-work-dir rt)]
     ;; TODO Put this all in a config file instead, this way sensitive information is harder to see
-    (assoc sc :environment-variables (-> (rt/rt->env rt)
-                                         (dissoc :args :jwk :containers :storage) ;; Remove some unnecessary values
-                                         (assoc :work-dir wd)
-                                         (assoc-in [:build :checkout-dir] wd)
-                                         (c/config->env)
-                                         (as-> x (mc/map-keys (comp csk/->SCREAMING_SNAKE_CASE name) x))))))
+    (assoc sc
+           :environment-variables
+           (-> (rt/rt->env rt)
+               ;; Remove some unnecessary values
+               (dissoc :args :checkout-base-dir :jwk :containers :storage) 
+               (update :build dissoc :git)                                         
+               (assoc :work-dir wd
+                      :checkout-base-dir work-dir)
+               (assoc-in [:build :checkout-dir] wd)
+               (c/config->env)
+               (as-> x (mc/map-keys (comp csk/->SCREAMING_SNAKE_CASE name) x))))))
 
 (defn instance-config
   "Generates the configuration for the container instance.  It has 

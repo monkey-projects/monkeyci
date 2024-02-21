@@ -18,29 +18,29 @@
   (get rt k))
 
 (defn artifact-archive-path [{:keys [build]} id]
-  ;; The artifact archive path is the build sid with the artifact id added.
+  ;; The blob archive path is the build sid with the blob id added.
   (str (cs/join "/" (concat (:sid build) [id])) ".tgz"))
 
-(defn- step-artifacts [rt {:keys [store-key step-key]}]
+(defn- step-blobs [rt {:keys [store-key step-key]}]
   (let [c (get-in rt [:step step-key])]
     (when (get-store rt store-key)
       c)))
 
-(defn- do-with-artifacts [rt conf f]
-  (->> (step-artifacts rt conf)
+(defn- do-with-blobs [rt conf f]
+  (->> (step-blobs rt conf)
        (map (partial f rt))
        (apply md/zip)))
 
-(defn save-artifact
-  "Saves a single artifact path"
+(defn save-blob
+  "Saves a single blob path"
   [{:keys [build-path store-key]} rt {:keys [path id]}]
-  (log/debug "Saving artifact:" id "at path" path)
+  (log/debug "Saving blob:" id "at path" path)
   (blob/save (get-store rt store-key)
              (b/step-relative-dir rt path)
              (build-path rt id)))
 
 (defn save-generic [rt conf]
-  (do-with-artifacts rt conf (partial save-artifact conf)))
+  (do-with-blobs rt conf (partial save-blob conf)))
 
 (defn save-artifacts
   "Saves all artifacts according to the step configuration."
@@ -50,8 +50,8 @@
                  :store-key :artifacts
                  :build-path artifact-archive-path}))
 
-(defn restore-artifact [{:keys [store-key build-path]} rt {:keys [id path]}]
-  (log/debug "Restoring artifact:" id "to path" path)
+(defn restore-blob [{:keys [store-key build-path]} rt {:keys [id path]}]
+  (log/debug "Restoring blob:" id "to path" path)
   (blob/restore (get-store rt store-key)
                 (build-path rt id)
                 ;; Restore to the parent path because the dir name will be in the archive
@@ -61,7 +61,7 @@
                     (str))))
 
 (defn restore-generic [rt conf]
-  (do-with-artifacts rt conf (partial restore-artifact conf)))
+  (do-with-blobs rt conf (partial restore-blob conf)))
 
 (defn restore-artifacts
   [rt]

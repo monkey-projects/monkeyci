@@ -58,8 +58,9 @@
       (is (every? has-checkout-vol? (:containers (sut/instance-config {} {}))))))
 
   (testing "job container"
-    (let [jc (->> {:step {:script ["first" "second"]}
-                   :build {:checkout-dir "/tmp/checkout"}}
+    (let [jc (->> {:step {:script ["first" "second"]
+                          :container/env {"TEST_ENV" "test-val"}}
+                   :build {:checkout-dir "/tmp/test-build"}}
                   (sut/instance-config {})
                   :containers
                   (mc/find-first (u/prop-pred :display-name "job")))]
@@ -76,19 +77,26 @@
       (testing "environment"
         (let [env (:environment-variables jc)]
           (testing "sets work dir"
-            (is (string? (get env "WORK_DIR"))))
-          
+            (is (= "/opt/monkeyci/checkout/work/test-build" (get env "MONKEYCI_WORK_DIR"))))
+
+          (testing "sets home to work dir"
+            (is (= "/opt/monkeyci/checkout/work/test-build" (get env "HOME"))))
+
           (testing "sets log dir"
-            (is (string? (get env "LOG_DIR"))))
+            (is (string? (get env "MONKEYCI_LOG_DIR"))))
 
           (testing "sets script dir"
-            (is (string? (get env "SCRIPT_DIR"))))))))
+            (is (string? (get env "MONKEYCI_SCRIPT_DIR"))))
+
+          (testing "adds env specified on the step"
+            (is (= "test-val" (get env "TEST_ENV"))))))))
 
   (testing "sidecar container"
     (let [pk (h/generate-private-key)
           ic (->> {:step {:script ["first" "second"]
                           :save-artifacts [{:id "test-artifact"
                                             :path "somewhere"}]
+                          :work-dir "/tmp/test-checkout/sub"
                           :index 0}
                    :pipeline {:name "test-pipe"}
                    :build {:build-id "test-build"
@@ -124,15 +132,21 @@
             (is (some? v))
             (is (= sut/config-dir (:mount-path mnt))))
 
-          (testing "config volume includes script step and pipeline details"
-            (let [e (find-volume-entry v "step.edn")]
-              (is (some? e))
-              (is (= {:step
-                      {:save-artifacts [{:id "test-artifact" :path "somewhere"}]
-                       :index 0}
-                      :pipeline
-                      {:name "test-pipe"}}
-                     (parse-b64-edn (:data e))))))))
+          (testing "step details"
+            (let [e (find-volume-entry v "step.edn")
+                  data (some-> e :data (parse-b64-edn))]
+              (testing "included in config volume"
+                (is (some? e)))
+
+              (testing "contains step and pipeline details"
+                (is (contains? data :step))
+                (is (contains? data :pipeline)))
+
+              (testing "recalculates step work dir"
+                (is (= "/opt/monkeyci/checkout/work/test-checkout/sub"
+                       (-> data
+                           :step
+                           :work-dir))))))))
 
       (testing "env vars"
         (let [env (:environment-variables sc)]
@@ -155,7 +169,9 @@
             (is (= (str sut/work-dir "/test-checkout") (get env "MONKEYCI_BUILD_CHECKOUT_DIR"))))
           
           (testing "sets work dir to checkout dir"
-            (is (= (str sut/work-dir "/test-checkout") (get env "MONKEYCI_WORK_DIR"))))))
+            (is (= (str sut/work-dir "/test-checkout") (get env "MONKEYCI_WORK_DIR"))))
+
+          (testing "recalculates script dir relative to new checkout dir")))
 
       (testing "runs as root to access mount volumes"
         (is (= 0 (-> sc :security-context :run-as-user)))))

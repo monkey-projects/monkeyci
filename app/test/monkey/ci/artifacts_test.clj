@@ -7,18 +7,20 @@
             [monkey.ci.helpers :as h]))
 
 (deftest save-artifacts
-  (testing "saves path using blob store"
+  (testing "saves path using blob store, relative to step work dir"
     (let [stored (atom {})
           bs (h/fake-blob-store stored)
           ctx {:artifacts bs
                :build {:sid ["test-cust" "test-build"]}
-               :step {:work-dir "work"
+               :step {:work-dir "/tmp/work"
                       :save-artifacts [{:id "test-artifact"
                                         :path "test-path"}]}}]
       (is (some? @(sut/save-artifacts ctx)))
       (is (= 1 (count @stored)))
-      (is (cs/ends-with? (-> @stored first second)
-                         "test-cust/test-build/test-artifact.tgz"))))
+      (let [[p dest] (first @stored)]
+        (is (cs/ends-with? dest
+                           "test-cust/test-build/test-artifact.tgz"))
+        (is (= "/tmp/work/test-path" p)))))
 
   (testing "nothing if no cache store"
     (is (empty? @(sut/save-artifacts

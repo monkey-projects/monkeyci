@@ -96,6 +96,10 @@
    base directory and the build id."
   (partial build-related-dir (rt/from-config :checkout-base-dir)))
 
+(def build-checkout-dir
+  "Gets the checkout dir as stored in the build structure"
+  (comp :checkout-dir :build))
+
 (def ssh-keys-dir
   "Calculates ssh keys dir for the build"
   (partial build-related-dir (rt/from-config :ssh-keys-dir)))
@@ -119,7 +123,7 @@
    (memfn getCanonicalPath)
    io/file
    (some-fn (comp :work-dir :step)
-            :checkout-dir
+            build-checkout-dir
             (constantly (u/cwd)))))
 
 (defn step-relative-dir

@@ -1,29 +1,29 @@
 #!/bin/sh
 
-if [ "$WORK_DIR" = "" ]; then
-    WORK_DIR=$PWD
+if [ "$MONKEYCI_WORK_DIR" = "" ]; then
+    MONKEYCI_WORK_DIR=$PWD
 fi
 
-if [ "$LOG_DIR" = "" ]; then
-    LOG_DIR=${WORK_DIR}/logs
+if [ "$MONKEYCI_LOG_DIR" = "" ]; then
+    MONKEYCI_LOG_DIR=${MONKEYCI_WORK_DIR}/logs
 fi
 
-if [ "$SCRIPT_DIR" = "" ]; then
-    SCRIPT_DIR=${WORK_DIR}
+if [ "$MONKEYCI_SCRIPT_DIR" = "" ]; then
+    MONKEYCI_SCRIPT_DIR=${MONKEYCI_WORK_DIR}
 fi
 
-if [ "$EVENT_FILE" = "" ]; then
-    EVENT_FILE=${LOG_DIR}/events.edn
+if [ "$MONKEYCI_EVENT_FILE" = "" ]; then
+    MONKEYCI_EVENT_FILE=${MONKEYCI_LOG_DIR}/events.edn
 fi
 
-if [ "$START_FILE" = "" ]; then
-    START_FILE=${LOG_DIR}/start
+if [ "$MONKEYCI_START_FILE" = "" ]; then
+    MONKEYCI_START_FILE=${MONKEYCI_LOG_DIR}/start
 fi
 
 wait_for_start()
 {
     echo "Waiting for start conditions..."
-    while [ ! -f "$START_FILE" ]; do
+    while [ ! -f "$MONKEYCI_START_FILE" ]; do
 	sleep 1
     done
     echo "Ready to start"
@@ -31,26 +31,26 @@ wait_for_start()
 
 post_event()
 {
-    echo $1 >> $EVENT_FILE
+    echo $1 >> $MONKEYCI_EVENT_FILE
 }
 
 run_command()
 {
     command=$1
     name=$command
-    out=${LOG_DIR}/${command}_out
-    err=${LOG_DIR}/${command}_err
+    out=${MONKEYCI_LOG_DIR}/${command}_out
+    err=${MONKEYCI_LOG_DIR}/${command}_err
     
     echo "Running command: $command"
     post_event "{:type :command/start :command \"$name\"}"
-    cd $WORK_DIR
-    sh ${SCRIPT_DIR}/${command} > $out 2>$err
+    cd $MONKEYCI_WORK_DIR
+    sh ${MONKEYCI_SCRIPT_DIR}/${command} > $out 2>$err
     status=$?
     post_event "{:type :command/end :command \"$name\" :exit $status :stdout \"$out\" :stderr \"$err\"}"
     return $status
 }
 
-mkdir -p $LOG_DIR
+mkdir -p $MONKEYCI_LOG_DIR
 post_event "{:type :job/wait}"
 wait_for_start
 post_event "{:type :job/start}"

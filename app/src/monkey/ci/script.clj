@@ -101,13 +101,14 @@
                                        (dissoc :action)
                                        (merge (->map r)))))))))
 
-(defn- make-step-dir-absolute [{:keys [checkout-dir step] :as ctx}]
+(defn- make-step-dir-absolute [{:keys [step] :as ctx}]
   (if (map? step)
-    (update-in ctx [:step :work-dir]
-               (fn [d]
-                 (if d
-                   (u/abs-path checkout-dir d)
-                   checkout-dir)))
+    (let [checkout-dir (build/build-checkout-dir ctx)]
+      (update-in ctx [:step :work-dir]
+                 (fn [d]
+                   (if d
+                     (u/abs-path checkout-dir d)
+                     checkout-dir))))
     ctx))
 
 (defn- run-single-step

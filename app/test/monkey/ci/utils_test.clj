@@ -14,6 +14,11 @@
   (testing "returns subpath of parent if child is not absolute"
     (is (= "parent/child" (sut/abs-path "parent" "child")))))
 
+(deftest rebase-path
+  (testing "makes path relative to last arg"
+    (is (= "/dest/sub"
+           (sut/rebase-path "/src/sub" "/src" "/dest")))))
+
 (deftest add-shutdown-hook!
   (testing "registers thread as shutdown hook"
     (let [t (sut/add-shutdown-hook! (constantly :ok))]

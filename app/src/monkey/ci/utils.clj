@@ -1,5 +1,6 @@
 (ns monkey.ci.utils
-  (:require [buddy.core.keys.pem :as pem]
+  (:require [babashka.fs :as fs]
+            [buddy.core.keys.pem :as pem]
             [clojure
              [edn :as edn]
              [string :as cs]
@@ -32,6 +33,14 @@
   "Returns the canonical path of combining `a` and `b`"
   [a b]
   (.getCanonicalPath (io/file a b)))
+
+(defn rebase-path
+  "Given two absolute paths, recalculates p so that it becomes relative to `to` instead
+   of `from`."
+  [p from to]
+  (->> (fs/relativize from p)
+       (fs/path to)
+       (str)))
 
 (defn add-shutdown-hook!
   "Executes `h` when the JVM shuts down.  Returns the thread that will
