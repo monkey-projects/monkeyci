@@ -147,7 +147,6 @@
         has-job-name? (comp (partial = job-container-name) :display-name)]
     (-> (oci/run-instance client ic {:match-container (partial filter has-job-name?)
                                      :delete? true})
-        ;; TODO Delete container afterwards
         (md/chain (partial hash-map :exit))
         (deref))))
 

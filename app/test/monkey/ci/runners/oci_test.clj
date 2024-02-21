@@ -27,7 +27,8 @@
 
   (testing "launches `:build/completed` event"
     (with-redefs [ci/create-container-instance (fn [_ opts]
-                                                 {:status 500})]
+                                                 {:status 500})
+                  ci/delete-container-instance (fn [_ r] r)]
       (let [received (atom [])]
         (is (some? (sut/oci-runner {} {} {:events {:poster (partial swap! received conj)}})))
         (is (not-empty @received))

@@ -46,7 +46,7 @@
         (update :containers patch-container rt))))
 
 (defn oci-runner [client conf rt]
-  (-> (oci/run-instance client (instance-config conf rt))
+  (-> (oci/run-instance client (instance-config conf rt) {:delete? true})
       (md/chain
        (fn [r]
          (rt/post-events rt (b/build-completed-evt (:build rt) r))
