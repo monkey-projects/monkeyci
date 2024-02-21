@@ -10,7 +10,7 @@
   (testing "saves path using blob store"
     (let [stored (atom {})
           bs (h/->FakeBlobStore stored)
-          ctx {:cache {:store bs}
+          ctx {:cache bs
                :build {:sid ["test-cust" "test-build"]}
                :step {:work-dir "work"
                       :caches [{:id "test-cache"
@@ -28,7 +28,7 @@
   (testing "restores path using blob store"
     (let [stored (atom {"test-cust/test-cache.tgz" ::dest})
           bs (h/->FakeBlobStore stored)
-          ctx {:cache {:store bs}
+          ctx {:cache bs
                :build {:sid ["test-cust" "test-build"]}
                :step {:work-dir "work"
                       :caches [{:id "test-cache"

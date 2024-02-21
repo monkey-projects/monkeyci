@@ -131,21 +131,16 @@
                       {:name "test-pipe"}}
                      (parse-b64-edn (:data e))))))))
 
-      (testing "includes private key volume"
-        (let [v (oci/find-mount sc "private-key")]
-          (is (some? v))
-          (is (= "/opt/monkeyci/keys" (:mount-path v)))))
+      (testing "serializes private key to pem"
+        (let [pk (get-in sc [:environment-variables "MONKEYCI_OCI_CREDENTIALS_PRIVATE_KEY"])]
+          (is (string? pk))
+          (is (some? (u/load-privkey pk)))))
 
       (testing "receives env vars from runtime"
         (is (some? (:environment-variables sc)))
         (is (= "test-build" (-> sc
                                 :environment-variables
                                 (get "MONKEYCI_BUILD_BUILD_ID")))))
-
-      (testing "rewrites OCI credentials private key to point to mounted file"
-        (is (= "/opt/monkeyci/keys/privkey" (-> sc
-                                                :environment-variables
-                                                (get "MONKEYCI_OCI_CREDENTIALS_PRIVATE_KEY")))))
 
       (testing "sets work dir to mount path"
         (is (= sut/work-dir (-> sc

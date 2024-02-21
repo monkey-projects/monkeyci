@@ -16,14 +16,14 @@
              [utils :as u]]))
 
 (defn restore-src [{:keys [build] :as rt}]
-  (let [store (get-in rt [:workspace :store])
+  (let [store (get rt :workspace)
         ws (:workspace build)
         checkout (:checkout-dir build)
         restore (fn [rt]
                   (md/chain
                    (blob/restore store ws checkout)
                    (fn [_]
-                     (assoc-in rt [:workspace :restored?] true))))]
+                     (assoc-in rt [:build :workspace/restored?] true))))]
     (log/info "Restoring workspace" ws)
     (cond-> rt
       (and store ws checkout)

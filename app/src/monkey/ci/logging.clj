@@ -65,7 +65,10 @@
                      (log/debug "Upload completed")))
         remove-hook (fn [& _]
                       (when-not @shutdown?
-                        (.removeShutdownHook (Runtime/getRuntime) t)))]
+                        (try 
+                          (.removeShutdownHook (Runtime/getRuntime) t)
+                          (catch Exception _
+                            (log/warn "Unable to remove shutdown hook, process is probably already shutting down.")))))]
     (when (md/deferred? d)
       (.addShutdownHook (Runtime/getRuntime) t)
       (md/on-realized d remove-hook remove-hook))

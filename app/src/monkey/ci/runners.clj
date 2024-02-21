@@ -69,7 +69,7 @@
                  (update :dir #(or % (build/checkout-dir rt))))
         add-script-dir (fn [{{:keys [script-dir checkout-dir]} :build :as rt}]
                          (assoc-in rt [:build :script-dir] (build/calc-script-dir checkout-dir script-dir)))]
-    (log/debug "Checking out git repo:" (:url conf))
+    (log/debug "Checking out git repo" (:url conf) "into" (:dir conf))
     (-> rt
         (assoc-in [:build :checkout-dir] (git conf))
         (add-script-dir))))
@@ -82,14 +82,14 @@
     (not-empty (get-in rt [:build :git])) (download-git)))
 
 (defn create-workspace [rt]
-  (let [{:keys [store]} (:workspace rt)
+  (let [ws (:workspace rt)
         ;; TODO For local builds, upload all workdir files according to .gitignore
         {:keys [checkout-dir sid]} (:build rt)
         dest (str (cs/join "/" sid) b/extension)]
     (when checkout-dir
       (log/info "Creating workspace using files from" checkout-dir)
       @(md/chain
-        (b/save store checkout-dir dest) ; TODO Check for errors
+        (b/save ws checkout-dir dest) ; TODO Check for errors
         (constantly (assoc-in rt [:build :workspace] dest))))))
 
 (defn store-src
@@ -98,7 +98,7 @@
    cached files as needed."
   [rt]
   (cond-> rt
-    (some? (get-in rt [:workspace :store])) (create-workspace)))
+    (some? (:workspace rt)) (create-workspace)))
 
 ;; Creates a runner fn according to its type
 (defmulti make-runner (comp :type :runner))

@@ -106,10 +106,10 @@
           store (h/->FakeBlobStore stored)
           rt {:build {:workspace "path/to/workspace"
                       :checkout-dir "local/dir"}
-               :workspace {:store store}}]
+              :workspace store}]
       (is (true? (-> (sut/restore-src rt)
                      (deref)
-                     (get-in [:workspace :restored?]))))
+                     (get-in [:build :workspace/restored?]))))
       (is (empty? @stored)))))
 
 (deftest mark-start
@@ -207,7 +207,7 @@
                           :caches [{:id "test-cache"
                                     :path "test-path"}]}
                    :logging {:maker (l/make-logger {})}
-                   :cache {:store cache}})]
+                   :cache cache})]
           (is (map? (deref r 500 :timeout)))
           (is (not-empty @stored)))))
     
@@ -227,7 +227,7 @@
                          :restore-artifacts [{:id "test-artifact"
                                               :path "test-path"}]}
                   :logging {:maker (l/make-logger {})}
-                  :artifacts {:store store}})]
+                  :artifacts store})]
           (is (empty? @stored)))))
 
     (testing "saves artifacts if configured"
@@ -245,5 +245,5 @@
                          :save-artifacts [{:id "test-artifact"
                                            :path "test-path"}]}
                   :logging {:maker (l/make-logger {})}
-                  :artifacts {:store store}})]
+                  :artifacts store})]
           (is (not-empty @stored)))))))
