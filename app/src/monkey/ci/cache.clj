@@ -23,24 +23,24 @@
 (defn save-caches
   "If the step configured in the context uses caching, saves it according
    to the cache configurations."
-  [ctx]
-  (art/save-generic ctx cache-config))
+  [rt]
+  (art/save-generic rt cache-config))
 
 (defn restore-caches
-  [ctx]
-  (art/restore-generic ctx cache-config))
+  [rt]
+  (art/restore-generic rt cache-config))
 
 (defn wrap-caches
   "Wraps fn `f` so that caches are restored/saved as configured on the step."
   [f]
-  (fn [ctx]
+  (fn [rt]
     @(md/chain
-      (restore-caches ctx)
+      (restore-caches rt)
       (fn [c]
-        (assoc-in ctx [:step :caches] c))
+        (assoc-in rt [:step :caches] c))
       f
       (fn [r]
-        (save-caches ctx)
+        (save-caches rt)
         r))))
 
 ;;; Config handling

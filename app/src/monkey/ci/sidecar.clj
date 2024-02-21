@@ -6,8 +6,10 @@
             [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
+             [artifacts :as art]
              [blob :as blob]
              [build :as b]
+             [cache :as cache]
              [config :as c]
              [logging :as l]
              [runtime :as rt]
@@ -18,10 +20,10 @@
         ws (:workspace build)
         checkout (:checkout-dir build)
         restore (fn [rt]
-                  @(md/chain
-                    (blob/restore store ws checkout)
-                    (fn [_]
-                      (assoc-in rt [:workspace :restored?] true))))]
+                  (md/chain
+                   (blob/restore store ws checkout)
+                   (fn [_]
+                     (assoc-in rt [:workspace :restored?] true))))]
     (log/info "Restoring workspace" ws)
     (cond-> rt
       (and store ws checkout)
@@ -68,7 +70,8 @@
         log-maker (rt/log-maker rt)
         log-base (b/get-step-sid rt)
         logger (when log-maker (comp (partial log-maker rt)
-                                     (partial concat log-base)))]
+                                     (partial concat log-base)))
+        set-exit (fn [v] (assoc rt :exit-code v))]
     (log/info "Polling events from" f)
     (md/future
       (try
@@ -77,7 +80,7 @@
             ;; TODO Also stop when the process we're monitoring has terminated without telling us
             (if (not (fs/exists? f))
               ;; Done when the events file is deleted
-              0
+              (set-exit 0)
               (when (if (= ::eof evt)
                       (do
                         ;; EOF reached, wait a bit and retry
@@ -85,51 +88,37 @@
                         true)
                       (do
                         (log/debug "Read next event:" evt)
-                        (upload-logs evt logger)
+                        ;; Wait until completed to ensure it's done.
+                        (some-> (upload-logs evt logger) (deref))
                         (rt/post-events rt evt)))
                 (if (:done? evt)
-                  0
+                  (set-exit 0)
                   (recur (read-next r)))))))
         (catch Exception ex
           (log/error "Failed to read events" ex)
-          1)
+          (set-exit 1))
         (finally
           (log/debug "Stopped reading events"))))))
 
-(defn- restore-caches [rt]
-  ;; TODO Restore using step config
-  rt)
-
-(defn- restore-artifacts [rt]
-  ;; TODO Restore using step config
-  rt)
-
-(defn- save-caches [rt]
-  ;; TODO
-  rt)
-
-(defn- save-artifacts [rt]
-  ;; TODO
-  rt)
-
-(defn run [rt]
+(defn run
+  "Runs sidecar by restoring workspace, artifacts and caches, and then polling for events.
+   After the event loop has terminated, saves artifacts and caches and returns a deferred
+   containing the runtime with an `:exit-code` added."
+  [rt]
   (log/info "Running sidecar with configuration:" (get-in rt [rt/config :sidecar]))
   (-> rt
       (merge (get-in rt [rt/config :sidecar :step-config]))
-      (restore-src)
-      (restore-caches)
-      (restore-artifacts)
-      (mark-start)
-      (poll-events)
-      (save-artifacts)
-      (save-caches)))
+      (md/chain
+       restore-src
+       mark-start
+       (cache/wrap-caches (art/wrap-artifacts poll-events)))))
 
 (defn- add-from-args [conf k]
   (update-in conf [:sidecar k] #(or (get-in conf [:args k]) %)))
 
 (defmethod c/normalize-key :sidecar [_ conf]
   (-> conf
-      (mc/update-existing :log-config u/try-slurp)
+      (mc/update-existing-in [:sidecar :log-config] u/try-slurp)
       (add-from-args :events-file)
       (add-from-args :start-file)
       (add-from-args :step-config)))

@@ -145,4 +145,6 @@
 
    The sidecar loop will stop when the events file is deleted."
   [rt]
-  (sidecar/run rt))
+  (-> (sidecar/run rt)
+      (deref)
+      :exit-code))

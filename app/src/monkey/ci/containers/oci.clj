@@ -121,6 +121,7 @@
 (defn- add-sidecar-env [sc rt]
   (assoc sc :environment-variables (-> (rt/rt->env rt)
                                        (dissoc :jwk :containers :storage) ;; Remove some unnecessary values
+                                       (assoc :work-dir work-dir)
                                        (update-private-key-paths)
                                        (c/config->env)
                                        (as-> x (mc/map-keys (comp csk/->SCREAMING_SNAKE_CASE name) x)))))

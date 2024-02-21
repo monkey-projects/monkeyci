@@ -147,6 +147,11 @@
                                                 :environment-variables
                                                 (get "MONKEYCI_OCI_CREDENTIALS_PRIVATE_KEY")))))
 
+      (testing "sets work dir to mount path"
+        (is (= sut/work-dir (-> sc
+                                :environment-variables
+                                (get "MONKEYCI_WORK_DIR")))))
+
       (testing "runs as root to access mount volumes"
         (is (= 0 (-> sc :security-context :run-as-user)))))
 

@@ -60,8 +60,9 @@
   (let [shutdown? (atom false)
         t (Thread. (fn []
                      (reset! shutdown? true)
-                     (log/debug "Waiting for deferred to complete...")
-                     (deref d)))
+                     (log/debug "Waiting for upload to complete...")
+                     (deref d)
+                     (log/debug "Upload completed")))
         remove-hook (fn [& _]
                       (when-not @shutdown?
                         (.removeShutdownHook (Runtime/getRuntime) t)))]
