@@ -86,12 +86,23 @@
           false
           (recur (rest t)))))))
 
-(defrecord FakeBlobStore [stored]
+(defrecord FakeBlobStore [stored strict?]
   blob/BlobStore
   (save [_ src dest]
     (md/success-deferred (swap! stored assoc src dest)))
   (restore [_ src dest]
-    (md/success-deferred (swap! stored dissoc src))))
+    (if (or (not strict?)
+            (= dest (get @stored src)))
+      (md/success-deferred (swap! stored dissoc src))
+      (md/error-deferred (ex-info
+                          (format "destination path was not as expected: %s, actual: %s" (get @stored src) dest)
+                          @stored)))))
+
+(defn fake-blob-store [stored]
+  (->FakeBlobStore stored false))
+
+(defn strict-fake-blob-store [stored]
+  (->FakeBlobStore stored true))
 
 (defn ->req
   "Takes a context and creates a request object from it that can be passed to
@@ -99,8 +110,7 @@
   [rt]
   {:reitit.core/match
    {:data
-    {:monkey.ci.web.common/context rt
-     :monkey.ci.web.common/runtime rt}}})
+    {:monkey.ci.web.common/runtime rt}}})
 
 (defn with-path-param [r k v]
   (assoc-in r [:parameters :path k] v))
@@ -117,5 +127,3 @@
 
 (defn generate-private-key []
   (.getPrivate (auth/generate-keypair)))
-
-(def ^:deprecated test-ctx test-rt)

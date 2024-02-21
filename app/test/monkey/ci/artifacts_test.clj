@@ -9,7 +9,7 @@
 (deftest save-artifacts
   (testing "saves path using blob store"
     (let [stored (atom {})
-          bs (h/->FakeBlobStore stored)
+          bs (h/fake-blob-store stored)
           ctx {:artifacts bs
                :build {:sid ["test-cust" "test-build"]}
                :step {:work-dir "work"
@@ -28,7 +28,7 @@
 (deftest restore-artifacts
   (testing "restores path using blob store"
     (let [stored (atom {"test-cust/test-build/test-artifact.tgz" ::dest})
-          bs (h/->FakeBlobStore stored)
+          bs (h/fake-blob-store stored)
           ctx {:artifacts bs
                :build {:sid ["test-cust" "test-build"]}
                :step {:work-dir "work"

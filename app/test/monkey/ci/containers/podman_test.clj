@@ -67,7 +67,7 @@
     (testing "restores and saves caches if configured"
       (h/with-tmp-dir dir
         (let [stored (atom {})
-              cache (h/->FakeBlobStore stored)
+              cache (h/fake-blob-store stored)
               r (mcc/run-container
                  {:containers {:type :podman}
                   :build {:build-id "test-build"}
@@ -84,7 +84,7 @@
     (testing "restores artifacts if configured"
       (h/with-tmp-dir dir
         (let [stored (atom {"test-cust/test-build/test-artifact.tgz" ::test})
-              store (h/->FakeBlobStore stored)
+              store (h/fake-blob-store stored)
               r (mcc/run-container
                  {:containers {:type :podman}
                   :build {:build-id "test-build"
@@ -102,7 +102,7 @@
     (testing "saves artifacts if configured"
       (h/with-tmp-dir dir
         (let [stored (atom {})
-              store (h/->FakeBlobStore stored)
+              store (h/fake-blob-store stored)
               r (mcc/run-container
                  {:containers {:type :podman}
                   :build {:build-id "test-build"

@@ -103,8 +103,8 @@
       (is (= rt (sut/restore-src rt)))))
 
   (testing "restores using the workspace path in build into checkout dir"
-    (let [stored (atom {"path/to/workspace" "local/dir"})
-          store (h/->FakeBlobStore stored)
+    (let [stored (atom {"path/to/workspace" "local"})
+          store (h/strict-fake-blob-store stored)
           rt {:build {:workspace "path/to/workspace"
                       :checkout-dir "local/dir"}
               :workspace store}]
@@ -206,7 +206,7 @@
     (testing "restores and saves caches if configured"
       (h/with-tmp-dir dir
         (let [stored (atom {})
-              cache (h/->FakeBlobStore stored)
+              cache (h/fake-blob-store stored)
               r (sut/run
                   {:containers {:type :podman}
                    :build {:build-id "test-build"}
@@ -224,12 +224,13 @@
     
     (testing "restores artifacts if configured"
       (h/with-tmp-dir dir
-        (let [stored (atom {"test-cust/test-build/test-artifact.tgz" ::test})
-              store (h/->FakeBlobStore stored)
+        (let [stored (atom {"test-cust/test-build/test-artifact.tgz" "/tmp/checkout"})
+              store (h/fake-blob-store stored)
               r (sut/run
                  {:containers {:type :podman}
                   :build {:build-id "test-build"
-                          :sid ["test-cust" "test-build"]}
+                          :sid ["test-cust" "test-build"]
+                          :checkout-dir "/tmp/checkout"}
                   :work-dir dir
                   :step {:name "test-step"
                          :container/image "test-img"
@@ -243,7 +244,7 @@
     (testing "saves artifacts if configured"
       (h/with-tmp-dir dir
         (let [stored (atom {})
-              store (h/->FakeBlobStore stored)
+              store (h/fake-blob-store stored)
               r (sut/run
                  {:containers {:type :podman}
                   :build {:build-id "test-build"

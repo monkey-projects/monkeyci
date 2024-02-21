@@ -1,6 +1,7 @@
 (ns monkey.ci.containers.oci
   "Container runner implementation that uses OCI container instances."
-  (:require [camel-snake-kebab.core :as csk]
+  (:require [babashka.fs :as fs]
+            [camel-snake-kebab.core :as csk]
             [clojure.java.io :as io]
             [clojure
              [string :as cs]
@@ -33,12 +34,18 @@
 
 (def sidecar-config (comp :sidecar rt/config))
 
+(defn- calc-work-dir [rt]
+  (some->> (get-in rt [:build :checkout-dir])
+           (fs/file-name)
+           (fs/path work-dir)
+           (str)))
+
 (defn- job-container
   "Configures the job container.  It runs the image as configured in
    the step, but the script that's being executed is replaced by a
    custom shell script that also redirects the output and dispatches
    events to a file, that are then picked up by the sidecar."
-  [{:keys [step]}]
+  [{:keys [step] :as rt}]
   {:image-url (:container/image step)
    :display-name job-container-name
    :command ["/bin/sh" (str script-dir "/" job-script)]
@@ -46,7 +53,7 @@
    :arguments (->> (count (:script step))
                    (range)
                    (mapv str))
-   :environment-variables {"WORK_DIR" work-dir
+   :environment-variables {"WORK_DIR" (calc-work-dir rt)
                            "LOG_DIR" log-dir
                            "SCRIPT_DIR" script-dir
                            "START_FILE" start-file
@@ -109,12 +116,14 @@
                 log-config (conj (config-entry "logback.xml" log-config)))}))
 
 (defn- add-sidecar-env [sc rt]
-  ;; TODO Put this all in a config file instead, this way sensitive information is harder to see
-  (assoc sc :environment-variables (-> (rt/rt->env rt)
-                                       (dissoc :jwk :containers :storage) ;; Remove some unnecessary values
-                                       (assoc :work-dir work-dir)
-                                       (c/config->env)
-                                       (as-> x (mc/map-keys (comp csk/->SCREAMING_SNAKE_CASE name) x)))))
+  (let [wd (calc-work-dir rt)]
+    ;; TODO Put this all in a config file instead, this way sensitive information is harder to see
+    (assoc sc :environment-variables (-> (rt/rt->env rt)
+                                         (dissoc :args :jwk :containers :storage) ;; Remove some unnecessary values
+                                         (assoc :work-dir wd)
+                                         (assoc-in [:build :checkout-dir] wd)
+                                         (c/config->env)
+                                         (as-> x (mc/map-keys (comp csk/->SCREAMING_SNAKE_CASE name) x))))))
 
 (defn instance-config
   "Generates the configuration for the container instance.  It has 

@@ -127,14 +127,14 @@
 
   (testing "stores src dir using blob and build id with extension"
     (let [stored (atom {})
-          rt {:workspace (h/->FakeBlobStore stored)
+          rt {:workspace (h/fake-blob-store stored)
               :build {:checkout-dir "test-checkout"
                       :sid ["test-cust" "test-repo" "test-build"]}}]
       (is (some? (sut/store-src rt)))
       (is (= {"test-checkout" "test-cust/test-repo/test-build.tgz"} @stored))))
 
   (testing "returns updated context"
-    (let [rt {:workspace (h/->FakeBlobStore (atom {}))
+    (let [rt {:workspace (h/fake-blob-store (atom {}))
               :build {:checkout-dir "test-checkout"
                       :sid ["test-build"]}}]
       (is (= (assoc-in rt [:build :workspace] "test-build.tgz")

@@ -18,7 +18,10 @@
 (defn restore-src [{:keys [build] :as rt}]
   (let [store (get rt :workspace)
         ws (:workspace build)
-        checkout (:checkout-dir build)
+        ;; Check out to the parent because the archive contains the directory
+        checkout (some-> (:checkout-dir build)
+                         (fs/parent)
+                         str)
         restore (fn [rt]
                   (md/chain
                    (blob/restore store ws checkout)
