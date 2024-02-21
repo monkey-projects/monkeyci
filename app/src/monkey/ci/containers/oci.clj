@@ -62,9 +62,9 @@
          :security-context {:security-context-type "LINUX"
                             :run-as-user 0}))
 
-(defn- display-name [{:keys [build step]}]
+(defn- display-name [{:keys [build step pipeline]}]
   (cs/join "-" [(:build-id build)
-                (:pipeline step)
+                (:index pipeline)
                 (:index step)]))
 
 (defn- script-mount [{{:keys [script]} :step}]
@@ -95,7 +95,7 @@
                  (into [(job-script-entry)]))})
 
 (defn- step-details->edn [rt]
-  (pr-str {:step (select-keys (:step rt) [:name :index :artifacts :caches])
+  (pr-str {:step (select-keys (:step rt) [:name :index :save-artifacts :restore-artifacts :caches])
            :pipeline (select-keys (:pipeline rt) [:name :index])}))
 
 (defn- config-vol-config

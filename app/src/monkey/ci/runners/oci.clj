@@ -16,16 +16,13 @@
 (def build-container "build")
 (def format-sid (partial cs/join "/"))
 
-(defn- ->env [rt pk?]
-  (->> (cond-> (rt/rt->env rt)
-         ;; FIXME This will turn out wrong if the private key is specified elsewhere
-         ;; TODO Move this to oci ns
-         pk? (assoc-in [:oci :credentials :private-key] (str oci/key-dir "/" oci/privkey-file)))
+(defn- ->env [rt]
+  (->> (rt/rt->env rt)
        (config/config->env)
        (mc/map-keys name)
        (mc/remove-vals empty?)))
 
-(defn- patch-container [[conf] rt pk?]
+(defn- patch-container [[conf] rt]
   (let [git (get-in rt [:build :git])]
     [(assoc conf
             :display-name build-container
@@ -34,7 +31,7 @@
                          (not-empty git) (concat ["-u" (:url git)
                                                   "-b" (:branch git)
                                                   "--commit-id" (:id git)]))
-            :environment-variables (->env rt pk?))]))
+            :environment-variables (->env rt))]))
 
 (defn instance-config
   "Creates container instance configuration using the context and the
@@ -46,7 +43,7 @@
         (oci/instance-config)
         (assoc :display-name (get-in rt [:build :build-id])
                :freeform-tags tags)
-        (update :containers patch-container rt (get-in conf [:credentials :private-key])))))
+        (update :containers patch-container rt))))
 
 (defn oci-runner [client conf rt]
   (-> (oci/run-instance client (instance-config conf rt))

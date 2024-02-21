@@ -89,6 +89,7 @@
                       (do
                         (log/debug "Read next event:" evt)
                         ;; Wait until completed to ensure it's done.
+                        ;; FIXME Turns out logs are not always (never?) uploaded, investigate why
                         (some-> (upload-logs evt logger) (deref))
                         (rt/post-events rt evt)))
                 (if (:done? evt)

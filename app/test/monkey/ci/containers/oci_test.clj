@@ -35,11 +35,11 @@
                 (map :display-name)
                 (set)))))
 
-  (testing "display name contains build id, pipeline name and step index"
-    (is (= "test-build-test-pipeline-1"
+  (testing "display name contains build id, pipeline index and step index"
+    (is (= "test-build-0-1"
            (->> {:build {:build-id "test-build"}
-                 :step {:pipeline "test-pipeline"
-                        :index 1}}
+                 :step {:index 1}
+                 :pipeline {:index 0}}
                 (sut/instance-config {})
                 :display-name))))
 
@@ -86,8 +86,8 @@
   (testing "sidecar container"
     (let [pk (h/generate-private-key)
           ic (->> {:step {:script ["first" "second"]
-                          :artifacts [{:id "test-artifact"
-                                       :path "somewhere"}]
+                          :save-artifacts [{:id "test-artifact"
+                                            :path "somewhere"}]
                           :index 0}
                    :pipeline {:name "test-pipe"}
                    :build {:build-id "test-build"}
@@ -125,7 +125,7 @@
             (let [e (find-volume-entry v "step.edn")]
               (is (some? e))
               (is (= {:step
-                      {:artifacts [{:id "test-artifact" :path "somewhere"}]
+                      {:save-artifacts [{:id "test-artifact" :path "somewhere"}]
                        :index 0}
                       :pipeline
                       {:name "test-pipe"}}
