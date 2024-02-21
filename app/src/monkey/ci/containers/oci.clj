@@ -62,9 +62,9 @@
          :security-context {:security-context-type "LINUX"
                             :run-as-user 0}))
 
-(defn- display-name [{:keys [build step]}]
+(defn- display-name [{:keys [build step pipeline]}]
   (cs/join "-" [(:build-id build)
-                (:pipeline step)
+                (:index pipeline)
                 (:index step)]))
 
 (defn- script-mount [{{:keys [script]} :step}]
@@ -95,7 +95,7 @@
                  (into [(job-script-entry)]))})
 
 (defn- step-details->edn [rt]
-  (pr-str {:step (select-keys (:step rt) [:name :index :artifacts :caches])
+  (pr-str {:step (select-keys (:step rt) [:name :index :save-artifacts :restore-artifacts :caches])
            :pipeline (select-keys (:pipeline rt) [:name :index])}))
 
 (defn- config-vol-config
@@ -107,21 +107,10 @@
      :configs (cond-> [(config-entry step-config-file (step-details->edn rt))]
                 log-config (conj (config-entry "logback.xml" log-config)))}))
 
-(defn- update-private-key-paths
-  "Updates the private key paths pointed to in the runtime env so it would refer
-   to a locally mounted key file instead of the configured path."
-  [rt-env]
-  (let [mounted-path (str oci/key-dir "/" oci/privkey-file)]
-    (cw/prewalk (fn [x]
-                  (if (and (map-entry? x) (= :private-key (first x)))
-                    [(first x) mounted-path]
-                    x))
-                rt-env)))
-
 (defn- add-sidecar-env [sc rt]
   (assoc sc :environment-variables (-> (rt/rt->env rt)
                                        (dissoc :jwk :containers :storage) ;; Remove some unnecessary values
-                                       (update-private-key-paths)
+                                       (assoc :work-dir work-dir)
                                        (c/config->env)
                                        (as-> x (mc/map-keys (comp csk/->SCREAMING_SNAKE_CASE name) x)))))
 

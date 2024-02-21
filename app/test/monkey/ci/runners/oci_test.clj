@@ -76,22 +76,6 @@
               :backing-store "EPHEMERAL_STORAGE"}
              (first (:volumes inst)))))
 
-    (testing "adds private key as config volume"
-      (let [v (second (:volumes inst))
-            c (first (:configs v))]
-        (is (= "private-key" (:name v)))
-        (is (= "CONFIGFILE" (:volume-type v)))
-        (is (= 1 (count (:configs v))))
-        (is (string? (:data c)))
-        (is (= "privkey" (:file-name c)))))
-
-    (testing "does not add priv key when none specified"
-      (is (= 1 (-> conf
-                   (dissoc :credentials)
-                   (sut/instance-config rt)
-                   :volumes
-                   (count)))))
-
     (testing "sets tags from sid"
       (is (= {"customer-id" "a"
               "project-id" "b"
@@ -134,13 +118,7 @@
             (is (= {:mount-path "/opt/monkeyci/checkout"
                     :is-read-only false
                     :volume-name "checkout"}
-                   (first (get vol-mounts "checkout")))))
-
-          (testing "mounts private key"
-            (is (= {:mount-path "/opt/monkeyci/keys"
-                    :is-read-only true
-                    :volume-name "private-key"}
-                   (first (get vol-mounts "private-key"))))))
+                   (first (get vol-mounts "checkout"))))))
 
         (let [env (:environment-variables c)]
           (testing "passes config as env vars"
@@ -148,11 +126,7 @@
             (is (not-empty env)))
 
           (testing "env vars are strings, not keywords"
-            (is (every? string? (keys env))))
-
-          (testing "points oci private key to mounted file"
-            (is (= "/opt/monkeyci/keys/privkey"
-                   (get env "monkeyci-oci-credentials-private-key"))))))
+            (is (every? string? (keys env))))))
 
       (testing "drops nil env vars"
         (let [c (-> rt

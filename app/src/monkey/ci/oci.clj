@@ -128,67 +128,30 @@
          return-result)
         (md/catch log-error))))
 
-(defn- privkey-base64
-  "Finds the private key referenced in the config, reads it and
-   returns it as a base64 encoded string."
-  [conf]
-  ;; TODO Allow for a private key to be specified other than the one
-  ;; used by the app itself.  Perhaps fetch it from the vault?
-  (some-> (get-in conf [:credentials :private-key])
-          (pem/private-key->pem)
-          (u/->base64))
-  #_(let [pk (get-in conf [:credentials :private-key])
-          read-existing (fn [f]
-                          (when (fs/exists? f)
-                            (slurp f)))]
-      (some-> (cond
-                (instance? java.security.PrivateKey pk)
-                (pem/private-key->pem pk)
-              
-                (string? pk)
-                (let [f (fs/file pk)]
-                  (read-existing f))
-              
-                (instance? java.io.File pk)
-                (read-existing pk))
-              (u/->base64))))
-
 (def checkout-vol "checkout")
 (def checkout-dir "/opt/monkeyci/checkout")
-(def privkey-vol "private-key")
-(def privkey-file "privkey")
 (def key-dir "/opt/monkeyci/keys")
 
-(defn- container-config [conf pk]
+(defn- container-config [conf]
   ;; The image url must point to a container running monkeyci cli
   {:image-url (str (:image-url conf) ":" (:image-tag conf))
-   :volume-mounts (cond-> [{:mount-path checkout-dir
-                            :is-read-only false
-                            :volume-name checkout-vol}]
-                    pk (conj {:mount-path key-dir
-                              :is-read-only true
-                              :volume-name privkey-vol}))})
+   :volume-mounts [{:mount-path checkout-dir
+                    :is-read-only false
+                    :volume-name checkout-vol}]})
 
 (defn instance-config
-  "Generates a skeleton instance configuration, generated from the oci configuration.
-   This includes a config volume that holds the private key to access other oci 
-   services."
+  "Generates a skeleton instance configuration, generated from the oci configuration."
   [conf]
-  (let [pk (privkey-base64 conf)]
-    (-> conf
-        (select-keys [:availability-domain :compartment-id :image-pull-secrets :vnics])
-        (assoc :container-restart-policy "NEVER"
-               :shape "CI.Standard.A1.Flex" ; Use ARM shape, it's cheaper
-               :shape-config {:ocpus 1
-                              :memory-in-g-bs 2}
-               :volumes (cond-> [{:name checkout-vol
-                                  :volume-type "EMPTYDIR"
-                                  :backing-store "EPHEMERAL_STORAGE"}]
-                          pk (conj {:name privkey-vol
-                                    :volume-type "CONFIGFILE"
-                                    :configs [{:file-name privkey-file
-                                               :data pk}]}))
-               :containers [(container-config conf pk)]))))
+  (-> conf
+      (select-keys [:availability-domain :compartment-id :image-pull-secrets :vnics])
+      (assoc :container-restart-policy "NEVER"
+             :shape "CI.Standard.A1.Flex" ; Use ARM shape, it's cheaper
+             :shape-config {:ocpus 1
+                            :memory-in-g-bs 2}
+             :volumes [{:name checkout-vol
+                        :volume-type "EMPTYDIR"
+                        :backing-store "EPHEMERAL_STORAGE"}]
+             :containers [(container-config conf)])))
 
 (defn sid->tags [sid]
   (->> sid

@@ -117,14 +117,6 @@
         (is (not-empty @reported))))))
 
 (deftest sidecar
-  (testing "polls for events"
-    (with-redefs [sc/restore-src (constantly ::restored)
-                  sc/poll-events (constantly ::polling)]
-      (is (= ::polling (sut/sidecar {})))))
-
-  (testing "restores src from workspace"
-    (with-redefs [sc/restore-src (constantly ::restored)
-                  sc/poll-events (fn [ctx]
-                                   (when (= ::restored ctx)
-                                     ::polling))]
-      (is (= ::polling (sut/sidecar {}))))))
+  (testing "runs sidecar poll loop, returns exit code"
+    (with-redefs [sc/run (constantly (md/success-deferred {:exit-code ::test-exit}))]
+      (is (= ::test-exit (sut/sidecar {}))))))

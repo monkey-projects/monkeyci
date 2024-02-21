@@ -14,6 +14,9 @@
   (handle-stream [_ _]
     (swap! streams conj path)))
 
+(defn- wait-for-exit [c]
+  (:exit-code (deref c 500 :timeout)))
+
 (deftest poll-events
   (testing "dispatches events from file to bus"
     (h/with-tmp-dir dir
@@ -31,7 +34,7 @@
         (is (= evt (-> (first @recv)
                        (select-keys (keys evt)))))
         (is (true? (.delete f)) "delete the file to stop the sidecar")
-        (is (= 0 (deref c 500 :timeout))))))
+        (is (= 0 (wait-for-exit c))))))
 
   (testing "reads events as they are posted"
     (h/with-tmp-dir dir
@@ -49,7 +52,7 @@
         (is (= evt (-> (first @recv)
                        (select-keys (keys evt)))))
         (is (true? (.delete f)))
-        (is (= 0 (deref c 500 :timeout))))))
+        (is (= 0 (wait-for-exit c))))))
 
   (testing "stops when a terminating event is received"
     (h/with-tmp-dir dir
@@ -67,7 +70,7 @@
         (is (not= :timeout (h/wait-until #(not-empty @recv) 500)))
         (is (= evt (-> (first @recv)
                        (select-keys (keys evt)))))
-        (is (= 0 (deref c 500 :timeout))))))
+        (is (= 0 (wait-for-exit c))))))
 
   (testing "logs using step sid and file path"
     (h/with-tmp-dir dir
@@ -90,7 +93,7 @@
             c (sut/poll-events rt)]
         (is (nil? (spit f (prn-str evt))))
         (is (not= :timeout (h/wait-until #(not-empty @streams) 500)))
-        (is (= 0 (deref c 500 :timeout)))
+        (is (= 0 (wait-for-exit c)))
         (is (= ["test-build" "test-pipe" "0" "out.log"] (first @streams)))))))
 
 (deftest restore-src
@@ -103,9 +106,10 @@
           store (h/->FakeBlobStore stored)
           rt {:build {:workspace "path/to/workspace"
                       :checkout-dir "local/dir"}
-               :workspace {:store store}}]
+              :workspace store}]
       (is (true? (-> (sut/restore-src rt)
-                     (get-in [:workspace :restored?]))))
+                     (deref)
+                     (get-in [:build :workspace/restored?]))))
       (is (empty? @stored)))))
 
 (deftest mark-start
@@ -143,7 +147,16 @@
            (-> (c/normalize-key :sidecar {:sidecar {}
                                           :args {:step-config {:key "value"}}})
                :sidecar
-               :step-config)))))
+               :step-config))))
+
+  (testing "reads log config if specified"
+    (h/with-tmp-dir dir
+      (let [p (io/file dir "log-test.xml")
+            file-contents "test-config-xml"]
+        (is (nil? (spit p file-contents)))
+        (is (= file-contents (-> (c/normalize-key :sidecar {:sidecar {:log-config (.getCanonicalPath p)}})
+                                 :sidecar
+                                 :log-config)))))))
 
 (deftest upload-logs
   (testing "does nothing if no logger"
@@ -165,7 +178,7 @@
 (deftest run
   (with-redefs [sut/mark-start identity
                 sut/poll-events (fn [rt]
-                                  (md/success-deferred rt))]
+                                  (md/success-deferred (assoc rt :exit-code 0)))]
     (testing "adds step config to runtime"
       (is (= "test-pipe" (-> {:config {:sidecar {:step-config {:pipeline {:name "test-pipe"}}}}}
                              (sut/run)
@@ -173,10 +186,64 @@
                              :pipeline
                              :name))))
     
-    (testing "restores required artifacts")
+    (testing "restores src from workspace"
+      (with-redefs [sut/restore-src (constantly {:stage ::restored})
+                    sut/poll-events (fn [rt]
+                                      (when (= ::restored (:stage rt))
+                                        {:stage ::polling}))]
+        (is (= ::polling (:stage @(sut/run {}))))))
 
-    (testing "stores generated artifacts")
+    (testing "restores and saves caches if configured"
+      (h/with-tmp-dir dir
+        (let [stored (atom {})
+              cache (h/->FakeBlobStore stored)
+              r (sut/run
+                  {:containers {:type :podman}
+                   :build {:build-id "test-build"}
+                   :work-dir dir
+                   :step {:name "test-step"
+                          :container/image "test-img"
+                          :script ["first" "second"]
+                          :caches [{:id "test-cache"
+                                    :path "test-path"}]}
+                   :logging {:maker (l/make-logger {})}
+                   :cache cache})]
+          (is (map? (deref r 500 :timeout)))
+          (is (not-empty @stored)))))
+    
+    
+    (testing "restores artifacts if configured"
+      (h/with-tmp-dir dir
+        (let [stored (atom {"test-cust/test-build/test-artifact.tgz" ::test})
+              store (h/->FakeBlobStore stored)
+              r (sut/run
+                 {:containers {:type :podman}
+                  :build {:build-id "test-build"
+                          :sid ["test-cust" "test-build"]}
+                  :work-dir dir
+                  :step {:name "test-step"
+                         :container/image "test-img"
+                         :script ["first" "second"]
+                         :restore-artifacts [{:id "test-artifact"
+                                              :path "test-path"}]}
+                  :logging {:maker (l/make-logger {})}
+                  :artifacts store})]
+          (is (empty? @stored)))))
 
-    (testing "restores caches")
-
-    (testing "saves caches")))
+    (testing "saves artifacts if configured"
+      (h/with-tmp-dir dir
+        (let [stored (atom {})
+              store (h/->FakeBlobStore stored)
+              r (sut/run
+                 {:containers {:type :podman}
+                  :build {:build-id "test-build"
+                          :sid ["test-cust" "test-build"]}
+                  :work-dir dir
+                  :step {:name "test-step"
+                         :container/image "test-img"
+                         :script ["first" "second"]
+                         :save-artifacts [{:id "test-artifact"
+                                           :path "test-path"}]}
+                  :logging {:maker (l/make-logger {})}
+                  :artifacts store})]
+          (is (not-empty @stored)))))))

@@ -15,7 +15,7 @@
              [runtime :as rt]]))
 
 (defn- get-store [rt k]
-  (get-in rt [k :store]))
+  (get rt k))
 
 (defn artifact-archive-path [{:keys [build]} id]
   ;; The artifact archive path is the build sid with the artifact id added.

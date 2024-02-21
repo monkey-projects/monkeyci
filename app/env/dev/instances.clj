@@ -2,6 +2,7 @@
   (:require [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [config :as co]
+            [manifold.deferred :as md]
             [monkey.ci
              [config :as config]
              [containers :as c]
@@ -105,3 +106,21 @@
 
 (defn get-container [id]
   (instance-call ci/get-container (constantly {:container-id id})))
+
+(defn delete-instances
+  "Deletes all instances where the name matches given regex"
+  [re]
+  (md/chain
+   (list-instances)
+   (partial filter (comp (partial = "INACTIVE") :lifecycle-state))
+   (partial filter (comp (partial re-matches re) :display-name))
+   (fn [m]
+     (println "Deleting" (count m) "container instances...")
+     (let [conf (co/oci-container-config)
+           client (ci/make-context conf)]
+       (md/loop [td m]
+         (when (not-empty td)
+           (md/chain
+            (ci/delete-container-instance client {:instance-id (:id (first td))})
+            (fn [_]
+              (md/recur (rest td))))))))))

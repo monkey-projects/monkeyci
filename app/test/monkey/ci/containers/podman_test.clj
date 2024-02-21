@@ -78,7 +78,7 @@
                          :caches [{:id "test-cache"
                                    :path "test-path"}]}
                   :logging {:maker (l/make-logger {})}
-                  :cache {:store cache}})]
+                  :cache cache})]
           (is (not-empty @stored)))))
     
     (testing "restores artifacts if configured"
@@ -96,7 +96,7 @@
                          :restore-artifacts [{:id "test-artifact"
                                               :path "test-path"}]}
                   :logging {:maker (l/make-logger {})}
-                  :artifacts {:store store}})]
+                  :artifacts store})]
           (is (empty? @stored)))))
 
     (testing "saves artifacts if configured"
@@ -114,7 +114,7 @@
                          :save-artifacts [{:id "test-artifact"
                                            :path "test-path"}]}
                   :logging {:maker (l/make-logger {})}
-                  :artifacts {:store store}})]
+                  :artifacts store})]
           (is (not-empty @stored)))))))
 
 (deftest build-cmd-args
