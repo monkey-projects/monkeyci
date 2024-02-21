@@ -12,7 +12,6 @@ ENTRYPOINT ["java", "-Dlogback.configurationFile=config/logback.xml", "-jar", "m
 
 VOLUME /home/monkeyci/work
 
-ENV MONKEYCI_CONTAINERS_TYPE=podman
 ENV MONKEYCI_WORK_DIR=/home/monkeyci/work
 
 ADD app/target/monkeyci-standalone.jar monkeyci.jar

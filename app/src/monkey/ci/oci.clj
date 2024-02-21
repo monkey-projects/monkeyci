@@ -80,7 +80,8 @@
 (defn run-instance
   "Creates and starts a container instance using the given config, and then
    waits for it to terminate.  Returns a deferred that will hold the exit value."
-  [client instance-config & [post-event]]
+  [client instance-config & [{:keys [post-event match-container delete?]
+                              :or {match-container identity}}]]
   (log/debug "Running OCI instance with config:" instance-config)
   (letfn [(check-error [handler]
             (fn [{:keys [body status]}]
@@ -106,6 +107,7 @@
 
           (get-container-exit [r]
             (let [cid (-> (:containers r)
+                          match-container
                           first
                           :container-id)]
               (ci/get-container
@@ -116,6 +118,13 @@
             ;; Return the exit code, or nonzero when no code is specified
             (or exit-code 1))
 
+          (maybe-delete-instance [{{:keys [container-instance-id]} :body :as c}]
+            (if delete?
+              (md/chain
+               (ci/delete-container-instance client {:instance-id container-instance-id})
+               (constantly c))
+              (md/success-deferred c)))
+
           (log-error [ex]
             (log/error "Error creating container instance" ex)
             ;; Nonzero exit code
@@ -125,6 +134,7 @@
          (create-instance)
          (check-error start-polling)
          (check-error get-container-exit)
+         maybe-delete-instance
          return-result)
         (md/catch log-error))))
 
@@ -143,7 +153,7 @@
   "Generates a skeleton instance configuration, generated from the oci configuration."
   [conf]
   (-> conf
-      (select-keys [:availability-domain :compartment-id :image-pull-secrets :vnics])
+      (select-keys [:availability-domain :compartment-id :image-pull-secrets :vnics :freeform-tags])
       (assoc :container-restart-policy "NEVER"
              :shape "CI.Standard.A1.Flex" ; Use ARM shape, it's cheaper
              :shape-config {:ocpus 1

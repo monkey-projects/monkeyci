@@ -156,4 +156,72 @@
                          {:status 400
                           :body
                           {:message "Invalid container id"}})))]
-        (is (= exit (deref (sut/run-instance {} {}) 200 :timeout)))))))
+        (is (= exit (deref (sut/run-instance {} {}) 200 :timeout))))))
+
+  (testing "returns configured container exit code"
+    (let [cid (random-uuid)
+          exit 545
+          opts {:match-container (partial filter (comp (partial = "job") :display-name))}
+          containers [{:display-name "sidecar"
+                       :container-id (random-uuid)}
+                      {:display-name "job"
+                       :container-id cid}]]
+      (with-redefs [ci/create-container-instance
+                    (constantly
+                     (md/success-deferred
+                      {:status 200
+                       :body
+                       {:id "test-instance"
+                        :containers containers}}))
+                    sut/wait-for-completion
+                    (fn [_ opts]
+                      (md/success-deferred
+                       {:status 200
+                        :body
+                        {:lifecycle-state "INACTIVE"
+                         :containers containers}}))
+                    ci/get-container
+                    (fn [_ opts]
+                      (md/success-deferred
+                       (if (= cid (:container-id opts))
+                         {:status 200
+                          :body
+                          {:exit-code exit}}
+                         {:status 400
+                          :body
+                          {:message "Invalid container id"}})))]
+        (is (= exit (deref (sut/run-instance {} {} opts) 200 :timeout))))))
+
+  (testing "deletes instance if configured"
+    (let [exit 545
+          iid (random-uuid)
+          containers [{:display-name "test-container"
+                       :container-id (random-uuid)}]
+          deleted? (atom false)]
+      (with-redefs [ci/create-container-instance
+                    (constantly
+                     (md/success-deferred
+                      {:status 200
+                       :body
+                       {:id iid
+                        :containers containers}}))
+                    sut/wait-for-completion
+                    (fn [_ opts]
+                      (md/success-deferred
+                       {:status 200
+                        :body
+                        {:lifecycle-state "INACTIVE"
+                         :containers containers}}))
+                    ci/get-container
+                    (fn [_ opts]
+                      (md/success-deferred
+                       {:status 200
+                        :body
+                        {:exit-code exit}}))
+                    ci/delete-container-instance
+                    (fn [_ opts]
+                      (reset! deleted? true)
+                      (md/success-deferred
+                       {:status (if (= iid (:instance-id opts)) 200 400)}))]
+        (is (= exit (deref (sut/run-instance {} {} {:delete? true}) 200 :timeout)))
+        (is (true? @deleted?))))))

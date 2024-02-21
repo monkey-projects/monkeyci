@@ -53,13 +53,22 @@
 
 (defn- upload-log [logger path]
   (when (and path logger)
-    (let [is (io/input-stream path)
-          capt (logger [(fs/file-name path)])]
-      (l/handle-stream capt is))))
+    (let [size (fs/size path)]
+      (when (pos? size)
+        (log/debug "Uploading log file" path "(" size "bytes)")
+        (with-open [is (io/input-stream path)]
+          (let [capt (logger [(fs/file-name path)])
+                d (l/handle-stream capt is)]
+            (when (md/deferred? d)
+              @d)))))))
 
-(defn upload-logs [evt logger]
+(defn upload-logs
+  "Uploads log files referenced in the event, if any"
+  [evt logger]
   (doseq [l ((juxt :stdout :stderr) evt)]
-    (upload-log logger l)))
+    (when l
+      (upload-log logger l)
+      (log/debug "File uploaded:" l))))
 
 (defn poll-events [rt]
   (let [f (-> (get-config rt :events-file)
@@ -88,9 +97,7 @@
                         true)
                       (do
                         (log/debug "Read next event:" evt)
-                        ;; Wait until completed to ensure it's done.
-                        ;; FIXME Turns out logs are not always (never?) uploaded, investigate why
-                        (some-> (upload-logs evt logger) (deref))
+                        (upload-logs evt logger)
                         (rt/post-events rt evt)))
                 (if (:done? evt)
                   (set-exit 0)

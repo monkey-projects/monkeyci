@@ -29,6 +29,7 @@
 (def config-vol "config")
 (def config-dir "/home/monkeyci/config")
 (def step-config-file "step.edn")
+(def job-container-name "job")
 
 (def sidecar-config (comp :sidecar rt/config))
 
@@ -39,7 +40,7 @@
    events to a file, that are then picked up by the sidecar."
   [{:keys [step]}]
   {:image-url (:container/image step)
-   :display-name "job"
+   :display-name job-container-name
    :command ["/bin/sh" (str script-dir "/" job-script)]
    ;; One file arg per script line, with index as name
    :arguments (->> (count (:script step))
@@ -108,6 +109,7 @@
                 log-config (conj (config-entry "logback.xml" log-config)))}))
 
 (defn- add-sidecar-env [sc rt]
+  ;; TODO Put this all in a config file instead, this way sensitive information is harder to see
   (assoc sc :environment-variables (-> (rt/rt->env rt)
                                        (dissoc :jwk :containers :storage) ;; Remove some unnecessary values
                                        (assoc :work-dir work-dir)
@@ -141,8 +143,11 @@
         client (-> conf
                    (oci/->oci-config)
                    (ci/make-context))
-        ic (instance-config conf rt)]
-    (-> (oci/run-instance client ic)
+        ic (instance-config conf rt)
+        has-job-name? (comp (partial = job-container-name) :display-name)]
+    (-> (oci/run-instance client ic {:match-container (partial filter has-job-name?)
+                                     :delete? true})
+        ;; TODO Delete container afterwards
         (md/chain (partial hash-map :exit))
         (deref))))
 

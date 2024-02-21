@@ -1,5 +1,6 @@
 (ns monkey.ci.sidecar-test
   (:require [clojure.test :refer [deftest testing is]]
+            [babashka.fs :as fs]
             [clojure.java.io :as io]
             [manifold.deferred :as md]
             [monkey.ci
@@ -163,7 +164,16 @@
     (is (nil? (sut/upload-logs {} nil))))
 
   (testing "does nothing if no output files"
-    (is (nil? (sut/upload-logs {} #(throw (ex-info "This should not be called" {}))))))
+    (is (nil? (sut/upload-logs {} (fn [_]
+                                    (throw (ex-info "This should not be called" {})))))))
+
+  (testing "does nothing if files are empty"
+    (h/with-tmp-dir dir
+      (let [f (io/file dir "test.txt")]
+        (is (some? (fs/create-file f)))
+        (is (nil? (sut/upload-logs {:stdout (.getCanonicalPath f)}
+                                   (fn [_]
+                                     (throw (ex-info "This should not be called" {})))))))))
 
   (testing "opens output file and handles stream, stores using file name"
     (h/with-tmp-dir dir
