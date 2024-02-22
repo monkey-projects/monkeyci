@@ -1,6 +1,8 @@
 (ns storage
   (:require [config :as c]
-            [monkey.ci.storage :as s]
+            [monkey.ci
+             [protocols :as p]
+             [storage :as s]]
             [monkey.ci.storage.oci]))
 
 (defn make-storage
@@ -37,6 +39,6 @@
 (defn delete-build [id]
   (let [b (make-storage)
         sid (vec (concat (c/account->sid) [id]))
-        d (juxt (comp (partial s/delete-obj b) s/build-metadata-sid)
-                (comp (partial s/delete-obj b) s/build-results-sid))]
+        d (juxt (comp (partial p/delete-obj b) s/build-metadata-sid)
+                (comp (partial p/delete-obj b) s/build-results-sid))]
     (d sid)))

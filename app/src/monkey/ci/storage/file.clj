@@ -7,6 +7,7 @@
             [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [monkey.ci
+             [protocols :as p]
              [storage :as s]
              [utils :as u]])
   (:import [java.io File PushbackReader]))
@@ -33,7 +34,7 @@
 
 ;; Must be a type, not a record, otherwise it gets lost in reitit data processing
 (deftype FileStorage [dir]
-  s/Storage
+  p/Storage
   (read-obj [_ loc]
     (let [f (->file dir loc)]
       (log/trace "Checking for file at" f)
