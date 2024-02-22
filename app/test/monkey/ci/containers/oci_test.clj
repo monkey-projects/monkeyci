@@ -44,12 +44,18 @@
                 :display-name))))
 
   (testing "has tags from sid"
-    (let [tags (->> {:build {:sid ["test-cust" "test-proj" "test-repo"]}}
+    (let [tags (->> {:build {:sid ["test-cust" "test-repo"]}}
                     (sut/instance-config {})
-                    :tags)]
+                    :freeform-tags)]
       (is (= "test-cust" (get tags "customer-id")))
-      (is (= "test-proj" (get tags "project-id")))
       (is (= "test-repo" (get tags "repo-id")))))
+
+  (testing "merges in existing tags"
+    (let [tags (->> {:build {:sid ["test-cust" "test-repo"]}}
+                    (sut/instance-config {:freeform-tags {"env" "test"}})
+                    :freeform-tags)]
+      (is (= "test-cust" (get tags "customer-id")))
+      (is (= "test" (get tags "env")))))
 
   (testing "both containers have checkout volume"
     (letfn [(has-checkout-vol? [c]

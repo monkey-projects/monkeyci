@@ -31,7 +31,7 @@
   [ctx]
   (or (tag-version ctx)
       ;; TODO Determine automatically
-      "0.3.0-SNAPSHOT"))
+      "0.3.1-SNAPSHOT"))
 
 (defn clj-container [name dir & args]
   "Executes script in clojure container"
@@ -64,7 +64,7 @@
 (defn podman-auth [{:keys [checkout-dir]}]
   (io/file checkout-dir "podman-auth.json"))
 
-(defn image-creds
+(defn create-image-creds
   "Fetches credentials from the params and writes them to Docker `config.json`"
   [ctx]
   (let [auth-file (podman-auth ctx)]
@@ -72,6 +72,15 @@
       (shell/param-to-file ctx "dockerhub-creds" auth-file)
       (fs/delete-on-exit auth-file)
       core/success)))
+
+(def image-creds-artifact
+  {:id "image-creds"
+   :path "podman-auth.json"})
+
+(def image-creds
+  {:name "image-creds"
+   :action create-image-creds
+   :save-artifacts [image-creds-artifact]})
 
 (def img-base "fra.ocir.io/frjdhmocn5qi")
 (def app-img (str img-base "/monkeyci"))
@@ -111,7 +120,8 @@
                        "--context" "dir:///workspace"]
        :container/mounts [[(make-context ctx context) "/workspace"]
                           [(podman-auth ctx) "/kaniko/.docker/config.json"]]}
-      opts))})
+      opts))
+   :restore-artifacts [image-creds-artifact]})
 
 (def build-app-image
   (kaniko-build-img
@@ -152,10 +162,9 @@
    :work-dir "gui"
    :script ["npm install"
             (str "npx shadow-cljs release " build)]
-   :caches [;; Disabled for now, problem with permissions
-            #_{:id "mvn-repo"
-               :path "/root/.m2"}
-            #_{:id "node-modules"
+   :caches [{:id "mvn-repo"
+             :path "/root/.m2"}
+            {:id "node-modules"
              :path "node_modules"}]})
 
 (def test-gui
@@ -213,10 +222,10 @@
   [app-uberjar
    build-gui-release
    image-creds
-   oci-creds
+   #_oci-creds
    build-app-image
    build-gui-image
-   upload-app-artifact])
+   #_upload-app-artifact])
 
 ;; Unused
 #_(core/defpipeline braid-bot

@@ -156,8 +156,8 @@
                                       (script-mount rt)]))]
     (-> ic
         (assoc :containers [sc jc]
-               :display-name (display-name rt)
-               :tags (oci/sid->tags (get-in rt [:build :sid])))
+               :display-name (display-name rt))
+        (update :freeform-tags merge (oci/sid->tags (get-in rt [:build :sid])))
         (update :volumes conj
                 (script-vol-config rt)
                 (config-vol-config rt)))))
