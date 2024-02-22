@@ -50,32 +50,8 @@
               :credentials {:private-key priv-key}}
         inst (sut/instance-config conf rt)]
 
-    (testing "uses settings from context"
-      (is (= "test-ad" (:availability-domain inst)))
-      (is (= "test-compartment" (:compartment-id inst)))
+    (testing "creates display name from build info"
       (is (= "test-build-id" (:display-name inst))))
-
-    (testing "never restart"
-      (is (= "NEVER" (:container-restart-policy inst))))
-    
-    (testing "uses ARM shape"
-      (is (= "CI.Standard.A1.Flex" (:shape inst)))
-      (let [{cpu :ocpus
-             mem :memory-in-g-bs} (:shape-config inst)]
-        (is (pos? cpu))
-        (is (pos? mem))))
-
-    (testing "uses pull secrets from config"
-      (is (= "test-secrets" (:image-pull-secrets inst))))
-
-    (testing "uses vnics from config"
-      (is (= "test-vnics" (:vnics inst))))
-
-    (testing "adds work volume"
-      (is (= {:name "checkout"
-              :volume-type "EMPTYDIR"
-              :backing-store "EPHEMERAL_STORAGE"}
-             (first (:volumes inst)))))
 
     (testing "sets tags from sid"
       (is (= {"customer-id" "a"
@@ -84,13 +60,8 @@
              (:freeform-tags inst))))
 
     (testing "container"
-      (is (= 1 (count (:containers inst))) "there should be exactly one")
-      
       (let [c (first (:containers inst))]
         
-        (testing "uses configured image and tag"
-          (is (= "test-image:test-version" (:image-url c))))
-
         (testing "uses app version if no tag configured"
           (is (cs/ends-with? (-> conf
                                  (dissoc :image-tag)
@@ -111,15 +82,6 @@
                   "-b" "main"
                   "--commit-id" "test-commit"]
                  (:arguments c))))
-
-        (let [vol-mounts (->> (:volume-mounts c)
-                              (group-by :volume-name))]
-          
-          (testing "mounts checkout dir"
-            (is (= {:mount-path "/opt/monkeyci/checkout"
-                    :is-read-only false
-                    :volume-name "checkout"}
-                   (first (get vol-mounts "checkout"))))))
 
         (let [env (:environment-variables c)]
           (testing "passes config as env vars"

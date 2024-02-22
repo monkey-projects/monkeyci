@@ -225,3 +225,65 @@
                        {:status (if (= iid (:instance-id opts)) 200 400)}))]
         (is (= exit (deref (sut/run-instance {} {} {:delete? true}) 200 :timeout)))
         (is (true? @deleted?))))))
+
+(deftest instance-config
+  (let [conf {:availability-domain "test-ad"
+              :compartment-id "test-compartment"
+              :image-pull-secrets "test-secrets"
+              :vnics "test-vnics"
+              :image-url "test-image"
+              :image-tag "test-version"}
+        inst (sut/instance-config conf)]
+
+    (testing "uses settings from config"
+      (is (= "test-ad" (:availability-domain inst)))
+      (is (= "test-compartment" (:compartment-id inst))))
+
+    (testing "picks random availability domain if multiple given"
+      (let [ads ["ad-1" "ad-2" "ad-3"]
+            c (-> conf
+                  (assoc :availability-domains ads)
+                  (dissoc :availability-domain))
+            inst (sut/instance-config c)
+            ad (:availability-domain inst)]
+        (is (string? ad))
+        (is (some? ((set ads) ad)))))
+
+    (testing "never restart"
+      (is (= "NEVER" (:container-restart-policy inst))))
+    
+    (testing "uses ARM shape"
+      (is (= "CI.Standard.A1.Flex" (:shape inst)))
+      (let [{cpu :ocpus
+             mem :memory-in-g-bs} (:shape-config inst)]
+        (is (pos? cpu))
+        (is (pos? mem))))
+
+    (testing "uses pull secrets from config"
+      (is (= "test-secrets" (:image-pull-secrets inst))))
+
+    (testing "uses vnics from config"
+      (is (= "test-vnics" (:vnics inst))))
+
+    (testing "adds work volume"
+      (is (= {:name "checkout"
+              :volume-type "EMPTYDIR"
+              :backing-store "EPHEMERAL_STORAGE"}
+             (first (:volumes inst)))))
+
+    (testing "container"
+      (is (= 1 (count (:containers inst))) "there should be exactly one")
+      
+      (let [c (first (:containers inst))]
+        
+        (testing "uses configured image and tag"
+          (is (= "test-image:test-version" (:image-url c))))
+
+        (let [vol-mounts (->> (:volume-mounts c)
+                              (group-by :volume-name))]
+          
+          (testing "mounts checkout dir"
+            (is (= {:mount-path "/opt/monkeyci/checkout"
+                    :is-read-only false
+                    :volume-name "checkout"}
+                   (first (get vol-mounts "checkout"))))))))))

@@ -149,15 +149,21 @@
                     :is-read-only false
                     :volume-name checkout-vol}]})
 
+(defn- pick-ad
+  "Either returns the configured AD, or picks one from the list if multiple specified."
+  [{ads :availability-domains ad :availability-domain}]
+  (or ad (when ads (nth (vec ads) (rand-int (count ads))))))
+
 (defn instance-config
   "Generates a skeleton instance configuration, generated from the oci configuration."
   [conf]
   (-> conf
-      (select-keys [:availability-domain :compartment-id :image-pull-secrets :vnics :freeform-tags])
+      (select-keys [:compartment-id :image-pull-secrets :vnics :freeform-tags])
       (assoc :container-restart-policy "NEVER"
              :shape "CI.Standard.A1.Flex" ; Use ARM shape, it's cheaper
              :shape-config {:ocpus 1
                             :memory-in-g-bs 2}
+             :availability-domain (pick-ad conf)
              :volumes [{:name checkout-vol
                         :volume-type "EMPTYDIR"
                         :backing-store "EPHEMERAL_STORAGE"}]
