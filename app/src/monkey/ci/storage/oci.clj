@@ -7,6 +7,7 @@
             [manifold.deferred :as md]
             [monkey.ci
              [oci :as oci]
+             [protocols :as p]
              [storage :as st]]
             [monkey.oci.os.core :as os]))
 
@@ -47,7 +48,7 @@
   (subs s (count prefix)))
 
 (deftype OciObjectStorage [client conf]
-  st/Storage
+  p/Storage
   (read-obj [this sid]
     (let [args (object-args client conf sid)]
       @(md/chain

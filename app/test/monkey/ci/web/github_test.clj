@@ -3,6 +3,7 @@
             [clojure.math :as cm]
             [buddy.sign.jwt :as jwt]
             [monkey.ci
+             [protocols :as p]
              [storage :as st]]
             [monkey.ci.web
              [auth :as auth]
@@ -67,10 +68,10 @@
                                   {:id (:id wh)
                                    :payload {}})]
           (is (some? r))
-          (is (st/obj-exists? s (-> wh
-                                    (select-keys [:customer-id :project-id :repo-id])
-                                    (assoc :build-id (:build-id r))
-                                    (st/build-metadata-sid))))))))
+          (is (p/obj-exists? s (-> wh
+                                   (select-keys [:customer-id :project-id :repo-id])
+                                   (assoc :build-id (:build-id r))
+                                   (st/build-metadata-sid))))))))
 
   (testing "metadata contains commit message"
     (h/with-memory-store s
