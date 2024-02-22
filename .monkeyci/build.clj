@@ -161,7 +161,7 @@
    :container/image "docker.io/dormeur/clojure-node:1.11.1"
    :work-dir "gui"
    :script ["npm install"
-            (str "clojure -Sdeps '{:mvn/local-repo \"m2\"}' -M -m shadow.cljs-devtools.cli release " build)]
+            (str "clojure -Sdeps '{:mvn/local-repo \".m2\"}' -M -m shadow.cljs.devtools.cli release " build)]
    :caches [{:id "mvn-repo"
              :path ".m2"}
             {:id "node-modules"
