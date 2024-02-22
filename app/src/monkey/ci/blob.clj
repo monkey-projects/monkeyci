@@ -111,12 +111,14 @@
 (deftype DiskBlobStore [dir]
   BlobStore
   (save [_ src dest]
-    (let [f (io/file dir dest)]
-      (log/debug "Saving archive" src "to" f)
-      (md/chain
-       (make-archive src f)
-       ;; Return destination path
-       (constantly (u/abs-path f)))))
+    (if (fs/exists? src)
+      (let [f (io/file dir dest)]
+        (log/debug "Saving archive" src "to" f)
+        (md/chain
+         (make-archive src f)
+         ;; Return destination path
+         (constantly (u/abs-path f))))
+      (md/success-deferred nil)))
 
   (restore [_ src dest]
     (let [f (io/file dest)
@@ -160,19 +162,21 @@
 (deftype OciBlobStore [client conf]
   BlobStore
   (save [_ src dest]
-    (let [arch (tmp-archive conf)
-          obj-name (archive-obj-name conf dest)]
-      ;; Write archive to temp file first
-      (log/debug "Archiving" src "to" arch)
-      (make-archive src arch)
-      ;; Upload the temp file
-      (log/debugf "Uploading archive %s to %s (%d bytes)" arch obj-name (fs/size arch))
-      (-> (os/put-object client (-> conf
-                                    (select-keys [:ns :bucket-name])
-                                    (assoc :object-name obj-name
-                                           :contents (fs/read-all-bytes arch))))
-          (md/chain (constantly obj-name))
-          (md/finally #(fs/delete arch)))))
+    (if (fs/exists? src)
+      (let [arch (tmp-archive conf)
+            obj-name (archive-obj-name conf dest)]
+        ;; Write archive to temp file first
+        (log/debug "Archiving" src "to" arch)
+        (make-archive src arch)
+        ;; Upload the temp file
+        (log/debugf "Uploading archive %s to %s (%d bytes)" arch obj-name (fs/size arch))
+        (-> (os/put-object client (-> conf
+                                      (select-keys [:ns :bucket-name])
+                                      (assoc :object-name obj-name
+                                             :contents (fs/read-all-bytes arch))))
+            (md/chain (constantly obj-name))
+            (md/finally #(fs/delete arch))))
+      (md/success-deferred nil)))
 
   (restore [_ src dest]
     (let [obj-name (archive-obj-name conf src)

@@ -90,9 +90,10 @@
   (let [f (:action step)]
     (log/debug "Executing function:" f)
     ;; If a step returns nil, treat it as success
-    (let [r (or ((-> f
-                     (art/wrap-artifacts)
-                     (cache/wrap-caches)) ctx)
+    (let [r (or ((comp deref
+                       (-> f
+                           (art/wrap-artifacts)
+                           (cache/wrap-caches))) ctx)
                 bc/success)]
       (if (bc/status? r)
         r

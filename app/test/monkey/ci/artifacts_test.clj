@@ -1,5 +1,6 @@
 (ns monkey.ci.artifacts-test
   (:require [clojure.test :refer [deftest testing is]]
+            [babashka.fs :as fs]
             [clojure.string :as cs]
             [monkey.ci
              [artifacts :as sut]
@@ -8,19 +9,21 @@
 
 (deftest save-artifacts
   (testing "saves path using blob store, relative to step work dir"
-    (let [stored (atom {})
-          bs (h/fake-blob-store stored)
-          ctx {:artifacts bs
-               :build {:sid ["test-cust" "test-build"]}
-               :step {:work-dir "/tmp/work"
-                      :save-artifacts [{:id "test-artifact"
-                                        :path "test-path"}]}}]
-      (is (some? @(sut/save-artifacts ctx)))
-      (is (= 1 (count @stored)))
-      (let [[p dest] (first @stored)]
-        (is (cs/ends-with? dest
-                           "test-cust/test-build/test-artifact.tgz"))
-        (is (= "/tmp/work/test-path" p)))))
+    (h/with-tmp-dir dir
+      (let [p (doto (fs/path dir "test-path")
+                (fs/create-file))
+            stored (atom {})
+            bs (h/fake-blob-store stored)
+            ctx {:artifacts bs
+                 :build {:sid ["test-cust" "test-build"]}
+                 :step {:work-dir dir
+                        :save-artifacts [{:id "test-artifact"
+                                          :path "test-path"}]}}]
+        (is (some? @(sut/save-artifacts ctx)))
+        (is (= 1 (count @stored)))
+        (let [[p dest] (first @stored)]
+          (is (cs/ends-with? dest "test-cust/test-build/test-artifact.tgz"))
+          (is (= (str dir "/test-path") p))))))
 
   (testing "nothing if no cache store"
     (is (empty? @(sut/save-artifacts

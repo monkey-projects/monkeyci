@@ -34,13 +34,16 @@
 (defn save-blob
   "Saves a single blob path"
   [{:keys [build-path store-key]} rt {:keys [path id]}]
-  (log/debug "Saving blob:" id "at path" path)
-  (blob/save (get-store rt store-key)
-             (b/step-relative-dir rt path)
-             (build-path rt id)))
+  (let [fullp (b/step-relative-dir rt path)]
+    (log/debug "Saving blob:" id "at path" path "(full path:" fullp ")")
+    (blob/save (get-store rt store-key)
+               fullp
+               (build-path rt id))))
 
 (defn save-generic [rt conf]
-  (do-with-blobs rt conf (partial save-blob conf)))
+  (md/chain
+   (do-with-blobs rt conf (partial save-blob conf))
+   (partial remove nil?)))
 
 (defn save-artifacts
   "Saves all artifacts according to the step configuration."
@@ -72,14 +75,15 @@
 
 (defn wrap-artifacts [f]
   (fn [rt]
-    @(md/chain
-      (restore-artifacts rt)
-      (fn [c]
-        (assoc-in rt [:step :restored-artifacts] c))
-      f
-      (fn [r]
+    (md/chain
+     (restore-artifacts rt)
+     (fn [c]
+       (assoc-in rt [:step :restored-artifacts] c))
+     f
+     (fn [r]
+       (md/chain
         (save-artifacts rt)
-        r))))
+        (constantly r))))))
 
 ;;; Config handling
 

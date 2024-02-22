@@ -23,11 +23,11 @@
                          (fs/parent)
                          str)
         restore (fn [rt]
+                  (log/info "Restoring workspace" ws)
                   (md/chain
                    (blob/restore store ws checkout)
                    (fn [_]
                      (assoc-in rt [:build :workspace/restored?] true))))]
-    (log/info "Restoring workspace" ws)
     (cond-> rt
       (and store ws checkout)
       (restore))))
@@ -119,9 +119,10 @@
   (log/info "Running sidecar with configuration:" (get-in rt [rt/config :sidecar]))
   (-> rt
       (merge (get-in rt [rt/config :sidecar :step-config]))
+      (restore-src)
       (md/chain
-       restore-src
        mark-start
+       ;; FIXME Process terminates before these are uploaded
        (cache/wrap-caches (art/wrap-artifacts poll-events)))))
 
 (defn- add-from-args [conf k]

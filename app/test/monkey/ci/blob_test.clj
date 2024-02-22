@@ -44,6 +44,10 @@
         (is (fs/exists? (io/file dest n)))
         (is (= contents (slurp (io/file dest n)))))))
 
+  (testing "does not store if file does not exist"
+    (with-disk-blob dir blob
+      (is (nil? @(sut/save blob "nonexisting.txt" "/test/dest")))))
+
   (testing "can compress and restore file tree"
     (with-disk-blob dir blob
       (let [files {"root.txt" "this is the root file"
@@ -82,7 +86,10 @@
               (is (= "prefix/remote/path" r)))
 
             (testing "deletes tmp file"
-              (is (empty? (fs/list-dir tmp-dir))))))))
+              (is (empty? (fs/list-dir tmp-dir)))))))
+
+      (testing "does not store nonexisting paths"
+        (is (nil? @(sut/save (sut/make-blob-store {:blob {:type :oci}} :blob) "nonexisting.txt" "/test/dest")))))
 
   (testing "`restore`"
     (h/with-tmp-dir dir

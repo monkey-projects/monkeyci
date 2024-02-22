@@ -82,13 +82,14 @@
                                            (map (partial conj log-base))
                                            (map (partial log-maker rt)))]
     (log/debug "Log base is:" log-base)
-    ((-> (fn [_]
-           (-> (bp/process {:dir (b/step-work-dir rt)
-                            :out (l/log-output out-log)
-                            :err (l/log-output err-log)
-                            :cmd (build-cmd-args rt)})
-               (l/handle-process-streams loggers)
-               (deref)))
-         (cache/wrap-caches)
-         (art/wrap-artifacts))
+    ((comp deref
+           (-> (fn [_]
+                 (-> (bp/process {:dir (b/step-work-dir rt)
+                                  :out (l/log-output out-log)
+                                  :err (l/log-output err-log)
+                                  :cmd (build-cmd-args rt)})
+                     (l/handle-process-streams loggers)
+                     (deref)))
+               (cache/wrap-caches)
+               (art/wrap-artifacts)))
      rt)))

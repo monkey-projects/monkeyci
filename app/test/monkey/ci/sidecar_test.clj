@@ -2,8 +2,13 @@
   (:require [clojure.test :refer [deftest testing is]]
             [babashka.fs :as fs]
             [clojure.java.io :as io]
-            [manifold.deferred :as md]
+            [clojure.tools.logging :as log]
+            [manifold
+             [deferred :as md]
+             [time :as mt]]
             [monkey.ci
+             [artifacts :as art]
+             [blob :as b]
              [config :as c]
              [logging :as l]
              [sidecar :as sut]
@@ -185,6 +190,14 @@
                                      (->TestLogger c p)))))
         (is (= [["test.txt"]] @c))))))
 
+(defrecord SlowBlobStore [delay]
+  b/BlobStore
+  (save [_ _ _]
+    (log/info "Simulating slow blob storage...")
+    (mt/in delay (constantly {::blob :saved})))
+  (restore [_ _ _]
+    (md/success-deferred nil)))
+
 (deftest run
   (with-redefs [sut/mark-start identity
                 sut/poll-events (fn [rt]
@@ -206,16 +219,18 @@
     (testing "restores and saves caches if configured"
       (h/with-tmp-dir dir
         (let [stored (atom {})
+              path "test-path"
+              _ (fs/create-file (fs/path dir path))
               cache (h/fake-blob-store stored)
               r (sut/run
                   {:containers {:type :podman}
-                   :build {:build-id "test-build"}
-                   :work-dir dir
+                   :build {:build-id "test-build"
+                           :checkout-dir dir}
                    :step {:name "test-step"
                           :container/image "test-img"
                           :script ["first" "second"]
                           :caches [{:id "test-cache"
-                                    :path "test-path"}]}
+                                    :path path}]}
                    :logging {:maker (l/make-logger {})}
                    :cache cache})]
           (is (map? (deref r 500 :timeout)))
@@ -227,34 +242,53 @@
         (let [stored (atom {"test-cust/test-build/test-artifact.tgz" "/tmp/checkout"})
               store (h/fake-blob-store stored)
               r (sut/run
-                 {:containers {:type :podman}
-                  :build {:build-id "test-build"
-                          :sid ["test-cust" "test-build"]
-                          :checkout-dir "/tmp/checkout"}
-                  :work-dir dir
-                  :step {:name "test-step"
-                         :container/image "test-img"
-                         :script ["first" "second"]
-                         :restore-artifacts [{:id "test-artifact"
-                                              :path "test-path"}]}
-                  :logging {:maker (l/make-logger {})}
-                  :artifacts store})]
+                  {:containers {:type :podman}
+                   :build {:build-id "test-build"
+                           :sid ["test-cust" "test-build"]
+                           :checkout-dir "/tmp/checkout"}
+                   :work-dir dir
+                   :step {:name "test-step"
+                          :container/image "test-img"
+                          :script ["first" "second"]
+                          :restore-artifacts [{:id "test-artifact"
+                                               :path "test-path"}]}
+                   :logging {:maker (l/make-logger {})}
+                   :artifacts store})]
           (is (empty? @stored)))))
 
     (testing "saves artifacts if configured"
       (h/with-tmp-dir dir
         (let [stored (atom {})
+              path "test-artifact"
+              _ (fs/create-file (fs/path dir path))
               store (h/fake-blob-store stored)
               r (sut/run
-                 {:containers {:type :podman}
-                  :build {:build-id "test-build"
-                          :sid ["test-cust" "test-build"]}
-                  :work-dir dir
-                  :step {:name "test-step"
-                         :container/image "test-img"
-                         :script ["first" "second"]
-                         :save-artifacts [{:id "test-artifact"
-                                           :path "test-path"}]}
-                  :logging {:maker (l/make-logger {})}
-                  :artifacts store})]
-          (is (not-empty @stored)))))))
+                  {:containers {:type :podman}
+                   :build {:build-id "test-build"
+                           :sid ["test-cust" "test-build"]
+                           :checkout-dir dir}
+                   :step {:name "test-step"
+                          :container/image "test-img"
+                          :script ["first" "second"]
+                          :save-artifacts [{:id "test-artifact"
+                                            :path path}]}
+                   :logging {:maker (l/make-logger {})}
+                   :artifacts store})]
+          (is (not-empty @stored)))))
+
+    (testing "waits until artifacts have been stored"
+      ;; Set up blob saving so it takes a while
+      (is (= ::timeout (-> {:step {:save-artifacts [{:id "test-artifact"
+                                                     :path "test-path"}]}
+                            :artifacts (->SlowBlobStore 1000)}
+                           (sut/run)
+                           (deref 100 ::timeout)))
+          "expected timeout while waiting for blobs to save"))
+
+    (testing "blocks until caches have been stored"
+      ;; Set up blob saving so it takes a while
+      (is (= ::timeout (-> {:step {:caches [{:id "test-artifact"
+                                             :path "test-path"}]}
+                            :cache (->SlowBlobStore 1000)}
+                           (sut/run)
+                           (deref 100 ::timeout)))))))

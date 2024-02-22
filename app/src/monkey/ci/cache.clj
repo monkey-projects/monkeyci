@@ -34,14 +34,15 @@
   "Wraps fn `f` so that caches are restored/saved as configured on the step."
   [f]
   (fn [rt]
-    @(md/chain
-      (restore-caches rt)
-      (fn [c]
-        (assoc-in rt [:step :caches] c))
-      f
-      (fn [r]
+    (md/chain
+     (restore-caches rt)
+     (fn [c]
+       (assoc-in rt [:step :caches] c))
+     f
+     (fn [r]
+       (md/chain
         (save-caches rt)
-        r))))
+        (constantly r))))))
 
 ;;; Config handling
 
