@@ -35,11 +35,20 @@
 
 (def sidecar-config (comp :sidecar rt/config))
 
-(defn- calc-work-dir [rt]
+(defn- base-work-dir
+  "Determines the base work dir to use inside the container"
+  [rt]
   (some->> (b/build-checkout-dir rt)
            (fs/file-name)
            (fs/path work-dir)
            (str)))
+
+(defn- step-work-dir
+  "The work dir to use for the step in the container.  This is the external step
+   work dir, rebased onto the base work dir."
+  [rt]
+  (some-> (get-in rt [:step :work-dir])
+          (u/rebase-path (b/build-checkout-dir rt) (base-work-dir rt))))
 
 (defn- job-container
   "Configures the job container.  It runs the image as configured in
@@ -47,25 +56,24 @@
    custom shell script that also redirects the output and dispatches
    events to a file, that are then picked up by the sidecar."
   [{:keys [step] :as rt}]
-  (let [wd (calc-work-dir rt)]
-    {:image-url (:container/image step)
-     :display-name job-container-name
-     :command ["/bin/sh" (str script-dir "/" job-script)]
-     ;; One file arg per script line, with index as name
-     :arguments (->> (count (:script step))
-                     (range)
-                     (mapv str))
-     :environment-variables (merge
-                             (:container/env step)
-                             {"MONKEYCI_WORK_DIR" wd
-                              "MONKEYCI_LOG_DIR" log-dir
-                              "MONKEYCI_SCRIPT_DIR" script-dir
-                              "MONKEYCI_START_FILE" start-file
-                              "MONKEYCI_EVENT_FILE" event-file
-                              ;; This may have unforseen consequences, so maybe we''l have to remove this later
-                              ;; but it can be useful for using caches/artifacts for processes that depend
-                              ;; on the home dir (e.g. mvn cache).
-                              "HOME" wd})}))
+  {:image-url (:container/image step)
+   :display-name job-container-name
+   :command ["/bin/sh" (str script-dir "/" job-script)]
+   ;; One file arg per script line, with index as name
+   :arguments (->> (count (:script step))
+                   (range)
+                   (mapv str))
+   :environment-variables (merge
+                           (:container/env step)
+                           {"MONKEYCI_WORK_DIR" (step-work-dir rt)
+                            "MONKEYCI_LOG_DIR" log-dir
+                            "MONKEYCI_SCRIPT_DIR" script-dir
+                            "MONKEYCI_START_FILE" start-file
+                            "MONKEYCI_EVENT_FILE" event-file
+                            ;; This may have unforseen consequences, so maybe we''l have to remove this later
+                            ;; but it can be useful for using caches/artifacts for processes that depend
+                            ;; on the home dir (e.g. mvn cache).
+                            "HOME" (base-work-dir rt)})})
 
 (defn- sidecar-container [{[c] :containers}]
   (assoc c
@@ -112,8 +120,8 @@
 
 (defn- step-details->edn [rt]
   (pr-str {:step (-> (:step rt)
-                     (select-keys [:name :index :save-artifacts :restore-artifacts :caches :work-dir])
-                     (mc/update-existing :work-dir u/rebase-path (b/build-checkout-dir rt) (calc-work-dir rt)))
+                     (select-keys [:name :index :save-artifacts :restore-artifacts :caches])
+                     (assoc :work-dir (step-work-dir rt)))
            :pipeline (select-keys (:pipeline rt) [:name :index])}))
 
 (defn- config-vol-config
@@ -126,7 +134,7 @@
                 log-config (conj (config-entry "logback.xml" log-config)))}))
 
 (defn- add-sidecar-env [sc rt]
-  (let [wd (calc-work-dir rt)]
+  (let [wd (base-work-dir rt)]
     ;; TODO Put this all in a config file instead, this way sensitive information is harder to see
     (assoc sc
            :environment-variables

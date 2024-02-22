@@ -42,8 +42,8 @@ run_command()
     err=${MONKEYCI_LOG_DIR}/${command}_err
     
     echo "Running command: $command"
-    post_event "{:type :command/start :command \"$name\"}"
-    cd $MONKEYCI_WORK_DIR
+    # Pass out and err files in the start command so the sidecar can already read them
+    post_event "{:type :command/start :command \"$name\" :stdout \"$out\" :stderr \"$err\"}"
     sh ${MONKEYCI_SCRIPT_DIR}/${command} > $out 2>$err
     status=$?
     post_event "{:type :command/end :command \"$name\" :exit $status :stdout \"$out\" :stderr \"$err\"}"
@@ -54,6 +54,7 @@ mkdir -p $MONKEYCI_LOG_DIR
 post_event "{:type :job/wait}"
 wait_for_start
 post_event "{:type :job/start}"
+cd $MONKEYCI_WORK_DIR
 # Execute all arguments as script commands
 for v in $*
 do

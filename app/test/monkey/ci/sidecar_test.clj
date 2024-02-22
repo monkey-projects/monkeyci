@@ -86,6 +86,7 @@
             evt {:type :test/event
                  :message "This is a test event"
                  :stdout (.getCanonicalPath logfile)
+                 :exit 0
                  :done? true}
             streams (atom [])
             rt {:events {:poster (constantly true)}

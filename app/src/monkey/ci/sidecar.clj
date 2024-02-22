@@ -100,7 +100,8 @@
                         true)
                       (do
                         (log/debug "Read next event:" evt)
-                        (upload-logs evt logger)
+                        (when (contains? evt :exit)
+                          (upload-logs evt logger))
                         (rt/post-events rt evt)))
                 (if (:done? evt)
                   (set-exit 0)

@@ -65,7 +65,8 @@
 
   (testing "job container"
     (let [jc (->> {:step {:script ["first" "second"]
-                          :container/env {"TEST_ENV" "test-val"}}
+                          :container/env {"TEST_ENV" "test-val"}
+                          :work-dir "/tmp/test-build/sub"}
                    :build {:checkout-dir "/tmp/test-build"}}
                   (sut/instance-config {})
                   :containers
@@ -82,8 +83,8 @@
 
       (testing "environment"
         (let [env (:environment-variables jc)]
-          (testing "sets work dir"
-            (is (= "/opt/monkeyci/checkout/work/test-build" (get env "MONKEYCI_WORK_DIR"))))
+          (testing "sets work dir to step work dir"
+            (is (= "/opt/monkeyci/checkout/work/test-build/sub" (get env "MONKEYCI_WORK_DIR"))))
 
           (testing "sets home to work dir"
             (is (= "/opt/monkeyci/checkout/work/test-build" (get env "HOME"))))
