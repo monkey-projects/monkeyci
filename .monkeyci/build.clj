@@ -162,7 +162,7 @@
    :work-dir "gui"
    :script ["npm install"
             (str "clojure -Sdeps '{:mvn/local-repo \".m2\"}' -M -m shadow.cljs.devtools.cli release " build)]
-   :caches [{:id "mvn-repo"
+   :caches [{:id "mvn-gui-repo"
              :path ".m2"}
             {:id "node-modules"
              :path "node_modules"}]})

@@ -330,7 +330,10 @@
     (var? p) (resolve-pipelines (var-get p) rt)
     :else (remove nil? p)))
 
-(defn- load-and-run-pipelines [{:keys [script-dir] :as rt}]
+(defn exec-script!
+  "Loads a script from a directory and executes it.  The script is
+   executed in this same process (but in a randomly generated namespace)."
+  [{:keys [script-dir] :as rt}]
   (let [build-id (build/get-build-id rt)]
     (log/debug "Executing script for build" build-id "at:" script-dir)
     (log/debug "Script runtime:" rt)
@@ -345,10 +348,3 @@
         (post-event rt {:type :script/end
                         :message (.getMessage ex)})
         bc/failure))))
-
-(defn exec-script!
-  "Loads a script from a directory and executes it.  The script is
-   executed in this same process (but in a randomly generated namespace)."
-  [rt]
-  #_(with-script-api ctx load-and-run-pipelines)
-  (load-and-run-pipelines rt))

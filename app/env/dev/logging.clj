@@ -28,7 +28,6 @@
   "Downloads logs for a given build from log bucket"
   [sid dir]
   (let [conf (co/oci-config :logging)
-        client (os/make-client conf)
         path (l/sid->path conf nil sid)]
     (log/info "Downloading logs for" sid "at" path "into" dir)
     (when-not (fs/create-dirs dir)
