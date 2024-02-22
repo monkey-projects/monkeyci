@@ -38,7 +38,7 @@
   {:name name
    ;; Alpine based images don't exist for arm, so use debian
    :container/image "docker.io/clojure:temurin-21-tools-deps-bookworm-slim"
-   :script [(str "cd " dir) (cs/join " " (concat ["clojure" "-Sdeps" "'{:mvn/local-repo \"../m2\"}'"] args))]
+   :script [(str "cd " dir " && " (cs/join " " (concat ["clojure" "-Sdeps" "'{:mvn/local-repo \"../m2\"}'"] args)))]
    :caches [{:id "mvn-local-repo"
              :path "m2"}]})
 
