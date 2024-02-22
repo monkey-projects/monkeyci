@@ -46,6 +46,10 @@
       {:name ~(name n)
        :steps ~steps})))
 
+(defrecord Job [id name description dependencies])
+
+(def job? (partial instance? Job))
+
 (defn git-ref
   "Gets the git ref from the context"
   [ctx]

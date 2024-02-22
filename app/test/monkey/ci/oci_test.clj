@@ -217,14 +217,35 @@
                       (md/success-deferred
                        {:status 200
                         :body
-                        {:exit-code exit}}))
+                        {:exit-code exit
+                         :container-instance-id iid}}))
                     ci/delete-container-instance
                     (fn [_ opts]
                       (reset! deleted? true)
                       (md/success-deferred
                        {:status (if (= iid (:instance-id opts)) 200 400)}))]
         (is (= exit (deref (sut/run-instance {} {} {:delete? true}) 200 :timeout)))
-        (is (true? @deleted?))))))
+        (is (true? @deleted?)))))
+  
+  (testing "does not instance if configured but not created"
+    (let [exit 545
+          iid (random-uuid)
+          containers [{:display-name "test-container"
+                       :container-id (random-uuid)}]
+          deleted? (atom false)]
+      (with-redefs [ci/create-container-instance
+                    (constantly
+                     (md/success-deferred
+                      {:status 404
+                       :body
+                       {:message "test failure"}}))
+                    ci/delete-container-instance
+                    (fn [_ opts]
+                      (reset! deleted? true)
+                      (md/success-deferred
+                       {:status (if (= iid (:instance-id opts)) 200 400)}))]
+        (is (= 1 (deref (sut/run-instance {} {} {:delete? true}) 200 :timeout)))
+        (is (false? @deleted?))))))
 
 (deftest instance-config
   (let [conf {:availability-domain "test-ad"

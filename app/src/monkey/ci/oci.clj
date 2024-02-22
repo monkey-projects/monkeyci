@@ -119,7 +119,7 @@
             (or exit-code 1))
 
           (maybe-delete-instance [{{:keys [container-instance-id]} :body :as c}]
-            (if delete?
+            (if (and delete? container-instance-id)
               (md/chain
                (ci/delete-container-instance client {:instance-id container-instance-id})
                (constantly c))
