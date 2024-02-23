@@ -69,11 +69,7 @@
                             "MONKEYCI_LOG_DIR" log-dir
                             "MONKEYCI_SCRIPT_DIR" script-dir
                             "MONKEYCI_START_FILE" start-file
-                            "MONKEYCI_EVENT_FILE" event-file
-                            ;; This may have unforseen consequences, so maybe we''l have to remove this later
-                            ;; but it can be useful for using caches/artifacts for processes that depend
-                            ;; on the home dir (e.g. mvn cache).
-                            "HOME" (base-work-dir rt)})})
+                            "MONKEYCI_EVENT_FILE" event-file})})
 
 (defn- sidecar-container [{[c] :containers}]
   (assoc c

@@ -86,9 +86,6 @@
           (testing "sets work dir to step work dir"
             (is (= "/opt/monkeyci/checkout/work/test-build/sub" (get env "MONKEYCI_WORK_DIR"))))
 
-          (testing "sets home to work dir"
-            (is (= "/opt/monkeyci/checkout/work/test-build" (get env "HOME"))))
-
           (testing "sets log dir"
             (is (string? (get env "MONKEYCI_LOG_DIR"))))
 
