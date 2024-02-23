@@ -201,3 +201,13 @@
   [f]
   (fn [{:keys [labels]}]
     (lbl/matches-labels? f labels)))
+
+(def resolvable? (partial satisfies? p/JobResolvable))
+
+(defn resolve-all
+  "Resolves all jobs, removes anything that's not resolvable or not a job."
+  [rt jobs]
+  (->> jobs
+       (filter resolvable?)
+       (map #(p/resolve-job % rt))
+       (filter job?)))

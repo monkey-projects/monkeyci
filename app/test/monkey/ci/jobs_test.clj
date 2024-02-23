@@ -59,7 +59,11 @@
       (is (sut/job? job)))
     
     (testing "executes action"
-      (is (= ::result (sut/execute! job {}))))))
+      (is (= ::result (sut/execute! job {}))))
+
+    (testing "restores and saves caches")
+    (testing "restores artifacts")
+    (testing "saves artifacts")))
 
 (deftest execute-jobs!
   (testing "empty if no jobs"
@@ -128,3 +132,11 @@
                                {:labels {"project" "test-project"}}))))
       (is (not (f (dummy-job ::third
                              {:labels {"project" "other-project"}})))))))
+
+(deftest resolve-all
+  (testing "resolves all jobs"
+    (let [[a b] (map dummy-job [::first ::second])]
+      (is (= [a b] (sut/resolve-all {} [a (constantly b)])))))
+
+  (testing "removes non-job objects"
+    (is (empty? (sut/resolve-all {} [(constantly nil)])))))

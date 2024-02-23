@@ -1,7 +1,6 @@
 (ns monkey.ci.script
   (:require [clojure.java.io :as io]
             [clojure.tools.logging :as log]
-            [clojure.core.async :as ca]
             [martian
              [core :as martian]
              [httpkit :as mh]
@@ -282,16 +281,6 @@
     socket (connect-to-uds socket)))
 
 (def valid-config? (some-fn :socket :url))
-
-#_(defn- setup-api-client [ctx]
-  (let [api? (some-fn :socket :url)]
-    (cond-> ctx
-      ;; In tests it could be there is no api configuration, so skip the initialization in that case
-      (api? (:api ctx)) (assoc-in [:api :client] (make-client ctx)))))
-
-#_(defn- with-script-api [ctx f]
-  (let [ctx (setup-api-client ctx)]
-    (f ctx)))
 
 (defmethod rt/setup-runtime :api [conf _]
   (when-let [c (:api conf)]
