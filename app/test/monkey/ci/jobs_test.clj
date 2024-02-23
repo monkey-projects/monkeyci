@@ -1,7 +1,9 @@
 (ns monkey.ci.jobs-test
-  (:require [monkey.ci.build.core :as bc]
-            [monkey.ci.jobs :as sut]
-            [clojure.test :refer [deftest testing is]]))
+  (:require [clojure.test :refer [deftest testing is]]
+            [monkey.ci.build.core :as bc]
+            [monkey.ci
+             [containers :as co]
+             [jobs :as sut]]))
 
 (defn dummy-job [id & [opts]]
   (sut/action-job id (constantly nil) opts))
@@ -86,3 +88,43 @@
               {:job c
                :result bc/success}}
              @(sut/execute-jobs! [p c] {}))))))
+
+(deftest container-job
+  (testing "is a job"
+    (is (sut/job? (sut/container-job ::test-job {:container/image "test-img"}))))
+
+  (testing "runs container on execution"
+    (with-redefs [co/run-container (constantly ::ok)]
+      (is (= ::ok (-> (sut/container-job ::test-job {})
+                      (sut/execute! {})))))))
+
+(deftest filter-jobs
+  (testing "applies filter to jobs"
+    (let [[a _ :as jobs] [(dummy-job ::first)
+                          (dummy-job ::second)]]
+      (is (= [a] (sut/filter-jobs (comp (partial = ::first) sut/job-id) jobs)))))
+
+  (testing "includes dependencies that don't match the filter"
+    (let [jobs [(dummy-job ::first {:dependencies [::second]})
+                (dummy-job ::second)]]
+      (is (= jobs (sut/filter-jobs (comp (partial = ::first) sut/job-id) jobs)))))
+
+  (testing "includes transitive dependencies"
+    (let [jobs [(dummy-job ::first {:dependencies [::second]})
+                (dummy-job ::second {:dependencies [::third]})
+                (dummy-job ::third)]]
+      (is (= jobs (sut/filter-jobs (comp (partial = ::first) sut/job-id) jobs))))))
+
+(deftest label-filter
+  (testing "matches job by label"
+    (let [f (sut/label-filter [[{:label "name"
+                                 :value "test-job"}]
+                               [{:label "project"
+                                 :value "test-project"}]])]
+      (is (fn? f))
+      (is (true? (f (dummy-job ::first
+                               {:labels {"name" "test-job"}}))))
+      (is (true? (f (dummy-job ::second
+                               {:labels {"project" "test-project"}}))))
+      (is (not (f (dummy-job ::third
+                             {:labels {"project" "other-project"}})))))))

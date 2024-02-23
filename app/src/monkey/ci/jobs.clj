@@ -1,16 +1,21 @@
 (ns monkey.ci.jobs
   "Handles job execution and ordering in a build"
   (:require [clojure.tools.logging :as log]
+            [clojure.set :as cs]
             [manifold
              [deferred :as md]
              [stream :as ms]]
             [medley.core :as mc]
             [monkey.ci.build.core :as bc]
-            [monkey.ci.protocols :as p]))
+            [monkey.ci
+             [containers :as co]
+             [labels :as lbl]
+             [protocols :as p]]))
 
 (def deps "Get job dependencies" :dependencies)
 (def status "Get job status" :status)
 (def labels "Get job labels" :labels)
+(def job-id "Gets job id" :id)
 
 (defprotocol Job
   "Base job protocol that is able to execute it, taking the runtime as argument."
@@ -24,7 +29,7 @@
 (def success? (comp (partial = :success) status))
 
 ;; Job that executes a function
-(defrecord ActionJob [id status action opts]
+(defrecord ActionJob [id status action]
   Job
   (execute! [_ rt]
     (action rt)))
@@ -48,7 +53,7 @@
   "Find job by id"
   [jobs id]
   (->> jobs
-       (filter (comp (partial = id) :id))
+       (filter (comp (partial = id) job-id))
        (first)))
 
 (defn- fulfilled?
@@ -56,7 +61,7 @@
    successful)."
   [others job]
   (->> (deps job)
-       (map (partial (comp others :id) others))
+       (map (partial (comp others job-id) others))
        (every? success?)))
 
 (defn- next-jobs*
@@ -111,7 +116,7 @@
         execute-all!
         (fn execute-all [jobs state]
           ;; Execute all jobs in parallel, return a list of deferreds
-          (log/info "Starting" (count jobs) "pending jobs:" (map :id jobs))
+          (log/info "Starting" (count jobs) "pending jobs:" (map job-id jobs))
           (map (fn [j]
                  (md/chain
                   (execute! j (assoc-in rt [:build :jobs] state))
@@ -121,13 +126,13 @@
         add-to-results
         (fn [global [job r]]
           (assoc global
-                 (:id job)
+                 (job-id job)
                  {:job job
                   :result r}))
 
         update-job-state
         (fn [jobs job s]
-          (assoc-in jobs [(:id job) :status] s))
+          (assoc-in jobs [(job-id job) :status] s))
 
         result->status
         (fn [r]
@@ -146,7 +151,8 @@
       (let [n (next-jobs* state)]
         (log/trace "Job state:" state)
         (log/debugf "There are %d pending jobs: %s" (count n) (keys n))
-        (log/debugf "There are %d jobs currently executing: %s" (count executing) (mapv (comp :id first) executing))
+        (log/debugf "There are %d jobs currently executing: %s"
+                    (count executing) (mapv (comp job-id first) executing))
         (if (and (empty? n) (empty? executing))
           ;; Done, no more jobs to run and all running jobs have terminated
           results
@@ -157,8 +163,41 @@
                 ;; Wait for next running job to terminate
                 (apply md/alt))
            (fn [[job res :as out]]
-             (log/info "Job finished:" (:id job))
+             (log/info "Job finished:" (job-id job))
              (md/recur
               (update-job-state state job (result->status res))
               (remove (partial = out) executing)
               (add-to-results results out)))))))))
+
+(defrecord ContainerJob [id status]
+  Job
+  (execute! [this rt]
+    (co/run-container (assoc rt :job this))))
+
+(defn container-job
+  "Creates a job that executes in a container"
+  [id props]
+  (map->ContainerJob (assoc props :id id)))
+
+(defn filter-jobs
+  "Applies a filter to the given jobs, but includes all dependencies of jobs that
+   match the filter, even though the dependencies themselves may not match it."
+  [pred jobs]
+  (let [g (group-by-id jobs)
+        add-missing-deps (fn [r]
+                           (let [all (->> (vals r)
+                                          (mapcat :dependencies)
+                                          (set))
+                                 missing (cs/difference all (set (:keys r)))]
+                             (merge r (select-keys g missing))))]
+    (loop [p {}
+           r (group-by-id (filter pred jobs))]
+      (if (= p r)
+        (vals r)
+        (recur r (add-missing-deps r))))))
+
+(defn label-filter
+  "Predicate function that matches a job by its labels"
+  [f]
+  (fn [{:keys [labels]}]
+    (lbl/matches-labels? f labels)))
