@@ -1,24 +1,36 @@
 (ns monkey.ci.jobs
   "Handles job execution and ordering in a build"
-  (:require [clojure.walk :as cw]
-            [medley.core :as mc]))
+  (:require [manifold.deferred :as md]
+            [medley.core :as mc]
+            [monkey.ci.protocols :as p]))
 
 (def deps "Get job dependencies" :dependencies)
 (def status "Get job status" :status)
+(def labels "Get job labels" :labels)
 
-(def job? "Checks if object is a job" map?)
+(defprotocol Job
+  "Base job protocol that is able to execute it, taking the runtime as argument."
+  (execute! [job rt]))
+
+(def job? "Checks if object is a job" (partial satisfies? Job))
 
 (def pending? (comp (some-fn nil? (partial = :pending)) status))
 (def running? (comp (partial = :running) status))
 (def failed?  (comp (partial = :failure) status))
 (def success? (comp (partial = :success) status))
 
-(defn job
+;; Job that executes a function
+(defrecord ActionJob [id status action opts]
+  Job
+  (execute! [_ rt]
+    (action rt)))
+
+(defn action-job
   "Creates a new job"
-  ([id opts]
-   (merge opts {:id id}))
-  ([id]
-   (job id {})))
+  ([id action opts]
+   (map->ActionJob (merge opts {:id id :action action})))
+  ([id action]
+   (action-job id action {})))
 
 (defn- find-dependents
   "Finds all jobs that are dependent on this job"
@@ -27,21 +39,6 @@
             (and (some? (deps j))
                  ((deps j) job)))]
     (filterv dependent? others)))
-
-#_(defn make-job-graph
-  "Given a set of jobs, creates a graph where jobs are sorted according
-   to dependencies.  The roots are all jobs that don't have dependencies,
-   and below that there are those that are dependent on the parents."
-  [jobs]
-  (let [jobs (map #(mc/update-existing % :dependencies set) jobs)
-        roots (filterv (comp empty? deps) jobs)
-        add-dependents (fn [x]
-                         (if (job? x)
-                           (let [d (find-dependents x jobs)]
-                             (cond-> [x]
-                               (not-empty d) (conj d)))
-                           x))]
-    (cw/prewalk add-dependents roots)))
 
 (defn- find-job
   "Find job by id"
@@ -67,3 +64,29 @@
   (->> jobs
        (filter pending?)
        (filter (partial fulfilled? jobs))))
+
+(extend-protocol p/JobResolvable
+  ActionJob
+  (resolve-job [job _]
+    job)
+  
+  clojure.lang.IFn
+  (resolve-job [f rt]
+    ;; Recursively resolve job
+    (p/resolve-job (f rt) rt))
+
+  clojure.lang.Var
+  (resolve-job [v rt]
+    (p/resolve-job (var-get v) rt))
+
+  nil
+  (resolve-job [_ _]
+    nil))
+
+(def resolve-job p/resolve-job)
+
+(defn execute-jobs!
+  "Executes all jobs in dependency order.  Returns a deferred that will hold
+   the results of all executed jobs."
+  [jobs rt]
+  (md/success-deferred nil))

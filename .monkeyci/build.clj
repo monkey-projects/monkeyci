@@ -31,7 +31,7 @@
   [ctx]
   (or (tag-version ctx)
       ;; TODO Determine automatically
-      "0.3.1-SNAPSHOT"))
+      "0.3.2-SNAPSHOT"))
 
 (defn clj-container [name dir & args]
   "Executes script in clojure container"
@@ -175,24 +175,24 @@
 (def build-gui-release
   (shadow-release "release-gui" :frontend))
 
-(defn oci-config-file [{:keys [checkout-dir]}]
+#_(defn oci-config-file [{:keys [checkout-dir]}]
   (io/file checkout-dir "oci-config"))
 
-(defn- param-to-secure-file [{:keys [checkout-dir] :as ctx} p]
+#_(defn- param-to-secure-file [{:keys [checkout-dir] :as ctx} p]
   (let [f (io/file checkout-dir p)]
     (shell/param-to-file ctx p f)
     (fs/set-posix-file-permissions f "rw-------")
     (fs/delete-on-exit f)
     f))
 
-(defn oci-creds
+#_(defn oci-creds
   "Creates oci credentials file"
   [ctx]
   (doseq [p ["oci-config" "oci.pem"]]
     (param-to-secure-file ctx p))
   core/success)
 
-(defn upload-app-artifact
+#_(defn upload-app-artifact
   "If this is a release build, uploads the uberjar to the OCI artifact registry."
   [ctx]
   (when (release? ctx)

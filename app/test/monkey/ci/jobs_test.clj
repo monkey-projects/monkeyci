@@ -2,45 +2,62 @@
   (:require [monkey.ci.jobs :as sut]
             [clojure.test :refer [deftest testing is]]))
 
-#_(deftest make-job-graph
-  (testing "ok"
-    (is (= 1 1)))
-  #_(testing "empty for empty set"
-    (is (= [] (sut/make-job-graph []))))
-
-  #_(testing "roots contain all jobs without dependencies"
-    (let [[a b :as jobs] [{:id ::first}
-                          {:id ::second}]]
-      (is (= [[a] [b]]
-             (sut/make-job-graph jobs)))))
-
-  #_(testing "roots point to dependent jobs"
-    (let [[p c :as jobs] [{:id ::root}
-                          {:id ::child
-                           :dependencies [::root]}]]
-      (is (= [[p [[c]]]]
-             (sut/make-job-graph jobs))))))
+(defn dummy-job [id & [opts]]
+  (sut/action-job id (constantly nil) opts))
 
 (deftest next-jobs
   (testing "returns starting jobs if all are pending"
-    (let [[a :as jobs] [(sut/job ::root)
-                        (sut/job ::child {:dependencies [::root]})]]
+    (let [[a :as jobs] [(dummy-job ::root)
+                        (dummy-job ::child {:dependencies [::root]})]]
       (is (= [a] (sut/next-jobs jobs)))))
 
   (testing "returns jobs that have succesful dependencies"
-    (let [[_ b :as jobs] [(sut/job ::root {:status :success})
-                          (sut/job ::child {:dependencies [::root]})]]
+    (let [[_ b :as jobs] [(dummy-job ::root {:status :success})
+                          (dummy-job ::child {:dependencies [::root]})]]
       (is (= [b] (sut/next-jobs jobs)))))
 
   (testing "does not return jobs that have failed dependencies"
-    (let [[_ _ c :as jobs] [(sut/job ::root {:status :success})
-                          (sut/job ::other-root {:status :failure})
-                          (sut/job ::child {:dependencies [::root]})
-                          (sut/job ::other-child {:dependencies [::other-root]})]]
+    (let [[_ _ c :as jobs] [(dummy-job ::root {:status :success})
+                            (dummy-job ::other-root {:status :failure})
+                            (dummy-job ::child {:dependencies [::root]})
+                            (dummy-job ::other-child {:dependencies [::other-root]})]]
       (is (= [c] (sut/next-jobs jobs)))))
 
   (testing "returns jobs that have multiple succesful dependencies"
-    (let [[_ _ c :as jobs] [(sut/job ::root {:status :success})
-                            (sut/job ::other-root {:status :success})
-                            (sut/job ::child {:dependencies [::root ::other-root]})]]
+    (let [[_ _ c :as jobs] [(dummy-job ::root {:status :success})
+                            (dummy-job ::other-root {:status :success})
+                            (dummy-job ::child {:dependencies [::root ::other-root]})]]
       (is (= [c] (sut/next-jobs jobs))))))
+
+(def test-job (dummy-job ::recursive-job))
+
+(deftest resolve-job
+  (testing "returns job"
+    (let [job (dummy-job ::test-job)]
+      (is (= job (sut/resolve-job job {})))))
+
+  (testing "invokes fn to return job"
+    (let [job (dummy-job ::indirect-job)]
+      (is (= job (sut/resolve-job (constantly job) {})))))
+
+  (testing "recurses into job"
+    (let [job (dummy-job ::recursive-job)]
+      (is (= job (sut/resolve-job (constantly (constantly job)) {})))))
+
+  (testing "resolves var"
+    (is (= test-job (sut/resolve-job #'test-job {}))))
+
+  (testing "resolves `nil`"
+    (is (nil? (sut/resolve-job nil {})))))
+
+(deftest action-job
+  (let [job (sut/action-job ::test-job (constantly ::result))]
+    (testing "is a job"
+      (is (sut/job? job)))
+    
+    (testing "executes action"
+      (is (= ::result (sut/execute! job {}))))))
+
+(deftest execute-jobs!
+  (testing "empty if no jobs"
+    (is (empty? @(sut/execute-jobs! [] {})))))

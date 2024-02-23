@@ -11,4 +11,8 @@
   (obj-exists? [this sid] "Checks if object at location exists")
   (list-obj [this sid] "Lists objects at given location"))
 
+(defprotocol JobResolvable
+  "Able to resolve into a job"
+  (resolve-job [x rt]))
+
 ;; TODO Add others
