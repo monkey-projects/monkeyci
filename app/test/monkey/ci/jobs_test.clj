@@ -1,5 +1,6 @@
 (ns monkey.ci.jobs-test
-  (:require [monkey.ci.jobs :as sut]
+  (:require [monkey.ci.build.core :as bc]
+            [monkey.ci.jobs :as sut]
             [clojure.test :refer [deftest testing is]]))
 
 (defn dummy-job [id & [opts]]
@@ -60,4 +61,28 @@
 
 (deftest execute-jobs!
   (testing "empty if no jobs"
-    (is (empty? @(sut/execute-jobs! [] {})))))
+    (is (empty? @(sut/execute-jobs! [] {}))))
+
+  (testing "executes single start job"
+    (let [job (sut/action-job ::start-job
+                              (constantly bc/success))]
+      (is (= {::start-job {:job job
+                           :result bc/success}}
+             @(sut/execute-jobs! [job] {})))))
+
+  (testing "executes dependent job after dependency"
+    (let [p (sut/action-job ::start-job
+                            (constantly bc/success))
+          c (sut/action-job ::dep-job
+                            (fn [rt]
+                              (if (= :success (get-in rt [:build :jobs ::start-job :status]))
+                                bc/success
+                                bc/failure))
+                            {:dependencies [::start-job]})]
+      (is (= {::start-job
+              {:job p
+               :result bc/success}
+              ::dep-job
+              {:job c
+               :result bc/success}}
+             @(sut/execute-jobs! [p c] {}))))))
