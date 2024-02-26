@@ -109,9 +109,9 @@
     (let [rt (c/req->rt req)]
       (if-let [build (create-build rt {:id (get-in p [:path :id])
                                        :payload (:body p)})]
-        (let [runner (rt/runner rt)]
-          (md/future
-            (runner (assoc rt :build build)))
+        (do
+          (c/run-build-async
+            (assoc rt :build build))
           (rur/response {:build-id "todo"}))
         ;; No valid webhook found
         (rur/not-found {:message "No valid webhook configuration found"})))

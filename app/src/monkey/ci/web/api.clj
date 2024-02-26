@@ -290,10 +290,7 @@
       (if (st/create-build-metadata st md)
         (do
           ;; Trigger the build but don't wait for the result
-          (-> (md/future
-                (runner (assoc (c/req->rt req) :build (make-build-ctx req bid))))
-              (md/catch (fn [ex]
-                          (log/error "Unable to start build" ex))))
+          (c/run-build-async (assoc (c/req->rt req) :build (make-build-ctx req bid)))
           (-> (rur/response {:build-id bid})
               (rur/status 202)))
         (-> (rur/response {:message "Unable to create build metadata"})

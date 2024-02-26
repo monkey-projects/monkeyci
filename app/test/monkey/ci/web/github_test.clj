@@ -54,7 +54,23 @@
                   (assoc :parameters {:body 
                                       {:key "value"}}))]
       (is (= 204 (:status (sut/webhook req))))
-      (is (nil? @inv)))))
+      (is (nil? @inv))))
+
+  (testing "fires build completed event on failure"
+    (let [st (st/make-memory-storage)
+          _ (st/save-webhook-details st {:id "test-hook"})
+          events (atom [])
+          req (-> {:runner (fn [rt]
+                             (throw (ex-info "Test error" {:runtime rt})))
+                   :storage st
+                   :events {:poster (partial swap! events conj)}}
+                  (h/->req)
+                  (assoc :parameters {:path {:id "test-hook"}
+                                      :body
+                                      {:head-commit {:id "test-id"}}}))]
+      (is (= 200 (:status (sut/webhook req))))
+      (is (not= :timeout (h/wait-until #(not-empty @events) 1000)))
+      (is (= :build/completed (-> @events first :type))))))
 
 (defn- test-webhook []
   (zipmap [:id :dustomer-id :repo-id] (repeatedly st/new-id)))

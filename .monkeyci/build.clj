@@ -175,39 +175,6 @@
 (def build-gui-release
   (shadow-release "release-gui" :frontend))
 
-#_(defn oci-config-file [{:keys [checkout-dir]}]
-  (io/file checkout-dir "oci-config"))
-
-#_(defn- param-to-secure-file [{:keys [checkout-dir] :as ctx} p]
-  (let [f (io/file checkout-dir p)]
-    (shell/param-to-file ctx p f)
-    (fs/set-posix-file-permissions f "rw-------")
-    (fs/delete-on-exit f)
-    f))
-
-#_(defn oci-creds
-  "Creates oci credentials file"
-  [ctx]
-  (doseq [p ["oci-config" "oci.pem"]]
-    (param-to-secure-file ctx p))
-  core/success)
-
-#_(defn upload-app-artifact
-  "If this is a release build, uploads the uberjar to the OCI artifact registry."
-  [ctx]
-  (when (release? ctx)
-    (let [repo-ocid (-> (api/build-params ctx)
-                        (get "repo-ocid"))]
-      {:container/image "ghcr.io/oracle/oci-cli:latest"
-       :script ["cd app" ; FIXME Use work-dir instead, but's relative to the script dir
-                (str "oci artifacts generic artifact upload-by-path"
-                     " --repository-id=" repo-ocid
-                     " --artifact-path=monkeyci/app/monkeyci.jar"
-                     " --artifact-version=" (tag-version ctx)
-                     " --content-body=target/monkeyci-standalone.jar")]
-       :container/mounts [[(oci-config-file ctx) "/oracle/.oci/config"]]
-       :restore-artifacts [uberjar-artifact]})))
-
 (core/defpipeline test-all
   ;; TODO Run these in parallel
   [test-lib
@@ -222,10 +189,8 @@
   [app-uberjar
    build-gui-release
    image-creds
-   #_oci-creds
    build-app-image
-   build-gui-image
-   #_upload-app-artifact])
+   build-gui-image])
 
 ;; Unused
 #_(core/defpipeline braid-bot

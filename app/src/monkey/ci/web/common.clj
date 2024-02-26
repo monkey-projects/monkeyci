@@ -2,10 +2,13 @@
   (:require [buddy.auth :as ba]
             [camel-snake-kebab.core :as csk]
             [cheshire.core :as json]
-            [clojure.core.async :refer [go <! <!! >!]]
             [clojure.java.io :as io]
             [clojure.tools.logging :as log]
+            [manifold.deferred :as md]
             [muuntaja.core :as mc]
+            [monkey.ci
+             [build :as b]
+             [runtime :as rt]]
             [reitit.ring :as ring]
             [reitit.ring.coercion :as rrc]
             [reitit.ring.middleware
@@ -82,3 +85,21 @@
     (json/parse-string s csk/->kebab-case-keyword)
     (with-open [r (io/reader s)]
       (json/parse-stream r csk/->kebab-case-keyword))))
+
+(defn run-build-async
+  "Starts the build in a new thread"
+  [rt]
+  (let [runner (rt/runner rt)
+        report-error (fn [ex]
+                       (log/error "Unable to start build:" ex)
+                       (rt/post-events rt (b/build-completed-evt (rt/build rt)
+                                                                 1
+                                                                 :exception ex)))]
+    (md/future
+      (try
+        ;; Catch both the deferred error, or the direct exception, because both
+        ;; can be thrown here.
+        (-> (runner rt)
+            (md/catch report-error))
+        (catch Exception ex
+          (report-error ex))))))
