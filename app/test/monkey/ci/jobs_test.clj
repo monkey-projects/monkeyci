@@ -6,7 +6,7 @@
              [jobs :as sut]]))
 
 (defn dummy-job [id & [opts]]
-  (sut/action-job id (constantly nil) opts))
+  (bc/action-job id (constantly nil) opts))
 
 (deftest next-jobs
   (testing "returns starting jobs if all are pending"
@@ -54,7 +54,7 @@
     (is (nil? (sut/resolve-job nil {})))))
 
 (deftest action-job
-  (let [job (sut/action-job ::test-job (constantly ::result))]
+  (let [job (bc/action-job ::test-job (constantly ::result))]
     (testing "is a job"
       (is (sut/job? job)))
     
@@ -70,21 +70,21 @@
     (is (empty? @(sut/execute-jobs! [] {}))))
 
   (testing "executes single start job"
-    (let [job (sut/action-job ::start-job
+    (let [job (bc/action-job ::start-job
                               (constantly bc/success))]
       (is (= {::start-job {:job job
                            :result bc/success}}
              @(sut/execute-jobs! [job] {})))))
 
   (testing "executes dependent job after dependency"
-    (let [p (sut/action-job ::start-job
-                            (constantly bc/success))
-          c (sut/action-job ::dep-job
-                            (fn [rt]
-                              (if (= :success (get-in rt [:build :jobs ::start-job :status]))
-                                bc/success
-                                bc/failure))
-                            {:dependencies [::start-job]})]
+    (let [p (bc/action-job ::start-job
+                           (constantly bc/success))
+          c (bc/action-job ::dep-job
+                           (fn [rt]
+                             (if (= :success (get-in rt [:build :jobs ::start-job :status]))
+                               bc/success
+                               bc/failure))
+                           {:dependencies [::start-job]})]
       (is (= {::start-job
               {:job p
                :result bc/success}
@@ -95,11 +95,11 @@
 
 (deftest container-job
   (testing "is a job"
-    (is (sut/job? (sut/container-job ::test-job {:container/image "test-img"}))))
+    (is (sut/job? (bc/container-job ::test-job {:container/image "test-img"}))))
 
   (testing "runs container on execution"
     (with-redefs [co/run-container (constantly ::ok)]
-      (is (= ::ok (-> (sut/container-job ::test-job {})
+      (is (= ::ok (-> (bc/container-job ::test-job {})
                       (sut/execute! {})))))))
 
 (deftest filter-jobs

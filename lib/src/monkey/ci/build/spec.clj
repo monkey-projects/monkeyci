@@ -28,31 +28,32 @@
 (s/def :container/env (s/map-of string? string?))
 (s/def :container/platform string?)
 
-(s/def :ci/basic-step (s/keys :opt-un [:ci/name :ci/caches :ci/restore-artifacts :ci/save-artifacts]))
+(s/def :ci/basic-job (s/keys :opt-un [:ci/name :ci/caches :ci/restore-artifacts :ci/save-artifacts]))
 
-(s/def :ci/step (s/or :fn fn?
-                      :action
-                      (-> (s/keys :req-un [:ci/action])
-                          (s/merge :ci/basic-step))
-                      :container
-                      (-> (s/keys :req [:container/image]
-                                  :opt [:container/entrypoint :container/cmd :container/mounts :container/env
-                                        :container/platform]
-                                  :opt-un [:ci/script])
-                          (s/merge :ci/basic-step))))
+(s/def :ci/job (s/or :fn fn?
+                     :action
+                     (-> (s/keys :req-un [:ci/action])
+                         (s/merge :ci/basic-job))
+                     :container
+                     (-> (s/keys :req [:container/image]
+                                 :opt [:container/entrypoint :container/cmd :container/mounts :container/env
+                                       :container/platform]
+                                 :opt-un [:ci/script])
+                         (s/merge :ci/basic-job))))
 
 (s/def :ci/output string?)
 (s/def :ci/exception (partial instance? java.lang.Exception))
 
-(s/def :ci/step-result (s/keys :req-un [:ci/status]
+(s/def :ci/job-result (s/keys :req-un [:ci/status]
                                :opt-un [:ci/output :ci/exception]))
-(s/def :ci/last-result :ci/step-result)
+(s/def :ci/last-result :ci/job-result)
 
-(s/def :ci/steps (s/coll-of :ci/step))
-(s/def :ci/pipeline (s/keys :req-un [:ci/steps]
-                            :opt-un [:ci/name]))
+(s/def :ci/jobs (s/coll-of :ci/job))
+;; For backwards compatibility
+(s/def :ci/steps :ci/jobs)
+(s/def :ci/pipeline (s/keys :opt-un [:ci/name :ci/jobs :ci/steps]))
 (s/def :ci/env map?)
 
 ;; The run context
 (s/def :ci/context (s/keys :opt-un [:ci/status :ci/last-result]
-                           :req-un [:ci/pipeline :ci/step :ci/env]))
+                           :req-un [:ci/pipeline :ci/job :ci/env]))

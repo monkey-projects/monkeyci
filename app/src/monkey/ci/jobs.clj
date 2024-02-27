@@ -28,18 +28,14 @@
 (def failed?  (comp (partial = :failure) status))
 (def success? (comp (partial = :success) status))
 
-;; Job that executes a function
-(defrecord ActionJob [id status action]
-  Job
-  (execute! [_ rt]
-    (action rt)))
+(extend-protocol Job
+  monkey.ci.build.core.ActionJob
+  (execute! [{:keys [action]} rt]
+    (action rt))
 
-(defn action-job
-  "Creates a new job"
-  ([id action opts]
-   (map->ActionJob (merge opts {:id id :action action})))
-  ([id action]
-   (action-job id action {})))
+  monkey.ci.build.core.ContainerJob
+  (execute! [this rt]
+    (co/run-container (assoc rt :job this))))
 
 (defn- find-dependents
   "Finds all jobs that are dependent on this job"
@@ -88,7 +84,11 @@
        (vals)))
 
 (extend-protocol p/JobResolvable
-  ActionJob
+  monkey.ci.build.core.ActionJob
+  (resolve-job [job _]
+    job)
+
+  monkey.ci.build.core.ContainerJob
   (resolve-job [job _]
     job)
   
@@ -168,16 +168,6 @@
               (update-job-state state job (result->status res))
               (remove (partial = out) executing)
               (add-to-results results out)))))))))
-
-(defrecord ContainerJob [id status]
-  Job
-  (execute! [this rt]
-    (co/run-container (assoc rt :job this))))
-
-(defn container-job
-  "Creates a job that executes in a container"
-  [id props]
-  (map->ContainerJob (assoc props :id id)))
 
 (defn filter-jobs
   "Applies a filter to the given jobs, but includes all dependencies of jobs that

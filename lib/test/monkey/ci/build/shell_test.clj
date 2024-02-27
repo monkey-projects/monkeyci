@@ -1,4 +1,4 @@
-(ns monkey.ci.test.build.shell-test
+(ns monkey.ci.build.shell-test
   (:require [clojure.test :refer :all]
             [clojure.java.io :as io]
             [clojure.string :as cs]
@@ -7,7 +7,7 @@
              [api :as api]
              [core :as core]
              [shell :as sut]]
-            [monkey.ci.test.build.helpers :as h]))
+            [monkey.ci.build.helpers :as h]))
 
 (deftest bash
   (testing "returns fn"

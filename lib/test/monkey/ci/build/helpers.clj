@@ -1,4 +1,4 @@
-(ns monkey.ci.test.build.helpers
+(ns monkey.ci.build.helpers
   "Test helper functions"
   (:require [clojure.java.io :as io])
   (:import org.apache.commons.io.FileUtils))

@@ -1,4 +1,4 @@
-(ns monkey.ci.test.build.api-test
+(ns monkey.ci.build.api-test
   (:require [clojure.test :refer [deftest testing is]]
             [martian
              [core :as martian]

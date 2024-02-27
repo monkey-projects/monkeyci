@@ -1,4 +1,4 @@
-(ns monkey.ci.test.build.container-test
+(ns monkey.ci.build.container-test
   (:require [clojure.test :refer :all]
             [clojure.spec.alpha :as s]
             [monkey.ci.build
