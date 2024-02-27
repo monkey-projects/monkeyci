@@ -8,7 +8,9 @@
              [blob :as sut]
              [utils :as u]]
             [monkey.ci.helpers :as h]
-            [monkey.oci.os.core :as os]))
+            [monkey.oci.os
+             [core :as os]
+             [stream :as oss]]))
 
 (defn blob-store? [x]
   (satisfies? sut/BlobStore x))
@@ -71,7 +73,7 @@
     (is (blob-store? (sut/make-blob-store {:blob {:type :oci}} :blob))))
   
   (testing "`save`"
-      (with-redefs [os/put-object (constantly (md/success-deferred nil))]
+      (with-redefs [oss/input-stream->multipart (constantly (md/success-deferred nil))]
         (h/with-tmp-dir dir
           (let [tmp-dir (io/file dir "tmp")
                 blob (sut/make-blob-store {:blob {:type :oci

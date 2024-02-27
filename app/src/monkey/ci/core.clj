@@ -65,7 +65,7 @@
   (try
     (log/info "Starting MonkeyCI version" (config/version))
     (cli/run-cmd args (make-cli-config {:env env}))
-    (catch Exception ex
+    (catch Throwable ex
       (log/error "Failed to run application" ex)
       1)
     (finally

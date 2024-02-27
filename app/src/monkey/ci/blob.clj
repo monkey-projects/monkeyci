@@ -13,7 +13,9 @@
             [monkey.ci
              [oci :as oci]
              [utils :as u]]
-            [monkey.oci.os.core :as os])
+            [monkey.oci.os
+             [core :as os]
+             [stream :as oss]])
   (:import [java.io BufferedInputStream PipedInputStream PipedOutputStream]
            [org.apache.commons.compress.archivers ArchiveStreamFactory]))
 
@@ -170,12 +172,17 @@
         (make-archive src arch)
         ;; Upload the temp file
         (log/debugf "Uploading archive %s to %s (%d bytes)" arch obj-name (fs/size arch))
-        (-> (os/put-object client (-> conf
-                                      (select-keys [:ns :bucket-name])
-                                      (assoc :object-name obj-name
-                                             :contents (fs/read-all-bytes arch))))
-            (md/chain (constantly obj-name))
-            (md/finally #(fs/delete arch))))
+        (let [is (io/input-stream arch)]
+          (-> (oss/input-stream->multipart client
+                                           (-> conf
+                                               (select-keys [:ns :bucket-name])
+                                               (assoc :object-name obj-name
+                                                      :input-stream is
+                                                      ;; Increase buffer size to 1MB
+                                                      :buf-size 0x100000
+                                                      :close? true)))
+              (md/chain (constantly obj-name))
+              (md/finally #(fs/delete arch)))))
       (md/success-deferred nil)))
 
   (restore [_ src dest]
