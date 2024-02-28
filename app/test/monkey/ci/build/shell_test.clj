@@ -7,11 +7,15 @@
              [api :as api]
              [core :as core]
              [shell :as sut]]
-            [monkey.ci.build.helpers :as h]))
+            [monkey.ci.build.helpers :as h]
+            [monkey.ci.jobs :as j]))
 
 (deftest bash
   (testing "returns fn"
     (is (fn? (sut/bash "test"))))
+
+  (testing "is a job fn"
+    (is (j/job-fn? (sut/bash "test"))))
   
   (testing "returns success"
     (with-redefs-fn {#'bp/shell (constantly {})}
