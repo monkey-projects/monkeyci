@@ -22,7 +22,12 @@
   "Base job protocol that is able to execute it, taking the runtime as argument."
   (execute! [job rt]))
 
-(def job? "Checks if object is a job" (partial satisfies? Job))
+(defn job?
+  "Checks if object is a job"
+  [x]
+  ;; Can't use def with partial here, for some reason the compiler always says false.
+  ;; Perhaps because partial does a closure on declaration.
+  (satisfies? Job x))
 
 (def pending? (comp (some-fn nil? (partial = :pending)) status))
 (def running? (comp (partial = :running) status))
@@ -205,7 +210,8 @@
   (fn [{:keys [labels]}]
     (lbl/matches-labels? f labels)))
 
-(def resolvable? (partial satisfies? p/JobResolvable))
+(defn resolvable? [x]
+  (satisfies? p/JobResolvable x))
 
 (defn resolve-all
   "Resolves all jobs, removes anything that's not resolvable or not a job."

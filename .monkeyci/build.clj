@@ -42,7 +42,6 @@
    :caches [{:id "mvn-local-repo"
              :path "m2"}]})
 
-(def test-lib (clj-container "test-lib" "lib" "-X:test:junit"))
 (def test-app (clj-container "test-app" "app" "-M:test:junit"))
 
 (def uberjar-artifact
@@ -150,9 +149,6 @@
     (-> (clj-container name dir "-X:jar:deploy")
         (assoc :container/env env))))
 
-(defn publish-lib [ctx]
-  (publish ctx "publish-lib" "lib"))
-
 (defn publish-app [ctx]
   (publish ctx "publish-app" "app"))
 
@@ -177,13 +173,11 @@
 
 (core/defpipeline test-all
   ;; TODO Run these in parallel
-  [test-lib
-   test-app
+  [test-app
    test-gui])
 
 (core/defpipeline publish-libs
-  [publish-lib
-   publish-app])
+  [publish-app])
 
 (core/defpipeline publish-images
   [app-uberjar
