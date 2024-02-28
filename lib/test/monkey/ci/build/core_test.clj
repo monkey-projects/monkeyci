@@ -70,36 +70,7 @@
     (let [job {:id ::test
                :action (constantly ::test)}
           p (sut/pipeline {:steps [job]})]
-      (is (= (:id job) (-> p :jobs first :id)))))
-
-  (testing "makes each job dependent on the previous"
-    (let [[a b :as jobs] [{:id ::first
-                           :action (constantly ::first)}
-                          {:id ::second
-                           :action (constantly ::second)}]
-          p (sut/pipeline {:jobs jobs})]
-      (is (= [::first] (-> p :jobs second :dependencies)))))
-
-  (testing "auto-assigns ids to jobs"
-    (let [jobs (repeat 10 {:action (constantly ::test)})
-          p (sut/pipeline {:jobs jobs})]
-      (is (every? :id (:jobs p)))))
-
-  (testing "assigns id as metadata to function"
-    (let [p (sut/pipeline {:jobs [(constantly ::ok)]})]
-      (is (some? (-> p
-                     :jobs
-                     first
-                     meta
-                     :job/id)))))
-
-  (testing "does not overwrite existing id"
-    (is (= ::test-id (-> {:jobs [{:id ::test-id
-                                  :action (constantly :ok)}]}
-                         (sut/pipeline)
-                         :jobs
-                         first
-                         sut/job-id)))))
+      (is (= (:id job) (-> p :jobs first :id))))))
 
 (deftest defpipeline
   (testing "declares def with pipeline"

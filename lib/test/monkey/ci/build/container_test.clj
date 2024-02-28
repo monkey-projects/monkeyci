@@ -6,16 +6,16 @@
              [spec :as spec]]))
 
 (deftest image
-  (testing "adds image to step config"
+  (testing "adds image to job config"
     (is (= "test-image" (-> {}
                             (sut/image "test-image")
                             :container/image)))))
 
 (deftest image-spec
-  (testing "allows valid steps"
-    (is (s/valid? :ci/step {:container/image "test-image"
-                            :container/cmd ["test" "cmd"]})))
+  (testing "allows valid jobs"
+    (is (s/valid? :ci/job {:container/image "test-image"
+                           :container/cmd ["test" "cmd"]})))
 
   (testing "allows mounts"
-    (is (s/valid? :ci/step {:container/image "test-image"
-                            :container/mounts [["/host/vol" "/container/vol"]]}))))
+    (is (s/valid? :ci/job {:container/image "test-image"
+                           :container/mounts [["/host/vol" "/container/vol"]]}))))

@@ -33,9 +33,9 @@
     (with-redefs-fn {#'bp/shell (fn [opts & _]
                                   {:out (:dir opts)})}
       (let [b (sut/bash "test")]
-        #(is (= "test-dir" (:output (b {:step {:work-dir "test-dir"}})))))))
+        #(is (= "test-dir" (:output (b {:job {:work-dir "test-dir"}})))))))
 
-  (testing "uses context checkout dir if no step dir specified"
+  (testing "uses context checkout dir if no job dir specified"
     (with-redefs-fn {#'bp/shell (fn [opts & _]
                                   {:out (:dir opts)})}
       (let [b (sut/bash "test")]
@@ -67,12 +67,12 @@
           (is (true? (.delete dest))))))))
 
 (deftest in-work
-  (testing "returns relative to step work dir"
+  (testing "returns relative to job work dir"
     (is (= "/script/sub"
-           (sut/in-work {:step {:work-dir "/script"}}
+           (sut/in-work {:job {:work-dir "/script"}}
                         "sub"))))
 
   (testing "fails with absolute path"
     (is (thrown? Exception
-                 (sut/in-work {:step {:work-dir "/script"}}
+                 (sut/in-work {:job {:work-dir "/script"}}
                               "/abs")))))

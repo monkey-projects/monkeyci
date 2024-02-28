@@ -55,34 +55,18 @@
   "Converts legacy map jobs into job records"
   [m]
   (cond
+    (action-job? m) m
+    (container-job? m) m
     (some? (:action m)) (map->ActionJob m)
     (some? (:container/image m)) (map->ContainerJob (assoc m :image (:container/image m)))
     :else m))
 
 (defrecord Pipeline [jobs name])
 
-(defn- add-dependencies [jobs]
-  (reduce (fn [r j]
-            (conj r (cond-> j
-                      (not-empty r)
-                      (update :dependencies (comp vec distinct conj) (:id (last r))))))
-          []
-          jobs))
+(def pipeline? (partial instance? Pipeline))
 
 (defn job-id [x]
   (or (:id x) (:job/id (meta x))))
-
-(defn- assign-ids [jobs]
-  (letfn [(assign-id [x id]
-            (if (nil? (job-id x))
-              (if (map? x)
-                (assoc x :id id)
-                (with-meta x (assoc (meta x) :job/id id)))
-              x))]
-    (map-indexed (fn [i {:keys [id] :as j}]
-                   (cond-> j
-                     (nil? id) (assign-id (keyword (format "job-%d" (inc i))))))
-                 jobs)))
 
 (defn pipeline
   "Create a pipeline with given config"
@@ -92,9 +76,7 @@
       ;; Convert steps into jobs, backwards compatibility
       (mc/assoc-some :jobs (:steps config))
       (dissoc :steps)
-      (update :jobs (comp add-dependencies
-                          assign-ids
-                          (partial map map->job)))
+      (update :jobs (partial map map->job))
       (map->Pipeline)))
 
 (defmacro defpipeline
@@ -105,6 +87,16 @@
      (pipeline
       {:name ~(name n)
        :jobs ~jobs})))
+
+(defmacro defjob
+  "Defines an action job function"
+  [n & args]
+  `(defn ^:job ~n ~@args))
+
+(defn as-job
+  "Marks fn `f` as a job"
+  [f]
+  (with-meta f {:job true}))
 
 (defn git-ref
   "Gets the git ref from the context"

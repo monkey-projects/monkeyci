@@ -47,6 +47,13 @@
     (let [job (dummy-job ::recursive-job)]
       (is (= job (sut/resolve-job (constantly (constantly job)) {})))))
 
+  (testing "returns job fn as action job"
+    (let [job (with-meta (constantly ::ok) {:job true :job/id "test-job"})
+          r (sut/resolve-job job {})]
+      (is (bc/action-job? r))
+      (is (= job (:action r)))
+      (is (= "test-job" (bc/job-id job)))))
+
   (testing "resolves var"
     (is (= test-job (sut/resolve-job #'test-job {}))))
 

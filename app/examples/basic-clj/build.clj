@@ -1,7 +1,7 @@
 ;; Basic Clojure build script
 (require '[monkey.ci.build.core :as core])
 
-(defn simple-step [_]
+(defn ^:job simple-step [_]
   (println "This must be the simplest build script!")
   (println "Running in namespace" (ns-name *ns*))
   ;; Return success response

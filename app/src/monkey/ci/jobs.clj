@@ -10,7 +10,8 @@
             [monkey.ci
              [containers :as co]
              [labels :as lbl]
-             [protocols :as p]]))
+             [protocols :as p]
+             [utils :as u]]))
 
 (def deps "Get job dependencies" :dependencies)
 (def status "Get job status" :status)
@@ -31,6 +32,8 @@
 (extend-protocol Job
   monkey.ci.build.core.ActionJob
   (execute! [{:keys [action]} rt]
+    ;; TODO Rewrite work dir
+    ;; TODO Caches and artifacts
     (action rt))
 
   monkey.ci.build.core.ContainerJob
@@ -83,6 +86,14 @@
        (next-jobs*)
        (vals)))
 
+(defn job-fn? [x]
+  (true? (:job (meta x))))
+
+(defn- fn->action-job [f]
+  (bc/action-job (or (bc/job-id f)
+                     (u/fn-name f))
+                 f))
+
 (extend-protocol p/JobResolvable
   monkey.ci.build.core.ActionJob
   (resolve-job [job _]
@@ -94,8 +105,10 @@
   
   clojure.lang.IFn
   (resolve-job [f rt]
-    ;; Recursively resolve job
-    (p/resolve-job (f rt) rt))
+    ;; Recursively resolve job, unless this is a job fn in itself
+    (if (job-fn? f)
+      (fn->action-job f)
+      (p/resolve-job (f rt) rt)))
 
   clojure.lang.Var
   (resolve-job [v rt]

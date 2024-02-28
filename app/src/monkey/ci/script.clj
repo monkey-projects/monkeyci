@@ -11,6 +11,7 @@
              [build :as build]
              [cache :as cache]
              [containers :as c]
+             [jobs :as j]
              [runtime :as rt]
              [utils :as u]]
             [monkey.ci.containers
@@ -22,7 +23,7 @@
   (:import java.nio.channels.SocketChannel
            [java.net UnixDomainSocketAddress StandardProtocolFamily]))
 
-(defn step-context [p]
+(defn job-context [p]
   (assoc bc/success
          :env {}
          :pipeline p))
@@ -101,56 +102,62 @@
                                        (dissoc :action)
                                        (merge (->map r)))))))))
 
-(defn- make-step-dir-absolute [{:keys [step] :as ctx}]
-  (if (map? step)
+(defn- make-job-dir-absolute
+  "Rewrites the job dir in the context so it becomes an absolute path, calculated
+   relative to the checkout dir.
+
+   Should be moved to job implementations, since this is only useful for action jobs."
+  [{:keys [job] :as ctx}]
+  (if (map? job)
     (let [checkout-dir (build/build-checkout-dir ctx)]
-      (update-in ctx [:step :work-dir]
+      (update-in ctx [:job :work-dir]
                  (fn [d]
                    (if d
                      (u/abs-path checkout-dir d)
                      checkout-dir))))
     ctx))
 
-(defn- run-single-step
-  "Runs a single step using the configured runner"
-  [initial-ctx]
-  (let [{:keys [step] :as ctx} (make-step-dir-absolute initial-ctx)]
+(defn- run-single-job
+  "Runs a single job using the configured runner"
+  [rt]
+  (let [{:keys [job] :as rt} (make-job-dir-absolute rt)]
     (try
-      (log/debug "Running step:" step)
-      (run-step ctx)
+      (log/debug "Running job:" job)
+      #_(run-job ctx)
+      (j/execute! job rt)
       (catch Exception ex
-        (log/warn "Step failed:" (.getMessage ex))
+        (log/warn "Job failed:" (.getMessage ex))
         (assoc bc/failure :exception ex)))))
 
 (defn- with-pipeline [{:keys [pipeline] :as ctx} evt]
   (let [p (select-keys pipeline [:name :index])]
     (-> evt
-        (assoc :index (get-in ctx [:step :index])
+        (assoc :index (get-in ctx [:job :index])
                :pipeline p)
         (script-evt ctx))))
 
-(defn- step-start-evt [{{:keys [name]} :step :as ctx}]
+(defn- job-start-evt [{{:keys [name]} :job :as ctx}]
   (with-pipeline ctx
-    (cond-> {:type :step/start
-             :message "Step started"}
+    (cond-> {:type :job/start
+             :message "Job started"}
       (some? name) (-> (assoc :name name)
                        (update :message str ": " name)))))
 
-(defn- step-end-evt [ctx {:keys [status message exception]}]
+(defn- job-end-evt [ctx {:keys [status message exception]}]
   (with-pipeline ctx
-    (cond-> {:type :step/end
+    (cond-> {:type :job/end
              :message (or message
-                          "Step completed")
-             :name (get-in ctx [:step :name])
+                          "Job completed")
+             :name (get-in ctx [:job :name])
              :status status}
       (some? exception) (assoc :message (.getMessage exception)
                                :stack-trace (u/stack-trace exception)))))
 
-(def run-single-step*
-  ;; TODO Send the start event only when the step has been fully resolved?
-  (wrapped run-single-step
-           step-start-evt
-           step-end-evt))
+(def run-single-job*
+  ;; TODO Send the start event only when the job has been fully resolved?
+  (wrapped run-single-job
+           job-start-evt
+           job-end-evt))
 
 (defn- log-result [r]
   (log/debug "Result:" r)
@@ -159,29 +166,27 @@
   (when-let [o (:error r)]
     (log/warn "Error output:" o)))
 
-(defn- run-steps!
-  "Runs all steps in sequence, stopping at the first failure.
+(defn- run-jobs!
+  "Runs all jobs in sequence, stopping at the first failure.
    Returns the execution context."
-  [initial-ctx idx {:keys [name steps] :as p}]
+  [initial-ctx idx {:keys [name jobs] :as p}]
   (log/info "Running pipeline:" name)
-  (log/debug "Running pipeline steps:" p)
-  ;; TODO If steps is a fn, then invoke it first to get the actual steps.
-  (->> steps
-       (map ->map)
-       ;; Add index to each step
+  (log/debug "Running pipeline jobs:" p)
+  (->> jobs
+       ;; Add index to each job
        (map (fn [i s]
               (assoc s :index i))
             (range))     
        (reduce (fn [ctx s]
                  (let [r (-> ctx
-                             (assoc :step s :pipeline (assoc p :index idx))
-                             (run-single-step*))]
+                             (assoc :job s :pipeline (assoc p :index idx))
+                             (run-single-job*))]
                    (log-result r)
                    (cond-> ctx
                      true (assoc :status (:status r)
                                  :last-result r)
                      (bc/failed? r) (reduced))))
-               (merge (step-context p) initial-ctx))))
+               (merge (job-context p) initial-ctx))))
 
 (defn- pipeline-start-evt [ctx idx {:keys [name]}]
   (script-evt
@@ -201,45 +206,29 @@
     :status (:status r)}
    ctx))
 
-(def run-steps!*
-  (wrapped run-steps!
+(def run-jobs!*
+  (wrapped run-jobs!
            pipeline-start-evt
            pipeline-end-evt))
 
 (defn run-pipelines
-  "Executes the pipelines by running all steps sequentially.  Currently,
+  "Executes the pipelines by running all jobs.  Currently,
    pipelines are executed sequentially too, but this could be converted 
    into parallel processing."
-  [{:keys [pipeline] :as ctx} p]
+  [{:keys [pipeline] :as rt} p]
   (let [pf (cond->> p
              ;; Filter pipeline by name, if given
              pipeline (filter (comp (partial = pipeline) :name)))]
     (log/debug "Found" (count pf) "matching pipelines:" (map :name pf))
     (log/debug "Pipelines after filtering:" pf)
     (let [result (->> pf
-                      (map-indexed (partial run-steps!* ctx))
+                      (map-indexed (partial run-jobs!* rt))
                       (doall))]
       {:status (if (every? bc/success? result) :success :failure)
        :pipelines pf})))
 
-(defn- load-script
-  "Loads the pipelines from the build script, by reading the script
-   files dynamically."
-  [dir build-id]
-  (let [tmp-ns (symbol (or build-id (str "build-" (random-uuid))))]
-    ;; Declare a temporary namespace to load the file in, in case
-    ;; it does not declare an ns of it's own.
-    (in-ns tmp-ns)
-    (clojure.core/use 'clojure.core)
-    (try
-      (let [path (io/file dir "build.clj")]
-        (log/debug "Loading script:" path)
-        ;; This should return pipelines to run
-        (load-file (str path)))
-      (finally
-        ;; Return
-        (in-ns 'monkey.ci.script)
-        (remove-ns tmp-ns)))))
+;;; Script client functions
+;;; TODO Replace this with a more generic approach (possibly using ZeroMQ sockets)
 
 (defn- make-uds-address [path]
   (UnixDomainSocketAddress/of path))
@@ -287,6 +276,28 @@
     (when (valid-config? c)
       {:client (make-client conf)})))
 
+;;; Script loading
+
+(defn- load-script
+  "Loads the pipelines from the build script, by reading the script files 
+   dynamically.  If the build script does not define its own namespace,
+   one will be randomly generated to avoid collisions."
+  [dir build-id]
+  (let [tmp-ns (symbol (or build-id (str "build-" (random-uuid))))]
+    ;; Declare a temporary namespace to load the file in, in case
+    ;; it does not declare an ns of it's own.
+    (in-ns tmp-ns)
+    (clojure.core/use 'clojure.core)
+    (try
+      (let [path (io/file dir "build.clj")]
+        (log/debug "Loading script:" path)
+        ;; This should return pipelines to run
+        (load-file (str path)))
+      (finally
+        ;; Return
+        (in-ns 'monkey.ci.script)
+        (remove-ns tmp-ns)))))
+
 (defn- with-script-dir [{:keys [script-dir] :as ctx} evt]
   (-> (assoc evt :dir script-dir)
       (script-evt ctx)))
@@ -306,29 +317,62 @@
            script-started-evt
            script-completed-evt))
 
-(def pipeline? (partial instance? monkey.ci.build.core.Pipeline))
+(def pipeline? bc/pipeline?)
 
-(defn resolve-pipelines
-  "The build script either returns a list of pipelines, or a function that
-   returns a list.  This function resolves the pipelines in case it's a function
-   or a var."
+(defn- add-dependencies
+  "Given a sequence of jobs from a pipeline, makes each job dependent on the previous one."
+  [jobs]
+  (reduce (fn [r j]
+            (conj r (cond-> j
+                      (not-empty r)
+                      (update :dependencies (comp vec distinct conj) (:id (last r))))))
+          []
+          jobs))
+
+(defn- assign-ids
+  "Assigns an id to each job that does not have one already."
+  [jobs]
+  (letfn [(assign-id [x id]
+            (if (nil? (bc/job-id x))
+              (if (map? x)
+                (assoc x :id id)
+                (with-meta x (assoc (meta x) :job/id id)))
+              x))]
+    (map-indexed (fn [i {:keys [id] :as j}]
+                   (cond-> j
+                     (nil? id) (assign-id (format "job-%d" (inc i)))))
+                 jobs)))
+
+(defn pipeline->jobs
+  "Converts a pipeline in a set of jobs"
+  [rt p]
+  (->> (:jobs p)
+       (j/resolve-all rt)
+       (add-dependencies)
+       (assign-ids)))
+
+(defn resolve-jobs
+  "The build script either returns a list of pipelines, a set of jobs or a function 
+   that returns either.  This function resolves the jobs by processing the script
+   return value."
   [p rt]
   (cond
-    (pipeline? p) [p]
-    (fn? p) (resolve-pipelines (p rt) rt)
-    (var? p) (resolve-pipelines (var-get p) rt)
+    (pipeline? p) (pipeline->jobs rt p)
+    (sequential? p) (mapcat #(resolve-jobs % rt) p)
+    (fn? p) (resolve-jobs (p rt) rt)
+    (var? p) (resolve-jobs (var-get p) rt)
     :else (remove nil? p)))
 
 (defn exec-script!
-  "Loads a script from a directory and executes it.  The script is
-   executed in this same process (but in a randomly generated namespace)."
+  "Loads a script from a directory and executes it.  The script is executed in 
+   this same process."
   [{:keys [script-dir] :as rt}]
   (let [build-id (build/get-build-id rt)]
     (log/debug "Executing script for build" build-id "at:" script-dir)
     (log/debug "Script runtime:" rt)
     (try 
       (let [p (-> (load-script script-dir build-id)
-                  (resolve-pipelines rt))]
+                  (resolve-jobs rt))]
         (log/debug "Pipelines:" p)
         (log/debug "Loaded" (count p) "pipelines:" (map :name p))
         (run-pipelines* rt p))
