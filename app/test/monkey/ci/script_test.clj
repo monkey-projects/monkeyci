@@ -1,15 +1,10 @@
 (ns monkey.ci.script-test
   (:require [clojure.test :refer :all]
-            [clojure.core.async :as ca]
-            [clojure.tools.logging :as log]
             [manifold.deferred :as md]
             [martian
              [core :as martian]
              [test :as mt]]
             [monkey.ci
-             [artifacts :as art]
-             [cache :as cache]
-             [containers :as c]
              [jobs :as j]
              [runtime :as rt]
              [script :as sut]
@@ -17,9 +12,7 @@
             [monkey.ci.web.script-api :as script-api]
             [monkey.ci.build.core :as bc]
             [monkey.ci.helpers :as h]
-            [monkey.socket-async
-             [core :as sa]
-             [uds :as uds]]
+            [monkey.socket-async.uds :as uds]
             [org.httpkit.fake :as hf]
             [schema.core :as s]))
 
@@ -208,119 +201,4 @@
       (is (bc/failed? @(j/execute! f rt)))
       (is (= 2 (count @events)) "expected job end event"))))
 
-#_(defmethod c/run-container :test [ctx]
-    {:test-result :run-from-test
-     :context ctx
-     :status :success
-     :exit 0})
 
-#_(deftest pipeline-run-job
-  (testing "fails on invalid config"
-    (is (thrown? Exception (sut/run-job {:job (constantly bc/success)}))))
-
-  (testing "executes action from map"
-    (is (bc/success? (sut/run-job {:job {:action (constantly bc/success)}}))))
-
-  (testing "executes in container if configured"
-    (let [ctx {:job {:container/image "test-image"}
-               :containers {:type :test}}
-          r (sut/run-job ctx)]
-      (is (= :run-from-test (:test-result r)))
-      (is (bc/success? r))))
-
-  (testing "restores/saves cache if configured"
-    (let [saved (atom false)]
-      (with-redefs [cache/save-caches
-                    (fn [ctx]
-                      (reset! saved true)
-                      ctx)
-                    cache/restore-caches
-                    (fn [ctx]
-                      (->> (get-in ctx [:job :caches])
-                           (mapv :id)))]
-        (let [ctx {:job {:action (fn [ctx]
-                                    (when-not (= [:test-cache] (get-in ctx [:job :caches]))
-                                      bc/failure))
-                          :caches [{:id :test-cache
-                                    :path "test-cache"}]}}
-              r (sut/run-job ctx)]
-          (is (bc/success? r))
-          (is (true? @saved))))))
-
-  (testing "saves artifacts if configured"
-    (let [saved (atom false)]
-      (with-redefs [art/save-artifacts
-                    (fn [ctx]
-                      (reset! saved true)
-                      ctx)]
-        (let [ctx {:job {:action (fn [ctx]
-                                    (when-not (= :test-artifact (-> (get-in ctx [:job :save-artifacts])
-                                                                    first
-                                                                    :id))
-                                      (assoc bc/failure)))
-                          :save-artifacts [{:id :test-artifact
-                                            :path "test-artifact"}]}}
-              r (sut/run-job ctx)]
-          (is (bc/success? r))
-          (is (true? @saved))))))
-
-  (testing "restores artifacts if configured"
-    (let [restored (atom false)]
-      (with-redefs [art/restore-artifacts
-                    (fn [ctx]
-                      (reset! restored true)
-                      ctx)]
-        (let [ctx {:job {:action (fn [ctx]
-                                    (when-not (= :test-artifact (-> (get-in ctx [:job :restore-artifacts])
-                                                                    first
-                                                                    :id))
-                                      (assoc bc/failure)))
-                          :restore-artifacts [{:id :test-artifact
-                                               :path "test-artifact"}]}}
-              r (sut/run-job ctx)]
-          (is (bc/success? r))
-          (is (true? @restored))))))
-
-  (testing "function returns job config"
-
-    (testing "runs container config when returned"
-      (let [job (fn [_]
-                   {:container/image "test-image"})
-            ctx {:job {:action job}
-                 :containers {:type :test}}
-            r (sut/run-job ctx)]
-        (is (= :run-from-test (:test-result r)))
-        (is (bc/success? r))))
-
-    (testing "adds job back to context"
-      (let [job {:container/image "test-image"}
-            job-fn (fn [_]
-                      job)
-            ctx {:containers {:type :test}
-                 :job {:action job-fn}}
-            r (sut/run-job ctx)]
-        (is (= job (get-in r [:context :job])))))
-
-    (testing "sets index on the job"
-      (let [job-dest (fn [ctx]
-                        (when-not (number? (get-in ctx [:job :index]))
-                          (assoc bc/failure :message "Index not specified")))
-            job-fn (fn [ctx]
-                      job-dest)
-            job {:action job-fn
-                  :index 123}
-            ctx {:containers {:type :test}
-                 :job job}
-            r (sut/run-job ctx)]
-        (is (bc/success? r))))))
-
-#_(deftest ->map
-  (testing "wraps function in map"
-    (is (map? (sut/->map (constantly "ok")))))
-
-  (testing "leaves map as-is"
-    (let [m {:key "value"}]
-      (is (= m (sut/->map m)))))
-
-  (testing "adds function name to action"
-    (is (= "->map" (:name (sut/->map sut/->map))))))

@@ -2,6 +2,8 @@
   (:require [clojure.test :refer [deftest testing is]]
             [monkey.ci.build.core :as bc]
             [monkey.ci
+             [artifacts :as art]
+             [cache :as cache]
              [containers :as co]
              [jobs :as sut]]))
 
@@ -66,11 +68,77 @@
       (is (sut/job? job)))
     
     (testing "executes action"
-      (is (= ::result (sut/execute! job {}))))
+      (is (= ::result @(sut/execute! job {}))))
 
-    (testing "restores and saves caches")
-    (testing "restores artifacts")
-    (testing "saves artifacts")))
+    (testing "rewrites work dir to absolute path against checkout dir"
+      (let [job (bc/action-job ::wd-job
+                               (fn [rt]
+                                 (assoc bc/success :wd (bc/work-dir rt)))
+                               {:work-dir "sub/dir"})]
+        (is (= "/checkout/sub/dir"
+               (-> (sut/execute! job {:build {:checkout-dir "/checkout"}
+                                      :job job})
+                   (deref)
+                   :wd)))))
+    
+    (testing "restores/saves cache if configured"
+      (let [saved (atom false)]
+        (with-redefs [cache/save-caches
+                      (fn [rt]
+                        (reset! saved true)
+                        rt)
+                      cache/restore-caches
+                      (fn [rt]
+                        (->> (get-in rt [:job :caches])
+                             (mapv :id)))]
+          (let [job (bc/action-job ::job-with-caches
+                                   (fn [rt]
+                                     (when-not (= [:test-cache] (get-in rt [:job :caches]))
+                                       bc/failure))
+                                   {:caches [{:id :test-cache
+                                              :path "test-cache"}]})
+                rt {:job job}
+                r (sut/execute! job rt)]
+            (is (bc/success? r))
+            (is (true? @saved))))))
+
+    (testing "saves artifacts if configured"
+      (let [saved (atom false)]
+        (with-redefs [art/save-artifacts
+                      (fn [rt]
+                        (reset! saved true)
+                        rt)]
+          (let [job (bc/action-job ::job-with-artifacts
+                                   (fn [rt]
+                                     (when-not (= :test-artifact (-> (get-in rt [:job :save-artifacts])
+                                                                     first
+                                                                     :id))
+                                       (assoc bc/failure)))
+                                   {:save-artifacts [{:id :test-artifact
+                                                      :path "test-artifact"}]})
+                rt {:job job}
+                r (sut/execute! job rt)]
+            (is (bc/success? r))
+            (is (true? @saved))))))
+
+    (testing "restores artifacts if configured"
+      (let [restored (atom false)]
+        (with-redefs [art/restore-artifacts
+                      (fn [rt]
+                        (reset! restored true)
+                        rt)]
+          (let [job (bc/action-job ::job-with-artifacts
+                                   (fn [rt]
+                                     (when-not (= :test-artifact (-> (get-in rt [:job :restore-artifacts])
+                                                                     first
+                                                                     :id))
+                                       (assoc bc/failure)))
+                                   {:restore-artifacts [{:id :test-artifact
+                                                         :path "test-artifact"}]})
+                rt {:job job}
+                r (sut/execute! job rt)]
+            (is (bc/success? r))
+            (is (true? @restored))))))))
 
 (deftest execute-jobs!
   (testing "empty if no jobs"

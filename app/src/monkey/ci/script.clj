@@ -24,11 +24,6 @@
   (:import java.nio.channels.SocketChannel
            [java.net UnixDomainSocketAddress StandardProtocolFamily]))
 
-(defn job-context [p]
-  (assoc bc/success
-         :env {}
-         :pipeline p))
-
 (defn- script-evt [evt rt]
   (assoc evt
          :src :script
@@ -57,68 +52,6 @@
     (fn [ctx & more]
       (apply w (assoc ctx :events {:poster (partial post-event ctx)}) more))))
 
-;; (defmethod run-step ::container
-;;   ;; Runs the step in a new container.  How this container is executed depends on
-;;   ;; the configuration passed in from the parent process, specified in the context.
-;;   [ctx]
-;;   (let [{:keys [exit] :as r} (->> (c/run-container ctx)
-;;                                   (merge bc/failure))]
-;;     (cond-> r
-;;       (= 0 exit) (merge bc/success))))
-
-;; (defmethod run-step ::action
-;;   ;; Runs a step as an action.  The action property of a step should be a
-;;   ;; function that either returns a status result, or a new step configuration.
-;;   [{:keys [step] :as ctx}]
-;;   (let [f (:action step)]
-;;     (log/debug "Executing function:" f)
-;;     ;; If a step returns nil, treat it as success
-;;     (let [r (or ((comp deref
-;;                        (-> f
-;;                            (art/wrap-artifacts)
-;;                            (cache/wrap-caches))) ctx)
-;;                 bc/success)]
-;;       (if (bc/status? r)
-;;         r
-;;         ;; Recurse
-;;         (run-step (assoc ctx :step (-> step
-;;                                        (dissoc :action)
-;;                                        (merge (->map r)))))))))
-
-;; (defn- make-job-dir-absolute
-;;   "Rewrites the job dir in the context so it becomes an absolute path, calculated
-;;    relative to the checkout dir.
-
-;;    Should be moved to job implementations, since this is only useful for action jobs."
-;;   [{:keys [job] :as ctx}]
-;;   (if (map? job)
-;;     (let [checkout-dir (build/build-checkout-dir ctx)]
-;;       (update-in ctx [:job :work-dir]
-;;                  (fn [d]
-;;                    (if d
-;;                      (u/abs-path checkout-dir d)
-;;                      checkout-dir))))
-;;     ctx))
-
-;; (defn- run-single-job
-;;   "Runs a single job using the configured runner"
-;;   [rt]
-;;   (let [{:keys [job] :as rt} (make-job-dir-absolute rt)]
-;;     (try
-;;       (log/debug "Running job:" job)
-;;       #_(run-job ctx)
-;;       (j/execute! job rt)
-;;       (catch Exception ex
-;;         (log/warn "Job failed:" (.getMessage ex))
-;;         (assoc bc/failure :exception ex)))))
-
-;; (defn- with-pipeline [{:keys [pipeline] :as ctx} evt]
-;;   (let [p (select-keys pipeline [:name :index])]
-;;     (-> evt
-;;         (assoc :index (get-in ctx [:job :index])
-;;                :pipeline p)
-;;         (script-evt ctx))))
-
 (defn- job-start-evt [{:keys [job]}]
   (cond-> {:type :job/start
            :id (bc/job-id job)
@@ -132,41 +65,6 @@
            :status status}
     (some? exception) (assoc :message (.getMessage exception)
                              :stack-trace (u/stack-trace exception))))
-
-;; (def run-single-job*
-;;   ;; TODO Send the start event only when the job has been fully resolved?
-;;   (wrapped run-single-job
-;;            job-start-evt
-;;            job-end-evt))
-
-;; (defn- log-result [r]
-;;   (log/debug "Result:" r)
-;;   (when-let [o (:output r)]
-;;     (log/debug "Output:" o))
-;;   (when-let [o (:error r)]
-;;     (log/warn "Error output:" o)))
-
-;; (defn- run-jobs!
-;;   "Runs all jobs in sequence, stopping at the first failure.
-;;    Returns the execution context."
-;;   [initial-ctx idx {:keys [name jobs] :as p}]
-;;   (log/info "Running pipeline:" name)
-;;   (log/debug "Running pipeline jobs:" p)
-;;   (->> jobs
-;;        ;; Add index to each job
-;;        (map (fn [i s]
-;;               (assoc s :index i))
-;;             (range))     
-;;        (reduce (fn [ctx s]
-;;                  (let [r (-> ctx
-;;                              (assoc :job s :pipeline (assoc p :index idx))
-;;                              (run-single-job*))]
-;;                    (log-result r)
-;;                    (cond-> ctx
-;;                      true (assoc :status (:status r)
-;;                                  :last-result r)
-;;                      (bc/failed? r) (reduced))))
-;;                (merge (job-context p) initial-ctx))))
 
 ;; Wraps a job so it fires an event before and after execution, and also
 ;; catches any exceptions.

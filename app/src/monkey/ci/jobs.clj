@@ -8,6 +8,9 @@
             [medley.core :as mc]
             [monkey.ci.build.core :as bc]
             [monkey.ci
+             [artifacts :as art]
+             [build :as build]
+             [cache :as cache]
              [containers :as co]
              [labels :as lbl]
              [protocols :as p]
@@ -34,12 +37,26 @@
 (def failed?  (comp (partial = :failure) status))
 (def success? (comp (partial = :success) status))
 
+(defn- make-job-dir-absolute
+  "Rewrites the job dir in the context so it becomes an absolute path, calculated
+   relative to the checkout dir."
+  [{:keys [job] :as rt}]
+  (let [checkout-dir (build/build-checkout-dir rt)]
+    (update-in rt [:job :work-dir]
+               (fn [d]
+                 (if d
+                   (u/abs-path checkout-dir d)
+                   checkout-dir)))))
+
 (extend-protocol Job
   monkey.ci.build.core.ActionJob
   (execute! [{:keys [action]} rt]
-    ;; TODO Rewrite work dir
-    ;; TODO Caches and artifacts
-    (action rt))
+    (let [a (-> action
+                (cache/wrap-caches)
+                (art/wrap-artifacts))]
+      (-> rt
+          (make-job-dir-absolute)
+          (a))))
 
   monkey.ci.build.core.ContainerJob
   (execute! [this rt]
