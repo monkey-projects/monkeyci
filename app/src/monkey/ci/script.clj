@@ -56,78 +56,78 @@
     (fn [ctx & more]
       (apply w (assoc ctx :events {:poster (partial post-event ctx)}) more))))
 
-(defn ->map [s]
-  (if (map? s)
-    s
-    {:action s
-     :name (u/fn-name s)}))
+;; (defn ->map [s]
+;;   (if (map? s)
+;;     s
+;;     {:action s
+;;      :name (u/fn-name s)}))
 
-(defn step-type
-  "Determines step type according to contents"
-  [{:keys [step]}]
-  (cond
-    ;; TODO Make more generic
-    (string? (:container/image step)) ::container
-    (fn? (:action step)) ::action
-    :else
-    (throw (ex-info "invalid step configuration" {:step step}))))
+;; (defn step-type
+;;   "Determines step type according to contents"
+;;   [{:keys [step]}]
+;;   (cond
+;;     ;; TODO Make more generic
+;;     (string? (:container/image step)) ::container
+;;     (fn? (:action step)) ::action
+;;     :else
+;;     (throw (ex-info "invalid step configuration" {:step step}))))
 
-(defmulti run-step step-type)
+;; (defmulti run-step step-type)
 
-(defmethod run-step ::container
-  ;; Runs the step in a new container.  How this container is executed depends on
-  ;; the configuration passed in from the parent process, specified in the context.
-  [ctx]
-  (let [{:keys [exit] :as r} (->> (c/run-container ctx)
-                                  (merge bc/failure))]
-    (cond-> r
-      (= 0 exit) (merge bc/success))))
+;; (defmethod run-step ::container
+;;   ;; Runs the step in a new container.  How this container is executed depends on
+;;   ;; the configuration passed in from the parent process, specified in the context.
+;;   [ctx]
+;;   (let [{:keys [exit] :as r} (->> (c/run-container ctx)
+;;                                   (merge bc/failure))]
+;;     (cond-> r
+;;       (= 0 exit) (merge bc/success))))
 
-(defmethod run-step ::action
-  ;; Runs a step as an action.  The action property of a step should be a
-  ;; function that either returns a status result, or a new step configuration.
-  [{:keys [step] :as ctx}]
-  (let [f (:action step)]
-    (log/debug "Executing function:" f)
-    ;; If a step returns nil, treat it as success
-    (let [r (or ((comp deref
-                       (-> f
-                           (art/wrap-artifacts)
-                           (cache/wrap-caches))) ctx)
-                bc/success)]
-      (if (bc/status? r)
-        r
-        ;; Recurse
-        (run-step (assoc ctx :step (-> step
-                                       (dissoc :action)
-                                       (merge (->map r)))))))))
+;; (defmethod run-step ::action
+;;   ;; Runs a step as an action.  The action property of a step should be a
+;;   ;; function that either returns a status result, or a new step configuration.
+;;   [{:keys [step] :as ctx}]
+;;   (let [f (:action step)]
+;;     (log/debug "Executing function:" f)
+;;     ;; If a step returns nil, treat it as success
+;;     (let [r (or ((comp deref
+;;                        (-> f
+;;                            (art/wrap-artifacts)
+;;                            (cache/wrap-caches))) ctx)
+;;                 bc/success)]
+;;       (if (bc/status? r)
+;;         r
+;;         ;; Recurse
+;;         (run-step (assoc ctx :step (-> step
+;;                                        (dissoc :action)
+;;                                        (merge (->map r)))))))))
 
-(defn- make-job-dir-absolute
-  "Rewrites the job dir in the context so it becomes an absolute path, calculated
-   relative to the checkout dir.
+;; (defn- make-job-dir-absolute
+;;   "Rewrites the job dir in the context so it becomes an absolute path, calculated
+;;    relative to the checkout dir.
 
-   Should be moved to job implementations, since this is only useful for action jobs."
-  [{:keys [job] :as ctx}]
-  (if (map? job)
-    (let [checkout-dir (build/build-checkout-dir ctx)]
-      (update-in ctx [:job :work-dir]
-                 (fn [d]
-                   (if d
-                     (u/abs-path checkout-dir d)
-                     checkout-dir))))
-    ctx))
+;;    Should be moved to job implementations, since this is only useful for action jobs."
+;;   [{:keys [job] :as ctx}]
+;;   (if (map? job)
+;;     (let [checkout-dir (build/build-checkout-dir ctx)]
+;;       (update-in ctx [:job :work-dir]
+;;                  (fn [d]
+;;                    (if d
+;;                      (u/abs-path checkout-dir d)
+;;                      checkout-dir))))
+;;     ctx))
 
-(defn- run-single-job
-  "Runs a single job using the configured runner"
-  [rt]
-  (let [{:keys [job] :as rt} (make-job-dir-absolute rt)]
-    (try
-      (log/debug "Running job:" job)
-      #_(run-job ctx)
-      (j/execute! job rt)
-      (catch Exception ex
-        (log/warn "Job failed:" (.getMessage ex))
-        (assoc bc/failure :exception ex)))))
+;; (defn- run-single-job
+;;   "Runs a single job using the configured runner"
+;;   [rt]
+;;   (let [{:keys [job] :as rt} (make-job-dir-absolute rt)]
+;;     (try
+;;       (log/debug "Running job:" job)
+;;       #_(run-job ctx)
+;;       (j/execute! job rt)
+;;       (catch Exception ex
+;;         (log/warn "Job failed:" (.getMessage ex))
+;;         (assoc bc/failure :exception ex)))))
 
 (defn- with-pipeline [{:keys [pipeline] :as ctx} evt]
   (let [p (select-keys pipeline [:name :index])]
@@ -153,79 +153,75 @@
       (some? exception) (assoc :message (.getMessage exception)
                                :stack-trace (u/stack-trace exception)))))
 
-(def run-single-job*
-  ;; TODO Send the start event only when the job has been fully resolved?
-  (wrapped run-single-job
-           job-start-evt
-           job-end-evt))
+;; (def run-single-job*
+;;   ;; TODO Send the start event only when the job has been fully resolved?
+;;   (wrapped run-single-job
+;;            job-start-evt
+;;            job-end-evt))
 
-(defn- log-result [r]
-  (log/debug "Result:" r)
-  (when-let [o (:output r)]
-    (log/debug "Output:" o))
-  (when-let [o (:error r)]
-    (log/warn "Error output:" o)))
+;; (defn- log-result [r]
+;;   (log/debug "Result:" r)
+;;   (when-let [o (:output r)]
+;;     (log/debug "Output:" o))
+;;   (when-let [o (:error r)]
+;;     (log/warn "Error output:" o)))
 
-(defn- run-jobs!
-  "Runs all jobs in sequence, stopping at the first failure.
-   Returns the execution context."
-  [initial-ctx idx {:keys [name jobs] :as p}]
-  (log/info "Running pipeline:" name)
-  (log/debug "Running pipeline jobs:" p)
-  (->> jobs
-       ;; Add index to each job
-       (map (fn [i s]
-              (assoc s :index i))
-            (range))     
-       (reduce (fn [ctx s]
-                 (let [r (-> ctx
-                             (assoc :job s :pipeline (assoc p :index idx))
-                             (run-single-job*))]
-                   (log-result r)
-                   (cond-> ctx
-                     true (assoc :status (:status r)
-                                 :last-result r)
-                     (bc/failed? r) (reduced))))
-               (merge (job-context p) initial-ctx))))
+;; (defn- run-jobs!
+;;   "Runs all jobs in sequence, stopping at the first failure.
+;;    Returns the execution context."
+;;   [initial-ctx idx {:keys [name jobs] :as p}]
+;;   (log/info "Running pipeline:" name)
+;;   (log/debug "Running pipeline jobs:" p)
+;;   (->> jobs
+;;        ;; Add index to each job
+;;        (map (fn [i s]
+;;               (assoc s :index i))
+;;             (range))     
+;;        (reduce (fn [ctx s]
+;;                  (let [r (-> ctx
+;;                              (assoc :job s :pipeline (assoc p :index idx))
+;;                              (run-single-job*))]
+;;                    (log-result r)
+;;                    (cond-> ctx
+;;                      true (assoc :status (:status r)
+;;                                  :last-result r)
+;;                      (bc/failed? r) (reduced))))
+;;                (merge (job-context p) initial-ctx))))
 
-(defn- pipeline-start-evt [ctx idx {:keys [name]}]
-  (script-evt
-   {:type :pipeline/start
-    :pipeline {:name name
-               :index idx}
-    :message (cond-> "Starting pipeline"
-               name (str ": " name))}
-   ctx))
+;; (defn- pipeline-start-evt [ctx idx {:keys [name]}]
+;;   (script-evt
+;;    {:type :pipeline/start
+;;     :pipeline {:name name
+;;                :index idx}
+;;     :message (cond-> "Starting pipeline"
+;;                name (str ": " name))}
+;;    ctx))
 
-(defn- pipeline-end-evt [ctx idx {:keys [name]} r]
-  (script-evt
-   {:type :pipeline/end
-    :pipeline {:name name
-               :index idx}
-    :message "Completed pipeline"
-    :status (:status r)}
-   ctx))
+;; (defn- pipeline-end-evt [ctx idx {:keys [name]} r]
+;;   (script-evt
+;;    {:type :pipeline/end
+;;     :pipeline {:name name
+;;                :index idx}
+;;     :message "Completed pipeline"
+;;     :status (:status r)}
+;;    ctx))
 
-(def run-jobs!*
-  (wrapped run-jobs!
-           pipeline-start-evt
-           pipeline-end-evt))
+;; (def run-jobs!*
+;;   (wrapped run-jobs!
+;;            pipeline-start-evt
+;;            pipeline-end-evt))
 
-(defn run-pipelines
-  "Executes the pipelines by running all jobs.  Currently,
-   pipelines are executed sequentially too, but this could be converted 
-   into parallel processing."
-  [{:keys [pipeline] :as rt} p]
-  (let [pf (cond->> p
-             ;; Filter pipeline by name, if given
-             pipeline (filter (comp (partial = pipeline) :name)))]
-    (log/debug "Found" (count pf) "matching pipelines:" (map :name pf))
-    (log/debug "Pipelines after filtering:" pf)
-    (let [result (->> pf
-                      (map-indexed (partial run-jobs!* rt))
-                      (doall))]
-      {:status (if (every? bc/success? result) :success :failure)
-       :pipelines pf})))
+(defn run-all-jobs
+  "Executes all jobs in the set, in dependency order."
+  [{:keys [pipeline] :as rt} jobs]
+  (let [pf (cond->> jobs
+             ;; Filter jobs by pipeline, if given
+             pipeline (j/filter-jobs (j/label-filter [[{:label "pipeline"
+                                                        :value pipeline}]])))]
+    (log/debug "Found" (count pf) "matching jobs:" (map bc/job-id pf))
+    (let [result @(j/execute-jobs! pf rt)]
+      {:status (if (every? (comp bc/success? :result) (vals result)) :success :failure)
+       :jobs result})))
 
 ;;; Script client functions
 ;;; TODO Replace this with a more generic approach (possibly using ZeroMQ sockets)
@@ -312,8 +308,8 @@
     {:type :script/end
      :message "Script completed"}))
 
-(def run-pipelines*
-  (wrapped run-pipelines
+(def run-all-jobs*
+  (wrapped run-all-jobs
            script-started-evt
            script-completed-evt))
 
@@ -343,13 +339,18 @@
                      (nil? id) (assign-id (format "job-%d" (inc i)))))
                  jobs)))
 
+(defn- add-pipeline-name-lbl [{:keys [name]} jobs]
+  (cond->> jobs
+    name (map #(assoc-in % [j/labels "pipeline"] name))))
+
 (defn pipeline->jobs
   "Converts a pipeline in a set of jobs"
   [rt p]
   (->> (:jobs p)
        (j/resolve-all rt)
        (add-dependencies)
-       (assign-ids)))
+       (assign-ids)
+       (add-pipeline-name-lbl p)))
 
 (defn resolve-jobs
   "The build script either returns a list of pipelines, a set of jobs or a function 
@@ -371,13 +372,13 @@
     (log/debug "Executing script for build" build-id "at:" script-dir)
     (log/debug "Script runtime:" rt)
     (try 
-      (let [p (-> (load-script script-dir build-id)
-                  (resolve-jobs rt))]
-        (log/debug "Pipelines:" p)
-        (log/debug "Loaded" (count p) "pipelines:" (map :name p))
-        (run-pipelines* rt p))
+      (let [jobs (-> (load-script script-dir build-id)
+                     (resolve-jobs rt))]
+        (log/debug "Jobs:" jobs)
+        (log/debug "Loaded" (count jobs) "jobs:" (map bc/job-id jobs))
+        (run-all-jobs* rt jobs))
       (catch Exception ex
-        (log/error "Unable to load pipelines" ex)
+        (log/error "Unable to load build script" ex)
         (post-event rt {:type :script/end
                         :message (.getMessage ex)})
         bc/failure))))

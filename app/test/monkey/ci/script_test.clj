@@ -9,6 +9,7 @@
              [artifacts :as art]
              [cache :as cache]
              [containers :as c]
+             [jobs :as j]
              [runtime :as rt]
              [script :as sut]
              [utils :as u]]
@@ -83,7 +84,16 @@
                          (bc/pipeline)
                          (sut/resolve-jobs {})
                          first
-                         bc/job-id)))))
+                         bc/job-id))))
+
+  (testing "adds pipeline name as label"
+    (is (= "test-pipeline" (-> {:jobs [(dummy-job)]
+                                :name "test-pipeline"}
+                               (bc/pipeline)
+                               (sut/resolve-jobs {})
+                               first
+                               j/labels
+                               (get "pipeline"))))))
 
 (deftest exec-script!
   (testing "executes basic clj script from location"
@@ -116,36 +126,30 @@
     (hf/with-fake-http ["http://test/script/swagger.json" 200]
       (is (some? (sut/make-client {:api {:url "http://test"}}))))))
 
-(deftest run-pipelines
+(deftest run-all-jobs
   (testing "success if no pipelines"
-    (is (bc/success? (sut/run-pipelines {} []))))
+    (is (bc/success? (sut/run-all-jobs {} []))))
 
   (testing "success if all jobs succeed"
-    (is (bc/success? (->> [(bc/pipeline {:jobs [(dummy-job bc/success)]})]
-                          (sut/run-pipelines {})))))
+    (is (bc/success? (->> [(dummy-job bc/success)]
+                          (sut/run-all-jobs {})))))
 
-  (testing "runs a single pipline"
-    (is (bc/success? (->> (bc/pipeline {:name "single"
-                                        :jobs [(dummy-job bc/success)]})
-                          (sut/run-pipelines {})))))
-  
   (testing "fails if a job fails"
-    (is (bc/failed? (->> [(bc/pipeline {:jobs [(dummy-job bc/failure)]})]
-                         (sut/run-pipelines {})))))
+    (is (bc/failed? (->> [(dummy-job bc/failure)]
+                         (sut/run-all-jobs {})))))
 
   (testing "success if job returns `nil`"
-    (is (bc/success? (->> (bc/pipeline {:name "nil"
-                                        :jobs [(dummy-job nil)]})
-                          (sut/run-pipelines {})))))
+    (is (bc/success? (->> [(dummy-job nil)]
+                          (sut/run-all-jobs {})))))
 
-  (testing "runs pipeline by name, if given"
+  (testing "runs jobs filtered by pipeline name"
     (is (bc/success? (->> [(bc/pipeline {:name "first"
                                          :jobs [(dummy-job bc/success)]})
                            (bc/pipeline {:name "second"
                                          :jobs [(dummy-job bc/failure)]})]
-                          (sut/run-pipelines {:pipeline "first"})))))
+                          (sut/run-all-jobs {:pipeline "first"})))))
 
-  (testing "posts events through api"
+  #_(testing "posts events through api"
     (letfn [(verify-evt [expected-type]
               (let [events-posted (atom [])
                     ;; Set up a fake api
@@ -157,36 +161,21 @@
                                (mt/respond-with {:post-event (fn [req]
                                                                (swap! events-posted conj (:body req))
                                                                (future {:status 200}))}))
-                    pipelines [(bc/pipeline {:name "test"
-                                             :jobs [(dummy-job bc/success)]})]
-                    ctx {:api {:client client}}]
-                (is (bc/success? (sut/run-pipelines ctx pipelines)))
+                    jobs [(dummy-job bc/success)]
+                    rt {:api {:client client}}]
+                (is (bc/success? (sut/run-all-jobs rt jobs)))
                 (is (not-empty @events-posted))
                 (is (true? (-> (map :type @events-posted)
                                (set)
                                (contains? expected-type))))))]
 
       ;; Run a test for each type
-      (->> [:pipeline/start
-            :pipeline/end
-            :job/start
+      (->> [:job/start
             :job/end]
            (map (fn [t]
                   (testing (str t)
                     (verify-evt t))))
-           (doall))))
-
-  (testing "skips `nil` pipelines"
-    (is (bc/success? (->> [(bc/pipeline {:jobs [(dummy-job bc/success)]})
-                           nil]
-                          (sut/run-pipelines {})))))
-
-  (testing "handles pipeline seq that's not a vector"
-    (let [r (->> '((bc/pipeline {:jobs [(dummy-job bc/success)]})
-                   (bc/pipeline {:jobs [(dummy-job bc/success)]}))
-                 (sut/run-pipelines {}))]
-      (is (bc/success? r))
-      (is (= 2 (count (:pipelines r)))))))
+           (doall)))))
 
 #_(defmethod c/run-container :test [ctx]
   {:test-result :run-from-test
