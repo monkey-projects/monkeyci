@@ -2,6 +2,7 @@
   (:require [clojure.test :refer :all]
             [clojure.core.async :as ca]
             [clojure.tools.logging :as log]
+            [manifold.deferred :as md]
             [martian
              [core :as martian]
              [test :as mt]]
@@ -177,11 +178,41 @@
                     (verify-evt t))))
            (doall)))))
 
+(deftest event-firing-job
+  (testing "invokes target"
+    (is (bc/success? @(j/execute! (sut/->EventFiringJob (dummy-job)) {}))))
+  
+  (testing "posts event at start and stop"
+    (let [events (atom [])
+          rt {:events {:poster (partial swap! events conj)}}
+          job (dummy-job)
+          f (sut/->EventFiringJob job)]
+      (is (some? @(j/execute! f rt)))
+      (is (= 2 (count @events)))
+      (is (= :job/start (:type (first @events))))
+      (is (= :job/end (:type (second @events))))))
+
+  (testing "catches sync errors, returns failure"
+    (let [events (atom [])
+          rt {:events {:poster (partial swap! events conj)}}
+          job (bc/action-job ::failing-job (fn [_] (throw (ex-info "Test error" {}))))
+          f (sut/->EventFiringJob job)]
+      (is (bc/failed? @(j/execute! f rt)))
+      (is (= 2 (count @events)) "expected job end event")))
+
+  (testing "catches async errors, returns failure"
+    (let [events (atom [])
+          rt {:events {:poster (partial swap! events conj)}}
+          job (bc/action-job ::failing-job (fn [_] (md/error-deferred (ex-info "Test error" {}))))
+          f (sut/->EventFiringJob job)]
+      (is (bc/failed? @(j/execute! f rt)))
+      (is (= 2 (count @events)) "expected job end event"))))
+
 #_(defmethod c/run-container :test [ctx]
-  {:test-result :run-from-test
-   :context ctx
-   :status :success
-   :exit 0})
+    {:test-result :run-from-test
+     :context ctx
+     :status :success
+     :exit 0})
 
 #_(deftest pipeline-run-job
   (testing "fails on invalid config"

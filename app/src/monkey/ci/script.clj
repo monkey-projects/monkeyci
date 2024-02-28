@@ -1,6 +1,7 @@
 (ns monkey.ci.script
   (:require [clojure.java.io :as io]
             [clojure.tools.logging :as log]
+            [manifold.deferred :as md]
             [martian
              [core :as martian]
              [httpkit :as mh]
@@ -55,24 +56,6 @@
         w (ec/wrapped f before after error)]
     (fn [ctx & more]
       (apply w (assoc ctx :events {:poster (partial post-event ctx)}) more))))
-
-;; (defn ->map [s]
-;;   (if (map? s)
-;;     s
-;;     {:action s
-;;      :name (u/fn-name s)}))
-
-;; (defn step-type
-;;   "Determines step type according to contents"
-;;   [{:keys [step]}]
-;;   (cond
-;;     ;; TODO Make more generic
-;;     (string? (:container/image step)) ::container
-;;     (fn? (:action step)) ::action
-;;     :else
-;;     (throw (ex-info "invalid step configuration" {:step step}))))
-
-;; (defmulti run-step step-type)
 
 ;; (defmethod run-step ::container
 ;;   ;; Runs the step in a new container.  How this container is executed depends on
@@ -129,29 +112,26 @@
 ;;         (log/warn "Job failed:" (.getMessage ex))
 ;;         (assoc bc/failure :exception ex)))))
 
-(defn- with-pipeline [{:keys [pipeline] :as ctx} evt]
-  (let [p (select-keys pipeline [:name :index])]
-    (-> evt
-        (assoc :index (get-in ctx [:job :index])
-               :pipeline p)
-        (script-evt ctx))))
+;; (defn- with-pipeline [{:keys [pipeline] :as ctx} evt]
+;;   (let [p (select-keys pipeline [:name :index])]
+;;     (-> evt
+;;         (assoc :index (get-in ctx [:job :index])
+;;                :pipeline p)
+;;         (script-evt ctx))))
 
-(defn- job-start-evt [{{:keys [name]} :job :as ctx}]
-  (with-pipeline ctx
-    (cond-> {:type :job/start
-             :message "Job started"}
-      (some? name) (-> (assoc :name name)
-                       (update :message str ": " name)))))
+(defn- job-start-evt [{:keys [job]}]
+  (cond-> {:type :job/start
+           :id (bc/job-id job)
+           :message "Job started"}))
 
-(defn- job-end-evt [ctx {:keys [status message exception]}]
-  (with-pipeline ctx
-    (cond-> {:type :job/end
-             :message (or message
-                          "Job completed")
-             :name (get-in ctx [:job :name])
-             :status status}
-      (some? exception) (assoc :message (.getMessage exception)
-                               :stack-trace (u/stack-trace exception)))))
+(defn- job-end-evt [{:keys [job]} {:keys [status message exception]}]
+  (cond-> {:type :job/end
+           :message (or message
+                        "Job completed")
+           :id (bc/job-id job)
+           :status status}
+    (some? exception) (assoc :message (.getMessage exception)
+                             :stack-trace (u/stack-trace exception))))
 
 ;; (def run-single-job*
 ;;   ;; TODO Send the start event only when the job has been fully resolved?
@@ -188,36 +168,45 @@
 ;;                      (bc/failed? r) (reduced))))
 ;;                (merge (job-context p) initial-ctx))))
 
-;; (defn- pipeline-start-evt [ctx idx {:keys [name]}]
-;;   (script-evt
-;;    {:type :pipeline/start
-;;     :pipeline {:name name
-;;                :index idx}
-;;     :message (cond-> "Starting pipeline"
-;;                name (str ": " name))}
-;;    ctx))
+;; Wraps a job so it fires an event before and after execution, and also
+;; catches any exceptions.
+(defrecord EventFiringJob [target]
+  j/Job
+  (execute! [job rt]
+    (let [rt-with-job (assoc rt :job target)
+          handle-error (fn [ex]
+                         (assoc bc/failure :exception ex))]
+      (md/chain
+       (rt/post-events rt (job-start-evt rt-with-job))
+       (fn [_]
+         ;; Catch both sync and async errors
+         (try 
+           (-> (j/execute! target rt-with-job)
+               (md/catch handle-error))
+           (catch Exception ex
+             (handle-error ex))))
+       (fn [r]
+         (md/chain
+          (rt/post-events rt (job-end-evt rt-with-job r))
+          (constantly r)))))))
 
-;; (defn- pipeline-end-evt [ctx idx {:keys [name]} r]
-;;   (script-evt
-;;    {:type :pipeline/end
-;;     :pipeline {:name name
-;;                :index idx}
-;;     :message "Completed pipeline"
-;;     :status (:status r)}
-;;    ctx))
+(defn- with-fire-events
+  "Wraps job so events are fired on start and end."
+  [job]
+  (map->EventFiringJob (-> (select-keys job [:id :dependencies :labels])
+                           (assoc :target job))))
 
-;; (def run-jobs!*
-;;   (wrapped run-jobs!
-;;            pipeline-start-evt
-;;            pipeline-end-evt))
+(defn- pipeline-filter [pipeline]
+  [[{:label "pipeline"
+     :value pipeline}]])
 
 (defn run-all-jobs
   "Executes all jobs in the set, in dependency order."
   [{:keys [pipeline] :as rt} jobs]
   (let [pf (cond->> jobs
              ;; Filter jobs by pipeline, if given
-             pipeline (j/filter-jobs (j/label-filter [[{:label "pipeline"
-                                                        :value pipeline}]])))]
+             pipeline (j/filter-jobs (j/label-filter (pipeline-filter pipeline)))
+             true (map with-fire-events))]
     (log/debug "Found" (count pf) "matching jobs:" (map bc/job-id pf))
     (let [result @(j/execute-jobs! pf rt)]
       {:status (if (every? (comp bc/success? :result) (vals result)) :success :failure)
