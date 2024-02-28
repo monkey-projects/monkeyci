@@ -80,7 +80,7 @@
                     (u/parse-edn r {:eof ::eof}))
         interval (get-in rt [rt/config :sidecar :poll-interval] 1000)
         log-maker (rt/log-maker rt)
-        log-base (b/get-step-sid rt)
+        log-base (b/get-job-sid rt)
         logger (when log-maker (comp (partial log-maker rt)
                                      (partial concat log-base)))
         set-exit (fn [v] (assoc rt :exit-code v))]
@@ -119,7 +119,7 @@
   [rt]
   (log/info "Running sidecar with configuration:" (get-in rt [rt/config :sidecar]))
   (-> rt
-      (merge (get-in rt [rt/config :sidecar :step-config]))
+      (merge (get-in rt [rt/config :sidecar :job-config]))
       (restore-src)
       (md/chain
        mark-start
@@ -134,4 +134,4 @@
       (mc/update-existing-in [:sidecar :log-config] u/try-slurp)
       (add-from-args :events-file)
       (add-from-args :start-file)
-      (add-from-args :step-config)))
+      (add-from-args :job-config)))

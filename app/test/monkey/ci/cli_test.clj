@@ -125,15 +125,15 @@
                 p (.getCanonicalPath script-config)]
             (is (nil? (spit script-config (pr-str {:key "value"}))))
             
-            (testing "accepts `step-config` or `-t` option"
+            (testing "accepts `job-config` or `-t` option"
               (is (= {:key "value"}
-                     (-> (run-cli "sidecar" "-e" "events" "-s" "start" "--step-config" p)
+                     (-> (run-cli "sidecar" "-e" "events" "-s" "start" "--job-config" p)
                          :args
-                         :step-config)))
+                         :job-config)))
               (is (= {:key "value"}
                      (-> (run-cli "sidecar" "-e" "events" "-s" "start" "-t" p)
                          :args
-                         :step-config))))))))))
+                         :job-config))))))))))
 
 (deftest set-invoker
   (testing "applies invoker to `runs` in commands"

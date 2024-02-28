@@ -8,7 +8,7 @@
             [monkey.ci.helpers :as h]))
 
 (deftest save-artifacts
-  (testing "saves path using blob store, relative to step work dir"
+  (testing "saves path using blob store, relative to job work dir"
     (h/with-tmp-dir dir
       (let [p (doto (fs/path dir "test-path")
                 (fs/create-file))
@@ -16,9 +16,9 @@
             bs (h/fake-blob-store stored)
             ctx {:artifacts bs
                  :build {:sid ["test-cust" "test-build"]}
-                 :step {:work-dir dir
-                        :save-artifacts [{:id "test-artifact"
-                                          :path "test-path"}]}}]
+                 :job {:work-dir dir
+                       :save-artifacts [{:id "test-artifact"
+                                         :path "test-path"}]}}]
         (is (some? @(sut/save-artifacts ctx)))
         (is (= 1 (count @stored)))
         (let [[p dest] (first @stored)]
@@ -27,8 +27,8 @@
 
   (testing "nothing if no cache store"
     (is (empty? @(sut/save-artifacts
-                  {:step {:save-artifacts [{:id "test-artifact"
-                                            :path "test-path"}]}})))))
+                  {:job {:save-artifacts [{:id "test-artifact"
+                                           :path "test-path"}]}})))))
 
 (deftest restore-artifacts
   (testing "restores path using blob store"
@@ -36,8 +36,8 @@
           bs (h/fake-blob-store stored)
           ctx {:artifacts bs
                :build {:sid ["test-cust" "test-build"]}
-               :step {:work-dir "work"
-                      :restore-artifacts [{:id "test-artifact"
-                                           :path "test-path"}]}}]
+               :job {:work-dir "work"
+                     :restore-artifacts [{:id "test-artifact"
+                                          :path "test-path"}]}}]
       (is (some? @(sut/restore-artifacts ctx)))
       (is (empty? @stored) "expected entry to be restored"))))

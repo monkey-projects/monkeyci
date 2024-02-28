@@ -16,6 +16,7 @@
              [oci :as oci]
              [runtime :as rt]
              [utils :as u]]
+            [monkey.ci.build.core :as bc]
             [monkey.oci.container-instance.core :as ci]))
 
 (defn- subdir [n]
@@ -30,7 +31,7 @@
 (def job-script "job.sh")
 (def config-vol "config")
 (def config-dir "/home/monkeyci/config")
-(def step-config-file "step.edn")
+(def job-config-file "job.edn")
 (def job-container-name "job")
 
 (def sidecar-config (comp :sidecar rt/config))
@@ -43,29 +44,29 @@
            (fs/path work-dir)
            (str)))
 
-(defn- step-work-dir
-  "The work dir to use for the step in the container.  This is the external step
+(defn- job-work-dir
+  "The work dir to use for the job in the container.  This is the external job
    work dir, rebased onto the base work dir."
   [rt]
-  (some-> (get-in rt [:step :work-dir])
+  (some-> (get-in rt [:job :work-dir])
           (u/rebase-path (b/build-checkout-dir rt) (base-work-dir rt))))
 
 (defn- job-container
   "Configures the job container.  It runs the image as configured in
-   the step, but the script that's being executed is replaced by a
+   the job, but the script that's being executed is replaced by a
    custom shell script that also redirects the output and dispatches
    events to a file, that are then picked up by the sidecar."
-  [{:keys [step] :as rt}]
-  {:image-url (:container/image step)
+  [{:keys [job] :as rt}]
+  {:image-url (:container/image job)
    :display-name job-container-name
    :command ["/bin/sh" (str script-dir "/" job-script)]
    ;; One file arg per script line, with index as name
-   :arguments (->> (count (:script step))
+   :arguments (->> (count (:script job))
                    (range)
                    (mapv str))
    :environment-variables (merge
-                           (:container/env step)
-                           {"MONKEYCI_WORK_DIR" (step-work-dir rt)
+                           (:container/env job)
+                           {"MONKEYCI_WORK_DIR" (job-work-dir rt)
                             "MONKEYCI_LOG_DIR" log-dir
                             "MONKEYCI_SCRIPT_DIR" script-dir
                             "MONKEYCI_START_FILE" start-file
@@ -77,17 +78,16 @@
          :arguments ["sidecar"
                      "--events-file" event-file
                      "--start-file" start-file
-                     "--step-config" (str config-dir "/" step-config-file)]
+                     "--job-config" (str config-dir "/" job-config-file)]
          ;; Run as root, because otherwise we can't write to the shared volumes
          :security-context {:security-context-type "LINUX"
                             :run-as-user 0}))
 
-(defn- display-name [{:keys [build step pipeline]}]
+(defn- display-name [{:keys [build job pipeline]}]
   (cs/join "-" [(:build-id build)
-                (:index pipeline)
-                (:index step)]))
+                (bc/job-id job)]))
 
-(defn- script-mount [{{:keys [script]} :step}]
+(defn- script-mount [{{:keys [script]} :job}]
   {:volume-name script-vol
    :is-read-only false
    :mount-path script-dir})
@@ -106,7 +106,7 @@
 
 (defn- script-vol-config
   "Adds the job script and a file for each script line as a configmap volume."
-  [{{:keys [script]} :step}]
+  [{{:keys [script]} :job}]
   {:name script-vol
    :volume-type "CONFIGFILE"
    :configs (->> script
@@ -114,10 +114,10 @@
                                 (config-entry (str i) s)))
                  (into [(job-script-entry)]))})
 
-(defn- step-details->edn [rt]
-  (pr-str {:step (-> (:step rt)
+(defn- job-details->edn [rt]
+  (pr-str {:job (-> (:job rt)
                      (select-keys [:name :index :save-artifacts :restore-artifacts :caches])
-                     (assoc :work-dir (step-work-dir rt)))
+                     (assoc :work-dir (job-work-dir rt)))
            :pipeline (select-keys (:pipeline rt) [:name :index])}))
 
 (defn- config-vol-config
@@ -126,7 +126,7 @@
   (let [{:keys [log-config]} (sidecar-config rt)]
     {:name config-vol
      :volume-type "CONFIGFILE"
-     :configs (cond-> [(config-entry step-config-file (step-details->edn rt))]
+     :configs (cond-> [(config-entry job-config-file (job-details->edn rt))]
                 log-config (conj (config-entry "logback.xml" log-config)))}))
 
 (defn- add-sidecar-env [sc rt]
@@ -146,7 +146,7 @@
 
 (defn instance-config
   "Generates the configuration for the container instance.  It has 
-   a container that runs the job, as configured in the `:step`, and
+   a container that runs the job, as configured in the `:job`, and
    next to that a sidecar that is responsible for capturing the output
    and dispatching events."
   [conf rt]

@@ -13,12 +13,12 @@
     
     (testing "starts podman process"   
       (h/with-tmp-dir dir
-        (let [r (mcc/run-container
-                 {:containers {:type :podman}
-                  :build {:build-id "test-build"}
-                  :work-dir dir
-                  :logging {:maker (l/make-logger {})}
-                  :step {:name "test-step"
+        (let [r @(mcc/run-container
+                  {:containers {:type :podman}
+                   :build {:build-id "test-build"}
+                   :work-dir dir
+                   :logging {:maker (l/make-logger {})}
+                   :job {:id "test-job"
                          :container/image "test-img"
                          :script ["first" "second"]}})]
           (is (map? r))
@@ -27,40 +27,37 @@
                          "test-img"))
           (is (= "first && second" (last (:cmd r)))))))
 
-    (testing "passes build, pipeline and step ids for output capturing"
+    (testing "passes build and job ids for output capturing"
       (h/with-tmp-dir dir
         (let [log-paths (atom [])
-              r (mcc/run-container
-                 {:containers {:type :podman}
-                  :build {:build-id "test-build"}
-                  :work-dir dir
-                  :step {:name "test-step"
-                         :index 0
+              r @(mcc/run-container
+                  {:containers {:type :podman}
+                   :build {:build-id "test-build"}
+                   :work-dir dir
+                   :job {:id "test-job"
                          :container/image "test-img"
                          :script ["first" "second"]}
-                  :pipeline {:name "test-pipeline"}
-                  :logging {:maker (fn [_ path]
-                                     (swap! log-paths conj path)
-                                     (l/->InheritLogger))}})]
+                   :logging {:maker (fn [_ path]
+                                      (swap! log-paths conj path)
+                                      (l/->InheritLogger))}})]
           (is (= 2 (count @log-paths)))
-          (is (= ["test-build" "test-pipeline" "0"] (->> @log-paths
-                                                         first
-                                                         (take 3)))))))
+          (is (= ["test-build" "test-job"] (->> @log-paths
+                                                first
+                                                (take 2)))))))
 
     (testing "uses dummy build id when none given"
       (h/with-tmp-dir dir
         (let [log-paths (atom [])
-              r (mcc/run-container
-                 {:containers {:type :podman}
-                  :work-dir dir
-                  :step {:name "test-step"
-                         :index 0
+              r @(mcc/run-container
+                  {:containers {:type :podman}
+                   :work-dir dir
+                   :job {:id "test-job"
                          :container/image "test-img"
                          :script ["first" "second"]}
-                  :pipeline {:name "test-pipeline"}
-                  :logging {:maker (fn [_ path]
-                                     (swap! log-paths conj path)
-                                     (l/->InheritLogger))}})]
+                   :pipeline {:name "test-pipeline"}
+                   :logging {:maker (fn [_ path]
+                                      (swap! log-paths conj path)
+                                      (l/->InheritLogger))}})]
           (is (= "unknown-build" (->> @log-paths
                                       ffirst))))))
 
@@ -68,63 +65,64 @@
       (h/with-tmp-dir dir
         (let [stored (atom {})
               cache (h/fake-blob-store stored)
-              r (mcc/run-container
-                 {:containers {:type :podman}
-                  :build {:build-id "test-build"}
-                  :work-dir dir
-                  :step {:name "test-step"
+              r @(mcc/run-container
+                  {:containers {:type :podman}
+                   :build {:build-id "test-build"}
+                   :work-dir dir
+                   :job {:id "test-job"
                          :container/image "test-img"
                          :script ["first" "second"]
                          :caches [{:id "test-cache"
                                    :path "test-path"}]}
-                  :logging {:maker (l/make-logger {})}
-                  :cache cache})]
+                   :logging {:maker (l/make-logger {})}
+                   :cache cache})]
+          (is (some? r))
           (is (not-empty @stored)))))
     
     (testing "restores artifacts if configured"
       (h/with-tmp-dir dir
         (let [stored (atom {"test-cust/test-build/test-artifact.tgz" ::test})
               store (h/fake-blob-store stored)
-              r (mcc/run-container
-                 {:containers {:type :podman}
-                  :build {:build-id "test-build"
-                          :sid ["test-cust" "test-build"]}
-                  :work-dir dir
-                  :step {:name "test-step"
+              r @(mcc/run-container
+                  {:containers {:type :podman}
+                   :build {:build-id "test-build"
+                           :sid ["test-cust" "test-build"]}
+                   :work-dir dir
+                   :job {:id "test-job"
                          :container/image "test-img"
                          :script ["first" "second"]
                          :restore-artifacts [{:id "test-artifact"
                                               :path "test-path"}]}
-                  :logging {:maker (l/make-logger {})}
-                  :artifacts store})]
+                   :logging {:maker (l/make-logger {})}
+                   :artifacts store})]
+          (is (some? r))
           (is (empty? @stored)))))
 
     (testing "saves artifacts if configured"
       (h/with-tmp-dir dir
         (let [stored (atom {})
               store (h/fake-blob-store stored)
-              r (mcc/run-container
-                 {:containers {:type :podman}
-                  :build {:build-id "test-build"
-                          :sid ["test-cust" "test-build"]}
-                  :work-dir dir
-                  :step {:name "test-step"
+              r @(mcc/run-container
+                  {:containers {:type :podman}
+                   :build {:build-id "test-build"
+                           :sid ["test-cust" "test-build"]}
+                   :work-dir dir
+                   :job {:id "test-job"
                          :container/image "test-img"
                          :script ["first" "second"]
                          :save-artifacts [{:id "test-artifact"
                                            :path "test-path"}]}
-                  :logging {:maker (l/make-logger {})}
-                  :artifacts store})]
+                   :logging {:maker (l/make-logger {})}
+                   :artifacts store})]
+          (is (some? r))
           (is (not-empty @stored)))))))
 
 (deftest build-cmd-args
   (let [base-ctx {:build {:build-id "test-build"}
                   :work-dir "test-dir"
-                  :step {:name "test-step"
-                         :index 0
-                         :container/image "test-img"
-                         :script ["first" "second"]}
-                  :pipeline {:name "test-pipeline"}}]
+                  :job {:id "test-job"
+                        :container/image "test-img"
+                        :script ["first" "second"]}}]
     
     (testing "when no command given, assumes `/bin/sh` and fails on errors"
       (let [r (sut/build-cmd-args base-ctx)]
@@ -132,7 +130,7 @@
     
     (testing "cmd overrides sh command"
       (let [r (-> base-ctx
-                  (assoc-in [:step :container/cmd] ["test-entry"])
+                  (assoc-in [:job :container/cmd] ["test-entry"])
                   sut/build-cmd-args)]
         (is (= "test-entry" (last (drop-last r))))))
 
@@ -144,20 +142,20 @@
       
       (testing "adds shared mounts to args"
         (let [r (sut/build-cmd-args (assoc-in base-ctx
-                                              [:step :container/mounts] [["/host/path" "/container/path"]]))]
+                                              [:job :container/mounts] [["/host/path" "/container/path"]]))]
           (is (contains-subseq? r ["-v" "/host/path:/container/path"])))))
 
     (testing "adds env vars"
       (let [r (-> base-ctx
-                  (assoc-in [:step :container/env] {"VAR1" "value1"
-                                                    "VAR2" "value2"})
+                  (assoc-in [:job :container/env] {"VAR1" "value1"
+                                                   "VAR2" "value2"})
                   (sut/build-cmd-args))]
         (is (contains-subseq? r ["-e" "VAR1=value1"]))
         (is (contains-subseq? r ["-e" "VAR2=value2"]))))
 
     (testing "passes entrypoint as json if specified"
       (let [r (-> base-ctx
-                  (assoc-in [:step :container/entrypoint] ["test-ep"])
+                  (assoc-in [:job :container/entrypoint] ["test-ep"])
                   (sut/build-cmd-args))]
         (is (contains-subseq? r ["--entrypoint" "'[\"test-ep\"]'"]))))
     
@@ -167,7 +165,7 @@
 
     (testing "adds platform if specified"
       (let [r (-> base-ctx
-                  (assoc-in [:step :container/platform] "linux/arm64")
+                  (assoc-in [:job :container/platform] "linux/arm64")
                   (sut/build-cmd-args))]
         (is (contains-subseq? r ["--platform" "linux/arm64"]))))
 
@@ -175,6 +173,6 @@
       (is (contains-subseq? (sut/build-cmd-args {:containers {:platform "test-platform"}})
                             ["--platform" "test-platform"])))
 
-    (testing "uses step id as container name"
+    (testing "uses job id as container name"
       (is (contains-subseq? (sut/build-cmd-args base-ctx)
-                            ["--name" "test-build-test-pipeline-0"])))))
+                            ["--name" "test-build-test-job"])))))

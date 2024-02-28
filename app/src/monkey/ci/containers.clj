@@ -17,7 +17,7 @@
    and drops that namespace."
   [rt]
   (->> rt
-       :step
+       :job
        (mc/filter-keys (comp (partial = "container") namespace))
        (mc/map-keys (comp keyword name))
        (update-env)))

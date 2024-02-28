@@ -17,11 +17,11 @@
   (str (cs/join "/" (concat (butlast (:sid build)) [id])) ".tgz"))
 
 (def cache-config {:store-key :cache
-                   :step-key :caches
+                   :job-key :caches
                    :build-path cache-archive-path})
 
 (defn save-caches
-  "If the step configured in the context uses caching, saves it according
+  "If the job configured in the context uses caching, saves it according
    to the cache configurations."
   [rt]
   (art/save-generic rt cache-config))
@@ -31,13 +31,13 @@
   (art/restore-generic rt cache-config))
 
 (defn wrap-caches
-  "Wraps fn `f` so that caches are restored/saved as configured on the step."
+  "Wraps fn `f` so that caches are restored/saved as configured on the job."
   [f]
   (fn [rt]
     (md/chain
      (restore-caches rt)
      (fn [c]
-       (assoc-in rt [:step :caches] c))
+       (assoc-in rt [:job :caches] c))
      f
      (fn [r]
        (md/chain

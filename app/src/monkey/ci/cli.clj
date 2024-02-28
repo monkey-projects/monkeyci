@@ -91,8 +91,8 @@
            :short "s"
            :type :string
            :default :present}
-          {:as "Step config"
-           :option "step-config"
+          {:as "Job config"
+           :option "job-config"
            :short "t"
            :type :ednfile}]
    :runs {:command cmd/sidecar

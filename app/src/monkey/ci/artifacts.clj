@@ -21,20 +21,20 @@
   ;; The blob archive path is the build sid with the blob id added.
   (str (cs/join "/" (concat (:sid build) [id])) ".tgz"))
 
-(defn- step-blobs [rt {:keys [store-key step-key]}]
-  (let [c (get-in rt [:step step-key])]
+(defn- job-blobs [rt {:keys [store-key job-key]}]
+  (let [c (get-in rt [:job job-key])]
     (when (get-store rt store-key)
       c)))
 
 (defn- do-with-blobs [rt conf f]
-  (->> (step-blobs rt conf)
+  (->> (job-blobs rt conf)
        (map (partial f rt))
        (apply md/zip)))
 
 (defn save-blob
   "Saves a single blob path"
   [{:keys [build-path store-key]} rt {:keys [path id]}]
-  (let [fullp (b/step-relative-dir rt path)]
+  (let [fullp (b/job-relative-dir rt path)]
     (log/debug "Saving blob:" id "at path" path "(full path:" fullp ")")
     (blob/save (get-store rt store-key)
                fullp
@@ -46,10 +46,10 @@
    (partial remove nil?)))
 
 (defn save-artifacts
-  "Saves all artifacts according to the step configuration."
+  "Saves all artifacts according to the job configuration."
   [rt]
   (save-generic rt
-                {:step-key :save-artifacts
+                {:job-key :save-artifacts
                  :store-key :artifacts
                  :build-path artifact-archive-path}))
 
@@ -58,7 +58,7 @@
   (blob/restore (get-store rt store-key)
                 (build-path rt id)
                 ;; Restore to the parent path because the dir name will be in the archive
-                (-> (b/step-relative-dir rt path)
+                (-> (b/job-relative-dir rt path)
                     (fs/parent)
                     (fs/canonicalize)
                     (str))))
@@ -69,7 +69,7 @@
 (defn restore-artifacts
   [rt]
   (restore-generic rt
-                   {:step-key :restore-artifacts
+                   {:job-key :restore-artifacts
                     :store-key :artifacts
                     :build-path artifact-archive-path}))
 
@@ -78,7 +78,7 @@
     (md/chain
      (restore-artifacts rt)
      (fn [c]
-       (assoc-in rt [:step :restored-artifacts] c))
+       (assoc-in rt [:job :restored-artifacts] c))
      f
      (fn [r]
        (md/chain

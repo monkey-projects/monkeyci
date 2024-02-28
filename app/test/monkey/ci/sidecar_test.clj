@@ -78,7 +78,7 @@
                        (select-keys (keys evt)))))
         (is (= 0 (wait-for-exit c))))))
 
-  (testing "logs using step sid and file path"
+  (testing "logs using job sid and file path"
     (h/with-tmp-dir dir
       (let [f (io/file dir "events.edn")
             logfile (io/file dir "out.log")
@@ -93,15 +93,14 @@
                 :config {:sidecar {:events-file f
                                    :poll-interval 10}}
                 :build {:build-id "test-build"}
-                :pipeline {:name "test-pipe"}
-                :step {:index 0}
+                :job {:id "test-job"}
                 :logging {:maker (fn [_ path]
                                    (->TestLogger streams path))}}
             c (sut/poll-events rt)]
         (is (nil? (spit f (prn-str evt))))
         (is (not= :timeout (h/wait-until #(not-empty @streams) 500)))
         (is (= 0 (wait-for-exit c)))
-        (is (= ["test-build" "test-pipe" "0" "out.log"] (first @streams)))))))
+        (is (= ["test-build" "test-job" "out.log"] (first @streams)))))))
 
 (deftest restore-src
   (testing "nothing if no workspace in build"
@@ -149,12 +148,12 @@
                            :sidecar
                            :start-file))))
 
-  (testing "adds step config from args"
+  (testing "adds job config from args"
     (is (= {:key "value"}
            (-> (c/normalize-key :sidecar {:sidecar {}
-                                          :args {:step-config {:key "value"}}})
+                                          :args {:job-config {:key "value"}}})
                :sidecar
-               :step-config))))
+               :job-config))))
 
   (testing "reads log config if specified"
     (h/with-tmp-dir dir
@@ -203,12 +202,11 @@
   (with-redefs [sut/mark-start identity
                 sut/poll-events (fn [rt]
                                   (md/success-deferred (assoc rt :exit-code 0)))]
-    (testing "adds step config to runtime"
-      (is (= "test-pipe" (-> {:config {:sidecar {:step-config {:pipeline {:name "test-pipe"}}}}}
-                             (sut/run)
-                             (deref)
-                             :pipeline
-                             :name))))
+    (testing "adds job config to runtime"
+      (is (= "test-job" (-> {:config {:sidecar {:job-config {:id "test-job"}}}}
+                            (sut/run)
+                            (deref)
+                            :id))))
     
     (testing "restores src from workspace"
       (with-redefs [sut/restore-src (constantly {:stage ::restored})
@@ -227,11 +225,11 @@
                   {:containers {:type :podman}
                    :build {:build-id "test-build"
                            :checkout-dir dir}
-                   :step {:name "test-step"
-                          :container/image "test-img"
-                          :script ["first" "second"]
-                          :caches [{:id "test-cache"
-                                    :path path}]}
+                   :job {:name "test-job"
+                         :container/image "test-img"
+                         :script ["first" "second"]
+                         :caches [{:id "test-cache"
+                                   :path path}]}
                    :logging {:maker (l/make-logger {})}
                    :cache cache})]
           (is (map? (deref r 500 :timeout)))
@@ -248,11 +246,11 @@
                            :sid ["test-cust" "test-build"]
                            :checkout-dir "/tmp/checkout"}
                    :work-dir dir
-                   :step {:name "test-step"
-                          :container/image "test-img"
-                          :script ["first" "second"]
-                          :restore-artifacts [{:id "test-artifact"
-                                               :path "test-path"}]}
+                   :job {:name "test-job"
+                         :container/image "test-img"
+                         :script ["first" "second"]
+                         :restore-artifacts [{:id "test-artifact"
+                                              :path "test-path"}]}
                    :logging {:maker (l/make-logger {})}
                    :artifacts store})]
           (is (empty? @stored)))))
@@ -268,19 +266,19 @@
                    :build {:build-id "test-build"
                            :sid ["test-cust" "test-build"]
                            :checkout-dir dir}
-                   :step {:name "test-step"
-                          :container/image "test-img"
-                          :script ["first" "second"]
-                          :save-artifacts [{:id "test-artifact"
-                                            :path path}]}
+                   :job {:name "test-job"
+                         :container/image "test-img"
+                         :script ["first" "second"]
+                         :save-artifacts [{:id "test-artifact"
+                                           :path path}]}
                    :logging {:maker (l/make-logger {})}
                    :artifacts store})]
           (is (not-empty @stored)))))
 
     (testing "waits until artifacts have been stored"
       ;; Set up blob saving so it takes a while
-      (is (= ::timeout (-> {:step {:save-artifacts [{:id "test-artifact"
-                                                     :path "test-path"}]}
+      (is (= ::timeout (-> {:job {:save-artifacts [{:id "test-artifact"
+                                                    :path "test-path"}]}
                             :artifacts (->SlowBlobStore 1000)}
                            (sut/run)
                            (deref 100 ::timeout)))
@@ -288,8 +286,8 @@
 
     (testing "blocks until caches have been stored"
       ;; Set up blob saving so it takes a while
-      (is (= ::timeout (-> {:step {:caches [{:id "test-artifact"
-                                             :path "test-path"}]}
+      (is (= ::timeout (-> {:job {:caches [{:id "test-artifact"
+                                            :path "test-path"}]}
                             :cache (->SlowBlobStore 1000)}
                            (sut/run)
                            (deref 100 ::timeout)))))))
