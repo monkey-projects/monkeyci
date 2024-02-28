@@ -318,6 +318,7 @@
 (defn- add-dependencies
   "Given a sequence of jobs from a pipeline, makes each job dependent on the previous one."
   [jobs]
+  (log/debug "Adding dependencies to" (count jobs) "jobs")
   (reduce (fn [r j]
             (conj r (cond-> j
                       (not-empty r)

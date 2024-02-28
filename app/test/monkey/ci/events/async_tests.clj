@@ -1,7 +1,9 @@
 (ns monkey.ci.events.async-tests
   "Generic test suite for asynchronous events"
   (:require [clojure.test :refer [testing is]]
-            [monkey.ci.events.core :as c]
+            [monkey.ci.events
+             [core :as c]
+             [manifold]]
             [monkey.ci.helpers :as h]))
 
 (def timeout 1000)
