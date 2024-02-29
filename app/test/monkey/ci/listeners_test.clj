@@ -22,104 +22,61 @@
                 :result :success}
                (st/find-build-results st sid)))))))
 
-(deftest pipeline-started
-  (testing "patches build results with pipeline info"
+(deftest job-started
+  (testing "patches build results with job info"
     (h/with-memory-store st
       (let [ctx {:storage st}
             sid (random-sid)
-            evt {:type :pipeline/start
-                 :time 100
+            evt {:type :job/start
+                 :time 120
                  :sid sid
-                 :pipeline {:name "test-pipeline"
-                            :index 0}
-                 :message "Starting pipeline"}]
-        (is (st/sid? (st/save-build-results st sid {:key "value"})))
-        (is (some? (sut/pipeline-started ctx evt)))
-        (is (= {:key "value"
-                :pipelines {0 {:name "test-pipeline"
-                               :start-time 100}}}
-               (st/find-build-results st sid)))))))
-
-(deftest pipeline-completed
-  (testing "patches build results with pipeline info"
-    (h/with-memory-store st
-      (let [ctx {:storage st}
-            sid (random-sid)
-            evt {:type :pipeline/end
-                 :time 200
-                 :sid sid
-                 :pipeline {:name "test-pipeline"
-                            :index 0}
-                 :message "Pipeline completed"
-                 :status :success}]
+                 :index 1
+                 :name "test-job"
+                 :pipeline {:index 0
+                            :name "test-pipeline"}
+                 :message "Starting job"}]
         (is (st/sid? (st/save-build-results st sid {:key "value"
                                                     :pipelines {0
                                                                 {:name "test-pipeline"
                                                                  :start-time 100}}})))
-        (is (some? (sut/pipeline-completed ctx evt)))
+        (is (some? (sut/job-started ctx evt)))
         (is (= {:key "value"
                 :pipelines {0
                             {:name "test-pipeline"
                              :start-time 100
-                             :end-time 200
-                             :status :success}}}
+                             :jobs {1 {:start-time 120
+                                       :name "test-job"}}}}}
                (st/find-build-results st sid)))))))
 
-(deftest step-started
-  (testing "patches build results with step info"
+(deftest job-completed
+  (testing "patches build results with job info"
     (h/with-memory-store st
       (let [ctx {:storage st}
             sid (random-sid)
-            evt {:type :step/start
+            evt {:type :job/end
                  :time 120
                  :sid sid
                  :index 1
-                 :name "test-step"
+                 :name "test-job"
                  :pipeline {:index 0
                             :name "test-pipeline"}
-                 :message "Starting step"}]
-        (is (st/sid? (st/save-build-results st sid {:key "value"
-                                                    :pipelines {0
-                                                                {:name "test-pipeline"
-                                                                 :start-time 100}}})))
-        (is (some? (sut/step-started ctx evt)))
-        (is (= {:key "value"
-                :pipelines {0
-                            {:name "test-pipeline"
-                             :start-time 100
-                             :steps {1 {:start-time 120
-                                        :name "test-step"}}}}}
-               (st/find-build-results st sid)))))))
-
-(deftest step-completed
-  (testing "patches build results with step info"
-    (h/with-memory-store st
-      (let [ctx {:storage st}
-            sid (random-sid)
-            evt {:type :step/end
-                 :time 120
-                 :sid sid
-                 :index 1
-                 :name "test-step"
-                 :pipeline {:index 0
-                            :name "test-pipeline"}
-                 :message "Step completed"
+                 :message "Job completed"
                  :status :success}]
         (is (st/sid? (st/save-build-results st sid {:key "value"
                                                     :pipelines {0
                                                                 {:name "test-pipeline"
                                                                  :start-time 100
-                                                                 :steps {1 {:start-time 110
-                                                                            :name "test-step"}}}}})))
-        (is (some? (sut/step-completed ctx evt)))
+                                                                 :jobs {1 {:start-time 110
+                                                                           :name "test-job"}}}}})))
+        (is (some? (sut/job-completed ctx evt)))
         (is (= {:key "value"
                 :pipelines {0
                             {:name "test-pipeline"
                              :start-time 100
-                             :steps {1 {:start-time 110
-                                        :end-time 120
-                                        :name "test-step"
-                                        :status :success}}}}}
+                             :jobs {1 {:start-time 110
+                                       :end-time 120
+                                       :name "test-job"
+                                       :status :success}}}}}
                (st/find-build-results st sid)))))))
 
 (deftest build-update-handler
@@ -129,25 +86,25 @@
   (testing "dispatches event by build sid"
     (let [inv (atom {})
           handled (atom 0)]
-      (with-redefs [sut/step-started
+      (with-redefs [sut/job-started
                     (fn [_ {{:keys [sid]} :build}]
                       (Thread/sleep 100)
                       (swap! inv assoc sid [:started])
                       (swap! handled inc))
-                    sut/step-completed
+                    sut/job-completed
                     (fn [_ {{:keys [sid]} :build}]
                       (Thread/sleep 50)
                       (swap! inv update sid conj :completed)
                       (swap! handled inc))]
         (let [h (sut/build-update-handler {:events {:poster (fn [_]
                                                               (swap! handled inc))}})]
-          (h {:type :step/start
+          (h {:type :job/start
               :build {:sid ::first}})
-          (h {:type :step/start
+          (h {:type :job/start
               :build {:sid ::second}})
-          (h {:type :step/end
+          (h {:type :job/end
               :build {:sid ::first}})
-          (h {:type :step/end
+          (h {:type :job/end
               :build {:sid ::second}})
           (is (not= :timeout (h/wait-until #(= 4 @handled) 1000)))
           (doseq [[k r] @inv]

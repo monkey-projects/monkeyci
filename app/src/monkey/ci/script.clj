@@ -30,10 +30,10 @@
          :sid (get-in rt [:build :sid])
          :time (System/currentTimeMillis)))
 
-(defn- post-event [ctx evt]
+(defn- post-event [rt evt]
   (log/trace "Posting event:" evt)
-  (if-let [c (get-in ctx [:api :client])]
-    (let [{:keys [status] :as r} @(martian/response-for c :post-event (script-evt evt ctx))]
+  (if-let [c (get-in rt [:api :client])]
+    (let [{:keys [status] :as r} @(martian/response-for c :post-event (script-evt evt rt))]
       (when-not (= 202 status)
         (log/warn "Failed to post event, got status" status)
         (log/debug "Full response:" r)))
@@ -49,8 +49,8 @@
                   (assoc (apply after (concat (butlast args) [{}]))
                          :exception (.getMessage ex))))
         w (ec/wrapped f before after error)]
-    (fn [ctx & more]
-      (apply w (assoc ctx :events {:poster (partial post-event ctx)}) more))))
+    (fn [rt & more]
+      (apply w (assoc rt :events {:poster (partial post-event rt)}) more))))
 
 (defn- job-start-evt [{:keys [job]}]
   (cond-> {:type :job/start
@@ -74,6 +74,7 @@
     (let [rt-with-job (assoc rt :job target)
           handle-error (fn [ex]
                          (assoc bc/failure :exception ex))]
+      (log/debug "Executing event firing job:" (bc/job-id target))
       (md/chain
        (rt/post-events rt (job-start-evt rt-with-job))
        (fn [_]
@@ -207,9 +208,8 @@
             (if (nil? (bc/job-id x))
               (assoc x :id id)
               x))]
-    (map-indexed (fn [i {:keys [id] :as j}]
-                   (cond-> j
-                     (nil? id) (assign-id (format "job-%d" (inc i)))))
+    (map-indexed (fn [i job]
+                   (assign-id job (format "job-%d" (inc i))))
                  jobs)))
 
 (defn resolve-jobs
@@ -224,7 +224,10 @@
   "Loads a script from a directory and executes it.  The script is executed in 
    this same process."
   [{:keys [script-dir] :as rt}]
-  (let [build-id (build/get-build-id rt)]
+  (let [build-id (build/get-build-id rt)
+        ;; Manually add events poster
+        ;; This will be removed when events are reworked to be more generic
+        rt (assoc-in rt [:events :poster] (partial post-event rt))]
     (log/debug "Executing script for build" build-id "at:" script-dir)
     (log/debug "Script runtime:" rt)
     (try 

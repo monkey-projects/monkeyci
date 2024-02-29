@@ -1,6 +1,7 @@
 (ns monkey.ci.build.core-test
   (:require [clojure.test :refer :all]
             [clojure.spec.alpha :as s]
+            [monkey.ci.jobs :as j]
             [monkey.ci.build
              [core :as sut]
              [spec :as spec]]))
@@ -131,3 +132,22 @@
                  {:git
                   {:main-branch "main"
                    :ref "refs/heads/main"}}})))))
+
+(deftest depends-on
+  (testing "adds dependencies to job"
+    (is (= [::deps]
+           (-> (sut/action-job ::test-job (constantly nil))
+               (sut/depends-on [::deps])
+               (j/deps)))))
+
+  (testing "adds to existing dependencies"
+    (is (= [::orig ::new]
+           (-> (sut/action-job ::test-job (constantly nil) {j/deps [::orig]})
+               (sut/depends-on [::new])
+               (j/deps)))))
+
+  (testing "removes duplicate dependencies"
+    (is (= [::orig ::new]
+           (-> (sut/action-job ::test-job (constantly nil) {j/deps [::orig ::new]})
+               (sut/depends-on [::new])
+               (j/deps))))))

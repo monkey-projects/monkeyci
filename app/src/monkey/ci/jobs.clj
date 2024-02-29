@@ -113,6 +113,7 @@
 
 (defn- fn->action-job [f]
   (bc/action-job (or (bc/job-id f)
+                     ;; FIXME This does not work for anonymous functions
                      (u/fn-name f))
                  f))
 
@@ -184,13 +185,16 @@
         
         execute-all!
         (fn execute-all [jobs state]
-          ;; Execute all jobs in parallel, return a list of deferreds
+          ;; Execute all jobs in parallel, return a map of job-ids and deferreds
           (log/info "Starting" (count jobs) "pending jobs:" (map job-id jobs))
-          (map (fn [j]
-                 (md/chain
-                  (execute! j (assoc-in rt [:build :jobs] state))
-                  (partial vector j)))
-               jobs))
+          (reduce (fn [r j]
+                    (assoc r
+                           (job-id j)
+                           (md/chain
+                            (execute! j (assoc-in rt [:build :jobs] state))
+                            (partial vector j))))
+                  {}
+                  jobs))
 
         add-to-results
         (fn [global [job r]]
@@ -199,15 +203,22 @@
                  {:job job
                   :result r}))
 
-        update-job-state
-        (fn [jobs job s]
-          (assoc-in jobs [(job-id job) :status] s))
-
         result->status
         (fn [r]
           (if (bc/success? r)
             :success
-            :failure))]
+            :failure))
+
+        update-job-state
+        (fn [state job s]
+          (assoc-in state [(job-id job) :status] s))
+
+        update-multiple-jobs
+        (fn [state jobs js]
+          (reduce (fn [res j]
+                    (update-job-state res j js))
+                  state
+                  jobs))]
     ;; Sets up a loop that checks if any jobs are pending for execution, and
     ;; starts them in parallel.  Then adds them to any already executing jobs.
     ;; It then waits for the first job to finish, and adds its result to the
@@ -215,28 +226,30 @@
     ;; jobs.  Stops when no more jobs are eligible for execution and all running
     ;; jobs have finished.
     (md/loop [state grouped
-              executing []
+              executing {}
               results {}]
       (let [n (next-jobs* state)]
         (log/trace "Job state:" state)
         (log/debugf "There are %d pending jobs: %s" (count n) (keys n))
-        (log/debugf "There are %d jobs currently executing: %s"
-                    (count executing) (mapv (comp job-id first) executing))
+        (log/debugf "There are %d jobs currently executing: %s" (count executing) (keys executing))
         (if (and (empty? n) (empty? executing))
           ;; Done, no more jobs to run and all running jobs have terminated
           results
           ;; More jobs to run, or at least one job is still executing
           (md/chain
-           (->> (execute-all! (vals n) state)
-                (concat executing)
-                ;; Wait for next running job to terminate
-                (apply md/alt))
-           (fn [[job res :as out]]
+           (md/let-flow [to-execute (vals n)
+                         updated-state (update-multiple-jobs state to-execute :running)
+                         all-executing (->> (execute-all! to-execute state)
+                                            (merge executing))
+                         ;; Wait for next running job to terminate
+                         next-done (apply md/alt (vals all-executing))]
+             [updated-state next-done all-executing])
+           (fn [[state [job out :as d] all]]
              (log/info "Job finished:" (job-id job))
              (md/recur
-              (update-job-state state job (result->status res))
-              (remove (partial = out) executing)
-              (add-to-results results out)))))))))
+              (update-job-state state job (result->status out))
+              (dissoc all (job-id job))
+              (add-to-results results d)))))))))
 
 (defn filter-jobs
   "Applies a filter to the given jobs, but includes all dependencies of jobs that

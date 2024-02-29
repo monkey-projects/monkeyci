@@ -5,33 +5,19 @@
              ;;[runtime :as rt]
              [storage :as st]]))
 
-(defn- update-pipeline [rt evt f & args]
+(defn- update-job [rt evt f & args]
   (apply st/patch-build-results
          (:storage rt)
          (:sid evt)
-         update-in [:pipelines (get-in evt [:pipeline :index])] f args))
+         update-in [:pipelines (get-in evt [:pipeline :index]) :jobs (:index evt)] f args))
 
-(defn pipeline-started [rt evt]
-  (update-pipeline rt evt merge {:start-time (:time evt)
-                                 :name (get-in evt [:pipeline :name])}))
+(defn job-started [rt evt]
+  (update-job rt evt merge {:start-time (:time evt)
+                            :name (:name evt)}))
 
-(defn pipeline-completed [rt evt]
-  (update-pipeline rt evt merge {:end-time (:time evt)
-                                 :status (:status evt)}))
-
-(defn- update-step [rt evt f & args]
-  (apply st/patch-build-results
-         (:storage rt)
-         (:sid evt)
-         update-in [:pipelines (get-in evt [:pipeline :index]) :steps (:index evt)] f args))
-
-(defn step-started [rt evt]
-  (update-step rt evt merge {:start-time (:time evt)
-                             :name (:name evt)}))
-
-(defn step-completed [rt evt]
-  (update-step rt evt merge {:end-time (:time evt)
-                             :status (:status evt)}))
+(defn job-completed [rt evt]
+  (update-job rt evt merge {:end-time (:time evt)
+                            :status (:status evt)}))
 
 (defn save-build-result
   "Handles a `build/completed` event to store the result."
@@ -46,10 +32,8 @@
   "Handles a build update event.  Because many events may come in close proximity,
    we need to queue them to avoid losing data."
   [rt]
-  (let [handlers {:pipeline/start  pipeline-started
-                  :pipeline/end    pipeline-completed
-                  :step/start      step-started
-                  :step/end        step-completed
+  (let [handlers {:job/start       job-started
+                  :job/end         job-completed
                   :build/completed save-build-result}
         ch (ca/chan 10)
         dispatch-sub (fn [s dest]
@@ -70,8 +54,3 @@
     (fn [evt]
       (ca/put! ch evt)
       nil)))
-
-;; (defrecord EventListeners [events storage])
-
-;; (defmethod rt/setup-runtime :listeners [conf _]
-;;   (map->EventListeners {}))

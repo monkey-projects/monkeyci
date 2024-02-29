@@ -88,15 +88,20 @@
       {:name ~(name n)
        :jobs ~jobs})))
 
-(defmacro defjob
-  "Defines an action job function"
-  [n & args]
-  `(defn ^:job ~n ~@args))
-
 (defn as-job
   "Marks fn `f` as a job"
   [f]
   (with-meta f {:job true}))
+
+(defmacro defjob
+  "Defines an action job function"
+  [n & args]
+  `(def ~n (action-job (str n) (fn ~@args))))
+
+(defn depends-on
+  "Adds dependencies to the given job"
+  [job ids]
+  (update job :dependencies (comp vec distinct concat) ids))
 
 (defn git-ref
   "Gets the git ref from the context"
