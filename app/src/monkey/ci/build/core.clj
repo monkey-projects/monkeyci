@@ -63,7 +63,8 @@
 
 (defrecord Pipeline [jobs name])
 
-(def pipeline? (partial instance? Pipeline))
+(defn pipeline? [x]
+  (instance? Pipeline x))
 
 (defn job-id [x]
   (or (:id x) (:job/id (meta x))))
@@ -96,7 +97,7 @@
 (defmacro defjob
   "Defines an action job function"
   [n & args]
-  `(def ~n (action-job (str n) (fn ~@args))))
+  `(def ~n (action-job ~(name n) (fn ~@args))))
 
 (defn depends-on
   "Adds dependencies to the given job"

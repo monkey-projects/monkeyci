@@ -6,9 +6,6 @@
              [core :as sut]
              [spec :as spec]]))
 
-(defn pipeline? [x]
-  (instance? monkey.ci.build.core.Pipeline x))
-
 (deftest failed?
   (testing "true if not successful"
     (is (sut/failed? sut/failure))
@@ -46,7 +43,7 @@
 
 (deftest pipeline
   (testing "creates pipeline object"
-    (is (pipeline? (sut/pipeline {:jobs []}))))
+    (is (sut/pipeline? (sut/pipeline {:jobs []}))))
 
   (testing "fails if config not conforming to spec"
     (is (thrown? AssertionError (sut/pipeline {:steps "invalid"}))))
@@ -61,7 +58,7 @@
     (let [p {:jobs [{:container/image "test-image"
                      :script ["first" "second"]}]}]
       (is (s/valid? :ci/job (-> p :jobs (first))))
-      (is (pipeline? (sut/pipeline p)))))
+      (is (sut/pipeline? (sut/pipeline p)))))
 
   (testing "converts maps to jobs"
     (let [p (sut/pipeline {:jobs [{:action (constantly "test")}]})]
@@ -77,10 +74,17 @@
   (testing "declares def with pipeline"
     (let [jobs [(constantly ::ok)]]
       (sut/defpipeline test-pipeline jobs)
-      (is (pipeline? test-pipeline))
+      (is (sut/pipeline? test-pipeline))
       (is (= "test-pipeline" (:name test-pipeline)))
       (is (= 1 (count (:jobs test-pipeline))))
       (ns-unalias *ns* 'test-pipeline))))
+
+(deftest defjob
+  (testing "declares var with action job"
+    (sut/defjob test-job [_] (constantly ::ok))
+    (is (sut/action-job? test-job))
+    (is (= "test-job" (sut/job-id test-job)))
+    (ns-unalias *ns* 'test-job)))
 
 (deftest git-ref
   (testing "gets git ref from build context"

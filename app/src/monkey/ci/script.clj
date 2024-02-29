@@ -6,6 +6,7 @@
              [core :as martian]
              [httpkit :as mh]
              [interceptors :as mi]]
+            [medley.core :as mc]
             [monkey.ci.build.core :as bc]
             [monkey.ci
              [artifacts :as art]
@@ -50,7 +51,7 @@
                          :exception (.getMessage ex))))
         w (ec/wrapped f before after error)]
     (fn [rt & more]
-      (apply w (assoc rt :events {:poster (partial post-event rt)}) more))))
+      (apply w rt more))))
 
 (defn- job-start-evt [{:keys [job]}]
   (cond-> {:type :job/start
@@ -186,15 +187,20 @@
   (-> (assoc evt :dir script-dir)
       (script-evt ctx)))
 
-(defn- script-started-evt [ctx _]
-  (with-script-dir ctx
+(defn- script-started-evt [rt _]
+  (with-script-dir rt
     {:type :script/start
      :message "Script started"}))
 
-(defn- script-completed-evt [ctx & _]
-  (with-script-dir ctx
+(defn- script-completed-evt [rt jobs res]
+  (with-script-dir rt
     {:type :script/end
-     :message "Script completed"}))
+     :message "Script completed"
+     ;; Add individual job results and dependencies, useful feedback to frontend
+     :jobs (mc/map-vals (fn [r]
+                          (-> (select-keys r [:result])
+                              (mc/assoc-some :dependencies (-> r :job j/deps))))
+                        (:jobs res))}))
 
 (def run-all-jobs*
   (wrapped run-all-jobs

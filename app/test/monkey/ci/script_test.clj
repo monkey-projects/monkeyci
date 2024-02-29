@@ -1,9 +1,6 @@
 (ns monkey.ci.script-test
   (:require [clojure.test :refer :all]
             [manifold.deferred :as md]
-            [martian
-             [core :as martian]
-             [test :as mt]]
             [monkey.ci
              [jobs :as j]
              [runtime :as rt]
@@ -12,9 +9,7 @@
             [monkey.ci.web.script-api :as script-api]
             [monkey.ci.build.core :as bc]
             [monkey.ci.helpers :as h]
-            [monkey.socket-async.uds :as uds]
-            [org.httpkit.fake :as hf]
-            [schema.core :as s]))
+            [org.httpkit.fake :as hf]))
 
 (defn with-listening-socket [f]
   (let [p (u/tmp-file "test-" ".sock")]
@@ -125,33 +120,39 @@
                                          :jobs [(dummy-job bc/failure)]})]
                           (sut/run-all-jobs {:pipeline "first"})))))
 
-  #_(testing "posts events through api"
-    (letfn [(verify-evt [expected-type]
-              (let [events-posted (atom [])
-                    ;; Set up a fake api
-                    client (-> (martian/bootstrap "http://test"
-                                                  [{:route-name :post-event
-                                                    :path-parts ["/event"]
-                                                    :method :post
-                                                    :body-schema {:event s/Any}}])
-                               (mt/respond-with {:post-event (fn [req]
-                                                               (swap! events-posted conj (:body req))
-                                                               (future {:status 200}))}))
-                    jobs [(dummy-job bc/success)]
-                    rt {:api {:client client}}]
-                (is (bc/success? (sut/run-all-jobs rt jobs)))
-                (is (not-empty @events-posted))
-                (is (true? (-> (map :type @events-posted)
-                               (set)
-                               (contains? expected-type))))))]
+  (testing "returns all job results"
+    (let [job (bc/action-job "test-job" (constantly bc/success))
+          result (->> [job]
+                      (sut/run-all-jobs {})
+                      :jobs)]
+      (is (= ["test-job"] (keys result)))
+      (is (= bc/success (get-in result ["test-job" :result]))))))
 
-      ;; Run a test for each type
-      (->> [:job/start
-            :job/end]
-           (map (fn [t]
-                  (testing (str t)
-                    (verify-evt t))))
-           (doall)))))
+(deftest run-all-jobs*
+  (testing "posts `:script/end` event with job results"
+    (let [result (assoc bc/success :message "Test result")
+          job (bc/action-job "test-job" (constantly result))
+          events (atom [])
+          rt {:events {:poster (partial swap! events conj)}}]
+      (is (some? (sut/run-all-jobs* rt [job])))
+      (is (not-empty @events))
+      (is (contains? (set (map :type @events)) :script/end))
+      (let [l (last @events)]
+        (is (= :script/end (:type l)))
+        (is (= {:result result}
+               (get-in l [:jobs "test-job"]))))))
+
+  (testing "adds job dependencies to end event"
+    (let [jobs [(bc/action-job "first-job" (constantly bc/success))
+                (bc/action-job "second-job" (constantly bc/success)
+                               {:dependencies ["first-job"]})]
+          events (atom [])
+          rt {:events {:poster (partial swap! events conj)}}]
+      (is (some? (sut/run-all-jobs* rt jobs)))
+      (let [l (last @events)]
+        (is (= :script/end (:type l)))
+        (is (= ["first-job"]
+               (get-in l [:jobs "second-job" :dependencies])))))))
 
 (deftest event-firing-job
   (testing "invokes target"
