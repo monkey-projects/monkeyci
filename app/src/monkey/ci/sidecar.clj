@@ -123,7 +123,6 @@
       (restore-src)
       (md/chain
        mark-start
-       ;; FIXME Process terminates before these are uploaded
        (cache/wrap-caches (art/wrap-artifacts poll-events)))))
 
 (defn- add-from-args [conf k]

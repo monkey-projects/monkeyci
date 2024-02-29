@@ -6,7 +6,8 @@
             [monkey.ci
              [runtime :as rt]
              [storage :as st]
-             [utils :as u]]))
+             [utils :as u]]
+            [monkey.ci.build.core :as bc]))
 
 (def account->sid (juxt :customer-id :repo-id))
 
@@ -29,15 +30,11 @@
   "Creates a unique step id using the build id and job id"
   (comp (partial mapv str)
         (juxt get-build-id
-              (comp :id :job))))
-
-(def ^:deprecated get-step-sid get-job-sid)
+              (comp bc/job-id :job))))
 
 (def get-job-id
   "Creates a string representation of the job sid"
   (comp (partial cs/join "-") get-job-sid))
-
-(def ^:deprecated get-step-id get-job-id)
 
 (defn- maybe-set-git-opts [build rt]
   (let [{:keys [git-url branch commit-id dir]} (rt/args rt)]
@@ -129,14 +126,10 @@
             build-checkout-dir
             (constantly (u/cwd)))))
 
-(def ^:deprecated step-work-dir job-work-dir)
-
 (defn job-relative-dir
   "Calculates path `p` as relative to the work dir for the current job"
   [rt p]
   (u/abs-path (job-work-dir rt) p))
-
-(def ^:deprecated step-relative-dir job-relative-dir)
 
 (defmethod rt/setup-runtime :build [conf _]
   ;; Just copy the build info to the runtime

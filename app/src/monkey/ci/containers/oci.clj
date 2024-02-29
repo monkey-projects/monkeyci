@@ -83,7 +83,7 @@
          :security-context {:security-context-type "LINUX"
                             :run-as-user 0}))
 
-(defn- display-name [{:keys [build job pipeline]}]
+(defn- display-name [{:keys [build job]}]
   (cs/join "-" [(:build-id build)
                 (bc/job-id job)]))
 
@@ -116,9 +116,8 @@
 
 (defn- job-details->edn [rt]
   (pr-str {:job (-> (:job rt)
-                     (select-keys [:name :index :save-artifacts :restore-artifacts :caches])
-                     (assoc :work-dir (job-work-dir rt)))
-           :pipeline (select-keys (:pipeline rt) [:name :index])}))
+                     (select-keys [:id :index :save-artifacts :restore-artifacts :caches])
+                     (assoc :work-dir (job-work-dir rt)))}))
 
 (defn- config-vol-config
   "Configuration files for the sidecar (e.g. logging)"
