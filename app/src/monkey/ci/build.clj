@@ -6,7 +6,8 @@
             [monkey.ci
              [runtime :as rt]
              [storage :as st]
-             [utils :as u]]))
+             [utils :as u]]
+            [monkey.ci.build.core :as bc]))
 
 (def account->sid (juxt :customer-id :repo-id))
 
@@ -25,16 +26,15 @@
 (defn get-build-id [rt]
   (or (get-in rt [:build :build-id]) "unknown-build"))
 
-(def get-step-sid
-  "Creates a unique step id using the build id, pipeline and step from the runtime."
+(def get-job-sid
+  "Creates a unique step id using the build id and job id"
   (comp (partial mapv str)
         (juxt get-build-id
-              (comp (some-fn :name :index) :pipeline)
-              (comp :index :step))))
+              (comp bc/job-id :job))))
 
-(def get-step-id
-  "Creates a string representation of the step sid"
-  (comp (partial cs/join "-") get-step-sid))
+(def get-job-id
+  "Creates a string representation of the job sid"
+  (comp (partial cs/join "-") get-job-sid))
 
 (defn- maybe-set-git-opts [build rt]
   (let [{:keys [git-url branch commit-id dir]} (rt/args rt)]
@@ -116,20 +116,20 @@
     true (assoc :type :build/completed)
     (not-empty keyvals) (merge (apply hash-map keyvals))))
 
-(def step-work-dir
-  "Given a context, determines the step working directory.  This is either the
-   work dir as configured on the step, or the context work dir, or the process dir."
+(def job-work-dir
+  "Given a runtime, determines the job working directory.  This is either the
+   work dir as configured on the job, or the context work dir, or the process dir."
   (comp
    (memfn getCanonicalPath)
    io/file
-   (some-fn (comp :work-dir :step)
+   (some-fn (comp :work-dir :job)
             build-checkout-dir
             (constantly (u/cwd)))))
 
-(defn step-relative-dir
-  "Calculates path `p` as relative to the work dir for the current step"
+(defn job-relative-dir
+  "Calculates path `p` as relative to the work dir for the current job"
   [rt p]
-  (u/abs-path (step-work-dir rt) p))
+  (u/abs-path (job-work-dir rt) p))
 
 (defmethod rt/setup-runtime :build [conf _]
   ;; Just copy the build info to the runtime

@@ -5,7 +5,9 @@
             [monkey.ci
              [config :as config]
              [oci :as oci]
-             [utils :as u]])
+             [storage]
+             [utils :as u]]
+            [monkey.ci.storage.oci])
   (:import java.io.PushbackReader))
 
 ;; Global config state
@@ -51,6 +53,9 @@
 
 (defn oci-runner-config []
   (oci-config :runner))
+
+(defn oci-storage-config []
+  (oci-config :storage))
 
 (defn oci-container-config []
   (oci-config :containers))

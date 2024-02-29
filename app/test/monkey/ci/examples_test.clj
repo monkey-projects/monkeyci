@@ -10,9 +10,9 @@
   (let [inv (-> cli/run-build-cmd
                 :runs
                 (core/system-invoker {}))]
-    (inv {:workdir "examples"
-          :dir path
-          :dev-mode true})))
+    (inv {:dev-mode true
+          :workdir "examples"
+          :dir path})))
 
 (defn success? [r]
   (= 0 (deref r 30000 :timeout)))

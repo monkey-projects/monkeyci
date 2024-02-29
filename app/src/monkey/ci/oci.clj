@@ -119,7 +119,7 @@
             (or exit-code 1))
 
           (maybe-delete-instance [{{:keys [container-instance-id]} :body :as c}]
-            (if delete?
+            (if (and delete? container-instance-id)
               (md/chain
                (ci/delete-container-instance client {:instance-id container-instance-id})
                (constantly c))
@@ -172,7 +172,7 @@
 (defn sid->tags [sid]
   (->> sid
        (remove nil?)
-       (zipmap ["customer-id" "project-id" "repo-id"])))
+       (zipmap ["customer-id" "repo-id"])))
 
 (defn find-mount
   "Finds mount with given volume name in the container"

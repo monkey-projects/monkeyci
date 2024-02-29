@@ -1,4 +1,4 @@
-(ns monkey.ci.test.build.shell-test
+(ns monkey.ci.build.shell-test
   (:require [clojure.test :refer :all]
             [clojure.java.io :as io]
             [clojure.string :as cs]
@@ -7,11 +7,15 @@
              [api :as api]
              [core :as core]
              [shell :as sut]]
-            [monkey.ci.test.build.helpers :as h]))
+            [monkey.ci.build.helpers :as h]
+            [monkey.ci.jobs :as j]))
 
 (deftest bash
   (testing "returns fn"
     (is (fn? (sut/bash "test"))))
+
+  (testing "is a job fn"
+    (is (j/job-fn? (sut/bash "test"))))
   
   (testing "returns success"
     (with-redefs-fn {#'bp/shell (constantly {})}
@@ -33,9 +37,9 @@
     (with-redefs-fn {#'bp/shell (fn [opts & _]
                                   {:out (:dir opts)})}
       (let [b (sut/bash "test")]
-        #(is (= "test-dir" (:output (b {:step {:work-dir "test-dir"}})))))))
+        #(is (= "test-dir" (:output (b {:job {:work-dir "test-dir"}})))))))
 
-  (testing "uses context checkout dir if no step dir specified"
+  (testing "uses context checkout dir if no job dir specified"
     (with-redefs-fn {#'bp/shell (fn [opts & _]
                                   {:out (:dir opts)})}
       (let [b (sut/bash "test")]
@@ -67,12 +71,12 @@
           (is (true? (.delete dest))))))))
 
 (deftest in-work
-  (testing "returns relative to step work dir"
+  (testing "returns relative to job work dir"
     (is (= "/script/sub"
-           (sut/in-work {:step {:work-dir "/script"}}
+           (sut/in-work {:job {:work-dir "/script"}}
                         "sub"))))
 
   (testing "fails with absolute path"
     (is (thrown? Exception
-                 (sut/in-work {:step {:work-dir "/script"}}
+                 (sut/in-work {:job {:work-dir "/script"}}
                               "/abs")))))

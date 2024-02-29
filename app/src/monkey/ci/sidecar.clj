@@ -80,7 +80,7 @@
                     (u/parse-edn r {:eof ::eof}))
         interval (get-in rt [rt/config :sidecar :poll-interval] 1000)
         log-maker (rt/log-maker rt)
-        log-base (b/get-step-sid rt)
+        log-base (b/get-job-sid rt)
         logger (when log-maker (comp (partial log-maker rt)
                                      (partial concat log-base)))
         set-exit (fn [v] (assoc rt :exit-code v))]
@@ -100,7 +100,8 @@
                         true)
                       (do
                         (log/debug "Read next event:" evt)
-                        (upload-logs evt logger)
+                        (when (contains? evt :exit)
+                          (upload-logs evt logger))
                         (rt/post-events rt evt)))
                 (if (:done? evt)
                   (set-exit 0)
@@ -118,11 +119,10 @@
   [rt]
   (log/info "Running sidecar with configuration:" (get-in rt [rt/config :sidecar]))
   (-> rt
-      (merge (get-in rt [rt/config :sidecar :step-config]))
+      (merge (get-in rt [rt/config :sidecar :job-config]))
       (restore-src)
       (md/chain
        mark-start
-       ;; FIXME Process terminates before these are uploaded
        (cache/wrap-caches (art/wrap-artifacts poll-events)))))
 
 (defn- add-from-args [conf k]
@@ -133,4 +133,4 @@
       (mc/update-existing-in [:sidecar :log-config] u/try-slurp)
       (add-from-args :events-file)
       (add-from-args :start-file)
-      (add-from-args :step-config)))
+      (add-from-args :job-config)))

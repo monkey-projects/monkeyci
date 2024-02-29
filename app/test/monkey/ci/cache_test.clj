@@ -12,17 +12,17 @@
           bs (h/fake-blob-store stored)
           ctx {:cache bs
                :build {:sid ["test-cust" "test-build"]}
-               :step {:work-dir "work"
-                      :caches [{:id "test-cache"
-                                :path "test-path"}]}}]
+               :job {:work-dir "work"
+                     :caches [{:id "test-cache"
+                               :path "test-path"}]}}]
       (is (some? @(sut/save-caches ctx)))
       (is (= 1 (count @stored)))
       (is (cs/ends-with? (-> @stored first second)
                          "test-cust/test-cache.tgz"))))
 
   (testing "nothing if no cache store"
-    (is (empty? @(sut/save-caches {:step {:caches [{:id "test-cache"
-                                                    :path "test-path"}]}})))))
+    (is (empty? @(sut/save-caches {:job {:caches [{:id "test-cache"
+                                                   :path "test-path"}]}})))))
 
 (deftest restore-caches
   (testing "restores path using blob store"
@@ -30,8 +30,8 @@
           bs (h/fake-blob-store stored)
           ctx {:cache bs
                :build {:sid ["test-cust" "test-build"]}
-               :step {:work-dir "work"
-                      :caches [{:id "test-cache"
-                                :path "test-path"}]}}]
+               :job {:work-dir "work"
+                     :caches [{:id "test-cache"
+                               :path "test-path"}]}}]
       (is (some? @(sut/restore-caches ctx)))
       (is (empty? @stored)))))

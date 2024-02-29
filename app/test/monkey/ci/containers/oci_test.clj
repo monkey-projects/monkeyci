@@ -35,21 +35,26 @@
                 (map :display-name)
                 (set)))))
 
-  (testing "display name contains build id, pipeline index and step index"
-    (is (= "test-build-0-1"
+  (testing "display name contains build id, pipeline index and job index"
+    (is (= "test-build-test-job"
            (->> {:build {:build-id "test-build"}
-                 :step {:index 1}
-                 :pipeline {:index 0}}
+                 :job {:id "test-job"}}
                 (sut/instance-config {})
                 :display-name))))
 
   (testing "has tags from sid"
-    (let [tags (->> {:build {:sid ["test-cust" "test-proj" "test-repo"]}}
+    (let [tags (->> {:build {:sid ["test-cust" "test-repo"]}}
                     (sut/instance-config {})
-                    :tags)]
+                    :freeform-tags)]
       (is (= "test-cust" (get tags "customer-id")))
-      (is (= "test-proj" (get tags "project-id")))
       (is (= "test-repo" (get tags "repo-id")))))
+
+  (testing "merges in existing tags"
+    (let [tags (->> {:build {:sid ["test-cust" "test-repo"]}}
+                    (sut/instance-config {:freeform-tags {"env" "test"}})
+                    :freeform-tags)]
+      (is (= "test-cust" (get tags "customer-id")))
+      (is (= "test" (get tags "env")))))
 
   (testing "both containers have checkout volume"
     (letfn [(has-checkout-vol? [c]
@@ -58,8 +63,9 @@
       (is (every? has-checkout-vol? (:containers (sut/instance-config {} {}))))))
 
   (testing "job container"
-    (let [jc (->> {:step {:script ["first" "second"]
-                          :container/env {"TEST_ENV" "test-val"}}
+    (let [jc (->> {:job {:script ["first" "second"]
+                         :container/env {"TEST_ENV" "test-val"}
+                         :work-dir "/tmp/test-build/sub"}
                    :build {:checkout-dir "/tmp/test-build"}}
                   (sut/instance-config {})
                   :containers
@@ -76,11 +82,8 @@
 
       (testing "environment"
         (let [env (:environment-variables jc)]
-          (testing "sets work dir"
-            (is (= "/opt/monkeyci/checkout/work/test-build" (get env "MONKEYCI_WORK_DIR"))))
-
-          (testing "sets home to work dir"
-            (is (= "/opt/monkeyci/checkout/work/test-build" (get env "HOME"))))
+          (testing "sets work dir to job work dir"
+            (is (= "/opt/monkeyci/checkout/work/test-build/sub" (get env "MONKEYCI_WORK_DIR"))))
 
           (testing "sets log dir"
             (is (string? (get env "MONKEYCI_LOG_DIR"))))
@@ -88,17 +91,15 @@
           (testing "sets script dir"
             (is (string? (get env "MONKEYCI_SCRIPT_DIR"))))
 
-          (testing "adds env specified on the step"
+          (testing "adds env specified on the job"
             (is (= "test-val" (get env "TEST_ENV"))))))))
 
   (testing "sidecar container"
     (let [pk (h/generate-private-key)
-          ic (->> {:step {:script ["first" "second"]
-                          :save-artifacts [{:id "test-artifact"
-                                            :path "somewhere"}]
-                          :work-dir "/tmp/test-checkout/sub"
-                          :index 0}
-                   :pipeline {:name "test-pipe"}
+          ic (->> {:job {:script ["first" "second"]
+                         :save-artifacts [{:id "test-artifact"
+                                           :path "somewhere"}]
+                         :work-dir "/tmp/test-checkout/sub"}
                    :build {:build-id "test-build"
                            :checkout-dir "/tmp/test-checkout"}
                    :config {:oci {:credentials {:private-key pk}}
@@ -119,9 +120,9 @@
         (is (h/contains-subseq? (:arguments sc)
                                 ["--start-file" sut/start-file])))
 
-      (testing "passes step config as arg"
+      (testing "passes job config as arg"
         (is (h/contains-subseq? (:arguments sc)
-                                ["--step-config" "/home/monkeyci/config/step.edn"])))
+                                ["--job-config" "/home/monkeyci/config/job.edn"])))
 
       (testing "config volume"
         (let [mnt (oci/find-mount sc "config")
@@ -132,20 +133,19 @@
             (is (some? v))
             (is (= sut/config-dir (:mount-path mnt))))
 
-          (testing "step details"
-            (let [e (find-volume-entry v "step.edn")
+          (testing "job details"
+            (let [e (find-volume-entry v "job.edn")
                   data (some-> e :data (parse-b64-edn))]
               (testing "included in config volume"
                 (is (some? e)))
 
-              (testing "contains step and pipeline details"
-                (is (contains? data :step))
-                (is (contains? data :pipeline)))
+              (testing "contains job details"
+                (is (contains? data :job)))
 
-              (testing "recalculates step work dir"
+              (testing "recalculates job work dir"
                 (is (= "/opt/monkeyci/checkout/work/test-checkout/sub"
                        (-> data
-                           :step
+                           :job
                            :work-dir))))))))
 
       (testing "env vars"
@@ -177,7 +177,7 @@
         (is (= 0 (-> sc :security-context :run-as-user)))))
 
     (testing "adds logback config file to config mount"
-      (let [vol (-> {:step {:script ["test"]}
+      (let [vol (-> {:job {:script ["test"]}
                      :config {:sidecar {:log-config "test log config"}}}
                     (as-> c (sut/instance-config {} c))
                     (oci/find-volume "config"))]
@@ -186,7 +186,7 @@
         (is (some? (find-volume-entry vol "logback.xml"))))))
 
   (testing "script volume"
-    (let [v (->> {:step {:script ["first" "second"]}}
+    (let [v (->> {:job {:script ["first" "second"]}}
                  (sut/instance-config {})
                  :volumes
                  (mc/find-first (u/prop-pred :name "scripts"))

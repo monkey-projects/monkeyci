@@ -70,6 +70,7 @@
 (def ssh-keys-dir (from-config :ssh-keys-dir))
 (def events-receiver (comp :receiver :events))
 (def runner :runner)
+(def build :build)
 
 (defn get-arg [rt k]
   (k (args rt)))

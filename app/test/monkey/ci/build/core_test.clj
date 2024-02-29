@@ -1,12 +1,10 @@
-(ns monkey.ci.test.build.core-test
+(ns monkey.ci.build.core-test
   (:require [clojure.test :refer :all]
             [clojure.spec.alpha :as s]
+            [monkey.ci.jobs :as j]
             [monkey.ci.build
              [core :as sut]
              [spec :as spec]]))
-
-(defn pipeline? [x]
-  (instance? monkey.ci.build.core.Pipeline x))
 
 (deftest failed?
   (testing "true if not successful"
@@ -31,34 +29,62 @@
     (is (true? (sut/status? sut/success)))
     (is (false? (sut/status? {:something "else"})))))
 
-(deftest pipeline
+(deftest map->job
+  (testing "converts map with action into action job"
+    (is (sut/action-job? (sut/map->job {:action (constantly sut/success)}))))
 
+  (testing "converts map with container into container job"
+    (is (sut/container-job? (sut/map->job {:container/image "test-img"}))))
+
+  (testing "maps image"
+    (is (= "test-img" (-> {:container/image "test-img"}
+                          (sut/map->job)
+                          :image)))))
+
+(deftest pipeline
   (testing "creates pipeline object"
-    (is (pipeline? (sut/pipeline {:steps []}))))
+    (is (sut/pipeline? (sut/pipeline {:jobs []}))))
 
   (testing "fails if config not conforming to spec"
-    (is (thrown? AssertionError (sut/pipeline {}))))
+    (is (thrown? AssertionError (sut/pipeline {:steps "invalid"}))))
 
-  (testing "function is valid step"
-    (is (s/valid? :ci/step (constantly "ok"))))
+  (testing "function is valid job"
+    (is (s/valid? :ci/job (constantly "ok"))))
 
-  (testing "map is valid step"
-    (is (s/valid? :ci/step {:action (constantly "ok")})))
+  (testing "map is valid job"
+    (is (s/valid? :ci/job {:action (constantly "ok")})))
 
   (testing "accepts container image"
-    (let [p {:steps [{:container/image "test-image"
-                      :script ["first" "second"]}]}]
-      (is (s/valid? :ci/step (-> p :steps (first))))
-      (is (pipeline? (sut/pipeline p))))))
+    (let [p {:jobs [{:container/image "test-image"
+                     :script ["first" "second"]}]}]
+      (is (s/valid? :ci/job (-> p :jobs (first))))
+      (is (sut/pipeline? (sut/pipeline p)))))
+
+  (testing "converts maps to jobs"
+    (let [p (sut/pipeline {:jobs [{:action (constantly "test")}]})]
+      (is (sut/action-job? (-> p :jobs first)))))
+
+  (testing "processes steps for backwards compatibility"
+    (let [job {:id ::test
+               :action (constantly ::test)}
+          p (sut/pipeline {:steps [job]})]
+      (is (= (:id job) (-> p :jobs first :id))))))
 
 (deftest defpipeline
   (testing "declares def with pipeline"
-    (let [steps [(constantly :test-step)]]
-      (sut/defpipeline test-pipeline steps)
-      (is (pipeline? test-pipeline))
+    (let [jobs [(constantly ::ok)]]
+      (sut/defpipeline test-pipeline jobs)
+      (is (sut/pipeline? test-pipeline))
       (is (= "test-pipeline" (:name test-pipeline)))
-      (is (= steps (:steps test-pipeline)))
+      (is (= 1 (count (:jobs test-pipeline))))
       (ns-unalias *ns* 'test-pipeline))))
+
+(deftest defjob
+  (testing "declares var with action job"
+    (sut/defjob test-job [_] (constantly ::ok))
+    (is (sut/action-job? test-job))
+    (is (= "test-job" (sut/job-id test-job)))
+    (ns-unalias *ns* 'test-job)))
 
 (deftest git-ref
   (testing "gets git ref from build context"
@@ -110,3 +136,22 @@
                  {:git
                   {:main-branch "main"
                    :ref "refs/heads/main"}}})))))
+
+(deftest depends-on
+  (testing "adds dependencies to job"
+    (is (= [::deps]
+           (-> (sut/action-job ::test-job (constantly nil))
+               (sut/depends-on [::deps])
+               (j/deps)))))
+
+  (testing "adds to existing dependencies"
+    (is (= [::orig ::new]
+           (-> (sut/action-job ::test-job (constantly nil) {j/deps [::orig]})
+               (sut/depends-on [::new])
+               (j/deps)))))
+
+  (testing "removes duplicate dependencies"
+    (is (= [::orig ::new]
+           (-> (sut/action-job ::test-job (constantly nil) {j/deps [::orig ::new]})
+               (sut/depends-on [::new])
+               (j/deps))))))

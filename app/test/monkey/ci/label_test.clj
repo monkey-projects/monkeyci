@@ -29,7 +29,7 @@
                                   {:label "second-label"
                                    :value "second-value"}]]}))))
 
-  (testing "does not conjunction filter when only one value matches"
+  (testing "does not match conjunction filter when only one value matches"
     (is (not (sut/apply-label-filters
               {"first-label" "first-value"
                "second-label" "other-value"}

@@ -8,23 +8,24 @@
              [core :as core]]))
 
 (defn bash [& args]
-  (fn [ctx]
-    (let [work-dir (or (get-in ctx [:step :work-dir]) (:checkout-dir ctx))]
-      (log/debug "Executing shell script with args" args "in work dir" work-dir)
-      (try
-        (let [opts (cond-> {:out :string
-                            :err :string}
-                     ;; Add work dir if specified in the context
-                     work-dir (assoc :dir work-dir))]
-          (assoc core/success
-                 :output (:out (apply bp/shell opts args))))
-        (catch Exception ex
-          (let [{:keys [out err]} (ex-data ex)]
-            ;; Report the error
-            (assoc core/failure
-                   :output out
-                   :error err
-                   :exception ex)))))))
+  (core/as-job
+   (fn [rt]
+     (let [work-dir (or (get-in rt [:job :work-dir]) (:checkout-dir rt))]
+       (log/debug "Executing shell script with args" args "in work dir" work-dir)
+       (try
+         (let [opts (cond-> {:out :string
+                             :err :string}
+                      ;; Add work dir if specified in the context
+                      work-dir (assoc :dir work-dir))]
+           (assoc core/success
+                  :output (:out (apply bp/shell opts args))))
+         (catch Exception ex
+           (let [{:keys [out err]} (ex-data ex)]
+             ;; Report the error
+             (assoc core/failure
+                    :output out
+                    :error err
+                    :exception ex))))))))
 
 (def home (System/getProperty "user.home"))
 
@@ -44,7 +45,7 @@
                                      (str "No parameter value found for " param))))))
 
 (defn in-work
-  "Given a relative path `p`, returns it as a subpath to the step working directory.
+  "Given a relative path `p`, returns it as a subpath to the job working directory.
    Fails if an absolute path is given."
   [ctx p]
   (let [wd (core/work-dir ctx)]

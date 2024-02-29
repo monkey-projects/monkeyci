@@ -41,8 +41,11 @@
 (defn- cleanup-checkout-dirs!
   "Deletes the checkout dir, but only if it is not the current working directory."
   [build]
-  (doseq [k [[:checkout-dir] [:git :ssh-keys-dir]]]
-    (cleanup-dir! (get-in build k))))
+  ;; TODO Instead of applying weird heuristics, just set a boolean somewhere if
+  ;; it should be cleaned up or not.
+  (when (some? (:git build))
+    (doseq [k [[:checkout-dir] [:git :ssh-keys-dir]]]
+      (cleanup-dir! (get-in build k)))))
 
 (defn build-local
   "Locates the build script locally and starts a child process that actually

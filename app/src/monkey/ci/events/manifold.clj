@@ -1,6 +1,8 @@
 (ns monkey.ci.events.manifold
   "Manifold-based implementation of event poster and receiver"
-  (:require [manifold.stream :as ms]
+  (:require [manifold
+             [deferred :as md]
+             [stream :as ms]]
             [monkey.ci.events.core :as c]))
 
 (defn- post [stream e]
@@ -23,8 +25,9 @@
       (ms/consume-async
        (fn [evt]
          ;; TODO This may deadlock
-         (when-let [r (l evt)]
-           (post stream r)))
+         (if-let [r (l evt)]
+           (post stream r)
+           (md/success-deferred true)))
        s)
       this))
   

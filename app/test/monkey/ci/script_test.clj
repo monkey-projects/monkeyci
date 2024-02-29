@@ -1,25 +1,16 @@
 (ns monkey.ci.script-test
   (:require [clojure.test :refer :all]
-            [clojure.core.async :as ca]
-            [clojure.tools.logging :as log]
-            [martian
-             [core :as martian]
-             [test :as mt]]
+            [manifold.deferred :as md]
             [monkey.ci
-             [artifacts :as art]
-             [cache :as cache]
-             [containers :as c]
+             [jobs :as j]
              [runtime :as rt]
              [script :as sut]
              [utils :as u]]
             [monkey.ci.web.script-api :as script-api]
             [monkey.ci.build.core :as bc]
             [monkey.ci.helpers :as h]
-            [monkey.socket-async
-             [core :as sa]
-             [uds :as uds]]
-            [org.httpkit.fake :as hf]
-            [schema.core :as s]))
+            [monkey.socket-async.uds :as uds]
+            [org.httpkit.fake :as hf]))
 
 (defn with-listening-socket [f]
   (let [p (u/tmp-file "test-" ".sock")]
@@ -34,16 +25,47 @@
       (finally
         (uds/delete-address p)))))
 
-(deftest resolve-pipelines
-  (testing "returns vector as-is"
-    (is (= [::pipelines] (sut/resolve-pipelines [::pipelines] {}))))
+(defn dummy-job
+  ([r]
+   (bc/action-job ::test-job (constantly r)))
+  ([]
+   (dummy-job bc/success)))
 
+(deftest resolve-jobs
   (testing "invokes fn"
-    (is (= [::pipelines] (sut/resolve-pipelines (constantly [::pipelines]) {}))))
+    (let [job (dummy-job)
+          p (bc/pipeline {:jobs [job]})]
+      (is (= [job] (sut/resolve-jobs (constantly p) {})))))
 
-  (testing "wraps single pipeline"
-    (let [p (bc/map->Pipeline {})]
-      (is (= [p] (sut/resolve-pipelines p {}))))))
+  (testing "auto-assigns ids to jobs"
+    (let [jobs (repeat 10 (bc/action-job nil (constantly ::test)))
+          p (sut/resolve-jobs (vec jobs) {})]
+      (is (not-empty p))
+      (is (every? :id p))
+      (is (= (count jobs) (count (distinct (map :id p)))))))
+
+  (testing "assigns id as metadata to function"
+    (let [p (sut/resolve-jobs [(bc/action-job nil (constantly ::ok))] {})]
+      (is (= 1 (count p)))
+      (is (= "job-1" (-> p
+                         first
+                         bc/job-id)))))
+
+  (testing "does not overwrite existing id"
+    (is (= ::test-id (-> {:jobs [{:id ::test-id
+                                  :action (constantly :ok)}]}
+                         (bc/pipeline)
+                         (sut/resolve-jobs {})
+                         first
+                         bc/job-id))))
+
+  (testing "returns jobs as-is"
+    (let [jobs (repeatedly 10 dummy-job)]
+      (is (= jobs (sut/resolve-jobs jobs {})))))
+
+  (testing "resolves job resolvables"
+    (let [job (dummy-job)]
+      (is (= [job] (sut/resolve-jobs [(constantly job)] {}))))))
 
 (deftest exec-script!
   (testing "executes basic clj script from location"
@@ -76,191 +98,101 @@
     (hf/with-fake-http ["http://test/script/swagger.json" 200]
       (is (some? (sut/make-client {:api {:url "http://test"}}))))))
 
-(deftest run-pipelines
+(deftest run-all-jobs
   (testing "success if no pipelines"
-    (is (bc/success? (sut/run-pipelines {} []))))
+    (is (bc/success? (sut/run-all-jobs {} []))))
 
-  (testing "success if all steps succeed"
-    (is (bc/success? (->> [(bc/pipeline {:steps [(constantly bc/success)]})]
-                          (sut/run-pipelines {})))))
+  (testing "success if all jobs succeed"
+    (is (bc/success? (->> [(dummy-job bc/success)]
+                          (sut/run-all-jobs {})))))
 
-  (testing "runs a single pipline"
-    (is (bc/success? (->> (bc/pipeline {:name "single"
-                                        :steps [(constantly bc/success)]})
-                          (sut/run-pipelines {})))))
-  
-  (testing "fails if a step fails"
-    (is (bc/failed? (->> [(bc/pipeline {:steps [(constantly bc/failure)]})]
-                         (sut/run-pipelines {})))))
+  (testing "fails if a job fails"
+    (is (bc/failed? (->> [(dummy-job bc/failure)]
+                         (sut/run-all-jobs {})))))
 
-  (testing "success if step returns `nil`"
-    (is (bc/success? (->> (bc/pipeline {:name "nil"
-                                        :steps [(constantly nil)]})
-                          (sut/run-pipelines {})))))
+  (testing "success if job returns `nil`"
+    (is (bc/success? (->> [(dummy-job nil)]
+                          (sut/run-all-jobs {})))))
 
-  (testing "runs pipeline by name, if given"
+  (testing "runs jobs filtered by pipeline name"
     (is (bc/success? (->> [(bc/pipeline {:name "first"
-                                         :steps [(constantly bc/success)]})
+                                         :jobs [(dummy-job bc/success)]})
                            (bc/pipeline {:name "second"
-                                         :steps [(constantly bc/failure)]})]
-                          (sut/run-pipelines {:pipeline "first"})))))
+                                         :jobs [(dummy-job bc/failure)]})]
+                          (sut/run-all-jobs {:pipeline "first"})))))
 
-  (testing "posts events through api"
-    (letfn [(verify-evt [expected-type]
-              (let [events-posted (atom [])
-                    ;; Set up a fake api
-                    client (-> (martian/bootstrap "http://test"
-                                                  [{:route-name :post-event
-                                                    :path-parts ["/event"]
-                                                    :method :post
-                                                    :body-schema {:event s/Any}}])
-                               (mt/respond-with {:post-event (fn [req]
-                                                               (swap! events-posted conj (:body req))
-                                                               (future {:status 200}))}))
-                    pipelines [(bc/pipeline {:name "test"
-                                             :steps [(constantly bc/success)]})]
-                    ctx {:api {:client client}}]
-                (is (bc/success? (sut/run-pipelines ctx pipelines)))
-                (is (not-empty @events-posted))
-                (is (true? (-> (map :type @events-posted)
-                               (set)
-                               (contains? expected-type))))))]
+  (testing "returns all job results"
+    (let [job (bc/action-job "test-job" (constantly bc/success))
+          result (->> [job]
+                      (sut/run-all-jobs {})
+                      :jobs)]
+      (is (= ["test-job"] (keys result)))
+      (is (= bc/success (get-in result ["test-job" :result]))))))
 
-      ;; Run a test for each type
-      (->> [:pipeline/start
-            :pipeline/end
-            :step/start
-            :step/end]
-           (map (fn [t]
-                  (testing (str t)
-                    (verify-evt t))))
-           (doall))))
+(deftest run-all-jobs*
+  (testing "posts `:script/end` event with job results"
+    (let [result (assoc bc/success :message "Test result")
+          job (bc/action-job "test-job" (constantly result))
+          events (atom [])
+          rt {:events {:poster (partial swap! events conj)}}]
+      (is (some? (sut/run-all-jobs* rt [job])))
+      (is (not-empty @events))
+      (is (contains? (set (map :type @events)) :script/end))
+      (let [l (last @events)]
+        (is (= :script/end (:type l)))
+        (is (= {:result result}
+               (get-in l [:jobs "test-job"]))))))
 
-  (testing "skips `nil` pipelines"
-    (is (bc/success? (->> [(bc/pipeline {:steps [(constantly bc/success)]})
-                           nil]
-                          (sut/run-pipelines {})))))
+  (testing "adds job labels to event"
+    (let [job (bc/action-job "test-job" (constantly bc/success) {:labels {:key "value"}})
+          events (atom [])
+          rt {:events {:poster (partial swap! events conj)}}]
+      (is (some? (sut/run-all-jobs* rt [job])))
+      (let [l (last @events)]
+        (is (= :script/end (:type l)))
+        (is (= {:key "value"}
+               (get-in l [:jobs "test-job" :labels]))))))
 
-  (testing "handles pipeline seq that's not a vector"
-    (let [r (->> '((bc/pipeline {:steps [(constantly bc/success)]})
-                   (bc/pipeline {:steps [(constantly bc/success)]}))
-                 (sut/run-pipelines {}))]
-      (is (bc/success? r))
-      (is (= 2 (count (:pipelines r)))))))
+  (testing "adds job dependencies to end event"
+    (let [jobs [(bc/action-job "first-job" (constantly bc/success))
+                (bc/action-job "second-job" (constantly bc/success)
+                               {:dependencies ["first-job"]})]
+          events (atom [])
+          rt {:events {:poster (partial swap! events conj)}}]
+      (is (some? (sut/run-all-jobs* rt jobs)))
+      (let [l (last @events)]
+        (is (= :script/end (:type l)))
+        (is (= ["first-job"]
+               (get-in l [:jobs "second-job" :dependencies])))))))
 
-(defmethod c/run-container :test [ctx]
-  {:test-result :run-from-test
-   :context ctx
-   :status :success
-   :exit 0})
+(deftest event-firing-job
+  (testing "invokes target"
+    (is (bc/success? @(j/execute! (sut/->EventFiringJob (dummy-job)) {}))))
+  
+  (testing "posts event at start and stop"
+    (let [events (atom [])
+          rt {:events {:poster (partial swap! events conj)}}
+          job (dummy-job)
+          f (sut/->EventFiringJob job)]
+      (is (some? @(j/execute! f rt)))
+      (is (= 2 (count @events)))
+      (is (= :job/start (:type (first @events))))
+      (is (= :job/end (:type (second @events))))))
 
-(deftest pipeline-run-step
-  (testing "fails on invalid config"
-    (is (thrown? Exception (sut/run-step {:step (constantly bc/success)}))))
+  (testing "catches sync errors, returns failure"
+    (let [events (atom [])
+          rt {:events {:poster (partial swap! events conj)}}
+          job (bc/action-job ::failing-job (fn [_] (throw (ex-info "Test error" {}))))
+          f (sut/->EventFiringJob job)]
+      (is (bc/failed? @(j/execute! f rt)))
+      (is (= 2 (count @events)) "expected job end event")))
 
-  (testing "executes action from map"
-    (is (bc/success? (sut/run-step {:step {:action (constantly bc/success)}}))))
+  (testing "catches async errors, returns failure"
+    (let [events (atom [])
+          rt {:events {:poster (partial swap! events conj)}}
+          job (bc/action-job ::failing-job (fn [_] (md/error-deferred (ex-info "Test error" {}))))
+          f (sut/->EventFiringJob job)]
+      (is (bc/failed? @(j/execute! f rt)))
+      (is (= 2 (count @events)) "expected job end event"))))
 
-  (testing "executes in container if configured"
-    (let [ctx {:step {:container/image "test-image"}
-               :containers {:type :test}}
-          r (sut/run-step ctx)]
-      (is (= :run-from-test (:test-result r)))
-      (is (bc/success? r))))
 
-  (testing "restores/saves cache if configured"
-    (let [saved (atom false)]
-      (with-redefs [cache/save-caches
-                    (fn [ctx]
-                      (reset! saved true)
-                      ctx)
-                    cache/restore-caches
-                    (fn [ctx]
-                      (->> (get-in ctx [:step :caches])
-                           (mapv :id)))]
-        (let [ctx {:step {:action (fn [ctx]
-                                    (when-not (= [:test-cache] (get-in ctx [:step :caches]))
-                                      bc/failure))
-                          :caches [{:id :test-cache
-                                    :path "test-cache"}]}}
-              r (sut/run-step ctx)]
-          (is (bc/success? r))
-          (is (true? @saved))))))
-
-  (testing "saves artifacts if configured"
-    (let [saved (atom false)]
-      (with-redefs [art/save-artifacts
-                    (fn [ctx]
-                      (reset! saved true)
-                      ctx)]
-        (let [ctx {:step {:action (fn [ctx]
-                                    (when-not (= :test-artifact (-> (get-in ctx [:step :save-artifacts])
-                                                                    first
-                                                                    :id))
-                                      (assoc bc/failure)))
-                          :save-artifacts [{:id :test-artifact
-                                            :path "test-artifact"}]}}
-              r (sut/run-step ctx)]
-          (is (bc/success? r))
-          (is (true? @saved))))))
-
-  (testing "restores artifacts if configured"
-    (let [restored (atom false)]
-      (with-redefs [art/restore-artifacts
-                    (fn [ctx]
-                      (reset! restored true)
-                      ctx)]
-        (let [ctx {:step {:action (fn [ctx]
-                                    (when-not (= :test-artifact (-> (get-in ctx [:step :restore-artifacts])
-                                                                    first
-                                                                    :id))
-                                      (assoc bc/failure)))
-                          :restore-artifacts [{:id :test-artifact
-                                               :path "test-artifact"}]}}
-              r (sut/run-step ctx)]
-          (is (bc/success? r))
-          (is (true? @restored))))))
-
-  (testing "function returns step config"
-
-    (testing "runs container config when returned"
-      (let [step (fn [_]
-                   {:container/image "test-image"})
-            ctx {:step {:action step}
-                 :containers {:type :test}}
-            r (sut/run-step ctx)]
-        (is (= :run-from-test (:test-result r)))
-        (is (bc/success? r))))
-
-    (testing "adds step back to context"
-      (let [step {:container/image "test-image"}
-            step-fn (fn [_]
-                      step)
-            ctx {:containers {:type :test}
-                 :step {:action step-fn}}
-            r (sut/run-step ctx)]
-        (is (= step (get-in r [:context :step])))))
-
-    (testing "sets index on the step"
-      (let [step-dest (fn [ctx]
-                        (when-not (number? (get-in ctx [:step :index]))
-                          (assoc bc/failure :message "Index not specified")))
-            step-fn (fn [ctx]
-                      step-dest)
-            step {:action step-fn
-                  :index 123}
-            ctx {:containers {:type :test}
-                 :step step}
-            r (sut/run-step ctx)]
-        (is (bc/success? r))))))
-
-(deftest ->map
-  (testing "wraps function in map"
-    (is (map? (sut/->map (constantly "ok")))))
-
-  (testing "leaves map as-is"
-    (let [m {:key "value"}]
-      (is (= m (sut/->map m)))))
-
-  (testing "adds function name to action"
-    (is (= "->map" (:name (sut/->map sut/->map))))))

@@ -31,18 +31,17 @@
   [ctx]
   (or (tag-version ctx)
       ;; TODO Determine automatically
-      "0.3.0-SNAPSHOT"))
+      "0.3.2-SNAPSHOT"))
 
 (defn clj-container [name dir & args]
   "Executes script in clojure container"
   {:name name
    ;; Alpine based images don't exist for arm, so use debian
    :container/image "docker.io/clojure:temurin-21-tools-deps-bookworm-slim"
-   :script [(str "cd " dir) (cs/join " " (concat ["clojure" "-Sdeps" "'{:mvn/local-repo \"../m2\"}'"] args))]
+   :script [(str "cd " dir " && " (cs/join " " (concat ["clojure" "-Sdeps" "'{:mvn/local-repo \"../m2\"}'"] args)))]
    :caches [{:id "mvn-local-repo"
              :path "m2"}]})
 
-(def test-lib (clj-container "test-lib" "lib" "-X:test:junit"))
 (def test-app (clj-container "test-app" "app" "-M:test:junit"))
 
 (def uberjar-artifact
@@ -64,7 +63,7 @@
 (defn podman-auth [{:keys [checkout-dir]}]
   (io/file checkout-dir "podman-auth.json"))
 
-(defn image-creds
+(defn create-image-creds
   "Fetches credentials from the params and writes them to Docker `config.json`"
   [ctx]
   (let [auth-file (podman-auth ctx)]
@@ -72,6 +71,15 @@
       (shell/param-to-file ctx "dockerhub-creds" auth-file)
       (fs/delete-on-exit auth-file)
       core/success)))
+
+(def image-creds-artifact
+  {:id "image-creds"
+   :path "podman-auth.json"})
+
+(def image-creds
+  {:name "image-creds"
+   :action create-image-creds
+   :save-artifacts [image-creds-artifact]})
 
 (def img-base "fra.ocir.io/frjdhmocn5qi")
 (def app-img (str img-base "/monkeyci"))
@@ -111,7 +119,8 @@
                        "--context" "dir:///workspace"]
        :container/mounts [[(make-context ctx context) "/workspace"]
                           [(podman-auth ctx) "/kaniko/.docker/config.json"]]}
-      opts))})
+      opts))
+   :restore-artifacts [image-creds-artifact]})
 
 (def build-app-image
   (kaniko-build-img
@@ -140,9 +149,6 @@
     (-> (clj-container name dir "-X:jar:deploy")
         (assoc :container/env env))))
 
-(defn publish-lib [ctx]
-  (publish ctx "publish-lib" "lib"))
-
 (defn publish-app [ctx]
   (publish ctx "publish-app" "app"))
 
@@ -151,11 +157,10 @@
    :container/image "docker.io/dormeur/clojure-node:1.11.1"
    :work-dir "gui"
    :script ["npm install"
-            (str "npx shadow-cljs release " build)]
-   :caches [;; Disabled for now, problem with permissions
-            #_{:id "mvn-repo"
-               :path "/root/.m2"}
-            #_{:id "node-modules"
+            (str "clojure -Sdeps '{:mvn/local-repo \".m2\"}' -M -m shadow.cljs.devtools.cli release " build)]
+   :caches [{:id "mvn-gui-repo"
+             :path ".m2"}
+            {:id "node-modules"
              :path "node_modules"}]})
 
 (def test-gui
@@ -166,57 +171,20 @@
 (def build-gui-release
   (shadow-release "release-gui" :frontend))
 
-(defn oci-config-file [{:keys [checkout-dir]}]
-  (io/file checkout-dir "oci-config"))
-
-(defn- param-to-secure-file [{:keys [checkout-dir] :as ctx} p]
-  (let [f (io/file checkout-dir p)]
-    (shell/param-to-file ctx p f)
-    (fs/set-posix-file-permissions f "rw-------")
-    (fs/delete-on-exit f)
-    f))
-
-(defn oci-creds
-  "Creates oci credentials file"
-  [ctx]
-  (doseq [p ["oci-config" "oci.pem"]]
-    (param-to-secure-file ctx p))
-  core/success)
-
-(defn upload-app-artifact
-  "If this is a release build, uploads the uberjar to the OCI artifact registry."
-  [ctx]
-  (when (release? ctx)
-    (let [repo-ocid (-> (api/build-params ctx)
-                        (get "repo-ocid"))]
-      {:container/image "ghcr.io/oracle/oci-cli:latest"
-       :script ["cd app" ; FIXME Use work-dir instead, but's relative to the script dir
-                (str "oci artifacts generic artifact upload-by-path"
-                     " --repository-id=" repo-ocid
-                     " --artifact-path=monkeyci/app/monkeyci.jar"
-                     " --artifact-version=" (tag-version ctx)
-                     " --content-body=target/monkeyci-standalone.jar")]
-       :container/mounts [[(oci-config-file ctx) "/oracle/.oci/config"]]
-       :restore-artifacts [uberjar-artifact]})))
-
 (core/defpipeline test-all
   ;; TODO Run these in parallel
-  [test-lib
-   test-app
+  [test-app
    test-gui])
 
 (core/defpipeline publish-libs
-  [publish-lib
-   publish-app])
+  [publish-app])
 
 (core/defpipeline publish-images
   [app-uberjar
    build-gui-release
    image-creds
-   oci-creds
    build-app-image
-   build-gui-image
-   upload-app-artifact])
+   build-gui-image])
 
 ;; Unused
 #_(core/defpipeline braid-bot

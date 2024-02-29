@@ -112,17 +112,10 @@
     (is (nil? (sut/get-sid {:config {:account {:repo-id "r"}}})))
     (is (nil? (sut/get-sid {:config {:account {:customer-id "c"}}})))))
 
-(deftest get-step-id
-  (testing "combines build id, pipeline and step"
-    (is (= "test-build-test-pipeline-1"
+(deftest get-job-id
+  (testing "combines build and job id"
+    (is (= "test-build-test-job"
            (-> {:build {:build-id "test-build"}
-                :pipeline {:name "test-pipeline"}
-                :step {:index 1}}
-               (sut/get-step-id)))))
-  
-  (testing "uses pipeline index when no name"
-    (is (= "test-build-0-1"
-           (-> {:build {:build-id "test-build"}
-                :pipeline {:index 0}
-                :step {:index 1}}
-               (sut/get-step-id))))))
+                :job {:id "test-job"}}
+               (sut/get-job-id))))))
+

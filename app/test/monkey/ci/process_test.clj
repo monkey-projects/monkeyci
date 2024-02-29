@@ -4,6 +4,7 @@
             [clojure.java.io :as io]
             [manifold.deferred :as md]
             [monkey.ci
+             [logging :as l]
              [containers]
              [process :as sut]
              [script :as script]]
@@ -44,11 +45,12 @@
           (is (= {:key :test-args} (get-in @captured-args [:config :args]))))))))
 
 (deftest ^:slow execute-slow!
-  (let [base-ctx {:public-api sa/local-api
-                  :config {:args {:dev-mode true}}}]
+  (let [rt {:public-api sa/local-api
+            :config {:dev-mode true}
+            :logging {:maker (l/make-logger {:logging {:type :inherit}})}}]
     
     (testing "executes build script in separate process"
-      (is (zero? (-> base-ctx
+      (is (zero? (-> rt
                      (assoc :build {:script-dir (example "basic-clj")
                                     :build-id (u/new-build-id)})
                      sut/execute!
@@ -56,7 +58,7 @@
                      :exit))))
 
     (testing "fails when script fails"
-      (is (pos? (-> base-ctx
+      (is (pos? (-> rt
                     (assoc :build {:script-dir (example "failing")
                                    :build-id (u/new-build-id)})
                     sut/execute!
@@ -64,7 +66,7 @@
                     :exit))))
 
     (testing "fails when script not found"
-      (is (thrown? java.io.IOException (-> base-ctx
+      (is (thrown? java.io.IOException (-> rt
                                            (assoc :build {:script-dir (example "non-existing")})
                                            (sut/execute!)))))))
 

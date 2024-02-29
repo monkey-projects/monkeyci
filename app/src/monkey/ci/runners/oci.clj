@@ -41,8 +41,8 @@
     (-> conf
         (update :image-tag #(or % (config/version)))
         (oci/instance-config)
-        (assoc :display-name (get-in rt [:build :build-id])
-               :freeform-tags tags)
+        (assoc :display-name (get-in rt [:build :build-id]))
+        (update :freeform-tags merge tags)
         (update :containers patch-container rt))))
 
 (defn oci-runner [client conf rt]

@@ -1,13 +1,10 @@
-;; Basic Clojure build script
+;; Build script with a single job
 (require '[monkey.ci.build.core :as core])
 
-(defn ^:job simple-step [_]
+(defn ^:job simple-job [_]
   (println "This must be the simplest build script!")
   (println "Running in namespace" (ns-name *ns*))
   ;; Return success response
   core/success)
 
-;; Pipeline with a single step that just prints a message to stdout
-(core/pipeline
- {:name "test pipeline"
-  :steps [simple-step]})
+[simple-job]

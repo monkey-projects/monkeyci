@@ -37,7 +37,7 @@
 (deftest instance-config
   (let [priv-key (h/generate-private-key)
         rt {:build {:build-id "test-build-id"
-                    :sid ["a" "b" "c" "test-build-id"]
+                    :sid ["a" "b" "test-build-id"]
                     :git {:url "http://git-url"
                           :branch "main"
                           :id "test-commit"}}}
@@ -55,9 +55,14 @@
 
     (testing "sets tags from sid"
       (is (= {"customer-id" "a"
-              "project-id" "b"
-              "repo-id" "c"}
+              "repo-id" "b"}
              (:freeform-tags inst))))
+
+    (testing "merges with configured tags"
+      (let [inst (sut/instance-config (assoc conf :freeform-tags {"env" "test"})
+                                      rt)]
+        (is (= "a" (get-in inst [:freeform-tags "customer-id"])))
+        (is (= "test" (get-in inst [:freeform-tags "env"])))))
 
     (testing "container"
       (let [c (first (:containers inst))]
@@ -77,7 +82,7 @@
         (testing "provides arguments as to monkeyci build"
           (is (= ["-w" "/opt/monkeyci/checkout"
                   "build" "run"
-                  "--sid" "a/b/c/test-build-id"
+                  "--sid" "a/b/test-build-id"
                   "-u" "http://git-url"
                   "-b" "main"
                   "--commit-id" "test-commit"]

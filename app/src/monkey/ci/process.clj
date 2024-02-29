@@ -53,16 +53,6 @@
   ([args]
    (run args cc/env)))
 
-(defn- local-script-lib-dir
-  "Calculates the local script directory as a sibling dir of the
-   current (app) directory."
-  []
-  (-> (.. (io/file (utils/cwd))
-          (getAbsoluteFile)
-          (getParentFile))
-      (io/file "lib")
-      (str)))
-
 (defn- generate-deps
   "Generates a string that will be added as a commandline argument
    to the clojure process when running the script.  Any existing `deps.edn`
@@ -80,9 +70,7 @@
       :aliases
       {:monkeyci/build
        (cond-> {:exec-fn 'monkey.ci.process/run
-                :extra-deps {'com.monkeyci/script
-                             (version-or local-script-lib-dir)
-                             'com.monkeyci/app
+                :extra-deps {'com.monkeyci/app
                              (version-or utils/cwd)}}
          (fs/exists? log-config) (assoc :jvm-opts
                                         [(str "-Dlogback.configurationFile=" log-config)]))}})))

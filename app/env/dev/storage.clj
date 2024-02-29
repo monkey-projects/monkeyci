@@ -1,18 +1,16 @@
 (ns storage
   (:require [config :as c]
             [monkey.ci
+             [config :as config]
              [protocols :as p]
              [storage :as s]]
             [monkey.ci.storage.oci]))
 
 (defn make-storage
-  ([conf]
-   (-> conf
-       (c/load-config)
-       (s/make-storage)))
-  ([]
-   (-> @c/global-config
-       (s/make-storage))))
+  []
+  (-> @c/global-config
+      (config/normalize-config {} {})
+      (s/make-storage)))
 
 (defn get-customer
   "Retrieves customer info for the current config"

@@ -2,5 +2,5 @@
 
 (bc/pipeline
  {:name "Failing pipeline"
-  :steps [(constantly bc/failure)]})
+  :jobs [(bc/action-job "failing-job" (constantly bc/failure))]})
 
