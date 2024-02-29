@@ -25,7 +25,7 @@
       [co/render-alert {:type :info
                         :message "Downloading log file, one moment..."}])))
 
-;; Node does not support ESM modules, so we need to apply this workaround
+;; Node does not support ESM modules, so we need to apply this workaround when testing
 #?(:node
    (defn ansi->html [l]
      l)
@@ -139,13 +139,40 @@
    :collapsed true
    :contents [pipeline-details p]})
 
-(defn- build-pipelines []
-  (let [d (rf/subscribe [:build/details])]
+(defn- build-pipelines [pipelines]
+  [:div.mb-2
+   [:h3 "Pipelines"]
+   [co/accordion ::pipelines
+    (map as-accordion-item pipelines)]])
+
+(defn- render-job [job]
+  [:tr
+   [:td (:id job)]
+   [:td (get-in job [:labels "pipeline"])]
+   [:td [co/build-result (:status job)]]
+   [:td (elapsed job)]
+   [:td (->> (:logs job)
+             (map render-log-link)
+             (into [:span]))]])
+
+(defn- jobs-table [jobs]
+  [:table.table.table-striped
+   [:thead
+    [:tr
+     [:th "Job"]
+     [:th "Pipeline"]
+     [:th "Result"]
+     [:th "Elapsed"]
+     [:th "Logs"]]]
+   (->> jobs
+        (map render-job)
+        (into [:tbody]))])
+
+(defn- build-jobs []
+  (let [jobs (rf/subscribe [:build/jobs])]
     [:div.mb-2
-     [:h3 "Pipelines"]
-     [co/accordion ::pipelines
-      (->> (:pipelines @d)
-           (map as-accordion-item))]]))
+     [:h3 "Jobs"]
+     [jobs-table @jobs]]))
 
 (defn- log-row [{:keys [name size] :as l}]
   (let [route (rf/subscribe [:route/current])]
@@ -200,7 +227,7 @@
           [auto-reload-check]]]
         [co/alerts [:build/alerts]]
         [build-details]
-        [build-pipelines]
+        [build-jobs]
         [build-logs params]
         [log-modal]
         [:div

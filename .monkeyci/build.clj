@@ -157,7 +157,7 @@
    :container/image "docker.io/dormeur/clojure-node:1.11.1"
    :work-dir "gui"
    :script ["npm install"
-            (str "clojure -Sdeps '{:mvn/local-repo \".m2\"}' -M -m shadow.cljs.devtools.cli release " build)]
+            (str "clojure -Sdeps '{:mvn/local-repo \".m2\"}' -M:test -m shadow.cljs.devtools.cli release " build)]
    :caches [{:id "mvn-gui-repo"
              :path ".m2"}
             {:id "node-modules"
@@ -165,7 +165,7 @@
 
 (def test-gui
   (-> (shadow-release "test-gui" :test/node)
-      ;; Explicitly run the tests, since :autorun always return zero
+      ;; Explicitly run the tests, since :autorun always returns zero
       (update :script conj "node target/js/node.js")))
 
 (def build-gui-release

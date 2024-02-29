@@ -10,4 +10,5 @@
 (defn start-staging []
   (c/load-config! "oci/staging-config.edn")
   (c/load-config! "staging.edn")
+  (c/load-config! "github/staging.edn")
   (server/start-server))
