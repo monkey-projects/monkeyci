@@ -9,6 +9,7 @@
             [monkey.ci.web.script-api :as script-api]
             [monkey.ci.build.core :as bc]
             [monkey.ci.helpers :as h]
+            [monkey.socket-async.uds :as uds]
             [org.httpkit.fake :as hf]))
 
 (defn with-listening-socket [f]
@@ -143,8 +144,7 @@
                (get-in l [:jobs "test-job"]))))))
 
   (testing "adds job labels to event"
-    (let [result (assoc bc/success :message "Test result")
-          job (bc/action-job "test-job" (constantly result) {:labels {:key "value"}})
+    (let [job (bc/action-job "test-job" (constantly bc/success) {:labels {:key "value"}})
           events (atom [])
           rt {:events {:poster (partial swap! events conj)}}]
       (is (some? (sut/run-all-jobs* rt [job])))

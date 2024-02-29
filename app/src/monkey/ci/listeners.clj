@@ -1,9 +1,7 @@
 (ns monkey.ci.listeners
   (:require [clojure.core.async :as ca]
             [clojure.tools.logging :as log]
-            [monkey.ci
-             ;;[runtime :as rt]
-             [storage :as st]]))
+            [monkey.ci.storage :as st]))
 
 (defn- update-job [rt evt f & args]
   (apply st/patch-build-results
@@ -12,8 +10,9 @@
          update-in [:jobs (:id evt)] f args))
 
 (defn job-started [rt evt]
-  (update-job rt evt merge {:start-time (:time evt)
-                            :id (:id evt)}))
+  (update-job rt evt merge (-> evt
+                               (select-keys [:id :dependencies :labels])
+                               (assoc :start-time (:time evt)))))
 
 (defn job-completed [rt evt]
   (update-job rt evt merge {:end-time (:time evt)
