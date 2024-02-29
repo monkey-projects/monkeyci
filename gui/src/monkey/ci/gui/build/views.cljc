@@ -142,6 +142,7 @@
      [:td size]]))
 
 (defn logs-table []
+  ;; TODO Remove logs that are linked to a job
   (let [l (rf/subscribe [:build/logs])]
     [:table.table.table-striped
      [:thead
