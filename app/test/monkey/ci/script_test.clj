@@ -87,7 +87,15 @@
                                (sut/resolve-jobs {})
                                first
                                j/labels
-                               (get "pipeline"))))))
+                               (get "pipeline")))))
+
+  (testing "returns jobs as-is"
+    (let [jobs (repeatedly 10 dummy-job)]
+      (is (= jobs (sut/resolve-jobs jobs {})))))
+
+  (testing "resolves job resolvables"
+    (let [job (dummy-job)]
+      (is (= [job] (sut/resolve-jobs [(constantly job)] {}))))))
 
 (deftest exec-script!
   (testing "executes basic clj script from location"

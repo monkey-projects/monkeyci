@@ -313,8 +313,6 @@
 (def allowed-events
   #{:script/start
     :script/end
-    :pipeline/start
-    :pipeline/end
     :step/start
     :step/end})
 

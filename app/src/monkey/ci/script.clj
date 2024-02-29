@@ -246,6 +246,8 @@
    return value."
   [p rt]
   (cond
+    (j/job? p) [p]
+    (j/resolvable? p) [(j/resolve-job p rt)]
     (pipeline? p) (pipeline->jobs rt p)
     (sequential? p) (mapcat #(resolve-jobs % rt) p)
     (fn? p) (resolve-jobs (p rt) rt)

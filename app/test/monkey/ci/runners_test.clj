@@ -34,7 +34,8 @@
     (testing "deletes checkout dir"
       (letfn [(verify-checkout-dir-deleted [checkout-dir script-dir]
                 (is (some? (-> {:build {:script-dir (u/abs-path script-dir)
-                                        :checkout-dir (u/abs-path checkout-dir)}}
+                                        :checkout-dir (u/abs-path checkout-dir)
+                                        :git {:dir "test"}}}
                                (sut/build-local)
                                (deref))))
                 (is (false? (.exists checkout-dir))))]
@@ -52,7 +53,18 @@
             (let [checkout-dir (doto (io/file dir "checkout")
                                  (.mkdirs))
                   script-dir (io/file checkout-dir "nonexisting")]
-              (verify-checkout-dir-deleted checkout-dir script-dir))))))))
+              (verify-checkout-dir-deleted checkout-dir script-dir))))))
+
+    (testing "does not delete checkout dir when no git download"
+      (h/with-tmp-dir dir
+        (let [checkout-dir (io/file dir "checkout")
+              script-dir (doto (io/file checkout-dir "script")
+                           (.mkdirs))]
+          (spit (io/file script-dir "build.clj") "[]")
+          (is (some? (-> {:build {:checkout-dir (u/abs-path checkout-dir)}}
+                         (sut/build-local)
+                         (deref))))
+          (is (true? (.exists checkout-dir))))))))
 
 (deftest download-src
   (testing "no-op if the source is local"

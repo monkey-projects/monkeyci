@@ -230,6 +230,8 @@
 (defn resolvable? [x]
   (satisfies? p/JobResolvable x))
 
+(def resolve-job p/resolve-job)
+
 (defn resolve-all
   "Resolves all jobs, removes anything that's not resolvable or not a job."
   [rt jobs]
