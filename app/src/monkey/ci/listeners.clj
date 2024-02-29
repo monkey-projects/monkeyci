@@ -9,11 +9,11 @@
   (apply st/patch-build-results
          (:storage rt)
          (:sid evt)
-         update-in [:pipelines (get-in evt [:pipeline :index]) :jobs (:index evt)] f args))
+         update-in [:jobs (:id evt)] f args))
 
 (defn job-started [rt evt]
   (update-job rt evt merge {:start-time (:time evt)
-                            :name (:name evt)}))
+                            :id (:id evt)}))
 
 (defn job-completed [rt evt]
   (update-job rt evt merge {:end-time (:time evt)

@@ -12,7 +12,7 @@
   (testing "writes to build result object"
     (h/with-memory-store st
       (let [ctx {:storage st}
-            sid ["test-customer" "test-project" "test-repo" "test-build"]
+            sid ["test-customer" "test-repo" "test-build"]
             evt {:type :build/completed
                  :build {:sid sid}
                  :exit 0
@@ -30,22 +30,14 @@
             evt {:type :job/start
                  :time 120
                  :sid sid
-                 :index 1
-                 :name "test-job"
-                 :pipeline {:index 0
-                            :name "test-pipeline"}
+                 :id "test-job"
                  :message "Starting job"}]
-        (is (st/sid? (st/save-build-results st sid {:key "value"
-                                                    :pipelines {0
-                                                                {:name "test-pipeline"
-                                                                 :start-time 100}}})))
+        (is (st/sid? (st/save-build-results st sid {:key "value"})))
         (is (some? (sut/job-started ctx evt)))
         (is (= {:key "value"
-                :pipelines {0
-                            {:name "test-pipeline"
-                             :start-time 100
-                             :jobs {1 {:start-time 120
-                                       :name "test-job"}}}}}
+                :jobs {"test-job"
+                       {:start-time 120
+                        :id "test-job"}}}
                (st/find-build-results st sid)))))))
 
 (deftest job-completed
@@ -56,27 +48,19 @@
             evt {:type :job/end
                  :time 120
                  :sid sid
-                 :index 1
-                 :name "test-job"
-                 :pipeline {:index 0
-                            :name "test-pipeline"}
+                 :id "test-job"
                  :message "Job completed"
                  :status :success}]
         (is (st/sid? (st/save-build-results st sid {:key "value"
-                                                    :pipelines {0
-                                                                {:name "test-pipeline"
-                                                                 :start-time 100
-                                                                 :jobs {1 {:start-time 110
-                                                                           :name "test-job"}}}}})))
+                                                    :jobs {"test-job"
+                                                           {:start-time 110
+                                                            :id "test-job"}}})))
         (is (some? (sut/job-completed ctx evt)))
         (is (= {:key "value"
-                :pipelines {0
-                            {:name "test-pipeline"
-                             :start-time 100
-                             :jobs {1 {:start-time 110
-                                       :end-time 120
-                                       :name "test-job"
-                                       :status :success}}}}}
+                :jobs {"test-job" {:start-time 110
+                                   :end-time 120
+                                   :id "test-job"
+                                   :status :success}}}
                (st/find-build-results st sid)))))))
 
 (deftest build-update-handler
