@@ -22,20 +22,6 @@
       (assoc :path (:name l))
       (update :name (comp last split-log-path))))
 
-(rf/reg-sub
- :build/details
- :<- [:build/current]
- :<- [:build/logs]
- (fn [[b l] _]
-   (let [logs-by-id (group-by (comp vec (partial take 2) split-log-path :name) l)
-         add-step-logs (fn [pn s]
-                         (assoc s :logs (->> (get logs-by-id [pn (str (:index s))])
-                                             (map strip-prefix))))
-         add-logs (fn [p]
-                    (update p :steps (partial map (partial add-step-logs (:name p)))))]
-     (some-> b
-             (update :pipelines (partial map add-logs))))))
-
 (defn- pipelines-as-jobs [pl logs]
   (let [logs-by-id (group-by (comp vec (partial take 2) split-log-path :name) logs)]
     (letfn [(add-step-logs [s pn]

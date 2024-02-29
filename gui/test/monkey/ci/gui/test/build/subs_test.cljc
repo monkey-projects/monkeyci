@@ -31,43 +31,6 @@
       (is (map? (reset! app-db (db/set-logs {} ::test-logs))))
       (is (= ::test-logs @l)))))
 
-(deftest details
-  (let [d (rf/subscribe [:build/details])]
-    (testing "exists"
-      (is (some? d)))
-
-    (testing "returns build details from current build"
-      (is (nil? @d))
-      (is (some? (reset! app-db (-> {}
-                                    (db/set-build
-                                     {:id "this-build"
-                                      :message "Test build"})
-                                    (assoc :route/current
-                                           {:parameters
-                                            {:path
-                                             {:build-id "this-build"}}})))))
-      (is (= {:id "this-build"
-              :message "Test build"}
-             (select-keys @d [:id :message]))))
-
-    (testing "adds logs for step according to path"
-      (is (map? (reset! app-db (-> {}
-                                   (db/set-build
-                                    {:id "test-build"
-                                     :pipelines
-                                     [{:index 0
-                                       :name "test-pipeline"
-                                       :steps
-                                       [{:index 0}]}]})
-                                   (db/set-logs
-                                    [{:name "test-pipeline/0/out.txt"
-                                      :size 100}
-                                     {:name "test-pipeline/0/err.txt"
-                                      :size 50}])))))
-      (is (= [{:name "out.txt" :size 100 :path "test-pipeline/0/out.txt"}
-              {:name "err.txt" :size 50 :path "test-pipeline/0/err.txt"}]
-             (-> @d :pipelines first :steps first :logs))))))
-
 (deftest jobs
   (let [jobs (rf/subscribe [:build/jobs])]
     (testing "exists"
