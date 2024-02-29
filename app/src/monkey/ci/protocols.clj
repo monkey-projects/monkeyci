@@ -12,7 +12,7 @@
   (list-obj [this sid] "Lists objects at given location"))
 
 (defprotocol JobResolvable
-  "Able to resolve into a job"
-  (resolve-job [x rt]))
+  "Able to resolve into jobs (zero or more)"
+  (resolve-jobs [x rt]))
 
 ;; TODO Add others

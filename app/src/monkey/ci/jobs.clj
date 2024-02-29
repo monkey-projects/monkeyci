@@ -116,31 +116,65 @@
                      (u/fn-name f))
                  f))
 
+(defn- resolve-sequential [v rt]
+  (mapcat #(p/resolve-jobs % rt) v))
+
+(defn- add-dependencies
+  "Given a sequence of jobs from a pipeline, makes each job dependent on the previous one."
+  [jobs]
+  (reduce (fn [r j]
+            (conj r (cond-> j
+                      (not-empty r)
+                      (update :dependencies (comp vec distinct conj) (:id (last r))))))
+          []
+          jobs))
+
+(defn- add-pipeline-name-lbl
+  "When jobs are resolved from a pipeline, adds the pipeline name as a label"
+  [jobs {:keys [name]}]
+  (cond->> jobs
+    name (map #(assoc-in % [labels "pipeline"] name))))
+
 (extend-protocol p/JobResolvable
   monkey.ci.build.core.ActionJob
-  (resolve-job [job _]
-    job)
+  (resolve-jobs [job _]
+    [job])
 
   monkey.ci.build.core.ContainerJob
-  (resolve-job [job _]
-    job)
+  (resolve-jobs [job _]
+    [job])
   
   clojure.lang.IFn
-  (resolve-job [f rt]
+  (resolve-jobs [f rt]
     ;; Recursively resolve job, unless this is a job fn in itself
     (if (job-fn? f)
-      (fn->action-job f)
-      (p/resolve-job (f rt) rt)))
+      [(fn->action-job f)]
+      (p/resolve-jobs (f rt) rt)))
 
   clojure.lang.Var
-  (resolve-job [v rt]
-    (p/resolve-job (var-get v) rt))
+  (resolve-jobs [v rt]
+    (p/resolve-jobs (var-get v) rt))
 
   nil
-  (resolve-job [_ _]
-    nil))
+  (resolve-jobs [_ _]
+    [])
 
-(def resolve-job p/resolve-job)
+  clojure.lang.PersistentVector
+  (resolve-jobs [v rt]
+    (resolve-sequential v rt))
+
+  clojure.lang.LazySeq
+  (resolve-jobs [v rt]
+    (resolve-sequential v rt))
+
+  monkey.ci.build.core.Pipeline
+  (resolve-jobs [p rt]
+    (-> (:jobs p)
+        (p/resolve-jobs rt)
+        (add-dependencies)
+        (add-pipeline-name-lbl p))))
+
+(def resolve-jobs p/resolve-jobs)
 
 (defn execute-jobs!
   "Executes all jobs in dependency order.  Returns a deferred that will hold
@@ -230,12 +264,10 @@
 (defn resolvable? [x]
   (satisfies? p/JobResolvable x))
 
-(def resolve-job p/resolve-job)
-
 (defn resolve-all
   "Resolves all jobs, removes anything that's not resolvable or not a job."
   [rt jobs]
   (->> jobs
        (filter resolvable?)
-       (map #(p/resolve-job % rt))
+       (mapcat #(resolve-jobs % rt))
        (filter job?)))

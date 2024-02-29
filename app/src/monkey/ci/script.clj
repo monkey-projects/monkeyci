@@ -200,59 +200,25 @@
            script-started-evt
            script-completed-evt))
 
-(def pipeline? bc/pipeline?)
-
-(defn- add-dependencies
-  "Given a sequence of jobs from a pipeline, makes each job dependent on the previous one."
-  [jobs]
-  (log/debug "Adding dependencies to" (count jobs) "jobs")
-  (reduce (fn [r j]
-            (conj r (cond-> j
-                      (not-empty r)
-                      (update :dependencies (comp vec distinct conj) (:id (last r))))))
-          []
-          jobs))
-
 (defn- assign-ids
   "Assigns an id to each job that does not have one already."
   [jobs]
   (letfn [(assign-id [x id]
             (if (nil? (bc/job-id x))
-              (if (map? x)
-                (assoc x :id id)
-                (with-meta x (assoc (meta x) :job/id id)))
+              (assoc x :id id)
               x))]
     (map-indexed (fn [i {:keys [id] :as j}]
                    (cond-> j
                      (nil? id) (assign-id (format "job-%d" (inc i)))))
                  jobs)))
 
-(defn- add-pipeline-name-lbl [{:keys [name]} jobs]
-  (cond->> jobs
-    name (map #(assoc-in % [j/labels "pipeline"] name))))
-
-(defn pipeline->jobs
-  "Converts a pipeline in a set of jobs"
-  [rt p]
-  (->> (:jobs p)
-       (j/resolve-all rt)
-       (add-dependencies)
-       (assign-ids)
-       (add-pipeline-name-lbl p)))
-
 (defn resolve-jobs
   "The build script either returns a list of pipelines, a set of jobs or a function 
    that returns either.  This function resolves the jobs by processing the script
    return value."
   [p rt]
-  (cond
-    (j/job? p) [p]
-    (j/resolvable? p) [(j/resolve-job p rt)]
-    (pipeline? p) (pipeline->jobs rt p)
-    (sequential? p) (mapcat #(resolve-jobs % rt) p)
-    (fn? p) (resolve-jobs (p rt) rt)
-    (var? p) (resolve-jobs (var-get p) rt)
-    :else (remove nil? p)))
+  (-> (j/resolve-jobs p rt)
+      (assign-ids)))
 
 (defn exec-script!
   "Loads a script from a directory and executes it.  The script is executed in 

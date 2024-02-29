@@ -36,29 +36,10 @@
    (dummy-job bc/success)))
 
 (deftest resolve-jobs
-  (testing "returns jobs from pipeline vector"
-    (let [[a b :as jobs] (repeatedly 2 dummy-job)]
-      (is (= jobs (sut/resolve-jobs [(bc/pipeline {:jobs [a]})
-                                     (bc/pipeline {:jobs [b]})]
-                                    {})))))
-
   (testing "invokes fn"
     (let [job (dummy-job)
           p (bc/pipeline {:jobs [job]})]
       (is (= [job] (sut/resolve-jobs (constantly p) {})))))
-
-  (testing "returns jobs from single pipeline"
-    (let [job (dummy-job)
-          p (bc/pipeline {:jobs [job]})]
-      (is (= [job] (sut/resolve-jobs p {})))))
-  
-  (testing "makes each job dependent on the previous"
-    (let [[a b :as jobs] [{:id ::first
-                           :action (constantly ::first)}
-                          {:id ::second
-                           :action (constantly ::second)}]
-          p (sut/resolve-jobs (bc/pipeline {:jobs jobs}) {})]
-      (is (= [::first] (-> p second :dependencies)))))
 
   (testing "auto-assigns ids to jobs"
     (let [jobs (repeat 10 {:action (constantly ::test)})
@@ -79,15 +60,6 @@
                          (sut/resolve-jobs {})
                          first
                          bc/job-id))))
-
-  (testing "adds pipeline name as label"
-    (is (= "test-pipeline" (-> {:jobs [(dummy-job)]
-                                :name "test-pipeline"}
-                               (bc/pipeline)
-                               (sut/resolve-jobs {})
-                               first
-                               j/labels
-                               (get "pipeline")))))
 
   (testing "returns jobs as-is"
     (let [jobs (repeatedly 10 dummy-job)]

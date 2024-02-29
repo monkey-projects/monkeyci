@@ -7,8 +7,11 @@
              [containers :as co]
              [jobs :as sut]]))
 
-(defn dummy-job [id & [opts]]
-  (bc/action-job id (constantly nil) opts))
+(defn dummy-job
+  ([id & [opts]]
+   (bc/action-job id (constantly nil) opts))
+  ([]
+   (dummy-job ::test-job)))
 
 (deftest next-jobs
   (testing "returns starting jobs if all are pending"
@@ -36,31 +39,69 @@
 
 (def test-job (dummy-job ::recursive-job))
 
-(deftest resolve-job
-  (testing "returns job"
+(deftest resolve-jobs
+  (testing "returns job as vector"
     (let [job (dummy-job ::test-job)]
-      (is (= job (sut/resolve-job job {})))))
+      (is (= [job] (sut/resolve-jobs job {})))))
 
   (testing "invokes fn to return job"
     (let [job (dummy-job ::indirect-job)]
-      (is (= job (sut/resolve-job (constantly job) {})))))
+      (is (= [job] (sut/resolve-jobs (constantly job) {})))))
+
+  (testing "fn can return multiple jobs"
+    (let [jobs (repeatedly 5 dummy-job)]
+      (is (= jobs (sut/resolve-jobs (constantly jobs) {})))))
 
   (testing "recurses into job"
     (let [job (dummy-job ::recursive-job)]
-      (is (= job (sut/resolve-job (constantly (constantly job)) {})))))
+      (is (= [job] (sut/resolve-jobs (constantly (constantly job)) {})))))
 
   (testing "returns job fn as action job"
     (let [job (with-meta (constantly ::ok) {:job true :job/id "test-job"})
-          r (sut/resolve-job job {})]
+          [r] (sut/resolve-jobs job {})]
       (is (bc/action-job? r))
       (is (= job (:action r)))
       (is (= "test-job" (bc/job-id job)))))
 
   (testing "resolves var"
-    (is (= test-job (sut/resolve-job #'test-job {}))))
+    (is (= [test-job] (sut/resolve-jobs #'test-job {}))))
 
-  (testing "resolves `nil`"
-    (is (nil? (sut/resolve-job nil {})))))
+  (testing "resolves `nil` to empty"
+    (is (empty? (sut/resolve-jobs nil {}))))
+
+  (testing "resolves vector into multiple jobs"
+    (let [jobs (repeatedly 2 dummy-job)
+          v (mapv constantly jobs)]
+      (is (= jobs (sut/resolve-jobs jobs {})))))
+
+  (testing "pipelines"
+    (testing "returns jobs from pipeline vector"
+      (let [[a b :as jobs] (repeatedly 2 dummy-job)]
+        (is (= jobs (sut/resolve-jobs [(bc/pipeline {:jobs [a]})
+                                       (bc/pipeline {:jobs [b]})]
+                                      {})))))
+
+    (testing "returns jobs from single pipeline"
+      (let [job (dummy-job)
+            p (bc/pipeline {:jobs [job]})]
+        (is (= [job] (sut/resolve-jobs p {})))))
+    
+    (testing "makes each job dependent on the previous"
+      (let [[a b :as jobs] [{:id ::first
+                             :action (constantly ::first)}
+                            {:id ::second
+                             :action (constantly ::second)}]
+            p (sut/resolve-jobs (bc/pipeline {:jobs jobs}) {})]
+        (is (= [::first] (-> p second :dependencies)))))
+
+    (testing "adds pipeline name as label"
+      (is (= "test-pipeline" (-> {:jobs [(dummy-job)]
+                                  :name "test-pipeline"}
+                                 (bc/pipeline)
+                                 (sut/resolve-jobs {})
+                                 first
+                                 sut/labels
+                                 (get "pipeline")))))))
 
 (deftest action-job
   (let [job (bc/action-job ::test-job (constantly ::result))]
