@@ -54,9 +54,10 @@
       (apply w rt more))))
 
 (defn- job-start-evt [{:keys [job]}]
-  (cond-> {:type :job/start
-           :id (bc/job-id job)
-           :message "Job started"}))
+  (-> {:type :job/start
+       :id (bc/job-id job)
+       :message "Job started"}
+      (merge (select-keys job [j/deps j/labels]))))
 
 (defn- job-end-evt [{:keys [job]} {:keys [status message exception]}]
   (cond-> {:type :job/end
@@ -64,6 +65,7 @@
                         "Job completed")
            :id (bc/job-id job)
            :status status}
+    true (merge (select-keys job [j/deps j/labels]))
     (some? exception) (assoc :message (.getMessage exception)
                              :stack-trace (u/stack-trace exception))))
 
@@ -199,7 +201,7 @@
      ;; Add individual job results and dependencies, useful feedback to frontend
      :jobs (mc/map-vals (fn [r]
                           (-> (select-keys r [:result])
-                              (mc/assoc-some :dependencies (-> r :job j/deps))))
+                              (merge (select-keys (:job r) [j/deps j/labels]))))
                         (:jobs res))}))
 
 (def run-all-jobs*

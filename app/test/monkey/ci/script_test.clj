@@ -142,6 +142,17 @@
         (is (= {:result result}
                (get-in l [:jobs "test-job"]))))))
 
+  (testing "adds job labels to event"
+    (let [result (assoc bc/success :message "Test result")
+          job (bc/action-job "test-job" (constantly result) {:labels {:key "value"}})
+          events (atom [])
+          rt {:events {:poster (partial swap! events conj)}}]
+      (is (some? (sut/run-all-jobs* rt [job])))
+      (let [l (last @events)]
+        (is (= :script/end (:type l)))
+        (is (= {:key "value"}
+               (get-in l [:jobs "test-job" :labels]))))))
+
   (testing "adds job dependencies to end event"
     (let [jobs [(bc/action-job "first-job" (constantly bc/success))
                 (bc/action-job "second-job" (constantly bc/success)
