@@ -17,25 +17,43 @@
 
 (def split-log-path #(cs/split % #"/"))
 
+(defn- strip-prefix [l]
+  (-> l
+      (assoc :path (:name l))
+      (update :name (comp last split-log-path))))
+
+(defn- pipelines-as-jobs [pl logs]
+  (let [logs-by-id (group-by (comp vec (partial take 2) split-log-path :name) logs)]
+    (letfn [(add-step-logs [s pn]
+              (assoc s :logs (->> (get logs-by-id [pn (str (:index s))])
+                                  (map strip-prefix))))
+            
+            (steps->jobs [p]
+              (map (fn [s]
+                     ;; TODO Dependencies
+                     (-> s
+                         (assoc :id (str (:name p) "-" (:index s))
+                                :labels {"pipeline" (:name p)})
+                         (add-step-logs (:name p))))
+                   ((some-fn :steps :jobs) p)))]
+      (mapcat steps->jobs pl))))
+
+(defn- jobs-with-logs [{:keys [jobs]} logs]
+  (let [logs-by-id (group-by (comp first split-log-path :name) logs)]
+    (letfn [(add-job-logs [{:keys [id] :as job}]
+              (assoc job :logs (->> (get logs-by-id id)
+                                    (map strip-prefix))))]
+      (->> (vals jobs)
+           (map add-job-logs)))))
+
 (rf/reg-sub
- :build/details
+ :build/jobs
  :<- [:build/current]
- :<- [:route/current]
  :<- [:build/logs]
- (fn [[b r l] _]
-   (let [id (get-in r [:parameters :path :build-id])
-         logs-by-id (group-by (comp vec (partial take 2) split-log-path :name) l)
-         strip-prefix (fn [l]
-                        (-> l
-                            (assoc :path (:name l))
-                            (update :name (comp last split-log-path))))
-         add-step-logs (fn [pn s]
-                         (assoc s :logs (->> (get logs-by-id [pn (str (:index s))])
-                                             (map strip-prefix))))
-         add-logs (fn [p]
-                    (update p :steps (partial map (partial add-step-logs (:name p)))))]
-     (some-> b
-             (update :pipelines (partial map add-logs))))))
+ (fn [[b logs] _]
+   (if-let [p (:pipelines b)]
+     (pipelines-as-jobs p logs)
+     (jobs-with-logs b logs))))
 
 (defn- add-line-breaks [s]
   (->> (cs/split-lines s)

@@ -201,7 +201,8 @@
                  (map add-index)
                  (sort-by :index)))]
     (->> (with-index p)
-         (map #(mc/update-existing % :steps with-index)))))
+         (map #(mc/update-existing % :steps with-index))
+         (map #(mc/update-existing % :jobs with-index)))))
 
 (defn- get-builds*
   "Helper function that retrieves the builds using the request, then
