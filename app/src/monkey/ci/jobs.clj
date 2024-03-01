@@ -32,6 +32,9 @@
   ;; Perhaps because partial does a closure on declaration.
   (satisfies? Job x))
 
+(defn resolvable? [x]
+  (satisfies? p/JobResolvable x))
+
 (def pending? (comp (some-fn nil? (partial = :pending)) status))
 (def running? (comp (partial = :running) status))
 (def failed?  (comp (partial = :failure) status))
@@ -48,10 +51,30 @@
                    (u/abs-path checkout-dir d)
                    checkout-dir)))))
 
+(defn- recurse-action
+  "An action may return another job definition, especially in legacy builds.
+   This function checks the result, and if it's not a regular response, it
+   tries to construct a new job from it and execute it recursively."
+  [{:keys [action] :as job}]
+  (fn [rt]
+    (let [assign-id (fn [j]
+                      (cond-> j
+                        (nil? (bc/job-id j)) (assoc :id (bc/job-id job))))]
+      (md/chain
+       (action rt)
+       (fn [r]
+         (cond
+           ;; Valid response
+           (or (nil? r) (bc/status? r)) r
+           (resolvable? r) (when-let [child (some-> (p/resolve-jobs r rt)
+                                                    first
+                                                    (assign-id))]
+                             (execute! child (assoc rt :job child)))))))))
+
 (extend-protocol Job
   monkey.ci.build.core.ActionJob
-  (execute! [{:keys [action]} rt]
-    (let [a (-> action
+  (execute! [job rt]
+    (let [a (-> (recurse-action job)
                 (cache/wrap-caches)
                 (art/wrap-artifacts))]
       (-> rt
@@ -60,7 +83,13 @@
 
   monkey.ci.build.core.ContainerJob
   (execute! [this rt]
-    (co/run-container (assoc rt :job this))))
+    (md/chain
+     (co/run-container (assoc rt :job this))
+     (fn [r]
+       (assoc (if (= 0 (:exit r))
+                bc/success
+                bc/failure)
+              :result r)))))
 
 (defn- find-dependents
   "Finds all jobs that are dependent on this job"
@@ -163,6 +192,11 @@
   clojure.lang.PersistentVector
   (resolve-jobs [v rt]
     (resolve-sequential v rt))
+
+  clojure.lang.PersistentArrayMap
+  (resolve-jobs [m rt]
+    ;; Legacy step, as a result of a function
+    (p/resolve-jobs (bc/step->job m) rt))
 
   clojure.lang.LazySeq
   (resolve-jobs [v rt]
@@ -273,9 +307,6 @@
   [f]
   (fn [{:keys [labels]}]
     (lbl/matches-labels? f labels)))
-
-(defn resolvable? [x]
-  (satisfies? p/JobResolvable x))
 
 (defn resolve-all
   "Resolves all jobs, removes anything that's not resolvable or not a job."

@@ -3,7 +3,7 @@
         buddy/buddy-auth {:mvn/version "3.0.323"}
         buddy/buddy-core {:mvn/version "1.11.423"}
         camel-snake-kebab/camel-snake-kebab {:mvn/version "0.4.3"}
-        ch.qos.logback/logback-classic {:mvn/version "1.4.14"}
+        ch.qos.logback/logback-classic {:mvn/version "1.5.1"}
         clansi/clansi {:mvn/version "1.0.0"}
         cli-matic/cli-matic {:mvn/version "0.5.4"}
         clj-jgit/clj-jgit {:mvn/version "1.0.2"

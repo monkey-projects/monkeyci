@@ -105,7 +105,7 @@
 (defn- render-job [job]
   [:tr
    [:td (:id job)]
-   [:td (get-in job [:labels "pipeline"])]
+   [:td (get-in job [:labels :pipeline])]
    [:td [co/build-result (:status job)]]
    [:td (elapsed job)]
    [:td (->> (:logs job)

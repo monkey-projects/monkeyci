@@ -37,8 +37,8 @@
       (is (some? jobs)))
 
     (testing "returns build jobs as list"
-      (is (some? (reset! app-db (db/set-build {} {:jobs {"test-job" {:id "test-job"
-                                                                     :result {:status :success}}}}))))
+      (is (some? (reset! app-db (db/set-build {} {:jobs [{:id "test-job"
+                                                          :result {:status :success}}]}))))
       (is (= [{:id "test-job"
                :result {:status :success}
                :logs []}]
@@ -47,8 +47,8 @@
     (testing "adds logs by job id"
       (is (map? (reset! app-db (-> {}
                                    (db/set-build
-                                    {:jobs {"test-job" {:id "test-job"
-                                                        :result {:status :success}}}})
+                                    {:jobs [{:id "test-job"
+                                             :result {:status :success}}]})
                                    (db/set-logs
                                     [{:name "test-job/out.txt" :size 100}
                                      {:name "test-job/err.txt" :size 50}])))))
