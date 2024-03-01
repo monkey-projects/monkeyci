@@ -201,7 +201,13 @@
                  (map add-index)
                  (sort-by :index)))]
     (->> (with-index p)
-         (map #(mc/update-existing % :steps with-index)))))
+         (map #(mc/update-existing % :steps with-index))
+         (map #(mc/update-existing % :jobs with-index)))))
+
+(defn- fetch-details [s sid id]
+  (-> (fetch-build-details s (st/->sid (concat sid [id])))
+      (mc/update-existing :pipelines pipelines->out)
+      (mc/update-existing :jobs vals)))
 
 (defn- get-builds*
   "Helper function that retrieves the builds using the request, then
@@ -209,14 +215,11 @@
   [req f]
   (let [s (c/req->storage req)
         sid (repo-sid req)
-        builds (st/list-builds s sid)
-        fetch-details (fn [id]
-                        (-> (fetch-build-details s (st/->sid (concat sid [id])))
-                            (update :pipelines pipelines->out)))]
+        builds (st/list-builds s sid)]
     (->> builds
          (f)
          ;; TODO This is slow when there are many builds
-         (map fetch-details))))
+         (map (partial fetch-details s sid)))))
 
 (defn get-builds
   "Lists all builds for the repository"
@@ -239,11 +242,11 @@
 (defn get-build
   "Retrieves build by id"
   [req]
-  (let [sid (st/ext-build-sid (get-in req [:parameters :path]))]
-    (if-let [b (some-> (fetch-build-details (c/req->storage req) sid)
-                       (update :pipelines pipelines->out))]
-      (rur/response b)
-      (rur/not-found nil))))
+  (if-let [b (fetch-details (c/req->storage req)
+                            (repo-sid req)
+                            (get-in req [:parameters :path :build-id]))]
+    (rur/response b)
+    (rur/not-found nil)))
 
 (defn- params->ref
   "Creates a git ref from the query parameters (either branch or tag)"

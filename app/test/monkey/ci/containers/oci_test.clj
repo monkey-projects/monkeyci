@@ -22,35 +22,40 @@
     (with-open [r (io/reader (java.io.ByteArrayInputStream. b))]
       (u/parse-edn r))))
 
+(def default-rt {:build {:checkout-dir "/tmp"}})
+
 (deftest instance-config
   (testing "creates configuration map"
-    (let [ic (sut/instance-config {} {})]
+    (let [ic (sut/instance-config {} default-rt)]
       (is (map? ic))
       (is (string? (:shape ic)))))
 
   (testing "contains job and sidecar containers"
     (is (= #{"job" "sidecar"}
-           (->> (sut/instance-config {} {})
+           (->> (sut/instance-config {} default-rt)
                 :containers
                 (map :display-name)
                 (set)))))
 
   (testing "display name contains build id, pipeline index and job index"
     (is (= "test-build-test-job"
-           (->> {:build {:build-id "test-build"}
+           (->> {:build {:build-id "test-build"
+                         :checkout-dir "/tmp"}
                  :job {:id "test-job"}}
                 (sut/instance-config {})
                 :display-name))))
 
   (testing "has tags from sid"
-    (let [tags (->> {:build {:sid ["test-cust" "test-repo"]}}
+    (let [tags (->> {:build {:sid ["test-cust" "test-repo"]
+                             :checkout-dir "/tmp"}}
                     (sut/instance-config {})
                     :freeform-tags)]
       (is (= "test-cust" (get tags "customer-id")))
       (is (= "test-repo" (get tags "repo-id")))))
 
   (testing "merges in existing tags"
-    (let [tags (->> {:build {:sid ["test-cust" "test-repo"]}}
+    (let [tags (->> {:build {:sid ["test-cust" "test-repo"]
+                             :checkout-dir "/tmp"}}
                     (sut/instance-config {:freeform-tags {"env" "test"}})
                     :freeform-tags)]
       (is (= "test-cust" (get tags "customer-id")))
@@ -60,7 +65,7 @@
     (letfn [(has-checkout-vol? [c]
               (some (comp (partial = oci/checkout-vol) :volume-name)
                     (:volume-mounts c)))]
-      (is (every? has-checkout-vol? (:containers (sut/instance-config {} {}))))))
+      (is (every? has-checkout-vol? (:containers (sut/instance-config {} default-rt))))))
 
   (testing "job container"
     (let [jc (->> {:job {:script ["first" "second"]
@@ -178,7 +183,8 @@
 
     (testing "adds logback config file to config mount"
       (let [vol (-> {:job {:script ["test"]}
-                     :config {:sidecar {:log-config "test log config"}}}
+                     :config {:sidecar {:log-config "test log config"}}
+                     :build {:checkout-dir "/tmp"}}
                     (as-> c (sut/instance-config {} c))
                     (oci/find-volume "config"))]
         (is (some? vol))
@@ -186,7 +192,7 @@
         (is (some? (find-volume-entry vol "logback.xml"))))))
 
   (testing "script volume"
-    (let [v (->> {:job {:script ["first" "second"]}}
+    (let [v (->> (assoc default-rt :job {:script ["first" "second"]})
                  (sut/instance-config {})
                  :volumes
                  (mc/find-first (u/prop-pred :name "scripts"))
@@ -210,7 +216,8 @@
 (deftest run-container
   (testing "can run using type `oci`, returns exit code"
     (with-redefs [oci/run-instance (constantly (md/success-deferred 123))]
-      (is (= 123 (-> (mcc/run-container {:containers {:type :oci}})
+      (is (= 123 (-> (mcc/run-container {:containers {:type :oci}
+                                         :build {:checkout-dir "/tmp"}})
                      :exit))))))
 
 (deftest normalize-key

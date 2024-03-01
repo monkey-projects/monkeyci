@@ -48,8 +48,9 @@
   "The work dir to use for the job in the container.  This is the external job
    work dir, rebased onto the base work dir."
   [rt]
-  (some-> (get-in rt [:job :work-dir])
-          (u/rebase-path (b/build-checkout-dir rt) (base-work-dir rt))))
+  (let [cd (b/build-checkout-dir rt)]
+    (-> (get-in rt [:job :work-dir] cd)
+        (u/rebase-path cd (base-work-dir rt)))))
 
 (defn- job-container
   "Configures the job container.  It runs the image as configured in
@@ -116,7 +117,7 @@
 
 (defn- job-details->edn [rt]
   (pr-str {:job (-> (:job rt)
-                     (select-keys [:id :index :save-artifacts :restore-artifacts :caches])
+                     (select-keys [:id :save-artifacts :restore-artifacts :caches])
                      (assoc :work-dir (job-work-dir rt)))}))
 
 (defn- config-vol-config
@@ -136,7 +137,7 @@
            (-> (rt/rt->env rt)
                ;; Remove some unnecessary values
                (dissoc :args :checkout-base-dir :jwk :containers :storage) 
-               (update :build dissoc :git)                                         
+               (update :build dissoc :git :jobs)
                (assoc :work-dir wd
                       :checkout-base-dir work-dir)
                (assoc-in [:build :checkout-dir] wd)
@@ -166,6 +167,7 @@
                 (config-vol-config rt)))))
 
 (defmethod mcc/run-container :oci [rt]
+  (log/debug "Running job as OCI instance:" (:job rt))
   (let [conf (:containers rt)
         client (-> conf
                    (oci/->oci-config)

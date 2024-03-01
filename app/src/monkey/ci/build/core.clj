@@ -51,15 +51,16 @@
 
 (def container-job? (partial instance? ContainerJob))
 
-(defn map->job
+(defn step->job
   "Converts legacy map jobs into job records"
   [m]
   (cond
     (action-job? m) m
     (container-job? m) m
-    (some? (:action m)) (map->ActionJob m)
+    (some? (:action m)) (map->ActionJob (mc/assoc-some m :id (:name m)))
     (some? (:container/image m)) (map->ContainerJob (assoc m :image (:container/image m)))
-    :else m))
+    (fn? m) m
+    :else nil))
 
 (defrecord Pipeline [jobs name])
 
@@ -77,7 +78,7 @@
       ;; Convert steps into jobs, backwards compatibility
       (mc/assoc-some :jobs (:steps config))
       (dissoc :steps)
-      (update :jobs (partial map map->job))
+      (update :jobs (partial map step->job))
       (map->Pipeline)))
 
 (defmacro defpipeline

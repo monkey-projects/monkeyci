@@ -25,7 +25,7 @@
       [co/render-alert {:type :info
                         :message "Downloading log file, one moment..."}])))
 
-;; Node does not support ESM modules, so we need to apply this workaround
+;; Node does not support ESM modules, so we need to apply this workaround when testing
 #?(:node
    (defn ansi->html [l]
      l)
@@ -60,7 +60,7 @@
 (defn build-details
   "Displays the build details by looking it up in the list of repo builds."
   []
-  (let [d (rf/subscribe [:build/details])
+  (let [d (rf/subscribe [:build/current])
         v (-> @d
               (select-keys [:id :message :ref :timestamp])
               (update :timestamp t/reformat))]
@@ -102,50 +102,34 @@
     [elapsed-running x]
     [elapsed-final x]))
 
-(defn- render-step [s]
+(defn- render-job [job]
   [:tr
-   [:td (or (:name s) (:index s))]
-   [:td [co/build-result (:status s)]]
-   [:td (elapsed s)]
-   [:td (->> (:logs s)
+   [:td (:id job)]
+   [:td (get-in job [:labels :pipeline])]
+   [:td [co/build-result (:status job)]]
+   [:td (elapsed job)]
+   [:td (->> (:logs job)
              (map render-log-link)
              (into [:span]))]])
 
-(defn- pipeline-details [p]
-  [:<>
-   [:ul
-    [:li
-     [:b "Elapsed: "]
-     [:span
-      {:title "Each pipeline incurs a small startup time, that's why the elapsed time is higher than the sum of the steps' times."}
-      (elapsed p)]]
-    [:li [:b "Steps: "] (count (:steps p))]]
-   [:table.table.table-striped
-    [:thead
-     [:tr
-      [:th "Step"]
-      [:th "Result"]
-      [:th "Elapsed"]
-      [:th "Logs"]]]
-    (->> (:steps p)
-         (map render-step)
-         (into [:tbody]))]])
+(defn- jobs-table [jobs]
+  [:table.table.table-striped
+   [:thead
+    [:tr
+     [:th "Job"]
+     [:th "Pipeline"]
+     [:th "Result"]
+     [:th "Elapsed"]
+     [:th "Logs"]]]
+   (->> jobs
+        (map render-job)
+        (into [:tbody]))])
 
-(defn- as-accordion-item [p]
-  {:title [:span
-           [:b.me-1 (or (:name p) (str "Pipeline " (:index p)))]
-           [:span.badge.text-bg-secondary.me-1 (str (count (:steps p)))]
-           [co/build-result (:status p)]]
-   :collapsed true
-   :contents [pipeline-details p]})
-
-(defn- build-pipelines []
-  (let [d (rf/subscribe [:build/details])]
+(defn- build-jobs []
+  (let [jobs (rf/subscribe [:build/jobs])]
     [:div.mb-2
-     [:h3 "Pipelines"]
-     [co/accordion ::pipelines
-      (->> (:pipelines @d)
-           (map as-accordion-item))]]))
+     [:h3 "Jobs"]
+     [jobs-table @jobs]]))
 
 (defn- log-row [{:keys [name size] :as l}]
   (let [route (rf/subscribe [:route/current])]
@@ -201,7 +185,7 @@
           [auto-reload-check]]]
         [co/alerts [:build/alerts]]
         [build-details]
-        [build-pipelines]
+        [build-jobs]
         [build-logs params]
         [log-modal]
         [:div

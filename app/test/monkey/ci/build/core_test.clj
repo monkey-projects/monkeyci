@@ -64,6 +64,11 @@
     (let [p (sut/pipeline {:jobs [{:action (constantly "test")}]})]
       (is (sut/action-job? (-> p :jobs first)))))
 
+  (testing "uses name as job id"
+    (let [p (sut/pipeline {:jobs [{:action (constantly "test")
+                                   :name "test-job"}]})]
+      (is (= "test-job" (-> p :jobs first sut/job-id)))))
+
   (testing "processes steps for backwards compatibility"
     (let [job {:id ::test
                :action (constantly ::test)}

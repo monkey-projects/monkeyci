@@ -43,6 +43,7 @@
      (let [rt (-> (config/normalize-config default-script-config (config/strip-env-prefix env) args)
                   (rt/config->runtime))]
        (log/debug "Executing script with runtime" rt)
+       (log/debug "Script working directory:" (utils/cwd))
        (when (bc/failed? (script/exec-script! rt))
          (exit! 1)))
      (catch Exception ex
@@ -70,8 +71,7 @@
       :aliases
       {:monkeyci/build
        (cond-> {:exec-fn 'monkey.ci.process/run
-                :extra-deps {'com.monkeyci/app
-                             (version-or utils/cwd)}}
+                :extra-deps {'com.monkeyci/app (version-or utils/cwd)}}
          (fs/exists? log-config) (assoc :jvm-opts
                                         [(str "-Dlogback.configurationFile=" log-config)]))}})))
 

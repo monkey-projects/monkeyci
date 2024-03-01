@@ -31,46 +31,61 @@
       (is (map? (reset! app-db (db/set-logs {} ::test-logs))))
       (is (= ::test-logs @l)))))
 
-(deftest details
-  (let [d (rf/subscribe [:build/details])]
+(deftest jobs
+  (let [jobs (rf/subscribe [:build/jobs])]
     (testing "exists"
-      (is (some? d)))
+      (is (some? jobs)))
 
-    (testing "returns build details from current build"
-      (is (nil? @d))
-      (is (some? (reset! app-db (-> {}
-                                    (db/set-build
-                                     {:id "this-build"
-                                      :message "Test build"})
-                                    (assoc :route/current
-                                           {:parameters
-                                            {:path
-                                             {:build-id "this-build"}}})))))
-      (is (= {:id "this-build"
-              :message "Test build"}
-             (select-keys @d [:id :message]))))
+    (testing "returns build jobs as list"
+      (is (some? (reset! app-db (db/set-build {} {:jobs [{:id "test-job"
+                                                          :result {:status :success}}]}))))
+      (is (= [{:id "test-job"
+               :result {:status :success}
+               :logs []}]
+             @jobs)))
 
-    (testing "adds logs for step according to path"
+    (testing "adds logs by job id"
       (is (map? (reset! app-db (-> {}
                                    (db/set-build
-                                    {:id "test-build"
-                                     :pipelines
-                                     [{:index 0
-                                       :name "test-pipeline"
-                                       :steps
-                                       [{:index 0}]}]})
+                                    {:jobs [{:id "test-job"
+                                             :result {:status :success}}]})
                                    (db/set-logs
-                                    [{:name "test-pipeline/0/out.txt"
-                                      :size 100}
-                                     {:name "test-pipeline/0/err.txt"
-                                      :size 50}])
-                                   (assoc :route/current
-                                          {:parameters
-                                           {:path
-                                            {:build-id "test-build"}}})))))
-      (is (= [{:name "out.txt" :size 100 :path "test-pipeline/0/out.txt"}
-              {:name "err.txt" :size 50 :path "test-pipeline/0/err.txt"}]
-             (-> @d :pipelines first :steps first :logs))))))
+                                    [{:name "test-job/out.txt" :size 100}
+                                     {:name "test-job/err.txt" :size 50}])))))
+      (is (= [{:name "out.txt" :size 100 :path "test-job/out.txt"}
+              {:name "err.txt" :size 50 :path "test-job/err.txt"}]
+             (-> @jobs first :logs))))
+
+    (testing "legacy pipelines"
+
+      (testing "returns steps as list"
+        (is (some? (reset! app-db (db/set-build
+                                   {}
+                                   {:pipelines [{:name "test-pipeline"
+                                                 :steps [{:index 0}]}]}))))
+        (is (= [{:index 0
+                 :id "test-pipeline-0"
+                 :labels {"pipeline" "test-pipeline"}
+                 :logs []}]
+               @jobs)))
+
+      (testing "adds logs for step according to path"
+        (is (map? (reset! app-db (-> {}
+                                     (db/set-build
+                                      {:id "test-build"
+                                       :pipelines
+                                       [{:index 0
+                                         :name "test-pipeline"
+                                         :steps
+                                         [{:index 0}]}]})
+                                     (db/set-logs
+                                      [{:name "test-pipeline/0/out.txt"
+                                        :size 100}
+                                       {:name "test-pipeline/0/err.txt"
+                                        :size 50}])))))
+        (is (= [{:name "out.txt" :size 100 :path "test-pipeline/0/out.txt"}
+                {:name "err.txt" :size 50 :path "test-pipeline/0/err.txt"}]
+               (-> @jobs first :logs)))))))
 
 (deftest reloading?
   (let [r (rf/subscribe [:build/reloading?])]
