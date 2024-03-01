@@ -163,7 +163,16 @@
       (let [l (last @events)]
         (is (= :script/end (:type l)))
         (is (= ["first-job"]
-               (get-in l [:jobs "second-job" :dependencies])))))))
+               (get-in l [:jobs "second-job" :dependencies]))))))
+
+  (testing "marks job as successful if it returns `nil`"
+    (let [jobs [(bc/action-job "nil-job" (constantly nil))]
+          events (atom [])
+          rt {:events {:poster (partial swap! events conj)}}]
+      (is (some? (sut/run-all-jobs* rt jobs)))
+      (let [l (last @events)]
+        (is (bc/success?
+             (get-in l [:jobs "nil-job" :status])))))))
 
 (deftest event-firing-job
   (testing "invokes target"
