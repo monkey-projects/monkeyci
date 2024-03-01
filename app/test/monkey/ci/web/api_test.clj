@@ -213,7 +213,7 @@
                :name "pipeline 2"}]
              (-> r :body :pipelines)))))
 
-  (testing "converts pipeline steps to list sorted by index"
+  (testing "converts pipeline jobs to list sorted by index"
     (let [{st :storage :as rt} (h/test-rt)
           id (st/new-id)
           md {:customer-id "test-cust"
@@ -223,20 +223,20 @@
           _ (st/save-build-results st sid
                                    {:pipelines {0
                                                 {:name "pipeline 1"
-                                                 :steps
-                                                 {0 {:name "step 1"}
-                                                  1 {:name "step 2"}}}}})
+                                                 :jobs
+                                                 {0 {:name "job 1"}
+                                                  1 {:name "job 2"}}}}})
           r (-> rt
                 (h/->req)
                 (h/with-path-params md)
                 (sut/get-latest-build))]
       (is (= 200 (:status r)))
-      (is (= 2 (-> r :body :pipelines first :steps count)))
+      (is (= 2 (-> r :body :pipelines first :jobs count)))
       (is (= [{:index 0
-               :name "step 1"}
+               :name "job 1"}
               {:index 1
-               :name "step 2"}]
-             (-> r :body :pipelines first :steps))))))
+               :name "job 2"}]
+             (-> r :body :pipelines first :jobs))))))
 
 (deftest get-build
   (testing "retrieves build by id, with pipelines as vector"
@@ -250,9 +250,9 @@
                                    {:pipelines
                                     {0
                                      {:name "pipeline 1"
-                                      :steps
-                                      {0 {:name "step 1"}
-                                       1 {:name "step 2"}}}}})
+                                      :jobs
+                                      {0 {:name "job 1"}
+                                       1 {:name "job 2"}}}}})
           r (-> rt
                 (h/->req)
                 (h/with-path-params (assoc md :build-id id))
@@ -260,10 +260,30 @@
       (is (= 200 (:status r)))
       (is (= [{:index 0
                :name "pipeline 1"
-               :steps
-               [{:index 0 :name "step 1"}
-                {:index 1 :name "step 2"}]}]
-             (get-in r [:body :pipelines]))))))
+               :jobs
+               [{:index 0 :name "job 1"}
+                {:index 1 :name "job 2"}]}]
+             (get-in r [:body :pipelines])))))
+
+  (testing "converts jobs to list"
+    (let [{st :storage :as rt} (h/test-rt)
+          id (st/new-id)
+          md {:customer-id "test-cust"
+              :repo-id "test-repo"}
+          sid (st/->sid (concat (vals md) [id]))
+          _ (st/create-build-metadata st sid md)
+          _ (st/save-build-results st sid
+                                   {:jobs
+                                    {"job-1" {:id "job-1"}
+                                     "job-2" {:id "job-2"}}})
+          r (-> rt
+                (h/->req)
+                (h/with-path-params (assoc md :build-id id))
+                (sut/get-build))]
+      (is (= 200 (:status r)))
+      (is (= [{:id "job-1"}
+              {:id "job-2"}]
+             (get-in r [:body :jobs]))))))
 
 (defrecord FakeChannel [messages]
   http/Channel

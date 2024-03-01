@@ -64,7 +64,7 @@
            :message (or message
                         "Job completed")
            :id (bc/job-id job)
-           :status status}
+           :status (or status :success)}
     true (merge (select-keys job [j/deps j/labels]))
     (some? exception) (assoc :message (.getMessage exception)
                              :stack-trace (u/stack-trace exception))))

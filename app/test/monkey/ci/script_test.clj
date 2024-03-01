@@ -190,7 +190,7 @@
   (testing "catches async errors, returns failure"
     (let [events (atom [])
           rt {:events {:poster (partial swap! events conj)}}
-          job (bc/action-job ::failing-job (fn [_] (md/error-deferred (ex-info "Test error" {}))))
+          job (bc/action-job ::failing-async-job (fn [_] (md/error-deferred (ex-info "Test error" {}))))
           f (sut/->EventFiringJob job)]
       (is (bc/failed? @(j/execute! f rt)))
       (is (= 2 (count @events)) "expected job end event"))))

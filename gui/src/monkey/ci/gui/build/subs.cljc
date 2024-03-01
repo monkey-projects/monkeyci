@@ -43,17 +43,17 @@
     (letfn [(add-job-logs [{:keys [id] :as job}]
               (assoc job :logs (->> (get logs-by-id id)
                                     (map strip-prefix))))]
-      (->> (vals jobs)
-           (map add-job-logs)))))
+      (map add-job-logs jobs))))
 
 (rf/reg-sub
  :build/jobs
  :<- [:build/current]
  :<- [:build/logs]
  (fn [[b logs] _]
-   (if-let [p (:pipelines b)]
-     (pipelines-as-jobs p logs)
-     (jobs-with-logs b logs))))
+   (let [p (:pipelines b)]
+     (if (not-empty p)
+       (pipelines-as-jobs p logs)
+       (jobs-with-logs b logs)))))
 
 (defn- add-line-breaks [s]
   (->> (cs/split-lines s)
