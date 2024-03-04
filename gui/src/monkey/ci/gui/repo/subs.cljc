@@ -23,7 +23,7 @@
  (fn [db _]
    (let [params (get-in db [:route/current :parameters :path])]
      (some->> (db/builds db)
-              (sort-by :time)
+              (sort-by :timestamp)
               (reverse)
               (map #(assoc % :build-id (:id %)))
               (map (partial merge params))))))
