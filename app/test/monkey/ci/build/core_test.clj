@@ -29,16 +29,16 @@
     (is (true? (sut/status? sut/success)))
     (is (false? (sut/status? {:something "else"})))))
 
-(deftest map->job
+(deftest step->job
   (testing "converts map with action into action job"
-    (is (sut/action-job? (sut/map->job {:action (constantly sut/success)}))))
+    (is (sut/action-job? (sut/step->job {:action (constantly sut/success)}))))
 
   (testing "converts map with container into container job"
-    (is (sut/container-job? (sut/map->job {:container/image "test-img"}))))
+    (is (sut/container-job? (sut/step->job {:container/image "test-img"}))))
 
   (testing "maps image"
     (is (= "test-img" (-> {:container/image "test-img"}
-                          (sut/map->job)
+                          (sut/step->job)
                           :image)))))
 
 (deftest pipeline
