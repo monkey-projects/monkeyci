@@ -13,6 +13,22 @@
 
 (def tag-regex #"^refs/tags/(\d+\.\d+\.\d+(\.\d+)?$)")
 
+(defn ref?
+  "Returns a predicate that checks if the ref matches the given regex"
+  [re]
+  (fn [ctx]
+    (some? (some->> (git-ref ctx)
+                    (re-matches re)))))
+
+(def main-branch?
+  (ref? #"^refs/heads/main$"))
+
+(def release?
+  (ref? tag-regex))
+
+(def should-publish?
+  (some-fn main-branch? release?))
+
 (defn tag-version
   "Extracts the version from the tag"
   [ctx]
@@ -85,22 +101,6 @@
 (def img-base "fra.ocir.io/frjdhmocn5qi")
 (def app-img (str img-base "/monkeyci"))
 (def gui-img (str img-base "/monkeyci-gui"))
-
-(defn ref?
-  "Returns a predicate that checks if the ref matches the given regex"
-  [re]
-  (fn [ctx]
-    (some? (some->> (git-ref ctx)
-                    (re-matches re)))))
-
-(def main-branch?
-  (ref? #"^refs/heads/main$"))
-
-(def release?
-  (ref? tag-regex))
-
-(def should-publish?
-  (some-fn main-branch? release?))
 
 (defn- make-context [ctx dir]
   (cond-> (:checkout-dir ctx)
