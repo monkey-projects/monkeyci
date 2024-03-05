@@ -236,7 +236,27 @@
                :name "job 1"}
               {:index 1
                :name "job 2"}]
-             (-> r :body :pipelines first :jobs))))))
+             (-> r :body :pipelines first :jobs)))))
+
+  (testing "returns latest build"
+    (let [{st :storage :as rt} (h/test-rt)
+          md {:customer-id "test-cust"
+              :repo-id "test-repo"}
+          create-build (fn [ts]
+                         (let [id (str "build-" ts)
+                               sid (st/->sid (concat (vals md) [id]))]
+                           (st/create-build-metadata st sid md)
+                           (st/save-build-results st sid
+                                                  {:id id
+                                                   :timestamp ts
+                                                   :jobs []})))
+          _ (create-build 200)
+          _ (create-build 100)
+          r (-> rt
+                (h/->req)
+                (h/with-path-params md)
+                (sut/get-latest-build))]
+      (is (= "build-200" (-> r :body :id))))))
 
 (deftest get-build
   (testing "retrieves build by id, with pipelines as vector"

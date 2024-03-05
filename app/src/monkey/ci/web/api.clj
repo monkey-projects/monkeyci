@@ -231,10 +231,9 @@
 (defn get-latest-build
   "Retrieves the latest build for the repository."
   [req]
-  ;; FIXME This assumes the last item in the list is the most recent one, but
-  ;; this may not always be the case.
   (if-let [r (-> req
-                 (get-builds* (partial take-last 1))
+                 ;; TODO Sort by timestamp, instead of build id
+                 (get-builds* (comp (partial take-last 1) sort))
                  first)]
     (rur/response r)
     (rur/status 204)))
@@ -273,7 +272,8 @@
               (mc/assoc-some :ssh-keys ssh-keys))
      :sid (-> acc
               (assoc :build-id bid)
-              (st/ext-build-sid))}))
+              (st/ext-build-sid))
+     :cleanup? true}))
 
 (defn trigger-build [req]
   (let [{p :parameters} req]

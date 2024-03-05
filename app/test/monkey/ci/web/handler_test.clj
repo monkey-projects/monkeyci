@@ -446,7 +446,13 @@
              (is (= (take 2 sid) (take 2 bsid)))
              (is (= (get-in @runner-args [:build :build-id])
                     (last bsid)))))))
-
+      
+      (testing "sets cleanup flag"
+        (verify-runner
+         "/trigger"
+         (fn [{:keys [sid runner-args]}]
+           (is (true? (get-in @runner-args [:build :cleanup?]))))))
+      
       (testing "creates build metadata in storage"
         (verify-runner
          "/trigger?branch=test-branch"

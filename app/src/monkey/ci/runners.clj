@@ -41,9 +41,7 @@
 (defn- cleanup-checkout-dirs!
   "Deletes the checkout dir, but only if it is not the current working directory."
   [{:keys [build] :as rt}]
-  ;; TODO Instead of applying weird heuristics, just set a boolean somewhere if
-  ;; it should be cleaned up or not.
-  (when (and (some? (:git build)) (not (rt/dev-mode? rt)))
+  (when (:cleanup? build)
     (doseq [k [[:checkout-dir] [:git :ssh-keys-dir]]]
       (cleanup-dir! (get-in build k)))))
 
@@ -61,7 +59,7 @@
        (partial post-build-completed rt)
        log-build-result
        :exit)
-     #(cleanup-checkout-dirs! (:build rt)))))
+     #(cleanup-checkout-dirs! rt))))
 
 (defn download-git
   "Downloads from git into a temp dir, and designates that as the working dir."

@@ -202,7 +202,21 @@
                                    :payload {:ref "test-ref"
                                              :repository {:master-branch "test-main"}}})]
           (is (= [ssh-key]
-                 (get-in r [:git :ssh-keys]))))))))
+                 (get-in r [:git :ssh-keys])))))))
+
+  (testing "sets cleanup flag"
+    (h/with-memory-store s
+      (let [wh (test-webhook)
+            cid (:customer-id wh)
+            rid (:repo-id wh)]
+        (is (st/sid? (st/save-webhook-details s wh)))
+        (is (st/sid? (st/save-repo s {:customer cid
+                                      :id rid})))
+        (let [r (sut/create-build {:storage s}
+                                  {:id (:id wh)
+                                   :payload {:ref "test-ref"
+                                             :repository {:master-branch "test-main"}}})]
+          (is (true? (:cleanup? r))))))))
 
 (defn- with-github-user
   "Sets up fake http communication with github to return the given user"

@@ -13,7 +13,6 @@
             [monkey.ci
              [build :as b]
              [config :refer [version] :as config]
-             [containers]
              [logging :as l]
              [runtime :as rt]
              [script :as script]
@@ -21,7 +20,10 @@
              [utils :as utils]
              [workspace]]
             [monkey.ci.build.core :as bc]
+            ;; Need to require these for the multimethod discovery
             [monkey.ci.containers.oci]
+            [monkey.ci.storage.file]
+            [monkey.ci.storage.oci]
             [monkey.ci.web.script-api :as script-api]
             [monkey.socket-async.uds :as uds]))
 
@@ -54,7 +56,17 @@
   ([args]
    (run args cc/env)))
 
-(defn- generate-deps
+(defn- find-log-config
+  "Finds logback configuration file, either configured on the runner, or present 
+   in the script dir"
+  [rt]
+  (->> [(io/file (get-in rt [:build :script-dir]) "logback.xml")
+        (some->> (get-in rt [:runner :log-config])
+                 (utils/abs-path (rt/work-dir rt)))]
+       (filter fs/exists?)
+       (first)))
+
+(defn generate-deps
   "Generates a string that will be added as a commandline argument
    to the clojure process when running the script.  Any existing `deps.edn`
    should be used as well."
@@ -65,15 +77,14 @@
                      (if (rt/dev-mode? rt)
                        {:local/root (f)}
                        {:mvn/version (version)}))
-        log-config (io/file script-dir "logback.xml")]
-    (pr-str
-     {:paths [script-dir]
-      :aliases
-      {:monkeyci/build
-       (cond-> {:exec-fn 'monkey.ci.process/run
-                :extra-deps {'com.monkeyci/app (version-or utils/cwd)}}
-         (fs/exists? log-config) (assoc :jvm-opts
-                                        [(str "-Dlogback.configurationFile=" log-config)]))}})))
+        log-config (find-log-config rt)]
+    {:paths [script-dir]
+     :aliases
+     {:monkeyci/build
+      (cond-> {:exec-fn 'monkey.ci.process/run
+               :extra-deps {'com.monkeyci/app (version-or utils/cwd)}}
+        log-config (assoc :jvm-opts
+                          [(str "-Dlogback.configurationFile=" log-config)]))}}))
 
 (defn- build-args
   "Builds command-line args vector for script process"
@@ -130,7 +141,7 @@
           :out (l/log-output out)
           :err (l/log-output err)
           :cmd (-> ["clojure"
-                    "-Sdeps" (generate-deps rt)
+                    "-Sdeps" (pr-str (generate-deps rt))
                     "-X:monkeyci/build"]
                    (concat (build-args rt))
                    (vec))
@@ -142,7 +153,7 @@
                          (script-api/stop-server server))
                        (when socket-path 
                          (uds/delete-address socket-path))
-                       (log/debug "Posting build/completed event")
+                       (log/debug "Reporting build completed to deferred")
                        (-> (b/build-completed-result build exit)
                            (assoc :process p)
                            (as-> r (md/success! result r)))))})

@@ -35,6 +35,7 @@
       (letfn [(verify-checkout-dir-deleted [checkout-dir script-dir]
                 (is (some? (-> {:build {:script-dir (u/abs-path script-dir)
                                         :checkout-dir (u/abs-path checkout-dir)
+                                        :cleanup? true
                                         :git {:dir "test"}}}
                                (sut/build-local)
                                (deref))))
@@ -55,7 +56,7 @@
                   script-dir (io/file checkout-dir "nonexisting")]
               (verify-checkout-dir-deleted checkout-dir script-dir))))))
 
-    (testing "does not delete checkout dir when no git download"
+    (testing "does not delete checkout dir when no cleanup flag set"
       (h/with-tmp-dir dir
         (let [checkout-dir (io/file dir "checkout")
               script-dir (doto (io/file checkout-dir "script")

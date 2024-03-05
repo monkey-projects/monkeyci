@@ -166,3 +166,34 @@
                   (sut/process-env "test-socket"))]
       (is (= "file" (:monkeyci-logging-type env)))
       (is (= "test-dir" (:monkeyci-logging-dir env))))))
+
+(deftest generate-deps
+  (testing "adds log config file, relative to work dir if configured"
+    (h/with-tmp-dir dir
+      (let [logfile (io/file dir "logback-test.xml")]
+        (is (nil? (spit logfile "test file")))
+        (is (= (str "-Dlogback.configurationFile=" logfile)
+               (-> {:runner
+                    {:type :child
+                     :log-config "logback-test.xml"}
+                    :config {:work-dir dir}}
+                   (sut/generate-deps)
+                   :aliases
+                   :monkeyci/build
+                   :jvm-opts
+                   first))))))
+
+  (testing "adds log config file as absolute path"
+    (h/with-tmp-dir dir
+      (let [logfile (io/file dir "logback-test.xml")]
+        (is (nil? (spit logfile "test file")))
+        (is (= (str "-Dlogback.configurationFile=" logfile)
+               (-> {:runner
+                    {:type :child
+                     :log-config (.getAbsolutePath logfile)}
+                    :config {:work-dir "other"}}
+                   (sut/generate-deps)
+                   :aliases
+                   :monkeyci/build
+                   :jvm-opts
+                   first)))))))

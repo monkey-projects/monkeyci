@@ -195,8 +195,6 @@
       ;; Download to tmp file
       (log/debug "Downloading" src "into" arch)
       (mkdirs! (.getParentFile arch))
-      ;; FIXME Find a way to either stream the response, or write to a file without
-      ;; buffering it into memory.  Right now this will go OOM on larger archives.
       (md/chain
        (os/head-object client params)
        (fn [exists?]
@@ -205,6 +203,7 @@
                (md/chain
                 bs/to-input-stream
                 (fn [is]
+                  (log/debug "Decompressing archive into" arch)
                   (with-open [os (io/output-stream arch)]
                     (cc/decompress is os compression-type))
                   ;; Reopen the decompressed archive as a stream

@@ -95,7 +95,8 @@
                            :ssh-keys-dir (rt/ssh-keys-dir rt build-id)}
                           (mc/assoc-some :ssh-keys ssh-keys))
                  :sid (s/ext-build-sid md) ; Build storage id
-                 :build-id build-id}]
+                 :build-id build-id
+                 :cleanup? true}]
       (when (s/create-build-metadata st md)
         build))
     (log/warn "No webhook configuration found for" id)))
