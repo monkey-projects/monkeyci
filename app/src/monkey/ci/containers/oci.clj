@@ -49,6 +49,9 @@
    work dir, rebased onto the base work dir."
   [rt]
   (let [cd (b/build-checkout-dir rt)]
+    (log/debug "Determining job work dir using checkout dir" cd
+               ", job dir" (get-in rt [:job :work-dir])
+               "and base dir" (base-work-dir rt))
     (-> (get-in rt [:job :work-dir] cd)
         (u/rebase-path cd (base-work-dir rt)))))
 
@@ -58,7 +61,7 @@
    custom shell script that also redirects the output and dispatches
    events to a file, that are then picked up by the sidecar."
   [{:keys [job] :as rt}]
-  {:image-url (:container/image job)
+  {:image-url (or (:image job) (:container/image job))
    :display-name job-container-name
    :command ["/bin/sh" (str script-dir "/" job-script)]
    ;; One file arg per script line, with index as name
@@ -176,8 +179,7 @@
         has-job-name? (comp (partial = job-container-name) :display-name)]
     (-> (oci/run-instance client ic {:match-container (partial filter has-job-name?)
                                      :delete? true})
-        (md/chain (partial hash-map :exit))
-        (deref))))
+        (md/chain (partial hash-map :exit)))))
 
 (defmethod mcc/normalize-containers-config :oci [conf]
   (oci/normalize-config conf :containers))

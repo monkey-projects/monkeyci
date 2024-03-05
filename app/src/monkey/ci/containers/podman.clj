@@ -68,7 +68,7 @@
      (env-vars job)
      (platform rt)
      (entrypoint job)
-     [(:image conf)]
+     [(or (:image conf) (:container/image conf))]
      (make-cmd job)
      ;; TODO Execute script job by job
      (make-script-cmd (:script job)))))

@@ -13,6 +13,22 @@
 
 (def tag-regex #"^refs/tags/(\d+\.\d+\.\d+(\.\d+)?$)")
 
+(defn ref?
+  "Returns a predicate that checks if the ref matches the given regex"
+  [re]
+  (fn [ctx]
+    (some? (some->> (git-ref ctx)
+                    (re-matches re)))))
+
+(def main-branch?
+  (ref? #"^refs/heads/main$"))
+
+(def release?
+  (ref? tag-regex))
+
+(def should-publish?
+  (some-fn main-branch? release?))
+
 (defn tag-version
   "Extracts the version from the tag"
   [ctx]
@@ -31,16 +47,19 @@
   [ctx]
   (or (tag-version ctx)
       ;; TODO Determine automatically
-      "0.3.3-SNAPSHOT"))
+      "0.3.4-SNAPSHOT"))
 
-(defn clj-container [name dir & args]
+(defn clj-container [id dir & args]
   "Executes script in clojure container"
-  {:name name
-   ;; Alpine based images don't exist for arm, so use debian
-   :container/image "docker.io/clojure:temurin-21-tools-deps-bookworm-slim"
-   :script [(str "cd " dir " && " (cs/join " " (concat ["clojure" "-Sdeps" "'{:mvn/local-repo \"../m2\"}'"] args)))]
-   :caches [{:id "mvn-local-repo"
-             :path "m2"}]})
+  (core/container-job
+   id
+   {;; Alpine based images don't exist for arm, so use debian
+    :image "docker.io/clojure:temurin-21-tools-deps-bookworm-slim"
+    :script [(str "cd " dir
+                  " && "
+                  (cs/join " " (concat ["clojure" "-Sdeps" "'{:mvn/local-repo \"../m2\"}'"] args)))]
+    :caches [{:id "mvn-local-repo"
+              :path "m2"}]}))
 
 (def test-app (clj-container "test-app" "app" "-M:test:junit"))
 
@@ -48,25 +67,22 @@
   {:id "uberjar"
    :path "target/monkeyci-standalone.jar"})
 
-(defn uberjar [name dir]
-  {:name name
-   :action
-   (fn [ctx]
-     (assoc (clj-container name dir "-X:jar:uber")
-            :container/env {"MONKEYCI_VERSION" (lib-version ctx)}
-            :save-artifacts [uberjar-artifact]))})
-
-(def app-uberjar (uberjar "app-uberjar" "app"))
-(def bot-uberjar (uberjar "braid-bot-uberjar" "braid-bot"))
+(defn app-uberjar [ctx]
+  (when (should-publish? ctx)
+    (-> (clj-container "app-uberjar" "app" "-X:jar:uber")
+        (assoc 
+         :container/env {"MONKEYCI_VERSION" (lib-version ctx)}
+         :save-artifacts [uberjar-artifact])
+        (core/depends-on ["test-app"]))))
 
 ;; Full path to the docker config file, used to push images
-(defn podman-auth [{:keys [checkout-dir]}]
+(defn img-repo-auth [{:keys [checkout-dir]}]
   (io/file checkout-dir "podman-auth.json"))
 
 (defn create-image-creds
   "Fetches credentials from the params and writes them to Docker `config.json`"
   [ctx]
-  (let [auth-file (podman-auth ctx)]
+  (let [auth-file (img-repo-auth ctx)]
     (when-not (fs/exists? auth-file)
       (shell/param-to-file ctx "dockerhub-creds" auth-file)
       (fs/delete-on-exit auth-file)
@@ -77,30 +93,14 @@
    :path "podman-auth.json"})
 
 (def image-creds
-  {:name "image-creds"
-   :action create-image-creds
-   :save-artifacts [image-creds-artifact]})
+  (core/action-job
+   "image-creds"
+   create-image-creds
+   {:save-artifacts [image-creds-artifact]}))
 
 (def img-base "fra.ocir.io/frjdhmocn5qi")
 (def app-img (str img-base "/monkeyci"))
-(def bot-img (str img-base "/monkeyci-bot"))
 (def gui-img (str img-base "/monkeyci-gui"))
-
-(defn ref?
-  "Returns a predicate that checks if the ref matches the given regex"
-  [re]
-  (fn [ctx]
-    (some? (some->> (git-ref ctx)
-                    (re-matches re)))))
-
-(def main-branch?
-  (ref? #"^refs/heads/main$"))
-
-(def release?
-  (ref? tag-regex))
-
-(def should-publish?
-  (some-fn main-branch? release?))
 
 (defn- make-context [ctx dir]
   (cond-> (:checkout-dir ctx)
@@ -108,94 +108,78 @@
 
 (defn kaniko-build-img
   "Creates a step that builds and uploads an image using kaniko"
-  [{:keys [name dockerfile context image tag opts]}]
-  {:name name
-   :action
-   (fn [ctx]
+  [{:keys [id dockerfile context image tag opts]}]
+  (fn [ctx]
+    (core/container-job
+     id
      (merge
-      {:container/image "gcr.io/kaniko-project/executor:latest"
-       :container/cmd ["--dockerfile" (str "/workspace/" (or dockerfile "Dockerfile"))
+      {:image "gcr.io/kaniko-project/executor:latest"
+       :container/cmd ["--dockerfile" (str "/home/monkeyci/" (or dockerfile "Dockerfile"))
                        "--destination" (str image ":" (or tag (image-version ctx)))
-                       "--context" "dir:///workspace"]
-       :container/mounts [[(make-context ctx context) "/workspace"]
-                          [(podman-auth ctx) "/kaniko/.docker/config.json"]]}
-      opts))
-   :restore-artifacts [image-creds-artifact]})
+                       "--context" "dir:///home/monkeyci"]
+       ;; FIXME This is not supported in OCI containers
+       ;; :container/mounts [[(make-context ctx context) "/workspace"]
+       ;;                    [(podman-auth ctx) "/kaniko/.docker/config.json"]]
+       :restore-artifacts [image-creds-artifact]
+       :dependencies ["image-creds"]}
+      opts))))
 
 (def build-app-image
   (kaniko-build-img
-   {:name "publish-app-img"
+   {:id "publish-app-img"
     :dockerfile "docker/Dockerfile"
     :image app-img
-    :opts {:restore-artifacts [uberjar-artifact]}}))
-
-(def build-bot-image
-  (kaniko-build-img
-   {:name "publish-bot-img"
-    :context "braid-bot"
-    :image bot-img}))
+    :opts {:restore-artifacts [uberjar-artifact image-creds-artifact]
+           :dependencies ["image-creds" "app-uberjar"]}}))
 
 (def build-gui-image
   (kaniko-build-img
-   {:name "publish-gui-img"
+   {:id "publish-gui-img"
     :context "gui"
-    :image gui-img}))
+    :image gui-img
+    :opts {:dependencies ["image-creds" "release-gui"]}}))
 
-(defn publish [ctx name dir]
+(defn publish [ctx id dir]
   "Executes script in clojure container that has clojars publish env vars"
-  (let [env (-> (api/build-params ctx)
-                (select-keys ["CLOJARS_USERNAME" "CLOJARS_PASSWORD"])
-                (assoc "MONKEYCI_VERSION" (lib-version ctx)))]
-    (-> (clj-container name dir "-X:jar:deploy")
-        (assoc :container/env env))))
+  (when (should-publish? ctx)
+    (let [env (-> (api/build-params ctx)
+                  (select-keys ["CLOJARS_USERNAME" "CLOJARS_PASSWORD"])
+                  (assoc "MONKEYCI_VERSION" (lib-version ctx)))]
+      (-> (clj-container id dir "-X:jar:deploy")
+          (assoc :container/env env)))))
 
 (defn publish-app [ctx]
-  (publish ctx "publish-app" "app"))
+  (some-> (publish ctx "publish-app" "app")
+          (core/depends-on ["test-app"])))
 
-(defn- shadow-release [n build]
-  {:name n
-   :container/image "docker.io/dormeur/clojure-node:1.11.1"
-   :work-dir "gui"
-   :script ["npm install"
-            (str "clojure -Sdeps '{:mvn/local-repo \".m2\"}' -M:test -m shadow.cljs.devtools.cli release " build)]
-   :caches [{:id "mvn-gui-repo"
-             :path ".m2"}
-            {:id "node-modules"
-             :path "node_modules"}]})
+(defn- shadow-release [id build]
+  (core/container-job
+   id
+   {:image "docker.io/dormeur/clojure-node:1.11.1"
+    :work-dir "gui"
+    :script ["npm install"
+             (str "clojure -Sdeps '{:mvn/local-repo \".m2\"}' -M:test -m shadow.cljs.devtools.cli release " build)]
+    :caches [{:id "mvn-gui-repo"
+              :path ".m2"}
+             {:id "node-modules"
+              :path "node_modules"}]}))
 
 (def test-gui
   (-> (shadow-release "test-gui" :test/node)
       ;; Explicitly run the tests, since :autorun always returns zero
       (update :script conj "node target/js/node.js")))
 
-(def build-gui-release
-  (shadow-release "release-gui" :frontend))
+(defn build-gui-release [ctx]
+  (when (should-publish? ctx)
+    (-> (shadow-release "release-gui" :frontend)
+        (core/depends-on ["test-gui"]))))
 
-(core/defpipeline test-all
-  ;; TODO Run these in parallel
-  [test-app
-   test-gui])
-
-(core/defpipeline publish-libs
-  [publish-app])
-
-(core/defpipeline publish-images
-  [app-uberjar
-   build-gui-release
-   image-creds
-   build-app-image
-   build-gui-image])
-
-;; Unused
-#_(core/defpipeline braid-bot
-    [bot-uberjar
-     image-creds
-     build-bot-image])
-
-;; Return the pipelines
-(defn all-pipelines [ctx]
-  (cond-> [test-all]
-    ;; Optionally publish images and libs
-    (should-publish? ctx)
-    (concat [publish-libs
-             publish-images])))
+;; List of jobs
+[test-app
+ app-uberjar
+ publish-app
+ test-gui
+ build-gui-release
+ image-creds
+ build-app-image
+ build-gui-image]

@@ -90,6 +90,17 @@
           (testing "sets work dir to job work dir"
             (is (= "/opt/monkeyci/checkout/work/test-build/sub" (get env "MONKEYCI_WORK_DIR"))))
 
+          (testing "handles relative work dir"
+            (let [env (->> {:job {:script ["first" "second"]
+                                  :container/env {"TEST_ENV" "test-val"}
+                                  :work-dir "sub"}
+                            :build {:checkout-dir "/tmp/test-build"}}
+                           (sut/instance-config {})
+                           :containers
+                           (mc/find-first (u/prop-pred :display-name "job"))
+                           :environment-variables)]
+              (is (= "/opt/monkeyci/checkout/work/test-build/sub" (get env "MONKEYCI_WORK_DIR")))))
+
           (testing "sets log dir"
             (is (string? (get env "MONKEYCI_LOG_DIR"))))
 
@@ -218,6 +229,7 @@
     (with-redefs [oci/run-instance (constantly (md/success-deferred 123))]
       (is (= 123 (-> (mcc/run-container {:containers {:type :oci}
                                          :build {:checkout-dir "/tmp"}})
+                     (deref)
                      :exit))))))
 
 (deftest normalize-key

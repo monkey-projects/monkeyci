@@ -17,7 +17,11 @@
 (deftest rebase-path
   (testing "makes path relative to last arg"
     (is (= "/dest/sub"
-           (sut/rebase-path "/src/sub" "/src" "/dest")))))
+           (sut/rebase-path "/src/sub" "/src" "/dest"))))
+
+  (testing "when relative dir given, adds it to last arg"
+    (is (= "/dest/sub"
+           (sut/rebase-path "sub" "/src" "/dest")))))
 
 (deftest add-shutdown-hook!
   (testing "registers thread as shutdown hook"
