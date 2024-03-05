@@ -1,4 +1,4 @@
--(ns monkey.ci.core
+(ns monkey.ci.core
   "Core namespace for the Monkey CI app.  This contains the entrypoint which
    processes the configuration.  This configuration determines whether the
    application runs as a server, execute a single script, which type of runner
@@ -16,7 +16,6 @@
              [git]
              [listeners :as l]
              [logging]
-             [reporting]
              [runtime :as rt]
              [runners]
              [sidecar]
@@ -27,6 +26,7 @@
             [monkey.ci.events
              [core :as ec]
              [manifold]]
+            [monkey.ci.reporting.print]
             [monkey.ci.storage
              [cached]
              [file]

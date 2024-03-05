@@ -53,13 +53,13 @@
               :repo-id "test-repo"}
              (select-keys (first @b) [:build-id :customer-id :repo-id]))))
 
-    (testing "sorts by time descending"
+    (testing "sorts by timestamp descending"
       (is (map? (reset! app-db (db/set-builds {} [{:id "old-build"
-                                                   :time "2023-12-01"}
+                                                   :timestamp "2023-12-01"}
                                                   {:id "new-build"
-                                                   :time "2023-12-22"}
+                                                   :timestamp "2023-12-22"}
                                                   {:id "intermediate-build"
-                                                   :time "2023-12-10"}]))))
+                                                   :timestamp "2023-12-10"}]))))
       (is (= ["new-build" "intermediate-build" "old-build"]
              (->> @b (map :id)))))
 
