@@ -216,6 +216,7 @@
             (if (nil? (bc/job-id x))
               (assoc x :id id)
               x))]
+    ;; TODO Sanitize existing ids
     (map-indexed (fn [i job]
                    (assign-id job (format "job-%d" (inc i))))
                  jobs)))

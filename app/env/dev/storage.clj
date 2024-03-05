@@ -1,16 +1,20 @@
 (ns storage
-  (:require [config :as c]
+  (:require [clojure.java.io :as io]
+            [config :as c]
             [monkey.ci
              [config :as config]
              [protocols :as p]
              [storage :as s]]
-            [monkey.ci.storage.oci]))
+            [monkey.ci.storage.oci]
+            [monkey.oci.os.core :as os]))
+
+(defn- storage-config []
+  (-> @c/global-config
+      (config/normalize-config {} {})))
 
 (defn make-storage
   []
-  (-> @c/global-config
-      (config/normalize-config {} {})
-      (s/make-storage)))
+  (s/make-storage (storage-config)))
 
 (defn get-customer
   "Retrieves customer info for the current config"
@@ -40,3 +44,22 @@
         d (juxt (comp (partial p/delete-obj b) s/build-metadata-sid)
                 (comp (partial p/delete-obj b) s/build-results-sid))]
     (d sid)))
+
+(defn download-all
+  "Downloads all files in the storage bucket with given prefix to local disk"
+  [prefix dir]
+  (let [conf (:storage (storage-config))
+        s (make-storage)
+        c (.client s)
+        files (-> @(os/list-objects c (cond-> conf
+                                        prefix (assoc :prefix prefix)))
+                  :objects)
+        dir (io/file dir)]
+    (println "Found" (count files) "files to download")
+    (.mkdirs dir)
+    (doseq [f (map :name files)]
+      (println f)
+      (let [dest (io/file dir f)]
+        (.mkdirs (.getParentFile dest))
+        (io/copy @(os/get-object c (assoc conf :object-name f)) dest)))
+    (println "Done.")))

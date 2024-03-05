@@ -50,20 +50,7 @@
                      {:label "Result"
                       :value (fn [b] [co/build-result (:result b)])}
                      {:label "Commit message"
-                      :value #(some-> (:message %) (subs 0 30))}]}]
-         #_[:table.table.table-striped
-          [:thead
-           [:tr
-            [:th {:scope :col} "Id"]
-            [:th {:scope :col} "Time " [co/icon :caret-down-fill]]
-            [:th {:scope :col} "Elapsed"]
-            [:th {:scope :col} "Trigger"]
-            [:th {:scope :col} "Ref"]
-            [:th {:scope :col} "Result"]
-            [:th {:scope :col} "Commit message"]]]
-          (->> @b
-               (map build-row)
-               (into [:tbody]))]]))))
+                      :value #(some-> (:message %) (subs 0 30))}]}]]))))
 
 (defn page [route]
   (rf/dispatch [:repo/load (get-in route [:parameters :path :customer-id])])
