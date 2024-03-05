@@ -183,7 +183,9 @@
                                                       :close? true)))
               (md/chain (constantly obj-name))
               (md/finally #(fs/delete arch)))))
-      (md/success-deferred nil)))
+      (do
+        (log/warn "Unable to save blob, path does not exist:" src)
+        (md/success-deferred nil))))
 
   (restore [_ src dest]
     (let [obj-name (archive-obj-name conf src)

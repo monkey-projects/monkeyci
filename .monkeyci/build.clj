@@ -65,7 +65,7 @@
 
 (def uberjar-artifact
   {:id "uberjar"
-   :path "target/monkeyci-standalone.jar"})
+   :path "app/target/monkeyci-standalone.jar"})
 
 (defn app-uberjar [ctx]
   (when (should-publish? ctx)
@@ -76,8 +76,8 @@
         (core/depends-on ["test-app"]))))
 
 ;; Full path to the docker config file, used to push images
-(defn img-repo-auth [{:keys [checkout-dir]}]
-  (io/file checkout-dir "podman-auth.json"))
+(defn img-repo-auth [ctx]
+  (shell/in-work ctx "podman-auth.json"))
 
 (defn create-image-creds
   "Fetches credentials from the params and writes them to Docker `config.json`"
@@ -85,7 +85,6 @@
   (let [auth-file (img-repo-auth ctx)]
     (when-not (fs/exists? auth-file)
       (shell/param-to-file ctx "dockerhub-creds" auth-file)
-      (fs/delete-on-exit auth-file)
       core/success)))
 
 (def image-creds-artifact
