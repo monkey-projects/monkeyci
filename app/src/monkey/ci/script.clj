@@ -200,7 +200,7 @@
      :message "Script completed"
      ;; Add individual job results and dependencies, useful feedback to frontend
      :jobs (mc/map-vals (fn [r]
-                          (-> {:result (select-keys (:result res) [:status :message])}
+                          (-> {:result (select-keys (:result r) [:status :message])}
                               (merge (select-keys (:job r) [j/deps j/labels]))))
                         (:jobs res))}))
 

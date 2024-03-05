@@ -38,9 +38,10 @@
   "Given two absolute paths, recalculates p so that it becomes relative to `to` instead
    of `from`."
   [p from to]
-  (->> (fs/relativize from p)
-       (fs/path to)
-       (str)))
+  (str (if (fs/absolute? p)
+         (->> (fs/relativize from p)
+              (fs/path to))
+         (fs/path to p))))
 
 (defn add-shutdown-hook!
   "Executes `h` when the JVM shuts down.  Returns the thread that will
