@@ -20,13 +20,27 @@ if [ "$MONKEYCI_START_FILE" = "" ]; then
     MONKEYCI_START_FILE=${MONKEYCI_LOG_DIR}/start
 fi
 
+if [ "$MONKEYCI_ABORT_FILE" = "" ]; then
+    MONKEYCI_ABORT_FILE=${MONKEYCI_LOG_DIR}/abort
+fi
+
 wait_for_start()
 {
     echo "Waiting for start conditions..."
-    while [ ! -f "$MONKEYCI_START_FILE" ]; do
+    while true; do
 	sleep 1
+	if [ -f "$MONKEYCI_START_FILE" ]; then
+	    echo "Ready to start"
+	    START=yes
+	    break
+	fi
+	# Abortion indicates there is something wrong with the sidecar
+	if [ -f "$MONKEYCI_ABORT_FILE" ]; then
+	    echo "Aborting execution"
+	    ABORT=yes
+	    break
+	fi
     done
-    echo "Ready to start"
 }
 
 post_event()
@@ -53,6 +67,11 @@ run_command()
 mkdir -p $MONKEYCI_LOG_DIR
 post_event "{:type :job/wait}"
 wait_for_start
+if [ "$ABORT" == "yes" ]; then
+    echo "Aborted."
+    exit 1
+fi
+
 post_event "{:type :job/start}"
 cd $MONKEYCI_WORK_DIR
 # Execute all arguments as script commands

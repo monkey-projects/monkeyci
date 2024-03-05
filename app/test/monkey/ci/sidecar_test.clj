@@ -290,4 +290,6 @@
                                             :path "test-path"}]}
                             :cache (->SlowBlobStore 1000)}
                            (sut/run)
-                           (deref 100 ::timeout)))))))
+                           (deref 100 ::timeout)))))
+
+    (testing "aborts on error")))

@@ -63,6 +63,14 @@
       (is (= ["new-build" "intermediate-build" "old-build"]
              (->> @b (map :id)))))
 
+    (testing "handles both epoch and string timestamps"
+      (is (map? (reset! app-db (db/set-builds {} [{:id "old-build"
+                                                   :timestamp "2024-01-18T09:11:40+01:00"}
+                                                  {:id "new-build"
+                                                   :timestamp 1708433539638}]))))
+      (is (= ["new-build" "old-build"]
+             (->> @b (map :id)))))
+
     (testing "`nil` when no builds"
       (is (empty? (reset! app-db {})))
       (is (nil? @b)))))
