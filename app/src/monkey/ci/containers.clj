@@ -35,3 +35,9 @@
 (defmethod rt/setup-runtime :containers [conf _]
   ;; Just return the config, will be reworked later to be more consistent with other runtimes
   (get conf :containers))
+
+(def image :image)
+(def env :container/env)
+(def cmd :container/cmd)
+(def mounts :container/mounts)
+(def entrypoint :container/entrypoint)

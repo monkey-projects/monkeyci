@@ -20,8 +20,8 @@
 (defn- make-script-cmd [script]
   [(cs/join " && " script)])
 
-(defn- make-cmd [{:keys [:container/cmd]}]
-  (if (some? cmd)
+(defn- make-cmd [conf]
+  (if-let [cmd (mcc/cmd conf)]
     cmd
     ;; When no command is given, use /bin/sh as entrypoint and fail on errors
     ["-ec"]))

@@ -75,9 +75,13 @@
          :save-artifacts [uberjar-artifact])
         (core/depends-on ["test-app"]))))
 
+(def image-creds-artifact
+  {:id "image-creds"
+   :path ".docker/config.json"})
+
 ;; Full path to the docker config file, used to push images
 (defn img-repo-auth [ctx]
-  (shell/in-work ctx "podman-auth.json"))
+  (shell/in-work ctx (:path image-creds-artifact)))
 
 (defn create-image-creds
   "Fetches credentials from the params and writes them to Docker `config.json`"
@@ -86,10 +90,6 @@
     (when-not (fs/exists? auth-file)
       (shell/param-to-file ctx "dockerhub-creds" auth-file)
       core/success)))
-
-(def image-creds-artifact
-  {:id "image-creds"
-   :path "podman-auth.json"})
 
 (def image-creds
   (core/action-job
@@ -112,13 +112,14 @@
     (core/container-job
      id
      (merge
-      {:image "gcr.io/kaniko-project/executor:latest"
-       :container/cmd ["--dockerfile" (str "/home/monkeyci/" (or dockerfile "Dockerfile"))
+      ;; Need to use debug image because it includes /bin/sh
+      {:image "gcr.io/kaniko-project/executor:v1.21.0-debug"
+       :container/cmd ["executor"
+                       "--dockerfile" (str "/home/monkeyci/" (or dockerfile "Dockerfile"))
                        "--destination" (str image ":" (or tag (image-version ctx)))
                        "--context" "dir:///home/monkeyci"]
-       ;; FIXME This is not supported in OCI containers
-       ;; :container/mounts [[(make-context ctx context) "/workspace"]
-       ;;                    [(podman-auth ctx) "/kaniko/.docker/config.json"]]
+       ;; Set docker config credentials location
+       :container/env {"DOCKER_CONFIG" (str "/home/monkeyci/" (:path image-creds-artifact))}
        :restore-artifacts [image-creds-artifact]
        :dependencies ["image-creds"]}
       opts))))

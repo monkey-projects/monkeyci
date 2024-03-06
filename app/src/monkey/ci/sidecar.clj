@@ -118,12 +118,14 @@
    containing the runtime with an `:exit-code` added."
   [rt]
   (log/info "Running sidecar with configuration:" (get-in rt [rt/config :sidecar]))
-  (-> rt
-      (merge (get-in rt [rt/config :sidecar :job-config]))
-      (restore-src)
-      (md/chain
-       mark-start
-       (cache/wrap-caches (art/wrap-artifacts poll-events)))))
+  ;; Restore caches and artifacts before starting the job
+  (let [h (-> (comp poll-events mark-start)
+              (art/wrap-artifacts)
+              (cache/wrap-caches))]
+    (-> rt
+        (merge (get-in rt [rt/config :sidecar :job-config]))
+        (restore-src)
+        (h))))
 
 (defn- add-from-args [conf k]
   (update-in conf [:sidecar k] #(or (get-in conf [:args k]) %)))

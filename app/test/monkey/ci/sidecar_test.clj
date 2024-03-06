@@ -284,6 +284,17 @@
                            (deref 100 ::timeout)))
           "expected timeout while waiting for blobs to save"))
 
+    (testing "restores artifacts and caches before creating start file"
+      (let [actions (atom [])
+            mark-action (fn [t]
+                          (fn [rt]
+                            (swap! actions conj t)
+                            rt))]
+        (with-redefs [sut/mark-start (mark-action ::started)
+                      art/restore-artifacts (mark-action ::restore-artifacts)]
+          (is (some? (deref (sut/run {}))))
+          (is (= [::restore-artifacts ::started] @actions)))))
+
     (testing "blocks until caches have been stored"
       ;; Set up blob saving so it takes a while
       (is (= ::timeout (-> {:job {:caches [{:id "test-artifact"
