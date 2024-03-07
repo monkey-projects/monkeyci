@@ -45,9 +45,14 @@
         (update :freeform-tags merge tags)
         (update :containers patch-container rt))))
 
-(defn oci-runner [client conf rt]
+(defn oci-runner
+  "Runs the build script as an OCI container instance.  Returns a deferred with
+   the container exit code."
+  [client conf rt]
   (-> (oci/run-instance client (instance-config conf rt) {:delete? true})
       (md/chain
+       (fn [r]
+         (or (-> r :body :containers first :exit-code) 1))
        (fn [r]
          (rt/post-events rt (b/build-completed-evt (:build rt) r))
          r))

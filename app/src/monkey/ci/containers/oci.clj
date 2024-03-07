@@ -63,6 +63,7 @@
   [{:keys [job] :as rt}]
   {:image-url (or (:image job) (:container/image job))
    :display-name job-container-name
+   ;; Override entrytpoint
    :command ["/bin/sh" (str script-dir "/" job-script)]
    ;; One file arg per script line, with index as name
    :arguments (->> (count (:script job))
@@ -111,6 +112,7 @@
 (defn- script-vol-config
   "Adds the job script and a file for each script line as a configmap volume."
   [{{:keys [script]} :job}]
+  ;; TODO Also handle :container/cmd key
   {:name script-vol
    :volume-type "CONFIGFILE"
    :configs (->> script
@@ -175,11 +177,17 @@
         client (-> conf
                    (oci/->oci-config)
                    (ci/make-context))
-        ic (instance-config conf rt)
-        has-job-name? (comp (partial = job-container-name) :display-name)]
-    (-> (oci/run-instance client ic {:match-container (partial filter has-job-name?)
-                                     :delete? true})
-        (md/chain (partial hash-map :exit)))))
+        ic (instance-config conf rt)]
+    (md/chain
+     (oci/run-instance client ic {:delete? true})
+     (fn [r]
+       (->> (get-in r [:body :containers])
+            (map :exit-code)
+            (filter (complement zero?))
+            (first)))
+     (fn [exit]
+       ;; TODO Add more info on failure
+       {:exit (or exit 0)}))))
 
 (defmethod mcc/normalize-containers-config :oci [conf]
   (oci/normalize-config conf :containers))

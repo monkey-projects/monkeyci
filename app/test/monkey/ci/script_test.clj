@@ -69,19 +69,24 @@
 
 (deftest exec-script!
   (testing "executes basic clj script from location"
-    (is (bc/success? (sut/exec-script! {:script-dir "examples/basic-clj"}))))
+    (is (bc/success? (sut/exec-script! {:build
+                                        {:script-dir "examples/basic-clj"}}))))
 
   (testing "executes script shell from location"
-    (is (bc/success? (sut/exec-script! {:script-dir "examples/basic-script"}))))
+    (is (bc/success? (sut/exec-script! {:build
+                                        {:script-dir "examples/basic-script"}}))))
 
   (testing "executes dynamic pipelines"
-    (is (bc/success? (sut/exec-script! {:script-dir "examples/dynamic-pipelines"}))))
+    (is (bc/success? (sut/exec-script! {:build
+                                        {:script-dir "examples/dynamic-pipelines"}}))))
 
   (testing "skips `nil` pipelines"
-    (is (bc/success? (sut/exec-script! {:script-dir "examples/conditional-pipelines"}))))
+    (is (bc/success? (sut/exec-script! {:build
+                                        {:script-dir "examples/conditional-pipelines"}}))))
   
   (testing "fails when invalid script"
-    (is (bc/failed? (sut/exec-script! {:script-dir "examples/invalid-script"})))))
+    (is (bc/failed? (sut/exec-script! {:build
+                                       {:script-dir "examples/invalid-script"}})))))
 
 (deftest setup-runtime
   (testing "connects to listening socket if specified"
@@ -202,5 +207,3 @@
           f (sut/->EventFiringJob job)]
       (is (bc/failed? @(j/execute! f rt)))
       (is (= 2 (count @events)) "expected job end event"))))
-
-

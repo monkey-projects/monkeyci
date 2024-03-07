@@ -57,85 +57,102 @@
 (defn wait-for-completion
   "Starts an async poll loop that waits until the container instance has completed.
    Returns a deferred that holds the last response received."
-  [client {:keys [get-details poll-interval post-event] :as c
-           :or {poll-interval 5000
-                post-event (constantly true)}}]
+  [{:keys [get-details poll-interval post-event] :as c
+    :or {poll-interval 5000
+         post-event (constantly true)}}]
   (let [get-async (fn []
-                    (get-details client (select-keys c [:instance-id])))
-        done? #{"INACTIVE" "DELETED" "FAILED"}]
+                    (get-details (:instance-id c)))
+        done? #{"INACTIVE" "DELETED" "FAILED"}
+        container-failed? (comp (partial some (comp (every-pred number? (complement zero?)) :exit-code))
+                                :containers)]
     (md/loop [state nil]
       (md/chain
        (get-async)
-       (fn [r]
-         (let [new-state (get-in r [:body :lifecycle-state])]
+       (fn [{:keys [body] :as r}]
+         (let [new-state (:lifecycle-state body)
+               failed? (container-failed? body)]
            (when (not= state new-state)
              (log/debug "State change:" state "->" new-state)
              (post-event {:type :oci-container/state-change
                           :details (:body r)}))
-           (if (done? new-state)
+           (when failed?
+             (log/debug "One of the containers has a nonzero exit code:" (:containers body)))
+           (if (or (done? new-state) failed?)
              r
              ;; Wait and re-check
              (mt/in poll-interval #(md/recur new-state)))))))))
 
 (defn run-instance
   "Creates and starts a container instance using the given config, and then
-   waits for it to terminate.  Returns a deferred that will hold the exit value."
-  [client instance-config & [{:keys [post-event match-container delete?]
-                              :or {match-container identity}}]]
+   waits for it to terminate.  Returns a deferred that will hold the full container
+   instance state on completion, including the container details."
+  [client instance-config & [{:keys [delete?] :as opts}]]
   (log/debug "Running OCI instance with config:" instance-config)
   (letfn [(check-error [handler]
-            (fn [{:keys [body status]}]
-              (when status
+            (fn [{:keys [body status] :as r}]
+              (if status
                 (if (>= status 400)
-                  (log/warn "Got an error response, status" status "with message" (:message body))
-                  (handler body)))))
+                  (do
+                    (log/warn "Got an error response, status" status "with message" (:message body))
+                    r)
+                  (handler body))
+                ;; Some other invalid response
+                r)))
           
           (create-instance []
             (log/debug "Creating instance...")
             (ci/create-container-instance
              client
              {:container-instance instance-config}))
+
+          (get-instance-details [id]
+            (log/trace "Retrieving container instance details for" id)
+            (md/chain
+             (ci/get-container-instance client {:instance-id id})
+             (fn [{:keys [status body] :as r}]
+               ;; Fetch details for all containers
+               (->> body
+                    :containers
+                    (map #(select-keys % [:container-id]))
+                    (map (partial ci/get-container client))
+                    (apply md/zip)
+                    (md/zip r)))
+             (fn [[r containers]]
+               ;; Add the exit codes for all containers to the result
+               (log/trace "Container details:" containers)
+               (let [by-id (->> containers
+                                (map :body) ; TODO Check for error response
+                                (group-by :id)
+                                (mc/map-vals first))
+                     add-exit-code (fn [c]
+                                     (merge c (-> (get by-id (:container-id c))
+                                                  (dissoc :id))))]
+                 (update-in r [:body :containers] (partial map add-exit-code))))))
           
           (start-polling [{:keys [id]}]
             (log/debug "Starting polling...")
             ;; TODO Replace this with OCI events as soon as they become available.
-            ;; TODO Don't wait, just let the container fire an event and react to that.
-            (wait-for-completion client
-                                 (-> {:instance-id id
-                                      :get-details ci/get-container-instance}
-                                     (mc/assoc-some :post-event post-event))))
+            (wait-for-completion (-> {:instance-id id
+                                      :get-details get-instance-details}
+                                     (merge (select-keys opts [:poll-interval :post-event])))))
 
-          (get-container-exit [r]
-            (let [cid (-> (:containers r)
-                          match-container
-                          first
-                          :container-id)]
-              (ci/get-container
-               client
-               {:container-id cid})))
-
-          (return-result [{{:keys [exit-code]} :body}]
-            ;; Return the exit code, or nonzero when no code is specified
-            (or exit-code 1))
-
-          (maybe-delete-instance [{{:keys [container-instance-id]} :body :as c}]
-            (if (and delete? container-instance-id)
+          (maybe-delete-instance [{{:keys [id]} :body :as c}]
+            (if (and delete? id)
               (md/chain
-               (ci/delete-container-instance client {:instance-id container-instance-id})
+               (ci/delete-container-instance client {:instance-id id})
                (constantly c))
               (md/success-deferred c)))
 
           (log-error [ex]
             (log/error "Error creating container instance" ex)
-            ;; Nonzero exit code
-            1)]
+            ;; Return the exception
+            {:status 500
+             :exception ex})]
     
     (-> (md/chain
          (create-instance)
          (check-error start-polling)
-         (check-error get-container-exit)
-         maybe-delete-instance
-         return-result)
+         maybe-delete-instance)
         (md/catch log-error))))
 
 (def checkout-vol "checkout")

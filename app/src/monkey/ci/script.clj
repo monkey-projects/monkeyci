@@ -232,8 +232,9 @@
 (defn exec-script!
   "Loads a script from a directory and executes it.  The script is executed in 
    this same process."
-  [{:keys [script-dir] :as rt}]
+  [rt]
   (let [build-id (build/get-build-id rt)
+        script-dir (build/script-dir rt)
         ;; Manually add events poster
         ;; This will be removed when events are reworked to be more generic
         rt (assoc-in rt [:events :poster] (partial post-event rt))]
