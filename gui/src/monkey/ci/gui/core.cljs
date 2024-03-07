@@ -4,6 +4,7 @@
             [monkey.ci.gui.martian :as m]
             [monkey.ci.gui.pages :as p]
             [monkey.ci.gui.routing :as routing]
+            [monkey.ci.gui.server-events :as se]
             [monkey.ci.gui.utils :as u]
             [reagent.core :as rc]
             [reagent.dom.client :as rd]
@@ -14,7 +15,8 @@
 (defn ^:dev/after-load reload []
   (when @app-root
     (rf/clear-subscription-cache!)
-    (rd/render @app-root [p/render])))
+    (rd/render @app-root [p/render])
+    (se/read-events)))
 
 (defn init []
   (let [root (rd/create-root (.getElementById js/document "root"))]
