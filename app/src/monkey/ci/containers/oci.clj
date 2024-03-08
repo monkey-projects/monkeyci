@@ -36,8 +36,9 @@
 
 (def sidecar-config (comp :sidecar rt/config))
 
-(defn- base-work-dir
+(defn base-work-dir
   "Determines the base work dir to use inside the container"
+  ;; TODO Move this to common ns
   [rt]
   (some->> (b/build-checkout-dir rt)
            (fs/file-name)

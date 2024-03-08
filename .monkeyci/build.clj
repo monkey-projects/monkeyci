@@ -109,19 +109,20 @@
   "Creates a step that builds and uploads an image using kaniko"
   [{:keys [id dockerfile context image tag opts]}]
   (fn [ctx]
-    (core/container-job
-     id
-     (merge
-      {:image "docker.io/monkeyci/kaniko:1.21.0"
-       :container/cmd ["/kaniko/executor"
-                       "--dockerfile" (str "/home/monkeyci/" (or dockerfile "Dockerfile"))
-                       "--destination" (str image ":" (or tag (image-version ctx)))
-                       "--context" "dir:///home/monkeyci"]
-       ;; Set docker config credentials location
-       :container/env {"DOCKER_CONFIG" (str "/home/monkeyci/" (:path image-creds-artifact))}
-       :restore-artifacts [image-creds-artifact]
-       :dependencies ["image-creds"]}
-      opts))))
+    (let [wd (shell/container-work-dir ctx)]
+      (core/container-job
+       id
+       (merge
+        {:image "docker.io/monkeyci/kaniko:1.21.0"
+         :container/cmd ["/kaniko/executor"
+                         "--dockerfile" (str wd "/" (or dockerfile "Dockerfile"))
+                         "--destination" (str image ":" (or tag (image-version ctx)))
+                         "--context" "dir://" wd]
+         ;; Set docker config credentials location
+         :container/env {"DOCKER_CONFIG" (str wd "/" (:path image-creds-artifact))}
+         :restore-artifacts [image-creds-artifact]
+         :dependencies ["image-creds"]}
+        opts)))))
 
 (def build-app-image
   (kaniko-build-img
