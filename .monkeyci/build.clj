@@ -47,7 +47,7 @@
   [ctx]
   (or (tag-version ctx)
       ;; TODO Determine automatically
-      "0.3.4-SNAPSHOT"))
+      "0.3.5-SNAPSHOT"))
 
 (defn clj-container [id dir & args]
   "Executes script in clojure container"
