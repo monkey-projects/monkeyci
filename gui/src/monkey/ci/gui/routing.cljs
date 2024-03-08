@@ -25,7 +25,8 @@
     ["/c/:customer-id" :page/customer]
     ["/c/:customer-id/r/:repo-id" :page/repo]
     ["/c/:customer-id/r/:repo-id/b/:build-id" :page/build]
-    ["/github/callback" :page/github-callback]]))
+    ["/github/callback" :page/github-callback]
+    ["/events" :page/event-stream]]))
 
 (defn on-route-change [match history]
   (println "Route changed:" match)

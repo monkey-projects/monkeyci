@@ -1,6 +1,9 @@
 (ns server
-  (:require [clojure.spec.alpha :as s]
+  (:require [aleph.http :as aleph]
+            [clojure.spec.alpha :as s]
+            [clojure.tools.logging :as log]
             [config :as co]
+            [manifold.stream :as ms]
             [monkey.ci
              [config :as config]
              [core :as c]
@@ -53,3 +56,26 @@
   (-> {:sub uid}
       (auth/augment-payload)
       (auth/sign-jwt (private-key))))
+
+(defn post-event
+  "Posts an event using the runtime in the current server config"
+  [evt]
+  (if-let [poster (some-> server deref :rt :events :poster)]
+    (poster evt)
+    (throw (ex-info "No event poster in server, or no server running" @server))))
+
+(defn sse-handler [req]
+  (let [stream (ms/periodically 2000
+                                #(format "data: %s\n\n"
+                                         (pr-str {:type :test
+                                                  :message "test-event"
+                                                  :time (System/currentTimeMillis)})))]
+    (ms/on-drained stream #(log/info "Event stream closed"))
+    (log/info "New event stream opened")
+    {:status 200
+     :headers {"content-type" "text/event-stream"
+               "access-control-allow-origin" "*"}
+     :body stream}))
+
+(defn sse-server [port]
+  (aleph/start-server sse-handler {:port port}))

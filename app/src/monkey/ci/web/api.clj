@@ -326,8 +326,11 @@
         make-reply (fn [evt]
                      (-> evt
                          (prn-str)
+                         (as-> x (format "event: %s\ndata: %s\n" (:type evt) x)) ;; Add a second newline as required
                          (rur/response)
-                         (rur/header "Content-Type" "text/event-stream")))
+                         (rur/header "Content-Type" "text/event-stream")
+                         (rur/header "Connection" "Keep-Alive")
+                         (rur/header "Access-Control-Allow-Origin" "*")))
         listener (atom nil)
         make-listener (fn [ch]
                         (let [l (fn [evt]
@@ -341,6 +344,8 @@
      {:on-open (fn [ch]
                  (log/debug "Event stream opened:" ch)
                  (ec/add-listener recv (make-listener ch)))
+      ;; XXX Http-kit never invokes this
       :on-close (fn [_ status]
+                  (log/debug "Removing event stream listener")
                   (ec/remove-listener recv @listener)
                   (log/debug "Event stream closed with status" status))})))
