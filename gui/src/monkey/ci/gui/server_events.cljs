@@ -1,5 +1,5 @@
 (ns monkey.ci.gui.server-events
-  "Read server-sent events from the API in an async channel"
+  "Read server-sent events from the API and dispatch events"
   (:require-macros [cljs.core.async.macros :refer [go]])
   (:require [cljs.core.async :refer [<!]]
             [clojure.tools.reader.edn :as edn]
@@ -9,7 +9,10 @@
 (defn- parse-edn [edn]
   (edn/read-string edn))
 
-(defn read-events [on-recv-evt]
+(defn read-events
+  "Creates an event source that reads from the events endpoint.  Dispatches an
+   event using `on-recv-event` with the received message appended."
+  [on-recv-evt]
   (let [src (js/EventSource. (str m/url "/events") (clj->js {}))]
     (println "Event source:" src)
     (set! (.-onmessage src)
@@ -22,6 +25,11 @@
 (defn stop-reading-events [src]
   (.close src))
 
+(rf/reg-cofx
+ :event-stream/connector
+ (fn [cofx _]
+   (assoc cofx ::connector read-events)))
+
 (rf/reg-fx
  :event-stream/close
  (fn [src]
@@ -29,9 +37,11 @@
 
 (rf/reg-event-fx
  :event-stream/start
- (fn [{:keys [db]} [_ id handler-evt]]
-   {:db (assoc-in db [::event-stream id] {:handler-evt handler-evt
-                                          :source (read-events handler-evt)})}))
+ [(rf/inject-cofx :event-stream/connector)]
+ (fn [{:keys [db] :as ctx} [_ id handler-evt]]
+   (let [conn (::connector ctx)]
+     {:db (assoc-in db [::event-stream id] {:handler-evt handler-evt
+                                            :source (conn handler-evt)})})))
 
 (rf/reg-event-fx
  :event-stream/stop

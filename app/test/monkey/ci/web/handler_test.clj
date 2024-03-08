@@ -15,9 +15,7 @@
              [auth :as auth]
              [handler :as sut]]
             [monkey.ci.helpers :refer [try-take] :as h]
-            [org.httpkit
-             [fake :as hf]
-             [server :as http]]
+            [org.httpkit.fake :as hf]
             [reitit
              [core :as rc]
              [ring :as ring]]
@@ -48,9 +46,9 @@
     (reset! closed? true)))
 
 (deftest start-server
-  (with-redefs [http/run-server (fn [h opts]
-                                  {:handler h
-                                   :opts opts})]
+  (with-redefs [aleph/start-server (fn [h opts]
+                                     {:handler h
+                                      :opts opts})]
     
     (testing "starts http server with default port"
       (is (number? (-> (sut/start-server {})
