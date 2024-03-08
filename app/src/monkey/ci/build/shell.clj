@@ -5,7 +5,8 @@
             [clojure.tools.logging :as log]
             [monkey.ci.build
              [api :as api]
-             [core :as core]]))
+             [core :as core]]
+            [monkey.ci.containers.oci :as oc]))
 
 (defn bash [& args]
   (core/as-job
@@ -50,3 +51,7 @@
   [ctx p]
   (let [wd (core/work-dir ctx)]
     (str (fs/normalize (fs/path wd p)))))
+
+(def container-work-dir
+  "Returns the dir where the workspace would be mounted in a container."
+  oc/base-work-dir)
