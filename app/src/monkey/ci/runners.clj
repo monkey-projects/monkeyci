@@ -51,15 +51,17 @@
    exited."
   [rt]
   (let [script-dir (build/script-dir rt)]
-    (md/finally
-      (md/chain
-       (if (some-> (io/file script-dir) (.exists))
-         (p/execute! rt)
-         (md/success-deferred (script-not-found rt)))
-       (partial post-build-completed rt)
-       log-build-result
-       :exit)
-     #(cleanup-checkout-dirs! rt))))
+    (rt/post-events rt {:type :build/start
+                        :build (:build rt)})
+    (-> (md/chain
+         (if (some-> (io/file script-dir) (.exists))
+           (p/execute! rt)
+           (md/success-deferred (script-not-found rt)))
+         (partial post-build-completed rt)
+         log-build-result
+         :exit)
+        (md/finally
+          #(cleanup-checkout-dirs! rt)))))
 
 (defn download-git
   "Downloads from git into a temp dir, and designates that as the working dir."

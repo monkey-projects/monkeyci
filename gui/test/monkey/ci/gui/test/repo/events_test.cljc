@@ -12,6 +12,21 @@
 
 (use-fixtures :each f/reset-db)
 
+(defn- set-repo-path! [cust repo]
+  (reset! app-db {:route/current
+                  {:parameters
+                   {:path 
+                    {:customer-id cust
+                     :repo-id repo}}}}))
+
+(defn- test-repo-path!
+  "Generate random ids for customer, repo and build, and sets the current
+   route to the generate path.  Returns the generated ids."
+  []
+  (let [[cust repo _ :as r] (repeatedly random-uuid)]
+    (set-repo-path! cust repo)
+    r))
+
 (deftest repo-load
   (testing "loads customer if not existing"
     (rft/run-test-sync
@@ -46,12 +61,7 @@
   (testing "fetches builds from backend"
     (rft/run-test-sync
      (let [c (h/catch-fx :martian.re-frame/request)]
-       (reset! app-db {:route/current
-                       {:parameters
-                        {:path 
-                         {:customer-id "test-cust"
-                          :project-id "test-proj"
-                          :repo-id "test-repo"}}}})
+       (set-repo-path! "test-cust" "test-repo")
        (h/initialize-martian {:get-builds {:body [{:id "test-build"}]
                                            :error-code :no-error}})
        (rf/dispatch [:builds/load])
@@ -69,3 +79,39 @@
                                                  :message "test notification"}]))))
     (rf/dispatch-sync [:builds/load--success {:body []}])
     (is (nil? (db/alerts @app-db)))))
+
+(deftest handle-event
+  (testing "ignores events for other repos"
+    (let [[cust] (test-repo-path!)]
+      (is (nil? (rf/dispatch-sync [:repo/handle-event {:type :build/start
+                                                       :build {:sid [cust "other-repo" "other-build"]
+                                                               :ref "main"}}])))
+      (is (empty? (db/builds @app-db)))))
+
+  (testing "updates build list when build is started"
+    (let [[cust repo build :as sid] (test-repo-path!)]
+      (is (empty? (db/builds @app-db)))
+      (is (nil? (rf/dispatch-sync [:repo/handle-event {:type :build/start
+                                                       :build {:sid sid
+                                                               :ref "main"}}])))
+      (is (= [{:customer-id cust
+               :repo-id repo
+               :build-id build
+               :ref "main"}]
+             (db/builds @app-db)))))
+
+  (testing "updates build list when build has completed"
+    (let [[cust repo build :as sid] (test-repo-path!)]
+      (is (some? (reset! app-db (db/set-builds {} [{:customer-id cust
+                                                    :repo-id repo
+                                                    :build-id build}]))))
+      (is (nil? (rf/dispatch-sync [:repo/handle-event {:type :build/completed
+                                                       :build {:sid sid
+                                                               :ref "main"
+                                                               :result :success}}])))
+      (is (= [{:customer-id cust
+               :repo-id repo
+               :build-id build
+               :ref "main"
+               :result :success}]
+             (db/builds @app-db))))))

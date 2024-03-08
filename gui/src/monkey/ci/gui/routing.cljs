@@ -3,20 +3,22 @@
             [reitit.frontend :as f]
             [reitit.frontend.easy :as rfe]))
 
+(def current :route/current)
+
 (rf/reg-sub
  :route/current
  (fn [db _]
-   (:route/current db)))
+   (current db)))
 
 (def on-page-leave ::on-page-leave)
 
 (rf/reg-event-fx
  :route/changed
  (fn [{:keys [db]} [_ match]]
-   (println "Changing current route from" (:route/current db) "into" match)
+   (println "Changing current route from" (current db) "into" match)
    (let [handlers (on-page-leave db)]
      (cond-> {:db (-> db
-                      (assoc :route/current match)
+                      (assoc current match)
                       (dissoc on-page-leave))}
        (not-empty handlers) (assoc :dispatch-n handlers)))))
 
