@@ -42,6 +42,10 @@
       (fs/create-dirs p)))
   (fs/create-file f))
 
+#_(defn- make-rw [f]
+  ;; Grant read/write to the world, in case the job runs as another user
+  (fs/set-posix-file-permissions f "rw-rw-rw-"))
+
 (defn mark-start [rt]
   (let [s (get-config rt :start-file)]
     (when (not-empty s)
@@ -125,7 +129,7 @@
     (-> rt
         (merge (get-in rt [rt/config :sidecar :job-config]))
         (restore-src)
-        (h))))
+        (md/chain h))))
 
 (defn- add-from-args [conf k]
   (update-in conf [:sidecar k] #(or (get-in conf [:args k]) %)))

@@ -112,9 +112,8 @@
     (core/container-job
      id
      (merge
-      ;; Need to use debug image because it includes /bin/sh
-      {:image "gcr.io/kaniko-project/executor:v1.21.0-debug"
-       :container/cmd ["executor"
+      {:image "docker.io/monkeyci/kaniko:1.21.0"
+       :container/cmd ["/kaniko/executor"
                        "--dockerfile" (str "/home/monkeyci/" (or dockerfile "Dockerfile"))
                        "--destination" (str image ":" (or tag (image-version ctx)))
                        "--context" "dir:///home/monkeyci"]

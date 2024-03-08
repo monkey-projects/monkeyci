@@ -108,7 +108,11 @@
             (is (string? (get env "MONKEYCI_SCRIPT_DIR"))))
 
           (testing "adds env specified on the job"
-            (is (= "test-val" (get env "TEST_ENV"))))))))
+            (is (= "test-val" (get env "TEST_ENV"))))))
+
+      (testing "sets working dir to job work dir"
+        (is (= "/opt/monkeyci/checkout/work/test-build/sub"
+               (:working-directory jc))))))
 
   (testing "sidecar container"
     (let [pk (h/generate-private-key)
@@ -225,8 +229,20 @@
                (get-in by-name ["1" :data])))))))
 
 (deftest run-container
-  (testing "can run using type `oci`, returns exit code"
-    (with-redefs [oci/run-instance (constantly (md/success-deferred 123))]
+  (testing "can run using type `oci`, returns zero exit code on success"
+    (with-redefs [oci/run-instance (constantly (md/success-deferred
+                                                {:status 200
+                                                 :body {:containers [{:exit-code 0}]}}))]
+      (is (= 0 (-> (mcc/run-container {:containers {:type :oci}
+                                       :build {:checkout-dir "/tmp"}})
+                   (deref)
+                   :exit)))))
+
+  (testing "returns first nonzero exit code"
+    (with-redefs [oci/run-instance (constantly (md/success-deferred
+                                                {:status 200
+                                                 :body {:containers [{:exit-code 0}
+                                                                     {:exit-code 123}]}}))]
       (is (= 123 (-> (mcc/run-container {:containers {:type :oci}
                                          :build {:checkout-dir "/tmp"}})
                      (deref)

@@ -63,8 +63,7 @@
 (deftest wait-for-completion
   (testing "returns channel that holds zero on successful completion"
     (let [ch (sut/wait-for-completion
-              :test-client
-              {:get-details (fn [_ args]
+              {:get-details (fn [_]
                               (future
                                 {:status 200
                                  :body
@@ -79,8 +78,7 @@
                        (ca/map (fn [s]
                                  {:status 200
                                   :body {:lifecycle-state s}})))
-          ch (sut/wait-for-completion :test-client
-                                      {:get-details (fn [& _]
+          ch (sut/wait-for-completion {:get-details (fn [_]
                                                       (future (ca/<!! results)))
                                        :poll-interval 100})]
       (is (map? @(md/timeout! ch 1000 :timeout)))))
@@ -88,8 +86,7 @@
   (testing "returns last response on completion"
     (let [r {:status 200
              :body {:lifecycle-state "FAILED"}}
-          ch (sut/wait-for-completion :test-client
-                                      {:get-details (fn [_ args]
+          ch (sut/wait-for-completion {:get-details (fn [_]
                                                       (future r))})]
       (is (some? ch))
       (is (= r @(md/timeout! ch 200 :timeout))))))
@@ -109,7 +106,7 @@
       (with-redefs [ci/create-container-instance (constantly {:status 200
                                                               :body
                                                               {:id "test-instance"}})
-                    sut/wait-for-completion (fn [_ opts]
+                    sut/wait-for-completion (fn [opts]
                                               (swap! calls conj opts)
                                               nil)]
         (is (some? (sut/run-instance {} {})))
@@ -120,51 +117,91 @@
       (with-redefs [ci/create-container-instance (constantly {:status 400
                                                               :body
                                                               {:message "test error"}})
-                    ci/get-container-instance (fn [_ opts]
+                    ci/get-container-instance (fn [opts]
                                                 (swap! calls conj opts)
                                                 nil)]
         (is (some? (sut/run-instance {} {})))
         (is (zero? (count @calls))))))
 
-  (testing "returns build container exit code"
-    (let [cid (random-uuid)
-          exit 543]
+  (testing "stops polling when job container fails"
+    (let [calls (atom 0)
+          [iid jid sid] (repeatedly random-uuid)]
+      (with-redefs [ci/create-container-instance
+                    (constantly {:status 200
+                                 :body
+                                 {:id iid}})
+                    ci/get-container-instance
+                    (fn [& _]
+                      (swap! calls inc)
+                      {:status 200
+                       :body
+                       {:containers
+                        [{:container-id jid
+                          :display-name "job"}
+                         {:container-id sid
+                          :display-name "sidecar"}]
+                        :lifecycle-state (if (> @calls 1) "FAILED" "RUNNING")}})
+                    ci/get-container
+                    (fn [_ {:keys [container-id]}]
+                      {:status 200
+                       :body {:id container-id
+                              :exit-code (condp = container-id
+                                           jid 128
+                                           sid 0)}})
+                    ci/retrieve-logs
+                    (constantly nil)]
+        (is (map? (-> (sut/run-instance {} {} {:poll-interval 200})
+                      (deref)
+                      :body)))
+        (is (= 1 @calls)))))
+
+  (testing "returns full instance state"
+    (let [[cid sid] (repeatedly random-uuid)
+          exit-codes {cid 100
+                      sid 200}
+          containers [{:display-name "job"
+                       :container-id cid}
+                      {:display-name "sidecar"
+                       :container-id sid}]]
       (with-redefs [ci/create-container-instance
                     (constantly
                      (md/success-deferred
                       {:status 200
                        :body
                        {:id "test-instance"
-                        :containers
-                        [{:display-name "build"
-                          :container-id cid}]}}))
-                    sut/wait-for-completion
-                    (fn [_ opts]
+                        :containers containers}}))
+                    ci/get-container-instance
+                    (fn [& _]
                       (md/success-deferred
                        {:status 200
                         :body
                         {:lifecycle-state "INACTIVE"
-                         :containers [{:display-name "build"
-                                       :container-id cid}]}}))
+                         :containers containers}}))
                     ci/get-container
-                    (fn [_ opts]
+                    (fn [_ {:keys [container-id]}]
                       (md/success-deferred
-                       (if (= cid (:container-id opts))
+                       (if (contains? exit-codes container-id)
                          {:status 200
                           :body
-                          {:exit-code exit}}
+                          {:id container-id
+                           :exit-code (get exit-codes container-id)}}
                          {:status 400
                           :body
                           {:message "Invalid container id"}})))]
-        (is (= exit (deref (sut/run-instance {} {}) 200 :timeout))))))
+        (is (= {:status 200
+                :body
+                {:lifecycle-state "INACTIVE"
+                 :containers [{:display-name "job"
+                               :container-id cid
+                               :exit-code 100}
+                              {:display-name "sidecar"
+                               :container-id sid
+                               :exit-code 200}]}}
+               (deref (sut/run-instance {} {}) 200 :timeout))))))
 
-  (testing "returns configured container exit code"
+  (testing "includes container logs if not inactive"
     (let [cid (random-uuid)
-          exit 545
-          opts {:match-container (partial filter (comp (partial = "job") :display-name))}
-          containers [{:display-name "sidecar"
-                       :container-id (random-uuid)}
-                      {:display-name "job"
+          containers [{:display-name "job"
                        :container-id cid}]]
       (with-redefs [ci/create-container-instance
                     (constantly
@@ -173,25 +210,30 @@
                        :body
                        {:id "test-instance"
                         :containers containers}}))
-                    sut/wait-for-completion
-                    (fn [_ opts]
+                    ci/get-container-instance
+                    (fn [& _]
                       (md/success-deferred
                        {:status 200
                         :body
-                        {:lifecycle-state "INACTIVE"
+                        {:lifecycle-state "ACTIVE"
                          :containers containers}}))
                     ci/get-container
-                    (fn [_ opts]
+                    (fn [_ {:keys [container-id]}]
                       (md/success-deferred
-                       (if (= cid (:container-id opts))
-                         {:status 200
-                          :body
-                          {:exit-code exit}}
-                         {:status 400
-                          :body
-                          {:message "Invalid container id"}})))]
-        (is (= exit (deref (sut/run-instance {} {} opts) 200 :timeout))))))
-
+                       {:status 200
+                        :body
+                        {:id container-id
+                         :exit-code 1}}))
+                    ci/retrieve-logs
+                    (constantly (md/success-deferred {:body "test container logs"}))]
+        (is (= "test container logs"
+               (-> (sut/run-instance {} {})
+                   (deref)
+                   :body
+                   :containers
+                   first
+                   :logs))))))
+  
   (testing "deletes instance if configured"
     (let [exit 545
           iid (random-uuid)
@@ -206,11 +248,12 @@
                        {:id iid
                         :containers containers}}))
                     sut/wait-for-completion
-                    (fn [_ opts]
+                    (fn [opts]
                       (md/success-deferred
                        {:status 200
                         :body
-                        {:lifecycle-state "INACTIVE"
+                        {:id iid
+                         :lifecycle-state "INACTIVE"
                          :containers containers}}))
                     ci/get-container
                     (fn [_ opts]
@@ -219,17 +262,17 @@
                         :body
                         {:exit-code exit
                          :container-instance-id iid}}))
+                    ci/retrieve-logs (constantly nil)
                     ci/delete-container-instance
                     (fn [_ opts]
                       (reset! deleted? true)
                       (md/success-deferred
                        {:status (if (= iid (:instance-id opts)) 200 400)}))]
-        (is (= exit (deref (sut/run-instance {} {} {:delete? true}) 200 :timeout)))
+        (is (map? (deref (sut/run-instance {} {} {:delete? true}) 200 :timeout)))
         (is (true? @deleted?)))))
   
-  (testing "does not instance if configured but not created"
-    (let [exit 545
-          iid (random-uuid)
+  (testing "does not delete instance if configured but not created"
+    (let [iid (random-uuid)
           containers [{:display-name "test-container"
                        :container-id (random-uuid)}]
           deleted? (atom false)]
@@ -244,7 +287,7 @@
                       (reset! deleted? true)
                       (md/success-deferred
                        {:status (if (= iid (:instance-id opts)) 200 400)}))]
-        (is (= 1 (deref (sut/run-instance {} {} {:delete? true}) 200 :timeout)))
+        (is (map? (deref (sut/run-instance {} {} {:delete? true}) 200 :timeout)))
         (is (false? @deleted?))))))
 
 (deftest instance-config
