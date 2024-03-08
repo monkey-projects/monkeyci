@@ -147,7 +147,9 @@
                        :body {:id container-id
                               :exit-code (condp = container-id
                                            jid 128
-                                           sid 0)}})]
+                                           sid 0)}})
+                    ci/retrieve-logs
+                    (constantly nil)]
         (is (map? (-> (sut/run-instance {} {} {:poll-interval 200})
                       (deref)
                       :body)))
@@ -197,6 +199,41 @@
                                :exit-code 200}]}}
                (deref (sut/run-instance {} {}) 200 :timeout))))))
 
+  (testing "includes container logs if not inactive"
+    (let [cid (random-uuid)
+          containers [{:display-name "job"
+                       :container-id cid}]]
+      (with-redefs [ci/create-container-instance
+                    (constantly
+                     (md/success-deferred
+                      {:status 200
+                       :body
+                       {:id "test-instance"
+                        :containers containers}}))
+                    ci/get-container-instance
+                    (fn [& _]
+                      (md/success-deferred
+                       {:status 200
+                        :body
+                        {:lifecycle-state "RUNNING"
+                         :containers containers}}))
+                    ci/get-container
+                    (fn [_ {:keys [container-id]}]
+                      (md/success-deferred
+                       {:status 200
+                        :body
+                        {:id container-id
+                         :exit-code 1}}))
+                    ci/retrieve-logs
+                    (constantly (md/success-deferred {:body "test container logs"}))]
+        (is (= "test container logs"
+               (-> (sut/run-instance {} {})
+                   (deref)
+                   :body
+                   :containers
+                   first
+                   :logs))))))
+  
   (testing "deletes instance if configured"
     (let [exit 545
           iid (random-uuid)
@@ -225,6 +262,7 @@
                         :body
                         {:exit-code exit
                          :container-instance-id iid}}))
+                    ci/retrieve-logs (constantly nil)
                     ci/delete-container-instance
                     (fn [_ opts]
                       (reset! deleted? true)

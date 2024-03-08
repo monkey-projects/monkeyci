@@ -54,6 +54,8 @@
                 (os/make-context))]
     (s/input-stream->multipart ctx (assoc conf :input-stream in))))
 
+(def terminated? #{"INACTIVE" "DELETED" "FAILED"})
+
 (defn wait-for-completion
   "Starts an async poll loop that waits until the container instance has completed.
    Returns a deferred that holds the last response received."
@@ -62,7 +64,6 @@
          post-event (constantly true)}}]
   (let [get-async (fn []
                     (get-details (:instance-id c)))
-        done? #{"INACTIVE" "DELETED" "FAILED"}
         container-failed? (comp (partial some (comp (every-pred number? (complement zero?)) :exit-code))
                                 :containers)]
     (md/loop [state nil]
@@ -77,7 +78,7 @@
                           :details (:body r)}))
            (when failed?
              (log/debug "One of the containers has a nonzero exit code:" (:containers body)))
-           (if (or (done? new-state) failed?)
+           (if (or (terminated? new-state) failed?)
              r
              ;; Wait and re-check
              (mt/in poll-interval #(md/recur new-state)))))))))
@@ -136,6 +137,22 @@
                                       :get-details get-instance-details}
                                      (merge (select-keys opts [:poll-interval :post-event])))))
 
+          (try-fetch-logs [{:keys [body] :as r}]
+            ;; Try to download the outputs for each of the containers.  Since we can
+            ;; only do this if the instance is still running, check for lifecycle state.
+            (if (= "ACTIVE" (:lifecycle-state body))
+              (do
+                (log/debug "Instance" (:display-name body) "is still running, so fetching logs")
+                (md/chain
+                 (->> (:containers body)
+                      (map (fn [c]
+                             (md/chain
+                              (ci/retrieve-logs client (select-keys c [:container-id]))
+                              #(mc/assoc-some c :logs (:body %)))))
+                      (apply md/zip))
+                 (partial assoc-in r [:body :containers])))
+              r))
+
           (maybe-delete-instance [{{:keys [id]} :body :as c}]
             (if (and delete? id)
               (md/chain
@@ -152,6 +169,7 @@
     (-> (md/chain
          (create-instance)
          (check-error start-polling)
+         try-fetch-logs
          maybe-delete-instance)
         (md/catch log-error))))
 

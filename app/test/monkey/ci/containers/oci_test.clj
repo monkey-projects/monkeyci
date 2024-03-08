@@ -108,7 +108,11 @@
             (is (string? (get env "MONKEYCI_SCRIPT_DIR"))))
 
           (testing "adds env specified on the job"
-            (is (= "test-val" (get env "TEST_ENV"))))))))
+            (is (= "test-val" (get env "TEST_ENV"))))))
+
+      (testing "sets working dir to job work dir"
+        (is (= "/opt/monkeyci/checkout/work/test-build/sub"
+               (:working-directory jc))))))
 
   (testing "sidecar container"
     (let [pk (h/generate-private-key)

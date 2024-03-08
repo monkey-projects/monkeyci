@@ -3,5 +3,6 @@
 
 (bc/container-job
  "build-image"
- {:image "gcr.io/kaniko-project/executor:v1.21.0-debug"
-  :script ["executor --context dir:///home/monkeyci --no-push"]})
+ ;; Use custom image since the kaniko one gives permission errors
+ {:image "docker.io/monkeyci/kaniko:1.21.0"
+  :script ["/kaniko/executor --context dir:///home/monkeyci --no-push"]})

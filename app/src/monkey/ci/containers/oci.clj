@@ -61,21 +61,23 @@
    custom shell script that also redirects the output and dispatches
    events to a file, that are then picked up by the sidecar."
   [{:keys [job] :as rt}]
-  {:image-url (or (:image job) (:container/image job))
-   :display-name job-container-name
-   ;; Override entrytpoint
-   :command ["/bin/sh" (str script-dir "/" job-script)]
-   ;; One file arg per script line, with index as name
-   :arguments (->> (count (:script job))
-                   (range)
-                   (mapv str))
-   :environment-variables (merge
-                           (:container/env job)
-                           {"MONKEYCI_WORK_DIR" (job-work-dir rt)
-                            "MONKEYCI_LOG_DIR" log-dir
-                            "MONKEYCI_SCRIPT_DIR" script-dir
-                            "MONKEYCI_START_FILE" start-file
-                            "MONKEYCI_EVENT_FILE" event-file})})
+  (let [wd (job-work-dir rt)]
+    {:image-url (or (:image job) (:container/image job))
+     :display-name job-container-name
+     ;; Override entrytpoint
+     :command ["/bin/sh" (str script-dir "/" job-script)]
+     ;; One file arg per script line, with index as name
+     :arguments (->> (count (:script job))
+                     (range)
+                     (mapv str))
+     :environment-variables (merge
+                             (:container/env job)
+                             {"MONKEYCI_WORK_DIR" wd
+                              "MONKEYCI_LOG_DIR" log-dir
+                              "MONKEYCI_SCRIPT_DIR" script-dir
+                              "MONKEYCI_START_FILE" start-file
+                              "MONKEYCI_EVENT_FILE" event-file})
+     :working-directory wd}))
 
 (defn- sidecar-container [{[c] :containers}]
   (assoc c
@@ -112,6 +114,10 @@
 (defn- script-vol-config
   "Adds the job script and a file for each script line as a configmap volume."
   [{{:keys [script]} :job}]
+  (when (log/enabled? :debug)
+    (log/debug "Executing script lines in container:")
+    (doseq [l script]
+      (log/debug "  " script)))
   ;; TODO Also handle :container/cmd key
   {:name script-vol
    :volume-type "CONFIGFILE"
@@ -181,10 +187,16 @@
     (md/chain
      (oci/run-instance client ic {:delete? true})
      (fn [r]
-       (->> (get-in r [:body :containers])
-            (map :exit-code)
-            (filter (complement zero?))
-            (first)))
+       (letfn [(maybe-log-output [{:keys [exit-code display-name logs] :as c}]
+                 (when (not= 0 exit-code)
+                   (log/warn "Container" display-name "returned a nonzero exit code:" exit-code)
+                   (log/warn "Captured output:" logs))
+                 c)]
+         (->> (get-in r [:body :containers])
+              (map maybe-log-output)
+              (map :exit-code)
+              (filter (complement zero?))
+              (first))))
      (fn [exit]
        ;; TODO Add more info on failure
        {:exit (or exit 0)}))))
