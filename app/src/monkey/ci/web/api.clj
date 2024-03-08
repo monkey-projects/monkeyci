@@ -1,7 +1,9 @@
 (ns monkey.ci.web.api
   (:require [camel-snake-kebab.core :as csk]
             [clojure.tools.logging :as log]
-            [manifold.deferred :as md]
+            [manifold
+             [deferred :as md]
+             [stream :as ms]]
             [medley.core :as mc]
             [monkey.ci
              [labels :as lbl]
@@ -13,7 +15,6 @@
             [monkey.ci.web
              [auth :as auth]
              [common :as c]]
-            [org.httpkit.server :as http]
             [ring.util.response :as rur]))
 
 (def body (comp :body :parameters))
@@ -323,29 +324,19 @@
   "Sets up an event stream for the specified filter."
   [req]
   (let [recv (c/from-rt req rt/events-receiver)
+        stream (ms/stream)
         make-reply (fn [evt]
-                     (-> evt
-                         (prn-str)
-                         (as-> x (format "event: %s\ndata: %s\n" (:type evt) x)) ;; Add a second newline as required
-                         (rur/response)
-                         (rur/header "Content-Type" "text/event-stream")
-                         (rur/header "Connection" "Keep-Alive")
-                         (rur/header "Access-Control-Allow-Origin" "*")))
-        listener (atom nil)
-        make-listener (fn [ch]
-                        (let [l (fn [evt]
-                                  (when (allowed-events (:type evt))
-                                    (when-not (http/send! ch (make-reply evt) false)
-                                      (log/warn "Could not send message to channel, stopping event transmission")
-                                      (ec/remove-listener recv @listener))))]
-                          (reset! listener l)))]
-    (http/as-channel
-     req
-     {:on-open (fn [ch]
-                 (log/debug "Event stream opened:" ch)
-                 (ec/add-listener recv (make-listener ch)))
-      ;; XXX Http-kit never invokes this
-      :on-close (fn [_ status]
-                  (log/debug "Removing event stream listener")
-                  (ec/remove-listener recv @listener)
-                  (log/debug "Event stream closed with status" status))})))
+                     ;; Format according to sse specs, with double newline at the end
+                     (str "data: " (pr-str evt) "\n\n"))
+        listener (ec/no-dispatch
+                  (fn [evt]
+                    (when (allowed-events (:type evt))
+                      (ms/put! stream (make-reply evt)))))]
+    (ms/on-drained stream
+                   (fn []
+                     (log/info "Closing event stream")
+                     (ec/remove-listener recv listener)))
+    (ec/add-listener recv listener)
+    (-> (rur/response stream)
+        (rur/header "content-type" "text/event-stream")
+        (rur/header "access-control-allow-origin" "*"))))

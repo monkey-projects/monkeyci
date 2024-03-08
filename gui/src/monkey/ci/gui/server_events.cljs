@@ -10,7 +10,7 @@
   (edn/read-string edn))
 
 (defn read-events [on-recv-evt]
-  (let [src (js/EventSource. "http://localhost:3001" (clj->js {}))]
+  (let [src (js/EventSource. (str m/url "/events") (clj->js {}))]
     (println "Event source:" src)
     (set! (.-onmessage src)
           (fn [evt]

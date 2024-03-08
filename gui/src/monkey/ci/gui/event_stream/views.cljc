@@ -30,7 +30,7 @@
        (into [:tr])))
 
 (defn- event-row [evt]
-  (let [f (juxt :time :type :message)]
+  (let [f (juxt :timestamp :type :message)]
     (td (f evt))))
 
 (defn page []
