@@ -93,7 +93,7 @@
                    :build)))))
 
 (deftest http-server
-  (with-redefs [wh/server-status (constantly :stopped)]
+  (with-redefs [wh/on-server-close (constantly (md/success-deferred nil))]
     (testing "returns a deferred"
       (is (md/deferred? (sut/http-server {:http (constantly ::ok)}))))
 
