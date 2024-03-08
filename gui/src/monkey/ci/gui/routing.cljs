@@ -8,11 +8,17 @@
  (fn [db _]
    (:route/current db)))
 
-(rf/reg-event-db
+(def on-page-leave ::on-page-leave)
+
+(rf/reg-event-fx
  :route/changed
- (fn [db [_ match]]
+ (fn [{:keys [db]} [_ match]]
    (println "Changing current route from" (:route/current db) "into" match)
-   (assoc db :route/current match)))
+   (let [handlers (on-page-leave db)]
+     (cond-> {:db (-> db
+                      (assoc :route/current match)
+                      (dissoc on-page-leave))}
+       (not-empty handlers) (assoc :dispatch-n handlers)))))
 
 (defonce router
   ;; Instead of pointing to the views directly, we refer to a keyword, which
@@ -69,3 +75,8 @@
          m (f/match-by-name router r params)]
      {:route/goto p
       :dispatch [:route/changed m]})))
+
+(rf/reg-event-db
+ :route/on-page-leave
+ (fn [db [_ evt]]
+   (update db on-page-leave (comp vec conj) evt)))

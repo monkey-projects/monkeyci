@@ -25,6 +25,12 @@
 (defn stop-reading-events [src]
   (.close src))
 
+(defn stream-config [db id]
+  (get-in db [::event-stream id]))
+
+(defn set-stream-config [db id c]
+  (assoc-in db [::event-stream id] c))
+
 (rf/reg-cofx
  :event-stream/connector
  (fn [cofx _]
@@ -40,11 +46,11 @@
  [(rf/inject-cofx :event-stream/connector)]
  (fn [{:keys [db] :as ctx} [_ id handler-evt]]
    (let [conn (::connector ctx)]
-     {:db (assoc-in db [::event-stream id] {:handler-evt handler-evt
-                                            :source (conn handler-evt)})})))
+     {:db (set-stream-config db id {:handler-evt handler-evt
+                                    :source (conn handler-evt)})})))
 
 (rf/reg-event-fx
  :event-stream/stop
  (fn [{:keys [db]} [_ id]]
    {:db (update db ::event-stream dissoc id)
-    :event-stream/close (get-in db [::event-stream id :source])}))
+    :event-stream/close (:source (stream-config db id))}))

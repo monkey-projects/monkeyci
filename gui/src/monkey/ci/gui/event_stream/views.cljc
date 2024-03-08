@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.event-stream.views
-  (:require [monkey.ci.gui.server-events :as se]
+  (:require [monkey.ci.gui.routing :as r]
+            [monkey.ci.gui.server-events :as se]
             [re-frame.core :as rf]))
 
 (def stream-id "test-stream")
@@ -37,7 +38,6 @@
   (let [events (rf/subscribe [::events])]
     [:<>
      [:h1 "Event Stream"]
-     [:p "Event stream overview goes here"]
      [:button.btn.btn-primary.me-2
       {:on-click #(rf/dispatch [:event-stream/start stream-id [::handle-event]])}
       "Start Stream"]
@@ -49,4 +49,5 @@
       "Clear"]     
      [:table.table.table-striped
       [:thead (th "Time" "Event" "Message")]
-      (into [:tbody] (map event-row @events))]]))
+      (into [:tbody] (map event-row @events))]
+     [:a {:href (r/path-for :page/root)} "Home"]]))
