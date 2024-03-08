@@ -215,7 +215,7 @@
                       (md/success-deferred
                        {:status 200
                         :body
-                        {:lifecycle-state "RUNNING"
+                        {:lifecycle-state "ACTIVE"
                          :containers containers}}))
                     ci/get-container
                     (fn [_ {:keys [container-id]}]
