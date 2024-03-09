@@ -29,7 +29,11 @@
                          (sut/build-local)
                          (deref))))
           (is (not-empty @events))
-          (is (= :error (:result (first @events)))))))
+          (let [m (->> @events
+                       (filter (comp (partial = :build/completed) :type))
+                       (first))]
+            (is (some? m))
+            (is (= :error (:result m)))))))
 
     (testing "deletes checkout dir"
       (letfn [(verify-checkout-dir-deleted [checkout-dir script-dir]
