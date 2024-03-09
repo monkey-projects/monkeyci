@@ -23,7 +23,7 @@
   "Generate random ids for customer, repo and build, and sets the current
    route to the generate path.  Returns the generated ids."
   []
-  (let [[cust repo _ :as r] (repeatedly random-uuid)]
+  (let [[cust repo _ :as r] (repeatedly 3 random-uuid)]
     (set-repo-path! cust repo)
     r))
 
@@ -102,9 +102,9 @@
 
   (testing "updates build list when build has completed"
     (let [[cust repo build :as sid] (test-repo-path!)]
-      (is (some? (reset! app-db (db/set-builds {} [{:customer-id cust
-                                                    :repo-id repo
-                                                    :build-id build}]))))
+      (is (some? (swap! app-db db/set-builds [{:customer-id cust
+                                               :repo-id repo
+                                               :build-id build}])))
       (is (nil? (rf/dispatch-sync [:repo/handle-event {:type :build/completed
                                                        :build {:sid sid
                                                                :ref "main"
