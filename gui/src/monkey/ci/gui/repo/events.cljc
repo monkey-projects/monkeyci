@@ -56,7 +56,6 @@
   (update-build db (:build evt)))
 
 (defmethod handle-event :default [db evt]
-  (println "Ignoring event:" evt)
   ;; Ignore
   db)
 
@@ -70,7 +69,5 @@
 (rf/reg-event-db
  :repo/handle-event
  (fn [db [_ evt]]
-   (println "Event:" evt)
-   (println "Db:" db)
    (when (for-repo? db evt)
      (handle-event db evt))))
