@@ -61,7 +61,7 @@
    in the script dir"
   [rt]
   (->> [(io/file (get-in rt [:build :script-dir]) "logback.xml")
-        (some->> (get-in rt [:runner :log-config])
+        (some->> (get-in rt [:config :runner :log-config])
                  (utils/abs-path (rt/work-dir rt)))]
        (filter fs/exists?)
        (first)))
@@ -78,6 +78,7 @@
                        {:local/root (f)}
                        {:mvn/version (version)}))
         log-config (find-log-config rt)]
+    (log/debug "Child process log config:" log-config)
     {:paths [script-dir]
      :aliases
      {:monkeyci/build

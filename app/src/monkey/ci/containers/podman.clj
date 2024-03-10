@@ -68,7 +68,7 @@
      (env-vars job)
      (platform rt)
      (entrypoint job)
-     [(or (:image conf) (:container/image conf))]
+     [(or (:image conf) (:image job))]
      (make-cmd job)
      ;; TODO Execute script job by job
      (make-script-cmd (:script job)))))
@@ -80,13 +80,15 @@
         log-base (b/get-job-sid rt)
         [out-log err-log :as loggers] (->> ["out.txt" "err.txt"]
                                            (map (partial conj log-base))
-                                           (map (partial log-maker rt)))]
+                                           (map (partial log-maker rt)))
+        cmd (build-cmd-args rt)]
     (log/debug "Log base is:" log-base)
+    (log/debug "Podman command:" cmd)
     ((-> (fn [rt]
            (-> (bp/process {:dir (b/job-work-dir rt)
                             :out (l/log-output out-log)
                             :err (l/log-output err-log)
-                            :cmd (build-cmd-args rt)})
+                            :cmd cmd})
                (l/handle-process-streams loggers)
                (deref)))
          (cache/wrap-caches)

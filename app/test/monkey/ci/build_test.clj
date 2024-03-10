@@ -1,7 +1,9 @@
 (ns monkey.ci.build-test
   (:require [clojure.test :refer [deftest testing is]]
-            [monkey.ci.build :as sut]
-            [monkey.ci.runtime :as rt]))
+            [monkey.ci
+             [build :as sut]
+             [runtime :as rt]
+             [utils :as u]]))
 
 (deftest make-build-ctx
   (testing "adds build id"
@@ -119,3 +121,20 @@
                 :job {:id "test-job"}}
                (sut/get-job-id))))))
 
+(deftest job-work-dir
+  (testing "returns job work dir as absolute path"
+    (is (= "/job/work/dir"
+           (sut/job-work-dir {:job {:work-dir "/job/work/dir"}}))))
+
+  (testing "returns checkout dir when no job dir given"
+    (is (= "/checkout/dir"
+           (sut/job-work-dir {:build {:checkout-dir "/checkout/dir"}}))))
+
+  (testing "returns current working dir when no job or checkout dir given"
+    (is (= (u/cwd)
+           (sut/job-work-dir {}))))
+
+  (testing "returns work dir as relative dir of checkout dir"
+    (is (= "/checkout/job-dir"
+           (sut/job-work-dir {:job {:work-dir "job-dir"}
+                              :build {:checkout-dir "/checkout"}})))))

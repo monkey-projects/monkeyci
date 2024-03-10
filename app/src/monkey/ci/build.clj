@@ -1,7 +1,8 @@
 (ns monkey.ci.build
   "Functions for working with the build object in the runtime.  This
    represents the current build."
-  (:require [clojure.java.io :as io]
+  (:require [babashka.fs :as fs]
+            [clojure.java.io :as io]
             [clojure.string :as cs]
             [monkey.ci
              [runtime :as rt]
@@ -116,15 +117,19 @@
     true (assoc :type :build/completed)
     (not-empty keyvals) (merge (apply hash-map keyvals))))
 
-(def job-work-dir
+(defn job-work-dir
   "Given a runtime, determines the job working directory.  This is either the
    work dir as configured on the job, or the context work dir, or the process dir."
-  (comp
-   (memfn getCanonicalPath)
-   io/file
-   (some-fn (comp :work-dir :job)
-            build-checkout-dir
-            (constantly (u/cwd)))))
+  [rt]
+  (-> (if-let [jwd (get-in rt [:job :work-dir])]
+        (if (fs/absolute? jwd)
+          jwd
+          (if-let [cd (build-checkout-dir rt)]
+            (fs/path cd jwd)
+            jwd))
+        (or (build-checkout-dir rt) (u/cwd)))
+      (fs/canonicalize)
+      (str)))
 
 (defn job-relative-dir
   "Calculates path `p` as relative to the work dir for the current job"

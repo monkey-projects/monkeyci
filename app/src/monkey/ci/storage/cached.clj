@@ -16,7 +16,7 @@
     (if-let [v (p/read-obj cache sid)]
       v
       (let [v (p/read-obj src sid)]
-        (log/debug "Adding to cache:" sid)
+        (log/trace "Adding to cache:" sid)
         (p/write-obj cache sid v)
         v)))
 

@@ -28,12 +28,10 @@
 
 (defn start-server []
   (stop-server)
-  (let [rt (-> @co/global-config
-               (merge {:dev-mode true
+  (let [rt (-> (merge {:dev-mode true
                        :http {:port 3000}
-                       :work-dir (u/abs-path "tmp")
-                       :checkout-base-dir (u/abs-path "tmp/checkout")
-                       :ssh-keys-dir (u/abs-path "tmp/ssh-keys")})
+                       :work-dir (u/abs-path "tmp")}
+                      @co/global-config)
                (config/normalize-config {} {})
                (validate-config)
                (rt/config->runtime))]

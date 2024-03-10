@@ -7,6 +7,7 @@
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
             [monkey.ci
+             [build :as b]
              [config :as c]
              [oci :as oci]
              [runtime :as rt]
@@ -38,10 +39,12 @@
   (fn [& _]
     (->InheritLogger)))
 
-(deftype FileLogger [conf ctx path]
+(deftype FileLogger [conf rt path]
   LogCapturer
   (log-output [_]
-    (let [f (apply io/file (or (:dir conf) (io/file (:work-dir ctx) "logs")) path)]
+    (let [f (apply io/file
+                   (or (:dir conf) (io/file (:work-dir rt) "logs"))
+                   (concat (drop-last (b/get-sid rt)) path))]
       (.mkdirs (.getParentFile f))
       f))
 
