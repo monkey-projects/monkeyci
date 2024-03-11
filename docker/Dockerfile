@@ -1,7 +1,7 @@
 FROM docker.io/clojure:temurin-21-tools-deps-jammy
 
 # We'll run the whole thing as non-root user
-RUN adduser --uid 1000 --shell /bin/bash monkeyci
+RUN adduser --system --uid 1000 --shell /bin/bash --disabled-password monkeyci
 
 USER monkeyci
 
