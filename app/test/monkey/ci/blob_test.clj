@@ -105,12 +105,20 @@
                                               :tmp-dir (u/abs-path tmp-dir)}}
                                       :blob)
             r (io/file dir "restored")]
+
         ;; Create archive first
         (doseq [[f v] files]
           (let [p (io/file orig f)]
             (is (true? (.mkdirs (.getParentFile p))))
             (spit p v)))
-        (is (nil? (sut/make-archive orig arch)))
+
+        (testing "returns archived entries and src/dest paths"
+          (let [r (sut/make-archive orig arch)]
+            (is (map? r))
+            (is (= orig (:src r)))
+            (is (= arch (:dest r)))
+            (is (not-empty (:entries r)))))
+        
         (is (fs/exists? arch))
         (is (pos? (fs/size arch)))
         (with-redefs [os/head-object (constantly true)

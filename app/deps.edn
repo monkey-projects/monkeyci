@@ -15,20 +15,20 @@
         clojure.java-time/clojure.java-time {:mvn/version "1.4.2"}
         com.github.loki4j/loki-logback-appender {:mvn/version "1.5.0-m1"}
         com.github.oliyh/martian-httpkit {:mvn/version "0.1.25"}
+        com.monkeyprojects/clompress {:mvn/version "0.1.1"}
         com.monkeyprojects/socket-async {:mvn/version "0.1.0"}
         com.monkeyprojects/oci-sign {:mvn/version "0.1.3"}
         com.monkeyprojects/oci-container-instance {:mvn/version "0.1.0"}
-        com.monkeyprojects/oci-os {:mvn/version "0.2.1-SNAPSHOT"}
-        com.monkeyprojects/zmq {:mvn/version "0.1.0-SNAPSHOT"}
+        com.monkeyprojects/oci-os {:mvn/version "0.2.1"}
+        ;;com.monkeyprojects/zmq {:mvn/version "0.1.0-SNAPSHOT"}
         com.stuartsierra/component {:mvn/version "1.1.0"}
-        commons-io/commons-io {:mvn/version "2.13.0"}
+        commons-io/commons-io {:mvn/version "2.15.1"}
         http-kit/http-kit {:mvn/version "2.7.0"}
         medley/medley {:mvn/version "1.4.0"}
         metosin/reitit-middleware {:mvn/version "0.7.0-alpha5"}
         metosin/reitit-ring {:mvn/version "0.7.0-alpha5"}
         metosin/reitit-schema {:mvn/version "0.7.0-alpha5"}
         metosin/reitit-swagger {:mvn/version "0.7.0-alpha5"}
-        org.clojars.alperenbayramoglu/clompress {:mvn/version "0.1.0"}
         org.clojars.lispyclouds/contajners {:mvn/version "1.0.1"}
         org.clojure/core.async {:mvn/version "1.6.681"}
         org.clojure/tools.logging {:mvn/version "1.2.4"}

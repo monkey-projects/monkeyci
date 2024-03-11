@@ -4,7 +4,7 @@
   <packaging>jar</packaging>
   <groupId>com.monkeyci</groupId>
   <artifactId>app</artifactId>
-  <version>0.3.5-SNAPSHOT</version>
+  <version>0.3.5</version>
   <name>app</name>
   <repositories>
     <repository>
@@ -80,7 +80,7 @@
     <dependency>
       <groupId>commons-io</groupId>
       <artifactId>commons-io</artifactId>
-      <version>2.13.0</version>
+      <version>2.15.1</version>
     </dependency>
     <dependency>
       <groupId>metosin</groupId>
@@ -105,7 +105,7 @@
     <dependency>
       <groupId>com.monkeyprojects</groupId>
       <artifactId>oci-os</artifactId>
-      <version>0.2.1-SNAPSHOT</version>
+      <version>0.2.1</version>
     </dependency>
     <dependency>
       <groupId>clojure.java-time</groupId>
@@ -118,6 +118,11 @@
       <version>0.7.0-alpha5</version>
     </dependency>
     <dependency>
+      <groupId>com.monkeyprojects</groupId>
+      <artifactId>clompress</artifactId>
+      <version>0.1.1</version>
+    </dependency>
+    <dependency>
       <groupId>yogthos</groupId>
       <artifactId>config</artifactId>
       <version>1.2.0</version>
@@ -126,11 +131,6 @@
       <groupId>babashka</groupId>
       <artifactId>process</artifactId>
       <version>0.5.21</version>
-    </dependency>
-    <dependency>
-      <groupId>org.clojars.alperenbayramoglu</groupId>
-      <artifactId>clompress</artifactId>
-      <version>0.1.0</version>
     </dependency>
     <dependency>
       <groupId>buddy</groupId>
@@ -159,11 +159,6 @@
           <artifactId>bcutil-jdk15on</artifactId>
         </exclusion>
       </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>com.monkeyprojects</groupId>
-      <artifactId>zmq</artifactId>
-      <version>0.1.0-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>ch.qos.logback</groupId>

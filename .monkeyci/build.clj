@@ -88,6 +88,7 @@
   "Fetches credentials from the params and writes them to Docker `config.json`"
   [ctx]
   (let [auth-file (img-repo-auth ctx)]
+    (println "Writing docker credentials to" auth-file)
     (when-not (fs/exists? auth-file)
       (shell/param-to-file ctx "dockerhub-creds" auth-file)
       core/success)))

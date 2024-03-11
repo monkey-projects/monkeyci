@@ -77,16 +77,19 @@
   [is dest]
   (log/debug "Extracting archive into" dest)
   (with-open [ai (.createArchiveInputStream stream-factory ArchiveStreamFactory/TAR is)]
-    (loop [e (next-entry ai)]
+    (loop [e (next-entry ai)
+           entries []]
       (if e
         (do
           (if (.canReadEntryData ai e)
             (extract-entry ai e dest)
             (log/warn "Unable to read entry data:" (.getName e)))
           ;; Go to next entry
-          (recur (next-entry ai)))
+          (recur (next-entry ai)
+                 (conj entries e)))
         ;; Done
-        dest))))
+        {:dest dest
+         :entries entries}))))
 
 (defn- drop-prefix-resolver
   "The default entry name resolver includes the full path to the file.  
@@ -96,19 +99,32 @@
   ;; Skip the /
   (subs path (inc (count base-dir))))
 
+(defn- entry-gathering-resolver
+  "Adds artifact entries to the given atom"
+  [entries]
+  (fn [p]
+    (swap! entries conj p)
+    p))
+
 (defn make-archive
   "Archives the `src` directory or file into `dest` file."
   [src dest]
   (let [prefix (u/abs-path
-                (fs/file (fs/parent src)))]
+                (fs/file (fs/parent src)))
+        entries (atom [])
+        gatherer (entry-gathering-resolver entries)]
     (log/debug "Archiving" src "and stripping prefix" prefix)
     (mkdirs! (.getParentFile dest))
     (ca/archive
      {:output-stream (io/output-stream dest)
       :compression compression-type
       :archive-type archive-type
-      :entryNameResolver (partial drop-prefix-resolver prefix)}
-     (u/abs-path src))))
+      :entryNameResolver (comp gatherer (partial drop-prefix-resolver prefix))}
+     (u/abs-path src))
+    ;; Return some info, since clompress returns `nil`
+    {:src src
+     :dest dest
+     :entries @entries}))
 
 (deftype DiskBlobStore [dir]
   BlobStore
@@ -214,6 +230,7 @@
                 (constantly f))
                (md/finally #(fs/delete-if-exists arch)))
            ;; FIXME It may occur that a file is not yet available if it is read immediately after writing
+           ;; In that case we should retry.
            (log/warn "Blob not found in bucket:" obj-name)))))))
 
 (defmethod make-blob-store :oci [conf k]
