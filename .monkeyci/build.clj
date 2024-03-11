@@ -77,6 +77,7 @@
 
 (def image-creds-artifact
   {:id "image-creds"
+   ;; File must be called config.json for kaniko
    :path ".docker/config.json"})
 
 ;; Full path to the docker config file, used to push images
@@ -105,21 +106,26 @@
   (cond-> (:checkout-dir ctx)
     (some? dir) (str "/" dir)))
 
+(defn- container-work-dir [ctx]
+  ;; TODO Use shell fn when it becomes available
+  #_(shell/container-work-dir ctx)
+  (str "/opt/monkeyci/checkout/work/" (get-in ctx [:build :build-id])))
+
 (defn kaniko-build-img
   "Creates a step that builds and uploads an image using kaniko"
   [{:keys [id dockerfile context image tag opts]}]
   (fn [ctx]
-    (let [wd (shell/container-work-dir ctx)]
+    (let [wd (container-work-dir ctx)]
       (core/container-job
        id
        (merge
         {:image "docker.io/monkeyci/kaniko:1.21.0"
-         :container/cmd ["/kaniko/executor"
-                         "--dockerfile" (str wd "/" (or dockerfile "Dockerfile"))
-                         "--destination" (str image ":" (or tag (image-version ctx)))
-                         "--context" "dir://" wd]
+         :script [(format "/kaniko/executor --dockerfile %s --destination %s --context dir://%s"
+                          (str wd "/" (or dockerfile "Dockerfile"))
+                          (str image ":" (or tag (image-version ctx)))
+                          wd)]
          ;; Set docker config credentials location
-         :container/env {"DOCKER_CONFIG" (str wd "/" (:path image-creds-artifact))}
+         :container/env {"DOCKER_CONFIG" (str wd "/.docker")}
          :restore-artifacts [image-creds-artifact]
          :dependencies ["image-creds"]}
         opts)))))

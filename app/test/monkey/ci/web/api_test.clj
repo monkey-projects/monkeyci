@@ -1,10 +1,10 @@
 (ns monkey.ci.web.api-test
   (:require [clojure.test :refer [deftest testing is]]
+            [manifold.stream :as ms]
             [monkey.ci.storage :as st]
             [monkey.ci.events.core :as ec]
             [monkey.ci.web.api :as sut]
-            [monkey.ci.helpers :as h]
-            [org.httpkit.server :as http]))
+            [monkey.ci.helpers :as h]))
 
 (deftest get-customer
   (testing "returns customer in body"
@@ -305,33 +305,19 @@
               {:id "job-2"}]
              (get-in r [:body :jobs]))))))
 
-(defrecord FakeChannel [messages]
-  http/Channel
-  (send! [this msg close?]
-    (swap! messages conj {:msg msg :closed? close?})))
-
-(defn- make-fake-channel []
-  (->FakeChannel (atom [])))
-
 (deftest event-stream
   (testing "returns stream reply"
-    (with-redefs [http/as-channel (constantly (make-fake-channel))]
-      (is (some? (sut/event-stream {})))))
+    (is (ms/source? (-> (sut/event-stream (h/->req {:events {:receiver (ec/make-sync-events)}}))
+                        :body))))
 
   (testing "sends received events on open"
     (let [sent (atom [])
-          ch (->FakeChannel sent)
-          evt (ec/make-sync-events)]
-      (with-redefs [http/as-channel (fn [_ {:keys [on-open]}]
-                                      on-open)]
-        (let [f (sut/event-stream (h/->req {:events {:receiver evt}}))]
-          (is (some? (f ch)))
-          (is (some? (ec/post-events evt {:type :script/start})))
-          (is (not-empty @sent))
-          (is (string? (-> @sent
-                           first
-                           :msg
-                           :body))))))))
+          evt (ec/make-sync-events)
+          f (sut/event-stream (h/->req {:events {:receiver evt}}))
+          _ (ms/consume (partial swap! sent conj) (:body f))]
+      (is (some? (ec/post-events evt {:type :script/start})))
+      (is (not= :timeout (h/wait-until #(not-empty @sent) 1000)))
+      (is (string? (first @sent))))))
 
 (deftest make-build-ctx
   (testing "adds ref to build from branch query param"

@@ -11,8 +11,7 @@
             [clj-commons.byte-streams :as bs]
             [manifold
              [deferred :as md]
-             [time :as mt]]
-            [org.httpkit.client :as hk]))
+             [time :as mt]]))
 
 (defn prepare-build-ctx
   "Updates the runtime for the build runner, by adding a `build` object"
@@ -74,9 +73,9 @@
         (r))))
 
 (defn list-builds [rt]
-  (->> (hk/get (apply format "%s/customer/%s/repo/%s/builds"
-                      ((juxt :url :customer-id :repo-id) (rt/account rt)))
-               {:headers {"accept" "application/edn"}})
+  (->> (http/get (apply format "%s/customer/%s/repo/%s/builds"
+                        ((juxt :url :customer-id :repo-id) (rt/account rt)))
+                 {:headers {"accept" "application/edn"}})
        (deref)
        :body
        (bs/to-reader)
@@ -94,13 +93,7 @@
                     (select-keys [:http])
                     (assoc :type :server/started)))
   ;; Start the server
-  (let [server (http rt)
-        get-status #(h/server-status server)
-        interval 200]
-    ;; Repeatedly check if server is still running
-    (md/loop [s (get-status)]
-      (when (not= :stopped s)
-        (mt/in interval #(md/recur (get-status)))))))
+  (h/on-server-close (http rt)))
 
 (defn watch
   "Starts listening for events and prints the results.  The arguments determine
@@ -124,7 +117,6 @@
                    :url url})
     ;; TODO Trailing slashes
     ;; TODO Customer and other filtering
-    ;; Unfortunately, http-kit can't seem to handle SSE, so we use Aleph instead
     (-> (md/chain
          (http/get (str url "/events"))
          :body

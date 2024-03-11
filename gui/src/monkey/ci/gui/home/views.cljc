@@ -14,7 +14,8 @@
       [:img.img-thumbnail.float-end {:width "50px" :src a :alt "Avatar"}])]
    (->> (:customers u)
         (map cust-item)
-        (into [:ul]))])
+        (into [:ul]))
+   [:p [:a {:href (r/path-for :page/event-stream)} "Event Stream"]]])
 
 (defn redirect-to-login []
   [:p "One moment, redirecting you to the login page"]

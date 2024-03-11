@@ -1,10 +1,13 @@
 (ns monkey.ci.gui.test.routing-test
-  (:require [cljs.test :refer-macros [deftest is testing]]
+  (:require [cljs.test :refer-macros [deftest is testing use-fixtures]]
             [day8.re-frame.test :as rf-test]
             [monkey.ci.gui.routing :as sut]
+            [monkey.ci.gui.test.fixtures :as f]
             [monkey.ci.gui.test.helpers :as h]
             [re-frame.core :as rf]
             [re-frame.db :refer [app-db]]))
+
+(use-fixtures :each f/reset-db)
 
 (deftest on-route-change
   (testing "dispatches `route/goto` event"
@@ -19,16 +22,27 @@
       (is (some? c)))
 
     (testing "returns current route from db"
-      (is (empty? (reset! app-db {})))
       (is (nil? @c))
       (is (not-empty (reset! app-db {:route/current :test-route})))
       (is (= :test-route @c)))))
 
 (deftest route-changed
   (testing "sets current route to arg"
-    (is (empty? (reset! app-db {})))
-    (rf/dispatch-sync [:route/changed "test-match"])
-    (is (= "test-match" (:route/current @app-db)))))
+    (is (nil? (rf/dispatch-sync [:route/changed "test-match"])))
+    (is (= "test-match" (:route/current @app-db))))
+
+  (testing "dispatches registered leave handlers"
+    (rf-test/run-test-sync
+     (is (some? (rf/reg-event-db ::test-evt (fn [db _] (assoc db ::invoked true)))))
+     (is (nil? (rf/dispatch [:route/on-page-leave [::test-evt]])))
+     (is (nil? (rf/dispatch [:route/changed "new-page"])))
+     (is (true? (::invoked @app-db)))))
+
+  (testing "clears leave handlers"
+    (is (nil? (rf/dispatch-sync [:route/on-page-leave [::test-evt]])))
+    (is (some? (sut/on-page-leave @app-db)))
+    (is (nil? (rf/dispatch-sync [:route/changed "new-page"])))
+    (is (nil? (sut/on-page-leave @app-db)))))
 
 (deftest path-for
   (testing "`nil` if unknown path"
@@ -57,7 +71,6 @@
       (is (= "/" (first @c)))))
 
   (testing "dispatches `route/changed` event with reitit match"
-    (reset! app-db {})
     (rf-test/run-test-sync
      (rf/dispatch [:route/goto :page/root])
      (is (= :page/root (get-in (:route/current @app-db) [:data :name]))))))

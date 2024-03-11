@@ -1,8 +1,12 @@
 (ns monkey.ci.web.handler
   "Handler for the web server"
-  (:require [camel-snake-kebab.core :as csk]
+  (:require [aleph
+             [http :as aleph]
+             [netty :as netty]]
+            [camel-snake-kebab.core :as csk]
             [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
+            [manifold.deferred :as md]
             [medley.core :refer [update-existing] :as mc]
             [monkey.ci
              [config :as config]
@@ -12,7 +16,6 @@
              [auth :as auth]
              [common :as c]
              [github :as github]]
-            [org.httpkit.server :as http]
             [reitit.coercion.schema]
             [reitit.ring :as ring]
             [ring.middleware.cors :as cors]
@@ -304,13 +307,13 @@
   [rt]
   (let [http-opts (merge {:port 3000} (:http (rt/config rt)))]
     (log/info "Starting HTTP server at port" (:port http-opts))
-    (http/run-server (make-app rt)
-                     (merge http-opts default-http-opts))))
+    (aleph/start-server (make-app rt)
+                        (merge http-opts default-http-opts))))
 
 (defn stop-server [s]
   (when s
     (log/info "Shutting down HTTP server...")
-    (http/server-stop! s)))
+    (.close s)))
 
 (defmethod config/normalize-key :http [_ {:keys [args] :as conf}]
   (update-in conf [:http :port] #(or (:port args) %)))
@@ -336,7 +339,7 @@
     (-> (->HttpServer rt)
         (co/start))))
 
-(defn server-status
-  "Returns server status, either `:running`, `:stopping` or `:stopped`"
+(defn on-server-close
+  "Returns a deferred that resolves when the server shuts down."
   [server]
-  (http/server-status (:server server)))
+  (md/future (netty/wait-for-close server)))

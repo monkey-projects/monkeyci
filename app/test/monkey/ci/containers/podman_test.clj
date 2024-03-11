@@ -118,7 +118,8 @@
           (is (not-empty @stored)))))))
 
 (deftest build-cmd-args
-  (let [base-ctx {:build {:build-id "test-build"}
+  (let [base-ctx {:build {:build-id "test-build"
+                          :checkout-dir "/test-dir/checkout"}
                   :work-dir "test-dir"
                   :job {:id "test-job"
                         :container/image "test-img"
@@ -137,6 +138,18 @@
     (testing "adds all script entries as a single arg"
       (let [r (sut/build-cmd-args base-ctx)]
         (is (= "first && second" (last r)))))
+
+    (testing "image"
+      (testing "adds when namespace is `:container`"
+        (is (contains-subseq? (sut/build-cmd-args base-ctx)
+                              ["test-img"])))
+
+      (testing "adds when keyword is `:image`"
+        (is (contains-subseq? (-> base-ctx
+                                  (update :job dissoc :container/image)
+                                  (update :job assoc :image "test-img")
+                                  (sut/build-cmd-args))
+                              ["test-img"]))))
 
     (testing "mounts"
       
@@ -175,4 +188,10 @@
 
     (testing "uses job id as container name"
       (is (contains-subseq? (sut/build-cmd-args base-ctx)
-                            ["--name" "test-build-test-job"])))))
+                            ["--name" "test-build-test-job"])))
+
+    (testing "makes job work dir relative to build checkout dir"
+      (is (contains-subseq? (-> base-ctx
+                                (assoc-in [:job :work-dir] "sub-dir")
+                                (sut/build-cmd-args))
+                            ["-v" "/test-dir/checkout/sub-dir:/home/monkeyci:Z"])))))

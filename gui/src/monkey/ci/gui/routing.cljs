@@ -3,16 +3,24 @@
             [reitit.frontend :as f]
             [reitit.frontend.easy :as rfe]))
 
+(def current :route/current)
+
 (rf/reg-sub
  :route/current
  (fn [db _]
-   (:route/current db)))
+   (current db)))
 
-(rf/reg-event-db
+(def on-page-leave ::on-page-leave)
+
+(rf/reg-event-fx
  :route/changed
- (fn [db [_ match]]
-   (println "Changing current route from" (:route/current db) "into" match)
-   (assoc db :route/current match)))
+ (fn [{:keys [db]} [_ match]]
+   (println "Changing current route from" (current db) "into" match)
+   (let [handlers (on-page-leave db)]
+     (cond-> {:db (-> db
+                      (assoc current match)
+                      (dissoc on-page-leave))}
+       (not-empty handlers) (assoc :dispatch-n handlers)))))
 
 (defonce router
   ;; Instead of pointing to the views directly, we refer to a keyword, which
@@ -25,7 +33,8 @@
     ["/c/:customer-id" :page/customer]
     ["/c/:customer-id/r/:repo-id" :page/repo]
     ["/c/:customer-id/r/:repo-id/b/:build-id" :page/build]
-    ["/github/callback" :page/github-callback]]))
+    ["/github/callback" :page/github-callback]
+    ["/events" :page/event-stream]]))
 
 (defn on-route-change [match history]
   (println "Route changed:" match)
@@ -68,3 +77,8 @@
          m (f/match-by-name router r params)]
      {:route/goto p
       :dispatch [:route/changed m]})))
+
+(rf/reg-event-db
+ :route/on-page-leave
+ (fn [db [_ evt]]
+   (update db on-page-leave (comp vec conj) evt)))

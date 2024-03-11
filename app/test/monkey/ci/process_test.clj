@@ -173,10 +173,10 @@
       (let [logfile (io/file dir "logback-test.xml")]
         (is (nil? (spit logfile "test file")))
         (is (= (str "-Dlogback.configurationFile=" logfile)
-               (-> {:runner
-                    {:type :child
-                     :log-config "logback-test.xml"}
-                    :config {:work-dir dir}}
+               (-> {:config {:runner
+                             {:type :child
+                              :log-config "logback-test.xml"}
+                             :work-dir dir}}
                    (sut/generate-deps)
                    :aliases
                    :monkeyci/build
@@ -188,10 +188,10 @@
       (let [logfile (io/file dir "logback-test.xml")]
         (is (nil? (spit logfile "test file")))
         (is (= (str "-Dlogback.configurationFile=" logfile)
-               (-> {:runner
-                    {:type :child
-                     :log-config (.getAbsolutePath logfile)}
-                    :config {:work-dir "other"}}
+               (-> {:config {:runner
+                             {:type :child
+                              :log-config (.getAbsolutePath logfile)}
+                             :work-dir "other"}}
                    (sut/generate-deps)
                    :aliases
                    :monkeyci/build

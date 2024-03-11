@@ -1,5 +1,6 @@
 (ns monkey.ci.web.handler-test
-  (:require [buddy.core
+  (:require [aleph.http :as aleph]
+            [buddy.core
              [codecs :as codecs]
              [mac :as mac]]
             [clojure.test :refer [deftest testing is]]
@@ -14,9 +15,7 @@
              [auth :as auth]
              [handler :as sut]]
             [monkey.ci.helpers :refer [try-take] :as h]
-            [org.httpkit
-             [fake :as hf]
-             [server :as http]]
+            [org.httpkit.fake :as hf]
             [reitit
              [core :as rc]
              [ring :as ring]]
@@ -41,10 +40,15 @@
 
 (def test-app (make-test-app))
 
+(defrecord FakeServer [closed?]
+  java.lang.AutoCloseable
+  (close [_]
+    (reset! closed? true)))
+
 (deftest start-server
-  (with-redefs [http/run-server (fn [h opts]
-                                  {:handler h
-                                   :opts opts})]
+  (with-redefs [aleph/start-server (fn [h opts]
+                                     {:handler h
+                                      :opts opts})]
     
     (testing "starts http server with default port"
       (is (number? (-> (sut/start-server {})
@@ -60,12 +64,14 @@
       (is (fn? (:handler (sut/start-server {})))))))
 
 (deftest stop-server
-  (with-redefs [http/server-stop! (constantly ::stopped)]
-    (testing "stops the server"
-      (is (= ::stopped (sut/stop-server :dummy-server))))
+  (testing "stops the server"
+    (let [stopped? (atom false)
+          s (->FakeServer stopped?)]
+      (is (nil? (sut/stop-server s)))
+      (is (true? @stopped?))))
 
-    (testing "does nothing when server is `nil`"
-      (is (nil? (sut/stop-server nil))))))
+  (testing "does nothing when server is `nil`"
+    (is (nil? (sut/stop-server nil)))))
 
 (deftest http-routes
   (testing "health check at `/health`"
@@ -664,19 +670,16 @@
               :config conf}
           inv (atom nil)]
       (is (fn? h))
-      (with-redefs [http/run-server (fn [handler args]
-                                      (reset! inv {:handler handler
-                                                   :opts args}))]
+      (with-redefs [aleph/start-server (fn [handler args]
+                                         (reset! inv {:handler handler
+                                                      :opts args}))]
         (is (some? (h rt)))
         (is (= {:port 1234} (-> (:opts @inv)
                                 (select-keys [:port])))))))
 
   (testing "start fn returns another fn that stops the server"
     (let [stopped? (atom false)]
-      (with-redefs [http/run-server (constantly ::server)
-                    http/server-stop! (fn [arg]
-                                        (when (= ::server arg)
-                                          (reset! stopped? true)))]
+      (with-redefs [aleph/start-server (constantly (->FakeServer stopped?))]
         (let [h (rt/setup-runtime {:http {}} :http)
               s (h {})]
           (is (ifn? s))

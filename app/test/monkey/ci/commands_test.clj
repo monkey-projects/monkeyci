@@ -9,8 +9,7 @@
              [sidecar :as sc]
              [spec :as spec]]
             [monkey.ci.helpers :as h]
-            [monkey.ci.web.handler :as wh]
-            [org.httpkit.fake :as f]))
+            [monkey.ci.web.handler :as wh]))
 
 (deftest run-build
   (testing "invokes runner from context"
@@ -47,8 +46,7 @@
               :config {:account {:url "http://server/api"
                                  :customer-id "test-cust"
                                  :repo-id "test-repo"}}}]
-      (f/with-fake-http ["http://server/api/customer/test-cust/repo/test-repo/builds"
-                         (pr-str builds)]
+      (with-redefs [http/request (constantly (md/success-deferred {:body (pr-str builds)}))]
         (is (some? (sut/list-builds rt)))
         (is (pos? (count @reported)))
         (let [r (first @reported)]
@@ -95,7 +93,7 @@
                    :build)))))
 
 (deftest http-server
-  (with-redefs [wh/server-status (constantly :stopped)]
+  (with-redefs [wh/on-server-close (constantly (md/success-deferred nil))]
     (testing "returns a deferred"
       (is (md/deferred? (sut/http-server {:http (constantly ::ok)}))))
 

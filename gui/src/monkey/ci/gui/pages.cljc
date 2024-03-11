@@ -5,6 +5,7 @@
             [monkey.ci.gui.login.subs]
             [monkey.ci.gui.build.views :as build]
             [monkey.ci.gui.customer.views :as customer]
+            [monkey.ci.gui.event-stream.views :as event-stream]
             [monkey.ci.gui.home.views :as home]
             [monkey.ci.gui.repo.views :as repo]
             [re-frame.core :as rf]))
@@ -15,7 +16,8 @@
    :page/login login/page
    :page/github-callback login/github-callback
    :page/customer customer/page
-   :page/repo repo/page})
+   :page/repo repo/page
+   :page/event-stream event-stream/page})
 
 (def route-name (comp :name :data))
 (def public? #{:page/login :page/github-callback})

@@ -4,6 +4,7 @@
             [monkey.ci.gui.martian :as m]
             [monkey.ci.gui.pages :as p]
             [monkey.ci.gui.routing :as routing]
+            [monkey.ci.gui.server-events]
             [monkey.ci.gui.utils :as u]
             [reagent.core :as rc]
             [reagent.dom.client :as rd]
