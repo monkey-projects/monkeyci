@@ -173,6 +173,9 @@
     (-> ic
         (assoc :containers [sc jc]
                :display-name (display-name rt))
+        ;; Increase memory, sidecar also needs a lot to save caches
+        ;; TODO Reduce this as soon as we manage to reduce sidecar memory usage
+        (assoc-in [:shape-config :memory-in-g-bs] 4)
         (update :freeform-tags merge (oci/sid->tags (get-in rt [:build :sid])))
         (update :volumes conj
                 (script-vol-config rt)
@@ -194,7 +197,7 @@
                    (log/warn "Captured output:" logs))
                  c)]
          (->> (get-in r [:body :containers])
-              (map maybe-log-output)
+              (mapv maybe-log-output)
               (map :exit-code)
               (filter (complement zero?))
               (first))))

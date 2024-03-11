@@ -122,6 +122,7 @@
    containing the runtime with an `:exit-code` added."
   [rt]
   (log/info "Running sidecar with configuration:" (get-in rt [rt/config :sidecar]))
+  (log/debug "Max memory available to this VM:" (.maxMemory (Runtime/getRuntime)) "bytes")
   ;; Restore caches and artifacts before starting the job
   (let [h (-> (comp poll-events mark-start)
               (art/wrap-artifacts)
@@ -129,7 +130,12 @@
     (-> rt
         (merge (get-in rt [rt/config :sidecar :job-config]))
         (restore-src)
-        (md/chain h))))
+        (md/chain h)
+        (md/catch
+            (fn [ex]
+              (log/error "Failed to run sidecar" ex)
+              {:exit-code 1
+               :exception ex})))))
 
 (defn- add-from-args [conf k]
   (update-in conf [:sidecar k] #(or (get-in conf [:args k]) %)))
