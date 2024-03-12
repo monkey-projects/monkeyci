@@ -90,7 +90,9 @@
 (defn- build-args
   "Builds command-line args vector for script process"
   [{:keys [build]}]
-  (->> (select-keys build [:checkout-dir :script-dir :pipeline])
+  (->> (-> build
+           (select-keys [:checkout-dir :pipeline])
+           (assoc :script-dir (b/script-dir build)))
        (mc/remove-vals nil?)
        (mc/map-keys str)
        (mc/map-vals pr-str)
@@ -132,9 +134,10 @@
   "Executes the build script located in given directory.  This actually runs the
    clojure cli with a generated `build` alias.  This expects absolute directories.
    Returns a deferred that will hold the process result when it completes."
-  [{{:keys [checkout-dir script-dir build-id] :as build} :build :as rt}]
+  [{{:keys [checkout-dir build-id] :as build} :build :as rt}]
   (log/info "Executing build process for" build-id "in" checkout-dir)
-  (let [{:keys [socket-path server]} (start-script-api rt)
+  (let [script-dir (b/rt->script-dir rt)
+        {:keys [socket-path server]} (start-script-api rt)
         [out err :as loggers] (map (partial make-logger rt) [:out :err])
         result (md/deferred)]
     (-> (bp/process
