@@ -50,7 +50,7 @@
   "Retrieves lib/jar version from the tag, or the next snapshot if this is the main branch."
   [ctx]
   (or (tag-version ctx)
-      snapshot-verion))
+      snapshot-version))
 
 (defn clj-container [id dir & args]
   "Executes script in clojure container"

@@ -70,7 +70,9 @@
   [rt]
   ;;(log/debug "Downloading from git using build config:" (:build rt))
   (let [git (get-in rt [:git :clone])
-        conf (-> (get-in rt [:build :git])
+        conf (-> rt
+                 rt/build
+                 :git
                  (update :dir #(or % (build/calc-checkout-dir rt))))
         cd (git conf)]
     (log/debug "Checking out git repo" (:url conf) "into" (:dir conf))
@@ -83,7 +85,7 @@
    is already local, does nothing.  Returns an updated context."
   [rt]
   (cond-> rt
-    (not-empty (get-in rt [:build :git])) (download-git)))
+    (not-empty (-> rt rt/build :git)) (download-git)))
 
 (defn create-workspace [rt]
   (let [ws (:workspace rt)

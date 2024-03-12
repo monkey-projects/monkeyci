@@ -84,9 +84,14 @@
 
     (testing "skips `nil` pipelines"
       (is (bc/success? (exec-in-dir "conditional-pipelines"))))
-    
-    (testing "fails when invalid script"
-      (is (bc/failed? (exec-in-dir "invalid-script"))))))
+
+    (testing "invalid script"
+      (let [r (exec-in-dir "invalid-script")]
+        (testing "fails"
+          (is (bc/failed? r)))
+
+        (testing "returns compiler error"
+          (is (= "Unable to resolve symbol: This in this context" (:message r))))))))
 
 (deftest setup-runtime
   (testing "connects to listening socket if specified"

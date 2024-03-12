@@ -250,6 +250,10 @@
         (run-all-jobs* rt jobs))
       (catch Exception ex
         (log/error "Unable to load build script" ex)
-        (post-event rt {:type :script/end
-                        :message (.getMessage ex)})
-        bc/failure))))
+        (let [msg ((some-fn (comp ex-message ex-cause)
+                            ex-message) ex)]
+          (post-event rt {:type :script/end
+                          :message msg})
+          (assoc bc/failure
+                 :message msg
+                 :exception ex))))))

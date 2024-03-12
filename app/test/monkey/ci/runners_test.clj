@@ -91,7 +91,9 @@
       (is (= "ok" (-> {:build
                        {:git git-config}
                        :git {:clone (fn [c]
-                                      (if (= (select-keys c (keys git-config)) git-config) "ok" "failed"))}}
+                                      (if (= (select-keys c (keys git-config)) git-config)
+                                        "ok"
+                                        (str "failed: " (pr-str c))))}}
                       (sut/download-src)
                       :build
                       :checkout-dir)))))

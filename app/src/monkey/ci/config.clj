@@ -187,6 +187,7 @@
   (update conf :build (fn [b]
                         (-> b
                             (group-keys :git)
+                            (group-keys :script)
                             (mc/update-existing :sid u/parse-sid)))))
 
 (defn normalize-config
