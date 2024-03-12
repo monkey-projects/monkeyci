@@ -120,10 +120,11 @@
     (is (re-matches #".*test/dir/test-script$"
                     (-> {:build
                          {:git {:url "http://git.test"}
-                          :script-dir "test-script"}
+                          :script {:script-dir "test-script"}}
                          :git {:clone (constantly "test/dir")}}
                         (sut/download-src)
                         :build
+                        :script
                         :script-dir))))
 
   (testing "uses default script dir when none specified"
@@ -135,6 +136,7 @@
                          :checkout-base-dir "checkout"}
                         (sut/download-src)
                         :build
+                        :script
                         :script-dir)))))
 
 (deftest store-src

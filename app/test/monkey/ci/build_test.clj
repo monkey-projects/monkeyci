@@ -92,13 +92,13 @@
                       (sut/make-build-ctx)
                       :sid))))))
 
-(deftest checkout-dir
+(deftest calc-checkout-dir
   (testing "combines build id with checkout base dir from config"
     (let [rt {:config {:checkout-base-dir "/tmp/checkout-base"}
               :build {:build-id "test-build"}}]
       (is (= "/tmp/checkout-base" ((rt/from-config :checkout-base-dir) rt)))
       (is (= "/tmp/checkout-base/test-build"
-             (sut/checkout-dir rt))))))
+             (sut/calc-checkout-dir rt))))))
 
 (deftest get-sid
   (testing "returns build sid"

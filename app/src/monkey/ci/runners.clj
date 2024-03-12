@@ -14,7 +14,7 @@
              [utils :as u]]))
 
 (defn- script-not-found [rt]
-  (log/warn "No build script found at" (build/script-dir rt))
+  (log/warn "No build script found at" (build/rt->script-dir rt))
   {:exit 1
    :result :error
    :build (:build rt)})
@@ -50,7 +50,7 @@
    runs the build.  Returns a deferred that resolves when the child process has
    exited."
   [rt]
-  (let [script-dir (build/script-dir rt)]
+  (let [script-dir (build/rt->script-dir rt)]
     (rt/post-events rt {:type :build/start
                         :build (:build rt)})
     (-> (md/chain
@@ -69,13 +69,12 @@
   ;;(log/debug "Downloading from git using build config:" (:build rt))
   (let [git (get-in rt [:git :clone])
         conf (-> (get-in rt [:build :git])
-                 (update :dir #(or % (build/checkout-dir rt))))
-        add-script-dir (fn [{{:keys [script-dir checkout-dir]} :build :as rt}]
-                         (assoc-in rt [:build :script-dir] (build/calc-script-dir checkout-dir script-dir)))]
+                 (update :dir #(or % (build/calc-checkout-dir rt))))
+        cd (git conf)]
     (log/debug "Checking out git repo" (:url conf) "into" (:dir conf))
     (-> rt
-        (assoc-in [:build :checkout-dir] (git conf))
-        (add-script-dir))))
+        (rt/update-build build/set-checkout-dir cd)
+        (rt/update-build build/set-script-dir (build/calc-script-dir cd (build/rt->script-dir rt))))))
 
 (defn download-src
   "Downloads the code from the remote source, if there is one.  If the source
@@ -87,7 +86,7 @@
 (defn create-workspace [rt]
   (let [ws (:workspace rt)
         ;; TODO For local builds, upload all workdir files according to .gitignore
-        {:keys [checkout-dir sid]} (:build rt)
+        {:keys [checkout-dir sid]} (rt/build rt)
         dest (str (cs/join "/" sid) b/extension)]
     (when checkout-dir
       (log/info "Creating workspace using files from" checkout-dir)

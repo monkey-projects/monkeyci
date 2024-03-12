@@ -112,6 +112,7 @@
              (ci/get-container-instance client {:instance-id id})
              (fn [{:keys [status body] :as r}]
                ;; Fetch details for all containers
+               ;; TODO Handle error responses (e.g. 429 status codes)
                (->> body
                     :containers
                     (map #(select-keys % [:container-id]))

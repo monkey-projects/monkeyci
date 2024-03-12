@@ -40,7 +40,7 @@
   "Determines the base work dir to use inside the container"
   ;; TODO Move this to common ns
   [rt]
-  (some->> (b/build-checkout-dir rt)
+  (some->> (b/rt->checkout-dir rt)
            (fs/file-name)
            (fs/path work-dir)
            (str)))
@@ -49,7 +49,7 @@
   "The work dir to use for the job in the container.  This is the external job
    work dir, rebased onto the base work dir."
   [rt]
-  (let [cd (b/build-checkout-dir rt)]
+  (let [cd (b/rt->checkout-dir rt)]
     (log/debug "Determining job work dir using checkout dir" cd
                ", job dir" (get-in rt [:job :work-dir])
                "and base dir" (base-work-dir rt))
@@ -149,7 +149,7 @@
            (-> (rt/rt->env rt)
                ;; Remove some unnecessary values
                (dissoc :args :checkout-base-dir :jwk :containers :storage) 
-               (update :build dissoc :git :jobs)
+               (update :build dissoc :git :jobs :cleanup?)
                (assoc :work-dir wd
                       :checkout-base-dir work-dir)
                (assoc-in [:build :checkout-dir] wd)

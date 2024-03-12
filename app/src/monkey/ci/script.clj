@@ -236,7 +236,7 @@
    this same process."
   [rt]
   (let [build-id (build/get-build-id rt)
-        script-dir (build/script-dir rt)
+        script-dir (build/rt->script-dir rt)
         ;; Manually add events poster
         ;; This will be removed when events are reworked to be more generic
         rt (assoc-in rt [:events :poster] (partial post-event rt))]

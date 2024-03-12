@@ -70,7 +70,7 @@
 (def ssh-keys-dir (from-config :ssh-keys-dir))
 (def events-receiver (comp :receiver :events))
 (def runner :runner)
-(def build :build)
+(def build "Gets build info from runtime" :build)
 
 (defn get-arg [rt k]
   (k (args rt)))
@@ -114,3 +114,8 @@
       :config
       (merge (select-keys rt [:build]))
       (mc/update-existing-in [:build :sid] u/serialize-sid)))
+
+(defn update-build
+  "Updates the build in the runtime by applying `f` with given args."
+  [rt f & args]
+  (apply update rt :build f args))

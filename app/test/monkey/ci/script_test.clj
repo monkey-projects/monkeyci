@@ -2,6 +2,7 @@
   (:require [clojure.test :refer :all]
             [manifold.deferred :as md]
             [monkey.ci
+             [build :as b]
              [jobs :as j]
              [runtime :as rt]
              [script :as sut]
@@ -68,25 +69,24 @@
       (is (= [job] (sut/resolve-jobs [(constantly job)] {}))))))
 
 (deftest exec-script!
-  (testing "executes basic clj script from location"
-    (is (bc/success? (sut/exec-script! {:build
-                                        {:script-dir "examples/basic-clj"}}))))
+  (letfn [(exec-in-dir [d]
+            (-> (rt/update-build {} b/set-script-dir (str "examples/" d))
+                (sut/exec-script!)))]
+    
+    (testing "executes basic clj script from location"
+      (is (bc/success? (exec-in-dir "basic-clj"))))
 
-  (testing "executes script shell from location"
-    (is (bc/success? (sut/exec-script! {:build
-                                        {:script-dir "examples/basic-script"}}))))
+    (testing "executes script shell from location"
+      (is (bc/success? (exec-in-dir "basic-script"))))
 
-  (testing "executes dynamic pipelines"
-    (is (bc/success? (sut/exec-script! {:build
-                                        {:script-dir "examples/dynamic-pipelines"}}))))
+    (testing "executes dynamic pipelines"
+      (is (bc/success? (exec-in-dir "dynamic-pipelines"))))
 
-  (testing "skips `nil` pipelines"
-    (is (bc/success? (sut/exec-script! {:build
-                                        {:script-dir "examples/conditional-pipelines"}}))))
-  
-  (testing "fails when invalid script"
-    (is (bc/failed? (sut/exec-script! {:build
-                                       {:script-dir "examples/invalid-script"}})))))
+    (testing "skips `nil` pipelines"
+      (is (bc/success? (exec-in-dir "conditional-pipelines"))))
+    
+    (testing "fails when invalid script"
+      (is (bc/failed? (exec-in-dir "invalid-script"))))))
 
 (deftest setup-runtime
   (testing "connects to listening socket if specified"
