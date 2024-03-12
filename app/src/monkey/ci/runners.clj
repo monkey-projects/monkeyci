@@ -14,10 +14,12 @@
              [utils :as u]]))
 
 (defn- script-not-found [rt]
-  (log/warn "No build script found at" (build/rt->script-dir rt))
-  {:exit 1
-   :result :error
-   :build (:build rt)})
+  (let [msg (str "No build script found at " (build/rt->script-dir rt))]
+    (log/warn msg)
+    {:exit 1
+     :result :error
+     :message msg
+     :build (:build rt)}))
 
 (defn- post-build-completed [rt res]
   (rt/post-events rt (assoc res :type :build/completed))
@@ -52,7 +54,7 @@
   [rt]
   (let [script-dir (build/rt->script-dir rt)]
     (rt/post-events rt {:type :build/start
-                        :build (:build rt)})
+                        :build (rt/build rt)})
     (-> (md/chain
          (if (some-> (io/file script-dir) (.exists))
            (p/execute! rt)
