@@ -22,7 +22,7 @@
                      (sut/build-local)
                      (deref)))))
 
-      (testing "fires `:build/completed` event with error result"
+      (testing "fires `:build/end` event with error result"
         (let [events (atom [])]
           (is (some? (-> {:build {:script-dir "nonexisting"}
                           :events {:poster (partial swap! events conj)}}
@@ -30,7 +30,7 @@
                          (deref))))
           (is (not-empty @events))
           (let [m (->> @events
-                       (filter (comp (partial = :build/completed) :type))
+                       (filter (comp (partial = :build/end) :type))
                        (first))]
             (is (some? m))
             (is (= :error (:result m)))))))

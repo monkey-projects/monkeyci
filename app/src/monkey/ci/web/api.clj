@@ -264,17 +264,21 @@
         repo (st/find-repo st (repo-sid req))
         ssh-keys (->> (st/find-ssh-keys st (customer-id req))
                       (lbl/filter-by-label repo))]
-    {:build-id bid
-     :git (-> (:query p)
-              (select-keys [:commit-id :branch])
-              (assoc :url (:url repo)
-                     :ssh-keys-dir (rt/ssh-keys-dir (c/req->rt req) bid))
-              (mc/assoc-some :ref (params->ref p))
-              (mc/assoc-some :ssh-keys ssh-keys))
-     :sid (-> acc
-              (assoc :build-id bid)
-              (st/ext-build-sid))
-     :cleanup? true}))
+    (-> acc
+        (select-keys [:customer-id :repo-id])
+        (assoc :source :api
+               :build-id bid
+               :git (-> (:query p)
+                        (select-keys [:commit-id :branch])
+                        (assoc :url (:url repo)
+                               :ssh-keys-dir (rt/ssh-keys-dir (c/req->rt req) bid))
+                        (mc/assoc-some :ref (params->ref p))
+                        (mc/assoc-some :ssh-keys ssh-keys))
+               :sid (-> acc
+                        (assoc :build-id bid)
+                        (st/ext-build-sid))
+               :start-time (u/now)
+               :cleanup? true))))
 
 (defn trigger-build [req]
   (let [{p :parameters} req]
@@ -286,7 +290,7 @@
                  (select-keys [:customer-id :repo-id])
                  (assoc :build-id bid
                         :source :api
-                        :timestamp (System/currentTimeMillis)
+                        :timestamp (u/now)
                         :ref (params->ref p))
                  (merge (:query p)))
           runner (c/from-rt req :runner)]
@@ -315,7 +319,9 @@
       (rur/not-found nil))))
 
 (def allowed-events
-  #{:script/start
+  #{:build/start
+    :build/end
+    :script/start
     :script/end
     :step/start
     :step/end})

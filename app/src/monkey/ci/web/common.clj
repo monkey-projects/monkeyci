@@ -94,7 +94,7 @@
                        (log/error "Unable to start build:" ex)
                        (rt/post-events rt (b/build-completed-evt (rt/build rt)
                                                                  1
-                                                                 :exception ex)))]
+                                                                 {:exception ex})))]
     (md/future
       (try
         ;; Catch both the deferred error, or the direct exception, because both

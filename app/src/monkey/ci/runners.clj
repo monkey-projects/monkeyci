@@ -18,11 +18,10 @@
     (log/warn msg)
     {:exit 1
      :result :error
-     :message msg
-     :build (:build rt)}))
+     :message msg}))
 
-(defn- post-build-completed [rt res]
-  (rt/post-events rt (assoc res :type :build/completed))
+(defn- post-build-completed [rt {:keys [exit] :as res}]
+  (rt/post-events rt (build/build-completed-evt (rt/build rt) exit res))
   res)
 
 (defn- log-build-result
@@ -54,7 +53,7 @@
   [rt]
   (let [script-dir (build/rt->script-dir rt)]
     (rt/post-events rt {:type :build/start
-                        :build (rt/build rt)})
+                        :build (assoc (rt/build rt) :start-time (u/now))})
     (-> (md/chain
          (if (some-> (io/file script-dir) (.exists))
            (p/execute! rt)

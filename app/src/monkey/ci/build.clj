@@ -121,16 +121,16 @@
   (partial build-related-dir (rt/from-config :ssh-keys-dir)))
 
 (defn build-completed-result [build exit-code]
-  {:build build
+  {:build (assoc build :end-time (u/now))
    :exit exit-code
    :result (if (zero? exit-code) :success :error)})
 
 (defn build-completed-evt
-  "Creates a build completed event"
-  [build exit-code & keyvals]
-  (cond-> (build-completed-result build exit-code)
-    true (assoc :type :build/completed)
-    (not-empty keyvals) (merge (apply hash-map keyvals))))
+  "Creates a `build/end` event"
+  [build exit-code & [extras]]
+  (-> (build-completed-result build exit-code)
+      (assoc :type :build/end)
+      (merge extras)))
 
 (defn job-work-dir
   "Given a runtime, determines the job working directory.  This is either the

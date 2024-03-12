@@ -1,14 +1,19 @@
 (ns monkey.ci.spec
   (:require [buddy.core.keys :as bk]
             [clojure.spec.alpha :as s]
-            [clojure.core.async.impl.protocols :as ap]
+            [clojure.tools.logging :as log]
             [monkey.ci.blob :as blob]
             [monkey.ci.spec.common :as c]
             [monkey.oci.sign :as oci-sign]))
 
-;; Unfortunately, there seems to be no clean way to determine
-;; if something is a channel apart from accessing impl details.
-(def channel? (partial satisfies? ap/Channel))
+(defn valid?
+  "Checks if the object is conform to the spec, and also prints a handy warning
+   if not."
+  [spec x]
+  (if-not (s/valid? spec x)
+    (do (log/warn "Object does not match spec:" x ", spec:" spec ", explanation:" (s/explain-str spec x))
+        false)
+    true))
 
 (def url? c/url?)
 
@@ -19,14 +24,6 @@
 (s/def :evt/src keyword?)
 (s/def :evt/event (s/keys :req-un [:evt/type :evt/time]
                           :opt-un [:evt/message :evt/src]))
-(s/def :evt/channel channel?)
-
-(s/def :evt/event-bus (s/keys :req-un [:evt/channel :evt/pub]))
-(s/def :evt/handler fn?)
-(s/def :evt/tx fn?)
-(s/def :evt/loop channel?)
-(s/def :evt/event-handler (s/keys :req-un [:evt/channel :evt/type]
-                                  :opt-un [:evt/handler :evt/tx :evt/loop]))
 
 ;;; Application configuration spec
 
