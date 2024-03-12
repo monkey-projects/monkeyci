@@ -60,7 +60,7 @@
   "Starts an async poll loop that waits until the container instance has completed.
    Returns a deferred that holds the last response received."
   [{:keys [get-details poll-interval post-event] :as c
-    :or {poll-interval 5000
+    :or {poll-interval 10000
          post-event (constantly true)}}]
   (let [get-async (fn []
                     (get-details (:instance-id c)))
@@ -110,15 +110,19 @@
             (log/trace "Retrieving container instance details for" id)
             (md/chain
              (ci/get-container-instance client {:instance-id id})
+             ;; TODO Handle error responses
              (fn [{:keys [status body] :as r}]
-               ;; Fetch details for all containers
-               ;; TODO Handle error responses (e.g. 429 status codes)
-               (->> body
-                    :containers
-                    (map #(select-keys % [:container-id]))
-                    (map (partial ci/get-container client))
-                    (apply md/zip)
-                    (md/zip r)))
+               (if (>= status 400)
+                 (do
+                   (log/warn "Got error response:" status ", message:" (:message body))
+                   [r []])
+                 ;; Fetch details for all containers
+                 (->> body
+                      :containers
+                      (map #(select-keys % [:container-id]))
+                      (map (partial ci/get-container client))
+                      (apply md/zip)
+                      (md/zip r))))
              (fn [[r containers]]
                ;; Add the exit codes for all containers to the result
                (log/trace "Container details:" containers)
@@ -129,7 +133,7 @@
                      add-exit-code (fn [c]
                                      (merge c (-> (get by-id (:container-id c))
                                                   (dissoc :id))))]
-                 (update-in r [:body :containers] (partial map add-exit-code))))))
+                 (mc/update-existing-in r [:body :containers] (partial map add-exit-code))))))
           
           (start-polling [{:keys [id]}]
             (log/debug "Starting polling...")
