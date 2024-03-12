@@ -8,6 +8,10 @@
              [core :as core]
              [shell :as shell]]))
 
+;; Version assigned when building main branch
+;; TODO Determine automatically
+(def snapshot-version "0.3.5-SNAPSHOT")
+
 (defn git-ref [ctx]
   (get-in ctx [:build :git :ref]))
 
@@ -46,8 +50,7 @@
   "Retrieves lib/jar version from the tag, or the next snapshot if this is the main branch."
   [ctx]
   (or (tag-version ctx)
-      ;; TODO Determine automatically
-      "0.3.5-SNAPSHOT"))
+      snapshot-verion))
 
 (defn clj-container [id dir & args]
   "Executes script in clojure container"

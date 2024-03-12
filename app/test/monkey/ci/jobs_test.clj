@@ -208,7 +208,10 @@
       (let [job (bc/action-job "parent-job"
                                (constantly {:action (fn [rt] (assoc bc/success :job-id (get-in rt [:job :id])))}))]
         (is (= "parent-job" (-> @(sut/execute! job {})
-                                :job-id)))))))
+                                :job-id))))))
+
+  (testing "returns success when action returns `nil`"
+    (is (= bc/success @(sut/execute! (bc/action-job "nil-job" (constantly nil)) {})))))
 
 (deftest execute-jobs!
   (testing "empty if no jobs"

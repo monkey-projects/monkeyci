@@ -3,16 +3,14 @@
             [clojure.spec.alpha :as s]
             [clojure.core.async.impl.protocols :as ap]
             [monkey.ci.blob :as blob]
+            [monkey.ci.spec.common :as c]
             [monkey.oci.sign :as oci-sign]))
 
 ;; Unfortunately, there seems to be no clean way to determine
 ;; if something is a channel apart from accessing impl details.
 (def channel? (partial satisfies? ap/Channel))
 
-(def url-regex #"^(?:([A-Za-z]+):)(\/{0,3})([0-9.\-A-Za-z]+)(?::(\d+))?(?:\/([^?#]*))?(?:\?([^#]*))?(?:#(.*))?$")
-
-(defn url? [x]
-  (and (string? x) (re-matches url-regex x)))
+(def url? c/url?)
 
 ;; Event related spec
 (s/def :evt/type keyword?)

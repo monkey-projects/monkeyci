@@ -66,7 +66,7 @@
            :id (bc/job-id job)
            :status (or status :success)}
     true (merge (select-keys job [j/deps j/labels]))
-    (some? exception) (assoc :message (.getMessage exception)
+    (some? exception) (assoc :message (or message (.getMessage exception))
                              :stack-trace (u/stack-trace exception))))
 
 ;; Wraps a job so it fires an event before and after execution, and also
@@ -76,7 +76,9 @@
   (execute! [job rt]
     (let [rt-with-job (assoc rt :job target)
           handle-error (fn [ex]
-                         (assoc bc/failure :exception ex))]
+                         (assoc bc/failure
+                                :exception ex
+                                :message (.getMessage ex)))]
       (log/debug "Executing event firing job:" (bc/job-id target))
       (md/chain
        (rt/post-events rt (job-start-evt rt-with-job))

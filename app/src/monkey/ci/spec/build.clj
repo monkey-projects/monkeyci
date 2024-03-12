@@ -72,6 +72,7 @@
 (s/def :git/dir path?)
 (s/def :git/main-branch string?)
 (s/def :git/ssh-keys-dir path?)
+
 (s/def :build/git
   (s/keys :req-un [:git/url :git/dir]
           :opt-un [:git/ref :git/commit-id :git/main-branch :git/ssh-keys-dir]))

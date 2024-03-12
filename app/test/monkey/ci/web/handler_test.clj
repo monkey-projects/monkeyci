@@ -1,5 +1,7 @@
 (ns monkey.ci.web.handler-test
-  (:require [aleph.http :as aleph]
+  (:require [aleph
+             [http :as aleph]
+             [netty :as netty]]
             [buddy.core
              [codecs :as codecs]
              [mac :as mac]]
@@ -685,3 +687,11 @@
           (is (ifn? s))
           (is (some? (s)))
           (is (true? @stopped?)))))))
+
+(deftest on-server-close
+  (testing "waits until netty server closes"
+    (with-redefs [netty/wait-for-close (fn [s]
+                                         (if (= ::server s)
+                                           ::closed
+                                           ::invalid-arg))]
+      (is (= ::closed @(sut/on-server-close (sut/map->HttpServer {:server ::server})))))))

@@ -79,7 +79,9 @@
                 (art/wrap-artifacts))]
       (-> rt
           (make-job-dir-absolute)
-          (a))))
+          (a)
+          (md/chain 
+           #(or % bc/success)))))
 
   monkey.ci.build.core.ContainerJob
   (execute! [this rt]

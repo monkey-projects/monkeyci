@@ -342,4 +342,4 @@
 (defn on-server-close
   "Returns a deferred that resolves when the server shuts down."
   [server]
-  (md/future (netty/wait-for-close server)))
+  (md/future (netty/wait-for-close (:server server))))

@@ -1,6 +1,7 @@
 (ns monkey.ci.build.spec
   (:require [clojure.spec.alpha :as s]))
 
+(s/def :ci/id string?)
 (s/def :ci/name string?)
 (s/def :ci/action fn?)
 (s/def :ci/status #{:success :failure :skipped :canceled :running})
@@ -42,10 +43,11 @@
                          (s/merge :ci/basic-job))))
 
 (s/def :ci/output string?)
+(s/def :ci/message string?)
 (s/def :ci/exception (partial instance? java.lang.Exception))
 
 (s/def :ci/job-result (s/keys :req-un [:ci/status]
-                               :opt-un [:ci/output :ci/exception]))
+                               :opt-un [:ci/output :ci/exception :ci/message]))
 (s/def :ci/last-result :ci/job-result)
 
 (s/def :ci/jobs (s/coll-of :ci/job))
