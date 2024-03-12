@@ -93,7 +93,11 @@
   (restore [_ src dest]
     (if (or (not strict?)
             (= dest (get @stored src)))
-      (md/success-deferred (swap! stored dissoc src))
+      (md/success-deferred
+       (do
+         (swap! stored dissoc src)
+         {:src src
+          :dest dest}))
       (md/error-deferred (ex-info
                           (format "destination path was not as expected: %s, actual: %s" (get @stored src) dest)
                           @stored)))))

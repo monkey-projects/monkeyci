@@ -119,7 +119,7 @@
      {:output-stream (io/output-stream dest)
       :compression compression-type
       :archive-type archive-type
-      :entryNameResolver (comp gatherer (partial drop-prefix-resolver prefix))}
+      :entry-name-resolver (comp gatherer (partial drop-prefix-resolver prefix))}
      (u/abs-path src))
     ;; Return some info, since clompress returns `nil`
     {:src src
@@ -159,7 +159,8 @@
               (.start))
             ;; Unarchive
             (mkdirs! f)
-            (extract-archive is f)))))))
+            (-> (extract-archive is f)
+                (assoc :src src))))))))
 
 (defmethod make-blob-store :disk [conf k]
   (->DiskBlobStore (get-in conf [k :dir])))
@@ -226,8 +227,9 @@
                     (cc/decompress is os compression-type))
                   ;; Reopen the decompressed archive as a stream
                   (io/input-stream arch))
-                #(extract-archive % f)
-                (constantly f))
+                (fn [r]
+                  (-> (extract-archive r f)
+                      (assoc :src src))))
                (md/finally #(fs/delete-if-exists arch)))
            ;; FIXME It may occur that a file is not yet available if it is read immediately after writing
            ;; In that case we should retry.

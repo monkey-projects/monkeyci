@@ -31,14 +31,23 @@
        (map (partial f rt))
        (apply md/zip)))
 
+(defn- mb [f]
+  (if (fs/exists? f)
+    (float (/ (fs/size f) (* 1024 1024)))
+    0.0))
+
 (defn save-blob
   "Saves a single blob path"
   [{:keys [build-path store-key]} rt {:keys [path id]}]
   (let [fullp (b/job-relative-dir rt path)]
     (log/debug "Saving blob:" id "at path" path "(full path:" fullp ")")
-    (blob/save (get-store rt store-key)
-               fullp
-               (build-path rt id))))
+    (md/chain
+     (blob/save (get-store rt store-key)
+                fullp
+                (build-path rt id))
+     (fn [{:keys [dest entries] :as r}]
+       (log/debugf "Zipped %d entries to %s (%.2f MB)" (count entries) dest (mb dest))
+       r))))
 
 (defn save-generic [rt conf]
   (md/chain
@@ -55,13 +64,17 @@
 
 (defn restore-blob [{:keys [store-key build-path]} rt {:keys [id path]}]
   (log/debug "Restoring blob:" id "to path" path)
-  (blob/restore (get-store rt store-key)
-                (build-path rt id)
-                ;; Restore to the parent path because the dir name will be in the archive
-                (-> (b/job-relative-dir rt path)
-                    (fs/parent)
-                    (fs/canonicalize)
-                    (str))))
+  (md/chain
+   (blob/restore (get-store rt store-key)
+                 (build-path rt id)
+                 ;; Restore to the parent path because the dir name will be in the archive
+                 (-> (b/job-relative-dir rt path)
+                     (fs/parent)
+                     (fs/canonicalize)
+                     (str)))
+   (fn [{:keys [entries src dest] :as r}]
+     (log/debugf "Unzipped %d entries from %s (%.2f MB) to %s" (count entries) src (mb src) dest)
+     r)))
 
 (defn restore-generic [rt conf]
   (do-with-blobs rt conf (partial restore-blob conf)))

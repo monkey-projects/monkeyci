@@ -126,9 +126,11 @@
           (let [res @(sut/restore blob "remote/path" r)]
             
             (testing "reads to temp file, then unarchives it"
-              (is (= r res))
+              (is (not-empty (:entries res)))
+              (is (= "remote/path" (:src res)))
+              (is (fs/exists? (:dest res)))
               (doseq [[f v] files]
-                (let [p (io/file r "orig" f)]
+                (let [p (io/file (:dest res) "orig" f)]
                   (is (fs/exists? p))
                   (is (= v (slurp p))))))
 
