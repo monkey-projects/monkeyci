@@ -92,9 +92,10 @@
   (let [runner (rt/runner rt)
         report-error (fn [ex]
                        (log/error "Unable to start build:" ex)
-                       (rt/post-events rt (b/build-completed-evt (rt/build rt)
-                                                                 1
-                                                                 {:exception ex})))]
+                       (rt/post-events rt (b/build-completed-evt
+                                           (-> (rt/build rt)
+                                               (assoc :status :error
+                                                      :message (ex-message ex))))))]
     (md/future
       (try
         ;; Catch both the deferred error, or the direct exception, because both

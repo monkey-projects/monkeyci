@@ -20,8 +20,11 @@
      :result :error
      :message msg}))
 
-(defn- post-build-completed [rt {:keys [exit] :as res}]
-  (rt/post-events rt (build/build-completed-evt (rt/build rt) exit res))
+(defn- post-build-completed [rt {:keys [exit message] :as res}]
+  (rt/post-events rt (build/build-completed-evt
+                      (cond-> (rt/build rt)
+                        message (assoc :message message))
+                      exit))
   res)
 
 (defn- log-build-result
@@ -30,7 +33,7 @@
   (condp = (or result :unknown)
     :success (log/info "Success!")
     :warning (log/warn "Exited with warnings:" (:message r))
-    :error   (log/error "Failure.")
+    :error   (log/error "Failure:" (:message r))
     :unknown (log/warn "Unknown result."))
   r)
 

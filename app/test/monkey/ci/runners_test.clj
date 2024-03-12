@@ -14,17 +14,21 @@
   (with-redefs [p/execute! (constantly (md/success-deferred {:exit 0}))]
 
     (testing "returns a deferred that waits for build to complete"
-      (is (md/deferred? (sut/build-local {:build {:script-dir "examples/basic-clj"}}))))
+      (is (md/deferred? (sut/build-local {:build
+                                          {:script
+                                           {:script-dir "examples/basic-clj"}}}))))
     
     (testing "when script not found"
       (testing "returns exit code 1"
-        (is (= 1 (-> {:build {:script-dir "nonexisting"}}
+        (is (= 1 (-> {:build
+                      {:script {:script-dir "nonexisting"}}}
                      (sut/build-local)
                      (deref)))))
 
-      (testing "fires `:build/end` event with error result"
+      (testing "fires `:build/end` event with error status"
         (let [events (atom [])]
-          (is (some? (-> {:build {:script-dir "nonexisting"}
+          (is (some? (-> {:build
+                          {:script {:script-dir "nonexisting"}}
                           :events {:poster (partial swap! events conj)}}
                          (sut/build-local)
                          (deref))))
@@ -33,11 +37,11 @@
                        (filter (comp (partial = :build/end) :type))
                        (first))]
             (is (some? m))
-            (is (= :error (:result m)))))))
+            (is (= :error (get-in m [:build :status])))))))
 
     (testing "deletes checkout dir"
       (letfn [(verify-checkout-dir-deleted [checkout-dir script-dir]
-                (is (some? (-> {:build {:script-dir (u/abs-path script-dir)
+                (is (some? (-> {:build {:script {:script-dir (u/abs-path script-dir)}
                                         :checkout-dir (u/abs-path checkout-dir)
                                         :cleanup? true
                                         :git {:dir "test"}}}

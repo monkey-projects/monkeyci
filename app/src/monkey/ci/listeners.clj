@@ -31,9 +31,10 @@
   "Handles a build update event.  Because many events may come in close proximity,
    we need to queue them to avoid losing data."
   [rt]
-  (let [handlers {:job/start       job-started
-                  :job/end         job-completed
-                  :build/completed save-build-result}
+  (let [handlers {:job/start    job-started
+                  :job/end      job-completed
+                  :build/start  (constantly nil) ; TODO
+                  :build/end    save-build-result}
         ch (ca/chan 10)
         dispatch-sub (fn [s dest]
                        (ca/go-loop [v (ca/<! s)]

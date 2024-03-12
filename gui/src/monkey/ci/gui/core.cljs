@@ -13,6 +13,7 @@
 (defonce app-root (atom nil))
 
 (defn ^:dev/after-load reload []
+  (routing/start!)
   (when @app-root
     (rf/clear-subscription-cache!)
     (rd/render @app-root [p/render])))
@@ -20,7 +21,7 @@
 (defn init []
   (let [root (rd/create-root (.getElementById js/document "root"))]
     (reset! app-root root)
-    (routing/start!)
+    #_(routing/start!)
     (rf/dispatch-sync [:initialize-db])
     (m/init)
     (reload)))

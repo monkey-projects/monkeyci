@@ -43,11 +43,7 @@
 (defmulti handle-event (fn [_ evt] (:type evt)))
 
 (defn- update-build [db build]
-  (let [{[cust-id repo-id build-id] :sid} build]
-    (db/update-build db (-> (select-keys build [:ref :result])
-                            (assoc :customer-id cust-id
-                                   :repo-id repo-id
-                                   :build-id build-id)))))
+  (db/update-build db build))
 
 (defmethod handle-event :build/start [db evt]
   (update-build db (:build evt)))
@@ -60,11 +56,11 @@
   db)
 
 (defn- for-repo? [db evt]
-  (let [as-sid (juxt :customer-id :repo-id)]
-    (= (take 2 (get-in evt [:build :sid]))
+  (let [get-id (juxt :customer-id :repo-id)]
+    (= (get-id (:build evt))
        (-> (r/current db)
            (r/path-params)
-           (as-sid)))))
+           (get-id)))))
 
 (rf/reg-event-db
  :repo/handle-event

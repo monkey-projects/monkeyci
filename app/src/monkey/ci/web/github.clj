@@ -100,6 +100,7 @@
                            :sid (s/ext-build-sid md) ; Build storage id
                            :source :github
                            :start-time now
+                           :status :running
                            :build-id build-id
                            :cleanup? true))]
       (when (s/create-build-metadata st md)

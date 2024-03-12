@@ -7,12 +7,17 @@
             [re-frame.core :as rf]))
 
 (defn- parse-edn [edn]
-  (edn/read-string edn))
+  (try
+    (edn/read-string edn)
+    (catch js/Error ex
+      (println "Unable to parse edn:" ex)
+      (println "Edn:" edn))))
 
 (defn read-events
   "Creates an event source that reads from the events endpoint.  Dispatches an
    event using `on-recv-event` with the received message appended."
   [on-recv-evt]
+  (println "Starting reading events")
   (let [src (js/EventSource. (str m/url "/events") (clj->js {}))]
     (println "Event source:" src)
     (set! (.-onmessage src)

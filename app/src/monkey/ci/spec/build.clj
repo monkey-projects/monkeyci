@@ -46,8 +46,10 @@
 
 ;;; Script: contains info about a build script, most notably the jobs
 
+(def build-states #{:pending :running :error :success})
+
 (s/def :script/script-dir path?)
-(s/def :script/status #{:pending :running :error :success})
+(s/def :script/status build-states)
 
 (s/def :build/script
   (-> (s/keys :req-un [:script/status :script/script-dir]
@@ -64,6 +66,7 @@
 (s/def :build/repo-id id?)
 (s/def :build/source keyword?)
 (s/def :build/checkout-dir path?)
+(s/def :build/status build-states)
 
 ;; GIT configuration
 (s/def :git/url c/url?)
@@ -79,6 +82,6 @@
 
 (s/def ::build
   (-> (s/keys :req-un [:build/customer-id :build/repo-id :build/build-id :build/sid
-                       :build/source]
+                       :build/source :build/status]
               :opt-un [:build/git :build/cleanup? :build/webhook-id :build/script :build/checkout-dir])
       (s/merge ::generic-entity)))

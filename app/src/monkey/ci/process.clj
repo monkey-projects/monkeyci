@@ -155,9 +155,8 @@
                        (when socket-path 
                          (uds/delete-address socket-path))
                        (log/debug "Reporting build completed to deferred")
-                       (-> (b/build-completed-result build exit)
-                           (assoc :process p)
-                           (as-> r (md/success! result r)))))})
+                       (md/success! result {:process p
+                                            :exit exit})))})
         ;; Depending on settings, some process streams need handling
         (l/handle-process-streams loggers))
     result))

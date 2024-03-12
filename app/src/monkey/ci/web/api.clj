@@ -278,6 +278,7 @@
                         (assoc :build-id bid)
                         (st/ext-build-sid))
                :start-time (u/now)
+               :status :running
                :cleanup? true))))
 
 (defn trigger-build [req]

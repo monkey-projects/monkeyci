@@ -10,7 +10,7 @@
             [monkey.ci.gui.repo.views :as repo]
             [re-frame.core :as rf]))
 
-(def pages
+(defonce pages
   {:page/root home/page
    :page/build build/page
    :page/login login/page
@@ -33,6 +33,7 @@
 (defn render []
   (let [r (rf/subscribe [:route/current])
         t (rf/subscribe [:login/token])]
+    (println "Rendering...")
     ;; If no token found, redirect to login
     (if (or @t (public? (route-name @r)))
       [render-page @r]

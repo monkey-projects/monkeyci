@@ -56,7 +56,7 @@
       (is (= 204 (:status (sut/webhook req))))
       (is (nil? @inv))))
 
-  (testing "fires build completed event on failure"
+  (testing "fires build end event on failure"
     (let [st (st/make-memory-storage)
           _ (st/save-webhook-details st {:id "test-hook"})
           events (atom [])
@@ -70,7 +70,7 @@
                                       {:head-commit {:id "test-id"}}}))]
       (is (= 200 (:status (sut/webhook req))))
       (is (not= :timeout (h/wait-until #(not-empty @events) 1000)))
-      (is (= :build/completed (-> @events first :type))))))
+      (is (= :build/end (-> @events first :type))))))
 
 (defn- test-webhook []
   (zipmap [:id :dustomer-id :repo-id] (repeatedly st/new-id)))

@@ -84,15 +84,19 @@
   (testing "ignores events for other repos"
     (let [[cust] (test-repo-path!)]
       (is (nil? (rf/dispatch-sync [:repo/handle-event {:type :build/start
-                                                       :build {:sid [cust "other-repo" "other-build"]
+                                                       :build {:customer-id cust
+                                                               :repo-id "other-repo"
+                                                               :build-id "other-build"
                                                                :ref "main"}}])))
       (is (empty? (db/builds @app-db)))))
 
   (testing "updates build list when build is started"
-    (let [[cust repo build :as sid] (test-repo-path!)]
+    (let [[cust repo build] (test-repo-path!)]
       (is (empty? (db/builds @app-db)))
       (is (nil? (rf/dispatch-sync [:repo/handle-event {:type :build/start
-                                                       :build {:sid sid
+                                                       :build {:customer-id cust
+                                                               :repo-id repo
+                                                               :build-id build
                                                                :ref "main"}}])))
       (is (= [{:customer-id cust
                :repo-id repo
@@ -101,12 +105,14 @@
              (db/builds @app-db)))))
 
   (testing "updates build list when build has completed"
-    (let [[cust repo build :as sid] (test-repo-path!)]
+    (let [[cust repo build] (test-repo-path!)]
       (is (some? (swap! app-db db/set-builds [{:customer-id cust
                                                :repo-id repo
                                                :build-id build}])))
       (is (nil? (rf/dispatch-sync [:repo/handle-event {:type :build/completed
-                                                       :build {:sid sid
+                                                       :build {:customer-id cust
+                                                               :repo-id repo
+                                                               :build-id build
                                                                :ref "main"
                                                                :result :success}}])))
       (is (= [{:customer-id cust

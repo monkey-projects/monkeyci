@@ -4,6 +4,7 @@
   (:require [babashka.fs :as fs]
             [clojure.java.io :as io]
             [clojure.string :as cs]
+            [medley.core :as mc]
             [monkey.ci
              [runtime :as rt]
              [storage :as st]
@@ -40,11 +41,11 @@
 (defn- maybe-set-git-opts [build rt]
   (let [{:keys [git-url branch commit-id dir]} (rt/args rt)]
     (cond-> build
-      git-url (merge {:git {:url git-url
-                            :branch (or branch "main")
-                            :id commit-id}
-                      ;; Overwrite script dir cause it will be calculated by the git checkout
-                      :script-dir dir}))))
+      git-url (-> (merge {:git {:url git-url
+                                :branch (or branch "main")
+                                :id commit-id}})
+                  ;; Overwrite script dir cause it will be calculated by the git checkout
+                  (assoc-in [:script :script-dir] dir)))))
 
 (defn- includes-build-id? [sid]
   (= build-sid-length (count sid)))
@@ -65,9 +66,11 @@
     (maybe-set-git-opts
      {:build-id id
       :checkout-dir work-dir
-      :script-dir (u/abs-path work-dir (rt/get-arg rt :dir))
+      :script {:script-dir (u/abs-path work-dir (rt/get-arg rt :dir))}
       :pipeline (rt/get-arg rt :pipeline)
-      :sid sid}
+      :sid sid
+      :customer-id (first sid)
+      :repo-id (second sid)}
      rt)))
 
 (def script "Gets script from the build"
@@ -120,17 +123,17 @@
   "Calculates ssh keys dir for the build"
   (partial build-related-dir (rt/from-config :ssh-keys-dir)))
 
-(defn build-completed-result [build exit-code]
-  {:build (assoc build :end-time (u/now))
-   :exit exit-code
-   :result (if (zero? exit-code) :success :error)})
+(defn exit-code->status [exit]
+  (when (number? exit)
+    (if (zero? exit) :success :error)))
 
 (defn build-completed-evt
   "Creates a `build/end` event"
-  [build exit-code & [extras]]
-  (-> (build-completed-result build exit-code)
-      (assoc :type :build/end)
-      (merge extras)))
+  [build & [exit-code]]
+  {:type :build/end
+   :build (-> build
+              (assoc :end-time (u/now))
+              (mc/assoc-some :status (exit-code->status exit-code)))})
 
 (defn job-work-dir
   "Given a runtime, determines the job working directory.  This is either the
