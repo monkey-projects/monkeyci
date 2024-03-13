@@ -364,7 +364,8 @@
           sid (generate-build-sid)
           build (-> (zipmap [:customer-id :repo-id :build-id] sid)
                     (assoc :status :success
-                           :message "test msg"))
+                           :message "test msg"
+                           :git {:message "test meta"}))
           path (repo-path sid)]
       (is (st/sid? (st/save-build st build)))
       (f {:events events
@@ -497,8 +498,8 @@
                           h/parse-json)]
             (is (= 200 (:status l)))
             (is (map? b))
-            (is (= build-id (:id b)) "should contain build id")
-            (is (= "test meta" (:message b)) "should contain build metadata")))
+            (is (= build-id (:build-id b)) "should contain build id")
+            (is (= "test meta" (get-in b [:git :message])) "should contain git data")))
 
         (testing "204 when there are no builds"
           (let [sid (generate-build-sid)
@@ -520,7 +521,7 @@
                 b (some-> l :body slurp h/parse-json)]
             (is (not-empty l))
             (is (= 200 (:status l)))
-            (is (= build-id (:id b)))))
+            (is (= build-id (:build-id b)))))
 
         (testing "404 when build does not exist"
           (let [sid (generate-build-sid)

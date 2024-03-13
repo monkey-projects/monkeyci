@@ -64,13 +64,13 @@
                         (concat orig-sid [(u/new-build-id)])))
         id (or (last sid) (u/new-build-id))]
     (maybe-set-git-opts
-     {:build-id id
+     {:customer-id (first sid)
+      :repo-id (second sid)
+      :build-id id
       :checkout-dir work-dir
       :script {:script-dir (u/abs-path work-dir (rt/get-arg rt :dir))}
       :pipeline (rt/get-arg rt :pipeline)
-      :sid sid
-      :customer-id (first sid)
-      :repo-id (second sid)}
+      :sid sid}
      rt)))
 
 (def script "Gets script from the build"
