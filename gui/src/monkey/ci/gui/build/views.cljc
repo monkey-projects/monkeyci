@@ -62,12 +62,14 @@
   []
   (let [d (rf/subscribe [:build/current])
         v (-> @d
-              (select-keys [:id :message :ref :timestamp])
-              (update :timestamp t/reformat))]
+              (select-keys [:id :message :start-time :end-time])
+              (assoc :ref (get-in @d [:git :ref]))
+              (update :start-time t/reformat)
+              (update :end-time t/reformat))]
     (->> v
          (map (fn [[k v]]
                 [:li [:b k ": "] v]))
-         (concat [[:li [:b "Result: "] [co/build-result (:result @d)]]])
+         (concat [[:li [:b "Result: "] [co/build-result (:status @d)]]])
          (into [:ul]))))
 
 (defn- build-path [route]

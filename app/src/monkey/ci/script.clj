@@ -54,20 +54,19 @@
       (apply w rt more))))
 
 (defn- job-start-evt [{:keys [job]}]
-  (-> {:type :job/start
-       :id (bc/job-id job)
-       :message "Job started"}
-      (merge (select-keys job [j/deps j/labels]))))
+  {:type :job/start
+   :job (-> (select-keys job [j/deps j/labels])
+            (assoc :id (bc/job-id job)))
+   :message "Job started"})
 
 (defn- job-end-evt [{:keys [job]} {:keys [status message exception]}]
-  (cond-> {:type :job/end
-           :message (or message
-                        "Job completed")
-           :id (bc/job-id job)
-           :status (or status :success)}
-    true (merge (select-keys job [j/deps j/labels]))
-    (some? exception) (assoc :message (or message (.getMessage exception))
-                             :stack-trace (u/stack-trace exception))))
+  {:type :job/end
+   :message "Job completed"
+   :job (cond-> {:id (bc/job-id job)
+                 :status (or status :success)}
+          true (merge (select-keys job [j/deps j/labels]))
+          (some? exception) (assoc :message (or message (.getMessage exception))
+                                   :stack-trace (u/stack-trace exception)))})
 
 ;; Wraps a job so it fires an event before and after execution, and also
 ;; catches any exceptions.
@@ -113,6 +112,7 @@
              true (map with-fire-events))]
     (log/debug "Found" (count pf) "matching jobs:" (map bc/job-id pf))
     (let [result @(j/execute-jobs! pf rt)]
+      (log/debug "Jobs executed, result is:" result)
       {:status (if (every? (comp bc/success? :result) (vals result)) :success :failure)
        :jobs result})))
 
@@ -187,29 +187,34 @@
         (in-ns 'monkey.ci.script)
         (remove-ns tmp-ns)))))
 
-(defn- with-script-dir [{:keys [script-dir] :as ctx} evt]
-  (-> (assoc evt :dir script-dir)
-      (script-evt ctx)))
+(defn- with-script-evt
+  "Creates an skeleton event with the script and invokes `f` on it"
+  [rt f]
+  (f {:script (-> rt rt/build build/script)}))
 
-(defn- script-started-evt [rt _]
-  (with-script-dir rt
-    {:type :script/start
-     :message "Script started"}))
+(defn- script-start-evt [rt _]
+  (with-script-evt rt
+    #(assoc %
+            :type :script/start
+            :message "Script started")))
 
-(defn- script-completed-evt [rt jobs res]
-  (with-script-dir rt
-    {:type :script/end
-     :message "Script completed"
-     ;; Add individual job results and dependencies, useful feedback to frontend
-     :jobs (mc/map-vals (fn [r]
-                          (-> {:result (select-keys (:result r) [:status :message])}
-                              (merge (select-keys (:job r) [j/deps j/labels]))))
-                        (:jobs res))}))
+(defn- script-end-evt [rt jobs res]
+  (with-script-evt rt
+    (fn [evt]
+      (-> evt 
+          (assoc :type :script/end
+                 :message "Script completed")
+          ;; FIXME Jobs don't contain all info here, as they should (like start and end time)
+          (assoc-in [:script :jobs]
+                    (mc/map-vals (fn [r]
+                                   (-> (select-keys (:result r) [:status :message])
+                                       (merge (select-keys (:job r) [j/deps j/labels]))))
+                                 (:jobs res)))))))
 
 (def run-all-jobs*
   (wrapped run-all-jobs
-           script-started-evt
-           script-completed-evt))
+           script-start-evt
+           script-end-evt))
 
 (defn- assign-ids
   "Assigns an id to each job that does not have one already."
@@ -253,6 +258,7 @@
         (let [msg ((some-fn (comp ex-message ex-cause)
                             ex-message) ex)]
           (post-event rt {:type :script/end
+                          :script (-> rt rt/build build/script)
                           :message msg})
           (assoc bc/failure
                  :message msg

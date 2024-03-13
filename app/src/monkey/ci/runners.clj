@@ -20,8 +20,8 @@
      :result :error
      :message msg}))
 
-(defn- post-build-completed [rt {:keys [exit message] :as res}]
-  (rt/post-events rt (build/build-completed-evt
+(defn- post-build-end [rt {:keys [exit message] :as res}]
+  (rt/post-events rt (build/build-end-evt
                       (cond-> (rt/build rt)
                         message (assoc :message message))
                       exit))
@@ -29,8 +29,8 @@
 
 (defn- log-build-result
   "Do some logging depending on the result"
-  [{:keys [result] :as r}]
-  (condp = (or result :unknown)
+  [{:keys [result exit] :as r}]
+  (condp = (or result (build/exit-code->status exit) :unknown)
     :success (log/info "Success!")
     :warning (log/warn "Exited with warnings:" (:message r))
     :error   (log/error "Failure:" (:message r))
@@ -54,14 +54,16 @@
    runs the build.  Returns a deferred that resolves when the child process has
    exited."
   [rt]
-  (let [script-dir (build/rt->script-dir rt)]
+  (let [script-dir (build/rt->script-dir rt)
+        build (rt/build rt)]
     (rt/post-events rt {:type :build/start
-                        :build (assoc (rt/build rt) :start-time (u/now))})
+                        :sid (build/get-sid rt)
+                        :build (assoc build :start-time (u/now))})
     (-> (md/chain
          (if (some-> (io/file script-dir) (.exists))
            (p/execute! rt)
            (md/success-deferred (script-not-found rt)))
-         (partial post-build-completed rt)
+         (partial post-build-end rt)
          log-build-result
          :exit)
         (md/finally

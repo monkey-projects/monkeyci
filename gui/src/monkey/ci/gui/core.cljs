@@ -8,20 +8,22 @@
             [monkey.ci.gui.utils :as u]
             [reagent.core :as rc]
             [reagent.dom.client :as rd]
-            [re-frame.core :as rf]))
+            [re-frame.core :as rf]
+            [re-frame.db :refer [app-db]]))
 
 (defonce app-root (atom nil))
 
 (defn ^:dev/after-load reload []
-  (routing/start!)
   (when @app-root
-    (rf/clear-subscription-cache!)
+    (println "Reloading application")
+    ;; If we do this, parts of the application no longer work after reloading
+    #_(rf/clear-subscription-cache!)
     (rd/render @app-root [p/render])))
 
 (defn init []
   (let [root (rd/create-root (.getElementById js/document "root"))]
     (reset! app-root root)
-    #_(routing/start!)
+    (routing/start!)
     (rf/dispatch-sync [:initialize-db])
     (m/init)
     (reload)))

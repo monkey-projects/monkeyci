@@ -142,7 +142,8 @@
 (deftest run-all-jobs*
   (letfn [(verify-script-end-evt [jobs verifier]
             (let [events (atom [])
-                  rt {:events {:poster (partial swap! events conj)}}]
+                  rt {:events {:poster (partial swap! events conj)}
+                      :build {:sid ["test-cust" "test-repo"]}}]
               (is (some? (sut/run-all-jobs* rt jobs)))
               (is (not-empty @events))
               (is (contains? (set (map :type @events)) :script/end))
@@ -150,21 +151,21 @@
                 (is (= :script/end (:type l)))
                 (verifier l))))]
     
-    (testing "posts `:script/end` event with job results"
+    (testing "posts `:script/end` event with job status"
       (let [result (assoc bc/success :message "Test result")
             job (bc/action-job "test-job" (constantly result))]
         (verify-script-end-evt
          [job]
          (fn [evt]
-           (is (= {:result result}
-                  (get-in evt [:jobs "test-job"])))))))
+           (is (= :success
+                  (get-in evt [:script :jobs "test-job" :status])))))))
 
     (testing "adds job labels to event"
       (verify-script-end-evt
        [(bc/action-job "test-job" (constantly bc/success) {:labels {:key "value"}})]
        (fn [evt]
          (is (= {:key "value"}
-                (get-in evt [:jobs "test-job" :labels]))))))
+                (get-in evt [:script :jobs "test-job" :labels]))))))
 
     (testing "adds job dependencies to end event"
       (let [jobs [(bc/action-job "first-job" (constantly bc/success))
@@ -174,14 +175,14 @@
          jobs
          (fn [evt]
            (is (= ["first-job"]
-                  (get-in evt [:jobs "second-job" :dependencies])))))))
+                  (get-in evt [:script :jobs "second-job" :dependencies])))))))
 
     (testing "marks job as successful if it returns `nil`"
       (verify-script-end-evt
        [(bc/action-job "nil-job" (constantly nil))]
        (fn [evt]
          (is (bc/success?
-              (get-in evt [:jobs "nil-job" :status]))))))))
+              (get-in evt [:script :jobs "nil-job" :status]))))))))
 
 (deftest event-firing-job
   (testing "invokes target"
@@ -211,4 +212,20 @@
           job (bc/action-job ::failing-async-job (fn [_] (md/error-deferred (ex-info "Test error" {}))))
           f (sut/->EventFiringJob job)]
       (is (bc/failed? @(j/execute! f rt)))
-      (is (= 2 (count @events)) "expected job end event"))))
+      (is (= 2 (count @events)) "expected job end event")))
+
+  (testing "event contains job id"
+    (let [events (atom [])
+          rt {:events {:poster (partial swap! events conj)}}
+          job (dummy-job)
+          f (sut/->EventFiringJob job)]
+      (is (every? (comp (partial = (:id job)) :id :job) @events))))
+
+  (testing "event contains build sid"
+    (let [events (atom [])
+          sid ["test-cust" "test-repo"]
+          rt {:events {:poster (partial swap! events conj)}
+              :build {:sid sid}}
+          job (dummy-job)
+          f (sut/->EventFiringJob job)]
+      (is (every? (comp some? :sid) @events)))))

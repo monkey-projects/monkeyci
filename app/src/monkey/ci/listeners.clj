@@ -3,38 +3,40 @@
             [clojure.tools.logging :as log]
             [monkey.ci.storage :as st]))
 
-(defn- update-job [rt evt f & args]
-  (apply st/patch-build-results
-         (:storage rt)
-         (:sid evt)
-         update-in [:jobs (:id evt)] f args))
+(defn update-build [{:keys [storage]} {:keys [sid build]}]
+  (log/debug "Updating build:" sid)
+  (let [existing (st/find-build storage sid)]
+    (st/save-build storage
+                   (-> (merge existing (dissoc build :script))
+                       (dissoc :sid :cleanup?)))))
 
-(defn job-started [rt evt]
-  (update-job rt evt merge (-> evt
-                               (select-keys [:id :dependencies :labels])
-                               (assoc :start-time (:time evt)))))
+(defn update-script [{:keys [storage]} {:keys [sid script]}]
+  (log/debug "Updating build script for sid" sid)
+  (if-let [build (st/find-build storage sid)]
+    (let [orig (get-in build [:script :jobs])]
+      (st/save-build storage
+                     (assoc build
+                            :script (cond-> script
+                                      orig (assoc :jobs orig)))))
+    (log/warn "Build not found when updating script:" sid)))
 
-(defn job-completed [rt evt]
-  (update-job rt evt merge {:end-time (:time evt)
-                            :status (:status evt)}))
-
-(defn save-build-result
-  "Handles a `build/completed` event to store the result."
-  [rt evt]
-  (let [r (select-keys evt [:exit :result])]
-    (log/debug "Saving build result:" r)
-    (st/patch-build-results (:storage rt)
-                            (get-in evt [:build :sid])
-                            merge r)))
+(defn update-job [{:keys [storage]} {:keys [sid job]}]
+  (let [job-id (:id job)]
+    (log/debug "Updating job for sid" sid ":" job-id)
+    (if-let [build (st/find-build storage sid)]
+      (st/save-build storage (assoc-in build [:script :jobs job-id] job))
+      (log/warn "Build not found when updating job:" sid))))
 
 (defn build-update-handler
   "Handles a build update event.  Because many events may come in close proximity,
    we need to queue them to avoid losing data."
   [rt]
-  (let [handlers {:job/start    job-started
-                  :job/end      job-completed
-                  :build/start  (constantly nil) ; TODO
-                  :build/end    save-build-result}
+  (let [handlers {:job/start    update-job
+                  :job/end      update-job
+                  :script/start update-script
+                  :script/end   update-script
+                  :build/start  update-build
+                  :build/end    update-build}
         ch (ca/chan 10)
         dispatch-sub (fn [s dest]
                        (ca/go-loop [v (ca/<! s)]

@@ -37,55 +37,25 @@
       (is (some? jobs)))
 
     (testing "returns build jobs as list"
-      (is (some? (reset! app-db (db/set-build {} {:jobs [{:id "test-job"
-                                                          :result {:status :success}}]}))))
+      (is (some? (reset! app-db (db/set-build {} {:script
+                                                  {:jobs [{:id "test-job"
+                                                           :status :success}]}}))))
       (is (= [{:id "test-job"
-               :result {:status :success}
+               :status :success
                :logs []}]
              @jobs)))
 
     (testing "adds logs by job id"
       (is (map? (reset! app-db (-> {}
                                    (db/set-build
-                                    {:jobs [{:id "test-job"
-                                             :result {:status :success}}]})
+                                    {:script
+                                     {:jobs [{:id "test-job"}]}})
                                    (db/set-logs
                                     [{:name "test-job/out.txt" :size 100}
                                      {:name "test-job/err.txt" :size 50}])))))
       (is (= [{:name "out.txt" :size 100 :path "test-job/out.txt"}
               {:name "err.txt" :size 50 :path "test-job/err.txt"}]
-             (-> @jobs first :logs))))
-
-    (testing "legacy pipelines"
-
-      (testing "returns steps as list"
-        (is (some? (reset! app-db (db/set-build
-                                   {}
-                                   {:pipelines [{:name "test-pipeline"
-                                                 :steps [{:index 0}]}]}))))
-        (is (= [{:index 0
-                 :id "test-pipeline-0"
-                 :labels {"pipeline" "test-pipeline"}
-                 :logs []}]
-               @jobs)))
-
-      (testing "adds logs for step according to path"
-        (is (map? (reset! app-db (-> {}
-                                     (db/set-build
-                                      {:id "test-build"
-                                       :pipelines
-                                       [{:index 0
-                                         :name "test-pipeline"
-                                         :steps
-                                         [{:index 0}]}]})
-                                     (db/set-logs
-                                      [{:name "test-pipeline/0/out.txt"
-                                        :size 100}
-                                       {:name "test-pipeline/0/err.txt"
-                                        :size 50}])))))
-        (is (= [{:name "out.txt" :size 100 :path "test-pipeline/0/out.txt"}
-                {:name "err.txt" :size 50 :path "test-pipeline/0/err.txt"}]
-               (-> @jobs first :logs)))))))
+             (-> @jobs first :logs))))))
 
 (deftest reloading?
   (let [r (rf/subscribe [:build/reloading?])]

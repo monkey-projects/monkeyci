@@ -28,7 +28,8 @@
     src))
 
 (defn stop-reading-events [src]
-  (.close src))
+  (when src
+    (.close src)))
 
 (defn stream-config [db id]
   (get-in db [::event-stream id]))

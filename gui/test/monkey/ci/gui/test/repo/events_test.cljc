@@ -87,7 +87,7 @@
                                                        :build {:customer-id cust
                                                                :repo-id "other-repo"
                                                                :build-id "other-build"
-                                                               :ref "main"}}])))
+                                                               :git {:ref "main"}}}])))
       (is (empty? (db/builds @app-db)))))
 
   (testing "updates build list when build is started"
@@ -97,11 +97,11 @@
                                                        :build {:customer-id cust
                                                                :repo-id repo
                                                                :build-id build
-                                                               :ref "main"}}])))
+                                                               :git {:ref "main"}}}])))
       (is (= [{:customer-id cust
                :repo-id repo
                :build-id build
-               :ref "main"}]
+               :git {:ref "main"}}]
              (db/builds @app-db)))))
 
   (testing "updates build list when build has completed"
@@ -113,11 +113,11 @@
                                                        :build {:customer-id cust
                                                                :repo-id repo
                                                                :build-id build
-                                                               :ref "main"
-                                                               :result :success}}])))
+                                                               :git {:ref "main"}
+                                                               :status :success}}])))
       (is (= [{:customer-id cust
                :repo-id repo
                :build-id build
-               :ref "main"
-               :result :success}]
+               :git {:ref "main"}
+               :status :success}]
              (db/builds @app-db))))))

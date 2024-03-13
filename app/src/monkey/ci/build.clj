@@ -127,13 +127,16 @@
   (when (number? exit)
     (if (zero? exit) :success :error)))
 
-(defn build-completed-evt
+(defn build-end-evt
   "Creates a `build/end` event"
   [build & [exit-code]]
   {:type :build/end
+   :sid (:sid build)
    :build (-> build
               (assoc :end-time (u/now))
               (mc/assoc-some :status (exit-code->status exit-code)))})
+
+(def ^:deprecated build-completed-evt build-end-evt)
 
 (defn job-work-dir
   "Given a runtime, determines the job working directory.  This is either the

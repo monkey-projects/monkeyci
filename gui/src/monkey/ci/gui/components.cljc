@@ -42,7 +42,7 @@
         (into [:ol.breadcrumb]))])
 
 (defn build-result [r]
-  (let [type (condp = r
+  (let [type (condp = (keyword r)
                :error :text-bg-danger
                :failure :text-bg-danger
                :success :text-bg-success

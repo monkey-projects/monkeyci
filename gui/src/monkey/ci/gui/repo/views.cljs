@@ -11,17 +11,9 @@
             [re-frame.core :as rf]))
 
 (defn- elapsed [b]
-  (t/format-seconds (int (/ (u/build-elapsed b) 1000))))
-
-(defn- build-row [b]
-  [:tr
-   [:td [:a {:href (r/path-for :page/build b)} (:build-id b)]]
-   [:td.text-end (t/reformat (:timestamp b))]
-   [:td (elapsed b)]
-   [:td (:source b)]
-   [:td (:ref b)]
-   [:td.text-center [co/build-result (:result b)]]
-   [:td (some-> (:message b) (subs 0 30))]])
+  (let [e (u/build-elapsed b)]
+    (when (pos? e)
+      (t/format-seconds (int (/ e 1000))))))
 
 (defn- builds []
   (rf/dispatch [:builds/load])
@@ -40,17 +32,18 @@
            :columns [{:label "Id"
                       :value (fn [b] [:a {:href (r/path-for :page/build b)} (:build-id b)])}
                      {:label "Time"
-                      :value #(t/reformat (:timestamp %))}
+                      :value #(t/reformat (:start-time %))}
                      {:label "Elapsed"
                       :value elapsed}
                      {:label "Trigger"
                       :value :source}
                      {:label "Ref"
-                      :value :ref}
+                      :value (comp :ref :git)}
                      {:label "Result"
-                      :value (fn [b] [co/build-result (:result b)])}
+                      :value (fn [b] [co/build-result (:status b)])}
                      {:label "Commit message"
-                      :value #(some-> (:message %) (subs 0 30))}]}]]))))
+                      :value (fn [b]
+                               [:span.text-truncate (:message b)])}]}]]))))
 
 (def stream-id ::event-stream)
 

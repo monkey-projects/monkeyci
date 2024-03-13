@@ -15,16 +15,8 @@
   (testing "0 if empty"
     (is (= 0 (sut/build-elapsed {}))))
 
-  (testing "total millis between start time and last step end time"
-    (let [b {:timestamp 10
-             :pipelines
-             [{:start-time 11
-               :steps
-               [{:start-time 12
-                 :end-time 100}]}
-              {:start-time 110
-               :steps
-               [{:start-time 120
-                 :end-time 200}]}]}
+  (testing "total millis between start time and end time"
+    (let [b {:start-time 10
+             :end-time 100}
           e (sut/build-elapsed b)]
-      (is (= 190 e)))))
+      (is (= 90 e)))))

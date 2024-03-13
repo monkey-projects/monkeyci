@@ -48,7 +48,7 @@
 (defmethod handle-event :build/start [db evt]
   (update-build db (:build evt)))
 
-(defmethod handle-event :build/completed [db evt]
+(defmethod handle-event :build/end [db evt]
   (update-build db (:build evt)))
 
 (defmethod handle-event :default [db evt]

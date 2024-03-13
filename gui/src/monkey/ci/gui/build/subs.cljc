@@ -22,22 +22,6 @@
       (assoc :path (:name l))
       (update :name (comp last split-log-path))))
 
-(defn- pipelines-as-jobs [pl logs]
-  (let [logs-by-id (group-by (comp vec (partial take 2) split-log-path :name) logs)]
-    (letfn [(add-step-logs [s pn]
-              (assoc s :logs (->> (get logs-by-id [pn (str (:index s))])
-                                  (map strip-prefix))))
-            
-            (steps->jobs [p]
-              (map (fn [s]
-                     ;; TODO Dependencies
-                     (-> s
-                         (assoc :id (str (:name p) "-" (:index s))
-                                :labels {"pipeline" (:name p)})
-                         (add-step-logs (:name p))))
-                   ((some-fn :steps :jobs) p)))]
-      (mapcat steps->jobs pl))))
-
 (defn- jobs-with-logs [{:keys [jobs]} logs]
   (let [logs-by-id (group-by (comp first split-log-path :name) logs)]
     (letfn [(add-job-logs [{:keys [id] :as job}]
@@ -50,10 +34,7 @@
  :<- [:build/current]
  :<- [:build/logs]
  (fn [[b logs] _]
-   (let [p (:pipelines b)]
-     (if (not-empty p)
-       (pipelines-as-jobs p logs)
-       (jobs-with-logs b logs)))))
+   (jobs-with-logs (:script b) logs)))
 
 (defn- add-line-breaks [s]
   (->> (cs/split-lines s)

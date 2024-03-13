@@ -40,34 +40,32 @@
     (testing "exists"
       (is (some? b)))
 
-    (testing "holds builds from db with repo info"
+    (testing "holds builds from db"
       (is (map? (reset! app-db (-> {:route/current
                                     {:parameters
                                      {:path
                                       {:customer-id "test-cust"
                                        :repo-id "test-repo"}}}}
-                                   (db/set-builds [{:id ::test-build}])))))
+                                   (db/set-builds [{:build-id ::test-build}])))))
       (is (= 1 (count @b)))
-      (is (= {:build-id ::test-build
-              :customer-id "test-cust"
-              :repo-id "test-repo"}
-             (select-keys (first @b) [:build-id :customer-id :repo-id]))))
+      (is (= {:build-id ::test-build}
+             (select-keys (first @b) [:build-id]))))
 
-    (testing "sorts by timestamp descending"
+    (testing "sorts by start-time descending"
       (is (map? (reset! app-db (db/set-builds {} [{:id "old-build"
-                                                   :timestamp "2023-12-01"}
+                                                   :start-time "2023-12-01"}
                                                   {:id "new-build"
-                                                   :timestamp "2023-12-22"}
+                                                   :start-time "2023-12-22"}
                                                   {:id "intermediate-build"
-                                                   :timestamp "2023-12-10"}]))))
+                                                   :start-time "2023-12-10"}]))))
       (is (= ["new-build" "intermediate-build" "old-build"]
              (->> @b (map :id)))))
 
-    (testing "handles both epoch and string timestamps"
+    (testing "handles both epoch and string start-times"
       (is (map? (reset! app-db (db/set-builds {} [{:id "old-build"
-                                                   :timestamp "2024-01-18T09:11:40+01:00"}
+                                                   :start-time "2024-01-18T09:11:40+01:00"}
                                                   {:id "new-build"
-                                                   :timestamp 1708433539638}]))))
+                                                   :start-time 1708433539638}]))))
       (is (= ["new-build" "old-build"]
              (->> @b (map :id)))))
 

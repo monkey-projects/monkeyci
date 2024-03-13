@@ -141,21 +141,21 @@
            (sut/job-work-dir {:job {:work-dir "job-dir"}
                               :build {:checkout-dir "/checkout"}})))))
 
-(deftest build-completed-evt
+(deftest build-end-evt
   (testing "creates build/end event with status completed"
     (let [build {:build-id "test-build"}
-          evt (sut/build-completed-evt build 0)]
+          evt (sut/build-end-evt build 0)]
       (is (= :build/end (:type evt)))
       (is (= "test-build" (get-in evt [:build :build-id])))))
 
   (testing "sets status according to exit"
     (is (= :success
-           (-> (sut/build-completed-evt {} 0)
+           (-> (sut/build-end-evt {} 0)
                (get-in [:build :status]))))
     (is (= :error
-           (-> (sut/build-completed-evt {} 1)
+           (-> (sut/build-end-evt {} 1)
                (get-in [:build :status])))))
 
   (testing "does not set status when no exit"
-    (is (nil? (-> (sut/build-completed-evt {} nil)
+    (is (nil? (-> (sut/build-end-evt {} nil)
                   (get-in [:build :status]))))))

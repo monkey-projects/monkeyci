@@ -258,6 +258,14 @@
                            :script
                            :jobs))))
 
+    (testing "assigns ids to jobs when none in job"
+      (is (= "test-job"
+             (-> (sut/build->out {:script {:jobs {"test-job" {:status :success}}}})
+                 :script
+                 :jobs
+                 first
+                 :id))))
+
     (testing "contains other properties"
       (let [build {:customer-id "test-cust"
                    :status :success}]

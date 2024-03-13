@@ -229,11 +229,15 @@
   (letfn [(convert-legacy [{:keys [jobs pipelines] :as b}]
             (cond-> (dissoc b :jobs :pipelines :legacy? :timestamp :result)
               true (mc/assoc-some :start-time (:timestamp b)
-                                  :status (:result b))
+                                  :status (:result b)
+                                  :git {:ref (:ref b)})
               jobs (assoc-in [:script :jobs] (vals jobs))
               pipelines (assoc-in [:script :jobs] (pipelines->out pipelines))))
+          (maybe-add-job-id [[id job]]
+            (cond-> job
+              (nil? (:id job)) (assoc :id (name id))))
           (convert-regular [b]
-            (mc/update-existing-in b [:script :jobs] vals))]
+            (mc/update-existing-in b [:script :jobs] (partial map maybe-add-job-id)))]
     (if (:legacy? b)
       (convert-legacy b)
       (convert-regular b))))
@@ -353,8 +357,8 @@
     :build/end
     :script/start
     :script/end
-    :step/start
-    :step/end})
+    :job/start
+    :job/end})
 
 (defn event-stream
   "Sets up an event stream for the specified filter."
