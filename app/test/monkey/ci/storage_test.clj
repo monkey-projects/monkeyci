@@ -43,6 +43,27 @@
         (is (sut/sid? (sut/save-build-results st md {:status :success})))
         (is (= :success (:status (sut/find-build-results st md))))))))
 
+(defn- test-build-sid []
+  (repeatedly 3 (comp str random-uuid)))
+
+(deftest patch-build-results
+  (testing "reads result, applies f with args, then writes result back"
+    (h/with-memory-store st
+      (let [sid (test-build-sid)]
+        (is (sut/sid? (sut/patch-build-results st sid assoc :key "value")))
+        (is (= {:key "value"}
+               (sut/find-build-results st sid)))))))
+
+(deftest save-build
+  (testing "creates new build"
+    (h/with-memory-store st
+      (let [[cust-id repo-id build-id :as sid] (test-build-sid)
+            build (-> (zipmap [:customer-id :repo-id :build-id] sid)
+                      (assoc :start-time 100))]
+        (is (sut/sid? (sut/save-build st build)))
+        (is (true? (sut/build-exists? st sid)))
+        (is (= build (sut/find-build st sid)))))))
+
 (deftest parameters
   (testing "can store on customer level"
     (h/with-memory-store st
@@ -57,14 +78,6 @@
         (is (sut/sid? (sut/save-params st cid params)))
         (is (= params (sut/find-params st cid)))))))
 
-(deftest patch-build-results
-  (testing "reads result, applies f with args, then writes result back"
-    (h/with-memory-store st
-      (let [sid (repeatedly 4 (comp str random-uuid))]
-        (is (sut/sid? (sut/patch-build-results st sid assoc :key "value")))
-        (is (= {:key "value"}
-               (sut/find-build-results st sid)))))))
-
 (deftest list-builds
   (testing "lists all builds for given repo"
     (h/with-memory-store st
@@ -74,7 +87,7 @@
                         (take 2))]
         (doseq [b builds]
           (let [sid (conj repo-sid b)]
-            (is (sut/sid? (sut/create-build-metadata
+            (is (sut/sid? (sut/save-build
                            st
                            (zipmap [:customer-id :repo-id :build-id] sid))))))
         (let [l (sut/list-builds st repo-sid)]

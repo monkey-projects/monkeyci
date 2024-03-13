@@ -1,7 +1,9 @@
 (ns monkey.ci.web.api-test
   (:require [clojure.test :refer [deftest testing is]]
             [manifold.stream :as ms]
-            [monkey.ci.storage :as st]
+            [monkey.ci
+             [storage :as st]
+             [utils :as u]]
             [monkey.ci.events.core :as ec]
             [monkey.ci.web.api :as sut]
             [monkey.ci.helpers :as h]))
@@ -191,53 +193,6 @@
       (is (nil? (get-in r [:body :secret-key]))))))
 
 (deftest get-latest-build
-  (testing "converts pipelines to list sorted by index"
-    (let [{st :storage :as rt} (h/test-rt)
-          id (st/new-id)
-          md {:customer-id "test-cust"
-              :repo-id "test-repo"}
-          sid (st/->sid (concat (vals md) [id]))
-          _ (st/create-build-metadata st sid md)
-          _ (st/save-build-results st sid
-                                   {:pipelines {0 {:name "pipeline 1"}
-                                                1 {:name "pipeline 2"}}})
-          r (-> rt
-                (h/->req)
-                (h/with-path-params md)
-                (sut/get-latest-build))]
-      (is (= 200 (:status r)))
-      (is (= 2 (-> r :body :pipelines count)))
-      (is (= [{:index 0
-               :name "pipeline 1"}
-              {:index 1
-               :name "pipeline 2"}]
-             (-> r :body :pipelines)))))
-
-  (testing "converts pipeline jobs to list sorted by index"
-    (let [{st :storage :as rt} (h/test-rt)
-          id (st/new-id)
-          md {:customer-id "test-cust"
-              :repo-id "test-repo"}
-          sid (st/->sid (concat (vals md) [id]))
-          _ (st/create-build-metadata st sid md)
-          _ (st/save-build-results st sid
-                                   {:pipelines {0
-                                                {:name "pipeline 1"
-                                                 :jobs
-                                                 {0 {:name "job 1"}
-                                                  1 {:name "job 2"}}}}})
-          r (-> rt
-                (h/->req)
-                (h/with-path-params md)
-                (sut/get-latest-build))]
-      (is (= 200 (:status r)))
-      (is (= 2 (-> r :body :pipelines first :jobs count)))
-      (is (= [{:index 0
-               :name "job 1"}
-              {:index 1
-               :name "job 2"}]
-             (-> r :body :pipelines first :jobs)))))
-
   (testing "returns latest build"
     (let [{st :storage :as rt} (h/test-rt)
           md {:customer-id "test-cust"
@@ -245,65 +200,125 @@
           create-build (fn [ts]
                          (let [id (str "build-" ts)
                                sid (st/->sid (concat (vals md) [id]))]
-                           (st/create-build-metadata st sid md)
-                           (st/save-build-results st sid
-                                                  {:id id
-                                                   :timestamp ts
-                                                   :jobs []})))
+                           (st/save-build st (merge md {:build-id id
+                                                        :timestamp ts
+                                                        :jobs []}))))
           _ (create-build 200)
           _ (create-build 100)
           r (-> rt
                 (h/->req)
                 (h/with-path-params md)
                 (sut/get-latest-build))]
-      (is (= "build-200" (-> r :body :id))))))
+      (is (= "build-200" (-> r :body :build-id))))))
 
 (deftest get-build
-  (testing "retrieves build by id, with pipelines as vector"
+  (testing "retrieves build by id"
     (let [{st :storage :as rt} (h/test-rt)
           id (st/new-id)
-          md {:customer-id "test-cust"
-              :repo-id "test-repo"}
-          sid (st/->sid (concat (vals md) [id]))
-          _ (st/create-build-metadata st sid md)
-          _ (st/save-build-results st sid
-                                   {:pipelines
-                                    {0
-                                     {:name "pipeline 1"
-                                      :jobs
-                                      {0 {:name "job 1"}
-                                       1 {:name "job 2"}}}}})
+          build {:customer-id "test-cust"
+                 :repo-id "test-repo"
+                 :build-id id
+                 :status :success}
+          sid (st/ext-build-sid build)
+          _ (st/save-build st build)
           r (-> rt
                 (h/->req)
-                (h/with-path-params (assoc md :build-id id))
+                (h/with-path-params build)
                 (sut/get-build))]
       (is (= 200 (:status r)))
-      (is (= [{:index 0
-               :name "pipeline 1"
-               :jobs
-               [{:index 0 :name "job 1"}
-                {:index 1 :name "job 2"}]}]
-             (get-in r [:body :pipelines])))))
+      (is (= build (:body r))))))
 
-  (testing "converts jobs to list"
-    (let [{st :storage :as rt} (h/test-rt)
-          id (st/new-id)
-          md {:customer-id "test-cust"
-              :repo-id "test-repo"}
-          sid (st/->sid (concat (vals md) [id]))
-          _ (st/create-build-metadata st sid md)
-          _ (st/save-build-results st sid
-                                   {:jobs
-                                    {"job-1" {:id "job-1"}
-                                     "job-2" {:id "job-2"}}})
-          r (-> rt
-                (h/->req)
-                (h/with-path-params (assoc md :build-id id))
-                (sut/get-build))]
-      (is (= 200 (:status r)))
-      (is (= [{:id "job-1"}
-              {:id "job-2"}]
-             (get-in r [:body :jobs]))))))
+(deftest fetch-build-details
+  (testing "retrieves regular build"
+    (h/with-memory-store st
+      (let [build {:build-id "test-build"
+                   :customer-id "test-cust"
+                   :repo-id "test-repo"}]
+        (is (st/sid? (st/save-build st build)))
+        (is (= build (sut/fetch-build-details st (st/ext-build-sid build)))))))
+
+  (testing "retrieves legacy build"
+    (h/with-memory-store st
+      (let [md {:customer-id "test-cust"
+                :repo-id "test-repo"
+                :build-id "test-build"}
+            results {:jobs {"test-job" {:status :success}}}
+            sid (st/ext-build-sid md)]
+        (is (st/sid? (st/create-build-metadata st md)))
+        (is (st/sid? (st/save-build-results st sid results)))
+        (let [r (sut/fetch-build-details st (st/ext-build-sid md))]
+          (is (some? (:jobs r)))
+          (is (= "test-cust" (:customer-id r)))
+          (is (true? (:legacy? r))))))))
+
+(deftest build->out
+  (testing "regular build"
+    (testing "converts jobs to sequential"
+      (is (sequential? (-> (sut/build->out {:script {:jobs {"test-job" {:id "test-job"}}}})
+                           :script
+                           :jobs))))
+
+    (testing "contains other properties"
+      (let [build {:customer-id "test-cust"
+                   :status :success}]
+        (is (= build (sut/build->out build))))))
+
+  (testing "legacy build"
+    (testing "converts jobs"
+      (is (= [{:id "test-job"}]
+             (-> {:legacy? true
+                  :jobs {"test-job" {:id "test-job"}}}
+                 (sut/build->out)
+                 :script
+                 :jobs))))
+
+    (testing "converts pipelines with jobs"
+      (is (= [{:id "test-job"
+               :labels {"pipeline" "test-pipeline"}}]
+             (-> {:pipelines {0
+                              {:name "test-pipeline"
+                               :jobs {0 {:name "test-job"}}}}
+                  :legacy? true}
+                 (sut/build->out)
+                 :script
+                 :jobs))))
+
+    (testing "converts pipelines with steps"
+      (is (= [{:id "test-job"
+               :labels {"pipeline" "test-pipeline"}}]
+             (-> {:pipelines {0
+                              {:name "test-pipeline"
+                               :steps {0 {:name "test-job"}}}}
+                  :legacy? true}
+                 (sut/build->out)
+                 :script
+                 :jobs))))
+
+    (testing "assigns id to job"
+      (is (= [{:id "test-pipeline-0"
+               :labels {"pipeline" "test-pipeline"}
+               :status :success}]
+             (-> {:pipelines {0
+                              {:name "test-pipeline"
+                               :jobs {0 {:status :success}}}}
+                  :legacy? true}
+                 (sut/build->out)
+                 :script
+                 :jobs))))
+
+    (testing "renames `timestamp` to `start-time`"
+      (let [ts (u/now)]
+        (is (= ts (-> {:legacy? true
+                       :timestamp ts}
+                      (sut/build->out)
+                      :start-time)))))
+
+    (testing "renames `result` to `status`"
+      (is (= :success
+             (-> {:legacy? true
+                  :result :success}
+                 (sut/build->out)
+                 :status))))))
 
 (deftest event-stream
   (testing "returns stream reply"

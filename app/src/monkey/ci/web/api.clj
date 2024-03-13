@@ -186,29 +186,61 @@
 (def update-ssh-keys
   (partial update-for-customer st/save-ssh-keys))
 
-(defn- fetch-build-details [s sid]
+(defn fetch-build-details [s sid]
   (log/debug "Fetching details for build" sid)
-  (when (st/build-exists? s sid)
-    (let [r (st/find-build-results s sid)
-          md (st/find-build-metadata s sid)]
-      (merge {:id (last sid)} md r))))
+  ;; TODO Remove this legacy stuff after a while
+  (if (st/legacy-build-exists? s sid)
+    (-> (st/find-build-metadata s sid)
+        (merge (st/find-build-results s sid))
+        (assoc :legacy? true))
+    (if (st/build-exists? s sid)
+      (st/find-build s sid))))
 
 (defn- add-index [[idx p]]
   (assoc p :index idx))
 
-(defn- pipelines->out [p]
+(defn- pipelines->out
+  "Converts legacy pipelines to job output format"
+  [p]
   (letfn [(with-index [v]
             (->> v
                  (map add-index)
-                 (sort-by :index)))]
+                 (sort-by :index)))
+          (rename-steps [p]
+            (mc/assoc-some p :jobs (:steps p)))
+          (assign-id [pn {:keys [name index] :as job}]
+            (-> job
+                (assoc :id (or name (str pn "-" index)))
+                (dissoc :name :index)))
+          (add-pipeline-lbl [n j]
+            (assoc-in j [:labels "pipeline"] n))
+          (convert-jobs [{:keys [jobs] n :name}]
+            (->> (with-index jobs)
+                 (map (partial assign-id n))
+                 (map (partial add-pipeline-lbl n))))]
     (->> (with-index p)
-         (map #(mc/update-existing % :steps with-index))
-         (map #(mc/update-existing % :jobs with-index)))))
+         (map rename-steps)
+         (mapcat convert-jobs))))
 
-(defn- fetch-details [s sid id]
+(defn build->out
+  "Converts build to output format.  This means converting legacy builds with pipelines,
+   jobs and regular builds with jobs."
+  [b]
+  (letfn [(convert-legacy [{:keys [jobs pipelines] :as b}]
+            (cond-> (dissoc b :jobs :pipelines :legacy? :timestamp :result)
+              true (mc/assoc-some :start-time (:timestamp b)
+                                  :status (:result b))
+              jobs (assoc-in [:script :jobs] (vals jobs))
+              pipelines (assoc-in [:script :jobs] (pipelines->out pipelines))))
+          (convert-regular [b]
+            (mc/update-existing-in b [:script :jobs] vals))]
+    (if (:legacy? b)
+      (convert-legacy b)
+      (convert-regular b))))
+
+(defn- fetch-and-convert [s sid id]
   (-> (fetch-build-details s (st/->sid (concat sid [id])))
-      (mc/update-existing :pipelines pipelines->out)
-      (mc/update-existing :jobs vals)))
+      (build->out)))
 
 (defn- get-builds*
   "Helper function that retrieves the builds using the request, then
@@ -220,7 +252,7 @@
     (->> builds
          (f)
          ;; TODO This is slow when there are many builds
-         (map (partial fetch-details s sid)))))
+         (map (partial fetch-and-convert s sid)))))
 
 (defn get-builds
   "Lists all builds for the repository"
@@ -233,7 +265,7 @@
   "Retrieves the latest build for the repository."
   [req]
   (if-let [r (-> req
-                 ;; TODO Sort by timestamp, instead of build id
+                 ;; This assumes the build name is time-based
                  (get-builds* (comp (partial take-last 1) sort))
                  first)]
     (rur/response r)
@@ -242,9 +274,10 @@
 (defn get-build
   "Retrieves build by id"
   [req]
-  (if-let [b (fetch-details (c/req->storage req)
-                            (repo-sid req)
-                            (get-in req [:parameters :path :build-id]))]
+  (if-let [b (fetch-and-convert
+              (c/req->storage req)
+              (repo-sid req)
+              (get-in req [:parameters :path :build-id]))]
     (rur/response b)
     (rur/not-found nil)))
 
@@ -258,7 +291,9 @@
       (some? tag)
       (str "refs/tags/" tag))))
 
-(defn make-build-ctx [{p :parameters :as req} bid]
+(defn make-build-ctx
+  "Creates a build object from the request"
+  [{p :parameters :as req} bid]
   (let [acc (:path p)
         st (c/req->storage req)
         repo (st/find-repo st (repo-sid req))
@@ -287,22 +322,16 @@
     (let [acc (:path p)
           bid (u/new-build-id)
           st (c/req->storage req)
-          md (-> acc
-                 (select-keys [:customer-id :repo-id])
-                 (assoc :build-id bid
-                        :source :api
-                        :timestamp (u/now)
-                        :ref (params->ref p))
-                 (merge (:query p)))
-          runner (c/from-rt req :runner)]
+          runner (c/from-rt req :runner)
+          build (make-build-ctx req bid)]
       (log/debug "Triggering build for repo sid:" (repo-sid req))
-      (if (st/create-build-metadata st md)
+      (if (st/save-build st build)
         (do
           ;; Trigger the build but don't wait for the result
-          (c/run-build-async (assoc (c/req->rt req) :build (make-build-ctx req bid)))
+          (c/run-build-async (assoc (c/req->rt req) :build build))
           (-> (rur/response {:build-id bid})
               (rur/status 202)))
-        (-> (rur/response {:message "Unable to create build metadata"})
+        (-> (rur/response {:message "Unable to create build"})
             (rur/status 500))))))
 
 (defn list-build-logs [req]
