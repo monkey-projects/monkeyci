@@ -73,10 +73,10 @@
       (is (= :build/end (-> @events first :type))))))
 
 (defn- test-webhook []
-  (zipmap [:id :dustomer-id :repo-id] (repeatedly st/new-id)))
+  (zipmap [:id :customer-id :repo-id] (repeatedly st/new-id)))
 
 (deftest create-build
-  (testing "creates metadata file for customer/project/repo"
+  (testing "creates build record for customer/repo"
     (h/with-memory-store s
       (let [wh (test-webhook)]
         (is (st/sid? (st/save-webhook-details s wh)))
@@ -85,11 +85,11 @@
                                    :payload {}})]
           (is (some? r))
           (is (p/obj-exists? s (-> wh
-                                   (select-keys [:customer-id :project-id :repo-id])
+                                   (select-keys [:customer-id :repo-id])
                                    (assoc :build-id (:build-id r))
-                                   (st/build-metadata-sid))))))))
+                                   (st/build-sid))))))))
 
-  (testing "metadata contains commit message"
+  (testing "build contains commit message"
     (h/with-memory-store s
       (let [wh (test-webhook)]
         (is (st/sid? (st/save-webhook-details s wh)))
@@ -97,12 +97,12 @@
                                   {:id (:id wh)
                                    :payload {:head-commit {:message "test message"}}})
               id (:sid r)
-              md (st/find-build-metadata s id)]
+              md (st/find-build s id)]
           (is (st/sid? id))
           (is (some? md))
-          (is (= "test message" (:message md)))))))
+          (is (= "test message" (get-in md [:git :message])))))))
 
-  (testing "adds timestamp as current epoch millis"
+  (testing "adds start time as current epoch millis"
     (h/with-memory-store s
       (let [wh (test-webhook)]
         (is (st/sid? (st/save-webhook-details s wh)))
@@ -110,10 +110,10 @@
                                   {:id (:id wh)
                                    :payload {:head-commit {:timestamp "2023-10-10"}}})
               id (:sid r)
-              md (st/find-build-metadata s id)]
+              md (st/find-build s id)]
           (is (st/sid? id))
           (is (some? md))
-          (is (number? (:timestamp md)))))))
+          (is (number? (:start-time md)))))))
   
   (testing "`nil` if no configured webhook found"
     (h/with-memory-store s
@@ -151,7 +151,7 @@
                                    :payload {:head-commit {:message "test message"
                                                            :timestamp "2023-10-10"}}})
               id (:sid r)
-              md (st/find-build-metadata s id)]
+              md (st/find-build s id)]
           (is (not (contains? md :secret-key)))))))
 
   (testing "adds payload ref to build"
