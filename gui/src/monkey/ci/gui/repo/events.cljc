@@ -5,6 +5,17 @@
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
+(def stream-id ::event-stream)
+
+(rf/reg-event-fx
+ :repo/init
+ (fn [{:keys [db]} _]
+   (let [cust-id (get-in (r/current db) [:parameters :path :customer-id])]
+     {:dispatch-n [[:repo/load cust-id]
+                   ;; Make sure we stop listening to events when we leave this page
+                   [:route/on-page-leave [:event-stream/stop stream-id]]
+                   [:event-stream/start stream-id [:repo/handle-event]]]})))
+
 (rf/reg-event-fx
  :repo/load
  (fn [{:keys [db]} [_ cust-id]]

@@ -124,3 +124,14 @@
     (testing "returns last reload time from db"
       (is (map? (reset! app-db (db/set-last-reload-time {} 543))))
       (is (= 543 @t)))))
+
+(deftest global-logs
+  (let [g (rf/subscribe [:build/global-logs])]
+    (testing "exists"
+      (is (some? g)))
+
+    (testing "returns logs without path"
+      (reset! app-db (db/set-logs {} [{:name "out.txt"}
+                                      {:name "test-job/out.txt"}]))
+      (is (= [{:name "out.txt"}]
+             @g)))))

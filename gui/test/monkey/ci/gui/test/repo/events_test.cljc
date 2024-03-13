@@ -105,19 +105,16 @@
              (db/builds @app-db)))))
 
   (testing "updates build list when build has completed"
-    (let [[cust repo build] (test-repo-path!)]
-      (is (some? (swap! app-db db/set-builds [{:customer-id cust
-                                               :repo-id repo
-                                               :build-id build}])))
-      (is (nil? (rf/dispatch-sync [:repo/handle-event {:type :build/completed
-                                                       :build {:customer-id cust
-                                                               :repo-id repo
-                                                               :build-id build
-                                                               :git {:ref "main"}
-                                                               :status :success}}])))
-      (is (= [{:customer-id cust
+    (let [[cust repo build] (test-repo-path!)
+          upd {:customer-id cust
                :repo-id repo
                :build-id build
                :git {:ref "main"}
                :status :success}]
+      (is (some? (swap! app-db db/set-builds [{:customer-id cust
+                                               :repo-id repo
+                                               :build-id build}])))
+      (is (nil? (rf/dispatch-sync [:repo/handle-event {:type :build/end
+                                                       :build upd}])))
+      (is (= [upd]
              (db/builds @app-db))))))

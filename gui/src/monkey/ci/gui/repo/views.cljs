@@ -45,13 +45,8 @@
                       :value (fn [b]
                                [:span.text-truncate (:message b)])}]}]]))))
 
-(def stream-id ::event-stream)
-
 (defn page [route]
-  (rf/dispatch [:repo/load (get-in route [:parameters :path :customer-id])])
-  ;; Make sure we stop listening to events when we leave this page
-  (rf/dispatch [:route/on-page-leave [:event-stream/stop stream-id]])
-  (rf/dispatch [:event-stream/start stream-id [:repo/handle-event]])
+  (rf/dispatch [:repo/init])
   (fn [route]
     (let [{:keys [customer-id repo-id] :as p} (get-in route [:parameters :path])
           r (rf/subscribe [:repo/info repo-id])]

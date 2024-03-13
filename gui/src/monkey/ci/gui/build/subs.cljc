@@ -45,3 +45,13 @@
  (fn [db _]
    (-> (db/current-log db)
        (add-line-breaks))))
+
+(defn global? [{n :name}]
+  (not (cs/includes? n "/")))
+
+(rf/reg-sub
+ :build/global-logs
+ :<- [:build/logs]
+ ;; Returns all logs that are not linked to a job
+ (fn [logs _]
+   (filter global? logs)))

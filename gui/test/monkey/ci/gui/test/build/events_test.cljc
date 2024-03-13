@@ -197,3 +197,82 @@
     (is (not (db/auto-reload? @app-db)))
     (rf/dispatch-sync [:build/auto-reload-changed true])
     (is (db/auto-reload? @app-db))))
+
+(defn- test-build []
+  (->> (repeatedly 3 (comp str random-uuid))
+       (zipmap [:customer-id :repo-id :build-id])))
+
+(def build-keys [:customer-id :repo-id :build-id])
+(def sid (apply juxt build-keys))
+
+(defn- set-build-path
+  "Updates the db route to match the build"
+  [db build]
+  (assoc-in db [:route/current :parameters :path]
+            (select-keys build build-keys)))
+
+(deftest handle-event
+  (testing "ignores events for other builds"
+    (let [build (test-build)
+          other-build (assoc build :build-id "other-build")
+          evt {:type :build/end
+               :sid (sid other-build)
+               :build other-build}]
+      (reset! app-db (-> {}
+                         (db/set-build build)
+                         (set-build-path build)))
+      (rf/dispatch-sync [:build/handle-event evt])
+      (is (= build (db/build @app-db)))))
+  
+  (testing "updates build on `build/end` event"
+    (let [build (test-build)
+          evt {:type :build/end
+               :sid (sid build)
+               :build (assoc build :status :success)}]
+      (reset! app-db (-> {}
+                         (db/set-build build)
+                         (set-build-path build)))
+      (rf/dispatch-sync [:build/handle-event evt])
+      (is (= :success (:status (db/build @app-db))))))
+
+  (letfn [(verify-script-updated [t]
+            (let [build (test-build)
+                  evt {:type t
+                       :sid (sid build)
+                       :script {:status :success}}]
+              (reset! app-db (-> {}
+                                 (db/set-build build)
+                                 (set-build-path build)))
+              (rf/dispatch-sync [:build/handle-event evt])
+              (is (= :success (-> (db/build @app-db)
+                                  :script
+                                  :status)))))]
+
+    (testing "updates build script on `script/start` event"
+      (verify-script-updated :script/start))
+
+    (testing "updates build script on `script/end` event"
+      (verify-script-updated :script/end)))
+
+  (letfn [(verify-job-updated [t]
+            (let [build (test-build)
+                  evt {:type t
+                       :sid (sid build)
+                       :job {:id "test-job"
+                             :key "value"}}]
+              (reset! app-db (-> {}
+                                 (db/set-build build)
+                                 (set-build-path build)))
+              (rf/dispatch-sync [:build/handle-event evt])
+              (is (= "value"
+                     (-> (db/build @app-db)
+                         :script
+                         :jobs
+                         (get "test-job")
+                         :key)))))]
+
+    (testing "updates build job on `job/start` event"
+      (verify-job-updated :job/start))
+
+    (testing "updates build job on `job/end` event"
+      (verify-job-updated :job/end))))

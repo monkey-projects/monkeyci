@@ -144,8 +144,7 @@
      [:td size]]))
 
 (defn logs-table []
-  ;; TODO Remove logs that are linked to a job
-  (let [l (rf/subscribe [:build/logs])]
+  (let [l (rf/subscribe [:build/global-logs])]
     [:table.table.table-striped
      [:thead
       [:tr
@@ -159,7 +158,7 @@
   (rf/dispatch [:build/load-logs])
   (fn [params]
     [:<>
-     [:h3.float-start "Captured Logs"]
+     [:h3.float-start "Global Logs"]
      [logs-table]]))
 
 (defn- auto-reload-check []
@@ -173,7 +172,7 @@
        [timer/timer ::auto-reload 5000 [:build/reload]])]))
 
 (defn page [route]
-  (rf/dispatch [:build/load])
+  (rf/dispatch [:build/init])
   (fn [route]
     (let [params (r/path-params route)
           repo (rf/subscribe [:repo/info (:repo-id params)])
