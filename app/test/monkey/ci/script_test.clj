@@ -198,6 +198,20 @@
       (is (= :job/start (:type (first @events))))
       (is (= :job/end (:type (second @events))))))
 
+    (let [events (atom [])
+          rt {:events {:poster (partial swap! events conj)}}
+          job (dummy-job)
+          f (sut/->EventFiringJob job)]
+      (is (some? @(j/execute! f rt)))
+      
+      (testing "start event has `start-time`"
+        (is (number? (-> @events first :job :start-time))))
+
+      (testing "end event has `start-time` and `end-time`"
+        (let [job (-> @events second :job)]
+          (is (number? (:start-time job)))
+          (is (number? (:end-time job))))))
+
   (testing "catches sync errors, returns failure"
     (let [events (atom [])
           rt {:events {:poster (partial swap! events conj)}}

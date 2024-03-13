@@ -34,6 +34,7 @@
 (defn- post-event [rt evt]
   (log/trace "Posting event:" evt)
   (if-let [c (get-in rt [:api :client])]
+    ;; TODO Check if this converts keys to keywords automatically
     (let [{:keys [status] :as r} @(martian/response-for c :post-event (script-evt evt rt))]
       (when-not (= 202 status)
         (log/warn "Failed to post event, got status" status)
@@ -55,7 +56,7 @@
 
 (defn- job-start-evt [{:keys [job]}]
   {:type :job/start
-   :job (-> (select-keys job [j/deps j/labels])
+   :job (-> (select-keys job [j/deps j/labels :start-time])
             (assoc :id (bc/job-id job)))
    :message "Job started"})
 
@@ -64,7 +65,7 @@
    :message "Job completed"
    :job (cond-> {:id (bc/job-id job)
                  :status (or status :success)}
-          true (merge (select-keys job [j/deps j/labels]))
+          true (merge (select-keys job [j/deps j/labels :start-time :end-time]))
           (some? exception) (assoc :message (or message (.getMessage exception))
                                    :stack-trace (u/stack-trace exception)))})
 
@@ -77,10 +78,12 @@
           handle-error (fn [ex]
                          (assoc bc/failure
                                 :exception ex
-                                :message (.getMessage ex)))]
+                                :message (.getMessage ex)))
+          st (u/now)]
       (log/debug "Executing event firing job:" (bc/job-id target))
       (md/chain
-       (rt/post-events rt (job-start-evt rt-with-job))
+       (rt/post-events rt (job-start-evt (-> rt-with-job
+                                             (assoc-in [:job :start-time] st))))
        (fn [_]
          ;; Catch both sync and async errors
          (try 
@@ -90,7 +93,10 @@
              (handle-error ex))))
        (fn [r]
          (md/chain
-          (rt/post-events rt (job-end-evt rt-with-job r))
+          (rt/post-events rt (job-end-evt (update rt-with-job :job assoc
+                                                  :start-time st
+                                                  :end-time (u/now))
+                                          r))
           (constantly r)))))))
 
 (defn- with-fire-events
