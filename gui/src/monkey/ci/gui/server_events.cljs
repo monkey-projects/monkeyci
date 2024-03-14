@@ -21,16 +21,17 @@
 (defn read-events
   "Creates an event source that reads from the events endpoint.  Dispatches an
    event using `on-recv-event` with the received message appended."
-  [cust-id on-recv-evt]
+  [cust-id token on-recv-evt]
   (if cust-id
     (do
       (println "Starting reading events for customer" cust-id)
-      ;; TODO Send security token as query arg
+      ;; Send security token as query arg.
       ;; Alternatively, and perhaps more secure, would be to add an extra endpoint where
       ;; the client can retrieve a short-lived "event token", only valid for events and
       ;; pass that here.  That way, the client wouldn't have to send its longer lived
       ;; token as query arg (which may be logged).
-      (let [src (js/EventSource. (str events-url "/customer/" cust-id "/events") (clj->js {}))]
+      (let [src (js/EventSource. (str events-url "/customer/" cust-id "/events?authorization=" token)
+                                 (clj->js {}))]
         (set! (.-onmessage src)
               (fn [evt]
                 (let [d (parse-edn (.-data evt))]
@@ -64,9 +65,10 @@
  [(rf/inject-cofx :event-stream/connector)]
  (fn [{:keys [db] :as ctx} [_ id cust-id handler-evt]]
    (println "Starting event stream:" id)
-   (let [conn (::connector ctx)]
+   (let [conn (::connector ctx)
+         token (:auth/token db)]
      {:db (set-stream-config db id {:handler-evt handler-evt
-                                    :source (conn cust-id handler-evt)})})))
+                                    :source (conn cust-id token handler-evt)})})))
 
 (rf/reg-event-fx
  :event-stream/stop
