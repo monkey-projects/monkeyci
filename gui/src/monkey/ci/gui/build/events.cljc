@@ -8,12 +8,12 @@
 
 (rf/reg-event-fx
  :build/init
- (fn [_ _]
+ (fn [{:keys [db]} _]
    {:dispatch-n [[:build/load]
                  ;; Make sure we stop listening to events when we leave this page
                  [:route/on-page-leave [:event-stream/stop stream-id]]
                  ;; TODO Only start reading events when the build has not finished yet
-                 [:event-stream/start stream-id [:build/handle-event]]]}))
+                 [:event-stream/start stream-id (r/customer-id db) [:build/handle-event]]]}))
 
 (defn load-logs-req [db]
   [:secure-request

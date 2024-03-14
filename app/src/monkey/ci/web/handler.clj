@@ -172,6 +172,9 @@
                     repo-ssh-keys-routes
                     build-routes]})])
 
+(def event-stream-routes
+  ["/events" {:get {:handler api/event-stream}}])
+
 (def customer-routes
   ["/customer"
    {:middleware [:customer-check]}
@@ -184,10 +187,8 @@
      :id-key :customer-id
      :child-routes [repo-routes
                     customer-parameter-routes
-                    customer-ssh-keys-routes]})])
-
-(def event-stream-routes
-  ["/events" {:get {:handler api/event-stream}}])
+                    customer-ssh-keys-routes
+                    event-stream-routes]})])
 
 (def github-routes
   ["/github" [["/login" {:post
@@ -222,7 +223,6 @@
    ["/version" {:get version}]
    webhook-routes
    customer-routes
-   event-stream-routes
    github-routes
    auth-routes
    user-routes])

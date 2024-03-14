@@ -363,6 +363,7 @@
 (defn event-stream
   "Sets up an event stream for the specified filter."
   [req]
+  ;; TODO Only send events for the customer specified in the url
   (let [recv (c/from-rt req rt/events-receiver)
         stream (ms/stream)
         make-reply (fn [evt]

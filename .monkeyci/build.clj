@@ -114,16 +114,17 @@
   "Creates a step that builds and uploads an image using kaniko"
   [{:keys [id dockerfile context image tag opts]}]
   (fn [ctx]
-    (let [wd (cond-> (shell/container-work-dir ctx)
-               context (str "/" context))]
+    (let [wd (shell/container-work-dir ctx)
+          ctx-dir (cond-> wd 
+                    context (str "/" context))]
       (core/container-job
        id
        (merge
         {:image "docker.io/monkeyci/kaniko:1.21.0"
          :script [(format "/kaniko/executor --dockerfile %s --destination %s --context dir://%s"
-                          (str wd "/" (or dockerfile "Dockerfile"))
+                          (str ctx-dir "/" (or dockerfile "Dockerfile"))
                           (str image ":" (or tag (image-version ctx)))
-                          wd)]
+                          ctx-dir)]
          ;; Set docker config credentials location
          :container/env {"DOCKER_CONFIG" (str wd "/.docker")}
          :restore-artifacts [image-creds-artifact]
