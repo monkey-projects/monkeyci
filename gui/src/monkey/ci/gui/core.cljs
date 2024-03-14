@@ -11,20 +11,13 @@
             [re-frame.core :as rf]
             [re-frame.db :refer [app-db]]))
 
-(defonce app-root (atom nil))
-
 (defn ^:dev/after-load reload []
-  (when @app-root
-    (println "Reloading application")
-    ;; If we do this, parts of the application no longer work after reloading
-    ;; But also we need to refresh when we modify subs...
-    #_(rf/clear-subscription-cache!)
-    (rd/render @app-root [p/render])))
+  (let [root (rd/create-root (.getElementById js/document "root"))]
+    (rf/clear-subscription-cache!)
+    (rd/render root [p/render])))
 
 (defn init []
-  (let [root (rd/create-root (.getElementById js/document "root"))]
-    (reset! app-root root)
-    (routing/start!)
-    (rf/dispatch-sync [:initialize-db])
-    (m/init)
-    (reload)))
+  (routing/start!)
+  (rf/dispatch-sync [:initialize-db])
+  (m/init)
+  (reload))

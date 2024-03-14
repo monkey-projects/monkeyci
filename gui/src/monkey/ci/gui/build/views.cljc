@@ -183,7 +183,7 @@
          [:h2.float-start (:name @repo) " - " (:build-id params)]
          [:div.float-end
           [co/reload-btn [:build/reload] (when @reloading? {:disabled true})]
-          [auto-reload-check]]]
+          #_[auto-reload-check]]]
         [co/alerts [:build/alerts]]
         [build-details]
         [build-jobs]

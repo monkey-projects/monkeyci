@@ -31,6 +31,7 @@
      [:p "No page exists for route " [:b (str (get-in route [:data :name]))]]]))
 
 (defn render []
+  (println "Rendering...")
   (let [r (rf/subscribe [:route/current])
         t (rf/subscribe [:login/token])]
     ;; If no token found, redirect to login
