@@ -139,12 +139,19 @@
     :opts {:restore-artifacts [uberjar-artifact image-creds-artifact]
            :dependencies ["image-creds" "app-uberjar"]}}))
 
+(def gui-release-artifact
+  {:id "gui-release"
+   :path "resources/public/js"})
+
 (def build-gui-image
   (kaniko-build-img
    {:id "publish-gui-img"
     :context "gui"
     :image gui-img
-    :opts {:dependencies ["image-creds" "release-gui"]}}))
+    ;; Restore artifacts but modify the path because work dir is not the same
+    :opts {:restore-artifacts [(update gui-release-artifact :path (partial str "gui/"))
+                               image-creds-artifact]
+           :dependencies ["image-creds" "release-gui"]}}))
 
 (defn publish [ctx id dir]
   "Executes script in clojure container that has clojars publish env vars"
@@ -179,7 +186,8 @@
 (defn build-gui-release [ctx]
   (when (should-publish? ctx)
     (-> (shadow-release "release-gui" :frontend)
-        (core/depends-on ["test-gui"]))))
+        (core/depends-on ["test-gui"])
+        (assoc :save-artifacts [gui-release-artifact]))))
 
 ;; List of jobs
 [test-app

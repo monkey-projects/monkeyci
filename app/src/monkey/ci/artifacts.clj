@@ -39,6 +39,8 @@
 (defn save-blob
   "Saves a single blob path"
   [{:keys [build-path store-key]} rt {:keys [path id]}]
+  ;; TODO Make paths relative to checkout dir because using job work dir can be wroing
+  ;; when the work dir of the saving job is not the same as the restoring job.
   (let [fullp (b/job-relative-dir rt path)]
     (log/debug "Saving blob:" id "at path" path "(full path:" fullp ")")
     (md/chain

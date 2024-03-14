@@ -340,7 +340,9 @@
           _ (ms/consume (partial swap! sent conj) (:body f))]
       (is (some? (ec/post-events evt {:type :script/start})))
       (is (not= :timeout (h/wait-until #(not-empty @sent) 1000)))
-      (is (string? (first @sent))))))
+      (is (string? (first @sent)))))
+
+  (testing "only sends events for customer specified in path"))
 
 (deftest make-build-ctx
   (testing "adds ref to build from branch query param"
