@@ -38,8 +38,9 @@
 
     (testing "returns build jobs as list"
       (is (some? (reset! app-db (db/set-build {} {:script
-                                                  {:jobs [{:id "test-job"
-                                                           :status :success}]}}))))
+                                                  {:jobs {"test-job"
+                                                          {:id "test-job"
+                                                           :status :success}}}}))))
       (is (= [{:id "test-job"
                :status :success
                :logs []}]
@@ -49,7 +50,8 @@
       (is (map? (reset! app-db (-> {}
                                    (db/set-build
                                     {:script
-                                     {:jobs [{:id "test-job"}]}})
+                                     {:jobs {"test-job"
+                                             {:id "test-job"}}}})
                                    (db/set-logs
                                     [{:name "test-job/out.txt" :size 100}
                                      {:name "test-job/err.txt" :size 50}])))))

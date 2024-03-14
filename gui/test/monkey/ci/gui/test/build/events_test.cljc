@@ -90,13 +90,20 @@
   (testing "clears alerts"
     (is (map? (reset! app-db (db/set-alerts {} [{:type :info
                                                  :message "test notification"}]))))
-    (rf/dispatch-sync [:build/load--success {:body []}])
+    (rf/dispatch-sync [:build/load--success {:body {}}])
     (is (nil? (db/alerts @app-db))))
 
   (testing "clears build reload flag"
     (is (map? (reset! app-db (db/set-reloading {} #{:build}))))
-    (rf/dispatch-sync [:build/load--success {:body []}])
-    (is (not (db/reloading? @app-db)))))
+    (rf/dispatch-sync [:build/load--success {:body {}}])
+    (is (not (db/reloading? @app-db))))
+
+  (testing "converts build jobs to map"
+    (rf/dispatch-sync [:build/load--success {:body {:script
+                                                    {:jobs [{:id "test-job"}]}}}])
+    (is (= {:script
+            {:jobs {"test-job" {:id "test-job"}}}}
+           (db/build @app-db)))))
 
 (deftest build-load--failed
   (testing "sets error"
@@ -223,17 +230,34 @@
                          (set-build-path build)))
       (rf/dispatch-sync [:build/handle-event evt])
       (is (= build (db/build @app-db)))))
-  
-  (testing "updates build on `build/end` event"
-    (let [build (test-build)
-          evt {:type :build/end
-               :sid (sid build)
-               :build (assoc build :status :success)}]
-      (reset! app-db (-> {}
-                         (db/set-build build)
-                         (set-build-path build)))
-      (rf/dispatch-sync [:build/handle-event evt])
-      (is (= :success (:status (db/build @app-db))))))
+
+  (testing "`build/end` event"
+    (testing "updates build"
+      (let [build (test-build)
+            evt {:type :build/end
+                 :sid (sid build)
+                 :build (assoc build :status :success)}]
+        (reset! app-db (-> {}
+                           (db/set-build build)
+                           (set-build-path build)))
+        (rf/dispatch-sync [:build/handle-event evt])
+        (is (= :success (:status (db/build @app-db))))))
+
+    (testing "leaves existing script info intact"
+      (let [script {:jobs {"test-job" {:status :success}}}
+            build (assoc (test-build) :script script)
+            evt {:type :build/end
+                 :sid (sid build)
+                 :build (-> build
+                            (assoc :status :success)
+                            (dissoc :script))}]
+        (reset! app-db (-> {}
+                           (db/set-build build)
+                           (set-build-path build)))
+        (rf/dispatch-sync [:build/handle-event evt])
+        (let [updated (db/build @app-db)]
+          (is (= :success (:status updated)))
+          (is (= script (:script updated)))))))
 
   (letfn [(verify-script-updated [t]
             (let [build (test-build)

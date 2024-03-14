@@ -17,6 +17,7 @@
  (fn [{:keys [db]} [_ match]]
    (println "Changing current route from" (current db) "into" match)
    (let [handlers (on-page-leave db)]
+     (println "Found" (count handlers) "leave handlers")
      (cond-> {:db (-> db
                       (assoc current match)
                       (dissoc on-page-leave))}

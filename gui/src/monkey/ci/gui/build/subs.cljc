@@ -22,8 +22,9 @@
       (assoc :path (:name l))
       (update :name (comp last split-log-path))))
 
-(defn- jobs-with-logs [{:keys [jobs]} logs]
-  (let [logs-by-id (group-by (comp first split-log-path :name) logs)]
+(defn- jobs-with-logs [b logs]
+  (let [jobs (-> b :script :jobs vals)
+        logs-by-id (group-by (comp first split-log-path :name) logs)]
     (letfn [(add-job-logs [{:keys [id] :as job}]
               (assoc job :logs (->> (get logs-by-id id)
                                     (map strip-prefix))))]
@@ -34,7 +35,7 @@
  :<- [:build/current]
  :<- [:build/logs]
  (fn [[b logs] _]
-   (jobs-with-logs (:script b) logs)))
+   (jobs-with-logs b logs)))
 
 (defn- add-line-breaks [s]
   (->> (cs/split-lines s)

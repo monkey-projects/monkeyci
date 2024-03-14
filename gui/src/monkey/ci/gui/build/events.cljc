@@ -12,6 +12,7 @@
    {:dispatch-n [[:build/load]
                  ;; Make sure we stop listening to events when we leave this page
                  [:route/on-page-leave [:event-stream/stop stream-id]]
+                 ;; TODO Only start reading events when the build has not finished yet
                  [:event-stream/start stream-id [:build/handle-event]]]}))
 
 (defn load-logs-req [db]
@@ -62,11 +63,23 @@
             (db/set-build nil))
     :dispatch (load-build-req db)}))
 
+(defn- convert-build
+  "Builds received from requests are slightly different from those received as events.
+   The jobs are in a vector instead of a map.  This function converts the received build
+   in event format."
+  [build]
+  (letfn [(to-map [jobs]
+            (reduce (fn [r j]
+                      (assoc r (:id j) j))
+                    {}
+                    jobs))]
+    (update-in build [:script :jobs] to-map)))
+
 (rf/reg-event-db
  :build/load--success
  (fn [db [_ {build :body}]]
    (-> db
-       (db/set-build build)
+       (db/set-build (convert-build build))
        (db/reset-alerts)
        (db/clear-build-reloading))))
 
@@ -133,7 +146,10 @@
 (defmulti handle-event (fn [_ evt] (:type evt)))
 
 (defmethod handle-event :build/end [db evt]
-  (db/set-build db (:build evt)))
+  ;; Update build but leave existing script info intact, because the event
+  ;; does not contain this.
+  (db/update-build db (fn [b]
+                        (merge (:build evt) (select-keys b [:script])))))
 
 (defn- update-script [db script]
   (db/update-build db assoc :script script))

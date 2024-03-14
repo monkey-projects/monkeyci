@@ -19,7 +19,6 @@
   [on-recv-evt]
   (println "Starting reading events")
   (let [src (js/EventSource. (str m/url "/events") (clj->js {}))]
-    (println "Event source:" src)
     (set! (.-onmessage src)
           (fn [evt]
             (let [d (parse-edn (.-data evt))]
@@ -51,6 +50,7 @@
  :event-stream/start
  [(rf/inject-cofx :event-stream/connector)]
  (fn [{:keys [db] :as ctx} [_ id handler-evt]]
+   (println "Starting event stream:" id)
    (let [conn (::connector ctx)]
      {:db (set-stream-config db id {:handler-evt handler-evt
                                     :source (conn handler-evt)})})))
@@ -58,5 +58,6 @@
 (rf/reg-event-fx
  :event-stream/stop
  (fn [{:keys [db]} [_ id]]
+   (println "Stopping event stream:" id)
    {:db (update db ::event-stream dissoc id)
     :event-stream/close (:source (stream-config db id))}))

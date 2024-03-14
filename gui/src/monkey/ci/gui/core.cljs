@@ -17,6 +17,7 @@
   (when @app-root
     (println "Reloading application")
     ;; If we do this, parts of the application no longer work after reloading
+    ;; But also we need to refresh when we modify subs...
     #_(rf/clear-subscription-cache!)
     (rd/render @app-root [p/render])))
 
