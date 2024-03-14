@@ -34,6 +34,7 @@
 (defn- post-event [rt evt]
   (log/trace "Posting event:" evt)
   (if-let [c (get-in rt [:api :client])]
+    ;; TODO Check if this converts keys to keywords automatically
     (let [{:keys [status] :as r} @(martian/response-for c :post-event (script-evt evt rt))]
       (when-not (= 202 status)
         (log/warn "Failed to post event, got status" status)
@@ -54,20 +55,19 @@
       (apply w rt more))))
 
 (defn- job-start-evt [{:keys [job]}]
-  (-> {:type :job/start
-       :id (bc/job-id job)
-       :message "Job started"}
-      (merge (select-keys job [j/deps j/labels]))))
+  {:type :job/start
+   :job (-> (select-keys job [j/deps j/labels :start-time])
+            (assoc :id (bc/job-id job)))
+   :message "Job started"})
 
 (defn- job-end-evt [{:keys [job]} {:keys [status message exception]}]
-  (cond-> {:type :job/end
-           :message (or message
-                        "Job completed")
-           :id (bc/job-id job)
-           :status (or status :success)}
-    true (merge (select-keys job [j/deps j/labels]))
-    (some? exception) (assoc :message (.getMessage exception)
-                             :stack-trace (u/stack-trace exception))))
+  {:type :job/end
+   :message "Job completed"
+   :job (cond-> {:id (bc/job-id job)
+                 :status (or status :success)}
+          true (merge (select-keys job [j/deps j/labels :start-time :end-time]))
+          (some? exception) (assoc :message (or message (.getMessage exception))
+                                   :stack-trace (u/stack-trace exception)))})
 
 ;; Wraps a job so it fires an event before and after execution, and also
 ;; catches any exceptions.
@@ -76,10 +76,14 @@
   (execute! [job rt]
     (let [rt-with-job (assoc rt :job target)
           handle-error (fn [ex]
-                         (assoc bc/failure :exception ex))]
+                         (assoc bc/failure
+                                :exception ex
+                                :message (.getMessage ex)))
+          st (u/now)]
       (log/debug "Executing event firing job:" (bc/job-id target))
       (md/chain
-       (rt/post-events rt (job-start-evt rt-with-job))
+       (rt/post-events rt (job-start-evt (-> rt-with-job
+                                             (assoc-in [:job :start-time] st))))
        (fn [_]
          ;; Catch both sync and async errors
          (try 
@@ -89,7 +93,10 @@
              (handle-error ex))))
        (fn [r]
          (md/chain
-          (rt/post-events rt (job-end-evt rt-with-job r))
+          (rt/post-events rt (job-end-evt (update rt-with-job :job assoc
+                                                  :start-time st
+                                                  :end-time (u/now))
+                                          r))
           (constantly r)))))))
 
 (defn- with-fire-events
@@ -111,6 +118,7 @@
              true (map with-fire-events))]
     (log/debug "Found" (count pf) "matching jobs:" (map bc/job-id pf))
     (let [result @(j/execute-jobs! pf rt)]
+      (log/debug "Jobs executed, result is:" result)
       {:status (if (every? (comp bc/success? :result) (vals result)) :success :failure)
        :jobs result})))
 
@@ -185,29 +193,34 @@
         (in-ns 'monkey.ci.script)
         (remove-ns tmp-ns)))))
 
-(defn- with-script-dir [{:keys [script-dir] :as ctx} evt]
-  (-> (assoc evt :dir script-dir)
-      (script-evt ctx)))
+(defn- with-script-evt
+  "Creates an skeleton event with the script and invokes `f` on it"
+  [rt f]
+  (f {:script (-> rt rt/build build/script)}))
 
-(defn- script-started-evt [rt _]
-  (with-script-dir rt
-    {:type :script/start
-     :message "Script started"}))
+(defn- script-start-evt [rt _]
+  (with-script-evt rt
+    #(assoc %
+            :type :script/start
+            :message "Script started")))
 
-(defn- script-completed-evt [rt jobs res]
-  (with-script-dir rt
-    {:type :script/end
-     :message "Script completed"
-     ;; Add individual job results and dependencies, useful feedback to frontend
-     :jobs (mc/map-vals (fn [r]
-                          (-> {:result (select-keys (:result r) [:status :message])}
-                              (merge (select-keys (:job r) [j/deps j/labels]))))
-                        (:jobs res))}))
+(defn- script-end-evt [rt jobs res]
+  (with-script-evt rt
+    (fn [evt]
+      (-> evt 
+          (assoc :type :script/end
+                 :message "Script completed")
+          ;; FIXME Jobs don't contain all info here, as they should (like start and end time)
+          (assoc-in [:script :jobs]
+                    (mc/map-vals (fn [r]
+                                   (-> (select-keys (:result r) [:status :message])
+                                       (merge (select-keys (:job r) [j/deps j/labels]))))
+                                 (:jobs res)))))))
 
 (def run-all-jobs*
   (wrapped run-all-jobs
-           script-started-evt
-           script-completed-evt))
+           script-start-evt
+           script-end-evt))
 
 (defn- assign-ids
   "Assigns an id to each job that does not have one already."
@@ -234,7 +247,7 @@
    this same process."
   [rt]
   (let [build-id (build/get-build-id rt)
-        script-dir (build/script-dir rt)
+        script-dir (build/rt->script-dir rt)
         ;; Manually add events poster
         ;; This will be removed when events are reworked to be more generic
         rt (assoc-in rt [:events :poster] (partial post-event rt))]
@@ -248,6 +261,11 @@
         (run-all-jobs* rt jobs))
       (catch Exception ex
         (log/error "Unable to load build script" ex)
-        (post-event rt {:type :script/end
-                        :message (.getMessage ex)})
-        bc/failure))))
+        (let [msg ((some-fn (comp ex-message ex-cause)
+                            ex-message) ex)]
+          (post-event rt {:type :script/end
+                          :script (-> rt rt/build build/script)
+                          :message msg})
+          (assoc bc/failure
+                 :message msg
+                 :exception ex))))))

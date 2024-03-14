@@ -12,3 +12,8 @@
   (c/load-config! "staging.edn")
   (c/load-config! "github/staging.edn")
   (server/start-server))
+
+(defn start-local []
+  (c/load-config! "local.edn")
+  (c/load-config! "github/staging.edn")
+  (server/start-server))

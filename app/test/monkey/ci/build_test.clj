@@ -37,6 +37,7 @@
            (-> {:config {:args {:dir "test-script"}
                          :work-dir "work-dir"}}
                (sut/make-build-ctx)
+               sut/script
                :script-dir))))
 
   (testing "with git opts"
@@ -60,6 +61,7 @@
                           :dir "test-script"}
                    :work-dir "work"}}
                  (sut/make-build-ctx)
+                 sut/script
                  :script-dir)))))
 
   (testing "when sid specified"
@@ -92,13 +94,13 @@
                       (sut/make-build-ctx)
                       :sid))))))
 
-(deftest checkout-dir
+(deftest calc-checkout-dir
   (testing "combines build id with checkout base dir from config"
     (let [rt {:config {:checkout-base-dir "/tmp/checkout-base"}
               :build {:build-id "test-build"}}]
       (is (= "/tmp/checkout-base" ((rt/from-config :checkout-base-dir) rt)))
       (is (= "/tmp/checkout-base/test-build"
-             (sut/checkout-dir rt))))))
+             (sut/calc-checkout-dir rt))))))
 
 (deftest get-sid
   (testing "returns build sid"
@@ -138,3 +140,22 @@
     (is (= "/checkout/job-dir"
            (sut/job-work-dir {:job {:work-dir "job-dir"}
                               :build {:checkout-dir "/checkout"}})))))
+
+(deftest build-end-evt
+  (testing "creates build/end event with status completed"
+    (let [build {:build-id "test-build"}
+          evt (sut/build-end-evt build 0)]
+      (is (= :build/end (:type evt)))
+      (is (= "test-build" (get-in evt [:build :build-id])))))
+
+  (testing "sets status according to exit"
+    (is (= :success
+           (-> (sut/build-end-evt {} 0)
+               (get-in [:build :status]))))
+    (is (= :error
+           (-> (sut/build-end-evt {} 1)
+               (get-in [:build :status])))))
+
+  (testing "does not set status when no exit"
+    (is (nil? (-> (sut/build-end-evt {} nil)
+                  (get-in [:build :status]))))))

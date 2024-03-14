@@ -18,6 +18,9 @@
 (defn set-build [db l]
   (assoc db build l))
 
+(defn update-build [db f & args]
+  (apply update db build f args))
+
 (def reloading ::reloading)
 
 (defn set-reloading

@@ -148,3 +148,6 @@
     (if (.exists f)
       (slurp f)
       x)))
+
+(defn now []
+  (System/currentTimeMillis))

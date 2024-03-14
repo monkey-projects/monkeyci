@@ -46,7 +46,8 @@
                 fullp
                 (build-path rt id))
      (fn [{:keys [dest entries] :as r}]
-       (log/debugf "Zipped %d entries to %s (%.2f MB)" (count entries) dest (mb dest))
+       (when r
+         (log/debugf "Zipped %d entries to %s (%.2f MB)" (count entries) dest (mb dest)))
        r))))
 
 (defn save-generic [rt conf]
@@ -73,7 +74,8 @@
                      (fs/canonicalize)
                      (str)))
    (fn [{:keys [entries src dest] :as r}]
-     (log/debugf "Unzipped %d entries from %s (%.2f MB) to %s" (count entries) src (mb src) dest)
+     (when r
+       (log/debugf "Unzipped %d entries from %s (%.2f MB) to %s" (count entries) src (mb src) dest))
      r)))
 
 (defn restore-generic [rt conf]

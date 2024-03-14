@@ -37,55 +37,27 @@
       (is (some? jobs)))
 
     (testing "returns build jobs as list"
-      (is (some? (reset! app-db (db/set-build {} {:jobs [{:id "test-job"
-                                                          :result {:status :success}}]}))))
+      (is (some? (reset! app-db (db/set-build {} {:script
+                                                  {:jobs {"test-job"
+                                                          {:id "test-job"
+                                                           :status :success}}}}))))
       (is (= [{:id "test-job"
-               :result {:status :success}
+               :status :success
                :logs []}]
              @jobs)))
 
     (testing "adds logs by job id"
       (is (map? (reset! app-db (-> {}
                                    (db/set-build
-                                    {:jobs [{:id "test-job"
-                                             :result {:status :success}}]})
+                                    {:script
+                                     {:jobs {"test-job"
+                                             {:id "test-job"}}}})
                                    (db/set-logs
                                     [{:name "test-job/out.txt" :size 100}
                                      {:name "test-job/err.txt" :size 50}])))))
       (is (= [{:name "out.txt" :size 100 :path "test-job/out.txt"}
               {:name "err.txt" :size 50 :path "test-job/err.txt"}]
-             (-> @jobs first :logs))))
-
-    (testing "legacy pipelines"
-
-      (testing "returns steps as list"
-        (is (some? (reset! app-db (db/set-build
-                                   {}
-                                   {:pipelines [{:name "test-pipeline"
-                                                 :steps [{:index 0}]}]}))))
-        (is (= [{:index 0
-                 :id "test-pipeline-0"
-                 :labels {"pipeline" "test-pipeline"}
-                 :logs []}]
-               @jobs)))
-
-      (testing "adds logs for step according to path"
-        (is (map? (reset! app-db (-> {}
-                                     (db/set-build
-                                      {:id "test-build"
-                                       :pipelines
-                                       [{:index 0
-                                         :name "test-pipeline"
-                                         :steps
-                                         [{:index 0}]}]})
-                                     (db/set-logs
-                                      [{:name "test-pipeline/0/out.txt"
-                                        :size 100}
-                                       {:name "test-pipeline/0/err.txt"
-                                        :size 50}])))))
-        (is (= [{:name "out.txt" :size 100 :path "test-pipeline/0/out.txt"}
-                {:name "err.txt" :size 50 :path "test-pipeline/0/err.txt"}]
-               (-> @jobs first :logs)))))))
+             (-> @jobs first :logs))))))
 
 (deftest reloading?
   (let [r (rf/subscribe [:build/reloading?])]
@@ -137,15 +109,6 @@
       (is (map? (reset! app-db (db/set-log-path {} "test-path"))))
       (is (= "test-path" @c)))))
 
-(deftest auto-reload?
-  (let [c (rf/subscribe [:build/auto-reload?])]
-    (testing "exists"
-      (is (some? c)))
-
-    (testing "returns true when auto reloading"
-      (is (map? (reset! app-db (db/set-auto-reload {} true))))
-      (is (true? @c)))))
-
 (deftest last-reload-time
   (let [t (rf/subscribe [:build/last-reload-time])]
     (testing "exists"
@@ -154,3 +117,14 @@
     (testing "returns last reload time from db"
       (is (map? (reset! app-db (db/set-last-reload-time {} 543))))
       (is (= 543 @t)))))
+
+(deftest global-logs
+  (let [g (rf/subscribe [:build/global-logs])]
+    (testing "exists"
+      (is (some? g)))
+
+    (testing "returns logs without path"
+      (reset! app-db (db/set-logs {} [{:name "out.txt"}
+                                      {:name "test-job/out.txt"}]))
+      (is (= [{:name "out.txt"}]
+             @g)))))

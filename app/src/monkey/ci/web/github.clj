@@ -75,36 +75,33 @@
     (let [{:keys [master-branch clone-url ssh-url private]} (:repository payload)
           build-id (u/new-build-id)
           commit-id (get-in payload [:head-commit :id])
-          md (-> details
-                 (dissoc :id :secret-key)
-                 (assoc :webhook-id id
-                        :build-id build-id
-                        :commit-id commit-id
-                        :source :github
-                        ;; Do not use the commit timestamp, because when triggered from a tag
-                        ;; this is still the time of the last commit, not of the tag creation.
-                        :timestamp (System/currentTimeMillis))
-                 (merge (-> payload
-                            :head-commit
-                            (select-keys [:message :author])))
-                 (merge (select-keys payload [:ref])))
           ssh-keys (find-ssh-keys st details)
-          build {:git (-> {:url (if private ssh-url clone-url)
-                           :main-branch master-branch
-                           :ref (:ref payload)
-                           :commit-id commit-id
-                           :ssh-keys-dir (rt/ssh-keys-dir rt build-id)}
-                          (mc/assoc-some :ssh-keys ssh-keys))
-                 :sid (s/ext-build-sid md) ; Build storage id
-                 :build-id build-id
-                 :cleanup? true}]
-      (when (s/create-build-metadata st md)
-        build))
+          build (-> (select-keys details [:customer-id :repo-id])
+                    (assoc :git (-> payload
+                                    :head-commit
+                                    (select-keys [:message :author])
+                                    (assoc :url (if private ssh-url clone-url)
+                                           :main-branch master-branch
+                                           :ref (:ref payload)
+                                           :commit-id commit-id
+                                           :ssh-keys-dir (rt/ssh-keys-dir rt build-id))
+                                    (mc/assoc-some :ssh-keys ssh-keys))
+                           :source :github
+                           ;; Do not use the commit timestamp, because when triggered from a tag
+                           ;; this is still the time of the last commit, not of the tag creation.
+                           :start-time (u/now)
+                           :status :running
+                           :build-id build-id
+                           :webhook-id id
+                           :cleanup? true))]
+      (when (s/save-build st build)
+        ;; Add the sid, cause it's used downstream
+        (assoc build :sid (s/ext-build-sid build))))
     (log/warn "No webhook configuration found for" id)))
 
 (defn webhook
-  "Receives an incoming webhook from Github.  This actually just posts
-   the event on the internal bus and returns a 200 OK response."
+  "Receives an incoming webhook from Github.  This starts the build
+   runner async and returns a 202 accepted."
   [{p :parameters :as req}]
   (log/trace "Got incoming webhook with body:" (prn-str (:body p)))
   (if (github-commit-trigger? req)

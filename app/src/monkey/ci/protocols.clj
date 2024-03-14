@@ -15,4 +15,8 @@
   "Able to resolve into jobs (zero or more)"
   (resolve-jobs [x rt]))
 
+(defprotocol EventBuilder
+  "Used to construct an event from an object"
+  (->event [this event-type]))
+
 ;; TODO Add others

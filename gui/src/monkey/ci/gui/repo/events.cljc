@@ -5,6 +5,17 @@
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
+(def stream-id ::event-stream)
+
+(rf/reg-event-fx
+ :repo/init
+ (fn [{:keys [db]} _]
+   (let [cust-id (get-in (r/current db) [:parameters :path :customer-id])]
+     {:dispatch-n [[:repo/load cust-id]
+                   ;; Make sure we stop listening to events when we leave this page
+                   [:route/on-page-leave [:event-stream/stop stream-id]]
+                   [:event-stream/start stream-id [:repo/handle-event]]]})))
+
 (rf/reg-event-fx
  :repo/load
  (fn [{:keys [db]} [_ cust-id]]
@@ -43,16 +54,12 @@
 (defmulti handle-event (fn [_ evt] (:type evt)))
 
 (defn- update-build [db build]
-  (let [{[cust-id repo-id build-id] :sid} build]
-    (db/update-build db (-> (select-keys build [:ref :result])
-                            (assoc :customer-id cust-id
-                                   :repo-id repo-id
-                                   :build-id build-id)))))
+  (db/update-build db build))
 
 (defmethod handle-event :build/start [db evt]
   (update-build db (:build evt)))
 
-(defmethod handle-event :build/completed [db evt]
+(defmethod handle-event :build/end [db evt]
   (update-build db (:build evt)))
 
 (defmethod handle-event :default [db evt]
@@ -60,11 +67,11 @@
   db)
 
 (defn- for-repo? [db evt]
-  (let [as-sid (juxt :customer-id :repo-id)]
-    (= (take 2 (get-in evt [:build :sid]))
+  (let [get-id (juxt :customer-id :repo-id)]
+    (= (get-id (:build evt))
        (-> (r/current db)
            (r/path-params)
-           (as-sid)))))
+           (get-id)))))
 
 (rf/reg-event-db
  :repo/handle-event

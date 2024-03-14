@@ -86,15 +86,43 @@
     (with-open [r (io/reader s)]
       (json/parse-stream r csk/->kebab-case-keyword))))
 
+#_(defn prepare-build-trigger
+  "Creates the build information after a trigger, either from api, webhook, or other
+   source."
+  [req]
+  (let [{p :parameters} req]
+    ;; TODO If no branch is specified, use the default
+    (let [acc (:path p)
+          bid (u/new-build-id)
+          st (c/req->storage req)
+          md (-> acc
+                 (select-keys [:customer-id :repo-id])
+                 (assoc :build-id bid
+                        :source :api
+                        :timestamp (u/now)
+                        :ref (params->ref p))
+                 (merge (:query p)))
+          runner (c/from-rt req :runner)]
+      (log/debug "Triggering build for repo sid:" (repo-sid req))
+      (if (st/create-build-metadata st md)
+        (do
+          ;; Trigger the build but don't wait for the result
+          (c/run-build-async (assoc (c/req->rt req) :build (make-build-ctx req bid)))
+          (-> (rur/response {:build-id bid})
+              (rur/status 202)))
+        (-> (rur/response {:message "Unable to create build metadata"})
+            (rur/status 500))))))
+
 (defn run-build-async
   "Starts the build in a new thread"
   [rt]
   (let [runner (rt/runner rt)
         report-error (fn [ex]
                        (log/error "Unable to start build:" ex)
-                       (rt/post-events rt (b/build-completed-evt (rt/build rt)
-                                                                 1
-                                                                 :exception ex)))]
+                       (rt/post-events rt (b/build-completed-evt
+                                           (-> (rt/build rt)
+                                               (assoc :status :error
+                                                      :message (ex-message ex))))))]
     (md/future
       (try
         ;; Catch both the deferred error, or the direct exception, because both

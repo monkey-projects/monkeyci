@@ -14,30 +14,34 @@
   (with-redefs [p/execute! (constantly (md/success-deferred {:exit 0}))]
 
     (testing "returns a deferred that waits for build to complete"
-      (is (md/deferred? (sut/build-local {:build {:script-dir "examples/basic-clj"}}))))
+      (is (md/deferred? (sut/build-local {:build
+                                          {:script
+                                           {:script-dir "examples/basic-clj"}}}))))
     
     (testing "when script not found"
       (testing "returns exit code 1"
-        (is (= 1 (-> {:build {:script-dir "nonexisting"}}
+        (is (= 1 (-> {:build
+                      {:script {:script-dir "nonexisting"}}}
                      (sut/build-local)
                      (deref)))))
 
-      (testing "fires `:build/completed` event with error result"
+      (testing "fires `:build/end` event with error status"
         (let [events (atom [])]
-          (is (some? (-> {:build {:script-dir "nonexisting"}
+          (is (some? (-> {:build
+                          {:script {:script-dir "nonexisting"}}
                           :events {:poster (partial swap! events conj)}}
                          (sut/build-local)
                          (deref))))
           (is (not-empty @events))
           (let [m (->> @events
-                       (filter (comp (partial = :build/completed) :type))
+                       (filter (comp (partial = :build/end) :type))
                        (first))]
             (is (some? m))
-            (is (= :error (:result m)))))))
+            (is (= :error (get-in m [:build :status])))))))
 
     (testing "deletes checkout dir"
       (letfn [(verify-checkout-dir-deleted [checkout-dir script-dir]
-                (is (some? (-> {:build {:script-dir (u/abs-path script-dir)
+                (is (some? (-> {:build {:script {:script-dir (u/abs-path script-dir)}
                                         :checkout-dir (u/abs-path checkout-dir)
                                         :cleanup? true
                                         :git {:dir "test"}}}
@@ -91,7 +95,9 @@
       (is (= "ok" (-> {:build
                        {:git git-config}
                        :git {:clone (fn [c]
-                                      (if (= (select-keys c (keys git-config)) git-config) "ok" "failed"))}}
+                                      (if (= (select-keys c (keys git-config)) git-config)
+                                        "ok"
+                                        (str "failed: " (pr-str c))))}}
                       (sut/download-src)
                       :build
                       :checkout-dir)))))
@@ -120,10 +126,11 @@
     (is (re-matches #".*test/dir/test-script$"
                     (-> {:build
                          {:git {:url "http://git.test"}
-                          :script-dir "test-script"}
+                          :script {:script-dir "test-script"}}
                          :git {:clone (constantly "test/dir")}}
                         (sut/download-src)
                         :build
+                        :script
                         :script-dir))))
 
   (testing "uses default script dir when none specified"
@@ -135,6 +142,7 @@
                          :checkout-base-dir "checkout"}
                         (sut/download-src)
                         :build
+                        :script
                         :script-dir)))))
 
 (deftest store-src

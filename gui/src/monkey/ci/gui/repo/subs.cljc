@@ -24,12 +24,11 @@
  (fn [db _]
    (let [params (get-in db [:route/current :parameters :path])
          parse-time (fn [b]
-                      (update b :timestamp (comp str t/parse)))]
+                      (update b :start-time (comp str t/parse)))]
      (some->> (db/builds db)
               (map parse-time)
-              (sort-by :timestamp)
+              (sort-by :start-time)
               (reverse)
-              (map #(assoc % :build-id (:id %)))
               (map (partial merge params))))))
 
 (rf/reg-sub

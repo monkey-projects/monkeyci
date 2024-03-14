@@ -1,4 +1,4 @@
-(ns monkey.ci.gui.pages
+(ns ^:dev/always  monkey.ci.gui.pages
   "Links route names to actual components to be rendered"
   (:require [monkey.ci.gui.layout :as l]
             [monkey.ci.gui.login.views :as login]
@@ -10,7 +10,7 @@
             [monkey.ci.gui.repo.views :as repo]
             [re-frame.core :as rf]))
 
-(def pages
+(defonce pages
   {:page/root home/page
    :page/build build/page
    :page/login login/page
@@ -31,6 +31,7 @@
      [:p "No page exists for route " [:b (str (get-in route [:data :name]))]]]))
 
 (defn render []
+  (println "Rendering...")
   (let [r (rf/subscribe [:route/current])
         t (rf/subscribe [:login/token])]
     ;; If no token found, redirect to login

@@ -8,7 +8,6 @@
 (u/db-sub :build/current db/build)
 (u/db-sub :build/logs db/logs)
 (u/db-sub :build/reloading? (comp some? db/reloading?))
-(u/db-sub :build/auto-reload? db/auto-reload?)
 (u/db-sub :build/last-reload-time db/last-reload-time)
 
 (u/db-sub :build/log-alerts db/log-alerts)
@@ -22,24 +21,9 @@
       (assoc :path (:name l))
       (update :name (comp last split-log-path))))
 
-(defn- pipelines-as-jobs [pl logs]
-  (let [logs-by-id (group-by (comp vec (partial take 2) split-log-path :name) logs)]
-    (letfn [(add-step-logs [s pn]
-              (assoc s :logs (->> (get logs-by-id [pn (str (:index s))])
-                                  (map strip-prefix))))
-            
-            (steps->jobs [p]
-              (map (fn [s]
-                     ;; TODO Dependencies
-                     (-> s
-                         (assoc :id (str (:name p) "-" (:index s))
-                                :labels {"pipeline" (:name p)})
-                         (add-step-logs (:name p))))
-                   ((some-fn :steps :jobs) p)))]
-      (mapcat steps->jobs pl))))
-
-(defn- jobs-with-logs [{:keys [jobs]} logs]
-  (let [logs-by-id (group-by (comp first split-log-path :name) logs)]
+(defn- jobs-with-logs [b logs]
+  (let [jobs (-> b :script :jobs vals)
+        logs-by-id (group-by (comp first split-log-path :name) logs)]
     (letfn [(add-job-logs [{:keys [id] :as job}]
               (assoc job :logs (->> (get logs-by-id id)
                                     (map strip-prefix))))]
@@ -50,10 +34,7 @@
  :<- [:build/current]
  :<- [:build/logs]
  (fn [[b logs] _]
-   (let [p (:pipelines b)]
-     (if (not-empty p)
-       (pipelines-as-jobs p logs)
-       (jobs-with-logs b logs)))))
+   (jobs-with-logs b logs)))
 
 (defn- add-line-breaks [s]
   (->> (cs/split-lines s)
@@ -64,3 +45,13 @@
  (fn [db _]
    (-> (db/current-log db)
        (add-line-breaks))))
+
+(defn global? [{n :name}]
+  (not (cs/includes? n "/")))
+
+(rf/reg-sub
+ :build/global-logs
+ :<- [:build/logs]
+ ;; Returns all logs that are not linked to a job
+ (fn [logs _]
+   (filter global? logs)))

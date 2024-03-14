@@ -1,5 +1,7 @@
 (ns monkey.ci.web.handler-test
-  (:require [aleph.http :as aleph]
+  (:require [aleph
+             [http :as aleph]
+             [netty :as netty]]
             [buddy.core
              [codecs :as codecs]
              [mac :as mac]]
@@ -360,9 +362,12 @@
                               :runner (constantly nil)}
                              rt))
           sid (generate-build-sid)
+          build (-> (zipmap [:customer-id :repo-id :build-id] sid)
+                    (assoc :status :success
+                           :message "test msg"
+                           :git {:message "test meta"}))
           path (repo-path sid)]
-      (is (st/sid? (st/save-build-results st sid {:exit 0 :status :success})))
-      (is (st/sid? (st/create-build-metadata st sid {:message "test meta"})))
+      (is (st/sid? (st/save-build st build)))
       (f {:events events
           :storage st
           :sid sid
@@ -381,8 +386,8 @@
                     h/parse-json)]
           (is (= 200 (:status l)))
           (is (= 1 (count b)))
-          (is (= build-id (:id (first b))) "should contain build id")
-          (is (= "test meta" (:message (first b))) "should contain build metadata")))))
+          (is (some? (first b)))
+          (is (= build-id (:build-id (first b))) "should contain build id")))))
   
   (testing "`POST /trigger`"
     (letfn [(verify-runner [p f]
@@ -459,14 +464,15 @@
          (fn [{:keys [sid runner-args]}]
            (is (true? (get-in @runner-args [:build :cleanup?]))))))
       
-      (testing "creates build metadata in storage"
+      (testing "creates build in storage"
         (verify-runner
          "/trigger?branch=test-branch"
          (fn [{:keys [runner-args] st :storage}]
            (let [bsid (get-in @runner-args [:build :sid])
-                 md (st/find-build-metadata st bsid)]
-             (is (some? md))
-             (is (= "refs/heads/test-branch" (:ref md)))))))
+                 build (st/find-build st bsid)]
+             (is (some? build))
+             (is (= :api (:source build)))
+             (is (= "refs/heads/test-branch" (get-in build [:git :ref])))))))
       
       (testing "returns build id"
         (with-repo
@@ -492,8 +498,8 @@
                           h/parse-json)]
             (is (= 200 (:status l)))
             (is (map? b))
-            (is (= build-id (:id b)) "should contain build id")
-            (is (= "test meta" (:message b)) "should contain build metadata")))
+            (is (= build-id (:build-id b)) "should contain build id")
+            (is (= "test meta" (get-in b [:git :message])) "should contain git data")))
 
         (testing "204 when there are no builds"
           (let [sid (generate-build-sid)
@@ -515,7 +521,7 @@
                 b (some-> l :body slurp h/parse-json)]
             (is (not-empty l))
             (is (= 200 (:status l)))
-            (is (= build-id (:id b)))))
+            (is (= build-id (:build-id b)))))
 
         (testing "404 when build does not exist"
           (let [sid (generate-build-sid)
@@ -685,3 +691,11 @@
           (is (ifn? s))
           (is (some? (s)))
           (is (true? @stopped?)))))))
+
+(deftest on-server-close
+  (testing "waits until netty server closes"
+    (with-redefs [netty/wait-for-close (fn [s]
+                                         (if (= ::server s)
+                                           ::closed
+                                           ::invalid-arg))]
+      (is (= ::closed @(sut/on-server-close (sut/map->HttpServer {:server ::server})))))))

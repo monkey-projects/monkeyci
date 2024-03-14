@@ -112,10 +112,12 @@
 (def build-sid (comp (partial into [builds])
                      ext-build-sid))
 
-(defn- build-sub-sid [obj p]
+;;; Deprecated build functions.  These are no longer split up between metadata and results.
+
+(defn- ^:deprecated build-sub-sid [obj p]
   (conj (build-sid obj) p))
 
-(defn- sub-sid-builder
+(defn- ^:deprecated sub-sid-builder
   "Creates a fn that is able to build a sid with given prefix and suffix value."
   [f]
   (fn [c]
@@ -123,29 +125,29 @@
       (vec (concat [builds] c [f]))
       (build-sub-sid c f))))
 
-(def build-metadata-sid (sub-sid-builder "metadata"))
-(def build-results-sid  (sub-sid-builder "results"))
+(def ^:deprecated build-metadata-sid (sub-sid-builder "metadata"))
+(def ^:deprecated build-results-sid  (sub-sid-builder "results"))
 
-(defn create-build-metadata
+(defn ^:deprecated create-build-metadata
   ([s sid md]
    (p/write-obj s (build-metadata-sid sid) md))
   ([s md]
    (create-build-metadata s md md)))
 
-(defn find-build-metadata
+(defn ^:deprecated find-build-metadata
   "Reads the build metadata given the build coordinates (required to build the path)"
   [s sid]
   (p/read-obj s (build-metadata-sid sid)))
 
-(defn save-build-results [s sid r]
+(defn ^:deprecated save-build-results [s sid r]
   (p/write-obj s (build-results-sid sid) r))
 
-(defn find-build-results
+(defn ^:deprecated find-build-results
   "Reads the build results given the build coordinates"
   [s sid]
   (p/read-obj s (build-results-sid sid)))
 
-(defn patch-build-results
+(defn ^:deprecated patch-build-results
   "Finds the build result with given sid, then applies `f` to it with arguments
    and saves the return value back into the result."
   [st sid f & args]
@@ -157,28 +159,28 @@
   "Checks efficiently if the build exists.  This is cheaper than trying to fetch it
    and checking if the result is `nil`."
   [s sid]
+  (p/obj-exists? s (concat [builds] sid)))
+
+(defn legacy-build-exists?
+  "Similar to `build-exists?` but for legacy builds that consist of metadata and 
+   result entities."
+  [s sid]
   (p/obj-exists? s (build-metadata-sid sid)))
+
+(defn save-build
+  "Creates or updates the build entity"
+  [s build]
+  (p/write-obj s (build-sid build) build))
+
+(defn find-build
+  "Finds build by sid"
+  [s sid]
+  (p/read-obj s (concat [builds] sid)))
 
 (defn list-builds
   "Lists the ids of the builds for given repo sid"
   [s sid]
   (p/list-obj s (concat [builds] sid)))
-
-(defn ^:deprecated legacy-params-sid [sid]
-  ;; Prepend params prefix, but also store at "params" leaf
-  (vec (concat ["params"] sid ["params"])))
-
-(defn ^:deprecated save-legacy-params
-  "Stores build parameters.  This can be done on customer, project or repo level.
-   The `sid` is a vector that determines on which level the information is stored."
-  [s sid p]
-  (p/write-obj s (legacy-params-sid sid) p))
-
-(defn ^:deprecated find-legacy-params
-  "Loads parameters on the given level.  This does not automatically include the
-   parameters of higher levels."
-  [s sid]
-  (p/read-obj s (legacy-params-sid sid)))
 
 (defn params-sid [customer-id]
   ;; All parameters for a customer are stored together

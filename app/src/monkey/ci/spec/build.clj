@@ -46,12 +46,13 @@
 
 ;;; Script: contains info about a build script, most notably the jobs
 
-(s/def :script/checkout-dir path?)
+(def build-states #{:pending :running :error :success})
+
 (s/def :script/script-dir path?)
-(s/def :script/status #{:pending :running :error :success})
+(s/def :script/status build-states)
 
 (s/def :build/script
-  (-> (s/keys :req-un [:script/status :script/checkout-dir :script/script-dir]
+  (-> (s/keys :req-un [:script/status :script/script-dir]
               :opt-un [:script/jobs])
       (s/merge ::generic-entity)))
 
@@ -64,6 +65,8 @@
 (s/def :build/customer-id id?)
 (s/def :build/repo-id id?)
 (s/def :build/source keyword?)
+(s/def :build/checkout-dir path?)
+(s/def :build/status build-states)
 
 ;; GIT configuration
 (s/def :git/url c/url?)
@@ -72,12 +75,14 @@
 (s/def :git/dir path?)
 (s/def :git/main-branch string?)
 (s/def :git/ssh-keys-dir path?)
+(s/def :git/message string?)
+
 (s/def :build/git
   (s/keys :req-un [:git/url :git/dir]
-          :opt-un [:git/ref :git/commit-id :git/main-branch :git/ssh-keys-dir]))
+          :opt-un [:git/ref :git/commit-id :git/main-branch :git/ssh-keys-dir :git/message]))
 
 (s/def ::build
   (-> (s/keys :req-un [:build/customer-id :build/repo-id :build/build-id :build/sid
-                       :build/source]
-              :opt-un [:build/git :build/cleanup? :build/webhook-id :build/script])
+                       :build/source :build/status]
+              :opt-un [:build/git :build/cleanup? :build/webhook-id :build/script :build/checkout-dir])
       (s/merge ::generic-entity)))

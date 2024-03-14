@@ -62,12 +62,14 @@
   []
   (let [d (rf/subscribe [:build/current])
         v (-> @d
-              (select-keys [:id :message :ref :timestamp])
-              (update :timestamp t/reformat))]
+              (select-keys [:id :message :start-time :end-time])
+              (assoc :ref (get-in @d [:git :ref]))
+              (update :start-time t/reformat)
+              (update :end-time t/reformat))]
     (->> v
          (map (fn [[k v]]
                 [:li [:b k ": "] v]))
-         (concat [[:li [:b "Result: "] [co/build-result (:result @d)]]])
+         (concat [[:li [:b "Result: "] [co/build-result (:status @d)]]])
          (into [:ul]))))
 
 (defn- build-path [route]
@@ -142,8 +144,7 @@
      [:td size]]))
 
 (defn logs-table []
-  ;; TODO Remove logs that are linked to a job
-  (let [l (rf/subscribe [:build/logs])]
+  (let [l (rf/subscribe [:build/global-logs])]
     [:table.table.table-striped
      [:thead
       [:tr
@@ -157,21 +158,11 @@
   (rf/dispatch [:build/load-logs])
   (fn [params]
     [:<>
-     [:h3.float-start "Captured Logs"]
+     [:h3.float-start "Global Logs"]
      [logs-table]]))
 
-(defn- auto-reload-check []
-  (let [r (rf/subscribe [:build/auto-reload?])]
-    [:div.form-check
-     [:input#auto-reload.form-check-input
-      {:type :checkbox
-       :on-change (u/form-evt-handler [:build/auto-reload-changed] u/evt->checked)}]
-     [:label.form-check-label {:for :auto-reload} "Auto reload"]
-     (when @r
-       [timer/timer ::auto-reload 5000 [:build/reload]])]))
-
 (defn page [route]
-  (rf/dispatch [:build/load])
+  (rf/dispatch [:build/init])
   (fn [route]
     (let [params (r/path-params route)
           repo (rf/subscribe [:repo/info (:repo-id params)])
@@ -181,8 +172,7 @@
         [:div.clearfix
          [:h2.float-start (:name @repo) " - " (:build-id params)]
          [:div.float-end
-          [co/reload-btn [:build/reload] (when @reloading? {:disabled true})]
-          [auto-reload-check]]]
+          [co/reload-btn [:build/reload] (when @reloading? {:disabled true})]]]
         [co/alerts [:build/alerts]]
         [build-details]
         [build-jobs]

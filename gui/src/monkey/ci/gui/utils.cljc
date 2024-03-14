@@ -37,17 +37,16 @@
 
 (defn build-elapsed
   "Calculates elapsed time for the build.  This is the difference between the start
-   time and the latest pipeline step end time."
+   and end times.  If there is no end time yet, returns zero."
   [b]
   (let [s (some-> b
-                  :timestamp
+                  :start-time
                   (t/parse)
                   (t/to-epoch))
-        e (->> b
-               :pipelines
-               (mapcat (fn [p]
-                         (map :end-time (:steps p))))
-               (apply max))]
+        e (some-> b
+                  :end-time
+                  (t/parse)
+                  (t/to-epoch))]
     (if (and s e)
       (- e s)
       0)))

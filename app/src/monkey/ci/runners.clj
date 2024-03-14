@@ -14,22 +14,26 @@
              [utils :as u]]))
 
 (defn- script-not-found [rt]
-  (log/warn "No build script found at" (build/script-dir rt))
-  {:exit 1
-   :result :error
-   :build (:build rt)})
+  (let [msg (str "No build script found at " (build/rt->script-dir rt))]
+    (log/warn msg)
+    {:exit 1
+     :result :error
+     :message msg}))
 
-(defn- post-build-completed [rt res]
-  (rt/post-events rt (assoc res :type :build/completed))
+(defn- post-build-end [rt {:keys [exit message] :as res}]
+  (rt/post-events rt (build/build-end-evt
+                      (cond-> (rt/build rt)
+                        message (assoc :message message))
+                      exit))
   res)
 
 (defn- log-build-result
   "Do some logging depending on the result"
-  [{:keys [result] :as r}]
-  (condp = (or result :unknown)
+  [{:keys [result exit] :as r}]
+  (condp = (or result (build/exit-code->status exit) :unknown)
     :success (log/info "Success!")
     :warning (log/warn "Exited with warnings:" (:message r))
-    :error   (log/error "Failure.")
+    :error   (log/error "Failure:" (:message r))
     :unknown (log/warn "Unknown result."))
   r)
 
@@ -50,14 +54,16 @@
    runs the build.  Returns a deferred that resolves when the child process has
    exited."
   [rt]
-  (let [script-dir (build/script-dir rt)]
+  (let [script-dir (build/rt->script-dir rt)
+        build (rt/build rt)]
     (rt/post-events rt {:type :build/start
-                        :build (:build rt)})
+                        :sid (build/get-sid rt)
+                        :build (assoc build :start-time (u/now))})
     (-> (md/chain
          (if (some-> (io/file script-dir) (.exists))
            (p/execute! rt)
            (md/success-deferred (script-not-found rt)))
-         (partial post-build-completed rt)
+         (partial post-build-end rt)
          log-build-result
          :exit)
         (md/finally
@@ -68,26 +74,27 @@
   [rt]
   ;;(log/debug "Downloading from git using build config:" (:build rt))
   (let [git (get-in rt [:git :clone])
-        conf (-> (get-in rt [:build :git])
-                 (update :dir #(or % (build/checkout-dir rt))))
-        add-script-dir (fn [{{:keys [script-dir checkout-dir]} :build :as rt}]
-                         (assoc-in rt [:build :script-dir] (build/calc-script-dir checkout-dir script-dir)))]
+        conf (-> rt
+                 rt/build
+                 :git
+                 (update :dir #(or % (build/calc-checkout-dir rt))))
+        cd (git conf)]
     (log/debug "Checking out git repo" (:url conf) "into" (:dir conf))
     (-> rt
-        (assoc-in [:build :checkout-dir] (git conf))
-        (add-script-dir))))
+        (rt/update-build build/set-checkout-dir cd)
+        (rt/update-build build/set-script-dir (build/calc-script-dir cd (build/rt->script-dir rt))))))
 
 (defn download-src
   "Downloads the code from the remote source, if there is one.  If the source
    is already local, does nothing.  Returns an updated context."
   [rt]
   (cond-> rt
-    (not-empty (get-in rt [:build :git])) (download-git)))
+    (not-empty (-> rt rt/build :git)) (download-git)))
 
 (defn create-workspace [rt]
   (let [ws (:workspace rt)
         ;; TODO For local builds, upload all workdir files according to .gitignore
-        {:keys [checkout-dir sid]} (:build rt)
+        {:keys [checkout-dir sid]} (rt/build rt)
         dest (str (cs/join "/" sid) b/extension)]
     (when checkout-dir
       (log/info "Creating workspace using files from" checkout-dir)

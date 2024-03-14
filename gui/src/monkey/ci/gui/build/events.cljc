@@ -4,6 +4,17 @@
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
+(def stream-id ::event-stream)
+
+(rf/reg-event-fx
+ :build/init
+ (fn [_ _]
+   {:dispatch-n [[:build/load]
+                 ;; Make sure we stop listening to events when we leave this page
+                 [:route/on-page-leave [:event-stream/stop stream-id]]
+                 ;; TODO Only start reading events when the build has not finished yet
+                 [:event-stream/start stream-id [:build/handle-event]]]}))
+
 (defn load-logs-req [db]
   [:secure-request
    :get-build-logs
@@ -52,11 +63,23 @@
             (db/set-build nil))
     :dispatch (load-build-req db)}))
 
+(defn- convert-build
+  "Builds received from requests are slightly different from those received as events.
+   The jobs are in a vector instead of a map.  This function converts the received build
+   in event format."
+  [build]
+  (letfn [(to-map [jobs]
+            (reduce (fn [r j]
+                      (assoc r (:id j) j))
+                    {}
+                    jobs))]
+    (update-in build [:script :jobs] to-map)))
+
 (rf/reg-event-db
  :build/load--success
  (fn [db [_ {build :body}]]
    (-> db
-       (db/set-build build)
+       (db/set-build (convert-build build))
        (db/reset-alerts)
        (db/clear-build-reloading))))
 
@@ -108,7 +131,45 @@
        (db/set-log-alerts [{:type :danger
                             :message (u/error-msg err)}]))))
 
+(defn- for-build? [db evt]
+  (let [get-id (juxt :customer-id :repo-id :build-id)]
+    (= (:sid evt)
+       (-> (r/current db)
+           (r/path-params)
+           (get-id)))))
+
+(defmulti handle-event (fn [_ evt] (:type evt)))
+
+(defmethod handle-event :build/end [db evt]
+  ;; Update build but leave existing script info intact, because the event
+  ;; does not contain this.
+  (db/update-build db (fn [b]
+                        (merge (:build evt) (select-keys b [:script])))))
+
+(defn- update-script [db script]
+  (db/update-build db assoc :script script))
+
+(defmethod handle-event :script/start [db evt]
+  (update-script db (:script evt)))
+
+(defmethod handle-event :script/end [db evt]
+  (update-script db (:script evt)))
+
+(defn- update-job [db job]
+  (db/update-build db assoc-in [:script :jobs (:id job)] job))
+
+(defmethod handle-event :job/start [db evt]
+  (update-job db (:job evt)))
+
+(defmethod handle-event :job/end [db evt]
+  (update-job db (:job evt)))
+
+(defmethod handle-event :default [db evt]
+  ;; Ignore
+  db)
+
 (rf/reg-event-db
- :build/auto-reload-changed
- (fn [db [_ v]]
-   (db/set-auto-reload db v)))
+ :build/handle-event
+ (fn [db [_ evt]]
+   (when (for-build? db evt)
+     (handle-event db evt))))

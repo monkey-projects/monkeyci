@@ -51,7 +51,7 @@
     
     (testing "executes build script in separate process"
       (is (zero? (-> rt
-                     (assoc :build {:script-dir (example "basic-clj")
+                     (assoc :build {:script {:script-dir (example "basic-clj")}
                                     :build-id (u/new-build-id)})
                      sut/execute!
                      deref
@@ -59,7 +59,7 @@
 
     (testing "fails when script fails"
       (is (pos? (-> rt
-                    (assoc :build {:script-dir (example "failing")
+                    (assoc :build {:script {:script-dir (example "failing")}
                                    :build-id (u/new-build-id)})
                     sut/execute!
                     deref
@@ -67,7 +67,8 @@
 
     (testing "fails when script not found"
       (is (thrown? java.io.IOException (-> rt
-                                           (assoc :build {:script-dir (example "non-existing")})
+                                           (assoc :build
+                                                  {:script {:script-dir (example "non-existing")}})
                                            (sut/execute!)))))))
 
 (defn- find-arg
@@ -102,15 +103,21 @@
       (testing "returns deferred"
         (is (md/deferred? (sut/execute!
                            {:args {:dev-mode true}
-                            :build {:script-dir (example "failing")}}))))
+                            :build
+                            {:script
+                             {:script-dir (example "failing")}}}))))
       
       (testing "returns exit code"
         (is (= 1234 (:exit @(sut/execute!
                              {:args {:dev-mode true}
-                              :build {:script-dir (example "failing")}})))))
+                              :build
+                              {:script
+                               {:script-dir (example "failing")}}})))))
 
       (testing "invokes in script dir"
-        (is (= "test-dir" (-> @(sut/execute! {:build {:script-dir "test-dir"}})
+        (is (= "test-dir" (-> @(sut/execute! {:build
+                                              {:script
+                                               {:script-dir "test-dir"}}})
                               :process
                               :args
                               :dir))))
@@ -121,7 +128,9 @@
                                   (find-arg :checkout-dir)))))
 
       (testing "passes script dir in edn"
-        (is (= "\"script-dir\"" (-> {:build {:script-dir "script-dir"}}
+        (is (= "\"script-dir\"" (-> {:build
+                                     {:script
+                                      {:script-dir "script-dir"}}}
                                     (sut/execute!)
                                     (find-arg :script-dir)))))
 
@@ -135,7 +144,7 @@
         (is (true? @server-started?)))
 
       (testing "passes socket path in env"
-        (is (string? (-> {:script-dir "test-dir"}
+        (is (string? (-> {:script {:script-dir "test-dir"}}
                          (sut/execute!)
                          (deref)
                          :process

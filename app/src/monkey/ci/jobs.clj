@@ -44,7 +44,7 @@
   "Rewrites the job dir in the context so it becomes an absolute path, calculated
    relative to the checkout dir."
   [{:keys [job] :as rt}]
-  (let [checkout-dir (build/build-checkout-dir rt)]
+  (let [checkout-dir (build/rt->checkout-dir rt)]
     (update-in rt [:job :work-dir]
                (fn [d]
                  (if d
@@ -79,7 +79,9 @@
                 (art/wrap-artifacts))]
       (-> rt
           (make-job-dir-absolute)
-          (a))))
+          (a)
+          (md/chain 
+           #(or % bc/success)))))
 
   monkey.ci.build.core.ContainerJob
   (execute! [this rt]
