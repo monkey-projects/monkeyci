@@ -131,11 +131,6 @@
        (db/set-log-alerts [{:type :danger
                             :message (u/error-msg err)}]))))
 
-(rf/reg-event-db
- :build/auto-reload-changed
- (fn [db [_ v]]
-   (db/set-auto-reload db v)))
-
 (defn- for-build? [db evt]
   (let [get-id (juxt :customer-id :repo-id :build-id)]
     (= (:sid evt)

@@ -109,15 +109,6 @@
       (is (map? (reset! app-db (db/set-log-path {} "test-path"))))
       (is (= "test-path" @c)))))
 
-(deftest auto-reload?
-  (let [c (rf/subscribe [:build/auto-reload?])]
-    (testing "exists"
-      (is (some? c)))
-
-    (testing "returns true when auto reloading"
-      (is (map? (reset! app-db (db/set-auto-reload {} true))))
-      (is (true? @c)))))
-
 (deftest last-reload-time
   (let [t (rf/subscribe [:build/last-reload-time])]
     (testing "exists"

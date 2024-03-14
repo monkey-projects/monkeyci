@@ -11,8 +11,17 @@
             [re-frame.core :as rf]
             [re-frame.db :refer [app-db]]))
 
+(defonce app-root (atom nil))
+
+(defn- get-app-root! []
+  (swap! app-root (fn [r]
+                    (or r (rd/create-root (.getElementById js/document "root"))))))
+
 (defn ^:dev/after-load reload []
-  (let [root (rd/create-root (.getElementById js/document "root"))]
+  ;; Creating the root multiple times gives a react warning on reload.  However, if we
+  ;; keep track of the existing root instead, re-frame subs give problems, so we're
+  ;; damned if we do, damned if we don't.
+  (let [root (get-app-root!)]
     (rf/clear-subscription-cache!)
     (rd/render root [p/render])))
 

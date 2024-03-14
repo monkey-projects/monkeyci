@@ -161,16 +161,6 @@
      [:h3.float-start "Global Logs"]
      [logs-table]]))
 
-(defn- auto-reload-check []
-  (let [r (rf/subscribe [:build/auto-reload?])]
-    [:div.form-check
-     [:input#auto-reload.form-check-input
-      {:type :checkbox
-       :on-change (u/form-evt-handler [:build/auto-reload-changed] u/evt->checked)}]
-     [:label.form-check-label {:for :auto-reload} "Auto reload"]
-     (when @r
-       [timer/timer ::auto-reload 5000 [:build/reload]])]))
-
 (defn page [route]
   (rf/dispatch [:build/init])
   (fn [route]
@@ -182,8 +172,7 @@
         [:div.clearfix
          [:h2.float-start (:name @repo) " - " (:build-id params)]
          [:div.float-end
-          [co/reload-btn [:build/reload] (when @reloading? {:disabled true})]
-          #_[auto-reload-check]]]
+          [co/reload-btn [:build/reload] (when @reloading? {:disabled true})]]]
         [co/alerts [:build/alerts]]
         [build-details]
         [build-jobs]

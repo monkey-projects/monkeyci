@@ -199,12 +199,6 @@
                        first
                        :type)))))
 
-(deftest build-auto-reload-changed
-  (testing "toggles auto-reload in db"
-    (is (not (db/auto-reload? @app-db)))
-    (rf/dispatch-sync [:build/auto-reload-changed true])
-    (is (db/auto-reload? @app-db))))
-
 (defn- test-build []
   (->> (repeatedly 3 (comp str random-uuid))
        (zipmap [:customer-id :repo-id :build-id])))

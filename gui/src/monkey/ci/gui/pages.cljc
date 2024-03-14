@@ -1,4 +1,4 @@
-(ns monkey.ci.gui.pages
+(ns ^:dev/always  monkey.ci.gui.pages
   "Links route names to actual components to be rendered"
   (:require [monkey.ci.gui.layout :as l]
             [monkey.ci.gui.login.views :as login]
