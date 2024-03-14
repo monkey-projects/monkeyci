@@ -54,4 +54,5 @@
 
 (def container-work-dir
   "Returns the dir where the workspace would be mounted in a container."
+  ;; TODO Get this from runtime instead, because now this depends on driver type
   oc/base-work-dir)

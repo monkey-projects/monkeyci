@@ -10,7 +10,7 @@
 
 ;; Version assigned when building main branch
 ;; TODO Determine automatically
-(def snapshot-version "0.3.5-SNAPSHOT")
+(def snapshot-version "0.4.0-SNAPSHOT")
 
 (defn git-ref [ctx]
   (get-in ctx [:build :git :ref]))
@@ -110,16 +110,12 @@
   (cond-> (:checkout-dir ctx)
     (some? dir) (str "/" dir)))
 
-(defn- container-work-dir [ctx]
-  ;; TODO Use shell fn when it becomes available
-  #_(shell/container-work-dir ctx)
-  (str "/opt/monkeyci/checkout/work/" (get-in ctx [:build :build-id])))
-
 (defn kaniko-build-img
   "Creates a step that builds and uploads an image using kaniko"
   [{:keys [id dockerfile context image tag opts]}]
   (fn [ctx]
-    (let [wd (container-work-dir ctx)]
+    (let [wd (cond-> (shell/container-work-dir ctx)
+               context (str "/" context))]
       (core/container-job
        id
        (merge
