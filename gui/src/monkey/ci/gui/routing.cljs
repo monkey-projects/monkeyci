@@ -3,7 +3,13 @@
             [reitit.frontend :as f]
             [reitit.frontend.easy :as rfe]))
 
-(def current :route/current)
+(def current
+  "Retrieve current route from app db"
+  :route/current)
+
+(def customer-id
+  "Retrieve current customer id from app db"
+  (comp :customer-id :path :parameters current))
 
 (rf/reg-sub
  :route/current

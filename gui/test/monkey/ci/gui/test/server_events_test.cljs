@@ -12,7 +12,7 @@
   (testing "connects and adds to db using id"
     (rf/reg-cofx :event-stream/connector (fn [cofx _]
                                            (assoc cofx ::sut/connector (constantly ::test-connector))))
-    (is (nil? (rf/dispatch-sync [:event-stream/start ::test-id [::test-evt]])))
+    (is (nil? (rf/dispatch-sync [:event-stream/start ::test-id "test-customer" [::test-evt]])))
     (is (= {:handler-evt [::test-evt]
             :source ::test-connector}
            (sut/stream-config @app-db ::test-id)))))

@@ -19,8 +19,8 @@
 
 (defn ^:dev/after-load reload []
   ;; Creating the root multiple times gives a react warning on reload.  However, if we
-  ;; keep track of the existing root instead, re-frame subs give problems, so we're
-  ;; damned if we do, damned if we don't.
+  ;; keep track of the existing root instead, re-frame subs give problems, that's why
+  ;; the pages ns is on "always reload".
   (let [root (get-app-root!)]
     (rf/clear-subscription-cache!)
     (rd/render root [p/render])))
