@@ -173,7 +173,8 @@
                     build-routes]})])
 
 (def event-stream-routes
-  ["/events" {:get {:handler api/event-stream}}])
+  ["/events" {:get {:handler api/event-stream
+                    :parameters {:query {(s/optional-key :authorization) s/Str}}}}])
 
 (def customer-routes
   ["/customer"

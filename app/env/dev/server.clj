@@ -48,7 +48,7 @@
           http/server-port))
 
 (defn private-key []
-  (some-> @server :context :jwk :priv))
+  (some-> @server :rt :jwk :priv))
 
 (defn generate-jwt [uid]
   (-> {:sub uid}

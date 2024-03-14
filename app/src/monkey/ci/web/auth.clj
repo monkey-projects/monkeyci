@@ -15,6 +15,7 @@
              [runtime :as rt]
              [storage :as st]]
             [monkey.ci.web.common :as c]
+            [ring.middleware.params :as rmp]
             [ring.util.response :as rur]))
 
 (def kid "master")
@@ -55,7 +56,6 @@
 (defn keypair->rt [kp]
   {:pub (.getPublic kp)
    :priv (.getPrivate kp)})
-(def ^:deprecated keypair->ctx keypair->rt)
 
 (defn config->keypair
   "Loads private and public keys from the app config, returns a map that can be
@@ -82,7 +82,6 @@
              ;; Required by oci api gateway
              :use "sig")))
 
-(def ^:deprecated ctx->pub-key (comp :pub :jwk))
 (def rt->pub-key (comp :pub :jwk))
 
 (defn jwks
@@ -101,16 +100,32 @@
         (some-> (st/find-user storage id)
                 (update :customers set))))))
 
+(defn- query-auth-to-bearer
+  "Middleware that puts the authorization token query param in the authorization header
+   if no auth header is provided."
+  [h]
+  (fn [req]
+    (let [header (get-in req [:headers "authorization"])
+          query (get-in req [:query-params "authorization"])]
+      (cond-> req
+        (and query (not header))
+        (assoc-in [:headers "authorization"] (str "Bearer " query))
+        true h))))
+
 (defn secure-ring-app
   "Wraps the ring handler so it verifies the JWT authorization header"
   [app rt]
   (let [pk (rt->pub-key rt)
+        ;; TODO Also check authorization query arg, because in some cases it's not possible
+        ;; to pass it as a header (e.g. server-sent events).
         backend (bb/jws {:secret pk
                          :token-name "Bearer"
                          :options {:alg :rs256}
                          :authfn (partial lookup-user rt)})]
     (-> app
-        (bmw/wrap-authentication backend))))
+        (bmw/wrap-authentication backend)
+        (query-auth-to-bearer)
+        (rmp/wrap-params))))
 
 (defn- check-authorization! [req]
   (when-let [cid (get-in req [:parameters :path :customer-id])]

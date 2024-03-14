@@ -363,15 +363,19 @@
 (defn event-stream
   "Sets up an event stream for the specified filter."
   [req]
-  ;; TODO Only send events for the customer specified in the url
-  (let [recv (c/from-rt req rt/events-receiver)
+  (let [cid (customer-id req)
+        recv (c/from-rt req rt/events-receiver)
         stream (ms/stream)
         make-reply (fn [evt]
                      ;; Format according to sse specs, with double newline at the end
                      (str "data: " (pr-str evt) "\n\n"))
+        for-cust? (fn [{:keys [sid]}]
+                    ;; Allow either events without sid or where the customer is the first component
+                    (or (nil? sid) (= cid (first sid))))
         listener (ec/no-dispatch
                   (fn [evt]
-                    (when (allowed-events (:type evt))
+                    ;; Only send events for the customer specified in the url
+                    (when (and (allowed-events (:type evt)) (for-cust? evt))
                       (ms/put! stream (make-reply evt)))))]
     (ms/on-drained stream
                    (fn []

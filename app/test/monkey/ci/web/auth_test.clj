@@ -40,6 +40,23 @@
                             (assoc :headers
                                    {"authorization"
                                     (str "Bearer " (sut/generate-jwt req {:sub "github/456"}))}))))
+            "bearer token provided"))))
+
+  (testing "verifies token query param using public key and puts user in request `:identity`"
+    (h/with-memory-store st
+      (let [app :identity
+            kp (sut/generate-keypair)
+            rt {:storage st
+                :jwk (sut/keypair->rt kp)}
+            sec (sut/secure-ring-app app rt)
+            req (h/->req rt)]
+        (is (st/sid? (st/save-user st {:type "github"
+                                       :type-id 456})))
+        (is (nil? (sec {}))
+            "no identity provided")
+        (is (some? (sec (-> req
+                            (assoc-in [:query-params "authorization"]
+                                      (sut/generate-jwt req {:sub "github/456"})))))
             "bearer token provided")))))
 
 (deftest customer-authorization

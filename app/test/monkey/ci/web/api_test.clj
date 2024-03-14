@@ -1,5 +1,6 @@
 (ns monkey.ci.web.api-test
   (:require [clojure.test :refer [deftest testing is]]
+            [clojure.string :as cs]
             [manifold.stream :as ms]
             [monkey.ci
              [storage :as st]
@@ -342,7 +343,21 @@
       (is (not= :timeout (h/wait-until #(not-empty @sent) 1000)))
       (is (string? (first @sent)))))
 
-  (testing "only sends events for customer specified in path"))
+  (testing "only sends events for customer specified in path"
+    (let [sent (atom [])
+          cid "test-customer"
+          evt (ec/make-sync-events)
+          f (-> (h/->req {:events {:receiver evt}})
+                (assoc-in [:parameters :path :customer-id] cid)
+                (sut/event-stream))
+          _ (ms/consume (partial swap! sent conj) (:body f))]
+      (is (some? (ec/post-events evt {:type :script/start
+                                      :sid ["test-customer" "test-repo" "test-build"]})))
+      (is (some? (ec/post-events evt {:type :script/start
+                                      :sid ["other-customer" "test-repo" "test-build"]})))
+      (is (not= :timeout (h/wait-until #(not-empty @sent) 1000)))
+      (is (= 1 (count @sent)))
+      (is (cs/includes? (-> @sent first) cid)))))
 
 (deftest make-build-ctx
   (testing "adds ref to build from branch query param"
