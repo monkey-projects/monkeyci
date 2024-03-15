@@ -41,13 +41,16 @@
    is run in a child process by the `execute!` function below.  This exits the VM
    with a nonzero value on failure."
   ([args env]
-   (try 
-     (let [rt (-> (config/normalize-config default-script-config (config/strip-env-prefix env) args)
-                  (rt/config->runtime))]
-       (log/debug "Executing script with runtime" rt)
-       (log/debug "Script working directory:" (utils/cwd))
-       (when (bc/failed? (script/exec-script! rt))
-         (exit! 1)))
+   (try
+     (when (bc/failed?
+            (rt/with-runtime
+                (config/normalize-config default-script-config (config/strip-env-prefix env) args)
+                :script
+                rt
+                (log/debug "Executing script with runtime" rt)
+                (log/debug "Script working directory:" (utils/cwd))
+                (script/exec-script! rt)))
+       (exit! 1))
      (catch Exception ex
        ;; This could happen if there is an error loading or initializing the child process
        (log/error "Failed to run child process" ex)

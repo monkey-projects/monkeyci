@@ -90,7 +90,7 @@
   (testing "starts and stops components"
     (with-redefs [sut/config->runtime (constantly {:test (->TestComponent (atom false) (atom false))})]
       (is (= [true true]
-             (->> @(sut/with-runtime {} :test rt
-                     (md/success-deferred (:test rt)))
+             (->> (sut/with-runtime {} :test rt
+                    (md/success-deferred (:test rt)))
                   ((juxt :started? :stopped?))
                   (map deref)))))))
