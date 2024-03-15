@@ -36,13 +36,20 @@
         (set! (.-onmessage src)
               (fn [evt]
                 (let [d (parse-edn (.-data evt))]
-                  (log/debug "Got event:" d)
+                  (log/debug "Got event:" (clj->js d))
                   (rf/dispatch (conj on-recv-evt d)))))
+        (set! (.-onerror src)
+              (fn [err]
+                (log/error "Unable to open event stream:" err)))
+        (set! (.-onopen src)
+              (fn [evt]
+                (log/debug "Connection opened:" evt)))
         src))
     (log/error "No customer id provided")))
 
 (defn stop-reading-events [src]
   (when src
+    (log/debug "Closing event source:" src)
     (.close src)))
 
 (defn stream-config [db id]

@@ -365,7 +365,7 @@
   [req]
   (let [cid (customer-id req)
         recv (c/from-rt req rt/events-receiver)
-        stream (ms/stream)
+        stream (ms/stream 1)
         make-reply (fn [evt]
                      ;; Format according to sse specs, with double newline at the end
                      (str "data: " (pr-str evt) "\n\n"))
@@ -382,6 +382,8 @@
                      (log/info "Closing event stream")
                      (ec/remove-listener recv listener)))
     (ec/add-listener recv listener)
+    ;; Send a ping, this makes the server see the connection is open
+    (ms/put! stream (make-reply {:type :ping}))
     (-> (rur/response stream)
         (rur/header "content-type" "text/event-stream")
         (rur/header "access-control-allow-origin" "*"))))

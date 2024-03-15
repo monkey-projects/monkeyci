@@ -9,6 +9,16 @@
             [monkey.ci.web.api :as sut]
             [monkey.ci.helpers :as h]))
 
+(defn- parse-edn [s]
+  (with-open [r (java.io.StringReader. s)]
+    (u/parse-edn r)))
+
+(defn- parse-event [evt]
+  (let [prefix "data: "]
+    (if (.startsWith evt prefix)
+      (parse-edn (subs evt (count prefix)))
+      (throw (ex-info "Invalid event payload" {:event evt})))))
+
 (deftest get-customer
   (testing "returns customer in body"
     (let [cust {:id "test-customer"
@@ -334,14 +344,28 @@
     (is (ms/source? (-> (sut/event-stream (h/->req {:events {:receiver (ec/make-sync-events)}}))
                         :body))))
 
-  (testing "sends received events on open"
+  (testing "sends ping on open"
     (let [sent (atom [])
           evt (ec/make-sync-events)
           f (sut/event-stream (h/->req {:events {:receiver evt}}))
           _ (ms/consume (partial swap! sent conj) (:body f))]
       (is (some? (ec/post-events evt {:type :script/start})))
       (is (not= :timeout (h/wait-until #(not-empty @sent) 1000)))
-      (is (string? (first @sent)))))
+      (is (= :ping (-> @sent
+                       first
+                       (parse-event)
+                       :type)))))
+
+  (testing "sends received events on open"
+    (let [sent (atom [])
+          evt (ec/make-sync-events)
+          f (sut/event-stream (h/->req {:events {:receiver evt}}))
+          _ (ms/consume (fn [evt]
+                          (swap! sent #(conj % (parse-event evt))))
+                        (:body f))]
+      (is (some? (ec/post-events evt {:type :script/start})))
+      (is (not= :timeout (h/wait-until #(some (comp (partial = :script/start) :type) @sent)
+                                       1000)))))
 
   (testing "only sends events for customer specified in path"
     (let [sent (atom [])
@@ -350,14 +374,18 @@
           f (-> (h/->req {:events {:receiver evt}})
                 (assoc-in [:parameters :path :customer-id] cid)
                 (sut/event-stream))
-          _ (ms/consume (partial swap! sent conj) (:body f))]
-      (is (some? (ec/post-events evt {:type :script/start
-                                      :sid ["test-customer" "test-repo" "test-build"]})))
+          _ (ms/consume (fn [evt]
+                          (swap! sent #(conj % (parse-event evt))))
+                        (:body f))]
       (is (some? (ec/post-events evt {:type :script/start
                                       :sid ["other-customer" "test-repo" "test-build"]})))
-      (is (not= :timeout (h/wait-until #(not-empty @sent) 1000)))
-      (is (= 1 (count @sent)))
-      (is (cs/includes? (-> @sent first) cid)))))
+      (is (some? (ec/post-events evt {:type :script/start
+                                      :sid ["test-customer" "test-repo" "test-build"]})))
+      (is (not= :timeout (h/wait-until #(some (comp (partial = "test-customer")
+                                                    first
+                                                    :sid)
+                                              @sent)
+                                       1000))))))
 
 (deftest make-build-ctx
   (testing "adds ref to build from branch query param"
