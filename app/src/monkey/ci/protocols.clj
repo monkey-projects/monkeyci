@@ -19,4 +19,10 @@
   "Used to construct an event from an object"
   (->event [this event-type]))
 
-;; TODO Add others
+(defprotocol EventPoster
+  (post-events [poster evt] "Posts one or more events"))
+
+(defprotocol EventReceiver
+  (add-listener [recv l] "Add the given listener to the receiver")
+  (remove-listener [recv l] "Removes the listener from the receiver"))
+

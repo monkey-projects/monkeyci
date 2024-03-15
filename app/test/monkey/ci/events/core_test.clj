@@ -59,7 +59,10 @@
 
 (deftest make-events
   (testing "can make sync events"
-    (is (some? (sut/make-events {:events {:type :sync}})))))
+    (is (some? (sut/make-events {:events {:type :sync}}))))
+
+  (testing "can make manifold events"
+    (is (some? (sut/make-events {:events {:type :manifold}})))))
 
 (deftest wrapped
   (testing "returns fn that invokes f"
