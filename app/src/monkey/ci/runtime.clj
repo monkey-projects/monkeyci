@@ -41,8 +41,10 @@
   "Starts the runtime by starting all parts as a component tree.  Returns a
    component system that can be passed to `stop`."
   [rt]
-  (-> (co/map->SystemMap rt)
-      (co/start-system)))
+  (->> rt
+       (mc/filter-vals some?)
+       (co/map->SystemMap)
+       (co/start-system)))
 
 (defn stop
   "Stops a previously started runtime"
@@ -90,8 +92,11 @@
                (assoc :app-mode mode)
                (config->runtime)
                (start))]
-    (-> (f rt)
-        (md/finally #(stop rt)))))
+    (try
+      (let [v (f rt)]
+        (cond-> v
+          (md/deferred? v) deref))
+      (finally (stop rt)))))
 
 (defmacro with-runtime
   "Convenience macro that wraps `with-runtime-fn` by binding runtime to `r` and 
