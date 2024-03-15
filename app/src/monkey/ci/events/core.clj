@@ -2,7 +2,9 @@
   (:require [monkey.ci
              [protocols :as p]
              [runtime :as rt]]
-            [monkey.ci.events.manifold :as manifold]))
+            [monkey.ci.events
+             [manifold :as manifold]
+             [zmq :as zmq]]))
 
 (def post-events p/post-events)
 (def add-listener p/add-listener)
@@ -61,6 +63,9 @@
 
 (defmethod make-events :manifold [_]
   (manifold/make-manifold-events))
+
+(defmethod make-events :zmq [config]
+  (zmq/make-zeromq-events (:events config)))
 
 (defmethod rt/setup-runtime :events [conf _]
   (when (:events conf)

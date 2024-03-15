@@ -63,4 +63,3 @@
 
 (defmethod make-zeromq-events :server [{:keys [endpoint]}]
   (->EventServer (make-context) endpoint (atom [])))
-

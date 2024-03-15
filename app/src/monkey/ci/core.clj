@@ -46,7 +46,6 @@
   (fn [args]
     (log/debug "Invoking command with arguments:" args)
     (let [config (config/app-config env args)]
-      ;; When app mode is specified, pass the runtime for new-style invocations
       (rt/with-runtime config app-mode runtime
         ;; TODO Make more generic
         (register-listeners runtime)

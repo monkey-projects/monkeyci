@@ -10,6 +10,7 @@
    directly."
   (:require [clojure.spec.alpha :as spec]
             [com.stuartsierra.component :as co]
+            [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
              [spec :as s]
@@ -87,9 +88,10 @@
   [conf mode f]
   (let [rt (-> conf
                (assoc :app-mode mode)
-               (config->runtime))]
-    ;; TODO Start/stop runtime
-    (f rt)))
+               (config->runtime)
+               (start))]
+    (-> (f rt)
+        (md/finally #(stop rt)))))
 
 (defmacro with-runtime
   "Convenience macro that wraps `with-runtime-fn` by binding runtime to `r` and 

@@ -1,5 +1,8 @@
 (ns monkey.ci.runtime-test
-  (:require [monkey.ci
+  (:require [clojure.test :refer [deftest testing is]]
+            [com.stuartsierra.component :as co]
+            [manifold.deferred :as md]
+            [monkey.ci
              [config :as c]
              [containers]
              [logging]
@@ -7,11 +10,8 @@
              [runtime :as sut]
              [storage]
              [workspace]]
-            [monkey.ci.events
-             [core]
-             [manifold]]
-            [monkey.ci.web.handler]
-            [clojure.test :refer [deftest testing is]]))
+            [monkey.ci.events.core]
+            [monkey.ci.web.handler]))
 
 (defn- verify-runtime [k extra-config checker]
   (is (checker (-> c/default-app-config
@@ -76,3 +76,21 @@
   (testing "returns config"
     (is (= {:key "value"}
            (sut/rt->env {:config {:key "value"}})))))
+
+(defrecord TestComponent [started? stopped?]
+  co/Lifecycle
+  (start [this]
+    (reset! started? true)
+    this)
+  (stop [this]
+    (reset! stopped? true)
+    this))
+
+(deftest with-runtime
+  (testing "starts and stops components"
+    (with-redefs [sut/config->runtime (constantly {:test (->TestComponent (atom false) (atom false))})]
+      (is (= [true true]
+             (->> @(sut/with-runtime {} :test rt
+                     (md/success-deferred (:test rt)))
+                  ((juxt :started? :stopped?))
+                  (map deref)))))))

@@ -1,7 +1,9 @@
 (ns monkey.ci.listeners
   (:require [clojure.core.async :as ca]
             [clojure.tools.logging :as log]
-            [monkey.ci.storage :as st]))
+            [monkey.ci
+             [runtime :as rt]
+             [storage :as st]]))
 
 (defn update-build [{:keys [storage]} {:keys [sid build]}]
   (log/debug "Updating build:" sid)
@@ -56,3 +58,8 @@
     (fn [evt]
       (ca/put! ch evt)
       nil)))
+
+(defmethod rt/setup-runtime :listeners [conf _]
+  ;; TODO Register listeners?
+  #_(ec/add-listener (get-in runtime [:events :receiver])
+                     (build-update-handler runtime)))

@@ -62,7 +62,12 @@
     (is (some? (sut/make-events {:events {:type :sync}}))))
 
   (testing "can make manifold events"
-    (is (some? (sut/make-events {:events {:type :manifold}})))))
+    (is (some? (sut/make-events {:events {:type :manifold}}))))
+  
+  (testing "can make zeromq server events"
+    (is (some? (sut/make-events {:events {:type :zmq
+                                          :mode :server
+                                          :endpoint "tcp://0.0.0.0:3001"}})))))
 
 (deftest wrapped
   (testing "returns fn that invokes f"
