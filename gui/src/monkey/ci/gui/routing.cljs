@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.routing
-  (:require [re-frame.core :as rf]
+  (:require [monkey.ci.gui.logging :as log]
+            [re-frame.core :as rf]
             [reitit.frontend :as f]
             [reitit.frontend.easy :as rfe]))
 
@@ -21,9 +22,9 @@
 (rf/reg-event-fx
  :route/changed
  (fn [{:keys [db]} [_ match]]
-   (println "Changing current route from" (current db) "into" match)
+   (log/debug "Changing current route from" (current db) "into" match)
    (let [handlers (on-page-leave db)]
-     (println "Found" (count handlers) "leave handlers")
+     (log/debug "Found" (count handlers) "leave handlers")
      (cond-> {:db (-> db
                       (assoc current match)
                       (dissoc on-page-leave))}
@@ -44,7 +45,7 @@
     ["/events" :page/event-stream]]))
 
 (defn on-route-change [match history]
-  (println "Route changed:" match)
+  (log/debug "Route changed:" match)
   (rf/dispatch [:route/changed match]))
 
 (defn start! []

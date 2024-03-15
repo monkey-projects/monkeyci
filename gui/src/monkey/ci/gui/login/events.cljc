@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.login.events
-  (:require [monkey.ci.gui.login.db :as db]
+  (:require [monkey.ci.gui.logging :as log]
+            [monkey.ci.gui.login.db :as db]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
@@ -30,7 +31,7 @@
 (rf/reg-event-fx
  :login/github-login--success
  (fn [{:keys [db]} [_ {u :body}]]
-   (println "Got user details:" u)
+   (log/debug "Got user details:" u)
    {:db (-> db
             (db/set-user (dissoc u :token))
             (db/set-token (:token u)))
@@ -39,7 +40,7 @@
 (rf/reg-event-db
  :login/github-login--failed
  (fn [db [_ err]]
-   (println "Got error:" err)
+   (log/debug "Got error:" err)
    (db/set-alerts db [{:type :danger
                        :message (str "Unable to fetch Github user token: " (u/error-msg err))}])))
 
@@ -55,12 +56,12 @@
 (rf/reg-event-db
  :login/load-github-config--success
  (fn [db [_ {config :body}]]
-   (println "Got github config:" config)
+   (log/debug "Got github config:" config)
    (db/set-github-config db config)))
 
 (rf/reg-event-db
  :login/load-github-config--failed
  (fn [db [_ err]]
    ;; Nothing (yet?)
-   (println "Unable to load github config:" err)
+   (log/warn "Unable to load github config:" err)
    db))

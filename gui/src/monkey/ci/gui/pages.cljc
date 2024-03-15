@@ -1,6 +1,7 @@
 (ns ^:dev/always  monkey.ci.gui.pages
   "Links route names to actual components to be rendered"
   (:require [monkey.ci.gui.layout :as l]
+            [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.login.views :as login]
             [monkey.ci.gui.login.subs]
             [monkey.ci.gui.build.views :as build]
@@ -23,7 +24,7 @@
 (def public? #{:page/login :page/github-callback})
 
 (defn render-page [route]
-  (println "Rendering page for route:" (route-name route))
+  (log/debug "Rendering page for route:" (route-name route))
   (if-let [p (get pages (get-in route [:data :name]))]
     [p route]
     [:div.alert.alert-warning
@@ -31,7 +32,6 @@
      [:p "No page exists for route " [:b (str (get-in route [:data :name]))]]]))
 
 (defn render []
-  (println "Rendering...")
   (let [r (rf/subscribe [:route/current])
         t (rf/subscribe [:login/token])]
     ;; If no token found, redirect to login

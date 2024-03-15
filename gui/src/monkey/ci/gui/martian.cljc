@@ -3,6 +3,7 @@
             [martian.cljs-http :as mh]
             [martian.interceptors :as mi]
             [martian.re-frame :as mr]
+            [monkey.ci.gui.logging :as log]
             [re-frame.core :as rf]
             [schema.core :as s]))
 
@@ -84,7 +85,7 @@
 (defn init
   "Initializes using the fixed routes"
   []
-  (println "Initializing" (count routes) "routes")
+  (log/debug "Initializing" (count routes) "routes")
   (rf/dispatch-sync
    [::mr/init (martian/bootstrap
                url

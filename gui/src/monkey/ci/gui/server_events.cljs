@@ -4,14 +4,15 @@
   (:require [cljs.core.async :refer [<!]]
             [clojure.tools.reader.edn :as edn]
             [monkey.ci.gui.martian :as m]
+            [monkey.ci.gui.logging :as log]
             [re-frame.core :as rf]))
 
 (defn- parse-edn [edn]
   (try
     (edn/read-string edn)
     (catch js/Error ex
-      (println "Unable to parse edn:" ex)
-      (println "Edn:" edn))))
+      (log/error "Unable to parse edn:" ex)
+      (log/error "Edn:" edn))))
 
 (def events-url
   (if (exists? js/eventsRoot)
@@ -24,7 +25,7 @@
   [cust-id token on-recv-evt]
   (if cust-id
     (do
-      (println "Starting reading events for customer" cust-id)
+      (log/debug "Starting reading events for customer" cust-id)
       ;; Send security token as query arg.
       ;; Alternatively, and perhaps more secure, would be to add an extra endpoint where
       ;; the client can retrieve a short-lived "event token", only valid for events and
@@ -35,10 +36,10 @@
         (set! (.-onmessage src)
               (fn [evt]
                 (let [d (parse-edn (.-data evt))]
-                  (println "Got event:" d)
+                  (log/debug "Got event:" d)
                   (rf/dispatch (conj on-recv-evt d)))))
         src))
-    (println "No customer id provided")))
+    (log/error "No customer id provided")))
 
 (defn stop-reading-events [src]
   (when src
@@ -64,7 +65,7 @@
  :event-stream/start
  [(rf/inject-cofx :event-stream/connector)]
  (fn [{:keys [db] :as ctx} [_ id cust-id handler-evt]]
-   (println "Starting event stream:" id)
+   (log/info "Starting event stream:" id)
    (let [conn (::connector ctx)
          token (:auth/token db)]
      {:db (set-stream-config db id {:handler-evt handler-evt
@@ -73,6 +74,6 @@
 (rf/reg-event-fx
  :event-stream/stop
  (fn [{:keys [db]} [_ id]]
-   (println "Stopping event stream:" id)
+   (log/info "Stopping event stream:" id)
    {:db (update db ::event-stream dissoc id)
     :event-stream/close (:source (stream-config db id))}))
