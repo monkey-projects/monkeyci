@@ -71,5 +71,6 @@
 
 (defmethod rt/setup-runtime :listeners [conf _]
   (when (every? conf [:events :storage])
+    (log/debug "Setting up storage event listeners")
     (-> (map->Listeners {})
         (co/using [:events :storage]))))

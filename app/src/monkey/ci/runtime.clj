@@ -76,9 +76,14 @@
 (def work-dir (from-config :work-dir))
 (def dev-mode? (from-config :dev-mode))
 (def ssh-keys-dir (from-config :ssh-keys-dir))
-(def events-receiver (comp :receiver :events))
 (def runner :runner)
 (def build "Gets build info from runtime" :build)
+
+(defn events-receiver [{:keys [events]}]
+  (if (satisfies? p/EventReceiver events)
+    events
+    ;; Backwards compatibility, mostly in tests
+    (:receiver events)))
 
 (defn get-arg [rt k]
   (k (args rt)))
@@ -119,7 +124,9 @@
     (p/post-events events evt)
     ;; For backwards compatibility, in tests
     (fn? (:poster events))
-    ((:poster events) evt)))
+    ((:poster events) evt)
+    :else
+    (log/warn "No event poster configured")))
 
 (defn rt->env
   "Returns a map that can be serialized back into env vars.  This is used

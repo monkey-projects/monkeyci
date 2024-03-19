@@ -75,12 +75,25 @@
                       {:autostart? false  ; Let component start it
                        :matches-filter? matches-filter?})))
 
+(defn- reuse-context?
+  "Checks if we should reuse context.  This is necessary if we use inproc protocol."
+  [conf]
+  (some-> conf
+          (get-in [:client :address])
+          (.startsWith "inproc://")))
+
 (defn make-zeromq-events
   "Creates zeromq events component.  Depending on configuration, it can contain both
    a client and a server.  The client connects to the server in order to post events,
    so the client functions as the event poster.  Both need to be started to work."
-  [{:keys [client server]}]
-  (let [listeners (atom [])]
+  [conf]
+  ;; FIXME inproc only works if they both use the same context.  We would have to inspect
+  ;; the address here to do that.
+  (let [listeners (atom [])
+        ctx (when (reuse-context? conf) (make-context))
+        {:keys [client server]} (cond-> conf
+                                  ctx (-> (assoc-in [:client :context] ctx)
+                                          (assoc-in [:server :context] ctx)))]
     (->ZeroMQEvents (make-server server)
                     (make-client client listeners)
                     listeners)))
