@@ -262,6 +262,8 @@
   (fn [req]
     (h req)))
 
+(deftype RuntimeWrapper [runtime])
+
 (defn make-router
   ([rt routes]
    (ring/router
@@ -277,8 +279,8 @@
                                       log-request]))
             :muuntaja (c/make-muuntaja)
             :coercion reitit.coercion.schema/coercion
-            ;; FIXME Wrap the runtime in a type, so reitit doesn't change the records into maps
-            ::c/runtime rt}
+            ;; Wrap the runtime in a type, so reitit doesn't change the records into maps
+            ::c/runtime (->RuntimeWrapper rt)}
      ;; Disabled, results in 405 errors for some reason
      ;;:compile rc/compile-request-coercers
      :reitit.middleware/registry
