@@ -7,6 +7,8 @@
              [events :as ze]]
             [zeromq.zmq :as z]))
 
+;; TODO Add security
+
 (defmulti make-zeromq-events :mode)
 
 (defn make-context []
