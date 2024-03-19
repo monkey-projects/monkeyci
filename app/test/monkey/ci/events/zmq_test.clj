@@ -7,32 +7,32 @@
              [zmq :as sut]]
             [monkey.ci.helpers :as h]))
 
-(deftest event-server
-  (ast/async-tests #(sut/make-zeromq-events {:mode :server
-                                             :endpoint "inproc://server-test"})))
+(deftest network-server
+  (let [addr "tcp://0.0.0.0:3100"]
+    (ast/async-tests #(sut/make-zeromq-events {:server
+                                               {:enabled true
+                                                :addresses [addr]}
+                                               :client
+                                               {:address addr}}))))
 
-(defn- stop-all [components]
-  (doseq [c components]
-    (co/stop c)))
-
-(deftest event-client
-  (testing "posts events to server"
+(deftest inproc-server
+  (testing "runs inproc client/server on single address"
     (let [ep "inproc://client-test"
-          events (atom [])
+          recv (atom [])
           ctx (sut/make-context)
-          server (-> (sut/make-zeromq-events {:mode :server
-                                              :endpoint ep
-                                              :context ctx})
-                     (c/add-listener (c/no-dispatch (partial swap! events conj)))
-                     (co/start))
-          client (-> (sut/make-zeromq-events {:mode :client
-                                              :endpoint ep
-                                              :context ctx})
-                     (co/start))
+          events (-> (sut/make-zeromq-events {:server
+                                              {:enabled true
+                                               :addresses [ep]
+                                               :context ctx}
+                                              :client
+                                              {:address ep
+                                               :context ctx}})
+                     (co/start)
+                     (c/add-listener (c/no-dispatch (partial swap! recv conj))))
           evt {:type ::client-test
                :id (random-uuid)}]
       (try
-        (is (some? (c/post-events client evt)))
-        (is (not= :timeout (h/wait-until #(not-empty @events) 1000)))
-        (is (= [evt] @events))
-        (finally (stop-all [client server]))))))
+        (is (some? (c/post-events events evt)))
+        (is (not= :timeout (h/wait-until #(not-empty @recv) 1000)))
+        (is (= [evt] @recv))
+        (finally (co/stop events))))))

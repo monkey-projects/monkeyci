@@ -41,14 +41,17 @@
   "Starts the runtime by starting all parts as a component tree.  Returns a
    component system that can be passed to `stop`."
   [rt]
+  (log/info "Starting runtime system")
   (->> rt
        (mc/filter-vals some?)
+       ;; TODO Check if we should create a separate system from the runtime instead of this
        (co/map->SystemMap)
        (co/start-system)))
 
 (defn stop
   "Stops a previously started runtime"
   [rt]
+  (log/info "Stopping runtime system")
   (co/stop-system rt))
 
 ;;; Accessors and utilities
