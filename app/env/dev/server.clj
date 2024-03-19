@@ -16,9 +16,11 @@
 (defonce server (atom nil))
 
 (defn stop-server []
-  (swap! server (fn [s]
-                  (when s
-                    (s))
+  (swap! server (fn [{:keys [server rt]}]
+                  (when server
+                    (server))
+                  (when rt
+                    (rt/stop rt))
                   nil)))
 
 (defn validate-config [c]
@@ -34,10 +36,11 @@
                       @co/global-config)
                (config/normalize-config {} {})
                (validate-config)
-               (rt/config->runtime))]
-    ;; TODO Use components instead
-    (c/register-listeners rt)
-    (reset! server ((:http rt) rt)))
+               (rt/config->runtime)
+               (rt/start))
+        start-server (:http rt)]
+    (reset! server {:rt rt
+                    :server (start-server rt)}))
   nil)
 
 (defn get-server-port []
@@ -58,9 +61,9 @@
 (defn post-event
   "Posts an event using the runtime in the current server config"
   [evt]
-  (if-let [poster (some-> server deref :rt :events :poster)]
-    (poster evt)
-    (throw (ex-info "No event poster in server, or no server running" @server))))
+  (if-let [rt (some-> server deref :rt)]
+    (rt/post-events rt evt)
+    (throw (ex-info "No server running" @server))))
 
 (defn sse-handler [req]
   (let [stream (ms/periodically 2000

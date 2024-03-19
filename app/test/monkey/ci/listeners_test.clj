@@ -2,6 +2,7 @@
   (:require [clojure.test :refer [deftest testing is]]
             [monkey.ci
              [listeners :as sut]
+             [runtime :as rt]
              [storage :as st]]
             [monkey.ci.helpers :as h]))
 
@@ -19,23 +20,21 @@
 (deftest save-build
   (testing "updates build entity"
     (h/with-memory-store st
-      (let [rt {:storage st}
-            sid (random-sid)
+      (let [sid (random-sid)
             evt {:type :build/end
                  :build (-> (test-build sid)
                             (assoc :status :success))
                  :sid sid
                  :exit 0
                  :result :success}]
-        (is (st/sid? (sut/update-build rt evt)))
+        (is (st/sid? (sut/update-build st evt)))
         (is (true? (st/build-exists? st sid)))
         (is (= :success
                (:status (st/find-build st sid)))))))
 
   (testing "removes unwanted fields"
     (h/with-memory-store st
-      (let [rt {:storage st}
-            sid (random-sid)
+      (let [sid (random-sid)
             evt {:type :build/end
                  :build (-> (test-build sid)
                             (assoc :status :success
@@ -43,15 +42,14 @@
                  :sid sid
                  :exit 0
                  :result :success}]
-        (is (st/sid? (sut/update-build rt evt)))
+        (is (st/sid? (sut/update-build st evt)))
         (let [match (st/find-build st sid)]
           (is (not (contains? match :sid)))
           (is (not (contains? match :cleanup?)))))))
 
   (testing "does not remove existing script info"
     (h/with-memory-store st
-      (let [rt {:storage st}
-            sid (random-sid)
+      (let [sid (random-sid)
             script {:jobs {"test-job" {:status :success}}}
             build (-> (test-build sid)
                       (assoc :status :success
@@ -62,15 +60,14 @@
                  :exit 0
                  :result :success}]
         (is (st/sid? (st/save-build st build)))
-        (is (st/sid? (sut/update-build rt evt)))
+        (is (st/sid? (sut/update-build st evt)))
         (let [match (st/find-build st sid)]
           (is (= script (:script match))))))))
 
 (deftest save-script
   (testing "updates script in build"
     (h/with-memory-store st
-      (let [rt {:storage st}
-            {:keys [sid] :as build} (test-build)
+      (let [{:keys [sid] :as build} (test-build)
             script {:start-time 100
                     :status :running
                     :jobs {"test-job" {}}}
@@ -78,26 +75,24 @@
                  :sid sid
                  :script script}]
         (is (st/sid? (st/save-build st build)))
-        (is (st/sid? (sut/update-script rt evt)))
+        (is (st/sid? (sut/update-script st evt)))
         (let [match (st/find-build st sid)]
           (is (= script (:script match)))))))
 
   (testing "returns `nil` when build not found"
     (h/with-memory-store st
-      (let [rt {:storage st}
-            {:keys [sid] :as build} (test-build)
+      (let [{:keys [sid] :as build} (test-build)
             script {:start-time 100
                     :status :running
                     :jobs {"test-job" {}}}
             evt {:type :script/start
                  :sid sid
                  :script script}]
-        (is (nil? (sut/update-script rt evt))))))
+        (is (nil? (sut/update-script st evt))))))
 
   (testing "does not overwrite jobs if already present"
     (h/with-memory-store st
-      (let [rt {:storage st}
-            {:keys [sid] :as build} (-> (test-build)
+      (let [{:keys [sid] :as build} (-> (test-build)
                                         (assoc :script
                                                {:start-time 100
                                                 :status :running
@@ -109,22 +104,21 @@
                  :sid sid
                  :script script}]
         (is (st/sid? (st/save-build st build)))
-        (is (st/sid? (sut/update-script rt evt)))
+        (is (st/sid? (sut/update-script st evt)))
         (let [match (st/find-build st sid)]
           (is (= :success (get-in match [:script :jobs "test-job" :status]))))))))
 
 (deftest update-job
   (testing "patches build script with job info"
     (h/with-memory-store st
-      (let [rt {:storage st}
-            {:keys [sid] :as build} (test-build)
+      (let [{:keys [sid] :as build} (test-build)
             evt {:type :job/start
                  :sid sid
                  :job {:id "test-job"
                        :start-time 120}
                  :message "Starting job"}]
         (is (st/sid? (st/save-build st build)))
-        (is (some? (sut/update-job rt evt)))
+        (is (some? (sut/update-job st evt)))
         (is (= (:job evt)
                (-> (st/find-build st sid)
                    (get-in [:script :jobs "test-job"]))))))))
@@ -137,7 +131,7 @@
             (h/with-memory-store st
               (let [sid (random-sid)
                     build (test-build sid)
-                    handler (sut/build-update-handler {:storage st})]
+                    handler (sut/build-update-handler st)]
                 (handler {:type evt-type
                           :build build})
                 (is (not= :timeout (h/wait-until #(st/build-exists? st sid) 1000))))))]
@@ -154,7 +148,7 @@
                     build (test-build sid)
                     _ (st/save-build st build)
                     script {:jobs {"test-job" {:status :success}}}
-                    handler (sut/build-update-handler {:storage st})]
+                    handler (sut/build-update-handler st)]
                 (handler {:type evt-type
                           :sid sid
                           :script script})
@@ -174,7 +168,7 @@
                     _ (st/save-build st build)
                     job {:id job-id
                          :status :success}
-                    handler (sut/build-update-handler {:storage st})]
+                    handler (sut/build-update-handler st)]
                 (handler {:type evt-type
                           :sid sid
                           :job job})
@@ -211,3 +205,15 @@
           (is (not= :timeout (h/wait-until #(= 4 @handled) 1000)))
           (doseq [[k r] @inv]
             (is (= [:started :completed] r) (str "for id " k))))))))
+
+(deftest setup-runtime
+  (testing "`nil` if no events configured"
+    (is (nil? (rt/setup-runtime {:storage ::test-storage} :listeners))))
+
+  (testing "`nil` if no storage configured"
+    (is (nil? (rt/setup-runtime {:events ::test-events} :listeners))))
+
+  (testing "returns component if storage and events configured"
+    (is (some? (rt/setup-runtime {:storage ::test-storage
+                                  :events ::test-events}
+                                 :listeners)))))

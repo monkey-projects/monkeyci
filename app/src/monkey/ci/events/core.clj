@@ -1,12 +1,14 @@
 (ns monkey.ci.events.core
-  (:require [monkey.ci.runtime :as rt]))
+  (:require [monkey.ci
+             [protocols :as p]
+             [runtime :as rt]]
+            [monkey.ci.events
+             [manifold :as manifold]
+             [zmq :as zmq]]))
 
-(defprotocol EventPoster
-  (post-events [poster evt] "Posts one or more events"))
-
-(defprotocol EventReceiver
-  (add-listener [recv l] "Add the given listener to the receiver")
-  (remove-listener [recv l] "Removes the listener from the receiver"))
+(def post-events p/post-events)
+(def add-listener p/add-listener)
+(def remove-listener p/remove-listener)
 
 (defn make-event [e]
   (assoc e :timestamp (System/currentTimeMillis)))
@@ -20,15 +22,12 @@
 
 ;; Simple in-memory implementation, useful for testing
 (deftype SyncEvents [listeners]
-  EventPoster
+  p/EventPoster
   (post-events [this evt]
-    ;; Re-dispatch all events that were the result of the listeners
-    (loop [all (if (sequential? evt) evt [evt])]
-      (when-not (empty? all)
-        (recur (post-one @listeners all))))
+    (post-one @listeners (if (sequential? evt) evt [evt]))
     this)
   
-  EventReceiver
+  p/EventReceiver
   (add-listener [this l]
     ;; It's up to the listener to do event filtering.
     ;; Possible problem: with many listeners and many events, this may become slow.
@@ -59,11 +58,15 @@
 (defmethod make-events :sync [_]
   (make-sync-events))
 
+(defmethod make-events :manifold [_]
+  (manifold/make-manifold-events))
+
+(defmethod make-events :zmq [config]
+  (zmq/make-zeromq-events (:events config)))
+
 (defmethod rt/setup-runtime :events [conf _]
   (when (:events conf)
-    (let [e (make-events conf)]
-      (cond-> {:poster (partial post-events e)}
-        (satisfies? EventReceiver e) (assoc :receiver e)))))
+    (make-events conf)))
 
 (defn wrapped
   "Returns a new function that wraps `f` and posts an event before 

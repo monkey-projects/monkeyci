@@ -17,10 +17,15 @@
              [parameters :as rrmp]]
             [ring.util.response :as rur]))
 
+
+;; Reitit rewrites records in the data to hashmaps, so wrap it in a type
+(deftype RuntimeWrapper [runtime])
+
 (defn req->rt
   "Gets the runtime from the request"
   [req]
-  (get-in req [:reitit.core/match :data ::runtime]))
+  (some-> (get-in req [:reitit.core/match :data ::runtime])
+          (.runtime)))
 
 (defn from-rt
   "Applies `f` to the request runtime"

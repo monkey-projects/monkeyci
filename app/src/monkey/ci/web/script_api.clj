@@ -75,7 +75,7 @@
     {:data {:middleware c/default-middleware
             :muuntaja (c/make-muuntaja)
             :coercion reitit.coercion.schema/coercion
-            ::c/runtime (with-api opts)}}))
+            ::c/runtime (c/->RuntimeWrapper (with-api opts))}}))
   ([opts]
    (make-router opts routes)))
 

@@ -8,7 +8,9 @@
             [monkey.ci
              [blob :as blob]
              [storage :as s]]
-            [monkey.ci.web.auth :as auth]
+            [monkey.ci.web
+             [common :as wc]
+             [auth :as auth]]
             [ring.mock.request :as mock])
   (:import org.apache.commons.io.FileUtils))
 
@@ -109,12 +111,12 @@
   (->FakeBlobStore stored true))
 
 (defn ->req
-  "Takes a context and creates a request object from it that can be passed to
+  "Takes a runtime and creates a request object from it that can be passed to
    an api handler function."
   [rt]
   {:reitit.core/match
    {:data
-    {:monkey.ci.web.common/runtime rt}}})
+    {:monkey.ci.web.common/runtime (wc/->RuntimeWrapper rt)}}})
 
 (defn with-path-param [r k v]
   (assoc-in r [:parameters :path k] v))

@@ -3,7 +3,7 @@
   (:require [manifold
              [deferred :as md]
              [stream :as ms]]
-            [monkey.ci.events.core :as c]))
+            [monkey.ci.protocols :as p]))
 
 (defn- post [stream e]
   ;; Either post one event, or multiple
@@ -12,23 +12,20 @@
     (ms/put! stream e)))
 
 (deftype ManifoldEvents [stream]
-  c/EventPoster
+  p/EventPoster
   (post-events [this e]
     (post stream e)
     this)
 
-  c/EventReceiver
+  p/EventReceiver
   (add-listener [this l]
     (let [s (ms/stream 10)]
       (ms/connect stream s
                   {:description {::listener l}})
-      (ms/consume-async
-       (fn [evt]
-         ;; TODO This may deadlock
-         (if-let [r (l evt)]
-           (post stream r)
-           (md/success-deferred true)))
-       s)
+      (ms/consume-async (fn [evt]
+                          (l evt) ; Ignore the return value
+                          (md/success-deferred true))
+                        s)
       this))
   
   (remove-listener [this l]
@@ -43,6 +40,3 @@
 (defn make-manifold-events []
   (->ManifoldEvents (ms/stream* {:permanent? true
                                  :description #(assoc % ::desc "Event bus")})))
-
-(defmethod c/make-events :manifold [_]
-  (make-manifold-events))

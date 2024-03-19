@@ -347,7 +347,7 @@
   (testing "sends ping on open"
     (let [sent (atom [])
           evt (ec/make-sync-events)
-          f (sut/event-stream (h/->req {:events {:receiver evt}}))
+          f (sut/event-stream (h/->req {:events evt}))
           _ (ms/consume (partial swap! sent conj) (:body f))]
       (is (some? (ec/post-events evt {:type :script/start})))
       (is (not= :timeout (h/wait-until #(not-empty @sent) 1000)))
@@ -359,7 +359,7 @@
   (testing "sends received events on open"
     (let [sent (atom [])
           evt (ec/make-sync-events)
-          f (sut/event-stream (h/->req {:events {:receiver evt}}))
+          f (sut/event-stream (h/->req {:events evt}))
           _ (ms/consume (fn [evt]
                           (swap! sent #(conj % (parse-event evt))))
                         (:body f))]
@@ -371,7 +371,7 @@
     (let [sent (atom [])
           cid "test-customer"
           evt (ec/make-sync-events)
-          f (-> (h/->req {:events {:receiver evt}})
+          f (-> (h/->req {:events evt})
                 (assoc-in [:parameters :path :customer-id] cid)
                 (sut/event-stream))
           _ (ms/consume (fn [evt]

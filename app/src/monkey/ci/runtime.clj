@@ -9,9 +9,12 @@
    context.  This is more stable than reading properties from the runtime 
    directly."
   (:require [clojure.spec.alpha :as spec]
+            [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
+            [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
+             [protocols :as p]
              [spec :as s]
              [utils :as u]]))
 
@@ -40,12 +43,17 @@
   "Starts the runtime by starting all parts as a component tree.  Returns a
    component system that can be passed to `stop`."
   [rt]
-  (-> (co/map->SystemMap rt)
-      (co/start-system)))
+  (log/info "Starting runtime system")
+  (->> rt
+       (mc/filter-vals some?)
+       ;; TODO Check if we should create a separate system from the runtime instead of this
+       (co/map->SystemMap)
+       (co/start-system)))
 
 (defn stop
   "Stops a previously started runtime"
   [rt]
+  (log/info "Stopping runtime system")
   (co/stop-system rt))
 
 ;;; Accessors and utilities
@@ -68,9 +76,14 @@
 (def work-dir (from-config :work-dir))
 (def dev-mode? (from-config :dev-mode))
 (def ssh-keys-dir (from-config :ssh-keys-dir))
-(def events-receiver (comp :receiver :events))
 (def runner :runner)
 (def build "Gets build info from runtime" :build)
+
+(defn events-receiver [{:keys [events]}]
+  (if (satisfies? p/EventReceiver events)
+    events
+    ;; Backwards compatibility, mostly in tests
+    (:receiver events)))
 
 (defn get-arg [rt k]
   (k (args rt)))
@@ -87,9 +100,13 @@
   [conf mode f]
   (let [rt (-> conf
                (assoc :app-mode mode)
-               (config->runtime))]
-    ;; TODO Start/stop runtime
-    (f rt)))
+               (config->runtime)
+               (start))]
+    (try
+      (let [v (f rt)]
+        (cond-> v
+          (md/deferred? v) deref))
+      (finally (stop rt)))))
 
 (defmacro with-runtime
   "Convenience macro that wraps `with-runtime-fn` by binding runtime to `r` and 
@@ -101,9 +118,15 @@
 
 (defn post-events
   "Posts one or more events using the event poster in the runtime"
-  [rt evt]
-  (when-let [p (get-in rt [:events :poster])]
-    (p evt)))
+  [{:keys [events]} evt]
+  (cond
+    (satisfies? p/EventPoster events)
+    (p/post-events events evt)
+    ;; For backwards compatibility, in tests
+    (fn? (:poster events))
+    ((:poster events) evt)
+    :else
+    (log/warn "No event poster configured")))
 
 (defn rt->env
   "Returns a map that can be serialized back into env vars.  This is used

@@ -14,7 +14,7 @@
              [config :as config]
              [containers]
              [git]
-             [listeners :as l]
+             [listeners]
              [logging]
              [runtime :as rt]
              [runners]
@@ -32,10 +32,6 @@
              [file]
              [oci]]))
 
-(defn register-listeners [runtime]
-  (ec/add-listener (get-in runtime [:events :receiver])
-                   (l/build-update-handler runtime)))
-
 (defn system-invoker
   "The event invoker starts a subsystem according to the command requirements,
    and posts the `command/invoked` event.  This event should be picked up by a
@@ -46,10 +42,7 @@
   (fn [args]
     (log/debug "Invoking command with arguments:" args)
     (let [config (config/app-config env args)]
-      ;; When app mode is specified, pass the runtime for new-style invocations
       (rt/with-runtime config app-mode runtime
-        ;; TODO Make more generic
-        (register-listeners runtime)
         (log/info "Executing command:" command)
         (command runtime)))))
 

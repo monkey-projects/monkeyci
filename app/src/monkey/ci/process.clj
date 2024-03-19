@@ -41,13 +41,14 @@
    is run in a child process by the `execute!` function below.  This exits the VM
    with a nonzero value on failure."
   ([args env]
-   (try 
-     (let [rt (-> (config/normalize-config default-script-config (config/strip-env-prefix env) args)
-                  (rt/config->runtime))]
-       (log/debug "Executing script with runtime" rt)
-       (log/debug "Script working directory:" (utils/cwd))
-       (when (bc/failed? (script/exec-script! rt))
-         (exit! 1)))
+   (try
+     (when (-> (config/normalize-config default-script-config (config/strip-env-prefix env) args)
+               (rt/with-runtime :script rt
+                 (log/debug "Executing script with runtime" rt)
+                 (log/debug "Script working directory:" (utils/cwd))
+                 (script/exec-script! rt))
+               (bc/failed?))
+       (exit! 1))
      (catch Exception ex
        ;; This could happen if there is an error loading or initializing the child process
        (log/error "Failed to run child process" ex)
@@ -137,6 +138,7 @@
   [{{:keys [checkout-dir build-id] :as build} :build :as rt}]
   (log/info "Executing build process for" build-id "in" checkout-dir)
   (let [script-dir (b/rt->script-dir rt)
+        ;; TODO Replace the script api with regular api client and token
         {:keys [socket-path server]} (start-script-api rt)
         [out err :as loggers] (map (partial make-logger rt) [:out :err])
         result (md/deferred)]

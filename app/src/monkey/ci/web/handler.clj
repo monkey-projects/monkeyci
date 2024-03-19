@@ -277,8 +277,8 @@
                                       log-request]))
             :muuntaja (c/make-muuntaja)
             :coercion reitit.coercion.schema/coercion
-            ::c/context rt ; TODO Remove this
-            ::c/runtime rt}
+            ;; Wrap the runtime in a type, so reitit doesn't change the records into maps
+            ::c/runtime (c/->RuntimeWrapper rt)}
      ;; Disabled, results in 405 errors for some reason
      ;;:compile rc/compile-request-coercers
      :reitit.middleware/registry
