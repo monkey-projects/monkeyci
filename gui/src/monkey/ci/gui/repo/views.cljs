@@ -43,7 +43,8 @@
                       :value (fn [b] [co/build-result (:status b)])}
                      {:label "Commit message"
                       :value (fn [b]
-                               [:span.text-truncate (:message b)])}]}]]))))
+                               [:span.text-truncate (:or (get-in b [:git :message])
+                                                         (:message b))])}]}]]))))
 
 (defn page [route]
   (rf/dispatch [:repo/init])
