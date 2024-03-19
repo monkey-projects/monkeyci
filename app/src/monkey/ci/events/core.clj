@@ -24,10 +24,7 @@
 (deftype SyncEvents [listeners]
   p/EventPoster
   (post-events [this evt]
-    ;; Re-dispatch all events that were the result of the listeners
-    (loop [all (if (sequential? evt) evt [evt])]
-      (when-not (empty? all)
-        (recur (post-one @listeners all))))
+    (post-one @listeners (if (sequential? evt) evt [evt]))
     this)
   
   p/EventReceiver
@@ -69,9 +66,7 @@
 
 (defmethod rt/setup-runtime :events [conf _]
   (when (:events conf)
-    (let [e (make-events conf)]
-      (cond-> {:poster (partial post-events e)}
-        (satisfies? p/EventReceiver e) (assoc :receiver e)))))
+    (make-events conf)))
 
 (defn wrapped
   "Returns a new function that wraps `f` and posts an event before 

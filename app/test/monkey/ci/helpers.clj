@@ -9,7 +9,7 @@
              [blob :as blob]
              [storage :as s]]
             [monkey.ci.web
-             [handler :as wh]
+             [common :as wc]
              [auth :as auth]]
             [ring.mock.request :as mock])
   (:import org.apache.commons.io.FileUtils))
@@ -116,7 +116,7 @@
   [rt]
   {:reitit.core/match
    {:data
-    {:monkey.ci.web.common/runtime (wh/->RuntimeWrapper rt)}}})
+    {:monkey.ci.web.common/runtime (wc/->RuntimeWrapper rt)}}})
 
 (defn with-path-param [r k v]
   (assoc-in r [:parameters :path k] v))

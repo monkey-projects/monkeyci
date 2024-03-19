@@ -22,13 +22,10 @@
     (let [s (ms/stream 10)]
       (ms/connect stream s
                   {:description {::listener l}})
-      (ms/consume-async
-       (fn [evt]
-         ;; TODO This may deadlock
-         (if-let [r (l evt)]
-           (post stream r)
-           (md/success-deferred true)))
-       s)
+      (ms/consume-async (fn [evt]
+                          (l evt) ; Ignore the return value
+                          (md/success-deferred true))
+                        s)
       this))
   
   (remove-listener [this l]

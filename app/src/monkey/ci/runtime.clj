@@ -9,10 +9,12 @@
    context.  This is more stable than reading properties from the runtime 
    directly."
   (:require [clojure.spec.alpha :as spec]
+            [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
             [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
+             [protocols :as p]
              [spec :as s]
              [utils :as u]]))
 
@@ -111,9 +113,13 @@
 
 (defn post-events
   "Posts one or more events using the event poster in the runtime"
-  [rt evt]
-  (when-let [p (get-in rt [:events :poster])]
-    (p evt)))
+  [{:keys [events]} evt]
+  (cond
+    (satisfies? p/EventPoster events)
+    (p/post-events events evt)
+    ;; For backwards compatibility, in tests
+    (fn? (:poster events))
+    ((:poster events) evt)))
 
 (defn rt->env
   "Returns a map that can be serialized back into env vars.  This is used

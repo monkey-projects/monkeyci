@@ -29,18 +29,7 @@
       (is (some? (sut/add-listener s (sut/no-dispatch
                                        (partial swap! recv conj)))))
       (is (= s (sut/post-events s evt)))
-      (is (= [evt] @recv))))
-
-  (testing "re-dispatches events"
-    (let [recv (atom [])
-          s (-> (sut/make-sync-events)
-                (sut/add-listener (sut/filter-type :type/first (constantly {:type :type/second})))
-                (sut/add-listener (sut/filter-type :type/second (fn [evt]
-                                                                  (swap! recv conj evt)
-                                                                  nil))))]
-      (is (some? (sut/post-events s {:type :type/first})))
-      (is (= [{:type :type/second}]
-             @recv)))))
+      (is (= [evt] @recv)))))
 
 (deftest post-one
   (testing "returns list of events to post"
@@ -66,8 +55,8 @@
   
   (testing "can make zeromq server events"
     (is (some? (sut/make-events {:events {:type :zmq
-                                          :mode :server
-                                          :endpoint "tcp://0.0.0.0:3001"}})))))
+                                          :server
+                                          {:addresses ["tcp://0.0.0.0:3001"]}}})))))
 
 (deftest wrapped
   (testing "returns fn that invokes f"
