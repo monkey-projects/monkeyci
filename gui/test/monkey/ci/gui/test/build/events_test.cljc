@@ -257,20 +257,42 @@
             (let [build (test-build)
                   evt {:type t
                        :sid (sid build)
-                       :script {:status :success}}]
+                       :script {:jobs {"test-job" {:status :success}}}}]
               (reset! app-db (-> {}
                                  (db/set-build build)
                                  (set-build-path build)))
               (rf/dispatch-sync [:build/handle-event evt])
               (is (= :success (-> (db/build @app-db)
                                   :script
+                                  :jobs
+                                  (get "test-job")
                                   :status)))))]
 
     (testing "updates build script on `script/start` event"
       (verify-script-updated :script/start))
 
     (testing "updates build script on `script/end` event"
-      (verify-script-updated :script/end)))
+      (verify-script-updated :script/end))
+
+    (testing "updates jobs in script"
+      (let [build (-> (test-build)
+                      (assoc :script {:jobs
+                                      {"test-job" {:id "test-job"
+                                                   :start-time 100}}}))
+            evt {:type :script/end
+                 :sid (sid build)
+                 :script {:jobs {"test-job" {:status :success}}}}]
+        (reset! app-db (-> {}
+                           (db/set-build build)
+                           (set-build-path build)))
+        (rf/dispatch-sync [:build/handle-event evt])
+        (is (= {:id "test-job"
+                :start-time 100
+                :status :success}
+               (-> (db/build @app-db)
+                   :script
+                   :jobs
+                   (get "test-job")))))))
 
   (letfn [(verify-job-updated [t]
             (let [build (test-build)

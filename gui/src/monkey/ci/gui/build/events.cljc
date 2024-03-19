@@ -152,8 +152,12 @@
 (defmethod handle-event :script/start [db evt]
   (update-script db (:script evt)))
 
-(defmethod handle-event :script/end [db evt]
-  (update-script db (:script evt)))
+(defmethod handle-event :script/end [db {upd :script}]
+  ;; Deep merge job info
+  (letfn [(merge-script [orig]
+            (-> (merge orig upd)
+                (assoc :jobs (merge-with merge (:jobs orig) (:jobs upd)))))]
+    (db/update-build db update :script merge-script)))
 
 (defn- update-job [db job]
   (db/update-build db assoc-in [:script :jobs (:id job)] job))
