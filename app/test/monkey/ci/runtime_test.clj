@@ -75,7 +75,13 @@
 (deftest rt->env
   (testing "returns config"
     (is (= {:key "value"}
-           (sut/rt->env {:config {:key "value"}})))))
+           (sut/rt->env {:config {:key "value"}}))))
+
+  (testing "removes event server"
+    (is (nil? (-> (sut/rt->env {:config {:events {:type :zmq
+                                                  :server {:enabled true}}}})
+                  :events
+                  :server)))))
 
 (defrecord TestComponent [started? stopped?]
   co/Lifecycle

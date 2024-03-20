@@ -104,7 +104,7 @@
   (utils/tmp-file (str "events-" build-id ".sock")))
 
 (defn- start-script-api
-  "Starts a script API  http server that listens at a domain socket 
+  "Starts a script API http server that listens at a domain socket 
    location.  Returns both the server and the socket path."
   [rt]
   (let [build-id (get-in rt [:build :build-id])
