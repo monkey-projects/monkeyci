@@ -136,7 +136,9 @@
   (-> rt
       :config
       (merge (select-keys rt [:build]))
-      (mc/update-existing-in [:build :sid] u/serialize-sid)))
+      (mc/update-existing-in [:build :sid] u/serialize-sid)
+      ;; Child processes never start an event server
+      (mc/update-existing :events dissoc :server)))
 
 (defn update-build
   "Updates the build in the runtime by applying `f` with given args."

@@ -339,14 +339,17 @@
                  (sut/build->out)
                  :status))))))
 
+(defn- make-events []
+  (ec/make-events {:events {:type :sync}}))
+
 (deftest event-stream
   (testing "returns stream reply"
-    (is (ms/source? (-> (sut/event-stream (h/->req {:events {:receiver (ec/make-sync-events)}}))
+    (is (ms/source? (-> (sut/event-stream (h/->req {:events (make-events)}))
                         :body))))
 
   (testing "sends ping on open"
     (let [sent (atom [])
-          evt (ec/make-sync-events)
+          evt (make-events)
           f (sut/event-stream (h/->req {:events evt}))
           _ (ms/consume (partial swap! sent conj) (:body f))]
       (is (some? (ec/post-events evt {:type :script/start})))
@@ -356,21 +359,10 @@
                        (parse-event)
                        :type)))))
 
-  (testing "sends received events on open"
-    (let [sent (atom [])
-          evt (ec/make-sync-events)
-          f (sut/event-stream (h/->req {:events evt}))
-          _ (ms/consume (fn [evt]
-                          (swap! sent #(conj % (parse-event evt))))
-                        (:body f))]
-      (is (some? (ec/post-events evt {:type :script/start})))
-      (is (not= :timeout (h/wait-until #(some (comp (partial = :script/start) :type) @sent)
-                                       1000)))))
-
   (testing "only sends events for customer specified in path"
     (let [sent (atom [])
           cid "test-customer"
-          evt (ec/make-sync-events)
+          evt (make-events)
           f (-> (h/->req {:events evt})
                 (assoc-in [:parameters :path :customer-id] cid)
                 (sut/event-stream))
@@ -380,7 +372,7 @@
       (is (some? (ec/post-events evt {:type :script/start
                                       :sid ["other-customer" "test-repo" "test-build"]})))
       (is (some? (ec/post-events evt {:type :script/start
-                                      :sid ["test-customer" "test-repo" "test-build"]})))
+                                      :sid [cid "test-repo" "test-build"]})))
       (is (not= :timeout (h/wait-until #(some (comp (partial = "test-customer")
                                                     first
                                                     :sid)

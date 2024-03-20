@@ -23,6 +23,6 @@
   (post-events [poster evt] "Posts one or more events"))
 
 (defprotocol EventReceiver
-  (add-listener [recv l] "Add the given listener to the receiver")
-  (remove-listener [recv l] "Removes the listener from the receiver"))
+  (add-listener [recv ef l] "Add the given filter with a listener to the receiver")
+  (remove-listener [recv ef l] "Removes the listener for the filter from the receiver"))
 

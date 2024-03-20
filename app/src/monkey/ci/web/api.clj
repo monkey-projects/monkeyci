@@ -369,19 +369,16 @@
         make-reply (fn [evt]
                      ;; Format according to sse specs, with double newline at the end
                      (str "data: " (pr-str evt) "\n\n"))
-        for-cust? (fn [{:keys [sid]}]
-                    ;; Allow either events without sid or where the customer is the first component
-                    (or (nil? sid) (= cid (first sid))))
-        listener (ec/no-dispatch
-                  (fn [evt]
-                    ;; Only send events for the customer specified in the url
-                    (when (and (allowed-events (:type evt)) (for-cust? evt))
-                      (ms/put! stream (make-reply evt)))))]
+        listener (fn [evt]
+                   (ms/put! stream (make-reply evt)))
+        cid-filter {:types allowed-events
+                    :sid [cid]}]
     (ms/on-drained stream
                    (fn []
                      (log/info "Closing event stream")
-                     (ec/remove-listener recv listener)))
-    (ec/add-listener recv listener)
+                     (ec/remove-listener recv cid-filter listener)))
+    ;; Only send events for the customer specified in the url
+    (ec/add-listener recv cid-filter listener)
     ;; Send a ping, this makes the server see the connection is open
     (ms/put! stream (make-reply {:type :ping}))
     (-> (rur/response stream)

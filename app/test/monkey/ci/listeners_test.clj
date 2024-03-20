@@ -184,24 +184,25 @@
 
   (testing "dispatches events in sequence"
     (let [inv (atom {})
-          handled (atom 0)]
-      (with-redefs [sut/update-job
-                    (fn [_ {:keys [sid] :as evt}]
-                      (Thread/sleep 100)
-                      (if (= :job/start (:type evt))
-                        (swap! inv assoc sid [:started])
-                        (swap! inv update sid conj :completed))
-                      (swap! handled inc))]
-        (let [h (sut/build-update-handler {:events {:poster (fn [_]
-                                                              (swap! handled inc))}})]
+          handled (atom 0)
+          handler (fn [_ {:keys [sid] :as evt}]
+                       (Thread/sleep 100)
+                       (if (= :job/start (:type evt))
+                         (swap! inv assoc sid [:started])
+                         (swap! inv update sid conj :completed))
+                       (swap! handled inc))]
+      (with-redefs [sut/update-handlers
+                    {:job/start handler
+                     :job/end handler}]
+        (let [h (sut/build-update-handler (st/make-memory-storage))]
           (h {:type :job/start
-              :sid ::first})
+              :sid [::first]})
           (h {:type :job/start
-              :sid ::second})
+              :sid [::second]})
           (h {:type :job/end
-              :sid ::first})
+              :sid [::first]})
           (h {:type :job/end
-              :sid ::second})
+              :sid [::second]})
           (is (not= :timeout (h/wait-until #(= 4 @handled) 1000)))
           (doseq [[k r] @inv]
             (is (= [:started :completed] r) (str "for id " k))))))))

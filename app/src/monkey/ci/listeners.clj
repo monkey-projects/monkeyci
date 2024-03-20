@@ -31,17 +31,19 @@
       (st/save-build storage (assoc-in build [:script :jobs job-id] job))
       (log/warn "Build not found when updating job:" sid))))
 
+(def update-handlers
+  {:job/start    update-job
+   :job/end      update-job
+   :script/start update-script
+   :script/end   update-script
+   :build/start  update-build
+   :build/end    update-build})
+
 (defn build-update-handler
   "Handles a build update event.  Because many events may come in close proximity,
    we need to queue them to avoid losing data."
   [storage]
-  (let [handlers {:job/start    update-job
-                  :job/end      update-job
-                  :script/start update-script
-                  :script/end   update-script
-                  :build/start  update-build
-                  :build/end    update-build}
-        ch (ca/chan 10)
+  (let [ch (ca/chan 10)
         dispatch-sub (fn [s dest]
                        (ca/go-loop [v (ca/<! s)]
                          (when v
@@ -55,7 +57,7 @@
     ;; Naive implementation: process them in sequence.  This does not look 
     ;; to the sid for optimization, so it could be faster.
     (dispatch-sub ch (fn [st evt]
-                       (when-let [h (get handlers (:type evt))]
+                       (when-let [h (get update-handlers (:type evt))]
                          (h st evt))))
     (fn [evt]
       (ca/put! ch evt)
@@ -65,7 +67,7 @@
   co/Lifecycle
   (start [this]
     ;; Register listeners
-    (ec/add-listener events (build-update-handler storage))
+    (ec/add-listener events (build-update-handler storage) {:types (set (keys update-handlers))})
     this)
   (stop [this]))
 

@@ -1,6 +1,8 @@
 (ns monkey.ci.events.core-test
   (:require [clojure.test :refer [deftest testing is]]
-            [monkey.ci.events.core :as sut]))
+            [monkey.ci.events
+             [core :as sut]
+             [async-tests :as ast]]))
 
 (deftest make-event
   (testing "adds timestamp to event"
@@ -10,41 +12,29 @@
 
 (deftest sync-events
   (testing "can add listener"
-    (let [s (sut/make-sync-events)]
-      (is (= s (sut/add-listener s (constantly nil))))
-      (is (= 1 (count @(.listeners s))))))
+    (let [s (sut/make-sync-events ast/matches-event?)
+          handler (constantly nil)]
+      (is (= s (sut/add-listener s nil handler)))
+      (is (= 1 (count @(.listeners s))))
+      (is (= {nil [handler]} @(.listeners s)))))
 
   (testing "can remove listener"
-    (let [l (constantly nil)]
-      (is (empty? (-> (sut/make-sync-events)
-                      (sut/add-listener l)
-                      (sut/remove-listener l)
+    (let [l (constantly nil)
+          ef {:type :test-event}]
+      (is (empty? (-> (sut/make-sync-events ast/matches-event?)
+                      (sut/add-listener ef l)
+                      (sut/remove-listener ef l)
                       (.listeners)
-                      (deref))))))
+                      (deref)
+                      (get ef))))))
 
   (testing "can dispatch single event"
     (let [recv (atom [])
-          s (sut/make-sync-events)
+          s (sut/make-sync-events ast/matches-event?)
           evt {:type :test-event}]
-      (is (some? (sut/add-listener s (sut/no-dispatch
-                                       (partial swap! recv conj)))))
+      (is (some? (sut/add-listener s {:type :test-event} (partial swap! recv conj))))
       (is (= s (sut/post-events s evt)))
       (is (= [evt] @recv)))))
-
-(deftest post-one
-  (testing "returns list of events to post"
-    (is (= [:new-event]
-           (sut/post-one [(constantly :new-event)] [:first-event]))))
-
-  (testing "empty list when no listeners"
-    (is (empty? (sut/post-one [] [:test-event]))))
-
-  (testing "flattens event list"
-    (is (= [:first :second]
-           (sut/post-one [(constantly [:first :second])] [:first-event]))))
-
-  (testing "ignores nil"
-    (is (empty? (sut/post-one [(constantly nil)] [:test-event])))))
 
 (deftest make-events
   (testing "can make sync events"
@@ -57,6 +47,33 @@
     (is (some? (sut/make-events {:events {:type :zmq
                                           :server
                                           {:addresses ["tcp://0.0.0.0:3001"]}}})))))
+
+(deftest matches-event?
+  (testing "matches event that contains one of the specified types"
+    (let [ef {:types #{::test-type}}]
+      (is (true? (sut/matches-event? {:type ::test-type} ef)))
+      (is (false? (sut/matches-event? {:type ::other-type} ef)))))
+
+  (testing "matches all events when `nil` filter"
+    (is (true? (sut/matches-event? {:type ::some-type} nil))))
+
+  (testing "matches by partial sid"
+    (let [ef {:sid ["test-cust"]}]
+      (is (true? (sut/matches-event? {:sid ["test-cust" "test-repo"]} ef)))
+      (is (false? (sut/matches-event? {:type ::other} ef)))))
+
+  (testing "matches both by sid and type"
+    (let [ef {:sid ["test-cust"]
+              :types #{::accepted-type}}]
+      (is (sut/matches-event? {:sid ["test-cust" "test-repo"]
+                               :type ::accepted-type}
+                              ef))
+      (is (not (sut/matches-event? {:sid ["other-cust" "tet-repo"]
+                                    :type ::accepted-type}
+                                   ef)))
+      (is (not (sut/matches-event? {:sid ["test-cust" "tet-repo"]
+                                    :type ::other-type}
+                                   ef))))))
 
 (deftest wrapped
   (testing "returns fn that invokes f"

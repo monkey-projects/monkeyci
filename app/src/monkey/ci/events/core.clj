@@ -13,40 +13,52 @@
 (defn make-event [e]
   (assoc e :timestamp (System/currentTimeMillis)))
 
-(defn post-one [listeners evt]
-  (->> listeners
-       (mapcat (fn [l]
-                 (map l evt)))
-       (flatten)
-       (remove nil?)))
+(defn invoke-listeners [filter-fn listeners events]
+  ;; Find all listeners where the filter and event are matched by the filter-fn
+  (doseq [[ef handlers] listeners]
+    (->> events
+         (filter #(filter-fn % ef))
+         (mapcat (fn [evt]
+                   (doseq [h handlers]
+                     (h evt))))
+         (doall))))
 
 ;; Simple in-memory implementation, useful for testing
-(deftype SyncEvents [listeners]
+(deftype SyncEvents [filter-fn listeners]
   p/EventPoster
   (post-events [this evt]
-    (post-one @listeners (if (sequential? evt) evt [evt]))
+    (invoke-listeners filter-fn @listeners (if (sequential? evt) evt [evt]))
     this)
   
   p/EventReceiver
-  (add-listener [this l]
-    ;; It's up to the listener to do event filtering.
-    ;; Possible problem: with many listeners and many events, this may become slow.
-    (swap! listeners (comp vec conj) l)
+  (add-listener [this ef l]
+    (swap! listeners update ef (fnil conj []) l)
     this)
 
-  (remove-listener [this l]
-    (swap! listeners (comp vec (partial remove (partial = l))))
+  (remove-listener [this ef l]
+    (swap! listeners update ef (partial remove (partial = l)))
     this))
 
-(defn make-sync-events []
-  (->SyncEvents (atom [])))
+(defn matches-event?
+  "Matches events against event filters.  This checks event types and possible sid."
+  [evt {:keys [types sid] :as ef}]
+  (letfn [(matches-type? [evt]
+            (or (nil? types) (contains? types (:type evt))))
+          (matches-sid? [evt]
+            (or (nil? sid) (= sid (take (count sid) (:sid evt)))))]
+    ;; TODO Add sid check
+    (or (nil? ef)
+        ((every-pred matches-type? matches-sid?) evt))))
 
-(defn filter-type [t f]
+(defn make-sync-events [filter-fn]
+  (->SyncEvents filter-fn (atom {})))
+
+(defn ^:deprecated filter-type [t f]
   (fn [evt]
     (when (= t (:type evt))
       (f evt))))
 
-(defn no-dispatch
+(defn ^:deprecated no-dispatch
   "Wraps `f` so that it always returns `nil`, to avoid events being re-dispatched."
   [f]
   (fn [evt]
@@ -56,13 +68,13 @@
 (defmulti make-events (comp :type :events))
 
 (defmethod make-events :sync [_]
-  (make-sync-events))
+  (make-sync-events matches-event?))
 
 (defmethod make-events :manifold [_]
-  (manifold/make-manifold-events))
+  (manifold/make-manifold-events matches-event?))
 
 (defmethod make-events :zmq [config]
-  (zmq/make-zeromq-events (:events config)))
+  (zmq/make-zeromq-events (:events config) matches-event?))
 
 (defmethod rt/setup-runtime :events [conf _]
   (when (:events conf)
