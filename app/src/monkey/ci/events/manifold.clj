@@ -11,32 +11,35 @@
     (ms/put-all! stream (filter some? e))
     (ms/put! stream e)))
 
-(deftype ManifoldEvents [stream]
+(deftype ManifoldEvents [filter-fn stream]
   p/EventPoster
   (post-events [this e]
     (post stream e)
     this)
 
   p/EventReceiver
-  (add-listener [this l]
+  (add-listener [this ef l]
     (let [s (ms/stream 10)]
       (ms/connect stream s
-                  {:description {::listener l}})
+                  {:description {::listener l
+                                 ::filter ef}})
       (ms/consume-async (fn [evt]
-                          (l evt) ; Ignore the return value
+                          (when (filter-fn evt ef)
+                            (l evt))       ; Ignore the return value
                           (md/success-deferred true))
                         s)
       this))
   
-  (remove-listener [this l]
+  (remove-listener [this ef l]
     ;; Find the downstream with given listener in the description
     (->> (ms/downstream stream)
-         (filter (fn [[{:keys [::listener]} sink]]
-                   (= l listener)))
+         (filter (fn [[{:keys [::listener ::filter]} sink]]
+                   (and (= l listener) (= ef filter))))
          (map (comp ms/close! second))
          (doall))
     this))
 
-(defn make-manifold-events []
-  (->ManifoldEvents (ms/stream* {:permanent? true
+(defn make-manifold-events [filter-fn]
+  (->ManifoldEvents filter-fn
+                    (ms/stream* {:permanent? true
                                  :description #(assoc % ::desc "Event bus")})))

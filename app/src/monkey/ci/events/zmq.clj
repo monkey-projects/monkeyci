@@ -33,13 +33,13 @@
     (assoc this :client nil :server nil))
 
   p/EventReceiver
-  (add-listener [recv l]
-    ;; TODO Specify filter
-    (ze/register (:client recv) nil)
+  (add-listener [recv ef l]
+    (ze/register (:client recv) ef)
     (swap! listeners conj l)
     recv)
 
-  (remove-listener [recv l]
+  (remove-listener [recv ef l]
+    (ze/unregister (:client recv) ef)
     (swap! listeners (partial remove (partial = l)))
     recv)
 
@@ -47,12 +47,6 @@
   (post-events [{:keys [client]} evt]
     (when client
       (post-internal client evt))))
-
-(defn matches-filter?
-  "Used by the event broker to check if an event matches a registered filter."
-  [evt ef]
-  ;; TODO Implement
-  true)
 
 (defn- event-handler
   "Invoked when an event is received.  Dispatches event to all listeners."
@@ -68,12 +62,12 @@
                     ;; Let component start it
                     {:autostart? false}))
 
-(defn- make-server [{:keys [addresses context enabled] :or {enabled false}}]
+(defn- make-server [{:keys [addresses context enabled] :or {enabled false}} filter-fn]
   (when enabled
     (ze/broker-server (or context (make-context))
                       (first addresses) ; Only one address supported for now
                       {:autostart? false  ; Let component start it
-                       :matches-filter? matches-filter?})))
+                       :matches-filter? filter-fn})))
 
 (defn- reuse-context?
   "Checks if we should reuse context.  This is necessary if we use inproc protocol."
@@ -86,14 +80,13 @@
   "Creates zeromq events component.  Depending on configuration, it can contain both
    a client and a server.  The client connects to the server in order to post events,
    so the client functions as the event poster.  Both need to be started to work."
-  [conf]
-  ;; FIXME inproc only works if they both use the same context.  We would have to inspect
-  ;; the address here to do that.
+  [conf filter-fn]
   (let [listeners (atom [])
+        ;; When using inproc protocol, we need to reuse the context
         ctx (when (reuse-context? conf) (make-context))
         {:keys [client server]} (cond-> conf
                                   ctx (-> (assoc-in [:client :context] ctx)
                                           (assoc-in [:server :context] ctx)))]
-    (->ZeroMQEvents (make-server server)
+    (->ZeroMQEvents (make-server server filter-fn)
                     (make-client client listeners)
                     listeners)))

@@ -9,26 +9,25 @@
 
 (deftest network-server
   (let [addr "tcp://0.0.0.0:3100"]
-    (ast/async-tests #(sut/make-zeromq-events {:server
-                                               {:enabled true
-                                                :addresses [addr]}
-                                               :client
-                                               {:address addr}}))))
+    (ast/async-tests (partial sut/make-zeromq-events
+                              {:server
+                               {:enabled true
+                                :addresses [addr]}
+                               :client
+                               {:address addr}}))))
 
 (deftest inproc-server
   (testing "runs inproc client/server on single address"
     (let [ep "inproc://client-test"
           recv (atom [])
-          ctx (sut/make-context)
           events (-> (sut/make-zeromq-events {:server
                                               {:enabled true
-                                               :addresses [ep]
-                                               :context ctx}
+                                               :addresses [ep]}
                                               :client
-                                              {:address ep
-                                               :context ctx}})
+                                              {:address ep}}
+                                             ast/matches-event?)
                      (co/start)
-                     (c/add-listener (c/no-dispatch (partial swap! recv conj))))
+                     (c/add-listener nil (partial swap! recv conj)))
           evt {:type ::client-test
                :id (random-uuid)}]
       (try
