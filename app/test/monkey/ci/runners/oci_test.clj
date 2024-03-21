@@ -31,10 +31,10 @@
     (with-redefs [ci/create-container-instance (fn [_ opts]
                                                  {:status 500})
                   ci/delete-container-instance (fn [_ r] r)]
-      (let [received (atom [])]
-        (is (some? (sut/oci-runner {} {} {:events {:poster (partial swap! received conj)}})))
-        (is (not-empty @received))
-        (is (= :build/end (-> @received first :type)))))))
+      (let [{:keys [recv] :as e} (h/fake-events)]
+        (is (some? (sut/oci-runner {} {} {:events e})))
+        (is (not-empty @recv))
+        (is (= :build/end (-> @recv first :type)))))))
 
 (deftest instance-config
   (let [priv-key (h/generate-private-key)

@@ -138,6 +138,7 @@
           (start-polling [{:keys [id]}]
             (log/debug "Starting polling...")
             ;; TODO Replace this with OCI events as soon as they become available.
+            ;; FIXME Polling may result in a 429 from OCI so need to replace this with events.
             (wait-for-completion (-> {:instance-id id
                                       :get-details get-instance-details}
                                      (merge (select-keys opts [:poll-interval :post-event])))))

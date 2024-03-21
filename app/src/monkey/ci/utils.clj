@@ -151,3 +151,8 @@
 
 (defn now []
   (System/currentTimeMillis))
+
+(defn ->seq
+  "Converts `x` into a sequential"
+  [x]
+  (if (sequential? x) x [x]))

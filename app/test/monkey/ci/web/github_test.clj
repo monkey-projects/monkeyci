@@ -59,18 +59,18 @@
   (testing "fires build end event on failure"
     (let [st (st/make-memory-storage)
           _ (st/save-webhook-details st {:id "test-hook"})
-          events (atom [])
+          {:keys [recv] :as e} (h/fake-events)
           req (-> {:runner (fn [rt]
                              (throw (ex-info "Test error" {:runtime rt})))
                    :storage st
-                   :events {:poster (partial swap! events conj)}}
+                   :events e}
                   (h/->req)
                   (assoc :parameters {:path {:id "test-hook"}
                                       :body
                                       {:head-commit {:id "test-id"}}}))]
       (is (= 200 (:status (sut/webhook req))))
-      (is (not= :timeout (h/wait-until #(not-empty @events) 1000)))
-      (is (= :build/end (-> @events first :type))))))
+      (is (not= :timeout (h/wait-until #(not-empty @recv) 1000)))
+      (is (= :build/end (-> @recv first :type))))))
 
 (defn- test-webhook []
   (zipmap [:id :customer-id :repo-id] (repeatedly st/new-id)))

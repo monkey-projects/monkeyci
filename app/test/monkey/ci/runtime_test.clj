@@ -11,6 +11,7 @@
              [storage]
              [workspace]]
             [monkey.ci.events.core]
+            [monkey.ci.helpers :as h]
             [monkey.ci.web.handler]))
 
 (defn- verify-runtime [k extra-config checker]
@@ -100,3 +101,17 @@
                     (md/success-deferred (:test rt)))
                   ((juxt :started? :stopped?))
                   (map deref)))))))
+
+(deftest post-events
+  (letfn [(verify-time [evt checker]
+            (let [{:keys [recv] :as e} (h/fake-events)]
+              (is (some? (sut/post-events {:events e} evt)))
+              (is (checker (-> @recv
+                               first
+                               :time)))))]
+    
+    (testing "adds time"
+      (is (verify-time {:type :test-event} number?)))
+
+    (testing "keeps provided time"
+      (is (verify-time {:type :test-event :time 100} (partial = 100))))))

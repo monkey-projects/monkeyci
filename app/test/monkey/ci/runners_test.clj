@@ -26,14 +26,14 @@
                      (deref)))))
 
       (testing "fires `:build/end` event with error status"
-        (let [events (atom [])]
+        (let [{:keys [recv] :as e} (h/fake-events)]
           (is (some? (-> {:build
                           {:script {:script-dir "nonexisting"}}
-                          :events {:poster (partial swap! events conj)}}
-                         (sut/build-local)
+                          :events e} 
+                        (sut/build-local)
                          (deref))))
-          (is (not-empty @events))
-          (let [m (->> @events
+          (is (not-empty @recv))
+          (let [m (->> @recv
                        (filter (comp (partial = :build/end) :type))
                        (first))]
             (is (some? m))

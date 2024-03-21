@@ -45,7 +45,7 @@
    (try
      (when (-> (config/normalize-config default-script-config (config/strip-env-prefix env) args)
                (rt/with-runtime :script rt
-                 (log/debug "Executing script with runtime" rt)
+                 (log/debug "Executing script with config" (:config rt))
                  (log/debug "Script working directory:" (utils/cwd))
                  (script/exec-script! rt))
                (bc/failed?))

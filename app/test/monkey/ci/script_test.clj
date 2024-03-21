@@ -141,13 +141,13 @@
 
 (deftest run-all-jobs*
   (letfn [(verify-script-end-evt [jobs verifier]
-            (let [events (atom [])
-                  rt {:events {:poster (partial swap! events conj)}
+            (let [{:keys [recv] :as e} (h/fake-events)
+                  rt {:events e
                       :build {:sid ["test-cust" "test-repo"]}}]
               (is (some? (sut/run-all-jobs* rt jobs)))
-              (is (not-empty @events))
-              (is (contains? (set (map :type @events)) :script/end))
-              (let [l (last @events)]
+              (is (not-empty @recv))
+              (is (contains? (set (map :type @recv)) :script/end))
+              (let [l (last @recv)]
                 (is (= :script/end (:type l)))
                 (verifier l))))]
     
@@ -189,57 +189,57 @@
     (is (bc/success? @(j/execute! (sut/->EventFiringJob (dummy-job)) {}))))
   
   (testing "posts event at start and stop"
-    (let [events (atom [])
-          rt {:events {:poster (partial swap! events conj)}}
+    (let [{:keys [recv] :as e} (h/fake-events)
+          rt {:events e}
           job (dummy-job)
           f (sut/->EventFiringJob job)]
       (is (some? @(j/execute! f rt)))
-      (is (= 2 (count @events)))
-      (is (= :job/start (:type (first @events))))
-      (is (= :job/end (:type (second @events))))))
+      (is (= 2 (count @recv)))
+      (is (= :job/start (:type (first @recv))))
+      (is (= :job/end (:type (second @recv))))))
 
-    (let [events (atom [])
-          rt {:events {:poster (partial swap! events conj)}}
+    (let [{:keys [recv] :as e} (h/fake-events)
+          rt {:events e}
           job (dummy-job)
           f (sut/->EventFiringJob job)]
       (is (some? @(j/execute! f rt)))
       
       (testing "start event has `start-time`"
-        (is (number? (-> @events first :job :start-time))))
+        (is (number? (-> @recv first :job :start-time))))
 
       (testing "end event has `start-time` and `end-time`"
-        (let [job (-> @events second :job)]
+        (let [job (-> @recv second :job)]
           (is (number? (:start-time job)))
           (is (number? (:end-time job))))))
 
   (testing "catches sync errors, returns failure"
-    (let [events (atom [])
-          rt {:events {:poster (partial swap! events conj)}}
+    (let [{:keys [recv] :as e} (h/fake-events)
+          rt {:events e}
           job (bc/action-job ::failing-job (fn [_] (throw (ex-info "Test error" {}))))
           f (sut/->EventFiringJob job)]
       (is (bc/failed? @(j/execute! f rt)))
-      (is (= 2 (count @events)) "expected job end event")))
+      (is (= 2 (count @recv)) "expected job end event")))
 
   (testing "catches async errors, returns failure"
-    (let [events (atom [])
-          rt {:events {:poster (partial swap! events conj)}}
+    (let [{:keys [recv] :as e} (h/fake-events)
+          rt {:events e}
           job (bc/action-job ::failing-async-job (fn [_] (md/error-deferred (ex-info "Test error" {}))))
           f (sut/->EventFiringJob job)]
       (is (bc/failed? @(j/execute! f rt)))
-      (is (= 2 (count @events)) "expected job end event")))
+      (is (= 2 (count @recv)) "expected job end event")))
 
   (testing "event contains job id"
-    (let [events (atom [])
-          rt {:events {:poster (partial swap! events conj)}}
+    (let [{:keys [recv] :as e} (h/fake-events)
+          rt {:events e}
           job (dummy-job)
           f (sut/->EventFiringJob job)]
-      (is (every? (comp (partial = (:id job)) :id :job) @events))))
+      (is (every? (comp (partial = (:id job)) :id :job) @recv))))
 
   (testing "event contains build sid"
-    (let [events (atom [])
+    (let [{:keys [recv] :as e} (h/fake-events)
           sid ["test-cust" "test-repo"]
-          rt {:events {:poster (partial swap! events conj)}
+          rt {:events e
               :build {:sid sid}}
           job (dummy-job)
           f (sut/->EventFiringJob job)]
-      (is (every? (comp some? :sid) @events)))))
+      (is (every? (comp some? :sid) @recv)))))
