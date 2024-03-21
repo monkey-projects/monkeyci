@@ -29,7 +29,7 @@
   (assoc evt
          :src :script
          :sid (get-in rt [:build :sid])
-         :time (System/currentTimeMillis)))
+         :time (u/now)))
 
 (defn- post-event [rt evt]
   (log/trace "Posting event:" evt)
@@ -40,6 +40,10 @@
         (log/warn "Failed to post event, got status" status)
         (log/debug "Full response:" r)))
     (log/warn "Unable to post event, no client configured")))
+
+(defn- post-events [rt events]
+  (doseq [e events]
+    (post-event rt e)))
 
 (defn- wrapped
   "Sets the event poster in the runtime."
@@ -250,7 +254,7 @@
         script-dir (build/rt->script-dir rt)
         ;; Manually add events poster
         ;; This will be removed when events are reworked to be more generic
-        rt (assoc-in rt [:events :poster] (partial post-event rt))]
+        rt (assoc-in rt [:events :poster] (partial post-events rt))]
     (log/debug "Executing script for build" build-id "at:" script-dir)
     (log/debug "Script runtime:" rt)
     (try 
