@@ -77,7 +77,9 @@
       (upload-log logger l)
       (log/debug "File uploaded:" l))))
 
-(defn poll-events [rt]
+(defn poll-events
+  "Reads events from the job container events file and posts them to the event service."
+  [rt]
   (let [f (-> (get-config rt :events-file)
               (maybe-create-file))
         read-next (fn [r]
@@ -122,7 +124,6 @@
    containing the runtime with an `:exit-code` added."
   [rt]
   (log/info "Running sidecar with configuration:" (get-in rt [rt/config :sidecar]))
-  (log/debug "Max memory available to this VM:" (.maxMemory (Runtime/getRuntime)) "bytes")
   ;; Restore caches and artifacts before starting the job
   (let [h (-> (comp poll-events mark-start)
               (art/wrap-artifacts)

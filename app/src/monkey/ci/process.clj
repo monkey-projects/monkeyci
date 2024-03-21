@@ -22,6 +22,7 @@
             [monkey.ci.build.core :as bc]
             ;; Need to require these for the multimethod discovery
             [monkey.ci.containers.oci]
+            [monkey.ci.events.core]
             [monkey.ci.storage.file]
             [monkey.ci.storage.oci]
             [monkey.ci.web.script-api :as script-api]

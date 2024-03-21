@@ -1,5 +1,6 @@
 (ns monkey.ci.events.core
   (:require [monkey.ci
+             [config :as c]
              [protocols :as p]
              [runtime :as rt]]
             [monkey.ci.events
@@ -64,6 +65,11 @@
   (fn [evt]
     (f evt)
     nil))
+
+(defmethod c/normalize-key :events [k conf]
+  (update conf k (comp #(c/group-keys % :client)
+                       #(c/group-keys % :server)
+                       c/keywordize-type)))
 
 (defmulti make-events (comp :type :events))
 
