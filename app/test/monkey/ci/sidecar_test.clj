@@ -60,6 +60,29 @@
         (is (true? (.delete f)))
         (is (= 0 (wait-for-exit c))))))
 
+  (testing "adds sid and job to events"
+    (h/with-tmp-dir dir
+      (let [f (io/file dir "events.edn")
+            evt {:type :test/event
+                 :message "This is a test event"}
+            {:keys [recv] :as e} (h/fake-events)
+            sid (repeatedly 3 random-uuid)
+            job {:id "test-job"}
+            rt {:events e
+                :job job
+                :build {:sid sid}
+                :config {:sidecar {:events-file f
+                                   :poll-interval 10}}}
+            c (sut/poll-events rt)]
+        ;; Post the event after sidecar has started
+        (is (nil? (spit f (prn-str evt))))
+        (is (not= :timeout (h/wait-until #(not-empty @recv) 500)))
+        (let [evt (first @recv)]
+          (is (= sid (:sid evt)))
+          (is (= job (:job evt))))
+        (is (true? (.delete f)))
+        (is (= 0 (wait-for-exit c))))))
+
   (testing "stops when a terminating event is received"
     (h/with-tmp-dir dir
       (let [f (io/file dir "events.edn")

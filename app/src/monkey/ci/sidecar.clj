@@ -79,7 +79,7 @@
 
 (defn poll-events
   "Reads events from the job container events file and posts them to the event service."
-  [rt]
+  [{:keys [job] :as rt}]
   (let [f (-> (get-config rt :events-file)
               (maybe-create-file))
         read-next (fn [r]
@@ -108,7 +108,9 @@
                         (log/debug "Read next event:" evt)
                         (when (contains? evt :exit)
                           (upload-logs evt logger))
-                        (rt/post-events rt (assoc evt :sid sid))))
+                        (rt/post-events rt (assoc evt
+                                                  :sid sid
+                                                  :job job))))
                 (if (:done? evt)
                   (set-exit 0)
                   (recur (read-next r)))))))
