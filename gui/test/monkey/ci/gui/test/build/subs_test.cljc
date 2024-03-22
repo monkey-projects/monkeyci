@@ -109,15 +109,6 @@
       (is (map? (reset! app-db (db/set-log-path {} "test-path"))))
       (is (= "test-path" @c)))))
 
-(deftest last-reload-time
-  (let [t (rf/subscribe [:build/last-reload-time])]
-    (testing "exists"
-      (is (some? t)))
-
-    (testing "returns last reload time from db"
-      (is (map? (reset! app-db (db/set-last-reload-time {} 543))))
-      (is (= 543 @t)))))
-
 (deftest global-logs
   (let [g (rf/subscribe [:build/global-logs])]
     (testing "exists"

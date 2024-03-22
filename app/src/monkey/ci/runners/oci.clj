@@ -54,12 +54,12 @@
        (fn [r]
          (or (-> r :body :containers first :exit-code) 1))
        (fn [r]
-         (rt/post-events rt (b/build-completed-evt (:build rt) r))
+         (rt/post-events rt (b/build-end-evt (:build rt) r))
          r))
       (md/catch
           (fn [ex]
             (log/error "Got error from container instance:" ex)
-            (rt/post-events rt (b/build-completed-evt (:build rt) 1))))))
+            (rt/post-events rt (b/build-end-evt (:build rt) 1))))))
 
 (defmethod r/make-runner :oci [rt]
   (let [conf (:runner rt)

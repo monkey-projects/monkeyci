@@ -8,7 +8,6 @@
 (u/db-sub :build/current db/build)
 (u/db-sub :build/logs db/logs)
 (u/db-sub :build/reloading? (comp some? db/reloading?))
-(u/db-sub :build/last-reload-time db/last-reload-time)
 
 (u/db-sub :build/log-alerts db/log-alerts)
 (u/db-sub :build/downloading? (comp some? db/downloading?))
