@@ -8,6 +8,7 @@
              [config :as mc]
              [oci :as oci]
              [runners :as r]]
+            [monkey.ci.events.core :as ec]
             [monkey.ci.runners.oci :as sut]
             [monkey.ci.helpers :as h]
             [monkey.oci.container-instance.core :as ci]))
@@ -104,4 +105,17 @@
                     (as-> x (sut/instance-config conf x)))]
           (is (not (contains? (-> c :containers first :environment-variables) "monkeyci-build-pipeline"))))))))
  
-
+(deftest wait-for-script-end-event
+  (testing "returns a deferred that holds the script end event"
+    (let [events (ec/make-events {:events {:type :manifold}})
+          sid (repeatedly 3 random-uuid)
+          d (sut/wait-for-script-end-event events sid)]
+      (is (md/deferred? d))
+      (is (not (md/realized? d)) "should not be realized initially")
+      (is (some? (ec/post-events events [{:type :script/start
+                                          :sid sid}])))
+      (is (not (md/realized? d)) "should not be realized after start event")
+      (is (some? (ec/post-events events [{:type :script/end
+                                          :sid sid}])))
+      (is (= :script/end (-> (deref d 100 :timeout)
+                              :type))))))

@@ -197,7 +197,8 @@
 (defn- with-script-evt
   "Creates an skeleton event with the script and invokes `f` on it"
   [rt f]
-  (f {:script (-> rt rt/build build/script)}))
+  (f {:script (-> rt rt/build build/script)
+      :sid (build/get-sid rt)}))
 
 (defn- script-start-evt [rt _]
   (with-script-evt rt
@@ -266,6 +267,7 @@
         (let [msg ((some-fn (comp ex-message ex-cause)
                             ex-message) ex)]
           (post-event rt {:type :script/end
+                          :sid (build/get-sid rt)
                           :script (-> rt rt/build build/script)
                           :message msg})
           (assoc bc/failure
