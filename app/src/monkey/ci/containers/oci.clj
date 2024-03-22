@@ -106,12 +106,8 @@
    :is-read-only true
    :mount-path config-dir})
 
-(defn- config-entry [n v]
-  {:file-name n
-   :data (u/->base64 v)})
-
 (defn- job-script-entry []
-  (config-entry job-script (slurp (io/resource job-script))))
+  (oci/config-entry job-script (slurp (io/resource job-script))))
 
 (defn- script-vol-config
   "Adds the job script and a file for each script line as a configmap volume."
@@ -125,7 +121,7 @@
    :volume-type "CONFIGFILE"
    :configs (->> script
                  (map-indexed (fn [i s]
-                                (config-entry (str i) s)))
+                                (oci/config-entry (str i) s)))
                  (into [(job-script-entry)]))})
 
 (defn- job-details->edn [rt]
@@ -139,8 +135,8 @@
   (let [{:keys [log-config]} (sidecar-config rt)]
     {:name config-vol
      :volume-type "CONFIGFILE"
-     :configs (cond-> [(config-entry job-config-file (job-details->edn rt))]
-                log-config (conj (config-entry "logback.xml" log-config)))}))
+     :configs (cond-> [(oci/config-entry job-config-file (job-details->edn rt))]
+                log-config (conj (oci/config-entry "logback.xml" log-config)))}))
 
 (defn- add-sidecar-env [sc rt]
   (let [wd (base-work-dir rt)]

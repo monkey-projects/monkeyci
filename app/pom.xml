@@ -4,7 +4,7 @@
   <packaging>jar</packaging>
   <groupId>com.monkeyci</groupId>
   <artifactId>app</artifactId>
-  <version>0.4.1-SNAPSHOT</version>
+  <version>0.4.2-SNAPSHOT</version>
   <name>app</name>
   <repositories>
     <repository>

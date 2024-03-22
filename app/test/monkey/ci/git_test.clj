@@ -65,6 +65,10 @@
   (testing "empty if no keys configured"
     (is (empty? (sut/prepare-ssh-keys {}))))
 
+  (testing "returns as-is when keys dir provided, but no ssh keys"
+    (let [conf {:ssh-keys-dir "/test/dir"}]
+      (is (= conf (sut/prepare-ssh-keys conf)))))
+
   (testing "writes keys to configured dir with public key"
     (h/with-tmp-dir dir
       (let [ssh-dir (str (fs/path dir "ssh-keys"))

@@ -43,7 +43,9 @@
                     :sid ["a" "b" "test-build-id"]
                     :git {:url "http://git-url"
                           :branch "main"
-                          :id "test-commit"}}}
+                          :commit-id "test-commit"
+                          :ssh-keys [{:private-key "test-privkey"
+                                      :public-key "test-pubkey"}]}}}
         conf {:availability-domain "test-ad"
               :compartment-id "test-compartment"
               :image-pull-secrets "test-secrets"
@@ -100,13 +102,51 @@
             (is (every? string? (keys env))))
 
           (testing "enforces child runner"
-            (is (= "child" (get env "MONKEYCI_RUNNER_TYPE"))))))
+            (is (= "child" (get env "monkeyci-runner-type"))))))
 
       (testing "drops nil env vars"
         (let [c (-> rt
                     (assoc-in [:build :pipeline] nil)
                     (as-> x (sut/instance-config conf x)))]
-          (is (not (contains? (-> c :containers first :environment-variables) "monkeyci-build-pipeline"))))))))
+          (is (not (contains? (-> c :containers first :environment-variables) "monkeyci-build-pipeline"))))))
+
+    (testing "ssh keys"
+      (testing "adds as volume"
+        (let [vol (oci/find-volume inst sut/ssh-keys-volume)]
+          (is (some? vol))
+          (is (= ["key-0" "key-0.pub"]
+                 (->> vol
+                      :configs
+                      (map :file-name))))))
+
+      (let [cc (first (:containers inst))
+            mnt (oci/find-mount cc sut/ssh-keys-volume)]
+        (testing "mounts in container"
+          (is (some? mnt)))
+
+        (testing "adds ssh keys dir as env var"
+          (is (= (:mount-path mnt)
+                 (get-in cc [:environment-variables "monkeyci-build-git-ssh-keys-dir"]))))))
+
+    (testing "log config"
+      (h/with-tmp-dir dir
+        (let [log-path (io/file dir "logback-test.xml")
+              rt (assoc-in rt [:config :runner :log-config] (.getAbsolutePath log-path))
+              _ (spit log-path "test log contents")
+              inst (sut/instance-config conf rt)]
+          
+          (testing "adds as volume"
+            (let [vol (oci/find-volume inst sut/log-config-volume)]
+              (is (some? vol))))
+
+          (let [cc (first (:containers inst))
+                mnt (oci/find-mount cc sut/log-config-volume)]
+            (testing "mounts in container"
+              (is (some? mnt)))
+
+            (testing "adds ssh keys dir as env var"
+              (is (= (:mount-path mnt)
+                     (get-in cc [:environment-variables "monkeyci-runner-log-config"]))))))))))
  
 (deftest wait-for-script-end-event
   (testing "returns a deferred that holds the script end event"

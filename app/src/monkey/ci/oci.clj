@@ -233,3 +233,9 @@
   [ci n]
   (mc/find-first (u/prop-pred :name n)
                  (:volumes ci)))
+
+(defn config-entry
+  "Creates an entry config for a volume, where the contents are base64 encoded."
+  [n v]
+  {:file-name n
+   :data (u/->base64 v)})

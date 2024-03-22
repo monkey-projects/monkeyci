@@ -11,27 +11,31 @@
 
 (defn prepare-ssh-keys
   "Writes any ssh keys in the options to a temp directory and returns their
-   file names and key dir to be used by clj-jgit."
-  [{:keys [ssh-keys ssh-keys-dir]}]
-  (when-let [f (io/file ssh-keys-dir)]
-    (when-not (or (.exists f) (.mkdirs f))
-      (throw (ex-info "Unable to create ssh key dir" {:dir ssh-keys-dir})))
-    (log/debug "Writing" (count ssh-keys) "ssh keys to" f)
-    (->> ssh-keys
-         (map-indexed (fn [idx r]
-                        (let [keys ((juxt :public-key :private-key) r)
-                              names (->> [".pub" ""]
-                                         (map (partial format "key-%d%s" idx)))
-                              paths (map (partial io/file f) names)]
-                          (->> (map (fn [n k]
-                                      (spit n k)
-                                      (fs/set-posix-file-permissions n "rw-------"))
-                                    paths keys)
-                               (doall))
-                          (merge r (zipmap [:public-key-file :private-key-file] (map str names))))))
-         (doall)
-         (mapv :private-key-file)
-         (hash-map :key-dir ssh-keys-dir :name))))
+   file names and key dir to be used by clj-jgit.  If an `ssh-keys-dir` is
+   configured, but no `ssh-keys`, then it is assumed the keys are already 
+   in place."
+  [{:keys [ssh-keys ssh-keys-dir] :as conf}]
+  (if (not-empty ssh-keys)
+    (when-let [f (io/file ssh-keys-dir)]
+      (when-not (or (.exists f) (.mkdirs f))
+        (throw (ex-info "Unable to create ssh key dir" {:dir ssh-keys-dir})))
+      (log/debug "Writing" (count ssh-keys) "ssh keys to" f)
+      (->> ssh-keys
+           (map-indexed (fn [idx r]
+                          (let [keys ((juxt :public-key :private-key) r)
+                                names (->> [".pub" ""]
+                                           (map (partial format "key-%d%s" idx)))
+                                paths (map (partial io/file f) names)]
+                            (->> (map (fn [n k]
+                                        (spit n k)
+                                        (fs/set-posix-file-permissions n "rw-------"))
+                                      paths keys)
+                                 (doall))
+                            (merge r (zipmap [:public-key-file :private-key-file] (map str names))))))
+           (doall)
+           (mapv :private-key-file)
+           (hash-map :key-dir ssh-keys-dir :name)))
+    conf))
 
 (def origin-prefix "origin/")
 

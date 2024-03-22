@@ -16,29 +16,90 @@
 
 (def build-container "build")
 (def format-sid (partial cs/join "/"))
+(def ssh-keys-volume "ssh-keys")
+(def ssh-keys-dir oci/key-dir)
+(def log-config-volume "log-config")
+(def log-config-dir "/home/monkeyci/config")
+
+(def build-ssh-keys (comp :ssh-keys :git :build))
+(def log-config (comp :log-config :runner :config))
 
 (defn- prepare-config-for-oci [config]
   (-> config
       ;; Enforce child runner
       (assoc :runner {:type :child})))
 
+(defn- add-ssh-keys-dir [rt conf]
+  (cond-> conf
+    (build-ssh-keys rt) (assoc-in [:build :git :ssh-keys-dir] ssh-keys-dir)))
+
+(defn- add-log-config-dir [rt conf]
+  (cond-> conf
+    (log-config rt) (assoc-in [:runner :log-config] log-config-dir)))
+
 (defn- ->env [rt]
   (->> (rt/rt->env rt)
        (prepare-config-for-oci)
+       (add-ssh-keys-dir rt)
+       (add-log-config-dir rt)
        (config/config->env)
        (mc/map-keys name)
        (mc/remove-vals empty?)))
 
+(defn- ssh-keys-volume-config [rt]
+  (letfn [(->config-entries [idx ssh-keys]
+            (map (fn [contents ext]
+                   (oci/config-entry (format "key-%d%s" idx ext) contents))
+                 ((juxt :private-key :public-key) ssh-keys)
+                 ["" ".pub"]))]
+    (when-let [ssh-keys (build-ssh-keys rt)]
+      {:name ssh-keys-volume
+       :volume-type "CONFIGFILE"
+       :configs (mapcat ->config-entries (range) ssh-keys)})))
+
+(defn- add-ssh-keys-volume [conf rt]
+  (let [vc (ssh-keys-volume-config rt)]
+    (cond-> conf
+      vc (update :volumes conj vc))))
+
+(defn- add-ssh-keys-mount [conf rt]
+  (cond-> conf
+    (build-ssh-keys rt) (update :volume-mounts conj {:mount-path ssh-keys-dir
+                                                     :is-read-only true
+                                                     :volume-name ssh-keys-volume})))
+
+(defn- log-config-volume-config [rt]
+  (when-let [f (log-config rt)]
+    (if (fs/exists? f)
+      {:name log-config-volume
+       :volume-type "CONFIGFILE"
+       :configs (oci/config-entry "logback.xml" (slurp f))}
+      (log/warn "Configured log config file does not exist:" f))))
+
+(defn- add-log-config-volume [conf rt]
+  (let [vc (log-config-volume-config rt)]
+    (cond-> conf
+      vc (update :volumes conj vc))))
+
+(defn- add-log-config-mount [conf rt]
+  (cond-> conf
+    (log-config rt) (update :volume-mounts conj {:mount-path log-config-dir
+                                                 :is-read-only true
+                                                 :volume-name log-config-volume})))
+
 (defn- patch-container [[conf] rt]
   (let [git (get-in rt [:build :git])]
-    [(assoc conf
-            :display-name build-container
-            :arguments (cond-> ["-w" oci/checkout-dir "build" "run"
-                                "--sid" (format-sid (b/get-sid rt))]
-                         (not-empty git) (concat ["-u" (:url git)
-                                                  "-b" (:branch git)
-                                                  "--commit-id" (:id git)]))
-            :environment-variables (->env rt))]))
+    [(-> conf
+         (assoc :display-name build-container
+                :arguments (cond-> ["-w" oci/checkout-dir "build" "run"
+                                    "--sid" (format-sid (b/get-sid rt))]
+                             (not-empty git) (concat ["-u" (:url git)
+                                                      "-b" (:branch git)
+                                                      "--commit-id" (:commit-id git)]))
+                ;; TODO Log config
+                :environment-variables (->env rt))
+         (add-ssh-keys-mount rt)
+         (add-log-config-mount rt))]))
 
 (defn instance-config
   "Creates container instance configuration using the context and the
@@ -50,7 +111,9 @@
         (oci/instance-config)
         (assoc :display-name (b/get-build-id rt))
         (update :freeform-tags merge tags)
-        (update :containers patch-container rt))))
+        (update :containers patch-container rt)
+        (add-ssh-keys-volume rt)
+        (add-log-config-volume rt))))
 
 (defn wait-for-script-end-event
   "Returns a deferred that realizes when the script/end event has been received."
