@@ -96,8 +96,8 @@
   [:span (calc-elapsed s)])
 
 (defn- elapsed-running [s]
-  (let [t (rf/subscribe [:build/last-reload-time])]
-    [:span (calc-elapsed (assoc s :end-time @t))]))
+  (let [now (t/to-epoch (t/now))]
+    [:span (calc-elapsed (assoc s :end-time now))]))
 
 (defn- elapsed [x]
   (if (u/running? x)

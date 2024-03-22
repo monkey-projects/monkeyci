@@ -116,17 +116,24 @@
      (fn [~r]
        ~@body)))
 
+(defn- prepare-events [evt]
+  (letfn [(add-time [evt]
+            (update evt :time #(or % (u/now))))]
+    (->> (u/->seq evt)
+         (map add-time))))
+
 (defn post-events
   "Posts one or more events using the event poster in the runtime"
   [{:keys [events]} evt]
-  (cond
-    (satisfies? p/EventPoster events)
-    (p/post-events events evt)
-    ;; For backwards compatibility, in tests
-    (fn? (:poster events))
-    ((:poster events) evt)
-    :else
-    (log/warn "No event poster configured")))
+  (let [evt (prepare-events evt)]
+    (cond
+      (satisfies? p/EventPoster events)
+      (p/post-events events evt)
+      ;; For backwards compatibility, in tests
+      (fn? (:poster events))
+      ((:poster events) evt)
+      :else
+      (log/warn "No event poster configured"))))
 
 (defn rt->env
   "Returns a map that can be serialized back into env vars.  This is used

@@ -117,4 +117,11 @@
 (deftest sidecar
   (testing "runs sidecar poll loop, returns exit code"
     (with-redefs [sc/run (constantly (md/success-deferred {:exit-code ::test-exit}))]
-      (is (= ::test-exit (sut/sidecar {}))))))
+      (is (= ::test-exit (sut/sidecar {})))))
+
+  (testing "posts start and end events"
+    (with-redefs [sc/run (constantly (md/success-deferred {:exit-code ::test-exit}))]
+      (let [{:keys [recv] :as e} (h/fake-events)]
+        (is (some? (sut/sidecar {:events e})))
+        (is (= [:sidecar/start :sidecar/end]
+               (map :type @recv)))))))

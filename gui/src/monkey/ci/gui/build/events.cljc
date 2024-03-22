@@ -97,9 +97,7 @@
  (fn [{:keys [db] :as cofx} _]
    {:dispatch-n [(load-build-req db)
                  (load-logs-req db)]
-    :db (-> db
-            (db/set-reloading)
-            (db/set-last-reload-time (:time/now cofx)))}))
+    :db (db/set-reloading db)}))
 
 (rf/reg-event-fx
  :build/download-log

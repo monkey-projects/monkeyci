@@ -1,5 +1,7 @@
 (ns monkey.ci.events.core
-  (:require [monkey.ci
+  (:require [manifold.deferred :as md]
+            [monkey.ci
+             [config :as c]
              [protocols :as p]
              [runtime :as rt]]
             [monkey.ci.events
@@ -65,6 +67,11 @@
     (f evt)
     nil))
 
+(defmethod c/normalize-key :events [k conf]
+  (update conf k (comp #(c/group-keys % :client)
+                       #(c/group-keys % :server)
+                       c/keywordize-type)))
+
 (defmulti make-events (comp :type :events))
 
 (defmethod make-events :sync [_]
@@ -109,3 +116,20 @@
             (maybe-post error args ex)
             (throw ex)))
         (inv args)))))
+
+(defn wait-for-event
+  "Utility fn that registers using an event filter and invokes the handler when one has
+   been received.  Returns a deferred that realizes with the received event.  An additional
+   predicate can do extra filtering if it's not supported by the event filter."
+  [events ef & [pred]]
+  (let [r (md/deferred)
+        l (fn [evt]
+            (when (or (nil? pred) (pred evt))
+              (md/success! r evt)))
+        unregister (fn [_]
+                     (remove-listener events ef l))]
+    ;; Make sure to unregister the listener in any case
+    (md/on-realized r unregister unregister)
+    (add-listener events ef l)
+    r))
+

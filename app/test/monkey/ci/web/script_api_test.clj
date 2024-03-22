@@ -6,12 +6,12 @@
             [ring.mock.request :as mock]))
 
 (deftest routes
-  (let [events (atom [])
+  (let [{:keys [recv] :as e} (h/fake-events)
         test-app (sut/make-app {:public-api (fn [_]
                                               (fn [ep]
                                                 (when (= :get-params ep)
                                                   {"key" "value"})))
-                                :events {:poster (partial swap! events conj)}})]
+                                :events e})]
 
     (testing "unknown endpoint results in 404"
       (is (= 404 (-> (mock/request :get "/unknown")
@@ -38,7 +38,7 @@
                   (mock/header :content-type "application/edn")
                   (test-app))]
         (is (= 202 (:status r)))
-        (is (= evt (-> @events
+        (is (= evt (-> @recv
                        (first)
                        (select-keys (keys evt)))))))))
 

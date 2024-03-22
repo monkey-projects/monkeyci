@@ -77,7 +77,9 @@
       (upload-log logger l)
       (log/debug "File uploaded:" l))))
 
-(defn poll-events [rt]
+(defn poll-events
+  "Reads events from the job container events file and posts them to the event service."
+  [rt]
   (let [f (-> (get-config rt :events-file)
               (maybe-create-file))
         read-next (fn [r]
@@ -87,13 +89,13 @@
         log-base (b/get-job-sid rt)
         logger (when log-maker (comp (partial log-maker rt)
                                      (partial concat log-base)))
-        set-exit (fn [v] (assoc rt :exit-code v))]
+        set-exit (fn [v] (assoc rt :exit-code v))
+        sid (b/get-sid rt)]
     (log/info "Polling events from" f)
     (md/future
       (try
         (with-open [r (io/reader f)]
           (loop [evt (read-next r)]
-            ;; TODO Also stop when the process we're monitoring has terminated without telling us
             (if (not (fs/exists? f))
               ;; Done when the events file is deleted
               (set-exit 0)
@@ -106,7 +108,7 @@
                         (log/debug "Read next event:" evt)
                         (when (contains? evt :exit)
                           (upload-logs evt logger))
-                        (rt/post-events rt evt)))
+                        (rt/post-events rt (assoc evt :sid sid))))
                 (if (:done? evt)
                   (set-exit 0)
                   (recur (read-next r)))))))
@@ -122,7 +124,6 @@
    containing the runtime with an `:exit-code` added."
   [rt]
   (log/info "Running sidecar with configuration:" (get-in rt [rt/config :sidecar]))
-  (log/debug "Max memory available to this VM:" (.maxMemory (Runtime/getRuntime)) "bytes")
   ;; Restore caches and artifacts before starting the job
   (let [h (-> (comp poll-events mark-start)
               (art/wrap-artifacts)

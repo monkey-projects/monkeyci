@@ -29,8 +29,8 @@
       (let [f (io/file dir "events.edn")
             evt {:type :test/event
                  :message "This is a test event"}
-            recv (atom [])
-            rt {:events {:poster (partial swap! recv conj)}
+            {:keys [recv] :as e} (h/fake-events)
+            rt {:events e
                 :config {:sidecar {:poll-interval 10
                                    :events-file f}}}
             _ (spit f (prn-str evt))
@@ -47,8 +47,8 @@
       (let [f (io/file dir "events.edn")
             evt {:type :test/event
                  :message "This is a test event"}
-            recv (atom [])
-            rt {:events {:poster (partial swap! recv conj)}
+            {:keys [recv] :as e} (h/fake-events)
+            rt {:events e
                 :config {:sidecar {:events-file f
                                    :poll-interval 10}}}
             c (sut/poll-events rt)]
@@ -66,8 +66,8 @@
             evt {:type :test/event
                  :message "This is a test event"
                  :done? true}
-            recv (atom [])
-            rt {:events {:poster (partial swap! recv conj)}
+            {:keys [recv] :as e} (h/fake-events)
+            rt {:events e
                 :config {:sidecar {:events-file f
                                    :poll-interval 10}}}
             c (sut/poll-events rt)]

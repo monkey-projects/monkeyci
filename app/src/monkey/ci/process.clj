@@ -22,6 +22,7 @@
             [monkey.ci.build.core :as bc]
             ;; Need to require these for the multimethod discovery
             [monkey.ci.containers.oci]
+            [monkey.ci.events.core]
             [monkey.ci.storage.file]
             [monkey.ci.storage.oci]
             [monkey.ci.web.script-api :as script-api]
@@ -44,7 +45,7 @@
    (try
      (when (-> (config/normalize-config default-script-config (config/strip-env-prefix env) args)
                (rt/with-runtime :script rt
-                 (log/debug "Executing script with runtime" rt)
+                 (log/debug "Executing script with config" (:config rt))
                  (log/debug "Script working directory:" (utils/cwd))
                  (script/exec-script! rt))
                (bc/failed?))

@@ -3,6 +3,7 @@
   (:require [clojure.tools.logging :as log]
             [monkey.ci
              [build :as b]
+             [jobs :as jobs]
              [runtime :as rt]
              [sidecar :as sidecar]
              [utils :as u]]
@@ -136,10 +137,17 @@
    which are then picked up by the sidecar to dispatch or store.  
 
    The sidecar loop will stop when the events file is deleted."
-  [rt]
-  (try
-    (-> (sidecar/run rt)
-        (deref)
-        :exit-code)
-    (finally
-      (log/info "Sidecar terminated"))))
+  [{:keys [job] :as rt}]
+  (let [sid (b/get-sid rt)]
+    (try
+      (rt/post-events rt {:type :sidecar/start
+                          :sid sid
+                          :job (jobs/job->event job)})
+      (-> (sidecar/run rt)
+          (deref)
+          :exit-code)
+      (finally
+        (log/info "Sidecar terminated")
+        (rt/post-events rt {:type :sidecar/end
+                            :sid sid
+                            :job (jobs/job->event job)})))))

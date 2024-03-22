@@ -1,5 +1,6 @@
 (ns monkey.ci.events.core-test
   (:require [clojure.test :refer [deftest testing is]]
+            [monkey.ci.config :as c]
             [monkey.ci.events
              [core :as sut]
              [async-tests :as ast]]))
@@ -91,7 +92,7 @@
                      (swap! invocations conj (into [t] args))
                      {:event t}))
           poster (fn [evt]
-                   (swap! invocations conj [:event evt]))
+                   (swap! invocations conj [:event (first evt)]))
           w (sut/wrapped (test-f :during)
                          (test-f :before)
                          (test-f :after))]
@@ -99,10 +100,10 @@
              (w {:events {:poster poster}} "test-arg")))
       (is (= 5 (count @invocations)))
       (is (= :before (ffirst @invocations)))
-      (is (= [:event {:event :before}] (second @invocations)))
+      (is (= {:event :before} (-> (second @invocations) second (select-keys [:event]))))
       (is (= :during (first (nth @invocations 2))))
       (is (= :after (first (nth @invocations 3))))
-      (is (= [:event {:event :after}] (nth @invocations 4)))))
+      (is (= {:event :after} (-> (nth @invocations 4) second (select-keys [:event]))))))
 
   (testing "invokes `on-error` fn on exception"
     (let [inv (atom [])
@@ -117,6 +118,21 @@
       (is (thrown? Exception (w {:events {:poster poster}})))
       (is (= 1 (count @inv)))
       (is (= "test error" (some-> @inv
-                                  first
+                                  ffirst
                                   :exception
                                   (.getMessage)))))))
+
+(deftest normalize-key
+  (testing "groups client subkey"
+    (is (= {:type :zmq
+            :client {:addr "test-addr"}}
+           (-> (c/normalize-key :events {:events {:type "zmq"
+                                                  :client-addr "test-addr"}})
+               :events))))
+
+  (testing "groups server subkey"
+    (is (= {:type :zmq
+            :server {:addr "test-addr"}}
+           (-> (c/normalize-key :events {:events {:type "zmq"
+                                                  :server-addr "test-addr"}})
+               :events)))))

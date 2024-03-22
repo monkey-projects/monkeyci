@@ -1,7 +1,8 @@
 (ns monkey.ci.oci-test
   (:require [clojure.test :refer [deftest testing is]]
-            [clojure.core.async :as ca]
-            [manifold.deferred :as md]
+            [manifold
+             [deferred :as md]
+             [stream :as ms]]
             [monkey.ci.oci :as sut]
             [monkey.ci.helpers :as h]
             [monkey.oci.container-instance.core :as ci]
@@ -60,9 +61,9 @@
         (is (some? (:context r)))
         (is (= in (get-in r [:opts :input-stream])))))))
 
-(deftest wait-for-completion
+(deftest poll-for-completion
   (testing "returns channel that holds zero on successful completion"
-    (let [ch (sut/wait-for-completion
+    (let [ch (sut/poll-for-completion
               {:get-details (fn [_]
                               (future
                                 {:status 200
@@ -73,23 +74,85 @@
 
   (testing "loops until a final state is encountered"
     (let [results (->> ["CREATING" "ACTIVE" "INACTIVE"]
-                       (ca/to-chan!)
-                       vector
-                       (ca/map (fn [s]
-                                 {:status 200
-                                  :body {:lifecycle-state s}})))
-          ch (sut/wait-for-completion {:get-details (fn [_]
-                                                      (future (ca/<!! results)))
+                       (map (fn [s]
+                              {:status 200
+                               :body {:lifecycle-state s}}))
+                       (ms/->source))
+          ch (sut/poll-for-completion {:get-details (fn [_]
+                                                      (ms/take! results))
                                        :poll-interval 100})]
-      (is (map? @(md/timeout! ch 1000 :timeout)))))
+      (is (= "INACTIVE" (-> (md/timeout! ch 1000 :timeout)
+                            deref
+                            (get-in [:body :lifecycle-state]))))))
+  
+  (testing "stops polling when job container fails"
+    (let [exit-codes [nil 1]
+          states (->> exit-codes
+                      (map (fn [e]
+                             {:status 200
+                              :body {:lifecycle-state "ACTIVE"
+                                     :containers [{:id "test-container"
+                                                   :exit-code e}]}}))
+                      (ms/->source))
+          ch (sut/poll-for-completion {:get-details (fn [_]
+                                                      (ms/take! states))
+                                       :poll-interval 100})
+          res @(md/timeout! ch 1000 :timeout)]
+      (is (not= :timeout res))
+      (is (= 1 (-> res
+                   :body
+                   :containers
+                   first
+                   :exit-code)))))
 
   (testing "returns last response on completion"
     (let [r {:status 200
              :body {:lifecycle-state "FAILED"}}
-          ch (sut/wait-for-completion {:get-details (fn [_]
+          ch (sut/poll-for-completion {:get-details (fn [_]
                                                       (future r))})]
       (is (some? ch))
       (is (= r @(md/timeout! ch 200 :timeout))))))
+
+(deftest get-full-instance-details
+  (testing "returns full instance state"
+    (let [[cid sid] (repeatedly random-uuid)
+          exit-codes {cid 100
+                      sid 200}
+          containers [{:display-name "job"
+                       :container-id cid}
+                      {:display-name "sidecar"
+                       :container-id sid}]]
+      (with-redefs [ci/get-container-instance
+                    (fn [& _]
+                      (md/success-deferred
+                       {:status 200
+                        :body
+                        {:id "test-instance"
+                         :lifecycle-state "INACTIVE"
+                         :containers containers}}))
+                    ci/get-container
+                    (fn [_ {:keys [container-id]}]
+                      (md/success-deferred
+                       (if (contains? exit-codes container-id)
+                         {:status 200
+                          :body
+                          {:id container-id
+                           :exit-code (get exit-codes container-id)}}
+                         {:status 400
+                          :body
+                          {:message "Invalid container id"}})))]
+        (is (= {:status 200
+                :body
+                {:id "test-instance"
+                 :lifecycle-state "INACTIVE"
+                 :containers [{:display-name "job"
+                               :container-id cid
+                               :exit-code 100}
+                              {:display-name "sidecar"
+                               :container-id sid
+                               :exit-code 200}]}}
+               (deref (sut/get-full-instance-details ::test-client "test-instance")
+                      200 :timeout)))))))
 
 (deftest run-instance
   (testing "creates container instance"
@@ -106,98 +169,18 @@
       (with-redefs [ci/create-container-instance (constantly {:status 200
                                                               :body
                                                               {:id "test-instance"}})
-                    sut/wait-for-completion (fn [opts]
+                    sut/poll-for-completion (fn [opts]
                                               (swap! calls conj opts)
                                               nil)]
         (is (some? (sut/run-instance {} {})))
         (is (not= :timeout (h/wait-until #(pos? (count @calls)) 200))))))
 
-  (testing "when creation fails, does not poll state"
-    (let [calls (atom [])]
-      (with-redefs [ci/create-container-instance (constantly {:status 400
-                                                              :body
-                                                              {:message "test error"}})
-                    ci/get-container-instance (fn [opts]
-                                                (swap! calls conj opts)
-                                                nil)]
-        (is (some? (sut/run-instance {} {})))
-        (is (zero? (count @calls))))))
-
-  (testing "stops polling when job container fails"
-    (let [calls (atom 0)
-          [iid jid sid] (repeatedly random-uuid)]
-      (with-redefs [ci/create-container-instance
-                    (constantly {:status 200
-                                 :body
-                                 {:id iid}})
-                    ci/get-container-instance
-                    (fn [& _]
-                      (swap! calls inc)
-                      {:status 200
-                       :body
-                       {:containers
-                        [{:container-id jid
-                          :display-name "job"}
-                         {:container-id sid
-                          :display-name "sidecar"}]
-                        :lifecycle-state (if (> @calls 1) "FAILED" "RUNNING")}})
-                    ci/get-container
-                    (fn [_ {:keys [container-id]}]
-                      {:status 200
-                       :body {:id container-id
-                              :exit-code (condp = container-id
-                                           jid 128
-                                           sid 0)}})
-                    ci/retrieve-logs
-                    (constantly nil)]
-        (is (map? (-> (sut/run-instance {} {} {:poll-interval 200})
-                      (deref)
-                      :body)))
-        (is (= 1 @calls)))))
-
-  (testing "returns full instance state"
-    (let [[cid sid] (repeatedly random-uuid)
-          exit-codes {cid 100
-                      sid 200}
-          containers [{:display-name "job"
-                       :container-id cid}
-                      {:display-name "sidecar"
-                       :container-id sid}]]
-      (with-redefs [ci/create-container-instance
-                    (constantly
-                     (md/success-deferred
-                      {:status 200
-                       :body
-                       {:id "test-instance"
-                        :containers containers}}))
-                    ci/get-container-instance
-                    (fn [& _]
-                      (md/success-deferred
-                       {:status 200
-                        :body
-                        {:lifecycle-state "INACTIVE"
-                         :containers containers}}))
-                    ci/get-container
-                    (fn [_ {:keys [container-id]}]
-                      (md/success-deferred
-                       (if (contains? exit-codes container-id)
-                         {:status 200
-                          :body
-                          {:id container-id
-                           :exit-code (get exit-codes container-id)}}
-                         {:status 400
-                          :body
-                          {:message "Invalid container id"}})))]
-        (is (= {:status 200
-                :body
-                {:lifecycle-state "INACTIVE"
-                 :containers [{:display-name "job"
-                               :container-id cid
-                               :exit-code 100}
-                              {:display-name "sidecar"
-                               :container-id sid
-                               :exit-code 200}]}}
-               (deref (sut/run-instance {} {}) 200 :timeout))))))
+  (testing "when creation fails, does not call exit checker"
+    (let [res {:status 400
+               :body
+               {:message "test error"}}]
+      (with-redefs [ci/create-container-instance (constantly res)]
+        (is (= res @(sut/run-instance {} {} {:exited? (md/error-deferred "should not be called")}))))))
 
   (testing "includes container logs if not inactive"
     (let [cid (random-uuid)
@@ -247,7 +230,7 @@
                        :body
                        {:id iid
                         :containers containers}}))
-                    sut/wait-for-completion
+                    sut/poll-for-completion
                     (fn [opts]
                       (md/success-deferred
                        {:status 200

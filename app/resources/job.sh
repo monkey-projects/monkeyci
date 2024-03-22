@@ -66,14 +66,14 @@ run_command()
 
 echo "Starting job script with working directory $MONKEYCI_WORK_DIR"
 mkdir -p $MONKEYCI_LOG_DIR
-post_event "{:type :job/wait}"
+post_event "{:type :container/pending}"
 wait_for_start
 if [ "$ABORT" == "yes" ]; then
     echo "Aborted."
     exit 1
 fi
 
-post_event "{:type :job/start}"
+post_event "{:type :container/start}"
 cd $MONKEYCI_WORK_DIR
 # Execute all arguments as script commands
 for v in $*
@@ -83,9 +83,9 @@ do
     if [ $r -ne 0 ]; then
 	echo "Got error at step $v: $r"
 	# Nonzero return value means error, so don't proceed
-	post_event "{:type :job/failed :done? true :exit $r :step \"$v\"}"
+	post_event "{:type :container/end :status :error :done? true :exit $r :step \"$v\"}"
 	exit $r
     fi
 done
-post_event "{:type :job/success :done? true}"
+post_event "{:type :container/end :status :success :done? true}"
 echo "All done."

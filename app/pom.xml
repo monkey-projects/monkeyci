@@ -4,7 +4,7 @@
   <packaging>jar</packaging>
   <groupId>com.monkeyci</groupId>
   <artifactId>app</artifactId>
-  <version>0.4.0-SNAPSHOT</version>
+  <version>0.4.1-SNAPSHOT</version>
   <name>app</name>
   <repositories>
     <repository>
@@ -41,6 +41,11 @@
       <groupId>org.clojure</groupId>
       <artifactId>tools.logging</artifactId>
       <version>1.2.4</version>
+    </dependency>
+    <dependency>
+      <groupId>org.zeromq</groupId>
+      <artifactId>jeromq</artifactId>
+      <version>0.5.4</version>
     </dependency>
     <dependency>
       <groupId>cli-matic</groupId>
@@ -157,6 +162,17 @@
         <exclusion>
           <groupId>org.bouncycastle</groupId>
           <artifactId>bcutil-jdk15on</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>com.monkeyprojects</groupId>
+      <artifactId>zmq</artifactId>
+      <version>0.2.0-SNAPSHOT</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.zeromq</groupId>
+          <artifactId>jzmq</artifactId>
         </exclusion>
       </exclusions>
     </dependency>

@@ -7,7 +7,9 @@
             [manifold.deferred :as md]
             [monkey.ci
              [blob :as blob]
-             [storage :as s]]
+             [protocols :as p]
+             [storage :as s]
+             [utils :as u]]
             [monkey.ci.web
              [common :as wc]
              [auth :as auth]]
@@ -133,3 +135,14 @@
 
 (defn generate-private-key []
   (.getPrivate (auth/generate-keypair)))
+
+(defrecord FakeEvents [recv]
+  p/EventPoster
+  (post-events [this evt]
+    (swap! recv (comp vec concat) (u/->seq evt))))
+
+(defn fake-events
+  "Set up fake events implementation.  It returns an event poster that can be
+   queried for received events."
+  []
+  (->FakeEvents (atom [])))

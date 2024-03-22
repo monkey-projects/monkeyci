@@ -67,7 +67,7 @@
   co/Lifecycle
   (start [this]
     ;; Register listeners
-    (ec/add-listener events (build-update-handler storage) {:types (set (keys update-handlers))})
+    (ec/add-listener events {:types (set (keys update-handlers))} (build-update-handler storage))
     this)
   (stop [this]))
 

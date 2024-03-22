@@ -9,6 +9,7 @@
              [oci :as oci]
              [utils :as u]]
             [monkey.ci.containers.oci :as sut]
+            [monkey.ci.events.core :as ec]
             [monkey.ci.helpers :as h]))
 
 (defn- find-volume-entry [vol n]
@@ -116,14 +117,18 @@
 
   (testing "sidecar container"
     (let [pk (h/generate-private-key)
+          conf {:oci {:credentials {:private-key pk}}
+                :events {:type :zmq
+                         :client {:address "inproc://test"}
+                         :server {:enabled true}}
+                :args "test-args"}
           ic (->> {:job {:script ["first" "second"]
                          :save-artifacts [{:id "test-artifact"
                                            :path "somewhere"}]
                          :work-dir "/tmp/test-checkout/sub"}
                    :build {:build-id "test-build"
                            :checkout-dir "/tmp/test-checkout"}
-                   :config {:oci {:credentials {:private-key pk}}
-                            :args "test-args"}}
+                   :config conf}
                   (sut/instance-config {:credentials {:private-key pk}}))
           sc (->> ic
                   :containers
@@ -191,7 +196,14 @@
           (testing "sets work dir to checkout dir"
             (is (= (str sut/work-dir "/test-checkout") (get env "MONKEYCI_WORK_DIR"))))
 
-          (testing "recalculates script dir relative to new checkout dir")))
+          (testing "recalculates script dir relative to new checkout dir")
+
+          (testing "disables event server"
+            (not (contains? env "MONKEYCI_EVENTS_SERVER_ENABLED")))
+
+          (testing "passes other event properties"
+            (is (= (get-in conf [:events :client :address])
+                   (get env "MONKEYCI_EVENTS_CLIENT_ADDRESS"))))))
 
       (testing "runs as root to access mount volumes"
         (is (= 0 (-> sc :security-context :run-as-user)))))
@@ -227,6 +239,26 @@
                (get-in by-name ["0" :data])))
         (is (= (u/->base64 "second")
                (get-in by-name ["1" :data])))))))
+
+(deftest wait-for-sidecar-end-event
+  (testing "returns a deferred that holds the sidecar end event"
+    (let [events (ec/make-events {:events {:type :manifold}})
+          sid (repeatedly 3 random-uuid)
+          d (sut/wait-for-sidecar-end-event events sid "this-job")]
+      (is (md/deferred? d))
+      (is (not (md/realized? d)) "should not be realized initially")
+      (is (some? (ec/post-events events [{:type :sidecar/start
+                                          :sid sid}])))
+      (is (not (md/realized? d)) "should not be realized after start event")
+      (is (some? (ec/post-events events [{:type :sidecar/end
+                                          :sid sid
+                                          :job {:id "other-job"}}])))
+      (is (not (md/realized? d)) "should not be realized for other job")
+      (is (some? (ec/post-events events [{:type :sidecar/end
+                                          :sid sid
+                                          :job {:id "this-job"}}])))
+      (is (= :sidecar/end (-> (deref d 100 :timeout)
+                              :type))))))
 
 (deftest run-container
   (testing "can run using type `oci`, returns zero exit code on success"

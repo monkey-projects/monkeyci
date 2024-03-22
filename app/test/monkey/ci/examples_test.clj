@@ -15,7 +15,7 @@
           :dir path})))
 
 (defn success? [r]
-  (= 0 (deref r 30000 :timeout)))
+  (= 0 r #_(deref r 30000 :timeout)))
 
 (deftest ^:integration examples
   (letfn [(run-example-test [n]
