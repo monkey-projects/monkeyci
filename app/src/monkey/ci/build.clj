@@ -130,12 +130,18 @@
   (when (number? exit)
     (if (zero? exit) :success :error)))
 
+(defn build->evt
+  "Prepare build object so it can be added to an event"
+  [build]
+  (mc/update-existing build :git dissoc :ssh-keys))
+
 (defn build-end-evt
   "Creates a `build/end` event"
   [build & [exit-code]]
   {:type :build/end
    :sid (:sid build)
    :build (-> build
+              (build->evt)
               (assoc :end-time (u/now))
               (mc/assoc-some :status (exit-code->status exit-code)))})
 

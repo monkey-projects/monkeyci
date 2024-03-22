@@ -54,11 +54,12 @@
    runs the build.  Returns a deferred that resolves when the child process has
    exited."
   [rt]
-  (let [script-dir (build/rt->script-dir rt)
-        build (rt/build rt)]
+  (let [script-dir (build/rt->script-dir rt)]
     (rt/post-events rt {:type :build/start
                         :sid (build/get-sid rt)
-                        :build (assoc build :start-time (u/now))})
+                        :build (-> (rt/build rt)
+                                   (build/build->evt)
+                                   (assoc :start-time (u/now)))})
     (-> (md/chain
          (if (some-> (io/file script-dir) (.exists))
            (p/execute! rt)

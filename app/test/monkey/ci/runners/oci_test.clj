@@ -97,7 +97,10 @@
             (is (not-empty env)))
 
           (testing "env vars are strings, not keywords"
-            (is (every? string? (keys env))))))
+            (is (every? string? (keys env))))
+
+          (testing "enforces child runner"
+            (is (= "child" (get env "MONKEYCI_RUNNER_TYPE"))))))
 
       (testing "drops nil env vars"
         (let [c (-> rt

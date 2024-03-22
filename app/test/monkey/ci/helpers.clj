@@ -146,3 +146,14 @@
    queried for received events."
   []
   (->FakeEvents (atom [])))
+
+(defrecord FakeEventReceiver [listeners]
+  p/EventReceiver
+  (add-listener [this ef h]
+    (swap! listeners update ef (fnil conj []) h))
+
+  (remove-listener [this ef h]
+    (swap! listeners update ef (partial remove (partial = h)))))
+
+(defn fake-events-receiver []
+  (->FakeEventReceiver (atom {})))
