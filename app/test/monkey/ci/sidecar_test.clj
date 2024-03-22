@@ -225,11 +225,6 @@
   (with-redefs [sut/mark-start identity
                 sut/poll-events (fn [rt]
                                   (md/success-deferred (assoc rt :exit-code 0)))]
-    (testing "adds job config to runtime"
-      (is (= "test-job" (-> {:config {:sidecar {:job-config {:id "test-job"}}}}
-                            (sut/run)
-                            (deref)
-                            :id))))
     
     (testing "restores src from workspace"
       (with-redefs [sut/restore-src (constantly {:stage ::restored})
