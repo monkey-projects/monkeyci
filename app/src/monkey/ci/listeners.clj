@@ -66,10 +66,17 @@
 (defrecord Listeners [events storage]
   co/Lifecycle
   (start [this]
-    ;; Register listeners
-    (ec/add-listener events {:types (set (keys update-handlers))} (build-update-handler storage))
-    this)
-  (stop [this]))
+    (if (every? nil? ((juxt :event-filter :handler) this))
+      (let [ef {:types (set (keys update-handlers))}
+            handler (build-update-handler storage)]
+        ;; Register listeners
+        (ec/add-listener events ef handler)
+        (assoc this :event-filter ef :handler handler))
+      ;; If already registered, do nothing
+      this))
+  (stop [{:keys [event-filter handler] :as this}]
+    (ec/remove-listener events event-filter handler)
+    (dissoc this :event-filter :handler)))
 
 (defmethod rt/setup-runtime :listeners [conf _]
   (when (every? conf [:events :storage])

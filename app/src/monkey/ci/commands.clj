@@ -93,7 +93,7 @@
                     (rt/config)
                     (select-keys [:http])
                     (assoc :type :server/started)))
-  ;; Start the server
+  ;; Start the server and wait for it to shut down
   (h/on-server-close (http rt)))
 
 (defn watch
@@ -137,8 +137,10 @@
    which are then picked up by the sidecar to dispatch or store.  
 
    The sidecar loop will stop when the events file is deleted."
-  [{:keys [job] :as rt}]
-  (let [sid (b/get-sid rt)]
+  [rt]
+  (let [sid (b/get-sid rt)
+        ;; Add job info from the sidecar config
+        {:keys [job] :as rt} (merge rt (get-in rt [rt/config :sidecar :job-config]))]
     (try
       (rt/post-events rt {:type :sidecar/start
                           :sid sid
@@ -148,6 +150,11 @@
           :exit-code)
       (finally
         (log/info "Sidecar terminated")
+        ;; FIXME The process shuts down immediately after this, so it may occur
+        ;; that the event is never sent.  So until this is fixed, we just wait
+        ;; a few seconds.
         (rt/post-events rt {:type :sidecar/end
                             :sid sid
-                            :job (jobs/job->event job)})))))
+                            :job (jobs/job->event job)})
+        (when-not (rt/dev-mode? rt)
+          (Thread/sleep 2000))))))

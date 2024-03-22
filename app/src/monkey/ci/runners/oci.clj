@@ -17,8 +17,14 @@
 (def build-container "build")
 (def format-sid (partial cs/join "/"))
 
+(defn- prepare-config-for-oci [config]
+  (-> config
+      ;; Enforce child runner
+      (assoc :runner {:type :child})))
+
 (defn- ->env [rt]
   (->> (rt/rt->env rt)
+       (prepare-config-for-oci)
        (config/config->env)
        (mc/map-keys name)
        (mc/remove-vals empty?)))

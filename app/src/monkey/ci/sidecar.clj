@@ -129,10 +129,10 @@
               (art/wrap-artifacts)
               (cache/wrap-caches))]
     (-> rt
-        (merge (get-in rt [rt/config :sidecar :job-config]))
         (restore-src)
         (md/chain h)
         (md/catch
+            ;; TODO At this point we also should abort the job container by writing to the abort file
             (fn [ex]
               (log/error "Failed to run sidecar" ex)
               {:exit-code 1

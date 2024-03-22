@@ -334,9 +334,8 @@
 
 (defmethod rt/setup-runtime :http [conf _]
   ;; Return a function that when invoked, returns another function to shut down the server
-  ;; TODO See if we can change this into a component
   (fn [rt]
-    (log/debug "Starting http server with runtime:" rt)
+    (log/debug "Starting http server with config:" (:config rt))
     (-> (->HttpServer rt)
         (co/start))))
 

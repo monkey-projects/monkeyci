@@ -20,7 +20,8 @@
   (->event [this event-type]))
 
 (defprotocol EventPoster
-  (post-events [poster evt] "Posts one or more events"))
+  (post-events [poster evt]
+    "Posts one or more events.  Returns a deferred that realizes when the events have been posted."))
 
 (defprotocol EventReceiver
   (add-listener [recv ef l] "Add the given filter with a listener to the receiver")
