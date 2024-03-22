@@ -17,6 +17,7 @@
              [runtime :as rt]
              [utils :as u]]
             [monkey.ci.build.core :as bc]
+            [monkey.ci.events.core :as ec]
             [monkey.oci.container-instance.core :as ci]))
 
 (defn- subdir [n]
@@ -181,6 +182,23 @@
                 (script-vol-config rt)
                 (config-vol-config rt)))))
 
+(defn wait-for-sidecar-end-event
+  "Checks the incoming events to see if a sidecar end event has been received.
+   Returns a deferred that will contain the sidecar end event."
+  [events sid job-id]
+  (let [r (md/deferred)
+        f {:types #{:sidecar/end}
+           :sid sid}
+        l (fn [evt]
+            (when (= job-id (get-in evt [:job :id]))
+              (md/success! r evt)))
+        unregister (fn [_]
+                     (ec/remove-listener events f l))]
+    ;; Make sure to unregister the listener in any case
+    (md/on-realized r unregister unregister)
+    (ec/add-listener events f l)
+    r))
+
 (defmethod mcc/run-container :oci [rt]
   (log/debug "Running job as OCI instance:" (:job rt))
   (let [conf (:containers rt)
@@ -189,7 +207,16 @@
                    (ci/make-context))
         ic (instance-config conf rt)]
     (md/chain
-     (oci/run-instance client ic {:delete? true})
+     (oci/run-instance client ic {:delete? true
+                                  :exited? (fn [id]
+                                             (md/chain
+                                              ;; TODO When a start event has not been received after
+                                              ;; a sufficient period of time, start polling anyway.
+                                              (wait-for-sidecar-end-event (:events rt)
+                                                                          (b/get-sid rt)
+                                                                          (b/rt->job-id rt))
+                                              (fn [_]
+                                                (oci/get-full-instance-details client id))))})
      (fn [r]
        (letfn [(maybe-log-output [{:keys [exit-code display-name logs] :as c}]
                  (when (not= 0 exit-code)

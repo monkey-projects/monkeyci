@@ -60,16 +60,13 @@
 
 (defn- job-start-evt [{:keys [job]}]
   {:type :job/start
-   :job (-> (select-keys job [j/deps j/labels :start-time])
-            (assoc :id (bc/job-id job)))
+   :job (j/job->event job)
    :message "Job started"})
 
 (defn- job-end-evt [{:keys [job]} {:keys [status message exception]}]
   {:type :job/end
    :message "Job completed"
-   :job (cond-> {:id (bc/job-id job)
-                 :status (or status :success)}
-          true (merge (select-keys job [j/deps j/labels :start-time :end-time]))
+   :job (cond-> (j/job->event job)
           (some? exception) (assoc :message (or message (.getMessage exception))
                                    :stack-trace (u/stack-trace exception)))})
 
@@ -254,7 +251,8 @@
         script-dir (build/rt->script-dir rt)
         ;; Manually add events poster
         ;; This will be removed when events are reworked to be more generic
-        rt (assoc-in rt [:events :poster] (partial post-events rt))]
+        ;; Don't use assoc-in, cause it will fail when events are already configured.
+        rt (assoc rt :events {:poster (partial post-events rt)})]
     (log/debug "Executing script for build" build-id "at:" script-dir)
     (log/debug "Script runtime:" rt)
     (try 

@@ -318,3 +318,10 @@
        (filter resolvable?)
        (mapcat #(resolve-jobs % rt))
        (filter job?)))
+
+(defn job->event
+  "Converts job into something that can be put in an event"
+  [job]
+  (-> job
+      (select-keys [:status :start-time :end-time deps labels])
+      (assoc :id (bc/job-id job))))

@@ -56,19 +56,18 @@
 
 (def terminated? #{"INACTIVE" "DELETED" "FAILED"})
 
-(defn wait-for-completion
+(defn poll-for-completion
   "Starts an async poll loop that waits until the container instance has completed.
    Returns a deferred that holds the last response received."
-  [{:keys [get-details poll-interval post-event] :as c
+  [{:keys [get-details poll-interval post-event instance-id] :as c
     :or {poll-interval 10000
          post-event (constantly true)}}]
-  (let [get-async (fn []
-                    (get-details (:instance-id c)))
-        container-failed? (comp (partial some (comp (every-pred number? (complement zero?)) :exit-code))
+  (let [container-failed? (comp (partial some (comp (every-pred number? (complement zero?)) :exit-code))
                                 :containers)]
+    (log/debug "Starting polling until container instance" instance-id "has exited")
     (md/loop [state nil]
       (md/chain
-       (get-async)
+       (get-details instance-id)
        (fn [{:keys [body] :as r}]
          (let [new-state (:lifecycle-state body)
                failed? (container-failed? body)]
@@ -83,11 +82,49 @@
              ;; Wait and re-check
              (mt/in poll-interval #(md/recur new-state)))))))))
 
+(defn get-full-instance-details
+  "Retrieves full container instance details by retrieving the container instance 
+   information, and fetching container details as well."
+  [client id]
+  (log/trace "Retrieving container instance details for" id)
+  (md/chain
+   (ci/get-container-instance client {:instance-id id})
+   ;; TODO Handle error responses
+   (fn [{:keys [status body] :as r}]
+     (if (>= status 400)
+       (do
+         (log/warn "Got error response:" status ", message:" (:message body))
+         [r []])
+       ;; Fetch details for all containers
+       (->> body
+            :containers
+            (map #(select-keys % [:container-id]))
+            (map (partial ci/get-container client))
+            (apply md/zip)
+            (md/zip r))))
+   (fn [[r containers]]
+     ;; The exited? option
+     ;; Add the exit codes for all containers to the result
+     (log/trace "Container details:" containers)
+     (let [by-id (->> containers
+                      (map :body) ; TODO Check for error response
+                      (group-by :id)
+                      (mc/map-vals first))
+           add-exit-code (fn [c]
+                           (merge c (-> (get by-id (:container-id c))
+                                        (dissoc :id))))]
+       (mc/update-existing-in r [:body :containers] (partial map add-exit-code))))))
+
 (defn run-instance
   "Creates and starts a container instance using the given config, and then
    waits for it to terminate.  Returns a deferred that will hold the full container
-   instance state on completion, including the container details."
-  [client instance-config & [{:keys [delete?] :as opts}]]
+   instance state on completion, including the container details.  
+
+   The `exited?` option should be a function that accepts the instance id and returns 
+   a deferred with the container instance status when it exits.  If not provided, a 
+   basic polling loop will be used.  Not that using extensive polling may lead to 429 
+   errors from OCI."
+  [client instance-config & [{:keys [delete? exited?] :as opts}]]
   (log/debug "Running OCI instance with config:" instance-config)
   (letfn [(check-error [handler]
             (fn [{:keys [body status] :as r}]
@@ -106,42 +143,12 @@
              client
              {:container-instance instance-config}))
 
-          (get-instance-details [id]
-            (log/trace "Retrieving container instance details for" id)
-            (md/chain
-             (ci/get-container-instance client {:instance-id id})
-             ;; TODO Handle error responses
-             (fn [{:keys [status body] :as r}]
-               (if (>= status 400)
-                 (do
-                   (log/warn "Got error response:" status ", message:" (:message body))
-                   [r []])
-                 ;; Fetch details for all containers
-                 (->> body
-                      :containers
-                      (map #(select-keys % [:container-id]))
-                      (map (partial ci/get-container client))
-                      (apply md/zip)
-                      (md/zip r))))
-             (fn [[r containers]]
-               ;; Add the exit codes for all containers to the result
-               (log/trace "Container details:" containers)
-               (let [by-id (->> containers
-                                (map :body) ; TODO Check for error response
-                                (group-by :id)
-                                (mc/map-vals first))
-                     add-exit-code (fn [c]
-                                     (merge c (-> (get by-id (:container-id c))
-                                                  (dissoc :id))))]
-                 (mc/update-existing-in r [:body :containers] (partial map add-exit-code))))))
-          
-          (start-polling [{:keys [id]}]
-            (log/debug "Starting polling...")
-            ;; TODO Replace this with OCI events as soon as they become available.
-            ;; FIXME Polling may result in a 429 from OCI so need to replace this with events.
-            (wait-for-completion (-> {:instance-id id
-                                      :get-details get-instance-details}
-                                     (merge (select-keys opts [:poll-interval :post-event])))))
+          (wait-for-exit [{:keys [id]}]
+            (if exited?
+              (exited? id)
+              (poll-for-completion (-> {:instance-id id
+                                        :get-details (partial get-full-instance-details client)}
+                                       (merge (select-keys opts [:poll-interval :post-event]))))))
 
           (try-fetch-logs [{:keys [body] :as r}]
             ;; Try to download the outputs for each of the containers.  Since we can
@@ -174,7 +181,7 @@
     
     (-> (md/chain
          (create-instance)
-         (check-error start-polling)
+         (check-error wait-for-exit)
          try-fetch-logs
          maybe-delete-instance)
         (md/catch log-error))))

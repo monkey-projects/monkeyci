@@ -9,6 +9,7 @@
              [oci :as oci]
              [utils :as u]]
             [monkey.ci.containers.oci :as sut]
+            [monkey.ci.events.core :as ec]
             [monkey.ci.helpers :as h]))
 
 (defn- find-volume-entry [vol n]
@@ -238,6 +239,26 @@
                (get-in by-name ["0" :data])))
         (is (= (u/->base64 "second")
                (get-in by-name ["1" :data])))))))
+
+(deftest wait-for-sidecar-end-event
+  (testing "returns a deferred that holds the sidecar end event"
+    (let [events (ec/make-events {:events {:type :manifold}})
+          sid (repeatedly 3 random-uuid)
+          d (sut/wait-for-sidecar-end-event events sid "this-job")]
+      (is (md/deferred? d))
+      (is (not (md/realized? d)) "should not be realized initially")
+      (is (some? (ec/post-events events [{:type :sidecar/start
+                                          :sid sid}])))
+      (is (not (md/realized? d)) "should not be realized after start event")
+      (is (some? (ec/post-events events [{:type :sidecar/end
+                                          :sid sid
+                                          :job {:id "other-job"}}])))
+      (is (not (md/realized? d)) "should not be realized for other job")
+      (is (some? (ec/post-events events [{:type :sidecar/end
+                                          :sid sid
+                                          :job {:id "this-job"}}])))
+      (is (= :sidecar/end (-> (deref d 100 :timeout)
+                              :type))))))
 
 (deftest run-container
   (testing "can run using type `oci`, returns zero exit code on success"

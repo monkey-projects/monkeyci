@@ -29,7 +29,8 @@
   (or (get-in rt [:build :build-id]) "unknown-build"))
 
 (def get-job-sid
-  "Creates a unique step id using the build id and job id"
+  "Creates a job sid using the build id and job id.  Note that this does
+   not include the customer and repo ids, so this is only unique within the repo."
   (comp (partial mapv str)
         (juxt get-build-id
               (comp bc/job-id :job))))
@@ -37,6 +38,8 @@
 (def get-job-id
   "Creates a string representation of the job sid"
   (comp (partial cs/join "-") get-job-sid))
+
+(def rt->job-id (comp bc/job-id :job))
 
 (defn- maybe-set-git-opts [build rt]
   (let [{:keys [git-url branch commit-id dir]} (rt/args rt)]
