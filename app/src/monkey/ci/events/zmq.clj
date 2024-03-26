@@ -76,7 +76,7 @@
                     filter-fn]
   (when enabled
     (ze/broker-server (or context (make-context))
-                      (first addresses) ; Only one address supported for now
+                      addresses
                       {:autostart? false  ; Let component start it
                        :matches-filter? filter-fn
                        :linger linger
