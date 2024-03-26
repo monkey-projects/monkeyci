@@ -20,6 +20,10 @@
          (apply md/zip))
     (poster events)))
 
+(defn filtering-listener [pred l]
+  (fn [evt]
+    (when (pred evt) (l evt))))
+
 (defrecord ZeroMQEvents [server client listeners]
   co/Lifecycle
   (start [this]
@@ -34,13 +38,15 @@
 
   p/EventReceiver
   (add-listener [recv ef l]
-    (ze/register (:client recv) ef)
-    (swap! listeners conj l)
+    (let [m (get-in recv [:client :matches-filter?])]
+      (ze/register (:client recv) ef)
+      (swap! listeners conj {:orig l
+                             :listener (filtering-listener #(m % ef) l)}))
     recv)
 
   (remove-listener [recv ef l]
     (ze/unregister (:client recv) ef)
-    (swap! listeners (partial remove (partial = l)))
+    (swap! listeners (partial remove (comp (partial = l) :orig)))
     recv)
 
   p/EventPoster
@@ -53,21 +59,28 @@
   [listeners]
   (fn [evt]
     (doseq [l @listeners]
-      (l evt))))
+      ((:listener l) evt))))
 
-(defn- make-client [{:keys [address context]} listeners]
-  (ze/broker-client (or context (make-context))
-                    address
-                    (event-handler listeners)
-                    ;; Let component start it
-                    {:autostart? false}))
+(defn- make-client [{:keys [address context linger]} filter-fn listeners]
+  (-> (ze/broker-client (or context (make-context))
+                        address
+                        (event-handler listeners)
+                        ;; Let component start it
+                        {:autostart? false
+                         :close-context? (nil? context)
+                         :linger (or linger 5000)})
+      (assoc :matches-filter? filter-fn)))
 
-(defn- make-server [{:keys [addresses context enabled] :or {enabled false}} filter-fn]
+(defn- make-server [{:keys [addresses context enabled linger]
+                     :or {enabled false linger 5000}}
+                    filter-fn]
   (when enabled
     (ze/broker-server (or context (make-context))
                       (first addresses) ; Only one address supported for now
                       {:autostart? false  ; Let component start it
-                       :matches-filter? filter-fn})))
+                       :matches-filter? filter-fn
+                       :linger linger
+                       :close-context? (nil? context)})))
 
 (defn- reuse-context?
   "Checks if we should reuse context.  This is necessary if we use inproc protocol."
@@ -88,5 +101,5 @@
                                   ctx (-> (assoc-in [:client :context] ctx)
                                           (assoc-in [:server :context] ctx)))]
     (->ZeroMQEvents (make-server server filter-fn)
-                    (make-client client listeners)
+                    (make-client client filter-fn listeners)
                     listeners)))

@@ -1,5 +1,6 @@
 (ns monkey.ci.events.core
-  (:require [manifold.deferred :as md]
+  (:require [clojure.tools.logging :as log]
+            [manifold.deferred :as md]
             [monkey.ci
              [config :as c]
              [protocols :as p]
@@ -122,9 +123,11 @@
    been received.  Returns a deferred that realizes with the received event.  An additional
    predicate can do extra filtering if it's not supported by the event filter."
   [events ef & [pred]]
+  (log/debug "Waiting for event to arrive that matches filter:" ef)
   (let [r (md/deferred)
         l (fn [evt]
             (when (or (nil? pred) (pred evt))
+              (log/debug "Matching event has arrived")
               (md/success! r evt)))
         unregister (fn [_]
                      (remove-listener events ef l))]

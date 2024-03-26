@@ -27,6 +27,7 @@
              [core :as ec]
              [manifold]]
             [monkey.ci.reporting.print]
+            [monkey.ci.runners.oci]
             [monkey.ci.storage
              [cached]
              [file]

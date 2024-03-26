@@ -210,15 +210,24 @@
 
 (deftest setup-runtime
   (testing "`nil` if no events configured"
-    (is (nil? (rt/setup-runtime {:storage ::test-storage} :listeners))))
+    (is (nil? (rt/setup-runtime {:app-mode :server
+                                 :storage ::test-storage} :listeners))))
 
   (testing "`nil` if no storage configured"
-    (is (nil? (rt/setup-runtime {:events ::test-events} :listeners))))
+    (is (nil? (rt/setup-runtime {:app-mode :server
+                                 :events ::test-events} :listeners))))
 
   (testing "returns component if storage and events configured"
-    (is (some? (rt/setup-runtime {:storage ::test-storage
+    (is (some? (rt/setup-runtime {:app-mode :server
+                                  :storage ::test-storage
                                   :events ::test-events}
-                                 :listeners)))))
+                                 :listeners))))
+
+  (testing "`nil` if not in server mode"
+    (is (nil? (rt/setup-runtime {:app-mode :script
+                                 :storage ::test-storage
+                                 :events ::test-events}
+                                :listeners)))))
 
 (deftest listeners-component
   (testing "adds listeners on start"

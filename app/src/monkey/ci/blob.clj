@@ -12,6 +12,7 @@
             [manifold.deferred :as md]
             [monkey.ci
              [oci :as oci]
+             [protocols :as p]
              [utils :as u]]
             [monkey.oci.os
              [core :as os]
@@ -19,16 +20,13 @@
   (:import [java.io BufferedInputStream PipedInputStream PipedOutputStream]
            [org.apache.commons.compress.archivers ArchiveStreamFactory]))
 
-(defprotocol BlobStore
-  "Protocol for blob store abstraction, used to save and compress files or directories
-   to some blob store, possibly remote."
-  (save [store src dest] "Saves `src` file or directory to `dest` as a blob")
-  (restore [store src dest] "Restores `src` to local `dest`"))
+(def save p/save-blob)
+(def restore p/restore-blob)
 
 (defmulti make-blob-store (fn [conf k]
                             (get-in conf [k :type])))
 
-(def blob-store? (partial satisfies? BlobStore))
+(def blob-store? p/blob-store?)
 
 (def compression-type "gz")
 (def archive-type "tar")
@@ -127,8 +125,8 @@
      :entries @entries}))
 
 (deftype DiskBlobStore [dir]
-  BlobStore
-  (save [_ src dest]
+  p/BlobStore
+  (save-blob [_ src dest]
     (if (fs/exists? src)
       (let [f (io/file dir dest)]
         (log/debug "Saving archive" src "to" f)
@@ -138,7 +136,7 @@
          (constantly (u/abs-path f))))
       (md/success-deferred nil)))
 
-  (restore [_ src dest]
+  (restore-blob [_ src dest]
     (let [f (io/file dest)
           os (PipedOutputStream.)
           srcf (io/file dir src)]
@@ -179,8 +177,8 @@
        (cs/join "/")))
 
 (deftype OciBlobStore [client conf]
-  BlobStore
-  (save [_ src dest]
+  p/BlobStore
+  (save-blob [_ src dest]
     (if (fs/exists? src)
       (let [arch (tmp-archive conf)
             obj-name (archive-obj-name conf dest)]
@@ -204,7 +202,7 @@
         (log/warn "Unable to save blob, path does not exist:" src)
         (md/success-deferred nil))))
 
-  (restore [_ src dest]
+  (restore-blob [_ src dest]
     (let [obj-name (archive-obj-name conf src)
           f (io/file dest)
           arch (tmp-archive conf)

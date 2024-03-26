@@ -37,16 +37,7 @@
            (hash-map :key-dir ssh-keys-dir :name)))
     conf))
 
-(def origin-prefix "origin/")
-
-(defn- prefix-origin
-  "Ensures that the given branch name has the `origin` prefix"
-  [b]
-  (when b
-    (cond->> b
-      (not (cs/starts-with? b origin-prefix)) (str origin-prefix))))
-
-(def opts->branch (some-fn :ref (comp prefix-origin :branch)))
+(def opts->branch (some-fn :ref :branch))
 
 (defn clone
   "Clones the repo at given url, and checks out the given branch.  Writes the

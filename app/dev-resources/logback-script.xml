@@ -6,7 +6,7 @@
     </http>
     <format>
       <label>
-	<pattern>env=dev,app=monkeyci,role=sidecar,level=%level</pattern>
+	<pattern>env=dev,app=monkeyci,role=script,level=%level</pattern>
       </label>
       <message>
 	<pattern>l=%level h=${HOSTNAME} c=%logger{20} t=%thread | %msg %ex</pattern>
@@ -30,7 +30,6 @@
   <logger name="net" level="WARN"/>
   <logger name="io" level="WARN"/>
   <logger name="monkey.ci" level="DEBUG"/>
-  <logger name="monkey.oci" level="TRACE"/>
 
   <root level="INFO">
     <appender-ref ref="LOKI"/>

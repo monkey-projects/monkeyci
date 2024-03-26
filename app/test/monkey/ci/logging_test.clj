@@ -185,3 +185,17 @@
                                          (ex-info "invalid object name" opts))))]
           (is (= contents
                  (slurp (sut/fetch-log logger ["a" "b" "c"] "out.txt")))))))))
+
+(deftest normalize-logging-config
+  (testing "drops unneeded oci keys"
+    (is (= {:type :oci
+            :compartment-id "test-compartment"
+            :ns "test-ns"
+            :bucket-name "test-bucket"}
+           (-> {:logging {:type :oci
+                          :compartment-id "test-compartment"
+                          :ns "test-ns"
+                          :bucket-name "test-bucket"
+                          :other-key "other-val"}}
+               (sut/normalize-logging-config)
+               :logging)))))

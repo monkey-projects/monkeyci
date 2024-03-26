@@ -89,6 +89,10 @@
   [r & [opts]]
   (edn/read (or opts {}) (java.io.PushbackReader. r)))
 
+(defn parse-edn-str [s]
+  (with-open [r (java.io.StringReader. s)]
+    (parse-edn r)))
+
 (defn fn-name
   "If x points to a fn, returns its name without namespace"
   [x]

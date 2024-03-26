@@ -20,6 +20,7 @@
 (def ssh-keys-dir oci/key-dir)
 (def log-config-volume "log-config")
 (def log-config-dir "/home/monkeyci/config")
+(def log-config-file "logback.xml")
 
 (def build-ssh-keys (comp :ssh-keys :git :build))
 (def log-config (comp :log-config :runner :config))
@@ -27,21 +28,25 @@
 (defn- prepare-config-for-oci [config]
   (-> config
       ;; Enforce child runner
+      ;; TODO Run in-process instead
       (assoc :runner {:type :child})))
 
 (defn- add-ssh-keys-dir [rt conf]
   (cond-> conf
     (build-ssh-keys rt) (assoc-in [:build :git :ssh-keys-dir] ssh-keys-dir)))
 
-(defn- add-log-config-dir [rt conf]
+(defn- add-log-config-path [rt conf]
   (cond-> conf
-    (log-config rt) (assoc-in [:runner :log-config] log-config-dir)))
+    (log-config rt) (assoc-in [:runner :log-config] (str log-config-dir "/" log-config-file))))
 
 (defn- ->env [rt]
-  (->> (rt/rt->env rt)
+  (->> (-> (rt/rt->env rt)
+           (dissoc :app-mode :git :github :http :args :jwk :storage :checkout-base-dir
+                   :ssh-keys-dir :work-dir :oci)
+           (update :build dissoc :cleanup? :status :ssh-keys))
        (prepare-config-for-oci)
        (add-ssh-keys-dir rt)
-       (add-log-config-dir rt)
+       (add-log-config-path rt)
        (config/config->env)
        (mc/map-keys name)
        (mc/remove-vals empty?)))
@@ -73,7 +78,7 @@
     (if (fs/exists? f)
       {:name log-config-volume
        :volume-type "CONFIGFILE"
-       :configs (oci/config-entry "logback.xml" (slurp f))}
+       :configs [(oci/config-entry log-config-file (slurp f))]}
       (log/warn "Configured log config file does not exist:" f))))
 
 (defn- add-log-config-volume [conf rt]
@@ -88,16 +93,24 @@
                                                  :volume-name log-config-volume})))
 
 (defn- patch-container [[conf] rt]
-  (let [git (get-in rt [:build :git])]
+  (let [{:keys [url branch commit-id] :as git} (get-in rt [:build :git])]
+    (when (nil? url)
+      (throw (ex-info "Git URL must be specified" {:git git})))
+    (when (and (nil? branch) (nil? commit-id))
+      (throw (ex-info "Either branch or commit id must be specified" {:git git})))
     [(-> conf
          (assoc :display-name build-container
+                ;; TODO Run build script in-process, it saves memory and time
                 :arguments (cond-> ["-w" oci/checkout-dir "build" "run"
-                                    "--sid" (format-sid (b/get-sid rt))]
-                             (not-empty git) (concat ["-u" (:url git)
-                                                      "-b" (:branch git)
-                                                      "--commit-id" (:commit-id git)]))
-                ;; TODO Log config
-                :environment-variables (->env rt))
+                                    "--sid" (format-sid (b/get-sid rt))
+                                    "-u" url]
+                             branch (concat ["-b" branch])
+                             commit-id (concat ["--commit-id" commit-id]))
+                ;; TODO Pass config in a config file instead of env, cleaner and somewhat safer
+                :environment-variables (->env rt)
+                ;; Run as root, because otherwise we can't write to the shared volumes
+                :security-context {:security-context-type "LINUX"
+                                   :run-as-user 0})
          (add-ssh-keys-mount rt)
          (add-log-config-mount rt))]))
 
@@ -110,6 +123,8 @@
         (update :image-tag #(or % (config/version)))
         (oci/instance-config)
         (assoc :display-name (b/get-build-id rt))
+        ;; TODO Reduce this after we use in-process build
+        ;;(assoc-in [:shape-config :memory-in-g-bs] 4)
         (update :freeform-tags merge tags)
         (update :containers patch-container rt)
         (add-ssh-keys-volume rt)
@@ -138,7 +153,10 @@
                                      (md/timeout!
                                       (wait-for-script-end-event (:events rt) (b/get-sid rt))
                                       max-script-timeout ::timeout)
-                                     (fn [_]
+                                     (fn [r]
+                                       (when (= r ::timeout)
+                                         (log/warn "Build script timed out after" max-script-timeout "msecs"))
+                                       (log/debug "Script end event received, fetching full instance details")
                                        (oci/get-full-instance-details client id))))})
       (md/chain
        (fn [r]

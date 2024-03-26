@@ -142,16 +142,19 @@
         ;; TODO Replace the script api with regular api client and token
         {:keys [socket-path server]} (start-script-api rt)
         [out err :as loggers] (map (partial make-logger rt) [:out :err])
-        result (md/deferred)]
+        result (md/deferred)
+        cmd (-> ["clojure"
+                 "-Sdeps" (pr-str (generate-deps rt))
+                 "-X:monkeyci/build"]
+                (concat (build-args rt))
+                (vec))]
+    (log/debug "Running in script dir:" script-dir ", this command:" cmd)
+    ;; TODO Run as another unprivileged user for security
     (-> (bp/process
          {:dir script-dir
           :out (l/log-output out)
           :err (l/log-output err)
-          :cmd (-> ["clojure"
-                    "-Sdeps" (pr-str (generate-deps rt))
-                    "-X:monkeyci/build"]
-                   (concat (build-args rt))
-                   (vec))
+          :cmd cmd
           :extra-env (process-env rt socket-path)
           :exit-fn (fn [{:keys [proc] :as p}]
                      (let [exit (or (some-> proc (.exitValue)) 0)]

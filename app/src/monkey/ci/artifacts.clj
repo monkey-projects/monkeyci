@@ -48,8 +48,9 @@
                 fullp
                 (build-path rt id))
      (fn [{:keys [dest entries] :as r}]
-       (when r
-         (log/debugf "Zipped %d entries to %s (%.2f MB)" (count entries) dest (mb dest)))
+       (if (not-empty entries)
+         (log/debugf "Zipped %d entries to %s (%.2f MB)" (count entries) dest (mb dest))
+         (log/warn "No files to archive for" id "at" path))
        r))))
 
 (defn save-generic [rt conf]

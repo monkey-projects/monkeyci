@@ -2,7 +2,7 @@
   (:require [buddy.core.keys :as bk]
             [clojure.spec.alpha :as s]
             [clojure.tools.logging :as log]
-            [monkey.ci.blob :as blob]
+            [monkey.ci.protocols :as p]
             [monkey.ci.spec.common :as c]
             [monkey.oci.sign :as oci-sign]))
 
@@ -69,7 +69,7 @@
 
 (defmulti blob-type :type)
 
-(s/def :blob/store blob/blob-store?)
+(s/def :blob/store p/blob-store?)
 (s/def :blob/type #{:disk :oci})
 (s/def :disk-blob/dir string?)
 

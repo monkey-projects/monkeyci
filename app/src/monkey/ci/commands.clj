@@ -150,11 +150,6 @@
           :exit-code)
       (finally
         (log/info "Sidecar terminated")
-        ;; FIXME The process shuts down immediately after this, so it may occur
-        ;; that the event is never sent.  So until this is fixed, we just wait
-        ;; a few seconds.
         (rt/post-events rt {:type :sidecar/end
                             :sid sid
-                            :job (jobs/job->event job)})
-        (when-not (rt/dev-mode? rt)
-          (Thread/sleep 2000))))))
+                            :job (jobs/job->event job)})))))

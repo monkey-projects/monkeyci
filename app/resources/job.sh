@@ -68,7 +68,7 @@ echo "Starting job script with working directory $MONKEYCI_WORK_DIR"
 mkdir -p $MONKEYCI_LOG_DIR
 post_event "{:type :container/pending}"
 wait_for_start
-if [ "$ABORT" == "yes" ]; then
+if [ "$ABORT" = "yes" ]; then
     echo "Aborted."
     exit 1
 fi

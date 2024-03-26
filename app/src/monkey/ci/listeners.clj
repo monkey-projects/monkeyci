@@ -79,7 +79,8 @@
     (dissoc this :event-filter :handler)))
 
 (defmethod rt/setup-runtime :listeners [conf _]
-  (when (every? conf [:events :storage])
+  (when (and (= :server (:app-mode conf))
+             (every? conf [:events :storage]))
     (log/debug "Setting up storage event listeners")
     (-> (map->Listeners {})
         (co/using [:events :storage]))))

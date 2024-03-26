@@ -20,12 +20,9 @@
             [monkey.ci.events.core :as ec]
             [monkey.oci.container-instance.core :as ci]))
 
-(defn- subdir [n]
-  (str oci/checkout-dir "/" n))
-
-(def work-dir (subdir "work"))
+(def work-dir oci/work-dir)
 (def script-dir "/opt/monkeyci/script")
-(def log-dir (subdir "log"))
+(def log-dir (oci/checkout-subdir "log"))
 (def start-file (str log-dir "/start"))
 (def event-file (str log-dir "/events.edn"))
 (def script-vol "scripts")
@@ -37,15 +34,6 @@
 
 (def sidecar-config (comp :sidecar rt/config))
 
-(defn base-work-dir
-  "Determines the base work dir to use inside the container"
-  ;; TODO Move this to common ns
-  [rt]
-  (some->> (b/rt->checkout-dir rt)
-           (fs/file-name)
-           (fs/path work-dir)
-           (str)))
-
 (defn- job-work-dir
   "The work dir to use for the job in the container.  This is the external job
    work dir, rebased onto the base work dir."
@@ -53,9 +41,9 @@
   (let [cd (b/rt->checkout-dir rt)]
     (log/debug "Determining job work dir using checkout dir" cd
                ", job dir" (get-in rt [:job :work-dir])
-               "and base dir" (base-work-dir rt))
+               "and base dir" (oci/base-work-dir rt))
     (-> (get-in rt [:job :work-dir] cd)
-        (u/rebase-path cd (base-work-dir rt)))))
+        (u/rebase-path cd (oci/base-work-dir rt)))))
 
 (defn- job-container
   "Configures the job container.  It runs the image as configured in
@@ -139,7 +127,7 @@
                 log-config (conj (oci/config-entry "logback.xml" log-config)))}))
 
 (defn- add-sidecar-env [sc rt]
-  (let [wd (base-work-dir rt)]
+  (let [wd (oci/base-work-dir rt)]
     ;; TODO Put this all in a config file instead, this way sensitive information is harder to see
     (assoc sc
            :environment-variables
@@ -208,7 +196,9 @@
                                                                  (b/get-sid rt)
                                                                  (b/rt->job-id rt))
                                      max-job-timeout ::timeout)
-                                    (fn [_]
+                                    (fn [r]
+                                      (when (= r ::timeout)
+                                        (log/warn "Container job timed out after" max-job-timeout "msecs"))
                                       (oci/get-full-instance-details client id))))})
      (fn [r]
        (letfn [(maybe-log-output [{:keys [exit-code display-name logs] :as c}]
