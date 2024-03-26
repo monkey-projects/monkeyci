@@ -43,7 +43,8 @@
   (->> (-> (rt/rt->env rt)
            (dissoc :app-mode :git :github :http :args :jwk :storage :checkout-base-dir
                    :ssh-keys-dir :work-dir :oci)
-           (update :build dissoc :cleanup? :status :ssh-keys))
+           (update :build dissoc :cleanup? :status)
+           (update-in [:build :git] dissoc :ssh-keys))
        (prepare-config-for-oci)
        (add-ssh-keys-dir rt)
        (add-log-config-path rt)
@@ -162,6 +163,7 @@
        (fn [r]
          (or (-> r :body :containers first :exit-code) 1))
        (fn [r]
+         ;; FIXME We have a duplicate build/end event here because the remote script also posts it
          (rt/post-events rt (b/build-end-evt (rt/build rt) r))
          r))
       (md/catch

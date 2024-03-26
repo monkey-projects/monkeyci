@@ -36,7 +36,15 @@
                                                          :repo-id "b"}}}
                                      (sut/run-build))]
       (is (= build-id (last sid)))
-      (is (= ["a" "b"] (take 2 sid))))))
+      (is (= ["a" "b"] (take 2 sid)))))
+
+  (testing "posts `build/end` event on exception"
+    (let [{:keys [recv] :as e} (h/fake-events)]
+      (is (= 1 (-> {:runner (fn [_] (throw (ex-info "test error" {})))
+                    :events e}
+                   (sut/run-build))))
+      (is (= 1 (count @recv)))      
+      (is (= :build/end (:type (first @recv)))))))
 
 (deftest list-builds
   (testing "reports builds from server"

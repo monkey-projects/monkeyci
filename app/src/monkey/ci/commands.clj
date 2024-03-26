@@ -69,9 +69,16 @@
   (let [r (:runner rt)]
     #_(report-evt ctx {:type :script/start})
     #_(register-all-handlers event-bus (:handlers acc))
-    (-> rt
-        (prepare-build-ctx)
-        (r))))
+    (try
+      (-> rt
+          (prepare-build-ctx)
+          (r))
+      (catch Exception ex
+        (log/error "Unable to start build" ex)
+        (let [exit-code 1]
+          (rt/post-events rt (b/build-end-evt (assoc (rt/build rt) :message (ex-message ex))
+                                              exit-code))
+          exit-code)))))
 
 (defn list-builds [rt]
   (->> (http/get (apply format "%s/customer/%s/repo/%s/builds"
