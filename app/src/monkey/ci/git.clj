@@ -64,7 +64,7 @@
                          (prepare-ssh-keys opts))
         branch (opts->branch opts)]
     (git/with-identity id-config
-      (log/debug "Cloning" url "and branch" branch "into" dir)
+      (log/debug "Cloning" url "and branch" branch "into" dir "with id config" id-config)
       (git/git-clone url
                      :branch branch
                      :dir dir))))

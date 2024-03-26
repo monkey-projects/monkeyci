@@ -41,12 +41,17 @@
 
 (def rt->job-id (comp bc/job-id :job))
 
-(defn- maybe-set-git-opts [build rt]
-  (let [{:keys [git-url branch commit-id dir]} (rt/args rt)]
+(defn- maybe-set-git-opts
+  "If a git url is specified, updates the build with git information, taken from
+   the arguments and from runtime."
+  [build rt]
+  (let [{:keys [git-url branch commit-id dir]} (rt/args rt)
+        existing (get-in rt [:build :git])]
     (cond-> build
-      git-url (-> (merge {:git {:url git-url
-                                :branch (or branch "main")
-                                :id commit-id}})
+      git-url (-> (assoc :git (assoc existing
+                                     :url git-url
+                                     :branch (or branch "main")
+                                     :id commit-id))
                   ;; Overwrite script dir cause it will be calculated by the git checkout
                   (assoc-in [:script :script-dir] dir)))))
 
