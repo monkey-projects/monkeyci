@@ -11,6 +11,7 @@
              [blob :as b]
              [config :as c]
              [logging :as l]
+             [protocols :as p]
              [sidecar :as sut]
              [spec :as spec]]
             [monkey.ci.helpers :as h]))
@@ -214,11 +215,11 @@
         (is (= [["test.txt"]] @c))))))
 
 (defrecord SlowBlobStore [delay]
-  b/BlobStore
-  (save [_ _ _]
+  p/BlobStore
+  (save-blob [_ _ _]
     (log/info "Simulating slow blob storage...")
     (mt/in delay (constantly {::blob :saved})))
-  (restore [_ _ _]
+  (restore-blob [_ _ _]
     (md/success-deferred nil)))
 
 (deftest run

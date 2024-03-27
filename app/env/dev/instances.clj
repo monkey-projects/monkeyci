@@ -28,15 +28,24 @@
     :command ["/bin/sh"]
     :arguments ["-c" "echo ok"]}])
 
+(defn config->client []
+  (-> (co/oci-container-config)
+      (ci/make-context)))
+
+(defn print-container-logs
+  ([client cid]
+   (println "Fetching logs for container" cid)
+   (md/chain
+    (ci/retrieve-logs client {:container-id cid})
+    (fn [{:keys [status] :as r}]
+      (if (= 200 status)
+        (println "Logs:" (:body r))
+        (println "Got invalid status code:" status)))))
+  ([cid]
+   (print-container-logs (config->client) cid)))
+
 (defn- fetch-logs [client inst]
-  (let [cid (-> inst :containers first :container-id)]
-    (println "Fetching logs for container" cid)
-    (md/chain
-     (ci/retrieve-logs client {:container-id cid})
-     (fn [{:keys [status] :as r}]
-       (if (= 200 status)
-         (println "Logs:" (:body r))
-         (println "Got invalid status code:" status))))))
+  (print-container-logs client (-> inst :containers first :container-id)))
 
 (defn- handle-event [client evt]
   (when (= "ACTIVE" (get-in evt [:details :lifecycle-state]))
@@ -63,16 +72,6 @@
                (run-test-container c)
                (partial hash-map :config c :result))))
        (apply md/zip)))
-
-(defn print-container-logs [client {{:keys [lifecycle-state] :as s} :details}]
-  (println "Got state change:" lifecycle-state)
-  (when (= "ACTIVE" lifecycle-state)
-    (let [cid (-> s :containers first :container-id)]
-      (println "Retrieving container logs for" cid)
-      (md/chain
-       (ci/retrieve-logs client {:container-id cid})
-       :body
-       println))))
 
 (defn pinp-test
   "Trying to get podman-in-podman to run on a container instance."
@@ -164,6 +163,17 @@
             (ci/delete-container-instance client {:instance-id (:id (first td))})
             (fn [_]
               (md/recur (rest td))))))))))
+
+(defn print-job-logs
+  "Prints the logs of the (active) job container in the given instance"
+  [iid]
+  (md/chain
+   (get-instance iid)
+   :containers
+   (partial (filter (comp (partial = "job") :display-name)))
+   first
+   :container-id
+   print-container-logs))
 
 (defn run-build
   "Runs a build given the specified GIT url and branch name, using the current config."
