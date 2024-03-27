@@ -7,6 +7,7 @@
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
+            [medley.core :as mc]
             [monkey.ci
              [blob :as blob]
              [build :as b]
@@ -77,9 +78,13 @@
                      (fs/canonicalize)
                      (str)))
    (fn [{:keys [entries src dest] :as r}]
-     (when r
-       (log/debugf "Unzipped %d entries from %s (%.2f MB) to %s" (count entries) src (mb src) dest))
-     r)))
+     (let [r (-> r
+                 (mc/update-existing :src (comp str fs/canonicalize))
+                 (mc/update-existing :dest (comp str fs/canonicalize))
+                 (mc/update-existing :entries count))]
+       (when r
+         (log/debugf "Unzipped %d entries from %s (%.2f MB) to %s" (count entries) src (mb src) dest))
+       r))))
 
 (defn restore-generic [rt conf]
   (do-with-blobs rt conf (partial restore-blob conf)))

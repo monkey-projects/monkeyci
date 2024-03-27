@@ -72,7 +72,7 @@
   "Generates a string that will be added as a commandline argument
    to the clojure process when running the script.  Any existing `deps.edn`
    should be used as well."
-  [{{:keys [script-dir]} :build :as rt}]
+  [{:keys [build] :as rt}]
   (when (rt/dev-mode? rt)
     (log/debug "Running in development mode, using local src instead of libs"))
   (let [version-or (fn [f]
@@ -81,7 +81,7 @@
                        {:mvn/version (version)}))
         log-config (find-log-config rt)]
     (log/debug "Child process log config:" log-config)
-    {:paths [script-dir]
+    {:paths [(b/script-dir build)]
      :aliases
      {:monkeyci/build
       (cond-> {:exec-fn 'monkey.ci.process/run

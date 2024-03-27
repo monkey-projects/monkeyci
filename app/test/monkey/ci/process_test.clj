@@ -205,4 +205,9 @@
                    :aliases
                    :monkeyci/build
                    :jvm-opts
-                   first)))))))
+                   first))))))
+
+  (testing "adds script dir as paths"
+    (is (= ["test-dir"] (-> {:build {:script {:script-dir "test-dir"}}}
+                            (sut/generate-deps)
+                            :paths)))))

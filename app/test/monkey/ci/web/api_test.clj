@@ -377,7 +377,13 @@
                                                     first
                                                     :sid)
                                               @sent)
-                                       1000))))))
+                                       1000)))))
+
+  (testing "sets `x-accel-buffering` header for nginx proxying"
+    (let [evt (make-events)
+          r (-> (h/->req {:events evt})
+                (sut/event-stream))]
+      (is (= "no" (get-in r [:headers "X-Accel-Buffering"]))))))
 
 (deftest make-build-ctx
   (testing "adds ref to build from branch query param"
@@ -410,7 +416,21 @@
                                                 :repo-id rid})
                  (sut/make-build-ctx "test-build")
                  :git
-                 :ssh-keys))))))
+                 :ssh-keys)))))
+
+  (testing "adds main branch from repo"
+    (let [{st :storage :as rt} (h/test-rt)
+          [cid rid] (repeatedly st/new-id)]
+      (is (st/sid? (st/save-repo st {:customer-id cid
+                                     :id rid
+                                     :main-branch "test-branch"})))
+      (is (= "test-branch"
+             (-> (h/->req rt)
+                 (assoc-in [:parameters :path] {:customer-id cid
+                                                :repo-id rid})
+                 (sut/make-build-ctx "test-build")
+                 :git
+                 :main-branch))))))
 
 (deftest update-user
   (testing "updates user in storage"

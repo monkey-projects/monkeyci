@@ -101,7 +101,8 @@
        (do
          (swap! stored dissoc src)
          {:src src
-          :dest dest}))
+          :dest dest
+          :entries []}))
       (md/error-deferred (ex-info
                           (format "destination path was not as expected: %s, actual: %s" (get @stored src) dest)
                           @stored)))))

@@ -311,8 +311,9 @@
                         (select-keys [:commit-id :branch])
                         (assoc :url (:url repo)
                                :ssh-keys-dir (rt/ssh-keys-dir (c/req->rt req) bid))
-                        (mc/assoc-some :ref (params->ref p))
-                        (mc/assoc-some :ssh-keys ssh-keys))
+                        (mc/assoc-some :ref (params->ref p)
+                                       :ssh-keys ssh-keys
+                                       :main-branch (:main-branch repo)))
                :sid (-> acc
                         (assoc :build-id bid)
                         (st/ext-build-sid))
@@ -383,4 +384,7 @@
     (ms/put! stream (make-reply {:type :ping}))
     (-> (rur/response stream)
         (rur/header "content-type" "text/event-stream")
-        (rur/header "access-control-allow-origin" "*"))))
+        (rur/header "access-control-allow-origin" "*")
+        ;; For nginx, set buffering to no.  This will disable buffering on NGinx proxy side.
+        ;; See https://www.nginx.com/resources/wiki/start/topics/examples/x-accel/#x-accel-buffering
+        (rur/header "X-Accel-Buffering" "no"))))

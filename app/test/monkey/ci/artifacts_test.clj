@@ -1,6 +1,7 @@
 (ns monkey.ci.artifacts-test
   (:require [clojure.test :refer [deftest testing is]]
             [babashka.fs :as fs]
+            [clojure.java.io :as io]
             [clojure.string :as cs]
             [monkey.ci
              [artifacts :as sut]
@@ -41,3 +42,18 @@
                                           :path "test-path"}]}}]
       (is (some? @(sut/restore-artifacts ctx)))
       (is (empty? @stored) "expected entry to be restored"))))
+
+(deftest restore-blob
+  (testing "returns paths as strings and entry count"
+    (let [src (io/file "src")
+          dest (io/file "dest")
+          bs (h/fake-blob-store (atom {src dest}))
+          r @(sut/restore-blob {:store-key :test-store
+                                :build-path (constantly src)}
+                               {:test-store bs}
+                               {:id "test-cache"
+                                :path "test-path"})]
+      (is (map? r))
+      (is (= (.getCanonicalPath src) (:src r)))
+      (is (= (.getCanonicalPath (.getParentFile (.getAbsoluteFile dest))) (:dest r)))
+      (is (number? (:entries r))))))

@@ -60,6 +60,7 @@
   {:customer-id Id
    :name Name
    :url s/Str
+   (s/optional-key :main-branch) Id
    (s/optional-key :labels) [Label]})
 
 (s/defschema UpdateRepo

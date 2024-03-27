@@ -170,7 +170,7 @@
   (md/chain
    (get-instance iid)
    :containers
-   (partial (filter (comp (partial = "job") :display-name)))
+   (partial filter (comp (partial = "job") :display-name))
    first
    :container-id
    print-container-logs))
