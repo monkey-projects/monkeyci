@@ -141,7 +141,7 @@
 (def max-script-timeout
   "Max msecs a build script can run before we terminate it"
   ;; One hour
-  (* 3600 60 1000))
+  (* 3600 1000))
 
 (defn oci-runner
   "Runs the build script as an OCI container instance.  Returns a deferred with

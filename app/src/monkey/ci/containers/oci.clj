@@ -182,7 +182,7 @@
                    (oci/->oci-config)
                    (ci/make-context))
         ic (instance-config conf rt)
-        max-job-timeout (* 20 60 60 1000)]
+        max-job-timeout (* 20 60 1000)]
     (md/chain
      (oci/run-instance client ic
                        {:delete? true
