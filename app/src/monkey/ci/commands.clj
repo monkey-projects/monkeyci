@@ -69,9 +69,16 @@
   (let [r (:runner rt)]
     #_(report-evt ctx {:type :script/start})
     #_(register-all-handlers event-bus (:handlers acc))
-    (-> rt
-        (prepare-build-ctx)
-        (r))))
+    (try
+      (-> rt
+          (prepare-build-ctx)
+          (r))
+      (catch Exception ex
+        (log/error "Unable to start build" ex)
+        (let [exit-code 1]
+          (rt/post-events rt (b/build-end-evt (assoc (rt/build rt) :message (ex-message ex))
+                                              exit-code))
+          exit-code)))))
 
 (defn list-builds [rt]
   (->> (http/get (apply format "%s/customer/%s/repo/%s/builds"
@@ -93,7 +100,7 @@
                     (rt/config)
                     (select-keys [:http])
                     (assoc :type :server/started)))
-  ;; Start the server
+  ;; Start the server and wait for it to shut down
   (h/on-server-close (http rt)))
 
 (defn watch
@@ -137,8 +144,10 @@
    which are then picked up by the sidecar to dispatch or store.  
 
    The sidecar loop will stop when the events file is deleted."
-  [{:keys [job] :as rt}]
-  (let [sid (b/get-sid rt)]
+  [rt]
+  (let [sid (b/get-sid rt)
+        ;; Add job info from the sidecar config
+        {:keys [job] :as rt} (merge rt (get-in rt [rt/config :sidecar :job-config]))]
     (try
       (rt/post-events rt {:type :sidecar/start
                           :sid sid

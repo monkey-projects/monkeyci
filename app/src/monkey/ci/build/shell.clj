@@ -6,7 +6,7 @@
             [monkey.ci.build
              [api :as api]
              [core :as core]]
-            [monkey.ci.containers.oci :as oc]))
+            [monkey.ci.oci :as oc]))
 
 (defn bash [& args]
   (core/as-job

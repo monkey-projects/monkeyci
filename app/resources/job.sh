@@ -54,8 +54,9 @@ run_command()
     name=$command
     out=${MONKEYCI_LOG_DIR}/${command}_out
     err=${MONKEYCI_LOG_DIR}/${command}_err
+    contents=`cat ${MONKEYCI_SCRIPT_DIR}/${command}`
     
-    echo "Running command: $command"
+    echo "Running command $command: $contents"
     # Pass out and err files in the start command so the sidecar can already read them
     post_event "{:type :command/start :command \"$name\" :stdout \"$out\" :stderr \"$err\"}"
     /bin/sh ${MONKEYCI_SCRIPT_DIR}/${command} > $out 2>$err
@@ -68,7 +69,7 @@ echo "Starting job script with working directory $MONKEYCI_WORK_DIR"
 mkdir -p $MONKEYCI_LOG_DIR
 post_event "{:type :container/pending}"
 wait_for_start
-if [ "$ABORT" == "yes" ]; then
+if [ "$ABORT" = "yes" ]; then
     echo "Aborted."
     exit 1
 fi

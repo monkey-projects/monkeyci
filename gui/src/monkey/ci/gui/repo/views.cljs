@@ -32,21 +32,25 @@
            :columns [{:label "Id"
                       :value (fn [b] [:a {:href (r/path-for :page/build b)} (:build-id b)])}
                      {:label "Time"
-                      :value #(t/reformat (:start-time %))}
+                      :value (fn [b]
+                               [:span.text-nowrap (t/reformat (:start-time b))])}
                      {:label "Elapsed"
                       :value elapsed}
                      {:label "Trigger"
                       :value :source}
                      {:label "Ref"
-                      :value (comp :ref :git)}
+                      :value (fn [b]
+                               [:span.text-nowrap (get-in b [:git :ref])])}
                      {:label "Result"
                       :value (fn [b] [co/build-result (:status b)])}
                      {:label "Commit message"
                       :value (fn [b]
-                               [:span.text-truncate (:or (get-in b [:git :message])
-                                                         (:message b))])}]}]]))))
+                               [:span (:or (get-in b [:git :message])
+                                           (:message b))])}]}]]))))
 
 (defn page [route]
+  ;; FIXME This starts listening to SSE's but when auto-reloading due to code change, it doesn't
+  ;; close the old connections so eventually the browser runs out of requests.
   (rf/dispatch [:repo/init])
   (fn [route]
     (let [{:keys [customer-id repo-id] :as p} (get-in route [:parameters :path])

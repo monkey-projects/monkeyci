@@ -12,7 +12,7 @@
   (testing "invokes `git-clone` without checking out"
     (with-redefs [git/git-clone (fn [& args]
                                   args)]
-      (is (= ["http://url" :branch "origin/master" :dir "tmp"]
+      (is (= ["http://url" :branch "master" :dir "tmp"]
              (sut/clone {:url "http://url"
                          :branch "master"
                          :dir "tmp"}))))))
@@ -64,6 +64,17 @@
 (deftest prepare-ssh-keys
   (testing "empty if no keys configured"
     (is (empty? (sut/prepare-ssh-keys {}))))
+
+  (testing "when keys dir provided, but no ssh keys, lists private keys"
+    (h/with-tmp-dir dir
+      (let [ssh-dir (str (-> (fs/path dir "ssh-keys")
+                             (fs/create-dirs)))
+            {pub :public-key priv :private-key :as kp} (keypair-base64)]
+        (is (nil? (spit (str (fs/path ssh-dir "key-0")) priv)))
+        (is (nil? (spit (str (fs/path ssh-dir "key-0.pub")) pub)))
+        (is (= {:key-dir ssh-dir
+                :name ["key-0"]}
+               (sut/prepare-ssh-keys {:ssh-keys-dir ssh-dir}))))))
 
   (testing "writes keys to configured dir with public key"
     (h/with-tmp-dir dir

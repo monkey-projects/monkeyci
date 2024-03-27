@@ -21,21 +21,23 @@
     (is (fn? (r/make-runner {:runner {:type :oci}})))))
 
 (deftest oci-runner
-  (testing "runs container instance"
-    (with-redefs [oci/run-instance (constantly (md/success-deferred
-                                                {:status 200
-                                                 :body {:containers [{:exit-code 0}]}}))]
-      (is (= 0 (-> (sut/oci-runner {} {} {})
-                   (deref))))))
+  (let [rt {:build {:git {:url "test-url"
+                          :branch "main"}}}]
+    (testing "runs container instance"
+      (with-redefs [oci/run-instance (constantly (md/success-deferred
+                                                  {:status 200
+                                                   :body {:containers [{:exit-code 0}]}}))]
+        (is (= 0 (-> (sut/oci-runner {} {} rt)
+                     (deref))))))
 
-  (testing "launches `:build/end` event"
-    (with-redefs [ci/create-container-instance (fn [_ opts]
-                                                 {:status 500})
-                  ci/delete-container-instance (fn [_ r] r)]
-      (let [{:keys [recv] :as e} (h/fake-events)]
-        (is (some? (sut/oci-runner {} {} {:events e})))
-        (is (not-empty @recv))
-        (is (= :build/end (-> @recv first :type)))))))
+    (testing "launches `:build/end` event"
+      (with-redefs [ci/create-container-instance (fn [_ opts]
+                                                   {:status 500})
+                    ci/delete-container-instance (fn [_ r] r)]
+        (let [{:keys [recv] :as e} (h/fake-events)]
+          (is (some? (sut/oci-runner {} {} (assoc rt :events e))))
+          (is (not-empty @recv))
+          (is (= :build/end (-> @recv first :type))))))))
 
 (deftest instance-config
   (let [priv-key (h/generate-private-key)
@@ -43,7 +45,9 @@
                     :sid ["a" "b" "test-build-id"]
                     :git {:url "http://git-url"
                           :branch "main"
-                          :id "test-commit"}}}
+                          :commit-id "test-commit"
+                          :ssh-keys [{:private-key "test-privkey"
+                                      :public-key "test-pubkey"}]}}}
         conf {:availability-domain "test-ad"
               :compartment-id "test-compartment"
               :image-pull-secrets "test-secrets"
@@ -66,6 +70,12 @@
                                       rt)]
         (is (= "a" (get-in inst [:freeform-tags "customer-id"])))
         (is (= "test" (get-in inst [:freeform-tags "env"])))))
+
+    (testing "fails when no git url specified"
+      (is (thrown? Exception (sut/instance-config conf (update-in rt [:build :git] dissoc :url)))))
+
+    (testing "fails when no git branch or commit-id specified"
+      (is (thrown? Exception (sut/instance-config conf (update-in rt [:build :git] dissoc :branch :commit-id)))))
 
     (testing "container"
       (let [c (first (:containers inst))]
@@ -97,13 +107,55 @@
             (is (not-empty env)))
 
           (testing "env vars are strings, not keywords"
-            (is (every? string? (keys env))))))
+            (is (every? string? (keys env))))
+
+          (testing "enforces child runner"
+            (is (= "child" (get env "monkeyci-runner-type"))))))
 
       (testing "drops nil env vars"
         (let [c (-> rt
                     (assoc-in [:build :pipeline] nil)
                     (as-> x (sut/instance-config conf x)))]
-          (is (not (contains? (-> c :containers first :environment-variables) "monkeyci-build-pipeline"))))))))
+          (is (not (contains? (-> c :containers first :environment-variables) "monkeyci-build-pipeline"))))))
+
+    (testing "ssh keys"
+      (testing "adds as volume"
+        (let [vol (oci/find-volume inst sut/ssh-keys-volume)]
+          (is (some? vol))
+          (is (= ["key-0" "key-0.pub"]
+                 (->> vol
+                      :configs
+                      (map :file-name))))))
+
+      (let [cc (first (:containers inst))
+            mnt (oci/find-mount cc sut/ssh-keys-volume)]
+        (testing "mounts in container"
+          (is (some? mnt)))
+
+        (testing "adds ssh keys dir as env var"
+          (is (= (:mount-path mnt)
+                 (get-in cc [:environment-variables "monkeyci-build-git-ssh-keys-dir"]))))))
+
+    (testing "log config"
+      (h/with-tmp-dir dir
+        (let [log-path (io/file dir "logback-test.xml")
+              rt (assoc-in rt [:config :runner :log-config] (.getAbsolutePath log-path))
+              _ (spit log-path "test log contents")
+              inst (sut/instance-config conf rt)
+              vol (oci/find-volume inst sut/log-config-volume)]
+          
+          (testing "adds as volume"
+            (is (some? vol))
+            (is (sequential? (:configs vol))))
+
+          (let [cc (first (:containers inst))
+                mnt (oci/find-mount cc sut/log-config-volume)]
+            (testing "mounts in container"
+              (is (some? mnt)))
+
+            (testing "adds config file path as env var"
+              (is (= (str (:mount-path mnt) "/" (-> vol :configs first :file-name))
+                     (get-in cc [:environment-variables "monkeyci-runner-log-config"]))))))))))
  
 (deftest wait-for-script-end-event
   (testing "returns a deferred that holds the script end event"

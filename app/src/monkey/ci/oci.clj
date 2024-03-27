@@ -7,6 +7,7 @@
              [time :as mt]]
             [medley.core :as mc]
             [monkey.ci
+             [build :as b]
              [config :as c]
              [pem :as pem]
              [utils :as u]]
@@ -26,11 +27,23 @@
    and in the `oci` key, and merging them."
   [conf k]
   (letfn [(load-key [c]
-            (mc/update-existing-in c [:credentials :private-key] u/load-privkey))]
+            (mc/update-existing-in c [:credentials :private-key] u/load-privkey))
+          (maybe-parse [s]
+            (cond-> s
+              (string? s)
+              (u/parse-edn-str)))
+          (parse-edn-prop [c k]
+            (mc/update-existing c k maybe-parse))
+          (parse-vnics [c]
+            (parse-edn-prop c :vnics))
+          (parse-ads [c]
+            (parse-edn-prop c :availability-domains))]
     (->> [(:oci (c/group-and-merge-from-env conf :oci)) (k conf)]
          (map group-credentials)
          (apply u/deep-merge)
          (load-key)
+         (parse-vnics)
+         (parse-ads)
          (assoc conf k))))
 
 (defn ->oci-config
@@ -233,3 +246,24 @@
   [ci n]
   (mc/find-first (u/prop-pred :name n)
                  (:volumes ci)))
+
+(defn config-entry
+  "Creates an entry config for a volume, where the contents are base64 encoded."
+  [n v]
+  {:file-name n
+   :data (u/->base64 v)})
+
+(defn checkout-subdir
+  "Returns the path for `n` as a subdir of the checkout dir"
+  [n]
+  (str checkout-dir "/" n))
+
+(def work-dir (checkout-subdir "work"))
+
+(defn base-work-dir
+  "Determines the base work dir to use inside the container"
+  [rt]
+  (some->> (b/rt->checkout-dir rt)
+           (fs/file-name)
+           (fs/path work-dir)
+           (str)))

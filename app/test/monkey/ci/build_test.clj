@@ -62,7 +62,20 @@
                    :work-dir "work"}}
                  (sut/make-build-ctx)
                  sut/script
-                 :script-dir)))))
+                 :script-dir))))
+
+    (testing "merges with existing git opts from runtime"
+      (is (= "test-dir"
+             (-> {:config
+                  {:args {:git-url "test-url"
+                          :branch "test-branch"
+                          :commit-id "test-id"
+                          :dir "test-script"}
+                   :work-dir "work"}
+                  :build {:git {:ssh-keys-dir "test-dir"}}}
+                 (sut/make-build-ctx)
+                 :git
+                 :ssh-keys-dir)))))
 
   (testing "when sid specified"
     (testing "parses on delimiter"

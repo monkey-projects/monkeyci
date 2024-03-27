@@ -36,7 +36,15 @@
                                                          :repo-id "b"}}}
                                      (sut/run-build))]
       (is (= build-id (last sid)))
-      (is (= ["a" "b"] (take 2 sid))))))
+      (is (= ["a" "b"] (take 2 sid)))))
+
+  (testing "posts `build/end` event on exception"
+    (let [{:keys [recv] :as e} (h/fake-events)]
+      (is (= 1 (-> {:runner (fn [_] (throw (ex-info "test error" {})))
+                    :events e}
+                   (sut/run-build))))
+      (is (= 1 (count @recv)))      
+      (is (= :build/end (:type (first @recv)))))))
 
 (deftest list-builds
   (testing "reports builds from server"
@@ -115,13 +123,21 @@
         (is (not-empty @reported))))))
 
 (deftest sidecar
-  (testing "runs sidecar poll loop, returns exit code"
-    (with-redefs [sc/run (constantly (md/success-deferred {:exit-code ::test-exit}))]
-      (is (= ::test-exit (sut/sidecar {})))))
+  (with-redefs [sc/run (constantly (md/success-deferred {:exit-code ::test-exit}))]
+    (testing "runs sidecar poll loop, returns exit code"
+      (is (= ::test-exit (sut/sidecar {:config {:dev-mode true}}))))
 
-  (testing "posts start and end events"
-    (with-redefs [sc/run (constantly (md/success-deferred {:exit-code ::test-exit}))]
+    (testing "posts start and end events"
       (let [{:keys [recv] :as e} (h/fake-events)]
-        (is (some? (sut/sidecar {:events e})))
+        (is (some? (sut/sidecar {:events e
+                                 :config {:dev-mode true}})))
         (is (= [:sidecar/start :sidecar/end]
-               (map :type @recv)))))))
+               (map :type @recv)))))
+
+    (testing "events contain job details from config"
+      (let [{:keys [recv] :as e} (h/fake-events)
+            job {:id "test-job"}]
+        (is (some? (sut/sidecar {:events e
+                                 :config {:sidecar {:job-config {:job job}}
+                                          :dev-mode true}})))
+        (is (= job (-> @recv first :job)))))))

@@ -11,6 +11,7 @@
              [blob :as b]
              [config :as c]
              [logging :as l]
+             [protocols :as p]
              [sidecar :as sut]
              [spec :as spec]]
             [monkey.ci.helpers :as h]))
@@ -57,6 +58,29 @@
         (is (not= :timeout (h/wait-until #(not-empty @recv) 500)))
         (is (= evt (-> (first @recv)
                        (select-keys (keys evt)))))
+        (is (true? (.delete f)))
+        (is (= 0 (wait-for-exit c))))))
+
+  (testing "adds sid and job to events"
+    (h/with-tmp-dir dir
+      (let [f (io/file dir "events.edn")
+            evt {:type :test/event
+                 :message "This is a test event"}
+            {:keys [recv] :as e} (h/fake-events)
+            sid (repeatedly 3 random-uuid)
+            job {:id "test-job"}
+            rt {:events e
+                :job job
+                :build {:sid sid}
+                :config {:sidecar {:events-file f
+                                   :poll-interval 10}}}
+            c (sut/poll-events rt)]
+        ;; Post the event after sidecar has started
+        (is (nil? (spit f (prn-str evt))))
+        (is (not= :timeout (h/wait-until #(not-empty @recv) 500)))
+        (let [evt (first @recv)]
+          (is (= sid (:sid evt)))
+          (is (= job (:job evt))))
         (is (true? (.delete f)))
         (is (= 0 (wait-for-exit c))))))
 
@@ -191,22 +215,17 @@
         (is (= [["test.txt"]] @c))))))
 
 (defrecord SlowBlobStore [delay]
-  b/BlobStore
-  (save [_ _ _]
+  p/BlobStore
+  (save-blob [_ _ _]
     (log/info "Simulating slow blob storage...")
     (mt/in delay (constantly {::blob :saved})))
-  (restore [_ _ _]
+  (restore-blob [_ _ _]
     (md/success-deferred nil)))
 
 (deftest run
   (with-redefs [sut/mark-start identity
                 sut/poll-events (fn [rt]
                                   (md/success-deferred (assoc rt :exit-code 0)))]
-    (testing "adds job config to runtime"
-      (is (= "test-job" (-> {:config {:sidecar {:job-config {:id "test-job"}}}}
-                            (sut/run)
-                            (deref)
-                            :id))))
     
     (testing "restores src from workspace"
       (with-redefs [sut/restore-src (constantly {:stage ::restored})

@@ -49,7 +49,37 @@
                         :storage)
                        :storage
                        :credentials
-                       :private-key)))))
+                       :private-key))))
+
+  (testing "parses vnics"
+    (let [vnics [{:subnet-id "test-subnet"}]]
+      (is (= vnics
+             (-> (sut/normalize-config
+                  {:oci
+                   {:vnics (pr-str vnics)}}
+                  :runner)
+                 :runner
+                 :vnics)))))
+
+  (testing "does not parse vnics when no string"
+    (let [vnics [{:subnet-id "test-subnet"}]]
+      (is (= vnics
+             (-> (sut/normalize-config
+                  {:oci
+                   {:vnics vnics}}
+                  :runner)
+                 :runner
+                 :vnics)))))
+
+  (testing "parses availability-domains"
+    (let [ads ["ad-1" "ad-2"]]
+      (is (= ads
+             (-> (sut/normalize-config
+                  {:oci
+                   {:availability-domains (pr-str ads)}}
+                  :runner)
+                 :runner
+                 :availability-domains))))))
 
 (deftest stream-to-bucket
   (testing "pipes input stream to multipart"

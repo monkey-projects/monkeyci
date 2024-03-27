@@ -41,12 +41,17 @@
 
 (def rt->job-id (comp bc/job-id :job))
 
-(defn- maybe-set-git-opts [build rt]
-  (let [{:keys [git-url branch commit-id dir]} (rt/args rt)]
+(defn- maybe-set-git-opts
+  "If a git url is specified, updates the build with git information, taken from
+   the arguments and from runtime."
+  [build rt]
+  (let [{:keys [git-url branch commit-id dir]} (rt/args rt)
+        existing (get-in rt [:build :git])]
     (cond-> build
-      git-url (-> (merge {:git {:url git-url
-                                :branch (or branch "main")
-                                :id commit-id}})
+      git-url (-> (assoc :git (assoc existing
+                                     :url git-url
+                                     :branch (or branch "main")
+                                     :id commit-id))
                   ;; Overwrite script dir cause it will be calculated by the git checkout
                   (assoc-in [:script :script-dir] dir)))))
 
@@ -130,12 +135,18 @@
   (when (number? exit)
     (if (zero? exit) :success :error)))
 
+(defn build->evt
+  "Prepare build object so it can be added to an event"
+  [build]
+  (mc/update-existing build :git dissoc :ssh-keys))
+
 (defn build-end-evt
   "Creates a `build/end` event"
   [build & [exit-code]]
   {:type :build/end
    :sid (:sid build)
    :build (-> build
+              (build->evt)
               (assoc :end-time (u/now))
               (mc/assoc-some :status (exit-code->status exit-code)))})
 

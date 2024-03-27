@@ -1,5 +1,6 @@
 (ns monkey.ci.listeners-test
   (:require [clojure.test :refer [deftest testing is]]
+            [com.stuartsierra.component :as co]
             [monkey.ci
              [listeners :as sut]
              [runtime :as rt]
@@ -209,12 +210,42 @@
 
 (deftest setup-runtime
   (testing "`nil` if no events configured"
-    (is (nil? (rt/setup-runtime {:storage ::test-storage} :listeners))))
+    (is (nil? (rt/setup-runtime {:app-mode :server
+                                 :storage ::test-storage} :listeners))))
 
   (testing "`nil` if no storage configured"
-    (is (nil? (rt/setup-runtime {:events ::test-events} :listeners))))
+    (is (nil? (rt/setup-runtime {:app-mode :server
+                                 :events ::test-events} :listeners))))
 
   (testing "returns component if storage and events configured"
-    (is (some? (rt/setup-runtime {:storage ::test-storage
+    (is (some? (rt/setup-runtime {:app-mode :server
+                                  :storage ::test-storage
                                   :events ::test-events}
-                                 :listeners)))))
+                                 :listeners))))
+
+  (testing "`nil` if not in server mode"
+    (is (nil? (rt/setup-runtime {:app-mode :script
+                                 :storage ::test-storage
+                                 :events ::test-events}
+                                :listeners)))))
+
+(deftest listeners-component
+  (testing "adds listeners on start"
+    (let [{:keys [listeners] :as er} (h/fake-events-receiver)
+          c (-> (sut/map->Listeners {:events er})
+                (co/start))]
+      (is (= 1 (count @listeners)))))
+
+  (testing "removes listener on stop"
+    (let [{:keys [listeners] :as er} (h/fake-events-receiver)
+          c (-> (sut/map->Listeners {:events er})
+                (co/start)
+                (co/stop))]
+      (is (empty? (-> @listeners first second)))))
+
+  (testing "does not register listeners twice"
+    (let [{:keys [listeners] :as er} (h/fake-events-receiver)
+          c (-> (sut/map->Listeners {:events er})
+                (co/start)
+                (co/start))]
+      (is (= 1 (-> @listeners first second count))))))

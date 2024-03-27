@@ -25,25 +25,25 @@
   (:import java.nio.channels.SocketChannel
            [java.net UnixDomainSocketAddress StandardProtocolFamily]))
 
-(defn- script-evt [evt rt]
-  (assoc evt
-         :src :script
-         :sid (get-in rt [:build :sid])
-         :time (u/now)))
+;; (defn- script-evt [evt rt]
+;;   (assoc evt
+;;          :src :script
+;;          :sid (get-in rt [:build :sid])
+;;          :time (u/now)))
 
-(defn- post-event [rt evt]
-  (log/trace "Posting event:" evt)
-  (if-let [c (get-in rt [:api :client])]
-    ;; TODO Check if this converts keys to keywords automatically
-    (let [{:keys [status] :as r} @(martian/response-for c :post-event (script-evt evt rt))]
-      (when-not (= 202 status)
-        (log/warn "Failed to post event, got status" status)
-        (log/debug "Full response:" r)))
-    (log/warn "Unable to post event, no client configured")))
+;; (defn- post-event [rt evt]
+;;   (log/trace "Posting event:" evt)
+;;   (if-let [c (get-in rt [:api :client])]
+;;     ;; TODO Check if this converts keys to keywords automatically
+;;     (let [{:keys [status] :as r} @(martian/response-for c :post-event (script-evt evt rt))]
+;;       (when-not (= 202 status)
+;;         (log/warn "Failed to post event, got status" status)
+;;         (log/debug "Full response:" r)))
+;;     (log/warn "Unable to post event, no client configured")))
 
-(defn- post-events [rt events]
-  (doseq [e events]
-    (post-event rt e)))
+;; (defn- post-events [rt events]
+;;   (doseq [e events]
+;;     (post-event rt e)))
 
 (defn- wrapped
   "Sets the event poster in the runtime."
@@ -58,17 +58,26 @@
     (fn [rt & more]
       (apply w rt more))))
 
-(defn- job-start-evt [{:keys [job]}]
-  {:type :job/start
-   :job (j/job->event job)
-   :message "Job started"})
+(defn- base-event
+  "Creates an skeleton event with basic properties"
+  [rt type]
+  {:type type
+   :src :script
+   :sid (build/get-sid rt)
+   :time (u/now)})
 
-(defn- job-end-evt [{:keys [job]} {:keys [status message exception]}]
-  {:type :job/end
-   :message "Job completed"
-   :job (cond-> (j/job->event job)
-          (some? exception) (assoc :message (or message (.getMessage exception))
-                                   :stack-trace (u/stack-trace exception)))})
+(defn- job-start-evt [{:keys [job] :as rt}]
+  (-> (base-event rt :job/start)
+      (assoc :job (j/job->event job)
+             :message "Job started")))
+
+(defn- job-end-evt [{:keys [job] :as rt} {:keys [status message exception]}]
+  (-> (base-event rt :job/end)
+      (assoc :message "Job completed"
+             :job (cond-> (j/job->event job)
+                    true (assoc :status status)
+                    (some? exception) (assoc :message (or message (.getMessage exception))
+                                             :stack-trace (u/stack-trace exception))))))
 
 ;; Wraps a job so it fires an event before and after execution, and also
 ;; catches any exceptions.
@@ -93,6 +102,7 @@
            (catch Exception ex
              (handle-error ex))))
        (fn [r]
+         (log/debug "Job ended with response:" r)
          (md/chain
           (rt/post-events rt (job-end-evt (update rt-with-job :job assoc
                                                   :start-time st
@@ -197,8 +207,10 @@
 (defn- with-script-evt
   "Creates an skeleton event with the script and invokes `f` on it"
   [rt f]
-  (f {:script (-> rt rt/build build/script)
-      :sid (build/get-sid rt)}))
+  (-> rt
+      (base-event nil)
+      (assoc :script (-> rt rt/build build/script))
+      (f)))
 
 (defn- script-start-evt [rt _]
   (with-script-evt rt
@@ -249,11 +261,7 @@
    this same process."
   [rt]
   (let [build-id (build/get-build-id rt)
-        script-dir (build/rt->script-dir rt)
-        ;; Manually add events poster
-        ;; This will be removed when events are reworked to be more generic
-        ;; Don't use assoc-in, cause it will fail when events are already configured.
-        rt (assoc rt :events {:poster (partial post-events rt)})]
+        script-dir (build/rt->script-dir rt)]
     (log/debug "Executing script for build" build-id "at:" script-dir)
     (log/debug "Script runtime:" rt)
     (try 
@@ -266,10 +274,9 @@
         (log/error "Unable to load build script" ex)
         (let [msg ((some-fn (comp ex-message ex-cause)
                             ex-message) ex)]
-          (post-event rt {:type :script/end
-                          :sid (build/get-sid rt)
-                          :script (-> rt rt/build build/script)
-                          :message msg})
+          (rt/post-events rt [(-> (base-event rt :script/end)
+                                  (assoc :script (-> rt rt/build build/script)
+                                         :message msg))])
           (assoc bc/failure
                  :message msg
                  :exception ex))))))

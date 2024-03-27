@@ -20,12 +20,9 @@
             [monkey.ci.events.core :as ec]
             [monkey.oci.container-instance.core :as ci]))
 
-(defn- subdir [n]
-  (str oci/checkout-dir "/" n))
-
-(def work-dir (subdir "work"))
+(def work-dir oci/work-dir)
 (def script-dir "/opt/monkeyci/script")
-(def log-dir (subdir "log"))
+(def log-dir (oci/checkout-subdir "log"))
 (def start-file (str log-dir "/start"))
 (def event-file (str log-dir "/events.edn"))
 (def script-vol "scripts")
@@ -37,15 +34,6 @@
 
 (def sidecar-config (comp :sidecar rt/config))
 
-(defn base-work-dir
-  "Determines the base work dir to use inside the container"
-  ;; TODO Move this to common ns
-  [rt]
-  (some->> (b/rt->checkout-dir rt)
-           (fs/file-name)
-           (fs/path work-dir)
-           (str)))
-
 (defn- job-work-dir
   "The work dir to use for the job in the container.  This is the external job
    work dir, rebased onto the base work dir."
@@ -53,9 +41,9 @@
   (let [cd (b/rt->checkout-dir rt)]
     (log/debug "Determining job work dir using checkout dir" cd
                ", job dir" (get-in rt [:job :work-dir])
-               "and base dir" (base-work-dir rt))
+               "and base dir" (oci/base-work-dir rt))
     (-> (get-in rt [:job :work-dir] cd)
-        (u/rebase-path cd (base-work-dir rt)))))
+        (u/rebase-path cd (oci/base-work-dir rt)))))
 
 (defn- job-container
   "Configures the job container.  It runs the image as configured in
@@ -106,12 +94,8 @@
    :is-read-only true
    :mount-path config-dir})
 
-(defn- config-entry [n v]
-  {:file-name n
-   :data (u/->base64 v)})
-
 (defn- job-script-entry []
-  (config-entry job-script (slurp (io/resource job-script))))
+  (oci/config-entry job-script (slurp (io/resource job-script))))
 
 (defn- script-vol-config
   "Adds the job script and a file for each script line as a configmap volume."
@@ -125,12 +109,12 @@
    :volume-type "CONFIGFILE"
    :configs (->> script
                  (map-indexed (fn [i s]
-                                (config-entry (str i) s)))
+                                (oci/config-entry (str i) s)))
                  (into [(job-script-entry)]))})
 
 (defn- job-details->edn [rt]
   (pr-str {:job (-> (:job rt)
-                     (select-keys [:id :save-artifacts :restore-artifacts :caches])
+                     (select-keys [:id :save-artifacts :restore-artifacts :caches :dependencies])
                      (assoc :work-dir (job-work-dir rt)))}))
 
 (defn- config-vol-config
@@ -139,11 +123,11 @@
   (let [{:keys [log-config]} (sidecar-config rt)]
     {:name config-vol
      :volume-type "CONFIGFILE"
-     :configs (cond-> [(config-entry job-config-file (job-details->edn rt))]
-                log-config (conj (config-entry "logback.xml" log-config)))}))
+     :configs (cond-> [(oci/config-entry job-config-file (job-details->edn rt))]
+                log-config (conj (oci/config-entry "logback.xml" log-config)))}))
 
 (defn- add-sidecar-env [sc rt]
-  (let [wd (base-work-dir rt)]
+  (let [wd (oci/base-work-dir rt)]
     ;; TODO Put this all in a config file instead, this way sensitive information is harder to see
     (assoc sc
            :environment-variables
@@ -212,7 +196,9 @@
                                                                  (b/get-sid rt)
                                                                  (b/rt->job-id rt))
                                      max-job-timeout ::timeout)
-                                    (fn [_]
+                                    (fn [r]
+                                      (when (= r ::timeout)
+                                        (log/warn "Container job timed out after" max-job-timeout "msecs"))
                                       (oci/get-full-instance-details client id))))})
      (fn [r]
        (letfn [(maybe-log-output [{:keys [exit-code display-name logs] :as c}]

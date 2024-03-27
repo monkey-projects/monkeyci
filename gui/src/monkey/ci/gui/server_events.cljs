@@ -35,8 +35,8 @@
                                  (clj->js {}))]
         (set! (.-onmessage src)
               (fn [evt]
+                (log/debug "Got event:" (.-data evt))
                 (let [d (parse-edn (.-data evt))]
-                  (log/debug "Got event:" (clj->js d))
                   (rf/dispatch (conj on-recv-evt d)))))
         (set! (.-onerror src)
               (fn [err]

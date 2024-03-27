@@ -20,9 +20,17 @@
   (->event [this event-type]))
 
 (defprotocol EventPoster
-  (post-events [poster evt] "Posts one or more events"))
+  (post-events [poster evt]
+    "Posts one or more events.  Returns a deferred that realizes when the events have been posted."))
 
 (defprotocol EventReceiver
   (add-listener [recv ef l] "Add the given filter with a listener to the receiver")
   (remove-listener [recv ef l] "Removes the listener for the filter from the receiver"))
 
+(defprotocol BlobStore
+  "Protocol for blob store abstraction, used to save and compress files or directories
+   to some blob store, possibly remote."
+  (save-blob [store src dest] "Saves `src` file or directory to `dest` as a blob")
+  (restore-blob [store src dest] "Restores `src` to local `dest`"))
+
+(def blob-store? (partial satisfies? BlobStore))

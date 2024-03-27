@@ -12,9 +12,6 @@
              [core :as os]
              [stream :as oss]]))
 
-(defn blob-store? [x]
-  (satisfies? sut/BlobStore x))
-
 (defmacro with-disk-blob [dir blob & body]
   `(h/with-tmp-dir ~dir
      (let [~blob (sut/make-blob-store {:blob 
@@ -28,7 +25,7 @@
     (with-disk-blob dir blob
       (let [f (io/file dir "out.txt")
             dest "dest.tar.gz"]
-        (is (blob-store? blob))
+        (is (sut/blob-store? blob))
         (is (nil? (spit f "this is a save test")))
         (is (some? @(sut/save blob f dest)))
         (is (fs/exists? (io/file dir "blob" dest))))))
@@ -70,7 +67,7 @@
 
 (deftest oci-blob
   (testing "created by `make-blob-store`"
-    (is (blob-store? (sut/make-blob-store {:blob {:type :oci}} :blob))))
+    (is (sut/blob-store? (sut/make-blob-store {:blob {:type :oci}} :blob))))
   
   (testing "`save`"
       (with-redefs [oss/input-stream->multipart (constantly (md/success-deferred nil))]

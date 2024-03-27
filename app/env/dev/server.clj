@@ -35,6 +35,7 @@
                        :work-dir (u/abs-path "tmp")}
                       @co/global-config)
                (config/normalize-config {} {})
+               (assoc :app-mode :server)
                (validate-config)
                (rt/config->runtime)
                (rt/start))

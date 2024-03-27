@@ -205,7 +205,8 @@
   (update-in conf [:logging :dir] #(or (u/abs-path %) (u/combine (c/abs-work-dir conf) "logs"))))
 
 (defmethod normalize-logging-config :oci [conf]
-  (oci/normalize-config conf :logging))
+  (-> (oci/normalize-config conf :logging)
+      (update :logging select-keys [:type :credentials :ns :compartment-id :bucket-name :region])))
 
 (defmethod c/normalize-key :logging [k conf]
   (c/normalize-typed k conf normalize-logging-config))
