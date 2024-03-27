@@ -216,4 +216,6 @@
        {:exit (or exit 0)}))))
 
 (defmethod mcc/normalize-containers-config :oci [conf]
-  (oci/normalize-config conf :containers))
+  (-> (oci/normalize-config conf :containers)
+      ;; Take app version if no image version specified
+      (update-in [:containers :image-tag] #(or % (c/version)))))

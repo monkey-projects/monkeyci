@@ -179,4 +179,5 @@
     (partial oci-runner client conf)))
 
 (defmethod r/normalize-runner-config :oci [conf]
-  (oci/normalize-config conf :runner))
+  (-> (oci/normalize-config conf :runner)
+      (update-in [:runner :image-tag] #(or % (config/version)))))

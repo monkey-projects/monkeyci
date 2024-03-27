@@ -171,3 +171,19 @@
                                           :sid sid}])))
       (is (= :script/end (-> (deref d 100 :timeout)
                               :type))))))
+
+(deftest normalize-runner-config
+  (testing "uses configured image tag"
+    (is (= "test-image"
+           (-> {:runner {:type :oci
+                         :image-tag "test-image"}}
+               (r/normalize-runner-config)
+               :runner
+               :image-tag))))
+
+  (testing "uses app version if no image tag configured"
+    (is (= (mc/version)
+           (-> {:runner {:type :oci}}
+               (r/normalize-runner-config)
+               :runner
+               :image-tag)))))
