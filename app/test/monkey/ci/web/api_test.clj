@@ -383,7 +383,7 @@
     (let [evt (make-events)
           r (-> (h/->req {:events evt})
                 (sut/event-stream))]
-      (is (= "no" (get-in r [:headers "X-Accel-Buffering"]))))))
+      (is (= "no" (get-in r [:headers "x-accel-buffering"]))))))
 
 (deftest make-build-ctx
   (testing "adds ref to build from branch query param"
