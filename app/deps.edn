@@ -20,7 +20,7 @@
         com.monkeyprojects/oci-sign {:mvn/version "0.1.3"}
         com.monkeyprojects/oci-container-instance {:mvn/version "0.1.0"}
         com.monkeyprojects/oci-os {:mvn/version "0.2.2"}
-        com.monkeyprojects/zmq {:mvn/version "0.3.0"
+        com.monkeyprojects/zmq {:mvn/version "0.3.1-SNAPSHOT"
                                 ;; Use jeromq, so we don't need native lib.  This is a bit
                                 ;; slower however, so maybe later we can change this.
                                 :exclusions [org.zeromq/jzmq]}

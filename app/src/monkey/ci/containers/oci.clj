@@ -197,6 +197,7 @@
                                                                  (b/rt->job-id rt))
                                      max-job-timeout ::timeout)
                                     (fn [r]
+                                      (log/debug "Job instance terminated, or timed out with value:" r)
                                       (when (= r ::timeout)
                                         (log/warn "Container job timed out after" max-job-timeout "msecs"))
                                       (oci/get-full-instance-details client id))))})
