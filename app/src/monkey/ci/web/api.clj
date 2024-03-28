@@ -387,4 +387,5 @@
         (rur/header "access-control-allow-origin" "*")
         ;; For nginx, set buffering to no.  This will disable buffering on NGinx proxy side.
         ;; See https://www.nginx.com/resources/wiki/start/topics/examples/x-accel/#x-accel-buffering
-        (rur/header "X-Accel-Buffering" "no"))))
+        (rur/header "x-accel-buffering" "no")
+        (rur/header "cache-control" "no-cache"))))
