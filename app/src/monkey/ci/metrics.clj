@@ -1,6 +1,8 @@
 (ns monkey.ci.metrics
-  (:require [com.stuartsierra.component :as co]
-            [io.resonant.micrometer :as mm]            
+  (:require [clojure.tools.logging :as log]
+            [com.stuartsierra.component :as co]
+            [io.resonant.micrometer :as mm]
+            [manifold.stream :as ms]
             [monkey.ci.runtime :as rt]))
 
 (defn make-registry []
@@ -11,24 +13,36 @@
   [r]
   (some-> r :registry (.scrape)))
 
-(defn test-counter []
-  (let [invocations (atom 0)]
-    (fn [_]
-      (swap! invocations inc))))
+(defn- count-listeners [state]
+  (->> state
+       :listeners
+       vals
+       (mapcat vals)
+       (distinct)
+       (count)))
 
-(defn add-test-counter [r]
-  (mm/get-function-counter r "test_counter" {} (test-counter))
+(defn add-events-metrics [r events]
+  (when-let [ss (get-in events [:server :state-stream])]
+    (let [state (atom nil)]
+      ;; Constantly store the latest state, so it can be used by the gauges
+      (ms/consume (partial reset! state) ss)
+      (mm/get-gauge r "monkey_event_filters" {}
+                    {:description "Number of different registered event filters"}
+                    #(count (keys (:listeners @state))))
+      (mm/get-gauge r "monkey_event_clients" {}
+                    {:description "Total number of registered clients"}
+                    #(count-listeners @state))))
   r)
 
 (extend-type io.resonant.micrometer.Registry
   co/Lifecycle
   (start [this]
-    ;; TODO Add real metrics
-    (add-test-counter this))
+    (add-events-metrics this (:events this)))
 
   (stop [this]
     (.close this)
     this))
 
 (defmethod rt/setup-runtime :metrics [_ _]
-  (make-registry))
+  (-> (make-registry)
+      (co/using [:events])))
