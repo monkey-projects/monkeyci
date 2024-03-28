@@ -188,7 +188,8 @@
                         (-> b
                             (group-keys :git)
                             (group-keys :script)
-                            (mc/update-existing :sid u/parse-sid)))))
+                            (mc/update-existing :sid u/parse-sid)
+                            (mc/update-existing :git group-keys :author)))))
 
 (defn normalize-config
   "Given a configuration map loaded from file, environment variables and command-line

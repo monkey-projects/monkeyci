@@ -370,4 +370,24 @@
                          {}
                          {:oci-storage-type "oci"}
                          {})
-                        :oci-storage-type)))))
+                        :oci-storage-type))))
+
+  (testing "build"
+    (testing "groups git keys"
+      (is (= {:url "test-url"}
+             (-> (sut/normalize-config
+                  {}
+                  {:build-git-url "test-url"}
+                  {})
+                 :build
+                 :git))))
+
+    (testing "groups git author"
+      (is (= {:email "test@monkeyci.com"}
+             (-> (sut/normalize-config
+                  {}
+                  {:build-git-author-email "test@monkeyci.com"}
+                  {})
+                 :build
+                 :git
+                 :author))))))
