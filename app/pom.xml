@@ -4,7 +4,7 @@
   <packaging>jar</packaging>
   <groupId>com.monkeyci</groupId>
   <artifactId>app</artifactId>
-  <version>0.4.2.3</version>
+  <version>0.4.3-SNAPSHOT</version>
   <name>app</name>
   <repositories>
     <repository>
@@ -168,7 +168,7 @@
     <dependency>
       <groupId>com.monkeyprojects</groupId>
       <artifactId>zmq</artifactId>
-      <version>0.3.0</version>
+      <version>0.3.1-SNAPSHOT</version>
       <exclusions>
         <exclusion>
           <groupId>org.zeromq</groupId>
