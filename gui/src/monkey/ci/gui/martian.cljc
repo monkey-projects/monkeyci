@@ -43,6 +43,14 @@
      :path-schema repo-schema})
 
    (api-route
+    {:route-name :trigger-build
+     :path-parts (into repo-path ["/builods/trigger"])
+     :path-schema build-schema
+     :query-schema {(s/optional-key :branch) s/Str
+                    (s/optional-key :tag) s/Str
+                    (s/optional-key :commit-id) s/Str}})
+
+   (api-route
     {:route-name :get-build
      :path-parts build-path
      :path-schema build-schema})

@@ -27,6 +27,29 @@
     (set-repo-path! cust repo)
     r))
 
+(deftest rep-init
+  (testing "does nothing if initialized"
+    (rft/run-test-sync
+     (let [c (h/catch-fx :martian.re-frame/request)]
+       (reset! app-db (db/set-initialized {} true))
+       (h/initialize-martian {:get-customer {:error-code :unexpected}})
+
+       (rf/dispatch [:repo/init])
+       (is (empty? @c)))))
+
+  (testing "when not initialized"
+    (rft/run-test-sync
+     (let [c (h/catch-fx :martian.re-frame/request)]
+       (h/initialize-martian {:get-customer {:body {}
+                                             :error-code :no-error}})
+       (rf/dispatch [:repo/init])
+       
+       (testing "loads repo"
+         (is (= 1 (count @c))))
+
+       (testing "sets initialized"
+         (is (db/initialized? @app-db)))))))
+
 (deftest repo-load
   (testing "loads customer if not existing"
     (rft/run-test-sync
@@ -118,3 +141,28 @@
                                                        :build upd}])))
       (is (= [upd]
              (db/builds @app-db))))))
+
+(deftest show-trigger-build
+  (testing "sets `show trigger form` flag in db"
+    (rf/dispatch-sync [:repo/show-trigger-build])
+    (is (db/show-trigger-form? @app-db))))
+
+(deftest hide-trigger-build
+  (testing "unsets `show trigger form` flag in db"
+    (reset! app-db (db/set-show-trigger-form {} true))
+    (rf/dispatch-sync [:repo/hide-trigger-build])
+    (is (nil? (db/show-trigger-form? @app-db)))))
+
+(deftest trigger-build
+  (testing "sets `triggering` flag"
+    (rf/dispatch-sync [:repo/trigger-build])
+    (is (true? (db/triggering? @app-db))))
+
+  (testing "invokes build trigger endpoint"
+    (rft/run-test-sync
+     (let [c (h/catch-fx :martian.re-frame/request)]
+       (h/initialize-martian {:trigger-build {:body {:build-id "test-build"}
+                                              :error-code :no-error}})
+       (rf/dispatch [:repo/trigger-build])
+       
+       (is (= 1 (count @c)))))))

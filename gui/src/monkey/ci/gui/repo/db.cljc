@@ -1,5 +1,13 @@
 (ns monkey.ci.gui.repo.db)
 
+(def initialized? ::initialized?)
+
+(defn set-initialized [db i]
+  (assoc db initialized? i))
+
+(defn unset-initialized [db]
+  (dissoc db initialized?))
+
 (def alerts ::alerts)
 
 (defn set-alerts [db a]
@@ -31,3 +39,16 @@
 
 (defn set-latest-build [db b]
   (assoc db latest-build b))
+
+(def show-trigger-form? ::show-trigger-form?)
+
+(defn set-show-trigger-form [db f]
+  (assoc db show-trigger-form? f))
+
+(def triggering? ::triggering?)
+
+(defn set-triggering [db]
+  (assoc db triggering? true))
+
+(defn unset-triggering [db]
+  (dissoc db triggering?))
