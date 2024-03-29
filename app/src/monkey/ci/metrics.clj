@@ -43,6 +43,6 @@
     (.close this)
     this))
 
-(defmethod rt/setup-runtime :metrics [_ _]
-  (-> (make-registry)
-      (co/using [:events])))
+(defmethod rt/setup-runtime :metrics [conf _]
+  (cond-> (make-registry)
+    (some? (:events conf)) (co/using [:events])))

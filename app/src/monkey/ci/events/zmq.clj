@@ -24,7 +24,12 @@
   (fn [evt]
     (when (pred evt) (l evt))))
 
-(defrecord ZeroMQEvents [server client listeners]
+(defn- remove-listener [listeners l]
+  (let [after (remove (comp (partial = l) :orig) listeners)]
+    (log/debug "Listeners before removing" l ":" (count listeners) ", after:" (count after))
+    after))
+
+(defrecord ZeroMQEvents [server client listeners context]
   co/Lifecycle
   (start [this]
     ;; Start both client and server, if provided
@@ -34,7 +39,11 @@
 
   (stop [{:keys [client server] :as this}]
     (zc/close-all (remove nil? [client server]))
-    (assoc this :client nil :server nil))
+    (when context
+      (log/debug "Closing context")
+      (.close context))
+    ;; Don't dissoc otherwise this record turns into a map
+    (assoc this :client nil :server nil :context nil))
 
   p/EventReceiver
   (add-listener [recv ef l]
@@ -50,7 +59,7 @@
     ;; To avoid not receiving any events when unregistering a listener for which
     ;; another one has already registered a filter, we just register for all events
     ;; and unregister when no more listeners remain.
-    (swap! listeners (partial remove (comp (partial = l) :orig)))
+    (swap! listeners remove-listener l)
     (when (empty? @listeners)
       (log/debug "No more listeners remaining, unregistering from events")
       ;; TODO Look out for race conditions: when the last one is unregistered
@@ -111,4 +120,5 @@
                                           (assoc-in [:server :context] ctx)))]
     (->ZeroMQEvents (make-server server filter-fn)
                     (make-client client filter-fn listeners)
-                    listeners)))
+                    listeners
+                    ctx)))

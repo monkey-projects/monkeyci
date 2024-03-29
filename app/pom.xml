@@ -28,6 +28,11 @@
       <version>0.7.0-alpha5</version>
     </dependency>
     <dependency>
+      <groupId>io.resonant</groupId>
+      <artifactId>micrometer-clj</artifactId>
+      <version>0.0.4</version>
+    </dependency>
+    <dependency>
       <groupId>buddy</groupId>
       <artifactId>buddy-core</artifactId>
       <version>1.11.423</version>
@@ -66,6 +71,11 @@
       <groupId>org.clojars.lispyclouds</groupId>
       <artifactId>contajners</artifactId>
       <version>1.0.1</version>
+    </dependency>
+    <dependency>
+      <groupId>io.micrometer</groupId>
+      <artifactId>micrometer-registry-prometheus</artifactId>
+      <version>1.12.4</version>
     </dependency>
     <dependency>
       <groupId>clansi</groupId>
@@ -121,6 +131,11 @@
       <groupId>metosin</groupId>
       <artifactId>reitit-schema</artifactId>
       <version>0.7.0-alpha5</version>
+    </dependency>
+    <dependency>
+      <groupId>io.micrometer</groupId>
+      <artifactId>micrometer-core</artifactId>
+      <version>1.12.4</version>
     </dependency>
     <dependency>
       <groupId>com.monkeyprojects</groupId>
