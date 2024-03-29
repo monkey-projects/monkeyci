@@ -10,6 +10,7 @@
             [medley.core :refer [update-existing] :as mc]
             [monkey.ci
              [config :as config]
+             [metrics :as metrics]
              [runtime :as rt]]
             [monkey.ci.web
              [api :as api]
@@ -19,18 +20,24 @@
             [reitit.coercion.schema]
             [reitit.ring :as ring]
             [ring.middleware.cors :as cors]
+            [ring.util.response :as rur]
             [schema.core :as s]))
 
 (defn health [_]
   ;; TODO Make this more meaningful
-  {:status 200
-   :body "ok"
-   :headers {"Content-Type" "text/plain"}})
+  (-> (rur/response "ok")
+      (rur/content-type "text/plain")))
 
 (defn version [_]
-  {:status 200
-   :body (config/version)
-   :headers {"Content-Type" "text/plain"}})
+  (-> (rur/response (config/version))
+      (rur/content-type "text/plain")))
+
+(defn metrics [req]
+  (if-let [m (c/from-rt req :metrics)]
+    (-> (metrics/scrape m)
+        (rur/response)
+        (rur/content-type "text/plain"))
+    (rur/status 204)))
 
 (def not-empty-str (s/constrained s/Str not-empty))
 (def Id not-empty-str)
@@ -223,6 +230,7 @@
 (def routes
   [["/health" {:get health}]
    ["/version" {:get version}]
+   ["/metrics" {:get metrics}]
    webhook-routes
    customer-routes
    github-routes

@@ -16,6 +16,7 @@
              [git]
              [listeners]
              [logging]
+             [metrics]
              [runtime :as rt]
              [runners]
              [sidecar]

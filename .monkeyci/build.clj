@@ -10,7 +10,7 @@
 
 ;; Version assigned when building main branch
 ;; TODO Determine automatically
-(def snapshot-version "0.4.2-SNAPSHOT")
+(def snapshot-version "0.4.3-SNAPSHOT")
 
 (defn git-ref [ctx]
   (get-in ctx [:build :git :ref]))
@@ -93,8 +93,7 @@
   (let [auth-file (img-repo-auth ctx)]
     (println "Writing docker credentials to" auth-file)
     (when-not (fs/exists? auth-file)
-      (shell/param-to-file ctx "dockerhub-creds" auth-file)
-      core/success)))
+      (shell/param-to-file ctx "dockerhub-creds" auth-file))))
 
 (def image-creds
   (core/action-job

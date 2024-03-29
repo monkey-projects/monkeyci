@@ -4,7 +4,7 @@
   <packaging>jar</packaging>
   <groupId>com.monkeyci</groupId>
   <artifactId>app</artifactId>
-  <version>0.4.2.3</version>
+  <version>0.4.3-SNAPSHOT</version>
   <name>app</name>
   <repositories>
     <repository>
@@ -26,6 +26,11 @@
       <groupId>metosin</groupId>
       <artifactId>reitit-middleware</artifactId>
       <version>0.7.0-alpha5</version>
+    </dependency>
+    <dependency>
+      <groupId>io.resonant</groupId>
+      <artifactId>micrometer-clj</artifactId>
+      <version>0.0.4</version>
     </dependency>
     <dependency>
       <groupId>buddy</groupId>
@@ -66,6 +71,11 @@
       <groupId>org.clojars.lispyclouds</groupId>
       <artifactId>contajners</artifactId>
       <version>1.0.1</version>
+    </dependency>
+    <dependency>
+      <groupId>io.micrometer</groupId>
+      <artifactId>micrometer-registry-prometheus</artifactId>
+      <version>1.12.4</version>
     </dependency>
     <dependency>
       <groupId>clansi</groupId>
@@ -123,6 +133,11 @@
       <version>0.7.0-alpha5</version>
     </dependency>
     <dependency>
+      <groupId>io.micrometer</groupId>
+      <artifactId>micrometer-core</artifactId>
+      <version>1.12.4</version>
+    </dependency>
+    <dependency>
       <groupId>com.monkeyprojects</groupId>
       <artifactId>clompress</artifactId>
       <version>0.1.1</version>
@@ -168,7 +183,7 @@
     <dependency>
       <groupId>com.monkeyprojects</groupId>
       <artifactId>zmq</artifactId>
-      <version>0.3.0</version>
+      <version>0.3.1-SNAPSHOT</version>
       <exclusions>
         <exclusion>
           <groupId>org.zeromq</groupId>

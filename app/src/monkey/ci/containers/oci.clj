@@ -198,6 +198,7 @@
                                      max-job-timeout ::timeout)
                                     (fn [r]
                                       (log/debug "Job instance terminated, or timed out with value:" r)
+                                      ;; FIXME If a job times out, it should fail
                                       (when (= r ::timeout)
                                         (log/warn "Container job timed out after" max-job-timeout "msecs"))
                                       (oci/get-full-instance-details client id))))})

@@ -24,7 +24,12 @@
   (fn [evt]
     (when (pred evt) (l evt))))
 
-(defrecord ZeroMQEvents [server client listeners]
+(defn- remove-listener [listeners l]
+  (let [after (remove (comp (partial = l) :orig) listeners)]
+    (log/debug "Listeners before removing" l ":" (count listeners) ", after:" (count after))
+    after))
+
+(defrecord ZeroMQEvents [server client listeners context]
   co/Lifecycle
   (start [this]
     ;; Start both client and server, if provided
@@ -34,19 +39,32 @@
 
   (stop [{:keys [client server] :as this}]
     (zc/close-all (remove nil? [client server]))
-    (assoc this :client nil :server nil))
+    (when context
+      (log/debug "Closing context")
+      (.close context))
+    ;; Don't dissoc otherwise this record turns into a map
+    (assoc this :client nil :server nil :context nil))
 
   p/EventReceiver
   (add-listener [recv ef l]
     (let [m (get-in recv [:client :matches-filter?])]
-      (ze/register (:client recv) ef)
+      (when (empty? @listeners)
+        (log/debug "Adding first listener, registering for all events")
+        (ze/register (:client recv) nil))
       (swap! listeners conj {:orig l
                              :listener (filtering-listener #(m % ef) l)}))
     recv)
 
   (remove-listener [recv ef l]
-    (ze/unregister (:client recv) ef)
-    (swap! listeners (partial remove (comp (partial = l) :orig)))
+    ;; To avoid not receiving any events when unregistering a listener for which
+    ;; another one has already registered a filter, we just register for all events
+    ;; and unregister when no more listeners remain.
+    (swap! listeners remove-listener l)
+    (when (empty? @listeners)
+      (log/debug "No more listeners remaining, unregistering from events")
+      ;; TODO Look out for race conditions: when the last one is unregistered
+      ;; and a new one is registered at the same time.
+      (ze/unregister (:client recv) nil))
     recv)
 
   p/EventPoster
@@ -102,4 +120,5 @@
                                           (assoc-in [:server :context] ctx)))]
     (->ZeroMQEvents (make-server server filter-fn)
                     (make-client client filter-fn listeners)
-                    listeners)))
+                    listeners
+                    ctx)))

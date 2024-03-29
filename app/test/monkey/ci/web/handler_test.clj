@@ -11,6 +11,7 @@
             [monkey.ci
              [config :as config]
              [logging :as l]
+             [metrics :as m]
              [runtime :as rt]
              [storage :as st]]
             [monkey.ci.web
@@ -665,6 +666,21 @@
 
     (testing "404 when no jwk configured"
       (is (= 404 (-> (mock/request :get "/auth/jwks")
+                     (test-app)
+                     :status))))))
+
+(deftest metrics
+  (testing "`GET /metrics`"
+    (testing "provides metrics scrape"
+      (let [rt {:metrics (m/make-registry)}
+            app (sut/make-app rt)
+            r (-> (mock/request :get "/metrics")
+                  (app))]
+        (is (= 200 (:status r)))
+        (is (string? (:body r)))))
+
+    (testing "no content when no metrics configured"
+      (is (= 204 (-> (mock/request :get "/metrics")
                      (test-app)
                      :status))))))
 
