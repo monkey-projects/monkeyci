@@ -39,14 +39,23 @@
   p/EventReceiver
   (add-listener [recv ef l]
     (let [m (get-in recv [:client :matches-filter?])]
-      (ze/register (:client recv) ef)
+      (when (empty? @listeners)
+        (log/debug "Adding first listener, registering for all events")
+        (ze/register (:client recv) nil))
       (swap! listeners conj {:orig l
                              :listener (filtering-listener #(m % ef) l)}))
     recv)
 
   (remove-listener [recv ef l]
-    (ze/unregister (:client recv) ef)
+    ;; To avoid not receiving any events when unregistering a listener for which
+    ;; another one has already registered a filter, we just register for all events
+    ;; and unregister when no more listeners remain.
     (swap! listeners (partial remove (comp (partial = l) :orig)))
+    (when (empty? @listeners)
+      (log/debug "No more listeners remaining, unregistering from events")
+      ;; TODO Look out for race conditions: when the last one is unregistered
+      ;; and a new one is registered at the same time.
+      (ze/unregister (:client recv) nil))
     recv)
 
   p/EventPoster
