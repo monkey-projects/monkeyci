@@ -38,13 +38,20 @@
          :iss "https://app.monkeyci.com"
          :aud ["https://api.monkeyci.com"]))
 
-(defn generate-jwt
-  "Signs a JWT using the keypair from the request context."
-  [req payload]
-  (let [pk (c/from-rt req (comp :priv :jwk))]
+(defn generate-jwt-from-rt
+  "Generates a JWT from the private key in the runtime"
+  [rt payload]
+  (when-let [pk (get-in rt [:jwk :priv])]
     (-> payload
         (augment-payload)
         (sign-jwt pk))))
+
+(defn generate-jwt
+  "Signs a JWT using the keypair from the request context."
+  [req payload]
+  (-> req
+      (c/req->rt)
+      (generate-jwt-from-rt payload)))
 
 (defn generate-keypair
   "Generates a new RSA keypair"

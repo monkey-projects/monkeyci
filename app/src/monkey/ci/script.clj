@@ -25,26 +25,6 @@
   (:import java.nio.channels.SocketChannel
            [java.net UnixDomainSocketAddress StandardProtocolFamily]))
 
-;; (defn- script-evt [evt rt]
-;;   (assoc evt
-;;          :src :script
-;;          :sid (get-in rt [:build :sid])
-;;          :time (u/now)))
-
-;; (defn- post-event [rt evt]
-;;   (log/trace "Posting event:" evt)
-;;   (if-let [c (get-in rt [:api :client])]
-;;     ;; TODO Check if this converts keys to keywords automatically
-;;     (let [{:keys [status] :as r} @(martian/response-for c :post-event (script-evt evt rt))]
-;;       (when-not (= 202 status)
-;;         (log/warn "Failed to post event, got status" status)
-;;         (log/debug "Full response:" r)))
-;;     (log/warn "Unable to post event, no client configured")))
-
-;; (defn- post-events [rt events]
-;;   (doseq [e events]
-;;     (post-event rt e)))
-
 (defn- wrapped
   "Sets the event poster in the runtime."
   [f before after]
@@ -163,6 +143,7 @@
                           {:client client})))
 
 (defn- connect-to-host [url]
+  ;; TODO Use provided token
   (mh/bootstrap-openapi (str url swagger-path)))
 
 (defn make-client

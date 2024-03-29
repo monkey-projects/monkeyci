@@ -139,18 +139,16 @@
                                        (sut/execute!)
                                        (find-arg :pipeline)))))
 
-      (testing "starts script api server"
-        (is (some? (sut/execute! {})))
-        (is (true? @server-started?)))
-
-      (testing "passes socket path in env"
-        (is (string? (-> {:script {:script-dir "test-dir"}}
-                         (sut/execute!)
-                         (deref)
-                         :process
-                         :args
-                         :extra-env
-                         :monkeyci-api-socket)))))))
+      (testing "passes api url and token in env"
+        (let [env (-> {:script {:script-dir "test-dir"}
+                       :config {:api {:url "http://test-api"}}}
+                      (sut/execute!)
+                      (deref)
+                      :process
+                      :args
+                      :extra-env)]
+          (is (= "http://test-api" (:monkeyci-api-url env)))
+          (is (string? (:monkeyci-api-token env))))))))
 
 (deftest process-env
   (testing "passes build id"
