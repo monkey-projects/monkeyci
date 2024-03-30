@@ -41,7 +41,7 @@
 
 (defn- ->env [rt]
   (->> (-> (rt/rt->env rt)
-           (dissoc :app-mode :git :github :http :args :jwk :checkout-base-dir
+           (dissoc :app-mode :git :github :http :args :jwk :checkout-base-dir :storage
                    :ssh-keys-dir :work-dir :oci)
            (update :build dissoc :cleanup? :status)
            (update-in [:build :git] dissoc :ssh-keys))

@@ -111,7 +111,7 @@
   [rt]
   (-> (rt/rt->env rt)
       ;; Generate an API token and add it to the config
-      (assoc-in [:api :token] (auth/generate-jwt-from-rt rt {:sub (str "build/" (b/get-build-id rt))}))
+      (assoc-in [:api :token] (auth/generate-jwt-from-rt rt (auth/build-token (b/get-sid rt))))
       (config/config->env)
       (merge default-envs)))
 

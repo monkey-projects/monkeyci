@@ -142,7 +142,7 @@
                           {:interceptors interceptors}
                           {:client client})))
 
-(defn- connect-to-host [url]
+(defn- connect-to-host [url token]
   ;; TODO Use provided token
   (mh/bootstrap-openapi (str url swagger-path)))
 
@@ -150,10 +150,10 @@
   "Initializes a Martian client using the configuration given.  It can either
    connect to a domain socket, or a host.  The client is then added to the
    context, where it can be accessed by the build scripts."
-  [{{:keys [url socket]} :api}]
+  [{{:keys [url socket token]} :api}]
   (log/debug "Connecting to API at" (or url socket))
   (cond
-    url (connect-to-host url)
+    url (connect-to-host url token)
     socket (connect-to-uds socket)))
 
 (def valid-config? (some-fn :socket :url))
@@ -248,7 +248,7 @@
     (try 
       (let [jobs (-> (load-script script-dir build-id)
                      (resolve-jobs rt))]
-        (log/debug "Jobs:" jobs)
+        (log/trace "Jobs:" jobs)
         (log/debug "Loaded" (count jobs) "jobs:" (map bc/job-id jobs))
         (run-all-jobs* rt jobs))
       (catch Exception ex
