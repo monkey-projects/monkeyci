@@ -25,7 +25,9 @@
             [monkey.ci.events.core]
             [monkey.ci.storage.file]
             [monkey.ci.storage.oci]
-            [monkey.ci.web.script-api :as script-api]
+            [monkey.ci.web
+             [auth :as auth]
+             [script-api :as script-api]]
             [monkey.socket-async.uds :as uds]))
 
 (def default-script-config
@@ -101,27 +103,15 @@
        (into [])
        (flatten)))
 
-(defn- make-socket-path [build-id]
-  (utils/tmp-file (str "events-" build-id ".sock")))
-
-(defn- start-script-api
-  "Starts a script API http server that listens at a domain socket 
-   location.  Returns both the server and the socket path."
-  [rt]
-  (let [build-id (get-in rt [:build :build-id])
-        path (make-socket-path build-id)]
-    {:socket-path path
-     :server (script-api/listen-at-socket path rt)}))
-
 (def default-envs
   {:lc-ctype "UTF-8"})
 
 (defn process-env
   "Build the environment to be passed to the child process."
-  [rt socket-path]
+  [rt]
   (-> (rt/rt->env rt)
-      (assoc :api
-             {:socket socket-path})
+      ;; Generate an API token and add it to the config
+      (update :api mc/assoc-some :token (auth/generate-jwt-from-rt rt (auth/build-token (b/get-sid rt))))
       (config/config->env)
       (merge default-envs)))
 
@@ -139,8 +129,6 @@
   [{{:keys [checkout-dir build-id] :as build} :build :as rt}]
   (log/info "Executing build process for" build-id "in" checkout-dir)
   (let [script-dir (b/rt->script-dir rt)
-        ;; TODO Replace the script api with regular api client and token
-        {:keys [socket-path server]} (start-script-api rt)
         [out err :as loggers] (map (partial make-logger rt) [:out :err])
         result (md/deferred)
         cmd (-> ["clojure"
@@ -155,15 +143,10 @@
           :out (l/log-output out)
           :err (l/log-output err)
           :cmd cmd
-          :extra-env (process-env rt socket-path)
+          :extra-env (process-env rt)
           :exit-fn (fn [{:keys [proc] :as p}]
                      (let [exit (or (some-> proc (.exitValue)) 0)]
                        (log/debug "Script process exited with code" exit ", cleaning up")
-                       (when server
-                         (script-api/stop-server server))
-                       (when socket-path 
-                         (uds/delete-address socket-path))
-                       (log/debug "Reporting build completed to deferred")
                        (md/success! result {:process p
                                             :exit exit})))})
         ;; Depending on settings, some process streams need handling

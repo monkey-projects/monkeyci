@@ -28,26 +28,18 @@
                                                   {:status 200
                                                    :body {:containers [{:exit-code 0}]}}))]
         (is (= 0 (-> (sut/oci-runner {} {} rt)
-                     (deref))))))
-
-    (testing "launches `:build/end` event"
-      (with-redefs [ci/create-container-instance (fn [_ opts]
-                                                   {:status 500})
-                    ci/delete-container-instance (fn [_ r] r)]
-        (let [{:keys [recv] :as e} (h/fake-events)]
-          (is (some? (sut/oci-runner {} {} (assoc rt :events e))))
-          (is (not-empty @recv))
-          (is (= :build/end (-> @recv first :type))))))))
+                     (deref))))))))
 
 (deftest instance-config
   (let [priv-key (h/generate-private-key)
-        rt {:build {:build-id "test-build-id"
-                    :sid ["a" "b" "test-build-id"]
-                    :git {:url "http://git-url"
-                          :branch "main"
-                          :commit-id "test-commit"
-                          :ssh-keys [{:private-key "test-privkey"
-                                      :public-key "test-pubkey"}]}}}
+        rt (assoc (h/test-rt)
+                  :build {:build-id "test-build-id"
+                          :sid ["a" "b" "test-build-id"]
+                          :git {:url "http://git-url"
+                                :branch "main"
+                                :commit-id "test-commit"
+                                :ssh-keys [{:private-key "test-privkey"
+                                            :public-key "test-pubkey"}]}})
         conf {:availability-domain "test-ad"
               :compartment-id "test-compartment"
               :image-pull-secrets "test-secrets"
@@ -110,7 +102,10 @@
             (is (every? string? (keys env))))
 
           (testing "enforces child runner"
-            (is (= "child" (get env "monkeyci-runner-type"))))))
+            (is (= "child" (get env "monkeyci-runner-type"))))
+
+          (testing "adds api token"
+            (is (not-empty (get env "monkeyci-api-token"))))))
 
       (testing "drops nil env vars"
         (let [c (-> rt

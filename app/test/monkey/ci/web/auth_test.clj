@@ -39,7 +39,8 @@
         (is (some? (sec (-> req
                             (assoc :headers
                                    {"authorization"
-                                    (str "Bearer " (sut/generate-jwt req {:sub "github/456"}))}))))
+                                    (str "Bearer " (sut/generate-jwt req {:role sut/role-user
+                                                                          :sub "github/456"}))}))))
             "bearer token provided"))))
 
   (testing "verifies token query param using public key and puts user in request `:identity`"
@@ -56,7 +57,29 @@
             "no identity provided")
         (is (some? (sec (-> req
                             (assoc-in [:query-params "authorization"]
-                                      (sut/generate-jwt req {:sub "github/456"})))))
+                                      (sut/generate-jwt req (sut/user-token ["github" "456"]))))))
+            "bearer token provided"))))
+
+  (testing "when build token, puts build customer and repo in identity"
+    (h/with-memory-store st
+      (let [app :identity
+            kp (sut/generate-keypair)
+            rt {:storage st
+                :jwk (sut/keypair->rt kp)}
+            sec (sut/secure-ring-app app rt)
+            req (h/->req rt)
+            [cid rid bid :as sid] (repeatedly 3 (comp str random-uuid))]
+        (is (st/sid? (st/save-customer st {:id cid
+                                           :name "test customer"
+                                           :repos [{:id rid
+                                                    :name "test repo"}]})))
+        (is (st/sid? (st/save-build st {:customer-id cid
+                                        :repo-id rid
+                                        :build-id bid})))
+        (is (some? (sec (-> req
+                            (assoc :headers
+                                   {"authorization"
+                                    (str "Bearer " (sut/generate-jwt req (sut/build-token sid)))}))))
             "bearer token provided")))))
 
 (deftest customer-authorization

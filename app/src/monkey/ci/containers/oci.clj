@@ -191,6 +191,7 @@
                                     ;; TODO When a start event has not been received after
                                     ;; a sufficient period of time, start polling anyway.
                                     ;; For now, we add a max timeout.
+                                    ;; FIXME Seems like the timeout not always works.
                                     (md/timeout!
                                      (wait-for-sidecar-end-event (:events rt)
                                                                  (b/get-sid rt)
