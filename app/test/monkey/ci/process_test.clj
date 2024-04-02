@@ -140,6 +140,19 @@
                                        (find-arg :pipeline)))))
 
       (testing "passes api url and token in env"
+        (let [env (-> (h/test-rt)
+                      (assoc :script {:script-dir "test-dir"}
+                             :config {:api {:url "http://test-api"}})
+                      (sut/execute!)
+                      (deref)
+                      :process
+                      :args
+                      :extra-env)]
+          (is (= "http://test-api" (:monkeyci-api-url env)))
+          (is (string? (:monkeyci-api-token env)))
+          (is (not-empty (:monkeyci-api-token env)))))
+
+      (testing "no token if no jwk keys configured"
         (let [env (-> {:script {:script-dir "test-dir"}
                        :config {:api {:url "http://test-api"}}}
                       (sut/execute!)
@@ -147,30 +160,40 @@
                       :process
                       :args
                       :extra-env)]
-          (is (= "http://test-api" (:monkeyci-api-url env)))
-          (is (string? (:monkeyci-api-token env))))))))
+          (is (empty? (:monkeyci-api-token env)))))
+
+      (testing "does not overwrite token if no jwk config"
+        (let [env (-> {:script {:script-dir "test-dir"}
+                       :config {:api {:url "http://test-api"
+                                      :token "test-token"}}}
+                      (sut/execute!)
+                      (deref)
+                      :process
+                      :args
+                      :extra-env)]
+          (is (= "test-token" (:monkeyci-api-token env))))))))
 
 (deftest process-env
   (testing "passes build id"
     (is (= "test-build" (-> {:build {:build-id "test-build"}}
-                            (sut/process-env "test-socket")
+                            (sut/process-env)
                             :monkeyci-build-build-id))))
 
   (testing "passes build sid in serialized fashion"
     (is (= "a/b/c" (-> {:build {:sid ["a" "b" "c"]}}
-                       (sut/process-env "test-socket")
+                       (sut/process-env)
                        :monkeyci-build-sid))))
   
   (testing "sets `LC_CTYPE` to `UTF-8` for git clones"
     (is (= "UTF-8" (-> {}
-                       (sut/process-env "test-socket")
+                       (sut/process-env)
                        :lc-ctype))))
 
   (testing "passes serialized config"
     (let [env (-> {:config
                    {:logging {:type :file
                               :dir "test-dir"}}}
-                  (sut/process-env "test-socket"))]
+                  (sut/process-env))]
       (is (= "file" (:monkeyci-logging-type env)))
       (is (= "test-dir" (:monkeyci-logging-dir env))))))
 

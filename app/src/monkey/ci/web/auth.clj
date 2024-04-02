@@ -129,6 +129,10 @@
                             (st/find-build storage))]
     (assoc build :customers #{(:customer-id build)})))
 
+(defmethod resolve-token :default [rt token]
+  ;; Fallback, for backwards compatibility
+  nil)
+
 (defn- query-auth-to-bearer
   "Middleware that puts the authorization token query param in the authorization header
    if no auth header is provided."

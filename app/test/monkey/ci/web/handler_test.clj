@@ -192,7 +192,9 @@
           cust-id (st/new-id)
           github-id 6453
           app (sut/make-app rt)
-          token (auth/sign-jwt {:sub (str "github/" github-id)} (.getPrivate kp))
+          token (auth/sign-jwt {:sub (str "github/" github-id)
+                                :role auth/role-user}
+                               (.getPrivate kp))
           _ (st/save-customer st {:id cust-id
                                   :name "test customer"})
           _ (st/save-user st {:type "github"

@@ -1,5 +1,6 @@
 (ns monkey.ci.script-test
-  (:require [clojure.test :refer :all]
+  (:require [aleph.http :as http]
+            [clojure.test :refer :all]
             [manifold.deferred :as md]
             [monkey.ci
              [build :as b]
@@ -7,24 +8,8 @@
              [runtime :as rt]
              [script :as sut]
              [utils :as u]]
-            [monkey.ci.web.script-api :as script-api]
             [monkey.ci.build.core :as bc]
-            [monkey.ci.helpers :as h]
-            [monkey.socket-async.uds :as uds]
-            [org.httpkit.fake :as hf]))
-
-(defn with-listening-socket [f]
-  (let [p (u/tmp-file "test-" ".sock")]
-    (try
-      (let [events (atom [])
-            server (script-api/listen-at-socket p {:public-api script-api/local-api
-                                                   :events {:poster (partial swap! events conj)}})]
-        (try
-          (f p events)
-          (finally
-            (script-api/stop-server server))))
-      (finally
-        (uds/delete-address p)))))
+            [monkey.ci.helpers :as h]))
 
 (defn dummy-job
   ([r]
@@ -94,19 +79,39 @@
           (is (= "Unable to resolve symbol: This in this context" (:message r))))))))
 
 (deftest setup-runtime
-  (testing "connects to listening socket if specified"
-    (with-listening-socket
-      (fn [socket-path _]
-        (is (some? (-> (rt/setup-runtime {:api {:socket socket-path}} :api)
-                       :client)))))))
+  (testing "creates client if configured"
+    (is (fn? (-> {:api {:url "http://test"
+                        :token "test-token"}}
+                 (rt/setup-runtime :api)
+                 :client))))
+
+  (testing "no client if not corretly configured"
+    (is (nil? (-> {:api {:url "http://test"}}
+                  (rt/setup-runtime :api)
+                  :client)))))
 
 (deftest make-client
-  (testing "creates client for domain socket"
-    (is (some? (sut/make-client {:api {:socket "test.sock"}}))))
+  (testing "client invokes http request, parses body as edn"
+    (with-redefs [http/request (constantly (md/success-deferred
+                                            {:status 200
+                                             :body "\"ok\""}))]
+      (let [c (sut/make-client {:api {:url "http://test"}})]
+        (is (= "ok" @(c {:method :get :url "/something"}))))))
 
-  (testing "creates client for host"
-    (hf/with-fake-http ["http://test/script/swagger.json" 200]
-      (is (some? (sut/make-client {:api {:url "http://test"}}))))))
+  (testing "throws on error"
+    (with-redefs [http/request (constantly (md/success-deferred
+                                            {:status 400
+                                             :body "Client error"}))]
+      (let [c (sut/make-client {:api {:url "http://test"}})]
+        (is (thrown? Exception @(c {:method :get :url "/something"}))))))
+
+  (testing "prefixes url to path"
+    (with-redefs [http/request (fn [{:keys [url]}]
+                                 (md/success-deferred
+                                  {:status 200
+                                   :body (pr-str url)}))]
+      (let [c (sut/make-client {:api {:url "http://test"}})]
+        (is (= "http://test/something" @(c {:method :get :url "/something"})))))))
 
 (deftest run-all-jobs
   (testing "success if no pipelines"

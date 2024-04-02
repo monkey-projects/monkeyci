@@ -1,11 +1,9 @@
 (ns monkey.ci.script
-  (:require [clojure.java.io :as io]
+  (:require [aleph.http :as http]
+            [clj-commons.byte-streams :as bs]
+            [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
-            [martian
-             [core :as martian]
-             [httpkit :as mh]
-             [interceptors :as mi]]
             [medley.core :as mc]
             [monkey.ci.build.core :as bc]
             [monkey.ci
@@ -20,8 +18,7 @@
              [docker]
              [oci]
              [podman]]
-            [monkey.ci.events.core :as ec]
-            [org.httpkit.client :as http])
+            [monkey.ci.events.core :as ec])
   (:import java.nio.channels.SocketChannel
            [java.net UnixDomainSocketAddress StandardProtocolFamily]))
 
@@ -114,49 +111,32 @@
        :jobs result})))
 
 ;;; Script client functions
-;;; TODO Replace this with a more generic approach (possibly using ZeroMQ sockets)
-
-(defn- make-uds-address [path]
-  (UnixDomainSocketAddress/of path))
-
-(defn- open-uds-socket []
-  (SocketChannel/open StandardProtocolFamily/UNIX))
-
-;; The swagger is fetched by the build script client api
-(def swagger-path "/script/swagger.json")
-
-(defn- connect-to-uds [path]
-  (let [client (http/make-client
-                {:address-finder (fn make-addr [_]
-                                   (make-uds-address path))
-                 :channel-factory (fn [_]
-                                    (open-uds-socket))})
-        ;; Martian doesn't pass in the client in the requests, so do it with an interceptor.
-        client-injector {:name ::inject-client
-                         :enter (fn [ctx]
-                                  (assoc-in ctx [:request :client] client))}
-        interceptors (-> mh/default-interceptors
-                         (mi/inject client-injector :before ::mh/perform-request))]
-    ;; Url is not used, but we need the path to the swagger
-    (mh/bootstrap-openapi (str "http://fake-host" swagger-path)
-                          {:interceptors interceptors}
-                          {:client client})))
-
-(defn- connect-to-host [url token]
-  ;; TODO Use provided token
-  (mh/bootstrap-openapi (str url swagger-path)))
 
 (defn make-client
-  "Initializes a Martian client using the configuration given.  It can either
-   connect to a domain socket, or a host.  The client is then added to the
-   context, where it can be accessed by the build scripts."
-  [{{:keys [url socket token]} :api}]
-  (log/debug "Connecting to API at" (or url socket))
-  (cond
-    url (connect-to-host url token)
-    socket (connect-to-uds socket)))
+  "Creates an API client function, that can be invoked by build scripts to 
+   perform certain operations, like retrieve build parameters.  The client
+   uses the token passed by the spawning process to gain access to those
+   resources."
+  [{{:keys [url token]} :api}]
+  (letfn [(throw-on-error [{:keys [status] :as r}]
+            (if (>= status 400)
+              (md/error-deferred (ex-info "Failed to invoke API call" r))
+              r))
+          (parse-body [{:keys [body]}]
+            (with-open [r (bs/to-reader body)]
+              (u/parse-edn r)))]
+    (log/debug "Connecting to API at" url)
+    (fn [req]
+      (-> req
+          (update :url (partial str url))
+          (assoc-in [:headers "authorization"] (str "Bearer " token))
+          (assoc-in [:headers "accept"] "application/edn")
+          (http/request)
+          (md/chain
+           throw-on-error
+           parse-body)))))
 
-(def valid-config? (some-fn :socket :url))
+(def valid-config? (every-pred :url :token))
 
 (defmethod rt/setup-runtime :api [conf _]
   (when-let [c (:api conf)]
