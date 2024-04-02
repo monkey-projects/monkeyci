@@ -205,14 +205,18 @@
                                       (oci/get-full-instance-details client id))))})
      (fn [r]
        (letfn [(maybe-log-output [{:keys [exit-code display-name logs] :as c}]
-                 (when (not= 0 exit-code)
+                 (when (and (not (nil? exit-code)) (not= 0 exit-code))
                    (log/warn "Container" display-name "returned a nonzero exit code:" exit-code)
                    (log/warn "Captured output:" logs))
                  c)]
          (->> (get-in r [:body :containers])
               (mapv maybe-log-output)
               (map :exit-code)
-              (filter (complement zero?))
+              ;; It may occur that the sidecar/end event has already been received, but the
+              ;; container has not stopped yet.  In that case, they will have a `nil` exit
+              ;; code and we'll assume it's zero, since the event will already inform us of
+              ;; any errors.
+              (filter (complement (fnil zero? 0)))
               (first))))
      (fn [exit]
        ;; TODO Add more info on failure

@@ -278,7 +278,17 @@
       (is (= 123 (-> (mcc/run-container {:containers {:type :oci}
                                          :build {:checkout-dir "/tmp"}})
                      (deref)
-                     :exit))))))
+                     :exit)))))
+
+  (testing "when container has `nil` exit code, assume zero"
+    (with-redefs [oci/run-instance (constantly (md/success-deferred
+                                                {:status 200
+                                                 :body {:containers [{:exit-code 0}
+                                                                     {:exit-code nil}]}}))]
+      (is (= 0 (-> (mcc/run-container {:containers {:type :oci}
+                                       :build {:checkout-dir "/tmp"}})
+                   (deref)
+                   :exit))))))
 
 (deftest normalize-key
   (testing "merges with oci"
