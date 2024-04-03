@@ -34,6 +34,7 @@
 (defn- wait-until-started
   "Blocks until the server has started by checking the state stream."
   [server]
+  ;; FIXME Even with this startup check, it still happens the client is not registered for events
   @(ms/take! (:state-stream server))
   server)
 

@@ -243,6 +243,7 @@
                job-cont (->> containers
                              (filter (comp (partial = job-container-name) :display-name))
                              (first))]
+           (log/debug "Containers:" containers)
            ;; Either return the first error result, or the result of the job container
            (:result (or nonzero job-cont))))))))
 
