@@ -173,11 +173,22 @@
       (assoc :script (-> rt rt/build build/script))
       (f)))
 
-(defn- script-start-evt [rt _]
-  (with-script-evt rt
-    #(assoc %
-            :type :script/start
-            :message "Script started")))
+(defn- job->evt [job]
+  (select-keys job [j/deps j/labels]))
+
+(defn- script-start-evt [rt jobs]
+  (letfn [(mark-pending [job]
+            (assoc job :status :pending))]
+    (with-script-evt rt
+      #(-> %
+           (assoc :type :script/start
+                  :message "Script started")
+           ;; Add all info we already have about jobs
+           (assoc-in [:script :jobs] (->> jobs
+                                          (map (fn [{:keys [id] :as job}]
+                                                 [id job]))
+                                          (into {})
+                                          (mc/map-vals (comp mark-pending job->evt))))))))
 
 (defn- script-end-evt [rt jobs res]
   (with-script-evt rt
@@ -189,7 +200,7 @@
           (assoc-in [:script :jobs]
                     (mc/map-vals (fn [r]
                                    (-> (select-keys (:result r) [:status :message])
-                                       (merge (select-keys (:job r) [j/deps j/labels]))))
+                                       (merge (job->evt (:job r)))))
                                  (:jobs res)))))))
 
 (def run-all-jobs*

@@ -145,16 +145,32 @@
       (is (= bc/success (get-in result ["test-job" :result]))))))
 
 (deftest run-all-jobs*
-  (letfn [(verify-script-end-evt [jobs verifier]
+  (letfn [(verify-script-evt [evt-type jobs verifier]
             (let [{:keys [recv] :as e} (h/fake-events)
                   rt {:events e
                       :build {:sid ["test-cust" "test-repo"]}}]
               (is (some? (sut/run-all-jobs* rt jobs)))
               (is (not-empty @recv))
               (is (contains? (set (map :type @recv)) :script/end))
-              (let [l (last @recv)]
-                (is (= :script/end (:type l)))
-                (verifier l))))]
+              (let [l (->> @recv
+                           (filter (comp (partial = evt-type) :type))
+                           (first))]
+                (is (some? l))
+                (verifier l))))
+          (verify-script-end-evt [jobs verifier]
+            (verify-script-evt :script/end jobs verifier))
+          (verify-script-start-evt [jobs verifier]
+            (verify-script-evt :script/start jobs verifier))]
+
+    (testing "posts `:script/start` event with pending jobs"
+      (let [job (bc/action-job "test-job" (constantly nil))]
+        (verify-script-start-evt
+         [job]
+         (fn [evt]
+           (is (= 1 (count (get-in evt [:script :jobs]))))
+           (is (some? (get-in evt [:script :jobs "test-job"])))
+           (is (= :pending
+                  (get-in evt [:script :jobs "test-job" :status])))))))
     
     (testing "posts `:script/end` event with job status"
       (let [result (assoc bc/success :message "Test result")
