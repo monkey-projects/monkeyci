@@ -137,7 +137,8 @@
             ;; TODO At this point we also should abort the job container by writing to the abort file
             (fn [ex]
               (log/error "Failed to run sidecar" ex)
-              {:exit-code 1
+              {:exit 1
+               :message (ex-message ex)
                :exception ex})))))
 
 (defn- add-from-args [conf k]

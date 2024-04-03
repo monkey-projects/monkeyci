@@ -155,7 +155,7 @@
                                        :job (jobs/job->event job)})
                    (let [e (-> (sidecar/run rt)
                                (deref)
-                               :exit-code)]
+                               :exit)]
                      (ec/make-result (b/exit-code->status e) e nil))
                    (catch Throwable t
                      (ec/exception-result t)))]
@@ -163,4 +163,5 @@
       (rt/post-events rt (-> {:type :sidecar/end
                               :sid sid
                               :job (jobs/job->event job)}
-                             (ec/set-result result))))))
+                             (ec/set-result result)))
+      (:exit result))))
