@@ -273,8 +273,9 @@
           job-id "test-job"
           rt {:events events
               :job {:id job-id}}
-          details {:containers [{:display-name sut/sidecar-container-name}
-                                {:display-name sut/job-container-name}]}
+          details {:body
+                   {:containers [{:display-name sut/sidecar-container-name}
+                                 {:display-name sut/job-container-name}]}}
           res (sut/wait-or-timeout rt 1000 (constantly details))]
       (is (some? (rt/post-events rt [{:type :sidecar/end
                                       :sid sid
@@ -282,7 +283,7 @@
                                      {:type :container/end
                                       :sid sid
                                       :job {:id job-id}}])))
-      (is (sequential? (:containers @res)))))
+      (is (sequential? (get-in @res [:body :containers])))))
 
   (testing "adds exit codes from events"
     (let [events (ec/make-events {:events {:type :manifold}})
@@ -290,8 +291,9 @@
           job-id "test-job"
           rt {:events events
               :job {:id job-id}}
-          details {:containers [{:display-name sut/sidecar-container-name}
-                                {:display-name sut/job-container-name}]}
+          details {:body
+                   {:containers [{:display-name sut/sidecar-container-name}
+                                 {:display-name sut/job-container-name}]}}
           res (sut/wait-or-timeout rt 1000 (constantly details))]
       (is (some? (rt/post-events rt [{:type :sidecar/end
                                       :sid sid
@@ -301,7 +303,7 @@
                                       :sid sid
                                       :job {:id job-id}
                                       :result {:exit 2}}])))
-      (is (= [1 2] (->> @res :containers (map ec/result-exit))))))
+      (is (= [1 2] (->> @res :body :containers (map ec/result-exit))))))
 
   (testing "marks timeout as failure"
     (let [events (ec/make-events {:events {:type :manifold}})
@@ -309,14 +311,15 @@
           job-id "test-job"
           rt {:events events
               :job {:id job-id}}
-          details {:containers [{:display-name sut/sidecar-container-name}
-                                {:display-name sut/job-container-name}]}
+          details {:body
+                   {:containers [{:display-name sut/sidecar-container-name}
+                                 {:display-name sut/job-container-name}]}}
           res (sut/wait-or-timeout rt 100 (constantly details))]
       (is (some? (rt/post-events rt [{:type :sidecar/end
                                       :sid sid
                                       :job {:id job-id}
                                       :result {:exit 0}}])))
-      (is (= 1 (->> @res :containers second ec/result-exit))))))
+      (is (= 1 (->> @res :body :containers second ec/result-exit))))))
 
 (deftest run-container
   (testing "can run using type `oci`, returns zero exit code on success"

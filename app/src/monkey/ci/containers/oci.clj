@@ -210,7 +210,7 @@
                           c)))]
        ;; We don't rely on the container exit codes, since the container may not have
        ;; exited completely when the events have arrived, so we use the event values instead.
-       (update details :containers (partial map add-exit))))))
+       (update-in details [:body :containers] (partial map add-exit))))))
 
 (defmethod mcc/run-container :oci [rt]
   (log/debug "Running job as OCI instance:" (:job rt))

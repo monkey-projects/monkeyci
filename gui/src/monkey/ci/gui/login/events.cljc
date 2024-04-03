@@ -9,6 +9,7 @@
  :login/login-and-redirect
  (fn [{:keys [db]} _]
    (let [next-route (r/current db)]
+     ;; FIXME This has no effect with github auth because it reloads the page
      {:db (db/set-redirect-route db next-route)
       :dispatch [:route/goto :page/login]})))
 

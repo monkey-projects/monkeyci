@@ -101,17 +101,25 @@
  (fn [db _]
    (db/set-show-trigger-form db nil)))
 
+(defn- add-ref
+  "Adds query params according to the trigger form input"
+  [params {:keys [trigger-type trigger-ref]}]
+  (let [tt (first trigger-type)
+        v (first trigger-ref)]
+    (cond-> params
+      (and tt v) (assoc (keyword tt) v))))
+
 (rf/reg-event-fx
  :repo/trigger-build
  (fn [{:keys [db]} [_ form-vals]]
-   (log/debug "Triggering build with form values:" (str form-vals))
    (let [params (get-in db [:route/current :parameters :path])]
      {:db (-> db
               (db/set-triggering)
               (db/reset-alerts))
       :dispatch [:secure-request
                  :trigger-build
-                 (select-keys params [:customer-id :repo-id])
+                 (-> (select-keys params [:customer-id :repo-id])
+                     (add-ref form-vals))
                  [:repo/trigger-build--success]
                  [:repo/trigger-build--failed]]})))
 

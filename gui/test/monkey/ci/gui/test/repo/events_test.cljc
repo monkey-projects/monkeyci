@@ -158,14 +158,20 @@
     (rf/dispatch-sync [:repo/trigger-build])
     (is (true? (db/triggering? @app-db))))
 
-  (testing "invokes build trigger endpoint"
+  (testing "invokes build trigger endpoint with params"
     (rft/run-test-sync
      (let [c (h/catch-fx :martian.re-frame/request)]
+       (is (some? (set-repo-path! "test-cust" "test-repo")))
        (h/initialize-martian {:trigger-build {:body {:build-id "test-build"}
                                               :error-code :no-error}})
-       (rf/dispatch [:repo/trigger-build])
+       (rf/dispatch [:repo/trigger-build {:trigger-type ["branch"]
+                                          :trigger-ref ["main"]}])
        
-       (is (= 1 (count @c))))))
+       (is (= 1 (count @c)))
+       (is (= {:branch "main"
+               :customer-id "test-cust"
+               :repo-id "test-repo"}
+              (-> @c first (nth 3)))))))
 
   (testing "clears notifications"
     (is (some? (reset! app-db (db/set-alerts {} [{:type :danger}]))))
