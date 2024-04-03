@@ -1,8 +1,16 @@
 (ns monkey.ci.gui.login.events
   (:require [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.login.db :as db]
+            [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
+
+(rf/reg-event-fx
+ :login/login-and-redirect
+ (fn [{:keys [db]} _]
+   (let [next-route (r/current db)]
+     {:db (db/set-redirect-route db next-route)
+      :dispatch [:route/goto :page/login]})))
 
 (rf/reg-event-db
  :login/submit
@@ -32,10 +40,16 @@
  :login/github-login--success
  (fn [{:keys [db]} [_ {u :body}]]
    (log/debug "Got user details:" u)
-   {:db (-> db
-            (db/set-user (dissoc u :token))
-            (db/set-token (:token u)))
-    :dispatch [:route/goto :page/root]}))
+   (let [redir (db/redirect-route db)]
+     (log/debug "Redirect route:" redir)
+     {:db (-> db
+              (db/set-user (dissoc u :token))
+              (db/set-token (:token u))
+              (db/clear-redirect-route))
+      :dispatch (if redir
+                  ;; Either go to the root page, or to the stored redirect path
+                  [:route/goto (get-in redir [:data :name]) (get redir :path-params)]
+                  [:route/goto :page/root])})))
 
 (rf/reg-event-db
  :login/github-login--failed

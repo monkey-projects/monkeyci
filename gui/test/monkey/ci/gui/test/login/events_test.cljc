@@ -4,6 +4,7 @@
             [day8.re-frame.test :as rf-test]
             [monkey.ci.gui.login.events :as sut]
             [monkey.ci.gui.login.db :as db]
+            [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.test.fixtures :as f]
             [monkey.ci.gui.test.helpers :as h]
             [re-frame.core :as rf]
@@ -11,6 +12,20 @@
 
 (use-fixtures :each
   f/reset-db)
+
+(deftest login-and-redirect
+  (testing "sets redirect route"
+    (h/catch-fx :route/goto)
+    (rf-test/run-test-sync
+     (is (some? (reset! app-db {r/current ::test-route})))
+     (rf/dispatch [:login/login-and-redirect])
+     (is (= ::test-route (db/redirect-route @app-db)))))
+
+  (testing "changes route to login"
+    (let [r (h/catch-fx :route/goto)]
+      (rf-test/run-test-sync
+       (rf/dispatch [:login/login-and-redirect])
+       (is (= [(r/path-for :page/login)] @r))))))
 
 (deftest login-submit
   (testing "updates state"
@@ -64,7 +79,15 @@
     (rf-test/run-test-sync
      (let [c (h/catch-fx :route/goto)]
        (rf/dispatch [:login/github-login--success {:body {}}])
-       (is (= "/" (first @c)))))))
+       (is (= "/" (first @c))))))
+
+  (testing "redirects to redirect page if set"
+    (rf-test/run-test-sync
+     (let [c (h/catch-fx :route/goto)]
+       (reset! app-db (db/set-redirect-route {} {:data {:name :page/customer}
+                                                 :path-params {:customer-id "test-cust"}}))
+       (rf/dispatch [:login/github-login--success {:body {}}])
+       (is (= "/c/test-cust" (first @c)))))))
 
 (deftest github-login--failed
   (testing "sets error alert"

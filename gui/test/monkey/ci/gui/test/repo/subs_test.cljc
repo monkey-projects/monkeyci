@@ -82,3 +82,13 @@
       (is (nil? @l))
       (is (some? (reset! app-db (db/set-latest-build {} ::latest))))
       (is (= ::latest @l)))))
+
+(deftest repo-show-trigger-form
+  (let [l (rf/subscribe [:repo/show-trigger-form?])]
+    (testing "exists"
+      (is (some? l)))
+
+    (testing "returns `show trigger form` flag from db"
+      (is (nil? @l))
+      (is (some? (reset! app-db (db/set-show-trigger-form {} true))))
+      (is (true? @l)))))

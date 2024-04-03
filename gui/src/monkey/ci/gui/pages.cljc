@@ -35,4 +35,4 @@
     ;; If no token found, redirect to login
     (if (or @t (public? (route-name @r)))
       [render-page @r]
-      (rf/dispatch [:route/goto :page/login]))))
+      (rf/dispatch [:login/login-and-redirect]))))

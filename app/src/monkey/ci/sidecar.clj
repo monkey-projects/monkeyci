@@ -89,7 +89,7 @@
         log-base (b/get-job-sid rt)
         logger (when log-maker (comp (partial log-maker rt)
                                      (partial concat log-base)))
-        set-exit (fn [v] (assoc rt :exit-code v))
+        set-exit (fn [v] (assoc rt :exit v))
         sid (b/get-sid rt)]
     (log/info "Polling events from" f)
     (md/future

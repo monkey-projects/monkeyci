@@ -22,7 +22,7 @@
     (swap! streams conj path)))
 
 (defn- wait-for-exit [c]
-  (:exit-code (deref c 500 :timeout)))
+  (:exit (deref c 500 :timeout)))
 
 (deftest poll-events
   (testing "dispatches events from file to bus"

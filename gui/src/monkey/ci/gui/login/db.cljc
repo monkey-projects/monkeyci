@@ -31,3 +31,11 @@
 
 (defn set-github-config [db c]
   (assoc db github-config c))
+
+(def redirect-route ::redirect-route)
+
+(defn set-redirect-route [db r]
+  (assoc db redirect-route r))
+
+(defn clear-redirect-route [db]
+  (dissoc db redirect-route))
