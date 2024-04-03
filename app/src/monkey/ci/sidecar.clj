@@ -112,7 +112,7 @@
                                                   :sid sid
                                                   :job job))))
                 (if (:done? evt)
-                  (set-exit (or (:exit evt) 0))
+                  (set-exit 0)
                   (recur (read-next r)))))))
         (catch Exception ex
           (log/error "Failed to read events" ex)

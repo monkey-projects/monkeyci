@@ -32,6 +32,7 @@
 (def job-config-file "job.edn")
 (def job-container-name "job")
 
+(def sidecar-container-name "sidecar")
 (def sidecar-config (comp :sidecar rt/config))
 
 (defn- job-work-dir
@@ -71,7 +72,7 @@
 
 (defn- sidecar-container [{[c] :containers}]
   (assoc c
-         :display-name "sidecar"
+         :display-name sidecar-container-name
          :arguments ["sidecar"
                      "--events-file" event-file
                      "--start-file" start-file
@@ -163,14 +164,53 @@
                 (script-vol-config rt)
                 (config-vol-config rt)))))
 
-(defn wait-for-sidecar-end-event
-  "Checks the incoming events to see if a sidecar end event has been received.
-   Returns a deferred that will contain the sidecar end event."
-  [events sid job-id]
-  (ec/wait-for-event events
-                     {:types #{:sidecar/end}
-                      :sid sid}
-                     #(= job-id (get-in % [:job :id]))))
+(defn wait-for-instance-end-events
+  "Checks the incoming events to see if a container and job end event has been received.
+   Returns a deferred that will contain both events, in no particular order."
+  [events sid job-id max-timeout]
+  (letfn [(wait-for [t]
+            ;; FIXME Seems like the timeout does not always work.
+            (md/timeout!
+             (ec/wait-for-event events
+                                {:types #{t}
+                                 :sid sid}
+                                #(= job-id (get-in % [:job :id])))
+             max-timeout (ec/set-result
+                          {:type t}
+                          (ec/make-result :error 1 (str "Timeout after " max-timeout " msecs")))))]
+    (md/zip
+     (wait-for :container/end)
+     (wait-for :sidecar/end))))
+
+(defn wait-or-timeout
+  "Waits for the container end event, or times out.  Afterwards, the full container
+   instance details are fetched.  The exit codes in the received events are used for
+   the container exit codes."
+  [rt max-timeout get-details]
+  (md/chain
+   (wait-for-instance-end-events (:events rt)
+                                 (b/get-sid rt)
+                                 (b/rt->job-id rt)
+                                 max-timeout)
+   (fn [r]
+     (log/debug "Job instance terminated with these events:" r)
+     (md/zip r (get-details)))
+   (fn [[events details]]
+     ;; Take exit codes from events, add them to container details
+     (let [by-type (group-by :type events)
+           container-types {sidecar-container-name :sidecar/end
+                            job-container-name :container/end}
+           add-exit (fn [{:keys [display-name] :as c}]
+                      (if-let [evt (first (get by-type (get container-types display-name)))]
+                        (let [exit-code (or (ec/result-exit evt) (:exit-code c) 0)]
+                          ;; Add the full result, may be useful for higher levels
+                          (assoc c :result (assoc (ec/result evt) :exit exit-code)))
+                        (do
+                          (log/warn "Unknown container:" display-name ", ignoring")
+                          c)))]
+       ;; We don't rely on the container exit codes, since the container may not have
+       ;; exited completely when the events have arrived, so we use the event values instead.
+       (update details :containers (partial map add-exit))))))
 
 (defmethod mcc/run-container :oci [rt]
   (log/debug "Running job as OCI instance:" (:job rt))
@@ -184,40 +224,27 @@
      (oci/run-instance client ic
                        {:delete? true
                         :exited? (fn [id]
-                                   (md/chain
-                                    ;; TODO When a start event has not been received after
-                                    ;; a sufficient period of time, start polling anyway.
-                                    ;; For now, we add a max timeout.
-                                    ;; FIXME Seems like the timeout not always works.
-                                    (md/timeout!
-                                     (wait-for-sidecar-end-event (:events rt)
-                                                                 (b/get-sid rt)
-                                                                 (b/rt->job-id rt))
-                                     max-job-timeout ::timeout)
-                                    (fn [r]
-                                      (log/debug "Job instance terminated, or timed out with value:" r)
-                                      ;; FIXME If a job times out, it should fail
-                                      (when (= r ::timeout)
-                                        (log/warn "Container job timed out after" max-job-timeout "msecs"))
-                                      (oci/get-full-instance-details client id))))})
+                                   ;; TODO When a start event has not been received after
+                                   ;; a sufficient period of time, start polling anyway.
+                                   ;; For now, we add a max timeout.
+                                   (wait-or-timeout rt max-job-timeout
+                                                    #(oci/get-full-instance-details client id)))})
      (fn [r]
        (letfn [(maybe-log-output [{:keys [exit-code display-name logs] :as c}]
                  (when (and (not (nil? exit-code)) (not= 0 exit-code))
                    (log/warn "Container" display-name "returned a nonzero exit code:" exit-code)
                    (log/warn "Captured output:" logs))
                  c)]
-         (->> (get-in r [:body :containers])
-              (mapv maybe-log-output)
-              (map :exit-code)
-              ;; It may occur that the sidecar/end event has already been received, but the
-              ;; container has not stopped yet.  In that case, they will have a `nil` exit
-              ;; code and we'll assume it's zero, since the event will already inform us of
-              ;; any errors.
-              (filter (complement (fnil zero? 0)))
-              (first))))
-     (fn [exit]
-       ;; TODO Add more info on failure
-       {:exit (or exit 0)}))))
+         (let [containers (->> (get-in r [:body :containers])
+                               (mapv maybe-log-output))
+               nonzero (->> containers
+                            (filter (comp (complement (fnil zero? 0)) ec/result-exit))
+                            (first))
+               job-cont (->> containers
+                             (filter (comp (partial = job-container-name) :display-name))
+                             (first))]
+           ;; Either return the first error result, or the result of the job container
+           (:result (or nonzero job-cont))))))))
 
 (defmethod mcc/normalize-containers-config :oci [conf]
   (-> (oci/normalize-config conf :containers)

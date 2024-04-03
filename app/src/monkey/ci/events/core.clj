@@ -136,3 +136,19 @@
     (add-listener events ef l)
     r))
 
+;;; Utility functions for building events
+
+(defn make-result [status exit-code msg]
+  {:status status
+   :exit exit-code
+   :message msg})
+
+(defn exception-result [ex]
+  (-> (make-result :error 1 (ex-message ex))
+      (assoc :exception ex)))
+
+(defn set-result [evt r]
+  (assoc evt :result r))
+
+(def result :result)
+(def result-exit (comp :exit result))
