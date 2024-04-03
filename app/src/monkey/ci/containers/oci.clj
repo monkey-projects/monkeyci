@@ -103,7 +103,7 @@
   (when (log/enabled? :debug)
     (log/debug "Executing script lines in container:")
     (doseq [l script]
-      (log/debug "  " script)))
+      (log/debug "  " l)))
   ;; TODO Also handle :container/cmd key
   {:name script-vol
    :volume-type "CONFIGFILE"
@@ -158,9 +158,6 @@
     (-> ic
         (assoc :containers [sc jc]
                :display-name (display-name rt))
-        ;; Increase memory, sidecar also needs a lot to save caches
-        ;; TODO Reduce this as soon as we manage to reduce sidecar memory usage
-        (assoc-in [:shape-config :memory-in-g-bs] 4)
         (update :freeform-tags merge (oci/sid->tags (get-in rt [:build :sid])))
         (update :volumes conj
                 (script-vol-config rt)

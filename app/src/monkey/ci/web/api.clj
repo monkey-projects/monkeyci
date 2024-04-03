@@ -384,7 +384,7 @@
     ;; The initial ping will make the browser "open" the connection.  The timeout must always
     ;; be lower than the read timeout of the client, or any intermediate proxy server.
     ;; TODO Ideally we should not send a ping if another event has been sent more recently.
-    ;; TODO Make the ping timout configurable
+    ;; TODO Make the ping timeout configurable
     (ms/connect (ms/periodically 30000 0 (constantly (make-reply {:type :ping})))
                 stream
                 {:upstream? true})

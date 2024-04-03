@@ -102,6 +102,25 @@
                        (select-keys (keys evt)))))
         (is (= 0 (wait-for-exit c))))))
 
+  (testing "uses exit code of last command"
+    (h/with-tmp-dir dir
+      (let [f (io/file dir "events.edn")
+            evt {:type :test/event
+                 :message "This is a failing command"
+                 :done? true
+                 :exit 10}
+            {:keys [recv] :as e} (h/fake-events)
+            rt {:events e
+                :config {:sidecar {:events-file f
+                                   :poll-interval 10}}}
+            c (sut/poll-events rt)]
+        ;; Post the event after sidecar has started
+        (is (nil? (spit f (prn-str evt))))
+        (is (not= :timeout (h/wait-until #(not-empty @recv) 500)))
+        (is (= evt (-> (first @recv)
+                       (select-keys (keys evt)))))
+        (is (= (:exit evt) (wait-for-exit c))))))
+
   (testing "logs using job sid and file path"
     (h/with-tmp-dir dir
       (let [f (io/file dir "events.edn")
