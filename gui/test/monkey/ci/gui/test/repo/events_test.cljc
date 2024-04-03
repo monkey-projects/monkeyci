@@ -165,4 +165,24 @@
                                               :error-code :no-error}})
        (rf/dispatch [:repo/trigger-build])
        
-       (is (= 1 (count @c)))))))
+       (is (= 1 (count @c))))))
+
+  (testing "clears notifications"
+    (is (some? (reset! app-db (db/set-alerts {} [{:type :danger}]))))
+    (rf/dispatch-sync [:repo/trigger-build])
+    (is (empty? (db/alerts @app-db)))))
+
+(deftest trigger-build--success
+  (testing "sets notification alert"
+    (rf/dispatch-sync [:repo/trigger-build--success {:body {:build-id "test-build"}}])
+    (is (= :info (-> (db/alerts @app-db) first :type))))
+
+  (testing "hides trigger form"
+    (is (some? (reset! app-db (db/set-show-trigger-form {} true))))
+    (rf/dispatch-sync [:repo/trigger-build--success {:body {:build-id "test-build"}}])
+    (is (not (db/show-trigger-form? @app-db)))))
+
+(deftest trigger-build--failed
+  (testing "sets error alert"
+    (rf/dispatch-sync [:repo/trigger-build--failed {:body {:message "test error"}}])
+    (is (= :danger (-> (db/alerts @app-db) first :type)))))

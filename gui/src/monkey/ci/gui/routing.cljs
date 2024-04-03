@@ -80,7 +80,7 @@
 (rf/reg-event-fx
  :route/goto
  (fn [_ [_ r & [params]]]
-   (let [p (apply path-for r params)
+   (let [p (path-for r params)
          m (f/match-by-name router r params)]
      {:route/goto p
       :dispatch [:route/changed m]})))

@@ -31,12 +31,12 @@
    [trigger-build-btn]])
 
 (defn- trigger-type []
-  [:select.form-select
+  [:select.form-select {:name :trigger-type}
    [:option {:value :branch} "Branch"]
    [:option {:value :tag} "Tag"]
    [:option {:value :commit-id} "Commit Id"]])
 
-(defn trigger-form []
+(defn trigger-form [repo]
   (let [show? (rf/subscribe [:repo/show-trigger-form?])]
     (when @show?
       [:div.card.my-2
@@ -47,7 +47,9 @@
           [:div.col-2
            [trigger-type]]
           [:div.col-10
-           [:input.form-control {:type :text}]]]
+           [:input.form-control {:type :text
+                                 :name :trigger-ref
+                                 :default-value (:main-branch @repo)}]]]
          [:div.row
           [:div.col-2
            [:button.btn.btn-primary.me-1
@@ -57,7 +59,7 @@
             {:on-click (u/link-evt-handler [:repo/hide-trigger-build])}
             "Cancel"]]]]]])))
 
-(defn- builds []
+(defn- builds [repo]
   (let [b (rf/subscribe [:repo/builds])]
     (if-not @b
       (rf/dispatch [:builds/load])
@@ -66,7 +68,7 @@
         [:h4.float-start "Builds"]
         [:div.float-end
          [build-actions]]]
-       [trigger-form]
+       [trigger-form repo]
        [:p "Found " (count @b) " builds"]
        [table/paged-table
         {:id ::builds
@@ -103,6 +105,6 @@
           [cl/clipboard-copy (u/->sid p :customer-id :repo-id) "Click to save the sid to clipboard"]]]
         [:p "Repository url: " [:a {:href (:url @r)} (:url @r)]]
         [co/alerts [:repo/alerts]]
-        [builds]
+        [builds r]
         [:div
          [:a {:href (r/path-for :page/customer {:customer-id customer-id})} "Back to customer"]]]])))

@@ -106,9 +106,25 @@
  (fn [{:keys [db]} [_ form-vals]]
    (log/debug "Triggering build with form values:" (str form-vals))
    (let [params (get-in db [:route/current :parameters :path])]
-     {:db (db/set-triggering db)
+     {:db (-> db
+              (db/set-triggering)
+              (db/reset-alerts))
       :dispatch [:secure-request
                  :trigger-build
                  (select-keys params [:customer-id :repo-id])
                  [:repo/trigger-build--success]
                  [:repo/trigger-build--failed]]})))
+
+(rf/reg-event-db
+ :repo/trigger-build--success
+ (fn [db [_ {:keys [body]}]]
+   (-> db
+       (db/set-alerts [{:type :info
+                        :message (str "Build " (:build-id body) " started.")}])
+       (db/set-show-trigger-form nil))))
+
+(rf/reg-event-db
+ :repo/trigger-build--failed
+ (fn [db [_ err]]
+   (db/set-alerts db [{:type :danger
+                       :message (str "Could not start build: " (u/error-msg err))}])))
