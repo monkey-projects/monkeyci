@@ -123,7 +123,7 @@
         (is (not-empty @reported))))))
 
 (deftest sidecar
-  (with-redefs [sc/run (constantly (md/success-deferred {:exit-code ::test-exit}))]
+  (with-redefs [sc/run (constantly (md/success-deferred {:exit ::test-exit}))]
     (testing "runs sidecar poll loop, returns exit code"
       (is (= ::test-exit (sut/sidecar {:config {:dev-mode true}}))))
 

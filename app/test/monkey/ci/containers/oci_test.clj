@@ -7,6 +7,7 @@
              [config :as c]
              [containers :as mcc]
              [oci :as oci]
+             [runtime :as rt]
              [utils :as u]]
             [monkey.ci.containers.oci :as sut]
             [monkey.ci.events.core :as ec]
@@ -240,31 +241,89 @@
         (is (= (u/->base64 "second")
                (get-in by-name ["1" :data])))))))
 
-(deftest wait-for-sidecar-end-event
-  (testing "returns a deferred that holds the sidecar end event"
+(deftest wait-for-instance-end-events
+  (testing "returns a deferred that holds the container and job end events"
     (let [events (ec/make-events {:events {:type :manifold}})
           sid (repeatedly 3 random-uuid)
-          d (sut/wait-for-sidecar-end-event events sid "this-job")]
+          d (sut/wait-for-instance-end-events events sid "this-job" 1000)]
       (is (md/deferred? d))
       (is (not (md/realized? d)) "should not be realized initially")
-      (is (some? (ec/post-events events [{:type :sidecar/start
+      (is (some? (ec/post-events events [{:type :container/start
                                           :sid sid}])))
       (is (not (md/realized? d)) "should not be realized after start event")
+      (is (some? (ec/post-events events [{:type :container/end
+                                          :sid sid
+                                          :job {:id "this-job"}}])))
+      (is (not (md/realized? d)) "should not be realized after one event")
       (is (some? (ec/post-events events [{:type :sidecar/end
                                           :sid sid
                                           :job {:id "other-job"}}])))
-      (is (not (md/realized? d)) "should not be realized for other job")
+      (is (not (md/realized? d)) "should not be realized after other job event")
       (is (some? (ec/post-events events [{:type :sidecar/end
                                           :sid sid
                                           :job {:id "this-job"}}])))
-      (is (= :sidecar/end (-> (deref d 100 :timeout)
-                              :type))))))
+      (is (= [:container/end :sidecar/end]
+             (->> (deref d 100 :timeout)
+                  (map :type)))))))
+
+(deftest wait-or-timeout
+  (testing "waits for sidecar and container end events, then fetches details"
+    (let [events (ec/make-events {:events {:type :manifold}})
+          sid (repeatedly 3 random-uuid)
+          job-id "test-job"
+          rt {:events events
+              :job {:id job-id}}
+          details {:containers [{:display-name sut/sidecar-container-name}
+                                {:display-name sut/job-container-name}]}
+          res (sut/wait-or-timeout rt 1000 (constantly details))]
+      (is (some? (rt/post-events rt [{:type :sidecar/end
+                                      :sid sid
+                                      :job {:id job-id}}
+                                     {:type :container/end
+                                      :sid sid
+                                      :job {:id job-id}}])))
+      (is (sequential? (:containers @res)))))
+
+  (testing "adds exit codes from events"
+    (let [events (ec/make-events {:events {:type :manifold}})
+          sid (repeatedly 3 random-uuid)
+          job-id "test-job"
+          rt {:events events
+              :job {:id job-id}}
+          details {:containers [{:display-name sut/sidecar-container-name}
+                                {:display-name sut/job-container-name}]}
+          res (sut/wait-or-timeout rt 1000 (constantly details))]
+      (is (some? (rt/post-events rt [{:type :sidecar/end
+                                      :sid sid
+                                      :job {:id job-id}
+                                      :result {:exit 1}}
+                                     {:type :container/end
+                                      :sid sid
+                                      :job {:id job-id}
+                                      :result {:exit 2}}])))
+      (is (= [1 2] (->> @res :containers (map ec/result-exit))))))
+
+  (testing "marks timeout as failure"
+    (let [events (ec/make-events {:events {:type :manifold}})
+          sid (repeatedly 3 random-uuid)
+          job-id "test-job"
+          rt {:events events
+              :job {:id job-id}}
+          details {:containers [{:display-name sut/sidecar-container-name}
+                                {:display-name sut/job-container-name}]}
+          res (sut/wait-or-timeout rt 100 (constantly details))]
+      (is (some? (rt/post-events rt [{:type :sidecar/end
+                                      :sid sid
+                                      :job {:id job-id}
+                                      :result {:exit 0}}])))
+      (is (= 1 (->> @res :containers second ec/result-exit))))))
 
 (deftest run-container
   (testing "can run using type `oci`, returns zero exit code on success"
     (with-redefs [oci/run-instance (constantly (md/success-deferred
                                                 {:status 200
-                                                 :body {:containers [{:exit-code 0}]}}))]
+                                                 :body {:containers [{:display-name sut/job-container-name
+                                                                      :result {:exit 0}}]}}))]
       (is (= 0 (-> (mcc/run-container {:containers {:type :oci}
                                        :build {:checkout-dir "/tmp"}})
                    (deref)
@@ -273,8 +332,8 @@
   (testing "returns first nonzero exit code"
     (with-redefs [oci/run-instance (constantly (md/success-deferred
                                                 {:status 200
-                                                 :body {:containers [{:exit-code 0}
-                                                                     {:exit-code 123}]}}))]
+                                                 :body {:containers [{:result {:exit 0}}
+                                                                     {:result {:exit 123}}]}}))]
       (is (= 123 (-> (mcc/run-container {:containers {:type :oci}
                                          :build {:checkout-dir "/tmp"}})
                      (deref)

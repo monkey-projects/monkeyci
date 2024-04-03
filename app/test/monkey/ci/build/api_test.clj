@@ -1,27 +1,14 @@
 (ns monkey.ci.build.api-test
   (:require [clojure.test :refer [deftest testing is]]
-            [martian
-             [core :as martian]
-             [test :as mt]]
+            [manifold.deferred :as md]
             [monkey.ci.build.api :as sut]))
 
-(def test-routes
-  [{:route-name :get-params
-    :method :get}])
-
 (deftest build-params
-  (letfn [(make-client [reply]
-            (-> (martian/bootstrap "http://test" test-routes)
-                (mt/respond-with {:get-params (future reply)})))]
-    
-    (testing "invokes `get-params` endpoint on client"
-      (let [m (make-client {:status 200
-                            :body {"key" "value"}})
-            ctx {:api {:client m}}]
-        (is (= {"key" "value"} (sut/build-params ctx)))))
-
-    (testing "throws exception on error"
-      (let [m (make-client {:status 500
-                            :body {:message "Test error"}})
-            ctx {:api {:client m}}]
-        (is (thrown? Exception (sut/build-params ctx)))))))
+  (testing "invokes `params` endpoint on client"
+    (let [m (fn [req]
+              (when (= "/customer/test-cust/repo/test-repo/param" (:url req))
+                (md/success-deferred [{:name "key"
+                                       :value "value"}])))
+          rt {:api {:client m}
+              :build {:sid ["test-cust" "test-repo" "test-build"]}}]
+      (is (= {"key" "value"} (sut/build-params rt))))))

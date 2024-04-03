@@ -1,7 +1,9 @@
 (ns monkey.ci.events.zmq
   (:require [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
-            [manifold.deferred :as md]
+            [manifold
+             [deferred :as md]
+             [stream :as ms]]
             [monkey.ci.protocols :as p]
             [monkey.zmq
              [common :as zc]
@@ -29,12 +31,19 @@
     (log/debug "Listeners before removing" l ":" (count listeners) ", after:" (count after))
     after))
 
+(defn- wait-until-started
+  "Blocks until the server has started by checking the state stream."
+  [server]
+  @(ms/take! (:state-stream server))
+  server)
+
 (defrecord ZeroMQEvents [server client listeners context]
   co/Lifecycle
   (start [this]
     ;; Start both client and server, if provided
     (cond-> this
-      server (assoc :server (co/start server))
+      server (assoc :server (-> (co/start server)
+                                (wait-until-started)))
       client (assoc :client (co/start client))))
 
   (stop [{:keys [client server] :as this}]

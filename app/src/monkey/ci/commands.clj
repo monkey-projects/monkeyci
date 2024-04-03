@@ -7,6 +7,7 @@
              [runtime :as rt]
              [sidecar :as sidecar]
              [utils :as u]]
+            [monkey.ci.events.core :as ec]
             [monkey.ci.web.handler :as h]
             [aleph.http :as http]
             [clj-commons.byte-streams :as bs]
@@ -148,15 +149,19 @@
   (let [sid (b/get-sid rt)
         ;; Add job info from the sidecar config
         {:keys [job] :as rt} (merge rt (get-in rt [rt/config :sidecar :job-config]))]
-    (try
-      (rt/post-events rt {:type :sidecar/start
-                          :sid sid
-                          :job (jobs/job->event job)})
-      (-> (sidecar/run rt)
-          (deref)
-          :exit-code)
-      (finally
-        (log/info "Sidecar terminated")
-        (rt/post-events rt {:type :sidecar/end
-                            :sid sid
-                            :job (jobs/job->event job)})))))
+    (let [result (try
+                   (rt/post-events rt {:type :sidecar/start
+                                       :sid sid
+                                       :job (jobs/job->event job)})
+                   (let [e (-> (sidecar/run rt)
+                               (deref)
+                               :exit)]
+                     (ec/make-result (b/exit-code->status e) e nil))
+                   (catch Throwable t
+                     (ec/exception-result t)))]
+      (log/info "Sidecar terminated")
+      (rt/post-events rt (-> {:type :sidecar/end
+                              :sid sid
+                              :job (jobs/job->event job)}
+                             (ec/set-result result)))
+      (:exit result))))

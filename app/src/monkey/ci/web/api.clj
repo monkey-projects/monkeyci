@@ -380,12 +380,18 @@
                      (ec/remove-listener recv cid-filter listener)))
     ;; Only send events for the customer specified in the url
     (ec/add-listener recv cid-filter listener)
-    ;; Send a ping, this makes the server see the connection is open
-    (ms/put! stream (make-reply {:type :ping}))
+    ;; Set up a keepalive, which pings the client periodically to keep the connection open.
+    ;; The initial ping will make the browser "open" the connection.  The timeout must always
+    ;; be lower than the read timeout of the client, or any intermediate proxy server.
+    ;; TODO Ideally we should not send a ping if another event has been sent more recently.
+    ;; TODO Make the ping timeout configurable
+    (ms/connect (ms/periodically 30000 0 (constantly (make-reply {:type :ping})))
+                stream
+                {:upstream? true})
     (-> (rur/response stream)
         (rur/header "content-type" "text/event-stream")
         (rur/header "access-control-allow-origin" "*")
-        ;; For nginx, set buffering to no.  This will disable buffering on NGinx proxy side.
+        ;; For nginx, set buffering to no.  This will disable buffering on Nginx proxy side.
         ;; See https://www.nginx.com/resources/wiki/start/topics/examples/x-accel/#x-accel-buffering
         (rur/header "x-accel-buffering" "no")
         (rur/header "cache-control" "no-cache"))))

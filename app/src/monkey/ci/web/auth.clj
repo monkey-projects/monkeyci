@@ -13,12 +13,27 @@
             [java-time.api :as jt]
             [monkey.ci
              [runtime :as rt]
-             [storage :as st]]
+             [storage :as st]
+             [utils :as u]]
             [monkey.ci.web.common :as c]
             [ring.middleware.params :as rmp]
             [ring.util.response :as rur]))
 
 (def kid "master")
+(def role-user "user")
+(def role-build "build")
+
+(defn user-token
+  "Creates token contents for an authenticated user"
+  [user-sid]
+  {:role role-user
+   :sub (u/serialize-sid user-sid)})
+
+(defn build-token
+  "Creates token contents for a build, to be used by a build script."
+  [build-sid]
+  {:role role-build
+   :sub (u/serialize-sid build-sid)})
 
 (defn generate-secret-key
   "Generates a random secret key object"
@@ -38,13 +53,20 @@
          :iss "https://app.monkeyci.com"
          :aud ["https://api.monkeyci.com"]))
 
-(defn generate-jwt
-  "Signs a JWT using the keypair from the request context."
-  [req payload]
-  (let [pk (c/from-rt req (comp :priv :jwk))]
+(defn generate-jwt-from-rt
+  "Generates a JWT from the private key in the runtime"
+  [rt payload]
+  (when-let [pk (get-in rt [:jwk :priv])]
     (-> payload
         (augment-payload)
         (sign-jwt pk))))
+
+(defn generate-jwt
+  "Signs a JWT using the keypair from the request context."
+  [req payload]
+  (-> req
+      (c/req->rt)
+      (generate-jwt-from-rt payload)))
 
 (defn generate-keypair
   "Generates a new RSA keypair"
@@ -91,14 +113,25 @@
     (rur/response {:keys [(make-jwk k)]})
     (rur/not-found {:message "No JWKS configured"})))
 
-(defn- lookup-user [{:keys [storage]} {:keys [sub]}]
+(defmulti resolve-token (fn [_ {:keys [role]}] role))
+
+(defmethod resolve-token role-user [{:keys [storage]} {:keys [sub]}]
   (when sub
-    (let [id (->> (seq (.split sub "/"))
-                  (take 2))]
+    (let [id (u/parse-sid sub)]
       (when (= 2 (count id))
         (log/debug "Looking up user with id" id)
         (some-> (st/find-user storage id)
                 (update :customers set))))))
+
+(defmethod resolve-token role-build [{:keys [storage]} {:keys [sub]}]
+  (when-let [build (some->> sub
+                            (u/parse-sid)
+                            (st/find-build storage))]
+    (assoc build :customers #{(:customer-id build)})))
+
+(defmethod resolve-token :default [rt token]
+  ;; Fallback, for backwards compatibility
+  nil)
 
 (defn- query-auth-to-bearer
   "Middleware that puts the authorization token query param in the authorization header
@@ -116,27 +149,30 @@
   "Wraps the ring handler so it verifies the JWT authorization header"
   [app rt]
   (let [pk (rt->pub-key rt)
-        ;; TODO Also check authorization query arg, because in some cases it's not possible
-        ;; to pass it as a header (e.g. server-sent events).
         backend (bb/jws {:secret pk
                          :token-name "Bearer"
                          :options {:alg :rs256}
-                         :authfn (partial lookup-user rt)})]
+                         :authfn (partial resolve-token rt)})]
     (-> app
         (bmw/wrap-authentication backend)
+        ;; Also check authorization query arg, because in some cases it's not possible
+        ;; to pass it as a header (e.g. server-sent events).
         (query-auth-to-bearer)
         (rmp/wrap-params))))
 
-(defn- check-authorization! [req]
+(defn- check-authorization!
+  "Checks if the request identity grants access to the customer specified in 
+   the parameters path."
+  [req]
   (when-let [cid (get-in req [:parameters :path :customer-id])]
     (when-not (and (ba/authenticated? req)
                    (contains? (get-in req [:identity :customers]) cid))
-      (throw (ex-info "User does not have access to this customer"
+      (throw (ex-info "Credentials do not grant access to this customer"
                       {:type :auth/unauthorized
                        :customer-id cid})))))
 
 (defn customer-authorization
-  "Middleware that verifies the identity token to check if the user has
+  "Middleware that verifies the identity token to check if the user or build has
    access to the given customer."
   [h]
   (fn [req]

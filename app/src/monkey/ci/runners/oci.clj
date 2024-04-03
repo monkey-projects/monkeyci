@@ -12,6 +12,7 @@
              [runtime :as rt]
              [utils :as u]]
             [monkey.ci.events.core :as ec]
+            [monkey.ci.web.auth :as auth]
             [monkey.oci.container-instance.core :as ci]))
 
 (def build-container "build")
@@ -39,15 +40,22 @@
   (cond-> conf
     (log-config rt) (assoc-in [:runner :log-config] (str log-config-dir "/" log-config-file))))
 
+(defn- add-api-token
+  "Generates a new API token that can be used by the build runner to invoke
+   certain API calls."
+  [rt conf]
+  (assoc-in conf [:api :token] (auth/generate-jwt-from-rt rt (auth/build-token (b/get-sid rt)))))
+
 (defn- ->env [rt]
   (->> (-> (rt/rt->env rt)
-           (dissoc :app-mode :git :github :http :args :jwk :checkout-base-dir
+           (dissoc :app-mode :git :github :http :args :jwk :checkout-base-dir :storage
                    :ssh-keys-dir :work-dir :oci)
            (update :build dissoc :cleanup? :status)
            (update-in [:build :git] dissoc :ssh-keys))
        (prepare-config-for-oci)
        (add-ssh-keys-dir rt)
        (add-log-config-path rt)
+       (add-api-token rt)
        (config/config->env)
        (mc/map-keys name)
        (mc/remove-vals empty?)))
@@ -161,11 +169,8 @@
                                        (oci/get-full-instance-details client id))))})
       (md/chain
        (fn [r]
-         (or (-> r :body :containers first :exit-code) 1))
-       (fn [r]
-         ;; FIXME We have a duplicate build/end event here because the remote script also posts it
-         (rt/post-events rt (b/build-end-evt (rt/build rt) r))
-         r))
+         (or (-> r :body :containers first :exit-code) 1)))
+      ;; Do not launch build/end event, that is already done by the script container.
       (md/catch
           (fn [ex]
             (log/error "Got error from container instance:" ex)
