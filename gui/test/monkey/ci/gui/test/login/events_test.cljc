@@ -14,12 +14,13 @@
   f/reset-db)
 
 (deftest login-and-redirect
-  (testing "sets redirect route"
+  (testing "sets redirect route in local storage"
     (h/catch-fx :route/goto)
-    (rf-test/run-test-sync
-     (is (some? (reset! app-db {r/current ::test-route})))
-     (rf/dispatch [:login/login-and-redirect])
-     (is (= ::test-route (db/redirect-route @app-db)))))
+    (let [c (h/catch-fx :local-storage)]
+      (rf-test/run-test-sync
+       (is (some? (reset! app-db {r/current {:path "/redirect/path"}})))
+       (rf/dispatch [:login/login-and-redirect])
+       (is (= "/redirect/path" (-> @c first second :redirect-to))))))
 
   (testing "changes route to login"
     (let [r (h/catch-fx :route/goto)]
@@ -89,9 +90,11 @@
 
   (testing "redirects to redirect page if set"
     (rf-test/run-test-sync
+     (rf/reg-cofx
+      :local-storage
+      (fn [cofx]
+        (assoc cofx :local-storage {:redirect-to "/c/test-cust"})))
      (let [c (h/catch-fx :route/goto)]
-       (reset! app-db (db/set-redirect-route {} {:data {:name :page/customer}
-                                                 :path-params {:customer-id "test-cust"}}))
        (rf/dispatch [:login/github-login--success {:body {}}])
        (is (= "/c/test-cust" (first @c)))))))
 

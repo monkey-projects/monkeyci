@@ -93,6 +93,13 @@
      {:route/goto (:path m)
       :dispatch [:route/changed m]})))
 
+(rf/reg-event-fx
+ :route/goto-path
+ (fn [_ [_ path]]
+   (when-let [m (f/match-by-path router path)]
+     {:route/goto path
+      :dispatch [:route/changed m]})))
+
 (rf/reg-event-db
  :route/on-page-leave
  (fn [db [_ evt]]
