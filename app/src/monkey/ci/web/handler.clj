@@ -127,7 +127,9 @@
        (conj ["/github"
               {:conflicting true}
               [["/app"
-                {:post github/app-webhook}]
+                ;; TODO Security
+                {:post {:handler github/app-webhook
+                        :parameters {:body s/Any}}}]
                ["/:id"
                 {:post {:handler github/webhook
                         :parameters {:path {:id Id}

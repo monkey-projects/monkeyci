@@ -75,11 +75,17 @@
     (rf/dispatch-sync [:login/github-login--success {:body {:token "test-token"}}])
     (is (= "test-token" (db/token @app-db))))
 
-  (testing "redirects to root page"
+  (testing "redirects to root page if multiple customers"
     (rf-test/run-test-sync
      (let [c (h/catch-fx :route/goto)]
-       (rf/dispatch [:login/github-login--success {:body {}}])
+       (rf/dispatch [:login/github-login--success {:body {:customers ["cust-1" "cust-2"]}}])
        (is (= "/" (first @c))))))
+
+  (testing "redirects to customer page if only one customer"
+    (rf-test/run-test-sync
+     (let [c (h/catch-fx :route/goto)]
+       (rf/dispatch [:login/github-login--success {:body {:customers ["test-cust"]}}])
+       (is (= "/c/test-cust" (first @c))))))
 
   (testing "redirects to redirect page if set"
     (rf-test/run-test-sync

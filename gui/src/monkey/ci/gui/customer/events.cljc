@@ -21,7 +21,7 @@
 (rf/reg-event-db
  :customer/load--success
  (fn [db [_ {cust :body}]]
-   (log/debug "Customer details loaded:" cust)
+   (log/debug "Customer details loaded:" (clj->js cust))
    (-> db
        (db/unset-loading)
        (db/set-customer cust)
@@ -30,7 +30,7 @@
 (rf/reg-event-db
  :customer/load--failed
  (fn [db [_ id err op]]
-   (log/warn "Failed to invoke" op ":" err)
+   (log/warn "Failed to invoke" op ":" (clj->js err))
    (-> db
        (db/set-alerts [{:type :danger
                         :message (str "Could not load details for customer " id ": "
