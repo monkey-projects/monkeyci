@@ -123,6 +123,7 @@
   (log/debug "Got github app webhook event:" (pr-str (get-in req [:parameters :body])))
   (log/debug "Event type:" (get-in req [:headers "x-github-event"]))
   (log/debug "Action:" (get-in req [:body :action]))
+  ;; TODO Determine the customer/repo this is about, then check if it's configured to build
   (rur/response {:message "ok"}))
 
 (defn- process-reply [{:keys [status] :as r}]

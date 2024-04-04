@@ -6,11 +6,13 @@
 (rf/reg-fx
  :local-storage
  (fn [[id value]]
-   #?(:cljs (.setItem js/localStorage (str id) (pr-str value))
+   #?(:cljs (when (exists? js/localStorage)
+              (.setItem js/localStorage (str id) (pr-str value)))
       :clj nil)))
 
 (rf/reg-cofx
  :local-storage
  (fn [cofx id]
-   (assoc cofx :local-storage #?(:cljs (edn/read-string (.getItem js/localStorage (str id)))
+   (assoc cofx :local-storage #?(:cljs (when (exists? js/localStorage)
+                                         (edn/read-string (.getItem js/localStorage (str id))))
                                  :clj nil))))
