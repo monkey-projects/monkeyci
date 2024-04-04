@@ -150,7 +150,22 @@
 
             (testing "adds config file path as env var"
               (is (= (str (:mount-path mnt) "/" (-> vol :configs first :file-name))
-                     (get-in cc [:environment-variables "monkeyci-runner-log-config"]))))))))))
+                     (get-in cc [:environment-variables "monkeyci-runner-log-config"]))))))))
+
+    (testing "events config"
+      (testing "taken from top level"
+        (let [rt (assoc-in rt [:config :events :client :address] "test-addr")
+              inst (sut/instance-config conf rt)
+              env (-> inst :containers first :environment-variables)]
+          (is (= "test-addr" (get env "monkeyci-events-client-address")))))
+
+      (testing "overwrites with runner specific config"
+        (let [rt (-> rt
+                     (assoc-in [:config :events :client :address] "test-addr")
+                     (assoc-in [:config :runner :events :client :address] "runner-addr"))
+              inst (sut/instance-config conf rt)
+              env (-> inst :containers first :environment-variables)]
+          (is (= "runner-addr" (get env "monkeyci-events-client-address"))))))))
  
 (deftest wait-for-script-end-event
   (testing "returns a deferred that holds the script end event"

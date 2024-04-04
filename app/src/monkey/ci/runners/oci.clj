@@ -49,9 +49,10 @@
 (defn- ->env [rt]
   (->> (-> (rt/rt->env rt)
            (dissoc :app-mode :git :github :http :args :jwk :checkout-base-dir :storage
-                   :ssh-keys-dir :work-dir :oci)
+                   :ssh-keys-dir :work-dir :oci :runner)
            (update :build dissoc :cleanup? :status)
-           (update-in [:build :git] dissoc :ssh-keys))
+           (update-in [:build :git] dissoc :ssh-keys)
+           (mc/assoc-some :events (get-in rt [rt/config :runner :events])))
        (prepare-config-for-oci)
        (add-ssh-keys-dir rt)
        (add-log-config-path rt)

@@ -171,7 +171,21 @@
                       :process
                       :args
                       :extra-env)]
-          (is (= "test-token" (:monkeyci-api-token env))))))))
+          (is (= "test-token" (:monkeyci-api-token env)))))
+
+      (testing "overwrites event config with runner settings"
+        (let [env (-> {:script {:script-dir "test-dir"}
+                       :config {:events
+                                {:type :manifold}
+                                :runner
+                                {:events
+                                 {:type :zmq}}}}
+                      (sut/execute!)
+                      (deref)
+                      :process
+                      :args
+                      :extra-env)]
+          (is (= "zmq" (:monkeyci-events-type env))))))))
 
 (deftest process-env
   (testing "passes build id"

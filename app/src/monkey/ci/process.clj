@@ -112,6 +112,8 @@
   (-> (rt/rt->env rt)
       ;; Generate an API token and add it to the config
       (update :api mc/assoc-some :token (auth/generate-jwt-from-rt rt (auth/build-token (b/get-sid rt))))
+      ;; Overwrite event settings with runner-specific config
+      (mc/assoc-some :events (get-in rt [rt/config :runner :events]))
       (config/config->env)
       (merge default-envs)))
 

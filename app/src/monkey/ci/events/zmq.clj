@@ -35,6 +35,7 @@
   "Blocks until the server has started by checking the state stream."
   [server]
   ;; FIXME Even with this startup check, it still happens the client is not registered for events
+  ;; This is probably because the server socket is still connecting at that point.
   @(ms/take! (:state-stream server))
   server)
 
