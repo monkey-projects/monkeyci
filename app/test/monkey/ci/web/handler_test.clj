@@ -131,6 +131,16 @@
                                    :runner (constantly nil)})]
         (is (= 204 (-> (mock/request :post "/webhook/github/test-hook")
                        (dev-app)
+                       :status))))))
+
+  (testing "`POST /webhook/github/app`"
+    (testing "accepts request"
+      (let [payload (h/to-json {:message "test from github"})
+            app (sut/make-app (test-rt {}))]
+        (is (= 200 (-> (mock/request :post "/webhook/github/app")
+                       (mock/body payload)
+                       (mock/content-type "application/json")
+                       (app)
                        :status)))))))
 
 (defn- verify-entity-endpoints [{:keys [path base-entity updated-entity name creator]}]

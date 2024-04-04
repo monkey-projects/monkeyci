@@ -89,8 +89,8 @@
                     :value (fn [b] [co/build-result (:status b)])}
                    {:label "Message"
                     :value (fn [b]
-                             [:span (:or (get-in b [:git :message])
-                                         (:message b))])}]}]])))
+                             [:span (or (get-in b [:git :message])
+                                        (:message b))])}]}]])))
 
 (defn page [route]
   (rf/dispatch [:repo/init])

@@ -117,6 +117,12 @@
     ;; If no build trigger, just respond with a '204 no content'
     (rur/status 204)))
 
+(defn app-webhook [req]
+  (log/debug "Got github app webhook event:" (pr-str (:body req)))
+  (log/debug "Event type:" (get-in req [:headers "x-github-event"]))
+  (log/debug "Action:" (get-in req [:body :action]))
+  (rur/response {:message "ok"}))
+
 (defn- process-reply [{:keys [status] :as r}]
   (log/debug "Got github reply:" r)
   (update r :body c/parse-json))

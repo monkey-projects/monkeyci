@@ -124,10 +124,15 @@
          :new-schema NewWebhook
          :update-schema UpdateWebhook
          :id-key :webhook-id})
-       (conj ["/github/:id" {:post {:handler github/webhook
-                                    :parameters {:path {:id Id}
-                                                 :body s/Any}}
-                             :middleware [:github-security]}]))])
+       (conj ["/github"
+              {:conflicting true}
+              [["/app"
+                {:post github/app-webhook}]
+               ["/:id"
+                {:post {:handler github/webhook
+                        :parameters {:path {:id Id}
+                                     :body s/Any}}
+                 :middleware [:github-security]}]]]))])
 
 (def customer-parameter-routes
   ["/param" {:get {:handler api/get-customer-params}
