@@ -55,11 +55,13 @@
                                   (s/find-details-for-webhook (req->webhook-id req))
                                   :secret-key)))))
 
-(defn- github-commit-trigger?
-  "Checks if the incoming request is actually a commit trigger.  Github can also
+(defn github-event [req]
+  (get-in req [:headers "x-github-event"]))
+
+(def github-push?
+  "Checks if the incoming request is actually a push.  Github can also
    send other types of requests."
-  [req]
-  (some? (get-in req [:parameters :body :head-commit])))
+  (comp (partial = "push") github-event))
 
 (defn- find-ssh-keys [st {:keys [customer-id repo-id]}]
   (let [repo (s/find-repo st [customer-id repo-id])
@@ -104,7 +106,7 @@
    runner async and returns a 202 accepted."
   [{p :parameters :as req}]
   (log/trace "Got incoming webhook with body:" (prn-str (:body p)))
-  (if (github-commit-trigger? req)
+  (if (github-push? req)
     (let [rt (c/req->rt req)]
       (if-let [build (create-build rt {:id (get-in p [:path :id])
                                        :payload (:body p)})]
@@ -118,7 +120,7 @@
     (rur/status 204)))
 
 (defn app-webhook [req]
-  (log/debug "Got github app webhook event:" (pr-str (:body req)))
+  (log/debug "Got github app webhook event:" (pr-str (get-in req [:parameters :body])))
   (log/debug "Event type:" (get-in req [:headers "x-github-event"]))
   (log/debug "Action:" (get-in req [:body :action]))
   (rur/response {:message "ok"}))

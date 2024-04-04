@@ -41,17 +41,19 @@
           req (-> {:runner (partial swap! inv conj)
                    :storage st}
                   (h/->req)
-                  (assoc :parameters {:path {:id "test-hook"}
+                  (assoc :headers {"x-github-event" "push"}
+                         :parameters {:path {:id "test-hook"}
                                       :body
                                       {:head-commit {:id "test-id"}}}))]
       (is (= 200 (:status (sut/webhook req))))
       (is (not= :timeout (h/wait-until #(some? @inv) 1000)))))
 
-  (testing "ignores non-commit events"
+  (testing "ignores non-push events"
     (let [inv (atom nil)
           req (-> {:runner (partial swap! inv conj)}
                   (h/->req)
-                  (assoc :parameters {:body 
+                  (assoc :headers {"x-github-event" "ping"}
+                         :parameters {:body 
                                       {:key "value"}}))]
       (is (= 204 (:status (sut/webhook req))))
       (is (nil? @inv))))
@@ -65,7 +67,8 @@
                    :storage st
                    :events e}
                   (h/->req)
-                  (assoc :parameters {:path {:id "test-hook"}
+                  (assoc :headers {"x-github-event" "push"}
+                         :parameters {:path {:id "test-hook"}
                                       :body
                                       {:head-commit {:id "test-id"}}}))]
       (is (= 200 (:status (sut/webhook req))))

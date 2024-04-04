@@ -127,9 +127,9 @@
        (conj ["/github"
               {:conflicting true}
               [["/app"
-                ;; TODO Security
                 {:post {:handler github/app-webhook
-                        :parameters {:body s/Any}}}]
+                        :parameters {:body s/Any}}
+                 :middleware [:github-app-security]}]
                ["/:id"
                 {:post {:handler github/webhook
                         :parameters {:path {:id Id}
@@ -298,13 +298,20 @@
      ;; Disabled, results in 405 errors for some reason
      ;;:compile rc/compile-request-coercers
      :reitit.middleware/registry
-     {:github-security (if (rt/dev-mode? rt)
-                         ;; Disable security in dev mode
-                         [passthrough-middleware]
-                         [github/validate-security])
-      :customer-check (if (rt/dev-mode? rt)
-                        [passthrough-middleware]
-                        [auth/customer-authorization])}}))
+     {:github-security
+      (if (rt/dev-mode? rt)
+        ;; Disable security in dev mode
+        [passthrough-middleware]
+        [github/validate-security])
+      :github-app-security
+      (if (rt/dev-mode? rt)
+        ;; Disable security in dev mode
+        [passthrough-middleware]
+        [github/validate-security (constantly (get-in (rt/config rt) [:github :webhook-secret]))])
+      :customer-check
+      (if (rt/dev-mode? rt)
+        [passthrough-middleware]
+        [auth/customer-authorization])}}))
   ([rt]
    (make-router rt routes)))
 
