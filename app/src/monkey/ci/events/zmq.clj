@@ -49,6 +49,9 @@
       client (assoc :client (co/start client))))
 
   (stop [{:keys [client server] :as this}]
+    ;; Wait a bit to see if events get sent this way
+    ;; FIXME Figure out why build/end event is (often) not sent, unless we add a sleep
+    (Thread/sleep 2000)
     (zc/close-all (remove nil? [client server]))
     (when context
       (log/debug "Closing context")
