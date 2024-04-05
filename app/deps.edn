@@ -1,5 +1,6 @@
 {:deps {aleph/aleph {:mvn/version "0.7.0-alpha2"} ; For http SSE receiving
         babashka/process {:mvn/version "0.5.21"}
+        bowerick/bowerick {:mvn/version "2.9.8"}
         buddy/buddy-auth {:mvn/version "3.0.323"}
         buddy/buddy-core {:mvn/version "1.11.423"}
         camel-snake-kebab/camel-snake-kebab {:mvn/version "0.4.3"}

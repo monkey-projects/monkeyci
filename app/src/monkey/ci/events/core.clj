@@ -6,6 +6,7 @@
              [protocols :as p]
              [runtime :as rt]]
             [monkey.ci.events
+             [jms :as jms]
              [manifold :as manifold]
              [zmq :as zmq]]))
 
@@ -77,6 +78,9 @@
 
 (defmethod make-events :sync [_]
   (make-sync-events matches-event?))
+
+(defmethod make-events :jms [config]
+  (jms/make-jms-events (:events config) matches-event?))
 
 (defmethod make-events :manifold [_]
   (manifold/make-manifold-events matches-event?))
