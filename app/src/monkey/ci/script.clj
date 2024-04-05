@@ -174,7 +174,7 @@
       (f)))
 
 (defn- job->evt [job]
-  (select-keys job [j/deps j/labels]))
+  (select-keys job [j/job-id j/deps j/labels]))
 
 (defn- script-start-evt [rt jobs]
   (letfn [(mark-pending [job]

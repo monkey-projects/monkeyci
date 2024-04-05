@@ -1,16 +1,18 @@
 (ns monkey.ci.gui.login.events
-  (:require [monkey.ci.gui.logging :as log]
+  (:require [monkey.ci.gui.local-storage :as ls]
+            [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.login.db :as db]
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
+(def storage-id "login")
+
 (rf/reg-event-fx
  :login/login-and-redirect
  (fn [{:keys [db]} _]
-   (let [next-route (r/current db)]
-     ;; FIXME This has no effect with github auth because it reloads the page
-     {:db (db/set-redirect-route db next-route)
+   (let [next-route (:path (r/current db))]
+     {:local-storage [storage-id {:redirect-to next-route}]
       :dispatch [:route/goto :page/login]})))
 
 (rf/reg-event-db
@@ -39,18 +41,25 @@
 
 (rf/reg-event-fx
  :login/github-login--success
- (fn [{:keys [db]} [_ {u :body}]]
-   (log/debug "Got user details:" u)
-   (let [redir (db/redirect-route db)]
+ [(rf/inject-cofx :local-storage storage-id)]
+ (fn [{:keys [db local-storage]} [_ {u :body}]]
+   (log/debug "Got user details:" (clj->js u))
+   (let [redir (:redirect-to local-storage)]
      (log/debug "Redirect route:" redir)
      {:db (-> db
               (db/set-user (dissoc u :token))
-              (db/set-token (:token u))
-              (db/clear-redirect-route))
-      :dispatch (if redir
-                  ;; Either go to the root page, or to the stored redirect path
-                  [:route/goto (get-in redir [:data :name]) (get redir :path-params)]
-                  [:route/goto :page/root])})))
+              (db/set-token (:token u)))
+      :dispatch (cond
+                  redir
+                  ;; If a redirect path was stored, go there
+                  [:route/goto-path redir]
+                  ;; If the user only has one customer, go directly there
+                  (= 1 (count (:customers u)))
+                  [:route/goto :page/customer {:customer-id (first (:customers u))}]
+                  ;; Any other case, go to the root page
+                  :else
+                  [:route/goto :page/root])
+      :local-storage [storage-id (dissoc local-storage :redirect-to)]})))
 
 (rf/reg-event-db
  :login/github-login--failed

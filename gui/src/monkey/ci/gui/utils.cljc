@@ -9,7 +9,7 @@
        (filter (comp (partial = id) :id))
        (first)))
 
-(def error-msg (some-fn :message (comp :error-description :body) :error-text str))
+(def error-msg (some-fn ex-message :message (comp :error-description :body) :error-text str))
 
 (defn link-evt-handler
   "Creates an event handler that dispatches an event when the user clicks a link"

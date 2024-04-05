@@ -22,7 +22,7 @@
 (def public? #{:page/login :page/github-callback})
 
 (defn render-page [route]
-  (log/debug "Rendering page for route:" (route-name route))
+  (log/debug "Rendering page for route:" (str (route-name route)))
   (if-let [p (get pages (get-in route [:data :name]))]
     [p route]
     [:div.alert.alert-warning

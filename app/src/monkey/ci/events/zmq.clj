@@ -49,6 +49,7 @@
       client (assoc :client (co/start client))))
 
   (stop [{:keys [client server] :as this}]
+    ;; FIXME It happens that the last messages are not sent, even though linger is set to 5 seconds
     (zc/close-all (remove nil? [client server]))
     (when context
       (log/debug "Closing context")

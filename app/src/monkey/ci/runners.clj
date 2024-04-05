@@ -21,11 +21,12 @@
      :message msg}))
 
 (defn- post-build-end [rt {:keys [exit message] :as res}]
-  (rt/post-events rt (build/build-end-evt
-                      (cond-> (rt/build rt)
-                        message (assoc :message message))
-                      exit))
-  res)
+  (md/chain
+   (rt/post-events rt (build/build-end-evt
+                       (cond-> (rt/build rt)
+                         message (assoc :message message))
+                       exit))
+   (constantly res)))
 
 (defn- log-build-result
   "Do some logging depending on the result"

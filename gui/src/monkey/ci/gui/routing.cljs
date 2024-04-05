@@ -22,7 +22,7 @@
 (rf/reg-event-fx
  :route/changed
  (fn [{:keys [db]} [_ match]]
-   (log/debug "Changing current route from" (current db) "into" match)
+   (log/debug "Changing current route from" (clj->js (current db)) "into" (clj->js match))
    (let [handlers (on-page-leave db)]
      (log/debug "Found" (count handlers) "leave handlers")
      (cond-> {:db (-> db
@@ -74,15 +74,30 @@
 
 (rf/reg-fx
  :route/goto
+ ;; Changes browser path
  (fn [p]
    (set-path! p)))
 
+(defn- match-by-name [r params]
+  ;; There is a bug in reitit where parameters are not filled in (no coercion)
+  ;; when calling `match-by-name` so we do a second lookup using the path,
+  ;; which seems to coerce correctly.
+  (->> (f/match-by-name router r params)
+       :path
+       (f/match-by-path router)))
+
 (rf/reg-event-fx
  :route/goto
- (fn [_ [_ r & [params]]]
-   (let [p (path-for r params)
-         m (f/match-by-name router r params)]
-     {:route/goto p
+ (fn [_ [_ r params]]
+   (let [m (match-by-name r params)]
+     {:route/goto (:path m)
+      :dispatch [:route/changed m]})))
+
+(rf/reg-event-fx
+ :route/goto-path
+ (fn [_ [_ path]]
+   (when-let [m (f/match-by-path router path)]
+     {:route/goto path
       :dispatch [:route/changed m]})))
 
 (rf/reg-event-db

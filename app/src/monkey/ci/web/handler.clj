@@ -124,10 +124,17 @@
          :new-schema NewWebhook
          :update-schema UpdateWebhook
          :id-key :webhook-id})
-       (conj ["/github/:id" {:post {:handler github/webhook
-                                    :parameters {:path {:id Id}
-                                                 :body s/Any}}
-                             :middleware [:github-security]}]))])
+       (conj ["/github"
+              {:conflicting true}
+              [["/app"
+                {:post {:handler github/app-webhook
+                        :parameters {:body s/Any}}
+                 :middleware [:github-app-security]}]
+               ["/:id"
+                {:post {:handler github/webhook
+                        :parameters {:path {:id Id}
+                                     :body s/Any}}
+                 :middleware [:github-security]}]]]))])
 
 (def customer-parameter-routes
   ["/param" {:get {:handler api/get-customer-params}
@@ -291,13 +298,20 @@
      ;; Disabled, results in 405 errors for some reason
      ;;:compile rc/compile-request-coercers
      :reitit.middleware/registry
-     {:github-security (if (rt/dev-mode? rt)
-                         ;; Disable security in dev mode
-                         [passthrough-middleware]
-                         [github/validate-security])
-      :customer-check (if (rt/dev-mode? rt)
-                        [passthrough-middleware]
-                        [auth/customer-authorization])}}))
+     {:github-security
+      (if (rt/dev-mode? rt)
+        ;; Disable security in dev mode
+        [passthrough-middleware]
+        [github/validate-security])
+      :github-app-security
+      (if (rt/dev-mode? rt)
+        ;; Disable security in dev mode
+        [passthrough-middleware]
+        [github/validate-security (constantly (get-in (rt/config rt) [:github :webhook-secret]))])
+      :customer-check
+      (if (rt/dev-mode? rt)
+        [passthrough-middleware]
+        [auth/customer-authorization])}}))
   ([rt]
    (make-router rt routes)))
 

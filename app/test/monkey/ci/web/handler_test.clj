@@ -98,7 +98,7 @@
                    (test-app)
                    :status)))))
 
-(deftest webhook-routes
+(deftest webhook-github-routes
   (testing "`POST /webhook/github/:id`"
     (testing "accepts with valid security header"
       (let [payload (h/to-json {:head-commit {:message "test"}})
@@ -115,6 +115,7 @@
         (is (= 200 (-> (mock/request :post (str "/webhook/github/" hook-id))
                        (mock/body payload)
                        (mock/header :x-hub-signature-256 (str "sha256=" signature))
+                       (mock/header :x-github-event "push")
                        (mock/content-type "application/json")
                        (mock/content-length (count payload))
                        (app)
@@ -131,6 +132,45 @@
                                    :runner (constantly nil)})]
         (is (= 204 (-> (mock/request :post "/webhook/github/test-hook")
                        (dev-app)
+                       :status))))))
+
+  (testing "`POST /webhook/github/app`"
+    (testing "accepts request with valid security"
+      (let [secret (str (random-uuid))
+            payload (h/to-json {:message "test from github"})
+            signature (-> (mac/hash payload {:key secret
+                                             :alg :hmac+sha256})
+                          (codecs/bytes->hex))
+            app (sut/make-app (test-rt {:config
+                                        {:github
+                                         {:webhook-secret secret}}}))]
+        (is (= 200 (-> (mock/request :post "/webhook/github/app")
+                       (mock/body payload)
+                       (mock/content-type "application/json")
+                       (mock/header :x-hub-signature-256 (str "sha256=" signature))
+                       (app)
+                       :status)))))
+
+    (testing "401 on invalid security"
+      (let [secret (str (random-uuid))
+            payload (h/to-json {:message "test from github"})
+            app (sut/make-app (test-rt {:config
+                                        {:github
+                                         {:webhook-secret secret}}}))]
+        (is (= 401 (-> (mock/request :post "/webhook/github/app")
+                       (mock/body payload)
+                       (mock/content-type "application/json")
+                       (app)
+                       :status)))))
+
+    (testing "no security check in dev mode"
+      (let [secret (str (random-uuid))
+            payload (h/to-json {:message "test from github"})
+            app (sut/make-app (test-rt {}))]
+        (is (= 200 (-> (mock/request :post "/webhook/github/app")
+                       (mock/body payload)
+                       (mock/content-type "application/json")
+                       (app)
                        :status)))))))
 
 (defn- verify-entity-endpoints [{:keys [path base-entity updated-entity name creator]}]
