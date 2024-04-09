@@ -5,6 +5,7 @@
              [build :as b]
              [jobs :as jobs]
              [runtime :as rt]
+             [script :as script]
              [sidecar :as sidecar]
              [utils :as u]]
             [monkey.ci.events.core :as ec]
@@ -80,6 +81,20 @@
           (rt/post-events rt (b/build-end-evt (assoc (rt/build rt) :message (ex-message ex))
                                               exit-code))
           exit-code)))))
+
+(defn verify-build
+  "Verifies the build in the current directory by loading the script files in-process
+   and resolving the jobs.  This is useful when checking if there are any compilation
+   errors in the script."
+  [rt]
+  (try 
+    (let [jobs (-> rt
+                   (prepare-build-ctx)
+                   (script/load-jobs))]
+      ;; TODO Report
+      (if (not-empty jobs) 0 1))
+    (catch Exception ex
+      2)))
 
 (defn list-builds [rt]
   (->> (http/get (apply format "%s/customer/%s/repo/%s/builds"

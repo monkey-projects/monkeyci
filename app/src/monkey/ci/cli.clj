@@ -5,14 +5,17 @@
              [commands :as cmd]
              [config :as config]]))
 
+(def script-location-opt
+  {:as "Script location"
+   :option "dir"
+   :short "d"
+   :type :string
+   :default b/default-script-dir})
+
 (def run-build-cmd
   {:command "run"
    :description "Runs build locally"
-   :opts [{:as "Script location"
-           :option "dir"
-           :short "d"
-           :type :string
-           :default b/default-script-dir}
+   :opts [script-location-opt
           {:as "Pipeline name"
            :option "pipeline"
            :short "p"
@@ -32,6 +35,13 @@
            :option "sid"
            :type :string}]
    :runs {:command cmd/run-build
+          :app-mode :cli}})
+
+(def verify-build-cmd
+  {:command "verify"
+   :description "Verifies local build script"
+   :opts [script-location-opt]
+   :runs {:command cmd/verify-build
           :app-mode :cli}})
 
 (def list-build-cmd
@@ -62,6 +72,7 @@
            :short "r"
            :type :string}]
    :subcommands [run-build-cmd
+                 verify-build-cmd
                  list-build-cmd
                  watch-cmd]})
 

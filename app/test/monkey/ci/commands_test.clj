@@ -46,6 +46,15 @@
       (is (= 1 (count @recv)))      
       (is (= :build/end (:type (first @recv)))))))
 
+(deftest verify-build
+  (testing "loads script and resolves jobs"
+    (is (zero? (sut/verify-build {:config
+                                  {:work-dir "examples"}
+                                  :args {:dir "basic-clj"}}))))
+
+  (testing "nonzero exit on failure"
+    (is (not= 0 (sut/verify-build {})))))
+
 (deftest list-builds
   (testing "reports builds from server"
     (let [reported (atom [])

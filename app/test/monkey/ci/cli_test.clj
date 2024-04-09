@@ -77,7 +77,7 @@
             (is (= "test-sid" (-> (run-cli "build" "run" "--sid" "test-sid")
                                   (get-in [:args :sid]))))))
         
-        (testing "`watch` command"
+        (testing "`watch` subcommand"
           (testing "runs `watch` command"
             (let [lc (run-cli "build" "-c" "test-customer" "watch")]
               (is (= cmd/watch (:cmd lc)))))
@@ -89,7 +89,12 @@
         (testing "`list` subcommand"
           (testing "runs `list-builds` command"
             (let [lc (run-cli "build" "list")]
-              (is (= cmd/list-builds (:cmd lc)))))))
+              (is (= cmd/list-builds (:cmd lc))))))
+
+        (testing "`verify` subcommand"
+          (testing "runs `verify-build` subcommand"
+            (let [lc (run-cli "build" "verify")]
+              (is (= cmd/verify-build (:cmd lc)))))))
 
       (testing "`server` command"
         (testing "runs `server` command"

@@ -228,6 +228,12 @@
   (-> (j/resolve-jobs p rt)
       (assign-ids)))
 
+(defn load-jobs
+  "Loads the script and resolves the jobs"
+  [rt]
+  (-> (load-script (build/rt->script-dir rt) (build/get-build-id rt))
+      (resolve-jobs rt)))
+
 (defn exec-script!
   "Loads a script from a directory and executes it.  The script is executed in 
    this same process."
@@ -237,8 +243,7 @@
     (log/debug "Executing script for build" build-id "at:" script-dir)
     (log/debug "Script runtime:" rt)
     (try 
-      (let [jobs (-> (load-script script-dir build-id)
-                     (resolve-jobs rt))]
+      (let [jobs (load-jobs rt)]
         (log/trace "Jobs:" jobs)
         (log/debug "Loaded" (count jobs) "jobs:" (map bc/job-id jobs))
         (run-all-jobs* rt jobs))

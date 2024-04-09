@@ -7,6 +7,7 @@
             [monkey.ci
              [process :as p]
              [runners :as sut]
+             [script :as script]
              [utils :as u]]
             [monkey.ci.helpers :as h]))
 
@@ -177,5 +178,11 @@
   (testing "provides default type"
     (let [r (sut/make-runner {})]
       (is (fn? r))
-      (is (pos? (r {}))))))
+      (is (pos? (r {})))))
+
+  (testing "provides in-process type"
+    (with-redefs [script/exec-script! (constantly {:status :success})]
+      (let [r (sut/make-runner {:runner {:type :in-process}})]
+        (is (fn? r))
+        (is (= 0 (r {})))))))
 

@@ -11,7 +11,9 @@
              [config :as config]
              [process :as p]
              [runtime :as rt]
-             [utils :as u]]))
+             [script :as s]
+             [utils :as u]]
+            [monkey.ci.build.core :as bc]))
 
 (defn- script-not-found [rt]
   (let [msg (str "No build script found at " (build/rt->script-dir rt))]
@@ -123,6 +125,14 @@
   ;; For testing
   (log/debug "No-op runner configured")
   (constantly 1))
+
+(defmethod make-runner :in-process [_]
+  ;; In-process runner that loads and executes the build script in this process instead
+  ;; of starting a child process.
+  (fn [rt]
+    (if (bc/failed? (s/exec-script! rt))
+      1
+      0)))
 
 (defmethod make-runner :default [_]
   ;; Fallback
