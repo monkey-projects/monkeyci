@@ -24,6 +24,7 @@
 (def script-dir "/opt/monkeyci/script")
 (def log-dir (oci/checkout-subdir "log"))
 (def start-file (str log-dir "/start"))
+(def abort-file (str log-dir "/abort"))
 (def event-file (str log-dir "/events.edn"))
 (def script-vol "scripts")
 (def job-script "job.sh")
@@ -67,6 +68,7 @@
                               "MONKEYCI_LOG_DIR" log-dir
                               "MONKEYCI_SCRIPT_DIR" script-dir
                               "MONKEYCI_START_FILE" start-file
+                              "MONKEYCI_ABORT_FILE" abort-file
                               "MONKEYCI_EVENT_FILE" event-file})
      :working-directory wd}))
 
@@ -76,6 +78,7 @@
          :arguments ["sidecar"
                      "--events-file" event-file
                      "--start-file" start-file
+                     "--abort-file" abort-file
                      "--job-config" (str config-dir "/" job-config-file)]
          ;; Run as root, because otherwise we can't write to the shared volumes
          :security-context {:security-context-type "LINUX"

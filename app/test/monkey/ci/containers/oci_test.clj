@@ -146,6 +146,10 @@
         (is (h/contains-subseq? (:arguments sc)
                                 ["--start-file" sut/start-file])))
 
+      (testing "passes abort-file as arg"
+        (is (h/contains-subseq? (:arguments sc)
+                                ["--abort-file" sut/abort-file])))
+
       (testing "passes job config as arg"
         (is (h/contains-subseq? (:arguments sc)
                                 ["--job-config" "/home/monkeyci/config/job.edn"])))
