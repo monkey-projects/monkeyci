@@ -79,6 +79,16 @@
     (is (not-empty (capture-out {:type :build/list
                                  :builds []})))))
 
+(deftest print-verify-success
+  (testing "prints success message"
+    (is (not-empty (capture-out {:type :verify/success
+                                 :jobs [{:id "test-job"}]})))))
+
+(deftest print-verify-failed
+  (testing "prints error"
+    (is (not-empty (capture-out {:type :verify/failed
+                                 :message "test error"})))))
+
 (deftest unknown-types
   (testing "prints warning"
     (is (string? (capture-out {:type :unkown/type})))))

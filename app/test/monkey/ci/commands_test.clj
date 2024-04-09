@@ -47,10 +47,10 @@
       (is (= :build/end (:type (first @recv)))))))
 
 (deftest verify-build
-  (testing "loads script and resolves jobs"
+  (testing "zero when successful"
     (is (zero? (sut/verify-build {:config
-                                  {:work-dir "examples"}
-                                  :args {:dir "basic-clj"}}))))
+                                  {:work-dir "examples"
+                                   :args {:dir "basic-clj"}}}))))
 
   (testing "nonzero exit on failure"
     (is (not= 0 (sut/verify-build {})))))

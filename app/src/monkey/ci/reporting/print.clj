@@ -5,15 +5,21 @@
             [monkey.ci.reporting :as r]
             [monkey.ci.build.core :as bc]))
 
-(def good (cl/style "\u221a" :bright :green))
-(def bad  (cl/style "X" :bright :red))
+(defn- error [s]
+  (cl/style s :bright :red))
+
+(defn- success [s]
+  (cl/style s :bright :green))
+
+(defn- accent [s]
+  (cl/style s :bright :yellow))
+
+(def good (success "\u221a"))
+(def bad  (error "X"))
 (def prev-line "\033[F") ; ANSI code to jump back to the start of previous line
 
 (defn- url [url]
   (cl/style url :underline))
-
-(defn- accent [s]
-  (cl/style s :bright :yellow))
 
 (defn- overwrite
   "Overwrites the previous line with the string"
@@ -122,6 +128,14 @@
 
 (defmethod printer :build/list [{:keys [builds]}]
   (print-all (build-list builds)))
+
+(defmethod printer :verify/success [{:keys [jobs]}]
+  (println (success "Success!") "Build script contains" (count jobs) "jobs.")
+  (doseq [j jobs]
+    (println "  " (accent (:id j)))))
+
+(defmethod printer :verify/failed [{:keys [message]}]
+  (println (error "Error:") "Exception while verifying:" message))
 
 (defmethod printer :default [msg]
   (println (cl/style "Warning:" :bright :cyan) "unknown message type" (accent (str (:type msg)))))

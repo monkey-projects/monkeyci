@@ -87,13 +87,24 @@
    and resolving the jobs.  This is useful when checking if there are any compilation
    errors in the script."
   [rt]
-  (try 
+  (try
+    (log/debug "Verifying build with runtime" (prepare-build-ctx rt))
+    ;; TODO Git branch and other options
     (let [jobs (-> rt
                    (prepare-build-ctx)
                    (script/load-jobs))]
-      ;; TODO Report
-      (if (not-empty jobs) 0 1))
+      (rt/report
+       rt
+       (if (not-empty jobs)
+         {:type :verify/success
+          :jobs jobs}
+         {:type :verify/failed
+          :message "No jobs found in build script"}))
+      (if (empty? jobs) 1 0))
     (catch Exception ex
+      (log/error "Error verifying build" ex)
+      (rt/report rt {:type :verify/failed
+                     :message (ex-message ex)})
       2)))
 
 (defn list-builds [rt]
