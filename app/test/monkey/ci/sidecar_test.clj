@@ -172,6 +172,12 @@
                            :sidecar
                            :start-file))))
 
+  (testing "adds abort file from args"
+    (is (= "test-file" (-> (c/normalize-key :sidecar {:sidecar {}
+                                                      :args {:abort-file "test-file"}})
+                           :sidecar
+                           :abort-file))))
+
   (testing "adds job config from args"
     (is (= {:key "value"}
            (-> (c/normalize-key :sidecar {:sidecar {}
@@ -322,4 +328,22 @@
                            (sut/run)
                            (deref 100 ::timeout)))))
 
-    (testing "aborts on error")))
+    (testing "aborts on async error"
+      (with-redefs [sut/poll-events (constantly (md/error-deferred (ex-info "test error" {})))]
+        (h/with-tmp-dir dir
+          (let [abort-file (io/file dir "abort")]
+            (is (some? (-> (sut/run {:config
+                                     {:sidecar {:abort-file (str abort-file)}}})
+                           deref
+                           :exception)))
+            (is (fs/exists? abort-file))))))
+
+    (testing "aborts on exception thrown"
+      (with-redefs [sut/restore-src (fn [_] (throw (ex-info "test error" {})))]
+        (h/with-tmp-dir dir
+          (let [abort-file (io/file dir "abort")]
+            (is (some? (-> (sut/run {:config
+                                     {:sidecar {:abort-file (str abort-file)}}})
+                           deref
+                           :exception)))
+            (is (fs/exists? abort-file))))))))

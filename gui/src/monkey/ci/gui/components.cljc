@@ -42,12 +42,14 @@
         (into [:ol.breadcrumb]))])
 
 (defn build-result [r]
-  (let [type (condp = (keyword r)
+  (let [r (or r "running")
+        type (condp = (keyword r)
                :error :text-bg-danger
                :failure :text-bg-danger
                :success :text-bg-success
+               :running :text-bg-primary
                :text-bg-secondary)]
-    [:span {:class (str "badge " (name type))} (or r "running")]))
+    [:span {:class (str "badge " (name type))} r]))
 
 (defn- item-id [id idx]
   (str (name id) "-" idx))

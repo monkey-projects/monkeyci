@@ -85,12 +85,17 @@
            :option "events-file"
            :short "e"
            :type :string
-           :default :present}
+           :default "events"}
           {:as "Start file"
            :option "start-file"
            :short "s"
            :type :string
-           :default :present}
+           :default "start"}
+          {:as "Abort file"
+           :option "abort-file"
+           :short "a"
+           :type :string
+           :default "abort"}
           {:as "Job config"
            :option "job-config"
            :short "t"

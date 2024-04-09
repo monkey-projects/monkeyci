@@ -8,7 +8,8 @@ USER monkeyci
 WORKDIR /home/monkeyci
 # Config dir, can be used to specify logback config
 VOLUME /home/monkeyci/config
-ENTRYPOINT ["java", "-Dlogback.configurationFile=config/logback.xml", "-jar", "monkeyci.jar"]
+# Override default memory limit for sidecar when smaller available memory
+ENTRYPOINT ["java", "-Xmx1g", "-Dlogback.configurationFile=config/logback.xml", "-jar", "monkeyci.jar"]
 
 VOLUME /home/monkeyci/work
 

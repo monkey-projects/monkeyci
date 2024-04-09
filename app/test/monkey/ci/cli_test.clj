@@ -120,6 +120,14 @@
                                  :args
                                  :start-file))))
 
+        (testing "accepts `abort-file` or `-a` option"
+          (is (= "abort-file" (-> (run-cli "sidecar" "-a" "abort-file")
+                                  :args
+                                  :abort-file)))
+          (is (= "abort-file" (-> (run-cli "sidecar" "--abort-file" "abort-file")
+                                  :args
+                                  :abort-file))))
+
         (h/with-tmp-dir dir
           (let [script-config (io/file dir "script.edn")
                 p (.getCanonicalPath script-config)]

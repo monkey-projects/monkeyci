@@ -153,10 +153,9 @@
                    (rt/post-events rt {:type :sidecar/start
                                        :sid sid
                                        :job (jobs/job->event job)})
-                   (let [e (-> (sidecar/run rt)
-                               (deref)
-                               :exit)]
-                     (ec/make-result (b/exit-code->status e) e nil))
+                   (let [r @(sidecar/run rt)
+                         e (:exit r)]
+                     (ec/make-result (b/exit-code->status e) e (:message r)))
                    (catch Throwable t
                      (ec/exception-result t)))]
       (log/info "Sidecar terminated")

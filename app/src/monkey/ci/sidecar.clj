@@ -46,12 +46,18 @@
   ;; Grant read/write to the world, in case the job runs as another user
   (fs/set-posix-file-permissions f "rw-rw-rw-"))
 
-(defn mark-start [rt]
-  (let [s (get-config rt :start-file)]
-    (when (not-empty s)
-      (log/debug "Creating start file:" s)
-      (create-file-with-dirs s))
+(defn- touch-file [rt k]
+  (let [f (get-config rt k)]
+    (when (not-empty f)
+      (log/debug "Creating file:" f)
+      (create-file-with-dirs f))
     rt))
+
+(defn mark-start [rt]
+  (touch-file rt :start-file))
+
+(defn mark-abort [rt]
+  (touch-file rt :abort-file))
 
 (defn- maybe-create-file [f]
   (when-not (fs/exists? f)
@@ -129,17 +135,23 @@
   ;; Restore caches and artifacts before starting the job
   (let [h (-> (comp poll-events mark-start)
               (art/wrap-artifacts)
-              (cache/wrap-caches))]
-    (-> rt
-        (restore-src)
-        (md/chain h)
-        (md/catch
-            ;; TODO At this point we also should abort the job container by writing to the abort file
-            (fn [ex]
-              (log/error "Failed to run sidecar" ex)
-              {:exit 1
-               :message (ex-message ex)
-               :exception ex})))))
+              (cache/wrap-caches))
+        error-result (fn [ex]
+                       {:exit 1
+                        :message (ex-message ex)
+                        :exception ex})]
+    (try
+      (-> rt
+          (restore-src)
+          (md/chain h)
+          (md/catch
+              (fn [ex]
+                (log/error "Failed to run sidecar" ex)
+                (mark-abort rt)
+                (error-result ex))))
+      (catch Throwable t
+        (mark-abort rt)
+        (md/success-deferred (error-result t))))))
 
 (defn- add-from-args [conf k]
   (update-in conf [:sidecar k] #(or (get-in conf [:args k]) %)))
@@ -149,4 +161,5 @@
       (mc/update-existing-in [:sidecar :log-config] u/try-slurp)
       (add-from-args :events-file)
       (add-from-args :start-file)
+      (add-from-args :abort-file)
       (add-from-args :job-config)))
