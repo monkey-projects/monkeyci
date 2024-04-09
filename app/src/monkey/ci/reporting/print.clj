@@ -130,7 +130,7 @@
   (print-all (build-list builds)))
 
 (defmethod printer :verify/success [{:keys [jobs]}]
-  (println (success "Success!") "Build script contains" (count jobs) "jobs.")
+  (println (success "Success!") "Build script provides" (count jobs) "jobs with the current settings.")
   (doseq [j jobs]
     (println "  " (accent (:id j)))))
 

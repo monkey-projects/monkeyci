@@ -186,4 +186,7 @@
 
 (defmethod r/normalize-runner-config :oci [conf]
   (-> (oci/normalize-config conf :runner)
-      (update-in [:runner :image-tag] #(or % (config/version)))))
+      (update-in [:runner :image-tag] #(or % (config/version)))
+      (update :runner config/group-keys :events)
+      ;; FIXME This is highly dependent on the events implementation
+      (update-in [:runner :events] config/group-keys :client)))

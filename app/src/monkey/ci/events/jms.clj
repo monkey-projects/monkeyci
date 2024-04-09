@@ -87,6 +87,7 @@
   (start [this]
     (-> this
         (mc/assoc-some :broker (maybe-start-broker (:server config)))
+        ;; Note that this opens 2 connections to the broker
         (assoc :producer (make-producer (:client config))
                :consumer (make-consumer (:client config) listeners))))
 

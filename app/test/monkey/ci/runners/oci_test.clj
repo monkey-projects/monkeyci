@@ -196,4 +196,25 @@
            (-> {:runner {:type :oci}}
                (r/normalize-runner-config)
                :runner
-               :image-tag)))))
+               :image-tag))))
+
+  (testing "groups events properties"
+    (is (= "test-url"
+           (-> (r/normalize-runner-config
+                {:runner
+                 {:type :oci
+                  :events-url "test-url"}})
+               :runner
+               :events
+               :url))))
+
+  (testing "groups event client properties"
+    (is (= "test-user"
+           (-> (r/normalize-runner-config
+                {:runner
+                 {:type :oci
+                  :events-client-username "test-user"}})
+               :runner
+               :events
+               :client
+               :username)))))
