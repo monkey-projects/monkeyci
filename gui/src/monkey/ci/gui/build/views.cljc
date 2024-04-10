@@ -105,6 +105,10 @@
     [elapsed-running x]
     [elapsed-final x]))
 
+(defn- build-graph []
+  ;; Unable to get mermaid to run, so have to use canvas instead
+  [:p "Build graph goes here"])
+
 (defn- render-job [job]
   [:tr
    [:td (:id job)]
@@ -172,7 +176,9 @@
 (defn details-tabs [route]
   [tabs/tabs
    ::build-details
-   [{:header "Jobs"
+   [#_{:header "Graph"
+     :contents [build-graph]}
+    {:header "Jobs"
      :current? true
      :contents [build-jobs]}
     {:header "Logs"
