@@ -58,6 +58,21 @@
       (is (= 204 (:status (sut/webhook req))))
       (is (nil? @inv))))
 
+  (testing "ignores ref delete events"
+    (let [inv (atom nil)
+          st (st/make-memory-storage)
+          _ (st/save-webhook-details st {:id "test-hook"})
+          req (-> {:runner (partial swap! inv conj)
+                   :storage st}
+                  (h/->req)
+                  (assoc :headers {"x-github-event" "push"}
+                         :parameters {:path {:id "test-hook"}
+                                      :body
+                                      {:head-commit {:id "test-id"}
+                                       :deleted true}}))]
+      (is (= 204 (:status (sut/webhook req))))
+      (is (empty? @inv))))
+
   (testing "fires build end event on failure"
     (let [st (st/make-memory-storage)
           _ (st/save-webhook-details st {:id "test-hook"})

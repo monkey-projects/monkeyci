@@ -51,6 +51,7 @@
   "Invoked when an event is received.  Dispatches event to all listeners."
   [listeners]
   (fn [evt]
+    (log/debug "Event received:" evt)
     (doseq [l @listeners]
       ((:listener l) evt))))
 

@@ -24,9 +24,7 @@
              [workspace]]
             [monkey.ci.containers
              [oci]]
-            [monkey.ci.events
-             [core :as ec]
-             [manifold]]
+            [monkey.ci.events.core :as ec]
             [monkey.ci.reporting.print]
             [monkey.ci.runners.oci]
             [monkey.ci.storage

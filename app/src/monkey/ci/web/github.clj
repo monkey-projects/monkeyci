@@ -106,17 +106,18 @@
    runner async and returns a 202 accepted."
   [{p :parameters :as req}]
   (log/trace "Got incoming webhook with body:" (prn-str (:body p)))
-  (if (github-push? req)
+  (log/debug "Event type:" (get-in req [:headers "x-github-event"]))
+  (if (and (github-push? req) (not (get-in p [:body :deleted])))
     (let [rt (c/req->rt req)]
       (if-let [build (create-build rt {:id (get-in p [:path :id])
                                        :payload (:body p)})]
         (do
           (c/run-build-async
             (assoc rt :build build))
-          (rur/response {:build-id "todo"}))
+          (rur/response {:build-id (:build-id build)}))
         ;; No valid webhook found
         (rur/not-found {:message "No valid webhook configuration found"})))
-    ;; If no build trigger, just respond with a '204 no content'
+    ;; If no build trigger or non build event, just respond with a '204 no content'
     (rur/status 204)))
 
 (defn app-webhook [req]
