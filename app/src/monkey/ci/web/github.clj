@@ -127,7 +127,7 @@
   (rur/response {:message "ok"}))
 
 (defn- process-reply [{:keys [status] :as r}]
-  (log/debug "Got github reply:" r)
+  (log/trace "Got github reply:" r)
   (update r :body c/parse-json))
 
 (defn- request-access-token [req]

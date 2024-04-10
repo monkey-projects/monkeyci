@@ -7,6 +7,7 @@
             [monkey.ci.gui.utils :as u]
             [monkey.ci.gui.build.events]
             [monkey.ci.gui.build.subs]
+            [monkey.ci.gui.tabs :as tabs]
             [monkey.ci.gui.time :as t]
             [monkey.ci.gui.timer :as timer]
             [re-frame.core :as rf]
@@ -130,7 +131,7 @@
 (defn- build-jobs []
   (let [jobs (rf/subscribe [:build/jobs])]
     [:div.mb-2
-     [:h3 "Jobs"]
+     [:p "This build contains " (count @jobs) " jobs"]
      [jobs-table @jobs]]))
 
 (defn- log-row [{:keys [name size] :as l}]
@@ -158,8 +159,24 @@
   (rf/dispatch [:build/load-logs])
   (fn [params]
     [:<>
-     [:h3.float-start "Global Logs"]
+     [:p "These are the global logs that do not belong to a specific job."]
      [logs-table]]))
+
+(defn- tab-header [lbl curr? contents]
+  [:li.nav-item
+   [:a.nav-link (cond-> {:href ""}
+                  curr? (assoc :class :active
+                               :aria-current :page))]
+   contents])
+
+(defn details-tabs [route]
+  [tabs/tabs
+   ::build-details
+   [{:header "Jobs"
+     :current? true
+     :contents [build-jobs]}
+    {:header "Logs"
+     :contents [build-logs (r/path-params route)]}]])
 
 (defn page [route]
   (rf/dispatch [:build/init])
@@ -175,8 +192,7 @@
           [co/reload-btn [:build/reload] (when @reloading? {:disabled true})]]]
         [co/alerts [:build/alerts]]
         [build-details]
-        [build-jobs]
-        [build-logs params]
+        [details-tabs route]
         [log-modal]
         [:div
          [:a {:href (r/path-for :page/repo params)} "Back to repository"]]]])))

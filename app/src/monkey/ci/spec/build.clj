@@ -46,7 +46,7 @@
 
 ;;; Script: contains info about a build script, most notably the jobs
 
-(def build-states #{:pending :running :error :success})
+(def build-states #{:pending :running :error :success :canceled})
 
 (s/def :script/script-dir path?)
 (s/def :script/status build-states)

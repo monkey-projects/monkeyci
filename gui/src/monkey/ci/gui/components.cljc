@@ -48,6 +48,8 @@
                :failure :text-bg-danger
                :success :text-bg-success
                :running :text-bg-primary
+               :canceled :text-bg-warning
+               :skipped :text-bg-warning
                :text-bg-secondary)]
     [:span {:class (str "badge " (name type))} r]))
 
