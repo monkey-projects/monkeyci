@@ -159,13 +159,17 @@
               env (-> inst :containers first :environment-variables)]
           (is (= "test-addr" (get env "monkeyci-events-client-address")))))
 
-      (testing "overwrites with runner specific config"
+      (testing "merges with runner specific config"
         (let [rt (-> rt
-                     (assoc-in [:config :events :client :address] "test-addr")
+                     (assoc-in [:config :events] {:type :jms
+                                                  :client {:address "test-addr"
+                                                           :username "test-user"}})
                      (assoc-in [:config :runner :events :client :address] "runner-addr"))
               inst (sut/instance-config conf rt)
               env (-> inst :containers first :environment-variables)]
-          (is (= "runner-addr" (get env "monkeyci-events-client-address"))))))))
+          (is (= "runner-addr" (get env "monkeyci-events-client-address")))
+          (is (= "test-user" (get env "monkeyci-events-client-username")))
+          (is (= "jms" (get env "monkeyci-events-type"))))))))
  
 (deftest wait-for-script-end-event
   (testing "returns a deferred that holds the script end event"
