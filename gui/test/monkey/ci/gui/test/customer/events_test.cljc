@@ -60,10 +60,10 @@
   (testing "invokes repos and orgs url from github user"
     (let [e (h/catch-fx :http-xhrio)]
       (rf-test/run-test-sync
-       (is (some? (reset! app-db (ldb/set-github-user {} {:repos-url "http://test-repos"
-                                                          :organizations-url "http://test-orgs"}))))
+       (is (some? (reset! app-db (ldb/set-github-user {} {:organizations-url "http://test-orgs"}))))
        (rf/dispatch [:customer/load-github-repos])
-       (is (= #{"http://test-repos" "http://test-orgs"}
+       (is (= 2 (count @e)))
+       (is (= #{"https://api.github.com/user/repos" "http://test-orgs"}
               (set (map :uri @e)))))))
 
   (testing "sets info alert"
@@ -104,3 +104,35 @@
        (is (= ["http://test-repos/org-1"
                "http://test-repos/org-2"]
               (map :uri @e)))))))
+
+(deftest repo-watch
+  (testing "creates new repo in backend"
+    (rf-test/run-test-sync
+     (let [c (h/catch-fx :martian.re-frame/request)]
+       (h/initialize-martian {:create-repo {:status 204
+                                            :body {:id "test-repo"}
+                                            :error-code :no-error}})
+       (is (some? (:martian.re-frame/martian @app-db)))
+       (rf/dispatch [:repo/watch {:id "github-id"
+                                  :private false
+                                  :name "test-repo"
+                                  :clone-url "http://test-url"}])
+       (is (= 1 (count @c)))
+       (is (= :create-repo (-> @c first (nth 2))))))))
+
+(deftest repo-watch--success
+  (testing "adds repo to customer"
+    (is (some? (reset! app-db (db/set-customer {} {:repos []}))))
+    (rf/dispatch-sync [:repo/watch--success {:body {:id "test-repo"}}])
+    (is (= {:repos [{:id "test-repo"}]}
+           (db/customer @app-db)))))
+
+(deftest repo-watch--failed
+  (testing "sets error alert"
+    (rf/dispatch-sync [:repo/watch--failed {:message "test error"}])
+    (let [a (db/repo-alerts @app-db)]
+      (is (= 1 (count a)))
+      (is (= :danger (:type (first a)))))))
+
+(deftest repo-unwatch
+  (testing "disables repo in backend"))

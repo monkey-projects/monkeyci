@@ -23,7 +23,8 @@
 
 (defn public-route [conf]
   (merge {:method :get
-          :produces #{"application/edn"}}
+          :produces #{"application/edn"}
+          :consumes #{"application/edn"}}
          conf))
 
 (defn api-route [conf]
@@ -36,6 +37,15 @@
     {:route-name :get-customer
      :path-parts customer-path
      :path-schema customer-schema})
+
+   (api-route
+    {:route-name :create-repo
+     :method :post
+     :path-parts (conj customer-path "/repo")
+     :path-schema customer-schema
+     :body-schema {:repo {:name s/Str
+                          :url s/Str
+                          :customer-id s/Str}}})
 
    (api-route
     {:route-name :get-builds

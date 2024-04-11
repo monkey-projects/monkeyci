@@ -635,11 +635,11 @@
             r (-> (mock/request :post "/github/login?code=1234")
                   (app))]
         (is (= 200 (:status r)) (:body r))
-        (is (= "test-user"
+        (is (= "test-token"
                (some-> (:body r)
                        (slurp)
                        (h/parse-json)
-                       :name))))))
+                       :github-token))))))
 
   (testing "`GET /github/config` returns client id"
     (let [app (-> (test-rt {:config {:github {:client-id "test-client-id"}}})

@@ -7,4 +7,22 @@
 (u/db-sub :customer/alerts db/alerts)
 (u/db-sub :customer/repo-alerts db/repo-alerts)
 (u/db-sub :customer/loading? db/loading?)
-(u/db-sub :customer/github-repos db/github-repos)
+(u/db-sub ::github-repos db/github-repos)
+
+(rf/reg-sub
+ :customer/repos
+ :<- [:customer/info]
+ (fn [ci _]
+   (:repos ci)))
+
+(rf/reg-sub
+ :customer/github-repos
+ :<- [:customer/repos]
+ :<- [::github-repos]
+ (fn [[cr gr] _]
+   (letfn [(watched? [r]
+             (some (some-fn (comp (partial = (:id r)) :git-id)
+                            (comp (partial = (:ssh-url r)) :url)
+                            (comp (partial = (:clone-url r)) :url))
+                   cr))]
+     (map #(assoc % :watched? (watched? %)) gr))))

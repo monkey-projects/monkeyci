@@ -4,6 +4,7 @@
             [monkey.ci.gui.martian]
             [monkey.ci.gui.customer.db :as db]
             [monkey.ci.gui.login.db :as ldb]
+            [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
@@ -51,9 +52,9 @@
 
 (rf/reg-event-fx
  ::load-user-repos
- (fn [{:keys [db]} _]
-   (let [u (ldb/github-user db)]
-     {:dispatch [::load-repos (:repos-url u)]})))
+ (fn [_ _]
+   ;; Turns out that this url gives different results than the one in :repos-url
+   {:dispatch [::load-repos (github/api-url "/user/repos")]}))
 
 (rf/reg-event-fx
  ::load-repos
@@ -62,6 +63,8 @@
                  db
                  {:method :get
                   :uri url
+                  :params {:type "all"
+                           :per_page 50}
                   :on-success [:customer/load-github-repos--success]
                   :on-failure [:customer/load-github-repos--failed]})}))
 
@@ -101,3 +104,36 @@
          (db/set-github-repos all)
          (db/set-repo-alerts [{:type :success
                                :message (str "Found " (count all) " repositories in Github.")}])))))
+
+(rf/reg-event-fx
+ :repo/watch
+ (fn [{:keys [db]} [_ repo]]
+   (log/debug "Watching repo:" repo)
+   (let [params (r/path-params (r/current db))]
+     {:dispatch [:secure-request
+                 :create-repo
+                 {:repo {:name (:name repo)
+                         :url (:clone-url repo)
+                         :customer-id (:customer-id params)}
+                  :customer-id (:customer-id params)}
+                 [:repo/watch--success]
+                 [:repo/watch--failed]]})))
+
+(rf/reg-event-db
+ :repo/watch--success
+ (fn [db [_ {:keys [body]}]]
+   (db/set-customer db (-> (db/customer db)
+                           (update :repos conj body)))))
+
+(rf/reg-event-db
+ :repo/watch--failed
+ (fn [db [_ err]]
+   (db/set-repo-alerts db [{:type :danger
+                            :message (str "Failed to watch repo: " (u/error-msg err))}])))
+
+(rf/reg-event-fx
+ :repo/unwatch
+ (fn [{:keys [db]} [_ repo]]
+   ;; TODO
+   (db/set-repo-alerts db [{:type :warning
+                            :message "Unwatching a repo is not implemented yet!"}])))

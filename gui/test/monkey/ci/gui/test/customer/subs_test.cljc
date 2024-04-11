@@ -58,4 +58,21 @@
     (testing "returns repos from db"
       (let [l [{:id "test-repo"}]]
         (is (map? (reset! app-db (db/set-github-repos {} l))))
-        (is (= l @r))))))
+        (is (= ["test-repo"] (map :id @r)))))
+
+    (testing "marks watched repo"
+      (is (map? (reset! app-db (db/set-github-repos {} [{:id "github-repo-id"
+                                                         :ssh-url "ssh@ssh-url"
+                                                         :clone-url "https://clone-url"}]))))
+
+      (testing "by git id"
+        (is (map? (swap! app-db db/set-customer {:repos [{:git-id "github-repo-id"}]})))
+        (is (true? (-> @r first :watched?))))
+      
+      (testing "by clone url"
+        (is (map? (swap! app-db db/set-customer {:repos [{:url "https://clone-url"}]})))
+        (is (true? (-> @r first :watched?))))
+      
+      (testing "by ssh url"
+        (is (map? (swap! app-db db/set-customer {:repos [{:url "ssh@ssh-url"}]})))
+        (is (true? (-> @r first :watched?)))))))

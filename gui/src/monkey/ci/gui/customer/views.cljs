@@ -4,6 +4,7 @@
             [monkey.ci.gui.customer.subs]
             [monkey.ci.gui.layout :as l]
             [monkey.ci.gui.routing :as r]
+            [monkey.ci.gui.table :as t]
             [re-frame.core :as rf]))
 
 (defn- load-customer [id]
@@ -63,18 +64,40 @@
       [customer-details id]])))
 
 (defn- repo-table []
-  (let [r (rf/subscribe [:customer/github-repos])]
-    (->> @r
-         (map :name)
-         (map (partial into [:li]))
-         (into [:ul]))))
+  (letfn [(name+url [{:keys [name html-url]}]
+            [:a {:href html-url :target "_blank"} name])
+          (visibility [{:keys [visibility]}]
+            [:span.badge {:class (if (= "public" visibility)
+                                   :text-bg-success
+                                   :text-bg-warning)}
+             visibility])
+          (actions [{:keys [watched?] :as repo}]
+            (if watched?
+              [:button.btn.btn-sm.btn-danger
+               {:on-click #(rf/dispatch [:repo/unwatch repo])}
+               [:span.me-1 [co/icon :stop-circle-fill]] "Unwatch"]
+              [:button.btn.btn-sm.btn-primary
+               {:on-click #(rf/dispatch [:repo/watch repo])}
+               [:span.me-1 [co/icon :binoculars-fill]] "Watch"]))]
+    [t/paged-table
+     {:id ::repos
+      :items-sub [:customer/github-repos]
+      :columns [{:label "Name"
+                 :value name+url}
+                {:label "Owner"
+                 :value (comp :login :owner)}
+                {:label "Description"
+                 :value :description}
+                {:label "Visibility"
+                 :value visibility}
+                {:label "Actions"
+                 :value actions}]}]))
 
 (defn add-repo-page
   []
   (let [route (rf/subscribe [:route/current])]
     (rf/dispatch [:customer/load-github-repos])
     (l/default
-     ;; TODO Also fetch repos from orgs
      [:<>
       [:h3 "Add Repository to Watch"]
       [co/alerts [:customer/repo-alerts]]
