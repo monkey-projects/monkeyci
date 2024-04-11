@@ -89,7 +89,7 @@
 (deftest load-orgs
   (testing "invokes orgs url from github user"
     (let [e (h/catch-fx :http-xhrio)]
-      (is (some? (reset! app-db (ldb/set-github-user {} {:orgs-url "http://test-orgs"}))))
+      (is (some? (reset! app-db (ldb/set-github-user {} {:organizations-url "http://test-orgs"}))))
       (rf/dispatch-sync [::sut/load-orgs])
       (is (= 1 (count @e)))
       (is (= "http://test-orgs" (-> @e first :uri))))))

@@ -1,9 +1,13 @@
 (ns monkey.ci.gui.github
   "Functions for invoking the github api"
-  (:require [ajax.core :as ajax]
+  (:require #?@(:node []
+                :cljs [[ajax.core :as ajax]])
             [camel-snake-kebab.core :as csk]
             [clojure.walk :as w]
             [re-frame.core :as rf]))
+
+(def format #?@(:node []
+                :cljs [(ajax/json-response-format)]))
 
 (defn- convert-keys
   "Since github uses snake casing for its keys, we convert them to clojure-style
@@ -18,7 +22,7 @@
 (defn api-request [db {:keys [path] :as opts}]
   (let [token (or (:token opts) (:github/token db))]
     (cond-> (-> opts
-                (assoc :response-format (ajax/json-response-format)
+                (assoc :response-format format
                        ;; Route the response to convert map keys
                        :on-success [:github/process-response (:on-success opts)])
                 (assoc-in [:headers "Authorization"] (str "Bearer " token))
