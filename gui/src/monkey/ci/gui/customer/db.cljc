@@ -20,3 +20,16 @@
 
 (defn reset-alerts [db]
   (dissoc db alerts))
+
+(def repo-alerts ::repo-alerts)
+
+(defn set-repo-alerts [db a]
+  (assoc db repo-alerts a))
+
+(defn reset-repo-alerts [db]
+  (dissoc db repo-alerts))
+
+(def github-repos ::github-repos)
+
+(defn set-github-repos [db r]
+  (assoc db github-repos r))

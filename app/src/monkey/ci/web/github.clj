@@ -147,9 +147,7 @@
       (process-reply)
       ;; TODO Check for failures
       :body
-      ;; Avatar url is used to display user avatar in gui
-      ;; Repos url is used to look up the repos the user has access to when adding a new repo.
-      (select-keys [:id :email :name :avatar-url :repos-url])
+      (select-keys [:id :email])
       ;; Return token to frontend, we'll need it when doing github requests.
       (assoc :github-token token)))
 
@@ -173,7 +171,7 @@
                      :email (:email user)}]
               (s/save-user st u)
               u))
-        (merge (select-keys user [:name :github-token :avatar-url :repos-url])))))
+        (merge (select-keys user [:github-token])))))
 
 (defn login
   "Invoked by the frontend during OAuth2 login flow.  It requests a Github

@@ -10,7 +10,10 @@
 (rf/reg-sub
  :login/user
  (fn [db _]
-   (db/user db)))
+   (let [gu (db/github-user db)]
+     (some-> (db/user db)
+             (assoc :github gu)
+             (merge (select-keys gu [:name :avatar-url]))))))
 
 (rf/reg-sub
  :login/alerts

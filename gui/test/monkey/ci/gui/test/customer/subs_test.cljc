@@ -6,6 +6,8 @@
             [re-frame.core :as rf]
             [re-frame.db :refer [app-db]]))
 
+(rf/clear-subscription-cache!)
+
 (deftest alerts
   (let [s (rf/subscribe [:customer/alerts])]
     (testing "exists"
@@ -33,6 +35,27 @@
       (is (some? l)))
 
     (testing "holds loading state from db"
-      (is (false? @l))
+      (is (not @l))
       (is (map? (reset! app-db (db/set-loading {}))))
       (is (true? @l)))))
+
+(deftest repo-alerts
+  (let [s (rf/subscribe [:customer/repo-alerts])]
+    (testing "exists"
+      (is (some? s)))
+
+    (testing "returns alerts from db"
+      (let [a [{:type :info
+                :message "Test alert"}]]
+        (is (map? (reset! app-db (db/set-repo-alerts {} a))))
+        (is (= a @s))))))
+
+(deftest github-repos
+  (let [r (rf/subscribe [:customer/github-repos])]
+    (testing "exists"
+      (is (some? r)))
+
+    (testing "returns repos from db"
+      (let [l [{:id "test-repo"}]]
+        (is (map? (reset! app-db (db/set-github-repos {} l))))
+        (is (= l @r))))))

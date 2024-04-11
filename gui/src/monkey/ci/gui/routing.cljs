@@ -39,6 +39,7 @@
    [["/" :page/root]
     ["/login" :page/login]
     ["/c/:customer-id" :page/customer]
+    ["/c/:customer-id/add-repo" :page/add-repo]
     ["/c/:customer-id/r/:repo-id" :page/repo]
     ["/c/:customer-id/r/:repo-id/b/:build-id" :page/build]
     ["/github/callback" :page/github-callback]]))
@@ -69,7 +70,6 @@
 (defn set-path!
   "Sets the current browser path without reloading the page"
   [p]
-  #_(set! (.-pathname js/location) p)
   (.pushState js/history (clj->js {}) nil (str (origin) p)))
 
 (rf/reg-fx

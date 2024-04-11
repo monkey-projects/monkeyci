@@ -28,8 +28,23 @@
 
     (testing "returns user from db"
       (is (nil? @s))
-      (is (map? (reset! app-db (db/set-user {} "test-user"))))
-      (is (= "test-user" @s)))))
+      (is (map? (reset! app-db (db/set-user {} {:name "test-user"}))))
+      (is (= "test-user" (:name @s))))
+
+    (testing "adds github user details"
+      (is (some? (reset! app-db (-> {}
+                                    (db/set-user {:id "test-user"})
+                                    (db/set-github-user {:name "github user"})))))
+      (is (= "github user" (-> @s :github :name))))
+
+    (testing "adds avatar url and name to user from github"
+      (is (some? (reset! app-db (-> {}
+                                    (db/set-user {:id "test-user"})
+                                    (db/set-github-user {:name "github user"
+                                                         :avatar-url "http://test-avatar"})))))
+      (is (= {:name "github user"
+              :avatar-url "http://test-avatar"}
+             (select-keys @s [:name :avatar-url]))))))
 
 (deftest alerts
   (let [s (rf/subscribe [:login/alerts])]

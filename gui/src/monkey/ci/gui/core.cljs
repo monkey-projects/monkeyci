@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.core
-  (:require [monkey.ci.gui.events]
+  (:require [day8.re-frame.http-fx]
+            [monkey.ci.gui.events]
             [monkey.ci.gui.login.views :as lv]
             [monkey.ci.gui.martian :as m]
             [monkey.ci.gui.pages :as p]

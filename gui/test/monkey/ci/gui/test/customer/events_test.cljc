@@ -4,6 +4,8 @@
             [day8.re-frame.test :as rf-test]
             [monkey.ci.gui.customer.db :as db]
             [monkey.ci.gui.customer.events :as sut]
+            [monkey.ci.gui.login.db :as ldb]
+            [monkey.ci.gui.login.events]
             [monkey.ci.gui.test.fixtures :as f]
             [monkey.ci.gui.test.helpers :as h]
             [re-frame.core :as rf]
@@ -53,3 +55,52 @@
     (is (map? (reset! app-db (db/set-loading {}))))
     (rf/dispatch-sync [:customer/load--failed "test-id" "test-customer"])
     (is (not (db/loading? @app-db)))))
+
+(deftest customer-load-github-repos
+  (testing "invokes repos and orgs url from github user"
+    (let [e (h/catch-fx :http-xhrio)]
+      (rf-test/run-test-sync
+       (is (some? (reset! app-db (ldb/set-github-user {} {:repos-url "http://test-repos"
+                                                          :organizations-url "http://test-orgs"}))))
+       (rf/dispatch [:customer/load-github-repos])
+       (is (= #{"http://test-repos" "http://test-orgs"}
+              (set (map :uri @e)))))))
+
+  (testing "sets info alert"
+    (let [_ (h/catch-fx :http-xhrio)]
+      (rf-test/run-test-sync
+       (is (some? (reset! app-db (ldb/set-github-user {} {:repos-url "http://test-repos"}))))
+       (rf/dispatch [:customer/load-github-repos])
+       (let [a (db/repo-alerts @app-db)]
+         (is (= 1 (count a)))
+         (is (= :info (-> a first :type))))))))
+
+(deftest customer-load-github-repos--success
+  (testing "sets repos in db"
+    (rf/dispatch-sync [:customer/load-github-repos--success [{:id "test-repo"}]])
+    (is (= 1 (count (db/github-repos @app-db)))))
+
+  (testing "sets success alert"
+    (rf/dispatch-sync [:customer/load-github-repos--success [{:id "test-repo"}]])
+      (let [a (db/repo-alerts @app-db)]
+        (is (= 1 (count a)))
+        (is (= :success (-> a first :type))))))
+
+(deftest load-orgs
+  (testing "invokes orgs url from github user"
+    (let [e (h/catch-fx :http-xhrio)]
+      (is (some? (reset! app-db (ldb/set-github-user {} {:orgs-url "http://test-orgs"}))))
+      (rf/dispatch-sync [::sut/load-orgs])
+      (is (= 1 (count @e)))
+      (is (= "http://test-orgs" (-> @e first :uri))))))
+
+(deftest load-orgs--success
+  (testing "fetches repos for each org"
+    (let [e (h/catch-fx :http-xhrio)]
+      (rf-test/run-test-sync
+       (rf/dispatch [::sut/load-orgs--success [{:repos-url "http://test-repos/org-1"}
+                                               {:repos-url "http://test-repos/org-2"}]])
+       (is (= 2 (count @e)))
+       (is (= ["http://test-repos/org-1"
+               "http://test-repos/org-2"]
+              (map :uri @e)))))))

@@ -34,6 +34,11 @@
        (map :value)
        (first)))
 
+(defn- add-repo-btn [id]
+  [:a.btn.btn-success.me-2
+   {:href (r/path-for :page/add-repo {:customer-id id})}
+   [:span.me-1 [co/icon :plus-square]] "Add Repository"])
+
 (defn- customer-details [id]
   (let [c (rf/subscribe [:customer/info])]
     (->> (:repos @c)
@@ -43,7 +48,9 @@
          (into [:<>
                 [:div.clearfix.mb-3
                  [:h3.float-start "Customer " (:name @c)]
-                 [co/reload-btn [:customer/load id] {:class :float-end}]]]))))
+                 [:span.float-end
+                  [add-repo-btn id]
+                  [co/reload-btn [:customer/load id]]]]]))))
 
 (defn page
   "Customer overview page"
@@ -54,3 +61,22 @@
      [:div
       [co/alerts [:customer/alerts]]
       [customer-details id]])))
+
+(defn- repo-table []
+  (let [r (rf/subscribe [:customer/github-repos])]
+    (->> @r
+         (map :name)
+         (map (partial into [:li]))
+         (into [:ul]))))
+
+(defn add-repo-page
+  []
+  (let [route (rf/subscribe [:route/current])]
+    (rf/dispatch [:customer/load-github-repos])
+    (l/default
+     ;; TODO Also fetch repos from orgs
+     [:<>
+      [:h3 "Add Repository to Watch"]
+      [co/alerts [:customer/repo-alerts]]
+      [repo-table]
+      [:a {:href (r/path-for :page/customer (r/path-params @route))} "Back to customer"]])))
