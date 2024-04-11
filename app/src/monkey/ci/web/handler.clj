@@ -67,6 +67,7 @@
   {:customer-id Id
    :name Name
    :url s/Str
+   (s/optional-key :github-id) s/Int
    (s/optional-key :main-branch) Id
    (s/optional-key :labels) [Label]})
 

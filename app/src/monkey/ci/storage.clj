@@ -86,6 +86,13 @@
 (defn find-customer [s id]
   (p/read-obj s (customer-sid id)))
 
+(defn- list-customers
+  "Lists all customers.  Don't do this.  That's why it's private  It's only
+   provided until we have a better storage system.."
+  [s]
+  ;; TODO Remove this
+  (p/list-obj s [global (name :customers)]))
+
 (defn save-repo
   "Saves the repository by updating the customer it belongs to"
   [s {:keys [customer-id id] :as r}]
@@ -96,6 +103,18 @@
   [s [cust-id id]]
   (some-> (find-customer s cust-id)
           (get-in [:repos id])))
+
+(defn find-watched-repos
+  "Looks up all watched repos with the given github id"
+  [s github-id]
+  ;; TODO Make this faster
+  (letfn [(watched-repos [c]
+            (->> c
+                 :repos
+                 (filter (every-pred (comp (partial = github-id) :github-id)
+                                     (complement :disabled)))))]
+    (->> (list-customers s)
+         (mapcat watched-repos))))
 
 (def webhook-sid (partial global-sid :webhooks))
 

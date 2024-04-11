@@ -101,19 +101,22 @@
         (assoc build :sid (s/ext-build-sid build))))
     (log/warn "No webhook configuration found for" id)))
 
+(def should-trigger-build? (every-pred github-push?
+                                       (complement (comp :deleted :body))))
+
 (defn webhook
   "Receives an incoming webhook from Github.  This starts the build
    runner async and returns a 202 accepted."
   [{p :parameters :as req}]
   (log/trace "Got incoming webhook with body:" (prn-str (:body p)))
   (log/debug "Event type:" (get-in req [:headers "x-github-event"]))
-  (if (and (github-push? req) (not (get-in p [:body :deleted])))
+  (if (should-trigger-build? req)
     (let [rt (c/req->rt req)]
       (if-let [build (create-build rt {:id (get-in p [:path :id])
                                        :payload (:body p)})]
         (do
           (c/run-build-async
-            (assoc rt :build build))
+           (assoc rt :build build))
           (rur/response {:build-id (:build-id build)}))
         ;; No valid webhook found
         (rur/not-found {:message "No valid webhook configuration found"})))
@@ -123,8 +126,14 @@
 (defn app-webhook [req]
   (log/debug "Got github app webhook event:" (pr-str (get-in req [:parameters :body])))
   (log/debug "Event type:" (get-in req [:headers "x-github-event"]))
-  ;; TODO Determine the customer/repo this is about, then check if it's configured to build
-  (rur/response {:message "ok"}))
+  (if (should-trigger-build? req)
+    (let [github-id (get-in req [:parameters :body :repository :id])
+          matches (s/find-watched-repos (c/req->storage req) github-id)]
+      (log/debug "Found" (count matches) "watched builds for id" github-id)
+      ;; TODO Create build and run it for the repo
+      (rur/status 202))
+    ;; Don't trigger build, just say fine
+    (rur/status 204)))
 
 (defn- process-reply [{:keys [status] :as r}]
   (log/trace "Got github reply:" r)

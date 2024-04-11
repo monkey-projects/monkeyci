@@ -90,6 +90,24 @@
       (is (not= :timeout (h/wait-until #(not-empty @recv) 1000)))
       (is (= :build/end (-> @recv first :type))))))
 
+(deftest app-webhook
+  (testing "triggers build on push for watched repo"
+    (h/with-memory-store s
+      (let [_ (st/save-customer s {:repos {"test-repo" {:github-id "test-id"}}})
+            runs (atom [])
+            req (-> {:storage s
+                     :runner (partial swap! runs conj)}
+                    (h/->req)
+                    (assoc :headers {"x-github-event" "push"}
+                           :parameters {:body
+                                        {:repository {:id "test-id"}}}))]
+        (is (= 202 (:status (sut/app-webhook req))))
+        (is (= 1 (count @runs))))))
+
+  (testing "ignores non-push events")
+
+  (testing "ignores push events for non-watched repos"))
+
 (defn- test-webhook []
   (zipmap [:id :customer-id :repo-id] (repeatedly st/new-id)))
 
