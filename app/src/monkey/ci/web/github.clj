@@ -147,8 +147,11 @@
       (process-reply)
       ;; TODO Check for failures
       :body
-      ;; TODO Create or lookup user in database according to github id
-      (select-keys [:id :avatar-url :email :name])))
+      ;; Avatar url is used to display user avatar in gui
+      ;; Repos url is used to look up the repos the user has access to when adding a new repo.
+      (select-keys [:id :email :name :avatar-url :repos-url])
+      ;; Return token to frontend, we'll need it when doing github requests.
+      (assoc :github-token token)))
 
 (defn- generate-jwt [req user]
   ;; Perhaps we should use the internal user id instead?
@@ -170,7 +173,7 @@
                      :email (:email user)}]
               (s/save-user st u)
               u))
-        (merge (select-keys user [:avatar-url :name])))))
+        (merge (select-keys user [:name :github-token :avatar-url :repos-url])))))
 
 (defn login
   "Invoked by the frontend during OAuth2 login flow.  It requests a Github

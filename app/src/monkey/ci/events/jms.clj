@@ -88,19 +88,20 @@
   (start [this]
     (-> this
         (mc/assoc-some :broker (maybe-start-broker (:server config)))
-        ;; Note that this opens 2 connections to the broker
+        ;; Note that this opens 2 connections to the broker and also 3 sessions
+        ;; per connection.  We may want to replace this in the future.
         (assoc :producer (make-producer (:client config))
-               :consumer (make-consumer (:client config) listeners))))
+               :consumer (make-consumer (:client config) listeners)))
 
-  (stop [{:keys [broker producer consumer] :as this}]
-    (with-logs
-      (when producer
-        (jms/close producer))
-      (when consumer
-        (jms/close consumer))
-      (when broker
-        (jms/stop broker)))
-    (assoc this :broker nil :producer nil :consumer nil)))
+    (stop [{:keys [broker producer consumer] :as this}]
+          (with-logs
+            (when producer
+              (jms/close producer))
+            (when consumer
+              (jms/close consumer))
+            (when broker
+              (jms/stop broker)))
+          (assoc this :broker nil :producer nil :consumer nil))))
 
 (defn make-jms-events [config matches-event?]
   (->JmsEvents config matches-event? (atom []) nil nil nil))

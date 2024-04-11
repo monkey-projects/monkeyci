@@ -333,4 +333,41 @@
           (is (= (str "github/" (:id u))
                  (-> token
                      (jwt/unsign pubkey {:alg :rs256})
-                     :sub))))))))
+                     :sub)))))))
+
+  (testing "adds repos url to response"
+    (with-github-user
+      {:id 1234
+       :name "test user"
+       :repos-url "http://repos"}
+      (fn [u]
+        (let [{st :storage :as rt} (h/test-rt)
+              req (-> rt
+                      (h/->req)
+                      (assoc :parameters
+                             {:query
+                              {:code "test-code"}}))
+              _ (st/save-user st {:type "github"
+                                  :type-id (:id u)
+                                  :id (st/new-id)})
+              resp (-> req
+                       (sut/login)
+                       :body)]
+          (is (= (:repos-url u) (:repos-url resp)))))))
+
+  (testing "adds github token to response"
+    (with-github-user
+      (fn [u]
+        (let [{st :storage :as rt} (h/test-rt)
+              req (-> rt
+                      (h/->req)
+                      (assoc :parameters
+                             {:query
+                              {:code "test-code"}}))
+              _ (st/save-user st {:type "github"
+                                  :type-id (:id u)
+                                  :id (st/new-id)})
+              resp (-> req
+                       (sut/login)
+                       :body)]
+          (is (string? (:github-token resp))))))))
