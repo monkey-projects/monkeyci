@@ -111,10 +111,11 @@
    (log/debug "Watching repo:" repo)
    (let [params (r/path-params (r/current db))]
      {:dispatch [:secure-request
-                 :create-repo
+                 :watch-github-repo
                  {:repo {:name (:name repo)
                          :url (:clone-url repo)
-                         :customer-id (:customer-id params)}
+                         :customer-id (:customer-id params)
+                         :github-id (:id repo)}
                   :customer-id (:customer-id params)}
                  [:repo/watch--success]
                  [:repo/watch--failed]]})))

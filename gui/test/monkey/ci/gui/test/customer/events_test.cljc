@@ -106,19 +106,19 @@
               (map :uri @e)))))))
 
 (deftest repo-watch
-  (testing "creates new repo in backend"
+  (testing "invokes repo github watch endpoint"
     (rf-test/run-test-sync
      (let [c (h/catch-fx :martian.re-frame/request)]
-       (h/initialize-martian {:create-repo {:status 204
-                                            :body {:id "test-repo"}
-                                            :error-code :no-error}})
+       (h/initialize-martian {:watch-github-repo {:status 204
+                                                  :body {:id "test-repo"}
+                                                  :error-code :no-error}})
        (is (some? (:martian.re-frame/martian @app-db)))
        (rf/dispatch [:repo/watch {:id "github-id"
                                   :private false
                                   :name "test-repo"
                                   :clone-url "http://test-url"}])
        (is (= 1 (count @c)))
-       (is (= :create-repo (-> @c first (nth 2))))))))
+       (is (= :watch-github-repo (-> @c first (nth 2))))))))
 
 (deftest repo-watch--success
   (testing "adds repo to customer"

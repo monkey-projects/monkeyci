@@ -38,7 +38,7 @@
      :path-parts customer-path
      :path-schema customer-schema})
 
-   (api-route
+   #_(api-route
     {:route-name :create-repo
      :method :post
      :path-parts (conj customer-path "/repo")
@@ -77,7 +77,18 @@
      :path-schema build-schema
      :query-schema {:path s/Str}
      :produces #{"text/plain"}})
-
+   
+   (api-route
+    {:route-name :watch-github-repo
+     :method :post
+     :path-parts (conj customer-path "/repo/github/watch")
+     :path-schema customer-schema
+     :body-schema {:repo {:name s/Str
+                          :url s/Str
+                          :customer-id s/Str
+                          :github-id s/Int}}
+     :consumes ["application/edn"]})
+   
    (public-route
     {:route-name :github-login
      :method :post
@@ -111,6 +122,7 @@
                routes
                {:interceptors (concat martian/default-interceptors
                                       [mi/default-coerce-response
+                                       mi/default-encode-body
                                        disable-with-credentials
                                        mh/perform-request])})]))
 
