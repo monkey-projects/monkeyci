@@ -281,10 +281,15 @@
                        :status))))
 
       (testing "`/unwatch` stops watching repo"
-        (let [repo-id (st/new-id)]
+        (let [st (st/make-memory-storage)
+              app (make-test-app st)
+              repo-id (st/new-id)
+              _ (st/watch-github-repo st {:customer-id cust-id
+                                          :id repo-id
+                                          :github-id 1234})]
           (is (= 200 (-> (mock/request :post
                                        (format "/customer/%s/repo/%s/github/unwatch" cust-id repo-id))
-                         (test-app)
+                         (app)
                          :status))))))))
 
 (deftest webhook-endpoints
