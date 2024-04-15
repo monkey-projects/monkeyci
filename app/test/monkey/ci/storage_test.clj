@@ -115,6 +115,59 @@
         (is (sut/sid? (sut/save-user st u)))
         (is (= u (sut/find-user st [:github 1234])) "can retrieve user by github id")))))
 
+(deftest update-repo
+  (testing "updates repo in customer object"
+    (h/with-memory-store st
+      (let [[cid rid] (repeatedly sut/new-id)]
+        (is (some? (sut/save-customer st {:id cid})))
+        (is (some? (sut/save-repo st {:id rid
+                                      :customer-id cid
+                                      :url "http://test-repo"})))
+        (is (some? (sut/update-repo st [cid rid] assoc :url "updated-url")))
+        (is (= "updated-url" (:url (sut/find-repo st [cid rid]))))))))
+
+(deftest watch-github-repo
+  (h/with-memory-store st
+    (let [[cid rid gid] (repeatedly sut/new-id)
+          repo {:id rid
+                :customer-id cid
+                :github-id gid
+                :url "http://test-repo"}]
+
+      (testing "new repo"
+        (let [sid (sut/watch-github-repo st repo)]
+          
+          (testing "creates repo"
+            (is (sut/sid? sid))
+            (is (= repo (sut/find-repo st [cid rid]))))
+
+          (testing "adds to watched repos"
+            (is (= [repo] (sut/find-watched-github-repos st gid))))))
+
+      (testing "sets github id in existing repo"
+        (is (sut/sid? (sut/save-repo st (dissoc repo :github-id))))
+        (is (sut/sid? (sut/watch-github-repo st repo)))
+        (is (= gid (:github-id (sut/find-repo st [cid rid]))))))))
+
+(deftest unwatch-github-repo
+  (h/with-memory-store st
+    (let [[cid rid gid] (repeatedly sut/new-id)
+          repo {:id rid
+                :customer-id cid
+                :github-id gid
+                :url "http://test-repo"}
+          _ (sut/watch-github-repo st repo)
+          r (sut/unwatch-github-repo st [cid rid])]
+
+      (is (true? r))
+      
+      (testing "removes from watch list"
+        (is (empty? (sut/find-watched-github-repos st gid))))
+
+      (testing "removes github id from repo"
+        (is (= (dissoc repo :github-id)
+               (-> (sut/find-repo st [cid rid]))))))))
+
 (deftest normalize-key
   (testing "normalizes string type"
     (is (= :memory (-> (c/normalize-key :storage {:storage {:type "memory"}})

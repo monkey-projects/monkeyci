@@ -86,17 +86,12 @@
 (defn find-customer [s id]
   (p/read-obj s (customer-sid id)))
 
-(defn- list-customers
-  "Lists all customers.  Don't do this.  That's why it's private  It's only
-   provided until we have a better storage system.."
-  [s]
-  ;; TODO Remove this
-  (p/list-obj s [global (name :customers)]))
-
 (defn save-repo
   "Saves the repository by updating the customer it belongs to"
   [s {:keys [customer-id id] :as r}]
-  (update-obj s (customer-sid customer-id) assoc-in [:repos id] r))
+  (-> (update-obj s (customer-sid customer-id) assoc-in [:repos id] r)
+      ;; Return repo sid
+      (conj id)))
 
 (defn find-repo
   "Reads the repo, as part of the customer object's projects"
@@ -104,17 +99,40 @@
   (some-> (find-customer s cust-id)
           (get-in [:repos id])))
 
-(defn find-watched-repos
+(defn update-repo
+  "Applies `f` to the repo with given sid"
+  [s [cust-id repo-id] f & args]
+  (apply update-obj s (customer-sid cust-id) update-in [:repos repo-id] f args))
+
+(def ext-repo-sid (partial take-last 2))
+(def watched-sid (comp (partial global-sid :watched) str))
+
+(defn find-watched-github-repos
   "Looks up all watched repos with the given github id"
   [s github-id]
-  ;; TODO Make this faster
-  (letfn [(watched-repos [c]
-            (->> c
-                 :repos
-                 (filter (every-pred (comp (partial = github-id) :github-id)
-                                     (complement :disabled)))))]
-    (->> (list-customers s)
-         (mapcat watched-repos))))
+  (->> (p/read-obj s (watched-sid github-id))
+       (map (partial find-repo s))))
+
+(defn watch-github-repo
+  "Creates necessary records to start watching a github repo.  Creates the
+   repo entity and returns it."
+  [s {:keys [customer-id id github-id] :as r}]
+  (let [repo-sid (save-repo s r)]
+    ;; Add the repo sid to the list of watched repos for the github id
+    (update-obj s (watched-sid github-id) (fnil conj []) (ext-repo-sid repo-sid))
+    repo-sid))
+
+(defn unwatch-github-repo
+  "Removes the records to stop watching the repo.  The entity will still 
+   exist, so any past builds can be looked up."
+  [s sid]
+  (when-let [repo (find-repo s sid)]
+    (when-let [gid (:github-id repo)]
+      ;; Remove it from the list of watched repos for the stored github id
+      (update-obj s (watched-sid gid) (comp vec (partial remove (partial = sid))))
+      ;; Clear github id
+      (update-repo s sid dissoc :github-id)
+      true)))
 
 (def webhook-sid (partial global-sid :webhooks))
 

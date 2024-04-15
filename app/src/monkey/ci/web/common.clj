@@ -97,7 +97,7 @@
   (let [runner (rt/runner rt)
         report-error (fn [ex]
                        (log/error "Unable to start build:" ex)
-                       (rt/post-events rt (b/build-completed-evt
+                       (rt/post-events rt (b/build-end-evt
                                            (-> (rt/build rt)
                                                (assoc :status :error
                                                       :message (ex-message ex))))))]

@@ -7,6 +7,7 @@
              [storage :as st]]
             [monkey.ci.web
              [auth :as auth]
+             [common :as wc]
              [github :as sut]]
             [monkey.ci.helpers :as h]
             [org.httpkit.fake :as hf]
@@ -45,7 +46,7 @@
                          :parameters {:path {:id "test-hook"}
                                       :body
                                       {:head-commit {:id "test-id"}}}))]
-      (is (= 200 (:status (sut/webhook req))))
+      (is (= 202 (:status (sut/webhook req))))
       (is (not= :timeout (h/wait-until #(some? @inv) 1000)))))
 
   (testing "ignores non-push events"
@@ -86,39 +87,73 @@
                          :parameters {:path {:id "test-hook"}
                                       :body
                                       {:head-commit {:id "test-id"}}}))]
-      (is (= 200 (:status (sut/webhook req))))
+      (is (= 202 (:status (sut/webhook req))))
       (is (not= :timeout (h/wait-until #(not-empty @recv) 1000)))
       (is (= :build/end (-> @recv first :type))))))
 
 (deftest app-webhook
   (testing "triggers build on push for watched repo"
     (h/with-memory-store s
-      (let [_ (st/save-customer s {:repos {"test-repo" {:github-id "test-id"}}})
+      (let [gid "test-id"
+            sid (st/watch-github-repo s {:customer-id "test-cust"
+                                         :id "test-repo"
+                                         :github-id gid})
             runs (atom [])
             req (-> {:storage s
                      :runner (partial swap! runs conj)}
                     (h/->req)
                     (assoc :headers {"x-github-event" "push"}
                            :parameters {:body
-                                        {:repository {:id "test-id"}}}))]
-        (is (= 202 (:status (sut/app-webhook req))))
-        (is (= 1 (count @runs))))))
+                                        {:repository {:id gid}}}))
+            resp (sut/app-webhook req)]
+        (is (some? (st/find-repo s (st/ext-repo-sid sid))))
+        (is (= 202 (:status resp)))
+        (is (= 1 (-> resp :body :builds count)))
+        (is (not= :timeout (h/wait-until #(pos? (count @runs)) 500))))))
 
-  (testing "ignores non-push events")
+  (testing "ignores non-push events"
+    (h/with-memory-store s
+      (let [gid "test-id"
+            sid (st/watch-github-repo s {:customer-id "test-cust"
+                                         :id "test-repo"
+                                         :github-id gid})
+            runs (atom [])
+            req (-> {:storage s
+                     :runner (partial swap! runs conj)}
+                    (h/->req)
+                    (assoc :headers {"x-github-event" "other"}
+                           :parameters {:body
+                                        {:repository {:id gid}}}))
+            resp (sut/app-webhook req)]
+        (is (some? (st/find-repo s (st/ext-repo-sid sid))))
+        (is (= 204 (:status resp)))
+        (is (= 0 (-> resp :body :builds count))))))
 
-  (testing "ignores push events for non-watched repos"))
+  (testing "ignores push events for non-watched repos"
+    (h/with-memory-store s
+      (let [gid "test-id"
+            runs (atom [])
+            req (-> {:storage s
+                     :runner (partial swap! runs conj)}
+                    (h/->req)
+                    (assoc :headers {"x-github-event" "push"}
+                           :parameters {:body
+                                        {:repository {:id gid}}}))
+            resp (sut/app-webhook req)]
+        (is (= 204 (:status resp)))
+        (is (= 0 (-> resp :body :builds count)))))))
 
 (defn- test-webhook []
   (zipmap [:id :customer-id :repo-id] (repeatedly st/new-id)))
 
-(deftest create-build
+(deftest create-webhook-build
   (testing "creates build record for customer/repo"
     (h/with-memory-store s
       (let [wh (test-webhook)]
         (is (st/sid? (st/save-webhook-details s wh)))
-        (let [r (sut/create-build {:storage s}
-                                  {:id (:id wh)
-                                   :payload {}})]
+        (let [r (sut/create-webhook-build {:storage s}
+                                          (:id wh)
+                                          {})]
           (is (some? r))
           (is (p/obj-exists? s (-> wh
                                    (select-keys [:customer-id :repo-id])
@@ -129,9 +164,9 @@
     (h/with-memory-store s
       (let [wh (test-webhook)]
         (is (st/sid? (st/save-webhook-details s wh)))
-        (let [r (sut/create-build {:storage s}
-                                  {:id (:id wh)
-                                   :payload {:head-commit {:message "test message"}}})
+        (let [r (sut/create-webhook-build {:storage s}
+                                          (:id wh)
+                                          {:head-commit {:message "test message"}})
               id (:sid r)
               md (st/find-build s id)]
           (is (st/sid? id))
@@ -142,9 +177,9 @@
     (h/with-memory-store s
       (let [wh (test-webhook)]
         (is (st/sid? (st/save-webhook-details s wh)))
-        (let [r (sut/create-build {:storage s}
-                                  {:id (:id wh)
-                                   :payload {:head-commit {:timestamp "2023-10-10"}}})
+        (let [r (sut/create-webhook-build {:storage s}
+                                          (:id wh)
+                                          {:head-commit {:timestamp "2023-10-10"}})
               id (:sid r)
               md (st/find-build s id)]
           (is (st/sid? id))
@@ -153,39 +188,39 @@
   
   (testing "`nil` if no configured webhook found"
     (h/with-memory-store s
-      (is (nil? (sut/create-build {:storage s}
-                                  {:id "test-webhook"
-                                   :payload {}})))))
+      (is (nil? (sut/create-webhook-build {:storage s}
+                                          "test-webhook"
+                                          {})))))
 
   (testing "uses clone url for public repos"
     (h/with-memory-store s
       (let [wh (test-webhook)]
         (is (st/sid? (st/save-webhook-details s wh)))
-        (let [r (sut/create-build {:storage s}
-                                  {:id (:id wh)
-                                   :payload {:repository {:ssh-url "ssh-url"
-                                                          :clone-url "clone-url"}}})]
+        (let [r (sut/create-webhook-build {:storage s}
+                                          (:id wh)
+                                          {:repository {:ssh-url "ssh-url"
+                                                        :clone-url "clone-url"}})]
           (is (= "clone-url" (get-in r [:git :url])))))))
 
   (testing "uses ssh url if repo is private"
     (h/with-memory-store s
       (let [wh (test-webhook)]
         (is (st/sid? (st/save-webhook-details s wh)))
-        (let [r (sut/create-build {:storage s}
-                                  {:id (:id wh)
-                                   :payload {:repository {:ssh-url "ssh-url"
-                                                          :clone-url "clone-url"
-                                                          :private true}}})]
+        (let [r (sut/create-webhook-build {:storage s}
+                                          (:id wh)
+                                          {:repository {:ssh-url "ssh-url"
+                                                        :clone-url "clone-url"
+                                                        :private true}})]
           (is (= "ssh-url" (get-in r [:git :url])))))))
 
   (testing "does not include secret key in metadata"
     (h/with-memory-store s
       (let [wh (assoc (test-webhook) :secret-key "very very secret!")]
         (is (st/sid? (st/save-webhook-details s wh)))
-        (let [r (sut/create-build {:storage s}
-                                  {:id (:id wh)
-                                   :payload {:head-commit {:message "test message"
-                                                           :timestamp "2023-10-10"}}})
+        (let [r (sut/create-webhook-build {:storage s}
+                                          (:id wh)
+                                          {:head-commit {:message "test message"
+                                                         :timestamp "2023-10-10"}})
               id (:sid r)
               md (st/find-build s id)]
           (is (not (contains? md :secret-key)))))))
@@ -194,19 +229,19 @@
     (h/with-memory-store s
       (let [wh (test-webhook)]
         (is (st/sid? (st/save-webhook-details s wh)))
-        (let [r (sut/create-build {:storage s}
-                                  {:id (:id wh)
-                                   :payload {:ref "test-ref"}})]
+        (let [r (sut/create-webhook-build {:storage s}
+                                          (:id wh)
+                                          {:ref "test-ref"})]
           (is (= "test-ref" (get-in r [:git :ref])))))))
 
   (testing "sets `main-branch`"
     (h/with-memory-store s
       (let [wh (test-webhook)]
         (is (st/sid? (st/save-webhook-details s wh)))
-        (let [r (sut/create-build {:storage s}
-                                  {:id (:id wh)
-                                   :payload {:ref "test-ref"
-                                             :repository {:master-branch "test-main"}}})]
+        (let [r (sut/create-webhook-build {:storage s}
+                                          (:id wh)
+                                          {:ref "test-ref"
+                                           :repository {:master-branch "test-main"}})]
           (is (= "test-main"
                  (get-in r [:git :main-branch])))))))
 
@@ -214,9 +249,9 @@
     (h/with-memory-store s
       (let [wh (test-webhook)]
         (is (st/sid? (st/save-webhook-details s wh)))
-        (let [r (sut/create-build {:storage s}
-                                  {:id (:id wh)
-                                   :payload {:head-commit {:id "test-commit-id"}}})]
+        (let [r (sut/create-webhook-build {:storage s}
+                                          (:id wh)
+                                          {:head-commit {:id "test-commit-id"}})]
           (is (= "test-commit-id"
                  (get-in r [:git :commit-id])))))))
 
@@ -233,10 +268,10 @@
                                       :labels [{:name "ssh-lbl"
                                                 :value "lbl-val"}]})))
         (is (st/sid? (st/save-ssh-keys s cid [ssh-key])))
-        (let [r (sut/create-build {:storage s}
-                                  {:id (:id wh)
-                                   :payload {:ref "test-ref"
-                                             :repository {:master-branch "test-main"}}})]
+        (let [r (sut/create-webhook-build {:storage s}
+                                          (:id wh)
+                                          {:ref "test-ref"
+                                           :repository {:master-branch "test-main"}})]
           (is (= [ssh-key]
                  (get-in r [:git :ssh-keys])))))))
 
@@ -248,10 +283,10 @@
         (is (st/sid? (st/save-webhook-details s wh)))
         (is (st/sid? (st/save-repo s {:customer cid
                                       :id rid})))
-        (let [r (sut/create-build {:storage s}
-                                  {:id (:id wh)
-                                   :payload {:ref "test-ref"
-                                             :repository {:master-branch "test-main"}}})]
+        (let [r (sut/create-webhook-build {:storage s}
+                                          (:id wh)
+                                          {:ref "test-ref"
+                                           :repository {:master-branch "test-main"}})]
           (is (true? (:cleanup? r))))))))
 
 (defn- with-github-user
@@ -369,3 +404,25 @@
                        (sut/login)
                        :body)]
           (is (string? (:github-token resp))))))))
+
+(deftest watch-repo
+  (let [cust-id (st/new-id)
+        {st :storage :as rt} (h/test-rt)
+        _ (st/save-customer st {:id cust-id :name "test customer"})
+        repo {:name "test repo"
+              :customer-id cust-id
+              :github-id 1234245}
+        r (-> rt
+              (h/->req)
+              (h/with-body repo)
+              (sut/watch-repo))]
+
+    (is (= 200 (:status r)))
+    
+    (testing "adds to watch list"
+      (is (= [(:body r)]
+             (st/find-watched-github-repos st (:github-id repo)))))
+
+    (testing "creates new repo"
+      (is (= (:body r)
+             (st/find-repo st [cust-id (get-in r [:body :id])]))))))
