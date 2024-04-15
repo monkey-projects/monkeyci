@@ -36,6 +36,7 @@
               {:key secret :alg :hmac+sha256})))
 
 (def req->webhook-id (comp :id :path :parameters))
+(def req->repo-sid (comp (juxt :customer-id :repo-id) :path :parameters))
 
 (defn validate-security
   "Middleware that validates the github security header using a fn that retrieves
@@ -179,8 +180,11 @@
       (rur/status 500))))
 
 (defn unwatch-repo [req]
-  ;; TODO
-  (rur/status 200))
+  (let [st (c/req->storage req)
+        sid (req->repo-sid req)]
+    (if (s/unwatch-github-repo st sid)
+      (rur/response (s/find-repo st sid))
+      (rur/status 404))))
 
 (defn- process-reply [{:keys [status] :as r}]
   (log/trace "Got github reply:" r)

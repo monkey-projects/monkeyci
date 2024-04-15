@@ -426,3 +426,27 @@
     (testing "creates new repo"
       (is (= (:body r)
              (st/find-repo st [cust-id (get-in r [:body :id])]))))))
+
+(deftest unwatch-repo
+  (testing "404 when repo not found"
+    (is (= 404 (-> (h/test-rt)
+                   (h/->req)
+                   (assoc :parameters {:path {:customer-id "test-cust"
+                                              :repo-id "test-repo"}})
+                   (sut/unwatch-repo)
+                   :status))))
+
+  (testing "unwatches in db"
+    (let [{st :storage :as rt} (h/test-rt)
+          [cust-id repo-id github-id :as sid] (repeatedly 3 st/new-id)
+          _ (st/watch-github-repo st (zipmap [:customer-id :id :github-id] sid))
+          req (-> rt
+                  (h/->req)
+                  (assoc :parameters {:path {:customer-id cust-id
+                                             :repo-id repo-id}}))
+          resp (sut/unwatch-repo req)]
+      (is (= 200 (:status resp)))
+      (is (= {:customer-id cust-id
+              :id repo-id}
+             (:body resp)))
+      (is (empty? (st/find-watched-repos st github-id))))))

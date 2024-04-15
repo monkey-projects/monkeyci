@@ -135,4 +135,4 @@
       (is (= :danger (:type (first a)))))))
 
 (deftest repo-unwatch
-  (testing "disables repo in backend"))
+  (testing "invokes unwatch endpoint"))
