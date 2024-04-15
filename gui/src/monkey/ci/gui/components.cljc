@@ -3,7 +3,7 @@
             [re-frame.core :as rf]))
 
 (defn logo []
-  [:img.img-fluid.rounded {:src "/img/monkeyci-large.png" :title "Placeholder Logo"}])
+  [:img.img-fluid.rounded {:src "/img/monkeyci-bw-small.png" :title "Placeholder Logo"}])
 
 (defn render-alert [{:keys [type message]}]
   [:div {:class (str "alert alert-" (name type))} message])
