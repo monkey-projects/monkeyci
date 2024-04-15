@@ -88,6 +88,12 @@
                           :customer-id s/Str
                           :github-id s/Int}}
      :consumes ["application/edn"]})
+
+   (api-route
+    {:route-name :unwatch-github-repo
+     :method :post
+     :path-parts (conj repo-path "github/unwatch")
+     :path-schema repo-schema})
    
    (public-route
     {:route-name :github-login

@@ -135,4 +135,29 @@
       (is (= :danger (:type (first a)))))))
 
 (deftest repo-unwatch
-  (testing "invokes unwatch endpoint"))
+  (testing "invokes unwatch endpoint"  
+    (rf-test/run-test-sync
+     (let [c (h/catch-fx :martian.re-frame/request)]
+       (h/initialize-martian {:unwatch-github-repo {:status 200
+                                                    :error-code :no-error}})
+       (is (some? (:martian.re-frame/martian @app-db)))
+       (rf/dispatch [:repo/unwatch {:id "test-repo"
+                                    :customer-id "test-cust"}])
+       (is (= 1 (count @c)))
+       (is (= :unwatch-github-repo (-> @c first (nth 2))))))))
+
+(deftest repo-unwatch--success
+  (testing "updates repo in db"
+    (let [repo-id "test-repo"]
+      (is (some? (reset! app-db (db/set-customer {} {:repos [{:id repo-id
+                                                              :github-id "test-github-id"}]}))))
+      (rf/dispatch-sync [:repo/unwatch--success {:body {:id repo-id}}])
+      (is (= {:repos [{:id "test-repo"}]}
+             (db/customer @app-db))))))
+
+(deftest repo-unwatch--failed
+  (testing "sets error alert"
+    (rf/dispatch-sync [:repo/unwatch--failed {:message "test error"}])
+    (let [a (db/repo-alerts @app-db)]
+      (is (= 1 (count a)))
+      (is (= :danger (:type (first a)))))))

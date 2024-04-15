@@ -71,10 +71,10 @@
                                    :text-bg-success
                                    :text-bg-warning)}
              visibility])
-          (actions [{:keys [watched?] :as repo}]
+          (actions [{:keys [:monkeyci/watched?] :as repo}]
             (if watched?
               [:button.btn.btn-sm.btn-danger
-               {:on-click #(rf/dispatch [:repo/unwatch repo])}
+               {:on-click #(rf/dispatch [:repo/unwatch (:monkeyci/repo repo)])}
                [:span.me-1 [co/icon :stop-circle-fill]] "Unwatch"]
               [:button.btn.btn-sm.btn-primary
                {:on-click #(rf/dispatch [:repo/watch repo])}

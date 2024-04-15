@@ -13,6 +13,20 @@
 (defn set-customer [db i]
   (assoc db customer i))
 
+(defn update-customer [db f & args]
+  (apply update db customer f args))
+
+(defn replace-repo
+  "Updates customer repos by replacing the existing repo with the same id."
+  [db updated-repo]
+  (letfn [(replace-with [repos]
+            (if-let [match (->> repos
+                                (filter (comp (partial = (:id updated-repo)) :id))
+                                (first))]
+              (replace {match updated-repo} repos)
+              (conj repos updated-repo)))]
+    (update-customer db update :repos replace-with)))
+
 (def alerts ::alerts)
 
 (defn set-alerts [db a]

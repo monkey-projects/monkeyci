@@ -20,9 +20,14 @@
  :<- [:customer/repos]
  :<- [::github-repos]
  (fn [[cr gr] _]
-   (letfn [(watched? [r]
-             (some (some-fn (comp (partial = (:id r)) :git-id)
+   (letfn [(watched-repo [r]
+             (some (some-fn (comp (partial = (:id r)) :github-id)
                             (comp (partial = (:ssh-url r)) :url)
                             (comp (partial = (:clone-url r)) :url))
                    cr))]
-     (map #(assoc % :watched? (watched? %)) gr))))
+     (map (fn [r]
+            (let [w (watched-repo r)]
+              (assoc r
+                     :monkeyci/watched? (some? w)
+                     :monkeyci/repo r)))
+          gr))))

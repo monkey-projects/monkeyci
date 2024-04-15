@@ -65,14 +65,14 @@
                                                          :ssh-url "ssh@ssh-url"
                                                          :clone-url "https://clone-url"}]))))
 
-      (testing "by git id"
-        (is (map? (swap! app-db db/set-customer {:repos [{:git-id "github-repo-id"}]})))
-        (is (true? (-> @r first :watched?))))
+      (testing "by github id"
+        (is (map? (swap! app-db db/set-customer {:repos [{:github-id "github-repo-id"}]})))
+        (is (true? (-> @r first :monkeyci/watched?))))
       
       (testing "by clone url"
         (is (map? (swap! app-db db/set-customer {:repos [{:url "https://clone-url"}]})))
-        (is (true? (-> @r first :watched?))))
+        (is (true? (-> @r first :monkeyci/watched?))))
       
       (testing "by ssh url"
         (is (map? (swap! app-db db/set-customer {:repos [{:url "ssh@ssh-url"}]})))
-        (is (true? (-> @r first :watched?)))))))
+        (is (true? (-> @r first :monkeyci/watched?)))))))

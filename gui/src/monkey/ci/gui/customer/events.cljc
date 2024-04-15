@@ -123,8 +123,7 @@
 (rf/reg-event-db
  :repo/watch--success
  (fn [db [_ {:keys [body]}]]
-   (db/set-customer db (-> (db/customer db)
-                           (update :repos conj body)))))
+   (db/update-customer db update :repos conj body)))
 
 (rf/reg-event-db
  :repo/watch--failed
@@ -135,6 +134,21 @@
 (rf/reg-event-fx
  :repo/unwatch
  (fn [{:keys [db]} [_ repo]]
-   ;; TODO
-   (db/set-repo-alerts db [{:type :warning
-                            :message "Unwatching a repo is not implemented yet!"}])))
+   (log/debug "Unwatching:" (str repo))
+   {:dispatch [:secure-request
+               :unwatch-github-repo
+               {:repo-id (:id repo)
+                :customer-id (:customer-id repo)}
+               [:repo/unwatch--success]
+               [:repo/unwatch--failed]]}))
+
+(rf/reg-event-db
+ :repo/unwatch--success
+ (fn [db [_ {:keys [body]}]]
+   (db/replace-repo db body)))
+
+(rf/reg-event-db
+ :repo/unwatch--failed
+ (fn [db [_ err]]
+   (db/set-repo-alerts db [{:type :danger
+                            :message (str "Failed to unwatch repo: " (u/error-msg err))}])))
