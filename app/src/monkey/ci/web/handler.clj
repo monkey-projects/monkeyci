@@ -67,12 +67,18 @@
   {:customer-id Id
    :name Name
    :url s/Str
-   (s/optional-key :github-id) s/Int
    (s/optional-key :main-branch) Id
    (s/optional-key :labels) [Label]})
 
 (s/defschema UpdateRepo
-  (assoc-id NewRepo))
+  (-> NewRepo
+      (assoc-id)
+      (assoc (s/optional-key :github-id) s/Int)))
+
+(s/defschema WatchGithubRepo
+  (-> NewRepo
+      (assoc-id)
+      (assoc :github-id s/Int)))
 
 (s/defschema ParameterValue
   {:name s/Str
@@ -175,18 +181,29 @@
          {:get {:handler api/download-build-log
                 :parameters {:query {:path s/Str}}}}]]]]]]])
 
+(def github-watch-route
+  ["/github"
+   [["/watch" {:post {:handler github/watch-repo
+                      :parameters {:body WatchGithubRepo}}}]]])
+
+(def github-unwatch-route
+  ["/github"
+   [["/unwatch" {:post {:handler github/unwatch-repo}}]]])
+
 (def repo-routes
   ["/repo"
-   (generic-routes
-    {:creator api/create-repo
-     :updater api/update-repo
-     :getter  api/get-repo
-     :new-schema NewRepo
-     :update-schema UpdateRepo
-     :id-key :repo-id
-     :child-routes [repo-parameter-routes
-                    repo-ssh-keys-routes
-                    build-routes]})])
+   (-> (generic-routes
+        {:creator api/create-repo
+         :updater api/update-repo
+         :getter  api/get-repo
+         :new-schema NewRepo
+         :update-schema UpdateRepo
+         :id-key :repo-id
+         :child-routes [repo-parameter-routes
+                        repo-ssh-keys-routes
+                        build-routes
+                        github-unwatch-route]})
+       (conj github-watch-route))])
 
 (def event-stream-routes
   ["/events" {:get {:handler api/event-stream

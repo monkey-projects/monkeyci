@@ -178,6 +178,10 @@
       (rur/response with-id)
       (rur/status 500))))
 
+(defn unwatch-repo [req]
+  ;; TODO
+  (rur/status 200))
+
 (defn- process-reply [{:keys [status] :as r}]
   (log/trace "Got github reply:" r)
   (update r :body c/parse-json))
