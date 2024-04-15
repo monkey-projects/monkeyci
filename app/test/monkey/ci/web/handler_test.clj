@@ -112,7 +112,7 @@
                                         :config {:dev-mode false}}))]
         (is (st/sid? (st/save-webhook-details st {:id hook-id
                                                   :secret-key github-secret})))
-        (is (= 200 (-> (mock/request :post (str "/webhook/github/" hook-id))
+        (is (= 202 (-> (mock/request :post (str "/webhook/github/" hook-id))
                        (mock/body payload)
                        (mock/header :x-hub-signature-256 (str "sha256=" signature))
                        (mock/header :x-github-event "push")
@@ -144,7 +144,7 @@
             app (sut/make-app (test-rt {:config
                                         {:github
                                          {:webhook-secret secret}}}))]
-        (is (= 200 (-> (mock/request :post "/webhook/github/app")
+        (is (= 204 (-> (mock/request :post "/webhook/github/app")
                        (mock/body payload)
                        (mock/content-type "application/json")
                        (mock/header :x-hub-signature-256 (str "sha256=" signature))
@@ -167,7 +167,7 @@
       (let [secret (str (random-uuid))
             payload (h/to-json {:message "test from github"})
             app (sut/make-app (test-rt {}))]
-        (is (= 200 (-> (mock/request :post "/webhook/github/app")
+        (is (= 204 (-> (mock/request :post "/webhook/github/app")
                        (mock/body payload)
                        (mock/content-type "application/json")
                        (app)
@@ -267,7 +267,25 @@
                                             :url "http://test-repo"
                                             :labels [{:name "app" :value "test-app"}]}
                               :updated-entity {:name "updated repo"}
-                              :creator st/save-repo})))
+                              :creator st/save-repo})
+    
+    (testing "`/customer/:id/github`"
+      (testing "`/watch` starts watching repo"
+        (is (= 200 (-> (h/json-request :post
+                                       (str "/customer/" cust-id "/repo/github/watch")
+                                       {:github-id 12324
+                                        :customer-id cust-id
+                                        :name "test-repo"
+                                        :url "http://test"})
+                       (test-app)
+                       :status))))
+
+      (testing "`/unwatch` stops watching repo"
+        (let [repo-id (st/new-id)]
+          (is (= 200 (-> (mock/request :post
+                                       (format "/customer/%s/repo/%s/github/unwatch" cust-id repo-id))
+                         (test-app)
+                         :status))))))))
 
 (deftest webhook-endpoints
   (verify-entity-endpoints {:name "webhook"
@@ -635,11 +653,11 @@
             r (-> (mock/request :post "/github/login?code=1234")
                   (app))]
         (is (= 200 (:status r)) (:body r))
-        (is (= "test-user"
+        (is (= "test-token"
                (some-> (:body r)
                        (slurp)
                        (h/parse-json)
-                       :name))))))
+                       :github-token))))))
 
   (testing "`GET /github/config` returns client id"
     (let [app (-> (test-rt {:config {:github {:client-id "test-client-id"}}})

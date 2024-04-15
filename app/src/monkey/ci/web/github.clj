@@ -36,6 +36,7 @@
               {:key secret :alg :hmac+sha256})))
 
 (def req->webhook-id (comp :id :path :parameters))
+(def req->repo-sid (comp (juxt :customer-id :repo-id) :path :parameters))
 
 (defn validate-security
   "Middleware that validates the github security header using a fn that retrieves
@@ -63,7 +64,7 @@
    send other types of requests."
   (comp (partial = "push") github-event))
 
-(defn- find-ssh-keys [st {:keys [customer-id repo-id]}]
+(defn- find-ssh-keys [st customer-id repo-id]
   (let [repo (s/find-repo st [customer-id repo-id])
         ssh-keys (s/find-ssh-keys st customer-id)]
     (lbl/filter-by-label repo ssh-keys)))
@@ -72,34 +73,56 @@
   "Looks up details for the given github webhook.  If the webhook refers to a valid 
    configuration, a build entity is created and a build structure is returned, which
    eventually will be passed on to the runner."
-  [{st :storage :as rt} {:keys [id payload]}]
+  [{st :storage :as rt} init-build payload]
+  (let [{:keys [master-branch clone-url ssh-url private]} (:repository payload)
+        build-id (u/new-build-id)
+        commit-id (get-in payload [:head-commit :id])
+        ssh-keys (find-ssh-keys st (:customer-id init-build) (:repo-id init-build))
+        build (-> init-build
+                  (assoc :git (-> payload
+                                  :head-commit
+                                  (select-keys [:message :author])
+                                  (assoc :url (if private ssh-url clone-url)
+                                         :main-branch master-branch
+                                         :ref (:ref payload)
+                                         :commit-id commit-id
+                                         :ssh-keys-dir (rt/ssh-keys-dir rt build-id))
+                                  (mc/assoc-some :ssh-keys ssh-keys))
+                         ;; Do not use the commit timestamp, because when triggered from a tag
+                         ;; this is still the time of the last commit, not of the tag creation.
+                         :start-time (u/now)
+                         :status :running
+                         :build-id build-id
+                         :cleanup? true))]
+    (when (s/save-build st build)
+      ;; Add the sid, cause it's used downstream
+      (assoc build :sid (s/ext-build-sid build)))))
+
+(defn create-webhook-build [{st :storage :as rt} id payload]
   (if-let [details (s/find-details-for-webhook st id)]
-    (let [{:keys [master-branch clone-url ssh-url private]} (:repository payload)
-          build-id (u/new-build-id)
-          commit-id (get-in payload [:head-commit :id])
-          ssh-keys (find-ssh-keys st details)
-          build (-> (select-keys details [:customer-id :repo-id])
-                    (assoc :git (-> payload
-                                    :head-commit
-                                    (select-keys [:message :author])
-                                    (assoc :url (if private ssh-url clone-url)
-                                           :main-branch master-branch
-                                           :ref (:ref payload)
-                                           :commit-id commit-id
-                                           :ssh-keys-dir (rt/ssh-keys-dir rt build-id))
-                                    (mc/assoc-some :ssh-keys ssh-keys))
-                           :source :github
-                           ;; Do not use the commit timestamp, because when triggered from a tag
-                           ;; this is still the time of the last commit, not of the tag creation.
-                           :start-time (u/now)
-                           :status :running
-                           :build-id build-id
-                           :webhook-id id
-                           :cleanup? true))]
-      (when (s/save-build st build)
-        ;; Add the sid, cause it's used downstream
-        (assoc build :sid (s/ext-build-sid build))))
+    (create-build
+     rt
+     (-> details
+         (select-keys [:customer-id :repo-id])
+         (assoc :webhook-id id
+                :source :github-webhook))
+     payload)
     (log/warn "No webhook configuration found for" id)))
+
+(defn create-app-build
+  "Creates a build as triggered from an app call.  This does not originate from a
+   webhook, but rather from a watched repo."
+  [rt {:keys [customer-id id]} payload]
+  (create-build rt
+                {:customer-id customer-id
+                 :repo-id id
+                 :source :github-app}
+                payload))
+
+(def body (comp :body :parameters))
+
+(def should-trigger-build? (every-pred github-push?
+                                       (complement (comp :deleted body))))
 
 (defn webhook
   "Receives an incoming webhook from Github.  This starts the build
@@ -107,24 +130,61 @@
   [{p :parameters :as req}]
   (log/trace "Got incoming webhook with body:" (prn-str (:body p)))
   (log/debug "Event type:" (get-in req [:headers "x-github-event"]))
-  (if (and (github-push? req) (not (get-in p [:body :deleted])))
+  (if (should-trigger-build? req)
     (let [rt (c/req->rt req)]
-      (if-let [build (create-build rt {:id (get-in p [:path :id])
-                                       :payload (:body p)})]
+      (if-let [build (create-webhook-build rt (get-in p [:path :id]) (:body p))]
         (do
           (c/run-build-async
-            (assoc rt :build build))
-          (rur/response {:build-id (:build-id build)}))
+           (assoc rt :build build))
+          (-> (rur/response {:build-id (:build-id build)})
+              (rur/status 202)))
         ;; No valid webhook found
         (rur/not-found {:message "No valid webhook configuration found"})))
     ;; If no build trigger or non build event, just respond with a '204 no content'
     (rur/status 204)))
 
 (defn app-webhook [req]
-  (log/debug "Got github app webhook event:" (pr-str (get-in req [:parameters :body])))
+  (log/debug "Got github app webhook event:" (pr-str (body req)))
   (log/debug "Event type:" (get-in req [:headers "x-github-event"]))
-  ;; TODO Determine the customer/repo this is about, then check if it's configured to build
-  (rur/response {:message "ok"}))
+  (if (should-trigger-build? req)
+    (let [github-id (get-in (body req) [:repository :id])
+          matches (s/find-watched-github-repos (c/req->storage req) github-id)
+          run-build (fn [repo]
+                      (let [rt (c/req->rt req)
+                            build (create-app-build rt repo (body req))]
+                        (c/run-build-async (assoc rt :build build))
+                        build))]
+      (log/debug "Found" (count matches) "watched builds for id" github-id)
+      (-> (->> matches
+               (map run-build)
+               (map (comp (partial hash-map :build-id) :build-id))
+               (hash-map :builds)
+               (rur/response))
+          (rur/status (if (empty? matches) 204 202))))
+    ;; Don't trigger build, just say fine
+    (rur/status 204)))
+
+(defn watch-repo
+  "Adds the repository to the watch list for github webhooks.  If the repo
+   does not exist, it will be created."
+  [req]
+  (let [st (c/req->storage req)
+        repo (get-in req [:parameters :body])
+        existing (when-let [id (:id repo)]
+                   (s/find-repo st [(:customer-id repo) id]))
+        with-id (if existing
+                  (merge existing repo)
+                  (assoc repo :id (s/new-id)))]
+    (if (s/watch-github-repo st with-id)
+      (rur/response with-id)
+      (rur/status 500))))
+
+(defn unwatch-repo [req]
+  (let [st (c/req->storage req)
+        sid (req->repo-sid req)]
+    (if (s/unwatch-github-repo st sid)
+      (rur/response (s/find-repo st sid))
+      (rur/status 404))))
 
 (defn- process-reply [{:keys [status] :as r}]
   (log/trace "Got github reply:" r)
@@ -147,8 +207,9 @@
       (process-reply)
       ;; TODO Check for failures
       :body
-      ;; TODO Create or lookup user in database according to github id
-      (select-keys [:id :avatar-url :email :name])))
+      (select-keys [:id :email])
+      ;; Return token to frontend, we'll need it when doing github requests.
+      (assoc :github-token token)))
 
 (defn- generate-jwt [req user]
   ;; Perhaps we should use the internal user id instead?
@@ -170,7 +231,7 @@
                      :email (:email user)}]
               (s/save-user st u)
               u))
-        (merge (select-keys user [:avatar-url :name])))))
+        (merge (select-keys user [:github-token])))))
 
 (defn login
   "Invoked by the frontend during OAuth2 login flow.  It requests a Github

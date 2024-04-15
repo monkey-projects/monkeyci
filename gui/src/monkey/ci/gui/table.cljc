@@ -126,6 +126,8 @@
 
 (defn paged-table [{:keys [id items-sub columns page-size]
                     :or {page-size 10}}]
+  ;; TODO Add support for paginated requests (i.e. dispatch an event
+  ;; when navigating to another page)
   (when-let [items (rf/subscribe items-sub)]
     (let [pag (rf/subscribe [:pagination/info id])
           pc (int (cm/ceil (/ (count @items) page-size)))

@@ -89,13 +89,50 @@
 (defn save-repo
   "Saves the repository by updating the customer it belongs to"
   [s {:keys [customer-id id] :as r}]
-  (update-obj s (customer-sid customer-id) assoc-in [:repos id] r))
+  (-> (update-obj s (customer-sid customer-id) assoc-in [:repos id] r)
+      ;; Return repo sid
+      (conj id)))
 
 (defn find-repo
   "Reads the repo, as part of the customer object's projects"
   [s [cust-id id]]
   (some-> (find-customer s cust-id)
           (get-in [:repos id])))
+
+(defn update-repo
+  "Applies `f` to the repo with given sid"
+  [s [cust-id repo-id] f & args]
+  (apply update-obj s (customer-sid cust-id) update-in [:repos repo-id] f args))
+
+(def ext-repo-sid (partial take-last 2))
+(def watched-sid (comp (partial global-sid :watched) str))
+
+(defn find-watched-github-repos
+  "Looks up all watched repos with the given github id"
+  [s github-id]
+  (->> (p/read-obj s (watched-sid github-id))
+       (map (partial find-repo s))))
+
+(defn watch-github-repo
+  "Creates necessary records to start watching a github repo.  Creates the
+   repo entity and returns it."
+  [s {:keys [customer-id id github-id] :as r}]
+  (let [repo-sid (save-repo s r)]
+    ;; Add the repo sid to the list of watched repos for the github id
+    (update-obj s (watched-sid github-id) (fnil conj []) (ext-repo-sid repo-sid))
+    repo-sid))
+
+(defn unwatch-github-repo
+  "Removes the records to stop watching the repo.  The entity will still 
+   exist, so any past builds can be looked up."
+  [s sid]
+  (when-let [repo (find-repo s sid)]
+    (when-let [gid (:github-id repo)]
+      ;; Remove it from the list of watched repos for the stored github id
+      (update-obj s (watched-sid gid) (comp vec (partial remove (partial = sid))))
+      ;; Clear github id
+      (update-repo s sid dissoc :github-id)
+      true)))
 
 (def webhook-sid (partial global-sid :webhooks))
 

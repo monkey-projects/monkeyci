@@ -1,4 +1,4 @@
-(ns ^:dev/always  monkey.ci.gui.pages
+(ns ^:dev/always monkey.ci.gui.pages
   "Links route names to actual components to be rendered"
   (:require [monkey.ci.gui.layout :as l]
             [monkey.ci.gui.logging :as log]
@@ -16,6 +16,7 @@
    :page/login login/page
    :page/github-callback login/github-callback
    :page/customer customer/page
+   :page/add-repo customer/add-repo-page
    :page/repo repo/page})
 
 (def route-name (comp :name :data))

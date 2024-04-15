@@ -23,7 +23,8 @@
 
 (defn public-route [conf]
   (merge {:method :get
-          :produces #{"application/edn"}}
+          :produces #{"application/edn"}
+          :consumes #{"application/edn"}}
          conf))
 
 (defn api-route [conf]
@@ -36,6 +37,15 @@
     {:route-name :get-customer
      :path-parts customer-path
      :path-schema customer-schema})
+
+   #_(api-route
+    {:route-name :create-repo
+     :method :post
+     :path-parts (conj customer-path "/repo")
+     :path-schema customer-schema
+     :body-schema {:repo {:name s/Str
+                          :url s/Str
+                          :customer-id s/Str}}})
 
    (api-route
     {:route-name :get-builds
@@ -67,7 +77,24 @@
      :path-schema build-schema
      :query-schema {:path s/Str}
      :produces #{"text/plain"}})
+   
+   (api-route
+    {:route-name :watch-github-repo
+     :method :post
+     :path-parts (conj customer-path "/repo/github/watch")
+     :path-schema customer-schema
+     :body-schema {:repo {:name s/Str
+                          :url s/Str
+                          :customer-id s/Str
+                          :github-id s/Int}}
+     :consumes ["application/edn"]})
 
+   (api-route
+    {:route-name :unwatch-github-repo
+     :method :post
+     :path-parts (conj repo-path "github/unwatch")
+     :path-schema repo-schema})
+   
    (public-route
     {:route-name :github-login
      :method :post
@@ -101,6 +128,7 @@
                routes
                {:interceptors (concat martian/default-interceptors
                                       [mi/default-coerce-response
+                                       mi/default-encode-body
                                        disable-with-credentials
                                        mh/perform-request])})]))
 

@@ -4,6 +4,7 @@
             [monkey.ci.gui.customer.subs]
             [monkey.ci.gui.layout :as l]
             [monkey.ci.gui.routing :as r]
+            [monkey.ci.gui.table :as t]
             [re-frame.core :as rf]))
 
 (defn- load-customer [id]
@@ -34,6 +35,11 @@
        (map :value)
        (first)))
 
+(defn- add-repo-btn [id]
+  [:a.btn.btn-success.me-2
+   {:href (r/path-for :page/add-repo {:customer-id id})}
+   [:span.me-1 [co/icon :plus-square]] "Add Repository"])
+
 (defn- customer-details [id]
   (let [c (rf/subscribe [:customer/info])]
     (->> (:repos @c)
@@ -43,7 +49,9 @@
          (into [:<>
                 [:div.clearfix.mb-3
                  [:h3.float-start "Customer " (:name @c)]
-                 [co/reload-btn [:customer/load id] {:class :float-end}]]]))))
+                 [:span.float-end
+                  [add-repo-btn id]
+                  [co/reload-btn [:customer/load id]]]]]))))
 
 (defn page
   "Customer overview page"
@@ -54,3 +62,44 @@
      [:div
       [co/alerts [:customer/alerts]]
       [customer-details id]])))
+
+(defn- repo-table []
+  (letfn [(name+url [{:keys [name html-url]}]
+            [:a {:href html-url :target "_blank"} name])
+          (visibility [{:keys [visibility]}]
+            [:span.badge {:class (if (= "public" visibility)
+                                   :text-bg-success
+                                   :text-bg-warning)}
+             visibility])
+          (actions [{:keys [:monkeyci/watched?] :as repo}]
+            (if watched?
+              [:button.btn.btn-sm.btn-danger
+               {:on-click #(rf/dispatch [:repo/unwatch (:monkeyci/repo repo)])}
+               [:span.me-1 [co/icon :stop-circle-fill]] "Unwatch"]
+              [:button.btn.btn-sm.btn-primary
+               {:on-click #(rf/dispatch [:repo/watch repo])}
+               [:span.me-1 [co/icon :binoculars-fill]] "Watch"]))]
+    [t/paged-table
+     {:id ::repos
+      :items-sub [:customer/github-repos]
+      :columns [{:label "Name"
+                 :value name+url}
+                {:label "Owner"
+                 :value (comp :login :owner)}
+                {:label "Description"
+                 :value :description}
+                {:label "Visibility"
+                 :value visibility}
+                {:label "Actions"
+                 :value actions}]}]))
+
+(defn add-repo-page
+  []
+  (let [route (rf/subscribe [:route/current])]
+    (rf/dispatch [:customer/load-github-repos])
+    (l/default
+     [:<>
+      [:h3 "Add Repository to Watch"]
+      [co/alerts [:customer/repo-alerts]]
+      [repo-table]
+      [:a {:href (r/path-for :page/customer (r/path-params @route))} "Back to customer"]])))

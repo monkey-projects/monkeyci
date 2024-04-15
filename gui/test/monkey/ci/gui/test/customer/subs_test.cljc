@@ -6,6 +6,8 @@
             [re-frame.core :as rf]
             [re-frame.db :refer [app-db]]))
 
+(rf/clear-subscription-cache!)
+
 (deftest alerts
   (let [s (rf/subscribe [:customer/alerts])]
     (testing "exists"
@@ -33,6 +35,44 @@
       (is (some? l)))
 
     (testing "holds loading state from db"
-      (is (false? @l))
+      (is (not @l))
       (is (map? (reset! app-db (db/set-loading {}))))
       (is (true? @l)))))
+
+(deftest repo-alerts
+  (let [s (rf/subscribe [:customer/repo-alerts])]
+    (testing "exists"
+      (is (some? s)))
+
+    (testing "returns alerts from db"
+      (let [a [{:type :info
+                :message "Test alert"}]]
+        (is (map? (reset! app-db (db/set-repo-alerts {} a))))
+        (is (= a @s))))))
+
+(deftest github-repos
+  (let [r (rf/subscribe [:customer/github-repos])]
+    (testing "exists"
+      (is (some? r)))
+
+    (testing "returns repos from db"
+      (let [l [{:id "test-repo"}]]
+        (is (map? (reset! app-db (db/set-github-repos {} l))))
+        (is (= ["test-repo"] (map :id @r)))))
+
+    (testing "marks watched repo"
+      (is (map? (reset! app-db (db/set-github-repos {} [{:id "github-repo-id"
+                                                         :ssh-url "ssh@ssh-url"
+                                                         :clone-url "https://clone-url"}]))))
+
+      (testing "by github id"
+        (is (map? (swap! app-db db/set-customer {:repos [{:github-id "github-repo-id"}]})))
+        (is (true? (-> @r first :monkeyci/watched?))))
+      
+      (testing "by clone url"
+        (is (map? (swap! app-db db/set-customer {:repos [{:url "https://clone-url"}]})))
+        (is (true? (-> @r first :monkeyci/watched?))))
+      
+      (testing "by ssh url"
+        (is (map? (swap! app-db db/set-customer {:repos [{:url "ssh@ssh-url"}]})))
+        (is (true? (-> @r first :monkeyci/watched?)))))))

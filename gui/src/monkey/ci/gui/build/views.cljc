@@ -137,6 +137,7 @@
 (defn- log-row [{:keys [name size] :as l}]
   (let [route (rf/subscribe [:route/current])]
     [:tr
+     ;; FIXME Clicking the link counts as "leaving the page" which stops the event stream
      [:td [:a {:href (u/->dom-id log-modal-id)
                :data-bs-toggle "modal"
                :on-click (u/link-evt-handler [:build/download-log name])}

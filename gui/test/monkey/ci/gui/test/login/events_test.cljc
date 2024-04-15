@@ -65,9 +65,6 @@
     (is (nil? (db/user @app-db)))))
 
 (deftest github-login--success
-  ;; Failsafe
-  (h/catch-fx :route/goto)
-  
   (testing "sets user in db"
     (rf/dispatch-sync [:login/github-login--success {:body {:id ::test-user}}])
     (is (= {:id ::test-user} (db/user @app-db))))
@@ -76,27 +73,17 @@
     (rf/dispatch-sync [:login/github-login--success {:body {:token "test-token"}}])
     (is (= "test-token" (db/token @app-db))))
 
-  (testing "redirects to root page if multiple customers"
-    (rf-test/run-test-sync
-     (let [c (h/catch-fx :route/goto)]
-       (rf/dispatch [:login/github-login--success {:body {:customers ["cust-1" "cust-2"]}}])
-       (is (= "/" (first @c))))))
+  (testing "sets github token in db"
+    (rf/dispatch-sync [:login/github-login--success {:body {:github-token "test-token"}}])
+    (is (= "test-token" (db/github-token @app-db))))
 
-  (testing "redirects to customer page if only one customer"
-    (rf-test/run-test-sync
-     (let [c (h/catch-fx :route/goto)]
-       (rf/dispatch [:login/github-login--success {:body {:customers ["test-cust"]}}])
-       (is (= "/c/test-cust" (first @c))))))
-
-  (testing "redirects to redirect page if set"
-    (rf-test/run-test-sync
-     (rf/reg-cofx
-      :local-storage
-      (fn [cofx]
-        (assoc cofx :local-storage {:redirect-to "/c/test-cust"})))
-     (let [c (h/catch-fx :route/goto)]
-       (rf/dispatch [:login/github-login--success {:body {}}])
-       (is (= "/c/test-cust" (first @c)))))))
+  (testing "fetches github user details"
+    (let [e (h/catch-fx :http-xhrio)]
+      (rf/dispatch-sync [:login/github-login--success {:body {:token "test-token"}}])
+      (is (= 1 (count @e)))
+      (is (= {:method :get
+              :uri "https://api.github.com/user"}
+             (select-keys (first @e) [:method :uri]))))))
 
 (deftest github-login--failed
   (testing "sets error alert"
@@ -119,3 +106,42 @@
   (testing "sets github config in db"
     (rf/dispatch-sync [:login/load-github-config--success {:body ::test-config}])
     (is (= ::test-config (db/github-config @app-db)))))
+
+(deftest github-load-user--success
+  ;; Failsafe
+  (h/catch-fx :route/goto)
+
+  (testing "sets github user in db"
+    (rf/dispatch-sync [:github/load-user--success ::github-user])
+    (is (= ::github-user (db/github-user @app-db))))
+  
+  (testing "redirects to root page if multiple customers"
+    (rf-test/run-test-sync
+     (let [c (h/catch-fx :route/goto)]
+       (reset! app-db (db/set-user {} {:customers ["cust-1" "cust-2"]}))
+       (rf/dispatch [:github/load-user--success {}])
+       (is (= "/" (first @c))))))
+
+  (testing "redirects to customer page if only one customer"
+    (rf-test/run-test-sync
+     (let [c (h/catch-fx :route/goto)]
+       (reset! app-db (db/set-user {} {:customers ["test-cust"]}))
+       (rf/dispatch [:github/load-user--success {}])
+       (is (= "/c/test-cust" (first @c))))))
+
+  (testing "redirects to redirect page if set"
+    (rf-test/run-test-sync
+     (rf/reg-cofx
+      :local-storage
+      (fn [cofx]
+        (assoc cofx :local-storage {:redirect-to "/c/test-cust"})))
+     (let [c (h/catch-fx :route/goto)]
+       (rf/dispatch [:github/load-user--success {}])
+       (is (= "/c/test-cust" (first @c)))))))
+
+(deftest github-load-user--failed
+  (testing "sets error alert"
+    (rf/dispatch-sync [:github/load-user--failed {:response "test error"}])
+    (let [a (db/alerts @app-db)]
+      (is (= :danger (-> a first :type)))
+      (is (string? (-> a first :message))))))
