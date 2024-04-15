@@ -449,4 +449,4 @@
       (is (= {:customer-id cust-id
               :id repo-id}
              (:body resp)))
-      (is (empty? (st/find-watched-repos st github-id))))))
+      (is (empty? (st/find-watched-github-repos st github-id))))))

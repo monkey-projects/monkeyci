@@ -142,7 +142,7 @@
   ;; Update build but leave existing script info intact, because the event
   ;; does not contain this.
   (db/update-build db (fn [b]
-                        (merge (:build evt) (select-keys b [:script])))))
+                        (merge b (:build evt)))))
 
 (defn- update-script [db script]
   (db/update-build db assoc :script script))
