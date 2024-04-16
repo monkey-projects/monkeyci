@@ -10,7 +10,7 @@
             [monkey.ci.gui.repo.views :as repo]
             [re-frame.core :as rf]))
 
-(defonce pages
+(def pages
   {:page/root home/page
    :page/build build/page
    :page/login login/page

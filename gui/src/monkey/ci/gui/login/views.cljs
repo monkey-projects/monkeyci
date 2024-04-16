@@ -33,7 +33,17 @@
         "Login with GitHub"]])))
 
 (defn page [_]
-  [l/welcome [login-form]])
+  [:div
+   [:div.row
+    [:div.col
+     [c/logo]
+     [:h1 "Welcome to MonkeyCI"]
+     [:p.lead
+      "A CI/CD tool designed to give you full power when building your applications."]]
+    [:div.col
+     [:h3.mt-2 "Please Sign On"]
+     [login-form]]]
+   [l/footer]])
 
 (defn github-callback [req]
   (let [q (get-in req [:parameters :query])]

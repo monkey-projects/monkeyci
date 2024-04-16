@@ -145,3 +145,20 @@
     (let [a (db/alerts @app-db)]
       (is (= :danger (-> a first :type)))
       (is (string? (-> a first :message))))))
+
+(deftest login-sign-off
+  (h/catch-fx :route/goto)
+  
+  (testing "clears user and token from db"
+    (is (some? (reset! app-db (-> {}
+                                  (db/set-user {:id "test-user"})
+                                  (db/set-token "test-token")))))
+    (rf/dispatch-sync [:login/sign-off])
+    (is (nil? (db/user @app-db)))
+    (is (nil? (db/token @app-db))))
+
+  (testing "redirect to login page"
+    (let [r (h/catch-fx :route/goto)]
+      (rf-test/run-test-sync
+       (rf/dispatch [:login/sign-off])
+       (is (= [(r/path-for :page/login)] @r))))))

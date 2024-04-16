@@ -48,7 +48,7 @@
          (map (partial show-project @c))
          (into [:<>
                 [:div.clearfix.mb-3
-                 [:h3.float-start "Customer " (:name @c)]
+                 [:h3.float-start (:name @c)]
                  [:span.float-end
                   [add-repo-btn id]
                   [co/reload-btn [:customer/load id]]]]]))))

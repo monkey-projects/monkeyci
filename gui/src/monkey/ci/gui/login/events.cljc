@@ -110,3 +110,11 @@
  (fn [db [_ err]]
    (db/set-alerts db [{:type :danger
                        :message (str "Unable to retrieve user details from Github: " (u/error-msg err))}])))
+
+(rf/reg-event-fx
+ :login/sign-off
+ (fn [{:keys [db]} _]
+   {:db (-> db
+            (db/set-user nil)
+            (db/set-token nil))
+    :dispatch [:route/goto :page/login]}))
