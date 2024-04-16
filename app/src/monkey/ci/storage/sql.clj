@@ -2,7 +2,9 @@
   "Storage implementation that uses SQL (e.g. MySQL or HSQLDB"
   (:require [clojure.tools.logging :as log]
             [honey.sql :as h]
-            [monkey.ci.storage :as st]
+            [monkey.ci
+             [protocols :as p]
+             [storage :as st]]
             [next.jdbc :as jdbc]
             [next.jdbc
              [result-set :as rs]
@@ -41,7 +43,7 @@
            (first)))
 
 (deftype SqlStorage [ds]
-  st/Storage
+  p/Storage
   (write-obj [_ sid obj]
     (when-let [t (sid->table sid)]
       (let [e (select-by-uuid ds t (sid->id sid))

@@ -1,6 +1,8 @@
 (ns monkey.ci.test.storage.sql-test
   (:require [clojure.test :refer [deftest testing is]]
-            [monkey.ci.storage :as st]
+            [monkey.ci
+             [protocols :as p]
+             [storage :as st]]
             [monkey.ci.storage.sql :as sut]
             [next.jdbc :as jdbc]
             [next.jdbc.connection :as conn])
@@ -60,7 +62,7 @@
 
 (deftest sql-storage
   (letfn [(count-customers [st]
-            (count (st/list-obj st [st/global "customers"])))]
+            (count (p/list-obj st [st/global "customers"])))]
     (testing "can write and read customer"
       (with-sql-store st
         (let [cust {:id (random-uuid)
