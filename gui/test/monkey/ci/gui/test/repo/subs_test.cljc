@@ -13,7 +13,7 @@
 (rf/clear-subscription-cache!)
 
 (deftest repo-info
-  (let [r (rf/subscribe [:repo/info "test-project" "test-repo"])]
+  (let [r (rf/subscribe [:repo/info "test-repo"])]
     (testing "exists"
       (is (some? r)))
     
@@ -21,11 +21,9 @@
       (is (nil? @r))
       (is (map? (reset! app-db (cdb/set-customer
                                 {}
-                                {:projects
-                                 [{:id "test-project"
-                                   :repos
-                                   [{:id "test-repo"
-                                     :name "test repository"}]}]}))))
+                                {:repos
+                                 [{:id "test-repo"
+                                   :name "test repository"}]}))))
       (is (= "test repository" (:name @r))))))
 
 (deftest alerts
@@ -42,29 +40,33 @@
     (testing "exists"
       (is (some? b)))
 
-    (testing "holds builds from db with repo info"
+    (testing "holds builds from db"
       (is (map? (reset! app-db (-> {:route/current
                                     {:parameters
                                      {:path
                                       {:customer-id "test-cust"
-                                       :project-id "test-proj"
                                        :repo-id "test-repo"}}}}
-                                   (db/set-builds [{:id ::test-build}])))))
+                                   (db/set-builds [{:build-id ::test-build}])))))
       (is (= 1 (count @b)))
-      (is (= {:build-id ::test-build
-              :customer-id "test-cust"
-              :project-id "test-proj"
-              :repo-id "test-repo"}
-             (select-keys (first @b) [:build-id :customer-id :project-id :repo-id]))))
+      (is (= {:build-id ::test-build}
+             (select-keys (first @b) [:build-id]))))
 
-    (testing "sorts by time descending"
+    (testing "sorts by start-time descending"
       (is (map? (reset! app-db (db/set-builds {} [{:id "old-build"
-                                                   :time "2023-12-01"}
+                                                   :start-time "2023-12-01"}
                                                   {:id "new-build"
-                                                   :time "2023-12-22"}
+                                                   :start-time "2023-12-22"}
                                                   {:id "intermediate-build"
-                                                   :time "2023-12-10"}]))))
+                                                   :start-time "2023-12-10"}]))))
       (is (= ["new-build" "intermediate-build" "old-build"]
+             (->> @b (map :id)))))
+
+    (testing "handles both epoch and string start-times"
+      (is (map? (reset! app-db (db/set-builds {} [{:id "old-build"
+                                                   :start-time "2024-01-18T09:11:40+01:00"}
+                                                  {:id "new-build"
+                                                   :start-time 1708433539638}]))))
+      (is (= ["new-build" "old-build"]
              (->> @b (map :id)))))
 
     (testing "`nil` when no builds"
@@ -80,3 +82,13 @@
       (is (nil? @l))
       (is (some? (reset! app-db (db/set-latest-build {} ::latest))))
       (is (= ::latest @l)))))
+
+(deftest repo-show-trigger-form
+  (let [l (rf/subscribe [:repo/show-trigger-form?])]
+    (testing "exists"
+      (is (some? l)))
+
+    (testing "returns `show trigger form` flag from db"
+      (is (nil? @l))
+      (is (some? (reset! app-db (db/set-show-trigger-form {} true))))
+      (is (true? @l)))))

@@ -8,16 +8,20 @@
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [monkey.ci
+             [artifacts :as art]
+             [build :as b]
+             [cache :as cache]
              [containers :as mcc]
-             [context :as c]
              [logging :as l]
-             [utils :as u]]))
+             [runtime :as rt]
+             [utils :as u]]
+            [monkey.ci.build.core :as bc]))
 
 (defn- make-script-cmd [script]
   [(cs/join " && " script)])
 
-(defn- make-cmd [{:keys [:container/cmd]}]
-  (if (some? cmd)
+(defn- make-cmd [conf]
+  (if-let [cmd (mcc/cmd conf)]
     cmd
     ;; When no command is given, use /bin/sh as entrypoint and fail on errors
     ["-ec"]))
@@ -33,9 +37,9 @@
             ["-e" (str k "=" v)])
           env))
 
-(defn- platform [ctx]
-  (when-let [p (or (get-in ctx [:step :container/platform])
-                   (get-in ctx [:containers :platform]))]
+(defn- platform [rt]
+  (when-let [p (or (get-in rt [:job :container/platform])
+                   (get-in rt [:containers :platform]))]
     ["--platform" p]))
 
 (defn- entrypoint [{ep :container/entrypoint cmd :container/cmd}]
@@ -47,10 +51,10 @@
 
 (defn build-cmd-args
   "Builds command line args for the podman executable"
-  [{:keys [step] :as ctx}]
-  (let [conf (mcc/ctx->container-config ctx)
-        cn (c/get-step-id ctx)
-        wd (c/step-work-dir ctx)
+  [{:keys [job] :as rt}]
+  (let [conf (mcc/rt->container-config rt)
+        cn (b/get-job-id rt)
+        wd (b/job-work-dir rt)
         cwd "/home/monkeyci"
         base-cmd ["/usr/bin/podman" "run"
                   "-t" "--rm"
@@ -60,27 +64,33 @@
     (concat
      ;; TODO Allow for more options to be passed in
      base-cmd
-     (mounts step)
-     (env-vars step)
-     (platform ctx)
-     (entrypoint step)
-     [(:image conf)]
-     (make-cmd step)
-     ;; TODO Execute script step by step
-     (make-script-cmd (:script step)))))
+     (mounts job)
+     (env-vars job)
+     (platform rt)
+     (entrypoint job)
+     [(or (:image conf) (:image job))]
+     (make-cmd job)
+     ;; TODO Execute script job by job
+     (make-script-cmd (:script job)))))
 
-(defmethod mcc/run-container :podman [{:keys [step pipeline] {:keys [build-id]} :build :as ctx}]
-  (log/info "Running build step " build-id "/" (:name step) "as podman container")
-  (let [log-maker (c/log-maker ctx)
+(defmethod mcc/run-container :podman [{:keys [job] {:keys [build-id]} :build :as rt}]
+  (log/info "Running build job " build-id "/" (bc/job-id job) "as podman container")
+  (let [log-maker (rt/log-maker rt)
         ;; Don't prefix the sid here, that's the responsability of the logger
-        log-base (c/get-step-sid ctx)
+        log-base (b/get-job-sid rt)
         [out-log err-log :as loggers] (->> ["out.txt" "err.txt"]
                                            (map (partial conj log-base))
-                                           (map (partial log-maker ctx)))]
+                                           (map (partial log-maker rt)))
+        cmd (build-cmd-args rt)]
     (log/debug "Log base is:" log-base)
-    (-> (bp/process {:dir (c/step-work-dir ctx)
-                     :out (l/log-output out-log)
-                     :err (l/log-output err-log)
-                     :cmd (build-cmd-args ctx)})
-        (l/handle-process-streams loggers)
-        (deref))))
+    (log/debug "Podman command:" cmd)
+    ((-> (fn [rt]
+           (-> (bp/process {:dir (b/job-work-dir rt)
+                            :out (l/log-output out-log)
+                            :err (l/log-output err-log)
+                            :cmd cmd})
+               (l/handle-process-streams loggers)
+               (deref)))
+         (cache/wrap-caches)
+         (art/wrap-artifacts))
+     rt)))

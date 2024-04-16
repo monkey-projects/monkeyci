@@ -1,17 +1,21 @@
 (ns monkey.ci.spec
-  (:require [clojure.spec.alpha :as s]
-            [clojure.core.async.impl.protocols :as ap]
-            [monkey.ci.blob :as blob]
+  (:require [buddy.core.keys :as bk]
+            [clojure.spec.alpha :as s]
+            [clojure.tools.logging :as log]
+            [monkey.ci.protocols :as p]
+            [monkey.ci.spec.common :as c]
             [monkey.oci.sign :as oci-sign]))
 
-;; Unfortunately, there seems to be no clean way to determine
-;; if something is a channel apart from accessing impl details.
-(def channel? (partial satisfies? ap/Channel))
+(defn valid?
+  "Checks if the object is conform to the spec, and also prints a handy warning
+   if not."
+  [spec x]
+  (if-not (s/valid? spec x)
+    (do (log/warn "Object does not match spec:" x ", spec:" spec ", explanation:" (s/explain-str spec x))
+        false)
+    true))
 
-(def url-regex #"^(?:([A-Za-z]+):)(\/{0,3})([0-9.\-A-Za-z]+)(?::(\d+))?(?:\/([^?#]*))?(?:\?([^#]*))?(?:#(.*))?$")
-
-(defn url? [x]
-  (and (string? x) (re-matches url-regex x)))
+(def url? c/url?)
 
 ;; Event related spec
 (s/def :evt/type keyword?)
@@ -20,16 +24,12 @@
 (s/def :evt/src keyword?)
 (s/def :evt/event (s/keys :req-un [:evt/type :evt/time]
                           :opt-un [:evt/message :evt/src]))
-(s/def :evt/channel channel?)
 
-(s/def :evt/event-bus (s/keys :req-un [:evt/channel :evt/pub]))
-(s/def :evt/handler fn?)
-(s/def :evt/tx fn?)
-(s/def :evt/loop channel?)
-(s/def :evt/event-handler (s/keys :req-un [:evt/channel :evt/type]
-                                  :opt-un [:evt/handler :evt/tx :evt/loop]))
+;;; Application configuration spec
 
-;; Application configuration spec
+;; App mode: how is this application being run?  Mode influences how the
+;; runtime is set up.
+(s/def :conf/app-mode #{:server :cli :script})
 
 (s/def :conf/dev-mode boolean?)
 ;; HTTP server configuration
@@ -69,7 +69,7 @@
 
 (defmulti blob-type :type)
 
-(s/def :blob/store blob/blob-store?)
+(s/def :blob/store p/blob-store?)
 (s/def :blob/type #{:disk :oci})
 (s/def :disk-blob/dir string?)
 
@@ -85,10 +85,13 @@
 (s/def :conf/blob (s/multi-spec blob-type :type))
 
 (s/def :conf/workspace (s/merge :conf/blob))
+(s/def :conf/artifacts (s/merge :conf/blob))
+(s/def :conf/cache (s/merge :conf/blob))
 
 (s/def :conf/log-dir string?)
 (s/def :conf/work-dir string?)
 (s/def :conf/checkout-base-dir string?)
+(s/def :conf/ssh-keys-dir string?)
 (s/def :conf/url url?)
 
 ;; Account configuration
@@ -107,6 +110,10 @@
 (s/def :sidecar/log-config string?)
 (s/def :conf/sidecar (s/keys :opt-un [:sidecar/poll-interval :sidecar/log-config]))
 
+(s/def :conf-jwk/public-key string?)
+(s/def :conf-jwk/private-key string?)
+(s/def :conf/jwk (s/keys :req-un [:conf-jwk/public-key :conf-jwk/private-key]))
+
 ;; Command line arguments
 (s/def :arg/pipeline string?)
 (s/def :arg/dir string?)
@@ -122,6 +129,7 @@
 (s/def :git/branch string?)
 (s/def :git/id string?)
 (s/def :git/fn fn?)
+(s/def :git/clone fn?)
 (s/def :git/dir string?)
 (s/def :build/git (s/keys :req-un [:git/url :git/dir]
                           :opt-un [:git/branch :git/id]))
@@ -159,25 +167,46 @@
                                    :opt-un [:oci/credentials :oci/prefix])))
 
 (s/def :conf/logging (s/multi-spec logging-type :type))
-(s/def :ctx/logging (s/merge :conf/logging
-                             (s/keys :req-un [:logging/maker])))
+(s/def :ctx/logging (s/keys :req-un [:logging/maker :logging/retriever]))
+
+(s/def :jwk/priv bk/private-key?)
+(s/def :jwk/pub bk/public-key?)
+(s/def :ctx/jwk (s/keys :req-un [:jwk/priv :jwk/pub]))
+
+;; TODO Refactor to put protocols in a separate ns so we can refer to them here
+;;(s/def :ctx/storage (partial satisfies? monkey.ci.storage/Storage))
+(s/def :ctx/storage some?)
+(s/def :ctx/containers (s/merge :conf/containers))
 
 ;; Arguments as passed in from the CLI
 (s/def :conf/args (s/keys :opt-un [:conf/dev-mode :arg/pipeline :arg/dir :arg/workdir
                                    :arg/git-url :arg/config-file :arg/events-file]))
 
 ;; Application configuration
-(s/def ::app-config (s/keys :req-un [:conf/http :conf/runner :conf/args :conf/logging
-                                     :conf/work-dir :conf/checkout-base-dir]
-                            :opt-un [:conf/dev-mode :conf/containers :conf/log-dir
-                                     :conf/storage :conf/account :conf/sidecar :conf/workspace]))
+(s/def ::app-config (s/keys :req-un [:conf/http :conf/runner :conf/logging :conf/containers
+                                     :conf/storage :conf/workspace :conf/artifacts :conf/cache]
+                            :opt-un [:conf/app-mode :conf/work-dir :conf/checkout-base-dir :conf/ssh-keys-dir
+                                     :conf/dev-mode :conf/args :conf/jwk :conf/account :conf/sidecar]))
 ;; Application context.  This is the result of processing the configuration and is passed
 ;; around internally.
-(s/def ::app-context (s/keys :req-un [:conf/http :ctx/runner :evt/event-bus :ctx/git :ctx/storage :ctx/public-api
+(s/def ::app-context (s/keys :req-un [:conf/http :ctx/runner :ctx/git :ctx/public-api
                                       :ctx/logging]
-                             :opt-un [:conf/dev-mode :arg/command ::system :conf/args :ctx/build :ctx/reporter
-                                      :conf/work-dir :conf/sidecar]))
+                             :opt-un [:conf/dev-mode :arg/command ::system :evt/event-bus :conf/args
+                                      :ctx/build :ctx/reporter :conf/work-dir :conf/sidecar :ctx/jwk]))
 
 ;; Script configuration
 (s/def ::script-config (s/keys :req-un [:conf/containers :conf/storage :conf/logging]
                                :opt-un [:conf/api]))
+
+(s/def :rt/logging (s/merge :ctx/logging))
+(s/def :rt/runner :ctx/runner)
+(s/def :rt/logging (s/merge :ctx/logging))
+(s/def :rt/containers (s/merge :ctx/containers))
+(s/def :rt/blob (s/keys :req-un [:blob/store]))
+(s/def :rt/workspace (s/merge :rt/blob))
+(s/def :rt/artifacts (s/merge :rt/blob))
+(s/def :rt/cache (s/merge :rt/blob))
+(s/def :rt/git (s/keys :req-un [:git/clone]))
+
+(s/def ::runtime (s/keys :req-un [:rt/logging :rt/runner :rt/storage :rt/workspace :rt/artifacts :rt/cache]
+                         :opt-un [:rt/containers :rt/git]))

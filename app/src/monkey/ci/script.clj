@@ -1,47 +1,29 @@
 (ns monkey.ci.script
-  (:require [clojure.java.io :as io]
+  (:require [aleph.http :as http]
+            [clj-commons.byte-streams :as bs]
+            [clojure.java.io :as io]
             [clojure.tools.logging :as log]
-            [clojure.core.async :as ca]
-            [martian
-             [core :as martian]
-             [httpkit :as mh]
-             [interceptors :as mi]]
+            [manifold.deferred :as md]
+            [medley.core :as mc]
             [monkey.ci.build.core :as bc]
             [monkey.ci
+             [artifacts :as art]
+             [build :as build]
+             [cache :as cache]
              [containers :as c]
-             [context :as ctx]
-             [events :as e]
+             [jobs :as j]
+             [runtime :as rt]
              [utils :as u]]
             [monkey.ci.containers
              [docker]
+             [oci]
              [podman]]
-            [org.httpkit.client :as http])
+            [monkey.ci.events.core :as ec])
   (:import java.nio.channels.SocketChannel
            [java.net UnixDomainSocketAddress StandardProtocolFamily]))
 
-(defn step-context [p]
-  (assoc bc/success
-         :env {}
-         :pipeline p))
-
-(defn- script-evt [evt ctx]
-  (assoc evt
-         :src :script
-         :sid (get-in ctx [:build :sid])
-         :time (System/currentTimeMillis)))
-
-(defn- post-event [ctx evt]
-  (log/trace "Posting event:" evt)
-  (if-let [c (get-in ctx [:api :client])]
-    (let [{:keys [status] :as r} @(martian/response-for c :post-event (script-evt evt ctx))]
-      (when-not (= 202 status)
-        (log/warn "Failed to post event, got status" status)
-        (log/debug "Full response:" r)))
-    (log/warn "Unable to post event, no client configured")))
-
 (defn- wrapped
-  "Adds the event poster to the wrapped function.  This is necessary because the `e/wrapped`
-   assumes events are posted through the bus."
+  "Sets the event poster in the runtime."
   [f before after]
   (let [error (fn [& args]
                 ;; On error, add the exception to the result of the 'after' event
@@ -49,174 +31,124 @@
                   (log/error "Got error:" ex)
                   (assoc (apply after (concat (butlast args) [{}]))
                          :exception (.getMessage ex))))
-        w (e/wrapped f before after error)]
-    (fn [ctx & more]
-      (apply w (assoc ctx :event-poster (partial post-event ctx)) more))))
+        w (ec/wrapped f before after error)]
+    (fn [rt & more]
+      (apply w rt more))))
 
-(defn ->map [s]
-  (if (map? s)
-    s
-    {:action s
-     :name (u/fn-name s)}))
+(defn- base-event
+  "Creates an skeleton event with basic properties"
+  [rt type]
+  {:type type
+   :src :script
+   :sid (build/get-sid rt)
+   :time (u/now)})
 
-(defn step-type
-  "Determines step type according to contents"
-  [{:keys [step]}]
-  (cond
-    ;; TODO Make more generic
-    (string? (:container/image step)) ::container
-    (fn? (:action step)) ::action
-    :else
-    (throw (ex-info "invalid step configuration" {:step step}))))
+(defn- job-start-evt [{:keys [job] :as rt}]
+  (-> (base-event rt :job/start)
+      (assoc :job (j/job->event job)
+             :message "Job started")))
 
-(defmulti run-step step-type)
+(defn- job-end-evt [{:keys [job] :as rt} {:keys [status message exception]}]
+  (-> (base-event rt :job/end)
+      (assoc :message "Job completed"
+             :job (cond-> (j/job->event job)
+                    true (assoc :status status)
+                    (some? exception) (assoc :message (or message (.getMessage exception))
+                                             :stack-trace (u/stack-trace exception))))))
 
-(defmethod run-step ::container
-  ;; Runs the step in a new container.  How this container is executed depends on
-  ;; the configuration passed in from the parent process, specified in the context.
-  [ctx]
-  (let [{:keys [exit] :as r} (->> (c/run-container ctx)
-                                  (merge bc/failure))]
-    (cond-> r
-      (zero? exit) (merge bc/success))))
+;; Wraps a job so it fires an event before and after execution, and also
+;; catches any exceptions.
+(defrecord EventFiringJob [target]
+  j/Job
+  (execute! [job rt]
+    (let [rt-with-job (assoc rt :job target)
+          handle-error (fn [ex]
+                         (assoc bc/failure
+                                :exception ex
+                                :message (.getMessage ex)))
+          st (u/now)]
+      (log/debug "Executing event firing job:" (bc/job-id target))
+      (md/chain
+       (rt/post-events rt (job-start-evt (-> rt-with-job
+                                             (assoc-in [:job :start-time] st))))
+       (fn [_]
+         ;; Catch both sync and async errors
+         (try 
+           (-> (j/execute! target rt-with-job)
+               (md/catch handle-error))
+           (catch Exception ex
+             (handle-error ex))))
+       (fn [r]
+         (log/debug "Job ended with response:" r)
+         (md/chain
+          (rt/post-events rt (job-end-evt (update rt-with-job :job assoc
+                                                  :start-time st
+                                                  :end-time (u/now))
+                                          r))
+          (constantly r)))))))
 
-(defmethod run-step ::action
-  ;; Runs a step as an action.  The action property of a step should be a
-  ;; function that either returns a status result, or a new step configuration.
-  [{:keys [step] :as ctx}]
-  (let [f (:action step)]
-    (log/debug "Executing function:" f)
-    ;; If a step returns nil, treat it as success
-    (let [r (or (f ctx) bc/success)]
-      (if (bc/status? r)
-        r
-        ;; Recurse
-        (run-step (assoc ctx :step (-> step
-                                       (dissoc :action)
-                                       (merge (->map r)))))))))
+(defn- with-fire-events
+  "Wraps job so events are fired on start and end."
+  [job]
+  (map->EventFiringJob (-> (select-keys job [:id :dependencies :labels])
+                           (assoc :target job))))
 
-(defn- make-step-dir-absolute [{:keys [checkout-dir step] :as ctx}]
-  (if (map? step)
-    (update-in ctx [:step :work-dir]
-               (fn [d]
-                 (if d
-                   (u/abs-path checkout-dir d)
-                   checkout-dir)))
-    ctx))
+(defn- pipeline-filter [pipeline]
+  [[{:label "pipeline"
+     :value pipeline}]])
 
-(defn- run-single-step
-  "Runs a single step using the configured runner"
-  [initial-ctx]
-  (let [{:keys [step] :as ctx} (make-step-dir-absolute initial-ctx)]
-    (try
-      (log/debug "Running step:" step)
-      (run-step ctx)
-      (catch Exception ex
-        (log/warn "Step failed:" (.getMessage ex))
-        (assoc bc/failure :exception ex)))))
+(defn run-all-jobs
+  "Executes all jobs in the set, in dependency order."
+  [{:keys [pipeline] :as rt} jobs]
+  (let [pf (cond->> jobs
+             ;; Filter jobs by pipeline, if given
+             pipeline (j/filter-jobs (j/label-filter (pipeline-filter pipeline)))
+             true (map with-fire-events))]
+    (log/debug "Found" (count pf) "matching jobs:" (map bc/job-id pf))
+    (let [result @(j/execute-jobs! pf rt)]
+      (log/debug "Jobs executed, result is:" result)
+      {:status (if (every? (comp bc/success? :result) (vals result)) :success :failure)
+       :jobs result})))
 
-(defn- with-pipeline [{:keys [pipeline] :as ctx} evt]
-  (let [p (select-keys pipeline [:name :index])]
-    (-> evt
-        (assoc :index (get-in ctx [:step :index])
-               :pipeline p)
-        (script-evt ctx))))
+;;; Script client functions
 
-(defn- step-start-evt [{{:keys [name]} :step :as ctx}]
-  (with-pipeline ctx
-    (cond-> {:type :step/start
-             :message "Step started"}
-      (some? name) (-> (assoc :name name)
-                       (update :message str ": " name)))))
+(defn make-client
+  "Creates an API client function, that can be invoked by build scripts to 
+   perform certain operations, like retrieve build parameters.  The client
+   uses the token passed by the spawning process to gain access to those
+   resources."
+  [{{:keys [url token]} :api}]
+  (letfn [(throw-on-error [{:keys [status] :as r}]
+            (if (>= status 400)
+              (md/error-deferred (ex-info "Failed to invoke API call" r))
+              r))
+          (parse-body [{:keys [body]}]
+            (with-open [r (bs/to-reader body)]
+              (u/parse-edn r)))]
+    (log/debug "Connecting to API at" url)
+    (fn [req]
+      (-> req
+          (update :url (partial str url))
+          (assoc-in [:headers "authorization"] (str "Bearer " token))
+          (assoc-in [:headers "accept"] "application/edn")
+          (http/request)
+          (md/chain
+           throw-on-error
+           parse-body)))))
 
-(defn- step-end-evt [ctx {:keys [status message exception]}]
-  (with-pipeline ctx
-    (cond-> {:type :step/end
-             :message (or message
-                          "Step completed")
-             :name (get-in ctx [:step :name])
-             :status status}
-      (some? exception) (assoc :message (.getMessage exception)
-                               :stack-trace (u/stack-trace exception)))))
+(def valid-config? (every-pred :url :token))
 
-(def run-single-step*
-  (wrapped run-single-step
-           step-start-evt
-           step-end-evt))
+(defmethod rt/setup-runtime :api [conf _]
+  (when-let [c (:api conf)]
+    (when (valid-config? c)
+      {:client (make-client conf)})))
 
-(defn- log-result [r]
-  (log/debug "Result:" r)
-  (when-let [o (:output r)]
-    (log/debug "Output:" o))
-  (when-let [o (:error r)]
-    (log/warn "Error output:" o)))
-
-(defn- run-steps!
-  "Runs all steps in sequence, stopping at the first failure.
-   Returns the execution context."
-  [initial-ctx idx {:keys [name steps] :as p}]
-  (log/info "Running pipeline:" name)
-  (log/debug "Running pipeline steps:" p)
-  ;; TODO If steps is a fn, then invoke it first to get the actual steps.
-  (->> steps
-       (map ->map)
-       ;; Add index to each step
-       (map (fn [i s]
-              (assoc s :index i))
-            (range))     
-       (reduce (fn [ctx s]
-                 (let [r (-> ctx
-                             (assoc :step s :pipeline (assoc p :index idx))
-                             (run-single-step*))]
-                   (log-result r)
-                   (cond-> ctx
-                     true (assoc :status (:status r)
-                                 :last-result r)
-                     (bc/failed? r) (reduced))))
-               (merge (step-context p) initial-ctx))))
-
-(defn- pipeline-start-evt [ctx idx {:keys [name]}]
-  (script-evt
-   {:type :pipeline/start
-    :pipeline {:name name
-               :index idx}
-    :message (cond-> "Starting pipeline"
-               name (str ": " name))}
-   ctx))
-
-(defn- pipeline-end-evt [ctx idx {:keys [name]} r]
-  (script-evt
-   {:type :pipeline/end
-    :pipeline {:name name
-               :index idx}
-    :message "Completed pipeline"
-    :status (:status r)}
-   ctx))
-
-(def run-steps!*
-  (wrapped run-steps!
-           pipeline-start-evt
-           pipeline-end-evt))
-
-(defn run-pipelines
-  "Executes the pipelines by running all steps sequentially.  Currently,
-   pipelines are executed sequentially too, but this could be converted 
-   into parallel processing."
-  [{:keys [pipeline] :as ctx} p]
-  (let [pf (cond->> p
-             ;; Filter pipeline by name, if given
-             pipeline (filter (comp (partial = pipeline) :name)))]
-    (log/debug "Found" (count pf) "matching pipelines:" (map :name pf))
-    (log/debug "Pipelines after filtering:" pf)
-    (let [result (->> pf
-                      (map-indexed (partial run-steps!* ctx))
-                      (doall))]
-      {:status (if (every? bc/success? result) :success :failure)
-       :pipelines pf})))
+;;; Script loading
 
 (defn- load-script
-  "Loads the pipelines from the build script, by reading the script
-   files dynamically."
+  "Loads the pipelines from the build script, by reading the script files 
+   dynamically.  If the build script does not define its own namespace,
+   one will be randomly generated to avoid collisions."
   [dir build-id]
   (let [tmp-ns (symbol (or build-id (str "build-" (random-uuid))))]
     ;; Declare a temporary namespace to load the file in, in case
@@ -233,104 +165,95 @@
         (in-ns 'monkey.ci.script)
         (remove-ns tmp-ns)))))
 
-(defn- make-uds-address [path]
-  (UnixDomainSocketAddress/of path))
+(defn- with-script-evt
+  "Creates an skeleton event with the script and invokes `f` on it"
+  [rt f]
+  (-> rt
+      (base-event nil)
+      (assoc :script (-> rt rt/build build/script))
+      (f)))
 
-(defn- open-uds-socket []
-  (SocketChannel/open StandardProtocolFamily/UNIX))
+(defn- job->evt [job]
+  (select-keys job [j/job-id j/deps j/labels]))
 
-;; The swagger is fetched by the build script client api
-(def swagger-path "/script/swagger.json")
+(defn- script-start-evt [rt jobs]
+  (letfn [(mark-pending [job]
+            (assoc job :status :pending))]
+    (with-script-evt rt
+      #(-> %
+           (assoc :type :script/start
+                  :message "Script started")
+           ;; Add all info we already have about jobs
+           (assoc-in [:script :jobs] (->> jobs
+                                          (map (fn [{:keys [id] :as job}]
+                                                 [id job]))
+                                          (into {})
+                                          (mc/map-vals (comp mark-pending job->evt))))))))
 
-(defn- connect-to-uds [path]
-  (let [client (http/make-client
-                {:address-finder (fn make-addr [_]
-                                   (make-uds-address path))
-                 :channel-factory (fn [_]
-                                    (open-uds-socket))})
-        ;; Martian doesn't pass in the client in the requests, so do it with an interceptor.
-        client-injector {:name ::inject-client
-                         :enter (fn [ctx]
-                                  (assoc-in ctx [:request :client] client))}
-        interceptors (-> mh/default-interceptors
-                         (mi/inject client-injector :before ::mh/perform-request))]
-    ;; Url is not used, but we need the path to the swagger
-    (mh/bootstrap-openapi (str "http://fake-host" swagger-path)
-                          {:interceptors interceptors}
-                          {:client client})))
+(defn- script-end-evt [rt jobs res]
+  (with-script-evt rt
+    (fn [evt]
+      (-> evt 
+          (assoc :type :script/end
+                 :message "Script completed")
+          ;; FIXME Jobs don't contain all info here, as they should (like start and end time)
+          (assoc-in [:script :jobs]
+                    (mc/map-vals (fn [r]
+                                   (-> (select-keys (:result r) [:status :message])
+                                       (merge (job->evt (:job r)))))
+                                 (:jobs res)))))))
 
-(defn- connect-to-host [url]
-  (mh/bootstrap-openapi (str url swagger-path)))
+(def run-all-jobs*
+  (wrapped run-all-jobs
+           script-start-evt
+           script-end-evt))
 
-(defn make-client
-  "Initializes a Martian client using the configuration given.  It can either
-   connect to a domain socket, or a host.  The client is then added to the
-   context, where it can be accessed by the build scripts."
-  [{{:keys [url socket]} :api}]
-  (log/debug "Connecting to API at" (or url socket))
-  (cond
-    url (connect-to-host url)
-    socket (connect-to-uds socket)))
+(defn- assign-ids
+  "Assigns an id to each job that does not have one already."
+  [jobs]
+  (letfn [(assign-id [x id]
+            (if (nil? (bc/job-id x))
+              (assoc x :id id)
+              x))]
+    ;; TODO Sanitize existing ids
+    (map-indexed (fn [i job]
+                   (assign-id job (format "job-%d" (inc i))))
+                 jobs)))
 
-(defn- setup-api-client [ctx]
-  (cond-> ctx
-    ;; In tests it could be there is no socket, so skip the initialization in that case
-    (get-in ctx [:api :socket]) (assoc-in [:api :client] (make-client ctx))))
+(defn resolve-jobs
+  "The build script either returns a list of pipelines, a set of jobs or a function 
+   that returns either.  This function resolves the jobs by processing the script
+   return value."
+  [p rt]
+  (-> (j/resolve-jobs p rt)
+      (assign-ids)))
 
-(defn- with-script-api [ctx f]
-  (let [ctx (setup-api-client ctx)]
-    (f ctx)))
-
-(defn- with-script-dir [{:keys [script-dir] :as ctx} evt]
-  (-> (assoc evt :dir script-dir)
-      (script-evt ctx)))
-
-(defn- script-started-evt [ctx _]
-  (with-script-dir ctx
-    {:type :script/start
-     :message "Script started"}))
-
-(defn- script-completed-evt [ctx & _]
-  (with-script-dir ctx
-    {:type :script/end
-     :message "Script completed"}))
-
-(def run-pipelines*
-  (wrapped run-pipelines
-           script-started-evt
-           script-completed-evt))
-
-(def pipeline? (partial instance? monkey.ci.build.core.Pipeline))
-
-(defn resolve-pipelines
-  "The build script either returns a list of pipelines, or a function that
-   returns a list.  This function resolves the pipelines in case it's a function
-   or a var."
-  [p ctx]
-  (cond
-    (pipeline? p) [p]
-    (fn? p) (resolve-pipelines (p ctx) ctx)
-    (var? p) (resolve-pipelines (var-get p) ctx)
-    :else (remove nil? p)))
-
-(defn- load-and-run-pipelines [{:keys [script-dir] :as ctx}]
-  (let [build-id (ctx/get-build-id ctx)]
-    (log/debug "Executing script for build" build-id "at:" script-dir)
-    (log/debug "Script context:" ctx)
-    (try 
-      (let [p (-> (load-script script-dir build-id)
-                  (resolve-pipelines ctx))]
-        (log/debug "Pipelines:" p)
-        (log/debug "Loaded" (count p) "pipelines:" (map :name p))
-        (run-pipelines* ctx p))
-      (catch Exception ex
-        (log/error "Unable to load pipelines" ex)
-        (post-event ctx {:type :script/end
-                         :message (.getMessage ex)})
-        bc/failure))))
+(defn load-jobs
+  "Loads the script and resolves the jobs"
+  [rt]
+  (-> (load-script (build/rt->script-dir rt) (build/get-build-id rt))
+      (resolve-jobs rt)))
 
 (defn exec-script!
-  "Loads a script from a directory and executes it.  The script is
-   executed in this same process (but in a randomly generated namespace)."
-  [ctx]
-  (with-script-api ctx load-and-run-pipelines))
+  "Loads a script from a directory and executes it.  The script is executed in 
+   this same process."
+  [rt]
+  (let [build-id (build/get-build-id rt)
+        script-dir (build/rt->script-dir rt)]
+    (log/debug "Executing script for build" build-id "at:" script-dir)
+    (log/debug "Script runtime:" rt)
+    (try 
+      (let [jobs (load-jobs rt)]
+        (log/trace "Jobs:" jobs)
+        (log/debug "Loaded" (count jobs) "jobs:" (map bc/job-id jobs))
+        (run-all-jobs* rt jobs))
+      (catch Exception ex
+        (log/error "Unable to load build script" ex)
+        (let [msg ((some-fn (comp ex-message ex-cause)
+                            ex-message) ex)]
+          (rt/post-events rt [(-> (base-event rt :script/end)
+                                  (assoc :script (-> rt rt/build build/script)
+                                         :message msg))])
+          (assoc bc/failure
+                 :message msg
+                 :exception ex))))))

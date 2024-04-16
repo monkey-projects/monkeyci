@@ -1,6 +1,6 @@
 (ns monkey.ci.utils
-  (:require [buddy.core.keys.pem :as pem]
-            [clojure.core.async :as ca]
+  (:require [babashka.fs :as fs]
+            [buddy.core.keys.pem :as pem]
             [clojure
              [edn :as edn]
              [string :as cs]
@@ -34,6 +34,15 @@
   [a b]
   (.getCanonicalPath (io/file a b)))
 
+(defn rebase-path
+  "Given two absolute paths, recalculates p so that it becomes relative to `to` instead
+   of `from`."
+  [p from to]
+  (str (if (fs/absolute? p)
+         (->> (fs/relativize from p)
+              (fs/path to))
+         (fs/path to p))))
+
 (defn add-shutdown-hook!
   "Executes `h` when the JVM shuts down.  Returns the thread that will
    execute the hook."
@@ -63,40 +72,26 @@
   ;; TODO Generate a more unique build id
   (format "build-%d" (System/currentTimeMillis)))
 
-#_(defn replace-last
-  "Replaces the last item in `v` by `l`"
-  [v l]
-  (-> v
-      (drop-last)
-      (conj l)))
-
 (defn load-privkey
-  "Load private key from file"
+  "Load private key from file or from string"
   [f]
-  (if (instance? java.security.PrivateKey f)
-    f
-    (with-open [r (io/reader f)]
-      (pem/read-privkey r nil))))
-
-(defn future->ch
-  "Returns a channel that will hold the future value.  The future value
-   cannot be `nil` as this value cannot be sent to a channel.  If `interval`
-   is not specified, 100 milliseconds is used between checks."
-  [f & [interval]]
-  (let [poll (fn []
-               (when (realized? f)
-                 @f))]
-    (ca/go-loop [v (poll)]
-      (if v
-        v
-        (do
-          (ca/<! (ca/timeout (or interval 100)))
-          (recur (poll)))))))
+  (letfn [(->reader [x]
+            (if (.exists (io/file x))
+              (io/reader x)
+              (java.io.StringReader. x)))]
+    (if (instance? java.security.PrivateKey f)
+      f
+      (with-open [r (->reader f)]
+        (pem/read-privkey r nil)))))
 
 (defn parse-edn
   "Parses edn from the reader"
   [r & [opts]]
   (edn/read (or opts {}) (java.io.PushbackReader. r)))
+
+(defn parse-edn-str [s]
+  (with-open [r (java.io.StringReader. s)]
+    (parse-edn r)))
 
 (defn fn-name
   "If x points to a fn, returns its name without namespace"
@@ -140,9 +135,28 @@
   (when s
     (cs/split s #"/")))
 
+(defn sid->repo-sid [s]
+  (take 2 s))
+
 (def serialize-sid (partial cs/join "/"))
 
 (defn prop-pred
   "Returns a fn that is a predicate to match property `p` with value `v`"
   [p v]
   (comp (partial = v) p))
+
+(defn try-slurp
+  "Reads the file if it exists, or just returns x"
+  [x]
+  (when-let [f (some-> x (io/file))]
+    (if (.exists f)
+      (slurp f)
+      x)))
+
+(defn now []
+  (System/currentTimeMillis))
+
+(defn ->seq
+  "Converts `x` into a sequential"
+  [x]
+  (if (sequential? x) x [x]))

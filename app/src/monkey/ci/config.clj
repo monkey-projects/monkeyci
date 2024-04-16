@@ -3,7 +3,7 @@
    sources, like environment vars or command-line args.  The configuration is structured
    in a hierarchy and optionally some values are converted.  Then this configuration is
    used to add any 'constructor functions', that are then used to create new functions to
-   to some actual work.  This allows us to change the behaviour of the application with
+   do some actual work.  This allows us to change the behaviour of the application with
    configuration, but also makes it possible to inject dummy functions for testing 
    purposes."
   (:require [camel-snake-kebab.core :as csk]
@@ -15,7 +15,7 @@
             [clojure.tools.logging :as log]
             [medley.core :as mc]
             [monkey.ci
-             [logging :as l]
+             [pem :as pem]
              [utils :as u]]))
 
 (def ^:dynamic *global-config-file* "/etc/monkeyci/config.edn")
@@ -42,41 +42,38 @@
        (mc/filter-keys (key-filter prefix))
        (mc/map-keys (strip-prefix prefix))))
 
-(defn- group-keys
+(defn strip-env-prefix [e]
+  (filter-and-strip-keys env-prefix e))
+
+(defn group-keys
   "Takes all keys in given map `m` that start with `:prefix-` and
    moves them to a submap with the prefix name, and the prefix 
    stripped from the keys.  E.g. `{:test-key 100}` with prefix `:test`
    would become `{:test {:key 100}}`"
-  [prefix m]
-  (let [s (filter-and-strip-keys prefix m)]
-    (-> (mc/remove-keys (key-filter prefix) m)
-        (assoc prefix s))))
+  [m prefix]
+  (let [s (filter-and-strip-keys prefix m)
+        r (mc/remove-keys (key-filter prefix) m)]
+    (cond-> r
+      (not-empty s)
+      (update prefix merge s))))
 
-(defn- group-credentials
-  "For each of the given keys, groups `credential` into subkeys"
-  [keys conf]
-  (reduce (fn [r k]
-            (update r k (partial group-keys :credentials)))
-          conf
-          keys))
+(defn group-and-merge-from-env
+  "Given a map, takes all keys in `:env` that start with the given prefix 
+   (using `group-keys`) and merges them with the existing submap with same 
+   key.
+   For example, `{:env {:test-key \"value\"} :test {:other-key \"other-value\"}}` 
+   would become `{:test {:key \"value\" :other-key \"other-value\"}}`.  
+   The newly grouped values overwrite any existing values."
+  [m prefix]
+  (let [em (filter-and-strip-keys prefix (:env m))]
+    (-> m
+        (update prefix merge em)
+        (as-> x (mc/remove-vals nil? x)))))
 
-(defn- config-from-env
-  "Takes configuration from env vars"
-  [env]
-  (letfn [(group-all-keys [c]
-            (reduce (fn [r v]
-                      (group-keys v r))
-                    c
-                    [:github :runner :containers :storage :api :account :http :logging :oci :build
-                     :sidecar]))
-          (group-build-keys [c]
-            (update c :build (partial group-keys :git)))]
-    (->> env
-         (filter-and-strip-keys env-prefix)
-         (group-all-keys)
-         (group-credentials [:oci :storage :runner :logging])
-         (group-build-keys)
-         (u/prune-tree))))
+(defn keywordize-type [v]
+  (if (map? v)
+    (mc/update-existing v :type keyword)
+    v))
 
 (defn- parse-edn
   "Parses the input file as `edn` and converts keys to kebab-case."
@@ -114,6 +111,8 @@
   "Default configuration for the application, without env vars or args applied."
   {:http
    {:port 3000}
+   :events
+   {:type :manifold}
    :runner
    {:type :child}
    :storage
@@ -123,79 +122,110 @@
    :reporter
    {:type :print}
    :logging
-   {:type :inherit}})
+   {:type :inherit}
+   :workspace
+   {:type :disk :dir "tmp/workspace"}
+   :artifacts
+   {:type :disk :dir "tmp/artifacts"}
+   :cache
+   {:type :disk :dir "tmp/cache"}})
 
 (defn- merge-configs [configs]
   (reduce u/deep-merge default-app-config configs))
 
-(defn- set-work-dir [conf]
-  (assoc conf :work-dir (u/abs-path (or (get-in conf [:args :workdir])
-                                        (:work-dir conf)
-                                        (u/cwd)))))
+(defn load-raw-config
+  "Loads raw (not normalized) configuration from its various sources"
+  [extra-files]
+  (-> (map load-config-file (concat [*global-config-file*
+                                     *home-config-file*]
+                                    extra-files))
+      (merge-configs)
+      (u/prune-tree)))
 
-(defn- set-checkout-base-dir [conf]
-  (update conf :checkout-base-dir #(or (u/abs-path %) (u/combine (:work-dir conf) "checkout"))))
+(defmulti normalize-key
+  "Normalizes the config as read from files and env, for the specific key.
+   The method receives the entire config, that also holds the env and args
+   and should return the updated config."
+  (fn [k _] k))
 
-(defn- set-log-dir [conf]
-  (update conf
-          :logging
-          (fn [{:keys [type] :as c}]
-            (cond-> c
-              ;; FIXME This check should be centralized in logging ns
-              (= :file type) (update :dir #(or (u/abs-path %) (u/combine (:work-dir conf) "logs")))))))
+(defmethod normalize-key :default [k c]
+  (mc/update-existing c k keywordize-type))
 
-(defn- set-account
-  "Updates the `:account` in the config with cli args"
-  [{:keys [args] :as conf}]
+(defmethod normalize-key :dev-mode [_ conf]
+  (let [r (mc/assoc-some conf :dev-mode (get-in conf [:args :dev-mode]))]
+    (cond-> r
+      (not (boolean? (:dev-mode r))) (dissoc :dev-mode))))
+
+(defn abs-work-dir [conf]
+  (u/abs-path (or (get-in conf [:args :workdir])
+                  (:work-dir conf)
+                  (u/cwd))))
+
+(defmethod normalize-key :work-dir [_ conf]
+  (assoc conf :work-dir (abs-work-dir conf)))
+
+(defmethod normalize-key :account [_ {:keys [args] :as conf}]
   (let [c (update conf :account merge (-> args
                                           (select-keys [:customer-id :project-id :repo-id])
                                           (mc/assoc-some :url (:server args))))]
     (cond-> c
       (empty? (:account c)) (dissoc :account))))
 
+(defn- dir-or-work-sub [conf k d]
+  (update conf k #(or (u/abs-path %) (u/combine (abs-work-dir conf) d))))
+
+(defmethod normalize-key :checkout-base-dir [k conf]
+  (dir-or-work-sub conf k "checkout"))
+
+(defmethod normalize-key :ssh-keys-dir [k conf]
+  (dir-or-work-sub conf k "ssh-keys"))
+
+(defmethod normalize-key :api [_ conf]
+  conf)
+
+(defmethod normalize-key :build [_ conf]
+  (update conf :build (fn [b]
+                        (-> b
+                            (group-keys :git)
+                            (group-keys :script)
+                            (mc/update-existing :sid u/parse-sid)
+                            (mc/update-existing :git group-keys :author)))))
+
+(defn normalize-config
+  "Given a configuration map loaded from file, environment variables and command-line
+   args, applies all registered normalizers to it and returns the result.  Since the 
+   order of normalizers is undefined, they should not be dependent on each other."
+  [conf env args]
+  (letfn [(merge-if-map [d m]
+            (if (map? d)
+              (merge d m)
+              (or m d)))
+          (nil-if-empty [x]
+            (when (or (not (seqable? x))
+                      (and (seqable? x) (not-empty x)))
+              x))]
+    (-> (methods normalize-key)
+        (keys)
+        (as-> keys-to-normalize
+            (reduce (fn [r k]
+                      (->> (or (get env k)
+                               (filter-and-strip-keys k env))
+                           (nil-if-empty)
+                           (merge-if-map (get conf k))
+                           (mc/assoc-some r k)
+                           (u/prune-tree)
+                           (normalize-key k)))
+                    (assoc conf :env env :args args)
+                    keys-to-normalize))
+        (dissoc :default :env))))
+
 (defn app-config
   "Combines app environment with command-line args into a unified 
    configuration structure.  Args have precedence over env vars,
    which in turn override config loaded from files and default values."
   [env args]
-  (-> (map load-config-file (concat [*global-config-file*
-                                     *home-config-file*]
-                                    (:config-file args)))
-      (concat [(config-from-env env)])
-      (merge-configs)
-      (merge (select-keys args [:dev-mode]))
-      (assoc :args args)
-      (update-in [:http :port] #(or (:port args) %))
-      (update-in [:runner :type] keyword)
-      (update-in [:storage :type] keyword)
-      (update-in [:logging :type] keyword)
-      (set-work-dir)
-      (set-checkout-base-dir)
-      (set-log-dir)
-      (set-account)))
-
-(def default-script-config
-  "Default configuration for the script runner."
-  {:containers {:type :docker}
-   :storage {:type :memory}
-   :logging {:type :inherit}})
-
-(defn initialize-log-maker [conf]
-  (assoc-in conf [:logging :maker] (l/make-logger conf)))
-
-(defn initialize-log-retriever [conf]
-  (assoc-in conf [:logging :retriever] (l/make-log-retriever conf)))
-
-(defn script-config
-  "Builds config map used by the child script process"
-  [env args]
-  (-> default-script-config
-      (u/deep-merge (config-from-env env))
-      (merge args)
-      (update-in [:containers :type] keyword)
-      (update-in [:logging :type] keyword)
-      (initialize-log-maker)
-      (mc/update-existing-in [:build :sid] u/parse-sid)))
+  (-> (load-raw-config (:config-file args))
+      (normalize-config (strip-env-prefix env) args)))
 
 (defn- flatten-nested
   "Recursively flattens a map of maps.  Each key in the resulting map is a
@@ -213,17 +243,32 @@
                {}
                c)))
 
+(defmulti serialize-config class)
+
+(defmethod serialize-config :default [x]
+  (str x))
+
+(defmethod serialize-config clojure.lang.Keyword [k]
+  (name k))
+
+(defmethod serialize-config java.security.PrivateKey [pk]
+  (pem/private-key->pem pk))
+
 (defn config->env
   "Creates a map of env vars from the config.  This is done by flattening
    the entries and prepending them with `monkeyci-`.  Values are converted 
    to string."
   [c]
-  (letfn [(->str [x]
-            (if (keyword? x)
-              (name x)
-              (str x)))]
-    (->> c
-         (flatten-nested [])
-         (mc/map-keys (fn [k]
-                        (keyword (str env-prefix "-" (name k)))))
-         (mc/map-vals ->str))))
+  (->> c
+       (flatten-nested [])
+       (mc/map-keys (fn [k]
+                      (keyword (str env-prefix "-" (name k)))))
+       (mc/map-vals serialize-config)))
+
+(defn normalize-typed
+  "Convenience function that converts the `:type` of an entry into a keyword and
+   then invokes `f` on it."
+  [k conf f]
+  (-> conf
+      (update k keywordize-type)
+      (f)))

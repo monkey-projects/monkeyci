@@ -3,8 +3,11 @@
             [clojure.java.io :as io]
             [common :as c]
             [monkey.ci
+             [config :as config]
              [oci :as oci]
-             [utils :as u]])
+             [storage]
+             [utils :as u]]
+            [monkey.ci.storage.oci])
   (:import java.io.PushbackReader))
 
 ;; Global config state
@@ -33,7 +36,8 @@
    and converts it to an OCI config map."
   ([env type]
    (-> (load-config (format "oci/%s-config.edn" (name env)))
-       (oci/ctx->oci-config type)
+       (config/normalize-config {} {})
+       (get type)
        (oci/->oci-config)))
   ([type]
    (load-oci-config @c/env type)))
@@ -43,17 +47,21 @@
    it (type being `:logging`, `:runner`, `:container`, `:storage`)"
   [type]
   (-> @global-config
-      (oci/ctx->oci-config type)
+      (config/normalize-config {} {})
+      (get type)
       (oci/->oci-config)))
 
 (defn oci-runner-config []
   (oci-config :runner))
 
+(defn oci-storage-config []
+  (oci-config :storage))
+
 (defn oci-container-config []
-  (oci-config :container))
+  (oci-config :containers))
 
 (defn account->sid []
-  (let [v (juxt :customer-id :project-id :repo-id)]
+  (let [v (juxt :customer-id :repo-id)]
     (->> @global-config
          :account
          (v)

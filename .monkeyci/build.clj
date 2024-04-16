@@ -6,69 +6,16 @@
             [monkey.ci.build
              [api :as api]
              [core :as core]
-             [shell :as shell]])
-  (:import [java.time OffsetDateTime ZoneOffset]
-           java.time.format.DateTimeFormatter))
+             [shell :as shell]]))
+
+;; Version assigned when building main branch
+;; TODO Determine automatically
+(def snapshot-version "0.4.8-SNAPSHOT")
 
 (defn git-ref [ctx]
   (get-in ctx [:build :git :ref]))
 
-(defn tag-version
-  "Extracts the version from the tag"
-  [ctx]
-  (some->> (git-ref ctx)
-           (re-matches #"^refs/tags/(\d+\.\d+\.\d+(\.\d+)?$)")
-           (second)))
-
-(defn image-version
-  "Retrieves image version from the tag, or `latest` if this is the main branch."
-  [ctx]
-  (or (tag-version ctx)
-      "latest"))
-
-(defn lib-version
-  "Retrieves lib/jar version from the tag, or the next snapshot if this is the main branch."
-  [ctx]
-  (or (tag-version ctx)
-      ;; TODO Determine automatically (e.g. by inspecting pom.xml?)
-      "0.1.2-SNAPSHOT"))
-
-(defn clj-container [name dir & args]
-  "Executes script in clojure container"
-  {:name name
-   ;; Alpine based images don't exist for arm, so use debian
-   :container/image "docker.io/clojure:temurin-21-tools-deps-bookworm-slim"
-   :script [(str "cd " dir) (cs/join " " (concat ["clojure"] args))]})
-
-(def test-lib (clj-container "test-lib" "lib" "-X:test:junit"))
-(def test-app (clj-container "test-app" "app" "-M:test:junit"))
-
-(defn uberjar [name dir]
-  (fn [ctx]
-    (assoc (clj-container name dir "-X:jar:uber")
-           :container/env {"MONKEYCI_VERSION" (lib-version ctx)})))
-
-(def app-uberjar (uberjar "app-uberjar" "app"))
-(def bot-uberjar (uberjar "braid-bot-uberjar" "braid-bot"))
-
-;; Full path to the docker config file, used to push images
-(defn podman-auth [{:keys [checkout-dir]}]
-  (io/file checkout-dir "podman-auth.json"))
-
-(defn image-creds
-  "Fetches credentials from the params and writes them to Docker `config.json`"
-  [ctx]
-  (let [auth-file (podman-auth ctx)]
-    (when-not (fs/exists? auth-file)
-      (shell/param-to-file ctx "dockerhub-creds" auth-file)
-      (fs/delete-on-exit auth-file)
-      core/success)))
-
-(def datetime-format (DateTimeFormatter/ofPattern "yyyyMMdd"))
-(def img-base "fra.ocir.io/frjdhmocn5qi")
-(def app-img (str img-base "/monkeyci"))
-(def bot-img (str img-base "/monkeyci-bot"))
-(def gui-img (str img-base "/monkeyci-gui"))
+(def tag-regex #"^refs/tags/(\d+\.\d+\.\d+(\.\d+)?$)")
 
 (defn ref?
   "Returns a predicate that checks if the ref matches the given regex"
@@ -81,10 +28,82 @@
   (ref? #"^refs/heads/main$"))
 
 (def release?
-  (ref? #"^refs/tags/\d{8}$"))
+  (ref? tag-regex))
 
 (def should-publish?
   (some-fn main-branch? release?))
+
+(defn tag-version
+  "Extracts the version from the tag"
+  [ctx]
+  (some->> (git-ref ctx)
+           (re-matches tag-regex)
+           (second)))
+
+(defn image-version
+  "Retrieves image version from the tag, or `latest` if this is the main branch."
+  [ctx]
+  (or (tag-version ctx)
+      "latest"))
+
+(defn lib-version
+  "Retrieves lib/jar version from the tag, or the next snapshot if this is the main branch."
+  [ctx]
+  (or (tag-version ctx)
+      snapshot-version))
+
+(defn clj-container [id dir & args]
+  "Executes script in clojure container"
+  (core/container-job
+   id
+   {;; Alpine based images don't exist for arm, so use debian
+    :image "docker.io/clojure:temurin-21-tools-deps-bookworm-slim"
+    :script [(str "cd " dir
+                  " && "
+                  (cs/join " " (concat ["clojure" "-Sdeps" "'{:mvn/local-repo \"../m2\"}'"] args)))]
+    :caches [{:id "mvn-local-repo"
+              :path "m2"}]}))
+
+(def test-app (clj-container "test-app" "app" "-M:test:junit"))
+
+(def uberjar-artifact
+  {:id "uberjar"
+   :path "app/target/monkeyci-standalone.jar"})
+
+(defn app-uberjar [ctx]
+  (when (should-publish? ctx)
+    (-> (clj-container "app-uberjar" "app" "-X:jar:uber")
+        (assoc 
+         :container/env {"MONKEYCI_VERSION" (lib-version ctx)}
+         :save-artifacts [uberjar-artifact])
+        (core/depends-on ["test-app"]))))
+
+(def image-creds-artifact
+  {:id "image-creds"
+   ;; File must be called config.json for kaniko
+   :path ".docker/config.json"})
+
+;; Full path to the docker config file, used to push images
+(defn img-repo-auth [ctx]
+  (shell/in-work ctx (:path image-creds-artifact)))
+
+(defn create-image-creds
+  "Fetches credentials from the params and writes them to Docker `config.json`"
+  [ctx]
+  (let [auth-file (img-repo-auth ctx)]
+    (println "Writing docker credentials to" auth-file)
+    (when-not (fs/exists? auth-file)
+      (shell/param-to-file ctx "dockerhub-creds" auth-file))))
+
+(def image-creds
+  (core/action-job
+   "image-creds"
+   create-image-creds
+   {:save-artifacts [image-creds-artifact]}))
+
+(def img-base "fra.ocir.io/frjdhmocn5qi")
+(def app-img (str img-base "/monkeyci"))
+(def gui-img (str img-base "/monkeyci-gui"))
 
 (defn- make-context [ctx dir]
   (cond-> (:checkout-dir ctx)
@@ -92,87 +111,89 @@
 
 (defn kaniko-build-img
   "Creates a step that builds and uploads an image using kaniko"
-  [{:keys [name dockerfile context image tag]}]
+  [{:keys [id dockerfile context image tag opts]}]
   (fn [ctx]
-    {:name name
-     :container/image "gcr.io/kaniko-project/executor:latest"
-     :container/cmd ["--dockerfile" (str "/workspace/" (or dockerfile "Dockerfile"))
-                     "--destination" (str image ":" (or tag (image-version ctx)))
-                     "--context" "dir:///workspace"]
-     :container/mounts [[(make-context ctx context) "/workspace"]
-                        [(podman-auth ctx) "/kaniko/.docker/config.json"]]}))
+    (let [wd (shell/container-work-dir ctx)
+          ctx-dir (cond-> wd 
+                    context (str "/" context))]
+      (core/container-job
+       id
+       (merge
+        {:image "docker.io/monkeyci/kaniko:1.21.0"
+         :script [(format "/kaniko/executor --dockerfile %s --destination %s --context dir://%s"
+                          (str ctx-dir "/" (or dockerfile "Dockerfile"))
+                          (str image ":" (or tag (image-version ctx)))
+                          ctx-dir)]
+         ;; Set docker config credentials location
+         :container/env {"DOCKER_CONFIG" (str wd "/.docker")}
+         :restore-artifacts [image-creds-artifact]
+         :dependencies ["image-creds"]}
+        opts)))))
 
 (def build-app-image
   (kaniko-build-img
-   {:name "publish-app-img"
+   {:id "publish-app-img"
     :dockerfile "docker/Dockerfile"
-    :image app-img}))
+    :image app-img
+    :opts {:restore-artifacts [uberjar-artifact image-creds-artifact]
+           :dependencies ["image-creds" "app-uberjar"]}}))
 
-(def build-bot-image
-  (kaniko-build-img
-   {:name "publish-bot-img"
-    :context "braid-bot"
-    :image bot-img}))
+(def gui-release-artifact
+  {:id "gui-release"
+   :path "resources/public/js"})
 
 (def build-gui-image
   (kaniko-build-img
-   {:name "publish-gui-img"
+   {:id "publish-gui-img"
     :context "gui"
-    :image gui-img}))
+    :image gui-img
+    ;; Restore artifacts but modify the path because work dir is not the same
+    :opts {:restore-artifacts [(update gui-release-artifact :path (partial str "gui/"))
+                               image-creds-artifact]
+           :dependencies ["image-creds" "release-gui"]}}))
 
-(defn publish [ctx name dir]
+(defn publish [ctx id dir]
   "Executes script in clojure container that has clojars publish env vars"
-  (let [env (-> (api/build-params ctx)
-                (select-keys ["CLOJARS_USERNAME" "CLOJARS_PASSWORD"])
-                (assoc "MONKEYCI_VERSION" (lib-version ctx)))]
-    (-> (clj-container name dir "-X:jar:deploy")
-        (assoc :container/env env))))
-
-(defn publish-lib [ctx]
-  (publish ctx "publish-lib" "lib"))
+  (when (should-publish? ctx)
+    (let [env (-> (api/build-params ctx)
+                  (select-keys ["CLOJARS_USERNAME" "CLOJARS_PASSWORD"])
+                  (assoc "MONKEYCI_VERSION" (lib-version ctx)))]
+      (-> (clj-container id dir "-X:jar:deploy")
+          (assoc :container/env env)))))
 
 (defn publish-app [ctx]
-  (publish ctx "publish-app" "app"))
+  (some-> (publish ctx "publish-app" "app")
+          (core/depends-on ["test-app"])))
 
-(defn- shadow-release [n build]
-  {:name n
-   :container/image "docker.io/dormeur/clojure-node:1.11.1"
-   :work-dir "gui"
-   :script ["npm install"
-            (str "npx shadow-cljs release " build)]})
+(defn- shadow-release [id build]
+  (core/container-job
+   id
+   {:image "docker.io/dormeur/clojure-node:1.11.1"
+    :work-dir "gui"
+    :script ["npm install"
+             (str "clojure -Sdeps '{:mvn/local-repo \".m2\"}' -M:test -m shadow.cljs.devtools.cli release " build)]
+    :caches [{:id "mvn-gui-repo"
+              :path ".m2"}
+             {:id "node-modules"
+              :path "node_modules"}]}))
 
 (def test-gui
-  (shadow-release "test-gui" :test/ci))
+  (-> (shadow-release "test-gui" :test/node)
+      ;; Explicitly run the tests, since :autorun always returns zero
+      (update :script conj "node target/js/node.js")))
 
-(def build-gui-release
-  (shadow-release "release-gui" :frontend))
+(defn build-gui-release [ctx]
+  (when (should-publish? ctx)
+    (-> (shadow-release "release-gui" :frontend)
+        (core/depends-on ["test-gui"])
+        (assoc :save-artifacts [gui-release-artifact]))))
 
-(core/defpipeline test-all
-  ;; TODO Run these in parallel
-  [test-lib
-   test-app
-   test-gui])
-
-(core/defpipeline publish-libs
-  [publish-lib
-   publish-app])
-
-(core/defpipeline publish-images
-  [app-uberjar
-   build-gui-release
-   image-creds
-   build-app-image
-   build-gui-image])
-
-(core/defpipeline braid-bot
-  [bot-uberjar
-   image-creds
-   build-bot-image])
-
-;; Return the pipelines
-(defn all-pipelines [ctx]
-  (cond-> [test-all]
-    ;; Optionally publish images and libs
-    (should-publish? ctx)
-    (concat [publish-libs
-             publish-images])))
+;; List of jobs
+[test-app
+ app-uberjar
+ publish-app
+ test-gui
+ build-gui-release
+ image-creds
+ build-app-image
+ build-gui-image]

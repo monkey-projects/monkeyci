@@ -6,7 +6,12 @@
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
-            [monkey.ci.oci :as oci]
+            [monkey.ci
+             [build :as b]
+             [config :as c]
+             [oci :as oci]
+             [runtime :as rt]
+             [utils :as u]]
             [monkey.ci.storage.oci :as st]
             [monkey.oci.os.core :as os]))
 
@@ -34,10 +39,12 @@
   (fn [& _]
     (->InheritLogger)))
 
-(deftype FileLogger [conf ctx path]
+(deftype FileLogger [conf rt path]
   LogCapturer
   (log-output [_]
-    (let [f (apply io/file (or (:dir conf) (io/file (:work-dir ctx) "logs")) path)]
+    (let [f (apply io/file
+                   (or (:dir conf) (io/file (:work-dir rt) "logs"))
+                   (concat (drop-last (b/get-sid rt)) path))]
       (.mkdirs (.getParentFile f))
       f))
 
@@ -56,11 +63,15 @@
   (let [shutdown? (atom false)
         t (Thread. (fn []
                      (reset! shutdown? true)
-                     (log/debug "Waiting for deferred to complete...")
-                     (deref d)))
+                     (log/debug "Waiting for upload to complete...")
+                     (deref d)
+                     (log/debug "Upload completed")))
         remove-hook (fn [& _]
                       (when-not @shutdown?
-                        (.removeShutdownHook (Runtime/getRuntime) t)))]
+                        (try 
+                          (.removeShutdownHook (Runtime/getRuntime) t)
+                          (catch Exception _
+                            (log/warn "Unable to remove shutdown hook, process is probably already shutting down.")))))]
     (when (md/deferred? d)
       (.addShutdownHook (Runtime/getRuntime) t)
       (md/on-realized d remove-hook remove-hook))
@@ -71,26 +82,28 @@
        (remove nil?)
        (cs/join "/")))
 
-(deftype OciBucketLogger [conf ctx path]
+(deftype OciBucketLogger [conf rt path]
   LogCapturer
   (log-output [_]
     :stream)
 
   (handle-stream [_ in]
-    (let [sid (get-in ctx [:build :sid])
-          on (sid->path conf path (take 3 sid))]
+    (let [sid (get-in rt [:build :sid])
+          ;; Since the configured path already includes the build id,
+          ;; we only use repo id to build the path
+          on (sid->path conf path (u/sid->repo-sid sid))]
       (-> (oci/stream-to-bucket (assoc conf :object-name on)
                                 in)
           (ensure-cleanup)))))
 
 (defmethod make-logger :oci [conf]
-  (fn [ctx path]
+  (fn [rt path]
     (-> conf
-        (oci/ctx->oci-config :logging)
-        (->OciBucketLogger ctx path))))
+        :logging
+        (->OciBucketLogger rt path))))
 
 (defn handle-process-streams
-  "Given a process return values (as from `babashka.process/process`) and two
+  "Given a process return value (as from `babashka.process/process`) and two
    loggers, will invoke the `handle-stream` on each logger for out and error
    output.  Returns the process."
   [{:keys [out err] :as proc} loggers]
@@ -167,6 +180,7 @@
   
   (fetch-log [_ sid path]
     ;; TODO Also return object size, so we can tell the client
+    ;; FIXME Return nil if file does not exist, instead of throwing an error
     @(md/chain
       (os/get-object client (-> conf
                                 (select-keys [:ns :compartment-id :bucket-name])
@@ -175,7 +189,28 @@
 
 (defmethod make-log-retriever :oci [conf]
   (let [oci-conf (-> conf
-                     (oci/ctx->oci-config :logging)
+                     :logging
                      (oci/->oci-config))
         client (os/make-client oci-conf)]
     (->OciBucketLogRetriever client oci-conf)))
+
+;;; Configuration handling
+
+(defmulti normalize-logging-config (comp :type :logging))
+
+(defmethod normalize-logging-config :default [conf]
+  conf)
+
+(defmethod normalize-logging-config :file [conf]
+  (update-in conf [:logging :dir] #(or (u/abs-path %) (u/combine (c/abs-work-dir conf) "logs"))))
+
+(defmethod normalize-logging-config :oci [conf]
+  (-> (oci/normalize-config conf :logging)
+      (update :logging select-keys [:type :credentials :ns :compartment-id :bucket-name :region])))
+
+(defmethod c/normalize-key :logging [k conf]
+  (c/normalize-typed k conf normalize-logging-config))
+
+(defmethod rt/setup-runtime :logging [conf _]
+  {:maker (make-logger conf)
+   :retriever (make-log-retriever conf)})

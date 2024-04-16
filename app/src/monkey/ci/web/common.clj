@@ -1,9 +1,14 @@
 (ns monkey.ci.web.common
-  (:require [camel-snake-kebab.core :as csk]
-            [clojure.core.async :refer [go <! <!! >!]]
+  (:require [buddy.auth :as ba]
+            [camel-snake-kebab.core :as csk]
+            [cheshire.core :as json]
+            [clojure.java.io :as io]
             [clojure.tools.logging :as log]
-            [monkey.ci.events :as e]
+            [manifold.deferred :as md]
             [muuntaja.core :as mc]
+            [monkey.ci
+             [build :as b]
+             [runtime :as rt]]
             [reitit.ring :as ring]
             [reitit.ring.coercion :as rrc]
             [reitit.ring.middleware
@@ -12,29 +17,25 @@
              [parameters :as rrmp]]
             [ring.util.response :as rur]))
 
-(defn req->ctx [req]
-  (get-in req [:reitit.core/match :data ::context]))
 
-(defn from-context [req f]
-  (f (req->ctx req)))
+;; Reitit rewrites records in the data to hashmaps, so wrap it in a type
+(deftype RuntimeWrapper [runtime])
 
-(defn req->bus
-  "Gets the event bus from the request data"
+(defn req->rt
+  "Gets the runtime from the request"
   [req]
-  (from-context req :event-bus))
+  (some-> (get-in req [:reitit.core/match :data ::runtime])
+          (.runtime)))
+
+(defn from-rt
+  "Applies `f` to the request runtime"
+  [req f]
+  (f (req->rt req)))
 
 (defn req->storage
   "Retrieves storage object from the request context"
   [req]
-  (from-context req :storage))
-
-(defn post-event
-  "Posts event to the bus found in the request data.  Returns an async channel
-   holding `true` if the event is posted."
-  [req evt]
-  (go (some-> (req->bus req)
-              (e/channel)
-              (>! (e/add-time evt)))))
+  (from-rt req :storage))
 
 (defn make-muuntaja
   "Creates muuntaja instance with custom settings"
@@ -58,10 +59,20 @@
         (log/error (str "Got error while handling request" (:uri req)) ex)
         (throw ex)))))
 
+(def exception-middleware
+  (rrme/create-exception-middleware
+   (merge rrme/default-handlers
+          {:auth/unauthorized (fn [e req]
+                                (if (ba/authenticated? req)
+                                  {:status 403
+                                   :body (.getMessage e)}
+                                  {:status 401
+                                   :body "Unauthenticated"}))})))
+
 (def default-middleware
   [rrmp/parameters-middleware
    rrmm/format-middleware
-   rrme/exception-middleware
+   exception-middleware
    exception-logger
    rrc/coerce-exceptions-middleware
    rrc/coerce-request-middleware
@@ -74,17 +85,27 @@
     (ring/redirect-trailing-slash-handler)
     (ring/create-default-handler))))
 
-(defn posting-handler
-  "Handles the incoming http request by dispatching it to the handler `h`
-   which returns an event, which is then posted."
-  [req h]
-  ;; TODO Refactor this into an interceptor where the handler is able to
-  ;; return a custom response in addition to dispatching an event.
-  ;; Httpkit can't handle channels so read it here
-  (<!!
-   (go
-     (rur/status
-      (let [evt (h req)]
-        (if (or (nil? evt) (<! (post-event req evt)))
-          200
-          500))))))
+(defn parse-json [s]
+  (if (string? s)
+    (json/parse-string s csk/->kebab-case-keyword)
+    (with-open [r (io/reader s)]
+      (json/parse-stream r csk/->kebab-case-keyword))))
+
+(defn run-build-async
+  "Starts the build in a new thread"
+  [rt]
+  (let [runner (rt/runner rt)
+        report-error (fn [ex]
+                       (log/error "Unable to start build:" ex)
+                       (rt/post-events rt (b/build-end-evt
+                                           (-> (rt/build rt)
+                                               (assoc :status :error
+                                                      :message (ex-message ex))))))]
+    (md/future
+      (try
+        ;; Catch both the deferred error, or the direct exception, because both
+        ;; can be thrown here.
+        (-> (runner rt)
+            (md/catch report-error))
+        (catch Exception ex
+          (report-error ex))))))

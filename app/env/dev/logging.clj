@@ -28,7 +28,6 @@
   "Downloads logs for a given build from log bucket"
   [sid dir]
   (let [conf (co/oci-config :logging)
-        client (os/make-client conf)
         path (l/sid->path conf nil sid)]
     (log/info "Downloading logs for" sid "at" path "into" dir)
     (when-not (fs/create-dirs dir)
@@ -38,3 +37,7 @@
 (defn get-log [path]
   (-> @(call-os os/get-object {:object-name path})
       (bs/to-string)))
+
+(defn move-log [from to]
+  @(call-os os/rename-object {:rename {:source-name from
+                                       :new-name to}}))

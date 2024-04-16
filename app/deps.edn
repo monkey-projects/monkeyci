@@ -1,8 +1,11 @@
 {:deps {aleph/aleph {:mvn/version "0.7.0-alpha2"} ; For http SSE receiving
         babashka/process {:mvn/version "0.5.21"}
+        bowerick/bowerick {:mvn/version "2.9.8"
+                           :exclusions [org.slf4j/slf4j-simple]}
+        buddy/buddy-auth {:mvn/version "3.0.323"}
         buddy/buddy-core {:mvn/version "1.11.423"}
         camel-snake-kebab/camel-snake-kebab {:mvn/version "0.4.3"}
-        ch.qos.logback/logback-classic {:mvn/version "1.4.14"}
+        ch.qos.logback/logback-classic {:mvn/version "1.5.1"}
         clansi/clansi {:mvn/version "1.0.0"}
         cli-matic/cli-matic {:mvn/version "0.5.4"}
         clj-jgit/clj-jgit {:mvn/version "1.0.2"
@@ -16,26 +19,33 @@
         com.github.oliyh/martian-httpkit {:mvn/version "0.1.25"}
         com.github.seancorfield/honeysql {:mvn/version "2.5.1103"}
         com.github.seancorfield/next.jdbc {:mvn/version "1.3.909"}
-        com.monkeyci/script {:local/root "../lib"}
-        com.monkeyprojects/socket-async {:mvn/version "0.1.0"}
-        com.monkeyprojects/oci-sign {:mvn/version "0.1.3"}
+        com.monkeyprojects/clompress {:mvn/version "0.1.1"}
         com.monkeyprojects/oci-container-instance {:mvn/version "0.1.0"}
-        com.monkeyprojects/oci-os {:mvn/version "0.1.0-SNAPSHOT"}
+        com.monkeyprojects/oci-os {:mvn/version "0.2.2"}
+        com.monkeyprojects/oci-sign {:mvn/version "0.1.3"}
+        com.monkeyprojects/socket-async {:mvn/version "0.1.0"}
         com.mysql/mysql-connector-j {:mvn/version "8.2.0"}
-        com.stuartsierra/component {:mvn/version "1.1.0"}
         com.zaxxer/HikariCP {:mvn/version "5.1.0"}
-        commons-io/commons-io {:mvn/version "2.13.0"}
         dev.weavejester/ragtime {:mvn/version "0.9.3"}
+        com.monkeyprojects/zmq {:mvn/version "0.3.2"
+                                ;; Use jeromq, so we don't need native lib.  This is a bit
+                                ;; slower however, so maybe later we can change this.
+                                :exclusions [org.zeromq/jzmq]}
+        com.stuartsierra/component {:mvn/version "1.1.0"}
+        commons-io/commons-io {:mvn/version "2.15.1"}
         http-kit/http-kit {:mvn/version "2.7.0"}
+        io.micrometer/micrometer-registry-prometheus {:mvn/version "1.12.4"}
+        io.micrometer/micrometer-core {:mvn/version "1.12.4"}
+        io.resonant/micrometer-clj {:mvn/version "0.0.4"}
         medley/medley {:mvn/version "1.4.0"}
         metosin/reitit-middleware {:mvn/version "0.7.0-alpha5"}
         metosin/reitit-ring {:mvn/version "0.7.0-alpha5"}
         metosin/reitit-schema {:mvn/version "0.7.0-alpha5"}
         metosin/reitit-swagger {:mvn/version "0.7.0-alpha5"}
-        org.clojars.alperenbayramoglu/clompress {:mvn/version "0.1.0"}
         org.clojars.lispyclouds/contajners {:mvn/version "1.0.1"}
         org.clojure/core.async {:mvn/version "1.6.681"}
         org.clojure/tools.logging {:mvn/version "1.2.4"}
+        org.zeromq/jeromq {:mvn/version "0.5.4"} ; Java implementation of zeromq
         ring-cors/ring-cors {:mvn/version "0.1.13"}
         yogthos/config {:mvn/version "1.2.0"}}
  
@@ -68,7 +78,7 @@
                "--junit-xml-file" "junit.xml"
                ;; Skip docker integration tests, they require access to the socket
                "--skip-meta" ":docker"
-               ;; Skip integration tests for now, they are too slow (for now)
+               ;; Skip integration tests, they are too slow (for now)
                "--skip-meta" ":integration"]
    ;; Add this to avoid falling back to the default logger
    :jvm-opts ["-Dlogback.configurationFile=resources/logback.xml"]}

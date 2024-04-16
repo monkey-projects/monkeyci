@@ -37,7 +37,7 @@ added complexity.  So for most parts of the application, we're using higher-orde
 functions that use the app configuration to spawn other functions that do the real
 work.  This allows us to "inject" testing functions where wanted.  But events will
 still be used for the async operations, like waiting for a child process to terminate
-and receiving any messages from it.
+and receiving any messages from it.  See more details in [the events page](events.md).
 
 ## Scripts ##
 

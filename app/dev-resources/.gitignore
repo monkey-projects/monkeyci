@@ -1,3 +1,4 @@
 *.key
 /*.edn
 /config
+/keys

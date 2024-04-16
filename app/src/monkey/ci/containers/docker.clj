@@ -1,5 +1,5 @@
 (ns monkey.ci.containers.docker
-  "Functions for running build steps using Docker api."
+  "Functions for running build jobs using Docker api."
   (:require [camel-snake-kebab.core :as csk]
             [clojure.java.io :as io]
             [clojure.tools.logging :as log]
@@ -7,8 +7,8 @@
             [contajners.core :as c]
             [medley.core :as mc]
             [monkey.ci
+             [build :as b]
              [containers :as mcc]
-             [context :as ctx]
              [utils :as u]])
   (:import org.apache.commons.io.IOUtils
            [java.io PrintWriter]))
@@ -187,11 +187,15 @@
 
 (def ^:private internal-log-dir "/var/log/monkeyci")
 
-(defn container-opts [ctx]
+(defn- log-dir [rt]
+  ;; TODO Rework to use logging system
+  (System/getProperty "java.io.tmpdir"))
+
+(defn container-opts [rt]
   (let [remote-wd "/home/build"
-        work-dir (ctx/step-work-dir ctx)
-        output-dir (ctx/log-dir ctx)]
-    (merge (mcc/ctx->container-config ctx)
+        work-dir (b/job-work-dir rt)
+        output-dir (log-dir rt)]
+    (merge (mcc/rt->container-config rt)
            {:cmd ["/bin/sh"]
             :open-stdin true
             :attach-stdin false
@@ -213,7 +217,7 @@
         log-path (fn [s]
                    (u/abs-path (io/file internal-log-dir s)))
         {:keys [image] :as conf} (container-opts ctx)
-        output-dir (doto (io/file (ctx/log-dir ctx))
+        output-dir (doto (io/file (log-dir ctx))
                      (.mkdirs))
         
         pull   (fn [{:keys [image]}]
@@ -235,32 +239,32 @@
                  (some->> (attach-container client id)
                           (hash-map :container cont :socket)))
         
-        execute-step (fn [pw in idx s]
-                       (log/info "Executing:" s)
-                       (let [out (str idx "-out")
-                             err (str idx "-err")]
-                         ;; Execute command with output redirection and then print the exit code
-                         ;; TODO Find a better way.  This is brittle.
-                         (.println pw (format "%s >%s 2>%s; echo $?"
-                                              s
-                                              (log-path out)
-                                              (log-path err)))
-                         ;; Read exit code
-                         (->> (parse-next-line in)
-                              :message
-                              (.trim)
-                              (Integer/parseInt)
-                              (hash-map :idx idx
-                                        :cmd s
-                                        :stdout (io/file output-dir out)
-                                        :stderr (io/file output-dir err)
-                                        :exit))))
+        execute-job (fn [pw in idx s]
+                      (log/info "Executing:" s)
+                      (let [out (str idx "-out")
+                            err (str idx "-err")]
+                        ;; Execute command with output redirection and then print the exit code
+                        ;; TODO Find a better way.  This is brittle.
+                        (.println pw (format "%s >%s 2>%s; echo $?"
+                                             s
+                                             (log-path out)
+                                             (log-path err)))
+                        ;; Read exit code
+                        (->> (parse-next-line in)
+                             :message
+                             (.trim)
+                             (Integer/parseInt)
+                             (hash-map :idx idx
+                                       :cmd s
+                                       :stdout (io/file output-dir out)
+                                       :stderr (io/file output-dir err)
+                                       :exit))))
         
         execute (fn [{:keys [socket container] :as state}]
-                  (let [script (get-in ctx [:step :script])
+                  (let [script (get-in ctx [:job :script])
                         pw (PrintWriter. (.getOutputStream socket) true)
                         in (.getInputStream socket)]
-                    ;; Run all steps until one returns nonzero
+                    ;; Run all jobs until one returns nonzero
                     (log/debug "Executing" (count script) "commands in container")
                     (try
                       (->> (loop [s script
@@ -268,13 +272,13 @@
                                   results []]
                              (if (empty? s)
                                results  ; Done
-                               (let [{:keys [exit] :as r} (execute-step pw in idx (first s))
+                               (let [{:keys [exit] :as r} (execute-job pw in idx (first s))
                                      acc (conj results r)]
                                  (if (zero? exit)
                                    ;; Continue with next command
                                    (recur (rest s) (inc idx) acc)
                                    (do
-                                     (log/warn "Step" (:idx r) "failed with exit code" exit)
+                                     (log/warn "Job" (:id r) "failed with exit code" exit)
                                      acc)))))
                            (assoc state :results))
                       (finally

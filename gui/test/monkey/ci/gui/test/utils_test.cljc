@@ -10,3 +10,13 @@
                 :second "b"
                 :third "c"}
                (sut/->sid :first :second :third))))))
+
+(deftest build-elapsed
+  (testing "0 if empty"
+    (is (= 0 (sut/build-elapsed {}))))
+
+  (testing "total millis between start time and end time"
+    (let [b {:start-time 10
+             :end-time 100}
+          e (sut/build-elapsed b)]
+      (is (= 90 e)))))

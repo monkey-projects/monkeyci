@@ -6,7 +6,7 @@
     </http>
     <format>
       <label>
-	<pattern>env=dev,app=monkeyci,level=%level</pattern>
+	<pattern>env=dev,app=monkeyci,role=api,level=%level</pattern>
       </label>
       <message>
 	<pattern>l=%level h=${HOSTNAME} c=%logger{20} t=%thread | %msg %ex</pattern>

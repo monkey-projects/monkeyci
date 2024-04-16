@@ -1,18 +1,21 @@
 (ns monkey.ci.cli
   (:require [clojure.walk :as w]
             [monkey.ci
+             [build :as b]
              [commands :as cmd]
-             [config :as config]
-             [runners :as r]]))
+             [config :as config]]))
+
+(def script-location-opt
+  {:as "Script location"
+   :option "dir"
+   :short "d"
+   :type :string
+   :default b/default-script-dir})
 
 (def run-build-cmd
   {:command "run"
    :description "Runs build locally"
-   :opts [{:as "Script location"
-           :option "dir"
-           :short "d"
-           :type :string
-           :default r/default-script-dir}
+   :opts [script-location-opt
           {:as "Pipeline name"
            :option "pipeline"
            :short "p"
@@ -31,17 +34,27 @@
           {:as "Repository sid"
            :option "sid"
            :type :string}]
-   :runs {:command cmd/run-build}})
+   :runs {:command cmd/run-build
+          :app-mode :cli}})
+
+(def verify-build-cmd
+  {:command "verify"
+   :description "Verifies local build script"
+   :opts [script-location-opt]
+   :runs {:command cmd/verify-build
+          :app-mode :cli}})
 
 (def list-build-cmd
   {:command "list"
-   :description "Lists builds for customer, project or repo"
-   :runs {:command cmd/list-builds}})
+   :description "Lists builds for customer or repo"
+   :runs {:command cmd/list-builds
+          :app-mode :cli}})
 
 (def watch-cmd
   {:command "watch"
-   :description "Logs build events for customer, project or repo"
-   :runs {:command cmd/watch}})
+   :description "Logs build events for customer or repo"
+   :runs {:command cmd/watch
+          :app-mode :cli}})
 
 (def build-cmd
   {:command "build"
@@ -54,15 +67,12 @@
            :option "customer-id"
            :short "c"
            :type :string}
-          {:as "Project id"
-           :option "project-id"
-           :short "p"
-           :type :string}
           {:as "Repository id"
            :option "repo-id"
            :short "r"
            :type :string}]
    :subcommands [run-build-cmd
+                 verify-build-cmd
                  list-build-cmd
                  watch-cmd]})
 
@@ -76,7 +86,8 @@
            :default 3000
            :env "PORT"}]
    :runs {:command cmd/http-server
-          :requires [:http]}})
+          :requires [:http]
+          :app-mode :server}})
 
 (def sidecar-cmd
   {:command "sidecar"
@@ -85,13 +96,23 @@
            :option "events-file"
            :short "e"
            :type :string
-           :default :present}
+           :default "events"}
           {:as "Start file"
            :option "start-file"
            :short "s"
            :type :string
-           :default :present}]
-   :runs {:command cmd/sidecar}})
+           :default "start"}
+          {:as "Abort file"
+           :option "abort-file"
+           :short "a"
+           :type :string
+           :default "abort"}
+          {:as "Job config"
+           :option "job-config"
+           :short "t"
+           :type :ednfile}]
+   :runs {:command cmd/sidecar
+          :app-mode :script}})
 
 (def base-config
   {:name "monkey-ci"

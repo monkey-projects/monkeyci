@@ -12,21 +12,21 @@
             [manifold.deferred :as md]
             [monkey.ci
              [oci :as oci]
+             [protocols :as p]
              [utils :as u]]
-            [monkey.oci.os.core :as os])
+            [monkey.oci.os
+             [core :as os]
+             [stream :as oss]])
   (:import [java.io BufferedInputStream PipedInputStream PipedOutputStream]
            [org.apache.commons.compress.archivers ArchiveStreamFactory]))
 
-(defprotocol BlobStore
-  "Protocol for blob store abstraction, used to save and compress files or directories
-   to some blob store, possibly remote."
-  (save [store src dest] "Saves `src` file or directory to `dest` as a blob")
-  (restore [store src dest] "Restores `src` to local `dest`"))
+(def save p/save-blob)
+(def restore p/restore-blob)
 
 (defmulti make-blob-store (fn [conf k]
                             (get-in conf [k :type])))
 
-(def blob-store? (partial satisfies? BlobStore))
+(def blob-store? p/blob-store?)
 
 (def compression-type "gz")
 (def archive-type "tar")
@@ -34,7 +34,7 @@
 (def stream-factory (ArchiveStreamFactory.))
 
 (defn- mkdirs! [f]
-  (if (fs/exists? f)
+  (if (and f (fs/exists? f))
     (when-not (.isDirectory f)
       (throw (ex-info "Directory cannot be created, already exists as a file" {:dir f})))
     (when-not (.mkdirs f)
@@ -54,7 +54,7 @@
         (throw ex)))))
 
 (defn- extract-entry [ai e dest]
-  (log/debug "Extracting entry from archive:" (.getName e))
+  (log/trace "Extracting entry from archive:" (.getName e))
   (let [f (io/file dest (.getName e))]
     (cond
       (.isDirectory e)
@@ -75,16 +75,19 @@
   [is dest]
   (log/debug "Extracting archive into" dest)
   (with-open [ai (.createArchiveInputStream stream-factory ArchiveStreamFactory/TAR is)]
-    (loop [e (next-entry ai)]
+    (loop [e (next-entry ai)
+           entries []]
       (if e
         (do
           (if (.canReadEntryData ai e)
             (extract-entry ai e dest)
             (log/warn "Unable to read entry data:" (.getName e)))
           ;; Go to next entry
-          (recur (next-entry ai)))
+          (recur (next-entry ai)
+                 (conj entries e)))
         ;; Done
-        dest))))
+        {:dest dest
+         :entries entries}))))
 
 (defn- drop-prefix-resolver
   "The default entry name resolver includes the full path to the file.  
@@ -94,43 +97,68 @@
   ;; Skip the /
   (subs path (inc (count base-dir))))
 
+(defn- entry-gathering-resolver
+  "Adds artifact entries to the given atom"
+  [entries]
+  (fn [p]
+    (swap! entries conj p)
+    p))
+
 (defn make-archive
   "Archives the `src` directory or file into `dest` file."
   [src dest]
   (let [prefix (u/abs-path
-                (fs/file (fs/parent src)))]
+                (fs/file (fs/parent src)))
+        entries (atom [])
+        gatherer (entry-gathering-resolver entries)]
     (log/debug "Archiving" src "and stripping prefix" prefix)
     (mkdirs! (.getParentFile dest))
     (ca/archive
      {:output-stream (io/output-stream dest)
       :compression compression-type
       :archive-type archive-type
-      :entryNameResolver (partial drop-prefix-resolver prefix)}
-     (u/abs-path src))))
+      :entry-name-resolver (comp gatherer (partial drop-prefix-resolver prefix))}
+     (u/abs-path src))
+    ;; Return some info, since clompress returns `nil`
+    {:src src
+     :dest dest
+     :entries @entries}))
 
 (deftype DiskBlobStore [dir]
-  BlobStore
-  (save [_ src dest]
-    (let [f (io/file dir dest)]
-      (md/chain
-       (make-archive src f)
-       ;; Return destination path
-       (constantly (u/abs-path f)))))
+  p/BlobStore
+  (save-blob [_ src dest]
+    (if (fs/exists? src)
+      (let [f (io/file dir dest)]
+        (log/debug "Saving archive" src "to" f)
+        (md/chain
+         (make-archive src f)
+         ;; Return destination path
+         (constantly (u/abs-path f))))
+      (md/success-deferred nil)))
 
-  (restore [_ src dest]
+  (restore-blob [_ src dest]
     (let [f (io/file dest)
-          os (PipedOutputStream.)]
+          os (PipedOutputStream.)
+          srcf (io/file dir src)]
       (md/future
-        (with-open [is (BufferedInputStream. (PipedInputStream. os))]
-          ;; Decompress to the output stream
-          (doto (Thread. #(cc/decompress
-                           (io/input-stream (io/file dir src))
-                           os
-                           compression-type))
-            (.start))
-          ;; Unarchive
-          (mkdirs! f)
-          (extract-archive is f))))))
+        (when (fs/exists? srcf)
+          (with-open [is (BufferedInputStream. (PipedInputStream. os))]
+            ;; Decompress to the output stream
+            (doto (Thread. (fn []
+                             (try 
+                               (cc/decompress
+                                (io/input-stream srcf)
+                                os
+                                compression-type)
+                               (catch Exception ex
+                                 (log/error "Unable to decompress archive" ex))
+                               (finally
+                                 (.close os)))))
+              (.start))
+            ;; Unarchive
+            (mkdirs! f)
+            (-> (extract-archive is f)
+                (assoc :src src))))))))
 
 (defmethod make-blob-store :disk [conf k]
   (->DiskBlobStore (get-in conf [k :dir])))
@@ -149,48 +177,75 @@
        (cs/join "/")))
 
 (deftype OciBlobStore [client conf]
-  BlobStore
-  (save [_ src dest]
-    (let [arch (tmp-archive conf)
-          obj-name (archive-obj-name conf dest)]
-      ;; Write archive to temp file first
-      (log/debug "Archiving" src "to" arch)
-      (make-archive src arch)
-      ;; Upload the temp file
-      (log/debugf "Uploading archive %s to %s (%d bytes)" arch obj-name (fs/size arch))
-      (-> (os/put-object client (-> conf
-                                    (select-keys [:ns :bucket-name])
-                                    (assoc :object-name obj-name
-                                           :contents (fs/read-all-bytes arch))))
-          (md/chain (constantly obj-name))
-          (md/finally #(fs/delete arch)))))
+  p/BlobStore
+  (save-blob [_ src dest]
+    (if (fs/exists? src)
+      (let [arch (tmp-archive conf)
+            obj-name (archive-obj-name conf dest)]
+        ;; Write archive to temp file first
+        (log/debug "Archiving" src "to" arch)
+        (make-archive src arch)
+        ;; Upload the temp file
+        (log/debugf "Uploading archive %s to %s (%d bytes)" arch obj-name (fs/size arch))
+        (let [is (io/input-stream arch)]
+          (-> (oss/input-stream->multipart client
+                                           (-> conf
+                                               (select-keys [:ns :bucket-name])
+                                               (assoc :object-name obj-name
+                                                      :input-stream is
+                                                      ;; Increase buffer size to 1MB
+                                                      :buf-size 0x100000
+                                                      :close? true)))
+              (md/chain (constantly obj-name))
+              (md/finally #(fs/delete arch)))))
+      (do
+        (log/warn "Unable to save blob, path does not exist:" src)
+        (md/success-deferred nil))))
 
-  (restore [_ src dest]
-    (let [obj-name (archive-obj-name conf dest)
+  (restore-blob [_ src dest]
+    (let [obj-name (archive-obj-name conf src)
           f (io/file dest)
-          arch (tmp-archive conf)]
+          arch (tmp-archive conf)
+          params (-> conf
+                     (select-keys [:ns :bucket-name])
+                     (assoc :object-name obj-name))]
       ;; Download to tmp file
       (log/debug "Downloading" src "into" arch)
       (mkdirs! (.getParentFile arch))
-      ;; FIXME Find a way to either stream the response, or write to a file without
-      ;; buffering it into memory.  Right now this will go OOM on larger archives.
-      (-> (os/get-object client (-> conf
-                                    (select-keys [:ns :bucket-name])
-                                    (assoc :object-name obj-name)))
-          (md/chain
-           bs/to-input-stream
-           (fn [is]
-             (with-open [os (io/output-stream arch)]
-               (cc/decompress is os compression-type))
-             ;; Reopen the decompressed archive as a stream
-             (io/input-stream arch))
-           #(extract-archive % f)
-           (constantly f))
-          (md/finally #(fs/delete arch))))))
+      (md/chain
+       (os/head-object client params)
+       (fn [exists?]
+         (if exists?
+           (-> (os/get-object client params)
+               (md/chain
+                bs/to-input-stream
+                (fn [is]
+                  (log/debug "Decompressing archive into" arch)
+                  (with-open [os (io/output-stream arch)]
+                    (cc/decompress is os compression-type))
+                  ;; Reopen the decompressed archive as a stream
+                  (io/input-stream arch))
+                (fn [r]
+                  (-> (extract-archive r f)
+                      (assoc :src src))))
+               (md/finally #(fs/delete-if-exists arch)))
+           ;; FIXME It may occur that a file is not yet available if it is read immediately after writing
+           ;; In that case we should retry.
+           (log/warn "Blob not found in bucket:" obj-name)))))))
 
 (defmethod make-blob-store :oci [conf k]
-  (let [oci-conf (oci/ctx->oci-config conf k)
+  (let [oci-conf (get conf k)
         client (-> oci-conf
                    (oci/->oci-config)
                    (os/make-client))]
     (->OciBlobStore client oci-conf)))
+
+(defmulti normalize-blob-config (fn [t conf] (get-in conf [t :type])))
+
+(defmethod normalize-blob-config :default [_ config]
+  config)
+
+(defmethod normalize-blob-config :oci [t config]
+  (-> config
+      (oci/normalize-config t)
+      (update t select-keys [:type :ns :region :bucket-name :credentials :prefix])))

@@ -7,6 +7,7 @@
             [manifold.deferred :as md]
             [monkey.ci
              [oci :as oci]
+             [protocols :as p]
              [storage :as st]]
             [monkey.oci.os.core :as os]))
 
@@ -47,7 +48,7 @@
   (subs s (count prefix)))
 
 (deftype OciObjectStorage [client conf]
-  st/Storage
+  p/Storage
   (read-obj [this sid]
     (let [args (object-args client conf sid)]
       @(md/chain
@@ -100,7 +101,11 @@
   (->OciObjectStorage (os/make-client conf) conf))
 
 (defmethod st/make-storage :oci [conf]
+  (log/debug "Creating oci storage with config:" (:storage conf))
   (-> conf
-      (oci/ctx->oci-config :storage)
+      :storage
       (oci/->oci-config)
       (make-oci-storage)))
+
+(defmethod st/normalize-storage-config :oci [conf]
+  (oci/normalize-config conf :storage))

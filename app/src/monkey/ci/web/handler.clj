@@ -1,32 +1,43 @@
 (ns monkey.ci.web.handler
   "Handler for the web server"
-  (:require [camel-snake-kebab.core :as csk]
+  (:require [aleph
+             [http :as aleph]
+             [netty :as netty]]
+            [camel-snake-kebab.core :as csk]
             [clojure.tools.logging :as log]
+            [com.stuartsierra.component :as co]
+            [manifold.deferred :as md]
             [medley.core :refer [update-existing] :as mc]
             [monkey.ci
              [config :as config]
-             [events :as e]]
+             [metrics :as metrics]
+             [runtime :as rt]]
             [monkey.ci.web
              [api :as api]
+             [auth :as auth]
              [common :as c]
-             #_[cors :as cors]
              [github :as github]]
-            [org.httpkit.server :as http]
             [reitit.coercion.schema]
             [reitit.ring :as ring]
             [ring.middleware.cors :as cors]
+            [ring.util.response :as rur]
             [schema.core :as s]))
 
 (defn health [_]
   ;; TODO Make this more meaningful
-  {:status 200
-   :body "ok"
-   :headers {"Content-Type" "text/plain"}})
+  (-> (rur/response "ok")
+      (rur/content-type "text/plain")))
 
 (defn version [_]
-  {:status 200
-   :body (config/version)
-   :headers {"Content-Type" "text/plain"}})
+  (-> (rur/response (config/version))
+      (rur/content-type "text/plain")))
+
+(defn metrics [req]
+  (if-let [m (c/from-rt req :metrics)]
+    (-> (metrics/scrape m)
+        (rur/response)
+        (rur/content-type "text/plain"))
+    (rur/status 204)))
 
 (def not-empty-str (s/constrained s/Str not-empty))
 (def Id not-empty-str)
@@ -35,22 +46,18 @@
 (defn- assoc-id [s]
   (assoc s (s/optional-key :id) Id))
 
+(s/defschema Label
+  {:name Name
+   :value not-empty-str})
+
 (s/defschema NewCustomer
   {:name Name})
 
 (s/defschema UpdateCustomer
   (assoc-id NewCustomer))
 
-(s/defschema NewProject
-  {:customer-id Id
-   :name Name})
-
-(s/defschema UpdateProject
-  (assoc-id NewProject))
-
 (s/defschema NewWebhook
   {:customer-id Id
-   :project-id Id
    :repo-id Id})
 
 (s/defschema UpdateWebhook
@@ -58,16 +65,49 @@
 
 (s/defschema NewRepo
   {:customer-id Id
-   :project-id Id
    :name Name
-   :url s/Str})
+   :url s/Str
+   (s/optional-key :main-branch) Id
+   (s/optional-key :labels) [Label]})
 
 (s/defschema UpdateRepo
-  (assoc-id NewRepo))
+  (-> NewRepo
+      (assoc-id)
+      (assoc (s/optional-key :github-id) s/Int)))
+
+(s/defschema WatchGithubRepo
+  (-> NewRepo
+      (assoc-id)
+      (assoc :github-id s/Int)))
+
+(s/defschema ParameterValue
+  {:name s/Str
+   :value s/Str})
+
+(s/defschema LabelFilterConjunction
+  {:label s/Str
+   :value s/Str})
+
+(s/defschema LabelFilter
+  [LabelFilterConjunction])
 
 (s/defschema Parameters
-  [{:name s/Str
-    :value s/Str}])
+  {:parameters [ParameterValue]
+   (s/optional-key :description) s/Str
+   :label-filters [LabelFilter]})
+
+(s/defschema SshKeys
+  {:private-key s/Str
+   :public-key s/Str ; TODO It may be possible to extract public key from private
+   (s/optional-key :description) s/Str
+   :label-filters [LabelFilter]})
+
+(s/defschema User
+  {:type s/Str
+   :type-id s/Any
+   (s/optional-key :id) Id ; Internal id
+   (s/optional-key :email) s/Str
+   (s/optional-key :customers) [Id]})
 
 (defn- generic-routes
   "Generates generic entity routes.  If child routes are given, they are added
@@ -91,15 +131,33 @@
          :new-schema NewWebhook
          :update-schema UpdateWebhook
          :id-key :webhook-id})
-       (conj ["/github/:id" {:post {:handler github/webhook
-                                    :parameters {:path {:id Id}
-                                                 :body s/Any}}
-                             :middleware [:github-security]}]))])
+       (conj ["/github"
+              {:conflicting true}
+              [["/app"
+                {:post {:handler github/app-webhook
+                        :parameters {:body s/Any}}
+                 :middleware [:github-app-security]}]
+               ["/:id"
+                {:post {:handler github/webhook
+                        :parameters {:path {:id Id}
+                                     :body s/Any}}
+                 :middleware [:github-security]}]]]))])
 
-(def parameter-routes
-  ["/param" {:get {:handler api/get-params}
+(def customer-parameter-routes
+  ["/param" {:get {:handler api/get-customer-params}
              :put {:handler api/update-params
-                   :parameters {:body Parameters}}}])
+                   :parameters {:body [Parameters]}}}])
+
+(def repo-parameter-routes
+  ["/param" {:get {:handler api/get-repo-params}}])
+
+(def customer-ssh-keys-routes
+  ["/ssh-keys" {:get {:handler api/get-customer-ssh-keys}
+                :put {:handler api/update-ssh-keys
+                      :parameters {:body [SshKeys]}}}])
+
+(def repo-ssh-keys-routes
+  ["/ssh-keys" {:get {:handler api/get-repo-ssh-keys}}])
 
 (def build-routes
   ["/builds"
@@ -123,32 +181,37 @@
          {:get {:handler api/download-build-log
                 :parameters {:query {:path s/Str}}}}]]]]]]])
 
+(def github-watch-route
+  ["/github"
+   [["/watch" {:post {:handler github/watch-repo
+                      :parameters {:body WatchGithubRepo}}}]]])
+
+(def github-unwatch-route
+  ["/github"
+   [["/unwatch" {:post {:handler github/unwatch-repo}}]]])
+
 (def repo-routes
   ["/repo"
-   (generic-routes
-    {:creator api/create-repo
-     :updater api/update-repo
-     :getter  api/get-repo
-     :new-schema NewRepo
-     :update-schema UpdateRepo
-     :id-key :repo-id
-     :child-routes [parameter-routes
-                    build-routes]})])
+   (-> (generic-routes
+        {:creator api/create-repo
+         :updater api/update-repo
+         :getter  api/get-repo
+         :new-schema NewRepo
+         :update-schema UpdateRepo
+         :id-key :repo-id
+         :child-routes [repo-parameter-routes
+                        repo-ssh-keys-routes
+                        build-routes
+                        github-unwatch-route]})
+       (conj github-watch-route))])
 
-(def project-routes
-  ["/project"
-   (generic-routes
-    {:creator api/create-project
-     :updater api/update-project
-     :getter  api/get-project
-     :new-schema NewProject
-     :update-schema UpdateProject
-     :id-key :project-id
-     :child-routes [repo-routes
-                    parameter-routes]})])
+(def event-stream-routes
+  ["/events" {:get {:handler api/event-stream
+                    :parameters {:query {(s/optional-key :authorization) s/Str}}}}])
 
 (def customer-routes
   ["/customer"
+   {:middleware [:customer-check]}
    (generic-routes
     {:creator api/create-customer
      :updater api/update-customer
@@ -156,18 +219,48 @@
      :new-schema NewCustomer
      :update-schema UpdateCustomer
      :id-key :customer-id
-     :child-routes [project-routes
-                    parameter-routes]})])
+     :child-routes [repo-routes
+                    customer-parameter-routes
+                    customer-ssh-keys-routes
+                    event-stream-routes]})])
 
-(def event-stream-routes
-  ["/events" {:get {:handler api/event-stream}}])
+(def github-routes
+  ["/github" [["/login" {:post
+                         {:handler github/login
+                          :parameters {:query {:code s/Str}}}}]
+              ["/config" {:get
+                          {:handler github/get-config}}]]])
+
+(def auth-routes
+  ["/auth/jwks" {:get
+                 {:handler auth/jwks
+                  :produces #{"application/json"}}}])
+
+(def user-routes
+  ["/user"
+   [[""
+     {:post
+      {:handler api/create-user
+       :parameters {:body User}}}]
+    ["/:user-type/:type-id"
+     {:parameters
+      {:path {:user-type s/Str
+              :type-id s/Str}}
+      :get
+      {:handler api/get-user}
+      :put
+      {:handler api/update-user
+       :parameters {:body User}}}]]])
 
 (def routes
   [["/health" {:get health}]
    ["/version" {:get version}]
+   ["/metrics" {:get metrics}]
    webhook-routes
    customer-routes
-   event-stream-routes])
+   github-routes
+   auth-routes
+   user-routes])
 
 (defn- stringify-body
   "Since the raw body could be read more than once (security, content negotation...),
@@ -204,7 +297,7 @@
     (h req)))
 
 (defn make-router
-  ([{:keys [dev-mode] :as opts} routes]
+  ([rt routes]
    (ring/router
     routes
     {:data {:middleware (vec (concat [stringify-body
@@ -213,23 +306,37 @@
                                        :access-control-allow-methods [:get :put :post :delete]
                                        :access-control-allow-credentials true]]
                                      c/default-middleware
+                                     ;; TODO Authorization checks
                                      [kebab-case-query
                                       log-request]))
             :muuntaja (c/make-muuntaja)
             :coercion reitit.coercion.schema/coercion
-            ::c/context opts}
+            ;; Wrap the runtime in a type, so reitit doesn't change the records into maps
+            ::c/runtime (c/->RuntimeWrapper rt)}
      ;; Disabled, results in 405 errors for some reason
      ;;:compile rc/compile-request-coercers
      :reitit.middleware/registry
-     {:github-security (if dev-mode
-                         ;; Disable security in dev mode
-                         [passthrough-middleware]
-                         [github/validate-security])}}))
-  ([opts]
-   (make-router opts routes)))
+     {:github-security
+      (if (rt/dev-mode? rt)
+        ;; Disable security in dev mode
+        [passthrough-middleware]
+        [github/validate-security])
+      :github-app-security
+      (if (rt/dev-mode? rt)
+        ;; Disable security in dev mode
+        [passthrough-middleware]
+        [github/validate-security (constantly (get-in (rt/config rt) [:github :webhook-secret]))])
+      :customer-check
+      (if (rt/dev-mode? rt)
+        [passthrough-middleware]
+        [auth/customer-authorization])}}))
+  ([rt]
+   (make-router rt routes)))
 
-(defn make-app [opts]
-  (c/make-app (make-router opts)))
+(defn make-app [rt]
+  (-> (make-router rt)
+      (c/make-app)
+      (auth/secure-ring-app rt)))
 
 (def default-http-opts
   ;; Virtual threads are still a preview feature
@@ -239,13 +346,41 @@
 (defn start-server
   "Starts http server.  Returns a server object that can be passed to
    `stop-server`."
-  [opts]
-  (let [http-opts (merge {:port 3000} (:http opts))]
+  [rt]
+  (let [http-opts (merge {:port 3000} (:http (rt/config rt)))]
     (log/info "Starting HTTP server at port" (:port http-opts))
-    (http/run-server (make-app opts)
-                     (merge http-opts default-http-opts))))
+    (aleph/start-server (make-app rt)
+                        (merge http-opts default-http-opts))))
 
 (defn stop-server [s]
   (when s
     (log/info "Shutting down HTTP server...")
-    (http/server-stop! s)))
+    (.close s)))
+
+(defmethod config/normalize-key :http [_ {:keys [args] :as conf}]
+  (update-in conf [:http :port] #(or (:port args) %)))
+
+(defrecord HttpServer [rt]
+  co/Lifecycle
+  (start [this]
+    (assoc this :server (start-server rt)))
+  (stop [{:keys [server] :as this}]
+    (when server
+      (stop-server server))
+    (dissoc this :server))
+  
+  clojure.lang.IFn
+  (invoke [this]
+    (co/stop this)))
+
+(defmethod rt/setup-runtime :http [conf _]
+  ;; Return a function that when invoked, returns another function to shut down the server
+  (fn [rt]
+    (log/debug "Starting http server with config:" (:config rt))
+    (-> (->HttpServer rt)
+        (co/start))))
+
+(defn on-server-close
+  "Returns a deferred that resolves when the server shuts down."
+  [server]
+  (md/future (netty/wait-for-close (:server server))))

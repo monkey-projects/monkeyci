@@ -12,6 +12,44 @@
 
 (use-fixtures :each f/reset-db)
 
+(defn- set-repo-path! [cust repo]
+  (reset! app-db {:route/current
+                  {:parameters
+                   {:path 
+                    {:customer-id cust
+                     :repo-id repo}}}}))
+
+(defn- test-repo-path!
+  "Generate random ids for customer, repo and build, and sets the current
+   route to the generate path.  Returns the generated ids."
+  []
+  (let [[cust repo _ :as r] (repeatedly 3 random-uuid)]
+    (set-repo-path! cust repo)
+    r))
+
+(deftest rep-init
+  (testing "does nothing if initialized"
+    (rft/run-test-sync
+     (let [c (h/catch-fx :martian.re-frame/request)]
+       (reset! app-db (db/set-initialized {} true))
+       (h/initialize-martian {:get-customer {:error-code :unexpected}})
+
+       (rf/dispatch [:repo/init])
+       (is (empty? @c)))))
+
+  (testing "when not initialized"
+    (rft/run-test-sync
+     (let [c (h/catch-fx :martian.re-frame/request)]
+       (h/initialize-martian {:get-customer {:body {}
+                                             :error-code :no-error}})
+       (rf/dispatch [:repo/init])
+       
+       (testing "loads repo"
+         (is (= 1 (count @c))))
+
+       (testing "sets initialized"
+         (is (db/initialized? @app-db)))))))
+
 (deftest repo-load
   (testing "loads customer if not existing"
     (rft/run-test-sync
@@ -46,12 +84,7 @@
   (testing "fetches builds from backend"
     (rft/run-test-sync
      (let [c (h/catch-fx :martian.re-frame/request)]
-       (reset! app-db {:route/current
-                       {:parameters
-                        {:path 
-                         {:customer-id "test-cust"
-                          :project-id "test-proj"
-                          :repo-id "test-repo"}}}})
+       (set-repo-path! "test-cust" "test-repo")
        (h/initialize-martian {:get-builds {:body [{:id "test-build"}]
                                            :error-code :no-error}})
        (rf/dispatch [:builds/load])
@@ -69,3 +102,93 @@
                                                  :message "test notification"}]))))
     (rf/dispatch-sync [:builds/load--success {:body []}])
     (is (nil? (db/alerts @app-db)))))
+
+(deftest handle-event
+  (testing "ignores events for other repos"
+    (let [[cust] (test-repo-path!)]
+      (is (nil? (rf/dispatch-sync [:repo/handle-event {:type :build/start
+                                                       :build {:customer-id cust
+                                                               :repo-id "other-repo"
+                                                               :build-id "other-build"
+                                                               :git {:ref "main"}}}])))
+      (is (empty? (db/builds @app-db)))))
+
+  (testing "updates build list when build is started"
+    (let [[cust repo build] (test-repo-path!)]
+      (is (empty? (db/builds @app-db)))
+      (is (nil? (rf/dispatch-sync [:repo/handle-event {:type :build/start
+                                                       :build {:customer-id cust
+                                                               :repo-id repo
+                                                               :build-id build
+                                                               :git {:ref "main"}}}])))
+      (is (= [{:customer-id cust
+               :repo-id repo
+               :build-id build
+               :git {:ref "main"}}]
+             (db/builds @app-db)))))
+
+  (testing "updates build list when build has completed"
+    (let [[cust repo build] (test-repo-path!)
+          upd {:customer-id cust
+               :repo-id repo
+               :build-id build
+               :git {:ref "main"}
+               :status :success}]
+      (is (some? (swap! app-db db/set-builds [{:customer-id cust
+                                               :repo-id repo
+                                               :build-id build}])))
+      (is (nil? (rf/dispatch-sync [:repo/handle-event {:type :build/end
+                                                       :build upd}])))
+      (is (= [upd]
+             (db/builds @app-db))))))
+
+(deftest show-trigger-build
+  (testing "sets `show trigger form` flag in db"
+    (rf/dispatch-sync [:repo/show-trigger-build])
+    (is (db/show-trigger-form? @app-db))))
+
+(deftest hide-trigger-build
+  (testing "unsets `show trigger form` flag in db"
+    (reset! app-db (db/set-show-trigger-form {} true))
+    (rf/dispatch-sync [:repo/hide-trigger-build])
+    (is (nil? (db/show-trigger-form? @app-db)))))
+
+(deftest trigger-build
+  (testing "sets `triggering` flag"
+    (rf/dispatch-sync [:repo/trigger-build])
+    (is (true? (db/triggering? @app-db))))
+
+  (testing "invokes build trigger endpoint with params"
+    (rft/run-test-sync
+     (let [c (h/catch-fx :martian.re-frame/request)]
+       (is (some? (set-repo-path! "test-cust" "test-repo")))
+       (h/initialize-martian {:trigger-build {:body {:build-id "test-build"}
+                                              :error-code :no-error}})
+       (rf/dispatch [:repo/trigger-build {:trigger-type ["branch"]
+                                          :trigger-ref ["main"]}])
+       
+       (is (= 1 (count @c)))
+       (is (= {:branch "main"
+               :customer-id "test-cust"
+               :repo-id "test-repo"}
+              (-> @c first (nth 3)))))))
+
+  (testing "clears notifications"
+    (is (some? (reset! app-db (db/set-alerts {} [{:type :danger}]))))
+    (rf/dispatch-sync [:repo/trigger-build])
+    (is (empty? (db/alerts @app-db)))))
+
+(deftest trigger-build--success
+  (testing "sets notification alert"
+    (rf/dispatch-sync [:repo/trigger-build--success {:body {:build-id "test-build"}}])
+    (is (= :info (-> (db/alerts @app-db) first :type))))
+
+  (testing "hides trigger form"
+    (is (some? (reset! app-db (db/set-show-trigger-form {} true))))
+    (rf/dispatch-sync [:repo/trigger-build--success {:body {:build-id "test-build"}}])
+    (is (not (db/show-trigger-form? @app-db)))))
+
+(deftest trigger-build--failed
+  (testing "sets error alert"
+    (rf/dispatch-sync [:repo/trigger-build--failed {:body {:message "test error"}}])
+    (is (= :danger (-> (db/alerts @app-db) first :type)))))

@@ -1,89 +1,93 @@
 (ns monkey.ci.listeners
-  (:require [clojure.core.async :as ca]
-            [clojure.tools.logging :as log]
-            [monkey.ci.storage :as st]))
+  (:require [clojure.tools.logging :as log]
+            [com.stuartsierra.component :as co]
+            [manifold.stream :as ms]
+            [monkey.ci
+             [runtime :as rt]
+             [storage :as st]]
+            [monkey.ci.events.core :as ec]))
 
-(defn- update-pipeline [ctx evt f & args]
-  (apply st/patch-build-results
-         (:storage ctx)
-         (:sid evt)
-         update-in [:pipelines (get-in evt [:pipeline :index])] f args))
+(defn- save-build
+  "Saves the build in storage, then returns it"
+  [storage build]
+  (st/save-build storage build)
+  build)
 
-(defn pipeline-started [ctx evt]
-  (update-pipeline ctx evt merge {:start-time (:time evt)
-                                  :name (get-in evt [:pipeline :name])}))
+(defn update-build [storage {:keys [sid build]}]
+  (log/debug "Updating build:" sid)
+  (let [existing (st/find-build storage sid)]
+    (save-build storage
+                (-> (merge existing (dissoc build :script))
+                    (dissoc :sid :cleanup?)))))
 
-(defn pipeline-completed [ctx evt]
-  (update-pipeline ctx evt merge {:end-time (:time evt)
-                                  :status (:status evt)}))
+(defn update-script [storage {:keys [sid script]}]
+  (log/debug "Updating build script for sid" sid)
+  (if-let [build (st/find-build storage sid)]
+    (let [orig (get-in build [:script :jobs])]
+      (save-build storage
+                  (assoc build
+                         :script (cond-> script
+                                   orig (assoc :jobs orig)))))
+    (log/warn "Build not found when updating script:" sid)))
 
-(defn- update-step [ctx evt f & args]
-  (apply st/patch-build-results
-         (:storage ctx)
-         (:sid evt)
-         update-in [:pipelines (get-in evt [:pipeline :index]) :steps (:index evt)] f args))
+(defn update-job [storage {:keys [sid job]}]
+  (let [job-id (:id job)]
+    (log/debug "Updating job for sid" sid ":" job-id)
+    (if-let [build (st/find-build storage sid)]
+      (save-build storage (assoc-in build [:script :jobs job-id] job))
+      (log/warn "Build not found when updating job:" sid))))
 
-(defn step-started [ctx evt]
-  (update-step ctx evt merge {:start-time (:time evt)
-                              :name (:name evt)}))
-
-(defn step-completed [ctx evt]
-  (update-step ctx evt merge {:end-time (:time evt)
-                              :status (:status evt)}))
-
-(defn save-build-result
-  "Handles a `build/completed` event to store the result."
-  [ctx evt]
-  (let [r (select-keys evt [:exit :result])]
-    (log/debug "Saving build result:" r)
-    (st/patch-build-results (:storage ctx)
-                            (get-in evt [:build :sid])
-                            merge r)))
+(def update-handlers
+  {:job/start    update-job
+   :job/end      update-job
+   :script/start update-script
+   :script/end   update-script
+   :build/start  update-build
+   :build/end    update-build})
 
 (defn build-update-handler
   "Handles a build update event.  Because many events may come in close proximity,
-   we need to queue them to avoid losing data.  This handler posts the received
-   events to another mult, grouped by build sid, where they are processed sequentially."
-  [ctx]
-  (let [handlers {:pipeline/start  pipeline-started
-                  :pipeline/end    pipeline-completed
-                  :step/start      step-started
-                  :step/end        step-completed
-                  :build/completed save-build-result
-                  }
-        ch (ca/chan 10)
-        p nil #_(ca/pub ch :type)
-        ch-per-build (atom {})
-        dispatch-sub (fn [s dest]
-                       (ca/go-loop [v (ca/<! s)]
-                         (when v
-                           (log/debug "Handling:" v)
-                           (try
-                             (dest ctx v)
-                             (catch Exception ex
-                               ;; TODO Handle this better
-                               (log/error "Unable to handle event" ex)))
-                           (recur (ca/<! s)))))
-        ensure-sub (fn [sid]
-                     (when-not (some? (get ch-per-build sid))
-                       (log/debug "Registering sub for sid" sid)
-                       (let [h (reduce-kv
-                                (fn [r t v]
-                                  (let [ch (ca/chan)]
-                                    ;; Read the sub channel
-                                    (dispatch-sub ch v)
-                                    (ca/sub p t ch)
-                                    (assoc r t ch)))
-                                {}
-                                handlers)]
-                         (swap! ch-per-build assoc sid h))))]
+   we need to queue them to avoid losing data."
+  [storage events]
+  (let [stream (ms/stream 10)]
     ;; Naive implementation: process them in sequence.  This does not look 
     ;; to the sid for optimization, so it could be faster.
-    (dispatch-sub ch (fn [ctx evt]
-                       (when-let [h (get handlers (:type evt))]
-                         (h ctx evt))))
+    (ms/consume (fn [evt]
+                  (when-let [h (get update-handlers (:type evt))]
+                    (log/debug "Handling:" evt)
+                    (try
+                      (when-let [build (h storage evt)]
+                        ;; Dispatch consolidated build updated event
+                        (ec/post-events events
+                                        {:type :build/updated
+                                         :sid (:sid build)
+                                         :build build}))
+                      (catch Exception ex
+                        ;; TODO Handle this better
+                        (log/error "Unable to handle event" ex)))))
+                stream)
     (fn [evt]
-      ;; FIXME This doesn't work well, it tends to register too many subs
-      #_(ensure-sub (get-in evt [:build :sid]))
-      #_(ca/go (ca/>! ch evt))
-      (ca/put! ch evt))))
+      (ms/put! stream evt)
+      nil)))
+
+(defrecord Listeners [events storage]
+  co/Lifecycle
+  (start [this]
+    (if (every? nil? ((juxt :event-filter :handler) this))
+      (let [ef {:types (set (keys update-handlers))}
+            handler (build-update-handler storage events)]
+        ;; Register listeners
+        (ec/add-listener events ef handler)
+        (assoc this :event-filter ef :handler handler))
+      ;; If already registered, do nothing
+      this))
+  (stop [{:keys [event-filter handler] :as this}]
+    (ec/remove-listener events event-filter handler)
+    (dissoc this :event-filter :handler)))
+
+(defmethod rt/setup-runtime :listeners [conf _]
+  (when (and (= :server (:app-mode conf))
+             (every? conf [:events :storage]))
+    (log/debug "Setting up storage event listeners")
+    (-> (map->Listeners {})
+        (co/using [:events :storage]))))

@@ -1,8 +1,9 @@
 (ns monkey.ci.gui.components
-  (:require [re-frame.core :as rf]))
+  (:require [monkey.ci.gui.utils :as u]
+            [re-frame.core :as rf]))
 
 (defn logo []
-  [:img.img-fluid.rounded {:src "/img/monkeyci-large.png" :title "Placeholder Logo"}])
+  [:img.img-fluid.rounded {:src "/img/monkeyci-bw-small.png" :title "Placeholder Logo"}])
 
 (defn render-alert [{:keys [type message]}]
   [:div {:class (str "alert alert-" (name type))} message])
@@ -13,6 +14,10 @@
       (->> @s
            (map render-alert)
            (into [:<>])))))
+
+(defn user-avatar [{:keys [avatar-url]}]
+  (when avatar-url
+    [:img.img-thumbnail.img-fluid {:width "50px" :src avatar-url :alt "Avatar"}]))
 
 (defn icon [n]
   [:i {:class (str "bi bi-" (name n))}])
@@ -41,9 +46,58 @@
         (into [:ol.breadcrumb]))])
 
 (defn build-result [r]
-  (let [type (condp = r
-               "error" :text-bg-danger
-               "failure" :text-bg-danger
-               "success" :text-bg-success
+  (let [r (or r "running")
+        type (condp = (keyword r)
+               :error :text-bg-danger
+               :failure :text-bg-danger
+               :success :text-bg-success
+               :running :text-bg-primary
+               :canceled :text-bg-warning
+               :skipped :text-bg-warning
                :text-bg-secondary)]
-    [:span {:class (str "badge " (name type))} (or r "running")]))
+    [:span {:class (str "badge " (name type))} r]))
+
+(defn- item-id [id idx]
+  (str (name id) "-" idx))
+
+(defn- accordion-item [id idx {:keys [title contents collapsed]}]
+  (let [iid (item-id id idx)] 
+    [:div.accordion-item
+     [:h2.accordion-header
+      [:button.accordion-button (cond-> {:type :button
+                                         :data-bs-toggle :collapse
+                                         :data-bs-target (u/->dom-id iid)
+                                         :aria-expanded true
+                                         :aria-controls iid}
+                                  collapsed (assoc :class :collapsed
+                                                   :aria-expanded false))
+       title]]
+     [:div.accordion-collapse.collapse (cond-> {:id iid
+                                                :data-bs-parent (u/->dom-id id)}
+                                         (not collapsed) (assoc :class :show))
+      [:div.accordion-body
+       contents]]]))
+
+(defn accordion
+  "Accordion component.  This uses the Bootstrap Javascript for functionality."
+  [id items]
+  (->> (map-indexed (partial accordion-item id) items)
+       (into [:div.accordion {:id id}])))
+
+(defn modal [id title contents]
+  [:div.modal.fade.modal-lg
+   {:id id
+    :tab-iindex -1}
+   [:div.modal-dialog
+    [:div.modal-content
+     [:div.modal-header
+      [:div.modal-title title]
+      [:button.btn-close {:type :button
+                          :data-bs-dismiss "modal"
+                          :aria-label "Close"}]]
+     [:div.modal-body
+      contents]
+     [:div.modal-footer
+      [:button.btn.btn-secondary {:type :button
+                                  :data-bs-dismiss "modal"}
+       "Close"]]]]])
