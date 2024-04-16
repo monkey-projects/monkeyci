@@ -57,6 +57,8 @@
     ;; Naive implementation: process them in sequence.  This does not look 
     ;; to the sid for optimization, so it could be faster.
     (dispatch-sub ch (fn [st evt]
+                       ;; TODO Re-dispatch a build update event that contains all info grouped,
+                       ;; useful for clients.
                        (when-let [h (get update-handlers (:type evt))]
                          (h st evt))))
     (fn [evt]

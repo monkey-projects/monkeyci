@@ -13,7 +13,8 @@
              [logging :as l]
              [metrics :as m]
              [runtime :as rt]
-             [storage :as st]]
+             [storage :as st]
+             [utils :as u]]
             [monkey.ci.web
              [auth :as auth]
              [handler :as sut]]
@@ -232,9 +233,12 @@
           cust-id (st/new-id)
           github-id 6453
           app (sut/make-app rt)
-          token (auth/sign-jwt {:sub (str "github/" github-id)
-                                :role auth/role-user}
-                               (.getPrivate kp))
+          token-info {:sub (str "github/" github-id)
+                      :role auth/role-user
+                      :exp (+ (u/now) 10000)}
+          make-token (fn [ti]
+                       (auth/sign-jwt ti (.getPrivate kp)))
+          token (make-token token-info)
           _ (st/save-customer st {:id cust-id
                                   :name "test customer"})
           _ (st/save-user st {:type "github"
@@ -255,6 +259,13 @@
       
       (testing "unauthenticated if no user credentials"
         (is (= 401 (-> (mock/request :get (str "/customer/" cust-id))
+                       (app)
+                       :status))))
+
+      (testing "unauthenticated if token expired"
+        (is (= 401 (-> (mock/request :get (str "/customer/" cust-id))
+                       (mock/header "authorization" (str "Bearer " (make-token
+                                                                    (assoc token-info :exp (- (u/now) 1000)))))
                        (app)
                        :status)))))))
 

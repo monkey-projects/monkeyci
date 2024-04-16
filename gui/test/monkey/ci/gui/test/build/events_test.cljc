@@ -12,6 +12,43 @@
 
 (use-fixtures :each f/reset-db)
 
+(deftest build-init
+  (testing "dispatches load event"
+    (rft/run-test-sync
+     (let [c (atom [])]
+       (rf/reg-event-db :build/load (fn [_ evt] (swap! c conj evt)))
+       (rf/reg-event-db :event-stream/start (constantly nil))
+       (rf/reg-event-db :route/on-page-leave (constantly nil))
+       (rf/dispatch [:build/init])
+       (is (= 1 (count @c))))))
+
+  (testing "dispatches page leave event"
+    (rft/run-test-sync
+     (let [c (atom [])]
+       (rf/reg-event-db :build/load (constantly nil))
+       (rf/reg-event-db :event-stream/start (constantly nil))
+       (rf/reg-event-db :route/on-page-leave (fn [_ evt] (swap! c conj evt)))
+       (rf/dispatch [:build/init])
+       (is (= 1 (count @c))))))
+
+  (testing "dispatches event stream start"
+    (rft/run-test-sync
+     (let [c (atom [])]
+       (rf/reg-event-db :build/load (constantly nil))
+       (rf/reg-event-db :event-stream/start (fn [_ evt] (swap! c conj evt)))
+       (rf/reg-event-db :route/on-page-leave (constantly nil))
+       (rf/dispatch [:build/init])
+       (is (= 1 (count @c))))))
+
+  (testing "clears logs"
+    (rft/run-test-sync
+     (reset! app-db (db/set-logs {} ::test-logs))
+     (rf/reg-event-db :build/load (constantly nil))
+     (rf/reg-event-db :event-stream/start (constantly nil))
+     (rf/reg-event-db :route/on-page-leave (constantly nil))
+     (rf/dispatch [:build/init])
+     (is (nil? (db/logs @app-db))))))
+
 (deftest build-load-logs
   (testing "sets alert"
     (rf/dispatch-sync [:build/load-logs])

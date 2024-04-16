@@ -113,21 +113,27 @@
     (rur/response {:keys [(make-jwk k)]})
     (rur/not-found {:message "No JWKS configured"})))
 
+(defn expired?
+  "Returns true if token has expired"
+  [{:keys [exp]}]
+  (not (and exp (pos? (- exp (u/now))))))
+
 (defmulti resolve-token (fn [_ {:keys [role]}] role))
 
-(defmethod resolve-token role-user [{:keys [storage]} {:keys [sub]}]
-  (when sub
+(defmethod resolve-token role-user [{:keys [storage]} {:keys [sub] :as token}]
+  (when (and (not (expired? token))  sub)
     (let [id (u/parse-sid sub)]
       (when (= 2 (count id))
         (log/debug "Looking up user with id" id)
         (some-> (st/find-user storage id)
                 (update :customers set))))))
 
-(defmethod resolve-token role-build [{:keys [storage]} {:keys [sub]}]
-  (when-let [build (some->> sub
-                            (u/parse-sid)
-                            (st/find-build storage))]
-    (assoc build :customers #{(:customer-id build)})))
+(defmethod resolve-token role-build [{:keys [storage]} {:keys [sub] :as token}]
+  (when-not (expired? token)
+    (when-let [build (some->> sub
+                              (u/parse-sid)
+                              (st/find-build storage))]
+      (assoc build :customers #{(:customer-id build)}))))
 
 (defmethod resolve-token :default [rt token]
   ;; Fallback, for backwards compatibility

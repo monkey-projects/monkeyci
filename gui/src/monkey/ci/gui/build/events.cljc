@@ -13,7 +13,8 @@
                  ;; Make sure we stop listening to events when we leave this page
                  [:route/on-page-leave [:event-stream/stop stream-id]]
                  ;; TODO Only start reading events when the build has not finished yet
-                 [:event-stream/start stream-id (r/customer-id db) [:build/handle-event]]]}))
+                 [:event-stream/start stream-id (r/customer-id db) [:build/handle-event]]]
+    :db (db/set-logs db nil)}))
 
 (defn load-logs-req [db]
   [:secure-request
