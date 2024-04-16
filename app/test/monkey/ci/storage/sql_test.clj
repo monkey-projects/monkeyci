@@ -1,4 +1,4 @@
-(ns monkey.ci.test.storage.sql-test
+(ns monkey.ci.storage.sql-test
   (:require [clojure.test :refer [deftest testing is]]
             [monkey.ci
              [protocols :as p]
