@@ -15,6 +15,10 @@
            (map render-alert)
            (into [:<>])))))
 
+(defn user-avatar [{:keys [avatar-url]}]
+  (when avatar-url
+    [:img.img-thumbnail.img-fluid {:width "50px" :src avatar-url :alt "Avatar"}]))
+
 (defn icon [n]
   [:i {:class (str "bi bi-" (name n))}])
 

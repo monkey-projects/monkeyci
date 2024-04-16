@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.home.views
-  (:require [monkey.ci.gui.layout :as l]
+  (:require [monkey.ci.gui.components :as co]
+            [monkey.ci.gui.layout :as l]
             [monkey.ci.gui.routing :as r]
             [re-frame.core :as rf]))
 
@@ -10,8 +11,7 @@
   [:<>
    [:div.clearfix
     [:h3.float-start "Customers for " (:name u)]
-    (when-let [a (:avatar-url u)]
-      [:img.img-thumbnail.float-end {:width "50px" :src a :alt "Avatar"}])]
+    [co/user-avatar u]]
    (->> (:customers u)
         (map cust-item)
         (into [:ul]))])
