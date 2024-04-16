@@ -126,13 +126,13 @@
 
 (deftest build-update-handler
   (testing "creates a fn"
-    (is (fn? (sut/build-update-handler {}))))
+    (is (fn? (sut/build-update-handler {} nil))))
 
   (letfn [(verify-build-event [evt-type]
             (h/with-memory-store st
               (let [sid (random-sid)
                     build (test-build sid)
-                    handler (sut/build-update-handler st)]
+                    handler (sut/build-update-handler st (h/fake-events))]
                 (handler {:type evt-type
                           :build build})
                 (is (not= :timeout (h/wait-until #(st/build-exists? st sid) 1000))))))]
@@ -149,7 +149,7 @@
                     build (test-build sid)
                     _ (st/save-build st build)
                     script {:jobs {"test-job" {:status :success}}}
-                    handler (sut/build-update-handler st)]
+                    handler (sut/build-update-handler st (h/fake-events))]
                 (handler {:type evt-type
                           :sid sid
                           :script script})
@@ -169,7 +169,7 @@
                     _ (st/save-build st build)
                     job {:id job-id
                          :status :success}
-                    handler (sut/build-update-handler st)]
+                    handler (sut/build-update-handler st (h/fake-events))]
                 (handler {:type evt-type
                           :sid sid
                           :job job})
@@ -195,7 +195,7 @@
       (with-redefs [sut/update-handlers
                     {:job/start handler
                      :job/end handler}]
-        (let [h (sut/build-update-handler (st/make-memory-storage))]
+        (let [h (sut/build-update-handler (st/make-memory-storage) (h/fake-events))]
           (h {:type :job/start
               :sid [::first]})
           (h {:type :job/start
@@ -206,7 +206,25 @@
               :sid [::second]})
           (is (not= :timeout (h/wait-until #(= 4 @handled) 1000)))
           (doseq [[k r] @inv]
-            (is (= [:started :completed] r) (str "for id " k))))))))
+            (is (= [:started :completed] r) (str "for id " k)))))))
+
+  (testing "dispatches `build/updated` event"
+    (h/with-memory-store st
+      (let [sid (random-sid)
+            events (h/fake-events)
+            build (test-build sid)
+            _ (st/save-build st build)
+            script {:jobs {"test-job" {:status :success}}}
+            handler (sut/build-update-handler st events)]
+        (handler {:type :script/start
+                  :sid sid
+                  :script script})
+        (is (not= :timeout (h/wait-until (comp some? :script #(st/find-build st sid)) 1000)))
+        (let [[e] @(:recv events)]
+          (is (some? e))
+          (is (= :build/updated (:type e)))
+          (is (= sid (:sid e)))
+          (is (= script (get-in e [:build :script]))))))))
 
 (deftest setup-runtime
   (testing "`nil` if no events configured"

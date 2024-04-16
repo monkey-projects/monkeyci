@@ -1,7 +1,7 @@
 (ns monkey.ci.listeners
-  (:require [clojure.core.async :as ca]
-            [clojure.tools.logging :as log]
+  (:require [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
+            [manifold.stream :as ms]
             [monkey.ci
              [runtime :as rt]
              [storage :as st]]
@@ -48,27 +48,26 @@
 (defn build-update-handler
   "Handles a build update event.  Because many events may come in close proximity,
    we need to queue them to avoid losing data."
-  [storage]
-  (let [ch (ca/chan 10)
-        dispatch-sub (fn [s dest]
-                       (ca/go-loop [v (ca/<! s)]
-                         (when v
-                           (log/debug "Handling:" v)
-                           (try
-                             (dest storage v)
-                             (catch Exception ex
-                               ;; TODO Handle this better
-                               (log/error "Unable to handle event" ex)))
-                           (recur (ca/<! s)))))]
+  [storage events]
+  (let [stream (ms/stream 10)]
     ;; Naive implementation: process them in sequence.  This does not look 
     ;; to the sid for optimization, so it could be faster.
-    (dispatch-sub ch (fn [st evt]
-                       ;; TODO Re-dispatch a build update event that contains all info grouped,
-                       ;; useful for clients.
-                       (when-let [h (get update-handlers (:type evt))]
-                         (h st evt))))
+    (ms/consume (fn [evt]
+                  (when-let [h (get update-handlers (:type evt))]
+                    (log/debug "Handling:" evt)
+                    (try
+                      (when-let [build (h storage evt)]
+                        ;; Dispatch consolidated build updated event
+                        (ec/post-events events
+                                        {:type :build/updated
+                                         :sid (:sid build)
+                                         :build build}))
+                      (catch Exception ex
+                        ;; TODO Handle this better
+                        (log/error "Unable to handle event" ex)))))
+                stream)
     (fn [evt]
-      (ca/put! ch evt)
+      (ms/put! stream evt)
       nil)))
 
 (defrecord Listeners [events storage]
@@ -76,7 +75,7 @@
   (start [this]
     (if (every? nil? ((juxt :event-filter :handler) this))
       (let [ef {:types (set (keys update-handlers))}
-            handler (build-update-handler storage)]
+            handler (build-update-handler storage events)]
         ;; Register listeners
         (ec/add-listener events ef handler)
         (assoc this :event-filter ef :handler handler))
