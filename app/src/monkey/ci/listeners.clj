@@ -7,28 +7,34 @@
              [storage :as st]]
             [monkey.ci.events.core :as ec]))
 
+(defn- save-build
+  "Saves the build in storage, then returns it"
+  [storage build]
+  (st/save-build storage build)
+  build)
+
 (defn update-build [storage {:keys [sid build]}]
   (log/debug "Updating build:" sid)
   (let [existing (st/find-build storage sid)]
-    (st/save-build storage
-                   (-> (merge existing (dissoc build :script))
-                       (dissoc :sid :cleanup?)))))
+    (save-build storage
+                (-> (merge existing (dissoc build :script))
+                    (dissoc :sid :cleanup?)))))
 
 (defn update-script [storage {:keys [sid script]}]
   (log/debug "Updating build script for sid" sid)
   (if-let [build (st/find-build storage sid)]
     (let [orig (get-in build [:script :jobs])]
-      (st/save-build storage
-                     (assoc build
-                            :script (cond-> script
-                                      orig (assoc :jobs orig)))))
+      (save-build storage
+                  (assoc build
+                         :script (cond-> script
+                                   orig (assoc :jobs orig)))))
     (log/warn "Build not found when updating script:" sid)))
 
 (defn update-job [storage {:keys [sid job]}]
   (let [job-id (:id job)]
     (log/debug "Updating job for sid" sid ":" job-id)
     (if-let [build (st/find-build storage sid)]
-      (st/save-build storage (assoc-in build [:script :jobs job-id] job))
+      (save-build storage (assoc-in build [:script :jobs job-id] job))
       (log/warn "Build not found when updating job:" sid))))
 
 (def update-handlers

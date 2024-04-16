@@ -28,7 +28,7 @@
                  :sid sid
                  :exit 0
                  :result :success}]
-        (is (st/sid? (sut/update-build st evt)))
+        (is (map? (sut/update-build st evt)))
         (is (true? (st/build-exists? st sid)))
         (is (= :success
                (:status (st/find-build st sid)))))))
@@ -43,7 +43,7 @@
                  :sid sid
                  :exit 0
                  :result :success}]
-        (is (st/sid? (sut/update-build st evt)))
+        (is (map? (sut/update-build st evt)))
         (let [match (st/find-build st sid)]
           (is (not (contains? match :sid)))
           (is (not (contains? match :cleanup?)))))))
@@ -61,7 +61,7 @@
                  :exit 0
                  :result :success}]
         (is (st/sid? (st/save-build st build)))
-        (is (st/sid? (sut/update-build st evt)))
+        (is (map? (sut/update-build st evt)))
         (let [match (st/find-build st sid)]
           (is (= script (:script match))))))))
 
@@ -76,7 +76,7 @@
                  :sid sid
                  :script script}]
         (is (st/sid? (st/save-build st build)))
-        (is (st/sid? (sut/update-script st evt)))
+        (is (map? (sut/update-script st evt)))
         (let [match (st/find-build st sid)]
           (is (= script (:script match)))))))
 
@@ -105,7 +105,7 @@
                  :sid sid
                  :script script}]
         (is (st/sid? (st/save-build st build)))
-        (is (st/sid? (sut/update-script st evt)))
+        (is (map? (sut/update-script st evt)))
         (let [match (st/find-build st sid)]
           (is (= :success (get-in match [:script :jobs "test-job" :status]))))))))
 
