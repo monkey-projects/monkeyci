@@ -15,14 +15,13 @@
 
 (def insert-opts (assoc default-opts :return-keys true))
 
-(defn insert-entity [{:keys [ds sql-opts]} table obj]
-  (let [rec (maybe-set-uuid obj)]
-    (merge rec (jdbc/execute-one! ds
-                                  (h/format {:insert-into table
-                                             :columns (keys rec)
-                                             :values [(vals rec)]}
-                                            sql-opts)
-                                  insert-opts))))
+(defn insert-entity [{:keys [ds sql-opts]} table rec]
+  (merge rec (jdbc/execute-one! ds
+                                (h/format {:insert-into table
+                                           :columns (keys rec)
+                                           :values [(vals rec)]}
+                                          sql-opts)
+                                insert-opts)))
 
 (def update-opts default-opts)
 
@@ -50,14 +49,21 @@
                           select-opts)
            (first)))
 
+;;; Selection filters
+
 (defn by-id [id]
   [:= :id id])
 
 (defn by-uuid [uuid]
   [:= :uuid uuid])
 
+(defn by-repo [id]
+  [:= :repo-id id])
+
+;;; Customers
+
 (defn insert-customer [conn cust]
-  (insert-entity conn :customers cust))
+  (insert-entity conn :customers (maybe-set-uuid cust)))
 
 (defn update-customer [conn cust]
   (update-entity conn :customers cust))
@@ -65,8 +71,24 @@
 (defn select-customer [conn f]
   (select-entity conn :customers f))
 
+;;; Repositories
+
 (defn insert-repo [conn cust]
-  (insert-entity conn :repos cust))
+  (insert-entity conn :repos (maybe-set-uuid cust)))
+
+(defn update-repo [conn cust]
+  (update-entity conn :repos cust))
 
 (defn select-repo [conn f]
   (select-entity conn :repos f))
+
+;;; Repository labels
+
+(defn insert-repo-label [conn cust]
+  (insert-entity conn :repo-labels cust))
+
+(defn update-repo-label [conn cust]
+  (update-entity conn :repo-labels cust))
+
+(defn select-repo-labels [conn f]
+  (select-entity conn :repo-labels f))

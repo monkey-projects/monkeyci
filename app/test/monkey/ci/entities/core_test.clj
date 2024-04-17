@@ -58,7 +58,29 @@
         (is (= r (sut/select-repo conn (sut/by-id (:id r))))))
 
       (testing "can select by uuid"
-        (is (= r (sut/select-repo conn (sut/by-uuid (:uuid r)))))))
+        (is (= r (sut/select-repo conn (sut/by-uuid (:uuid r))))))
+
+      (testing "can update"
+        (is (= 1 (sut/update-repo conn (assoc r :name "updated"))))
+        (is (= "updated" (:name (sut/select-repo conn (sut/by-id (:id r))))))))
 
     (testing "throws on invalid record"
       (is (thrown? Exception (sut/insert-repo conn {:name "customerless repo"}))))))
+
+(deftest repo-labels
+  (eh/with-prepared-db conn
+    (let [cust (sut/insert-customer conn {:name "test customer"})
+          repo (sut/insert-repo conn {:name "test repo"
+                                      :customer-id (:id cust)
+                                      :url "http://test"})
+          lbl (sut/insert-repo-label conn {:name "test-label"
+                                           :value "test-value"
+                                           :repo-id (:id repo)})]
+      (testing "can insert"
+        (is (number? (:id lbl))))
+
+      (testing "can select for repo"
+        (is (= lbl (sut/select-repo-labels conn (sut/by-repo (:id repo)))))))
+
+    (testing "throws on invalid record"
+      (is (thrown? Exception (sut/insert-repo-label conn {:name "repoless label"}))))))
