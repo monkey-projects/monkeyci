@@ -9,13 +9,14 @@
   (:import com.zaxxer.hikari.HikariDataSource))
 
 (defn with-memory-db* [f]
-  (let [conf {:jdbcUrl "jdbc:hsqldb:mem:testdb"
+  (let [conf {:jdbcUrl (str "jdbc:hsqldb:mem:test-" (random-uuid))
               :username "SA"
               :password ""}
         ds (conn/->pool HikariDataSource conf)]
     (try
       (f ds)
       (finally
+        ;; This also drops the migrations table
         #_(jdbc/execute! ds ["truncate schema public and commit"])))))
 
 (defn with-prepared-db* [f]
@@ -58,7 +59,10 @@
 
 (deftest sid->table
   (testing "for customers"
-    (is (= :customers (sut/sid->table (st/customer-sid (random-uuid)))))))
+    (is (= :customers (sut/sid->table (st/customer-sid (random-uuid))))))
+
+  (testing "for repos"
+    (is (= :repos (sut/sid->table (repeatedly 2 random-uuid))))))
 
 (deftest sql-storage
   (letfn [(count-customers [st]
@@ -80,4 +84,14 @@
               n (count-customers st)]
           (is (st/sid? (st/save-customer st cust)))
           (is (st/sid? (st/save-customer st (assoc cust :name "updated"))))
-          (is (= 1 (- (count-customers st) n))))))))
+          (is (= 1 (- (count-customers st) n)))))))
+
+  (testing "can write and read repo"
+    (with-sql-store st
+      (let [cust {:id (random-uuid)
+                  :name "test customer"}
+            repo {:customer-id (:id cust)
+                  :id (random-uuid)
+                  :name "test repo"
+                  :url "http://test-url"}]
+        (is (st/sid? (st/save-repo st repo)))))))

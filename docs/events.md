@@ -18,7 +18,7 @@ under "requests".  Ideally, we want to abstract away the underlying method of co
 and only have to know whether we want to send a request to which we expect a reply, or just
 post an event where we don't care who listens in.
 
-Initially the intention was to write our own abstraction using [core.async](https://clojure.github.io/core.async/)
+We wanted to write our own abstraction using [core.async](https://clojure.github.io/core.async/)
 channels.  But after working with them for a while, I'm no longer convinced this is the way
 to go.  They are just too cumbersome and difficult to test.  [Manifold Streams](https://github.com/clj-commons/manifold#streams)
 are similar.  The advantage is that they seem to allow more control, and they function more
@@ -32,7 +32,7 @@ for parent-child processes.  Or just over HTTP, for instance when the UI talks t
 Http is still the most portable solution for the outside world.  But due to the purely
 request/reply nature, it is somewhat harder to use it for events, especially when you're on
 the receiving end.  I tried using SSE, but it turns out support in the existing tools is
-not that good.  Websockets are a possible alternative, but they are more complex.
+not that good.  Websockets are a possible alternative, but they are more complicated.
 
 ## ZeroMQ
 
