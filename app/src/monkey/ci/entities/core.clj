@@ -111,9 +111,13 @@
 
 (defentity customer)
 (defentity repo)
-(defaggregate repo-label)
 (defentity customer-param)
-(defaggregate param-label)
 (defentity webhook)
 (defentity ssh-key)
+(defentity build)
+
+;;; Aggregate entities
+
+(defaggregate repo-label)
+(defaggregate param-label)
 (defaggregate ssh-key-label)
