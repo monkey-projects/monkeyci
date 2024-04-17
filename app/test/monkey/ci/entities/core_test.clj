@@ -80,7 +80,27 @@
         (is (number? (:id lbl))))
 
       (testing "can select for repo"
-        (is (= lbl (sut/select-repo-labels conn (sut/by-repo (:id repo)))))))
+        (is (= [lbl] (sut/select-repo-labels conn (sut/by-repo (:id repo))))))
+
+      (testing "can delete"
+        (is (= 1 (sut/delete-repo-labels conn (sut/by-id (:id lbl)))))
+        (is (empty? (sut/select-repo-labels conn (sut/by-repo (:id repo)))))))
 
     (testing "throws on invalid record"
       (is (thrown? Exception (sut/insert-repo-label conn {:name "repoless label"}))))))
+
+(deftest customer-params
+  (eh/with-prepared-db conn
+    (let [cust (sut/insert-customer conn {:name "test customer"})
+          param (sut/insert-customer-param conn {:name "test-label"
+                                                 :value "test-value"
+                                                 :customer-id (:id cust)})]
+      (testing "can insert"
+        (is (number? (:id param))))
+
+      (testing "can select for customer"
+        (is (= [param] (sut/select-customer-params conn (sut/by-customer (:id cust))))))
+
+      (testing "can delete"
+        (is (= 1 (sut/delete-customer-params conn (sut/by-id (:id param)))))
+        (is (empty? (sut/select-customer-params conn (sut/by-customer (:id cust)))))))))
