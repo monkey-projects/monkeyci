@@ -61,6 +61,32 @@
                         :from table
                         :where f}))
 
+(defn- declare-entity-cruds
+  "Declares basic functions used for CRUD and simple selects."
+  [n before-insert]
+  (let [pl (str (name n) "s")]
+    (intern *ns* (symbol (str "insert-" (name n)))
+            (fn [conn e]
+              (insert-entity conn (keyword pl) (before-insert e))))
+    (intern *ns* (symbol (str "update-" (name n)))
+            (fn [conn e]
+              (update-entity conn (keyword pl) e)))
+    (intern *ns* (symbol (str "delete-" pl))
+            (fn [conn f]
+              (delete-entities conn (keyword pl) f)))
+    (intern *ns* (symbol (str "select-" (name n)))
+            (fn [conn f]
+              (select-entity conn (keyword pl) f)))
+    (intern *ns* (symbol (str "select-" pl))
+            (fn [conn f]
+              (select-entities conn (keyword pl) f)))))
+
+(defmacro defentity [n]
+  `(declare-entity-cruds ~(str n) maybe-set-uuid))
+
+(defmacro defaggregate [n]
+  `(declare-entity-cruds ~(str n) identity))
+
 ;;; Selection filters
 
 (defn by-id [id]
@@ -75,52 +101,10 @@
 (defn by-repo [id]
   [:= :repo-id id])
 
-;;; Customers
+;;; Basic entities
 
-(defn insert-customer [conn cust]
-  (insert-entity conn :customers (maybe-set-uuid cust)))
-
-(defn update-customer [conn cust]
-  (update-entity conn :customers cust))
-
-(defn select-customer [conn f]
-  (select-entity conn :customers f))
-
-;;; Repositories
-
-(defn insert-repo [conn repo]
-  (insert-entity conn :repos (maybe-set-uuid repo)))
-
-(defn update-repo [conn repo]
-  (update-entity conn :repos repo))
-
-(defn select-repo [conn f]
-  (select-entity conn :repos f))
-
-;;; Repository labels
-
-(defn insert-repo-label [conn lbl]
-  (insert-entity conn :repo-labels lbl))
-
-(defn update-repo-label [conn lbl]
-  (update-entity conn :repo-labels lbl))
-
-(defn delete-repo-labels [conn f]
-  (delete-entities conn :repo-labels f))
-
-(defn select-repo-labels [conn f]
-  (select-entities conn :repo-labels f))
-
-;;; Customer parameters
-
-(defn insert-customer-param [conn param]
-  (insert-entity conn :customer-params (maybe-set-uuid param)))
-
-(defn update-customer-param [conn param]
-  (update-entity conn :customer-params param))
-
-(defn delete-customer-params [conn f]
-  (delete-entities conn :customer-params f))
-
-(defn select-customer-params [conn f]
-  (select-entities conn :customer-params f))
+(defentity customer)
+(defentity repo)
+(defaggregate repo-label)
+(defentity customer-param)
+(defentity webhook)

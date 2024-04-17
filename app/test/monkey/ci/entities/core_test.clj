@@ -69,13 +69,19 @@
 
 (deftest repo-labels
   (eh/with-prepared-db conn
-    (let [cust (sut/insert-customer conn {:name "test customer"})
-          repo (sut/insert-repo conn {:name "test repo"
-                                      :customer-id (:id cust)
-                                      :url "http://test"})
-          lbl (sut/insert-repo-label conn {:name "test-label"
-                                           :value "test-value"
-                                           :repo-id (:id repo)})]
+    (let [cust (sut/insert-customer
+                conn
+                {:name "test customer"})
+          repo (sut/insert-repo
+                conn
+                {:name "test repo"
+                 :customer-id (:id cust)
+                 :url "http://test"})
+          lbl  (sut/insert-repo-label
+                conn
+                {:name "test-label"
+                 :value "test-value"
+                 :repo-id (:id repo)})]
       (testing "can insert"
         (is (number? (:id lbl))))
 
@@ -91,10 +97,14 @@
 
 (deftest customer-params
   (eh/with-prepared-db conn
-    (let [cust (sut/insert-customer conn {:name "test customer"})
-          param (sut/insert-customer-param conn {:name "test-label"
-                                                 :value "test-value"
-                                                 :customer-id (:id cust)})]
+    (let [cust  (sut/insert-customer
+                 conn
+                 {:name "test customer"})
+          param (sut/insert-customer-param
+                 conn
+                 {:name "test-label"
+                  :value "test-value"
+                  :customer-id (:id cust)})]
       (testing "can insert"
         (is (number? (:id param))))
 
@@ -104,3 +114,26 @@
       (testing "can delete"
         (is (= 1 (sut/delete-customer-params conn (sut/by-id (:id param)))))
         (is (empty? (sut/select-customer-params conn (sut/by-customer (:id cust)))))))))
+
+(deftest webhooks
+  (eh/with-prepared-db conn
+    (let [cust (sut/insert-customer
+                conn
+                {:name "test customer"})
+          repo (sut/insert-repo
+                conn
+                {:name "test repo"
+                 :customer-id (:id cust)}) 
+          wh   (sut/insert-webhook
+                conn
+                {:repo-id (:id repo)
+                 :secret "very secret"})]
+      (testing "can insert"
+        (is (number? (:id wh))))
+
+      (testing "can select for repo"
+        (is (= [wh] (sut/select-webhooks conn (sut/by-repo (:id repo))))))
+
+      (testing "can delete"
+        (is (= 1 (sut/delete-webhooks conn (sut/by-id (:id wh)))))
+        (is (empty? (sut/select-webhooks conn (sut/by-repo (:id repo)))))))))
