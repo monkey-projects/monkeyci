@@ -7,7 +7,7 @@
 
 (deftest ^:mysql memory-db
   (testing "can connect"
-    (eh/with-memory-db*
+    (eh/with-test-db*
       (fn [conn]
         (is (some? conn))))))
 
@@ -16,7 +16,7 @@
     (eh/with-prepared-db*
       (fn [conn]
         (is (number? (-> (jdbc/execute-one! (:ds conn) ["select count(*) as c from customers"])
-                         :C)))))))
+                         :c)))))))
 
 (deftest ^:mysql customer-entities
   (eh/with-prepared-db conn

@@ -2,6 +2,7 @@
   "Core functionality for database entities.  Allows to store/retrieve basic entities."
   (:require [honey.sql :as h]
             [honey.sql.helpers :as hh]
+            [monkey.ci.entities.types]
             [next.jdbc :as jdbc]
             [next.jdbc
              [result-set :as rs]
@@ -16,12 +17,14 @@
 (def insert-opts (assoc default-opts :return-keys true))
 
 (defn insert-entity [{:keys [ds sql-opts]} table rec]
-  (merge rec (jdbc/execute-one! ds
-                                (h/format {:insert-into table
-                                           :columns (keys rec)
-                                           :values [(vals rec)]}
-                                          sql-opts)
-                                insert-opts)))
+  (->> (jdbc/execute-one! ds
+                          (h/format {:insert-into table
+                                     :columns (keys rec)
+                                     :values [(vals rec)]}
+                                    sql-opts)
+                          insert-opts)
+       :generated-key
+       (assoc rec :id)))
 
 (def update-opts default-opts)
 
