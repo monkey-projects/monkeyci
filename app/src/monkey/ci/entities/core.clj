@@ -101,10 +101,19 @@
 (defn by-repo [id]
   [:= :repo-id id])
 
+(defn by-ssh-key [id]
+  [:= :ssh-key-id id])
+
+(defn by-param [id]
+  [:= :param-id id])
+
 ;;; Basic entities
 
 (defentity customer)
 (defentity repo)
 (defaggregate repo-label)
 (defentity customer-param)
+(defaggregate param-label)
 (defentity webhook)
+(defentity ssh-key)
+(defaggregate ssh-key-label)

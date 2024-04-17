@@ -115,6 +115,31 @@
         (is (= 1 (sut/delete-customer-params conn (sut/by-id (:id param)))))
         (is (empty? (sut/select-customer-params conn (sut/by-customer (:id cust)))))))))
 
+(deftest param-labels
+  (eh/with-prepared-db conn
+    (let [cust  (sut/insert-customer
+                 conn
+                 {:name "test customer"})
+          param (sut/insert-customer-param
+                conn
+                {:name "test param"
+                 :value "test param value"
+                 :customer-id (:id cust)})
+          lbl   (sut/insert-param-label
+                 conn
+                 {:name "test-label"
+                  :value "test-value"
+                  :param-id (:id param)})]
+      (testing "can insert"
+        (is (number? (:id lbl))))
+
+      (testing "can select for param"
+        (is (= [lbl] (sut/select-param-labels conn (sut/by-param (:id param))))))
+
+      (testing "can delete"
+        (is (= 1 (sut/delete-param-labels conn (sut/by-id (:id lbl)))))
+        (is (empty? (sut/select-param-labels conn (sut/by-param (:id param)))))))))
+
 (deftest webhooks
   (eh/with-prepared-db conn
     (let [cust (sut/insert-customer
@@ -137,3 +162,50 @@
       (testing "can delete"
         (is (= 1 (sut/delete-webhooks conn (sut/by-id (:id wh)))))
         (is (empty? (sut/select-webhooks conn (sut/by-repo (:id repo)))))))))
+
+(deftest ssh-keys
+  (eh/with-prepared-db conn
+    (let [cust (sut/insert-customer
+                conn
+                {:name "test customer"})
+          key  (sut/insert-ssh-key
+                conn
+                {:description "test key"
+                 :public-key "pubkey"
+                 :private-key "privkey"
+                 :customer-id (:id cust)})]
+      (testing "can insert"
+        (is (number? (:id key))))
+
+      (testing "can select for customer"
+        (is (= [key] (sut/select-ssh-keys conn (sut/by-customer (:id cust))))))
+
+      (testing "can delete"
+        (is (= 1 (sut/delete-ssh-keys conn (sut/by-id (:id key)))))
+        (is (empty? (sut/select-ssh-keys conn (sut/by-customer (:id cust)))))))))
+
+(deftest ssh-key-labels
+  (eh/with-prepared-db conn
+    (let [cust (sut/insert-customer
+                conn
+                {:name "test customer"})
+          key  (sut/insert-ssh-key
+                conn
+                {:description "test ssh-key"
+                 :public-key "pubkey"
+                 :private-key "privkey"
+                 :customer-id (:id cust)})
+          lbl  (sut/insert-ssh-key-label
+                conn
+                {:name "test-label"
+                 :value "test-value"
+                 :ssh-key-id (:id key)})]
+      (testing "can insert"
+        (is (number? (:id lbl))))
+
+      (testing "can select for ssh-key"
+        (is (= [lbl] (sut/select-ssh-key-labels conn (sut/by-ssh-key (:id key))))))
+
+      (testing "can delete"
+        (is (= 1 (sut/delete-ssh-key-labels conn (sut/by-id (:id lbl)))))
+        (is (empty? (sut/select-ssh-key-labels conn (sut/by-ssh-key (:id key)))))))))
