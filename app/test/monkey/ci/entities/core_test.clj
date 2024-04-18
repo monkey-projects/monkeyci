@@ -47,6 +47,7 @@
   (eh/with-prepared-db conn
     (let [cust (sut/insert-customer conn {:name "test customer"})
           r (sut/insert-repo conn {:name "test repo"
+                                   :display-id "test-repo"
                                    :customer-id (:id cust)
                                    :url "http://test"
                                    :main-branch "main"})]
@@ -76,6 +77,7 @@
           repo (sut/insert-repo
                 conn
                 {:name "test repo"
+                 :display-id "test-repo"
                  :customer-id (:id cust)
                  :url "http://test"})
           lbl  (sut/insert-repo-label
@@ -150,6 +152,7 @@
           repo (sut/insert-repo
                 conn
                 {:name "test repo"
+                 :display-id "test-repo"
                  :customer-id (:id cust)}) 
           wh   (sut/insert-webhook
                 conn
@@ -220,10 +223,12 @@
           repo  (sut/insert-repo
                  conn
                  {:name "test repo"
+                  :display-id "test-repo"
                   :customer-id (:id cust)})
           build (sut/insert-build
                 conn
                 {:repo-id (:id repo)
+                 :idx 1
                  :jobs [{:id "test-job"}]})]
       (testing "can insert"
         (is (number? (:id build))))

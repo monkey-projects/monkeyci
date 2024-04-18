@@ -126,6 +126,9 @@
 (defn by-param [id]
   [:= :param-id id])
 
+(defn by-user [id]
+  [:= :user-id id])
+
 ;;; Basic entities
 
 (defentity customer)
