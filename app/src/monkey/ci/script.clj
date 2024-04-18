@@ -90,7 +90,7 @@
 (defn- with-fire-events
   "Wraps job so events are fired on start and end."
   [job]
-  (map->EventFiringJob (-> (select-keys job [:id :dependencies :labels])
+  (map->EventFiringJob (-> (select-keys job [j/job-id j/deps j/labels])
                            (assoc :target job))))
 
 (defn- pipeline-filter [pipeline]

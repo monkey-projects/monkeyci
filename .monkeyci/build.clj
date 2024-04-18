@@ -10,7 +10,7 @@
 
 ;; Version assigned when building main branch
 ;; TODO Determine automatically
-(def snapshot-version "0.4.8-SNAPSHOT")
+(def snapshot-version "0.4.9-SNAPSHOT")
 
 (defn git-ref [ctx]
   (get-in ctx [:build :git :ref]))
