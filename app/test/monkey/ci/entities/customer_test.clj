@@ -5,7 +5,7 @@
              [customer :as sut]
              [helpers :as h]]))
 
-(deftest customer-with-repos
+(deftest ^:mysql customer-with-repos
   (testing "returns customer and its repos"
     (h/with-prepared-db conn
       (let [cust (c/insert-customer conn {:name "test customer"})
