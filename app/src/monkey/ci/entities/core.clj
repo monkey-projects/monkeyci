@@ -133,11 +133,12 @@
 (defentity customer-param)
 (defentity webhook)
 (defentity ssh-key)
+(defentity user)
 
-(defn- jobs->json [b]
+(defn jobs->json [b]
   (mc/update-existing b :jobs json/generate-string))
 
-(defn- json->jobs [b]
+(defn json->jobs [b]
   (mc/update-existing b :jobs #(json/parse-string % keyword)))
 
 (defentity build {:before-insert jobs->json
@@ -149,3 +150,4 @@
 (defaggregate repo-label)
 (defaggregate param-label)
 (defaggregate ssh-key-label)
+(defaggregate user-customer)

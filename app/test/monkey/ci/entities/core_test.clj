@@ -48,7 +48,8 @@
     (let [cust (sut/insert-customer conn {:name "test customer"})
           r (sut/insert-repo conn {:name "test repo"
                                    :customer-id (:id cust)
-                                   :url "http://test"})]
+                                   :url "http://test"
+                                   :main-branch "main"})]
       (testing "can insert"
         (is (some? (:uuid r)))
         (is (number? (:id r)))
@@ -104,6 +105,7 @@
                  conn
                  {:name "test-label"
                   :value "test-value"
+                  :description "Test parameter"
                   :customer-id (:id cust)})]
       (testing "can insert"
         (is (number? (:id param))))
@@ -237,3 +239,30 @@
       (testing "can delete"
         (is (= 1 (sut/delete-builds conn (sut/by-id (:id build)))))
         (is (empty? (sut/select-builds conn (sut/by-repo (:id repo)))))))))
+
+(deftest ^:mysql users
+  (eh/with-prepared-db conn
+    (let [cust (sut/insert-customer
+                conn
+                {:name "test customer"})
+          user (sut/insert-user
+                conn
+                {:type "github"
+                 :type-id "1234"
+                 :email "test@monkeyci.com"})]
+      (testing "can insert"
+        (is (number? (:id user))))
+
+      (testing "can select by uuid"
+        (is (= user (sut/select-user conn (sut/by-uuid (:uuid user))))))
+
+      (testing "can link to customer"
+        (is (some? (sut/insert-user-customer conn {:user-id (:id user)
+                                                   :customer-id (:id cust)}))))
+
+      (testing "can delete"
+        (is (= 1 (sut/delete-user-customers conn [:and
+                                                  [:= :user-id (:id user)]
+                                                  [:= :customer-id (:id cust)]])))
+        (is (= 1 (sut/delete-users conn (sut/by-id (:id user)))))
+        (is (empty? (sut/select-users conn (sut/by-id (:id user)))))))))
