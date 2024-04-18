@@ -1,7 +1,9 @@
 (ns monkey.ci.entities.core
   "Core functionality for database entities.  Allows to store/retrieve basic entities."
-  (:require [honey.sql :as h]
+  (:require [cheshire.core :as json]
+            [honey.sql :as h]
             [honey.sql.helpers :as hh]
+            [medley.core :as mc]
             [monkey.ci.entities.types]
             [next.jdbc :as jdbc]
             [next.jdbc
@@ -64,31 +66,45 @@
                         :from table
                         :where f}))
 
+(defn- maybe-comp
+  "Takes functions stored at `k` in the maps, and composes them left to right."
+  [k & maps]
+  (->> (map k maps)
+       (remove nil?)
+       (apply comp)))
+
 (defn- declare-entity-cruds
   "Declares basic functions used for CRUD and simple selects."
-  [n before-insert]
-  (let [pl (str (name n) "s")]
+  [n opts extra-opts]
+  (let [pl (str (name n) "s")
+        default-opts {:before-insert identity
+                      :before-update identity
+                      :after-select identity}
+        [bi bu as] (map #(maybe-comp % extra-opts opts default-opts)
+                        [:before-insert :before-update :after-select])]
     (intern *ns* (symbol (str "insert-" (name n)))
             (fn [conn e]
-              (insert-entity conn (keyword pl) (before-insert e))))
+              (insert-entity conn (keyword pl) (bi e))))
     (intern *ns* (symbol (str "update-" (name n)))
             (fn [conn e]
-              (update-entity conn (keyword pl) e)))
+              (update-entity conn (keyword pl) (bu e))))
     (intern *ns* (symbol (str "delete-" pl))
             (fn [conn f]
               (delete-entities conn (keyword pl) f)))
     (intern *ns* (symbol (str "select-" (name n)))
             (fn [conn f]
-              (select-entity conn (keyword pl) f)))
+              (some-> (select-entity conn (keyword pl) f)
+                      (as))))
     (intern *ns* (symbol (str "select-" pl))
             (fn [conn f]
-              (select-entities conn (keyword pl) f)))))
+              (->> (select-entities conn (keyword pl) f)
+                   (map as))))))
 
-(defmacro defentity [n]
-  `(declare-entity-cruds ~(str n) maybe-set-uuid))
+(defmacro defentity [n & [opts]]
+  `(declare-entity-cruds ~(str n) {:before-insert maybe-set-uuid} ~opts))
 
-(defmacro defaggregate [n]
-  `(declare-entity-cruds ~(str n) identity))
+(defmacro defaggregate [n & [opts]]
+  `(declare-entity-cruds ~(str n) {} ~opts))
 
 ;;; Selection filters
 
@@ -117,7 +133,16 @@
 (defentity customer-param)
 (defentity webhook)
 (defentity ssh-key)
-(defentity build)
+
+(defn- jobs->json [b]
+  (mc/update-existing b :jobs json/generate-string))
+
+(defn- json->jobs [b]
+  (mc/update-existing b :jobs #(json/parse-string % keyword)))
+
+(defentity build {:before-insert jobs->json
+                  :before-update jobs->json
+                  :after-select  json->jobs})
 
 ;;; Aggregate entities
 

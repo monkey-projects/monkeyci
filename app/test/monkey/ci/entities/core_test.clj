@@ -222,12 +222,17 @@
           build (sut/insert-build
                 conn
                 {:repo-id (:id repo)
-                 :jobs "test jobs"})]
+                 :jobs [{:id "test-job"}]})]
       (testing "can insert"
         (is (number? (:id build))))
 
       (testing "can select for customer"
         (is (not-empty (sut/select-builds conn (sut/by-repo (:id repo))))))
+
+      (testing "parses jobs from json"
+        (is (= [{:id "test-job"}]
+               (-> (sut/select-build conn (sut/by-id (:id build)))
+                   :jobs))))
 
       (testing "can delete"
         (is (= 1 (sut/delete-builds conn (sut/by-id (:id build)))))
