@@ -1,12 +1,14 @@
 (ns monkey.ci.extensions-test
   (:require [clojure.test :refer [deftest testing is]]
             [monkey.ci.build.core :as bc]
-            [monkey.ci.extensions :as sut]))
+            [monkey.ci
+             [extensions :as sut]
+             [jobs :as j]]))
 
 (defmacro with-extensions [& body]
   `(let [ext# @sut/registered-extensions]
      (try
-       (reset! sut/registered-extensions {})
+       (reset! sut/registered-extensions sut/new-register)
        ~@body
        (finally
          (reset! sut/registered-extensions ext#)))))
@@ -26,7 +28,7 @@
                :before (fn [rt]
                          ;; Get the config from the job
                          (assoc rt ::value (get-in rt [:job :test/before])))}
-          reg (sut/register {} ext)
+          reg (sut/register sut/new-register ext)
           job (bc/action-job "test-job" (constantly bc/success)
                              {:test/before "config for extensions"})
           res (sut/apply-extensions-before {:job job} reg)]
@@ -53,7 +55,7 @@
                :after (fn [rt]
                          ;; Get the config from the job
                          (assoc rt ::value (get-in rt [:job :test/after])))}
-          reg (sut/register {} ext)
+          reg (sut/register sut/new-register ext)
           job (bc/action-job "test-job" (constantly bc/success)
                              {:test/after "config for extensions"})
           res (sut/apply-extensions-after {:job job} reg)]
@@ -74,3 +76,29 @@
                (::value res)))
         (remove-method sut/after-job :test/after)))))
 
+(deftest wrap-job
+  (let [ext {:key :test/wrapped
+             :before (fn [rt]
+                       (assoc rt ::before? true))
+             :after  (fn [rt]
+                       (assoc-in rt [:job :result ::after?] true))}
+        reg (sut/register sut/new-register ext)
+        wrapped (sut/wrap-job (bc/action-job "test-job"
+                                             (fn [rt]
+                                               (assoc bc/success
+                                                      ::executed? true
+                                                      ::before? (::before? rt)))
+                                             {(:key ext) ::extension-config})
+                              reg)
+        rt {:job wrapped}]
+    (testing "creates job"
+      (is (j/job? wrapped)))
+    
+    (testing "executes job"
+      (is (true? (::executed? @(j/execute! wrapped rt)))))
+    
+    (testing "invokes `before` extension"
+      (is (true? (::before? @(j/execute! wrapped rt)))))
+    
+    (testing "invokes `after` extension"
+      (is (true? (::after? @(j/execute! wrapped rt)))))))

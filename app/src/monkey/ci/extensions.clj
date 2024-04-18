@@ -6,9 +6,13 @@
    use, especially when using container jobs.  Extensions do this by registering
    themselves under a specific namespaced keyword.  If this key is found in
    job properties, the associated extension code is executed.  Extensions can
-   be executed before or after a job (or both).")
+   be executed before or after a job (or both)."
+  (:require [manifold.deferred :as md]
+            [monkey.ci.jobs :as j]))
 
-(defonce registered-extensions (atom {}))
+(def new-register {})
+
+(defonce registered-extensions (atom new-register))
 
 (defn register [l ext]
   (assoc l (:key ext) ext))
@@ -46,3 +50,24 @@
    (apply-extensions rt registered :after after-job))
   ([rt]
    (apply-extensions-after rt @registered-extensions)))
+
+(defrecord ExtensionWrappingJob [target registered-ext]
+  j/Job
+  (execute! [job rt]
+    (let [rt (assoc rt :job target)]
+      ;; FIXME This is fairly dirty: jobs don't return the runtime, but extensions use it,
+      ;; so maybe we need to think about reworking this.
+      (-> rt
+          (apply-extensions-before registered-ext)
+          (as-> r (j/execute! target r))
+          (md/chain
+           (partial assoc-in rt [:job :result])
+           #(apply-extensions-after % registered-ext)
+           (comp :result :job))))))
+
+(defn wrap-job
+  "Wraps job so that extensions are invoked before and after it."
+  ([job registered-ext]
+   (->ExtensionWrappingJob job registered-ext))
+  ([job]
+   (wrap-job job @registered-extensions)))
