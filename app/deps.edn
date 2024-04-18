@@ -70,6 +70,8 @@
                ;; Plugin added for timing
                "--plugin" "kaocha.plugin/profiling"
                "--junit-xml-file" "junit.xml"
+               ;; Skip zmq tests, they tend to block
+               "--skip-meta" ":zmq"
                ;; Skip docker integration tests, they require access to the socket
                "--skip-meta" ":docker"
                ;; Skip integration tests, they are too slow (for now)

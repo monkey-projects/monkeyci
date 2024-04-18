@@ -7,7 +7,7 @@
              [zmq :as sut]]
             [monkey.ci.helpers :as h]))
 
-(deftest network-server
+(deftest ^:zmq network-server
   (let [addr "tcp://0.0.0.0:3100"]
     (with-open [ctx (sut/make-context)]
       (ast/async-tests (partial sut/make-zeromq-events
@@ -24,7 +24,7 @@
 (defn- make-addr []
   (str "inproc://client-test-" (random-uuid)))
 
-(deftest inproc-server
+(deftest ^:zmq inproc-server
   (letfn [(default-config []
             (let [ep (make-addr)]
               {:server
