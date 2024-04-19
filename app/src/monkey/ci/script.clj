@@ -11,6 +11,7 @@
              [build :as build]
              [cache :as cache]
              [containers :as c]
+             [extensions :as ext]
              [jobs :as j]
              [runtime :as rt]
              [utils :as u]]
@@ -90,8 +91,12 @@
 (defn- with-fire-events
   "Wraps job so events are fired on start and end."
   [job]
-  (map->EventFiringJob (-> (select-keys job [:id :dependencies :labels])
+  (map->EventFiringJob (-> (select-keys job [j/job-id j/deps j/labels])
                            (assoc :target job))))
+
+(def with-extensions
+  "Wraps the job so any registered extensions get executed."
+  ext/wrap-job)
 
 (defn- pipeline-filter [pipeline]
   [[{:label "pipeline"
@@ -103,7 +108,7 @@
   (let [pf (cond->> jobs
              ;; Filter jobs by pipeline, if given
              pipeline (j/filter-jobs (j/label-filter (pipeline-filter pipeline)))
-             true (map with-fire-events))]
+             true (map (comp with-fire-events with-extensions)))]
     (log/debug "Found" (count pf) "matching jobs:" (map bc/job-id pf))
     (let [result @(j/execute-jobs! pf rt)]
       (log/debug "Jobs executed, result is:" result)

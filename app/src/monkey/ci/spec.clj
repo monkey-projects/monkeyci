@@ -173,9 +173,7 @@
 (s/def :jwk/pub bk/public-key?)
 (s/def :ctx/jwk (s/keys :req-un [:jwk/priv :jwk/pub]))
 
-;; TODO Refactor to put protocols in a separate ns so we can refer to them here
-;;(s/def :ctx/storage (partial satisfies? monkey.ci.storage/Storage))
-(s/def :ctx/storage some?)
+(s/def :ctx/storage (partial satisfies? monkey.ci.protocols/Storage))
 (s/def :ctx/containers (s/merge :conf/containers))
 
 ;; Arguments as passed in from the CLI
