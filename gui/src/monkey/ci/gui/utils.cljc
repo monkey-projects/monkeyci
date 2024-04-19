@@ -72,3 +72,16 @@
 
 (defn unescape-entity [e]
   (gstring/unescapeEntities e))
+
+(defn login-on-401 [ctx {:keys [status]}]
+  (cond-> ctx
+    (= 401 status) (assoc :dispatch [:route/goto :page/login])))
+
+(defn req-error-handler-db
+  "Creates an fx handler fn that redirects to the login page on a 401 error
+   and passes the error also to `f`, which can modify the db."
+  [f]
+  (fn [{:keys [db]} evt]
+    (login-on-401
+     {:db (f db evt)}
+     (last evt))))

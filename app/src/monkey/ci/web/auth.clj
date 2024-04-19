@@ -44,10 +44,12 @@
 (defn sign-jwt [payload pk]
   (jwt/sign payload pk {:alg :rs256 :header {:kid kid}}))
 
+(def default-token-expiration (jt/days 1))
+
 (defn augment-payload [payload]
   ;; TODO Make token expiration configurable
   (assoc payload
-         :exp (-> (jt/plus (jt/instant) (jt/hours 1))
+         :exp (-> (jt/plus (jt/instant) default-token-expiration)
                   (jt/to-millis-from-epoch))
          ;; TODO Make issuer and audiences configurable
          :iss "https://app.monkeyci.com"

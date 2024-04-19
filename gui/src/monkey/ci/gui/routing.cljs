@@ -104,3 +104,4 @@
  :route/on-page-leave
  (fn [db [_ evt]]
    (update db on-page-leave (comp vec conj) evt)))
+
