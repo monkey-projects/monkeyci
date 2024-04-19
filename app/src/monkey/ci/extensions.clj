@@ -61,13 +61,18 @@
           (apply-extensions-before registered-ext)
           (as-> r (j/execute! target r))
           (md/chain
+           ;; Add the result to the job in runtime
            (partial assoc-in rt [:job :result])
+           ;; Let any extensions work on it
            #(apply-extensions-after % registered-ext)
+           ;; Return the job result (possibly modified by extensions)
            (comp :result :job))))))
 
 (defn wrap-job
   "Wraps job so that extensions are invoked before and after it."
   ([job registered-ext]
-   (->ExtensionWrappingJob job registered-ext))
+   (map->ExtensionWrappingJob (-> job
+                                  (select-keys [j/job-id j/labels j/deps])
+                                  (assoc :target job :registered-ext registered-ext))))
   ([job]
    (wrap-job job @registered-extensions)))

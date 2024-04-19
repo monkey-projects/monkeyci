@@ -96,6 +96,10 @@
     
     (testing "executes job"
       (is (true? (::executed? @(j/execute! wrapped rt)))))
+
+    (testing "executes job without any extensions"
+      (let [wrapped (sut/wrap-job (bc/action-job "regular-job" (constantly bc/success)))]
+        (is (= bc/success @(j/execute! wrapped {})))))
     
     (testing "invokes `before` extension"
       (is (true? (::before? @(j/execute! wrapped rt)))))
