@@ -19,16 +19,20 @@
 
 (def on-page-leave ::on-page-leave)
 
+(defn- path-changed? [from to]
+  (not= (:path from) (:path to)))
+
 (rf/reg-event-fx
  :route/changed
  (fn [{:keys [db]} [_ match]]
-   (log/debug "Changing current route from" (clj->js (current db)) "into" (clj->js match))
-   (let [handlers (on-page-leave db)]
-     (log/debug "Found" (count handlers) "leave handlers")
-     (cond-> {:db (-> db
-                      (assoc current match)
-                      (dissoc on-page-leave))}
-       (not-empty handlers) (assoc :dispatch-n handlers)))))
+   (when (path-changed? (current db) match)
+     (log/debug "Changing current route from" (clj->js (current db)) "into" (clj->js match))
+     (let [handlers (on-page-leave db)]
+       (log/debug "Found" (count handlers) "leave handlers")
+       (cond-> {:db (-> db
+                        (assoc current match)
+                        (dissoc on-page-leave))}
+         (not-empty handlers) (assoc :dispatch-n handlers))))))
 
 (defonce router
   ;; Instead of pointing to the views directly, we refer to a keyword, which

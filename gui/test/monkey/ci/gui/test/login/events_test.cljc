@@ -137,6 +137,17 @@
         (assoc cofx :local-storage {:redirect-to "/c/test-cust"})))
      (let [c (h/catch-fx :route/goto)]
        (rf/dispatch [:github/load-user--success {}])
+       (is (= "/c/test-cust" (first @c))))))
+
+  (testing "ignores redirect page if `/`"
+    (rf-test/run-test-sync
+     (rf/reg-cofx
+      :local-storage
+      (fn [cofx]
+        (assoc cofx :local-storage {:redirect-to "/"})))
+     (let [c (h/catch-fx :route/goto)]
+       (reset! app-db (db/set-user {} {:customers ["test-cust"]}))
+       (rf/dispatch [:github/load-user--success {}])
        (is (= "/c/test-cust" (first @c)))))))
 
 (deftest github-load-user--failed

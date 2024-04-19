@@ -87,7 +87,7 @@
 (defn modal [id title contents]
   [:div.modal.fade.modal-lg
    {:id id
-    :tab-iindex -1}
+    :tab-index -1}
    [:div.modal-dialog
     [:div.modal-content
      [:div.modal-header

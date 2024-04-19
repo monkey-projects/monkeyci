@@ -105,6 +105,13 @@
                "http://test-repos/org-2"]
               (map :uri @e)))))))
 
+(deftest load-orgs--failed
+  (testing "redirect to login on 401 error"
+    (rf-test/run-test-sync
+     (let [e (h/catch-fx :route/goto)]
+       (rf/dispatch [::sut/load-orgs--failed {:status 401}])
+       (is (= ["/login"] @e))))))
+
 (deftest repo-watch
   (testing "invokes repo github watch endpoint"
     (rf-test/run-test-sync

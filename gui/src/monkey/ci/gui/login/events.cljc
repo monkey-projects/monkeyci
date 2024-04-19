@@ -94,7 +94,7 @@
      (log/debug "Github user details:" (str github-user))
      {:db (db/set-github-user db github-user)
       :dispatch (cond
-                  redir
+                  (and redir (not= "/" redir))
                   ;; If a redirect path was stored, go there
                   [:route/goto-path redir]
                   ;; If the user only has one customer, go directly there

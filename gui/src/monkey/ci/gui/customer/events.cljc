@@ -85,12 +85,13 @@
                            :repos-url)
                      orgs)}))
 
-(rf/reg-event-db
+(rf/reg-event-fx
  ::load-orgs--failed
- (fn [db [_ err]]
-   (db/set-repo-alerts db
-                       [{:type :danger
-                         :message (str "Unable to fetch user orgs from Github: " (u/error-msg err))}])))
+ (u/req-error-handler-db
+  (fn [db [_ err]]
+    (db/set-repo-alerts db
+                        [{:type :danger
+                          :message (str "Unable to fetch user orgs from Github: " (u/error-msg err))}]))))
 
 (rf/reg-event-db
  :customer/load-github-repos--success

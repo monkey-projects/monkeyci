@@ -11,9 +11,10 @@
 
 (deftest on-route-change
   (testing "dispatches `route/goto` event"
-    (rf-test/run-test-sync
-     (is (nil? (sut/on-route-change :test-match :test-history)))
-     (is (= :test-match (:route/current @app-db))))))
+    (let [route {:path "/test"}]
+      (rf-test/run-test-sync
+       (is (nil? (sut/on-route-change route :test-history)))
+       (is (= route (:route/current @app-db)))))))
 
 (deftest current-sub
   (let [c (rf/subscribe [:route/current])]
@@ -28,21 +29,30 @@
 
 (deftest route-changed
   (testing "sets current route to arg"
-    (is (nil? (rf/dispatch-sync [:route/changed "test-match"])))
-    (is (= "test-match" (:route/current @app-db))))
+    (let [route {:path "test-match"}]
+      (is (nil? (rf/dispatch-sync [:route/changed route])))
+      (is (= route (:route/current @app-db)))))
 
   (testing "dispatches registered leave handlers"
     (rf-test/run-test-sync
      (is (some? (rf/reg-event-db ::test-evt (fn [db _] (assoc db ::invoked true)))))
      (is (nil? (rf/dispatch [:route/on-page-leave [::test-evt]])))
-     (is (nil? (rf/dispatch [:route/changed "new-page"])))
+     (is (nil? (rf/dispatch [:route/changed {:path "/new-page"}])))
      (is (true? (::invoked @app-db)))))
 
   (testing "clears leave handlers"
     (is (nil? (rf/dispatch-sync [:route/on-page-leave [::test-evt]])))
     (is (some? (sut/on-page-leave @app-db)))
-    (is (nil? (rf/dispatch-sync [:route/changed "new-page"])))
-    (is (nil? (sut/on-page-leave @app-db)))))
+    (is (nil? (rf/dispatch-sync [:route/changed {:path "new-page"}])))
+    (is (nil? (sut/on-page-leave @app-db))))
+
+  (testing "does nothing when paths have not changed"
+    (rf-test/run-test-sync
+     (is (nil? (rf/dispatch [:route/changed {:path "/curr"}])))
+     (is (some? (rf/reg-event-db ::test-evt (fn [db _] (assoc db ::invoked true)))))
+     (is (nil? (rf/dispatch [:route/on-page-leave [::test-evt]])))
+     (is (nil? (rf/dispatch [:route/changed {:path "/curr"}])))
+     (is (nil? (::invoked @app-db))))))
 
 (deftest path-for
   (testing "`nil` if unknown path"
