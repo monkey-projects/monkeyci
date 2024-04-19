@@ -137,8 +137,16 @@
     (cond-> opts
       t (assoc :authorization (str "Bearer " t)))))
 
+(rf/reg-event-fx
+ ::error-handler
+ (fn [{:keys [db]} [_ target-evt err]]
+   (log/debug "Got error:" (clj->js err))
+   {:dispatch (if (= 401 (:status err))
+                [:route/goto :page/login]
+                target-evt)}))
+
 ;; Takes the token from the db and adds it to the martian request
 (rf/reg-event-fx
  :secure-request
- (fn [{:keys [db]} [_ req args & extras]]
-   {:dispatch (into [:martian.re-frame/request req (add-token db args)] extras)}))
+ (fn [{:keys [db]} [_ req args on-success on-failure]]
+   {:dispatch (into [:martian.re-frame/request req (add-token db args) on-success [::error-handler on-failure]])}))

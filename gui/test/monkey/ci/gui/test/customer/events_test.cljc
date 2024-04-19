@@ -54,13 +54,7 @@
   (testing "unmarks loading"
     (is (map? (reset! app-db (db/set-loading {}))))
     (rf/dispatch-sync [:customer/load--failed "test-id" "test-customer"])
-    (is (not (db/loading? @app-db))))
-
-  (testing "redirects to login page on 401"
-    (rf-test/run-test-sync
-     (let [e (h/catch-fx :route/goto)]
-       (rf/dispatch [:customer/load--failed "test-id" {:status 401}])
-       (is (= ["/login"] @e))))))
+    (is (not (db/loading? @app-db)))))
 
 (deftest customer-load-github-repos
   (testing "invokes repos and orgs url from github user"

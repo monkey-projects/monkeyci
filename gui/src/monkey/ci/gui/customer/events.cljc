@@ -30,15 +30,14 @@
        (db/set-customer cust)
        (db/reset-alerts))))
 
-(rf/reg-event-fx
+(rf/reg-event-db
  :customer/load--failed
- (u/req-error-handler-db
-  (fn [db [_ id err]]
-    (-> db
-        (db/set-alerts [{:type :danger
-                         :message (str "Could not load details for customer " id ": "
-                                       (u/error-msg err))}])
-        (db/unset-loading)))))
+ (fn [db [_ id err]]
+   (-> db
+       (db/set-alerts [{:type :danger
+                        :message (str "Could not load details for customer " id ": "
+                                      (u/error-msg err))}])
+       (db/unset-loading))))
 
 (rf/reg-event-fx
  :customer/load-github-repos
@@ -86,13 +85,12 @@
                            :repos-url)
                      orgs)}))
 
-(rf/reg-event-fx
+(rf/reg-event-db
  ::load-orgs--failed
- (u/req-error-handler-db
-  (fn [db [_ err]]
-    (db/set-repo-alerts db
-                        [{:type :danger
-                          :message (str "Unable to fetch user orgs from Github: " (u/error-msg err))}]))))
+ (fn [db [_ err]]
+   (db/set-repo-alerts db
+                       [{:type :danger
+                         :message (str "Unable to fetch user orgs from Github: " (u/error-msg err))}])))
 
 (rf/reg-event-db
  :customer/load-github-repos--success
@@ -126,12 +124,11 @@
  (fn [db [_ {:keys [body]}]]
    (db/update-customer db update :repos conj body)))
 
-(rf/reg-event-fx
+(rf/reg-event-db
  :repo/watch--failed
- (u/req-error-handler-db
-  (fn [db [_ err]]
-    (db/set-repo-alerts db [{:type :danger
-                             :message (str "Failed to watch repo: " (u/error-msg err))}]))))
+ (fn [db [_ err]]
+   (db/set-repo-alerts db [{:type :danger
+                            :message (str "Failed to watch repo: " (u/error-msg err))}])))
 
 (rf/reg-event-fx
  :repo/unwatch
@@ -149,9 +146,8 @@
  (fn [db [_ {:keys [body]}]]
    (db/replace-repo db body)))
 
-(rf/reg-event-fx
+(rf/reg-event-db
  :repo/unwatch--failed
- (u/req-error-handler-db
-  (fn [db [_ err]]
-    (db/set-repo-alerts db [{:type :danger
-                             :message (str "Failed to unwatch repo: " (u/error-msg err))}]))))
+ (fn [db [_ err]]
+   (db/set-repo-alerts db [{:type :danger
+                            :message (str "Failed to unwatch repo: " (u/error-msg err))}])))
