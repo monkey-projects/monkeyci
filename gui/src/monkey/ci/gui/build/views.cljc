@@ -111,7 +111,7 @@
     [:ul
      [:li "Labels:" (str (:labels job))]
      [:li "Dependencies:" (str (:dependencies job))]]]
-   [:div.col-6
+   [:div.col-6.border-start
     [:h5 "Logs"]
     (->> (:logs job)
          (filter (comp pos? :size))
