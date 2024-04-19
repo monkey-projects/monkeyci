@@ -12,6 +12,7 @@
 (u/db-sub :build/log-alerts db/log-alerts)
 (u/db-sub :build/downloading? (comp some? db/downloading?))
 (u/db-sub :build/log-path db/log-path)
+(u/db-sub :build/expanded-jobs db/expanded-jobs)
 
 (def split-log-path #(cs/split % #"/"))
 

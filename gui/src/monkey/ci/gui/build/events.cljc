@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.build.events
   (:require [monkey.ci.gui.build.db :as db]
+            [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
@@ -9,12 +10,20 @@
 (rf/reg-event-fx
  :build/init
  (fn [{:keys [db]} _]
-   {:dispatch-n [[:build/load]
-                 ;; Make sure we stop listening to events when we leave this page
-                 [:route/on-page-leave [:event-stream/stop stream-id]]
-                 ;; TODO Only start reading events when the build has not finished yet
-                 [:event-stream/start stream-id (r/customer-id db) [:build/handle-event]]]
-    :db (db/set-logs db nil)}))
+   (when-not (db/initialized? db)
+     {:dispatch-n [[:build/load]
+                   [:build/load-logs]
+                   ;; Make sure we stop listening to events when we leave this page
+                   [:route/on-page-leave [:build/leave]]
+                   ;; TODO Only start reading events when the build has not finished yet
+                   [:event-stream/start stream-id (r/customer-id db) [:build/handle-event]]]
+      :db (db/set-initialized db true)})))
+
+(rf/reg-event-fx
+ :build/leave
+ (fn [{:keys [db]} _]
+   {:dispatch [:event-stream/stop stream-id]
+    :db (db/unset-initialized db)}))
 
 (defn load-logs-req [db]
   [:secure-request
@@ -177,3 +186,8 @@
  (fn [db [_ evt]]
    (when (for-build? db evt)
      (handle-event db evt))))
+
+(rf/reg-event-db
+ :job/toggle
+ (fn [db [_ job]]
+   (db/toggle-expanded-job db (:id job))))

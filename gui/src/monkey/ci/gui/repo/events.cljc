@@ -11,12 +11,12 @@
 (rf/reg-event-fx
  :repo/init
  (fn [{:keys [db]} _]
+   ;; Only proceed if not already initialized
    (when-not (db/initialized? db)
      (let [cust-id (r/customer-id db)]
        {:dispatch-n [[:repo/load cust-id]
                      ;; Make sure we stop listening to events when we leave this page
                      [:route/on-page-leave [:repo/leave]]
-                     ;; TODO Only do this if we're not listening already (e.g. code change reload)
                      [:event-stream/start stream-id cust-id [:repo/handle-event]]]
         :db (-> db
                 (db/set-initialized true)

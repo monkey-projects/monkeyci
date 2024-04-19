@@ -23,6 +23,7 @@
 (defn page
   "Renders user home page, or redirects to login if user has not authenticated yet."
   []
+  ;; TODO When a valid token was stored, use it to fetch user info
   (let [u (rf/subscribe [:login/user])]
     [l/default
      [:<>

@@ -105,25 +105,47 @@
     [elapsed-running x]
     [elapsed-final x]))
 
+(defn- job-details [job]
+  [:div.row
+   [:div.col-4
+    [:ul
+     [:li "Labels:" (str (:labels job))]
+     [:li "Dependencies:" (str (:dependencies job))]]]
+   [:div.col-6
+    [:h5 "Logs"]
+    (->> (:logs job)
+         (filter (comp pos? :size))
+         (map render-log-link)
+         (map (partial conj [:li]))
+         (into [:ul]))]
+   [:div.col-2
+    [:button.btn.btn-outline-primary.float-end
+     {:on-click #(rf/dispatch [:job/toggle job])}
+     "Hide"]]])
+
 (defn- render-job [job]
-  [:tr
-   [:td (:id job)]
-   [:td (get-in job [:labels :pipeline])]
-   [:td [co/build-result (:status job)]]
-   [:td (elapsed job)]
-   [:td (->> (:logs job)
-             (map render-log-link)
-             (into [:span]))]])
+  (let [exp (rf/subscribe [:build/expanded-jobs])
+        expanded? (and exp (contains? @exp (:id job)))
+        cells [[:td [:a {:href ""}
+                     (:id job)]]
+               [:td (get-in job [:labels :pipeline])]
+               [:td [co/build-result (:status job)]]
+               [:td (elapsed job)]]]
+    [:<>
+     (into [:tr {:on-click #(rf/dispatch [:job/toggle job])}] cells)
+     (when expanded?
+       [:tr
+        [:td {:col-span (count cells)}
+         [job-details job]]])]))
 
 (defn- jobs-table [jobs]
-  [:table.table.table-striped
+  [:table.table
    [:thead
     [:tr
      [:th "Job"]
      [:th "Pipeline"]
      [:th "Result"]
-     [:th "Elapsed"]
-     [:th "Logs"]]]
+     [:th "Elapsed"]]]
    (->> jobs
         (map render-job)
         (into [:tbody]))])
@@ -137,7 +159,6 @@
 (defn- log-row [{:keys [name size] :as l}]
   (let [route (rf/subscribe [:route/current])]
     [:tr
-     ;; FIXME Clicking the link counts as "leaving the page" which stops the event stream
      [:td [:a {:href (u/->dom-id log-modal-id)
                :data-bs-toggle "modal"
                :on-click (u/link-evt-handler [:build/download-log name])}

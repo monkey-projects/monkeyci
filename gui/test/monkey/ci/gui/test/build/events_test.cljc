@@ -13,41 +13,63 @@
 (use-fixtures :each f/reset-db)
 
 (deftest build-init
-  (testing "dispatches load event"
-    (rft/run-test-sync
-     (let [c (atom [])]
-       (rf/reg-event-db :build/load (fn [_ evt] (swap! c conj evt)))
-       (rf/reg-event-db :event-stream/start (constantly nil))
-       (rf/reg-event-db :route/on-page-leave (constantly nil))
-       (rf/dispatch [:build/init])
-       (is (= 1 (count @c))))))
+  (letfn [(mock-handlers []
+            (rf/reg-event-db :build/load (constantly nil))
+            (rf/reg-event-db :build/load-logs (constantly nil))
+            (rf/reg-event-db :event-stream/start (constantly nil))
+            (rf/reg-event-db :route/on-page-leave (constantly nil)))]
+    
+    (testing "when not initialized"
+      (testing "dispatches load event"
+        (rft/run-test-sync
+         (let [c (atom [])]
+           (mock-handlers)
+           (rf/reg-event-db :build/load (fn [_ evt] (swap! c conj evt)))
+           (rf/dispatch [:build/init])
+           (is (= 1 (count @c))))))
+      
+      (testing "dispatches log load event"
+        (rft/run-test-sync
+         (let [c (atom [])]
+           (mock-handlers)
+           (rf/reg-event-db :build/load-logs (fn [_ evt] (swap! c conj evt)))
+           (rf/dispatch [:build/init])
+           (is (= 1 (count @c))))))
 
-  (testing "dispatches page leave event"
-    (rft/run-test-sync
-     (let [c (atom [])]
-       (rf/reg-event-db :build/load (constantly nil))
-       (rf/reg-event-db :event-stream/start (constantly nil))
-       (rf/reg-event-db :route/on-page-leave (fn [_ evt] (swap! c conj evt)))
-       (rf/dispatch [:build/init])
-       (is (= 1 (count @c))))))
+      (testing "dispatches page leave event"
+        (rft/run-test-sync
+         (let [c (atom [])]
+           (mock-handlers)
+           (rf/reg-event-db :route/on-page-leave (fn [_ evt] (swap! c conj evt)))
+           (rf/dispatch [:build/init])
+           (is (= 1 (count @c))))))
 
-  (testing "dispatches event stream start"
-    (rft/run-test-sync
-     (let [c (atom [])]
-       (rf/reg-event-db :build/load (constantly nil))
-       (rf/reg-event-db :event-stream/start (fn [_ evt] (swap! c conj evt)))
-       (rf/reg-event-db :route/on-page-leave (constantly nil))
-       (rf/dispatch [:build/init])
-       (is (= 1 (count @c))))))
+      (testing "dispatches event stream start"
+        (rft/run-test-sync
+         (let [c (atom [])]
+           (mock-handlers)
+           (rf/reg-event-db :event-stream/start (fn [_ evt] (swap! c conj evt)))
+           (rf/dispatch [:build/init])
+           (is (= 1 (count @c))))))
 
-  (testing "clears logs"
-    (rft/run-test-sync
-     (reset! app-db (db/set-logs {} ::test-logs))
-     (rf/reg-event-db :build/load (constantly nil))
-     (rf/reg-event-db :event-stream/start (constantly nil))
-     (rf/reg-event-db :route/on-page-leave (constantly nil))
-     (rf/dispatch [:build/init])
-     (is (nil? (db/logs @app-db))))))
+      (testing "marks initialized"
+        (rft/run-test-sync
+         (mock-handlers)
+         (reset! app-db (db/set-logs {} ::test-logs))
+         (rf/dispatch [:build/init])
+         (is (true? (db/initialized? @app-db))))))
+
+    (testing "does nothing when initialized"
+      (reset! app-db (db/set-initialized {} true))
+      (rft/run-test-sync
+       (mock-handlers)
+       (let [c (atom [])
+             h (fn [_ evt] (swap! c conj evt))]
+         (rf/reg-event-db :build/load h)
+         (rf/reg-event-db :event-stream/start h)
+         (rf/reg-event-db :route/on-page-leave h)
+         (rf/dispatch [:build/init])
+         (is (empty? @c)))))))
 
 (deftest build-load-logs
   (testing "sets alert"
@@ -140,7 +162,11 @@
                                                     {:jobs [{:id "test-job"}]}}}])
     (is (= {:script
             {:jobs {"test-job" {:id "test-job"}}}}
-           (db/build @app-db)))))
+           (db/build @app-db))))
+
+  (testing "starts event stream when build is running")
+
+  (testing "does not start event stream when build has finished"))
 
 (deftest build-load--failed
   (testing "sets error"
@@ -347,3 +373,15 @@
 
     (testing "updates build job on `job/end` event"
       (verify-job-updated :job/end))))
+
+(deftest job-toggle
+  (testing "marks job as expanded in db by id"
+    (let [job {:id ::test-job}]
+      (rf/dispatch-sync [:job/toggle job])
+      (is (= #{::test-job} (db/expanded-jobs @app-db)))))
+
+  (testing "removes expanded job from list"
+    (let [job {:id ::test-job-2}]
+      (rf/dispatch-sync [:job/toggle job])
+      (rf/dispatch-sync [:job/toggle job])
+      (is (= #{::test-job} (db/expanded-jobs @app-db))))))

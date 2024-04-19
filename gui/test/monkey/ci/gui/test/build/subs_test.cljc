@@ -119,3 +119,12 @@
                                       {:name "test-job/out.txt"}]))
       (is (= [{:name "out.txt"}]
              @g)))))
+
+(deftest expanded-jobs
+  (let [c (rf/subscribe [:build/expanded-jobs])]
+    (testing "exists"
+      (is (some? c)))
+
+    (testing "returns expanded job ids from db"
+      (is (map? (reset! app-db (db/set-expanded-jobs {} [::job-1 ::job-2]))))
+      (is (= #{::job-1 ::job-2} @c)))))

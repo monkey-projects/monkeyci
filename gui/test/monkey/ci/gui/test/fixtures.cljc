@@ -5,3 +5,7 @@
 (def reset-db
   #?(:cljs {:before #(reset! app-db {})}))
 
+(def restore-rf
+  (let [r (atom nil)]
+    {:before (reset! r (rf/make-restore-fn))
+     :after (@r)}))
