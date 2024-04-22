@@ -113,6 +113,8 @@
                       (do
                         (log/debug "Read next event:" evt)
                         (when (contains? evt :exit)
+                          ;; TODO Start uploading logs as soon as the file is created instead
+                          ;; of when the command has finished.
                           (upload-logs evt logger))
                         (rt/post-events rt (assoc evt
                                                   :sid sid

@@ -64,6 +64,7 @@
   (execute! [job rt]
     (let [rt-with-job (assoc rt :job target)
           handle-error (fn [ex]
+                         (log/error "Got job exception:" ex)
                          (assoc bc/failure
                                 :exception ex
                                 :message (.getMessage ex)))
