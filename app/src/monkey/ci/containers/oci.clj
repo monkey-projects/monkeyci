@@ -96,8 +96,8 @@
       first
       (oci/find-mount oci/checkout-vol)))
 
-(defn- promtail-container [rt]
-  (-> (pt/rt->config rt)
+(defn- promtail-container [conf]
+  (-> conf
       (pt/promtail-container)
       (assoc :arguments ["-config.file" (str promtail-config-dir "/" promtail-config-file)])))
 
@@ -106,8 +106,8 @@
    :is-read-only true
    :mount-path "/etc/promtail"})
 
-(defn- promtail-config-vol-config [rt]
-  (let [conf (-> (pt/rt->config rt)
+(defn- promtail-config-vol-config [conf]
+  (let [conf (-> conf
                  (assoc :paths [(str log-dir "/*.log")]))]
     {:name promtail-config-vol
      :volume-type "CONFIGFILE"
@@ -118,11 +118,14 @@
   "Adds promtail container configuration to the existing instance config.
    It will be configured to push all logs from the script log dir."
   [ic rt]
-  (-> ic
-      (update :containers conj (-> (promtail-container rt)
-                                   (assoc :volume-mounts [(find-checkout-vol ic)
-                                                          (promtail-config-mount)])))
-      (update :volumes conj (promtail-config-vol-config rt))))
+  (let [conf (pt/rt->config rt)
+        add? (some? (:loki-url conf))]
+    (cond-> ic
+      add?
+      (-> (update :containers conj (-> (promtail-container conf)
+                                       (assoc :volume-mounts [(find-checkout-vol ic)
+                                                              (promtail-config-mount)])))
+          (update :volumes conj (promtail-config-vol-config conf))))))
 
 (defn- display-name [{:keys [build job]}]
   (cs/join "-" [(:build-id build)

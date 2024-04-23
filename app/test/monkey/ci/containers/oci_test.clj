@@ -246,8 +246,8 @@
                     :work-dir "/tmp/test-build/sub"}
                    :build
                    {:checkout-dir "/tmp/test-build"}
-                   :promtail
-                   {}}
+                   :config {:promtail
+                            {:loki-url "http://loki"}}}
                   (sut/instance-config {}))
           pc (->> ci
                   :containers
@@ -278,7 +278,18 @@
                      :static_configs
                      first
                      :labels
-                     :__path__))))))))
+                     :__path__))))))
+
+    (testing "not added if no loki url configured"
+      (is (nil? (->> {:job
+                      {:script ["first" "second"]
+                       :container/env {"TEST_ENV" "test-val"}
+                       :work-dir "/tmp/test-build/sub"}
+                      :build
+                      {:checkout-dir "/tmp/test-build"}}
+                     (sut/instance-config {})
+                     :containers
+                     (mc/find-first (u/prop-pred :display-name "promtail"))))))))
 
 (deftest wait-for-instance-end-events
   (testing "returns a deferred that holds the container and job end events"
