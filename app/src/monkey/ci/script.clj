@@ -113,7 +113,7 @@
     (log/debug "Found" (count pf) "matching jobs:" (map bc/job-id pf))
     (let [result @(j/execute-jobs! pf rt)]
       (log/debug "Jobs executed, result is:" result)
-      {:status (if (every? (comp bc/success? :result) (vals result)) :success :failure)
+      {:status (if (some (comp bc/failed? :result) (vals result)) :failure :success)
        :jobs result})))
 
 ;;; Script client functions
