@@ -17,6 +17,7 @@
              [runtime :as rt]
              [utils :as u]]
             [monkey.ci.build.core :as bc]
+            [monkey.ci.containers.promtail :as pt]
             [monkey.ci.events.core :as ec]
             [monkey.oci.container-instance.core :as ci]))
 
@@ -36,6 +37,10 @@
 
 (def sidecar-container-name "sidecar")
 (def sidecar-config (comp :sidecar rt/config))
+
+(def promtail-config-vol "promtail-config")
+(def promtail-config-dir "/etc/promtail")
+(def promtail-config-file "config.yml")
 
 (defn- job-work-dir
   "The work dir to use for the job in the container.  This is the external job
@@ -84,6 +89,40 @@
          ;; Run as root, because otherwise we can't write to the shared volumes
          :security-context {:security-context-type "LINUX"
                             :run-as-user 0}))
+
+(defn- find-checkout-vol [ci]
+  (-> ci
+      :containers
+      first
+      (oci/find-mount oci/checkout-vol)))
+
+(defn- promtail-container [rt]
+  (-> (pt/rt->config rt)
+      (pt/promtail-container)
+      (assoc :arguments ["-config.file" (str promtail-config-dir "/" promtail-config-file)])))
+
+(defn- promtail-config-mount []
+  {:volume-name promtail-config-vol
+   :is-read-only true
+   :mount-path "/etc/promtail"})
+
+(defn- promtail-config-vol-config [rt]
+  (let [conf (-> (pt/rt->config rt)
+                 (assoc :paths [(str log-dir "/*.log")]))]
+    {:name promtail-config-vol
+     :volume-type "CONFIGFILE"
+     :configs [(oci/config-entry promtail-config-file
+                                 (pt/yaml-config conf))]}))
+
+(defn- add-promtail-container
+  "Adds promtail container configuration to the existing instance config.
+   It will be configured to push all logs from the script log dir."
+  [ic rt]
+  (-> ic
+      (update :containers conj (-> (promtail-container rt)
+                                   (assoc :volume-mounts [(find-checkout-vol ic)
+                                                          (promtail-config-mount)])))
+      (update :volumes conj (promtail-config-vol-config rt))))
 
 (defn- display-name [{:keys [build job]}]
   (cs/join "-" [(:build-id build)
@@ -150,7 +189,7 @@
   "Generates the configuration for the container instance.  It has 
    a container that runs the job, as configured in the `:job`, and
    next to that a sidecar that is responsible for capturing the output
-   and dispatching events."
+   and dispatching events.  If configured, it also "
   [conf rt]
   (let [ic (oci/instance-config conf)
         sc (-> (sidecar-container ic)
@@ -158,7 +197,7 @@
                (add-sidecar-env rt))
         jc (-> (job-container rt)
                ;; Use common volume for logs and events
-               (assoc :volume-mounts [(oci/find-mount sc oci/checkout-vol)
+               (assoc :volume-mounts [(find-checkout-vol ic)
                                       (script-mount rt)]))]
     (-> ic
         (assoc :containers [sc jc]
@@ -166,7 +205,10 @@
         (update :freeform-tags merge (oci/sid->tags (get-in rt [:build :sid])))
         (update :volumes conj
                 (script-vol-config rt)
-                (config-vol-config rt)))))
+                (config-vol-config rt))
+        ;; Note that promtail will never terminate, so we rely on the script to
+        ;; delete the container instance when the sidecar and the job have completed.
+        (add-promtail-container rt))))
 
 (defn wait-for-instance-end-events
   "Checks the incoming events to see if a container and job end event has been received.

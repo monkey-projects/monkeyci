@@ -4,7 +4,10 @@
   (:require [camel-snake-kebab.core :as csk]
             [clj-yaml.core :as yaml]
             [clojure.walk :as cw]
-            [medley.core :as mc]))
+            [medley.core :as mc]
+            [monkey.ci
+             [build :as b]
+             [runtime :as rt]]))
 
 ;; Default promtail settings
 (def promtail-image "docker.io/grafana/promtail")
@@ -14,7 +17,9 @@
   "Generates config structure that can be passed to promtail.  The structure should
    be converted to yaml in order to be usable by promtail."
   [conf]
-  {:positions
+  {:server
+   {:disable true}
+   :positions
    {:filename "/tmp/positions.yaml"}
    :clients
    [(-> {:url (:loki-url conf)
@@ -23,20 +28,25 @@
    :scrape-configs
    [{:job-name "build-logs"
      :static-configs
-     (map (fn [dir]
+     (map (fn [path]
             {:labels (-> conf
                          (select-keys [:customer-id :repo-id :build-id :job-id])
-                         (assoc :__path__ (str dir)))})
-          (:dirs conf))}]})
+                         ;; Add it as a string otherwise case conversion will drop the underscores
+                         (assoc "__path__" (str path)))})
+          (:paths conf))}]})
 
 (defn ->yaml [conf]
-  (->> (cw/postwalk
-        (fn [obj]
-          (if (map-entry? obj)
-            [(csk/->snake_case (name (first obj))) (second obj)]
-            obj))
-        conf)
-       (yaml/generate-string)))
+  (letfn [(convert [x]
+            (if (keyword? x)
+              (csk/->snake_case (name x))
+              x))]
+    (->> (cw/postwalk
+          (fn [obj]
+            (if (map-entry? obj)
+              [(convert (first obj)) (second obj)]
+              obj))
+          conf)
+         (yaml/generate-string))))
 
 (def yaml-config (comp ->yaml promtail-config))
 
@@ -46,3 +56,16 @@
   [{:keys [image-url image-tag] :as conf}]
   {:image-url (str (or image-url promtail-image) ":" (or image-tag promtail-version))
    :display-name "promtail"})
+
+(defn rt->config
+  "Extracts necessary values from the runtime to create a promtail config map, that
+   can be passed to `promtail-config`."
+  [rt]
+  (letfn [(build-props []
+            (zipmap [:customer-id :repo-id :build-id] (b/get-sid rt)))
+          (job-props []
+            {:job-id (b/rt->job-id rt)})]
+    (-> (select-keys (:promtail (rt/config rt)) [:image-url :image-tag :loki-url])
+        (merge (build-props)
+               (job-props))
+        (assoc :token (-> (rt/config rt) :api :token)))))

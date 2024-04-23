@@ -5,7 +5,7 @@
 (deftest promtail-config
   (let [conf {:loki-url "http://loki-test"
               :token "test-token"
-              :dirs ["/test/dir"]
+              :paths ["/test/dir"]
               :customer-id "test-cust"
               :repo-id "test-repo"
               :build-id "test-build"
@@ -29,7 +29,7 @@
       (let [sc (-> pc :scrape-configs first)]
         (is (some? sc))
 
-        (testing "with static config per dir"
+        (testing "with static config per path"
           (is (= 1 (count (:static-configs sc)))))
 
         (testing "with build ids as labels"
@@ -55,3 +55,24 @@
                (sut/promtail-container)
                :image-url)))))
 
+(deftest rt->config
+  (testing "builds promtail config input map"
+    (is (= {:image-url "promtail-img"
+            :image-tag "promtail-version"
+            :loki-url "http://loki"
+            :customer-id "test-cust"
+            :repo-id "test-repo"
+            :build-id "test-build"
+            :job-id "test-job"
+            :token "test-token"}
+           (sut/rt->config {:config
+                            {:promtail
+                             {:image-url "promtail-img"
+                              :image-tag "promtail-version"
+                              :loki-url "http://loki"}
+                             :api
+                             {:token "test-token"}}
+                            :build
+                            {:sid ["test-cust" "test-repo" "test-build"]}
+                            :job
+                            {:id "test-job"}})))))

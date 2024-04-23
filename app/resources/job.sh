@@ -52,8 +52,8 @@ run_command()
 {
     command=$1
     name=$command
-    out=${MONKEYCI_LOG_DIR}/${command}_out
-    err=${MONKEYCI_LOG_DIR}/${command}_err
+    out=${MONKEYCI_LOG_DIR}/${command}_out.log
+    err=${MONKEYCI_LOG_DIR}/${command}_err.log
     contents=`cat ${MONKEYCI_SCRIPT_DIR}/${command}`
     
     echo "Running command $command: $contents"

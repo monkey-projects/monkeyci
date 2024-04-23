@@ -1,5 +1,6 @@
 (ns monkey.ci.containers.oci-test
   (:require [clojure.test :refer [deftest testing is]]
+            [clj-yaml.core :as yaml]
             [clojure.java.io :as io]
             [manifold.deferred :as md]
             [medley.core :as mc]
@@ -32,13 +33,6 @@
       (is (map? ic))
       (is (string? (:shape ic)))))
 
-  (testing "contains job and sidecar containers"
-    (is (= #{"job" "sidecar"}
-           (->> (sut/instance-config {} default-rt)
-                :containers
-                (map :display-name)
-                (set)))))
-
   (testing "display name contains build id, pipeline index and job index"
     (is (= "test-build-test-job"
            (->> {:build {:build-id "test-build"
@@ -63,7 +57,7 @@
       (is (= "test-cust" (get tags "customer-id")))
       (is (= "test" (get tags "env")))))
 
-  (testing "both containers have checkout volume"
+  (testing "all containers have checkout volume"
     (letfn [(has-checkout-vol? [c]
               (some (comp (partial = oci/checkout-vol) :volume-name)
                     (:volume-mounts c)))]
@@ -243,7 +237,48 @@
         (is (= (u/->base64 "first")
                (get-in by-name ["0" :data])))
         (is (= (u/->base64 "second")
-               (get-in by-name ["1" :data])))))))
+               (get-in by-name ["1" :data]))))))
+
+  (testing "promtail container"
+    (let [ci (->> {:job
+                   {:script ["first" "second"]
+                    :container/env {"TEST_ENV" "test-val"}
+                    :work-dir "/tmp/test-build/sub"}
+                   :build
+                   {:checkout-dir "/tmp/test-build"}
+                   :promtail
+                   {}}
+                  (sut/instance-config {}))
+          pc (->> ci
+                  :containers
+                  (mc/find-first (u/prop-pred :display-name "promtail")))]
+      (testing "added to instance"
+        (is (some? pc)))
+
+      (testing "refers to mounted config file"
+        (is (= ["-config.file" "/etc/promtail/config.yml"]
+               (:arguments pc)))
+        (is (some? (mc/find-first (u/prop-pred :volume-name "promtail-config")
+                                  (:volume-mounts pc)))))
+
+      (testing "monitors script log dir"
+        (let [v (oci/find-volume ci "promtail-config")
+              contents (some->> v
+                                :configs
+                                first
+                                :data
+                                h/base64->
+                                yaml/parse-string)]
+          (is (some? v))
+          (is (map? contents))
+          (is (= (str sut/log-dir "/*.log")
+                 (-> contents
+                     :scrape_configs
+                     first
+                     :static_configs
+                     first
+                     :labels
+                     :__path__))))))))
 
 (deftest wait-for-instance-end-events
   (testing "returns a deferred that holds the container and job end events"
