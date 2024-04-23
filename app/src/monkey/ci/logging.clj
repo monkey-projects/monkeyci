@@ -88,12 +88,11 @@
     :stream)
 
   (handle-stream [_ in]
-    (let [sid (get-in rt [:build :sid])
+    (let [sid (b/get-sid rt)
           ;; Since the configured path already includes the build id,
           ;; we only use repo id to build the path
           on (sid->path conf path (u/sid->repo-sid sid))]
-      (-> (oci/stream-to-bucket (assoc conf :object-name on)
-                                in)
+      (-> (oci/stream-to-bucket (assoc conf :object-name on) in)
           (ensure-cleanup)))))
 
 (defmethod make-logger :oci [conf]

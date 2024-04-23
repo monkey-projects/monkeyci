@@ -64,6 +64,9 @@
   "Finds logback configuration file, either configured on the runner, or present 
    in the script dir"
   [rt]
+  ;; TODO Use some sort of templating engine to generate a custom log config to add
+  ;; the build id as a label to the logs (e.g. moustache).  That would make it easier
+  ;; to fetch logs for a specific build.
   (->> [(io/file (get-in rt [:build :script-dir]) "logback.xml")
         (some->> (get-in rt [:config :runner :log-config])
                  (utils/abs-path (rt/work-dir rt)))]

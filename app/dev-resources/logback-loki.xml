@@ -3,6 +3,7 @@
   <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
     <http>
       <url>http://loki.monkey-projects.be/loki/api/v1/push</url>
+      <tenantId>monkeyci</tenantId>
     </http>
     <format>
       <label>

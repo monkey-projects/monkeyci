@@ -113,12 +113,12 @@
                (config/normalize-config {} {})
                (assoc-in [:containers :image-tag] version)
                (rt/config->runtime)
-               (assoc :step
-                      {:container/image "docker.io/alpine:latest"
+               (assoc :job
+                      {:id "test-job"
+                       :container/image "docker.io/alpine:latest"
                        :script ["echo 'Hi, this is a simple test.  Waiting for a bit...'"
                                 "sleep 5"]
                        :index 0}
-                      :pipeline {:name pipeline}
                       :build
                       (cond-> {:build-id build-id
                                :sid ["test-customer" "test-repo" build-id]

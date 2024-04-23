@@ -120,6 +120,10 @@
   (testing "success if all jobs succeed"
     (is (bc/success? (->> [(dummy-job bc/success)]
                           (sut/run-all-jobs {})))))
+  
+  (testing "success if jobs skipped"
+      (is (bc/success? (->> [(dummy-job bc/skipped)]
+                          (sut/run-all-jobs {})))))
 
   (testing "fails if a job fails"
     (is (bc/failed? (->> [(dummy-job bc/failure)]

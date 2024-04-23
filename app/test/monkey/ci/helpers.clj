@@ -158,3 +158,11 @@
 
 (defn fake-events-receiver []
   (->FakeEventReceiver (atom {})))
+
+(defn base64->
+  "Converts from base64"
+  [x]
+  (when x
+    (String.
+     (.. (java.util.Base64/getDecoder)
+         (decode x)))))

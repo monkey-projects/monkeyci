@@ -106,6 +106,7 @@
   (let [{:keys [url branch commit-id] :as git} (get-in rt [:build :git])]
     (when (nil? url)
       (throw (ex-info "Git URL must be specified" {:git git})))
+    ;; FIXME Also allow tags
     (when (and (nil? branch) (nil? commit-id))
       (throw (ex-info "Either branch or commit id must be specified" {:git git})))
     [(-> conf
@@ -114,6 +115,7 @@
                 :arguments (cond-> ["-w" oci/checkout-dir "build" "run"
                                     "--sid" (format-sid (b/get-sid rt))
                                     "-u" url]
+                             ;; TODO Add support for tags as well
                              branch (concat ["-b" branch])
                              commit-id (concat ["--commit-id" commit-id]))
                 ;; TODO Pass config in a config file instead of env, cleaner and somewhat safer
