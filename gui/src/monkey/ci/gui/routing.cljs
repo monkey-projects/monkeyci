@@ -49,6 +49,7 @@
     ["/c/:customer-id/add-repo" :page/add-repo]
     ["/c/:customer-id/r/:repo-id" :page/repo]
     ["/c/:customer-id/r/:repo-id/b/:build-id" :page/build]
+    ["/c/:customer-id/r/:repo-id/b/:build-id/j/:job-id" :page/job]
     ["/github/callback" :page/github-callback]]))
 
 (defn on-route-change [match history]

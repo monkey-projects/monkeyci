@@ -27,4 +27,8 @@
 
        build-id
        (conj {:url (r/path-for :page/build (select-keys p [:customer-id :repo-id :build-id]))
-              :name build-id})))))
+              :name build-id})
+
+       job-id
+       (conj {:url (r/path-for :page/job p)
+              :name job-id})))))

@@ -2,7 +2,9 @@
   (:require [monkey.ci.gui.time :as t]
             [monkey.ci.gui.subs]
             [monkey.ci.gui.utils :as u]
-            [re-frame.core :as rf]))
+            [re-frame.core :as rf]
+            #?@(:node [] ; Exclude ansi_up when building for node
+                :cljs [["ansi_up" :refer [AnsiUp]]])))
 
 (defn logo []
   [:img.img-fluid.rounded {:src "/img/monkeyci-bw-small.png" :title "Placeholder Logo"}])
@@ -116,3 +118,26 @@
   [x]
   (when x
     (t/format-datetime (t/parse x))))
+
+;; Node does not support ESM modules, so we need to apply this workaround when testing
+#?(:node
+   (defn ansi->html [l]
+     l)
+   :cljs
+   (do
+     (def ansi-up (AnsiUp.))
+     (defn- ansi->html [l]
+       (.ansi_to_html ansi-up l))))
+
+(defn ->html
+  "Converts raw string to html"
+  [l]
+  (if (string? l)
+    [:span
+     {:dangerouslySetInnerHTML {:__html (ansi->html l)}}]
+    l))
+
+(defn log-contents [raw]
+  (->> raw
+       (map ->html)
+       (into [:p.text-bg-dark.font-monospace.overflow-auto.text-nowrap.h-100])))

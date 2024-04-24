@@ -60,4 +60,20 @@
       (is (= 4 (count @p)))
       (is (= {:url "/c/test-cust/r/test-repo/b/test-build"
               :name "test-build"}
+             (last @p))))
+
+    (testing "includes job when `job-id` in path"
+      (reset! app-db (-> {}
+                         (r/set-current {:parameters
+                                         {:path
+                                          {:customer-id "test-cust"
+                                           :repo-id "test-repo"
+                                           :build-id "test-build"
+                                           :job-id "test-job"}}})
+                         (cdb/set-customer {:name "Test customer"
+                                            :repos [{:id "test-repo"
+                                                     :name "Test repo"}]})))
+      (is (= 5 (count @p)))
+      (is (= {:url "/c/test-cust/r/test-repo/b/test-build/j/test-job"
+              :name "test-job"}
              (last @p))))))

@@ -10,9 +10,7 @@
             [monkey.ci.gui.tabs :as tabs]
             [monkey.ci.gui.time :as t]
             [monkey.ci.gui.timer :as timer]
-            [re-frame.core :as rf]
-            #?@(:node [] ; Exclude ansi_up when building for node
-                :cljs [["ansi_up" :refer [AnsiUp]]])))
+            [re-frame.core :as rf]))
 
 (def log-modal-id :log-dialog)
 
@@ -26,27 +24,9 @@
       [co/render-alert {:type :info
                         :message "Downloading log file, one moment..."}])))
 
-;; Node does not support ESM modules, so we need to apply this workaround when testing
-#?(:node
-   (defn ansi->html [l]
-     l)
-   :cljs
-   (do
-     (def ansi-up (AnsiUp.))
-     (defn- ansi->html [l]
-       (.ansi_to_html ansi-up l))))
-
-(defn- ->html [l]
-  (if (string? l)
-    [:span
-     {:dangerouslySetInnerHTML {:__html (ansi->html l)}}]
-    l))
-
 (defn- log-contents []
   (let [c (rf/subscribe [:build/current-log])]
-    (->> @c
-         (map ->html)
-         (into [:p.text-bg-dark.font-monospace.overflow-auto.text-nowrap.h-100]))))
+    [co/log-contents @c]))
 
 (defn log-modal []
   (let [a (rf/subscribe [:build/log-alerts])]
@@ -105,10 +85,16 @@
     [elapsed-running x]
     [elapsed-final x]))
 
+(defn- job-path [job curr]
+  (r/path-for :page/job (-> curr
+                            (r/path-params)
+                            (assoc :job-id (:id job)))))
+
 (defn- logs-btn [job]
-  [:button.btn.btn-primary.me-2
-   {:on-click #(rf/dispatch [:job/logs job])}
-   [co/icon :file-earmark-plus] [:span.ms-1 "View Logs"]])
+  (let [r (rf/subscribe [:route/current])]
+    [:a.btn.btn-primary.me-2
+     {:href (job-path job @r)}
+     [co/icon :file-earmark-plus] [:span.ms-1 "View Logs"]]))
 
 (defn- hide-btn [job]
   [:button.btn.btn-close
@@ -143,7 +129,8 @@
 (defn- render-job [job]
   (let [exp (rf/subscribe [:build/expanded-jobs])
         expanded? (and exp (contains? @exp (:id job)))
-        cells [[:td [:a {:href ""}
+        r (rf/subscribe [:route/current])
+        cells [[:td [:a {:href (job-path job @r)}
                      (:id job)]]
                [:td (get-in job [:labels :pipeline])]
                [:td [co/build-result (:status job)]]
