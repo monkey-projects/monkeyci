@@ -21,6 +21,14 @@
                [:customer/load--success]
                [:customer/load--failed id]]}))
 
+(rf/reg-event-fx
+ :customer/maybe-load
+ (fn [{:keys [db]} [_ id]]
+   (let [existing (db/customer db)
+         id (or id (r/customer-id db))]
+     (when-not (= (:id existing) id)
+       {:dispatch [:customer/load id]}))))
+
 (rf/reg-event-db
  :customer/load--success
  (fn [db [_ {cust :body}]]

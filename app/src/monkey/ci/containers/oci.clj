@@ -255,7 +255,7 @@
                           ;; Add the full result, may be useful for higher levels
                           (assoc c :result (assoc (ec/result evt) :exit exit-code)))
                         (do
-                          (log/warn "Unknown container:" display-name ", ignoring")
+                          (log/debug "Unknown container:" display-name ", ignoring")
                           c)))]
        ;; We don't rely on the container exit codes, since the container may not have
        ;; exited completely when the events have arrived, so we use the event values instead.

@@ -6,5 +6,5 @@
 (rf/reg-event-fx
  :job/init
  (fn [_ _]
-   ;; TODO
-   ))
+   {:dispatch-n [[:customer/maybe-load]
+                 [:build/maybe-load]]}))
