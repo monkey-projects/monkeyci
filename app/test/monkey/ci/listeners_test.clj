@@ -18,7 +18,7 @@
   ([]
    (test-build (random-sid))))
 
-(deftest save-build
+(deftest update-build
   (testing "updates build entity"
     (h/with-memory-store st
       (let [sid (random-sid)
@@ -65,7 +65,7 @@
         (let [match (st/find-build st sid)]
           (is (= script (:script match))))))))
 
-(deftest save-script
+(deftest update-script
   (testing "updates script in build"
     (h/with-memory-store st
       (let [{:keys [sid] :as build} (test-build)
@@ -91,23 +91,29 @@
                  :script script}]
         (is (nil? (sut/update-script st evt))))))
 
-  (testing "does not overwrite jobs if already present"
+  (testing "merges job info with existing"
     (h/with-memory-store st
       (let [{:keys [sid] :as build} (-> (test-build)
                                         (assoc :script
                                                {:start-time 100
                                                 :status :running
-                                                :jobs {"test-job" {:status :success}}}))
+                                                :jobs {"test-job" {:start-time 100
+                                                                   :status :pending}}}))
             script {:start-time 100
                     :status :running
-                    :jobs {"test-job" {}}}
+                    :jobs {"test-job" {:status :skipped
+                                       :end-time 200}}}
             evt {:type :script/start
                  :sid sid
                  :script script}]
         (is (st/sid? (st/save-build st build)))
         (is (map? (sut/update-script st evt)))
-        (let [match (st/find-build st sid)]
-          (is (= :success (get-in match [:script :jobs "test-job" :status]))))))))
+        (let [match (st/find-build st sid)
+              job (get-in match [:script :jobs "test-job"])]
+          (is (some? job))
+          (is (= :skipped (:status job)))
+          (is (= 100 (:start-time job)))
+          (is (= 200 (:end-time job))))))))
 
 (deftest update-job
   (testing "patches build script with job info"
