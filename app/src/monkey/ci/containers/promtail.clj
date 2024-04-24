@@ -7,6 +7,7 @@
             [medley.core :as mc]
             [monkey.ci
              [build :as b]
+             [config :as c]
              [runtime :as rt]]))
 
 ;; Default promtail settings
@@ -69,3 +70,6 @@
         (merge (build-props)
                (job-props))
         (assoc :token (-> (rt/config rt) :api :token)))))
+
+(defmethod c/normalize-key :promtail [_ conf]
+  conf)

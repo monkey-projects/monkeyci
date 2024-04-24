@@ -5,6 +5,7 @@
             [monkey.ci.gui.customer.db :as cdb]
             [monkey.ci.gui.build.db :as db]
             [monkey.ci.gui.build.events :as sut]
+            [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.test.fixtures :as f]
             [monkey.ci.gui.test.helpers :as h]
             [re-frame.core :as rf]
@@ -144,6 +145,55 @@
     (is (map? (reset! app-db (db/set-build {} "test-build"))))
     (rf/dispatch-sync [:build/load])
     (is (nil? (db/logs @app-db)))))
+
+(deftest build-maybe-load
+  (testing "loads build if not in db"
+    (rft/run-test-sync
+     (let [c (h/catch-fx :martian.re-frame/request)]
+       (reset! app-db (r/set-current
+                       {}
+                       {:parameters
+                        {:path 
+                         {:customer-id "test-cust"
+                          :repo-id "test-repo"
+                          :build-id "test-build"}}}))
+       (h/initialize-martian {:get-build {:body "test-build"
+                                          :error-code :no-error}})
+       (rf/dispatch [:build/maybe-load])
+       (is (= 1 (count @c)))
+       (is (= :get-build (-> @c first (nth 2)))))))
+
+  (testing "does not load build if already in db"
+    (rft/run-test-sync
+     (let [c (h/catch-fx :martian.re-frame/request)]
+       (reset! app-db (-> {}
+                          (r/set-current
+                           {:parameters
+                            {:path 
+                             {:customer-id "test-cust"
+                              :repo-id "test-repo"
+                              :build-id "test-build"}}})
+                          (db/set-build {:id "test-build"})))
+       (h/initialize-martian {:get-build {:body "test-build"
+                                          :error-code :no-error}})
+       (rf/dispatch [:build/maybe-load])
+       (is (empty? @c)))))
+
+  (testing "loads build if id in db differs from route id"
+    (rft/run-test-sync
+     (let [c (h/catch-fx :martian.re-frame/request)]
+       (reset! app-db (-> {}
+                          (r/set-current
+                           {:parameters
+                            {:path 
+                             {:customer-id "test-cust"
+                              :repo-id "test-repo"
+                              :build-id "test-build"}}})
+                          (db/set-build {:id "other-build"})))
+       (h/initialize-martian {:get-build {:body "test-build"
+                                          :error-code :no-error}})
+       (rf/dispatch [:build/maybe-load])
+       (is (= 1 (count @c)))))))
 
 (deftest build-load--success
   (testing "clears alerts"

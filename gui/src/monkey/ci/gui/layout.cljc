@@ -15,14 +15,17 @@
 
 (defn header []
   [:div.header
-   [:div.row
+   [:div.row.border-bottom
     [:div.col-1
      [:div.mt-2 [:a {:href "/"} [co/logo]]]]
     [:div.col-9
      [:h1 "MonkeyCI"]
      [:p.lead "Welcome to MonkeyCI, the CI/CD tool that makes your life (and the planet) better!"]]
     [:div.col-2.text-end
-     [user-info]]]])
+     [user-info]]]
+   [:div.row.mt-1
+    [:div.col
+     [co/path-breadcrumb]]]])
 
 (defn footer []
   [:div.footer.border-top.mt-3

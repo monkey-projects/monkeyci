@@ -54,3 +54,4 @@ Thumbs.db
 junit.xml
 tmp/
 /app/*.sh
+\#.*

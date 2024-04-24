@@ -73,6 +73,14 @@
             (db/set-build nil))
     :dispatch (load-build-req db)}))
 
+(rf/reg-event-fx
+ :build/maybe-load
+ (fn [{:keys [db]} _]
+   (let [existing (db/build db)
+         id (-> (r/current db) r/path-params :build-id)]
+     (when-not (= (:id existing) id)
+       {:dispatch [:build/load id]}))))
+
 (defn- convert-build
   "Builds received from requests are slightly different from those received as events.
    The jobs are in a vector instead of a map.  This function converts the received build

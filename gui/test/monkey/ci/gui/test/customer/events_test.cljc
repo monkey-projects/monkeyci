@@ -6,6 +6,7 @@
             [monkey.ci.gui.customer.events :as sut]
             [monkey.ci.gui.login.db :as ldb]
             [monkey.ci.gui.login.events]
+            [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.test.fixtures :as f]
             [monkey.ci.gui.test.helpers :as h]
             [re-frame.core :as rf]
@@ -37,6 +38,55 @@
        (rf/dispatch [:customer/load "test-customer"])
        (is (= 1 (count @c)))
        (is (= :get-customer (-> @c first (nth 2))))))))
+
+(deftest customer-maybe-load
+  (testing "loads customer if not in db"
+    (rf-test/run-test-sync
+     (let [cust {:id "test-cust"
+                 :name "Test customer"}
+           c (h/catch-fx :martian.re-frame/request)]
+       (h/initialize-martian {:get-customer {:status 200
+                                             :body cust
+                                             :error-code :no-error}})
+       (rf/dispatch [:customer/maybe-load (:id cust)])
+       (is (= 1 (count @c))))))
+
+  (testing "does not load if already in db"
+    (rf-test/run-test-sync
+     (let [cust {:id "test-cust"
+                 :name "Test customer"}
+           c (h/catch-fx :martian.re-frame/request)]
+       (reset! app-db (db/set-customer {} cust))
+       (h/initialize-martian {:get-customer {:status 200
+                                             :body cust
+                                             :error-code :no-error}})
+       (rf/dispatch [:customer/maybe-load (:id cust)])
+       (is (empty? @c)))))
+
+  (testing "loads if id differs from id in db"
+    (rf-test/run-test-sync
+     (let [cust {:id "test-cust"
+                 :name "Test customer"}
+           c (h/catch-fx :martian.re-frame/request)]
+       (reset! app-db (db/set-customer {} {:id "other-cust"}))
+       (h/initialize-martian {:get-customer {:status 200
+                                             :body cust
+                                             :error-code :no-error}})
+       (rf/dispatch [:customer/maybe-load (:id cust)])
+       (is (= 1 (count @c))))))
+
+  (testing "takes id from current route if not specified"
+    (rf-test/run-test-sync
+     (let [cust {:id "test-cust"
+                 :name "Test customer"}
+           c (h/catch-fx :martian.re-frame/request)]
+       (reset! app-db (r/set-current {} {:path "/c/test-cust"
+                                         :parameters {:path {:customer-id "test-cust"}}}))
+       (h/initialize-martian {:get-customer {:status 200
+                                             :body cust
+                                             :error-code :no-error}})
+       (rf/dispatch [:customer/maybe-load])
+       (is (= 1 (count @c)))))))
 
 (deftest customer-load--success
   (testing "unmarks loading"

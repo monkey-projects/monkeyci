@@ -1,6 +1,10 @@
 (ns monkey.ci.gui.components
-  (:require [monkey.ci.gui.utils :as u]
-            [re-frame.core :as rf]))
+  (:require [monkey.ci.gui.time :as t]
+            [monkey.ci.gui.subs]
+            [monkey.ci.gui.utils :as u]
+            [re-frame.core :as rf]
+            #?@(:node [] ; Exclude ansi_up when building for node
+                :cljs [["ansi_up" :refer [AnsiUp]]])))
 
 (defn logo []
   [:img.img-fluid.rounded {:src "/img/monkeyci-bw-small.png" :title "Placeholder Logo"}])
@@ -44,6 +48,13 @@
               r+
               (recur (rest p) r+))))
         (into [:ol.breadcrumb]))])
+
+(defn path-breadcrumb
+  "Renders breadcrumb component according to path.  It uses the current route to
+   determine what to display."
+  []
+  (let [p (rf/subscribe [:breadcrumb/path])]
+    [breadcrumb @p]))
 
 (defn build-result [r]
   (let [r (or r "running")
@@ -101,3 +112,32 @@
       [:button.btn.btn-secondary {:type :button
                                   :data-bs-dismiss "modal"}
        "Close"]]]]])
+
+(defn date-time
+  "Reformats given object as a date-time"
+  [x]
+  (when x
+    (t/format-datetime (t/parse x))))
+
+;; Node does not support ESM modules, so we need to apply this workaround when testing
+#?(:node
+   (defn ansi->html [l]
+     l)
+   :cljs
+   (do
+     (def ansi-up (AnsiUp.))
+     (defn- ansi->html [l]
+       (.ansi_to_html ansi-up l))))
+
+(defn ->html
+  "Converts raw string to html"
+  [l]
+  (if (string? l)
+    [:span
+     {:dangerouslySetInnerHTML {:__html (ansi->html l)}}]
+    l))
+
+(defn log-contents [raw]
+  (->> raw
+       (map ->html)
+       (into [:p.text-bg-dark.font-monospace.overflow-auto.text-nowrap.h-100])))

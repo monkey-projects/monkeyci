@@ -120,12 +120,15 @@
                   (map? x) (prune-map)))
               t))
 
-(defn- merge-if-map [a b]
-  (if (map? a)
-    (merge a b)
-    b))
-
-(def deep-merge (partial merge-with merge-if-map))
+(defn deep-merge
+  "Recursively merges maps."
+  ;; Copied from https://dnaeon.github.io/recursively-merging-maps-in-clojure/
+  [& maps]
+  (letfn [(m [& xs]
+            (if (some #(and (map? %) (not (record? %))) xs)
+              (apply merge-with m xs)
+              (last xs)))]
+    (reduce m maps)))
 
 (defn ->base64 [s]
   (.. (java.util.Base64/getEncoder)

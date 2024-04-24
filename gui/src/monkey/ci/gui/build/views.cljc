@@ -10,9 +10,7 @@
             [monkey.ci.gui.tabs :as tabs]
             [monkey.ci.gui.time :as t]
             [monkey.ci.gui.timer :as timer]
-            [re-frame.core :as rf]
-            #?@(:node [] ; Exclude ansi_up when building for node
-                :cljs [["ansi_up" :refer [AnsiUp]]])))
+            [re-frame.core :as rf]))
 
 (def log-modal-id :log-dialog)
 
@@ -26,27 +24,9 @@
       [co/render-alert {:type :info
                         :message "Downloading log file, one moment..."}])))
 
-;; Node does not support ESM modules, so we need to apply this workaround when testing
-#?(:node
-   (defn ansi->html [l]
-     l)
-   :cljs
-   (do
-     (def ansi-up (AnsiUp.))
-     (defn- ansi->html [l]
-       (.ansi_to_html ansi-up l))))
-
-(defn- ->html [l]
-  (if (string? l)
-    [:span
-     {:dangerouslySetInnerHTML {:__html (ansi->html l)}}]
-    l))
-
 (defn- log-contents []
   (let [c (rf/subscribe [:build/current-log])]
-    (->> @c
-         (map ->html)
-         (into [:p.text-bg-dark.font-monospace.overflow-auto.text-nowrap.h-100]))))
+    [co/log-contents @c]))
 
 (defn log-modal []
   (let [a (rf/subscribe [:build/log-alerts])]
@@ -85,7 +65,7 @@
   (when (and s e)
     (t/format-seconds (int (/ (- e s) 1000)))))
 
-(defn- render-log-link [{:keys [name size path]}]
+#_(defn- render-log-link [{:keys [name size path]}]
   [:span.me-1
    [:a.me-1 {:href (u/->dom-id log-modal-id)
              :data-bs-toggle "modal"
@@ -105,28 +85,52 @@
     [elapsed-running x]
     [elapsed-final x]))
 
-(defn- job-details [job]
+(defn- job-path [job curr]
+  (r/path-for :page/job (-> curr
+                            (r/path-params)
+                            (assoc :job-id (:id job)))))
+
+(defn- logs-btn [job]
+  (let [r (rf/subscribe [:route/current])]
+    [:a.btn.btn-primary.me-2
+     {:href (job-path job @r)}
+     [co/icon :file-earmark-plus] [:span.ms-1 "View Logs"]]))
+
+(defn- hide-btn [job]
+  [:button.btn.btn-close
+   {:on-click #(rf/dispatch [:job/toggle job])
+    :aria-label "Close"}])
+
+(defn- job-details [{:keys [labels start-time end-time] deps :dependencies :as job}]
   [:div.row
    [:div.col-4
     [:ul
-     [:li "Labels:" (str (:labels job))]
-     [:li "Dependencies:" (str (:dependencies job))]]]
-   [:div.col-6.border-start
-    [:h5 "Logs"]
-    (->> (:logs job)
-         (filter (comp pos? :size))
-         (map render-log-link)
-         (map (partial conj [:li]))
-         (into [:ul]))]
-   [:div.col-2
-    [:button.btn.btn-outline-primary.float-end
-     {:on-click #(rf/dispatch [:job/toggle job])}
-     "Hide"]]])
+     (when start-time
+       [:li "Started at:" [co/date-time start-time]])
+     (when end-time
+       [:li "Ended at:" [co/date-time end-time]])
+     (when-not (empty? labels)
+       [:li "Labels:" (str labels)])
+     (when-not (empty? deps)
+       [:li "Dependent on: " (cs/join ", " deps)])]]
+   #_[:div.col-6.border-start
+      [:h5 "Logs"]
+      (->> (:logs job)
+           (filter (comp pos? :size))
+           (map render-log-link)
+           (map (partial conj [:li]))
+           (into [:ul]))]
+   [:div.col-4
+    [logs-btn job]]
+   [:div.col-4
+    [:div.float-end
+     [hide-btn job]]]])
 
 (defn- render-job [job]
   (let [exp (rf/subscribe [:build/expanded-jobs])
         expanded? (and exp (contains? @exp (:id job)))
-        cells [[:td [:a {:href ""}
+        r (rf/subscribe [:route/current])
+        cells [[:td [:a {:href (job-path job @r)}
                      (:id job)]]
                [:td (get-in job [:labels :pipeline])]
                [:td [co/build-result (:status job)]]
