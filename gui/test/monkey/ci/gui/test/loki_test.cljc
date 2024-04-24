@@ -29,4 +29,22 @@
 
         (testing "has start and end time in epoch seconds"
           (is (= 10 (get-in req [:params :start])))
-          (is (= 21 (get-in req [:params :end]))))))))
+          (is (= 21 (get-in req [:params :end]))))))
+
+    (testing "for started job"
+      (let [sid ["test-cust" "test-repo" "test-build"]
+            job {:id "test-job"
+                 :start-time 10000}
+            req (sut/job-logs-request sid job)]
+        (is (map? req))
+
+        (testing "invokes query range"
+          (is (= (str sut/loki-url "/query_range")
+                 (:uri req))))
+
+        (testing "has query"
+          (is (string? (get-in req [:params :query]))))
+
+        (testing "has start time in epoch seconds"
+          (is (= 10 (get-in req [:params :start])))
+          (is (nil? (get-in req [:params :end]))))))))

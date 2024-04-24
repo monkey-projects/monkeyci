@@ -18,3 +18,9 @@
  :<- [:build/current]
  (fn [[id b] _]
    (get-in b [:script :jobs id])))
+
+(rf/reg-sub
+ :job/logs
+ (fn [db _]
+   ;; TODO Rework raw response from loki
+   {}))

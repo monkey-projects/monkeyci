@@ -21,7 +21,7 @@
          (into [:<>]))))
 
 (defn- job-details []
-  (let [{:keys [start-time end-time labels] deps :dependencies :as job} @(rf/subscribe [:job/current])]
+  (when-let [{:keys [start-time end-time labels] deps :dependencies :as job} @(rf/subscribe [:job/current])]
     [info
      ["Status:" [co/build-result (:status job)]]
      (when start-time
@@ -35,11 +35,23 @@
      (when-not (empty? deps)
        ["Dependent on:" (cs/join ", " deps)])]))
 
+(defn- log-tabs []
+  (when-let [logs (rf/subscribe [:job/logs])]
+    ;; TODO
+    [:p "Log tabs go here"]))
+
+(defn- load-log-tabs []
+  (when-let [job @(rf/subscribe [:job/current])]
+    (rf/dispatch [:job/load-logs job])
+    [log-tabs]))
+
 (defn page [_]
   (rf/dispatch [:job/init])
   (let [job-id (rf/subscribe [:job/id])]
     [l/default
      [:<>
       [:h2 "Job: " @job-id]
-      [job-details]
-      [co/alerts [:job/alerts]]]]))
+      [:div.mb-2
+       [job-details]]
+      [co/alerts [:job/alerts]]
+      [load-log-tabs]]]))

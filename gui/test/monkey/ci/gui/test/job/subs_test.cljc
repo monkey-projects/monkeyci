@@ -43,3 +43,8 @@
       (is (nil? @a))
       (is (some? (reset! app-db (db/set-alerts {} ::alerts))))
       (is (= ::alerts @a)))))
+
+(deftest job-logs
+  (let [s (rf/subscribe [:job/logs])]
+    (testing "exists"
+      (is (some? s)))))
