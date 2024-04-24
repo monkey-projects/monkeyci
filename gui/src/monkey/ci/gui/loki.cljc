@@ -1,6 +1,7 @@
 (ns monkey.ci.gui.loki
   "Functions for fetching loki logs"
-  (:require [ajax.core :as ajax]))
+  (:require #?@(:node []
+                :cljs [[ajax.core :as ajax]])))
 
 (def loki-url
   #?(:cljs (if (exists? js/logUrl)
@@ -21,7 +22,8 @@
   [sid {:keys [id start-time end-time]}]
   {:uri (str loki-url "/query_range")
    :method :get
-   :response-format (ajax/json-response-format {:keywords? true})
+   :response-format #?@(:node [:json]
+                        :cljs [(ajax/json-response-format {:keywords? true})])
    :params {:query (job-query sid id)
             :start (int (/ start-time 1000))
             ;; Add one second to end time
