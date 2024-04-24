@@ -8,6 +8,9 @@
   "Retrieve current route from app db"
   :route/current)
 
+(defn set-current [db r]
+  (assoc db current r))
+
 (def customer-id
   "Retrieve current customer id from app db"
   (comp :customer-id :path :parameters current))

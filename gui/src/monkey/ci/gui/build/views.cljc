@@ -85,7 +85,7 @@
   (when (and s e)
     (t/format-seconds (int (/ (- e s) 1000)))))
 
-(defn- render-log-link [{:keys [name size path]}]
+#_(defn- render-log-link [{:keys [name size path]}]
   [:span.me-1
    [:a.me-1 {:href (u/->dom-id log-modal-id)
              :data-bs-toggle "modal"
@@ -105,23 +105,40 @@
     [elapsed-running x]
     [elapsed-final x]))
 
-(defn- job-details [job]
+(defn- logs-btn [job]
+  [:button.btn.btn-primary.me-2
+   {:on-click #(rf/dispatch [:job/logs job])}
+   [co/icon :file-earmark-plus] [:span.ms-1 "View Logs"]])
+
+(defn- hide-btn [job]
+  [:button.btn.btn-close
+   {:on-click #(rf/dispatch [:job/toggle job])
+    :aria-label "Close"}])
+
+(defn- job-details [{:keys [labels start-time end-time] deps :dependencies :as job}]
   [:div.row
    [:div.col-4
     [:ul
-     [:li "Labels:" (str (:labels job))]
-     [:li "Dependencies:" (str (:dependencies job))]]]
-   [:div.col-6.border-start
-    [:h5 "Logs"]
-    (->> (:logs job)
-         (filter (comp pos? :size))
-         (map render-log-link)
-         (map (partial conj [:li]))
-         (into [:ul]))]
-   [:div.col-2
-    [:button.btn.btn-outline-primary.float-end
-     {:on-click #(rf/dispatch [:job/toggle job])}
-     "Hide"]]])
+     (when start-time
+       [:li "Started at:" [co/date-time start-time]])
+     (when end-time
+       [:li "Ended at:" [co/date-time end-time]])
+     (when-not (empty? labels)
+       [:li "Labels:" (str labels)])
+     (when-not (empty? deps)
+       [:li "Dependent on: " (cs/join ", " deps)])]]
+   #_[:div.col-6.border-start
+      [:h5 "Logs"]
+      (->> (:logs job)
+           (filter (comp pos? :size))
+           (map render-log-link)
+           (map (partial conj [:li]))
+           (into [:ul]))]
+   [:div.col-4
+    [logs-btn job]]
+   [:div.col-4
+    [:div.float-end
+     [hide-btn job]]]])
 
 (defn- render-job [job]
   (let [exp (rf/subscribe [:build/expanded-jobs])

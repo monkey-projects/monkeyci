@@ -1,5 +1,7 @@
 (ns monkey.ci.gui.components
-  (:require [monkey.ci.gui.utils :as u]
+  (:require [monkey.ci.gui.time :as t]
+            [monkey.ci.gui.subs]
+            [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
 (defn logo []
@@ -44,6 +46,13 @@
               r+
               (recur (rest p) r+))))
         (into [:ol.breadcrumb]))])
+
+(defn path-breadcrumb
+  "Renders breadcrumb component according to path.  It uses the current route to
+   determine what to display."
+  []
+  (let [p (rf/subscribe [:breadcrumb/path])]
+    [breadcrumb @p]))
 
 (defn build-result [r]
   (let [r (or r "running")
@@ -101,3 +110,9 @@
       [:button.btn.btn-secondary {:type :button
                                   :data-bs-dismiss "modal"}
        "Close"]]]]])
+
+(defn date-time
+  "Reformats given object as a date-time"
+  [x]
+  (when x
+    (t/format-datetime (t/parse x))))
