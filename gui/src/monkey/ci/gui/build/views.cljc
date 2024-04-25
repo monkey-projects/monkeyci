@@ -53,6 +53,22 @@
          (concat [[:li [:b "Result: "] [co/build-result (:status @d)]]])
          (into [:ul]))))
 
+(defn build-result []
+  (let [b (rf/subscribe [:build/current])]
+    ;; TODO Signal warnings or skipped jobs.
+    (case (:status @b)
+      :success
+      [:div.alert.alert-success
+       [co/icon :check-circle-fill]
+       [:span.ms-2 "Build successful!"]]
+      :failure
+      [:div.alert.alert-danger
+       [co/icon :exclamation-triangle-fill]
+       [:b.ms-2.me-2 "This build failed."]
+       [:span "Check the job logs for details."]]
+      ;; Build still running: show nothing
+      nil)))
+
 (defn- build-path [route]
   (let [p (r/path-params route)
         get-p (juxt :customer-id :repo-id :build-id)]
@@ -162,14 +178,14 @@
      [jobs-table @jobs]]))
 
 #_(defn- log-row [{:keys [name size] :as l}]
-  (let [route (rf/subscribe [:route/current])]
-    [:tr
-     [:td [:a {:href (u/->dom-id log-modal-id)
-               :data-bs-toggle "modal"
-               :on-click (u/link-evt-handler [:build/download-log name])}
-           name]]
-     ;; TODO Make size human readable
-     [:td size]]))
+    (let [route (rf/subscribe [:route/current])]
+      [:tr
+       [:td [:a {:href (u/->dom-id log-modal-id)
+                 :data-bs-toggle "modal"
+                 :on-click (u/link-evt-handler [:build/download-log name])}
+             name]]
+       ;; TODO Make size human readable
+       [:td size]]))
 
 #_(defn logs-table []
   (let [l (rf/subscribe [:build/global-logs])]
@@ -219,6 +235,7 @@
           [co/reload-btn [:build/reload] (when @reloading? {:disabled true})]]]
         [co/alerts [:build/alerts]]
         [build-details]
+        [build-result]
         #_[details-tabs route]
         [build-jobs]
         [log-modal]
