@@ -132,7 +132,8 @@
         r (rf/subscribe [:route/current])
         cells [[:td [:a {:href (job-path job @r)}
                      (:id job)]]
-               [:td (get-in job [:labels :pipeline])]
+               [:td (->> (get-in job [:dependencies])
+                         (cs/join ", "))]
                [:td [co/build-result (:status job)]]
                [:td (elapsed job)]]]
     [:<>
@@ -147,7 +148,7 @@
    [:thead
     [:tr
      [:th "Job"]
-     [:th "Pipeline"]
+     [:th "Dependencies"]
      [:th "Result"]
      [:th "Elapsed"]]]
    (->> jobs
@@ -160,7 +161,7 @@
      [:p "This build contains " (count @jobs) " jobs"]
      [jobs-table @jobs]]))
 
-(defn- log-row [{:keys [name size] :as l}]
+#_(defn- log-row [{:keys [name size] :as l}]
   (let [route (rf/subscribe [:route/current])]
     [:tr
      [:td [:a {:href (u/->dom-id log-modal-id)
@@ -170,7 +171,7 @@
      ;; TODO Make size human readable
      [:td size]]))
 
-(defn logs-table []
+#_(defn logs-table []
   (let [l (rf/subscribe [:build/global-logs])]
     [:table.table.table-striped
      [:thead
@@ -181,21 +182,21 @@
           (map log-row)
           (into [:tbody]))]))
 
-(defn- build-logs [params]
+#_(defn- build-logs [params]
   (rf/dispatch [:build/load-logs])
   (fn [params]
     [:<>
      [:p "These are the global logs that do not belong to a specific job."]
      [logs-table]]))
 
-(defn- tab-header [lbl curr? contents]
+#_(defn- tab-header [lbl curr? contents]
   [:li.nav-item
    [:a.nav-link (cond-> {:href ""}
                   curr? (assoc :class :active
                                :aria-current :page))]
    contents])
 
-(defn details-tabs [route]
+#_(defn details-tabs [route]
   [tabs/tabs
    ::build-details
    [{:header "Jobs"
@@ -218,7 +219,8 @@
           [co/reload-btn [:build/reload] (when @reloading? {:disabled true})]]]
         [co/alerts [:build/alerts]]
         [build-details]
-        [details-tabs route]
+        #_[details-tabs route]
+        [build-jobs]
         [log-modal]
         [:div
          [:a {:href (r/path-for :page/repo params)} "Back to repository"]]]])))
