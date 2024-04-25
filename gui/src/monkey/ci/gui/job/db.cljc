@@ -30,3 +30,6 @@
 
 (defn set-log-files [db l]
   (assoc db log-files l))
+
+(defn clear-log-files [db]
+  (dissoc db log-files))

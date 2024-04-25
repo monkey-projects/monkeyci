@@ -6,12 +6,18 @@
             [re-frame.core :as rf]))
 
 (def alerts ::alerts)
+(def log-tabs-id ::log-tabs)
 
 (rf/reg-event-fx
  :job/init
- (fn [_ _]
+ (fn [{:keys [db]} _]
    {:dispatch-n [[:customer/maybe-load]
-                 [:build/maybe-load]]}))
+                 [:build/maybe-load]
+                 [:tab/tab-changed log-tabs-id nil]]
+    :db (-> db
+            (db/clear-alerts)
+            (db/set-log-files nil)
+            (db/clear-log-files))}))
 
 (def params->build-sid (juxt :customer-id :repo-id :build-id))
 

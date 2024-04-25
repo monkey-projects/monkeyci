@@ -65,7 +65,7 @@
                           {:header (path->file p)
                            :contents [log-contents job p]
                            :current? (zero? idx)}))
-           (conj [tabs/tabs ::logs])))))
+           (conj [tabs/tabs e/log-tabs-id])))))
 
 (defn- load-log-tabs []
   (when-let [job @(rf/subscribe [:job/current])]

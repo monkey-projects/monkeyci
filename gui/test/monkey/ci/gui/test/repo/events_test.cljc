@@ -127,7 +127,7 @@
                :git {:ref "main"}}]
              (db/builds @app-db)))))
 
-  (testing "updates build list when build has completed"
+  (testing "updates build list when build has updated"
     (let [[cust repo build] (test-repo-path!)
           upd {:customer-id cust
                :repo-id repo
@@ -137,7 +137,7 @@
       (is (some? (swap! app-db db/set-builds [{:customer-id cust
                                                :repo-id repo
                                                :build-id build}])))
-      (is (nil? (rf/dispatch-sync [:repo/handle-event {:type :build/end
+      (is (nil? (rf/dispatch-sync [:repo/handle-event {:type :build/updated
                                                        :build upd}])))
       (is (= [upd]
              (db/builds @app-db))))))

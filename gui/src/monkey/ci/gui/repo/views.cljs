@@ -100,7 +100,7 @@
       [l/default
        [:<>
         [:h3
-         (:name @r)
+         "Repository: " (:name @r)
          [:span.fs-6.p-1
           [cl/clipboard-copy (u/->sid p :customer-id :repo-id) "Click to save the sid to clipboard"]]]
         [:p "Repository url: " [:a {:href (:url @r)} (:url @r)]]
