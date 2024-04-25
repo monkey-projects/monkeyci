@@ -5,6 +5,7 @@
             [monkey.ci.gui.job.subs]
             [monkey.ci.gui.layout :as l]
             [monkey.ci.gui.routing :as r]
+            [monkey.ci.gui.tabs :as tabs]
             [monkey.ci.gui.time :as t]
             [re-frame.core :as rf]))
 
@@ -37,8 +38,14 @@
 
 (defn- log-tabs []
   (when-let [logs (rf/subscribe [:job/logs])]
-    ;; TODO
-    [:p "Log tabs go here"]))
+    (if (empty? @logs)
+      [:p "No log information available.  You may want to try again later."]
+      (->> @logs
+           (map-indexed (fn [idx {:keys [file contents]}]
+                          {:header file
+                           :contents [co/log-contents contents]
+                           :current? (zero? idx)}))
+           (conj [tabs/tabs ::logs])))))
 
 (defn- load-log-tabs []
   (when-let [job @(rf/subscribe [:job/current])]
