@@ -129,7 +129,9 @@
    (-> db
        (db/set-alerts [{:type :info
                         :message (str "Build " (:build-id body) " started.")}])
-       (db/set-show-trigger-form nil))))
+       (db/set-show-trigger-form nil)
+       ;; Ideally the server immediately sends an event, so we wouldn't have to do this
+       (db/update-build body))))
 
 (rf/reg-event-db
  :repo/trigger-build--failed

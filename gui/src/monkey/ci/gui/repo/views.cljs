@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.repo.views
-  (:require [monkey.ci.gui.clipboard :as cl]
+  (:require [clojure.string :as cs]
+            [monkey.ci.gui.clipboard :as cl]
             [monkey.ci.gui.components :as co]
             [monkey.ci.gui.forms :as f]
             [monkey.ci.gui.layout :as l]
@@ -59,6 +60,12 @@
             {:on-click (u/link-evt-handler [:repo/hide-trigger-build])}
             "Cancel"]]]]]])))
 
+(defn- trim-ref [ref]
+  (let [prefix "refs/heads/"]
+    (if (cs/starts-with? ref prefix)
+      (subs ref (count prefix))
+      ref)))
+
 (defn- builds [repo]
   (let [b (rf/subscribe [:repo/builds])]
     (if-not @b
@@ -66,10 +73,11 @@
       [:<>
        [:div.clearfix
         [:h4.float-start "Builds"]
+        (when @b
+          [:span.badge.text-bg-secondary.ms-2 (count @b)])
         [:div.float-end
          [build-actions]]]
        [trigger-form repo]
-       [:p "Found " (count @b) " builds"]
        [table/paged-table
         {:id ::builds
          :items-sub [:repo/builds]
@@ -84,9 +92,9 @@
                     :value :source}
                    {:label "Ref"
                     :value (fn [b]
-                             [:span.text-nowrap (get-in b [:git :ref])])}
+                             [:span.text-nowrap (trim-ref (get-in b [:git :ref]))])}
                    {:label "Result"
-                    :value (fn [b] [co/build-result (:status b)])}
+                    :value (fn [b] [:div.text-center [co/build-result (:status b)]])}
                    {:label "Message"
                     :value (fn [b]
                              [:span (or (get-in b [:git :message])
