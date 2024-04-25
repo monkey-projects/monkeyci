@@ -42,21 +42,35 @@
      (when-not (empty? deps)
        ["Dependent on:" (cs/join ", " deps)])]))
 
-(defn- log-tabs []
-  (when-let [logs (rf/subscribe [:job/logs])]
-    (if (empty? @logs)
+(defn- path->file [p]
+  (some-> p
+          (cs/split #"/")
+          last))
+
+(defn- log-contents [job path]
+  (let [log (rf/subscribe [:job/logs path])]
+    ;; Reload log file
+    (rf/dispatch [:job/load-logs job path])
+    [:<>
+     [co/alerts [:job/path-alerts path]]
+     (when (and @log (not-empty @log))
+       [co/log-contents @log])]))
+
+(defn- log-tabs [job]
+  (when-let [files (rf/subscribe [:job/log-files])]
+    (if (empty? @files)
       [:p "No log information available.  You may want to try again later."]
-      (->> @logs
-           (map-indexed (fn [idx {:keys [file contents]}]
-                          {:header file
-                           :contents [co/log-contents contents]
+      (->> @files
+           (map-indexed (fn [idx p]
+                          {:header (path->file p)
+                           :contents [log-contents job p]
                            :current? (zero? idx)}))
            (conj [tabs/tabs ::logs])))))
 
 (defn- load-log-tabs []
   (when-let [job @(rf/subscribe [:job/current])]
-    (rf/dispatch [:job/load-logs job])
-    [log-tabs]))
+    (rf/dispatch [:job/load-log-files job])
+    [log-tabs job]))
 
 (defn page [_]
   (rf/dispatch [:job/init])

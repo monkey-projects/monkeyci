@@ -39,13 +39,24 @@
     (testing "exists"
       (is (some? a)))
 
-    (testing "returns alerts from db"
+    (testing "returns global alerts from db"
       (is (nil? @a))
       (is (some? (reset! app-db (db/set-alerts {} ::alerts))))
       (is (= ::alerts @a)))))
 
+(deftest job-log-files
+  (let [f (rf/subscribe [:job/log-files])]
+    (testing "exists"
+      (is (some? f)))
+
+    (testing "returns files from db"
+      (is (nil? @f))
+      (is (some? (reset! app-db (db/set-log-files {} ::files))))
+      (is (= ::files @f)))))
+
 (deftest job-logs
-  (let [s (rf/subscribe [:job/logs])]
+  (let [path "test.txt"
+        s (rf/subscribe [:job/logs path])]
     (testing "exists"
       (is (some? s)))
 
@@ -60,9 +71,19 @@
                      ;; First entry is timestamp in epoch nanos, second the log line
                      [["100" "Line 1"]
                       ["200" "Line 2"]]}]}}]
-        (is (some? (reset! app-db (db/set-logs {} loki))))
-        (is (= [{:file "test.log"
-                 :contents ["Line 1"
-                            [:br]
-                            "Line 2"]}]
+        (is (some? (reset! app-db (db/set-logs {} path loki))))
+        (is (= ["Line 1"
+                [:br]
+                "Line 2"]
                @s))))))
+
+(deftest job-path-alerts
+  (let [path "test/path"
+        a (rf/subscribe [:job/path-alerts path])]
+    (testing "exists"
+      (is (some? a)))
+
+    (testing "returns path-specific alerts from db"
+      (is (nil? @a))
+      (is (some? (reset! app-db (db/set-alerts {} path ::alerts))))
+      (is (= ::alerts @a)))))

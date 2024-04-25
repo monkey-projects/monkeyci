@@ -14,6 +14,7 @@
                         (comp :error-description :body)
                         :error-text
                         :response
+                        (comp :status-text :parse-error)
                         :status-text
                         str))
 

@@ -5,7 +5,13 @@
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
-(u/db-sub :job/alerts db/alerts)
+(u/db-sub :job/alerts db/global-alerts)
+(u/db-sub :job/log-files db/log-files)
+
+(rf/reg-sub
+ :job/path-alerts
+ (fn [db [_ path]]
+   (db/path-alerts db path)))
 
 (rf/reg-sub
  :job/id
@@ -21,18 +27,15 @@
    (get-in b [:script :jobs id])))
 
 (defn- convert-result [{:keys [stream values]}]
-  (let [fn (some-> (:filename stream)
-                   (cs/split #"/")
-                   last)]
-    {:file fn
-     ;; TODO Add timestamp (first entry in each value)
-     :contents (->> (map second values)
-                    (interpose [:br]))}))
+  ;; TODO Add timestamp (first entry in each value)
+  (->> (map second values)
+       (interpose [:br])))
 
 (rf/reg-sub
  :job/logs
- (fn [db _]
-   (->> (db/logs db)
+ (fn [db [_ path]]
+   (->> (db/logs db path)
         :data
         :result
-        (map convert-result))))
+        first
+        convert-result)))
