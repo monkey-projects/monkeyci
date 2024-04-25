@@ -17,9 +17,10 @@
 (defn update-build [storage {:keys [sid build]}]
   (log/debug "Updating build:" sid)
   (let [existing (st/find-build storage sid)]
-    (save-build storage
-                (-> (merge existing (dissoc build :script))
-                    (dissoc :sid :cleanup?)))))
+    (-> (save-build storage
+                    (-> (merge existing (dissoc build :script))
+                        (dissoc :sid :cleanup?)))
+        (assoc :sid sid))))
 
 (defn update-script [storage {:keys [sid script]}]
   (log/debug "Updating build script for sid" sid)

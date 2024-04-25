@@ -61,7 +61,7 @@
       [:div.alert.alert-success
        [co/icon :check-circle-fill]
        [:span.ms-2 "Build successful!"]]
-      :failure
+      :error
       [:div.alert.alert-danger
        [co/icon :exclamation-triangle-fill]
        [:b.ms-2.me-2 "This build failed."]

@@ -332,7 +332,18 @@
       (rf/dispatch-sync [:build/handle-event evt])
       (is (= build (db/build @app-db)))))
 
-  (testing "`build/end` event"
+  (testing "updates build on `build/updated` event"
+    (let [build (test-build)
+          evt {:type :build/updated
+               :sid (sid build)
+               :build (assoc build :start-time 100)}]
+      (is (some? (reset! app-db (-> {}
+                                    (db/set-build build)
+                                    (set-build-path build)))))
+      (rf/dispatch-sync [:build/handle-event evt])
+      (is (= (:build evt) (db/build @app-db)))))
+
+  #_(testing "`build/end` event"
     (testing "updates build"
       (let [build (test-build)
             evt {:type :build/end
@@ -360,7 +371,7 @@
           (is (= :success (:status updated)))
           (is (= script (:script updated)))))))
 
-  (letfn [(verify-script-updated [t]
+  #_(letfn [(verify-script-updated [t]
             (let [build (test-build)
                   evt {:type t
                        :sid (sid build)
@@ -401,7 +412,7 @@
                    :jobs
                    (get "test-job")))))))
 
-  (letfn [(verify-job-updated [t]
+  #_(letfn [(verify-job-updated [t]
             (let [build (test-build)
                   evt {:type t
                        :sid (sid build)

@@ -156,34 +156,37 @@
 
 (defmulti handle-event (fn [_ evt] (:type evt)))
 
-(defmethod handle-event :build/end [db evt]
-  ;; Update build but leave existing script info intact, because the event
-  ;; does not contain this.
-  (db/update-build db (fn [b]
-                        (merge b (-> (:build evt)
-                                     (dissoc :script))))))
+(defmethod handle-event :build/updated [db evt]
+  (db/set-build db (:build evt)))
 
-(defn- update-script [db script]
-  (db/update-build db assoc :script script))
+;; (defmethod handle-event :build/end [db evt]
+;;   ;; Update build but leave existing script info intact, because the event
+;;   ;; does not contain this.
+;;   (db/update-build db (fn [b]
+;;                         (merge b (-> (:build evt)
+;;                                      (dissoc :script))))))
 
-(defmethod handle-event :script/start [db evt]
-  (update-script db (:script evt)))
+;; (defn- update-script [db script]
+;;   (db/update-build db assoc :script script))
 
-(defmethod handle-event :script/end [db {upd :script}]
-  ;; Deep merge job info
-  (letfn [(merge-script [orig]
-            (-> (merge orig upd)
-                (assoc :jobs (merge-with merge (:jobs orig) (:jobs upd)))))]
-    (db/update-build db update :script merge-script)))
+;; (defmethod handle-event :script/start [db evt]
+;;   (update-script db (:script evt)))
 
-(defn- update-job [db job]
-  (db/update-build db assoc-in [:script :jobs (:id job)] job))
+;; (defmethod handle-event :script/end [db {upd :script}]
+;;   ;; Deep merge job info
+;;   (letfn [(merge-script [orig]
+;;             (-> (merge orig upd)
+;;                 (assoc :jobs (merge-with merge (:jobs orig) (:jobs upd)))))]
+;;     (db/update-build db update :script merge-script)))
 
-(defmethod handle-event :job/start [db evt]
-  (update-job db (:job evt)))
+;; (defn- update-job [db job]
+;;   (db/update-build db assoc-in [:script :jobs (:id job)] job))
 
-(defmethod handle-event :job/end [db evt]
-  (update-job db (:job evt)))
+;; (defmethod handle-event :job/start [db evt]
+;;   (update-job db (:job evt)))
+
+;; (defmethod handle-event :job/end [db evt]
+;;   (update-job db (:job evt)))
 
 (defmethod handle-event :default [db evt]
   ;; Ignore

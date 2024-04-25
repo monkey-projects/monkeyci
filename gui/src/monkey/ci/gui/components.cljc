@@ -140,4 +140,4 @@
 (defn log-contents [raw]
   (->> raw
        (map ->html)
-       (into [:p.text-bg-dark.font-monospace.overflow-auto.text-nowrap.h-100])))
+       (into [:p.text-bg-dark.font-monospace.overflow-auto.text-nowrap.h-100.p-1])))

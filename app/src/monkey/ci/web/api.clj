@@ -356,6 +356,7 @@
 (def allowed-events
   #{:build/start
     :build/end
+    :build/updated
     :script/start
     :script/end
     :job/start

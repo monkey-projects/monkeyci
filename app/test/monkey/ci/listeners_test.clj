@@ -230,7 +230,23 @@
           (is (some? e))
           (is (= :build/updated (:type e)))
           (is (= sid (:sid e)))
-          (is (= script (get-in e [:build :script]))))))))
+          (is (= script (get-in e [:build :script])))))))
+
+  (testing "`build/updated` event has sid from `build/end`"
+    (h/with-memory-store st
+      (let [sid (random-sid)
+            events (h/fake-events)
+            build (test-build sid)
+            _ (st/save-build st build)
+            handler (sut/build-update-handler st events)]
+        (handler {:type :build/end
+                  :sid sid
+                  :build (assoc build :end-time 200)})
+        (is (not= :timeout (h/wait-until (comp some? :end-time #(st/find-build st sid)) 1000)))
+        (let [[e] @(:recv events)]
+          (is (some? e))
+          (is (= :build/updated (:type e)))
+          (is (= sid (:sid e))))))))
 
 (deftest setup-runtime
   (testing "`nil` if no events configured"
