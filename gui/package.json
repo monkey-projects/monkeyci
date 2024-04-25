@@ -1,11 +1,11 @@
 {
   "name": "monkeyci-gui",
-  "version": "0.0.1",
+  "version": "0.5.0",
   "private": true,
   "devDependencies": {
     "highlight.js": "^10.6.0",
     "marked": "^2.0.1",
-    "shadow-cljs": "2.26.2"
+    "shadow-cljs": "2.28.4"
   },
   "dependencies": {
     "ansi_up": "^6.0.2",
