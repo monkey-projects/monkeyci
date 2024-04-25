@@ -21,6 +21,12 @@
          (map info-row)
          (into [:<>]))))
 
+(defn- job-labels [labels]
+  (->> labels
+       (map (fn [[k v]]
+              [:li k ": " v]))
+       (into [:ul])))
+
 (defn- job-details []
   (when-let [{:keys [start-time end-time labels] deps :dependencies :as job} @(rf/subscribe [:job/current])]
     [info
@@ -32,7 +38,7 @@
      (when (and start-time end-time)
        ["Duration:" [t/format-seconds (int (/ (- end-time start-time) 1000))]])
      (when-not (empty? labels)
-       ["Labels:" (str labels)])
+       ["Labels:" [job-labels labels]])
      (when-not (empty? deps)
        ["Dependent on:" (cs/join ", " deps)])]))
 
