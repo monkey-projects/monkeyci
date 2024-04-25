@@ -43,3 +43,25 @@
       (is (nil? @a))
       (is (some? (reset! app-db (db/set-alerts {} ::alerts))))
       (is (= ::alerts @a)))))
+
+(deftest job-logs
+  (let [s (rf/subscribe [:job/logs])]
+    (testing "exists"
+      (is (some? s)))
+
+    (testing "converts loki format"
+      (let [loki {:status "success"
+                  :data
+                  {:resultType "streams"
+                   :result
+                   [{:stream
+                     {:filename "/var/log/test.log"}
+                     :values
+                     ;; First entry is timestamp in epoch nanos, second the log line
+                     [["100" "Line 1"]
+                      ["200" "Line 2"]]}]}}]
+        (is (some? (reset! app-db (db/set-logs {} loki))))
+        (is (= [{:file "test.log"
+                 :contents ["Line 1"
+                            "Line 2"]}]
+               @s))))))

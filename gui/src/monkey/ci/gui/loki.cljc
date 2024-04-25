@@ -24,10 +24,9 @@
    :method :get
    :response-format #?@(:node [:json]
                         :cljs [(ajax/json-response-format {:keywords? true})])
-   :params {:query (job-query sid id)
-            :start (int (/ start-time 1000))
-            ;; Add one second to end time
-            :end (inc (int (/ end-time 1000)))
-            :direction "forward"}})
+   :params (cond-> {:query (job-query sid id)
+                    :start (int (/ start-time 1000))
+                    :direction "forward"}
+             ;; Add one second to end time
+             end-time (assoc :end (inc (int (/ end-time 1000)))))})
 
-(defn fetch-logs [])
