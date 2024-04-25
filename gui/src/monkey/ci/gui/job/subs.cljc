@@ -26,7 +26,8 @@
                    last)]
     {:file fn
      ;; TODO Add timestamp (first entry in each value)
-     :contents (map second values)}))
+     :contents (->> (map second values)
+                    (interpose [:br]))}))
 
 (rf/reg-sub
  :job/logs

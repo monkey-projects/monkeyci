@@ -63,5 +63,6 @@
         (is (some? (reset! app-db (db/set-logs {} loki))))
         (is (= [{:file "test.log"
                  :contents ["Line 1"
+                            [:br]
                             "Line 2"]}]
                @s))))))
