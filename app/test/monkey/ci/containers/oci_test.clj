@@ -63,6 +63,25 @@
                     (:volume-mounts c)))]
       (is (every? has-checkout-vol? (:containers (sut/instance-config {} default-rt))))))
 
+  (testing "pod memory"
+    (testing "has default value"
+      (is (number? (-> (sut/instance-config {} default-rt)
+                       :shape-config
+                       :memory-in-g-bs))))
+
+    (testing "can specify custom memory limit"
+      (is (= 4 (-> (sut/instance-config {} (-> default-rt
+                                               (assoc-in [:job :memory] 4)))
+                   :shape-config
+                   :memory-in-g-bs))))
+
+    (testing "limited to max memory"
+      (is (= sut/max-pod-memory
+             (-> (sut/instance-config {} (-> default-rt
+                                             (assoc-in [:job :memory] 10000)))
+                 :shape-config
+                 :memory-in-g-bs)))))
+
   (testing "job container"
     (let [jc (->> {:job {:script ["first" "second"]
                          :container/env {"TEST_ENV" "test-val"}

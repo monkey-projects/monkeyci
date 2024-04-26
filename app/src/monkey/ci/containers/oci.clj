@@ -21,6 +21,7 @@
             [monkey.ci.events.core :as ec]
             [monkey.oci.container-instance.core :as ci]))
 
+(def max-pod-memory "Max memory that can be assigned to a pod, in gbs" 64)
 (def work-dir oci/work-dir)
 (def script-dir "/opt/monkeyci/script")
 (def log-dir (oci/checkout-subdir "log"))
@@ -188,6 +189,11 @@
                (c/config->env)
                (as-> x (mc/map-keys (comp csk/->SCREAMING_SNAKE_CASE name) x))))))
 
+(defn- set-pod-resources [ic rt]
+  (-> ic
+      (update :shape-config mc/assoc-some :memory-in-g-bs (get-in rt [:job :memory]))
+      (mc/update-existing-in [:shape-config :memory-in-g-bs] min max-pod-memory)))
+
 (defn instance-config
   "Generates the configuration for the container instance.  It has 
    a container that runs the job, as configured in the `:job`, and
@@ -209,6 +215,7 @@
         (update :volumes conj
                 (script-vol-config rt)
                 (config-vol-config rt))
+        (set-pod-resources rt)
         ;; Note that promtail will never terminate, so we rely on the script to
         ;; delete the container instance when the sidecar and the job have completed.
         (add-promtail-container rt))))
