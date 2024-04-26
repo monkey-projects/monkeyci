@@ -146,6 +146,23 @@
 (defn- test-webhook []
   (zipmap [:id :customer-id :repo-id] (repeatedly st/new-id)))
 
+(deftest create-build
+  (testing "file changes"
+    (testing "adds file changes to build"
+      (h/with-memory-store s
+        (let [b (sut/create-build {:storage s}
+                                  {}
+                                  {:commits
+                                   [{:added ["new-file-1"]
+                                     :removed ["removed-file-1"]}
+                                    {:added ["new-file-2"]
+                                     :modified ["modified-file-1"]}]})]
+          (is (= {:added    #{"new-file-1"
+                              "new-file-2"}
+                  :removed  #{"removed-file-1"}
+                  :modified #{"modified-file-1"}}
+                 (:changes b))))))))
+
 (deftest create-webhook-build
   (testing "creates build record for customer/repo"
     (h/with-memory-store s
