@@ -12,3 +12,14 @@
           rt {:api {:client m}
               :build {:sid ["test-cust" "test-repo" "test-build"]}}]
       (is (= {"key" "value"} (sut/build-params rt))))))
+
+(deftest download-artifact
+  (testing "invokes artifact download endpoint on client"
+    (let [m (fn [req]
+              (when (= "/customer/test-cust/repo/test-repo/build/test-build/artifact/test-artifact/download"
+                       (:url req))
+                (md/success-deferred "test artifact contents")))
+          rt {:api {:client m}
+              :build {:sid ["test-cust" "test-repo" "test-build"]}}]
+      (is (= "test artifact contents"
+             (sut/download-artifact rt "test-artifact"))))))

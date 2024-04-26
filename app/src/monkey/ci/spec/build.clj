@@ -33,13 +33,14 @@
           :opt-un [:blob/size]))
 (s/def :job/caches (s/coll-of ::blob))
 (s/def :job/artifacts (s/coll-of ::blob))
+(s/def :job/memory int?)
 
 (s/def :job/command string?)
 (s/def :job/commands (s/coll-of :job/command))
 
 (s/def :script/job
   (-> (s/keys :req-un [:job/id :job/type :job/status]
-              :opt-un [:job/dependencies :job/caches :job/artifacts :job/commands])
+              :opt-un [:job/dependencies :job/caches :job/artifacts :job/commands :job/memory])
       (s/merge ::generic-entity)))
 
 (s/def :script/jobs (s/coll-of :script/job))

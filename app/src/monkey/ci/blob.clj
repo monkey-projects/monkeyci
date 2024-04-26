@@ -14,6 +14,7 @@
              [oci :as oci]
              [protocols :as p]
              [utils :as u]]
+            [monkey.ci.build.archive :as a]
             [monkey.oci.os
              [core :as os]
              [stream :as oss]])
@@ -32,63 +33,7 @@
 (def compression-type "gz")
 (def archive-type "tar")
 
-(def stream-factory (ArchiveStreamFactory.))
-
-(defn- mkdirs! [f]
-  (if (and f (fs/exists? f))
-    (when-not (.isDirectory f)
-      (throw (ex-info "Directory cannot be created, already exists as a file" {:dir f})))
-    (when-not (.mkdirs f)
-      (throw (ex-info "Unable to create directory" {:dir f}))))
-  f)
-
-(defn- next-entry
-  "Gets the next entry from the stream.  Due to the nature of piped streams,
-   this may throw an exception when the write end is closed.  In that case, 
-   we return `nil`, indicating we're at EOF."
-  [ai]
-  (try
-    (.getNextEntry ai)
-    (catch java.io.IOException ex
-      (when-not (= "Write end dead" (.getMessage ex))
-        ;; Some other i/o exception, rethrow it
-        (throw ex)))))
-
-(defn- extract-entry [ai e dest]
-  (log/trace "Extracting entry from archive:" (.getName e))
-  (let [f (io/file dest (.getName e))]
-    (cond
-      (.isDirectory e)
-      (mkdirs! f)
-      
-      (.isFile e)
-      (let [p (mkdirs! (.getParentFile f))]
-        (with-open [os (io/output-stream f)]
-          (io/copy ai os)))
-
-      :else
-      (log/warn "Unsupported archive entry:" e))))
-
-(defn- extract-archive
-  "Extraction is not supported by the lib.  This takes an input stream
-   (possibly from a decompression) and a destination directory.  Returns
-   the destination directory."
-  [is dest]
-  (log/debug "Extracting archive into" dest)
-  (with-open [ai (.createArchiveInputStream stream-factory ArchiveStreamFactory/TAR is)]
-    (loop [e (next-entry ai)
-           entries []]
-      (if e
-        (do
-          (if (.canReadEntryData ai e)
-            (extract-entry ai e dest)
-            (log/warn "Unable to read entry data:" (.getName e)))
-          ;; Go to next entry
-          (recur (next-entry ai)
-                 (conj entries e)))
-        ;; Done
-        {:dest dest
-         :entries entries}))))
+(def extract-archive a/extract)
 
 (defn- drop-prefix-resolver
   "The default entry name resolver includes the full path to the file.  
@@ -113,13 +58,14 @@
         entries (atom [])
         gatherer (entry-gathering-resolver entries)]
     (log/debug "Archiving" src "and stripping prefix" prefix)
-    (mkdirs! (.getParentFile dest))
-    (ca/archive
-     {:output-stream (io/output-stream dest)
-      :compression compression-type
-      :archive-type archive-type
-      :entry-name-resolver (comp gatherer (partial drop-prefix-resolver prefix))}
-     (u/abs-path src))
+    (u/mkdirs! (.getParentFile dest))
+    (with-open [os (io/output-stream dest)]
+      (ca/archive
+       {:output-stream os
+        :compression compression-type
+        :archive-type archive-type
+        :entry-name-resolver (comp gatherer (partial drop-prefix-resolver prefix))}
+       (u/abs-path src)))
     ;; Return some info, since clompress returns `nil`
     {:src src
      :dest dest
@@ -163,7 +109,7 @@
                                  (.close os)))))
               (.start))
             ;; Unarchive
-            (mkdirs! f)
+            (u/mkdirs! f)
             (-> (extract-archive is f)
                 (assoc :src src))))))))
 
@@ -231,7 +177,7 @@
                      (assoc :object-name obj-name))]
       ;; Download to tmp file
       (log/debug "Downloading" src "into" arch)
-      (mkdirs! (.getParentFile arch))
+      (u/mkdirs! (.getParentFile arch))
       (md/chain
        (os/head-object client params)
        (fn [exists?]

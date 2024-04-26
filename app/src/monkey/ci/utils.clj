@@ -43,6 +43,14 @@
               (fs/path to))
          (fs/path to p))))
 
+(defn mkdirs! [f]
+  (if (and f (fs/exists? f))
+    (when-not (.isDirectory f)
+      (throw (ex-info "Directory cannot be created, already exists as a file" {:dir f})))
+    (when-not (.mkdirs f)
+      (throw (ex-info "Unable to create directory" {:dir f}))))
+  f)
+
 (defn add-shutdown-hook!
   "Executes `h` when the JVM shuts down.  Returns the thread that will
    execute the hook."
