@@ -63,7 +63,21 @@
         (doseq [[f c] files]
           (let [in (io/file restore-dir "src" f)]
             (is (fs/exists? in))
-            (is (= c (slurp in)))))))))
+            (is (= c (slurp in))))))))
+
+  (testing "can get blob stream"
+    (with-disk-blob dir blob
+      (let [f (io/file dir "out.txt")
+            dest "dest.tar.gz"]
+        (is (sut/blob-store? blob))
+        (is (nil? (spit f "this is a save test")))
+        (is (some? @(sut/save blob f dest)))
+        (with-open [stream @(sut/input-stream blob dest)]
+          (is (some? stream))))))
+
+  (testing "`nil` stream if blob does not exist"
+    (with-disk-blob dir blob
+      (is (nil? @(sut/input-stream blob "nonexisting"))))))
 
 (deftest oci-blob
   (testing "created by `make-blob-store`"
@@ -140,5 +154,20 @@
           (let [res @(sut/restore blob "remote/path" r)]
             
             (testing "returns `nil` if src does not exist"
-              (is (nil? res)))))))))
+              (is (nil? res))))))))
+
+  (testing "blob stream"
+    (let [blob (sut/make-blob-store {:blob {:type :oci
+                                            :prefix "prefix"}}
+                                    :blob)
+          path "/test/path"]
+
+      (testing "returns raw stream"
+        (with-redefs [os/head-object (constantly true)
+                      os/get-object (constantly (md/success-deferred (.getBytes "this is a test")))]
+          (is (instance? java.io.InputStream @(sut/input-stream blob path)))))
+
+      (testing "`nil` if blob does not exist"
+        (with-redefs [os/head-object (constantly false)]
+          (is (nil? @(sut/input-stream blob path))))))))
 

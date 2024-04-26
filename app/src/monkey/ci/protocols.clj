@@ -31,6 +31,7 @@
   "Protocol for blob store abstraction, used to save and compress files or directories
    to some blob store, possibly remote."
   (save-blob [store src dest] "Saves `src` file or directory to `dest` as a blob")
-  (restore-blob [store src dest] "Restores `src` to local `dest`"))
+  (restore-blob [store src dest] "Restores `src` to local `dest`")
+  (get-blob-stream [store src] "Gets a blob file as an `InputStream`"))
 
 (def blob-store? (partial satisfies? BlobStore))

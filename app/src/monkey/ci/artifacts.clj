@@ -28,7 +28,7 @@
 
 (defn artifact-archive-path [{:keys [build]} id]
   ;; The blob archive path is the build sid with the blob id added.
-  (build-sid->artifact-path (:sid build)))
+  (build-sid->artifact-path (:sid build) id))
 
 (defn- job-blobs [rt {:keys [store-key job-key]}]
   (let [c (get-in rt [:job job-key])]

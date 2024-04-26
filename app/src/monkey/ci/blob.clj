@@ -22,6 +22,7 @@
 
 (def save p/save-blob)
 (def restore p/restore-blob)
+(def input-stream p/get-blob-stream)
 
 (defmulti make-blob-store (fn [conf k]
                             (get-in conf [k :type])))
@@ -136,6 +137,12 @@
          (constantly (u/abs-path f))))
       (md/success-deferred nil)))
 
+  (get-blob-stream [_ src]
+    (let [srcf (io/file dir src)]
+      (md/success-deferred
+       (when (fs/exists? srcf)
+         (io/input-stream srcf)))))
+
   (restore-blob [_ src dest]
     (let [f (io/file dest)
           os (PipedOutputStream.)
@@ -201,6 +208,19 @@
       (do
         (log/warn "Unable to save blob, path does not exist:" src)
         (md/success-deferred nil))))
+
+  (get-blob-stream [_ src]
+    (let [obj-name (archive-obj-name conf src)
+          params (-> conf
+                     (select-keys [:ns :bucket-name])
+                     (assoc :object-name obj-name))]
+      (md/chain
+       (os/head-object client params)
+       (fn [exists?]
+         (when exists?
+           (md/chain
+            (os/get-object client params)
+            bs/to-input-stream))))))
 
   (restore-blob [_ src dest]
     (let [obj-name (archive-obj-name conf src)

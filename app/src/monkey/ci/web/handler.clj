@@ -172,7 +172,10 @@
    [["" {:get {:handler api/get-build-artifacts}}]
     ["/:artifact-id"
      {:parameters {:path {:artifact-id s/Str}}}
-     [["" {:get {:handler api/get-artifact}}]]]]])
+     [[""
+       {:get {:handler api/get-artifact}}]
+      ["/download"
+       {:get {:handler api/download-artifact}}]]]]])
 
 (def build-routes
   ["/builds" ; TODO Replace with singular

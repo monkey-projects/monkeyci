@@ -9,6 +9,7 @@
             [clojure.core.async :as ca]
             [clojure.string :as cs]
             [monkey.ci
+             [artifacts :as a]
              [config :as config]
              [logging :as l]
              [metrics :as m]
@@ -795,7 +796,8 @@
 (deftest artifacts-endpoints
   (let [[cust-id repo-id build-id :as sid] (repeatedly 3 st/new-id)
         base-path (format "/customer/%s/repo/%s/builds/%s" cust-id repo-id build-id)
-        artifacts (atom {})
+        art-id "test-artifact"
+        artifacts (atom {(a/build-sid->artifact-path sid "test-artifact") "test.txt"})
         art-store (h/fake-blob-store artifacts)
         st (st/make-memory-storage)
         app (-> (test-rt {:storage st})
@@ -804,7 +806,7 @@
         build (-> (zipmap st/build-sid-keys sid)
                   (assoc :script
                          {:jobs {"test-job" {:status :success
-                                             :saved-artifacts [{:id "test-artifact"
+                                             :saved-artifacts [{:id art-id
                                                                 :path "/test/path"}]}}}))
         _ (st/save-build st build)]
     
@@ -815,11 +817,15 @@
                        :status)))))
 
     (testing "`GET /:id` retrieves artifact details"
-      (is (= 200 (-> (mock/request :get (str base-path "/artifact/test-artifact"))
+      (is (= 200 (-> (mock/request :get (str base-path (str "/artifact/" art-id)))
                      (app)
                      :status))))
 
-    (testing "`GET /:id/download` retrieves artifact contents")
+    (testing "`GET /:id/download` retrieves artifact contents"
+      (is (= 200 (-> (mock/request :get (format "%s/artifact/%s/download" base-path art-id))
+                     (app)
+                     (deref)
+                     :status))))
 
     (testing "`DELETE /:id` deletes artifact")))
 

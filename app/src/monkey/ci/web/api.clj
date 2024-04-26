@@ -7,6 +7,7 @@
             [medley.core :as mc]
             [monkey.ci
              [artifacts :as a]
+             [blob :as blob]
              [build :as b]
              [labels :as lbl]
              [logging :as l]
@@ -296,11 +297,14 @@
                                   (build-sid req))]
     (let [res (->> (b/success-jobs b)
                    (mapcat :saved-artifacts)
-                   (f))]
-      (if (empty? res)
-        (rur/status 204)
-        (rur/response res)))
-    ;; Extract the ids of all successful jobs in the build
+                   (f))
+          ->response (fn [res]
+                       (if (or (nil? res) (and (sequential? res) (empty? res)))
+                         (rur/status 204)
+                         (rur/response res)))]
+      (if (md/deferred? res)
+        (md/chain res ->response)
+        (->response res)))
     (rur/not-found nil)))
 
 (defn get-build-artifacts
@@ -322,13 +326,12 @@
 
 (defn download-artifact
   "Downloads the artifact contents.  Returns a stream that contains the raw zipped
-   files directly from the blob store."
+   files directly from the blob store.  It is up to the caller to unzip the archive."
   [req]
   (letfn [(get-contents [{:keys [id]}]
             (let [store (a/artifact-store (c/req->rt req))
                   path (a/build-sid->artifact-path (build-sid req) id)]
-              ;; TODO Get blob stream
-              ))]
+              (blob/input-stream store path)))]
     (with-artifacts req (comp get-contents
                               (partial artifact-by-id (artifact-id req))))))
 
