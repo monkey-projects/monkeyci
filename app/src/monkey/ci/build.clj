@@ -171,6 +171,15 @@
   [rt p]
   (u/abs-path (job-work-dir rt) p))
 
+(defn success-jobs
+  "Returns all successful jobs in the build"
+  [b]
+  (->> b
+       :script
+       :jobs
+       vals
+       (filter (comp (partial = :success) :status))))
+
 (defmethod rt/setup-runtime :build [conf _]
   ;; Just copy the build info to the runtime
   (get conf :build))

@@ -159,8 +159,23 @@
 (def repo-ssh-keys-routes
   ["/ssh-keys" {:get {:handler api/get-repo-ssh-keys}}])
 
+(def log-routes
+  ["/logs" ; Deprecated, use loki instead
+   [[""
+     {:get {:handler api/list-build-logs}}]
+    ["/download"
+     {:get {:handler api/download-build-log
+            :parameters {:query {:path s/Str}}}}]]])
+
+(def artifact-routes
+  ["/artifact"
+   [["" {:get {:handler api/get-build-artifacts}}]
+    ["/:artifact-id"
+     {:parameters {:path {:artifact-id s/Str}}}
+     [["" {:get {:handler api/get-artifact}}]]]]])
+
 (def build-routes
-  ["/builds"
+  ["/builds" ; TODO Replace with singular
    {:conflicting true}
    [["" {:get {:handler api/get-builds}}]
     ["/trigger"
@@ -174,12 +189,8 @@
      {:parameters {:path {:build-id Id}}}
      [[""
        {:get {:handler api/get-build}}]
-      ["/logs"
-       [[""
-         {:get {:handler api/list-build-logs}}]
-        ["/download"
-         {:get {:handler api/download-build-log
-                :parameters {:query {:path s/Str}}}}]]]]]]])
+      log-routes
+      artifact-routes]]]])
 
 (def github-watch-route
   ["/github"

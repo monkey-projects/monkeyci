@@ -791,3 +791,35 @@
                                            ::closed
                                            ::invalid-arg))]
       (is (= ::closed @(sut/on-server-close (sut/map->HttpServer {:server ::server})))))))
+
+(deftest artifacts-endpoints
+  (let [[cust-id repo-id build-id :as sid] (repeatedly 3 st/new-id)
+        base-path (format "/customer/%s/repo/%s/builds/%s" cust-id repo-id build-id)
+        artifacts (atom {})
+        art-store (h/fake-blob-store artifacts)
+        st (st/make-memory-storage)
+        app (-> (test-rt {:storage st})
+                (assoc :artifacts art-store)
+                (sut/make-app))
+        build (-> (zipmap st/build-sid-keys sid)
+                  (assoc :script
+                         {:jobs {"test-job" {:status :success
+                                             :saved-artifacts [{:id "test-artifact"
+                                                                :path "/test/path"}]}}}))
+        _ (st/save-build st build)]
+    
+    (testing "`GET /artifact`"
+      (testing "no content when no artifacts"
+        (is (= 200 (-> (mock/request :get (str base-path "/artifact"))
+                       (app)
+                       :status)))))
+
+    (testing "`GET /:id` retrieves artifact details"
+      (is (= 200 (-> (mock/request :get (str base-path "/artifact/test-artifact"))
+                     (app)
+                     :status))))
+
+    (testing "`GET /:id/download` retrieves artifact contents")
+
+    (testing "`DELETE /:id` deletes artifact")))
+

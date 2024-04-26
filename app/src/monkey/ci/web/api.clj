@@ -6,6 +6,8 @@
              [stream :as ms]]
             [medley.core :as mc]
             [monkey.ci
+             [artifacts :as a]
+             [build :as b]
              [labels :as lbl]
              [logging :as l]
              [runtime :as rt]
@@ -193,7 +195,7 @@
     (-> (st/find-build-metadata s sid)
         (merge (st/find-build-results s sid))
         (assoc :legacy? true))
-    (if (st/build-exists? s sid)
+    (when (st/build-exists? s sid)
       (st/find-build s sid))))
 
 (defn- add-index [[idx p]]
@@ -284,6 +286,51 @@
               (get-in req [:parameters :path :build-id]))]
     (rur/response b)
     (rur/not-found nil)))
+
+(def build-sid (comp (juxt :customer-id :repo-id :build-id)
+                     :path
+                     :parameters))
+
+(defn- with-artifacts [req f]
+  (if-let [b (fetch-build-details (c/req->storage req)
+                                  (build-sid req))]
+    (let [res (->> (b/success-jobs b)
+                   (mapcat :saved-artifacts)
+                   (f))]
+      (if (empty? res)
+        (rur/status 204)
+        (rur/response res)))
+    ;; Extract the ids of all successful jobs in the build
+    (rur/not-found nil)))
+
+(defn get-build-artifacts
+  "Lists all artifacts produced by the given build"
+  [req]
+  (with-artifacts req identity))
+
+(defn- artifact-by-id [id art]
+  (->> art
+       (filter (comp (partial = id) :id))
+       (first)))
+
+(def artifact-id (comp :artifact-id :path :parameters))
+
+(defn get-artifact
+  "Returns details about a single artifact"
+  [req]
+  (with-artifacts req (partial artifact-by-id (artifact-id req))))
+
+(defn download-artifact
+  "Downloads the artifact contents.  Returns a stream that contains the raw zipped
+   files directly from the blob store."
+  [req]
+  (letfn [(get-contents [{:keys [id]}]
+            (let [store (a/artifact-store (c/req->rt req))
+                  path (a/build-sid->artifact-path (build-sid req) id)]
+              ;; TODO Get blob stream
+              ))]
+    (with-artifacts req (comp get-contents
+                              (partial artifact-by-id (artifact-id req))))))
 
 (defn- params->ref
   "Creates a git ref from the query parameters (either branch or tag)"
