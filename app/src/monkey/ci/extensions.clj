@@ -76,3 +76,16 @@
                                   (assoc :target job :registered-ext registered-ext))))
   ([job]
    (wrap-job job @registered-extensions)))
+
+;;; Utility functions
+
+(defn get-config
+  "Retrieves configuration for the extension from the job"
+  [rt k]
+  (get-in rt [:job k]))
+
+(defn set-value
+  "Sets the extension value in the job.  This value will be stored with the job, so it
+   must be serializable to `edn`."
+  [rt k v]
+  (assoc-in rt [:job :result k] v))
