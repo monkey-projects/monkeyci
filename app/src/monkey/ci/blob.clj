@@ -14,6 +14,7 @@
              [oci :as oci]
              [protocols :as p]
              [utils :as u]]
+            [monkey.ci.build.archive :as a]
             [monkey.oci.os
              [core :as os]
              [stream :as oss]])
@@ -22,6 +23,7 @@
 
 (def save p/save-blob)
 (def restore p/restore-blob)
+(def input-stream p/get-blob-stream)
 
 (defmulti make-blob-store (fn [conf k]
                             (get-in conf [k :type])))
@@ -31,63 +33,7 @@
 (def compression-type "gz")
 (def archive-type "tar")
 
-(def stream-factory (ArchiveStreamFactory.))
-
-(defn- mkdirs! [f]
-  (if (and f (fs/exists? f))
-    (when-not (.isDirectory f)
-      (throw (ex-info "Directory cannot be created, already exists as a file" {:dir f})))
-    (when-not (.mkdirs f)
-      (throw (ex-info "Unable to create directory" {:dir f}))))
-  f)
-
-(defn- next-entry
-  "Gets the next entry from the stream.  Due to the nature of piped streams,
-   this may throw an exception when the write end is closed.  In that case, 
-   we return `nil`, indicating we're at EOF."
-  [ai]
-  (try
-    (.getNextEntry ai)
-    (catch java.io.IOException ex
-      (when-not (= "Write end dead" (.getMessage ex))
-        ;; Some other i/o exception, rethrow it
-        (throw ex)))))
-
-(defn- extract-entry [ai e dest]
-  (log/trace "Extracting entry from archive:" (.getName e))
-  (let [f (io/file dest (.getName e))]
-    (cond
-      (.isDirectory e)
-      (mkdirs! f)
-      
-      (.isFile e)
-      (let [p (mkdirs! (.getParentFile f))]
-        (with-open [os (io/output-stream f)]
-          (io/copy ai os)))
-
-      :else
-      (log/warn "Unsupported archive entry:" e))))
-
-(defn- extract-archive
-  "Extraction is not supported by the lib.  This takes an input stream
-   (possibly from a decompression) and a destination directory.  Returns
-   the destination directory."
-  [is dest]
-  (log/debug "Extracting archive into" dest)
-  (with-open [ai (.createArchiveInputStream stream-factory ArchiveStreamFactory/TAR is)]
-    (loop [e (next-entry ai)
-           entries []]
-      (if e
-        (do
-          (if (.canReadEntryData ai e)
-            (extract-entry ai e dest)
-            (log/warn "Unable to read entry data:" (.getName e)))
-          ;; Go to next entry
-          (recur (next-entry ai)
-                 (conj entries e)))
-        ;; Done
-        {:dest dest
-         :entries entries}))))
+(def extract-archive a/extract)
 
 (defn- drop-prefix-resolver
   "The default entry name resolver includes the full path to the file.  
@@ -112,13 +58,14 @@
         entries (atom [])
         gatherer (entry-gathering-resolver entries)]
     (log/debug "Archiving" src "and stripping prefix" prefix)
-    (mkdirs! (.getParentFile dest))
-    (ca/archive
-     {:output-stream (io/output-stream dest)
-      :compression compression-type
-      :archive-type archive-type
-      :entry-name-resolver (comp gatherer (partial drop-prefix-resolver prefix))}
-     (u/abs-path src))
+    (u/mkdirs! (.getParentFile dest))
+    (with-open [os (io/output-stream dest)]
+      (ca/archive
+       {:output-stream os
+        :compression compression-type
+        :archive-type archive-type
+        :entry-name-resolver (comp gatherer (partial drop-prefix-resolver prefix))}
+       (u/abs-path src)))
     ;; Return some info, since clompress returns `nil`
     {:src src
      :dest dest
@@ -136,29 +83,20 @@
          (constantly (u/abs-path f))))
       (md/success-deferred nil)))
 
+  (get-blob-stream [_ src]
+    (let [srcf (io/file dir src)]
+      (md/success-deferred
+       (when (fs/exists? srcf)
+         (io/input-stream srcf)))))
+
   (restore-blob [_ src dest]
     (let [f (io/file dest)
           os (PipedOutputStream.)
           srcf (io/file dir src)]
       (md/future
         (when (fs/exists? srcf)
-          (with-open [is (BufferedInputStream. (PipedInputStream. os))]
-            ;; Decompress to the output stream
-            (doto (Thread. (fn []
-                             (try 
-                               (cc/decompress
-                                (io/input-stream srcf)
-                                os
-                                compression-type)
-                               (catch Exception ex
-                                 (log/error "Unable to decompress archive" ex))
-                               (finally
-                                 (.close os)))))
-              (.start))
-            ;; Unarchive
-            (mkdirs! f)
-            (-> (extract-archive is f)
-                (assoc :src src))))))))
+          (-> (a/extract srcf f)
+              (assoc :src src)))))))
 
 (defmethod make-blob-store :disk [conf k]
   (->DiskBlobStore (get-in conf [k :dir])))
@@ -202,16 +140,25 @@
         (log/warn "Unable to save blob, path does not exist:" src)
         (md/success-deferred nil))))
 
-  (restore-blob [_ src dest]
+  (get-blob-stream [_ src]
     (let [obj-name (archive-obj-name conf src)
-          f (io/file dest)
-          arch (tmp-archive conf)
           params (-> conf
                      (select-keys [:ns :bucket-name])
                      (assoc :object-name obj-name))]
-      ;; Download to tmp file
-      (log/debug "Downloading" src "into" arch)
-      (mkdirs! (.getParentFile arch))
+      (md/chain
+       (os/head-object client params)
+       (fn [exists?]
+         (when exists?
+           (md/chain
+            (os/get-object client params)
+            bs/to-input-stream))))))
+
+  (restore-blob [_ src dest]
+    (let [obj-name (archive-obj-name conf src)
+          f (io/file dest)
+          params (-> conf
+                     (select-keys [:ns :bucket-name])
+                     (assoc :object-name obj-name))]
       (md/chain
        (os/head-object client params)
        (fn [exists?]
@@ -219,16 +166,9 @@
            (-> (os/get-object client params)
                (md/chain
                 bs/to-input-stream
-                (fn [is]
-                  (log/debug "Decompressing archive into" arch)
-                  (with-open [os (io/output-stream arch)]
-                    (cc/decompress is os compression-type))
-                  ;; Reopen the decompressed archive as a stream
-                  (io/input-stream arch))
-                (fn [r]
-                  (-> (extract-archive r f)
-                      (assoc :src src))))
-               (md/finally #(fs/delete-if-exists arch)))
+                ;; Unzip and unpack in one go
+                #(a/extract % dest)
+                #(assoc % :src src)))
            ;; FIXME It may occur that a file is not yet available if it is read immediately after writing
            ;; In that case we should retry.
            (log/warn "Blob not found in bucket:" obj-name)))))))

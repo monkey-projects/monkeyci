@@ -18,9 +18,17 @@
 (defn- get-store [rt k]
   (get rt k))
 
+(defn artifact-store [rt]
+  (get-store rt :artifacts))
+
+(defn build-sid->artifact-path
+  "Returns the path to the artifact with specified id for given build sid"
+  [sid id]
+  (str (cs/join "/" (concat sid [id])) ".tgz"))
+
 (defn artifact-archive-path [{:keys [build]} id]
   ;; The blob archive path is the build sid with the blob id added.
-  (str (cs/join "/" (concat (:sid build) [id])) ".tgz"))
+  (build-sid->artifact-path (:sid build) id))
 
 (defn- job-blobs [rt {:keys [store-key job-key]}]
   (let [c (get-in rt [:job job-key])]

@@ -105,7 +105,11 @@
           :entries []}))
       (md/error-deferred (ex-info
                           (format "destination path was not as expected: %s, actual: %s" (get @stored src) dest)
-                          @stored)))))
+                          @stored))))
+  (get-blob-stream [_ src]
+    (md/success-deferred
+     (when (contains? @stored src)
+       (io/input-stream (.getBytes "This is a test stream"))))))
 
 (defn fake-blob-store [stored]
   (->FakeBlobStore stored false))

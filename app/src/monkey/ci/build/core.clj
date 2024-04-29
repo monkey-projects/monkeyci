@@ -151,7 +151,7 @@
 
 (def regex? (partial instance? java.util.regex.Pattern))
 
-(defn- ->pred [x]
+(defn ->pred [x]
   (cond
     (regex? x) (partial re-matches x)
     (fn? x) x
@@ -180,5 +180,7 @@
 
 (def touched?
   "Returns `true` if the path occurs in any of the file changes.  If `p` is a regex, 
-   checks if any of the files matches the regex."
+   checks if any of the files match the regex.  If `p` is a function, it is applied
+   as a predicate against the files, until one matches."
+  ;; Wrap the args in a vector because some-fn only passes one argument
   (comp (some-fn added? modified? removed?) vector))
