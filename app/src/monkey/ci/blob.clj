@@ -95,23 +95,8 @@
           srcf (io/file dir src)]
       (md/future
         (when (fs/exists? srcf)
-          (with-open [is (BufferedInputStream. (PipedInputStream. os))]
-            ;; Decompress to the output stream
-            (doto (Thread. (fn []
-                             (try 
-                               (cc/decompress
-                                (io/input-stream srcf)
-                                os
-                                compression-type)
-                               (catch Exception ex
-                                 (log/error "Unable to decompress archive" ex))
-                               (finally
-                                 (.close os)))))
-              (.start))
-            ;; Unarchive
-            (u/mkdirs! f)
-            (-> (extract-archive is f)
-                (assoc :src src))))))))
+          (-> (a/extract srcf f)
+              (assoc :src src)))))))
 
 (defmethod make-blob-store :disk [conf k]
   (->DiskBlobStore (get-in conf [k :dir])))
@@ -171,13 +156,9 @@
   (restore-blob [_ src dest]
     (let [obj-name (archive-obj-name conf src)
           f (io/file dest)
-          arch (tmp-archive conf)
           params (-> conf
                      (select-keys [:ns :bucket-name])
                      (assoc :object-name obj-name))]
-      ;; Download to tmp file
-      (log/debug "Downloading" src "into" arch)
-      (u/mkdirs! (.getParentFile arch))
       (md/chain
        (os/head-object client params)
        (fn [exists?]
@@ -185,16 +166,9 @@
            (-> (os/get-object client params)
                (md/chain
                 bs/to-input-stream
-                (fn [is]
-                  (log/debug "Decompressing archive into" arch)
-                  (with-open [os (io/output-stream arch)]
-                    (cc/decompress is os compression-type))
-                  ;; Reopen the decompressed archive as a stream
-                  (io/input-stream arch))
-                (fn [r]
-                  (-> (extract-archive r f)
-                      (assoc :src src))))
-               (md/finally #(fs/delete-if-exists arch)))
+                ;; Unzip and unpack in one go
+                #(a/extract % dest)
+                #(assoc % :src src)))
            ;; FIXME It may occur that a file is not yet available if it is read immediately after writing
            ;; In that case we should retry.
            (log/warn "Blob not found in bucket:" obj-name)))))))

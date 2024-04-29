@@ -136,7 +136,7 @@
                       os/get-object (constantly (md/success-deferred (fs/read-all-bytes arch)))]
           (let [res @(sut/restore blob "remote/path" r)]
             
-            (testing "reads to temp file, then unarchives it"
+            (testing "unzips and unarchives to destination"
               (is (not-empty (:entries res)))
               (is (= "remote/path" (:src res)))
               (is (fs/exists? (:dest res)))
@@ -145,7 +145,7 @@
                   (is (fs/exists? p))
                   (is (= v (slurp p))))))
 
-            (testing "deletes tmp files"
+            #_(testing "deletes tmp files"
               (is (empty? (fs/list-dir tmp-dir))))))
 
         (with-redefs [os/head-object (constantly false)

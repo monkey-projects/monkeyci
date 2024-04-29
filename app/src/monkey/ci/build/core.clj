@@ -151,7 +151,7 @@
 
 (def regex? (partial instance? java.util.regex.Pattern))
 
-(defn- ->pred [x]
+(defn ->pred [x]
   (cond
     (regex? x) (partial re-matches x)
     (fn? x) x
