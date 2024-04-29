@@ -188,6 +188,13 @@
         (core/depends-on ["test-gui"])
         (assoc :save-artifacts [gui-release-artifact]))))
 
+;; TODO Add jobs that auto-deploy to staging after running some sanity checks
+;; We could do a git push with updated kustomization file.
+;; But running sanity checks requires a running app.  Either we could rely on
+;; argocd to do a blue/green deploy, or start it as a service (somehow) and
+;; run the checks here.  This latter preferred as it is contained inside the
+;; build process.
+
 ;; List of jobs
 [test-app
  app-uberjar
