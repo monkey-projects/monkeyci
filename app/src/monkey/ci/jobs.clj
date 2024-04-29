@@ -328,9 +328,13 @@
        (mapcat #(resolve-jobs % rt))
        (filter job?)))
 
+(defn- art->event [a]
+  (select-keys a [:id :path]))
+
 (defn job->event
   "Converts job into something that can be put in an event"
   [job]
   (-> job
-      (select-keys [:status :start-time :end-time deps labels])
+      (select-keys [:status :start-time :end-time deps labels :save-artifacts])
+      (update :save-artifacts (partial map art->event))
       (assoc :id (bc/job-id job))))

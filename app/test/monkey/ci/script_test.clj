@@ -258,6 +258,7 @@
           rt {:events e}
           job (dummy-job)
           f (sut/->EventFiringJob job)]
+      (is (bc/success? @(j/execute! f rt)))
       (is (every? (comp (partial = (:id job)) :id :job) @recv))))
 
   (testing "event contains build sid"
@@ -267,4 +268,22 @@
               :build {:sid sid}}
           job (dummy-job)
           f (sut/->EventFiringJob job)]
-      (is (every? (comp some? :sid) @recv)))))
+      (is (bc/success? @(j/execute! f rt)))
+      (is (every? (comp some? :sid) @recv))))
+
+  (testing "end event contains saved artifacts"
+    (let [{:keys [recv] :as e} (h/fake-events)
+          sid ["test-cust" "test-repo"]
+          rt {:events e
+              :build {:sid sid}}
+          job (-> (dummy-job)
+                  (assoc :save-artifacts [{:id "test-art"
+                                           :path "/test/path"
+                                           :entries ::test-entries}]))
+          f (sut/->EventFiringJob job)]
+      (is (bc/success? @(j/execute! f rt)))
+      (is (= [{:id "test-art"
+               :path "/test/path"}]
+             (-> (last @recv)
+                 :job
+                 :save-artifacts))))))
