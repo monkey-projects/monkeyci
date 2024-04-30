@@ -52,3 +52,8 @@
 
 (defn unset-triggering [db]
   (dissoc db triggering?))
+
+(def editing ::editing)
+
+(defn set-editing [db e]
+  (assoc db editing e))

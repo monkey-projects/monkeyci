@@ -138,3 +138,10 @@
  (fn [db [_ err]]
    (db/set-alerts db [{:type :danger
                        :message (str "Could not start build: " (u/error-msg err))}])))
+
+(rf/reg-event-fx
+ :repo/load+edit
+ (fn [{:keys [db]} _]
+   (let [cust-id (r/customer-id (r/current db))]
+     ;; TODO Load the repo, not the customer
+     {:dispatch [:repo/load cust-id]})))

@@ -27,7 +27,7 @@
     (set-repo-path! cust repo)
     r))
 
-(deftest rep-init
+(deftest repo-init
   (testing "does nothing if initialized"
     (rft/run-test-sync
      (let [c (h/catch-fx :martian.re-frame/request)]
@@ -199,3 +199,13 @@
   (testing "sets error alert"
     (rf/dispatch-sync [:repo/trigger-build--failed {:body {:message "test error"}}])
     (is (= :danger (-> (db/alerts @app-db) first :type)))))
+
+(deftest repo-load+edit
+  (rft/run-test-sync
+   (let [c (h/catch-fx :martian.re-frame/request)]
+     (h/initialize-martian {:get-customer {:body {}
+                                           :error-code :no-error}})
+     (rf/dispatch [:repo/load+edit])
+
+     (testing "loads current repo"
+       (is (= 1 (count @c)))))))

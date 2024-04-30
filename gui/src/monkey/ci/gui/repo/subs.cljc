@@ -29,3 +29,4 @@
 (u/db-sub :repo/alerts db/alerts)
 (u/db-sub :repo/latest-build db/latest-build)
 (u/db-sub :repo/show-trigger-form? db/show-trigger-form?)
+(u/db-sub :repo/editing db/editing)

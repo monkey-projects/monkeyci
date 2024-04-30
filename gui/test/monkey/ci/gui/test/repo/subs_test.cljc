@@ -92,3 +92,13 @@
       (is (nil? @l))
       (is (some? (reset! app-db (db/set-show-trigger-form {} true))))
       (is (true? @l)))))
+
+(deftest repo-editing
+  (let [l (rf/subscribe [:repo/editing])]
+    (testing "exists"
+      (is (some? l)))
+
+    (testing "returns currently editing repo from db"
+      (is (nil? @l))
+      (is (some? (reset! app-db (db/set-editing {} ::editing))))
+      (is (= ::editing @l)))))

@@ -131,44 +131,45 @@
   ;; TODO
   )
 
-(defn- edit-form [route repo]
-  [:form
-   {:on-submit #(rf/dispatch [:repo/save])}
-   [:div.row
-    [:div.col
-     [:div.mb-2
-      [:label.form-label {:for "name"} "Repository name"]
-      [:input.form-control {:id "name"}]]
-     [:div.mb-2
-      [:label.form-label {:for "main-branch"} "Main branch"]
-      [:input.form-control {:id "main-branch"}]
-      [:div.form-text "Required when you want to determine the 'main branch' in the build script."]]
-     [:div.mb-2
-      [:label.form-label {:for "url"} "Url"]
-      [:input.form-control {:id "url"}]
-      [:div.form-text "This is used when manually triggering a build from the UI."]]]
-    [:div.col
-     [:p "Labels:"]
-     [:p.text-body-secondary
-      "Labels are used to expose parameters and ssh keys to builds, but also to group repositories. "
-      "You can assign any labels you like.  Labels are case-sensitive."]
-     [labels]]
-    [:div.row
-     [:div.col
-      [:button.btn.btn-primary.me-2 {:type :submit} [:span.me-2 [co/icon :floppy]] "Save"]
-      [:a.btn.btn-outline-danger
-       {:href (r/path-for :page/repo (-> route
-                                         (r/path-params)
-                                         (select-keys [:repo-id :customer-id])))}
-       [:span.me-2 [co/icon :x-square]] "Cancel"]]]]])
+(defn- edit-form [route]
+  (let [e (rf/subscribe [:repo/editing])]
+    [:form
+     {:on-submit #(rf/dispatch [:repo/save])}
+     [:div.row
+      [:div.col
+       [:div.mb-2
+        [:label.form-label {:for "name"} "Repository name"]
+        [:input.form-control {:id "name" :value (:name e)}]]
+       [:div.mb-2
+        [:label.form-label {:for "main-branch"} "Main branch"]
+        [:input.form-control {:id "main-branch" :value (:main-branch e)}]
+        [:div.form-text "Required when you want to determine the 'main branch' in the build script."]]
+       [:div.mb-2
+        [:label.form-label {:for "url"} "Url"]
+        [:input.form-control {:id "url" :value (:url e)}]
+        [:div.form-text "This is used when manually triggering a build from the UI."]]]
+      [:div.col
+       [:p "Labels:"]
+       [:p.text-body-secondary
+        "Labels are used to expose parameters and ssh keys to builds, but also to group repositories. "
+        "You can assign any labels you like.  Labels are case-sensitive."]
+       [labels]]
+      [:div.row
+       [:div.col
+        [:button.btn.btn-primary.me-2 {:type :submit} [:span.me-2 [co/icon :floppy]] "Save"]
+        [:a.btn.btn-outline-danger
+         {:href (r/path-for :page/repo (-> route
+                                           (r/path-params)
+                                           (select-keys [:repo-id :customer-id])))}
+         [:span.me-2 [co/icon :x-square]] "Cancel"]]]]]))
 
 (defn edit
   "Displays repo editing page"
   []
-  (rf/dispatch [:repo/load])
+  (rf/dispatch [:repo/load+edit])
   (let [route (rf/subscribe [:route/current])
         repo (rf/subscribe [:repo/info (get-in @route [:parameters :path :repo-id])])]
     [l/default
      [:<>
       [:h3 "Edit Repository: " (:name @repo)]
-      [edit-form @route @repo]]]))
+      [edit-form @route]]]))
