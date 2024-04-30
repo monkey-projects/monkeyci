@@ -38,14 +38,11 @@
      :path-parts customer-path
      :path-schema customer-schema})
 
-   #_(api-route
-    {:route-name :create-repo
-     :method :post
-     :path-parts (conj customer-path "/repo")
-     :path-schema customer-schema
-     :body-schema {:repo {:name s/Str
-                          :url s/Str
-                          :customer-id s/Str}}})
+   (api-route
+    {:route-name :get-repo
+     :method :get
+     :path-parts repo-path
+     :path-schema repo-schema})
 
    (api-route
     {:route-name :get-builds

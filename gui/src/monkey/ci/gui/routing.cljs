@@ -15,6 +15,10 @@
   "Retrieve current customer id from app db"
   (comp :customer-id :path :parameters current))
 
+(def repo-id
+  "Retrieve current repo id from app db"
+  (comp :repo-id :path :parameters current))
+
 (rf/reg-sub
  :route/current
  (fn [db _]

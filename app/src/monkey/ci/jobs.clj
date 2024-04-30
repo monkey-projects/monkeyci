@@ -335,5 +335,5 @@
             (select-keys a [:id :path]))]
     (-> job
         (select-keys [:status :start-time :end-time deps labels :save-artifacts :extensions])
-        (update :save-artifacts (partial map art->event))
+        (mc/update-existing :save-artifacts (partial map art->event))
         (assoc :id (bc/job-id job)))))

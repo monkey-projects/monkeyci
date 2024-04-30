@@ -7,6 +7,7 @@
             [monkey.ci.gui.repo.events :as sut]
             [monkey.ci.gui.test.fixtures :as f]
             [monkey.ci.gui.test.helpers :as h]
+            [monkey.ci.gui.routing :as r]
             [re-frame.core :as rf]
             [re-frame.db :refer [app-db]]))
 
@@ -202,10 +203,35 @@
 
 (deftest repo-load+edit
   (rft/run-test-sync
-   (let [c (h/catch-fx :martian.re-frame/request)]
-     (h/initialize-martian {:get-customer {:body {}
+   (let [c (h/catch-fx :martian.re-frame/request)
+         [_ repo-id _] (test-repo-path!)
+         repo {:id repo-id
+               :name "test repo"}
+         cust {:repos [repo]}]
+     (h/initialize-martian {:get-customer {:body cust
                                            :error-code :no-error}})
      (rf/dispatch [:repo/load+edit])
 
-     (testing "loads current repo"
-       (is (= 1 (count @c)))))))
+     (testing "loads customer from backend"
+       (is (= 1 (count @c)))
+       (is (= :get-customer (-> @c first (nth 2))))))))
+
+(deftest repo-load+edit--success
+  (rft/run-test-sync
+   (let [[_ repo-id] (test-repo-path!)
+         repo {:id repo-id
+               :name "test repo"}
+         cust {:repos [repo]}]
+
+     (rf/dispatch [:repo/load+edit--success {:body cust}])
+     
+     (testing "sets current customer"
+       (is (= cust (cdb/customer @app-db))))
+     
+     (testing "sets repo for editing"
+       (is (= repo (db/editing @app-db)))))))
+
+(deftest repo-load+edit--failed
+  (testing "sets error alert"
+    (rf/dispatch-sync [:repo/load+edit--failed {:body {:message "test error"}}])
+    (is (= :danger (-> (db/edit-alerts @app-db) first :type)))))

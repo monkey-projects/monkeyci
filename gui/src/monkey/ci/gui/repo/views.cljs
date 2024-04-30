@@ -125,11 +125,31 @@
         [:div
          [:a {:href (r/path-for :page/customer {:customer-id customer-id})} "Back to customer"]]]])))
 
-(defn- labels
+(defn labels
   "Component that allows the user to edit, add or remove repo labels."
-  []
-  ;; TODO
-  )
+  [labels]
+  (letfn [(label-entry [{:keys [name value]}]
+            [:div.row.mb-2
+             [:div.col-5
+              [:input.form-control {:placeholder "Label name"
+                                    :value name
+                                    :on-change #(rf/dispatch-sync [:label/label-changed])}]]
+             [:div.col-6
+              [:input.form-control {:placeholder "Label value"
+                                    :value value
+                                    :on-change #(rf/dispatch-sync [:label/value-changed])}]]
+             [:div.col-1
+              [:button.btn-close {:type :button
+                                  :aria-label "Remove label"
+                                  :on-click #(rf/dispatch [:label/removed name])}]]])
+          (add-btn []
+            [:button.btn.btn-primary
+             {:on-click #(rf/dispatch [:label/add])}
+             [:span.me-1 [co/icon :plus-square]] "Add"])]
+    ;; TODO Make editable
+    (-> (map label-entry labels)
+        (as-> x (into [:div x]))
+        (conj [add-btn]))))
 
 (defn- edit-form [route]
   (let [e (rf/subscribe [:repo/editing])]
@@ -139,21 +159,27 @@
       [:div.col
        [:div.mb-2
         [:label.form-label {:for "name"} "Repository name"]
-        [:input.form-control {:id "name" :value (:name e)}]]
+        [:input.form-control
+         {:id "name"
+          :value (:name @e)}]]
        [:div.mb-2
         [:label.form-label {:for "main-branch"} "Main branch"]
-        [:input.form-control {:id "main-branch" :value (:main-branch e)}]
+        [:input.form-control
+         {:id "main-branch"
+          :value (:main-branch @e)}]
         [:div.form-text "Required when you want to determine the 'main branch' in the build script."]]
        [:div.mb-2
         [:label.form-label {:for "url"} "Url"]
-        [:input.form-control {:id "url" :value (:url e)}]
+        [:input.form-control
+         {:id "url"
+          :value (:url @e)}]
         [:div.form-text "This is used when manually triggering a build from the UI."]]]
       [:div.col
        [:p "Labels:"]
        [:p.text-body-secondary
         "Labels are used to expose parameters and ssh keys to builds, but also to group repositories. "
         "You can assign any labels you like.  Labels are case-sensitive."]
-       [labels]]
+       [labels (:labels @e)]]
       [:div.row
        [:div.col
         [:button.btn.btn-primary.me-2 {:type :submit} [:span.me-2 [co/icon :floppy]] "Save"]
@@ -172,4 +198,5 @@
     [l/default
      [:<>
       [:h3 "Edit Repository: " (:name @repo)]
+      [co/alerts [:repo/edit-alerts]]
       [edit-form @route]]]))

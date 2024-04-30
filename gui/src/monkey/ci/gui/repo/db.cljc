@@ -57,3 +57,12 @@
 
 (defn set-editing [db e]
   (assoc db editing e))
+
+(def edit-alerts ::edit-alerts)
+
+(defn set-edit-alerts [db a]
+  (assoc db edit-alerts a))
+
+(defn reset-edit-alerts [db]
+  (dissoc db edit-alerts))
+

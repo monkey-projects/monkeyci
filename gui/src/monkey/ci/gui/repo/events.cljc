@@ -142,6 +142,25 @@
 (rf/reg-event-fx
  :repo/load+edit
  (fn [{:keys [db]} _]
-   (let [cust-id (r/customer-id (r/current db))]
-     ;; TODO Load the repo, not the customer
-     {:dispatch [:repo/load cust-id]})))
+   (let [cust-id (r/customer-id db)]
+     {:dispatch [:secure-request
+                 :get-customer
+                 {:customer-id cust-id}
+                 [:repo/load+edit--success]
+                 [:repo/load+edit--failed]]})))
+
+(rf/reg-event-fx
+ :repo/load+edit--success
+ (fn [{:keys [db]} [_ resp]]
+   (let [repo-id (r/repo-id db)]
+     {:dispatch [:customer/load--success resp]
+      :db (db/set-editing db (->> (:body resp)
+                                  :repos
+                                  (filter (comp (partial = repo-id) :id))
+                                  (first)))})))
+
+(rf/reg-event-db
+ :repo/load+edit--failed
+ (fn [db [_ err]]
+   (db/set-edit-alerts db [{:type :danger
+                            :message (str "Unable to fetch repository info: " (u/error-msg err))}])))

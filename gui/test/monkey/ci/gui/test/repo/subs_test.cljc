@@ -102,3 +102,12 @@
       (is (nil? @l))
       (is (some? (reset! app-db (db/set-editing {} ::editing))))
       (is (= ::editing @l)))))
+
+(deftest edit-alerts
+  (let [a (rf/subscribe [:repo/edit-alerts])]
+    (testing "exists"
+      (is (some? a)))
+
+    (testing "holds edit-alerts from db"
+      (is (map? (reset! app-db (db/set-edit-alerts {} ::test-edit-alerts))))
+      (is (= ::test-edit-alerts @a)))))
