@@ -19,6 +19,7 @@
    :page/customer customer/page
    :page/add-repo customer/add-repo-page
    :page/repo repo/page
+   :page/repo-edit repo/edit
    :page/job job/page})
 
 (def route-name (comp :name :data))
