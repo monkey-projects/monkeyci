@@ -117,36 +117,6 @@
                  (load-logs-req db)]
     :db (db/set-reloading db)}))
 
-(rf/reg-event-fx
- :build/download-log
- (fn [{:keys [db]} [_ path]]
-   {:db (-> db
-            (db/set-current-log nil)
-            (db/mark-downloading)
-            (db/reset-log-alerts)
-            (db/set-log-path path))
-    :dispatch [:secure-request
-               :download-log
-               (-> (r/path-params (:route/current db))
-                   (assoc :path path))
-               [:build/download-log--success]
-               [:build/download-log--failed]]}))
-
-(rf/reg-event-db
- :build/download-log--success
- (fn [db [_ {log-contents :body}]]
-   (-> db
-       (db/reset-downloading)
-       (db/set-current-log log-contents))))
-
-(rf/reg-event-db
- :build/download-log--failed
- (fn [db [_ {err :body}]]
-   (-> db
-       (db/reset-downloading)
-       (db/set-log-alerts [{:type :danger
-                            :message (u/error-msg err)}]))))
-
 (defn- for-build? [db evt]
   (let [get-id (juxt :customer-id :repo-id :build-id)]
     (= (:sid evt)
@@ -158,35 +128,6 @@
 
 (defmethod handle-event :build/updated [db evt]
   (db/set-build db (:build evt)))
-
-;; (defmethod handle-event :build/end [db evt]
-;;   ;; Update build but leave existing script info intact, because the event
-;;   ;; does not contain this.
-;;   (db/update-build db (fn [b]
-;;                         (merge b (-> (:build evt)
-;;                                      (dissoc :script))))))
-
-;; (defn- update-script [db script]
-;;   (db/update-build db assoc :script script))
-
-;; (defmethod handle-event :script/start [db evt]
-;;   (update-script db (:script evt)))
-
-;; (defmethod handle-event :script/end [db {upd :script}]
-;;   ;; Deep merge job info
-;;   (letfn [(merge-script [orig]
-;;             (-> (merge orig upd)
-;;                 (assoc :jobs (merge-with merge (:jobs orig) (:jobs upd)))))]
-;;     (db/update-build db update :script merge-script)))
-
-;; (defn- update-job [db job]
-;;   (db/update-build db assoc-in [:script :jobs (:id job)] job))
-
-;; (defmethod handle-event :job/start [db evt]
-;;   (update-job db (:job evt)))
-
-;; (defmethod handle-event :job/end [db evt]
-;;   (update-job db (:job evt)))
 
 (defmethod handle-event :default [db evt]
   ;; Ignore

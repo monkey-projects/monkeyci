@@ -34,6 +34,12 @@
    (s/optional-key :github-id) s/Int
    (s/optional-key :labels) [Label]})
 
+(s/defschema log-query-schema
+  {:query s/Str
+   :start s/Int
+   :direction s/Str
+   (s/optional-key :end) s/Int})
+
 (defn public-route [conf]
   (merge {:method :get
           :produces #{"application/edn"}
@@ -84,16 +90,25 @@
      :path-schema build-schema})
 
    (api-route
-    {:route-name :get-build-logs
-     :path-parts (into build-path ["/logs"])
-     :path-schema build-schema})
+    {:route-name :download-log
+     :path-parts ["/logs/" :customer-id "/entries"]
+     :path-schema customer-schema
+     :query-schema log-query-schema
+     :produces #{"application/json"}})
 
    (api-route
-    {:route-name :download-log
-     :path-parts (into build-path ["/logs/download"])
-     :path-schema build-schema
-     :query-schema {:path s/Str}
-     :produces #{"text/plain"}})
+    {:route-name :get-log-stats
+     :path-parts ["/logs/" :customer-id "/stats"]
+     :path-schema customer-schema
+     :query-schema log-query-schema
+     :produces #{"application/json"}})
+
+   (api-route
+    {:route-name :get-log-label-values
+     :path-parts ["/logs/" :customer-id "/label/" :label "/values"]
+     :path-schema (assoc customer-schema :label s/Str)
+     :query-schema log-query-schema
+     :produces #{"application/json"}})
    
    (api-route
     {:route-name :watch-github-repo

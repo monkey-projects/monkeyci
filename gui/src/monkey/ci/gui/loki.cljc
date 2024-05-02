@@ -26,19 +26,22 @@
    "build_id" build-id
    "job_id" job-id})
 
+(defn request-params [sid {:keys [id start-time end-time]}]
+  (cond-> {:query (query->str (job-query sid id))
+           :start (int (/ start-time 1000))
+           :direction "forward"}
+    ;; Add one second to end time
+    end-time (assoc :end (inc (int (/ end-time 1000))))))
+
 (defn job-request
   "Creates a request map for the job.  It can server as a template for specific
    requests, but it will contain a query, start time and end time param (if the
    job has finished)."
-  ([sid {:keys [id start-time end-time]}]
+  ([sid job]
    {:method :get
     :response-format #?@(:node [:json]
                          :cljs [(ajax/json-response-format {:keywords? true})])
-    :params (cond-> {:query (query->str (job-query sid id))
-                     :start (int (/ start-time 1000))
-                     :direction "forward"}
-              ;; Add one second to end time
-              end-time (assoc :end (inc (int (/ end-time 1000)))))
+    :params (request-params sid job)
     :headers {"X-Scope-OrgID" (first sid)}})
   ([path sid job]
    (-> (job-request sid job)

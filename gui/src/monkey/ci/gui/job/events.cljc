@@ -27,16 +27,20 @@
    (when job
      (let [params (r/path-params (r/current db))
            sid (params->build-sid params)]
-       {:http-xhrio (-> (loki/filename-values-request sid job)
-                        (assoc :on-success [:job/load-log-files--success]
-                               :on-failure [:job/load-log-files--failed]))
+       {:dispatch [:secure-request
+                   :get-log-label-values
+                   (-> (loki/request-params sid job)
+                       (assoc :customer-id (:customer-id params)
+                              :label "filename"))
+                   [:job/load-log-files--success]
+                   [:job/load-log-files--failed]]
         :db (db/set-alerts db
                            [{:type :info
                              :message "Seaching logs..."}])}))))
 
 (rf/reg-event-db
  :job/load-log-files--success
- (fn [db [_ {:keys [data]}]]
+ (fn [db [_ {{:keys [data]} :body}]]
    (-> db
        (db/clear-alerts)
        (db/set-log-files data))))
@@ -57,13 +61,15 @@
        ;; FIXME Loki limits the number of entries returned.  We should send an index stats
        ;; request first and then fetch all entries.  This could lead to problems with large
        ;; logs however, so we'll need to add some sort of pagination.
-       {:http-xhrio (-> (loki/query-range-request sid job)
-                        (loki/with-query (-> (loki/job-query sid (:id job))
-                                             (assoc "filename" path)
-                                             (loki/query->str)))
-                        (assoc-in [:params :limit] 1000)
-                        (assoc :on-success [:job/load-logs--success path]
-                               :on-failure [:job/load-logs--failed path]))
+       {:dispatch [:secure-request
+                   :download-log
+                   (-> (loki/request-params sid job)
+                       (assoc :limit 1000
+                              :query (-> (loki/job-query sid (:id job))
+                                         (assoc "filename" path)
+                                         (loki/query->str))))
+                   [:job/load-logs--success path]
+                   [:job/load-logs--failed path]]
         :db (db/set-alerts db
                            path
                            [{:type :info
@@ -71,7 +77,7 @@
 
 (rf/reg-event-db
  :job/load-logs--success
- (fn [db [_ path logs]]
+ (fn [db [_ path {logs :body}]]
    (-> db
        (db/clear-alerts path)
        (db/set-logs path logs))))

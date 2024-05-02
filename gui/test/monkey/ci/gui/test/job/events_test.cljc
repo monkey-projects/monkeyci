@@ -42,21 +42,29 @@
                                               :repo-id "test-repo"
                                               :build-id "test-build"
                                               :job-id "test-job"}}}))))
-  
-  (testing "sends request to label values endpoint with job filter"
-    (let [e (h/catch-fx :http-xhrio)]
-      (is (nil? (rf/dispatch-sync [:job/load-log-files
-                                   {:id "test-job"
-                                    :start-time 100000
-                                    :end-time 200000}])))
-      (is (= 1 (count @e)))
-      (is (re-matches #".*/label/filename/values" (:uri (first @e))))))
+  (rft/run-test-sync
+   (h/initialize-martian {:get-log-label-values {:error-code :no-error
+                                                 :body {}}})
+   
+   (testing "sends request to label values endpoint with job filter"
+     (let [e (h/catch-fx :martian.re-frame/request)]
+       (is (nil? (rf/dispatch [:job/load-log-files
+                               {:id "test-job"
+                                :start-time 100000
+                                :end-time 200000}])))
+       (is (= 1 (count @e)))
+       (let [params (-> @e
+                        first
+                        (nth 3))]
+         (is (= "filename" (:label params)))
+         (is (= 100 (:start params)))
+         (is (= 201 (:end params))))))
 
-  (testing "sets alert"
-    (rf/dispatch-sync [:job/load-logs {:id "test-job" :start-time 100}])
-    (let [a (db/global-alerts @app-db)]
-      (is (= 1 (count a)))
-      (is (= :info (-> a first :type))))))
+   (testing "sets alert"
+     (rf/dispatch [:job/load-logs {:id "test-job" :start-time 100}])
+     (let [a (db/global-alerts @app-db)]
+       (is (= 1 (count a)))
+       (is (= :info (-> a first :type)))))))
 
 (deftest job-load-log-files--success
   (testing "clears alerts"
@@ -66,7 +74,7 @@
   
   (testing "sets log files in db"
     (is (empty? (reset! app-db {})))
-    (rf/dispatch-sync [:job/load-log-files--success {:data ::logs}])
+    (rf/dispatch-sync [:job/load-log-files--success {:body {:data ::logs}}])
     (is (= ::logs (db/log-files @app-db)))))
 
 (deftest job-load-log-files--failed
@@ -84,26 +92,29 @@
                                               :repo-id "test-repo"
                                               :build-id "test-build"
                                               :job-id "test-job"}}}))))
-  
-  (testing "sends request to query range endpoint with job and filename filter"
-    (let [e (h/catch-fx :http-xhrio)]
-      (is (nil? (rf/dispatch-sync [:job/load-logs
-                                   {:id "test-job"
-                                    :start-time 100000
-                                    :end-time 200000}
-                                   "test/path"])))
-      (is (= 1 (count @e)))
-      (is (cs/ends-with? (:uri (first @e))
-                         "/query_range"))
-      (is (cs/includes? (-> @e first (get-in [:params :query]))
-                        "filename=\"test/path\""))))
 
-  (testing "sets alert"
-    (let [path "test/path"]
-      (rf/dispatch-sync [:job/load-logs {:id "test-job" :start-time 100} "test/path"])
-      (let [a (db/path-alerts @app-db path)]
-        (is (= 1 (count a)))
-        (is (= :info (-> a first :type)))))))
+  (rft/run-test-sync
+
+   (h/initialize-martian {:download-log {:error-code :no-error
+                                         :body {}}})
+   
+   (testing "sends request to query range endpoint with job and filename filter"
+     (let [e (h/catch-fx :martian.re-frame/request)]
+       (is (nil? (rf/dispatch [:job/load-logs
+                               {:id "test-job"
+                                :start-time 100000
+                                :end-time 200000}
+                               "test/path"])))
+       (is (= 1 (count @e)))
+       (is (cs/includes? (-> @e first (nth 3) :query)
+                         "filename=\"test/path\""))))
+
+   (testing "sets alert"
+     (let [path "test/path"]
+       (rf/dispatch [:job/load-logs {:id "test-job" :start-time 100} "test/path"])
+       (let [a (db/path-alerts @app-db path)]
+         (is (= 1 (count a)))
+         (is (= :info (-> a first :type))))))))
 
 (deftest job-load-logs--success
   (testing "clears alerts"
@@ -114,7 +125,7 @@
   
   (testing "sets log lines in db"
     (is (empty? (reset! app-db {})))
-    (rf/dispatch-sync [:job/load-logs--success "test/path" ::logs])
+    (rf/dispatch-sync [:job/load-logs--success "test/path" {:body ::logs}])
     (is (= ::logs (db/logs @app-db "test/path")))))
 
 (deftest job-load-logs--failed
