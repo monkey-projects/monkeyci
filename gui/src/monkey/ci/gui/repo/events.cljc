@@ -71,6 +71,9 @@
 (defmethod handle-event :build/start [db evt]
   (update-build db (:build evt)))
 
+(defmethod handle-event :build/pending [db evt]
+  (update-build db (:build evt)))
+
 (defmethod handle-event :build/updated [db evt]
   (update-build db (:build evt)))
 
@@ -129,10 +132,7 @@
    (-> db
        (db/set-alerts [{:type :info
                         :message (str "Build " (:build-id body) " started.")}])
-       (db/set-show-trigger-form nil)
-       ;; Ideally the server immediately sends an event, so we wouldn't have to do this
-       ;; FIXME The build object does not contain the necessary properties.
-       (db/update-build body))))
+       (db/set-show-trigger-form nil))))
 
 (rf/reg-event-db
  :repo/trigger-build--failed

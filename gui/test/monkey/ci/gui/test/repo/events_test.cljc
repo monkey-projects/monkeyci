@@ -128,6 +128,20 @@
                :git {:ref "main"}}]
              (db/builds @app-db)))))
 
+  (testing "updates build list when build is pending"
+    (let [[cust repo build] (test-repo-path!)]
+      (is (empty? (db/builds @app-db)))
+      (is (nil? (rf/dispatch-sync [:repo/handle-event {:type :build/pending
+                                                       :build {:customer-id cust
+                                                               :repo-id repo
+                                                               :build-id build
+                                                               :git {:ref "main"}}}])))
+      (is (= [{:customer-id cust
+               :repo-id repo
+               :build-id build
+               :git {:ref "main"}}]
+             (db/builds @app-db)))))
+
   (testing "updates build list when build has updated"
     (let [[cust repo build] (test-repo-path!)
           upd {:customer-id cust
@@ -187,14 +201,7 @@
   (testing "hides trigger form"
     (is (some? (reset! app-db (db/set-show-trigger-form {} true))))
     (rf/dispatch-sync [:repo/trigger-build--success {:body {:build-id "test-build"}}])
-    (is (not (db/show-trigger-form? @app-db))))
-
-  (testing "adds build to list"
-    (is (some? (reset! app-db (db/set-builds {} [{:build-id "first build"}]))))
-    (rf/dispatch-sync [:repo/trigger-build--success {:body {:build-id "second build"}}])
-    (is (= [{:build-id "first build"}
-            {:build-id "second build"}]
-           (db/builds @app-db)))))
+    (is (not (db/show-trigger-form? @app-db)))))
 
 (deftest trigger-build--failed
   (testing "sets error alert"
