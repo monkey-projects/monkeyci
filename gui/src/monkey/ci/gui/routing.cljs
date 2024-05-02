@@ -15,6 +15,10 @@
   "Retrieve current customer id from app db"
   (comp :customer-id :path :parameters current))
 
+(def repo-id
+  "Retrieve current repo id from app db"
+  (comp :repo-id :path :parameters current))
+
 (rf/reg-sub
  :route/current
  (fn [db _]
@@ -48,6 +52,7 @@
     ["/c/:customer-id" :page/customer]
     ["/c/:customer-id/add-repo" :page/add-repo]
     ["/c/:customer-id/r/:repo-id" :page/repo]
+    ["/c/:customer-id/r/:repo-id/edit" :page/repo-edit]
     ["/c/:customer-id/r/:repo-id/b/:build-id" :page/build]
     ["/c/:customer-id/r/:repo-id/b/:build-id/j/:job-id" :page/job]
     ["/github/callback" :page/github-callback]]))
