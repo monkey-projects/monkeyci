@@ -296,7 +296,7 @@
   (if-let [b (fetch-build-details (c/req->storage req)
                                   (build-sid req))]
     (let [res (->> (b/success-jobs b)
-                   (mapcat :saved-artifacts)
+                   (mapcat :save-artifacts)
                    (f))
           ->response (fn [res]
                        (if (or (nil? res) (and (sequential? res) (empty? res)))

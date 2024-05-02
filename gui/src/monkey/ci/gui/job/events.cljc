@@ -85,7 +85,6 @@
 (rf/reg-event-db
  :job/load-logs--failed
  (fn [db [_ path err]]
-   (println "Got error:" err)
    (db/set-alerts db
                   path
                   [{:type :danger

@@ -12,7 +12,6 @@
  (fn [{:keys [db]} _]
    (when-not (db/initialized? db)
      {:dispatch-n [[:build/load]
-                   [:build/load-logs]
                    ;; Make sure we stop listening to events when we leave this page
                    [:route/on-page-leave [:build/leave]]
                    ;; TODO Only start reading events when the build has not finished yet
@@ -25,44 +24,12 @@
    {:dispatch [:event-stream/stop stream-id]
     :db (db/unset-initialized db)}))
 
-(defn load-logs-req [db]
-  [:secure-request
-   :get-build-logs
-   (r/path-params (:route/current db))
-   [:build/load-logs--success]
-   [:build/load-logs--failed]])
-
 (defn load-build-req [db]
   [:secure-request
    :get-build
    (r/path-params (:route/current db))
    [:build/load--success]
    [:build/load--failed]])
-
-(rf/reg-event-fx
- :build/load-logs
- (fn [{:keys [db]} _]
-   {:db (-> db
-            (db/set-alerts [{:type :info
-                             :message "Loading logs for build..."}])
-            (db/set-logs nil))
-    :dispatch (load-logs-req db)}))
-
-(rf/reg-event-db
- :build/load-logs--success
- (fn [db [_ {logs :body}]]
-   (-> db
-       (db/set-logs logs)
-       (db/reset-alerts)
-       (db/clear-logs-reloading))))
-
-(rf/reg-event-db
- :build/load-logs--failed
- (fn [db [_ err op]]
-   (-> db
-       (db/set-alerts [{:type :danger
-                        :message (str "Could not load build logs: " (u/error-msg err))}])
-       (db/clear-logs-reloading))))
 
 (rf/reg-event-fx
  :build/load
@@ -113,8 +80,7 @@
  :build/reload
  [(rf/inject-cofx :time/now)]
  (fn [{:keys [db] :as cofx} _]
-   {:dispatch-n [(load-build-req db)
-                 (load-logs-req db)]
+   {:dispatch (load-build-req db)
     :db (db/set-reloading db)}))
 
 (defn- for-build? [db evt]

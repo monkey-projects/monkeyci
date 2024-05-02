@@ -806,8 +806,8 @@
         build (-> (zipmap st/build-sid-keys sid)
                   (assoc :script
                          {:jobs {"test-job" {:status :success
-                                             :saved-artifacts [{:id art-id
-                                                                :path "/test/path"}]}}}))
+                                             :save-artifacts [{:id art-id
+                                                               :path "/test/path"}]}}}))
         _ (st/save-build st build)]
     
     (testing "`GET /artifact`"

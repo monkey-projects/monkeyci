@@ -70,7 +70,7 @@
 
 (defn- trim-ref [ref]
   (let [prefix "refs/heads/"]
-    (if (cs/starts-with? ref prefix)
+    (if (and ref (cs/starts-with? ref prefix))
       (subs ref (count prefix))
       ref)))
 

@@ -16,7 +16,6 @@
 (deftest build-init
   (letfn [(mock-handlers []
             (rf/reg-event-db :build/load (constantly nil))
-            (rf/reg-event-db :build/load-logs (constantly nil))
             (rf/reg-event-db :event-stream/start (constantly nil))
             (rf/reg-event-db :route/on-page-leave (constantly nil)))]
     
@@ -29,14 +28,6 @@
            (rf/dispatch [:build/init])
            (is (= 1 (count @c))))))
       
-      (testing "dispatches log load event"
-        (rft/run-test-sync
-         (let [c (atom [])]
-           (mock-handlers)
-           (rf/reg-event-db :build/load-logs (fn [_ evt] (swap! c conj evt)))
-           (rf/dispatch [:build/init])
-           (is (= 1 (count @c))))))
-
       (testing "dispatches page leave event"
         (rft/run-test-sync
          (let [c (atom [])]
@@ -56,7 +47,7 @@
       (testing "marks initialized"
         (rft/run-test-sync
          (mock-handlers)
-         (reset! app-db (db/set-logs {} ::test-logs))
+         (reset! app-db {})
          (rf/dispatch [:build/init])
          (is (true? (db/initialized? @app-db))))))
 
@@ -71,55 +62,6 @@
          (rf/reg-event-db :route/on-page-leave h)
          (rf/dispatch [:build/init])
          (is (empty? @c)))))))
-
-(deftest build-load-logs
-  (testing "sets alert"
-    (rf/dispatch-sync [:build/load-logs])
-    (is (= 1 (count (db/alerts @app-db)))))
-
-  (testing "fetches builds from backend"
-    (rft/run-test-sync
-     (let [c (h/catch-fx :martian.re-frame/request)]
-       (reset! app-db {:route/current
-                       {:parameters
-                        {:path 
-                         {:customer-id "test-cust"
-                          :repo-id "test-repo"
-                          :build-id "test-build"}}}})
-       (h/initialize-martian {:get-build-logs {:body ["test-log"]
-                                               :error-code :no-error}})
-       (rf/dispatch [:build/load-logs])
-       (is (= 1 (count @c)))
-       (is (= :get-build-logs (-> @c first (nth 2)))))))
-
-  (testing "clears current logs"
-    (is (map? (reset! app-db (db/set-logs {} ["test-log"]))))
-    (rf/dispatch-sync [:build/load-logs])
-    (is (nil? (db/logs @app-db)))))
-
-(deftest build-load-logs--success
-  (testing "clears alerts"
-    (is (map? (reset! app-db (db/set-alerts {} [{:type :info
-                                                 :message "test notification"}]))))
-    (rf/dispatch-sync [:build/load-logs--success {:body []}])
-    (is (nil? (db/alerts @app-db))))
-
-  (testing "clears logs reload flag"
-    (is (map? (reset! app-db (db/set-reloading {} #{:logs}))))
-    (rf/dispatch-sync [:build/load-logs--success {:body []}])
-    (is (not (db/reloading? @app-db)))))
-
-(deftest build-load-logs--failed
-  (testing "sets error"
-    (rf/dispatch-sync [:build/load-logs--failed "test-error"])
-    (is (= :danger (-> (db/alerts @app-db)
-                       (first)
-                       :type))))
-
-  (testing "clears logs reload flag"
-    (is (map? (reset! app-db (db/set-reloading {} #{:logs}))))
-    (rf/dispatch-sync [:build/load-logs--failed {:body {}}])
-    (is (not (db/reloading? @app-db)))))
 
 (deftest build-load
   (testing "sets alert"
@@ -144,7 +86,7 @@
   (testing "clears current build"
     (is (map? (reset! app-db (db/set-build {} "test-build"))))
     (rf/dispatch-sync [:build/load])
-    (is (nil? (db/logs @app-db)))))
+    (is (nil? (db/build @app-db)))))
 
 (deftest build-maybe-load
   (testing "loads build if not in db"
@@ -231,7 +173,7 @@
     (is (not (db/reloading? @app-db)))))
 
 (deftest build-reload
-  (testing "loads build and logs from backend"
+  (testing "loads build from backend"
     (rft/run-test-sync
      (let [c (h/catch-fx :martian.re-frame/request)]
        (reset! app-db {:route/current
@@ -242,13 +184,10 @@
                           :build-id "test-build"}}}})
        (h/initialize-martian {:get-build
                               {:body "test-build"
-                               :error-code :no-error}
-                              :get-build-logs
-                              {:body "test-build-logs"
                                :error-code :no-error}})
        (rf/dispatch [:build/reload])
-       (is (= 2 (count @c)))
-       (is (= [:get-build :get-build-logs] (->> @c (map #(nth % 2))))))))
+       (is (= 1 (count @c)))
+       (is (= [:get-build] (->> @c (map #(nth % 2))))))))
 
   (testing "marks reloading"
     (rf/dispatch-sync [:build/reload])

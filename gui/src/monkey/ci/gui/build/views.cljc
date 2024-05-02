@@ -129,13 +129,6 @@
        [:li "Labels:" (str labels)])
      (when-not (empty? deps)
        [:li "Dependent on: " (cs/join ", " deps)])]]
-   #_[:div.col-6.border-start
-      [:h5 "Logs"]
-      (->> (:logs job)
-           (filter (comp pos? :size))
-           (map render-log-link)
-           (map (partial conj [:li]))
-           (into [:ul]))]
    [:div.col-4
     [logs-btn job]]
    [:div.col-4
@@ -177,50 +170,6 @@
      [:p "This build contains " (count @jobs) " jobs"]
      [jobs-table @jobs]]))
 
-#_(defn- log-row [{:keys [name size] :as l}]
-    (let [route (rf/subscribe [:route/current])]
-      [:tr
-       [:td [:a {:href (u/->dom-id log-modal-id)
-                 :data-bs-toggle "modal"
-                 :on-click (u/link-evt-handler [:build/download-log name])}
-             name]]
-       ;; TODO Make size human readable
-       [:td size]]))
-
-#_(defn logs-table []
-  (let [l (rf/subscribe [:build/global-logs])]
-    [:table.table.table-striped
-     [:thead
-      [:tr
-       [:th {:scope :col} "Log file"]
-       [:th {:scope :col} "Size"]]]
-     (->> @l
-          (map log-row)
-          (into [:tbody]))]))
-
-#_(defn- build-logs [params]
-  (rf/dispatch [:build/load-logs])
-  (fn [params]
-    [:<>
-     [:p "These are the global logs that do not belong to a specific job."]
-     [logs-table]]))
-
-#_(defn- tab-header [lbl curr? contents]
-  [:li.nav-item
-   [:a.nav-link (cond-> {:href ""}
-                  curr? (assoc :class :active
-                               :aria-current :page))]
-   contents])
-
-#_(defn details-tabs [route]
-  [tabs/tabs
-   ::build-details
-   [{:header "Jobs"
-     :current? true
-     :contents [build-jobs]}
-    {:header "Logs"
-     :contents [build-logs (r/path-params route)]}]])
-
 (defn page [route]
   (rf/dispatch [:build/init])
   (fn [route]
@@ -236,7 +185,6 @@
         [co/alerts [:build/alerts]]
         [build-details]
         [build-result]
-        #_[details-tabs route]
         [build-jobs]
         [log-modal]
         [:div
