@@ -131,6 +131,7 @@
                         :message (str "Build " (:build-id body) " started.")}])
        (db/set-show-trigger-form nil)
        ;; Ideally the server immediately sends an event, so we wouldn't have to do this
+       ;; FIXME The build object does not contain the necessary properties.
        (db/update-build body))))
 
 (rf/reg-event-db

@@ -103,6 +103,9 @@
                                                       :message (ex-message ex))))))]
     (md/future
       (try
+        (rt/post-events rt {:type :build/pending
+                            :build (b/build->evt (rt/build rt))
+                            :sid (b/get-sid rt)})
         ;; Catch both the deferred error, or the direct exception, because both
         ;; can be thrown here.
         (-> (runner rt)

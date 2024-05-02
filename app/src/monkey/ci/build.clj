@@ -138,7 +138,7 @@
 (defn build->evt
   "Prepare build object so it can be added to an event"
   [build]
-  (mc/update-existing build :git dissoc :ssh-keys))
+  (mc/update-existing build :git dissoc :ssh-keys :ssh-keys-dir))
 
 (defn build-end-evt
   "Creates a `build/end` event"

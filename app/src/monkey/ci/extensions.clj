@@ -72,7 +72,7 @@
   "Wraps job so that extensions are invoked before and after it."
   ([job registered-ext]
    (map->ExtensionWrappingJob (-> job
-                                  (select-keys [j/job-id j/labels j/deps])
+                                  (j/job->event)
                                   (assoc :target job :registered-ext registered-ext))))
   ([job]
    (wrap-job job @registered-extensions)))
