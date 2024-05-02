@@ -22,7 +22,7 @@
 
 (defn- test-repo-path!
   "Generate random ids for customer, repo and build, and sets the current
-   route to the generate path.  Returns the generated ids."
+   route to the generated path.  Returns the generated ids."
   []
   (let [[cust repo _ :as r] (repeatedly 3 random-uuid)]
     (set-repo-path! cust repo)
@@ -208,13 +208,17 @@
          repo {:id repo-id
                :name "test repo"}
          cust {:repos [repo]}]
+     (reset! app-db (db/set-edit-alerts {} [{:type :warning}]))
      (h/initialize-martian {:get-customer {:body cust
                                            :error-code :no-error}})
      (rf/dispatch [:repo/load+edit])
 
      (testing "loads customer from backend"
        (is (= 1 (count @c)))
-       (is (= :get-customer (-> @c first (nth 2))))))))
+       (is (= :get-customer (-> @c first (nth 2)))))
+
+     (testing "clears alerts"
+       (is (empty? (db/edit-alerts @app-db)))))))
 
 (deftest repo-load+edit--success
   (rft/run-test-sync
@@ -235,3 +239,128 @@
   (testing "sets error alert"
     (rf/dispatch-sync [:repo/load+edit--failed {:body {:message "test error"}}])
     (is (= :danger (-> (db/edit-alerts @app-db) first :type)))))
+
+(deftest repo-label-add
+  (testing "adds new label to editing repo"
+    (rf/dispatch-sync [:repo/label-add])
+    (is (= 1 (count (-> (db/editing @app-db)
+                        :labels))))))
+
+(deftest repo-label-removed
+  (testing "removes given label from editing repo"
+    (let [lbl {:name "test label" :value "test value"}]
+      (is (some? (reset! app-db (db/set-editing {} {:labels [lbl]}))))
+      (rf/dispatch-sync [:repo/label-removed lbl])
+      (is (empty? (-> (db/editing @app-db)
+                      :labels))))))
+
+(deftest repo-label-name-changed
+  (testing "updates name for given label"
+    (let [lbl {:name "test label" :value "test value"}]
+      (is (some? (reset! app-db (db/set-editing {} {:labels [lbl]}))))
+      (rf/dispatch-sync [:repo/label-name-changed lbl "updated label"])
+      (is (= {:name "updated label"
+              :value "test value"}
+             (-> (db/editing @app-db)
+                 :labels
+                 first))))))
+
+(deftest repo-label-value-changed
+  (testing "updates value for given label"
+    (let [lbl {:name "test label" :value "test value"}]
+      (is (some? (reset! app-db (db/set-editing {} {:labels [lbl]}))))
+      (rf/dispatch-sync [:repo/label-value-changed lbl "updated value"])
+      (is (= {:name "test label"
+              :value "updated value"}
+             (-> (db/editing @app-db)
+                 :labels
+                 first))))))
+
+(deftest repo-name-changed
+  (testing "updates editing repo name"
+    (rf/dispatch-sync [:repo/name-changed "new name"])
+    (is (= "new name" (:name (db/editing @app-db))))))
+
+(deftest repo-main-branch-changed
+  (testing "updates editing repo main-branch"
+    (rf/dispatch-sync [:repo/main-branch-changed "new branch"])
+    (is (= "new branch" (:main-branch (db/editing @app-db))))))
+
+(deftest repo-url-changed
+  (testing "updates editing repo url"
+    (rf/dispatch-sync [:repo/url-changed "new url"])
+    (is (= "new url" (:url (db/editing @app-db))))))
+
+(deftest repo-save
+  (rft/run-test-sync
+   (let [c (h/catch-fx :martian.re-frame/request)
+         [cust-id repo-id] (test-repo-path!)]
+     (swap! app-db #(-> %
+                        (db/set-editing {:name "updated repo name"})
+                        (db/set-edit-alerts [{:type :warning}])))
+     (h/initialize-martian {:update-repo {:error-code :no-error}})
+
+     (is (not-empty (r/path-params (r/current @app-db))))
+
+     (rf/dispatch [:repo/save])
+
+     (testing "updates repo in backend"
+       (is (= 1 (count @c))))
+
+     (testing "adds customer and repo id to body"
+       (let [args (-> @c first (nth 3) :repo)]
+         (is (map? args))
+         (is (= cust-id (:customer-id args)))
+         (is (= repo-id (:id args)))))
+
+     (testing "adds customer and repo id to params"
+       (let [args (-> @c first (nth 3))]
+         (is (map? args))
+         (is (= cust-id (:customer-id args)))
+         (is (= repo-id (:repo-id args)))))
+
+     (testing "marks saving"
+       (is (db/saving? @app-db)))
+
+     (testing "clears alerts"
+       (is (empty? (db/edit-alerts @app-db)))))))
+
+(deftest repo-save--success
+  (testing "updates repo in db"
+    (reset! app-db (cdb/set-customer {}
+                                     {:name "test customer"
+                                      :repos [{:id "test-repo"
+                                               :name "original repo"}]}))
+    (rf/dispatch-sync [:repo/save--success {:body {:id "test-repo"
+                                                   :name "updated repo"}}])
+    (is (= "updated repo"
+           (-> @app-db
+               (cdb/customer)
+               :repos
+               first
+               :name))))
+
+  (testing "unmarks saving"
+    (reset! app-db (db/mark-saving {}))
+    (rf/dispatch-sync [:repo/save--success {}])
+    (is (not (db/saving? @app-db))))
+
+  (testing "sets success alert"
+    (rf/dispatch-sync [:repo/save--success {}])
+    (is (= 1 (count (db/edit-alerts @app-db))))
+    (is (= :success (-> (db/edit-alerts @app-db)
+                        first
+                        :type)))))
+
+(deftest repo-save--failed
+  (testing "sets error alert"
+    (rf/dispatch-sync [:repo/save--failed {}])
+    (is (= 1 (count (db/edit-alerts @app-db))))
+    (is (= :danger (-> (db/edit-alerts @app-db)
+                       first
+                       :type))))
+
+  (testing "unmarks saving"
+    (reset! app-db (db/mark-saving {}))
+    (rf/dispatch-sync [:repo/save--failed {}])
+    (is (not (db/saving? @app-db)))))

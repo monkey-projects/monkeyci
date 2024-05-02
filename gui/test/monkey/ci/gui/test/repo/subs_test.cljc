@@ -111,3 +111,12 @@
     (testing "holds edit-alerts from db"
       (is (map? (reset! app-db (db/set-edit-alerts {} ::test-edit-alerts))))
       (is (= ::test-edit-alerts @a)))))
+
+(deftest saving?
+  (let [a (rf/subscribe [:repo/saving?])]
+    (testing "exists"
+      (is (some? a)))
+
+    (testing "holds saving state from db"
+      (is (map? (reset! app-db (db/set-saving {} true))))
+      (is (true? @a)))))

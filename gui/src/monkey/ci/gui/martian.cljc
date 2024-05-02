@@ -21,6 +21,19 @@
 (def build-schema
   (assoc repo-schema :build-id s/Str))
 
+;; TODO Use the same source as backend for this
+(s/defschema Label
+  {:name s/Str
+   :value s/Str})
+
+(s/defschema UpdateRepo
+  {:customer-id s/Str
+   :name s/Str
+   :url s/Str
+   (s/optional-key :main-branch) s/Str
+   (s/optional-key :github-id) s/Int
+   (s/optional-key :labels) [Label]})
+
 (defn public-route [conf]
   (merge {:method :get
           :produces #{"application/edn"}
@@ -43,6 +56,13 @@
      :method :get
      :path-parts repo-path
      :path-schema repo-schema})
+
+   (api-route
+    {:route-name :update-repo
+     :method :put
+     :path-parts repo-path
+     :path-schema repo-schema
+     :body-schema {:repo UpdateRepo}})
 
    (api-route
     {:route-name :get-builds

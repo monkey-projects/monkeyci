@@ -58,6 +58,15 @@
 (defn set-editing [db e]
   (assoc db editing e))
 
+(defn update-editing [db f & args]
+  (apply update db editing f args))
+
+(defn update-labels [db f & args]
+  (apply update-in db [editing :labels] f args))
+
+(defn update-label [db lbl f & args]
+  (update-labels db (partial replace {lbl (apply f lbl args)})))
+
 (def edit-alerts ::edit-alerts)
 
 (defn set-edit-alerts [db a]
@@ -66,3 +75,13 @@
 (defn reset-edit-alerts [db]
   (dissoc db edit-alerts))
 
+(def saving? ::saving?)
+
+(defn set-saving [db s]
+  (assoc db saving? s))
+
+(defn mark-saving [db]
+  (set-saving db true))
+
+(defn unmark-saving [db]
+  (dissoc db saving?))

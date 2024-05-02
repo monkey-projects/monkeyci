@@ -36,7 +36,8 @@
 (defn form-evt-handler
   [evt & [get-val]]
   (fn [e]
-    (rf/dispatch (conj evt ((or get-val evt->value) e)))))
+    ;; Dispatch synchronously to avoid losing events on fast input
+    (rf/dispatch-sync (conj evt ((or get-val evt->value) e)))))
 
 (defn ->sid [m & keys]
   (let [g (apply juxt keys)]
