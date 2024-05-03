@@ -37,9 +37,6 @@
 
   (testing "invalid job configurations"
     (let [configs [{:spec {:action "no id"}}
-                   {:id "action-and-container"
-                    :spec
-                    {:action (constantly :ok)
-                     :container {:image "test-img"}}}]]
+                   {:id "no-spec"}]]
       (doseq [c configs]
         (is (not (s/valid? :script/job c)) c)))))
