@@ -59,13 +59,6 @@
        (add-log-config-path rt)
        (add-api-token rt)))
 
-(defn- ->env [rt]
-  (->> rt
-       (rt->config)
-       (config/config->env)
-       (mc/map-keys name)
-       (mc/remove-vals empty?)))
-
 (defn- ->edn [rt]
   (-> (rt->config rt)
       (prn-str)))
@@ -138,8 +131,6 @@
                              ;; TODO Add support for tags as well
                              branch (concat ["-b" branch])
                              commit-id (concat ["--commit-id" commit-id]))
-                ;; TODO Pass config in a config file instead of env, cleaner and somewhat safer
-                ;;:environment-variables (->env rt)
                 ;; Run as root, because otherwise we can't write to the shared volumes
                 :security-context {:security-context-type "LINUX"
                                    :run-as-user 0})
