@@ -7,7 +7,8 @@
             [monkey.ci
              [config :as mc]
              [oci :as oci]
-             [runners :as r]]
+             [runners :as r]
+             [utils :as u]]
             [monkey.ci.events.core :as ec]
             [monkey.ci.runners.oci :as sut]
             [monkey.ci.helpers :as h]
@@ -105,7 +106,30 @@
             (is (= "child" (get env "monkeyci-runner-type"))))
 
           (testing "adds api token"
-            (is (not-empty (get env "monkeyci-api-token"))))))
+            (is (not-empty (get env "monkeyci-api-token")))))
+
+        (testing "config"
+          (testing "passed at global config path"
+            (let [mnt (oci/find-mount c sut/config-volume)]
+              (is (some? mnt))
+              (is (= mc/*global-config-file* (:mount-path mnt)))))
+
+          (let [vol (oci/find-volume inst sut/config-volume)
+                parsed (-> vol
+                           :configs
+                           first
+                           :data
+                           h/base64->
+                           u/parse-edn-str)]
+            (testing "contains `config.edn`"
+              (is (= 1 (count (:configs vol))))
+              (is (= "config.edn" (:file-name (first (:configs vol))))))
+
+            (testing "enforces child runner"
+              (is (= :child (get-in parsed [:runner :type]))))
+            
+            (testing "adds api token"
+              (is (not-empty (get-in parsed [:api :token])))))))
 
       (testing "drops nil env vars"
         (let [c (-> rt

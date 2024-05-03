@@ -22,6 +22,7 @@
 (def log-config-volume "log-config")
 (def log-config-dir "/home/monkeyci/config")
 (def log-config-file "logback.xml")
+(def config-volume "config")
 
 (def build-ssh-keys (comp :ssh-keys :git :build))
 (def log-config (comp :log-config :runner :config))
@@ -46,7 +47,7 @@
   [rt conf]
   (assoc-in conf [:api :token] (auth/generate-jwt-from-rt rt (auth/build-token (b/get-sid rt)))))
 
-(defn- ->env [rt]
+(defn- rt->config [rt]
   (->> (-> (rt/rt->env rt)
            (dissoc :app-mode :git :github :http :args :jwk :checkout-base-dir :storage
                    :ssh-keys-dir :work-dir :oci :runner)
@@ -56,10 +57,18 @@
        (prepare-config-for-oci)
        (add-ssh-keys-dir rt)
        (add-log-config-path rt)
-       (add-api-token rt)
+       (add-api-token rt)))
+
+(defn- ->env [rt]
+  (->> rt
+       (rt->config)
        (config/config->env)
        (mc/map-keys name)
        (mc/remove-vals empty?)))
+
+(defn- ->edn [rt]
+  (-> (rt->config rt)
+      (prn-str)))
 
 (defn- ssh-keys-volume-config [rt]
   (letfn [(->config-entries [idx ssh-keys]
@@ -102,6 +111,17 @@
                                                  :is-read-only true
                                                  :volume-name log-config-volume})))
 
+(defn- add-config-volume [conf rt]
+  (update conf :volumes conj {:name config-volume
+                              :volume-type "CONFIGFILE"
+                              :configs [(oci/config-entry "config.edn"
+                                                          (->edn rt))]}))
+
+(defn- add-config-mount [conf]
+  (update conf :volume-mounts conj {:mount-path config/*global-config-file*
+                                    :is-read-only true
+                                    :volume-name config-volume}))
+
 (defn- patch-container [[conf] rt]
   (let [{:keys [url branch commit-id] :as git} (get-in rt [:build :git])]
     (when (nil? url)
@@ -119,12 +139,13 @@
                              branch (concat ["-b" branch])
                              commit-id (concat ["--commit-id" commit-id]))
                 ;; TODO Pass config in a config file instead of env, cleaner and somewhat safer
-                :environment-variables (->env rt)
+                ;;:environment-variables (->env rt)
                 ;; Run as root, because otherwise we can't write to the shared volumes
                 :security-context {:security-context-type "LINUX"
                                    :run-as-user 0})
          (add-ssh-keys-mount rt)
-         (add-log-config-mount rt))]))
+         (add-log-config-mount rt)
+         (add-config-mount))]))
 
 (defn instance-config
   "Creates container instance configuration using the context and the
@@ -140,7 +161,8 @@
         (update :freeform-tags merge tags)
         (update :containers patch-container rt)
         (add-ssh-keys-volume rt)
-        (add-log-config-volume rt))))
+        (add-log-config-volume rt)
+        (add-config-volume rt))))
 
 (defn wait-for-script-end-event
   "Returns a deferred that realizes when the script/end event has been received."
