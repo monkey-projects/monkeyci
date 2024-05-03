@@ -86,10 +86,12 @@
                   (assoc :headers {"x-github-event" "push"}
                          :parameters {:path {:id "test-hook"}
                                       :body
-                                      {:head-commit {:id "test-id"}}}))]
+                                      {:head-commit {:id "test-id"}}}))
+          build-end? (comp (partial = :build/end) :type)
+          recv-build-end (fn []
+                           (some build-end? @recv))]
       (is (= 202 (:status (sut/webhook req))))
-      (is (not= :timeout (h/wait-until #(not-empty @recv) 1000)))
-      (is (= :build/end (-> @recv first :type))))))
+      (is (not= :timeout (h/wait-until recv-build-end 1000))))))
 
 (deftest app-webhook
   (testing "triggers build on push for watched repo"
