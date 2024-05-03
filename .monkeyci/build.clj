@@ -33,6 +33,18 @@
 (def should-publish?
   (some-fn main-branch? release?))
 
+(defn app-changed? [ctx]
+  (core/touched? ctx #"^app/.*"))
+
+(defn gui-changed? [ctx]
+  (core/touched? ctx #"^gui/.*"))
+
+(def build-app? (some-fn app-changed? release?))
+(def build-gui? (some-fn gui-changed? release?))
+
+(def publish-app? (every-pred app-changed? should-publish?))
+(def publish-gui? (every-pred gui-changed? should-publish?))
+
 (defn tag-version
   "Extracts the version from the tag"
   [ctx]
