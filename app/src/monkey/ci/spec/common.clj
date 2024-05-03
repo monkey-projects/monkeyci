@@ -4,3 +4,7 @@
 
 (defn url? [x]
   (and (string? x) (re-matches url-regex x)))
+
+(def id? string?)
+(def ts? int?) ; Timestamp
+(def path? string?)

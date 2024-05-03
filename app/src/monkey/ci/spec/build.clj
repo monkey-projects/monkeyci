@@ -4,9 +4,9 @@
   (:require [clojure.spec.alpha :as s]
             [monkey.ci.spec.common :as c]))
 
-(def id? string?)
-(def ts? int?)
-(def path? string?)
+(def id? c/id?)
+(def ts? c/ts?)
+(def path? c/path?)
 
 ;; Start and end time for build, script, job, etc...
 (s/def ::start-time ts?)
@@ -26,24 +26,42 @@
 (s/def :blob/id id?)
 (s/def :blob/path path?)
 (s/def :blob/size int?)
-(s/def :job/dependencies (s/coll-of :blob/id))
+(s/def :job/dependencies (s/coll-of :job/id))
 
 (s/def ::blob
   (s/keys :req-un [:blob/id :blob/path]
           :opt-un [:blob/size]))
 (s/def :job/caches (s/coll-of ::blob))
-(s/def :job/artifacts (s/coll-of ::blob))
-(s/def :job/memory int?)
+(s/def :job/save-artifacts (s/coll-of ::blob))
+(s/def :job/restore-artifacts (s/coll-of ::blob))
 
+(s/def :job/action fn?)
+(s/def :job/image string?)
+(s/def :job/memory int?)
 (s/def :job/command string?)
 (s/def :job/commands (s/coll-of :job/command))
 
-(s/def :script/job
+(s/def ::job-common
   (-> (s/keys :req-un [:job/id :job/type :job/status]
-              :opt-un [:job/dependencies :job/caches :job/artifacts :job/commands :job/memory])
+              :opt-un [:job/dependencies :job/caches :job/save-artifacts :job/restore-artifacts
+                       :job/commands :job/memory])
       (s/merge ::generic-entity)))
 
+(defmulti job-type :type)
+
+(defmethod job-type :action [_]
+  (-> (s/keys :req-un [:job/action])
+      (s/merge ::job-common)))
+
+(defmethod job-type :container [_]
+  (-> (s/keys :req-un [:job/image :job/commands]
+              :opt-un [:job/memory])
+      (s/merge ::job-common)))
+
+(s/def :script/job (s/multi-spec job-type :job/type))
 (s/def :script/jobs (s/coll-of :script/job))
+
+(s/def :job/spec (s/multi-spec job-type :job/type))
 
 ;;; Script: contains info about a build script, most notably the jobs
 
