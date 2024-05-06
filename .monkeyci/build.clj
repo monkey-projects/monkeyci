@@ -34,10 +34,14 @@
   (some-fn main-branch? release?))
 
 (defn app-changed? [ctx]
-  (core/touched? ctx #"^app/.*"))
+  ;; TODO Uncomment when changed files work
+  #_(core/touched? ctx #"^app/.*")
+  (constantly true))
 
 (defn gui-changed? [ctx]
-  (core/touched? ctx #"^gui/.*"))
+  ;; TODO Uncomment when changed files work
+  #_(core/touched? ctx #"^gui/.*")
+  (constantly true))
 
 (def build-app? (some-fn app-changed? release?))
 (def build-gui? (some-fn gui-changed? release?))

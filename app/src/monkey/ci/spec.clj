@@ -15,6 +15,21 @@
         false)
     true))
 
+(defn validate
+  "Validates the object against the spec.  Logs a warning if it is not valid, but always
+   returns `true`."
+  [spec x]
+  (when-not (s/valid? spec x)
+    (log/warn "Object does not match spec:" x ", spec:" spec ", explanation:" (s/explain-str spec x)))
+  true)
+
+(defn validate!
+  "Same as `validate`, but throws an exception on validation failure."
+  [spec x]
+  (when-not (s/valid? spec x)
+    (throw (ex-info "Object does not match spec" (s/explain-data spec x))))
+  true)
+
 (def url? c/url?)
 
 ;; Event related spec

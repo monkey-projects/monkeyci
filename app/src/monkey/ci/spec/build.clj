@@ -28,11 +28,12 @@
 
 ;;; Build: contains information about a single build, like id, git info, and script
 
+(s/def :customer/id c/id?)
+(s/def :repo/id c/id?)
+
 (s/def :build/id c/id?)
 (s/def :build/cleanup? boolean?)
 (s/def :build/webhook-id c/id?)
-(s/def :build/customer-id c/id?)
-(s/def :build/repo-id c/id?)
 (s/def :build/source keyword?)
 (s/def :build/checkout-dir c/path?)
 (s/def :build/phase phases)
@@ -74,7 +75,7 @@
 ;;; Build properties
 
 (s/def :build/props
-  (s/keys :req [:build/customer-id :build/repo-id :build/build-id :build/source]
+  (s/keys :req [:customer/id :repo/id :build/id :build/source]
           :opt [:build/git :build/webhook-id :script/props]))
 
 (s/def :build/status
