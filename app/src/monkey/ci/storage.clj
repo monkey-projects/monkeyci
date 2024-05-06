@@ -209,7 +209,7 @@
   [s build]
   (p/write-obj s (build-sid build) (-> build
                                        (dissoc :cleanup? :sid)
-                                       (update :git dissoc :ssh-keys :ssh-keys-dir))))
+                                       (mc/update-existing :git dissoc :ssh-keys :ssh-keys-dir))))
 
 (defn find-build
   "Finds build by sid"

@@ -24,7 +24,8 @@
 
 (defn update-script [storage {:keys [sid script]}]
   (log/debug "Updating build script for sid" sid)
-  (if-let [build (st/find-build storage sid)]
+  (if-let [build (some-> (st/find-build storage sid)
+                         (assoc :sid sid))]
     (let [orig (get-in build [:script :jobs])]
       (save-build storage
                   (assoc build

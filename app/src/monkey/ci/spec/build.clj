@@ -2,103 +2,65 @@
   "Spec definitions for build.  The build object in the runtime and events that contain
    builds, scripts or jobs should conform to these specs."
   (:require [clojure.spec.alpha :as s]
-            [monkey.ci.spec.common :as c]))
+            [monkey.ci.spec
+             [common :as c]
+             [job]]))
 
-(def id? c/id?)
-(def ts? c/ts?)
-(def path? c/path?)
-
-;; Start and end time for build, script, job, etc...
-(s/def ::start-time ts?)
-(s/def ::end-time ts?)
 ;; Informative message for the user, e.g. on failure
 (s/def ::message string?)
 
-(s/def ::generic-entity (s/keys :req-un [::start-time]
-                                :opt-un [::end-time ::message]))
-
-;;; Jobs: parts of a script
-
-(s/def :job/id id?)
-(s/def :job/type #{:action :container})
-(s/def :job/status #{:pending :starting :running :stopping :error :failure :success :skipped})
-
-(s/def :blob/id id?)
-(s/def :blob/path path?)
-(s/def :blob/size int?)
-(s/def :job/dependencies (s/coll-of :job/id))
-
-(s/def ::blob
-  (s/keys :req-un [:blob/id :blob/path]
-          :opt-un [:blob/size]))
-(s/def :job/caches (s/coll-of ::blob))
-(s/def :job/save-artifacts (s/coll-of ::blob))
-(s/def :job/restore-artifacts (s/coll-of ::blob))
-
-(s/def :job/action fn?)
-(s/def :job/image string?)
-(s/def :job/memory int?)
-(s/def :job/command string?)
-(s/def :job/commands (s/coll-of :job/command))
-
-(s/def ::job-common
-  (-> (s/keys :req-un [:job/id :job/type :job/status]
-              :opt-un [:job/dependencies :job/caches :job/save-artifacts :job/restore-artifacts
-                       :job/commands :job/memory])
-      (s/merge ::generic-entity)))
-
-(defmulti job-type :type)
-
-(defmethod job-type :action [_]
-  (-> (s/keys :req-un [:job/action])
-      (s/merge ::job-common)))
-
-(defmethod job-type :container [_]
-  (-> (s/keys :req-un [:job/image :job/commands]
-              :opt-un [:job/memory])
-      (s/merge ::job-common)))
-
-(s/def :script/job (s/multi-spec job-type :job/type))
-(s/def :script/jobs (s/coll-of :script/job))
-
-(s/def :job/spec (s/multi-spec job-type :job/type))
-
 ;;; Script: contains info about a build script, most notably the jobs
 
-(def build-states #{:pending :running :error :success :canceled})
+(s/def :script/jobs (s/coll-of :job/props))
 
-(s/def :script/script-dir path?)
-(s/def :script/status build-states)
+(def phases #{:pending :running :error :success :canceled})
 
-(s/def :build/script
-  (-> (s/keys :req-un [:script/status :script/script-dir]
-              :opt-un [:script/jobs])
-      (s/merge ::generic-entity)))
+(s/def :script/script-dir c/path?)
+(s/def :script/phase phases)
+
+(s/def :script/props
+  (s/keys :req [:script/script-dir]
+          :opt [:script/jobs]))
+
+(s/def :script/status
+  (-> (s/keys :req [:script/phase :job/states])
+      (s/merge :entity/timed)))
 
 ;;; Build: contains information about a single build, like id, git info, and script
 
-(s/def :build/id id?)
-(s/def :build/sid vector?)
+(s/def :build/id c/id?)
 (s/def :build/cleanup? boolean?)
-(s/def :build/webhook-id id?)
-(s/def :build/customer-id id?)
-(s/def :build/repo-id id?)
+(s/def :build/webhook-id c/id?)
+(s/def :build/customer-id c/id?)
+(s/def :build/repo-id c/id?)
 (s/def :build/source keyword?)
-(s/def :build/checkout-dir path?)
-(s/def :build/status build-states)
+(s/def :build/checkout-dir c/path?)
+(s/def :build/phase phases)
 
 ;; GIT configuration
 (s/def :git/url c/url?)
 (s/def :git/ref string?)
 (s/def :git/commit-id string?)
-(s/def :git/dir path?)
 (s/def :git/main-branch string?)
-(s/def :git/ssh-keys-dir path?)
-(s/def :git/message string?)
 
-(s/def :build/git
-  (s/keys :req-un [:git/url :git/dir]
-          :opt-un [:git/ref :git/commit-id :git/main-branch :git/ssh-keys-dir :git/message]))
+(s/def :git/props
+  (s/keys :req [:git/url :git/changes]
+          :opt [:git/ref :git/commit-id :git/main-branch]))
+
+(s/def :git/dir c/path?)
+(s/def :git/message string?)
+(s/def :git/ssh-keys-dir c/path?)
+(s/def :git/ssh-keys (s/coll-of :git/ssh-key))
+
+(s/def :git/ssh-key (s/keys :req [:key/public :key/private]
+                            :opt [:key/desc]))
+(s/def :key/public string?)
+(s/def :key/private string?)
+(s/def :key/desc string?)
+
+(s/def :git/status
+  (s/keys :req [:git/dir]
+          :opt [:git/ssh-keys :git/ssh-keys-dir :git/message]))
 
 ;;; Changes: which files have changed for the build
 
@@ -106,12 +68,19 @@
 (s/def :changes/removed  (s/coll-of string?))
 (s/def :changes/modified (s/coll-of string?))
 
-(s/def :build/changes
+(s/def :git/changes
   (s/keys :opt-un [:changes/added :changes/removed :changes/modified]))
 
-(s/def ::build
-  (-> (s/keys :req-un [:build/customer-id :build/repo-id :build/build-id :build/sid
-                       :build/source :build/status]
-              :opt-un [:build/git :build/cleanup? :build/webhook-id :build/script :build/checkout-dir
-                       :build/changes])
-      (s/merge ::generic-entity)))
+;;; Build properties
+
+(s/def :build/props
+  (s/keys :req [:build/customer-id :build/repo-id :build/build-id :build/source]
+          :opt [:build/git :build/webhook-id :script/props]))
+
+(s/def :build/status
+  (-> (s/keys :req [:build/phase :build/checkout-dir :build/cleanup? :script/status])
+      (s/merge :entity/timed)))
+
+(s/def :app/build
+  (s/keys :req [:build/props]
+          :opt [:build/status]))

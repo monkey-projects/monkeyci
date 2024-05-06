@@ -9,34 +9,41 @@
 
 (deftest spec-job
   (testing "valid job configurations"
-    (let [configs [{:id "action-job"
-                    :spec {:action (constantly "ok")
-                           :dependencies
-                           ["other-job"]
-                           :caches
-                           [{:id "mvn-cache"
-                             :path "/mvn/cache"}]
-                           :save-artifacts
-                           [{:id "jar"
-                             :path "test.jar"}]}}
-                   {:id "container-job"
-                    :spec {:container
-                           {:image "test:img"
-                            :commands ["a" "b"]}
-                           :dependencies
-                           ["other-job"]
-                           :restore-artifacts
-                           [{:id "jar"
-                             :path "test.jar"}]}}
-                   {:id "completed-job"
-                    :spec {:action (constantly true)}
-                    :status
-                    {:phase :completed}}]]
+    (let [configs [{:job/id "action-job"
+                    :job/action (constantly "ok")
+                    :job/dependencies
+                    ["other-job"]
+                    :job/caches
+                    [{:blob/id "mvn-cache"
+                      :blob/path "/mvn/cache"}]
+                    :job/save-artifacts
+                    [{:blob/id "jar"
+                      :blob/path "test.jar"}]}
+                   {:job/id "container-job"
+                    :job/container
+                    {:container/image "test:img"
+                     :container/commands ["a" "b"]}
+                    :job/dependencies
+                    ["other-job"]
+                    :job/restore-artifacts
+                    [{:blob/id "jar"
+                      :blob/path "test.jar"}]}
+                   {:job/id "completed-job"
+                    :job/action (constantly true)}]]
       (doseq [c configs]
-        (validate-spec :script/job c))))
+        (validate-spec :job/props c))))
+
+  (testing "valid job states"
+    (validate-spec :job/status {:job/id "test-job"
+                                :job/phase :completed
+                                :time/start 100
+                                :time/end 200}))
 
   (testing "invalid job configurations"
-    (let [configs [{:spec {:action "no id"}}
-                   {:id "no-spec"}]]
+    (let [configs [{:job/action (constantly "no id")}
+                   {:job/id "no-spec"}]]
       (doseq [c configs]
-        (is (not (s/valid? :script/job c)) c)))))
+        (is (not (s/valid? :job/props c)) c))))
+
+  (testing "invalid job states"
+    (is (not (s/valid? :job/status {:job/phase :running})))))
