@@ -12,32 +12,6 @@
             [monkey.ci.gui.timer :as timer]
             [re-frame.core :as rf]))
 
-(def log-modal-id :log-dialog)
-
-(defn- modal-title []
-  (let [p (rf/subscribe [:build/log-path])]
-    [:h5 "Log for " @p]))
-
-(defn- show-downloading []
-  (let [d? (rf/subscribe [:build/downloading?])]
-    (when @d?
-      [co/render-alert {:type :info
-                        :message "Downloading log file, one moment..."}])))
-
-(defn- log-contents []
-  (let [c (rf/subscribe [:build/current-log])]
-    [co/log-contents @c]))
-
-(defn log-modal []
-  (let [a (rf/subscribe [:build/log-alerts])]
-    [co/modal
-     log-modal-id
-     [modal-title]
-     [:div {:style {:min-height "100px"}}
-      [co/alerts [:build/log-alerts]]
-      [show-downloading]
-      [log-contents]]]))
-
 (defn build-details
   "Displays the build details by looking it up in the list of repo builds."
   []
@@ -80,14 +54,6 @@
 (defn- calc-elapsed [{s :start-time e :end-time}]
   (when (and s e)
     (t/format-seconds (int (/ (- e s) 1000)))))
-
-#_(defn- render-log-link [{:keys [name size path]}]
-  [:span.me-1
-   [:a.me-1 {:href (u/->dom-id log-modal-id)
-             :data-bs-toggle "modal"
-             :on-click (u/link-evt-handler [:build/download-log path])}
-    name]
-   (str "(" size " bytes)")])
 
 (defn- elapsed-final [s]
   [:span (calc-elapsed s)])
@@ -186,6 +152,5 @@
         [build-details]
         [build-result]
         [build-jobs]
-        [log-modal]
         [:div
          [:a {:href (r/path-for :page/repo params)} "Back to repository"]]]])))
