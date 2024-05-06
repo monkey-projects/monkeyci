@@ -12,6 +12,7 @@
              [labels :as lbl]
              [logging :as l]
              [runtime :as rt]
+             [spec :as s]
              [storage :as st]
              [utils :as u]]
             [monkey.ci.events.core :as ec]
@@ -353,23 +354,23 @@
         repo (st/find-repo st (repo-sid req))
         ssh-keys (->> (st/find-ssh-keys st (customer-id req))
                       (lbl/filter-by-label repo))]
-    (-> acc
-        (select-keys [:customer-id :repo-id])
-        (assoc :source :api
-               :build-id bid
-               :git (-> (:query p)
-                        (select-keys [:commit-id :branch])
-                        (assoc :url (:url repo)
-                               :ssh-keys-dir (rt/ssh-keys-dir (c/req->rt req) bid))
-                        (mc/assoc-some :ref (params->ref p)
-                                       :ssh-keys ssh-keys
-                                       :main-branch (:main-branch repo)))
-               :sid (-> acc
-                        (assoc :build-id bid)
-                        (st/ext-build-sid))
-               :start-time (u/now)
-               :status :running
-               :cleanup? true))))
+    {:build/props
+     {:customer/id (:customer-id acc)
+      :repo/id (:repo-id acc)
+      :build/id bid
+      :build/source :api
+      :git/props (-> {:git/url (:url repo)
+                      :git/changes {}}
+                     (mc/assoc-some :git/commit-id (get-in p [:query :commit-id])
+                                    :git/ref (params->ref p)))}
+     :build/status
+     {:time/start (u/now)
+      :build/phase :pending
+      :build/cleanup? true
+      :git/status
+      {:git/ssh-keys-dir (rt/ssh-keys-dir (c/req->rt req) bid)
+       :git/ssh-keys ssh-keys
+       :git/main-branch (:main-branch repo)}}}))
 
 (defn trigger-build [req]
   (let [{p :parameters} req]

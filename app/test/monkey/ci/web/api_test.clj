@@ -392,8 +392,9 @@
                (h/->req)
                (assoc-in [:parameters :query :branch] "test-branch")
                (sut/make-build-ctx "test-build")
-               :git
-               :ref))))
+               :build/props
+               :git/props
+               :git/ref))))
 
   (testing "adds ref to build from tag query param"
     (is (= "refs/tags/test-tag"
@@ -401,8 +402,9 @@
                (h/->req)
                (assoc-in [:parameters :query :tag] "test-tag")
                (sut/make-build-ctx "test-build")
-               :git
-               :ref))))
+               :build/props
+               :git/props
+               :git/ref))))
 
   (testing "adds configured ssh keys"
     (let [{st :storage :as rt} (h/test-rt)
@@ -415,8 +417,9 @@
                  (assoc-in [:parameters :path] {:customer-id cid
                                                 :repo-id rid})
                  (sut/make-build-ctx "test-build")
-                 :git
-                 :ssh-keys)))))
+                 :build/status
+                 :git/status
+                 :git/ssh-keys)))))
 
   (testing "adds main branch from repo"
     (let [{st :storage :as rt} (h/test-rt)
@@ -429,8 +432,9 @@
                  (assoc-in [:parameters :path] {:customer-id cid
                                                 :repo-id rid})
                  (sut/make-build-ctx "test-build")
-                 :git
-                 :main-branch))))))
+                 :build/status
+                 :git/status
+                 :git/main-branch))))))
 
 (deftest update-user
   (testing "updates user in storage"

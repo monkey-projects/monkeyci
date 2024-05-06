@@ -3,7 +3,9 @@
             [clojure.spec.alpha :as s]
             [clojure.tools.logging :as log]
             [monkey.ci.protocols :as p]
-            [monkey.ci.spec.common :as c]
+            [monkey.ci.spec
+             [build]
+             [common :as c]]
             [monkey.oci.sign :as oci-sign]))
 
 (defn valid?

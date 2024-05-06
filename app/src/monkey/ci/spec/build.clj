@@ -30,19 +30,20 @@
 
 (s/def :customer/id c/id?)
 (s/def :repo/id c/id?)
+(s/def :webhook/id c/id?)
 
 (s/def :build/id c/id?)
 (s/def :build/cleanup? boolean?)
-(s/def :build/webhook-id c/id?)
 (s/def :build/source keyword?)
 (s/def :build/checkout-dir c/path?)
 (s/def :build/phase phases)
+
+(s/def :git/main-branch string?)
 
 ;; GIT configuration
 (s/def :git/url c/url?)
 (s/def :git/ref string?)
 (s/def :git/commit-id string?)
-(s/def :git/main-branch string?)
 
 (s/def :git/props
   (s/keys :req [:git/url :git/changes]
@@ -60,8 +61,7 @@
 (s/def :key/desc string?)
 
 (s/def :git/status
-  (s/keys :req [:git/dir]
-          :opt [:git/ssh-keys :git/ssh-keys-dir :git/message]))
+  (s/keys :opt [:git/dir :git/ssh-keys :git/ssh-keys-dir :git/message]))
 
 ;;; Changes: which files have changed for the build
 
@@ -76,10 +76,11 @@
 
 (s/def :build/props
   (s/keys :req [:customer/id :repo/id :build/id :build/source]
-          :opt [:build/git :build/webhook-id :script/props]))
+          :opt [:webhook/id :git/props :script/props]))
 
 (s/def :build/status
-  (-> (s/keys :req [:build/phase :build/checkout-dir :build/cleanup? :script/status])
+  (-> (s/keys :req [:build/phase :build/cleanup? :git/status]
+              :opt [:script/status :build/checkout-dir])
       (s/merge :entity/timed)))
 
 (s/def :app/build
