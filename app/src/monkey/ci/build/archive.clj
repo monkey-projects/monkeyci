@@ -99,9 +99,11 @@
    argument, only the files that match the regex are extracted."
   [is dest & [re]]
   (with-open [ds (decompress is)]
-    (unarchive ds dest (if re
-                         (bc/->pred re)
-                         (constantly true)))))
+    (unarchive ds
+               (io/file dest)
+               (if re
+                 (bc/->pred re)
+                 (constantly true)))))
 
 (defn list-files
   "Lists files in the archive at given path"

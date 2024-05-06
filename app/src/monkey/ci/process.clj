@@ -148,6 +148,7 @@
           :out (l/log-output out)
           :err (l/log-output err)
           :cmd cmd
+          ;; TODO Pass as edn instead of env vars.  We would have to write it to a tmp file.
           :extra-env (process-env rt)
           :exit-fn (fn [{:keys [proc] :as p}]
                      (let [exit (or (some-> proc (.exitValue)) 0)]
