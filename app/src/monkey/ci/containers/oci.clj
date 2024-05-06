@@ -162,8 +162,8 @@
 
 (defn- job-details->edn [rt]
   (pr-str {:job (-> (:job rt)
-                     (select-keys [:id :save-artifacts :restore-artifacts :caches :dependencies])
-                     (assoc :work-dir (job-work-dir rt)))}))
+                    (select-keys [:id :save-artifacts :restore-artifacts :caches :dependencies])
+                    (assoc :work-dir (job-work-dir rt)))}))
 
 (defn- config-vol-config
   "Configuration files for the sidecar (e.g. logging)"
@@ -234,6 +234,8 @@
              max-timeout (ec/set-result
                           {:type t}
                           (ec/make-result :error 1 (str "Timeout after " max-timeout " msecs")))))]
+    ;; TODO As soon as a failure for the sidecar has been received, we should return
+    ;; because then container events won't be sent anymore anyway.
     (md/zip
      (wait-for :container/end)
      (wait-for :sidecar/end))))
