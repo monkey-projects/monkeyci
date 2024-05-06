@@ -207,7 +207,9 @@
 (defn save-build
   "Creates or updates the build entity"
   [s build]
-  (p/write-obj s (build-sid build) build))
+  (p/write-obj s (build-sid build) (-> build
+                                       (dissoc :cleanup? :sid)
+                                       (update :git dissoc :ssh-keys :ssh-keys-dir))))
 
 (defn find-build
   "Finds build by sid"

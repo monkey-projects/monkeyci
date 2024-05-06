@@ -162,8 +162,8 @@
 
 (defn- job-details->edn [rt]
   (pr-str {:job (-> (:job rt)
-                     (select-keys [:id :save-artifacts :restore-artifacts :caches :dependencies])
-                     (assoc :work-dir (job-work-dir rt)))}))
+                    (select-keys [:id :save-artifacts :restore-artifacts :caches :dependencies])
+                    (assoc :work-dir (job-work-dir rt)))}))
 
 (defn- config-vol-config
   "Configuration files for the sidecar (e.g. logging)"

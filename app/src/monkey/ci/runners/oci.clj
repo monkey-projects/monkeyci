@@ -60,8 +60,10 @@
        (add-api-token rt)))
 
 (defn- ->edn [rt]
-  (-> (rt->config rt)
-      (prn-str)))
+  (let [edn (-> (rt->config rt)
+                (prn-str))]
+    (log/debug "Configuration used for build:" edn)
+    edn))
 
 (defn- ssh-keys-volume-config [rt]
   (letfn [(->config-entries [idx ssh-keys]
