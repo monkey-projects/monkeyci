@@ -29,7 +29,7 @@
                                               (reset! captured-args args)
                                               bc/success)]
             (is (nil? (spit config-file (pr-str {:build {:build-id "test-build"}}))))
-            (is (nil? (sut/run (.getAbsolutePath config-file))))
+            (is (nil? (sut/run {:config-file (.getAbsolutePath config-file)})))
             (is (= {:build-id "test-build"}
                    (-> @captured-args
                        :build)))))))
@@ -43,7 +43,7 @@
                                               bc/success)]
             (is (nil? (spit config-file (pr-str {:build {:build-id "test-build"}}))))
             (is (nil? (sut/run
-                        (.getAbsolutePath config-file)
+                        {:config-file (.getAbsolutePath config-file)}
                         {:monkeyci-containers-type "podman"
                          :monkeyci-api-socket "/tmp/test.sock"})))
             (is (= {:type :podman} (:containers @captured-args)))

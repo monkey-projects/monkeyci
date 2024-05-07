@@ -40,8 +40,8 @@
 (defn exit! [exit-code]
   (System/exit exit-code))
 
-(defn- load-config [args]
-  (with-open [r (io/reader (if (sequential? args) (first args) args))]
+(defn- load-config [{:keys [config-file]}]
+  (with-open [r (io/reader config-file)]
     (utils/parse-edn r)))
 
 (defn run
@@ -49,15 +49,16 @@
    is run in a child process by the `execute!` function below.  This exits the VM
    with a nonzero value on failure."
   ([args env]
+   (log/debug "Running with args:" args)
    (try
      (let [config (load-config args)]
        (when (-> (config/normalize-config (merge default-script-config config)
                                           (config/strip-env-prefix env)
                                           nil)
                  (rt/with-runtime :script rt
-                   (log/debug "Executing script with config" (:config rt))
-                   (log/debug "Script working directory:" (utils/cwd))
-                   (script/exec-script! rt))
+                     (log/debug "Executing script with config" (:config rt))
+                     (log/debug "Script working directory:" (utils/cwd))
+                     (script/exec-script! rt))
                  (bc/failed?))
          (exit! 1)))
      (catch Exception ex
@@ -140,7 +141,7 @@
         cmd ["clojure"
              "-Sdeps" (pr-str (generate-deps rt))
              "-X:monkeyci/build"
-             (config->edn rt)]]
+             (pr-str {:config-file (config->edn rt)})]]
     (log/debug "Running in script dir:" script-dir ", this command:" cmd)
     ;; TODO Run as another unprivileged user for security
     (-> (bp/process
