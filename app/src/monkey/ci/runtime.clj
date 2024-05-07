@@ -135,7 +135,7 @@
       :else
       (log/warn "No event poster configured"))))
 
-(defn rt->env
+(defn ^:deprecated rt->env
   "Returns a map that can be serialized back into env vars.  This is used
    to pass application configuration to child processes or containers."
   [rt]

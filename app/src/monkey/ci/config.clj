@@ -166,7 +166,7 @@
 
 (defmethod normalize-key :account [_ {:keys [args] :as conf}]
   (let [c (update conf :account merge (-> args
-                                          (select-keys [:customer-id :project-id :repo-id])
+                                          (select-keys [:customer-id :repo-id])
                                           (mc/assoc-some :url (:server args))))]
     (cond-> c
       (empty? (:account c)) (dissoc :account))))
