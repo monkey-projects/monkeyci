@@ -126,30 +126,6 @@
                                last)
                            ".edn"))))))
 
-(deftest process-env
-  (testing "passes build id"
-    (is (= "test-build" (-> {:build {:build-id "test-build"}}
-                            (sut/process-env)
-                            :monkeyci-build-build-id))))
-
-  (testing "passes build sid in serialized fashion"
-    (is (= "a/b/c" (-> {:build {:sid ["a" "b" "c"]}}
-                       (sut/process-env)
-                       :monkeyci-build-sid))))
-  
-  (testing "sets `LC_CTYPE` to `UTF-8` for git clones"
-    (is (= "UTF-8" (-> {}
-                       (sut/process-env)
-                       :lc-ctype))))
-
-  (testing "passes serialized config"
-    (let [env (-> {:config
-                   {:logging {:type :file
-                              :dir "test-dir"}}}
-                  (sut/process-env))]
-      (is (= "file" (:monkeyci-logging-type env)))
-      (is (= "test-dir" (:monkeyci-logging-dir env))))))
-
 (deftest generate-deps
   (testing "adds log config file, relative to work dir if configured"
     (h/with-tmp-dir dir

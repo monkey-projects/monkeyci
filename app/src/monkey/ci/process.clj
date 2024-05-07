@@ -102,32 +102,6 @@
         log-config (assoc :jvm-opts
                           [(str "-Dlogback.configurationFile=" log-config)]))}}))
 
-(defn- ^:deprecated build-args
-  "Builds command-line args vector for script process"
-  [build]
-  (->> (-> build
-           (select-keys [:checkout-dir :pipeline])
-           (assoc :script-dir (b/script-dir build)))
-       (mc/remove-vals nil?)
-       (mc/map-keys str)
-       (mc/map-vals pr-str)
-       (into [])
-       (flatten)))
-
-(def default-envs
-  {:lc-ctype "UTF-8"})
-
-(defn ^:deprecated process-env
-  "Build the environment to be passed to the child process."
-  [rt]
-  (-> (rt/rt->env rt)
-      ;; Generate an API token and add it to the config
-      (update :api mc/assoc-some :token (auth/generate-jwt-from-rt rt (auth/build-token (b/get-sid rt))))
-      ;; Overwrite event settings with runner-specific config
-      (mc/assoc-some :events (get-in rt [rt/config :runner :events]))
-      (config/config->env)
-      (merge default-envs)))
-
 (defn rt->config [rt]
   (-> (rt/config rt)
       (assoc :build (rt/build rt))
