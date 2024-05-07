@@ -49,7 +49,7 @@
   (assoc-in conf [:api :token] (auth/generate-jwt-from-rt rt (auth/build-token (b/get-sid rt)))))
 
 (defn- rt->config [rt]
-  (->> (-> (rt/rt->env rt)
+  (->> (-> (rt/rt->config rt)
            (dissoc :app-mode :git :github :http :args :jwk :checkout-base-dir :storage
                    :ssh-keys-dir :work-dir :oci :runner)
            (update :build dissoc :cleanup? :status)

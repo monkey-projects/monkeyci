@@ -117,14 +117,14 @@
                               :dir))))
 
       (testing "passes config file in edn"
-        (is (cs/ends-with? (-> {:build {:checkout-dir "work-dir"}}
-                               (sut/execute!)
-                               (deref)
-                               :process
-                               :args
-                               :cmd
-                               last)
-                           ".edn"))))))
+        (is (re-matches #"^\{:config-file \".*\.edn\"}" 
+                        (-> {:build {:checkout-dir "work-dir"}}
+                            (sut/execute!)
+                            (deref)
+                            :process
+                            :args
+                            :cmd
+                            last)))))))
 
 (deftest generate-deps
   (testing "adds log config file, relative to work dir if configured"
