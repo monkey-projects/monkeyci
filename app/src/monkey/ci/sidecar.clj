@@ -101,7 +101,7 @@
     (log/info "Polling events from" f)
     (md/future
       (try
-        (with-open [r (io/reader f)]
+        (with-open [r (java.io.PushbackReader. (io/reader f))]
           (loop [evt (read-next r)]
             (if (not (fs/exists? f))
               ;; Done when the events file is deleted
