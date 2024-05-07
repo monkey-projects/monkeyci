@@ -58,3 +58,10 @@
     (is (= {:parent {:child {:name "test"}}}
            (sut/prune-tree {:parent {:child {:name "test"
                                              :other {}}}})))))
+
+(deftest parse-sid
+  (testing "parses string"
+    (is (= ["a" "b"] (sut/parse-sid "a/b"))))
+
+  (testing "leaves seq as-is"
+    (is (= ["a" "b"] (sut/parse-sid ["a" "b"])))))

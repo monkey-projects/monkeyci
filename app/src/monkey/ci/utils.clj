@@ -142,8 +142,8 @@
       (encodeToString (.getBytes s java.nio.charset.StandardCharsets/UTF_8))))
 
 (defn parse-sid [s]
-  (when s
-    (cs/split s #"/")))
+  (cond-> s
+    (string? s) (cs/split #"/")))
 
 (defn sid->repo-sid [s]
   (take 2 s))

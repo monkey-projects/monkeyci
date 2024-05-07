@@ -54,7 +54,7 @@
                    :ssh-keys-dir :work-dir :oci :runner)
            (update :build dissoc :cleanup? :status)
            (update-in [:build :git] dissoc :ssh-keys)
-           (update :events (partial merge-with merge) (get-in rt [rt/config :runner :events])))
+           (update :events u/deep-merge (get-in rt [rt/config :runner :events])))
        (prepare-config-for-oci)
        (add-ssh-keys-dir rt)
        (add-log-config-path rt)

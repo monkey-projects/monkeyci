@@ -83,7 +83,7 @@
    {:on-click #(rf/dispatch [:job/toggle job])
     :aria-label "Close"}])
 
-(defn- job-details [{:keys [labels start-time end-time] deps :dependencies :as job}]
+(defn- job-details [{:keys [labels start-time end-time] deps :dependencies arts :save-artifacts :as job}]
   [:div.row
    [:div.col-4
     [:ul
@@ -94,7 +94,10 @@
      (when-not (empty? labels)
        [:li "Labels:" (str labels)])
      (when-not (empty? deps)
-       [:li "Dependent on: " (cs/join ", " deps)])]]
+       [:li "Dependent on: " (cs/join ", " deps)])
+     (when-not (empty? arts)
+       ;; TODO Link to artifact
+       [:li "Artifacts: " (cs/join ", " (map :id arts))])]]
    [:div.col-4
     [logs-btn job]]
    [:div.col-4
