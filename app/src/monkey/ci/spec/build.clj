@@ -18,13 +18,13 @@
 (s/def :script/script-dir c/path?)
 (s/def :script/phase phases)
 
-(s/def :script/props
-  (s/keys :req [:script/script-dir]
-          :opt [:script/jobs]))
+(s/def :script/entity
+  (-> (s/keys :req [:script/script-dir :script/phase]
+              :opt [:script/jobs])
+      (s/merge :entity/timed)))
 
 (s/def :script/status
-  (-> (s/keys :req [:script/phase :job/states])
-      (s/merge :entity/timed)))
+  (s/keys :req [:job/states]))
 
 ;;; Build: contains information about a single build, like id, git info, and script
 
@@ -43,25 +43,26 @@
 ;; GIT configuration
 (s/def :git/url c/url?)
 (s/def :git/ref string?)
-(s/def :git/commit-id string?)
+(s/def :commit/id string?)
+(s/def :commit/message (s/nilable string?))
 
-(s/def :git/props
+(s/def :git/entity
   (s/keys :req [:git/url :git/changes]
-          :opt [:git/ref :git/commit-id :git/main-branch]))
+          :opt [:git/ref :git/main-branch :commit/id :commit/message]))
 
 (s/def :git/dir c/path?)
-(s/def :git/message string?)
-(s/def :git/ssh-keys-dir c/path?)
+(s/def :git/ssh-keys-dir (s/nilable c/path?))
 (s/def :git/ssh-keys (s/coll-of :git/ssh-key))
 
-(s/def :git/ssh-key (s/keys :req [:key/public :key/private]
-                            :opt [:key/desc]))
+(s/def :git/ssh-key
+  (s/keys :req [:key/public :key/private]
+          :opt [:key/desc]))
 (s/def :key/public string?)
 (s/def :key/private string?)
 (s/def :key/desc string?)
 
 (s/def :git/status
-  (s/keys :opt [:git/dir :git/ssh-keys :git/ssh-keys-dir :git/message]))
+  (s/keys :opt [:git/dir :git/ssh-keys :git/ssh-keys-dir]))
 
 ;;; Changes: which files have changed for the build
 
@@ -70,19 +71,19 @@
 (s/def :changes/modified (s/coll-of string?))
 
 (s/def :git/changes
-  (s/keys :opt-un [:changes/added :changes/removed :changes/modified]))
+  (s/keys :opt [:changes/added :changes/removed :changes/modified]))
 
 ;;; Build properties
 
-(s/def :build/props
-  (s/keys :req [:customer/id :repo/id :build/id :build/source]
-          :opt [:webhook/id :git/props :script/props]))
-
-(s/def :build/status
-  (-> (s/keys :req [:build/phase :build/cleanup? :git/status]
-              :opt [:script/status :build/checkout-dir])
+(s/def :build/entity
+  (-> (s/keys :req [:customer/id :repo/id :build/id :build/source :build/phase]
+              :opt [:webhook/id :git/entity :script/entity])
       (s/merge :entity/timed)))
 
+(s/def :build/status
+  (s/keys :req [:build/cleanup? :git/status]
+          :opt [:script/status :build/checkout-dir]))
+
 (s/def :app/build
-  (s/keys :req [:build/props]
+  (s/keys :req [:build/entity]
           :opt [:build/status]))

@@ -12,6 +12,8 @@
             [monkey.ci.build.core :as bc]))
 
 (def account->sid (juxt :customer-id :repo-id))
+(def entity :build/entity)
+(def build->sid (comp (juxt :customer/id :repo/id :build/id) entity))
 
 (def build-sid-length 3)
 
@@ -181,6 +183,9 @@
        :jobs
        vals
        (filter (comp (partial = :success) :status))))
+
+(def git-entity (comp :git/entity entity))
+(def git-changes (comp :git/changes git-entity))
 
 (defmethod rt/setup-runtime :build [conf _]
   ;; Just copy the build info to the runtime

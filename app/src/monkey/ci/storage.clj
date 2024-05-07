@@ -81,17 +81,17 @@
 (def customer-sid (partial global-sid :customers))
 
 (defn save-customer [s cust]
-  (p/write-obj s (customer-sid (:id cust)) cust))
+  (p/write-obj s (customer-sid (:customer/id cust)) cust))
 
 (defn find-customer [s id]
   (p/read-obj s (customer-sid id)))
 
 (defn save-repo
   "Saves the repository by updating the customer it belongs to"
-  [s {:keys [customer-id id] :as r}]
-  (-> (update-obj s (customer-sid customer-id) assoc-in [:repos id] r)
+  [s r]
+  (-> (update-obj s (customer-sid (:customer/id r)) assoc-in [:repos (:repo/id r)] r)
       ;; Return repo sid
-      (conj id)))
+      (conj (:repo/id r))))
 
 (defn find-repo
   "Reads the repo, as part of the customer object's projects"
@@ -116,10 +116,10 @@
 (defn watch-github-repo
   "Creates necessary records to start watching a github repo.  Creates the
    repo entity and returns it."
-  [s {:keys [customer-id id github-id] :as r}]
+  [s r]
   (let [repo-sid (save-repo s r)]
     ;; Add the repo sid to the list of watched repos for the github id
-    (update-obj s (watched-sid github-id) (fnil conj []) (ext-repo-sid repo-sid))
+    (update-obj s (watched-sid (:github/id r)) (fnil conj []) (ext-repo-sid repo-sid))
     repo-sid))
 
 (defn unwatch-github-repo
@@ -137,13 +137,13 @@
 (def webhook-sid (partial global-sid :webhooks))
 
 (defn save-webhook-details [s details]
-  (p/write-obj s (webhook-sid (:id details)) details))
+  (p/write-obj s (webhook-sid (:webhook/id details)) details))
 
 (defn find-details-for-webhook [s id]
   (p/read-obj s (webhook-sid id)))
 
 (def builds "builds")
-(def build-sid-keys [:customer-id :repo-id :build-id])
+(def build-sid-keys [:customer/id :repo/id :build/id])
 ;; Build sid, for external representation
 (def ext-build-sid (apply juxt build-sid-keys))
 (def build-sid (comp (partial into [builds])
@@ -207,9 +207,7 @@
 (defn save-build
   "Creates or updates the build entity"
   [s build]
-  (p/write-obj s (build-sid build) (-> build
-                                       (dissoc :cleanup? :sid)
-                                       (mc/update-existing :git dissoc :ssh-keys :ssh-keys-dir))))
+  (p/write-obj s (build-sid build) build))
 
 (defn find-build
   "Finds build by sid"

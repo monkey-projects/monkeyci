@@ -9,6 +9,7 @@
             [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
+             [build :as b]
              [config :as config]
              [labels :as lbl]
              [runtime :as rt]
@@ -72,11 +73,12 @@
 (defn- file-changes
   "Determines file changes according to the payload commits."
   [payload]
-  (let [fkeys [:added :modified :removed]]
+  (let [fkeys [:changes/added :changes/modified :changes/removed]
+        pkeys (juxt :added :modified :removed)]
     (->> payload
          :commits
          (reduce (fn [r c]
-                   (merge-with (comp set concat) r (select-keys c fkeys)))
+                   (merge-with (comp set concat) r (zipmap fkeys (pkeys c))))
                  (zipmap fkeys (repeat #{}))))))
 
 (defn create-build
@@ -87,36 +89,34 @@
   (let [{:keys [master-branch clone-url ssh-url private]} (:repository payload)
         build-id (u/new-build-id)
         commit-id (get-in payload [:head-commit :id])
-        ssh-keys (find-ssh-keys st (:customer-id init-build) (:repo-id init-build))
-        build (-> init-build
-                  (assoc :git (-> payload
-                                  :head-commit
-                                  (select-keys [:message :author])
-                                  (assoc :url (if private ssh-url clone-url)
-                                         :main-branch master-branch
-                                         :ref (:ref payload)
-                                         :commit-id commit-id
-                                         :ssh-keys-dir (rt/ssh-keys-dir rt build-id))
-                                  (mc/assoc-some :ssh-keys ssh-keys))
-                         ;; Do not use the commit timestamp, because when triggered from a tag
-                         ;; this is still the time of the last commit, not of the tag creation.
-                         :start-time (u/now)
-                         :status :running
-                         :build-id build-id
-                         :cleanup? true
-                         :changes (file-changes payload)))]
-    (when (s/save-build st build)
-      ;; Add the sid, cause it's used downstream
-      (assoc build :sid (s/ext-build-sid build)))))
+        ssh-keys (find-ssh-keys st (:customer/id init-build) (:repo/id init-build))
+        build {:build/entity
+               (-> init-build
+                   (assoc :git/entity {:git/url (if private ssh-url clone-url)
+                                       :git/main-branch master-branch
+                                       :git/ref (:ref payload)
+                                       :commit/id commit-id
+                                       :commit/message (get-in payload [:head-commit :message])
+                                       :git/changes (file-changes payload)}
+                          :build/id build-id
+                          ;; Do not use the commit timestamp, because when triggered from a tag
+                          ;; this is still the time of the last commit, not of the tag creation.
+                          :time/start (u/now)
+                          :build/phase :pending))
+               :build/status
+               {:build/cleanup? true
+                :git/status (-> {:git/ssh-keys-dir (rt/ssh-keys-dir rt build-id)}
+                                (mc/assoc-some :git/ssh-keys ssh-keys))}}]
+    (when (s/save-build st (b/entity build))
+      build)))
 
 (defn create-webhook-build [{st :storage :as rt} id payload]
   (if-let [details (s/find-details-for-webhook st id)]
     (create-build
      rt
      (-> details
-         (select-keys [:customer-id :repo-id])
-         (assoc :webhook-id id
-                :source :github-webhook))
+         (select-keys [:customer/id :repo/id :webhook/id])
+         (assoc :build/source :github-webhook))
      payload)
     (log/warn "No webhook configuration found for" id)))
 
@@ -124,11 +124,12 @@
   "Creates a build as triggered from an app call.  This does not originate from a
    webhook, but rather from a watched repo."
   [rt {:keys [customer-id id]} payload]
-  (create-build rt
-                {:customer-id customer-id
-                 :repo-id id
-                 :source :github-app}
-                payload))
+  (create-build
+   rt
+   {:customer/id customer-id
+    :repo/id id
+    :build/source :github-app}
+   payload))
 
 (def body (comp :body :parameters))
 
@@ -175,19 +176,35 @@
     ;; Don't trigger build, just say fine
     (rur/status 204)))
 
+(defn- in->repo [in]
+  (mc/assoc-some
+   {}
+   :repo/id (:id in)
+   :customer/id (:customer-id in)
+   :repo/name (:name in)
+   :repo/url (:url in)
+   :github/id (:github-id in)))
+
+(defn- repo->out [r]
+  {:id (:repo/id r)
+   :customer-id (:customer/id r)
+   :github-id (:github/id r)
+   :name (:repo/name r)
+   :url (:repo/url r)})
+
 (defn watch-repo
   "Adds the repository to the watch list for github webhooks.  If the repo
    does not exist, it will be created."
   [req]
   (let [st (c/req->storage req)
-        repo (get-in req [:parameters :body])
-        existing (when-let [id (:id repo)]
-                   (s/find-repo st [(:customer-id repo) id]))
+        repo (in->repo (get-in req [:parameters :body]))
+        existing (when-let [id (:repo/id repo)]
+                   (s/find-repo st [(:customer/id repo) id]))
         with-id (if existing
                   (merge existing repo)
-                  (assoc repo :id (s/new-id)))]
+                  (assoc repo :repo/id (s/new-id)))]
     (if (s/watch-github-repo st with-id)
-      (rur/response with-id)
+      (rur/response (repo->out with-id))
       (rur/status 500))))
 
 (defn unwatch-repo [req]

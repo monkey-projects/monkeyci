@@ -359,14 +359,14 @@
       :repo/id (:repo-id acc)
       :build/id bid
       :build/source :api
+      :build/phase :pending
+      :time/start (u/now)
       :git/props (-> {:git/url (:url repo)
                       :git/changes {}}
                      (mc/assoc-some :git/commit-id (get-in p [:query :commit-id])
                                     :git/ref (params->ref p)))}
      :build/status
-     {:time/start (u/now)
-      :build/phase :pending
-      :build/cleanup? true
+     {:build/cleanup? true
       :git/status
       {:git/ssh-keys-dir (rt/ssh-keys-dir (c/req->rt req) bid)
        :git/ssh-keys ssh-keys
