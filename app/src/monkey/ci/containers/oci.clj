@@ -170,8 +170,7 @@
 
 (defn- rt->config [rt]
   (let [wd (oci/base-work-dir rt)]
-    (-> (rt/config rt)
-        (assoc :build (rt/build rt))
+    (-> (rt/rt->config rt)
         ;; Remove some unnecessary values
         (dissoc :args :checkout-base-dir :jwk :containers :storage) 
         (update :build dissoc :git :jobs :cleanup?)
@@ -191,22 +190,6 @@
      :configs (cond-> [(oci/config-entry job-config-file (job-details->edn rt))
                        (oci/config-entry config-file (rt->edn rt))]
                 log-config (conj (oci/config-entry "logback.xml" log-config)))}))
-
-(defn- ^:deprecated add-sidecar-env [sc rt]
-  ;; TODO Replace with edn config
-  (let [wd (oci/base-work-dir rt)]
-    ;; TODO Put this all in a config file instead, this way sensitive information is harder to see
-    (assoc sc
-           :environment-variables
-           (-> (rt/rt->env rt)
-               ;; Remove some unnecessary values
-               (dissoc :args :checkout-base-dir :jwk :containers :storage) 
-               (update :build dissoc :git :jobs :cleanup?)
-               (assoc :work-dir wd
-                      :checkout-base-dir work-dir)
-               (assoc-in [:build :checkout-dir] wd)
-               (c/config->env)
-               (as-> x (mc/map-keys (comp csk/->SCREAMING_SNAKE_CASE name) x))))))
 
 (defn- set-pod-resources [ic rt]
   (-> ic

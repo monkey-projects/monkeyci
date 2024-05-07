@@ -103,8 +103,7 @@
                           [(str "-Dlogback.configurationFile=" log-config)]))}}))
 
 (defn rt->config [rt]
-  (-> (rt/config rt)
-      (assoc :build (rt/build rt))
+  (-> (rt/rt->config rt)
       ;; Generate an API token and add it to the config
       (update :api mc/assoc-some :token (auth/generate-jwt-from-rt rt (auth/build-token (b/get-sid rt))))
       ;; Overwrite event settings with runner-specific config

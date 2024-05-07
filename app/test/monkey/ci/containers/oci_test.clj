@@ -203,38 +203,6 @@
               (testing "contains build details"
                 (is (contains? data :build)))))))
 
-      #_(testing "env vars"
-        (let [env (:environment-variables sc)]
-
-          (testing "specified in container"
-            (is (some? env)))
-
-          (testing "receives env vars from runtime"
-            (is (= "test-build" (get env "MONKEYCI_BUILD_BUILD_ID"))))
-
-          (testing "serializes private key to pem"
-            (let [pk (get env "MONKEYCI_OCI_CREDENTIALS_PRIVATE_KEY")]
-              (is (string? pk))
-              (is (some? (u/load-privkey pk)))))
-
-          (testing "removes initial args"
-            (not (contains? env "MONKEYCI_ARGS")))
-
-          (testing "overwrites build checkout dir"
-            (is (= (str sut/work-dir "/test-checkout") (get env "MONKEYCI_BUILD_CHECKOUT_DIR"))))
-          
-          (testing "sets work dir to checkout dir"
-            (is (= (str sut/work-dir "/test-checkout") (get env "MONKEYCI_WORK_DIR"))))
-
-          (testing "recalculates script dir relative to new checkout dir")
-
-          (testing "disables event server"
-            (not (contains? env "MONKEYCI_EVENTS_SERVER_ENABLED")))
-
-          (testing "passes other event properties"
-            (is (= (get-in conf [:events :client :address])
-                   (get env "MONKEYCI_EVENTS_CLIENT_ADDRESS"))))))
-
       (testing "runs as root to access mount volumes"
         (is (= 0 (-> sc :security-context :run-as-user)))))
 
