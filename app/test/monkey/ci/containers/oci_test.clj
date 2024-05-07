@@ -147,9 +147,12 @@
           sc (->> ic
                   :containers
                   (mc/find-first (u/prop-pred :display-name "sidecar")))]
+
+      (testing "passes config file as arg"
+        (is (= "/home/monkeyci/config/config.edn" (second (:arguments sc)))))
       
-      (testing "starts sidecar using first arg"
-        (is (= "sidecar" (first (:arguments sc)))))
+      (testing "starts sidecar"
+        (is (= "sidecar" (nth (:arguments sc) 2))))
 
       (testing "passes events-file as arg"
         (is (h/contains-subseq? (:arguments sc)
@@ -189,9 +192,18 @@
                 (is (= "/opt/monkeyci/checkout/work/test-checkout/sub"
                        (-> data
                            :job
-                           :work-dir))))))))
+                           :work-dir))))))
 
-      (testing "env vars"
+          (testing "config file"
+            (let [e (find-volume-entry v "config.edn")
+                  data (some-> e :data (parse-b64-edn))]
+              (testing "included in config volume"
+                (is (some? e)))
+
+              (testing "contains build details"
+                (is (contains? data :build)))))))
+
+      #_(testing "env vars"
         (let [env (:environment-variables sc)]
 
           (testing "specified in container"

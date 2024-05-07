@@ -13,6 +13,7 @@
              [build :as b]
              [config :as c]
              [containers :as mcc]
+             [edn :as edn]
              [oci :as oci]
              [runtime :as rt]
              [utils :as u]]
@@ -35,6 +36,7 @@
 (def config-dir "/home/monkeyci/config")
 (def job-config-file "job.edn")
 (def job-container-name "job")
+(def config-file "config.edn")
 
 (def sidecar-container-name "sidecar")
 (def sidecar-config (comp :sidecar rt/config))
@@ -82,7 +84,8 @@
 (defn- sidecar-container [{[c] :containers}]
   (assoc c
          :display-name sidecar-container-name
-         :arguments ["sidecar"
+         :arguments ["-c" (str config-dir "/" config-file)
+                     "sidecar"
                      "--events-file" event-file
                      "--start-file" start-file
                      "--abort-file" abort-file
@@ -165,16 +168,32 @@
                      (select-keys [:id :save-artifacts :restore-artifacts :caches :dependencies])
                      (assoc :work-dir (job-work-dir rt)))}))
 
+(defn- rt->config [rt]
+  (let [wd (oci/base-work-dir rt)]
+    (-> (rt/config rt)
+        (assoc :build (rt/build rt))
+        ;; Remove some unnecessary values
+        (dissoc :args :checkout-base-dir :jwk :containers :storage) 
+        (update :build dissoc :git :jobs :cleanup?)
+        (assoc :work-dir wd
+               :checkout-base-dir work-dir)
+        (assoc-in [:build :checkout-dir] wd))))
+
+(defn- rt->edn [rt]
+  (edn/->edn (rt->config rt)))
+
 (defn- config-vol-config
   "Configuration files for the sidecar (e.g. logging)"
   [rt]
   (let [{:keys [log-config]} (sidecar-config rt)]
     {:name config-vol
      :volume-type "CONFIGFILE"
-     :configs (cond-> [(oci/config-entry job-config-file (job-details->edn rt))]
+     :configs (cond-> [(oci/config-entry job-config-file (job-details->edn rt))
+                       (oci/config-entry config-file (rt->edn rt))]
                 log-config (conj (oci/config-entry "logback.xml" log-config)))}))
 
-(defn- add-sidecar-env [sc rt]
+(defn- ^:deprecated add-sidecar-env [sc rt]
+  ;; TODO Replace with edn config
   (let [wd (oci/base-work-dir rt)]
     ;; TODO Put this all in a config file instead, this way sensitive information is harder to see
     (assoc sc
@@ -202,8 +221,7 @@
   [conf rt]
   (let [ic (oci/instance-config conf)
         sc (-> (sidecar-container ic)
-               (update :volume-mounts conj (config-mount rt))
-               (add-sidecar-env rt))
+               (update :volume-mounts conj (config-mount rt)))
         jc (-> (job-container rt)
                ;; Use common volume for logs and events
                (assoc :volume-mounts [(find-checkout-vol ic)
