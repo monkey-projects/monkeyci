@@ -7,6 +7,7 @@
             [monkey.ci
              [build :as b]
              [config :as config]
+             [edn :as edn]
              [oci :as oci]
              [runners :as r]
              [runtime :as rt]
@@ -61,7 +62,7 @@
 
 (defn- ->edn [rt]
   (-> (rt->config rt)
-      (prn-str)))
+      (edn/->edn)))
 
 (defn- ssh-keys-volume-config [rt]
   (letfn [(->config-entries [idx ssh-keys]
@@ -111,7 +112,9 @@
                                                           (->edn rt))]}))
 
 (defn- add-config-mount [conf]
-  (update conf :volume-mounts conj {:mount-path config/*global-config-file*
+  (update conf :volume-mounts conj {:mount-path (-> config/*global-config-file*
+                                                    (fs/parent)
+                                                    str)
                                     :is-read-only true
                                     :volume-name config-volume}))
 

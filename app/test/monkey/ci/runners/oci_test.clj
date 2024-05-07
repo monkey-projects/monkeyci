@@ -106,7 +106,7 @@
           (testing "passed at global config path"
             (let [mnt (oci/find-mount c sut/config-volume)]
               (is (some? mnt))
-              (is (= mc/*global-config-file* (:mount-path mnt)))))
+              (is (= "/etc/monkeyci" (:mount-path mnt)))))
 
           (let [vol (oci/find-volume inst sut/config-volume)
                 parsed (-> vol

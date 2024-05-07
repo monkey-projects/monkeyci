@@ -2,12 +2,12 @@
   (:require [babashka.fs :as fs]
             [buddy.core.keys.pem :as pem]
             [clojure
-             [edn :as edn]
              [string :as cs]
              [walk :as cw]]
             [clojure.java.io :as io]
             [clojure.repl :as cr]
-            [medley.core :as mc])
+            [medley.core :as mc]
+            [monkey.ci.edn :as ce])
   (:import org.apache.commons.io.FileUtils))
 
 (defn cwd
@@ -92,10 +92,9 @@
       (with-open [r (->reader f)]
         (pem/read-privkey r nil)))))
 
-(defn parse-edn
+(def parse-edn
   "Parses edn from the reader"
-  [r & [opts]]
-  (edn/read (or opts {}) (java.io.PushbackReader. r)))
+  ce/edn->)
 
 (defn parse-edn-str [s]
   (with-open [r (java.io.StringReader. s)]
