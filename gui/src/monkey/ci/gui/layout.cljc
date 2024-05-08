@@ -1,6 +1,8 @@
 (ns monkey.ci.gui.layout
   (:require [monkey.ci.gui.components :as co]
+            [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.utils :as u]
+            [reagent.core :as rc]
             [re-frame.core :as rf]))
 
 (defn user-info []
@@ -31,6 +33,27 @@
   [:div.footer.border-top.mt-3
    [:p "built by " [:a {:href "https://www.monkey-projects.be"} "Monkey Projects"]]])
 
+(defn error-boundary [target]
+  (rc/create-class
+   {:constructor
+    (fn [this props]
+      (set! (.-state this) #js {:error nil}))
+    :component-did-catch
+    (fn [this e info]
+      (log/error "An error occurred:" e))
+    :get-derived-state-from-error
+    (fn [error]
+      #js {:error error})
+    :render
+    (fn [this]
+      (rc/as-element
+       (if-let [error (.. this -state -error)]
+         [:div
+          [:h3 "Something went wrong"]
+          [:p "An error has occurred in this component.  We're looking in to it."]]
+         ;; No error, just render target
+         target)))}))
+
 (defn welcome
   "Renders welcome panel with the subpanel as a child"
   [subpanel]
@@ -46,5 +69,5 @@
 (defn default [subpanel]
   [:div
    [header]
-   subpanel
+   [error-boundary subpanel]
    [footer]])
