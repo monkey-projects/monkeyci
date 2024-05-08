@@ -84,7 +84,7 @@
   :coverage
   {:exec-fn monkey.test/coverage
    :exec-args {:ns-regex ["monkey.ci.*"]
-               :ns-exclude-regex [".*repl" ".*-test" "monkey.ci.build.*"]}}
+               :ns-exclude-regex [".*repl" ".*-test"]}}
 
   :watch ; Use in combination with :test, watches for changes
   {:extra-deps {org.clojure/tools.namespace {:mvn/version "1.5.0"}}

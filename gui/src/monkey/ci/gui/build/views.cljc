@@ -84,25 +84,29 @@
     :aria-label "Close"}])
 
 (defn- job-details [{:keys [labels start-time end-time] deps :dependencies arts :save-artifacts :as job}]
-  [:div.row
-   [:div.col-4
-    [:ul
-     (when start-time
-       [:li "Started at:" [co/date-time start-time]])
-     (when end-time
-       [:li "Ended at:" [co/date-time end-time]])
-     (when-not (empty? labels)
-       [:li "Labels:" (str labels)])
-     (when-not (empty? deps)
-       [:li "Dependent on: " (cs/join ", " deps)])
-     (when-not (empty? arts)
-       ;; TODO Link to artifact
-       [:li "Artifacts: " (cs/join ", " (map :id arts))])]]
-   [:div.col-4
-    [logs-btn job]]
-   [:div.col-4
-    [:div.float-end
-     [hide-btn job]]]])
+  (letfn [(format-labels [lbls]
+            (->> lbls
+                 (map (partial cs/join " = "))
+                 (cs/join ", ")))]
+    [:div.row
+     [:div.col-4
+      [:ul
+       (when start-time
+         [:li "Started at: " [co/date-time start-time]])
+       (when end-time
+         [:li "Ended at: " [co/date-time end-time]])
+       (when-not (empty? labels)
+         [:li "Labels: " (format-labels labels)])
+       (when-not (empty? deps)
+         [:li "Dependent on: " (cs/join ", " deps)])
+       (when-not (empty? arts)
+         ;; TODO Link to artifact
+         [:li "Artifacts: " (cs/join ", " (map :id arts))])]]
+     [:div.col-4
+      [logs-btn job]]
+     [:div.col-4
+      [:div.float-end
+       [hide-btn job]]]]))
 
 (defn- render-job [job]
   (let [exp (rf/subscribe [:build/expanded-jobs])
