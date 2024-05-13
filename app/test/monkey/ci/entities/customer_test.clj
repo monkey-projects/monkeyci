@@ -11,6 +11,7 @@
       (let [cust (c/insert-customer conn {:name "test customer"})
             repos (->> (range 3)
                        (map #(c/insert-repo conn {:customer-id (:id cust)
+                                                  :display-id (str "repo-" %)
                                                   :name (str "repo-" %)}))
                        (doall))
             match (sut/customer-with-repos conn (c/by-uuid (:uuid cust)))]

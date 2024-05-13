@@ -8,6 +8,6 @@
     (let [{:keys [recv] :as e} (h/fake-events)
           rt {:events e
               :runner (constantly :ok)}]
-      (is (some? @(sut/run-build-async rt)))
+      (is (some? @(sut/run-build-async rt {})))
       (is (= 1 (count @recv)))
       (is (= :build/pending (-> @recv first :type))))))

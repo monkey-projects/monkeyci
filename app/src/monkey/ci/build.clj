@@ -91,7 +91,8 @@
 (defn set-script-dir [b d]
   (assoc-in b [:script :script-dir] d))
 
-(def rt->script-dir "Gets script dir for the build from runtime"
+(def ^:deprecated rt->script-dir
+  "Gets script dir for the build from runtime"
   (comp script-dir rt/build))
 
 (defn- build-related-dir
@@ -100,12 +101,17 @@
            (base-dir-key)
            (u/combine build-id)))
   ([base-dir-key rt]
+   ;; DEPRECATED Use the 3-arg fn
    (build-related-dir base-dir-key rt (get-in rt [:build :build-id]))))
 
-(def calc-checkout-dir
+(defn calc-checkout-dir
   "Calculates the checkout directory for the build, by combining the checkout
    base directory and the build id."
-  (partial build-related-dir (rt/from-config :checkout-base-dir)))
+  ([rt build]
+   (build-related-dir (rt/from-config :checkout-base-dir) rt (:build-id build)))
+  ([rt]
+   ;; DEPRECATED Use the 2 arg fun
+   (build-related-dir (rt/from-config :checkout-base-dir) rt (get-in rt [:build :build-id]))))
 
 (def checkout-dir
   "Gets the checkout dir as stored in the build structure"
@@ -114,7 +120,7 @@
 (defn set-checkout-dir [b d]
   (assoc b :checkout-dir d))
 
-(def rt->checkout-dir (comp checkout-dir rt/build))
+(def ^:deprecated rt->checkout-dir (comp checkout-dir rt/build))
 
 (def default-script-dir ".monkeyci")
 

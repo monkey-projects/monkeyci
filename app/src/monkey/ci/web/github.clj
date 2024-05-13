@@ -145,8 +145,7 @@
     (let [rt (c/req->rt req)]
       (if-let [build (create-webhook-build rt (get-in p [:path :id]) (body req))]
         (do
-          (c/run-build-async
-           (assoc rt :build build))
+          (c/run-build-async rt build)
           (-> (rur/response {:build-id (:build-id build)})
               (rur/status 202)))
         ;; No valid webhook found
@@ -163,7 +162,7 @@
           run-build (fn [repo]
                       (let [rt (c/req->rt req)
                             build (create-app-build rt repo (body req))]
-                        (c/run-build-async (assoc rt :build build))
+                        (c/run-build-async rt build)
                         build))]
       (log/debug "Found" (count matches) "watched builds for id" github-id)
       (-> (->> matches

@@ -383,7 +383,7 @@
       (if (st/save-build st build)
         (do
           ;; Trigger the build but don't wait for the result
-          (c/run-build-async (assoc (c/req->rt req) :build build))
+          (c/run-build-async (c/req->rt req) build)
           (-> (rur/response {:build-id bid})
               (rur/status 202)))
         (-> (rur/response {:message "Unable to create build"})

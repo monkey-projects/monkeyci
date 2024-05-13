@@ -77,7 +77,7 @@
 (def dev-mode? (from-config :dev-mode))
 (def ssh-keys-dir (from-config :ssh-keys-dir))
 (def runner :runner)
-(def build "Gets build info from runtime" :build)
+(def ^:deprecated build "Gets build info from runtime" :build)
 
 (defn events-receiver [{:keys [events]}]
   (if (satisfies? p/EventReceiver events)
@@ -146,7 +146,7 @@
       ;; Child processes never start an event server
       (mc/update-existing :events dissoc :server)))
 
-(defn update-build
+(defn ^:deprecated update-build
   "Updates the build in the runtime by applying `f` with given args."
   [rt f & args]
   (apply update rt :build f args))

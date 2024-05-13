@@ -100,10 +100,15 @@
               (->> (select-entities conn (keyword pl) f)
                    (map as))))))
 
-(defmacro defentity [n & [opts]]
+(defmacro defentity
+  "Declares functions that can be used to fetch or manipulate a basic entity in db."
+  [n & [opts]]
   `(declare-entity-cruds ~(str n) {:before-insert maybe-set-uuid} ~opts))
 
-(defmacro defaggregate [n & [opts]]
+(defmacro defaggregate
+  "Declares functions that are used to fetch or manipulate entities that depend on
+   others (i.e. that do not have their own uuid)."
+  [n & [opts]]
   `(declare-entity-cruds ~(str n) {} ~opts))
 
 ;;; Selection filters

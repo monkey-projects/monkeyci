@@ -15,17 +15,17 @@
              [utils :as u]]
             [monkey.ci.build.core :as bc]))
 
-(defn- script-not-found [rt]
-  (let [msg (str "No build script found at " (build/rt->script-dir rt))]
+(defn- script-not-found [build]
+  (let [msg (str "No build script found at " (build/script-dir build))]
     (log/warn msg)
     {:exit 1
      :result :error
      :message msg}))
 
-(defn- post-build-end [rt {:keys [exit message] :as res}]
+(defn- post-build-end [rt build {:keys [exit message] :as res}]
   (md/chain
    (rt/post-events rt (build/build-end-evt
-                       (cond-> (rt/build rt)
+                       (cond-> build
                          message (assoc :message message))
                        exit))
    (constantly res)))
@@ -47,7 +47,7 @@
 
 (defn- cleanup-checkout-dirs!
   "Deletes the checkout dir, but only if it is not the current working directory."
-  [{:keys [build] :as rt}]
+  [build]
   (when (:cleanup? build)
     (doseq [k [[:checkout-dir] [:git :ssh-keys-dir]]]
       (cleanup-dir! (get-in build k)))))
@@ -56,70 +56,71 @@
   "Locates the build script locally and starts a child process that actually
    runs the build.  Returns a deferred that resolves when the child process has
    exited."
-  [rt]
-  (let [script-dir (build/rt->script-dir rt)]
+  [build rt]
+  (let [script-dir (build/script-dir build)]
     (rt/post-events rt {:type :build/start
-                        :sid (build/get-sid rt)
-                        :build (-> (rt/build rt)
+                        :sid (:sid rt)
+                        :build (-> build
                                    (build/build->evt)
                                    (assoc :start-time (u/now)))})
     (-> (md/chain
          (if (some-> (io/file script-dir) (.exists))
            (p/execute! rt)
-           (md/success-deferred (script-not-found rt)))
-         (partial post-build-end rt)
+           (md/success-deferred (script-not-found build)))
+         (partial post-build-end rt build)
          log-build-result
          :exit)
         (md/finally
-          #(cleanup-checkout-dirs! rt)))))
+          #(cleanup-checkout-dirs! build)))))
 
 (defn download-git
   "Downloads from git into a temp dir, and designates that as the working dir."
-  [rt]
+  [build rt]
   ;;(log/debug "Downloading from git using build config:" (:build rt))
   (let [git (get-in rt [:git :clone])
-        conf (-> rt
-                 rt/build
+        conf (-> build
                  :git
-                 (update :dir #(or % (build/calc-checkout-dir rt))))
+                 (update :dir #(or % (build/calc-checkout-dir rt build))))
         cd (git conf)]
     (log/debug "Checking out git repo" (:url conf) "into" (:dir conf))
-    (-> rt
-        (rt/update-build build/set-checkout-dir cd)
-        (rt/update-build build/set-script-dir (build/calc-script-dir cd (build/rt->script-dir rt))))))
+    (-> build
+        (build/set-checkout-dir cd)
+        (build/set-script-dir (build/calc-script-dir cd (build/script-dir build))))))
 
 (defn download-src
   "Downloads the code from the remote source, if there is one.  If the source
    is already local, does nothing.  Returns an updated context."
-  [rt]
-  (cond-> rt
-    (not-empty (-> rt rt/build :git)) (download-git)))
+  [build rt]
+  (cond-> build
+    (not-empty (:git build)) (download-git rt)))
 
-(defn create-workspace [rt]
+(defn create-workspace [{:keys [checkout-dir sid] :as build} rt]
   (let [ws (:workspace rt)
-        ;; TODO For local builds, upload all workdir files according to .gitignore
-        {:keys [checkout-dir sid]} (rt/build rt)
         dest (str (cs/join "/" sid) b/extension)]
     (when checkout-dir
       (log/info "Creating workspace using files from" checkout-dir)
       @(md/chain
         (b/save ws checkout-dir dest) ; TODO Check for errors
-        (constantly (assoc-in rt [:build :workspace] dest))))))
+        (constantly (assoc build :workspace dest))))))
 
 (defn store-src
   "If a workspace configuration is present, uses it to store the source in
    the workspace.  This can then be used by other processes to download the
    cached files as needed."
-  [rt]
-  (cond-> rt
-    (some? (:workspace rt)) (create-workspace)))
+  [build rt]
+  (cond-> build
+    (some? (:workspace rt)) (create-workspace rt)))
 
 ;; Creates a runner fn according to its type
 (defmulti make-runner (comp :type :runner))
 
 (defmethod make-runner :child [_]
   (log/info "Using child process runner")
-  (comp build-local store-src download-src))
+  (fn [build rt]
+    (-> build
+        (download-src rt)
+        (store-src rt)
+        (build-local rt))))
 
 (defmethod make-runner :noop [_]
   ;; For testing
@@ -129,8 +130,8 @@
 (defmethod make-runner :in-process [_]
   ;; In-process runner that loads and executes the build script in this process instead
   ;; of starting a child process.
-  (fn [rt]
-    (if (bc/failed? (s/exec-script! rt))
+  (fn [build rt]
+    (if (bc/failed? (s/exec-script! (assoc rt :build build)))
       1
       0)))
 
