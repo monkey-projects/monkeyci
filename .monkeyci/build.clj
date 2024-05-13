@@ -33,6 +33,20 @@
 (def should-publish?
   (some-fn main-branch? release?))
 
+(defn app-changed? [ctx]
+  #_(core/touched? ctx #"^app/.*")
+  true)
+
+(defn gui-changed? [ctx]
+  #_(core/touched? ctx #"^gui/.*")
+  true)
+
+(def build-app? (some-fn app-changed? release?))
+(def build-gui? (some-fn gui-changed? release?))
+
+(def publish-app? (every-pred app-changed? should-publish?))
+(def publish-gui? (every-pred gui-changed? should-publish?))
+
 (defn tag-version
   "Extracts the version from the tag"
   [ctx]
@@ -64,14 +78,16 @@
     :caches [{:id "mvn-local-repo"
               :path "m2"}]}))
 
-(def test-app (clj-container "test-app" "app" "-M:test:junit"))
+(defn test-app [ctx]
+  (when (build-app? ctx)
+    (clj-container "test-app" "app" "-M:test:junit")))
 
 (def uberjar-artifact
   {:id "uberjar"
    :path "app/target/monkeyci-standalone.jar"})
 
 (defn app-uberjar [ctx]
-  (when (should-publish? ctx)
+  (when (publish-app? ctx)
     (-> (clj-container "app-uberjar" "app" "-X:jar:uber")
         (assoc 
          :container/env {"MONKEYCI_VERSION" (lib-version ctx)}
@@ -95,11 +111,12 @@
     (when-not (fs/exists? auth-file)
       (shell/param-to-file ctx "dockerhub-creds" auth-file))))
 
-(def image-creds
-  (core/action-job
-   "image-creds"
-   create-image-creds
-   {:save-artifacts [image-creds-artifact]}))
+(defn image-creds [ctx]
+  (when (should-publish? ctx)
+    (core/action-job
+     "image-creds"
+     create-image-creds
+     {:save-artifacts [image-creds-artifact]})))
 
 (def img-base "fra.ocir.io/frjdhmocn5qi")
 (def app-img (str img-base "/monkeyci"))
@@ -130,31 +147,33 @@
          :dependencies ["image-creds"]}
         opts)))))
 
-(def build-app-image
-  (kaniko-build-img
-   {:id "publish-app-img"
-    :dockerfile "docker/Dockerfile"
-    :image app-img
-    :opts {:restore-artifacts [uberjar-artifact image-creds-artifact]
-           :dependencies ["image-creds" "app-uberjar"]}}))
+(defn build-app-image [ctx]
+  (when (publish-app? ctx)
+    (kaniko-build-img
+     {:id "publish-app-img"
+      :dockerfile "docker/Dockerfile"
+      :image app-img
+      :opts {:restore-artifacts [uberjar-artifact image-creds-artifact]
+             :dependencies ["image-creds" "app-uberjar"]}})))
 
 (def gui-release-artifact
   {:id "gui-release"
    :path "resources/public/js"})
 
-(def build-gui-image
-  (kaniko-build-img
-   {:id "publish-gui-img"
-    :context "gui"
-    :image gui-img
-    ;; Restore artifacts but modify the path because work dir is not the same
-    :opts {:restore-artifacts [(update gui-release-artifact :path (partial str "gui/"))
-                               image-creds-artifact]
-           :dependencies ["image-creds" "release-gui"]}}))
+(defn build-gui-image [ctx]
+  (when (publish-gui? ctx)
+    (kaniko-build-img
+     {:id "publish-gui-img"
+      :context "gui"
+      :image gui-img
+      ;; Restore artifacts but modify the path because work dir is not the same
+      :opts {:restore-artifacts [(update gui-release-artifact :path (partial str "gui/"))
+                                 image-creds-artifact]
+             :dependencies ["image-creds" "release-gui"]}})))
 
 (defn publish [ctx id dir]
   "Executes script in clojure container that has clojars publish env vars"
-  (when (should-publish? ctx)
+  (when (publish-app? ctx)
     (let [env (-> (api/build-params ctx)
                   (select-keys ["CLOJARS_USERNAME" "CLOJARS_PASSWORD"])
                   (assoc "MONKEYCI_VERSION" (lib-version ctx)))]
@@ -177,13 +196,14 @@
              {:id "node-modules"
               :path "node_modules"}]}))
 
-(def test-gui
-  (-> (shadow-release "test-gui" :test/node)
-      ;; Explicitly run the tests, since :autorun always returns zero
-      (update :script conj "node target/js/node.js")))
+(defn test-gui [ctx]
+  (when (build-gui? ctx)
+    (-> (shadow-release "test-gui" :test/node)
+        ;; Explicitly run the tests, since :autorun always returns zero
+        (update :script conj "node target/js/node.js"))))
 
 (defn build-gui-release [ctx]
-  (when (should-publish? ctx)
+  (when (publish-gui? ctx)
     (-> (shadow-release "release-gui" :frontend)
         (core/depends-on ["test-gui"])
         (assoc :save-artifacts [gui-release-artifact]))))

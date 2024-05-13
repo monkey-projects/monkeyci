@@ -93,22 +93,22 @@
 
 (defn run-build-async
   "Starts the build in a new thread"
-  [rt]
+  [rt build]
   (let [runner (rt/runner rt)
         report-error (fn [ex]
                        (log/error "Unable to start build:" ex)
                        (rt/post-events rt (b/build-end-evt
-                                           (-> (rt/build rt)
+                                           (-> build
                                                (assoc :status :error
                                                       :message (ex-message ex))))))]
     (md/future
       (try
         (rt/post-events rt {:type :build/pending
-                            :build (b/build->evt (rt/build rt))
-                            :sid (b/get-sid rt)})
+                            :build (b/build->evt build)
+                            :sid (:sid build)})
         ;; Catch both the deferred error, or the direct exception, because both
         ;; can be thrown here.
-        (-> (runner rt)
+        (-> (runner build rt)
             (md/catch report-error))
         (catch Exception ex
           (report-error ex))))))

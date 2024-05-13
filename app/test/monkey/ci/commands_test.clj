@@ -16,27 +16,28 @@
     (let [ctx {:runner (constantly :invoked)}]
       (is (= :invoked (sut/run-build ctx)))))
 
-  (testing "adds `build` to runtime"
-    (is (map? (-> {:config {:args {:git-url "test-url"
-                                   :branch "test-branch"
-                                   :commit-id "test-id"}}
-                   :runner :build}
-                  (sut/run-build)))))
+  (letfn [(test-runner [build _] build)]
+    (testing "adds `build` to runtime"
+      (is (map? (-> {:config {:args {:git-url "test-url"
+                                     :branch "test-branch"
+                                     :commit-id "test-id"}}
+                     :runner test-runner}
+                    (sut/run-build)))))
 
-  (testing "adds build sid to build config"
-    (let [{:keys [sid build-id]} (-> {:config {:args {:sid "a/b/c"}}
-                                      :runner :build}
-                                     (sut/run-build))]
-      (is (= build-id (last sid)))
-      (is (= ["a" "b" "c"] (take 3 sid)))))
+    (testing "adds build sid to build config"
+      (let [{:keys [sid build-id]} (-> {:config {:args {:sid "a/b/c"}}
+                                        :runner test-runner}
+                                       (sut/run-build))]
+        (is (= build-id (last sid)))
+        (is (= ["a" "b" "c"] (take 3 sid)))))
 
-  (testing "constructs `sid` from account settings if not specified"
-    (let [{:keys [sid build-id]} (-> {:runner :build
-                                      :config {:account {:customer-id "a"
-                                                         :repo-id "b"}}}
-                                     (sut/run-build))]
-      (is (= build-id (last sid)))
-      (is (= ["a" "b"] (take 2 sid)))))
+    (testing "constructs `sid` from account settings if not specified"
+      (let [{:keys [sid build-id]} (-> {:runner test-runner
+                                        :config {:account {:customer-id "a"
+                                                           :repo-id "b"}}}
+                                       (sut/run-build))]
+        (is (= build-id (last sid)))
+        (is (= ["a" "b"] (take 2 sid))))))
 
   (testing "posts `build/end` event on exception"
     (let [{:keys [recv] :as e} (h/fake-events)]
@@ -102,12 +103,6 @@
                                            :end-time 100
                                            :status :success}}}}})))
       (is (nil? (c {}))))))
-
-(deftest prepare-build-ctx
-  (testing "adds build object to runtime"
-    (is (some? (-> {:config {:args {:dir "test-dir"}}}
-                   (sut/prepare-build-ctx)
-                   :build)))))
 
 (deftest http-server
   (with-redefs [wh/on-server-close (constantly (md/success-deferred nil))]

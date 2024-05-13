@@ -55,7 +55,7 @@
 
 (deftest exec-script!
   (letfn [(exec-in-dir [d]
-            (-> (rt/update-build {} b/set-script-dir (str "examples/" d))
+            (-> {:build (b/set-script-dir {} (str "examples/" d))}
                 (sut/exec-script!)))]
     
     (testing "executes basic clj script from location"

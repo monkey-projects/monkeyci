@@ -22,13 +22,13 @@
     (is (fn? (r/make-runner {:runner {:type :oci}})))))
 
 (deftest oci-runner
-  (let [rt {:build {:git {:url "test-url"
-                          :branch "main"}}}]
+  (let [build {:git {:url "test-url"
+                     :branch "main"}}]
     (testing "runs container instance"
       (with-redefs [oci/run-instance (constantly (md/success-deferred
                                                   {:status 200
                                                    :body {:containers [{:exit-code 0}]}}))]
-        (is (= 0 (-> (sut/oci-runner {} {} rt)
+        (is (= 0 (-> (sut/oci-runner {} {} build {})
                      (deref))))))))
 
 (defn- parse-config-vol [ic]
@@ -41,14 +41,14 @@
 
 (deftest instance-config
   (let [priv-key (h/generate-private-key)
-        rt (assoc (h/test-rt)
-                  :build {:build-id "test-build-id"
-                          :sid ["a" "b" "test-build-id"]
-                          :git {:url "http://git-url"
-                                :branch "main"
-                                :commit-id "test-commit"
-                                :ssh-keys [{:private-key "test-privkey"
-                                            :public-key "test-pubkey"}]}})
+        build {:build-id "test-build-id"
+               :sid ["a" "b" "test-build-id"]
+               :git {:url "http://git-url"
+                     :branch "main"
+                     :commit-id "test-commit"
+                     :ssh-keys [{:private-key "test-privkey"
+                                 :public-key "test-pubkey"}]}}
+        rt (h/test-rt)
         conf {:availability-domain "test-ad"
               :compartment-id "test-compartment"
               :image-pull-secrets "test-secrets"
@@ -56,7 +56,7 @@
               :image-url "test-image"
               :image-tag "test-version"
               :credentials {:private-key priv-key}}
-        inst (sut/instance-config conf rt)]
+        inst (sut/instance-config conf build rt)]
 
     (testing "creates display name from build info"
       (is (= "test-build-id" (:display-name inst))))
@@ -68,15 +68,18 @@
 
     (testing "merges with configured tags"
       (let [inst (sut/instance-config (assoc conf :freeform-tags {"env" "test"})
+                                      build
                                       rt)]
         (is (= "a" (get-in inst [:freeform-tags "customer-id"])))
         (is (= "test" (get-in inst [:freeform-tags "env"])))))
 
     (testing "fails when no git url specified"
-      (is (thrown? Exception (sut/instance-config conf (update-in rt [:build :git] dissoc :url)))))
+      (is (thrown? Exception (sut/instance-config conf (update build :git dissoc :url) rt))))
 
     (testing "fails when no git branch or commit-id specified"
-      (is (thrown? Exception (sut/instance-config conf (update-in rt [:build :git] dissoc :branch :commit-id)))))
+      (is (thrown? Exception (sut/instance-config conf
+                                                  (update build :git dissoc :branch :commit-id)
+                                                  rt))))
 
     (testing "container"
       (let [c (first (:containers inst))]
@@ -84,7 +87,7 @@
         (testing "uses app version if no tag configured"
           (is (cs/ends-with? (-> conf
                                  (dissoc :image-tag)
-                                 (sut/instance-config rt)
+                                 (sut/instance-config build rt)
                                  :containers
                                  first
                                  :image-url)
@@ -123,13 +126,7 @@
               (is (= :child (get-in parsed [:runner :type]))))
             
             (testing "adds api token"
-              (is (not-empty (get-in parsed [:api :token])))))))
-
-      (testing "drops nil env vars"
-        (let [c (-> rt
-                    (assoc-in [:build :pipeline] nil)
-                    (as-> x (sut/instance-config conf x)))]
-          (is (not (contains? (-> c :containers first :environment-variables) "monkeyci-build-pipeline"))))))
+              (is (not-empty (get-in parsed [:api :token]))))))))
 
     (testing "ssh keys"
       (testing "adds as volume"
@@ -155,7 +152,7 @@
         (let [log-path (io/file dir "logback-test.xml")
               rt (assoc-in rt [:config :runner :log-config] (.getAbsolutePath log-path))
               _ (spit log-path "test log contents")
-              inst (sut/instance-config conf rt)
+              inst (sut/instance-config conf build rt)
               vol (oci/find-volume inst sut/log-config-volume)]
           
           (testing "adds as volume"
@@ -175,7 +172,7 @@
     (testing "events config"
       (testing "taken from top level"
         (let [rt (assoc-in rt [:config :events :client :address] "test-addr")
-              inst (sut/instance-config conf rt)
+              inst (sut/instance-config conf build rt)
               conf (parse-config-vol inst)]
           (is (= "test-addr" (get-in conf [:events :client :address])))))
 
@@ -185,7 +182,7 @@
                                                   :client {:address "test-addr"
                                                            :username "test-user"}})
                      (assoc-in [:config :runner :events :client :address] "runner-addr"))
-              inst (sut/instance-config conf rt)
+              inst (sut/instance-config conf build rt)
               conf (parse-config-vol inst)]
           (is (= "runner-addr" (get-in conf [:events :client :address])))
           (is (= "test-user" (get-in conf [:events :client :username])))

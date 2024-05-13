@@ -247,7 +247,7 @@
   (let [build-id (build/get-build-id rt)
         script-dir (build/rt->script-dir rt)]
     (log/debug "Executing script for build" build-id "at:" script-dir)
-    (log/debug "Script runtime:" rt)
+    (log/debug "Build map:" (:build rt))
     (try 
       (let [jobs (load-jobs rt)]
         (log/trace "Jobs:" jobs)

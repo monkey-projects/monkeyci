@@ -15,23 +15,20 @@
   (with-redefs [p/execute! (constantly (md/success-deferred {:exit 0}))]
 
     (testing "returns a deferred that waits for build to complete"
-      (is (md/deferred? (sut/build-local {:build
-                                          {:script
-                                           {:script-dir "examples/basic-clj"}}}))))
+      (is (md/deferred? (sut/build-local {:script
+                                          {:script-dir "examples/basic-clj"}}
+                                         {}))))
     
     (testing "when script not found"
       (testing "returns exit code 1"
-        (is (= 1 (-> {:build
-                      {:script {:script-dir "nonexisting"}}}
-                     (sut/build-local)
+        (is (= 1 (-> {:script {:script-dir "nonexisting"}}
+                     (sut/build-local {})
                      (deref)))))
 
       (testing "fires `:build/end` event with error status"
         (let [{:keys [recv] :as e} (h/fake-events)]
-          (is (some? (-> {:build
-                          {:script {:script-dir "nonexisting"}}
-                          :events e} 
-                        (sut/build-local)
+          (is (some? (-> {:script {:script-dir "nonexisting"}}
+                         (sut/build-local {:events e} )
                          (deref))))
           (is (not-empty @recv))
           (let [m (->> @recv
@@ -42,11 +39,11 @@
 
     (testing "deletes checkout dir"
       (letfn [(verify-checkout-dir-deleted [checkout-dir script-dir]
-                (is (some? (-> {:build {:script {:script-dir (u/abs-path script-dir)}
-                                        :checkout-dir (u/abs-path checkout-dir)
-                                        :cleanup? true
-                                        :git {:dir "test"}}}
-                               (sut/build-local)
+                (is (some? (-> {:script {:script-dir (u/abs-path script-dir)}
+                                :checkout-dir (u/abs-path checkout-dir)
+                                :cleanup? true
+                                :git {:dir "test"}}
+                               (sut/build-local {})
                                (deref))))
                 (is (false? (.exists checkout-dir))))]
         
@@ -71,118 +68,106 @@
               script-dir (doto (io/file checkout-dir "script")
                            (.mkdirs))]
           (spit (io/file script-dir "build.clj") "[]")
-          (is (some? (-> {:build {:checkout-dir (u/abs-path checkout-dir)}}
-                         (sut/build-local)
+          (is (some? (-> {:checkout-dir (u/abs-path checkout-dir)}
+                         (sut/build-local {})
                          (deref))))
           (is (true? (.exists checkout-dir))))))))
 
 (deftest download-src
   (testing "no-op if the source is local"
-    (let [rt {}]
-      (is (= rt (sut/download-src rt)))))
+    (let [build {}]
+      (is (= build (sut/download-src build {})))))
 
   (testing "gets src using git fn"
-    (is (= "test/dir" (-> {:build
-                           {:git {:url "http://git.test"}}
-                           :git {:clone (constantly "test/dir")}}
-                          (sut/download-src)
-                          :build
+    (is (= "test/dir" (-> {:git {:url "http://git.test"}}
+                          (sut/download-src {:git {:clone (constantly "test/dir")}})
                           :checkout-dir))))
 
   (testing "passes git config to git fn"
     (let [git-config {:url "http://test"
                       :branch "main"
                       :id "test-id"}]
-      (is (= "ok" (-> {:build
-                       {:git git-config}
-                       :git {:clone (fn [c]
-                                      (if (= (select-keys c (keys git-config)) git-config)
-                                        "ok"
-                                        (str "failed: " (pr-str c))))}}
-                      (sut/download-src)
-                      :build
+      (is (= "ok" (-> {:git git-config}
+                      (sut/download-src
+                       {:git {:clone (fn [c]
+                                       (if (= (select-keys c (keys git-config)) git-config)
+                                         "ok"
+                                         (str "failed: " (pr-str c))))}})
                       :checkout-dir)))))
 
   (testing "calculates checkout dir if not specified"
-    (is (cs/ends-with? (-> {:config {:checkout-base-dir "test-work-dir"}
-                            :git {:clone :dir}
-                            :build {:git {:url "http:/test.git"}
-                                    :build-id "test-build"}}
-                           (sut/download-src)
-                           :build
+    (is (cs/ends-with? (-> {:git {:url "http:/test.git"}
+                                    :build-id "test-build"}
+                           (sut/download-src
+                            {:config {:checkout-base-dir "test-work-dir"}
+                             :git {:clone :dir}})
                            :checkout-dir)
                        "test-work-dir/test-build")))
 
   (testing "uses dir from build config if specified"
     (is (= "git-dir"
-           (-> {:args {:workdir "test-work-dir"}
-                :git {:clone :dir}
-                :build {:git {:url "http:/test.git"
-                              :dir "git-dir"}}}
-               (sut/download-src)
-               :build
+           (-> {:git {:url "http:/test.git"
+                      :dir "git-dir"}}
+               (sut/download-src {:args {:workdir "test-work-dir"}
+                                  :git {:clone :dir}})
                :checkout-dir))))
 
   (testing "calculates script dir"
     (is (re-matches #".*test/dir/test-script$"
-                    (-> {:build
-                         {:git {:url "http://git.test"}
-                          :script {:script-dir "test-script"}}
-                         :git {:clone (constantly "test/dir")}}
-                        (sut/download-src)
-                        :build
+                    (-> {:git {:url "http://git.test"}
+                         :script {:script-dir "test-script"}}
+                        (sut/download-src {:git {:clone (constantly "test/dir")}})
                         :script
                         :script-dir))))
 
   (testing "uses default script dir when none specified"
     (is (re-matches #".*test/dir/.monkeyci$"
-                    (-> {:build
-                         {:git {:url "http://git.test"}
-                          :build-id "test-build"}
-                         :git {:clone (constantly "test/dir")}
-                         :checkout-base-dir "checkout"}
-                        (sut/download-src)
-                        :build
+                    (-> {:git {:url "http://git.test"}
+                         :build-id "test-build"}
+                        (sut/download-src
+                         {:git {:clone (constantly "test/dir")}
+                          :config {:checkout-base-dir "checkout"}})
                         :script
                         :script-dir)))))
 
 (deftest store-src
   (testing "does nothing if no workspace configured"
-    (let [rt {}]
-      (is (= rt (sut/store-src rt)))))
+    (let [build {}]
+      (is (= build (sut/store-src build {})))))
 
   (testing "stores src dir using blob and build id with extension"
     (let [stored (atom {})
-          rt {:workspace (h/fake-blob-store stored)
-              :build {:checkout-dir "test-checkout"
-                      :sid ["test-cust" "test-repo" "test-build"]}}]
-      (is (some? (sut/store-src rt)))
+          rt {:workspace (h/fake-blob-store stored)}
+          build {:checkout-dir "test-checkout"
+                 :sid ["test-cust" "test-repo" "test-build"]}]
+      (is (some? (sut/store-src build rt)))
       (is (= {"test-checkout" "test-cust/test-repo/test-build.tgz"} @stored))))
 
-  (testing "returns updated context"
-    (let [rt {:workspace (h/fake-blob-store (atom {}))
-              :build {:checkout-dir "test-checkout"
-                      :sid ["test-build"]}}]
-      (is (= (assoc-in rt [:build :workspace] "test-build.tgz")
-             (sut/store-src rt))))))
+  (testing "returns updated build"
+    (let [rt {:workspace (h/fake-blob-store (atom {}))}
+          build {:checkout-dir "test-checkout"
+                 :sid ["test-build"]}]
+      (is (= (assoc build :workspace "test-build.tgz")
+             (sut/store-src build rt))))))
 
 (deftest make-runner
-  (testing "provides child type"
-    (is (fn? (sut/make-runner {:runner {:type :child}}))))
+  (let [build {:build-id "test-build"}]
+    (testing "provides child type"
+      (is (fn? (sut/make-runner {:runner {:type :child}}))))
 
-  (testing "provides noop type"
-    (let [r (sut/make-runner {:runner {:type :noop}})]
-      (is (fn? r))
-      (is (pos? (r {})))))
-
-  (testing "provides default type"
-    (let [r (sut/make-runner {})]
-      (is (fn? r))
-      (is (pos? (r {})))))
-
-  (testing "provides in-process type"
-    (with-redefs [script/exec-script! (constantly {:status :success})]
-      (let [r (sut/make-runner {:runner {:type :in-process}})]
+    (testing "provides noop type"
+      (let [r (sut/make-runner {:runner {:type :noop}})]
         (is (fn? r))
-        (is (= 0 (r {})))))))
+        (is (pos? (r build {})))))
+
+    (testing "provides default type"
+      (let [r (sut/make-runner {})]
+        (is (fn? r))
+        (is (pos? (r build {})))))
+
+    (testing "provides in-process type"
+      (with-redefs [script/exec-script! (constantly {:status :success})]
+        (let [r (sut/make-runner {:runner {:type :in-process}})]
+          (is (fn? r))
+          (is (= 0 (r build {}))))))))
 

@@ -288,6 +288,11 @@
     (rur/response b)
     (rur/not-found nil)))
 
+(defn- as-ref [k v]
+  (fn [p]
+    (when-let [r (get-in p [:query k])]
+      (format "refs/%s/%s" v r))))
+
 (def build-sid (comp (juxt :customer-id :repo-id :build-id)
                      :path
                      :parameters))
@@ -335,15 +340,10 @@
     (with-artifacts req (comp get-contents
                               (partial artifact-by-id (artifact-id req))))))
 
-(defn- params->ref
+(def params->ref
   "Creates a git ref from the query parameters (either branch or tag)"
-  [p]
-  (let [{{:keys [branch tag]} :query} p]
-    (cond
-      (some? branch)
-      (str "refs/heads/" branch)
-      (some? tag)
-      (str "refs/tags/" tag))))
+  (some-fn (as-ref :branch "heads")
+           (as-ref :tag "tags")))
 
 (defn make-build-ctx
   "Creates a build object from the request"
@@ -383,7 +383,7 @@
       (if (st/save-build st build)
         (do
           ;; Trigger the build but don't wait for the result
-          (c/run-build-async (assoc (c/req->rt req) :build build))
+          (c/run-build-async (c/req->rt req) build)
           (-> (rur/response {:build-id bid})
               (rur/status 202)))
         (-> (rur/response {:message "Unable to create build"})

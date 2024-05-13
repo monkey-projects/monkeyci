@@ -470,7 +470,8 @@
   (testing "`POST /trigger`"
     (letfn [(verify-runner [p f]
               (let [runner-args (atom nil)
-                    runner (partial reset! runner-args)]
+                    runner (fn [build _]
+                             (reset! runner-args build))]
                 (with-repo
                   (fn [{:keys [app path] :as ctx}]
                     (let [props [:customer-id :repo-id]]
@@ -485,11 +486,12 @@
         (verify-runner
          "/trigger"
          (fn [{:keys [runner-args]}]
-           (is (some? (:build @runner-args))))))
+           (is (some? @runner-args)))))
       
       (testing "looks up url in repo config"
         (let [runner-args (atom nil)
-              runner (partial reset! runner-args)]
+              runner (fn [build _]
+                       (reset! runner-args build))]
           (with-repo
             (fn [{:keys [app path] [customer-id repo-id] :sid st :storage}]
               (is (some? (st/save-customer st {:id customer-id
@@ -502,7 +504,7 @@
                              :status)))
               (is (not-empty @runner-args))
               (is (= "http://test-url"
-                     (-> @runner-args :build :git :url))))
+                     (-> @runner-args :git :url))))
             {:runner runner})))
       
       (testing "adds commit id from query params"
@@ -510,43 +512,43 @@
          "/trigger?commitId=test-id"
          (fn [{:keys [runner-args]}]
            (is (= "test-id"
-                  (-> @runner-args :build :git :commit-id))))))
+                  (-> @runner-args :git :commit-id))))))
 
       (testing "adds branch from query params as ref"
         (verify-runner
          "/trigger?branch=test-branch"
          (fn [{:keys [runner-args]}]
            (is (= "refs/heads/test-branch"
-                  (-> @runner-args :build :git :ref))))))
+                  (-> @runner-args :git :ref))))))
 
       (testing "adds tag from query params as ref"
         (verify-runner
          "/trigger?tag=test-tag"
          (fn [{:keys [runner-args]}]
            (is (= "refs/tags/test-tag"
-                  (-> @runner-args :build :git :ref))))))
+                  (-> @runner-args :git :ref))))))
 
       (testing "adds `sid` to build props"
         (verify-runner
          "/trigger"
          (fn [{:keys [sid runner-args]}]
-           (let [bsid (get-in @runner-args [:build :sid])]
+           (let [bsid (:sid @runner-args)]
              (is (= 3 (count bsid)) "expected sid to contain repo path and build id")
              (is (= (take 2 sid) (take 2 bsid)))
-             (is (= (get-in @runner-args [:build :build-id])
+             (is (= (:build-id @runner-args)
                     (last bsid)))))))
       
       (testing "sets cleanup flag"
         (verify-runner
          "/trigger"
          (fn [{:keys [sid runner-args]}]
-           (is (true? (get-in @runner-args [:build :cleanup?]))))))
+           (is (true? (:cleanup? @runner-args))))))
       
       (testing "creates build in storage"
         (verify-runner
          "/trigger?branch=test-branch"
          (fn [{:keys [runner-args] st :storage}]
-           (let [bsid (get-in @runner-args [:build :sid])
+           (let [bsid (:sid @runner-args)
                  build (st/find-build st bsid)]
              (is (some? build))
              (is (= :api (:source build)))

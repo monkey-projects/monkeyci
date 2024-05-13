@@ -1,3 +1,4 @@
 #kaocha/v1
 {:omit-system-out? true
- :ignore ["\\.#*.clj"]}
+ :ignore ["\\.#*.clj"]
+ :fail-fast? true}

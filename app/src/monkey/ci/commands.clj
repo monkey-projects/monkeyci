@@ -16,11 +16,6 @@
              [deferred :as md]
              [time :as mt]]))
 
-(defn prepare-build-ctx
-  "Updates the runtime for the build runner, by adding a `build` object"
-  [rt]
-  (assoc rt :build (b/make-build-ctx rt)))
-
 ;; (defn- print-result [state]
 ;;   (log/info "Build summary:")
 ;;   (let [{:keys [pipelines]} @state]
@@ -73,8 +68,8 @@
     #_(register-all-handlers event-bus (:handlers acc))
     (try
       (-> rt
-          (prepare-build-ctx)
-          (r))
+          (b/make-build-ctx)
+          (r rt))
       (catch Exception ex
         (log/error "Unable to start build" ex)
         (let [exit-code 1]
@@ -88,10 +83,9 @@
    errors in the script."
   [rt]
   (try
-    (log/debug "Verifying build with runtime" (prepare-build-ctx rt))
     ;; TODO Git branch and other options
     (let [jobs (-> rt
-                   (prepare-build-ctx)
+                   (assoc :build (b/make-build-ctx rt))
                    (script/load-jobs))]
       (rt/report
        rt
