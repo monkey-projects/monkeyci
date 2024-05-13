@@ -15,18 +15,23 @@
 
 (def build-sid-length 3)
 
+(def sid
+  "Gets the sid from the build"
+  :sid)
+
+(def build-id (some-fn :build-id (constantly "unknown-build")))
+
 (defn get-sid
   "Gets current build sid from the runtime.  This is either specified directly,
    or taken from account settings."
   [rt]
-  (or (get-in rt [:build :sid])
+  (or (get-in rt [:build sid])
       (let [sid (->> (account->sid (rt/account rt))
                      (take-while some?))]
         (when (= (dec build-sid-length) (count sid))
           sid))))
 
-(defn get-build-id [rt]
-  (or (get-in rt [:build :build-id]) "unknown-build"))
+(def get-build-id (comp build-id rt/build))
 
 (def get-job-sid
   "Creates a job sid using the build id and job id.  Note that this does

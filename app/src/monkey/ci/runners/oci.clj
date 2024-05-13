@@ -25,7 +25,7 @@
 (def log-config-file "logback.xml")
 (def config-volume "config")
 
-(def build-ssh-keys (comp :ssh-keys :git :build))
+(def build-ssh-keys (comp :ssh-keys :git))
 (def log-config (comp :log-config :runner :config))
 
 (defn- prepare-config-for-oci [config]
@@ -34,9 +34,9 @@
       ;; TODO Run in-process instead
       (assoc :runner {:type :child})))
 
-(defn- add-ssh-keys-dir [rt conf]
+(defn- add-ssh-keys-dir [build conf]
   (cond-> conf
-    (build-ssh-keys rt) (assoc-in [:build :git :ssh-keys-dir] ssh-keys-dir)))
+    (build-ssh-keys build) (assoc-in [:build :git :ssh-keys-dir] ssh-keys-dir)))
 
 (defn- add-log-config-path [rt conf]
   (cond-> conf
@@ -48,43 +48,43 @@
   [rt conf]
   (assoc-in conf [:api :token] (auth/generate-jwt-from-rt rt (auth/build-token (b/get-sid rt)))))
 
-(defn- rt->config [rt]
+(defn- rt->config [build rt]
   (->> (-> (rt/rt->config rt)
            (dissoc :app-mode :git :github :http :args :jwk :checkout-base-dir :storage
                    :ssh-keys-dir :work-dir :oci :runner)
            (update :build dissoc :cleanup? :status)
-           (update-in [:build :git] dissoc :ssh-keys)
+           (assoc :build (dissoc build :ssh-keys))
            (update :events u/deep-merge (get-in rt [rt/config :runner :events])))
        (prepare-config-for-oci)
-       (add-ssh-keys-dir rt)
+       (add-ssh-keys-dir build)
        (add-log-config-path rt)
        (add-api-token rt)))
 
-(defn- ->edn [rt]
-  (-> (rt->config rt)
+(defn- ->edn [build rt]
+  (-> (rt->config build rt)
       (edn/->edn)))
 
-(defn- ssh-keys-volume-config [rt]
+(defn- ssh-keys-volume-config [build]
   (letfn [(->config-entries [idx ssh-keys]
             (map (fn [contents ext]
                    (oci/config-entry (format "key-%d%s" idx ext) contents))
                  ((juxt :private-key :public-key) ssh-keys)
                  ["" ".pub"]))]
-    (when-let [ssh-keys (build-ssh-keys rt)]
+    (when-let [ssh-keys (build-ssh-keys build)]
       {:name ssh-keys-volume
        :volume-type "CONFIGFILE"
        :configs (mapcat ->config-entries (range) ssh-keys)})))
 
-(defn- add-ssh-keys-volume [conf rt]
-  (let [vc (ssh-keys-volume-config rt)]
+(defn- add-ssh-keys-volume [conf build]
+  (let [vc (ssh-keys-volume-config build)]
     (cond-> conf
       vc (update :volumes conj vc))))
 
-(defn- add-ssh-keys-mount [conf rt]
+(defn- add-ssh-keys-mount [conf build]
   (cond-> conf
-    (build-ssh-keys rt) (update :volume-mounts conj {:mount-path ssh-keys-dir
-                                                     :is-read-only true
-                                                     :volume-name ssh-keys-volume})))
+    (build-ssh-keys build) (update :volume-mounts conj {:mount-path ssh-keys-dir
+                                                        :is-read-only true
+                                                        :volume-name ssh-keys-volume})))
 
 (defn- log-config-volume-config [rt]
   (when-let [f (log-config rt)]
@@ -105,11 +105,11 @@
                                                  :is-read-only true
                                                  :volume-name log-config-volume})))
 
-(defn- add-config-volume [conf rt]
+(defn- add-config-volume [conf build rt]
   (update conf :volumes conj {:name config-volume
                               :volume-type "CONFIGFILE"
                               :configs [(oci/config-entry "config.edn"
-                                                          (->edn rt))]}))
+                                                          (->edn build rt))]}))
 
 (defn- add-config-mount [conf]
   (update conf :volume-mounts conj {:mount-path (-> config/*global-config-file*
@@ -118,8 +118,8 @@
                                     :is-read-only true
                                     :volume-name config-volume}))
 
-(defn- patch-container [[conf] rt]
-  (let [{:keys [url branch commit-id] :as git} (get-in rt [:build :git])]
+(defn- patch-container [[conf] build rt]
+  (let [{:keys [url branch commit-id] :as git} (:git build)]
     (when (nil? url)
       (throw (ex-info "Git URL must be specified" {:git git})))
     ;; FIXME Also allow tags
@@ -129,7 +129,7 @@
          (assoc :display-name build-container
                 ;; TODO Run build script in-process, it saves memory and time
                 :arguments (cond-> ["-w" oci/checkout-dir "build" "run"
-                                    "--sid" (format-sid (b/get-sid rt))
+                                    "--sid" (format-sid (b/sid build))
                                     "-u" url]
                              ;; TODO Add support for tags as well
                              branch (concat ["-b" branch])
@@ -137,26 +137,26 @@
                 ;; Run as root, because otherwise we can't write to the shared volumes
                 :security-context {:security-context-type "LINUX"
                                    :run-as-user 0})
-         (add-ssh-keys-mount rt)
+         (add-ssh-keys-mount build)
          (add-log-config-mount rt)
          (add-config-mount))]))
 
 (defn instance-config
   "Creates container instance configuration using the context and the
    skeleton config."
-  [conf rt]
-  (let [tags (oci/sid->tags (b/get-sid rt))]
+  [conf build rt]
+  (let [tags (oci/sid->tags (b/sid build))]
     (-> conf
         (update :image-tag #(or % (config/version)))
         (oci/instance-config)
-        (assoc :display-name (b/get-build-id rt))
+        (assoc :display-name (b/build-id build))
         ;; TODO Reduce this after we use in-process build
         ;;(assoc-in [:shape-config :memory-in-g-bs] 4)
         (update :freeform-tags merge tags)
-        (update :containers patch-container rt)
-        (add-ssh-keys-volume rt)
+        (update :containers patch-container build rt)
+        (add-ssh-keys-volume build)
         (add-log-config-volume rt)
-        (add-config-volume rt))))
+        (add-config-volume build rt))))
 
 (defn wait-for-script-end-event
   "Returns a deferred that realizes when the script/end event has been received."
@@ -173,13 +173,13 @@
 (defn oci-runner
   "Runs the build script as an OCI container instance.  Returns a deferred with
    the container exit code."
-  [client conf rt]
-  (-> (oci/run-instance client (instance-config conf rt)
+  [client conf build rt]
+  (-> (oci/run-instance client (instance-config conf build rt)
                         {:delete? true
                          :exited? (fn [id]
                                     (md/chain
                                      (md/timeout!
-                                      (wait-for-script-end-event (:events rt) (b/get-sid rt))
+                                      (wait-for-script-end-event (:events rt) (b/sid rt))
                                       max-script-timeout ::timeout)
                                      (fn [r]
                                        (when (= r ::timeout)
@@ -194,7 +194,7 @@
       (md/catch
           (fn [ex]
             (log/error "Got error from container instance:" ex)
-            (rt/post-events rt (b/build-end-evt (rt/build rt) 1))))))
+            (rt/post-events rt (b/build-end-evt build 1))))))
 
 (defmethod r/make-runner :oci [rt]
   (let [conf (:runner rt)
