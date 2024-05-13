@@ -69,14 +69,15 @@
   (testing "updates script in build"
     (h/with-memory-store st
       (let [{:keys [sid] :as build} (test-build)
+            stored-build (dissoc build :sid)
             script {:start-time 100
                     :status :running
                     :jobs {"test-job" {}}}
             evt {:type :script/start
                  :sid sid
                  :script script}]
-        (is (st/sid? (st/save-build st build)))
-        (is (map? (sut/update-script st evt)))
+        (is (st/sid? (st/save-build st stored-build)))
+        (is (= sid (:sid (sut/update-script st evt))))
         (let [match (st/find-build st sid)]
           (is (= script (:script match)))))))
 
@@ -119,13 +120,14 @@
   (testing "patches build script with job info"
     (h/with-memory-store st
       (let [{:keys [sid] :as build} (test-build)
+            stored-build (dissoc build :sid)
             evt {:type :job/start
                  :sid sid
                  :job {:id "test-job"
                        :start-time 120}
                  :message "Starting job"}]
-        (is (st/sid? (st/save-build st build)))
-        (is (some? (sut/update-job st evt)))
+        (is (st/sid? (st/save-build st stored-build)))
+        (is (= sid (:sid (sut/update-job st evt))))
         (is (= (:job evt)
                (-> (st/find-build st sid)
                    (get-in [:script :jobs "test-job"]))))))))
