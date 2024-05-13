@@ -98,23 +98,26 @@
    (h/initialize-martian {:download-log {:error-code :no-error
                                          :body {}}})
    
-   (testing "sends request to query range endpoint with job and filename filter"
-     (let [e (h/catch-fx :martian.re-frame/request)]
-       (is (nil? (rf/dispatch [:job/load-logs
-                               {:id "test-job"
-                                :start-time 100000
-                                :end-time 200000}
-                               "test/path"])))
-       (is (= 1 (count @e)))
+   (let [e (h/catch-fx :martian.re-frame/request)]
+     (is (nil? (rf/dispatch [:job/load-logs
+                             {:id "test-job"
+                              :start-time 100000
+                              :end-time 200000}
+                             "test/path"])))
+     (is (= 1 (count @e)))
+     
+     (testing "sends request to query range endpoint with job and filename filter"
        (is (cs/includes? (-> @e first (nth 3) :query)
-                         "filename=\"test/path\""))))
+                         "filename=\"test/path\"")))
 
-   (testing "sets alert"
-     (let [path "test/path"]
-       (rf/dispatch [:job/load-logs {:id "test-job" :start-time 100} "test/path"])
-       (let [a (db/path-alerts @app-db path)]
-         (is (= 1 (count a)))
-         (is (= :info (-> a first :type))))))))
+     (testing "sets customer id in request"
+       (is (= "test-cust" (-> @e first (nth 3) :customer-id))))
+
+     (testing "sets alert"
+       (let [path "test/path"]
+         (let [a (db/path-alerts @app-db path)]
+           (is (= 1 (count a)))
+           (is (= :info (-> a first :type)))))))))
 
 (deftest job-load-logs--success
   (testing "clears alerts"

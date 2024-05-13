@@ -64,7 +64,8 @@
        {:dispatch [:secure-request
                    :download-log
                    (-> (loki/request-params sid job)
-                       (assoc :limit 1000
+                       (assoc :customer-id (:customer-id params)
+                              :limit 1000
                               :query (-> (loki/job-query sid (:id job))
                                          (assoc "filename" path)
                                          (loki/query->str))))
