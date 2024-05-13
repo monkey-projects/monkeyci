@@ -2,6 +2,7 @@
   (:require [babashka.process :as bp]
             [clojure.test :refer :all]
             [clojure.java.io :as io]
+            [clojure.string :as cs]
             [manifold.deferred :as md]
             [monkey.ci
              [logging :as l]
@@ -20,29 +21,33 @@
 
 (deftest run
   (with-redefs [sut/exit! (constantly nil)]
-    (testing "executes script with given args"
-      (let [captured-args (atom nil)]
-        (with-redefs [script/exec-script! (fn [args]
-                                            (reset! captured-args args)
-                                            bc/success)]
-          (is (nil? (sut/run {:key :test-args})))
-          (is (= {:key :test-args}
-                 (-> @captured-args
-                     :config
-                     :args))))))
+    (testing "parses arg as config file"
+      (h/with-tmp-dir dir
+        (let [captured-args (atom nil)
+              config-file (io/file dir "config.edn")]
+          (with-redefs [script/exec-script! (fn [args]
+                                              (reset! captured-args args)
+                                              bc/success)]
+            (is (nil? (spit config-file (pr-str {:build {:build-id "test-build"}}))))
+            (is (nil? (sut/run {:config-file (.getAbsolutePath config-file)})))
+            (is (= {:build-id "test-build"}
+                   (-> @captured-args
+                       :build)))))))
 
-    (testing "merges args with env vars"
-      (let [captured-args (atom nil)]
-        (with-redefs [script/exec-script! (fn [args]
-                                            (reset! captured-args args)
-                                            bc/success)]
-          (is (nil? (sut/run
-                      {:key :test-args}
-                      {:monkeyci-containers-type "podman"
-                       :monkeyci-api-socket "/tmp/test.sock"})))
-          (is (= {:type :podman} (:containers @captured-args)))
-          (is (= {:socket "/tmp/test.sock"} (get-in @captured-args [:config :api])))
-          (is (= {:key :test-args} (get-in @captured-args [:config :args]))))))))
+    (testing "merges config with env vars"
+      (h/with-tmp-dir dir
+        (let [captured-args (atom nil)
+              config-file (io/file dir "config.edn")]
+          (with-redefs [script/exec-script! (fn [args]
+                                              (reset! captured-args args)
+                                              bc/success)]
+            (is (nil? (spit config-file (pr-str {:build {:build-id "test-build"}}))))
+            (is (nil? (sut/run
+                        {:config-file (.getAbsolutePath config-file)}
+                        {:monkeyci-containers-type "podman"
+                         :monkeyci-api-socket "/tmp/test.sock"})))
+            (is (= {:type :podman} (:containers @captured-args)))
+            (is (= {:socket "/tmp/test.sock"} (get-in @captured-args [:config :api])))))))))
 
 (deftest ^:slow execute-slow!
   (let [rt {:public-api sa/local-api
@@ -70,17 +75,6 @@
                                            (assoc :build
                                                   {:script {:script-dir (example "non-existing")}})
                                            (sut/execute!)))))))
-
-(defn- find-arg
-  "Finds the argument value for given key"
-  [d k]
-  (->> d
-       deref
-       :process
-       :args
-       :cmd
-       (drop-while (partial not= (str k)))
-       (second)))
 
 (defrecord TestServer []
   org.httpkit.server.IHttpServer
@@ -122,94 +116,15 @@
                               :args
                               :dir))))
 
-      (testing "passes checkout dir in edn"
-        (is (= "\"work-dir\"" (-> {:build {:checkout-dir "work-dir"}}
-                                  (sut/execute!)
-                                  (find-arg :checkout-dir)))))
-
-      (testing "passes script dir in edn"
-        (is (= "\"script-dir\"" (-> {:build
-                                     {:script
-                                      {:script-dir "script-dir"}}}
-                                    (sut/execute!)
-                                    (find-arg :script-dir)))))
-
-      (testing "passes pipeline in edn"
-        (is (= "\"test-pipeline\"" (-> {:build {:pipeline "test-pipeline"}}
-                                       (sut/execute!)
-                                       (find-arg :pipeline)))))
-
-      (testing "passes api url and token in env"
-        (let [env (-> (h/test-rt)
-                      (assoc :script {:script-dir "test-dir"}
-                             :config {:api {:url "http://test-api"}})
-                      (sut/execute!)
-                      (deref)
-                      :process
-                      :args
-                      :extra-env)]
-          (is (= "http://test-api" (:monkeyci-api-url env)))
-          (is (string? (:monkeyci-api-token env)))
-          (is (not-empty (:monkeyci-api-token env)))))
-
-      (testing "no token if no jwk keys configured"
-        (let [env (-> {:script {:script-dir "test-dir"}
-                       :config {:api {:url "http://test-api"}}}
-                      (sut/execute!)
-                      (deref)
-                      :process
-                      :args
-                      :extra-env)]
-          (is (empty? (:monkeyci-api-token env)))))
-
-      (testing "does not overwrite token if no jwk config"
-        (let [env (-> {:script {:script-dir "test-dir"}
-                       :config {:api {:url "http://test-api"
-                                      :token "test-token"}}}
-                      (sut/execute!)
-                      (deref)
-                      :process
-                      :args
-                      :extra-env)]
-          (is (= "test-token" (:monkeyci-api-token env)))))
-
-      (testing "overwrites event config with runner settings"
-        (let [env (-> {:script {:script-dir "test-dir"}
-                       :config {:events
-                                {:type :manifold}
-                                :runner
-                                {:events
-                                 {:type :zmq}}}}
-                      (sut/execute!)
-                      (deref)
-                      :process
-                      :args
-                      :extra-env)]
-          (is (= "zmq" (:monkeyci-events-type env))))))))
-
-(deftest process-env
-  (testing "passes build id"
-    (is (= "test-build" (-> {:build {:build-id "test-build"}}
-                            (sut/process-env)
-                            :monkeyci-build-build-id))))
-
-  (testing "passes build sid in serialized fashion"
-    (is (= "a/b/c" (-> {:build {:sid ["a" "b" "c"]}}
-                       (sut/process-env)
-                       :monkeyci-build-sid))))
-  
-  (testing "sets `LC_CTYPE` to `UTF-8` for git clones"
-    (is (= "UTF-8" (-> {}
-                       (sut/process-env)
-                       :lc-ctype))))
-
-  (testing "passes serialized config"
-    (let [env (-> {:config
-                   {:logging {:type :file
-                              :dir "test-dir"}}}
-                  (sut/process-env))]
-      (is (= "file" (:monkeyci-logging-type env)))
-      (is (= "test-dir" (:monkeyci-logging-dir env))))))
+      (testing "passes config file in edn"
+        (is (re-matches #"^\{:config-file \".*\.edn\"}" 
+                        (-> {:build {:checkout-dir "work-dir"}}
+                            (sut/execute!)
+                            (deref)
+                            :process
+                            :args
+                            :cmd
+                            last)))))))
 
 (deftest generate-deps
   (testing "adds log config file, relative to work dir if configured"
@@ -246,3 +161,37 @@
     (is (= ["test-dir"] (-> {:build {:script {:script-dir "test-dir"}}}
                             (sut/generate-deps)
                             :paths)))))
+
+(deftest rt->config
+  (testing "adds build to config"
+    (let [build {:build-id "test-build"}
+          e (sut/rt->config {:config {:config-key "value"}
+                             :build build})]
+      (is (= build (:build e)))
+      (is (= "value" (:config-key e)))))
+
+  (testing "adds api token"
+    (is (some? (-> (h/test-rt)
+                   (sut/rt->config)
+                   (get-in [:api :token])))))
+
+  (testing "no token if no jwk keys configured"
+    (is (nil? (-> {}
+                  (sut/rt->config)
+                  (get-in [:api :token])))))
+
+  (testing "does not overwrite token if no jwk config"
+    (is (= "test-token"
+           (-> {:config {:api {:token "test-token"}}}
+               (sut/rt->config)
+               (get-in [:api :token])))))
+
+  (testing "overwrites event config with runner settings"
+    (let [rt {:config {:events
+                       {:type :manifold}
+                       :runner
+                       {:events
+                        {:type :zmq}}}}]
+      (is (= :zmq (-> (sut/rt->config rt)
+                      :events
+                      :type))))))

@@ -13,15 +13,15 @@ if [ "$MONKEYCI_SCRIPT_DIR" = "" ]; then
 fi
 
 if [ "$MONKEYCI_EVENT_FILE" = "" ]; then
-    MONKEYCI_EVENT_FILE=${MONKEYCI_LOG_DIR}/events.edn
+    MONKEYCI_EVENT_FILE=${MONKEYCI_WORK_DIR}/events.edn
 fi
 
 if [ "$MONKEYCI_START_FILE" = "" ]; then
-    MONKEYCI_START_FILE=${MONKEYCI_LOG_DIR}/start
+    MONKEYCI_START_FILE=${MONKEYCI_WORK_DIR}/start
 fi
 
 if [ "$MONKEYCI_ABORT_FILE" = "" ]; then
-    MONKEYCI_ABORT_FILE=${MONKEYCI_LOG_DIR}/abort
+    MONKEYCI_ABORT_FILE=${MONKEYCI_WORK_DIR}/abort
 fi
 
 wait_for_start()
@@ -52,8 +52,8 @@ run_command()
 {
     command=$1
     name=$command
-    out=${MONKEYCI_LOG_DIR}/${command}_out
-    err=${MONKEYCI_LOG_DIR}/${command}_err
+    out=${MONKEYCI_LOG_DIR}/${command}_out.log
+    err=${MONKEYCI_LOG_DIR}/${command}_err.log
     contents=`cat ${MONKEYCI_SCRIPT_DIR}/${command}`
     
     echo "Running command $command: $contents"
@@ -66,7 +66,12 @@ run_command()
 }
 
 echo "Starting job script with working directory $MONKEYCI_WORK_DIR"
+# Create any directories
 mkdir -p $MONKEYCI_LOG_DIR
+mkdir -p `dirname $MONKEYCI_EVENT_FILE`
+mkdir -p `dirname $MONKEYCI_START_FILE`
+mkdir -p `dirname $MONKEYCI_ABORT_FILE`
+
 post_event "{:type :container/pending}"
 wait_for_start
 if [ "$ABORT" = "yes" ]; then

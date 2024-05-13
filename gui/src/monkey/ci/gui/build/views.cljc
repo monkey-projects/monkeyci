@@ -10,53 +10,7 @@
             [monkey.ci.gui.tabs :as tabs]
             [monkey.ci.gui.time :as t]
             [monkey.ci.gui.timer :as timer]
-            [re-frame.core :as rf]
-            #?@(:node [] ; Exclude ansi_up when building for node
-                :cljs [["ansi_up" :refer [AnsiUp]]])))
-
-(def log-modal-id :log-dialog)
-
-(defn- modal-title []
-  (let [p (rf/subscribe [:build/log-path])]
-    [:h5 "Log for " @p]))
-
-(defn- show-downloading []
-  (let [d? (rf/subscribe [:build/downloading?])]
-    (when @d?
-      [co/render-alert {:type :info
-                        :message "Downloading log file, one moment..."}])))
-
-;; Node does not support ESM modules, so we need to apply this workaround when testing
-#?(:node
-   (defn ansi->html [l]
-     l)
-   :cljs
-   (do
-     (def ansi-up (AnsiUp.))
-     (defn- ansi->html [l]
-       (.ansi_to_html ansi-up l))))
-
-(defn- ->html [l]
-  (if (string? l)
-    [:span
-     {:dangerouslySetInnerHTML {:__html (ansi->html l)}}]
-    l))
-
-(defn- log-contents []
-  (let [c (rf/subscribe [:build/current-log])]
-    (->> @c
-         (map ->html)
-         (into [:p.text-bg-dark.font-monospace.overflow-auto.text-nowrap.h-100]))))
-
-(defn log-modal []
-  (let [a (rf/subscribe [:build/log-alerts])]
-    [co/modal
-     log-modal-id
-     [modal-title]
-     [:div {:style {:min-height "100px"}}
-      [co/alerts [:build/log-alerts]]
-      [show-downloading]
-      [log-contents]]]))
+            [re-frame.core :as rf]))
 
 (defn build-details
   "Displays the build details by looking it up in the list of repo builds."
@@ -73,6 +27,22 @@
          (concat [[:li [:b "Result: "] [co/build-result (:status @d)]]])
          (into [:ul]))))
 
+(defn build-result []
+  (let [b (rf/subscribe [:build/current])]
+    ;; TODO Signal warnings or skipped jobs.
+    (case (:status @b)
+      :success
+      [:div.alert.alert-success
+       [co/icon :check-circle-fill]
+       [:span.ms-2 "Build successful!"]]
+      :error
+      [:div.alert.alert-danger
+       [co/icon :exclamation-triangle-fill]
+       [:b.ms-2.me-2 "This build failed."]
+       [:span "Check the job logs for details."]]
+      ;; Build still running: show nothing
+      nil)))
+
 (defn- build-path [route]
   (let [p (r/path-params route)
         get-p (juxt :customer-id :repo-id :build-id)]
@@ -84,14 +54,6 @@
 (defn- calc-elapsed [{s :start-time e :end-time}]
   (when (and s e)
     (t/format-seconds (int (/ (- e s) 1000)))))
-
-(defn- render-log-link [{:keys [name size path]}]
-  [:span.me-1
-   [:a.me-1 {:href (u/->dom-id log-modal-id)
-             :data-bs-toggle "modal"
-             :on-click (u/link-evt-handler [:build/download-log path])}
-    name]
-   (str "(" size " bytes)")])
 
 (defn- elapsed-final [s]
   [:span (calc-elapsed s)])
@@ -105,25 +67,72 @@
     [elapsed-running x]
     [elapsed-final x]))
 
+(defn- job-path [job curr]
+  (r/path-for :page/job (-> curr
+                            (r/path-params)
+                            (assoc :job-id (:id job)))))
+
+(defn- logs-btn [job]
+  (let [r (rf/subscribe [:route/current])]
+    [:a.btn.btn-primary.me-2
+     {:href (job-path job @r)}
+     [co/icon :file-earmark-plus] [:span.ms-1 "View Logs"]]))
+
+(defn- hide-btn [job]
+  [:button.btn.btn-close
+   {:on-click #(rf/dispatch [:job/toggle job])
+    :aria-label "Close"}])
+
+(defn- job-details [{:keys [labels start-time end-time] deps :dependencies arts :save-artifacts :as job}]
+  (letfn [(format-labels [lbls]
+            (->> lbls
+                 (map (partial cs/join " = "))
+                 (cs/join ", ")))]
+    [:div.row
+     [:div.col-4
+      [:ul
+       (when start-time
+         [:li "Started at: " [co/date-time start-time]])
+       (when end-time
+         [:li "Ended at: " [co/date-time end-time]])
+       (when-not (empty? labels)
+         [:li "Labels: " (format-labels labels)])
+       (when-not (empty? deps)
+         [:li "Dependent on: " (cs/join ", " deps)])
+       (when-not (empty? arts)
+         ;; TODO Link to artifact
+         [:li "Artifacts: " (cs/join ", " (map :id arts))])]]
+     [:div.col-4
+      [logs-btn job]]
+     [:div.col-4
+      [:div.float-end
+       [hide-btn job]]]]))
+
 (defn- render-job [job]
-  [:tr
-   [:td (:id job)]
-   [:td (get-in job [:labels :pipeline])]
-   [:td [co/build-result (:status job)]]
-   [:td (elapsed job)]
-   [:td (->> (:logs job)
-             (map render-log-link)
-             (into [:span]))]])
+  (let [exp (rf/subscribe [:build/expanded-jobs])
+        expanded? (and exp (contains? @exp (:id job)))
+        r (rf/subscribe [:route/current])
+        cells [[:td [:a {:href (job-path job @r)}
+                     (:id job)]]
+               [:td (->> (get-in job [:dependencies])
+                         (cs/join ", "))]
+               [:td [co/build-result (:status job)]]
+               [:td (elapsed job)]]]
+    [:<>
+     (into [:tr {:on-click #(rf/dispatch [:job/toggle job])}] cells)
+     (when expanded?
+       [:tr
+        [:td {:col-span (count cells)}
+         [job-details job]]])]))
 
 (defn- jobs-table [jobs]
-  [:table.table.table-striped
+  [:table.table
    [:thead
     [:tr
      [:th "Job"]
-     [:th "Pipeline"]
+     [:th "Dependencies"]
      [:th "Result"]
-     [:th "Elapsed"]
-     [:th "Logs"]]]
+     [:th "Elapsed"]]]
    (->> jobs
         (map render-job)
         (into [:tbody]))])
@@ -133,51 +142,6 @@
     [:div.mb-2
      [:p "This build contains " (count @jobs) " jobs"]
      [jobs-table @jobs]]))
-
-(defn- log-row [{:keys [name size] :as l}]
-  (let [route (rf/subscribe [:route/current])]
-    [:tr
-     ;; FIXME Clicking the link counts as "leaving the page" which stops the event stream
-     [:td [:a {:href (u/->dom-id log-modal-id)
-               :data-bs-toggle "modal"
-               :on-click (u/link-evt-handler [:build/download-log name])}
-           name]]
-     ;; TODO Make size human readable
-     [:td size]]))
-
-(defn logs-table []
-  (let [l (rf/subscribe [:build/global-logs])]
-    [:table.table.table-striped
-     [:thead
-      [:tr
-       [:th {:scope :col} "Log file"]
-       [:th {:scope :col} "Size"]]]
-     (->> @l
-          (map log-row)
-          (into [:tbody]))]))
-
-(defn- build-logs [params]
-  (rf/dispatch [:build/load-logs])
-  (fn [params]
-    [:<>
-     [:p "These are the global logs that do not belong to a specific job."]
-     [logs-table]]))
-
-(defn- tab-header [lbl curr? contents]
-  [:li.nav-item
-   [:a.nav-link (cond-> {:href ""}
-                  curr? (assoc :class :active
-                               :aria-current :page))]
-   contents])
-
-(defn details-tabs [route]
-  [tabs/tabs
-   ::build-details
-   [{:header "Jobs"
-     :current? true
-     :contents [build-jobs]}
-    {:header "Logs"
-     :contents [build-logs (r/path-params route)]}]])
 
 (defn page [route]
   (rf/dispatch [:build/init])
@@ -193,7 +157,7 @@
           [co/reload-btn [:build/reload] (when @reloading? {:disabled true})]]]
         [co/alerts [:build/alerts]]
         [build-details]
-        [details-tabs route]
-        [log-modal]
+        [build-result]
+        [build-jobs]
         [:div
          [:a {:href (r/path-for :page/repo params)} "Back to repository"]]]])))

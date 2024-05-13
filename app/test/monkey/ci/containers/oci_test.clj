@@ -1,5 +1,6 @@
 (ns monkey.ci.containers.oci-test
   (:require [clojure.test :refer [deftest testing is]]
+            [clj-yaml.core :as yaml]
             [clojure.java.io :as io]
             [manifold.deferred :as md]
             [medley.core :as mc]
@@ -32,13 +33,6 @@
       (is (map? ic))
       (is (string? (:shape ic)))))
 
-  (testing "contains job and sidecar containers"
-    (is (= #{"job" "sidecar"}
-           (->> (sut/instance-config {} default-rt)
-                :containers
-                (map :display-name)
-                (set)))))
-
   (testing "display name contains build id, pipeline index and job index"
     (is (= "test-build-test-job"
            (->> {:build {:build-id "test-build"
@@ -63,11 +57,30 @@
       (is (= "test-cust" (get tags "customer-id")))
       (is (= "test" (get tags "env")))))
 
-  (testing "both containers have checkout volume"
+  (testing "all containers have checkout volume"
     (letfn [(has-checkout-vol? [c]
               (some (comp (partial = oci/checkout-vol) :volume-name)
                     (:volume-mounts c)))]
       (is (every? has-checkout-vol? (:containers (sut/instance-config {} default-rt))))))
+
+  (testing "pod memory"
+    (testing "has default value"
+      (is (number? (-> (sut/instance-config {} default-rt)
+                       :shape-config
+                       :memory-in-g-bs))))
+
+    (testing "can specify custom memory limit"
+      (is (= 4 (-> (sut/instance-config {} (-> default-rt
+                                               (assoc-in [:job :memory] 4)))
+                   :shape-config
+                   :memory-in-g-bs))))
+
+    (testing "limited to max memory"
+      (is (= sut/max-pod-memory
+             (-> (sut/instance-config {} (-> default-rt
+                                             (assoc-in [:job :memory] 10000)))
+                 :shape-config
+                 :memory-in-g-bs)))))
 
   (testing "job container"
     (let [jc (->> {:job {:script ["first" "second"]
@@ -134,9 +147,12 @@
           sc (->> ic
                   :containers
                   (mc/find-first (u/prop-pred :display-name "sidecar")))]
+
+      (testing "passes config file as arg"
+        (is (= "/home/monkeyci/config/config.edn" (second (:arguments sc)))))
       
-      (testing "starts sidecar using first arg"
-        (is (= "sidecar" (first (:arguments sc)))))
+      (testing "starts sidecar"
+        (is (= "sidecar" (nth (:arguments sc) 2))))
 
       (testing "passes events-file as arg"
         (is (h/contains-subseq? (:arguments sc)
@@ -176,39 +192,16 @@
                 (is (= "/opt/monkeyci/checkout/work/test-checkout/sub"
                        (-> data
                            :job
-                           :work-dir))))))))
+                           :work-dir))))))
 
-      (testing "env vars"
-        (let [env (:environment-variables sc)]
+          (testing "config file"
+            (let [e (find-volume-entry v "config.edn")
+                  data (some-> e :data (parse-b64-edn))]
+              (testing "included in config volume"
+                (is (some? e)))
 
-          (testing "specified in container"
-            (is (some? env)))
-
-          (testing "receives env vars from runtime"
-            (is (= "test-build" (get env "MONKEYCI_BUILD_BUILD_ID"))))
-
-          (testing "serializes private key to pem"
-            (let [pk (get env "MONKEYCI_OCI_CREDENTIALS_PRIVATE_KEY")]
-              (is (string? pk))
-              (is (some? (u/load-privkey pk)))))
-
-          (testing "removes initial args"
-            (not (contains? env "MONKEYCI_ARGS")))
-
-          (testing "overwrites build checkout dir"
-            (is (= (str sut/work-dir "/test-checkout") (get env "MONKEYCI_BUILD_CHECKOUT_DIR"))))
-          
-          (testing "sets work dir to checkout dir"
-            (is (= (str sut/work-dir "/test-checkout") (get env "MONKEYCI_WORK_DIR"))))
-
-          (testing "recalculates script dir relative to new checkout dir")
-
-          (testing "disables event server"
-            (not (contains? env "MONKEYCI_EVENTS_SERVER_ENABLED")))
-
-          (testing "passes other event properties"
-            (is (= (get-in conf [:events :client :address])
-                   (get env "MONKEYCI_EVENTS_CLIENT_ADDRESS"))))))
+              (testing "contains build details"
+                (is (contains? data :build)))))))
 
       (testing "runs as root to access mount volumes"
         (is (= 0 (-> sc :security-context :run-as-user)))))
@@ -243,7 +236,59 @@
         (is (= (u/->base64 "first")
                (get-in by-name ["0" :data])))
         (is (= (u/->base64 "second")
-               (get-in by-name ["1" :data])))))))
+               (get-in by-name ["1" :data]))))))
+
+  (testing "promtail container"
+    (let [ci (->> {:job
+                   {:script ["first" "second"]
+                    :container/env {"TEST_ENV" "test-val"}
+                    :work-dir "/tmp/test-build/sub"}
+                   :build
+                   {:checkout-dir "/tmp/test-build"}
+                   :config {:promtail
+                            {:loki-url "http://loki"}}}
+                  (sut/instance-config {}))
+          pc (->> ci
+                  :containers
+                  (mc/find-first (u/prop-pred :display-name "promtail")))]
+      (testing "added to instance"
+        (is (some? pc)))
+
+      (testing "refers to mounted config file"
+        (is (= ["-config.file" "/etc/promtail/config.yml"]
+               (:arguments pc)))
+        (is (some? (mc/find-first (u/prop-pred :volume-name "promtail-config")
+                                  (:volume-mounts pc)))))
+
+      (testing "monitors script log dir"
+        (let [v (oci/find-volume ci "promtail-config")
+              contents (some->> v
+                                :configs
+                                first
+                                :data
+                                h/base64->
+                                yaml/parse-string)]
+          (is (some? v))
+          (is (map? contents))
+          (is (= (str sut/log-dir "/*.log")
+                 (-> contents
+                     :scrape_configs
+                     first
+                     :static_configs
+                     first
+                     :labels
+                     :__path__))))))
+
+    (testing "not added if no loki url configured"
+      (is (nil? (->> {:job
+                      {:script ["first" "second"]
+                       :container/env {"TEST_ENV" "test-val"}
+                       :work-dir "/tmp/test-build/sub"}
+                      :build
+                      {:checkout-dir "/tmp/test-build"}}
+                     (sut/instance-config {})
+                     :containers
+                     (mc/find-first (u/prop-pred :display-name "promtail"))))))))
 
 (deftest wait-for-instance-end-events
   (testing "returns a deferred that holds the container and job end events"

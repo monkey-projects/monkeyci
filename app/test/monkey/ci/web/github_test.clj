@@ -86,10 +86,12 @@
                   (assoc :headers {"x-github-event" "push"}
                          :parameters {:path {:id "test-hook"}
                                       :body
-                                      {:head-commit {:id "test-id"}}}))]
+                                      {:head-commit {:id "test-id"}}}))
+          build-end? (comp (partial = :build/end) :type)
+          recv-build-end (fn []
+                           (some build-end? @recv))]
       (is (= 202 (:status (sut/webhook req))))
-      (is (not= :timeout (h/wait-until #(not-empty @recv) 1000)))
-      (is (= :build/end (-> @recv first :type))))))
+      (is (not= :timeout (h/wait-until recv-build-end 1000))))))
 
 (deftest app-webhook
   (testing "triggers build on push for watched repo"
@@ -145,6 +147,23 @@
 
 (defn- test-webhook []
   (zipmap [:id :customer-id :repo-id] (repeatedly st/new-id)))
+
+(deftest create-build
+  (testing "file changes"
+    (testing "adds file changes to build"
+      (h/with-memory-store s
+        (let [b (sut/create-build {:storage s}
+                                  {}
+                                  {:commits
+                                   [{:added ["new-file-1"]
+                                     :removed ["removed-file-1"]}
+                                    {:added ["new-file-2"]
+                                     :modified ["modified-file-1"]}]})]
+          (is (= {:added    #{"new-file-1"
+                              "new-file-2"}
+                  :removed  #{"removed-file-1"}
+                  :modified #{"modified-file-1"}}
+                 (:changes b))))))))
 
 (deftest create-webhook-build
   (testing "creates build record for customer/repo"

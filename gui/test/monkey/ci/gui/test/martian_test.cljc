@@ -21,7 +21,6 @@
   (testing "dispatches martian request"
     (rf-test/run-test-sync
      (let [e (h/catch-fx :martian.re-frame/request)]
-       (h/initialize-martian {:get-customer {:status 200}})
        (rf/dispatch [:secure-request :get-customer {:key "value"} [::on-success] [::on-failure]])
        (is (= 1 (count @e)))
        (is (= :get-customer (-> @e first (nth 2)))))))
@@ -30,8 +29,27 @@
     (rf-test/run-test-sync
      (let [e (h/catch-fx :martian.re-frame/request)]
        (is (map? (swap! app-db assoc :auth/token "test-token")))
-       (h/initialize-martian {:get-customer {:status 200}})
        (rf/dispatch [:secure-request :get-customer {} [::on-success] [::on-failure]])
        (is (= 1 (count @e)))
        (is (= {:authorization "Bearer test-token"}
-              (-> @e first (nth 3))))))))
+              (-> @e first (nth 3)))))))
+
+  (testing "wraps error handler"
+    (rf-test/run-test-sync
+     (let [e (h/catch-fx :martian.re-frame/request)]
+       (rf/dispatch [:secure-request :test-request {} [::on-success] [::on-failure]])
+       (is (= [::sut/error-handler [::on-failure]]
+              (-> @e first last)))))))
+
+(deftest error-handler
+  (testing "redirects to login page on 401"
+    (rf-test/run-test-sync
+     (let [e (h/catch-fx :route/goto)]
+       (rf/dispatch [::sut/error-handler [::on-failure] {:status 401}])
+       (is (= ["/login"] @e)))))
+
+  (testing "dispatches target event when no 401 error"
+    (rf-test/run-test-sync
+     (rf/reg-event-db ::on-failure #(assoc % ::invoked? true))
+     (rf/dispatch [::sut/error-handler [::on-failure] {:status 500}])
+     (is (true? (::invoked? @app-db))))))

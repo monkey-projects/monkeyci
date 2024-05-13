@@ -13,6 +13,7 @@
             [monkey.ci
              [build :as b]
              [config :refer [version] :as config]
+             [edn :as edn]
              [logging :as l]
              [runtime :as rt]
              [script :as script]
@@ -39,19 +40,27 @@
 (defn exit! [exit-code]
   (System/exit exit-code))
 
+(defn- load-config [{:keys [config-file]}]
+  (with-open [r (io/reader config-file)]
+    (utils/parse-edn r)))
+
 (defn run
   "Run function for when a build task is executed using clojure tools.  This function
    is run in a child process by the `execute!` function below.  This exits the VM
    with a nonzero value on failure."
   ([args env]
+   (log/debug "Running with args:" args)
    (try
-     (when (-> (config/normalize-config default-script-config (config/strip-env-prefix env) args)
-               (rt/with-runtime :script rt
-                 (log/debug "Executing script with config" (:config rt))
-                 (log/debug "Script working directory:" (utils/cwd))
-                 (script/exec-script! rt))
-               (bc/failed?))
-       (exit! 1))
+     (let [config (load-config args)]
+       (when (-> (config/normalize-config (merge default-script-config config)
+                                          (config/strip-env-prefix env)
+                                          nil)
+                 (rt/with-runtime :script rt
+                     (log/debug "Executing script with config" (:config rt))
+                     (log/debug "Script working directory:" (utils/cwd))
+                     (script/exec-script! rt))
+                 (bc/failed?))
+         (exit! 1)))
      (catch Exception ex
        ;; This could happen if there is an error loading or initializing the child process
        (log/error "Failed to run child process" ex)
@@ -64,6 +73,9 @@
   "Finds logback configuration file, either configured on the runner, or present 
    in the script dir"
   [rt]
+  ;; TODO Use some sort of templating engine to generate a custom log config to add
+  ;; the build id as a label to the logs (e.g. moustache).  That would make it easier
+  ;; to fetch logs for a specific build.
   (->> [(io/file (get-in rt [:build :script-dir]) "logback.xml")
         (some->> (get-in rt [:config :runner :log-config])
                  (utils/abs-path (rt/work-dir rt)))]
@@ -91,31 +103,24 @@
         log-config (assoc :jvm-opts
                           [(str "-Dlogback.configurationFile=" log-config)]))}}))
 
-(defn- build-args
-  "Builds command-line args vector for script process"
-  [{:keys [build]}]
-  (->> (-> build
-           (select-keys [:checkout-dir :pipeline])
-           (assoc :script-dir (b/script-dir build)))
-       (mc/remove-vals nil?)
-       (mc/map-keys str)
-       (mc/map-vals pr-str)
-       (into [])
-       (flatten)))
-
-(def default-envs
-  {:lc-ctype "UTF-8"})
-
-(defn process-env
-  "Build the environment to be passed to the child process."
-  [rt]
-  (-> (rt/rt->env rt)
+(defn rt->config [rt]
+  (-> (rt/rt->config rt)
       ;; Generate an API token and add it to the config
       (update :api mc/assoc-some :token (auth/generate-jwt-from-rt rt (auth/build-token (b/get-sid rt))))
       ;; Overwrite event settings with runner-specific config
       (mc/assoc-some :events (get-in rt [rt/config :runner :events]))
-      (config/config->env)
-      (merge default-envs)))
+      ;; Don't start an events server in any case
+      (mc/update-existing :events dissoc :server)))
+
+(defn- config->edn
+  "Writes the configuration to an edn file that is then passed as command line to the app."
+  [rt]
+  (let [f (utils/tmp-file "config" ".edn")]
+    (->> rt
+         (rt->config)
+         (edn/->edn)
+         (spit f))
+    f))
 
 (defn- log-maker [rt]
   (or (rt/log-maker rt) (l/make-logger {})))
@@ -133,11 +138,10 @@
   (let [script-dir (b/rt->script-dir rt)
         [out err :as loggers] (map (partial make-logger rt) [:out :err])
         result (md/deferred)
-        cmd (-> ["clojure"
-                 "-Sdeps" (pr-str (generate-deps rt))
-                 "-X:monkeyci/build"]
-                (concat (build-args rt))
-                (vec))]
+        cmd ["clojure"
+             "-Sdeps" (pr-str (generate-deps rt))
+             "-X:monkeyci/build"
+             (pr-str {:config-file (config->edn rt)})]]
     (log/debug "Running in script dir:" script-dir ", this command:" cmd)
     ;; TODO Run as another unprivileged user for security
     (-> (bp/process
@@ -145,7 +149,6 @@
           :out (l/log-output out)
           :err (l/log-output err)
           :cmd cmd
-          :extra-env (process-env rt)
           :exit-fn (fn [{:keys [proc] :as p}]
                      (let [exit (or (some-> proc (.exitValue)) 0)]
                        (log/debug "Script process exited with code" exit ", cleaning up")

@@ -8,9 +8,16 @@
   "Retrieve current route from app db"
   :route/current)
 
+(defn set-current [db r]
+  (assoc db current r))
+
 (def customer-id
   "Retrieve current customer id from app db"
   (comp :customer-id :path :parameters current))
+
+(def repo-id
+  "Retrieve current repo id from app db"
+  (comp :repo-id :path :parameters current))
 
 (rf/reg-sub
  :route/current
@@ -19,16 +26,20 @@
 
 (def on-page-leave ::on-page-leave)
 
+(defn- path-changed? [from to]
+  (not= (:path from) (:path to)))
+
 (rf/reg-event-fx
  :route/changed
  (fn [{:keys [db]} [_ match]]
-   (log/debug "Changing current route from" (clj->js (current db)) "into" (clj->js match))
-   (let [handlers (on-page-leave db)]
-     (log/debug "Found" (count handlers) "leave handlers")
-     (cond-> {:db (-> db
-                      (assoc current match)
-                      (dissoc on-page-leave))}
-       (not-empty handlers) (assoc :dispatch-n handlers)))))
+   (when (path-changed? (current db) match)
+     (log/debug "Changing current route from" (clj->js (current db)) "into" (clj->js match))
+     (let [handlers (on-page-leave db)]
+       (log/debug "Found" (count handlers) "leave handlers")
+       (cond-> {:db (-> db
+                        (assoc current match)
+                        (dissoc on-page-leave))}
+         (not-empty handlers) (assoc :dispatch-n handlers))))))
 
 (defonce router
   ;; Instead of pointing to the views directly, we refer to a keyword, which
@@ -41,7 +52,9 @@
     ["/c/:customer-id" :page/customer]
     ["/c/:customer-id/add-repo" :page/add-repo]
     ["/c/:customer-id/r/:repo-id" :page/repo]
+    ["/c/:customer-id/r/:repo-id/edit" :page/repo-edit]
     ["/c/:customer-id/r/:repo-id/b/:build-id" :page/build]
+    ["/c/:customer-id/r/:repo-id/b/:build-id/j/:job-id" :page/job]
     ["/github/callback" :page/github-callback]]))
 
 (defn on-route-change [match history]
@@ -104,3 +117,4 @@
  :route/on-page-leave
  (fn [db [_ evt]]
    (update db on-page-leave (comp vec conj) evt)))
+

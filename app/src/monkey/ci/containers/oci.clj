@@ -13,28 +13,37 @@
              [build :as b]
              [config :as c]
              [containers :as mcc]
+             [edn :as edn]
              [oci :as oci]
              [runtime :as rt]
              [utils :as u]]
             [monkey.ci.build.core :as bc]
+            [monkey.ci.containers.promtail :as pt]
             [monkey.ci.events.core :as ec]
             [monkey.oci.container-instance.core :as ci]))
 
+(def max-pod-memory "Max memory that can be assigned to a pod, in gbs" 64)
 (def work-dir oci/work-dir)
 (def script-dir "/opt/monkeyci/script")
 (def log-dir (oci/checkout-subdir "log"))
-(def start-file (str log-dir "/start"))
-(def abort-file (str log-dir "/abort"))
-(def event-file (str log-dir "/events.edn"))
+(def events-dir (oci/checkout-subdir "events"))
+(def start-file (str events-dir "/start"))
+(def abort-file (str events-dir "/abort"))
+(def event-file (str events-dir "/events.edn"))
 (def script-vol "scripts")
 (def job-script "job.sh")
 (def config-vol "config")
 (def config-dir "/home/monkeyci/config")
 (def job-config-file "job.edn")
 (def job-container-name "job")
+(def config-file "config.edn")
 
 (def sidecar-container-name "sidecar")
 (def sidecar-config (comp :sidecar rt/config))
+
+(def promtail-config-vol "promtail-config")
+(def promtail-config-dir "/etc/promtail")
+(def promtail-config-file "config.yml")
 
 (defn- job-work-dir
   "The work dir to use for the job in the container.  This is the external job
@@ -75,7 +84,8 @@
 (defn- sidecar-container [{[c] :containers}]
   (assoc c
          :display-name sidecar-container-name
-         :arguments ["sidecar"
+         :arguments ["-c" (str config-dir "/" config-file)
+                     "sidecar"
                      "--events-file" event-file
                      "--start-file" start-file
                      "--abort-file" abort-file
@@ -83,6 +93,43 @@
          ;; Run as root, because otherwise we can't write to the shared volumes
          :security-context {:security-context-type "LINUX"
                             :run-as-user 0}))
+
+(defn- find-checkout-vol [ci]
+  (-> ci
+      :containers
+      first
+      (oci/find-mount oci/checkout-vol)))
+
+(defn- promtail-container [conf]
+  (-> conf
+      (pt/promtail-container)
+      (assoc :arguments ["-config.file" (str promtail-config-dir "/" promtail-config-file)])))
+
+(defn- promtail-config-mount []
+  {:volume-name promtail-config-vol
+   :is-read-only true
+   :mount-path "/etc/promtail"})
+
+(defn- promtail-config-vol-config [conf]
+  (let [conf (-> conf
+                 (assoc :paths [(str log-dir "/*.log")]))]
+    {:name promtail-config-vol
+     :volume-type "CONFIGFILE"
+     :configs [(oci/config-entry promtail-config-file
+                                 (pt/yaml-config conf))]}))
+
+(defn- add-promtail-container
+  "Adds promtail container configuration to the existing instance config.
+   It will be configured to push all logs from the script log dir."
+  [ic rt]
+  (let [conf (pt/rt->config rt)
+        add? (some? (:loki-url conf))]
+    (cond-> ic
+      add?
+      (-> (update :containers conj (-> (promtail-container conf)
+                                       (assoc :volume-mounts [(find-checkout-vol ic)
+                                                              (promtail-config-mount)])))
+          (update :volumes conj (promtail-config-vol-config conf))))))
 
 (defn- display-name [{:keys [build job]}]
   (cs/join "-" [(:build-id build)
@@ -121,43 +168,46 @@
                      (select-keys [:id :save-artifacts :restore-artifacts :caches :dependencies])
                      (assoc :work-dir (job-work-dir rt)))}))
 
+(defn- rt->config [rt]
+  (let [wd (oci/base-work-dir rt)]
+    (-> (rt/rt->config rt)
+        ;; Remove some unnecessary values
+        (dissoc :args :checkout-base-dir :jwk :containers :storage) 
+        (update :build dissoc :git :jobs :cleanup?)
+        (assoc :work-dir wd
+               :checkout-base-dir work-dir)
+        (assoc-in [:build :checkout-dir] wd))))
+
+(defn- rt->edn [rt]
+  (edn/->edn (rt->config rt)))
+
 (defn- config-vol-config
   "Configuration files for the sidecar (e.g. logging)"
   [rt]
   (let [{:keys [log-config]} (sidecar-config rt)]
     {:name config-vol
      :volume-type "CONFIGFILE"
-     :configs (cond-> [(oci/config-entry job-config-file (job-details->edn rt))]
+     :configs (cond-> [(oci/config-entry job-config-file (job-details->edn rt))
+                       (oci/config-entry config-file (rt->edn rt))]
                 log-config (conj (oci/config-entry "logback.xml" log-config)))}))
 
-(defn- add-sidecar-env [sc rt]
-  (let [wd (oci/base-work-dir rt)]
-    ;; TODO Put this all in a config file instead, this way sensitive information is harder to see
-    (assoc sc
-           :environment-variables
-           (-> (rt/rt->env rt)
-               ;; Remove some unnecessary values
-               (dissoc :args :checkout-base-dir :jwk :containers :storage) 
-               (update :build dissoc :git :jobs :cleanup?)
-               (assoc :work-dir wd
-                      :checkout-base-dir work-dir)
-               (assoc-in [:build :checkout-dir] wd)
-               (c/config->env)
-               (as-> x (mc/map-keys (comp csk/->SCREAMING_SNAKE_CASE name) x))))))
+(defn- set-pod-resources [ic rt]
+  (-> ic
+      (update :shape-config mc/assoc-some :memory-in-g-bs (get-in rt [:job :memory]))
+      (mc/update-existing-in [:shape-config :memory-in-g-bs] min max-pod-memory)))
 
 (defn instance-config
   "Generates the configuration for the container instance.  It has 
    a container that runs the job, as configured in the `:job`, and
    next to that a sidecar that is responsible for capturing the output
-   and dispatching events."
+   and dispatching events.  If configured, it also "
   [conf rt]
   (let [ic (oci/instance-config conf)
         sc (-> (sidecar-container ic)
-               (update :volume-mounts conj (config-mount rt))
-               (add-sidecar-env rt))
+               (update :volume-mounts conj (config-mount rt)))
         jc (-> (job-container rt)
                ;; Use common volume for logs and events
-               (assoc :volume-mounts [(oci/find-mount sc oci/checkout-vol)
+               (assoc :volume-mounts [(find-checkout-vol ic)
                                       (script-mount rt)]))]
     (-> ic
         (assoc :containers [sc jc]
@@ -165,7 +215,11 @@
         (update :freeform-tags merge (oci/sid->tags (get-in rt [:build :sid])))
         (update :volumes conj
                 (script-vol-config rt)
-                (config-vol-config rt)))))
+                (config-vol-config rt))
+        (set-pod-resources rt)
+        ;; Note that promtail will never terminate, so we rely on the script to
+        ;; delete the container instance when the sidecar and the job have completed.
+        (add-promtail-container rt))))
 
 (defn wait-for-instance-end-events
   "Checks the incoming events to see if a container and job end event has been received.
@@ -181,6 +235,8 @@
              max-timeout (ec/set-result
                           {:type t}
                           (ec/make-result :error 1 (str "Timeout after " max-timeout " msecs")))))]
+    ;; TODO As soon as a failure for the sidecar has been received, we should return
+    ;; because then container events won't be sent anymore anyway.
     (md/zip
      (wait-for :container/end)
      (wait-for :sidecar/end))))
@@ -209,7 +265,7 @@
                           ;; Add the full result, may be useful for higher levels
                           (assoc c :result (assoc (ec/result evt) :exit exit-code)))
                         (do
-                          (log/warn "Unknown container:" display-name ", ignoring")
+                          (log/debug "Unknown container:" display-name ", ignoring")
                           c)))]
        ;; We don't rely on the container exit codes, since the container may not have
        ;; exited completely when the events have arrived, so we use the event values instead.

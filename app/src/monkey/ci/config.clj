@@ -14,9 +14,7 @@
             [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [medley.core :as mc]
-            [monkey.ci
-             [pem :as pem]
-             [utils :as u]]))
+            [monkey.ci.utils :as u]))
 
 (def ^:dynamic *global-config-file* "/etc/monkeyci/config.edn")
 (def ^:dynamic *home-config-file* (-> (System/getProperty "user.home")
@@ -166,7 +164,7 @@
 
 (defmethod normalize-key :account [_ {:keys [args] :as conf}]
   (let [c (update conf :account merge (-> args
-                                          (select-keys [:customer-id :project-id :repo-id])
+                                          (select-keys [:customer-id :repo-id])
                                           (mc/assoc-some :url (:server args))))]
     (cond-> c
       (empty? (:account c)) (dissoc :account))))
@@ -242,28 +240,6 @@
                    (assoc r (make-key k) v)))
                {}
                c)))
-
-(defmulti serialize-config class)
-
-(defmethod serialize-config :default [x]
-  (str x))
-
-(defmethod serialize-config clojure.lang.Keyword [k]
-  (name k))
-
-(defmethod serialize-config java.security.PrivateKey [pk]
-  (pem/private-key->pem pk))
-
-(defn config->env
-  "Creates a map of env vars from the config.  This is done by flattening
-   the entries and prepending them with `monkeyci-`.  Values are converted 
-   to string."
-  [c]
-  (->> c
-       (flatten-nested [])
-       (mc/map-keys (fn [k]
-                      (keyword (str env-prefix "-" (name k)))))
-       (mc/map-vals serialize-config)))
 
 (defn normalize-typed
   "Convenience function that converts the `:type` of an entry into a keyword and

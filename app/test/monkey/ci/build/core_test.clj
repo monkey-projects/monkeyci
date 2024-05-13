@@ -160,3 +160,49 @@
            (-> (sut/action-job ::test-job (constantly nil) {j/deps [::orig ::new]})
                (sut/depends-on [::new])
                (j/deps))))))
+
+(deftest file-changes
+  (testing "lists added files"
+    (let [files [:a :b :c]
+          rt {:build
+              {:changes
+               {:added files}}}]
+      (is (= files (sut/files-added rt)))))
+
+  (testing "lists modified files"
+    (let [files [:a :b :c]
+          rt {:build
+              {:changes
+               {:modified files}}}]
+      (is (= files (sut/files-modified rt)))))
+
+  (testing "lists removed files"
+    (let [files [:a :b :c]
+          rt {:build
+              {:changes
+               {:removed files}}}]
+      (is (= files (sut/files-removed rt)))))
+
+  (testing "`touched?`"
+    (let [rt {:build
+              {:changes
+               {:added    #{"file-added"}
+                :modified #{"file-modified"}
+                :removed  #{"file-removed"}}}}]
+      (testing "`true` if file added"
+        (is (sut/touched? rt "file-added")))
+
+      (testing "`true` if file modified"
+        (is (sut/touched? rt "file-modified")))
+
+      (testing "`true` if file removed"
+        (is (sut/touched? rt "file-removed")))
+
+      (testing "`false` if file unchanged"
+        (is (not (sut/touched? rt "file-unchanged"))))
+
+      (testing "`true` if regex matches"
+        (is (sut/touched? rt #"^file-.*$")))
+
+      (testing "`true` if predicate matches"
+        (is (sut/touched? rt #(clojure.string/includes? % "add")))))))

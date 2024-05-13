@@ -4,7 +4,8 @@
             [manifold.stream :as ms]
             [monkey.ci
              [runtime :as rt]
-             [storage :as st]]
+             [storage :as st]
+             [utils :as u]]
             [monkey.ci.events.core :as ec]))
 
 (defn- save-build
@@ -16,9 +17,10 @@
 (defn update-build [storage {:keys [sid build]}]
   (log/debug "Updating build:" sid)
   (let [existing (st/find-build storage sid)]
-    (save-build storage
-                (-> (merge existing (dissoc build :script))
-                    (dissoc :sid :cleanup?)))))
+    (-> (save-build storage
+                    (-> (merge existing (dissoc build :script))
+                        (dissoc :sid :cleanup?)))
+        (assoc :sid sid))))
 
 (defn update-script [storage {:keys [sid script]}]
   (log/debug "Updating build script for sid" sid)
@@ -26,8 +28,7 @@
     (let [orig (get-in build [:script :jobs])]
       (save-build storage
                   (assoc build
-                         :script (cond-> script
-                                   orig (assoc :jobs orig)))))
+                         :script (u/deep-merge (:script build) script))))
     (log/warn "Build not found when updating script:" sid)))
 
 (defn update-job [storage {:keys [sid job]}]

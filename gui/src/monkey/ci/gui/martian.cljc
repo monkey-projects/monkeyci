@@ -21,6 +21,25 @@
 (def build-schema
   (assoc repo-schema :build-id s/Str))
 
+;; TODO Use the same source as backend for this
+(s/defschema Label
+  {:name s/Str
+   :value s/Str})
+
+(s/defschema UpdateRepo
+  {:customer-id s/Str
+   :name s/Str
+   :url s/Str
+   (s/optional-key :main-branch) s/Str
+   (s/optional-key :github-id) s/Int
+   (s/optional-key :labels) [Label]})
+
+(s/defschema log-query-schema
+  {:query s/Str
+   :start s/Int
+   :direction s/Str
+   (s/optional-key :end) s/Int})
+
 (defn public-route [conf]
   (merge {:method :get
           :produces #{"application/edn"}
@@ -38,14 +57,18 @@
      :path-parts customer-path
      :path-schema customer-schema})
 
-   #_(api-route
-    {:route-name :create-repo
-     :method :post
-     :path-parts (conj customer-path "/repo")
-     :path-schema customer-schema
-     :body-schema {:repo {:name s/Str
-                          :url s/Str
-                          :customer-id s/Str}}})
+   (api-route
+    {:route-name :get-repo
+     :method :get
+     :path-parts repo-path
+     :path-schema repo-schema})
+
+   (api-route
+    {:route-name :update-repo
+     :method :put
+     :path-parts repo-path
+     :path-schema repo-schema
+     :body-schema {:repo UpdateRepo}})
 
    (api-route
     {:route-name :get-builds
@@ -67,16 +90,25 @@
      :path-schema build-schema})
 
    (api-route
-    {:route-name :get-build-logs
-     :path-parts (into build-path ["/logs"])
-     :path-schema build-schema})
+    {:route-name :download-log
+     :path-parts ["/logs/" :customer-id "/entries"]
+     :path-schema customer-schema
+     :query-schema log-query-schema
+     :produces #{"application/json"}})
 
    (api-route
-    {:route-name :download-log
-     :path-parts (into build-path ["/logs/download"])
-     :path-schema build-schema
-     :query-schema {:path s/Str}
-     :produces #{"text/plain"}})
+    {:route-name :get-log-stats
+     :path-parts ["/logs/" :customer-id "/stats"]
+     :path-schema customer-schema
+     :query-schema log-query-schema
+     :produces #{"application/json"}})
+
+   (api-route
+    {:route-name :get-log-label-values
+     :path-parts ["/logs/" :customer-id "/label/" :label "/values"]
+     :path-schema (assoc customer-schema :label s/Str)
+     :query-schema log-query-schema
+     :produces #{"application/json"}})
    
    (api-route
     {:route-name :watch-github-repo
@@ -137,8 +169,16 @@
     (cond-> opts
       t (assoc :authorization (str "Bearer " t)))))
 
+(rf/reg-event-fx
+ ::error-handler
+ (fn [{:keys [db]} [_ target-evt err]]
+   (log/debug "Got error:" (clj->js err))
+   {:dispatch (if (= 401 (:status err))
+                [:route/goto :page/login]
+                target-evt)}))
+
 ;; Takes the token from the db and adds it to the martian request
 (rf/reg-event-fx
  :secure-request
- (fn [{:keys [db]} [_ req args & extras]]
-   {:dispatch (into [:martian.re-frame/request req (add-token db args)] extras)}))
+ (fn [{:keys [db]} [_ req args on-success on-failure]]
+   {:dispatch (into [:martian.re-frame/request req (add-token db args) on-success [::error-handler on-failure]])}))

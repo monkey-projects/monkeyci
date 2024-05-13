@@ -69,6 +69,16 @@
         ssh-keys (s/find-ssh-keys st customer-id)]
     (lbl/filter-by-label repo ssh-keys)))
 
+(defn- file-changes
+  "Determines file changes according to the payload commits."
+  [payload]
+  (let [fkeys [:added :modified :removed]]
+    (->> payload
+         :commits
+         (reduce (fn [r c]
+                   (merge-with (comp set concat) r (select-keys c fkeys)))
+                 (zipmap fkeys (repeat #{}))))))
+
 (defn create-build
   "Looks up details for the given github webhook.  If the webhook refers to a valid 
    configuration, a build entity is created and a build structure is returned, which
@@ -93,7 +103,8 @@
                          :start-time (u/now)
                          :status :running
                          :build-id build-id
-                         :cleanup? true))]
+                         :cleanup? true
+                         :changes (file-changes payload)))]
     (when (s/save-build st build)
       ;; Add the sid, cause it's used downstream
       (assoc build :sid (s/ext-build-sid build)))))
@@ -128,11 +139,11 @@
   "Receives an incoming webhook from Github.  This starts the build
    runner async and returns a 202 accepted."
   [{p :parameters :as req}]
-  (log/trace "Got incoming webhook with body:" (prn-str (:body p)))
+  (log/trace "Got incoming webhook with body:" (prn-str (body req)))
   (log/debug "Event type:" (get-in req [:headers "x-github-event"]))
   (if (should-trigger-build? req)
     (let [rt (c/req->rt req)]
-      (if-let [build (create-webhook-build rt (get-in p [:path :id]) (:body p))]
+      (if-let [build (create-webhook-build rt (get-in p [:path :id]) (body req))]
         (do
           (c/run-build-async
            (assoc rt :build build))
@@ -140,7 +151,7 @@
               (rur/status 202)))
         ;; No valid webhook found
         (rur/not-found {:message "No valid webhook configuration found"})))
-    ;; If no build trigger or non build event, just respond with a '204 no content'
+    ;; If this is not a build event, just respond with a '204 no content'
     (rur/status 204)))
 
 (defn app-webhook [req]

@@ -138,7 +138,7 @@
 (defn build->evt
   "Prepare build object so it can be added to an event"
   [build]
-  (mc/update-existing build :git dissoc :ssh-keys))
+  (mc/update-existing build :git dissoc :ssh-keys :ssh-keys-dir))
 
 (defn build-end-evt
   "Creates a `build/end` event"
@@ -170,6 +170,15 @@
   "Calculates path `p` as relative to the work dir for the current job"
   [rt p]
   (u/abs-path (job-work-dir rt) p))
+
+(defn success-jobs
+  "Returns all successful jobs in the build"
+  [b]
+  (->> b
+       :script
+       :jobs
+       vals
+       (filter (comp (partial = :success) :status))))
 
 (defmethod rt/setup-runtime :build [conf _]
   ;; Just copy the build info to the runtime

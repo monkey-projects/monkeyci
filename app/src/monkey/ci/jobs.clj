@@ -255,7 +255,15 @@
           (reduce (fn [res j]
                     (update-job-state res j js))
                   state
-                  jobs))]
+                  jobs))
+
+        mark-pending-skipped
+        (fn [state res]
+          (let [pending (clojure.set/difference (set (keys state)) (set (keys res)))]
+            (reduce (fn [r id]
+                      (add-to-results r [(get state id) bc/skipped]))
+                    res
+                    pending)))]
     ;; Sets up a loop that checks if any jobs are pending for execution, and
     ;; starts them in parallel.  Then adds them to any already executing jobs.
     ;; It then waits for the first job to finish, and adds its result to the
@@ -270,8 +278,9 @@
         (log/debugf "There are %d pending jobs: %s" (count n) (keys n))
         (log/debugf "There are %d jobs currently executing: %s" (count executing) (keys executing))
         (if (and (empty? n) (empty? executing))
-          ;; Done, no more jobs to run and all running jobs have terminated
-          results
+          ;; Done, no more jobs to run and all running jobs have terminated.
+          ;; Mark any jobs that have not been executed as skipped.
+          (mark-pending-skipped state results)
           ;; More jobs to run, or at least one job is still executing
           (md/chain
            (md/let-flow [to-execute (vals n)
@@ -322,6 +331,9 @@
 (defn job->event
   "Converts job into something that can be put in an event"
   [job]
-  (-> job
-      (select-keys [:status :start-time :end-time deps labels])
-      (assoc :id (bc/job-id job))))
+  (letfn [(art->event [a]
+            (select-keys a [:id :path]))]
+    (-> job
+        (select-keys [:status :start-time :end-time deps labels :save-artifacts :extensions])
+        (mc/update-existing :save-artifacts (partial map art->event))
+        (assoc :id (bc/job-id job)))))

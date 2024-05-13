@@ -239,6 +239,20 @@
               ::dep-job
               {:job c
                :result bc/success}}
+             @(sut/execute-jobs! [p c] {})))))
+
+  (testing "marks any still pending jobs as skipped"
+    (let [p (bc/action-job ::start-job
+                           (constantly bc/success))
+          c (bc/action-job ::dep-job
+                           (constantly bc/failure)
+                           {:dependencies [::nonexisting-job]})]
+      (is (= {::start-job
+              {:job p
+               :result bc/success}
+              ::dep-job
+              {:job c
+               :result bc/skipped}}
              @(sut/execute-jobs! [p c] {}))))))
 
 (deftest container-job

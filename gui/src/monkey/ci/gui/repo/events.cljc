@@ -11,12 +11,12 @@
 (rf/reg-event-fx
  :repo/init
  (fn [{:keys [db]} _]
+   ;; Only proceed if not already initialized
    (when-not (db/initialized? db)
      (let [cust-id (r/customer-id db)]
        {:dispatch-n [[:repo/load cust-id]
                      ;; Make sure we stop listening to events when we leave this page
                      [:route/on-page-leave [:repo/leave]]
-                     ;; TODO Only do this if we're not listening already (e.g. code change reload)
                      [:event-stream/start stream-id cust-id [:repo/handle-event]]]
         :db (-> db
                 (db/set-initialized true)
@@ -71,7 +71,10 @@
 (defmethod handle-event :build/start [db evt]
   (update-build db (:build evt)))
 
-(defmethod handle-event :build/end [db evt]
+(defmethod handle-event :build/pending [db evt]
+  (update-build db (:build evt)))
+
+(defmethod handle-event :build/updated [db evt]
   (update-build db (:build evt)))
 
 (defmethod handle-event :default [db evt]
@@ -136,3 +139,102 @@
  (fn [db [_ err]]
    (db/set-alerts db [{:type :danger
                        :message (str "Could not start build: " (u/error-msg err))}])))
+
+(rf/reg-event-fx
+ :repo/load+edit
+ (fn [{:keys [db]} _]
+   (let [cust-id (r/customer-id db)]
+     {:dispatch [:secure-request
+                 :get-customer
+                 {:customer-id cust-id}
+                 [:repo/load+edit--success]
+                 [:repo/load+edit--failed]]
+      :db (-> db
+              (db/reset-edit-alerts)
+              (db/unmark-saving))})))
+
+(rf/reg-event-fx
+ :repo/load+edit--success
+ (fn [{:keys [db]} [_ resp]]
+   (let [repo-id (r/repo-id db)]
+     {:dispatch [:customer/load--success resp]
+      :db (db/set-editing db (->> (:body resp)
+                                  :repos
+                                  (filter (comp (partial = repo-id) :id))
+                                  (first)))})))
+
+(rf/reg-event-db
+ :repo/load+edit--failed
+ (fn [db [_ err]]
+   (db/set-edit-alerts db [{:type :danger
+                            :message (str "Unable to fetch repository info: " (u/error-msg err))}])))
+
+(rf/reg-event-db
+ :repo/name-changed
+ (fn [db [_ v]]
+   (assoc-in db [db/editing :name] v)))
+
+(rf/reg-event-db
+ :repo/main-branch-changed
+ (fn [db [_ v]]
+   (assoc-in db [db/editing :main-branch] v)))
+
+(rf/reg-event-db
+ :repo/url-changed
+ (fn [db [_ v]]
+   (assoc-in db [db/editing :url] v)))
+
+(rf/reg-event-db
+ :repo/label-add
+ (fn [db _]
+   (db/update-labels db (fnil conj []) {:name "New label" :value "New value"})))
+
+(rf/reg-event-db
+ :repo/label-removed
+ (fn [db [_ lbl]]
+   (db/update-labels db (partial filterv (partial not= lbl)))))
+
+(rf/reg-event-db
+ :repo/label-name-changed
+ (fn [db [_ lbl new-name]]
+   (db/update-label db lbl assoc :name new-name)))
+
+(rf/reg-event-db
+ :repo/label-value-changed
+ (fn [db [_ lbl new-name]]
+   (db/update-label db lbl assoc :value new-name)))
+
+(rf/reg-event-fx
+ :repo/save
+ (fn [{:keys [db]} _]
+   (let [params (-> (r/current db)
+                    (r/path-params)
+                    (select-keys [:customer-id :repo-id]))]
+     {:dispatch [:secure-request
+                 :update-repo
+                 (-> params
+                     (assoc :repo (-> (db/editing db)
+                                      (assoc :id (:repo-id params)
+                                             :customer-id (:customer-id params)))))
+                 [:repo/save--success]
+                 [:repo/save--failed]]
+      :db (-> db
+              (db/mark-saving)
+              (db/reset-edit-alerts))})))
+
+(rf/reg-event-db
+ :repo/save--success
+ (fn [db [_ {:keys [body]}]]
+   (-> db
+       (cdb/replace-repo body)
+       (db/unmark-saving)
+       (db/set-edit-alerts [{:type :success
+                             :message "Repository changes have been saved."}]))))
+
+(rf/reg-event-db
+ :repo/save--failed
+ (fn [db [_ err]]
+   (-> db
+       (db/set-edit-alerts [{:type :danger
+                             :message (str "Failed to save changes: " (u/error-msg err))}])
+       (db/unmark-saving))))

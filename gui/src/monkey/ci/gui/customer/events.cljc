@@ -21,6 +21,14 @@
                [:customer/load--success]
                [:customer/load--failed id]]}))
 
+(rf/reg-event-fx
+ :customer/maybe-load
+ (fn [{:keys [db]} [_ id]]
+   (let [existing (db/customer db)
+         id (or id (r/customer-id db))]
+     (when-not (= (:id existing) id)
+       {:dispatch [:customer/load id]}))))
+
 (rf/reg-event-db
  :customer/load--success
  (fn [db [_ {cust :body}]]
@@ -32,8 +40,7 @@
 
 (rf/reg-event-db
  :customer/load--failed
- (fn [db [_ id err op]]
-   (log/warn "Failed to invoke" op ":" (clj->js err))
+ (fn [db [_ id err]]
    (-> db
        (db/set-alerts [{:type :danger
                         :message (str "Could not load details for customer " id ": "
@@ -86,12 +93,13 @@
                            :repos-url)
                      orgs)}))
 
-(rf/reg-event-db
+(rf/reg-event-fx
  ::load-orgs--failed
- (fn [db [_ err]]
-   (db/set-repo-alerts db
-                       [{:type :danger
-                         :message (str "Unable to fetch user orgs from Github: " (u/error-msg err))}])))
+ (u/req-error-handler-db
+  (fn [db [_ err]]
+    (db/set-repo-alerts db
+                        [{:type :danger
+                          :message (str "Unable to fetch user orgs from Github: " (u/error-msg err))}]))))
 
 (rf/reg-event-db
  :customer/load-github-repos--success

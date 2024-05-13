@@ -2,12 +2,12 @@
   (:require [babashka.fs :as fs]
             [buddy.core.keys.pem :as pem]
             [clojure
-             [edn :as edn]
              [string :as cs]
              [walk :as cw]]
             [clojure.java.io :as io]
             [clojure.repl :as cr]
-            [medley.core :as mc])
+            [medley.core :as mc]
+            [monkey.ci.edn :as ce])
   (:import org.apache.commons.io.FileUtils))
 
 (defn cwd
@@ -42,6 +42,14 @@
          (->> (fs/relativize from p)
               (fs/path to))
          (fs/path to p))))
+
+(defn mkdirs! [f]
+  (if (and f (fs/exists? f))
+    (when-not (.isDirectory f)
+      (throw (ex-info "Directory cannot be created, already exists as a file" {:dir f})))
+    (when-not (.mkdirs f)
+      (throw (ex-info "Unable to create directory" {:dir f}))))
+  f)
 
 (defn add-shutdown-hook!
   "Executes `h` when the JVM shuts down.  Returns the thread that will
@@ -84,10 +92,9 @@
       (with-open [r (->reader f)]
         (pem/read-privkey r nil)))))
 
-(defn parse-edn
+(def parse-edn
   "Parses edn from the reader"
-  [r & [opts]]
-  (edn/read (or opts {}) (java.io.PushbackReader. r)))
+  ce/edn->)
 
 (defn parse-edn-str [s]
   (with-open [r (java.io.StringReader. s)]
@@ -120,20 +127,23 @@
                   (map? x) (prune-map)))
               t))
 
-(defn- merge-if-map [a b]
-  (if (map? a)
-    (merge a b)
-    b))
-
-(def deep-merge (partial merge-with merge-if-map))
+(defn deep-merge
+  "Recursively merges maps."
+  ;; Copied from https://dnaeon.github.io/recursively-merging-maps-in-clojure/
+  [& maps]
+  (letfn [(m [& xs]
+            (if (some #(and (map? %) (not (record? %))) xs)
+              (apply merge-with m xs)
+              (last xs)))]
+    (reduce m maps)))
 
 (defn ->base64 [s]
   (.. (java.util.Base64/getEncoder)
       (encodeToString (.getBytes s java.nio.charset.StandardCharsets/UTF_8))))
 
 (defn parse-sid [s]
-  (when s
-    (cs/split s #"/")))
+  (cond-> s
+    (string? s) (cs/split #"/")))
 
 (defn sid->repo-sid [s]
   (take 2 s))

@@ -1,22 +1,24 @@
-{:deps {aleph/aleph {:mvn/version "0.7.0-alpha2"} ; For http SSE receiving
-        babashka/process {:mvn/version "0.5.21"}
+{:deps {org.clojure/clojure {:mvn/version "1.11.3"}
+        aleph/aleph {:mvn/version "0.7.1"} ; For http SSE receiving
+        babashka/process {:mvn/version "0.5.22"}
         bowerick/bowerick {:mvn/version "2.9.8"
                            :exclusions [org.slf4j/slf4j-simple]}
         buddy/buddy-auth {:mvn/version "3.0.323"}
         buddy/buddy-core {:mvn/version "1.11.423"}
         camel-snake-kebab/camel-snake-kebab {:mvn/version "0.4.3"}
-        ch.qos.logback/logback-classic {:mvn/version "1.5.1"}
+        ch.qos.logback/logback-classic {:mvn/version "1.5.6"}
         clansi/clansi {:mvn/version "1.0.0"}
+        clj-commons/clj-yaml {:mvn/version "1.0.27"}
         cli-matic/cli-matic {:mvn/version "0.5.4"}
-        clj-jgit/clj-jgit {:mvn/version "1.0.2"
+        clj-jgit/clj-jgit {:mvn/version "1.1.0"
                            ;; Exclude these because they conflict with buddy
                            :exclusions [org.bouncycastle/bcpg-jdk15on
                                         org.bouncycastle/bcprov-jdk15on
                                         org.bouncycastle/bcpkix-jdk15on
                                         org.bouncycastle/bcutil-jdk15on]}
         clojure.java-time/clojure.java-time {:mvn/version "1.4.2"}
-        com.github.loki4j/loki-logback-appender {:mvn/version "1.5.0-m1"}
-        com.github.oliyh/martian-httpkit {:mvn/version "0.1.25"}
+        com.github.loki4j/loki-logback-appender {:mvn/version "1.5.1"}
+        com.github.oliyh/martian-httpkit {:mvn/version "0.1.26"}
         com.github.seancorfield/honeysql {:mvn/version "2.5.1103"}
         com.github.seancorfield/next.jdbc {:mvn/version "1.3.909"}
         com.monkeyprojects/clompress {:mvn/version "0.1.1"}
@@ -32,20 +34,20 @@
                                 ;; slower however, so maybe later we can change this.
                                 :exclusions [org.zeromq/jzmq]}
         com.stuartsierra/component {:mvn/version "1.1.0"}
-        commons-io/commons-io {:mvn/version "2.15.1"}
+        commons-io/commons-io {:mvn/version "2.16.1"}
         http-kit/http-kit {:mvn/version "2.7.0"}
-        io.micrometer/micrometer-registry-prometheus {:mvn/version "1.12.4"}
-        io.micrometer/micrometer-core {:mvn/version "1.12.4"}
+        io.micrometer/micrometer-registry-prometheus {:mvn/version "1.12.5"}
+        io.micrometer/micrometer-core {:mvn/version "1.12.5"}
         io.resonant/micrometer-clj {:mvn/version "0.0.4"}
         medley/medley {:mvn/version "1.4.0"}
-        metosin/reitit-middleware {:mvn/version "0.7.0-alpha5"}
-        metosin/reitit-ring {:mvn/version "0.7.0-alpha5"}
-        metosin/reitit-schema {:mvn/version "0.7.0-alpha5"}
-        metosin/reitit-swagger {:mvn/version "0.7.0-alpha5"}
-        org.clojars.lispyclouds/contajners {:mvn/version "1.0.1"}
+        metosin/reitit-middleware {:mvn/version "0.7.0-alpha7"}
+        metosin/reitit-ring {:mvn/version "0.7.0-alpha7"}
+        metosin/reitit-schema {:mvn/version "0.7.0-alpha7"}
+        metosin/reitit-swagger {:mvn/version "0.7.0-alpha7"}
+        org.clojars.lispyclouds/contajners {:mvn/version "1.0.5"}
         org.clojure/core.async {:mvn/version "1.6.681"}
-        org.clojure/tools.logging {:mvn/version "1.2.4"}
-        org.zeromq/jeromq {:mvn/version "0.5.4"} ; Java implementation of zeromq
+        org.clojure/tools.logging {:mvn/version "1.3.0"}
+        org.zeromq/jeromq {:mvn/version "0.6.0"} ; Java implementation of zeromq
         ring-cors/ring-cors {:mvn/version "0.1.13"}
         yogthos/config {:mvn/version "1.2.0"}}
  
@@ -61,8 +63,8 @@
   :test
   {:extra-paths [:test-paths]
    :extra-deps {com.monkeyprojects/build {:mvn/version "0.2.0"}
-                com.github.oliyh/martian-test {:mvn/version "0.1.25"}
-                http-kit.fake/http-kit.fake {:mvn/version "0.2.1"}
+                com.github.oliyh/martian-test {:mvn/version "0.1.26"}
+                http-kit.fake/http-kit.fake {:mvn/version "0.2.2"}
                 org.hsqldb/hsqldb {:mvn/version "2.7.2"}
                 ring/ring-mock {:mvn/version "0.4.0"}}
    :exec-fn monkey.test/all
@@ -76,6 +78,8 @@
                ;; Plugin added for timing
                "--plugin" "kaocha.plugin/profiling"
                "--junit-xml-file" "junit.xml"
+               ;; Skip zmq tests, they tend to block
+               "--skip-meta" ":zmq"
                ;; Skip docker integration tests, they require access to the socket
                "--skip-meta" ":docker"
                ;; Skip mysql tests until we can set up test services
@@ -88,10 +92,10 @@
   :coverage
   {:exec-fn monkey.test/coverage
    :exec-args {:ns-regex ["monkey.ci.*"]
-               :ns-exclude-regex [".*repl" ".*-test" "monkey.ci.build.*"]}}
+               :ns-exclude-regex [".*repl" ".*-test"]}}
 
   :watch ; Use in combination with :test, watches for changes
-  {:extra-deps {org.clojure/tools.namespace {:mvn/version "1.4.4"}}
+  {:extra-deps {org.clojure/tools.namespace {:mvn/version "1.5.0"}}
    :exec-fn monkey.test/watch
    ;; Skip integration and slow tests
    :exec-args {:kaocha.filter/skip-meta [:integration :slow]}}

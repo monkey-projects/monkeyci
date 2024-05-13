@@ -155,7 +155,8 @@
     (-> (md/chain
          (http/get (str url "/events"))
          :body
-         bs/to-reader)
+         bs/to-reader
+         #(java.io.PushbackReader. %))
         (md/on-realized pipe-events
                         (fn [err]
                           (log/error "Unable to receive server events:" err))))

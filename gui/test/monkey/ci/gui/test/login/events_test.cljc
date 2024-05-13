@@ -65,6 +65,9 @@
     (is (nil? (db/user @app-db)))))
 
 (deftest github-login--success
+  ;; Safety
+  (h/catch-fx :http-xhrio)
+  
   (testing "sets user in db"
     (rf/dispatch-sync [:login/github-login--success {:body {:id ::test-user}}])
     (is (= {:id ::test-user} (db/user @app-db))))
@@ -83,7 +86,15 @@
       (is (= 1 (count @e)))
       (is (= {:method :get
               :uri "https://api.github.com/user"}
-             (select-keys (first @e) [:method :uri]))))))
+             (select-keys (first @e) [:method :uri])))))
+
+  (testing "saves tokens to local storage"
+    (let [e (h/catch-fx :local-storage)]
+      (rf/dispatch-sync [:login/github-login--success {:body {:token "test-token"
+                                                              :github-token "test-github"}}])
+      (is (= [["login-tokens" {:token "test-token"
+                               :github-token "test-github"}]]
+             @e)))))
 
 (deftest github-login--failed
   (testing "sets error alert"
@@ -137,6 +148,17 @@
         (assoc cofx :local-storage {:redirect-to "/c/test-cust"})))
      (let [c (h/catch-fx :route/goto)]
        (rf/dispatch [:github/load-user--success {}])
+       (is (= "/c/test-cust" (first @c))))))
+
+  (testing "ignores redirect page if `/`"
+    (rf-test/run-test-sync
+     (rf/reg-cofx
+      :local-storage
+      (fn [cofx]
+        (assoc cofx :local-storage {:redirect-to "/"})))
+     (let [c (h/catch-fx :route/goto)]
+       (reset! app-db (db/set-user {} {:customers ["test-cust"]}))
+       (rf/dispatch [:github/load-user--success {}])
        (is (= "/c/test-cust" (first @c)))))))
 
 (deftest github-load-user--failed
@@ -161,4 +183,10 @@
     (let [r (h/catch-fx :route/goto)]
       (rf-test/run-test-sync
        (rf/dispatch [:login/sign-off])
-       (is (= [(r/path-for :page/login)] @r))))))
+       (is (= [(r/path-for :page/login)] @r)))))
+
+  (testing "removes tokens from local storage"
+    (let [r (h/catch-fx :local-storage)]
+      (rf/dispatch-sync [:login/sign-off])
+      (is (= [[sut/storage-token-id nil]]
+             @r)))))

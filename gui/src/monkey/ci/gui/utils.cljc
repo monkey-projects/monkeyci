@@ -14,6 +14,7 @@
                         (comp :error-description :body)
                         :error-text
                         :response
+                        (comp :status-text :parse-error)
                         :status-text
                         str))
 
@@ -35,7 +36,8 @@
 (defn form-evt-handler
   [evt & [get-val]]
   (fn [e]
-    (rf/dispatch (conj evt ((or get-val evt->value) e)))))
+    ;; Dispatch synchronously to avoid losing events on fast input
+    (rf/dispatch-sync (conj evt ((or get-val evt->value) e)))))
 
 (defn ->sid [m & keys]
   (let [g (apply juxt keys)]
@@ -72,3 +74,16 @@
 
 (defn unescape-entity [e]
   (gstring/unescapeEntities e))
+
+(defn login-on-401 [ctx {:keys [status]}]
+  (cond-> ctx
+    (= 401 status) (assoc :dispatch [:route/goto :page/login])))
+
+(defn req-error-handler-db
+  "Creates an fx handler fn that redirects to the login page on a 401 error
+   and passes the error also to `f`, which can modify the db."
+  [f]
+  (fn [{:keys [db]} evt]
+    (login-on-401
+     {:db (f db evt)}
+     (last evt))))

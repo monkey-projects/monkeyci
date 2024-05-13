@@ -33,13 +33,14 @@
           :opt-un [:blob/size]))
 (s/def :job/caches (s/coll-of ::blob))
 (s/def :job/artifacts (s/coll-of ::blob))
+(s/def :job/memory int?)
 
 (s/def :job/command string?)
 (s/def :job/commands (s/coll-of :job/command))
 
 (s/def :script/job
   (-> (s/keys :req-un [:job/id :job/type :job/status]
-              :opt-un [:job/dependencies :job/caches :job/artifacts :job/commands])
+              :opt-un [:job/dependencies :job/caches :job/artifacts :job/commands :job/memory])
       (s/merge ::generic-entity)))
 
 (s/def :script/jobs (s/coll-of :script/job))
@@ -81,8 +82,18 @@
   (s/keys :req-un [:git/url :git/dir]
           :opt-un [:git/ref :git/commit-id :git/main-branch :git/ssh-keys-dir :git/message]))
 
+;;; Changes: which files have changed for the build
+
+(s/def :changes/added    (s/coll-of string?))
+(s/def :changes/removed  (s/coll-of string?))
+(s/def :changes/modified (s/coll-of string?))
+
+(s/def :build/changes
+  (s/keys :opt-un [:changes/added :changes/removed :changes/modified]))
+
 (s/def ::build
   (-> (s/keys :req-un [:build/customer-id :build/repo-id :build/build-id :build/sid
                        :build/source :build/status]
-              :opt-un [:build/git :build/cleanup? :build/webhook-id :build/script :build/checkout-dir])
+              :opt-un [:build/git :build/cleanup? :build/webhook-id :build/script :build/checkout-dir
+                       :build/changes])
       (s/merge ::generic-entity)))

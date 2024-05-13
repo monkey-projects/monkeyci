@@ -6,6 +6,9 @@
              [stream :as ms]]
             [medley.core :as mc]
             [monkey.ci
+             [artifacts :as a]
+             [blob :as blob]
+             [build :as b]
              [labels :as lbl]
              [logging :as l]
              [runtime :as rt]
@@ -193,7 +196,7 @@
     (-> (st/find-build-metadata s sid)
         (merge (st/find-build-results s sid))
         (assoc :legacy? true))
-    (if (st/build-exists? s sid)
+    (when (st/build-exists? s sid)
       (st/find-build s sid))))
 
 (defn- add-index [[idx p]]
@@ -290,6 +293,53 @@
     (when-let [r (get-in p [:query k])]
       (format "refs/%s/%s" v r))))
 
+(def build-sid (comp (juxt :customer-id :repo-id :build-id)
+                     :path
+                     :parameters))
+
+(defn- with-artifacts [req f]
+  (if-let [b (fetch-build-details (c/req->storage req)
+                                  (build-sid req))]
+    (let [res (->> (b/success-jobs b)
+                   (mapcat :save-artifacts)
+                   (f))
+          ->response (fn [res]
+                       (if (or (nil? res) (and (sequential? res) (empty? res)))
+                         (rur/status 204)
+                         (rur/response res)))]
+      (if (md/deferred? res)
+        (md/chain res ->response)
+        (->response res)))
+    (rur/not-found nil)))
+
+(defn get-build-artifacts
+  "Lists all artifacts produced by the given build"
+  [req]
+  (with-artifacts req identity))
+
+(defn- artifact-by-id [id art]
+  (->> art
+       (filter (comp (partial = id) :id))
+       (first)))
+
+(def artifact-id (comp :artifact-id :path :parameters))
+
+(defn get-artifact
+  "Returns details about a single artifact"
+  [req]
+  (with-artifacts req (partial artifact-by-id (artifact-id req))))
+
+(defn download-artifact
+  "Downloads the artifact contents.  Returns a stream that contains the raw zipped
+   files directly from the blob store.  It is up to the caller to unzip the archive."
+  [req]
+  (letfn [(get-contents [{:keys [id]}]
+            (let [store (a/artifact-store (c/req->rt req))
+                  path (a/build-sid->artifact-path (build-sid req) id)]
+              (blob/input-stream store path)))]
+    (with-artifacts req (comp get-contents
+                              (partial artifact-by-id (artifact-id req))))))
+
 (def params->ref
   "Creates a git ref from the query parameters (either branch or tag)"
   (some-fn (as-ref :branch "heads")
@@ -356,6 +406,7 @@
 (def allowed-events
   #{:build/start
     :build/end
+    :build/updated
     :script/start
     :script/end
     :job/start

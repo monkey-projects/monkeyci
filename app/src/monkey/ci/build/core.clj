@@ -134,3 +134,53 @@
   (comp second #(ref-regex % tag-regex)))
 
 (def work-dir "The job work dir" (comp :work-dir :job))
+
+(def file-changes (comp :changes :build))
+
+(def files-added
+  "Files that have been added by the commits"
+  (comp :added file-changes))
+
+(def files-modified
+  "Files that have been modified by the commits"
+  (comp :modified file-changes))
+
+(def files-removed
+  "Files that have been removed by the commits"
+  (comp :removed file-changes))
+
+(def regex? (partial instance? java.util.regex.Pattern))
+
+(defn ->pred [x]
+  (cond
+    (regex? x) (partial re-matches x)
+    (fn? x) x
+    :else (partial = x)))
+
+(defn- matches-pred? [coll p]
+  (some (->pred p) coll))
+
+(defn- pred-matcher [coll]
+  (fn [[rt p]]
+    (some (->pred p) (coll rt))))
+
+(def added?
+  "Checks if any of the added files matches `p`.  If `p` is a function, it is used
+   as a predicate.  If it's a string, and exact match is performed.  If it's a regex,
+   a regex match is done."
+  (pred-matcher files-added))
+
+(def modified?
+  "Similar to `added?` but for modified files"
+  (pred-matcher files-modified))
+
+(def removed?
+  "Similar to `added?` but for removed files"
+  (pred-matcher files-removed))
+
+(def touched?
+  "Returns `true` if the path occurs in any of the file changes.  If `p` is a regex, 
+   checks if any of the files match the regex.  If `p` is a function, it is applied
+   as a predicate against the files, until one matches."
+  ;; Wrap the args in a vector because some-fn only passes one argument
+  (comp (some-fn added? modified? removed?) vector))

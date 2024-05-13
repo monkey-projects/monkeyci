@@ -135,15 +135,14 @@
       :else
       (log/warn "No event poster configured"))))
 
-(defn rt->env
-  "Returns a map that can be serialized back into env vars.  This is used
+(defn rt->config
+  "Returns a map that can be serialized to `edn`.  This is used
    to pass application configuration to child processes or containers."
   [rt]
   ;; Return the original, non-normalized configuration
   (-> rt
       :config
       (merge (select-keys rt [:build]))
-      (mc/update-existing-in [:build :sid] u/serialize-sid)
       ;; Child processes never start an event server
       (mc/update-existing :events dissoc :server)))
 

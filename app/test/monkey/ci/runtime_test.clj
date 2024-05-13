@@ -73,14 +73,14 @@
     (is (= "test-val" ((sut/from-config :test-val)
                        {:config {:test-val "test-val"}})))))
 
-(deftest rt->env
+(deftest rt->config
   (testing "returns config"
     (is (= {:key "value"}
-           (sut/rt->env {:config {:key "value"}}))))
+           (sut/rt->config {:config {:key "value"}}))))
 
   (testing "removes event server"
-    (is (nil? (-> (sut/rt->env {:config {:events {:type :zmq
-                                                  :server {:enabled true}}}})
+    (is (nil? (-> (sut/rt->config {:config {:events {:type :zmq
+                                                     :server {:enabled true}}}})
                   :events
                   :server)))))
 

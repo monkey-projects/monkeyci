@@ -7,7 +7,8 @@
             [monkey.ci
              [config :as mc]
              [oci :as oci]
-             [runners :as r]]
+             [runners :as r]
+             [utils :as u]]
             [monkey.ci.events.core :as ec]
             [monkey.ci.runners.oci :as sut]
             [monkey.ci.helpers :as h]
@@ -29,6 +30,14 @@
                                                    :body {:containers [{:exit-code 0}]}}))]
         (is (= 0 (-> (sut/oci-runner {} {} rt)
                      (deref))))))))
+
+(defn- parse-config-vol [ic]
+  (-> (oci/find-volume ic sut/config-volume)
+      :configs
+      first
+      :data
+      h/base64->
+      u/parse-edn-str))
 
 (deftest instance-config
   (let [priv-key (h/generate-private-key)
@@ -93,19 +102,28 @@
                   "--commit-id" "test-commit"]
                  (:arguments c))))
 
-        (let [env (:environment-variables c)]
-          (testing "passes config as env vars"
-            (is (map? env))
-            (is (not-empty env)))
+        (testing "config"
+          (testing "passed at global config path"
+            (let [mnt (oci/find-mount c sut/config-volume)]
+              (is (some? mnt))
+              (is (= "/etc/monkeyci" (:mount-path mnt)))))
 
-          (testing "env vars are strings, not keywords"
-            (is (every? string? (keys env))))
+          (let [vol (oci/find-volume inst sut/config-volume)
+                parsed (-> vol
+                           :configs
+                           first
+                           :data
+                           h/base64->
+                           u/parse-edn-str)]
+            (testing "contains `config.edn`"
+              (is (= 1 (count (:configs vol))))
+              (is (= "config.edn" (:file-name (first (:configs vol))))))
 
-          (testing "enforces child runner"
-            (is (= "child" (get env "monkeyci-runner-type"))))
-
-          (testing "adds api token"
-            (is (not-empty (get env "monkeyci-api-token"))))))
+            (testing "enforces child runner"
+              (is (= :child (get-in parsed [:runner :type]))))
+            
+            (testing "adds api token"
+              (is (not-empty (get-in parsed [:api :token])))))))
 
       (testing "drops nil env vars"
         (let [c (-> rt
@@ -123,13 +141,14 @@
                       (map :file-name))))))
 
       (let [cc (first (:containers inst))
-            mnt (oci/find-mount cc sut/ssh-keys-volume)]
+            mnt (oci/find-mount cc sut/ssh-keys-volume)
+            conf (parse-config-vol inst)]
         (testing "mounts in container"
           (is (some? mnt)))
 
-        (testing "adds ssh keys dir as env var"
+        (testing "adds ssh keys dir in config"
           (is (= (:mount-path mnt)
-                 (get-in cc [:environment-variables "monkeyci-build-git-ssh-keys-dir"]))))))
+                 (get-in conf [:build :git :ssh-keys-dir]))))))
 
     (testing "log config"
       (h/with-tmp-dir dir
@@ -144,20 +163,21 @@
             (is (sequential? (:configs vol))))
 
           (let [cc (first (:containers inst))
-                mnt (oci/find-mount cc sut/log-config-volume)]
+                mnt (oci/find-mount cc sut/log-config-volume)
+                conf (parse-config-vol inst)]
             (testing "mounts in container"
               (is (some? mnt)))
 
             (testing "adds config file path as env var"
               (is (= (str (:mount-path mnt) "/" (-> vol :configs first :file-name))
-                     (get-in cc [:environment-variables "monkeyci-runner-log-config"]))))))))
+                     (get-in conf [:runner :log-config]))))))))
 
     (testing "events config"
       (testing "taken from top level"
         (let [rt (assoc-in rt [:config :events :client :address] "test-addr")
               inst (sut/instance-config conf rt)
-              env (-> inst :containers first :environment-variables)]
-          (is (= "test-addr" (get env "monkeyci-events-client-address")))))
+              conf (parse-config-vol inst)]
+          (is (= "test-addr" (get-in conf [:events :client :address])))))
 
       (testing "merges with runner specific config"
         (let [rt (-> rt
@@ -166,10 +186,10 @@
                                                            :username "test-user"}})
                      (assoc-in [:config :runner :events :client :address] "runner-addr"))
               inst (sut/instance-config conf rt)
-              env (-> inst :containers first :environment-variables)]
-          (is (= "runner-addr" (get env "monkeyci-events-client-address")))
-          (is (= "test-user" (get env "monkeyci-events-client-username")))
-          (is (= "jms" (get env "monkeyci-events-type"))))))))
+              conf (parse-config-vol inst)]
+          (is (= "runner-addr" (get-in conf [:events :client :address])))
+          (is (= "test-user" (get-in conf [:events :client :username])))
+          (is (= :jms (get-in conf [:events :type]))))))))
  
 (deftest wait-for-script-end-event
   (testing "returns a deferred that holds the script end event"

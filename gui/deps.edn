@@ -1,10 +1,10 @@
 {:deps {day8.re-frame/http-fx {:mvn/version "0.2.4"}
-        com.github.oliyh/martian-re-frame {:mvn/version "0.1.25"}
+        com.github.oliyh/martian-re-frame {:mvn/version "0.1.26"}
         metosin/reitit-frontend {:mvn/version "0.7.0-alpha7"}
         org.clojure/core.async {:mvn/version "1.6.681"}
         reagent/reagent {:mvn/version "1.2.0"}
-        re-frame/re-frame {:mvn/version "1.4.2"}
-        thheller/shadow-cljs {:mvn/version "2.26.2"}}
+        re-frame/re-frame {:mvn/version "1.4.3"}
+        thheller/shadow-cljs {:mvn/version "2.28.4"}}
 
  :paths ["src" "resources"]
 
@@ -14,7 +14,7 @@
 
   :test
   {:extra-paths ["test"]
-   :extra-deps {com.github.oliyh/martian-test {:mvn/version "0.1.25"}
+   :extra-deps {com.github.oliyh/martian-test {:mvn/version "0.1.26"}
                 lambdaisland/kaocha-cljs2 {:mvn/version "0.2.72"}
                 day8.re-frame/test {:mvn/version "0.1.5"}
                 devcards/devcards {:mvn/version "0.2.7"}}}
