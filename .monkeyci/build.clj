@@ -34,10 +34,12 @@
   (some-fn main-branch? release?))
 
 (defn app-changed? [ctx]
-  (core/touched? ctx #"^app/.*"))
+  #_(core/touched? ctx #"^app/.*")
+  true)
 
 (defn gui-changed? [ctx]
-  (core/touched? ctx #"^gui/.*"))
+  #_(core/touched? ctx #"^gui/.*")
+  true)
 
 (def build-app? (some-fn app-changed? release?))
 (def build-gui? (some-fn gui-changed? release?))

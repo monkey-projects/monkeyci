@@ -133,6 +133,7 @@
    Returns a deferred that will hold the process result when it completes."
   [{:keys [checkout-dir build-id] :as build} rt]
   (log/info "Executing build process for" build-id "in" checkout-dir)
+  (log/debug "Build before passing to child:" build)
   (let [script-dir (b/script-dir build)
         [out err :as loggers] (map (partial make-logger rt) [:out :err])
         result (md/deferred)
