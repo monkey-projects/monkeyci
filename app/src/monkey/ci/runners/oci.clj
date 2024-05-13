@@ -190,6 +190,7 @@
        (fn [r]
          (or (-> r :body :containers first :exit-code) 1)))
       ;; Do not launch build/end event, that is already done by the script container.
+      ;; FIXME In case of a request error (e.g. 429 status) the build never finishes, since an end event is not sent.
       (md/catch
           (fn [ex]
             (log/error "Got error from container instance:" ex)

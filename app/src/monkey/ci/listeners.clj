@@ -10,14 +10,15 @@
 
 (defn- save-build
   "Saves the build in storage, then returns it"
-  [storage build]
+  [storage sid build]
   (st/save-build storage build)
-  build)
+  (assoc build :sid sid))
 
 (defn update-build [storage {:keys [sid build]}]
   (log/debug "Updating build:" sid)
   (let [existing (st/find-build storage sid)]
     (-> (save-build storage
+                    sid
                     (-> (merge existing (dissoc build :script))
                         (dissoc :sid :cleanup?)))
         (assoc :sid sid))))
@@ -27,6 +28,7 @@
   (if-let [build (st/find-build storage sid)]
     (let [orig (get-in build [:script :jobs])]
       (save-build storage
+                  sid
                   (assoc build
                          :script (u/deep-merge (:script build) script))))
     (log/warn "Build not found when updating script:" sid)))
@@ -35,7 +37,7 @@
   (let [job-id (:id job)]
     (log/debug "Updating job for sid" sid ":" job-id)
     (if-let [build (st/find-build storage sid)]
-      (save-build storage (assoc-in build [:script :jobs job-id] job))
+      (save-build storage sid (assoc-in build [:script :jobs job-id] job))
       (log/warn "Build not found when updating job:" sid))))
 
 (def update-handlers
