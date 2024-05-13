@@ -65,7 +65,7 @@
                                    (assoc :start-time (u/now)))})
     (-> (md/chain
          (if (some-> (io/file script-dir) (.exists))
-           (p/execute! rt)
+           (p/execute! build rt)
            (md/success-deferred (script-not-found build)))
          (partial post-build-end rt build)
          log-build-result

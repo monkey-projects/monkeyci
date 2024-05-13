@@ -52,8 +52,7 @@
   (->> (-> (rt/rt->config rt)
            (dissoc :app-mode :git :github :http :args :jwk :checkout-base-dir :storage
                    :ssh-keys-dir :work-dir :oci :runner)
-           (update :build dissoc :cleanup? :status)
-           (assoc :build (dissoc build :ssh-keys))
+           (assoc :build (dissoc build :ssh-keys :cleanup? :status))
            (update :events u/deep-merge (get-in rt [rt/config :runner :events])))
        (prepare-config-for-oci)
        (add-ssh-keys-dir build)

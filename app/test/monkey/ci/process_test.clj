@@ -55,26 +55,23 @@
             :logging {:maker (l/make-logger {:logging {:type :inherit}})}}]
     
     (testing "executes build script in separate process"
-      (is (zero? (-> rt
-                     (assoc :build {:script {:script-dir (example "basic-clj")}
-                                    :build-id (u/new-build-id)})
-                     sut/execute!
+      (is (zero? (-> {:script {:script-dir (example "basic-clj")}
+                      :build-id (u/new-build-id)}
+                     (sut/execute! rt)
                      deref
                      :exit))))
 
     (testing "fails when script fails"
-      (is (pos? (-> rt
-                    (assoc :build {:script {:script-dir (example "failing")}
-                                   :build-id (u/new-build-id)})
-                    sut/execute!
+      (is (pos? (-> {:script {:script-dir (example "failing")}
+                                   :build-id (u/new-build-id)}
+                    (sut/execute! rt)
                     deref
                     :exit))))
 
     (testing "fails when script not found"
-      (is (thrown? java.io.IOException (-> rt
-                                           (assoc :build
-                                                  {:script {:script-dir (example "non-existing")}})
-                                           (sut/execute!)))))))
+      (is (thrown? java.io.IOException (sut/execute!
+                                        {:script {:script-dir (example "non-existing")}}
+                                        rt))))))
 
 (defrecord TestServer []
   org.httpkit.server.IHttpServer
@@ -96,30 +93,28 @@
 
       (testing "returns deferred"
         (is (md/deferred? (sut/execute!
-                           {:args {:dev-mode true}
-                            :build
-                            {:script
-                             {:script-dir (example "failing")}}}))))
+                           {:script
+                            {:script-dir (example "failing")}}
+                           {:args {:dev-mode true}}))))
       
       (testing "returns exit code"
         (is (= 1234 (:exit @(sut/execute!
-                             {:args {:dev-mode true}
-                              :build
-                              {:script
-                               {:script-dir (example "failing")}}})))))
+                             {:script
+                              {:script-dir (example "failing")}}
+                             {:args {:dev-mode true}})))))
 
       (testing "invokes in script dir"
-        (is (= "test-dir" (-> @(sut/execute! {:build
-                                              {:script
-                                               {:script-dir "test-dir"}}})
+        (is (= "test-dir" (-> @(sut/execute! {:script
+                                              {:script-dir "test-dir"}}
+                                             {})
                               :process
                               :args
                               :dir))))
 
       (testing "passes config file in edn"
         (is (re-matches #"^\{:config-file \".*\.edn\"}" 
-                        (-> {:build {:checkout-dir "work-dir"}}
-                            (sut/execute!)
+                        (-> {:checkout-dir "work-dir"}
+                            (sut/execute! {})
                             (deref)
                             :process
                             :args
@@ -132,58 +127,54 @@
       (let [logfile (io/file dir "logback-test.xml")]
         (is (nil? (spit logfile "test file")))
         (is (= (str "-Dlogback.configurationFile=" logfile)
-               (-> {:config {:runner
-                             {:type :child
-                              :log-config "logback-test.xml"}
-                             :work-dir dir}}
-                   (sut/generate-deps)
-                   :aliases
-                   :monkeyci/build
-                   :jvm-opts
-                   first))))))
+               (->> {:config {:runner
+                              {:type :child
+                               :log-config "logback-test.xml"}
+                              :work-dir dir}}
+                    (sut/generate-deps {})
+                    :aliases
+                    :monkeyci/build
+                    :jvm-opts
+                    first))))))
 
   (testing "adds log config file as absolute path"
     (h/with-tmp-dir dir
       (let [logfile (io/file dir "logback-test.xml")]
         (is (nil? (spit logfile "test file")))
         (is (= (str "-Dlogback.configurationFile=" logfile)
-               (-> {:config {:runner
-                             {:type :child
-                              :log-config (.getAbsolutePath logfile)}
-                             :work-dir "other"}}
-                   (sut/generate-deps)
-                   :aliases
-                   :monkeyci/build
-                   :jvm-opts
-                   first))))))
+               (->> {:config {:runner
+                              {:type :child
+                               :log-config (.getAbsolutePath logfile)}
+                              :work-dir "other"}}
+                    (sut/generate-deps {})
+                    :aliases
+                    :monkeyci/build
+                    :jvm-opts
+                    first))))))
 
   (testing "adds script dir as paths"
-    (is (= ["test-dir"] (-> {:build {:script {:script-dir "test-dir"}}}
-                            (sut/generate-deps)
+    (is (= ["test-dir"] (-> {:script {:script-dir "test-dir"}}
+                            (sut/generate-deps {})
                             :paths)))))
 
 (deftest rt->config
   (testing "adds build to config"
     (let [build {:build-id "test-build"}
-          e (sut/rt->config {:config {:config-key "value"}
-                             :build build})]
+          e (sut/rt->config build {:config {:config-key "value"}})]
       (is (= build (:build e)))
       (is (= "value" (:config-key e)))))
 
   (testing "adds api token"
-    (is (some? (-> (h/test-rt)
-                   (sut/rt->config)
+    (is (some? (-> (sut/rt->config {} (h/test-rt))
                    (get-in [:api :token])))))
 
   (testing "no token if no jwk keys configured"
-    (is (nil? (-> {}
-                  (sut/rt->config)
+    (is (nil? (-> (sut/rt->config {} {})
                   (get-in [:api :token])))))
 
   (testing "does not overwrite token if no jwk config"
     (is (= "test-token"
-           (-> {:config {:api {:token "test-token"}}}
-               (sut/rt->config)
+           (-> (sut/rt->config {} {:config {:api {:token "test-token"}}})
                (get-in [:api :token])))))
 
   (testing "overwrites event config with runner settings"
@@ -192,6 +183,6 @@
                        :runner
                        {:events
                         {:type :zmq}}}}]
-      (is (= :zmq (-> (sut/rt->config rt)
+      (is (= :zmq (-> (sut/rt->config {} rt)
                       :events
                       :type))))))

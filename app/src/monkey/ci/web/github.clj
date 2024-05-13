@@ -146,7 +146,7 @@
       (if-let [build (create-webhook-build rt (get-in p [:path :id]) (body req))]
         (do
           (c/run-build-async rt build)
-          (-> (rur/response {:build-id (:build-id build)})
+          (-> (rur/response (select-keys build [:build-id]))
               (rur/status 202)))
         ;; No valid webhook found
         (rur/not-found {:message "No valid webhook configuration found"})))

@@ -142,11 +142,6 @@
   ;; Return the original, non-normalized configuration
   (-> rt
       :config
-      (merge (select-keys rt [:build]))
       ;; Child processes never start an event server
       (mc/update-existing :events dissoc :server)))
 
-(defn ^:deprecated update-build
-  "Updates the build in the runtime by applying `f` with given args."
-  [rt f & args]
-  (apply update rt :build f args))

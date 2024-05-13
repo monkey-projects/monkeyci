@@ -86,7 +86,7 @@
   "Generates a string that will be added as a commandline argument
    to the clojure process when running the script.  Any existing `deps.edn`
    should be used as well."
-  [{:keys [build] :as rt}]
+  [build rt]
   (when (rt/dev-mode? rt)
     (log/debug "Running in development mode, using local src instead of libs"))
   (let [version-or (fn [f]
@@ -103,21 +103,19 @@
         log-config (assoc :jvm-opts
                           [(str "-Dlogback.configurationFile=" log-config)]))}}))
 
-(defn rt->config [rt]
+(defn rt->config [build rt]
   (-> (rt/rt->config rt)
+      (assoc :build build)
       ;; Generate an API token and add it to the config
-      (update :api mc/assoc-some :token (auth/generate-jwt-from-rt rt (auth/build-token (b/get-sid rt))))
+      (update :api mc/assoc-some :token (auth/generate-jwt-from-rt rt (auth/build-token (b/sid build))))
       ;; Overwrite event settings with runner-specific config
-      (mc/assoc-some :events (get-in rt [rt/config :runner :events]))
-      ;; Don't start an events server in any case
-      (mc/update-existing :events dissoc :server)))
+      (mc/assoc-some :events (get-in rt [rt/config :runner :events]))))
 
 (defn- config->edn
   "Writes the configuration to an edn file that is then passed as command line to the app."
-  [rt]
+  [build rt]
   (let [f (utils/tmp-file "config" ".edn")]
-    (->> rt
-         (rt->config)
+    (->> (rt->config build rt)
          (edn/->edn)
          (spit f))
     f))
@@ -133,15 +131,15 @@
   "Executes the build script located in given directory.  This actually runs the
    clojure cli with a generated `build` alias.  This expects absolute directories.
    Returns a deferred that will hold the process result when it completes."
-  [{{:keys [checkout-dir build-id] :as build} :build :as rt}]
+  [{:keys [checkout-dir build-id] :as build} rt]
   (log/info "Executing build process for" build-id "in" checkout-dir)
-  (let [script-dir (b/rt->script-dir rt)
+  (let [script-dir (b/script-dir build)
         [out err :as loggers] (map (partial make-logger rt) [:out :err])
         result (md/deferred)
         cmd ["clojure"
-             "-Sdeps" (pr-str (generate-deps rt))
+             "-Sdeps" (pr-str (generate-deps build rt))
              "-X:monkeyci/build"
-             (pr-str {:config-file (config->edn rt)})]]
+             (pr-str {:config-file (config->edn build rt)})]]
     (log/debug "Running in script dir:" script-dir ", this command:" cmd)
     ;; TODO Run as another unprivileged user for security
     (-> (bp/process
