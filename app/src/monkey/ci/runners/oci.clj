@@ -178,7 +178,7 @@
                          :exited? (fn [id]
                                     (md/chain
                                      (md/timeout!
-                                      (wait-for-script-end-event (:events rt) (b/sid rt))
+                                      (wait-for-script-end-event (:events rt) (b/sid build))
                                       max-script-timeout ::timeout)
                                      (fn [r]
                                        (when (= r ::timeout)

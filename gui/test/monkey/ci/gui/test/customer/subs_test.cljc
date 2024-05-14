@@ -75,4 +75,13 @@
       
       (testing "by ssh url"
         (is (map? (swap! app-db db/set-customer {:repos [{:url "ssh@ssh-url"}]})))
-        (is (true? (-> @r first :monkeyci/watched?)))))))
+        (is (true? (-> @r first :monkeyci/watched?)))))
+
+    (testing "contains repo info"
+      (is (map? (reset! app-db (-> {}
+                                   (db/set-github-repos [{:id "github-repo-id"
+                                                          :ssh-url "ssh@ssh-url"
+                                                          :clone-url "https://clone-url"}])
+                                   (db/set-customer {:repos [{:url "ssh@ssh-url"
+                                                              :id "test-repo"}]})))))
+      (is (= "test-repo" (-> @r first :monkeyci/repo :id))))))

@@ -105,7 +105,13 @@
     (testing "leaves it unspecified"
       (is (empty? (-> {:config {:args {}}}
                       (sut/make-build-ctx)
-                      :sid))))))
+                      :sid)))))
+
+  (testing "merges in build from config"
+    (is (= ::test-changes
+           (-> {:config {:build {:changes ::test-changes}}}
+               (sut/make-build-ctx)
+               :changes)))))
 
 (deftest calc-checkout-dir
   (testing "combines build id with checkout base dir from config"

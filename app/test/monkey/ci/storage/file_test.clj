@@ -40,6 +40,15 @@
     (is (nil? (-> (sut/make-file-storage "nonexisting")
                   (p/read-obj ["nonexisting-loc"])))))
 
+  (testing "object with `nil` in path does not exist"
+    (h/with-tmp-dir dir
+      (let [s (sut/make-file-storage dir)
+            obj {:key "value"}
+            loc ["subdir" "test"]]
+        (is (= (p/write-obj s loc obj) loc))
+        (is (= obj (p/read-obj s loc)))
+        (is (nil? (p/read-obj s (conj loc nil)))))))
+
   (testing "delete-obj"
     (testing "can delete file"
       (h/with-tmp-dir dir

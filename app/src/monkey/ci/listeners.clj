@@ -63,7 +63,7 @@
                         ;; Dispatch consolidated build updated event
                         (ec/post-events events
                                         {:type :build/updated
-                                         :sid (:sid build)
+                                         :sid (:sid evt)
                                          :build build}))
                       (catch Exception ex
                         ;; TODO Handle this better

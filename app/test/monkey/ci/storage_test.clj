@@ -64,6 +64,14 @@
         (is (true? (sut/build-exists? st sid)))
         (is (= build (sut/find-build st sid)))))))
 
+(deftest find-build
+  (testing "`nil` if sid is `nil`"
+    (h/with-memory-store st
+      (let [[cust-id repo-id build-id :as sid] (test-build-sid)
+            build (zipmap [:customer-id :repo-id :build-id] sid)]
+        (is (sut/sid? (sut/save-build st build)))
+        (is (nil? (sut/find-build st nil)))))))
+
 (deftest parameters
   (testing "can store on customer level"
     (h/with-memory-store st

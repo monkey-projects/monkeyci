@@ -21,13 +21,14 @@
  :<- [::github-repos]
  (fn [[cr gr] _]
    (letfn [(watched-repo [r]
-             (some (some-fn (comp (partial = (:id r)) :github-id)
-                            (comp (partial = (:ssh-url r)) :url)
-                            (comp (partial = (:clone-url r)) :url))
-                   cr))]
+             (->> cr
+                  (filter (some-fn (comp (partial = (:id r)) :github-id)
+                                   (comp (partial = (:ssh-url r)) :url)
+                                   (comp (partial = (:clone-url r)) :url)))
+                  first))]
      (map (fn [r]
             (let [w (watched-repo r)]
               (assoc r
                      :monkeyci/watched? (some? w)
-                     :monkeyci/repo r)))
+                     :monkeyci/repo w)))
           gr))))

@@ -75,10 +75,10 @@
             (if watched?
               [:button.btn.btn-sm.btn-danger
                {:on-click #(rf/dispatch [:repo/unwatch (:monkeyci/repo repo)])}
-               [:span.me-1 [co/icon :stop-circle-fill]] "Unwatch"]
+               [:span.me-1.text-nowrap [co/icon :stop-circle-fill]] "Unwatch"]
               [:button.btn.btn-sm.btn-primary
                {:on-click #(rf/dispatch [:repo/watch repo])}
-               [:span.me-1 [co/icon :binoculars-fill]] "Watch"]))]
+               [:span.me-1.text-nowrap [co/icon :binoculars-fill]] "Watch"]))]
     [t/paged-table
      {:id ::repos
       :items-sub [:customer/github-repos]

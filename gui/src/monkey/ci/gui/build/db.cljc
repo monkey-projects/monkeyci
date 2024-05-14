@@ -31,16 +31,13 @@
   ([db r]
    (assoc db reloading r))
   ([db]
-   (set-reloading db #{:build :logs})))
+   (set-reloading db #{:build})))
 
 (defn clear-reloading [db r]
   (update db reloading disj r))
 
 (defn clear-build-reloading [db]
   (clear-reloading db :build))
-
-(defn clear-logs-reloading [db]
-  (clear-reloading db :logs))
 
 (defn reloading? [db]
   (not-empty (reloading db)))
@@ -52,11 +49,6 @@
 
 (defn reset-downloading [db]
   (dissoc db downloading?))
-
-(def current-log ::current-log)
-
-(defn set-current-log [db l]
-  (assoc db current-log l))
 
 (def log-path ::log-path)
 

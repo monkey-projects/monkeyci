@@ -195,13 +195,20 @@
   (testing "invokes unwatch endpoint"  
     (rf-test/run-test-sync
      (let [c (h/catch-fx :martian.re-frame/request)]
+       (is (some? (reset! app-db (r/set-current {} {:parameters {:path {:customer-id "test-cust"}}}))))
        (h/initialize-martian {:unwatch-github-repo {:status 200
                                                     :error-code :no-error}})
        (is (some? (:martian.re-frame/martian @app-db)))
-       (rf/dispatch [:repo/unwatch {:id "test-repo"
-                                    :customer-id "test-cust"}])
+       (rf/dispatch [:repo/unwatch {:monkeyci/repo
+                                    {:id "test-repo"}
+                                    :id 12432}])
        (is (= 1 (count @c)))
-       (is (= :unwatch-github-repo (-> @c first (nth 2))))))))
+       (is (= :unwatch-github-repo (-> @c first (nth 2)))
+           "invokes correct endpoint")
+       (is (= "test-repo" (-> @c first (nth 3) :repo-id))
+           "passes repo id")
+       (is (= "test-cust" (-> @c first (nth 3) :customer-id))
+           "passes customer id")))))
 
 (deftest repo-unwatch--success
   (testing "updates repo in db"

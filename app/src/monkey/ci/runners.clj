@@ -59,7 +59,7 @@
   [build rt]
   (let [script-dir (build/script-dir build)]
     (rt/post-events rt {:type :build/start
-                        :sid (:sid rt)
+                        :sid (build/sid build)
                         :build (-> build
                                    (build/build->evt)
                                    (assoc :start-time (u/now)))})
@@ -117,6 +117,7 @@
 (defmethod make-runner :child [_]
   (log/info "Using child process runner")
   (fn [build rt]
+    (log/debug "Running build in child process:" build)
     (-> build
         (download-src rt)
         (store-src rt)

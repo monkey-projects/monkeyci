@@ -71,7 +71,18 @@
           (is (some? (-> {:checkout-dir (u/abs-path checkout-dir)}
                          (sut/build-local {})
                          (deref))))
-          (is (true? (.exists checkout-dir))))))))
+          (is (true? (.exists checkout-dir))))))
+
+    (testing "fires `build/start` event with sid"
+      (let [{:keys [recv] :as e} (h/fake-events)
+            rt {:events e}
+            build {:build-id "test-build"
+                   :sid ["test" "build"]}]
+        (is (some? @(sut/build-local build rt)))
+        (is (not-empty @recv))
+        (let [evt (first @recv)]
+          (is (= :build/start (:type evt)))
+          (is (= (:sid build) (:sid evt))))))))
 
 (deftest download-src
   (testing "no-op if the source is local"
