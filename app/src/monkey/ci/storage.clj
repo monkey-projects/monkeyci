@@ -212,7 +212,8 @@
 (defn find-build
   "Finds build by sid"
   [s sid]
-  (p/read-obj s (concat [builds] sid)))
+  (when sid
+    (p/read-obj s (concat [builds] sid))))
 
 (defn list-builds
   "Lists the ids of the builds for given repo sid"
