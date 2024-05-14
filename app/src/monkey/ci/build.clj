@@ -77,13 +77,14 @@
                         (concat orig-sid [(u/new-build-id)])))
         id (or (last sid) (u/new-build-id))]
     (maybe-set-git-opts
-     {:customer-id (first sid)
-      :repo-id (second sid)
-      :build-id id
-      :checkout-dir work-dir
-      :script {:script-dir (u/abs-path work-dir (rt/get-arg rt :dir))}
-      :pipeline (rt/get-arg rt :pipeline)
-      :sid sid}
+     (merge (get-in rt [rt/config :build])
+            {:customer-id (first sid)
+             :repo-id (second sid)
+             :build-id id
+             :checkout-dir work-dir
+             :script {:script-dir (u/abs-path work-dir (rt/get-arg rt :dir))}
+             :pipeline (rt/get-arg rt :pipeline)
+             :sid sid})
      rt)))
 
 (def script "Gets script from the build"

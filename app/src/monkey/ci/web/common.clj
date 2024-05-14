@@ -108,7 +108,6 @@
                             :sid (b/sid build)})
         ;; Catch both the deferred error, or the direct exception, because both
         ;; can be thrown here.
-        (log/debug "Running build:" build)
         (-> (runner build rt)
             (md/catch report-error))
         (catch Exception ex
