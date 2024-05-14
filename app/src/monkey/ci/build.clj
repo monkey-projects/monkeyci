@@ -7,7 +7,7 @@
             [medley.core :as mc]
             [monkey.ci
              [runtime :as rt]
-             [storage :as st]
+             [sid :as sid]
              [utils :as u]]
             [monkey.ci.build.core :as bc]))
 
@@ -68,13 +68,13 @@
   [rt]
   (let [work-dir (rt/work-dir rt)
         orig-sid (or (some->> (:sid (rt/args rt))
-                              (u/parse-sid)
+                              (sid/parse-sid)
                               (take build-sid-length))
                      (get-sid rt))
         ;; Either generate a new build id, or use the one given
-        sid (st/->sid (if (or (empty? orig-sid) (includes-build-id? orig-sid))
-                        orig-sid
-                        (concat orig-sid [(u/new-build-id)])))
+        sid (sid/->sid (if (or (empty? orig-sid) (includes-build-id? orig-sid))
+                         orig-sid
+                         (concat orig-sid [(u/new-build-id)])))
         id (or (last sid) (u/new-build-id))]
     (maybe-set-git-opts
      (merge (get-in rt [rt/config :build])

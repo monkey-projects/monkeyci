@@ -71,11 +71,6 @@
                                         {:script {:script-dir (example "non-existing")}}
                                         rt))))))
 
-(defrecord TestServer []
-  org.httpkit.server.IHttpServer
-  (-server-stop! [s opts]
-    (future nil)))
-
 (deftype FakeProcess [exitValue])
 
 (deftest execute!

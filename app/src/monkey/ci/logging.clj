@@ -11,8 +11,8 @@
              [config :as c]
              [oci :as oci]
              [runtime :as rt]
+             [sid :as sid]
              [utils :as u]]
-            [monkey.ci.storage.oci :as st]
             [monkey.oci.os.core :as os]))
 
 (defprotocol LogCapturer
@@ -158,7 +158,7 @@
   (->NoopLogRetriever))
 
 (defn- sid->prefix [sid {:keys [prefix]}]
-  (cond->> (str (cs/join st/delim sid) st/delim)
+  (cond->> (str (cs/join sid/delim sid) sid/delim)
     (some? prefix) (str prefix "/")))
 
 (deftype OciBucketLogRetriever [client conf]

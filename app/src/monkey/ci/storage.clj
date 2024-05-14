@@ -9,12 +9,13 @@
              [config :as c]
              [protocols :as p]
              [runtime :as rt]
+             [sid :as sid]
              [utils :as u]]
             [monkey.ci.storage.cached :as cached])
   (:import [java.io File PushbackReader]))
 
-(def sid? vector?)
-(def ->sid vec)
+(def sid? sid/sid?)
+(def ->sid sid/->sid)
 
 (def new-id
   "Generates a new random id"
@@ -250,4 +251,5 @@
   (p/write-obj s (user->sid u) u))
 
 (defn find-user [s id]
-  (p/read-obj s (user-sid id)))
+  (when id
+    (p/read-obj s (user-sid id))))

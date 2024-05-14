@@ -8,6 +8,7 @@
             [monkey.ci
              [oci :as oci]
              [protocols :as p]
+             [sid :as sid]
              [storage :as st]]
             [monkey.oci.os.core :as os]))
 
@@ -17,7 +18,7 @@
 (def ext ".edn")
 (def ->edn pr-str)
 (def parse-edn edn/read-string)
-(def delim "/")
+(def delim sid/delim)
 
 (defn make-path [sid]
   (cs/join delim (concat (butlast sid) [(str (last sid) ext)])))

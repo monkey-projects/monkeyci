@@ -13,19 +13,32 @@
    :username (get cc/env :test-db-username)
    :password (get cc/env :test-db-password)})
 
-(def hsqldb-config
-  {:jdbcUrl (str "jdbc:hsqldb:mem:test-" (random-uuid))
+(def h2-config
+  {:jdbcUrl "jdbc:h2:mem:"
    :username "SA"
    :password ""})
 
-(defn with-test-db* [f]
-  (let [conf (db-config)
-        conn {:ds (conn/->pool HikariDataSource conf)
-              :sql-opts {} #_{:dialect :ansi}}]
-    (try
-      (f conn)
-      (finally
-        (.close (:ds conn))))))
+(defn- test-config
+  "Either takes db configuration from env, or memory db"
+  []
+  (let [c (db-config)]
+    (if (empty? (:jdbcUrl c))
+      h2-config
+      c)))
+
+(defn with-test-db*
+  ([f conf]
+   (let [conn {:ds (conn/->pool HikariDataSource conf)
+               :sql-opts {} #_{:dialect :ansi}}]
+     (try
+       (f conn)
+       (finally
+         (.close (:ds conn))))))
+  ([f]
+   (with-test-db* f (test-config))))
+
+(defn with-memory-db* [f]
+  (with-test-db* f h2-config))
 
 (defn with-prepared-db* [f]
   (with-test-db*

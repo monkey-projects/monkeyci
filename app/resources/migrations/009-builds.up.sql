@@ -4,6 +4,7 @@ CREATE TABLE builds (
   idx INTEGER NOT NULL,
   repo_id INTEGER NOT NULL,
   jobs JSON,
-  INDEX build_uuid_idx (uuid),
   FOREIGN KEY (repo_id) REFERENCES repos(id)
 );
+--;;
+CREATE INDEX build_uuid_idx ON builds (uuid);

@@ -7,7 +7,9 @@
             [clojure.java.io :as io]
             [clojure.repl :as cr]
             [medley.core :as mc]
-            [monkey.ci.edn :as ce])
+            [monkey.ci
+             [edn :as ce]
+             [sid :as sid]])
   (:import org.apache.commons.io.FileUtils))
 
 (defn cwd
@@ -141,12 +143,8 @@
   (.. (java.util.Base64/getEncoder)
       (encodeToString (.getBytes s java.nio.charset.StandardCharsets/UTF_8))))
 
-(defn parse-sid [s]
-  (cond-> s
-    (string? s) (cs/split #"/")))
-
-(defn sid->repo-sid [s]
-  (take 2 s))
+(def ^:deprecated parse-sid sid/parse-sid)
+(def ^:deprecated sid->repo-sid sid/sid->repo-sid)
 
 (def serialize-sid (partial cs/join "/"))
 

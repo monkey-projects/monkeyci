@@ -6,6 +6,7 @@ CREATE TABLE repos (
   name VARCHAR(200) NOT NULL,
   url VARCHAR(300),
   main_branch VARCHAR(100),
-  INDEX repo_uuid_idx (uuid),
   FOREIGN KEY (customer_id) REFERENCES customers(id)
 );
+--;;
+CREATE INDEX repo_uuid_idx ON repos (uuid);

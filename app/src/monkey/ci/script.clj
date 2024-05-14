@@ -247,6 +247,7 @@
   (let [build (rt/build rt)
         build-id (build/build-id build)
         script-dir (build/script-dir build)]
+    ;; TODO Replace the runtime with a specific context when passing it to a job
     (log/debug "Executing script for build" build-id "at:" script-dir)
     (log/debug "Build map:" (:build rt))
     (try 

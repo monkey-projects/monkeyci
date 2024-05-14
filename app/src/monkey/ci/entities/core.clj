@@ -18,6 +18,8 @@
 
 (def insert-opts (assoc default-opts :return-keys true))
 
+(def extract-id (some-fn :generated-key :id))
+
 (defn insert-entity [{:keys [ds sql-opts]} table rec]
   (->> (jdbc/execute-one! ds
                           (h/format {:insert-into table
@@ -25,7 +27,7 @@
                                      :values [(vals rec)]}
                                     sql-opts)
                           insert-opts)
-       :generated-key
+       extract-id
        (assoc rec :id)))
 
 (def update-opts default-opts)
