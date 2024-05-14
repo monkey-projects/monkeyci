@@ -63,7 +63,7 @@
 
     (testing "fails when script fails"
       (is (pos? (-> {:script {:script-dir (example "failing")}
-                                   :build-id (u/new-build-id)}
+                     :build-id (u/new-build-id)}
                     (sut/execute! rt)
                     deref
                     :exit))))
