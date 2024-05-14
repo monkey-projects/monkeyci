@@ -117,6 +117,7 @@
 (defmethod make-runner :child [_]
   (log/info "Using child process runner")
   (fn [build rt]
+    (log/debug "Running build in child process:" build)
     (-> build
         (download-src rt)
         (store-src rt)
