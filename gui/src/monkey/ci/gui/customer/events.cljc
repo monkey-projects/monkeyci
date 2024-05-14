@@ -117,14 +117,14 @@
  :repo/watch
  (fn [{:keys [db]} [_ repo]]
    (log/debug "Watching repo:" repo)
-   (let [params (r/path-params (r/current db))]
+   (let [cust-id (r/customer-id db)]
      {:dispatch [:secure-request
                  :watch-github-repo
                  {:repo {:name (:name repo)
                          :url (:clone-url repo)
-                         :customer-id (:customer-id params)
+                         :customer-id cust-id
                          :github-id (:id repo)}
-                  :customer-id (:customer-id params)}
+                  :customer-id cust-id}
                  [:repo/watch--success]
                  [:repo/watch--failed]]})))
 
@@ -145,8 +145,8 @@
    (log/debug "Unwatching:" (str repo))
    {:dispatch [:secure-request
                :unwatch-github-repo
-               {:repo-id (:id repo)
-                :customer-id (:customer-id repo)}
+               {:repo-id (get-in repo [:monkeyci/repo :id])
+                :customer-id (r/customer-id db)}
                [:repo/unwatch--success]
                [:repo/unwatch--failed]]}))
 
