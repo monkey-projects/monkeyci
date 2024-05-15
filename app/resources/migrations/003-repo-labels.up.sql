@@ -5,3 +5,5 @@ CREATE TABLE repo_labels (
   `value` VARCHAR(100),
   FOREIGN KEY (repo_id) REFERENCES repos(id)
 );
+--;;
+CREATE INDEX repo_labels_repo_id_idx ON repo_labels (repo_id);

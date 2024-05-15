@@ -10,3 +10,5 @@ CREATE TABLE repos (
 );
 --;;
 CREATE INDEX repo_uuid_idx ON repos (uuid);
+--;;
+CREATE INDEX repo_customer_id_idx ON repos (customer_id);

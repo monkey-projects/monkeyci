@@ -1,9 +1,9 @@
 (ns monkey.ci.entities.core
   "Core functionality for database entities.  Allows to store/retrieve basic entities."
-  (:require [cheshire.core :as json]
-            [honey.sql :as h]
+  (:require [honey.sql :as h]
             [honey.sql.helpers :as hh]
             [medley.core :as mc]
+            [monkey.ci.edn :as edn]
             [monkey.ci.entities.types]
             [next.jdbc :as jdbc]
             [next.jdbc
@@ -80,16 +80,20 @@
   [n opts extra-opts]
   (let [pl (str (name n) "s")
         default-opts {:before-insert identity
+                      :after-insert  identity
                       :before-update identity
-                      :after-select identity}
-        [bi bu as] (map #(maybe-comp % extra-opts opts default-opts)
-                        [:before-insert :before-update :after-select])]
+                      :after-update  identity
+                      :after-select  identity}
+        [bi ai bu au as] (map #(maybe-comp % extra-opts opts default-opts)
+                              [:before-insert :after-insert
+                               :before-update :after-update
+                               :after-select])]
     (intern *ns* (symbol (str "insert-" (name n)))
             (fn [conn e]
-              (insert-entity conn (keyword pl) (bi e))))
+              (first (ai [(insert-entity conn (keyword pl) (bi e)) e]))))
     (intern *ns* (symbol (str "update-" (name n)))
             (fn [conn e]
-              (update-entity conn (keyword pl) (bu e))))
+              (first (au [(update-entity conn (keyword pl) (bu e)) e]))))
     (intern *ns* (symbol (str "delete-" pl))
             (fn [conn f]
               (delete-entities conn (keyword pl) f)))
@@ -127,6 +131,9 @@
 (defn by-repo [id]
   [:= :repo-id id])
 
+(defn by-build [id]
+  [:= :build-id id])
+
 (defn by-ssh-key [id]
   [:= :ssh-key-id id])
 
@@ -144,16 +151,22 @@
 (defentity webhook)
 (defentity ssh-key)
 (defentity user)
+(defentity build)
 
-(defn jobs->json [b]
-  (mc/update-existing b :jobs json/generate-string))
+(defn- details->edn [b]
+  (mc/update-existing b :details edn/->edn))
 
-(defn json->jobs [b]
-  (mc/update-existing b :jobs #(json/parse-string % keyword)))
+(defn- details->job [[r e]]
+  [(assoc r :details (:details e)) e])
 
-(defentity build {:before-insert jobs->json
-                  :before-update jobs->json
-                  :after-select  json->jobs})
+(defn- edn->details [b]
+  (mc/update-existing b :details edn/edn->))
+
+(defentity job {:before-insert details->edn
+                :after-insert  details->job
+                :before-update details->edn
+                :after-update  details->job
+                :after-select  edn->details})
 
 ;;; Aggregate entities
 

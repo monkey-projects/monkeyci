@@ -9,3 +9,5 @@ CREATE TABLE ssh_keys (
 );
 --;;
 CREATE INDEX ssh_keys_uuid_idx ON ssh_keys (uuid);
+--;;
+CREATE INDEX ssh_keys_customer_id_idx ON ssh_keys (customer_id);

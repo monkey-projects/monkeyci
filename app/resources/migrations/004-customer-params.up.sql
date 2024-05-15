@@ -9,3 +9,5 @@ CREATE TABLE customer_params (
 );
 --;;
 CREATE INDEX params_uuid_idx ON customer_params (uuid);
+--;;
+CREATE INDEX customer_params_customer_id_idx ON customer_params (customer_id);

@@ -5,3 +5,5 @@ CREATE TABLE param_labels (
   `value` VARCHAR(100),
   FOREIGN KEY (param_id) REFERENCES customer_params(id)
 );
+--;;
+CREATE INDEX param_labels_param_id_idx ON param_labels (param_id);

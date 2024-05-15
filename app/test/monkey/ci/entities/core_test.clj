@@ -3,22 +3,24 @@
             [monkey.ci.entities
              [core :as sut]
              [helpers :as eh]]
-            [next.jdbc :as jdbc]))
+            [next.jdbc :as jdbc]
+            [next.jdbc.result-set :as rs]))
 
-(deftest ^:mysql memory-db
+(deftest ^:sql memory-db
   (testing "can connect"
     (eh/with-test-db*
       (fn [conn]
         (is (some? conn))))))
 
-(deftest ^:mysql prepared-db
+(deftest ^:sql prepared-db
   (testing "has customers table"
     (eh/with-prepared-db*
       (fn [conn]
-        (is (number? (-> (jdbc/execute-one! (:ds conn) ["select count(*) as c from customers"])
+        (is (number? (-> (jdbc/execute-one! (:ds conn) ["select count(*) as c from customers"]
+                                            {:builder-fn rs/as-unqualified-lower-maps})
                          :c)))))))
 
-(deftest ^:mysql customer-entities
+(deftest ^:sql customer-entities
   (eh/with-prepared-db conn
     (let [cust {:name "test customer"}
           r (sut/insert-customer conn cust)]
@@ -43,7 +45,7 @@
     (testing "throws on invalid record"
       (is (thrown? Exception (sut/insert-customer conn {}))))))
 
-(deftest ^:mysql repo-entities
+(deftest ^:sql repo-entities
   (eh/with-prepared-db conn
     (let [cust (sut/insert-customer conn {:name "test customer"})
           r (sut/insert-repo conn {:name "test repo"
@@ -69,7 +71,7 @@
     (testing "throws on invalid record"
       (is (thrown? Exception (sut/insert-repo conn {:name "customerless repo"}))))))
 
-(deftest ^:mysql repo-labels
+(deftest ^:sql repo-labels
   (eh/with-prepared-db conn
     (let [cust (sut/insert-customer
                 conn
@@ -98,7 +100,7 @@
     (testing "throws on invalid record"
       (is (thrown? Exception (sut/insert-repo-label conn {:name "repoless label"}))))))
 
-(deftest ^:mysql customer-params
+(deftest ^:sql customer-params
   (eh/with-prepared-db conn
     (let [cust  (sut/insert-customer
                  conn
@@ -119,7 +121,7 @@
         (is (= 1 (sut/delete-customer-params conn (sut/by-id (:id param)))))
         (is (empty? (sut/select-customer-params conn (sut/by-customer (:id cust)))))))))
 
-(deftest ^:mysql param-labels
+(deftest ^:sql param-labels
   (eh/with-prepared-db conn
     (let [cust  (sut/insert-customer
                  conn
@@ -144,7 +146,7 @@
         (is (= 1 (sut/delete-param-labels conn (sut/by-id (:id lbl)))))
         (is (empty? (sut/select-param-labels conn (sut/by-param (:id param)))))))))
 
-(deftest ^:mysql webhooks
+(deftest ^:sql webhooks
   (eh/with-prepared-db conn
     (let [cust (sut/insert-customer
                 conn
@@ -168,7 +170,7 @@
         (is (= 1 (sut/delete-webhooks conn (sut/by-id (:id wh)))))
         (is (empty? (sut/select-webhooks conn (sut/by-repo (:id repo)))))))))
 
-(deftest ^:mysql ssh-keys
+(deftest ^:sql ssh-keys
   (eh/with-prepared-db conn
     (let [cust (sut/insert-customer
                 conn
@@ -189,7 +191,7 @@
         (is (= 1 (sut/delete-ssh-keys conn (sut/by-id (:id key)))))
         (is (empty? (sut/select-ssh-keys conn (sut/by-customer (:id cust)))))))))
 
-(deftest ^:mysql ssh-key-labels
+(deftest ^:sql ssh-key-labels
   (eh/with-prepared-db conn
     (let [cust (sut/insert-customer
                 conn
@@ -215,7 +217,7 @@
         (is (= 1 (sut/delete-ssh-key-labels conn (sut/by-id (:id lbl)))))
         (is (empty? (sut/select-ssh-key-labels conn (sut/by-ssh-key (:id key)))))))))
 
-(deftest ^:mysql builds
+(deftest ^:sql builds
   (eh/with-prepared-db conn
     (let [cust  (sut/insert-customer
                  conn
@@ -228,24 +230,52 @@
           build (sut/insert-build
                 conn
                 {:repo-id (:id repo)
-                 :idx 1
-                 :jobs [{:id "test-job"}]})]
+                 :idx 1})]
       (testing "can insert"
         (is (number? (:id build))))
 
-      (testing "can select for customer"
+      (testing "can select for repo"
         (is (not-empty (sut/select-builds conn (sut/by-repo (:id repo))))))
-
-      (testing "parses jobs from json"
-        (is (= [{:id "test-job"}]
-               (-> (sut/select-build conn (sut/by-id (:id build)))
-                   :jobs))))
 
       (testing "can delete"
         (is (= 1 (sut/delete-builds conn (sut/by-id (:id build)))))
         (is (empty? (sut/select-builds conn (sut/by-repo (:id repo)))))))))
 
-(deftest ^:mysql users
+(deftest ^:sql jobs
+  (eh/with-prepared-db conn
+    (let [cust  (sut/insert-customer
+                 conn
+                 {:name "test customer"})
+          repo  (sut/insert-repo
+                 conn
+                 {:name "test repo"
+                  :display-id "test-repo"
+                  :customer-id (:id cust)})
+          build (sut/insert-build
+                conn
+                {:repo-id (:id repo)
+                 :idx 1})
+          job   (sut/insert-job
+                 conn
+                 {:build-id (:id build)
+                  :display-id "test-job"
+                  :details {:image "test-image"}})]
+      (testing "can insert"
+        (is (number? (:id job))))
+
+      (testing "can select for build"
+        (is (not-empty (sut/select-jobs conn (sut/by-build (:id build))))))
+
+      (testing "parses details from edn"
+        (is (= (:details job)
+               (-> (sut/select-job conn (sut/by-id (:id job)))
+                   :details))))
+
+      (testing "can delete"
+        (is (= 1 (sut/delete-jobs conn (sut/by-id (:id job)))))
+        (is (empty? (sut/select-jobs conn (sut/by-build (:id build)))))))))
+
+(deftest ^:sql users
   (eh/with-prepared-db conn
     (let [cust (sut/insert-customer
                 conn

@@ -5,3 +5,5 @@ CREATE TABLE ssh_key_labels (
   `value` VARCHAR(100),
   FOREIGN KEY (ssh_key_id) REFERENCES ssh_keys(id)
 );
+--;;
+CREATE INDEX ssh_key_labels_ssh_key_id_idx ON ssh_key_labels (ssh_key_id);

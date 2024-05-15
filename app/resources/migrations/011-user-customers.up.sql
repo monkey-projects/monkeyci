@@ -5,3 +5,7 @@ CREATE TABLE user_customers (
   FOREIGN KEY (user_id) REFERENCES users(id),
   FOREIGN KEY (customer_id) REFERENCES customers(id)
 );
+--;;
+CREATE INDEX user_customers_user_id_idx ON user_customers (user_id);
+--;;
+CREATE INDEX user_customers_customer_id_idx ON user_customers (customer_id);

@@ -5,3 +5,5 @@ CREATE TABLE webhooks (
   secret VARCHAR(50) NOT NULL,
   FOREIGN KEY (repo_id) REFERENCES repos(id)
 );
+--;;
+CREATE INDEX webhooks_repo_id_idx ON webhooks (repo_id);

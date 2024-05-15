@@ -29,7 +29,7 @@
 (defn with-test-db*
   ([f conf]
    (let [conn {:ds (conn/->pool HikariDataSource conf)
-               :sql-opts {} #_{:dialect :ansi}}]
+               :sql-opts {:dialect :mysql :quoted-snake true}}]
      (try
        (f conn)
        (finally
