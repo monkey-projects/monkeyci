@@ -151,7 +151,39 @@
 (defentity webhook)
 (defentity ssh-key)
 (defentity user)
-(defentity build)
+
+(defn- or-nil [f]
+  (fn [x]
+    (when x
+      (f x))))
+
+(defn- time->int [k x]
+  (mc/update-existing x k (or-nil (memfn getTime))))
+
+(defn- int->time [k x]
+  (mc/update-existing x k (or-nil #(java.sql.Timestamp. %))))
+
+(def start-time->int (partial time->int :start-time))
+(def int->start-time (partial int->time :start-time))
+
+(def end-time->int (partial time->int :start-time))
+(def int->end-time (partial int->time :end-time))
+
+(defn- status->str [x]
+  (mc/update-existing x :status name))
+
+(defn- str->status [x]
+  (mc/update-existing x :status keyword))
+
+(def prepare-timed (comp status->str int->start-time int->end-time))
+;; Seems like timestamps are read as long?
+(def convert-timed #_(comp str->status start-time->int end-time->int) str->status)
+
+(defentity build {:before-insert prepare-timed
+                  :after-insert  convert-timed
+                  :before-update prepare-timed
+                  :after-update  convert-timed
+                  :after-select  convert-timed})
 
 (defn- details->edn [b]
   (mc/update-existing b :details edn/->edn))
@@ -162,11 +194,15 @@
 (defn- edn->details [b]
   (mc/update-existing b :details edn/edn->))
 
-(defentity job {:before-insert details->edn
-                :after-insert  details->job
-                :before-update details->edn
-                :after-update  details->job
-                :after-select  edn->details})
+(def prepare-job (comp details->edn prepare-timed))
+(def convert-job (comp details->job convert-timed))
+(def convert-job-select (comp edn->details convert-timed))
+
+(defentity job {:before-insert prepare-job
+                :after-insert  convert-job
+                :before-update prepare-job
+                :after-update  convert-job
+                :after-select  convert-job-select})
 
 ;;; Aggregate entities
 

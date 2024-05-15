@@ -29,6 +29,12 @@
 (defn gen-repo []
   (gen/generate (s/gen :entity/repo)))
 
+(defn gen-build []
+  (gen/generate (s/gen :entity/build)))
+
+(defn gen-job []
+  (gen/generate (s/gen :entity/job)))
+
 (deftest ^:sql customer-entities
   (eh/with-prepared-db conn
     (let [cust (gen-customer)
@@ -229,16 +235,16 @@
   (eh/with-prepared-db conn
     (let [cust  (sut/insert-customer
                  conn
-                 {:name "test customer"})
+                 (gen-customer))
           repo  (sut/insert-repo
                  conn
-                 {:name "test repo"
-                  :display-id "test-repo"
-                  :customer-id (:id cust)})
+                 (-> (gen-repo)
+                     (assoc :customer-id (:id cust))))
           build (sut/insert-build
-                conn
-                {:repo-id (:id repo)
-                 :idx 1})]
+                 conn
+                 (-> (gen-build)
+                     (assoc :repo-id (:id repo)
+                            :status :pending)))]
       (testing "can insert"
         (is (number? (:id build))))
 
@@ -253,21 +259,20 @@
   (eh/with-prepared-db conn
     (let [cust  (sut/insert-customer
                  conn
-                 {:name "test customer"})
+                 (gen-customer))
           repo  (sut/insert-repo
                  conn
-                 {:name "test repo"
-                  :display-id "test-repo"
-                  :customer-id (:id cust)})
+                 (-> (gen-repo)
+                     (assoc :customer-id (:id cust))))
           build (sut/insert-build
                 conn
-                {:repo-id (:id repo)
-                 :idx 1})
+                (-> (gen-build)
+                    (assoc :repo-id (:id repo))))
           job   (sut/insert-job
                  conn
-                 {:build-id (:id build)
-                  :display-id "test-job"
-                  :details {:image "test-image"}})]
+                 (-> (gen-job)
+                     (assoc :build-id (:id build)
+                            :details {:image "test-image"})))]
       (testing "can insert"
         (is (number? (:id job))))
 

@@ -4,6 +4,9 @@ CREATE TABLE jobs (
   display_id VARCHAR(100) NOT NULL,
   build_id INTEGER NOT NULL,
   details MEDIUMTEXT,
+  start_time TIMESTAMP,
+  end_time TIMESTAMP,
+  status VARCHAR(30),
   FOREIGN KEY (build_id) REFERENCES builds(id)
 );
 --;;
