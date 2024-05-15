@@ -143,6 +143,9 @@
 (defn by-user [id]
   [:= :user-id id])
 
+(defn by-display-id [id]
+  [:= :display-id id])
+
 ;;; Basic entities
 
 (defentity customer)
