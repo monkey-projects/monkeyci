@@ -2,11 +2,12 @@
   "Spec definitions for build.  The build object in the runtime and events that contain
    builds, scripts or jobs should conform to these specs."
   (:require [clojure.spec.alpha :as s]
+            [clojure.spec.gen.alpha :as gen]
             [monkey.ci.spec.common :as c]))
 
-(def id? string?)
-(def ts? int?)
-(def path? string?)
+(def id? c/id?)
+(def ts? c/ts?)
+(def path? c/path?)
 
 ;; Start and end time for build, script, job, etc...
 (s/def ::start-time ts?)
@@ -70,7 +71,8 @@
 (s/def :build/status build-states)
 
 ;; GIT configuration
-(s/def :git/url c/url?)
+(s/def :git/url (s/with-gen c/url?
+                  #(gen/fmap (partial format "http://%s") (gen/string-alphanumeric))))
 (s/def :git/ref string?)
 (s/def :git/commit-id string?)
 (s/def :git/dir path?)

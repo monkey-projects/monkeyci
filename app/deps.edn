@@ -64,8 +64,9 @@
   {:extra-paths [:test-paths]
    :extra-deps {com.monkeyprojects/build {:mvn/version "0.2.0"}
                 com.github.oliyh/martian-test {:mvn/version "0.1.26"}
-                http-kit.fake/http-kit.fake {:mvn/version "0.2.2"}
                 com.h2database/h2 {:mvn/version "2.2.224"}
+                http-kit.fake/http-kit.fake {:mvn/version "0.2.2"}
+                org.clojure/test.check {:mvn/version "0.9.0"}
                 ring/ring-mock {:mvn/version "0.4.0"}}
    :exec-fn monkey.test/all
    ;; Add this to avoid falling back to the default logger

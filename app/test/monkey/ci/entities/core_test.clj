@@ -1,8 +1,11 @@
 (ns monkey.ci.entities.core-test
   (:require [clojure.test :refer [deftest testing is]]
+            [clojure.spec.alpha :as s]
+            [clojure.spec.gen.alpha :as gen]
             [monkey.ci.entities
              [core :as sut]
              [helpers :as eh]]
+            [monkey.ci.spec.entities]
             [next.jdbc :as jdbc]
             [next.jdbc.result-set :as rs]))
 
@@ -20,9 +23,15 @@
                                             {:builder-fn rs/as-unqualified-lower-maps})
                          :c)))))))
 
+(defn gen-customer []
+  (gen/generate (s/gen :entity/customer)))
+
+(defn gen-repo []
+  (gen/generate (s/gen :entity/repo)))
+
 (deftest ^:sql customer-entities
   (eh/with-prepared-db conn
-    (let [cust {:name "test customer"}
+    (let [cust (gen-customer)
           r (sut/insert-customer conn cust)]
       (testing "can insert"
         (is (some? (:uuid r)))
@@ -47,22 +56,21 @@
 
 (deftest ^:sql repo-entities
   (eh/with-prepared-db conn
-    (let [cust (sut/insert-customer conn {:name "test customer"})
-          r (sut/insert-repo conn {:name "test repo"
-                                   :display-id "test-repo"
-                                   :customer-id (:id cust)
-                                   :url "http://test"
-                                   :main-branch "main"})]
+    (let [cust (sut/insert-customer conn (gen-customer))
+          r (sut/insert-repo conn (-> (gen-repo)
+                                      (assoc :customer-id (:id cust))))]
       (testing "can insert"
         (is (some? (:uuid r)))
         (is (number? (:id r)))
-        (is (= "test repo" (:name r))))
+        (is (some? (:name r))))
 
       (testing "can select by id"
-        (is (= r (sut/select-repo conn (sut/by-id (:id r))))))
+        (is (= r (-> (sut/select-repo conn (sut/by-id (:id r)))
+                     (select-keys (keys r))))))
 
       (testing "can select by uuid"
-        (is (= r (sut/select-repo conn (sut/by-uuid (:uuid r))))))
+        (is (= r (-> (sut/select-repo conn (sut/by-uuid (:uuid r)))
+                     (select-keys (keys r))))))
 
       (testing "can update"
         (is (= 1 (sut/update-repo conn (assoc r :name "updated"))))
