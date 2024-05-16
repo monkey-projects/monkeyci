@@ -47,3 +47,62 @@
                                  [{:label "other-label"
                                    :value "other-value"}]]})))))
 
+(deftest reconcile-labels
+  (testing "all new labels should be inserted"
+    (let [labels [{:name "new label"
+                   :value "new value"}]]
+      (is (= {:insert labels}
+             (sut/reconcile-labels [] labels)))))
+
+  (testing "all removed labels should be deleted"
+    (let [labels [{:id 1
+                   :name "new label"
+                   :value "new value"}]]
+      (is (= {:delete labels}
+             (sut/reconcile-labels labels [])))))
+
+  (testing "ignores unchanged labels"
+    (is (empty? (sut/reconcile-labels [{:id 1
+                                        :name "test label"
+                                        :value "unchanged"}]
+                                      [{:name "test label"
+                                        :value "unchanged"}]))))
+
+  (testing "changed labels should be updated"
+    (is (= {:update [{:id 1
+                      :name "test label"
+                      :value "updated"}]}
+           (sut/reconcile-labels [{:id 1
+                                   :name "test label"
+                                   :value "original"}]
+                                 [{:name "test label"
+                                   :value "updated"}]))))
+
+  (testing "combines updated and new"
+    (let [new  {:name "new label"
+                :value "new value"}
+          orig {:id 1
+                :name "existing label"
+                :value "original value"}
+          upd  {:name "existing label"
+                :value "updated value"}]
+      (is (= {:insert [new]
+              :update [{:id 1
+                        :name "existing label"
+                        :value "updated value"}]}
+             (sut/reconcile-labels [orig] [upd new])))))
+
+  (testing "combines updated and deleted"
+    (let [del  {:id 2
+                :name "removed label"
+                :value "removed value"}
+          orig {:id 1
+                :name "existing label"
+                :value "original value"}
+          upd  {:name "existing label"
+                :value "updated value"}]
+      (is (= {:delete [del]
+              :update [{:id 1
+                        :name "existing label"
+                        :value "updated value"}]}
+             (sut/reconcile-labels [orig del] [upd]))))))

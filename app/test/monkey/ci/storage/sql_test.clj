@@ -13,7 +13,7 @@
     {:id id
      :name (str "Test customer " id)}))
 
-(deftest sql-storage
+(deftest ^:sql sql-storage
   (eh/with-prepared-db conn
     (let [s (sut/make-storage conn)]
       (testing "customers"
@@ -53,16 +53,48 @@
       (testing "repos"
         (let [repo {:name "test repo"
                     :id "test-repo"}
+              lbl (str "test-label-" (random-uuid))
               cust (-> (gen-cust)
-                       (assoc-in [:repos (:id repo)] repo))]
+                       (assoc-in [:repos (:id repo)] repo))
+              sid [(:id cust) (:id repo)]]
           (testing "can find by sid"
             (is (sid/sid? (st/save-customer s cust)))
             (is (= (assoc repo :customer-id (:id cust))
-                   (st/find-repo s [(:id cust) (:id repo)]))))
+                   (st/find-repo s sid))))
 
-          (testing "can add labels")
+          (testing "can add labels"
+            (let [labels [{:name lbl
+                           :value "test value"}]]
+              (is (sid/sid? (st/update-repo s sid assoc :labels labels)))
+              (is (= labels (-> (st/find-repo s sid)
+                                :labels)))
+              (is (= 1 (count (ec/select-repo-labels conn [:= :name lbl]))))))
 
-          (testing "can update labels")))
+          (testing "can update labels"
+            (let [labels [{:name lbl
+                           :value "updated value"}]]
+              (is (sid/sid? (st/update-repo s sid assoc :labels labels)))
+              (is (= labels (-> (st/find-repo s sid)
+                                :labels)))
+              (is (= 1 (count (ec/select-repo-labels conn [:= :name lbl]))))))
+
+          (testing "can remove labels"
+            (is (sid/sid? (st/update-repo s sid dissoc :labels)))
+            (is (empty? (ec/select-repo-labels conn [:= :name lbl]))))
+
+          (testing "creates labels on new repo"
+            (let [labels [{:name "test-label"
+                           :value "test value"}]
+                  _ (st/save-repo s {:name "new repo"
+                                     :id "new-repo"
+                                     :customer-id (:id cust)
+                                     :labels labels})
+                  sid [(:id cust) "new-repo"]]
+              (is (sid/sid? sid))
+              (is (= 1 (count (ec/select-repo-labels conn [:= :name "test-label"]))))
+              (let [repo (st/find-repo s sid)]
+                (is (some? repo))
+                (is (= labels (:labels repo))))))))
 
       (testing "watched github repos"
         (let [cust (gen-cust)
@@ -83,3 +115,4 @@
           (testing "can unwatch"
             (is (true? (st/unwatch-github-repo s [(:id cust) (:id repo)])))
             (is (empty? (st/find-watched-github-repos s github-id)))))))))
+

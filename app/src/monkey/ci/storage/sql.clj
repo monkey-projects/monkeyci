@@ -2,16 +2,21 @@
   "Storage implementation that uses an SQL database for persistence.  This namespace provides
    a layer on top of the entities namespace to perform the required queries whenever a 
    document is saved or loaded."
-  (:require [medley.core :as mc]
+  (:require [clojure.tools.logging :as log]
+            [medley.core :as mc]
             [monkey.ci.entities
              [core :as ec]
              [customer :as ecu]]
             [monkey.ci
+             [labels :as lbl]
              [protocols :as p]
              [sid :as sid]
              [storage :as st]]))
 
 (def deleted? (fnil pos? 0))
+
+(defn- entity->labels [labels]
+  (map #(select-keys % [:name :value]) labels))
 
 (defn- repo->entity
   "Converts the repository into an entity that can be sent to the database."
@@ -26,28 +31,54 @@
   "Converts the repo entity (a db record) into a repository.  If `f` is provided,
    it is invoked to allow some processing on the resulting object."
   [re & [f]]
+  (log/debug "Converting repo:" re)
   (cond->
       (-> re
           (dissoc :uuid :customer-id :display-id)
           (assoc :id (:display-id re))
+          (mc/update-existing :labels entity->labels)
           ;; Drop nil properties
           (as-> x (mc/filter-vals some? x)))
-    f (f re)))
+      f (f re)))
 
-(defn- insert-repo [conn re]
-  (ec/insert-repo conn re))
+(defn- insert-repo-labels [conn labels re]
+  (when-not (empty? labels)
+    (->> labels
+         (map #(assoc % :repo-id (:id re)))
+         (ec/insert-repo-labels conn))))
 
-(defn- update-repo [conn re existing]
+(defn- update-repo-labels [conn labels]
+  (doseq [l labels]
+    (ec/update-repo-label conn l)))
+
+(defn- delete-repo-labels [conn labels]
+  (ec/delete-repo-labels conn [:in :id (map :id labels)]))
+
+(defn- sync-repo-labels [conn labels re]
+  {:pre [(some? (:id re))]}
+  (let [ex (ec/select-repo-labels conn (ec/by-repo (:id re)))
+        {:keys [insert update delete]} (lbl/reconcile-labels ex labels)]
+    (insert-repo-labels conn insert re)
+    (update-repo-labels conn update)
+    (delete-repo-labels conn delete)))
+
+(defn- insert-repo [conn re repo]
+  (let [re (ec/insert-repo conn re)]
+    (insert-repo-labels conn (:labels repo) re)))
+
+(defn- update-repo [conn re repo existing]
   (when (not= re existing)
-    (ec/update-repo conn (merge existing re))))
+    (let [re (merge existing re)]
+      (ec/update-repo conn re)
+      (sync-repo-labels conn (:labels repo) re))))
 
 (defn- upsert-repo [conn repo cust-id]
   (let [re (repo->entity repo cust-id)]
     (if-let [existing (ec/select-repo conn [:and
                                             (ec/by-customer cust-id)
                                             (ec/by-display-id (:id repo))])]
-      (update-repo conn re existing)
-      (insert-repo conn re))))
+      (update-repo conn re repo existing)
+      (insert-repo conn re repo))))
 
 (defn- upsert-repos [conn {:keys [repos]} cust-id]
   (doseq [[id r] repos]
@@ -79,14 +110,14 @@
                          (assoc r (:display-id v) (entity->repo v)))
                        {}
                        repos))
-          (cust->storage [c]
+          (entity->cust [c]
             (-> c
                 (dissoc :uuid)
                 (assoc :id (str (:uuid c)))
                 (update :repos entities->repos)))]
     (when uuid
       (some-> (ecu/customer-with-repos conn (ec/by-uuid uuid))
-              (cust->storage)))))
+              (entity->cust)))))
 
 (defn- customer-exists? [conn uuid]
   (some? (ec/select-customer conn (ec/by-uuid uuid))))

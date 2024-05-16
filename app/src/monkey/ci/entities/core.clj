@@ -20,15 +20,34 @@
 
 (def extract-id (some-fn :generated-key :id))
 
-(defn insert-entity [{:keys [ds sql-opts]} table rec]
-  (->> (jdbc/execute-one! ds
-                          (h/format {:insert-into table
-                                     :columns (keys rec)
-                                     :values [(vals rec)]}
-                                    sql-opts)
-                          insert-opts)
-       extract-id
-       (assoc rec :id)))
+(defn insert-entities
+  "Batch inserts multiple entities at once.  The records are assumed to
+   be vectors of values."
+  [{:keys [ds sql-opts]} table cols recs]
+  (->> (jdbc/execute! ds
+                      (h/format {:insert-into table
+                                 :columns cols
+                                 :values recs}
+                                sql-opts)
+                      insert-opts)
+       (map extract-id)
+       (zipmap recs)
+       (map (fn [[r id]]
+              (-> (zipmap cols r)
+                  (assoc :id id))))))
+
+(defn insert-entity [{:keys [ds sql-opts] :as conn} table rec]
+  ;; Both work, maybe the first is a little bit more efficient.
+  #_(->> (jdbc/execute-one! ds
+                            (h/format {:insert-into table
+                                       :columns (keys rec)
+                                       :values [(vals rec)]}
+                                      sql-opts)
+                            insert-opts)
+         extract-id
+         (assoc rec :id))
+  (-> (insert-entities conn table (keys rec) [(vals rec)])
+      (first)))
 
 (def update-opts default-opts)
 
@@ -210,6 +229,14 @@
 ;;; Aggregate entities
 
 (defaggregate repo-label)
+
+(defn insert-repo-labels
+  "Batch inserts multiple labels at once"
+  [conn labels]
+  (->> labels
+       (map (juxt :repo-id :name :value))
+       (insert-entities conn :repo-labels [:repo-id :name :value])))
+
 (defaggregate param-label)
 (defaggregate ssh-key-label)
 (defaggregate user-customer)

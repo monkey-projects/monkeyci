@@ -96,24 +96,31 @@
 (defn find-customer [s id]
   (p/read-obj s (customer-sid id)))
 
-(defn save-repo
+(def save-repo
   "Saves the repository by updating the customer it belongs to"
-  [s {:keys [customer-id id] :as r}]
-  (-> (update-obj s (customer-sid customer-id) assoc-in [:repos id] r)
-      ;; Return repo sid
-      (conj id)))
+  (override-or
+   [:repo :save]
+   (fn [s {:keys [customer-id id] :as r}]
+     (-> (update-obj s (customer-sid customer-id) assoc-in [:repos id] r)
+         ;; Return repo sid
+         (conj id)))))
 
-(defn find-repo
+(def find-repo
   "Reads the repo, as part of the customer object's projects"
-  [s [cust-id id]]
-  (some-> (find-customer s cust-id)
-          (get-in [:repos id])
-          (assoc :customer-id cust-id)))
+  (override-or
+   [:repo :find]
+   (fn 
+     [s [cust-id id]]
+     (some-> (find-customer s cust-id)
+             (get-in [:repos id])
+             (assoc :customer-id cust-id)))))
 
-(defn update-repo
+(def update-repo
   "Applies `f` to the repo with given sid"
-  [s [cust-id repo-id] f & args]
-  (apply update-obj s (customer-sid cust-id) update-in [:repos repo-id] f args))
+  (override-or
+   [:repo :update]
+   (fn [s [cust-id repo-id] f & args]
+     (apply update-obj s (customer-sid cust-id) update-in [:repos repo-id] f args))))
 
 (def ext-repo-sid (partial take-last 2))
 (def watched-sid (comp (partial global-sid :watched) str))
