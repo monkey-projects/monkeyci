@@ -6,7 +6,7 @@ CREATE TABLE builds (
   start_time TIMESTAMP,
   end_time TIMESTAMP,
   status VARCHAR(30),
-  FOREIGN KEY (repo_id) REFERENCES repos(id)
+  FOREIGN KEY (repo_id) REFERENCES repos(id) ON DELETE CASCADE
 );
 --;;
 CREATE INDEX build_uuid_idx ON builds (uuid);

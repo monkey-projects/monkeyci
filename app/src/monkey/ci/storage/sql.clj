@@ -1,6 +1,7 @@
 (ns monkey.ci.storage.sql
   "Storage implementation that uses an SQL database for persistence.  This namespace provides
-   a layer on top of the entities namespace."
+   a layer on top of the entities namespace to perform the required queries whenever a 
+   document is saved or loaded."
   (:require [medley.core :as mc]
             [monkey.ci.entities
              [core :as ec]
@@ -8,6 +9,8 @@
             [monkey.ci
              [protocols :as p]
              [storage :as st]]))
+
+(def deleted? (fnil pos? 0))
 
 (defn- repo->entity
   "Converts the repository into an entity that can be sent to the database."
@@ -76,22 +79,42 @@
                 (assoc :id (str (:uuid c)))
                 (update :repos entities->repos)))]
     (when uuid
-      (some-> (ecu/customer-with-repos conn (ec/by-uuid (parse-uuid uuid)))
+      (some-> (ecu/customer-with-repos conn (ec/by-uuid uuid))
               (cust->storage)))))
+
+(defn- customer-exists? [conn uuid]
+  (some? (ec/select-customer conn (ec/by-uuid uuid))))
+
+(defn- delete-customer [conn uuid]
+  (when uuid
+    (ec/delete-customers conn (ec/by-uuid uuid))))
 
 (defn- customer? [sid]
   (= [st/global "customers"] (take 2 sid)))
+
+(defn- sid->customer-uuid [sid]
+  (some-> (nth sid 2)
+          (parse-uuid)))
 
 (defrecord SqlStorage [conn]
   p/Storage
   (read-obj [_ sid]
     (when (customer? sid)
-      (select-customer conn (nth sid 2))))
+      (select-customer conn (sid->customer-uuid sid))))
   
   (write-obj [_ sid obj]
     (when (customer? sid)
       (upsert-customer conn obj))
-    sid))
+    sid)
+
+  (obj-exists? [_ sid]
+    (when (customer? sid)
+      (customer-exists? conn (sid->customer-uuid sid))))
+
+  (delete-obj [_ sid]
+    (deleted?
+     (when (customer? sid)
+       (delete-customer conn (sid->customer-uuid sid))))))
 
 (defn make-storage [conn]
   (->SqlStorage conn))

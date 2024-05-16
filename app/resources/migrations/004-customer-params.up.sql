@@ -5,7 +5,7 @@ CREATE TABLE customer_params (
   `name` VARCHAR(100) NOT NULL,
   `value` VARCHAR(1000) NOT NULL,
   description VARCHAR(300),
-  FOREIGN KEY (customer_id) REFERENCES customers(id)
+  FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
 );
 --;;
 CREATE INDEX params_uuid_idx ON customer_params (uuid);

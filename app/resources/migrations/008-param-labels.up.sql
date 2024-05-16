@@ -3,7 +3,7 @@ CREATE TABLE param_labels (
   param_id INTEGER NOT NULL,
   `name` VARCHAR(100),
   `value` VARCHAR(100),
-  FOREIGN KEY (param_id) REFERENCES customer_params(id)
+  FOREIGN KEY (param_id) REFERENCES customer_params(id) ON DELETE CASCADE
 );
 --;;
 CREATE INDEX param_labels_param_id_idx ON param_labels (param_id);

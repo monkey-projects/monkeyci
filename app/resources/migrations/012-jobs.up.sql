@@ -7,7 +7,7 @@ CREATE TABLE jobs (
   start_time TIMESTAMP,
   end_time TIMESTAMP,
   status VARCHAR(30),
-  FOREIGN KEY (build_id) REFERENCES builds(id)
+  FOREIGN KEY (build_id) REFERENCES builds(id) ON DELETE CASCADE
 );
 --;;
 CREATE INDEX job_uuid_idx ON jobs (uuid);
