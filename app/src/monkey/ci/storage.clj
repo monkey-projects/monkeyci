@@ -137,17 +137,19 @@
        (update-obj s (watched-sid github-id) (fnil conj []) (ext-repo-sid repo-sid))
        repo-sid))))
 
-(defn unwatch-github-repo
+(def unwatch-github-repo
   "Removes the records to stop watching the repo.  The entity will still 
    exist, so any past builds can be looked up."
-  [s sid]
-  (when-let [repo (find-repo s sid)]
-    (when-let [gid (:github-id repo)]
-      ;; Remove it from the list of watched repos for the stored github id
-      (update-obj s (watched-sid gid) (comp vec (partial remove (partial = sid))))
-      ;; Clear github id
-      (update-repo s sid dissoc :github-id)
-      true)))
+  (override-or
+   [:watched-github-repos :unwatch]
+   (fn [s sid]
+     (when-let [repo (find-repo s sid)]
+       (when-let [gid (:github-id repo)]
+         ;; Remove it from the list of watched repos for the stored github id
+         (update-obj s (watched-sid gid) (comp vec (partial remove (partial = sid))))
+         ;; Clear github id
+         (update-repo s sid dissoc :github-id)
+         true)))))
 
 (def webhook-sid (partial global-sid :webhooks))
 

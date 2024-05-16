@@ -144,10 +144,19 @@
     (let [r (ec/insert-repo conn (repo->entity repo (:id cust)))]
       (sid/->sid [customer-id (:display-id r)]))))
 
+(defn unwatch-github-repo [{:keys [conn]} [customer-id repo-id]]
+  ;; TODO Use a single query with join
+  (= 1 (when-let [cust (ec/select-customer conn (ec/by-uuid (parse-uuid customer-id)))]
+         (when-let [repo (ec/select-repo conn [:and
+                                               [:= :customer-id (:id cust)]
+                                               [:= :display-id repo-id]])]
+           (ec/update-repo conn (assoc repo :github-id nil))))))
+
 (def overrides
   {:watched-github-repos
    {:find select-watched-github-repos
-    :watch watch-github-repo}})
+    :watch watch-github-repo
+    :unwatch unwatch-github-repo}})
 
 (defn make-storage [conn]
   (map->SqlStorage {:conn conn

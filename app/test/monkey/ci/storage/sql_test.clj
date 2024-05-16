@@ -80,4 +80,6 @@
               (is (= repo (st/find-repo s repo-sid)))
               (is (= [repo] (st/find-watched-github-repos s github-id)))))
 
-          (testing "can unwatch"))))))
+          (testing "can unwatch"
+            (is (true? (st/unwatch-github-repo s [(:id cust) (:id repo)])))
+            (is (empty? (st/find-watched-github-repos s github-id)))))))))
