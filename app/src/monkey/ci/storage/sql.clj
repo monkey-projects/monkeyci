@@ -8,6 +8,7 @@
              [customer :as ecu]]
             [monkey.ci
              [protocols :as p]
+             [sid :as sid]
              [storage :as st]]))
 
 (def deleted? (fnil pos? 0))
@@ -16,17 +17,22 @@
   "Converts the repository into an entity that can be sent to the database."
   [r cust-id]
   (-> r
+      (select-keys [:name :url :main-branch :github-id])
       (dissoc :id)
       (assoc :display-id (:id r)
              :customer-id cust-id)))
 
 (defn- entity->repo
-  "Converts the repo entity (a db record) into a repository."
-  [re]
-  (-> re
-      (dissoc :uuid :customer-id :display-id)
-      (assoc :id (:display-id re))
-      (as-> x (mc/filter-vals some? x))))
+  "Converts the repo entity (a db record) into a repository.  If `f` is provided,
+   it is invoked to allow some processing on the resulting object."
+  [re & [f]]
+  (cond->
+      (-> re
+          (dissoc :uuid :customer-id :display-id)
+          (assoc :id (:display-id re))
+          ;; Drop nil properties
+          (as-> x (mc/filter-vals some? x)))
+    f (f re)))
 
 (defn- insert-repo [conn re]
   (ec/insert-repo conn re))
@@ -94,6 +100,7 @@
 
 (defn- sid->customer-uuid [sid]
   (some-> (nth sid 2)
+          ;; This assumes the id in the sid is a uuid
           (parse-uuid)))
 
 (defrecord SqlStorage [conn]
@@ -116,5 +123,32 @@
      (when (customer? sid)
        (delete-customer conn (sid->customer-uuid sid))))))
 
+(defn select-watched-github-repos [{:keys [conn]} github-id]
+  (let [matches (ec/select-repos conn [:= :github-id github-id])
+        ;; Select all customer records for the repos
+        customers (->> matches
+                       (map :customer-id)
+                       (distinct)
+                       (vector :in :id)
+                       (ec/select-customers conn)
+                       (group-by :id)
+                       (mc/map-vals first))
+        add-cust-uuid (fn [r e]
+                        (assoc r :customer-id (str (get-in customers [(:customer-id e) :uuid]))))
+        convert (fn [e]
+                  (entity->repo e add-cust-uuid))]
+    (map convert matches)))
+
+(defn watch-github-repo [{:keys [conn]} {:keys [customer-id] :as repo}]
+  (when-let [cust (ec/select-customer conn (ec/by-uuid (parse-uuid customer-id)))]
+    (let [r (ec/insert-repo conn (repo->entity repo (:id cust)))]
+      (sid/->sid [customer-id (:display-id r)]))))
+
+(def overrides
+  {:watched-github-repos
+   {:find select-watched-github-repos
+    :watch watch-github-repo}})
+
 (defn make-storage [conn]
-  (->SqlStorage conn))
+  (map->SqlStorage {:conn conn
+                    :overrides overrides}))

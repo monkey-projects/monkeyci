@@ -6,6 +6,7 @@ CREATE TABLE repos (
   name VARCHAR(200) NOT NULL,
   url VARCHAR(300),
   main_branch VARCHAR(100),
+  github_id INTEGER,
   FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
 );
 --;;
