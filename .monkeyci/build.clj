@@ -78,11 +78,11 @@
 
 (def app-junit-artifact
   {:id "app-junit"
-   :path "junit.xml"})
+   :path "app/junit.xml"})
 
 (def app-coverage-artifact
   {:id "app-coverage"
-   :path "target/coverage"})
+   :path "app/target/coverage"})
 
 (defn test-app [ctx]
   (when (build-app? ctx)
