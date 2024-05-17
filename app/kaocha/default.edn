@@ -1,0 +1,3 @@
+{:omit-system-out? true
+ :ignore ["\\.#*.clj"]
+ :fail-fast? true}

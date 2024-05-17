@@ -1,4 +1,2 @@
 #kaocha/v1
-{:omit-system-out? true
- :ignore ["\\.#*.clj"]
- :fail-fast? true}
+#include "kaocha/default.edn"

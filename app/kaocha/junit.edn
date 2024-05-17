@@ -1,0 +1,8 @@
+#kaocha/v1
+#meta-merge
+[#include "default.edn"
+ {:tests [{:id :unit
+           :skip-meta [:zmq :docker :mysql :integration]}]
+  :kaocha/plugins [:kaocha.plugin/junit-xml
+                   :kaocha.plugin/profiling]
+  :kaocha.plugin.junit-xml/target-file "junit.xml"}]

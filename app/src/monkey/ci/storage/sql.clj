@@ -52,7 +52,8 @@
     (ec/update-repo-label conn l)))
 
 (defn- delete-repo-labels [conn labels]
-  (ec/delete-repo-labels conn [:in :id (map :id labels)]))
+  (when-not (empty? labels)
+    (ec/delete-repo-labels conn [:in :id (map :id labels)])))
 
 (defn- sync-repo-labels [conn labels re]
   {:pre [(some? (:id re))]}

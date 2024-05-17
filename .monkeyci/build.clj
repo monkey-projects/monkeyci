@@ -76,9 +76,19 @@
     :caches [{:id "mvn-local-repo"
               :path "m2"}]}))
 
+(def junit-junit-artifact
+  {:id "app-junit"
+   :path "junit.xml"})
+
+(def app-coverage-artifact
+  {:id "app-coverage"
+   :path "target/coverage"})
+
 (defn test-app [ctx]
   (when (build-app? ctx)
-    (clj-container "test-app" "app" "-M:test:junit")))
+    (-> (clj-container "test-app" "app" "-M:test:junit:coverage")
+        (assoc :save-artifacts [app-junit-artifact
+                                app-coverage-artifact]))))
 
 (def uberjar-artifact
   {:id "uberjar"

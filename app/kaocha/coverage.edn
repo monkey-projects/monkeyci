@@ -1,0 +1,9 @@
+#kaocha/v1
+#meta-merge
+[#include "junit.edn"
+ {:kaocha/plugins ^:append [:kaocha.plugin/cloverage]
+  :kaocha.plugin.junit-xml/target-file "junit.xml"
+  :cloverage/opts
+  {:ns-exclude-regex [".*repl" ".*-test"]
+   :ns-regex ["monkey.ci.*"]
+   :emma-xml? true}}]
