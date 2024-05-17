@@ -9,12 +9,13 @@
              [config :as c]
              [protocols :as p]
              [runtime :as rt]
+             [sid :as sid]
              [utils :as u]]
             [monkey.ci.storage.cached :as cached])
   (:import [java.io File PushbackReader]))
 
-(def sid? vector?)
-(def ->sid vec)
+(def sid? sid/sid?)
+(def ->sid sid/->sid)
 
 (def new-id
   "Generates a new random id"
@@ -66,6 +67,15 @@
   (cond-> (make-storage conf)
     (not= :memory (get-in conf [:storage :type])) (cached/->CachedStorage (make-memory-storage))))
 
+(defn- override-or
+  "Invokes the override function in the storage at given path, or calls the
+   fallback function.  This is used by storage implementations to override the
+   default behaviour, for performance reasons."
+  [ovr-path fallback]
+  (fn [s & args]
+    (let [h (get-in s (concat [:overrides] ovr-path) fallback)]
+      (apply h s args))))
+
 ;;; Higher level functions
 
 (defn- update-obj
@@ -86,53 +96,67 @@
 (defn find-customer [s id]
   (p/read-obj s (customer-sid id)))
 
-(defn save-repo
+(def save-repo
   "Saves the repository by updating the customer it belongs to"
-  [s {:keys [customer-id id] :as r}]
-  (-> (update-obj s (customer-sid customer-id) assoc-in [:repos id] r)
-      ;; Return repo sid
-      (conj id)))
+  (override-or
+   [:repo :save]
+   (fn [s {:keys [customer-id id] :as r}]
+     (-> (update-obj s (customer-sid customer-id) assoc-in [:repos id] r)
+         ;; Return repo sid
+         (conj id)))))
 
-(defn find-repo
+(def find-repo
   "Reads the repo, as part of the customer object's projects"
-  [s [cust-id id]]
-  (some-> (find-customer s cust-id)
-          (get-in [:repos id])))
+  (override-or
+   [:repo :find]
+   (fn 
+     [s [cust-id id]]
+     (some-> (find-customer s cust-id)
+             (get-in [:repos id])
+             (assoc :customer-id cust-id)))))
 
-(defn update-repo
+(def update-repo
   "Applies `f` to the repo with given sid"
-  [s [cust-id repo-id] f & args]
-  (apply update-obj s (customer-sid cust-id) update-in [:repos repo-id] f args))
+  (override-or
+   [:repo :update]
+   (fn [s [cust-id repo-id] f & args]
+     (apply update-obj s (customer-sid cust-id) update-in [:repos repo-id] f args))))
 
 (def ext-repo-sid (partial take-last 2))
 (def watched-sid (comp (partial global-sid :watched) str))
 
-(defn find-watched-github-repos
+(def find-watched-github-repos
   "Looks up all watched repos with the given github id"
-  [s github-id]
-  (->> (p/read-obj s (watched-sid github-id))
-       (map (partial find-repo s))))
+  (override-or
+   [:watched-github-repos :find]
+   (fn [s github-id]
+     (->> (p/read-obj s (watched-sid github-id))
+          (map (partial find-repo s))))))
 
-(defn watch-github-repo
+(def watch-github-repo
   "Creates necessary records to start watching a github repo.  Creates the
    repo entity and returns it."
-  [s {:keys [customer-id id github-id] :as r}]
-  (let [repo-sid (save-repo s r)]
-    ;; Add the repo sid to the list of watched repos for the github id
-    (update-obj s (watched-sid github-id) (fnil conj []) (ext-repo-sid repo-sid))
-    repo-sid))
+  (override-or
+   [:watched-github-repos :watch]
+   (fn [s {:keys [customer-id id github-id] :as r}]
+     (let [repo-sid (save-repo s r)]
+       ;; Add the repo sid to the list of watched repos for the github id
+       (update-obj s (watched-sid github-id) (fnil conj []) (ext-repo-sid repo-sid))
+       repo-sid))))
 
-(defn unwatch-github-repo
+(def unwatch-github-repo
   "Removes the records to stop watching the repo.  The entity will still 
    exist, so any past builds can be looked up."
-  [s sid]
-  (when-let [repo (find-repo s sid)]
-    (when-let [gid (:github-id repo)]
-      ;; Remove it from the list of watched repos for the stored github id
-      (update-obj s (watched-sid gid) (comp vec (partial remove (partial = sid))))
-      ;; Clear github id
-      (update-repo s sid dissoc :github-id)
-      true)))
+  (override-or
+   [:watched-github-repos :unwatch]
+   (fn [s sid]
+     (when-let [repo (find-repo s sid)]
+       (when-let [gid (:github-id repo)]
+         ;; Remove it from the list of watched repos for the stored github id
+         (update-obj s (watched-sid gid) (comp vec (partial remove (partial = sid))))
+         ;; Clear github id
+         (update-repo s sid dissoc :github-id)
+         true)))))
 
 (def webhook-sid (partial global-sid :webhooks))
 
@@ -250,4 +274,5 @@
   (p/write-obj s (user->sid u) u))
 
 (defn find-user [s id]
-  (p/read-obj s (user-sid id)))
+  (when id
+    (p/read-obj s (user-sid id))))

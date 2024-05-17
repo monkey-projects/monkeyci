@@ -10,7 +10,7 @@
 
 ;; Version assigned when building main branch
 ;; TODO Determine automatically
-(def snapshot-version "0.5.3-SNAPSHOT")
+(def snapshot-version "0.5.4-SNAPSHOT")
 
 (defn git-ref [ctx]
   (get-in ctx [:build :git :ref]))
@@ -34,12 +34,10 @@
   (some-fn main-branch? release?))
 
 (defn app-changed? [ctx]
-  #_(core/touched? ctx #"^app/.*")
-  true)
+  (core/touched? ctx #"^app/.*"))
 
 (defn gui-changed? [ctx]
-  #_(core/touched? ctx #"^gui/.*")
-  true)
+  (core/touched? ctx #"^gui/.*"))
 
 (def build-app? (some-fn app-changed? release?))
 (def build-gui? (some-fn gui-changed? release?))
@@ -78,9 +76,19 @@
     :caches [{:id "mvn-local-repo"
               :path "m2"}]}))
 
+(def app-junit-artifact
+  {:id "app-junit"
+   :path "junit.xml"})
+
+(def app-coverage-artifact
+  {:id "app-coverage"
+   :path "target/coverage"})
+
 (defn test-app [ctx]
   (when (build-app? ctx)
-    (clj-container "test-app" "app" "-M:test:junit")))
+    (-> (clj-container "test-app" "app" "-M:test:junit:coverage")
+        (assoc :save-artifacts [app-junit-artifact
+                                app-coverage-artifact]))))
 
 (def uberjar-artifact
   {:id "uberjar"

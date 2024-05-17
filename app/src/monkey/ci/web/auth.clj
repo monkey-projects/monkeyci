@@ -13,6 +13,7 @@
             [java-time.api :as jt]
             [monkey.ci
              [runtime :as rt]
+             [sid :as sid]
              [storage :as st]
              [utils :as u]]
             [monkey.ci.web.common :as c]
@@ -124,7 +125,7 @@
 
 (defmethod resolve-token role-user [{:keys [storage]} {:keys [sub] :as token}]
   (when (and (not (expired? token))  sub)
-    (let [id (u/parse-sid sub)]
+    (let [id (sid/parse-sid sub)]
       (when (= 2 (count id))
         (log/debug "Looking up user with id" id)
         (some-> (st/find-user storage id)
@@ -133,7 +134,7 @@
 (defmethod resolve-token role-build [{:keys [storage]} {:keys [sub] :as token}]
   (when-not (expired? token)
     (when-let [build (some->> sub
-                              (u/parse-sid)
+                              (sid/parse-sid)
                               (st/find-build storage))]
       (assoc build :customers #{(:customer-id build)}))))
 

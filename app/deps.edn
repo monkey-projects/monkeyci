@@ -64,8 +64,9 @@
   {:extra-paths [:test-paths]
    :extra-deps {com.monkeyprojects/build {:mvn/version "0.2.0"}
                 com.github.oliyh/martian-test {:mvn/version "0.1.26"}
+                com.h2database/h2 {:mvn/version "2.2.224"}
                 http-kit.fake/http-kit.fake {:mvn/version "0.2.2"}
-                org.hsqldb/hsqldb {:mvn/version "2.7.2"}
+                org.clojure/test.check {:mvn/version "0.9.0"}
                 ring/ring-mock {:mvn/version "0.4.0"}}
    :exec-fn monkey.test/all
    ;; Add this to avoid falling back to the default logger
@@ -74,25 +75,14 @@
   :junit ; Use this in conjunction with :test
   {:extra-deps {lambdaisland/kaocha-junit-xml {:mvn/version "1.17.101"}}
    :main-opts ["-m" "kaocha.runner"
-               "--plugin" "kaocha.plugin/junit-xml"
-               ;; Plugin added for timing
-               "--plugin" "kaocha.plugin/profiling"
-               "--junit-xml-file" "junit.xml"
-               ;; Skip zmq tests, they tend to block
-               "--skip-meta" ":zmq"
-               ;; Skip docker integration tests, they require access to the socket
-               "--skip-meta" ":docker"
-               ;; Skip mysql tests until we can set up test services
-               "--skip-meta" ":mysql"
-               ;; Skip integration tests, they are too slow (for now)
-               "--skip-meta" ":integration"]
+               "-c" "kaocha/junit.edn"]
    ;; Add this to avoid falling back to the default logger
    :jvm-opts ["-Dlogback.configurationFile=resources/logback.xml"]}
 
   :coverage
-  {:exec-fn monkey.test/coverage
-   :exec-args {:ns-regex ["monkey.ci.*"]
-               :ns-exclude-regex [".*repl" ".*-test"]}}
+  {:extra-deps {lambdaisland/kaocha-cloverage {:mvn/version "1.1.89"}}
+   :main-opts ["-m" "kaocha.runner"
+               "-c" "kaocha/coverage.edn"]}
 
   :watch ; Use in combination with :test, watches for changes
   {:extra-deps {org.clojure/tools.namespace {:mvn/version "1.5.0"}}

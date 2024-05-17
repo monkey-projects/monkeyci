@@ -6,6 +6,10 @@ CREATE TABLE repos (
   name VARCHAR(200) NOT NULL,
   url VARCHAR(300),
   main_branch VARCHAR(100),
-  INDEX repo_uuid_idx (uuid),
-  FOREIGN KEY (customer_id) REFERENCES customers(id)
+  github_id INTEGER,
+  FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
 );
+--;;
+CREATE INDEX repo_uuid_idx ON repos (uuid);
+--;;
+CREATE INDEX repo_customer_id_idx ON repos (customer_id);

@@ -11,7 +11,6 @@
              [script :as script]]
             [monkey.ci.utils :as u]
             [monkey.ci.build.core :as bc]
-            [monkey.ci.web.script-api :as sa]
             [monkey.ci.helpers :as h]))
 
 (def cwd (u/cwd))
@@ -50,8 +49,7 @@
             (is (= {:socket "/tmp/test.sock"} (get-in @captured-args [:config :api])))))))))
 
 (deftest ^:slow execute-slow!
-  (let [rt {:public-api sa/local-api
-            :config {:dev-mode true}
+  (let [rt {:config {:dev-mode true}
             :logging {:maker (l/make-logger {:logging {:type :inherit}})}}]
     
     (testing "executes build script in separate process"
@@ -63,7 +61,7 @@
 
     (testing "fails when script fails"
       (is (pos? (-> {:script {:script-dir (example "failing")}
-                                   :build-id (u/new-build-id)}
+                     :build-id (u/new-build-id)}
                     (sut/execute! rt)
                     deref
                     :exit))))
@@ -73,11 +71,6 @@
                                         {:script {:script-dir (example "non-existing")}}
                                         rt))))))
 
-(defrecord TestServer []
-  org.httpkit.server.IHttpServer
-  (-server-stop! [s opts]
-    (future nil)))
-
 (deftype FakeProcess [exitValue])
 
 (deftest execute!
@@ -86,10 +79,7 @@
                                (do
                                  (when (fn? exit-fn)
                                    (exit-fn {:proc (->FakeProcess 1234)
-                                             :args args}))))
-                  sa/start-server (fn [& args]
-                                    (reset! server-started? true)
-                                    (->TestServer))]
+                                             :args args}))))]
 
       (testing "returns deferred"
         (is (md/deferred? (sut/execute!

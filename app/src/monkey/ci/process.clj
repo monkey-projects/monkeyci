@@ -26,9 +26,7 @@
             [monkey.ci.events.core]
             [monkey.ci.storage.file]
             [monkey.ci.storage.oci]
-            [monkey.ci.web
-             [auth :as auth]
-             [script-api :as script-api]]
+            [monkey.ci.web.auth :as auth]
             [monkey.socket-async.uds :as uds]))
 
 (def default-script-config

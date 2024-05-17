@@ -502,7 +502,7 @@
               (is (= 202 (-> (mock/request :post (str path "/trigger"))
                              (app)
                              :status)))
-              (is (not-empty @runner-args))
+              (is (not= :timeout (h/wait-until #(not-empty @runner-args) 1000)))
               (is (= "http://test-url"
                      (-> @runner-args :git :url))))
             {:runner runner})))

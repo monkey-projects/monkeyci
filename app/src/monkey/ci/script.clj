@@ -244,8 +244,10 @@
   "Loads a script from a directory and executes it.  The script is executed in 
    this same process."
   [rt]
-  (let [build-id (build/get-build-id rt)
-        script-dir (build/rt->script-dir rt)]
+  (let [build (rt/build rt)
+        build-id (build/build-id build)
+        script-dir (build/script-dir build)]
+    ;; TODO Replace the runtime with a specific context when passing it to a job
     (log/debug "Executing script for build" build-id "at:" script-dir)
     (log/debug "Build map:" (:build rt))
     (try 
@@ -258,7 +260,7 @@
         (let [msg ((some-fn (comp ex-message ex-cause)
                             ex-message) ex)]
           (rt/post-events rt [(-> (base-event rt :script/end)
-                                  (assoc :script (-> rt rt/build build/script)
+                                  (assoc :script (build/script build)
                                          :message msg))])
           (assoc bc/failure
                  :message msg

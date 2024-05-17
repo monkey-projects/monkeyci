@@ -1,9 +1,9 @@
 (ns monkey.ci.entities.core
   "Core functionality for database entities.  Allows to store/retrieve basic entities."
-  (:require [cheshire.core :as json]
-            [honey.sql :as h]
+  (:require [honey.sql :as h]
             [honey.sql.helpers :as hh]
             [medley.core :as mc]
+            [monkey.ci.edn :as edn]
             [monkey.ci.entities.types]
             [next.jdbc :as jdbc]
             [next.jdbc
@@ -18,15 +18,36 @@
 
 (def insert-opts (assoc default-opts :return-keys true))
 
-(defn insert-entity [{:keys [ds sql-opts]} table rec]
-  (->> (jdbc/execute-one! ds
-                          (h/format {:insert-into table
-                                     :columns (keys rec)
-                                     :values [(vals rec)]}
-                                    sql-opts)
-                          insert-opts)
-       :generated-key
-       (assoc rec :id)))
+(def extract-id (some-fn :generated-key :id))
+
+(defn insert-entities
+  "Batch inserts multiple entities at once.  The records are assumed to
+   be vectors of values."
+  [{:keys [ds sql-opts]} table cols recs]
+  (->> (jdbc/execute! ds
+                      (h/format {:insert-into table
+                                 :columns cols
+                                 :values recs}
+                                sql-opts)
+                      insert-opts)
+       (map extract-id)
+       (zipmap recs)
+       (map (fn [[r id]]
+              (-> (zipmap cols r)
+                  (assoc :id id))))))
+
+(defn insert-entity [{:keys [ds sql-opts] :as conn} table rec]
+  ;; Both work, maybe the first is a little bit more efficient.
+  #_(->> (jdbc/execute-one! ds
+                            (h/format {:insert-into table
+                                       :columns (keys rec)
+                                       :values [(vals rec)]}
+                                      sql-opts)
+                            insert-opts)
+         extract-id
+         (assoc rec :id))
+  (-> (insert-entities conn table (keys rec) [(vals rec)])
+      (first)))
 
 (def update-opts default-opts)
 
@@ -78,16 +99,20 @@
   [n opts extra-opts]
   (let [pl (str (name n) "s")
         default-opts {:before-insert identity
+                      :after-insert  identity
                       :before-update identity
-                      :after-select identity}
-        [bi bu as] (map #(maybe-comp % extra-opts opts default-opts)
-                        [:before-insert :before-update :after-select])]
+                      :after-update  identity
+                      :after-select  identity}
+        [bi ai bu au as] (map #(maybe-comp % extra-opts opts default-opts)
+                              [:before-insert :after-insert
+                               :before-update :after-update
+                               :after-select])]
     (intern *ns* (symbol (str "insert-" (name n)))
             (fn [conn e]
-              (insert-entity conn (keyword pl) (bi e))))
+              (first (ai [(insert-entity conn (keyword pl) (bi e)) e]))))
     (intern *ns* (symbol (str "update-" (name n)))
             (fn [conn e]
-              (update-entity conn (keyword pl) (bu e))))
+              (first (au [(update-entity conn (keyword pl) (bu e)) e]))))
     (intern *ns* (symbol (str "delete-" pl))
             (fn [conn f]
               (delete-entities conn (keyword pl) f)))
@@ -125,6 +150,9 @@
 (defn by-repo [id]
   [:= :repo-id id])
 
+(defn by-build [id]
+  [:= :build-id id])
+
 (defn by-ssh-key [id]
   [:= :ssh-key-id id])
 
@@ -133,6 +161,9 @@
 
 (defn by-user [id]
   [:= :user-id id])
+
+(defn by-display-id [id]
+  [:= :display-id id])
 
 ;;; Basic entities
 
@@ -143,19 +174,69 @@
 (defentity ssh-key)
 (defentity user)
 
-(defn jobs->json [b]
-  (mc/update-existing b :jobs json/generate-string))
+(defn- or-nil [f]
+  (fn [x]
+    (when x
+      (f x))))
 
-(defn json->jobs [b]
-  (mc/update-existing b :jobs #(json/parse-string % keyword)))
+(defn- time->int [k x]
+  (mc/update-existing x k (or-nil (memfn getTime))))
 
-(defentity build {:before-insert jobs->json
-                  :before-update jobs->json
-                  :after-select  json->jobs})
+(defn- int->time [k x]
+  (mc/update-existing x k (or-nil #(java.sql.Timestamp. %))))
+
+(def start-time->int (partial time->int :start-time))
+(def int->start-time (partial int->time :start-time))
+
+(def end-time->int (partial time->int :start-time))
+(def int->end-time (partial int->time :end-time))
+
+(defn- status->str [x]
+  (mc/update-existing x :status name))
+
+(defn- str->status [x]
+  (mc/update-existing x :status keyword))
+
+(def prepare-timed (comp status->str int->start-time int->end-time))
+;; Seems like timestamps are read as long?
+(def convert-timed #_(comp str->status start-time->int end-time->int) str->status)
+
+(defentity build {:before-insert prepare-timed
+                  :after-insert  convert-timed
+                  :before-update prepare-timed
+                  :after-update  convert-timed
+                  :after-select  convert-timed})
+
+(defn- details->edn [b]
+  (mc/update-existing b :details edn/->edn))
+
+(defn- details->job [[r e]]
+  [(assoc r :details (:details e)) e])
+
+(defn- edn->details [b]
+  (mc/update-existing b :details edn/edn->))
+
+(def prepare-job (comp details->edn prepare-timed))
+(def convert-job (comp details->job convert-timed))
+(def convert-job-select (comp edn->details convert-timed))
+
+(defentity job {:before-insert prepare-job
+                :after-insert  convert-job
+                :before-update prepare-job
+                :after-update  convert-job
+                :after-select  convert-job-select})
 
 ;;; Aggregate entities
 
 (defaggregate repo-label)
+
+(defn insert-repo-labels
+  "Batch inserts multiple labels at once"
+  [conn labels]
+  (->> labels
+       (map (juxt :repo-id :name :value))
+       (insert-entities conn :repo-labels [:repo-id :name :value])))
+
 (defaggregate param-label)
 (defaggregate ssh-key-label)
 (defaggregate user-customer)
