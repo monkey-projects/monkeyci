@@ -193,12 +193,12 @@
 
   (obj-exists? [_ sid]
     (when (customer? sid)
-      (customer-exists? conn (sid->customer-uuid sid))))
+      (customer-exists? conn (global-sid->uuid sid))))
 
   (delete-obj [_ sid]
     (deleted?
      (when (customer? sid)
-       (delete-customer conn (sid->customer-uuid sid))))))
+       (delete-customer conn (global-sid->uuid sid))))))
 
 (defn select-watched-github-repos [{:keys [conn]} github-id]
   (let [matches (ec/select-repos conn [:= :github-id github-id])
