@@ -11,5 +11,7 @@
   (cond-> s
     (string? s) (cs/split #"/")))
 
+(def serialize-sid (partial cs/join "/"))
+
 (defn sid->repo-sid [s]
   (take 2 s))

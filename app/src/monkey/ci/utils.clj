@@ -146,7 +146,7 @@
 (def ^:deprecated parse-sid sid/parse-sid)
 (def ^:deprecated sid->repo-sid sid/sid->repo-sid)
 
-(def serialize-sid (partial cs/join "/"))
+(def ^:deprecated serialize-sid sid/serialize-sid)
 
 (defn prop-pred
   "Returns a fn that is a predicate to match property `p` with value `v`"
