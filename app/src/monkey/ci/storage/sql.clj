@@ -6,7 +6,8 @@
             [medley.core :as mc]
             [monkey.ci.entities
              [core :as ec]
-             [customer :as ecu]]
+             [customer :as ecu]
+             [webhook :as ewh]]
             [monkey.ci
              [labels :as lbl]
              [protocols :as p]
@@ -166,13 +167,10 @@
     (insert-webhook conn wh)))
 
 (defn- select-webhook [conn uuid]
-  (when-let [we (ec/select-webhook conn (ec/by-uuid uuid))]
-    (let [repo (ec/select-repo conn (ec/by-id (:repo-id we)))
-          cust (ec/select-customer conn (ec/by-id (:customer-id repo)))]
-      {:id (str (:uuid we))
-       :secret-key (:secret we)
-       :repo-id (:display-id repo)
-       :customer-id (str (:uuid cust))})))
+  (-> (ewh/select-webhook-as-entity conn uuid)
+      (first)
+      (update :id str)
+      (update :customer-id str)))
 
 (defrecord SqlStorage [conn]
   p/Storage

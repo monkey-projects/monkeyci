@@ -67,15 +67,17 @@
 
 (def select-opts default-opts)
 
+(defn select
+  "Formats and executes the given query"
+  [{:keys [ds sql-opts]} query]
+  (jdbc/execute! ds (h/format query sql-opts) select-opts))
+
 (defn select-entities
   "Selects entity from table using filter"
-  [{:keys [ds sql-opts]} table f]
-  (jdbc/execute! ds
-                 (h/format {:select :*
-                            :from [table]
-                            :where f}
-                           sql-opts)
-                 select-opts))
+  [conn table f]
+  (select conn {:select :*
+                :from [table]
+                :where f}))
 
 (defn select-entity [conn table f]
   (first (select-entities conn table f)))
