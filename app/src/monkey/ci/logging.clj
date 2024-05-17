@@ -23,6 +23,10 @@
 
 (defmulti make-logger (comp :type :logging))
 
+;; Note that inherit logger redirects output to the stdout of the parent,
+;; which is not necessarily the same as the log output.  For example, logging
+;; to Loki does not capture stdout, only the log appender sends to Loki.
+;; This makes the inherit logger not very useful.
 (deftype InheritLogger []
   LogCapturer
   (log-output [_]
@@ -35,6 +39,18 @@
   (fn [& _]
     (->InheritLogger)))
 
+(deftype StringLogger []
+  LogCapturer
+  (log-output [_]
+    :string)
+
+  (handle-stream [_ _]
+    nil))
+
+(defmethod make-logger :string [_]
+  (fn [& _]
+    (->StringLogger)))
+
 (defmethod make-logger :default [_]
   (fn [& _]
     (->InheritLogger)))
@@ -42,6 +58,7 @@
 (deftype FileLogger [conf rt path]
   LogCapturer
   (log-output [_]
+    ;; FIXME Refactor to separate build from rt
     (let [f (apply io/file
                    (or (:dir conf) (io/file (:work-dir rt) "logs"))
                    (concat (drop-last (b/get-sid rt)) path))]

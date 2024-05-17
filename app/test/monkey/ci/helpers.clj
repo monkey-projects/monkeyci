@@ -4,6 +4,7 @@
             [clojure.java.io :as io]
             [clojure.core.async :as ca]
             [cheshire.core :as json]
+            [clojure.string :as cs]
             [manifold.deferred :as md]
             [monkey.ci
              [blob :as blob]
@@ -170,3 +171,13 @@
     (String.
      (.. (java.util.Base64/getDecoder)
          (decode x)))))
+
+(defn parse-token-payload
+  "Given an API JWT token, extracts and parses the payload.  This does
+   not verify the signature."
+  [token]
+  (-> token
+      (cs/split #"\.")
+      (second)
+      (base64->)
+      (parse-json)))

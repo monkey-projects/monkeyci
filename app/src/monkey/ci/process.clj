@@ -125,6 +125,11 @@
   (let [id (get-in rt [:build :build-id])]
     ((log-maker rt) rt [id (str (name type) ".log")])))
 
+(defn- out->str [x]
+  (if (instance? java.io.InputStream x)
+    (slurp x)
+    x))
+
 (defn execute!
   "Executes the build script located in given directory.  This actually runs the
    clojure cli with a generated `build` alias.  This expects absolute directories.
@@ -132,7 +137,8 @@
   [{:keys [checkout-dir build-id] :as build} rt]
   (log/info "Executing build process for" build-id "in" checkout-dir)
   (let [script-dir (b/script-dir build)
-        [out err :as loggers] (map (partial make-logger rt) [:out :err])
+        ;; FIXME Loggers still require the build in the runtime, refactor this
+        [out err :as loggers] (map (partial make-logger (assoc rt :build build)) [:out :err])
         result (md/deferred)
         cmd ["clojure"
              "-Sdeps" (pr-str (generate-deps build rt))
@@ -145,9 +151,13 @@
           :out (l/log-output out)
           :err (l/log-output err)
           :cmd cmd
-          :exit-fn (fn [{:keys [proc] :as p}]
+          :exit-fn (fn [{:keys [proc out err] :as p}]
                      (let [exit (or (some-> proc (.exitValue)) 0)]
                        (log/debug "Script process exited with code" exit ", cleaning up")
+                       (when out
+                         (log/debug "Process output:" (out->str out)))
+                       (when err
+                         (log/warn "Process error output:" (out->str err)))
                        (md/success! result {:process p
                                             :exit exit})))})
         ;; Depending on settings, some process streams need handling

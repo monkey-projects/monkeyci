@@ -24,17 +24,17 @@
 (def role-user "user")
 (def role-build "build")
 
-(defn user-token
-  "Creates token contents for an authenticated user"
-  [user-sid]
-  {:role role-user
-   :sub (sid/serialize-sid user-sid)})
+(defn- make-token [role sid]
+  {:role role
+   :sub (sid/serialize-sid sid)})
 
-(defn build-token
+(def user-token
+  "Creates token contents for an authenticated user"
+  (partial make-token role-user))
+
+(def build-token
   "Creates token contents for a build, to be used by a build script."
-  [build-sid]
-  {:role role-build
-   :sub (sid/serialize-sid build-sid)})
+  (partial make-token role-build))
 
 (defn generate-secret-key
   "Generates a random secret key object"

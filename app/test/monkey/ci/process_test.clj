@@ -8,7 +8,8 @@
              [logging :as l]
              [containers]
              [process :as sut]
-             [script :as script]]
+             [script :as script]
+             [sid :as sid]]
             [monkey.ci.utils :as u]
             [monkey.ci.build.core :as bc]
             [monkey.ci.helpers :as h]))
@@ -155,8 +156,16 @@
       (is (= "value" (:config-key e)))))
 
   (testing "adds api token"
-    (is (some? (-> (sut/rt->config {} (h/test-rt))
-                   (get-in [:api :token])))))
+    (is (not-empty (-> (sut/rt->config {} (h/test-rt))
+                       (get-in [:api :token])))))
+
+  (testing "api token contains build sid in sub"
+    (let [sid (repeatedly 3 (comp str random-uuid))
+          build {:sid sid}
+          payload (-> (sut/rt->config build (h/test-rt))
+                      (get-in [:api :token])
+                      (h/parse-token-payload))]
+      (is (= (sid/serialize-sid sid) (:sub payload)))))
 
   (testing "no token if no jwk keys configured"
     (is (nil? (-> (sut/rt->config {} {})

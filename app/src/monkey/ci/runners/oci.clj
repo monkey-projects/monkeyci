@@ -45,8 +45,8 @@
 (defn- add-api-token
   "Generates a new API token that can be used by the build runner to invoke
    certain API calls."
-  [rt conf]
-  (assoc-in conf [:api :token] (auth/generate-jwt-from-rt rt (auth/build-token (b/get-sid rt)))))
+  [build rt conf]
+  (assoc-in conf [:api :token] (auth/generate-jwt-from-rt rt (auth/build-token (b/sid build)))))
 
 (defn- rt->config [build rt]
   (->> (-> (rt/rt->config rt)
@@ -57,7 +57,7 @@
        (prepare-config-for-oci)
        (add-ssh-keys-dir build)
        (add-log-config-path rt)
-       (add-api-token rt)))
+       (add-api-token build rt)))
 
 (defn- ->edn [build rt]
   (-> (rt->config build rt)

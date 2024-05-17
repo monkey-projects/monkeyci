@@ -8,6 +8,7 @@
              [config :as mc]
              [oci :as oci]
              [runners :as r]
+             [sid :as sid]
              [utils :as u]]
             [monkey.ci.events.core :as ec]
             [monkey.ci.runners.oci :as sut]
@@ -126,7 +127,17 @@
               (is (= :child (get-in parsed [:runner :type]))))
             
             (testing "adds api token"
-              (is (not-empty (get-in parsed [:api :token]))))))))
+              (is (not-empty (get-in parsed [:api :token]))))
+
+            (testing "api token contains serialized build sid in sub"
+              (is (= (sid/serialize-sid (:sid build))
+                     (-> parsed
+                         (get-in [:api :token])
+                         (h/parse-token-payload)
+                         :sub))))
+
+            (testing "adds build sid"
+              (is (= (:sid build) (get-in parsed [:build :sid]))))))))
 
     (testing "ssh keys"
       (testing "adds as volume"
