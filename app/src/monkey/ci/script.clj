@@ -14,12 +14,14 @@
              [extensions :as ext]
              [jobs :as j]
              [runtime :as rt]
+             [spec :as s]
              [utils :as u]]
             [monkey.ci.containers
              [docker]
              [oci]
              [podman]]
-            [monkey.ci.events.core :as ec])
+            [monkey.ci.events.core :as ec]
+            [monkey.ci.spec.build :as sb])
   (:import java.nio.channels.SocketChannel
            [java.net UnixDomainSocketAddress StandardProtocolFamily]))
 
@@ -243,13 +245,15 @@
 (defn exec-script!
   "Loads a script from a directory and executes it.  The script is executed in 
    this same process."
-  [rt]
-  (let [build (rt/build rt)
+  [rt+build]
+  (let [build (rt/build rt+build)
+        rt rt+build ; TODO Remove build from runtime
         build-id (build/build-id build)
         script-dir (build/script-dir build)]
+    (s/valid? ::sb/build build)
     ;; TODO Replace the runtime with a specific context when passing it to a job
     (log/debug "Executing script for build" build-id "at:" script-dir)
-    (log/debug "Build map:" (:build rt))
+    (log/debug "Build map:" build)
     (try 
       (let [jobs (load-jobs rt)]
         (log/trace "Jobs:" jobs)

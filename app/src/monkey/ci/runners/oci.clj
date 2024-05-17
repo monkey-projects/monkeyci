@@ -11,8 +11,10 @@
              [oci :as oci]
              [runners :as r]
              [runtime :as rt]
+             [spec :as s]
              [utils :as u]]
             [monkey.ci.events.core :as ec]
+            [monkey.ci.spec.build :as sb]
             [monkey.ci.web.auth :as auth]
             [monkey.oci.container-instance.core :as ci]))
 
@@ -173,6 +175,7 @@
   "Runs the build script as an OCI container instance.  Returns a deferred with
    the container exit code."
   [client conf build rt]
+  (s/valid? ::sb/build build)
   (-> (oci/run-instance client (instance-config conf build rt)
                         {:delete? true
                          :exited? (fn [id]
