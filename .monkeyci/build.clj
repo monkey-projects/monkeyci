@@ -76,7 +76,7 @@
     :caches [{:id "mvn-local-repo"
               :path "m2"}]}))
 
-(def junit-junit-artifact
+(def app-junit-artifact
   {:id "app-junit"
    :path "junit.xml"})
 
