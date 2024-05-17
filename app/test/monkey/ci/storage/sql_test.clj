@@ -1,17 +1,27 @@
 (ns monkey.ci.storage.sql-test
   (:require [clojure.test :refer [deftest testing is]]
+            [clojure.spec.alpha :as spec]
+            [clojure.spec.gen.alpha :as gen]
             [monkey.ci.entities.helpers :as eh]
             [monkey.ci
              [protocols :as p]
              [sid :as sid]
              [storage :as st]]
             [monkey.ci.entities.core :as ec]
+            [monkey.ci.spec.entities :as se]
             [monkey.ci.storage.sql :as sut]))
 
 (defn- gen-cust []
   (let [id (st/new-id)]
     {:id id
      :name (str "Test customer " id)}))
+
+(defn- gen-repo []
+  (gen/generate (spec/gen :entity/repo)))
+
+(defn- gen-webhook []
+  (-> (gen/generate (spec/gen :entity/webhook))
+      (assoc :id (st/new-id))))
 
 (deftest ^:sql sql-storage
   (eh/with-prepared-db conn
@@ -114,5 +124,22 @@
 
           (testing "can unwatch"
             (is (true? (st/unwatch-github-repo s [(:id cust) (:id repo)])))
-            (is (empty? (st/find-watched-github-repos s github-id)))))))))
+            (is (empty? (st/find-watched-github-repos s github-id))))))
 
+      #_(testing "ssh keys"
+          (letfn [(gen-ssh-key []
+                    {})]
+            (testing "can create and retrieve")))
+
+      (testing "webhooks"
+        (let [cust (gen-cust)
+              repo (-> (gen-repo)
+                       (assoc :customer-id (:id cust)))
+              wh (-> (gen-webhook)
+                     (assoc :customer-id (:id cust)
+                            :repo-id (:id repo)))]
+          (is (some? (st/save-customer s (assoc-in cust [:repos (:id repo)] repo))))
+          
+          (testing "can create and retrieve"
+            (is (sid/sid? (st/save-webhook-details s wh)))
+            (is (= wh (st/find-details-for-webhook s (:id wh))))))))))

@@ -11,14 +11,17 @@
              [labels :as lbl]
              [protocols :as p]
              [sid :as sid]
-             [storage :as st]]))
+             [spec :as spec]
+             [storage :as st]]
+            [monkey.ci.spec.db-entities]
+            [monkey.ci.spec.entities]))
 
 (def deleted? (fnil pos? 0))
 
-(defn- entity->labels [labels]
+(defn- db->labels [labels]
   (map #(select-keys % [:name :value]) labels))
 
-(defn- repo->entity
+(defn- repo->db
   "Converts the repository into an entity that can be sent to the database."
   [r cust-id]
   (-> r
@@ -27,7 +30,7 @@
       (assoc :display-id (:id r)
              :customer-id cust-id)))
 
-(defn- entity->repo
+(defn- db->repo
   "Converts the repo entity (a db record) into a repository.  If `f` is provided,
    it is invoked to allow some processing on the resulting object."
   [re & [f]]
@@ -36,7 +39,7 @@
       (-> re
           (dissoc :uuid :customer-id :display-id)
           (assoc :id (:display-id re))
-          (mc/update-existing :labels entity->labels)
+          (mc/update-existing :labels db->labels)
           ;; Drop nil properties
           (as-> x (mc/filter-vals some? x)))
       f (f re)))
@@ -74,7 +77,9 @@
       (sync-repo-labels conn (:labels repo) re))))
 
 (defn- upsert-repo [conn repo cust-id]
-  (let [re (repo->entity repo cust-id)]
+  (spec/valid? :entity/repo repo)
+  (let [re (repo->db repo cust-id)]
+    (spec/valid? :db/repo re)
     (if-let [existing (ec/select-repo conn [:and
                                             (ec/by-customer cust-id)
                                             (ec/by-display-id (:id repo))])]
@@ -85,22 +90,24 @@
   (doseq [[id r] repos]
     (upsert-repo conn r cust-id)))
 
-(defn- cust->entity [cust]
+(defn- cust->db [cust]
   (-> cust
       (select-keys [:name])
       (assoc :uuid (parse-uuid (:id cust)))))
 
 (defn- insert-customer [conn cust]
-  (let [cust-id (:id (ec/insert-customer conn (cust->entity cust)))]
+  (let [cust-id (:id (ec/insert-customer conn (cust->db cust)))]
     (upsert-repos conn cust cust-id)))
 
 (defn- update-customer [conn cust existing]
-  (let [ce (cust->entity cust)]
+  (let [ce (cust->db cust)]
+    (spec/valid? :db/customer ce)
     (when (not= ce existing)
       (ec/update-customer conn (merge existing ce)))
     (upsert-repos conn cust (:id existing))))
 
 (defn- upsert-customer [conn cust]
+  (spec/valid? :entity/customer cust)
   (if-let [existing (ec/select-customer conn (ec/by-uuid (parse-uuid (:id cust))))]
     (update-customer conn cust existing)
     (insert-customer conn cust)))
@@ -108,17 +115,17 @@
 (defn- select-customer [conn uuid]
   (letfn [(entities->repos [repos]
             (reduce-kv (fn [r _ v]
-                         (assoc r (:display-id v) (entity->repo v)))
+                         (assoc r (:display-id v) (db->repo v)))
                        {}
                        repos))
-          (entity->cust [c]
+          (db->cust [c]
             (-> c
                 (dissoc :uuid)
                 (assoc :id (str (:uuid c)))
                 (update :repos entities->repos)))]
     (when uuid
       (some-> (ecu/customer-with-repos conn (ec/by-uuid uuid))
-              (entity->cust)))))
+              (db->cust)))))
 
 (defn- customer-exists? [conn uuid]
   (some? (ec/select-customer conn (ec/by-uuid uuid))))
@@ -127,23 +134,61 @@
   (when uuid
     (ec/delete-customers conn (ec/by-uuid uuid))))
 
-(defn- customer? [sid]
-  (= [st/global "customers"] (take 2 sid)))
+(defn- global-sid? [type sid]
+  (= [st/global (name type)] (take 2 sid)))
 
-(defn- sid->customer-uuid [sid]
+(def customer? (partial global-sid? :customers))
+(def webhook? (partial global-sid? :webhooks))
+
+(defn- global-sid->uuid [sid]
   (some-> (nth sid 2)
           ;; This assumes the id in the sid is a uuid
           (parse-uuid)))
 
+(defn- insert-webhook [conn wh]
+  (if-let [cust (ec/select-customer conn (ec/by-uuid (parse-uuid (:customer-id wh))))]
+    (if-let [repo (ec/select-repo conn [:and
+                                        (ec/by-display-id (:repo-id wh))
+                                        (ec/by-customer (:id cust))])]
+      (let [we {:uuid (parse-uuid (:id wh))
+                :repo-id (:id repo)
+                :secret (:secret-key wh)}]
+        (ec/insert-webhook conn we))
+      (throw (ex-info "Repository does not exist" wh)))
+    (throw (ex-info "Customer does not exist" wh))))
+
+(defn- update-webhook [conn wh existing])
+
+(defn- upsert-webhook [conn wh]
+  (spec/valid? :entity/webhook wh)
+  (if-let [existing (ec/select-webhook conn (ec/by-uuid (parse-uuid (:id wh))))]
+    (update-webhook conn wh existing)
+    (insert-webhook conn wh)))
+
+(defn- select-webhook [conn uuid]
+  (when-let [we (ec/select-webhook conn (ec/by-uuid uuid))]
+    (let [repo (ec/select-repo conn (ec/by-id (:repo-id we)))
+          cust (ec/select-customer conn (ec/by-id (:customer-id repo)))]
+      {:id (str (:uuid we))
+       :secret-key (:secret we)
+       :repo-id (:display-id repo)
+       :customer-id (str (:uuid cust))})))
+
 (defrecord SqlStorage [conn]
   p/Storage
   (read-obj [_ sid]
-    (when (customer? sid)
-      (select-customer conn (sid->customer-uuid sid))))
+    (cond
+      (customer? sid)
+      (select-customer conn (global-sid->uuid sid))
+      (webhook? sid)
+      (select-webhook conn (global-sid->uuid sid))))
   
   (write-obj [_ sid obj]
-    (when (customer? sid)
-      (upsert-customer conn obj))
+    (cond
+      (customer? sid)
+      (upsert-customer conn obj)
+      (webhook? sid)
+      (upsert-webhook conn obj))
     sid)
 
   (obj-exists? [_ sid]
@@ -168,12 +213,12 @@
         add-cust-uuid (fn [r e]
                         (assoc r :customer-id (str (get-in customers [(:customer-id e) :uuid]))))
         convert (fn [e]
-                  (entity->repo e add-cust-uuid))]
+                  (db->repo e add-cust-uuid))]
     (map convert matches)))
 
 (defn watch-github-repo [{:keys [conn]} {:keys [customer-id] :as repo}]
   (when-let [cust (ec/select-customer conn (ec/by-uuid (parse-uuid customer-id)))]
-    (let [r (ec/insert-repo conn (repo->entity repo (:id cust)))]
+    (let [r (ec/insert-repo conn (repo->db repo (:id cust)))]
       (sid/->sid [customer-id (:display-id r)]))))
 
 (defn unwatch-github-repo [{:keys [conn]} [customer-id repo-id]]
