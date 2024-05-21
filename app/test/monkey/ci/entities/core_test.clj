@@ -24,31 +24,31 @@
                          :c)))))))
 
 (defn gen-customer []
-  (gen/generate (s/gen :entity/customer)))
+  (gen/generate (s/gen :db/customer)))
 
 (defn gen-repo []
-  (gen/generate (s/gen :entity/repo)))
+  (gen/generate (s/gen :db/repo)))
 
 (defn gen-build []
-  (gen/generate (s/gen :entity/build)))
+  (gen/generate (s/gen :db/build)))
 
 (defn gen-job []
-  (gen/generate (s/gen :entity/job)))
+  (gen/generate (s/gen :db/job)))
 
 (deftest ^:sql customer-entities
   (eh/with-prepared-db conn
     (let [cust (gen-customer)
           r (sut/insert-customer conn cust)]
       (testing "can insert"
-        (is (some? (:uuid r)))
+        (is (some? (:cuid r)))
         (is (number? (:id r)))
         (is (= cust (select-keys r (keys cust)))))
 
       (testing "can select by id"
         (is (= r (sut/select-customer conn (sut/by-id (:id r))))))
 
-      (testing "can select by uuid"
-        (is (= r (sut/select-customer conn (sut/by-uuid (:uuid r))))))
+      (testing "can select by cuid"
+        (is (= r (sut/select-customer conn (sut/by-cuid (:cuid r))))))
 
       (testing "can update"
         (is (= 1 (sut/update-customer conn (assoc r :name "updated"))))
@@ -66,7 +66,7 @@
           r (sut/insert-repo conn (-> (gen-repo)
                                       (assoc :customer-id (:id cust))))]
       (testing "can insert"
-        (is (some? (:uuid r)))
+        (is (some? (:cuid r)))
         (is (number? (:id r)))
         (is (some? (:name r))))
 
@@ -74,8 +74,8 @@
         (is (= r (-> (sut/select-repo conn (sut/by-id (:id r)))
                      (select-keys (keys r))))))
 
-      (testing "can select by uuid"
-        (is (= r (-> (sut/select-repo conn (sut/by-uuid (:uuid r)))
+      (testing "can select by cuid"
+        (is (= r (-> (sut/select-repo conn (sut/by-cuid (:cuid r)))
                      (select-keys (keys r))))))
 
       (testing "can update"
@@ -301,8 +301,8 @@
       (testing "can insert"
         (is (number? (:id user))))
 
-      (testing "can select by uuid"
-        (is (= user (sut/select-user conn (sut/by-uuid (:uuid user))))))
+      (testing "can select by cuid"
+        (is (= user (sut/select-user conn (sut/by-cuid (:cuid user))))))
 
       (testing "can link to customer"
         (is (some? (sut/insert-user-customer conn {:user-id (:id user)

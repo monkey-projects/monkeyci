@@ -1,6 +1,6 @@
 CREATE TABLE jobs (
   id INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  uuid BINARY(16) NOT NULL,
+  cuid CHAR(24) NOT NULL,
   display_id VARCHAR(100) NOT NULL,
   build_id INTEGER NOT NULL,
   details MEDIUMTEXT,
@@ -10,7 +10,7 @@ CREATE TABLE jobs (
   FOREIGN KEY (build_id) REFERENCES builds(id) ON DELETE CASCADE
 );
 --;;
-CREATE INDEX job_uuid_idx ON jobs (uuid);
+CREATE INDEX job_cuid_idx ON jobs (cuid);
 --;;
 CREATE INDEX job_build_id_idx ON jobs (build_id);
 --;;

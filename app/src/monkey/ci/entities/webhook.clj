@@ -5,17 +5,17 @@
 
 (defn select-webhook-as-entity
   "Select the necessary properties for a webhook to return it as an entity."
-  [conn uuid]
+  [conn cuid]
   (ec/select conn
-             {:select [[:c.uuid :customer-id]
+             {:select [[:c.cuid :customer-id]
                        [:r.display-id :repo-id]
-                       [:w.uuid :id]
+                       [:w.cuid :id]
                        [:w.secret :secret-key]]
               :from [[:customers :c]
                      [:repos :r]
                      [:webhooks :w]]
               :where [:and
-                      [:= :w.uuid uuid]
+                      [:= :w.cuid cuid]
                       [:= :r.id :w.repo-id]
                       [:= :c.id :r.customer-id]]}))
 

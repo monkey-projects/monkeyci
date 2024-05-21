@@ -3,16 +3,18 @@
   (:require [honey.sql :as h]
             [honey.sql.helpers :as hh]
             [medley.core :as mc]
-            [monkey.ci.edn :as edn]
+            [monkey.ci
+             [cuid :as cuid]
+             [edn :as edn]]
             [monkey.ci.entities.types]
             [next.jdbc :as jdbc]
             [next.jdbc
              [result-set :as rs]
              [sql :as sql]]))
 
-(defn- maybe-set-uuid [x]
+(defn- maybe-set-cuid [x]
   (cond-> x
-    (nil? (:uuid x)) (assoc :uuid (random-uuid))))
+    (nil? (:cuid x)) (assoc :cuid (cuid/random-cuid))))
 
 (def default-opts {:builder-fn rs/as-unqualified-kebab-maps})
 
@@ -130,11 +132,11 @@
 (defmacro defentity
   "Declares functions that can be used to fetch or manipulate a basic entity in db."
   [n & [opts]]
-  `(declare-entity-cruds ~(str n) {:before-insert maybe-set-uuid} ~opts))
+  `(declare-entity-cruds ~(str n) {:before-insert maybe-set-cuid} ~opts))
 
 (defmacro defaggregate
   "Declares functions that are used to fetch or manipulate entities that depend on
-   others (i.e. that do not have their own uuid)."
+   others (i.e. that do not have their own cuid)."
   [n & [opts]]
   `(declare-entity-cruds ~(str n) {} ~opts))
 
@@ -143,8 +145,8 @@
 (defn by-id [id]
   [:= :id id])
 
-(defn by-uuid [uuid]
-  [:= :uuid uuid])
+(defn by-cuid [cuid]
+  [:= :cuid cuid])
 
 (defn by-customer [id]
   [:= :customer-id id])

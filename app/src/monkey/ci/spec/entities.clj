@@ -5,9 +5,8 @@
              [build]
              [common :as c]]))
 
-(def id? c/id?)
-
-(s/def :entity/id id?)
+(s/def :entity/id ::c/cuid)
+(s/def :display/id string?)
 
 (s/def :github/secret string?)
 (s/def :entity/name string?)
@@ -26,16 +25,15 @@
   (-> (s/keys :req-un [:entity/name])
       (s/merge :entity/common)))
 
-(s/def :entity/customer-id id?)
+(s/def :entity/customer-id ::c/cuid)
 (s/def :entity/github-id int?)
 
 (s/def :entity/repo
-  (-> (s/keys :req-un [:entity/customer-id :entity/name]
-              :opt-un [:git/url :git/main-branch :entity/github-id])
-      (s/merge :entity/common)))
+  (s/keys :req-un [:entity/customer-id :entity/name :display/id]
+          :opt-un [:git/url :git/main-branch :entity/github-id]))
 
-(s/def :entity/repo-id id?)
-(s/def :entity/build-id id?)
+(s/def :entity/repo-id ::c/cuid)
+(s/def :entity/build-id ::c/cuid)
 (s/def :entity/idx int?)
 
 (s/def :entity/build
@@ -44,7 +42,7 @@
       (s/merge :entity/timed)))
 
 (s/def :entity/job
-  (-> (s/keys :req-un [:entity/id]
+  (-> (s/keys :req-un [:display/id]
               :opt-un [:job/status])
       (s/merge :entity/timed)))
 

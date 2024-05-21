@@ -10,6 +10,6 @@
   [conn f]
   (when-let [cust (ec/select-customer conn f)]
     (->> (r/repos-with-labels conn (ec/by-customer (:id cust)))
-         (group-by :uuid)
+         (group-by :cuid)
          (mc/map-vals first)
          (assoc cust :repos))))

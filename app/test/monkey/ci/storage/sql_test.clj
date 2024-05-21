@@ -4,6 +4,7 @@
             [clojure.spec.gen.alpha :as gen]
             [monkey.ci.entities.helpers :as eh]
             [monkey.ci
+             [cuid :as cuid]
              [protocols :as p]
              [sid :as sid]
              [storage :as st]]
@@ -20,8 +21,7 @@
   (gen/generate (spec/gen :entity/repo)))
 
 (defn- gen-webhook []
-  (-> (gen/generate (spec/gen :entity/webhook))
-      (assoc :id (st/new-id))))
+  (gen/generate (spec/gen :entity/webhook)))
 
 (deftest ^:sql sql-storage
   (eh/with-prepared-db conn
@@ -31,7 +31,7 @@
           (let [cust (gen-cust)]
             (is (sid/sid? (st/save-customer s cust)))
             (is (= 1 (count (ec/select-customers conn [:is :id [:not nil]]))))
-            (is (some? (ec/select-customer conn (ec/by-uuid (parse-uuid (:id cust))))))
+            (is (some? (ec/select-customer conn (ec/by-cuid (:id cust)))))
             (is (= (assoc cust :repos {})
                    (st/find-customer s (:id cust))))))
 
@@ -63,14 +63,22 @@
       (testing "repos"
         (let [repo {:name "test repo"
                     :id "test-repo"}
-              lbl (str "test-label-" (random-uuid))
+              lbl (str "test-label-" (cuid/random-cuid))
               cust (-> (gen-cust)
                        (assoc-in [:repos (:id repo)] repo))
               sid [(:id cust) (:id repo)]]
-          (testing "can find by sid"
+          
+          (testing "saved with customer"
             (is (sid/sid? (st/save-customer s cust)))
             (is (= (assoc repo :customer-id (:id cust))
                    (st/find-repo s sid))))
+
+          (testing "saved with `save-repo`"
+            (let [r (assoc repo :customer-id (:id cust))
+                  sid (vec (take-last 2 (st/save-repo s r)))]
+              (is (sid/sid? sid))
+              (is (= [(:id cust) (:id repo)] sid))
+              (is (= r (st/find-repo s sid)))))
 
           (testing "can add labels"
             (let [labels [{:name lbl
@@ -95,13 +103,14 @@
           (testing "creates labels on new repo"
             (let [labels [{:name "test-label"
                            :value "test value"}]
-                  _ (st/save-repo s {:name "new repo"
-                                     :id "new-repo"
-                                     :customer-id (:id cust)
-                                     :labels labels})
+                  saved-sid (st/save-repo s {:name "new repo"
+                                             :id "new-repo"
+                                             :customer-id (:id cust)
+                                             :labels labels})
                   sid [(:id cust) "new-repo"]]
-              (is (sid/sid? sid))
+              (is (= sid (take-last 2 saved-sid)))
               (is (= 1 (count (ec/select-repo-labels conn [:= :name "test-label"]))))
+              (is (= "new-repo" (get-in (st/find-customer s (:id cust)) [:repos "new-repo" :id])))
               (let [repo (st/find-repo s sid)]
                 (is (some? repo))
                 (is (= labels (:labels repo))))))))
