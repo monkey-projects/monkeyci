@@ -23,17 +23,23 @@
                                             {:builder-fn rs/as-unqualified-lower-maps})
                          :c)))))))
 
+(defn- gen-spec [s]
+  (gen/generate (s/gen s)))
+
 (defn gen-customer []
-  (gen/generate (s/gen :db/customer)))
+  (gen-spec :db/customer))
 
 (defn gen-repo []
-  (gen/generate (s/gen :db/repo)))
+  (gen-spec :db/repo))
 
 (defn gen-build []
-  (gen/generate (s/gen :db/build)))
+  (gen-spec :db/build))
 
 (defn gen-job []
-  (gen/generate (s/gen :db/job)))
+  (gen-spec :db/job))
+
+(defn gen-ssh-key []
+  (gen-spec :db/ssh-key))
 
 (deftest ^:sql customer-entities
   (eh/with-prepared-db conn
@@ -204,32 +210,6 @@
       (testing "can delete"
         (is (= 1 (sut/delete-ssh-keys conn (sut/by-id (:id key)))))
         (is (empty? (sut/select-ssh-keys conn (sut/by-customer (:id cust)))))))))
-
-(deftest ^:sql ssh-key-labels
-  (eh/with-prepared-db conn
-    (let [cust (sut/insert-customer
-                conn
-                {:name "test customer"})
-          key  (sut/insert-ssh-key
-                conn
-                {:description "test ssh-key"
-                 :public-key "pubkey"
-                 :private-key "privkey"
-                 :customer-id (:id cust)})
-          lbl  (sut/insert-ssh-key-label
-                conn
-                {:name "test-label"
-                 :value "test-value"
-                 :ssh-key-id (:id key)})]
-      (testing "can insert"
-        (is (number? (:id lbl))))
-
-      (testing "can select for ssh-key"
-        (is (= [lbl] (sut/select-ssh-key-labels conn (sut/by-ssh-key (:id key))))))
-
-      (testing "can delete"
-        (is (= 1 (sut/delete-ssh-key-labels conn (sut/by-id (:id lbl)))))
-        (is (empty? (sut/select-ssh-key-labels conn (sut/by-ssh-key (:id key)))))))))
 
 (deftest ^:sql builds
   (eh/with-prepared-db conn

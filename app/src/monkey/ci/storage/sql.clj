@@ -7,6 +7,7 @@
             [monkey.ci.entities
              [core :as ec]
              [customer :as ecu]
+             [ssh-key :as essh]
              [webhook :as ewh]]
             [monkey.ci
              [labels :as lbl]
@@ -35,7 +36,6 @@
   "Converts the repo entity (a db record) into a repository.  If `f` is provided,
    it is invoked to allow some processing on the resulting object."
   [re & [f]]
-  (log/debug "Converting repo:" re)
   (cond->
       (-> re
           (dissoc :cuid :customer-id :display-id)
@@ -62,13 +62,13 @@
 (defn- sync-repo-labels [conn labels re]
   {:pre [(some? (:id re))]}
   (let [ex (ec/select-repo-labels conn (ec/by-repo (:id re)))
-        {:keys [insert update delete]} (lbl/reconcile-labels ex labels)]
+        {:keys [insert update delete] :as r} (lbl/reconcile-labels ex labels)]
+    (log/debug "Reconciled labels" labels "into" r)
     (insert-repo-labels conn insert re)
     (update-repo-labels conn update)
     (delete-repo-labels conn delete)))
 
 (defn- insert-repo [conn re repo]
-  (log/debug "Inserting repository:" re)
   (let [re (ec/insert-repo conn re)]
     (insert-repo-labels conn (:labels repo) re)))
 
@@ -171,6 +171,31 @@
       (update :id str)
       (update :customer-id str)))
 
+(defn- ssh-key? [sid]
+  (and (= 2 (count sid))
+       (= "ssh-keys" (first sid))))
+
+(defn- insert-ssh-key [conn ssh-key]
+  (when-let [cust (ec/select-customer conn (ec/by-cuid (:customer-id ssh-key)))]
+    ;; TODO Label filters
+    (ec/insert-ssh-key conn (-> ssh-key
+                                (assoc :customer-id (:id cust))
+                                (dissoc :label-filters)))))
+
+(defn- update-ssh-key [conn ssh-key existing]
+  ;; TODO Label filters
+  (ec/update-ssh-key conn (merge existing (dissoc ssh-key :customer-id :label-filters))))
+
+(defn- upsert-ssh-key [conn ssh-key]
+  (spec/valid? :entity/ssh-key ssh-key)
+  (if-let [existing (ec/select-ssh-key conn (ec/by-cuid (:id ssh-key)))]
+    (update-ssh-key conn ssh-key existing)
+    (insert-ssh-key conn ssh-key)))
+
+(defn- select-ssh-keys [conn customer-id]
+  ;; TODO Label filters
+  (essh/select-ssh-keys-as-entity conn customer-id))
+
 (defrecord SqlStorage [conn]
   p/Storage
   (read-obj [_ sid]
@@ -178,14 +203,18 @@
       (customer? sid)
       (select-customer conn (global-sid->cuid sid))
       (webhook? sid)
-      (select-webhook conn (global-sid->cuid sid))))
+      (select-webhook conn (global-sid->cuid sid))
+      (ssh-key? sid)
+      (select-ssh-keys conn (second sid))))
   
   (write-obj [_ sid obj]
     (cond
       (customer? sid)
       (upsert-customer conn obj)
       (webhook? sid)
-      (upsert-webhook conn obj))
+      (upsert-webhook conn obj)
+      (ssh-key? sid)
+      (upsert-ssh-key conn obj))
     sid)
 
   (obj-exists? [_ sid]

@@ -14,6 +14,7 @@
 
 (s/def :github/secret string?)
 (s/def :db/name string?)
+(s/def :db/description string?)
 
 (s/def :db/common
   (s/keys :req-un [:db/cuid]
@@ -59,3 +60,15 @@
 (s/def :db/webhook
   (-> (s/keys :req-un [:build/repo-id :github/secret])
       (s/merge :db/common)))
+
+(s/def :db/ssh-key
+  (s/keys :req-un [:db/customer-id :ssh/private-key :ssh/public-key :db/description]))
+
+(s/def :label/label string?)
+(s/def :label/value string?)
+
+(s/def :db/label-filter
+  (s/keys :req-un [:label/label :label/value]))
+
+(s/def :db/label-filter-conjunction (s/coll-of :db/label-filter))
+(s/def :db/label-filters (s/coll-of :db/label-filter-conjunction))

@@ -10,6 +10,7 @@
 
 (s/def :github/secret string?)
 (s/def :entity/name string?)
+(s/def :entity/description string?)
 
 (s/def :entity/common
   (s/keys :req-un [:entity/id]))
@@ -25,12 +26,20 @@
   (-> (s/keys :req-un [:entity/name])
       (s/merge :entity/common)))
 
+(s/def :label/name string?)
+(s/def :label/value string?)
+
+(s/def :entity/label
+  (s/keys :req-un [:label/name :label/value]))
+
+(s/def :entity/labels (s/coll-of :entity/label))
+
 (s/def :entity/customer-id ::c/cuid)
 (s/def :entity/github-id int?)
 
 (s/def :entity/repo
   (s/keys :req-un [:entity/customer-id :entity/name :display/id]
-          :opt-un [:git/url :git/main-branch :entity/github-id]))
+          :opt-un [:git/url :git/main-branch :entity/github-id :entity/labels]))
 
 (s/def :entity/repo-id ::c/cuid)
 (s/def :entity/build-id ::c/cuid)
@@ -43,7 +52,7 @@
 
 (s/def :entity/job
   (-> (s/keys :req-un [:display/id]
-              :opt-un [:job/status])
+              :opt-un [:job/status :entity/labels])
       (s/merge :entity/timed)))
 
 (s/def :entity/secret-key string?)
@@ -51,3 +60,16 @@
 (s/def :entity/webhook
   (-> (s/keys :req-un [:entity/customer-id :entity/repo-id :entity/secret-key])
       (s/merge :entity/common)))
+
+(s/def :label-filter/label string?)
+
+(s/def :entity/label-filter-conjunction
+  (s/keys :req-un [:label-filter/label :label/value]))
+
+(s/def :entity/label-filters (s/coll-of :entity/label-filter-conjunction))
+
+(s/def :ssh/private-key string?)
+(s/def :ssh/public-key string?)
+
+(s/def :entity/ssh-key
+  (s/keys :req-un [:ssh/private-key :ssh/public-key :entity/description :entity/label-filters]))

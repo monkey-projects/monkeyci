@@ -243,4 +243,5 @@
 
 (defaggregate param-label)
 (defaggregate ssh-key-label)
+(defaggregate ssh-key-label-conjunction)
 (defaggregate user-customer)
