@@ -161,7 +161,7 @@
 
         (testing "can update label filters")))))
 
-(deftest webhook-entities
+(deftest ^:sql webhooks
   (with-storage conn s
     (testing "webhooks"
       (let [cust (gen-cust)

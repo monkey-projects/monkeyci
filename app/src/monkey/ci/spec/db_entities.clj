@@ -72,3 +72,12 @@
 
 (s/def :db/label-filter-conjunction (s/coll-of :db/label-filter))
 (s/def :db/label-filters (s/coll-of :db/label-filter-conjunction))
+
+(s/def :db/customer-param
+  (s/keys :req-un [:db/customer-id]
+          :opt-un [:db/label-filters :db/description]))
+
+(s/def :db/params-id id?)
+
+(s/def :db/parameter-value
+  (s/keys :req-un [:db/params-id :db/name :label/value]))

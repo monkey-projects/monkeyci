@@ -210,10 +210,10 @@
                   :after-select  convert-timed})
 
 (defn- prop->edn [prop b]
-  (mc/update-existing b prop edn/->edn))
+  (mc/update-existing b prop (or-nil edn/->edn)))
 
 (defn- edn->prop [prop b]
-  (mc/update-existing b prop edn/edn->))
+  (mc/update-existing b prop (or-nil edn/edn->)))
 
 (defn- copy-prop [prop [r e]]
   [(assoc r prop (prop e)) e])

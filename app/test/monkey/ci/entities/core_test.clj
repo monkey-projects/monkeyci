@@ -41,6 +41,12 @@
 (defn gen-ssh-key []
   (gen-spec :db/ssh-key))
 
+(defn gen-customer-param []
+  (gen-spec :db/customer-param))
+
+(defn gen-param-value []
+  (gen-spec :db/parameter-value))
+
 (deftest ^:sql customer-entities
   (eh/with-prepared-db conn
     (let [cust (gen-customer)
@@ -124,13 +130,10 @@
   (eh/with-prepared-db conn
     (let [cust  (sut/insert-customer
                  conn
-                 {:name "test customer"})
+                 (gen-customer))
           param (sut/insert-customer-param
                  conn
-                 {:description "Test parameter"
-                  :customer-id (:id cust)
-                  :label-filters [[{:label "test-filter"
-                                    :value "test value"}]]})]
+                 (assoc (gen-customer-param) :customer-id (:id cust)))]
       (testing "can insert"
         (is (number? (:id param))))
 
@@ -141,11 +144,32 @@
         (is (= 1 (sut/delete-customer-params conn (sut/by-id (:id param)))))
         (is (empty? (sut/select-customer-params conn (sut/by-customer (:id cust)))))))))
 
+(deftest ^:sql customer-param-values
+  (eh/with-prepared-db conn
+    (let [cust  (sut/insert-customer
+                 conn
+                 (gen-customer))
+          param (sut/insert-customer-param
+                 conn
+                 (assoc (gen-customer-param) :customer-id (:id cust)))
+          value (sut/insert-customer-param-value
+                 conn
+                 (assoc (gen-param-value) :params-id (:id param)))]
+      (testing "can insert"
+        (is (number? (:id value))))
+
+      (testing "can select for param"
+        (is (= [value] (sut/select-customer-param-values conn [:= :params-id (:id param)]))))
+
+      (testing "can delete"
+        (is (= 1 (sut/delete-customer-param-values conn (sut/by-id (:id value)))))
+        (is (nil? (sut/select-customer-param-value conn (sut/by-id (:id value)))))))))
+
 (deftest ^:sql webhooks
   (eh/with-prepared-db conn
     (let [cust (sut/insert-customer
                 conn
-                {:name "test customer"})
+                (gen-customer))
           repo (sut/insert-repo
                 conn
                 {:name "test repo"
@@ -169,15 +193,10 @@
   (eh/with-prepared-db conn
     (let [cust (sut/insert-customer
                 conn
-                {:name "test customer"})
+                (gen-customer))
           key  (sut/insert-ssh-key
                 conn
-                {:description "test key"
-                 :public-key "pubkey"
-                 :private-key "privkey"
-                 :customer-id (:id cust)
-                 :label-filters [[{:label "test-label"
-                                   :value "test-value"}]]})]
+                (assoc (gen-ssh-key) :customer-id (:id cust)))]
       (testing "can insert"
         (is (number? (:id key))))
 
