@@ -14,7 +14,7 @@
                                                   :display-id (str "repo-" %)
                                                   :name (str "repo-" %)}))
                        (doall))
-            match (sut/customer-with-repos conn (c/by-uuid (:uuid cust)))]
+            match (sut/customer-with-repos conn (c/by-cuid (:cuid cust)))]
         (is (some? match))
         (is (= (:id cust) (:id match)))
         (is (map? (:repos match)))

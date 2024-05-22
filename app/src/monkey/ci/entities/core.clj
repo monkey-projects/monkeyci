@@ -3,16 +3,18 @@
   (:require [honey.sql :as h]
             [honey.sql.helpers :as hh]
             [medley.core :as mc]
-            [monkey.ci.edn :as edn]
+            [monkey.ci
+             [cuid :as cuid]
+             [edn :as edn]]
             [monkey.ci.entities.types]
             [next.jdbc :as jdbc]
             [next.jdbc
              [result-set :as rs]
              [sql :as sql]]))
 
-(defn- maybe-set-uuid [x]
+(defn- maybe-set-cuid [x]
   (cond-> x
-    (nil? (:uuid x)) (assoc :uuid (random-uuid))))
+    (nil? (:cuid x)) (assoc :cuid (cuid/random-cuid))))
 
 (def default-opts {:builder-fn rs/as-unqualified-kebab-maps})
 
@@ -67,15 +69,17 @@
 
 (def select-opts default-opts)
 
+(defn select
+  "Formats and executes the given query"
+  [{:keys [ds sql-opts]} query]
+  (jdbc/execute! ds (h/format query sql-opts) select-opts))
+
 (defn select-entities
   "Selects entity from table using filter"
-  [{:keys [ds sql-opts]} table f]
-  (jdbc/execute! ds
-                 (h/format {:select :*
-                            :from [table]
-                            :where f}
-                           sql-opts)
-                 select-opts))
+  [conn table f]
+  (select conn {:select :*
+                :from [table]
+                :where f}))
 
 (defn select-entity [conn table f]
   (first (select-entities conn table f)))
@@ -112,7 +116,9 @@
               (first (ai [(insert-entity conn (keyword pl) (bi e)) e]))))
     (intern *ns* (symbol (str "update-" (name n)))
             (fn [conn e]
-              (first (au [(update-entity conn (keyword pl) (bu e)) e]))))
+              (let [upd (bu e)]
+                (when (pos? (update-entity conn (keyword pl) upd))
+                  (first (au [upd e]))))))
     (intern *ns* (symbol (str "delete-" pl))
             (fn [conn f]
               (delete-entities conn (keyword pl) f)))
@@ -128,11 +134,11 @@
 (defmacro defentity
   "Declares functions that can be used to fetch or manipulate a basic entity in db."
   [n & [opts]]
-  `(declare-entity-cruds ~(str n) {:before-insert maybe-set-uuid} ~opts))
+  `(declare-entity-cruds ~(str n) {:before-insert maybe-set-cuid} ~opts))
 
 (defmacro defaggregate
   "Declares functions that are used to fetch or manipulate entities that depend on
-   others (i.e. that do not have their own uuid)."
+   others (i.e. that do not have their own cuid)."
   [n & [opts]]
   `(declare-entity-cruds ~(str n) {} ~opts))
 
@@ -141,8 +147,8 @@
 (defn by-id [id]
   [:= :id id])
 
-(defn by-uuid [uuid]
-  [:= :uuid uuid])
+(defn by-cuid [cuid]
+  [:= :cuid cuid])
 
 (defn by-customer [id]
   [:= :customer-id id])
@@ -156,8 +162,8 @@
 (defn by-ssh-key [id]
   [:= :ssh-key-id id])
 
-(defn by-param [id]
-  [:= :param-id id])
+(defn by-params [id]
+  [:= :params-id id])
 
 (defn by-user [id]
   [:= :user-id id])
@@ -169,9 +175,7 @@
 
 (defentity customer)
 (defentity repo)
-(defentity customer-param)
 (defentity webhook)
-(defentity ssh-key)
 (defentity user)
 
 (defn- or-nil [f]
@@ -198,8 +202,8 @@
   (mc/update-existing x :status keyword))
 
 (def prepare-timed (comp status->str int->start-time int->end-time))
-;; Seems like timestamps are read as long?
-(def convert-timed #_(comp str->status start-time->int end-time->int) str->status)
+;; Seems like timestamps are read as long?  So no need to convert back.
+(def convert-timed str->status)
 
 (defentity build {:before-insert prepare-timed
                   :after-insert  convert-timed
@@ -207,24 +211,48 @@
                   :after-update  convert-timed
                   :after-select  convert-timed})
 
-(defn- details->edn [b]
-  (mc/update-existing b :details edn/->edn))
+(defn- prop->edn [prop b]
+  (mc/update-existing b prop (or-nil edn/->edn)))
 
-(defn- details->job [[r e]]
-  [(assoc r :details (:details e)) e])
+(defn- edn->prop [prop b]
+  (mc/update-existing b prop (or-nil edn/edn->)))
 
-(defn- edn->details [b]
-  (mc/update-existing b :details edn/edn->))
+(defn- copy-prop [prop [r e]]
+  [(assoc r prop (prop e)) e])
+
+(def details->edn (partial prop->edn :details))
+(def edn->details (partial edn->prop :details))
+(def details->job (partial copy-prop :details))
 
 (def prepare-job (comp details->edn prepare-timed))
 (def convert-job (comp details->job convert-timed))
 (def convert-job-select (comp edn->details convert-timed))
 
-(defentity job {:before-insert prepare-job
-                :after-insert  convert-job
-                :before-update prepare-job
-                :after-update  convert-job
-                :after-select  convert-job-select})
+(defentity job
+  {:before-insert prepare-job
+   :after-insert  convert-job
+   :before-update prepare-job
+   :after-update  convert-job
+   :after-select  convert-job-select})
+
+;; For customer params and ssh keys we don't store the labels in a separate table.
+;; This to avoid lots of work on mapping to and from sql statements, and because
+;; there is no real added value: it's not possible to do a query that will retrieve
+;; all matching params or ssh keys, so we may just as well do it in code.
+
+(def prepare-label-filters (partial prop->edn :label-filters))
+(def convert-label-filters (partial copy-prop :label-filters))
+(def convert-label-filters-select (partial edn->prop :label-filters))
+
+(def label-filter-conversions
+  {:before-insert prepare-label-filters
+   :after-insert  convert-label-filters
+   :before-update prepare-label-filters
+   :after-update  convert-label-filters
+   :after-select  convert-label-filters-select})
+
+(defentity customer-param label-filter-conversions)
+(defentity ssh-key label-filter-conversions)
 
 ;;; Aggregate entities
 
@@ -237,6 +265,12 @@
        (map (juxt :repo-id :name :value))
        (insert-entities conn :repo-labels [:repo-id :name :value])))
 
-(defaggregate param-label)
-(defaggregate ssh-key-label)
 (defaggregate user-customer)
+(defaggregate customer-param-value)
+
+(defn insert-customer-param-values
+  "Batch inserts multiple parameter values at once"
+  [conn values]
+  (->> values
+       (map (juxt :params-id :name :value))
+       (insert-entities conn :customer-param-values [:params-id :name :value])))

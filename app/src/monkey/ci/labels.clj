@@ -3,7 +3,7 @@
 
 (defn matches-labels?
   "Predicate that checks if the given labels match filter `f`.  The filter
-   is a list of a list labels and values, where the first level represents a
+   is a list of a list of labels and values, where the first level represents a
    disjunction (logical 'or') and the second a conjunction (logical 'and')."
   [f labels]
   (letfn [(filter-applies? [{:keys [label value]}]

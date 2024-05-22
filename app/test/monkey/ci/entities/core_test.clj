@@ -23,39 +23,51 @@
                                             {:builder-fn rs/as-unqualified-lower-maps})
                          :c)))))))
 
+(defn- gen-spec [s]
+  (gen/generate (s/gen s)))
+
 (defn gen-customer []
-  (gen/generate (s/gen :entity/customer)))
+  (gen-spec :db/customer))
 
 (defn gen-repo []
-  (gen/generate (s/gen :entity/repo)))
+  (gen-spec :db/repo))
 
 (defn gen-build []
-  (gen/generate (s/gen :entity/build)))
+  (gen-spec :db/build))
 
 (defn gen-job []
-  (gen/generate (s/gen :entity/job)))
+  (gen-spec :db/job))
+
+(defn gen-ssh-key []
+  (gen-spec :db/ssh-key))
+
+(defn gen-customer-param []
+  (gen-spec :db/customer-param))
+
+(defn gen-param-value []
+  (gen-spec :db/parameter-value))
 
 (deftest ^:sql customer-entities
   (eh/with-prepared-db conn
     (let [cust (gen-customer)
           r (sut/insert-customer conn cust)]
       (testing "can insert"
-        (is (some? (:uuid r)))
+        (is (some? (:cuid r)))
         (is (number? (:id r)))
         (is (= cust (select-keys r (keys cust)))))
 
       (testing "can select by id"
         (is (= r (sut/select-customer conn (sut/by-id (:id r))))))
 
-      (testing "can select by uuid"
-        (is (= r (sut/select-customer conn (sut/by-uuid (:uuid r))))))
+      (testing "can select by cuid"
+        (is (= r (sut/select-customer conn (sut/by-cuid (:cuid r))))))
 
       (testing "can update"
-        (is (= 1 (sut/update-customer conn (assoc r :name "updated"))))
+        (is (some? (sut/update-customer conn (assoc r :name "updated"))))
         (is (= "updated" (:name (sut/select-customer conn (sut/by-id (:id r)))))))
 
       (testing "cannot update nonexisting"
-        (is (zero? (sut/update-customer conn {:id -1 :name "nonexisting customer"})))))
+        (is (nil? (sut/update-customer conn {:id -1 :name "nonexisting customer"})))))
 
     (testing "throws on invalid record"
       (is (thrown? Exception (sut/insert-customer conn {}))))))
@@ -66,7 +78,7 @@
           r (sut/insert-repo conn (-> (gen-repo)
                                       (assoc :customer-id (:id cust))))]
       (testing "can insert"
-        (is (some? (:uuid r)))
+        (is (some? (:cuid r)))
         (is (number? (:id r)))
         (is (some? (:name r))))
 
@@ -74,12 +86,12 @@
         (is (= r (-> (sut/select-repo conn (sut/by-id (:id r)))
                      (select-keys (keys r))))))
 
-      (testing "can select by uuid"
-        (is (= r (-> (sut/select-repo conn (sut/by-uuid (:uuid r)))
+      (testing "can select by cuid"
+        (is (= r (-> (sut/select-repo conn (sut/by-cuid (:cuid r)))
                      (select-keys (keys r))))))
 
       (testing "can update"
-        (is (= 1 (sut/update-repo conn (assoc r :name "updated"))))
+        (is (some? (sut/update-repo conn (assoc r :name "updated"))))
         (is (= "updated" (:name (sut/select-repo conn (sut/by-id (:id r))))))))
 
     (testing "throws on invalid record"
@@ -118,53 +130,47 @@
   (eh/with-prepared-db conn
     (let [cust  (sut/insert-customer
                  conn
-                 {:name "test customer"})
+                 (gen-customer))
           param (sut/insert-customer-param
                  conn
-                 {:name "test-label"
-                  :value "test-value"
-                  :description "Test parameter"
-                  :customer-id (:id cust)})]
+                 (assoc (gen-customer-param) :customer-id (:id cust)))]
       (testing "can insert"
         (is (number? (:id param))))
 
       (testing "can select for customer"
-        (is (= [param] (sut/select-customer-params conn (sut/by-customer (:id cust))))))
+        (is (= [param] (->> (sut/select-customer-params conn (sut/by-customer (:id cust)))
+                            (map #(select-keys % (keys param)))))))
 
       (testing "can delete"
         (is (= 1 (sut/delete-customer-params conn (sut/by-id (:id param)))))
         (is (empty? (sut/select-customer-params conn (sut/by-customer (:id cust)))))))))
 
-(deftest ^:sql param-labels
+(deftest ^:sql customer-param-values
   (eh/with-prepared-db conn
     (let [cust  (sut/insert-customer
                  conn
-                 {:name "test customer"})
+                 (gen-customer))
           param (sut/insert-customer-param
-                conn
-                {:name "test param"
-                 :value "test param value"
-                 :customer-id (:id cust)})
-          lbl   (sut/insert-param-label
                  conn
-                 {:name "test-label"
-                  :value "test-value"
-                  :param-id (:id param)})]
+                 (assoc (gen-customer-param) :customer-id (:id cust)))
+          value (sut/insert-customer-param-value
+                 conn
+                 (assoc (gen-param-value) :params-id (:id param)))]
       (testing "can insert"
-        (is (number? (:id lbl))))
+        (is (number? (:id value))))
 
       (testing "can select for param"
-        (is (= [lbl] (sut/select-param-labels conn (sut/by-param (:id param))))))
+        (is (= [value] (sut/select-customer-param-values conn [:= :params-id (:id param)]))))
 
       (testing "can delete"
-        (is (= 1 (sut/delete-param-labels conn (sut/by-id (:id lbl)))))
-        (is (empty? (sut/select-param-labels conn (sut/by-param (:id param)))))))))
+        (is (= 1 (sut/delete-customer-param-values conn (sut/by-id (:id value)))))
+        (is (nil? (sut/select-customer-param-value conn (sut/by-id (:id value)))))))))
 
 (deftest ^:sql webhooks
   (eh/with-prepared-db conn
     (let [cust (sut/insert-customer
                 conn
-                {:name "test customer"})
+                (gen-customer))
           repo (sut/insert-repo
                 conn
                 {:name "test repo"
@@ -188,13 +194,10 @@
   (eh/with-prepared-db conn
     (let [cust (sut/insert-customer
                 conn
-                {:name "test customer"})
+                (gen-customer))
           key  (sut/insert-ssh-key
                 conn
-                {:description "test key"
-                 :public-key "pubkey"
-                 :private-key "privkey"
-                 :customer-id (:id cust)})]
+                (assoc (gen-ssh-key) :customer-id (:id cust)))]
       (testing "can insert"
         (is (number? (:id key))))
 
@@ -204,32 +207,6 @@
       (testing "can delete"
         (is (= 1 (sut/delete-ssh-keys conn (sut/by-id (:id key)))))
         (is (empty? (sut/select-ssh-keys conn (sut/by-customer (:id cust)))))))))
-
-(deftest ^:sql ssh-key-labels
-  (eh/with-prepared-db conn
-    (let [cust (sut/insert-customer
-                conn
-                {:name "test customer"})
-          key  (sut/insert-ssh-key
-                conn
-                {:description "test ssh-key"
-                 :public-key "pubkey"
-                 :private-key "privkey"
-                 :customer-id (:id cust)})
-          lbl  (sut/insert-ssh-key-label
-                conn
-                {:name "test-label"
-                 :value "test-value"
-                 :ssh-key-id (:id key)})]
-      (testing "can insert"
-        (is (number? (:id lbl))))
-
-      (testing "can select for ssh-key"
-        (is (= [lbl] (sut/select-ssh-key-labels conn (sut/by-ssh-key (:id key))))))
-
-      (testing "can delete"
-        (is (= 1 (sut/delete-ssh-key-labels conn (sut/by-id (:id lbl)))))
-        (is (empty? (sut/select-ssh-key-labels conn (sut/by-ssh-key (:id key)))))))))
 
 (deftest ^:sql builds
   (eh/with-prepared-db conn
@@ -301,8 +278,8 @@
       (testing "can insert"
         (is (number? (:id user))))
 
-      (testing "can select by uuid"
-        (is (= user (sut/select-user conn (sut/by-uuid (:uuid user))))))
+      (testing "can select by cuid"
+        (is (= user (sut/select-user conn (sut/by-cuid (:cuid user))))))
 
       (testing "can link to customer"
         (is (some? (sut/insert-user-customer conn {:user-id (:id user)

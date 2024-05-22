@@ -24,3 +24,6 @@
   
 (defn ^:export init []
   (dc/start-devcard-ui!))
+
+(defn ^:dev/after-load reload []
+  (init))

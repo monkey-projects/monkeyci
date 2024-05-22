@@ -12,8 +12,10 @@
              [process :as p]
              [runtime :as rt]
              [script :as s]
+             [spec :as spec]
              [utils :as u]]
-            [monkey.ci.build.core :as bc]))
+            [monkey.ci.build.core :as bc]
+            [monkey.ci.spec.build :as sb]))
 
 (defn- script-not-found [build]
   (let [msg (str "No build script found at " (build/script-dir build))]
@@ -57,6 +59,7 @@
    runs the build.  Returns a deferred that resolves when the child process has
    exited."
   [build rt]
+  (spec/valid? ::sb/build build)
   (let [script-dir (build/script-dir build)]
     (rt/post-events rt {:type :build/start
                         :sid (build/sid build)

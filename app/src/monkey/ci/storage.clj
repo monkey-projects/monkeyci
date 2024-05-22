@@ -7,6 +7,7 @@
             [medley.core :as mc]
             [monkey.ci
              [config :as c]
+             [cuid :as cuid]
              [protocols :as p]
              [runtime :as rt]
              [sid :as sid]
@@ -19,7 +20,7 @@
 
 (def new-id
   "Generates a new random id"
-  (comp str random-uuid))
+  cuid/random-cuid)
 
 ;; In-memory implementation, provider for testing/development purposes.
 ;; Must be a type, not a record otherwise reitit sees it as a map.
