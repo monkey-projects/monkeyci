@@ -2,9 +2,8 @@ CREATE TABLE customer_params (
   id INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
   cuid CHAR(24) NOT NULL,
   customer_id INTEGER NOT NULL,
-  `name` VARCHAR(100) NOT NULL,
-  `value` VARCHAR(1000) NOT NULL,
   description VARCHAR(300),
+  label_filters TEXT,
   FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
 );
 --;;

@@ -175,25 +175,43 @@
   (and (= 2 (count sid))
        (= "ssh-keys" (first sid))))
 
+;; (defn- insert-ssh-label-filters [conn lk key-id]
+;;   (let [lk-entities (->> lk
+;;                          (map (constantly {:ssh-key-id key-id}))
+;;                          (ec/insert-ssh-key-labels conn))
+;;         conjunctions (map (fn [k e]
+;;                             (assoc k :label-id (:id e)))
+;;                           lk
+;;                           lk-entities)]
+;;     (ec/insert-ssh-key-label-conjunctions conn conjunctions)))
+
+;; (defn- upsert-ssh-label-filters [conn key-id]
+;;   (let [existing (essh/select-label-filter-conjunctions-for-key conn key-id)]
+;;     ))
+
 (defn- insert-ssh-key [conn ssh-key]
-  (when-let [cust (ec/select-customer conn (ec/by-cuid (:customer-id ssh-key)))]
-    ;; TODO Label filters
-    (ec/insert-ssh-key conn (-> ssh-key
-                                (assoc :customer-id (:id cust))
-                                (dissoc :label-filters)))))
+  (if-let [cust (ec/select-customer conn (ec/by-cuid (:customer-id ssh-key)))]
+    (do
+      (log/debug "Inserting new ssh key:" ssh-key)
+      (let [{:keys [id]} (ec/insert-ssh-key conn (assoc ssh-key :customer-id (:id cust)))]))
+    (throw (ex-info "Customer not found when inserting ssh key" ssh-key))))
 
 (defn- update-ssh-key [conn ssh-key existing]
-  ;; TODO Label filters
+  (log/debug "Updating existing ssh key:" existing "<-" ssh-key)
   (ec/update-ssh-key conn (merge existing (dissoc ssh-key :customer-id :label-filters))))
 
 (defn- upsert-ssh-key [conn ssh-key]
   (spec/valid? :entity/ssh-key ssh-key)
+  (log/debug "Upserting ssh key:" ssh-key)
   (if-let [existing (ec/select-ssh-key conn (ec/by-cuid (:id ssh-key)))]
     (update-ssh-key conn ssh-key existing)
     (insert-ssh-key conn ssh-key)))
 
+(defn- upsert-ssh-keys [conn ssh-keys]
+  (doseq [k ssh-keys]
+    (upsert-ssh-key conn k)))
+
 (defn- select-ssh-keys [conn customer-id]
-  ;; TODO Label filters
   (essh/select-ssh-keys-as-entity conn customer-id))
 
 (defrecord SqlStorage [conn]
@@ -214,7 +232,7 @@
       (webhook? sid)
       (upsert-webhook conn obj)
       (ssh-key? sid)
-      (upsert-ssh-key conn obj))
+      (upsert-ssh-keys conn obj))
     sid)
 
   (obj-exists? [_ sid]

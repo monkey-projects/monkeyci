@@ -63,8 +63,9 @@
 
 (s/def :label-filter/label string?)
 
-(s/def :entity/label-filter-conjunction
+(s/def :entity/label-filter
   (s/keys :req-un [:label-filter/label :label/value]))
+(s/def :entity/label-filter-conjunction (s/coll-of :entity/label-filter))
 
 (s/def :entity/label-filters (s/coll-of :entity/label-filter-conjunction))
 

@@ -3,14 +3,15 @@
             [monkey.ci.entities.core :as ec]))
 
 (defn select-ssh-keys-as-entity [conn customer-cuid]
-  (ec/select conn
-             {:select [:k.private-key
-                       :k.public-key
-                       :k.description
-                       [:c.cuid :customer-id]]
-              :from [[:ssh-keys :k]
-                     [:customers :c]]
-              :where [:and
-                      [:= :c.cuid customer-cuid]
-                      [:= :c.id :k.customer-id]]}))
-
+  (->> (ec/select conn
+                  {:select [:k.private-key
+                            :k.public-key
+                            :k.description
+                            :k.label-filters
+                            [:c.cuid :customer-id]]
+                   :from [[:ssh-keys :k]
+                          [:customers :c]]
+                   :where [:and
+                           [:= :c.cuid customer-cuid]
+                           [:= :c.id :k.customer-id]]})
+       (map ec/convert-label-filters-select)))

@@ -154,9 +154,12 @@
         (is (sid/sid? (st/save-customer s cust)))
         
         (testing "can create and retrieve"
-          (is (sid/sid? (st/save-ssh-keys s cust-id k)))
-          ;;(is (= 1 (count (ec/select-ssh-keys conn (ec/by-customer cust-id)))))
-          (is (= [k] (st/find-ssh-keys s cust-id))))))))
+          (let [ce (ec/select-customer conn (ec/by-cuid cust-id))]
+            (is (sid/sid? (st/save-ssh-keys s cust-id [k])))
+            (is (= 1 (count (ec/select-ssh-keys conn (ec/by-customer (:id ce))))))
+            (is (= [k] (st/find-ssh-keys s cust-id)))))
+
+        (testing "can update label filters")))))
 
 (deftest webhook-entities
   (with-storage conn s

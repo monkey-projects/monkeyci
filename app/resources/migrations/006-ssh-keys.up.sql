@@ -3,8 +3,9 @@ CREATE TABLE ssh_keys (
   cuid CHAR(24) NOT NULL,
   customer_id INTEGER NOT NULL,
   description VARCHAR(300) NOT NULL,
-  private_key VARCHAR(500) NOT NULL,
-  public_key VARCHAR(500) NOT NULL,
+  private_key TEXT NOT NULL,
+  public_key TEXT NOT NULL,
+  label_filters TEXT,
   FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
 );
 --;;

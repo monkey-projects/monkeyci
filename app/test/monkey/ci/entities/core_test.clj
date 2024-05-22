@@ -127,10 +127,10 @@
                  {:name "test customer"})
           param (sut/insert-customer-param
                  conn
-                 {:name "test-label"
-                  :value "test-value"
-                  :description "Test parameter"
-                  :customer-id (:id cust)})]
+                 {:description "Test parameter"
+                  :customer-id (:id cust)
+                  :label-filters [[{:label "test-filter"
+                                    :value "test value"}]]})]
       (testing "can insert"
         (is (number? (:id param))))
 
@@ -140,31 +140,6 @@
       (testing "can delete"
         (is (= 1 (sut/delete-customer-params conn (sut/by-id (:id param)))))
         (is (empty? (sut/select-customer-params conn (sut/by-customer (:id cust)))))))))
-
-(deftest ^:sql param-labels
-  (eh/with-prepared-db conn
-    (let [cust  (sut/insert-customer
-                 conn
-                 {:name "test customer"})
-          param (sut/insert-customer-param
-                conn
-                {:name "test param"
-                 :value "test param value"
-                 :customer-id (:id cust)})
-          lbl   (sut/insert-param-label
-                 conn
-                 {:name "test-label"
-                  :value "test-value"
-                  :param-id (:id param)})]
-      (testing "can insert"
-        (is (number? (:id lbl))))
-
-      (testing "can select for param"
-        (is (= [lbl] (sut/select-param-labels conn (sut/by-param (:id param))))))
-
-      (testing "can delete"
-        (is (= 1 (sut/delete-param-labels conn (sut/by-id (:id lbl)))))
-        (is (empty? (sut/select-param-labels conn (sut/by-param (:id param)))))))))
 
 (deftest ^:sql webhooks
   (eh/with-prepared-db conn
@@ -200,7 +175,9 @@
                 {:description "test key"
                  :public-key "pubkey"
                  :private-key "privkey"
-                 :customer-id (:id cust)})]
+                 :customer-id (:id cust)
+                 :label-filters [[{:label "test-label"
+                                   :value "test-value"}]]})]
       (testing "can insert"
         (is (number? (:id key))))
 

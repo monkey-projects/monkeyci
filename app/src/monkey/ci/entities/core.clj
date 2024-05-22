@@ -173,9 +173,7 @@
 
 (defentity customer)
 (defentity repo)
-(defentity customer-param)
 (defentity webhook)
-(defentity ssh-key)
 (defentity user)
 
 (defn- or-nil [f]
@@ -202,8 +200,8 @@
   (mc/update-existing x :status keyword))
 
 (def prepare-timed (comp status->str int->start-time int->end-time))
-;; Seems like timestamps are read as long?
-(def convert-timed #_(comp str->status start-time->int end-time->int) str->status)
+;; Seems like timestamps are read as long?  So no need to convert back.
+(def convert-timed str->status)
 
 (defentity build {:before-insert prepare-timed
                   :after-insert  convert-timed
@@ -211,24 +209,48 @@
                   :after-update  convert-timed
                   :after-select  convert-timed})
 
-(defn- details->edn [b]
-  (mc/update-existing b :details edn/->edn))
+(defn- prop->edn [prop b]
+  (mc/update-existing b prop edn/->edn))
 
-(defn- details->job [[r e]]
-  [(assoc r :details (:details e)) e])
+(defn- edn->prop [prop b]
+  (mc/update-existing b prop edn/edn->))
 
-(defn- edn->details [b]
-  (mc/update-existing b :details edn/edn->))
+(defn- copy-prop [prop [r e]]
+  [(assoc r prop (prop e)) e])
+
+(def details->edn (partial prop->edn :details))
+(def edn->details (partial edn->prop :details))
+(def details->job (partial copy-prop :details))
 
 (def prepare-job (comp details->edn prepare-timed))
 (def convert-job (comp details->job convert-timed))
 (def convert-job-select (comp edn->details convert-timed))
 
-(defentity job {:before-insert prepare-job
-                :after-insert  convert-job
-                :before-update prepare-job
-                :after-update  convert-job
-                :after-select  convert-job-select})
+(defentity job
+  {:before-insert prepare-job
+   :after-insert  convert-job
+   :before-update prepare-job
+   :after-update  convert-job
+   :after-select  convert-job-select})
+
+;; For customer params and ssh keys we don't store the labels in a separate table.
+;; This to avoid lots of work on mapping to and from sql statements, and because
+;; there is no real added value: it's not possible to do a query that will retrieve
+;; all matching params or ssh keys, so we may just as well do it in code.
+
+(def prepare-label-filters (partial prop->edn :label-filters))
+(def convert-label-filters (partial copy-prop :label-filters))
+(def convert-label-filters-select (partial edn->prop :label-filters))
+
+(def label-filter-conversions
+  {:before-insert prepare-label-filters
+   :after-insert  convert-label-filters
+   :before-update prepare-label-filters
+   :after-update  convert-label-filters
+   :after-select  convert-label-filters-select})
+
+(defentity customer-param label-filter-conversions)
+(defentity ssh-key label-filter-conversions)
 
 ;;; Aggregate entities
 
@@ -241,7 +263,5 @@
        (map (juxt :repo-id :name :value))
        (insert-entities conn :repo-labels [:repo-id :name :value])))
 
-(defaggregate param-label)
-(defaggregate ssh-key-label)
-(defaggregate ssh-key-label-conjunction)
 (defaggregate user-customer)
+(defaggregate customer-param-value)
