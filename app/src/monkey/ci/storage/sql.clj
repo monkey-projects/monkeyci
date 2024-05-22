@@ -7,6 +7,7 @@
             [monkey.ci.entities
              [core :as ec]
              [customer :as ecu]
+             [param :as eparam]
              [ssh-key :as essh]
              [webhook :as ewh]]
             [monkey.ci
@@ -171,38 +172,31 @@
       (update :id str)
       (update :customer-id str)))
 
-(defn- ssh-key? [sid]
+(defn- top-sid? [type sid]
   (and (= 2 (count sid))
-       (= "ssh-keys" (first sid))))
+       (= (name type) (first sid))))
 
-;; (defn- insert-ssh-label-filters [conn lk key-id]
-;;   (let [lk-entities (->> lk
-;;                          (map (constantly {:ssh-key-id key-id}))
-;;                          (ec/insert-ssh-key-labels conn))
-;;         conjunctions (map (fn [k e]
-;;                             (assoc k :label-id (:id e)))
-;;                           lk
-;;                           lk-entities)]
-;;     (ec/insert-ssh-key-label-conjunctions conn conjunctions)))
+(def ssh-key? (partial top-sid? :ssh-keys))
 
-;; (defn- upsert-ssh-label-filters [conn key-id]
-;;   (let [existing (essh/select-label-filter-conjunctions-for-key conn key-id)]
-;;     ))
+(defn- ssh-key->db [k]
+  (-> k
+      (assoc :cuid (:id k))
+      (dissoc :id :customer-id)))
 
 (defn- insert-ssh-key [conn ssh-key]
+  (log/debug "Inserting ssh key:" ssh-key)
   (if-let [cust (ec/select-customer conn (ec/by-cuid (:customer-id ssh-key)))]
-    (do
-      (log/debug "Inserting new ssh key:" ssh-key)
-      (let [{:keys [id]} (ec/insert-ssh-key conn (assoc ssh-key :customer-id (:id cust)))]))
+    (ec/insert-ssh-key conn (-> ssh-key
+                                (ssh-key->db)
+                                (assoc :customer-id (:id cust))))
     (throw (ex-info "Customer not found when inserting ssh key" ssh-key))))
 
 (defn- update-ssh-key [conn ssh-key existing]
-  (log/debug "Updating existing ssh key:" existing "<-" ssh-key)
-  (ec/update-ssh-key conn (merge existing (dissoc ssh-key :customer-id :label-filters))))
+  (log/debug "Updating ssh key:" ssh-key)
+  (ec/update-ssh-key conn (merge existing (ssh-key->db ssh-key))))
 
 (defn- upsert-ssh-key [conn ssh-key]
   (spec/valid? :entity/ssh-key ssh-key)
-  (log/debug "Upserting ssh key:" ssh-key)
   (if-let [existing (ec/select-ssh-key conn (ec/by-cuid (:id ssh-key)))]
     (update-ssh-key conn ssh-key existing)
     (insert-ssh-key conn ssh-key)))
@@ -214,6 +208,58 @@
 (defn- select-ssh-keys [conn customer-id]
   (essh/select-ssh-keys-as-entity conn customer-id))
 
+(def params? (partial top-sid? :build-params))
+
+(defn- insert-param-values [conn values param-id]
+  (when-not (empty? values)
+    (->> values
+         (map (fn [v]
+                (-> (select-keys v [:name :value])
+                    (assoc :params-id param-id))))
+         (ec/insert-customer-param-values conn))))
+
+(defn- update-param-values [conn values]
+  (doseq [pv values]
+    (ec/update-customer-param-value conn pv)))
+
+(defn- delete-param-values [conn values]
+  (ec/delete-customer-param-values conn [:in :id (map :id values)]))
+
+(defn- param->db [param cust-id]
+  (-> param
+      (select-keys [:description :label-filters])
+      (assoc :customer-id cust-id
+             :cuid (:id param))))
+
+(defn- insert-param [conn param cust-id]
+  (let [{:keys [id]} (ec/insert-customer-param conn (param->db param cust-id))]
+    (insert-param-values conn (:parameters param) id)))
+
+(defn- update-param [conn param cust-id existing]
+  (ec/update-customer-param conn (merge existing (param->db param cust-id)))
+  (let [ex-vals (ec/select-customer-param-values conn (ec/by-params (:id existing)))
+        r (lbl/reconcile-labels ex-vals (:parameters param))]
+    (log/debug "Reconciled param values:" r)
+    (insert-param-values conn (:insert r) (:id existing))
+    (update-param-values conn (:update r))
+    (delete-param-values conn (:delete r))))
+
+(defn- upsert-param [conn param cust-id]
+  (spec/valid? :entity/customer-params param)
+  (if-let [existing (ec/select-customer-param conn (ec/by-cuid (:id param)))]
+    (update-param conn param cust-id existing)
+    (insert-param conn param cust-id)))
+
+(defn- upsert-params [conn params]
+  (when-not (empty? params)
+    (let [{cust-id :id} (ec/select-customer conn (ec/by-cuid (:customer-id (first params))))]
+      (doseq [p params]
+        (upsert-param conn p cust-id)))))
+
+(defn- select-params [conn customer-id]
+  ;; Select customer params and values for customer cuid
+  (eparam/select-customer-params-with-values conn customer-id))
+
 (defrecord SqlStorage [conn]
   p/Storage
   (read-obj [_ sid]
@@ -223,7 +269,9 @@
       (webhook? sid)
       (select-webhook conn (global-sid->cuid sid))
       (ssh-key? sid)
-      (select-ssh-keys conn (second sid))))
+      (select-ssh-keys conn (second sid))
+      (params? sid)
+      (select-params conn (second sid))))
   
   (write-obj [_ sid obj]
     (cond
@@ -232,7 +280,9 @@
       (webhook? sid)
       (upsert-webhook conn obj)
       (ssh-key? sid)
-      (upsert-ssh-keys conn obj))
+      (upsert-ssh-keys conn obj)
+      (params? sid)
+      (upsert-params conn obj))
     sid)
 
   (obj-exists? [_ sid]
@@ -267,11 +317,11 @@
 
 (defn unwatch-github-repo [{:keys [conn]} [customer-id repo-id]]
   ;; TODO Use a single query with join
-  (= 1 (when-let [cust (ec/select-customer conn (ec/by-cuid customer-id))]
-         (when-let [repo (ec/select-repo conn [:and
-                                               [:= :customer-id (:id cust)]
-                                               [:= :display-id repo-id]])]
-           (ec/update-repo conn (assoc repo :github-id nil))))))
+  (some? (when-let [cust (ec/select-customer conn (ec/by-cuid customer-id))]
+           (when-let [repo (ec/select-repo conn [:and
+                                                 [:= :customer-id (:id cust)]
+                                                 [:= :display-id repo-id]])]
+             (ec/update-repo conn (assoc repo :github-id nil))))))
 
 (def overrides
   {:watched-github-repos

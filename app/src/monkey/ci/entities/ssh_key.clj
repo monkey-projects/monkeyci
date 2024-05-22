@@ -4,7 +4,8 @@
 
 (defn select-ssh-keys-as-entity [conn customer-cuid]
   (->> (ec/select conn
-                  {:select [:k.private-key
+                  {:select [[:k.cuid :id]
+                            :k.private-key
                             :k.public-key
                             :k.description
                             :k.label-filters

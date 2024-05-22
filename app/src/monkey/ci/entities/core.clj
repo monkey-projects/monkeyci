@@ -116,7 +116,9 @@
               (first (ai [(insert-entity conn (keyword pl) (bi e)) e]))))
     (intern *ns* (symbol (str "update-" (name n)))
             (fn [conn e]
-              (first (au [(update-entity conn (keyword pl) (bu e)) e]))))
+              (let [upd (bu e)]
+                (when (pos? (update-entity conn (keyword pl) upd))
+                  (first (au [upd e]))))))
     (intern *ns* (symbol (str "delete-" pl))
             (fn [conn f]
               (delete-entities conn (keyword pl) f)))
@@ -160,8 +162,8 @@
 (defn by-ssh-key [id]
   [:= :ssh-key-id id])
 
-(defn by-param [id]
-  [:= :param-id id])
+(defn by-params [id]
+  [:= :params-id id])
 
 (defn by-user [id]
   [:= :user-id id])
@@ -265,3 +267,10 @@
 
 (defaggregate user-customer)
 (defaggregate customer-param-value)
+
+(defn insert-customer-param-values
+  "Batch inserts multiple parameter values at once"
+  [conn values]
+  (->> values
+       (map (juxt :params-id :name :value))
+       (insert-entities conn :customer-param-values [:params-id :name :value])))

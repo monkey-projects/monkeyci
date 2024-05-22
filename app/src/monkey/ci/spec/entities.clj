@@ -73,4 +73,17 @@
 (s/def :ssh/public-key string?)
 
 (s/def :entity/ssh-key
-  (s/keys :req-un [:ssh/private-key :ssh/public-key :entity/description :entity/label-filters]))
+  (-> (s/keys :req-un [:entity/customer-id :ssh/private-key :ssh/public-key
+                       :entity/description]
+              :opt-un [:entity/label-filters])
+      (s/merge :entity/common)))
+
+(s/def :entity/customer-params
+  (-> (s/keys :req-un [:entity/customer-id :entity/parameters]
+              :opt-un [:entity/description :entity/label-filters])
+      (s/merge :entity/common)))
+
+(s/def :entity/parameters (s/coll-of :entity/parameter-value))
+
+(s/def :entity/parameter-value
+  (s/keys :req-un [:entity/name :label/value]))

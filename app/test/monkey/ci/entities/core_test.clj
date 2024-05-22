@@ -63,11 +63,11 @@
         (is (= r (sut/select-customer conn (sut/by-cuid (:cuid r))))))
 
       (testing "can update"
-        (is (= 1 (sut/update-customer conn (assoc r :name "updated"))))
+        (is (some? (sut/update-customer conn (assoc r :name "updated"))))
         (is (= "updated" (:name (sut/select-customer conn (sut/by-id (:id r)))))))
 
       (testing "cannot update nonexisting"
-        (is (zero? (sut/update-customer conn {:id -1 :name "nonexisting customer"})))))
+        (is (nil? (sut/update-customer conn {:id -1 :name "nonexisting customer"})))))
 
     (testing "throws on invalid record"
       (is (thrown? Exception (sut/insert-customer conn {}))))))
@@ -91,7 +91,7 @@
                      (select-keys (keys r))))))
 
       (testing "can update"
-        (is (= 1 (sut/update-repo conn (assoc r :name "updated"))))
+        (is (some? (sut/update-repo conn (assoc r :name "updated"))))
         (is (= "updated" (:name (sut/select-repo conn (sut/by-id (:id r))))))))
 
     (testing "throws on invalid record"
@@ -138,7 +138,8 @@
         (is (number? (:id param))))
 
       (testing "can select for customer"
-        (is (= [param] (sut/select-customer-params conn (sut/by-customer (:id cust))))))
+        (is (= [param] (->> (sut/select-customer-params conn (sut/by-customer (:id cust)))
+                            (map #(select-keys % (keys param)))))))
 
       (testing "can delete"
         (is (= 1 (sut/delete-customer-params conn (sut/by-id (:id param)))))

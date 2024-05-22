@@ -2,6 +2,7 @@
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.spec.alpha :as spec]
             [clojure.spec.gen.alpha :as gen]
+            [medley.core :as mc]
             [monkey.ci.entities.helpers :as eh]
             [monkey.ci
              [cuid :as cuid]
@@ -26,6 +27,9 @@
 
 (defn- gen-ssh-key []
   (gen-entity :entity/ssh-key))
+
+(defn- gen-customer-params []
+  (gen-entity :entity/customer-params))
 
 (defmacro with-storage [conn s & body]
   `(eh/with-prepared-db ~conn
@@ -157,9 +161,17 @@
           (let [ce (ec/select-customer conn (ec/by-cuid cust-id))]
             (is (sid/sid? (st/save-ssh-keys s cust-id [k])))
             (is (= 1 (count (ec/select-ssh-keys conn (ec/by-customer (:id ce))))))
-            (is (= [k] (st/find-ssh-keys s cust-id)))))
+            (is (= k (->> (st/find-ssh-keys s cust-id)
+                          (first)
+                          (mc/remove-vals nil?))))))
 
-        (testing "can update label filters")))))
+        (testing "can update label filters"
+          (let [lf [[{:label "test-label"
+                      :value "test-value"}]]]
+            (is (sid/sid? (st/save-ssh-keys s cust-id [(assoc k :label-filters lf)])))
+            (let [matches (st/find-ssh-keys s cust-id)]
+              (is (= 1 (count matches)))
+              (is (= lf (-> matches first :label-filters))))))))))
 
 (deftest ^:sql webhooks
   (with-storage conn s
@@ -175,3 +187,29 @@
         (testing "can create and retrieve"
           (is (sid/sid? (st/save-webhook-details s wh)))
           (is (= wh (st/find-details-for-webhook s (:id wh)))))))))
+
+(deftest ^:sql customer-params
+  (with-storage conn s
+    (testing "customer params"
+      (let [{cust-id :id :as cust} (gen-cust)
+            params (assoc (gen-customer-params) :customer-id cust-id)]
+        (is (sid/sid? (st/save-customer s cust)))
+        
+        (testing "can create and retrieve"
+          (let [ce (ec/select-customer conn (ec/by-cuid cust-id))]
+            (is (sid/sid? (st/save-params s cust-id [params])))
+            (is (= [params] (st/find-params s cust-id)))))
+
+        (testing "can update label filters"
+          (let [lf [[{:label "test-label"
+                      :value "test-value"}]]]
+            (is (sid/sid? (st/save-params s cust-id [(assoc params :label-filters lf)])))
+            (let [matches (st/find-params s cust-id)]
+              (is (= 1 (count matches)))
+              (is (= lf (-> matches first :label-filters))))))
+
+        (testing "can update parameter values"
+          (let [pv [{:name "new-param"
+                     :value "new value"}]]
+            (is (sid/sid? (st/save-params s cust-id [(assoc params :parameters pv)])))
+            (is (= pv (-> (st/find-params s cust-id) first :parameters)))))))))
