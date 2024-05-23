@@ -31,6 +31,9 @@
 (defn- gen-customer-params []
   (gen-entity :entity/customer-params))
 
+(defn- gen-user []
+  (gen-entity :entity/user))
+
 (defmacro with-storage [conn s & body]
   `(eh/with-prepared-db ~conn
      (let [~s (sut/make-storage ~conn)]
@@ -213,3 +216,25 @@
                      :value "new value"}]]
             (is (sid/sid? (st/save-params s cust-id [(assoc params :parameters pv)])))
             (is (= pv (-> (st/find-params s cust-id) first :parameters)))))))))
+
+(deftest ^:sql users
+  (with-storage conn s
+    (testing "users"
+      (let [user (-> (gen-user)
+                     (dissoc :customers))
+            user->id (juxt :type :type-id)]
+        (testing "can save and find"
+          (is (sid/sid? (st/save-user s user)))
+          (is (= user (st/find-user s (user->id user)))))
+
+        (testing "can link to customer"
+          (let [cust (gen-cust)
+                user (assoc user :customers [(:id cust)])]
+            (is (sid/sid? (st/save-customer s cust)))
+            (is (sid/sid? (st/save-user s user)))
+            (is (= (:customers user)
+                   (-> (st/find-user s (user->id user)) :customers)))))
+
+        (testing "can unlink from customer"
+          (is (sid/sid? (st/save-user s (dissoc user :customers))))
+          (is (empty? (-> (st/find-user s (user->id user)) :customers))))))))

@@ -266,6 +266,15 @@
        (insert-entities conn :repo-labels [:repo-id :name :value])))
 
 (defaggregate user-customer)
+
+(defn insert-user-customers
+  "Batch inserts user/customer links"
+  [conn user-id cust-ids]
+  (when-not (empty? cust-ids)
+    (insert-entities conn :user-customers
+                     [:user-id :customer-id]
+                     (map (partial conj [user-id]) cust-ids))))
+
 (defaggregate customer-param-value)
 
 (defn insert-customer-param-values

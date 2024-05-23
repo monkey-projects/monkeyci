@@ -2,13 +2,15 @@
   "Storage implementation that uses an SQL database for persistence.  This namespace provides
    a layer on top of the entities namespace to perform the required queries whenever a 
    document is saved or loaded."
-  (:require [clojure.tools.logging :as log]
+  (:require [clojure.set :as cset]
+            [clojure.tools.logging :as log]
             [medley.core :as mc]
             [monkey.ci.entities
              [core :as ec]
              [customer :as ecu]
              [param :as eparam]
              [ssh-key :as essh]
+             [user :as eu]
              [webhook :as ewh]]
             [monkey.ci
              [labels :as lbl]
@@ -20,6 +22,9 @@
             [monkey.ci.spec.entities]))
 
 (def deleted? (fnil pos? 0))
+
+(defn- drop-nil [m]
+  (mc/filter-vals some? m))
 
 (defn- db->labels [labels]
   (map #(select-keys % [:name :value]) labels))
@@ -42,8 +47,7 @@
           (dissoc :cuid :customer-id :display-id)
           (assoc :id (:display-id re))
           (mc/update-existing :labels db->labels)
-          ;; Drop nil properties
-          (as-> x (mc/filter-vals some? x)))
+          (drop-nil))
       f (f re)))
 
 (defn- insert-repo-labels [conn labels re]
@@ -260,6 +264,51 @@
   ;; Select customer params and values for customer cuid
   (eparam/select-customer-params-with-values conn customer-id))
 
+(defn user? [sid]
+  (and (= 4 (count sid))
+       (= [st/global "users"] (take 2 sid))))
+
+(defn- user->db [user]
+  (-> (select-keys user [:type :type-id :email])
+      (assoc :cuid (:id user))
+      (mc/update-existing :type name)
+      (mc/update-existing :type-id str)))
+
+(defn- db->user [user]
+  (-> (select-keys user [:type :type-id :email])
+      (mc/update-existing :type keyword)
+      (assoc :id (:cuid user))))
+
+(defn- insert-user [conn user]
+  (let [{:keys [id]} (ec/insert-user conn (user->db user))
+        ids (ecu/customer-ids-by-cuids conn (:customers user))]
+    (ec/insert-user-customers conn id ids)))
+
+(defn- update-user [conn user {user-id :id :as existing}]
+  (when (ec/update-user conn (merge existing (user->db user)))
+    ;; Update user/customer links
+    (let [existing-cust (set (eu/select-user-customer-cuids conn user-id))
+          new-cust (set (:customers user))
+          to-add (cset/difference new-cust existing-cust)
+          to-remove (cset/difference existing-cust new-cust)]
+      (ec/insert-user-customers conn user-id (ecu/customer-ids-by-cuids conn to-add))
+      (when-not (empty? to-remove)
+        (ec/delete-user-customers conn [:in :customer-id (ecu/customer-ids-by-cuids conn to-remove)])))))
+
+(defn- upsert-user [conn user]
+  (let [existing (ec/select-user conn (ec/by-cuid (:id user)))]
+    (update-user conn user existing)
+    (insert-user conn user)))
+
+(defn- select-user [conn [type type-id]]
+  (when-let [r (ec/select-user conn [:and
+                                     [:= :type type]
+                                     [:= :type-id type-id]])]
+    (let [cust (eu/select-user-customer-cuids conn (:id r))]
+      (cond-> (db->user r)
+        true (drop-nil)
+        (not-empty cust) (assoc :customers cust)))))
+
 (defrecord SqlStorage [conn]
   p/Storage
   (read-obj [_ sid]
@@ -271,7 +320,9 @@
       (ssh-key? sid)
       (select-ssh-keys conn (second sid))
       (params? sid)
-      (select-params conn (second sid))))
+      (select-params conn (second sid))
+      (user? sid)
+      (select-user conn (drop 2 sid))))
   
   (write-obj [_ sid obj]
     (cond
@@ -282,7 +333,9 @@
       (ssh-key? sid)
       (upsert-ssh-keys conn obj)
       (params? sid)
-      (upsert-params conn obj))
+      (upsert-params conn obj)
+      (user? sid)
+      (upsert-user conn obj))
     sid)
 
   (obj-exists? [_ sid]

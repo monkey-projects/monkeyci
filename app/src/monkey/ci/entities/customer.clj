@@ -13,3 +13,13 @@
          (group-by :cuid)
          (mc/map-vals first)
          (assoc cust :repos))))
+
+(defn customer-ids-by-cuids
+  "Fetches all customer ids for given cuids"
+  [conn cuids]
+  (when (not-empty cuids)
+    (->> (ec/select conn
+                    {:select [:c.id]
+                     :from [[:customers :c]]
+                     :where [:in :c.cuid cuids]})
+         (map :id))))
