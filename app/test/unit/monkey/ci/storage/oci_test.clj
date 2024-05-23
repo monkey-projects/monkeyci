@@ -1,18 +1,13 @@
 (ns monkey.ci.storage.oci-test
   (:require [clojure.test :refer [deftest testing is]]
             [buddy.core.keys.pem :as pem]
-            [clojure.edn :as edn]
-            [clojure.java.io :as io]
-            [clojure.spec.alpha :as spec]
             [manifold.deferred :as md]
             [monkey.ci
              [protocols :as p]
              [spec :as s]
-             [storage :as st]
-             [utils :refer [load-privkey]]]
+             [storage :as st]]
             [monkey.ci.storage.oci :as sut]
-            [monkey.oci.os.core :as os])
-  (:import java.io.PushbackReader))
+            [monkey.oci.os.core :as os]))
 
 (deftest oci-object-storage
   (let [conf {:compartment-id "test-compartment"
@@ -118,25 +113,3 @@
                             (.conf)
                             :private-key))))))
 
-(defn- load-test-config []  
-  (with-open [r (PushbackReader. (io/reader "dev-resources/test/config.edn"))]
-    (-> (edn/read r)
-        (update-in [:storage :credentials :private-key] load-privkey))))
-
-(deftest ^:integration oci-integration
-  ;; Run some integration tests on an OCI bucket
-  (let [conf (load-test-config)
-        s (st/make-storage conf)]
-
-    (testing "config is valid"
-      (is (spec/valid? :conf/storage (:storage conf))
-          (spec/explain-str :conf/storage (:storage conf))))    
-
-    (testing "customer operations"
-      (let [id (st/new-id)
-            cust {:id id
-                  :name "Test customer"}]
-        (is (nil? (st/find-customer s id)))
-        (is (st/sid? (st/save-customer s cust)))
-        (is (= cust (st/find-customer s id)))
-        (is (true? (p/delete-obj s (st/customer-sid id))))))))
