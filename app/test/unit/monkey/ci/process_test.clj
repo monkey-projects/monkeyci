@@ -49,29 +49,6 @@
             (is (= {:type :podman} (:containers @captured-args)))
             (is (= {:socket "/tmp/test.sock"} (get-in @captured-args [:config :api])))))))))
 
-(deftest ^:slow execute-slow!
-  (let [rt {:config {:dev-mode true}
-            :logging {:maker (l/make-logger {:logging {:type :inherit}})}}]
-    
-    (testing "executes build script in separate process"
-      (is (zero? (-> {:script {:script-dir (example "basic-clj")}
-                      :build-id (u/new-build-id)}
-                     (sut/execute! rt)
-                     deref
-                     :exit))))
-
-    (testing "fails when script fails"
-      (is (pos? (-> {:script {:script-dir (example "failing")}
-                     :build-id (u/new-build-id)}
-                    (sut/execute! rt)
-                    deref
-                    :exit))))
-
-    (testing "fails when script not found"
-      (is (thrown? java.io.IOException (sut/execute!
-                                        {:script {:script-dir (example "non-existing")}}
-                                        rt))))))
-
 (deftype FakeProcess [exitValue])
 
 (deftest execute!

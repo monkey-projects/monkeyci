@@ -1,4 +1,4 @@
-(ns monkey.ci.events.zmq-test
+(ns monkey.ci.integration-test.events.zmq-test
   (:require [clojure.test :refer [deftest testing is]]
             [com.stuartsierra.component :as co]
             [monkey.ci.events

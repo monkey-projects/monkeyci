@@ -58,7 +58,7 @@
   {:extra-deps {org.clojure/test.check {:mvn/version "0.9.0"}}
    :extra-paths ["dev-resources" "env/dev"]}
 
-  :test-paths ["test"]
+  :test-paths ["test/unit" "test/integration"]
   
   :test
   {:extra-paths [:test-paths]

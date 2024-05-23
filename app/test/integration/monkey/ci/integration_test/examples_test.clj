@@ -1,4 +1,4 @@
-(ns monkey.ci.examples-test
+(ns monkey.ci.integration-test.examples-test
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.tools.logging :as log]
             [monkey.ci

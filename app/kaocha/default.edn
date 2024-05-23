@@ -1,3 +1,5 @@
 {:omit-system-out? true
  :ignore ["\\.#*.clj"]
- :fail-fast? true}
+ :fail-fast? true
+ :tests [{:id :unit
+          :test-paths ["test/unit"]}]}
