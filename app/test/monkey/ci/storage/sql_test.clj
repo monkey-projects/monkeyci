@@ -34,6 +34,9 @@
 (defn- gen-user []
   (gen-entity :entity/user))
 
+(defn- gen-build []
+  (gen-entity :entity/build))
+
 (defmacro with-storage [conn s & body]
   `(eh/with-prepared-db ~conn
      (let [~s (sut/make-storage ~conn)]
@@ -238,3 +241,26 @@
         (testing "can unlink from customer"
           (is (sid/sid? (st/save-user s (dissoc user :customers))))
           (is (empty? (-> (st/find-user s (user->id user)) :customers))))))))
+
+(deftest ^:sql builds
+  (with-storage conn s
+    (testing "builds"
+      (let [repo (gen-repo)
+            cust (-> (gen-cust)
+                     (assoc-in [:repos (:id repo)] repo))
+            build (-> (gen-build)
+                      (assoc :customer-id (:id cust)
+                             :repo-id (:id repo)))
+            build-sid (st/ext-build-sid build)]
+        (is (sid/sid? (st/save-customer s cust)))
+
+        (testing "can save and retrieve"
+          (is (sid/sid? (st/save-build s build)))
+          (is (= 1 (count (ec/select conn {:select :*
+                                           :from :builds}))))
+          (is (= build (-> (st/find-build s build-sid)
+                           (select-keys (keys build))))))
+
+        (testing "can update jobs")
+
+        (testing "can list")))))

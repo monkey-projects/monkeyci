@@ -42,13 +42,15 @@
           :opt-un [:git/url :git/main-branch :entity/github-id :entity/labels]))
 
 (s/def :entity/repo-id ::c/cuid)
-(s/def :entity/build-id ::c/cuid)
+(s/def :entity/build-id string?)
 (s/def :entity/idx int?)
 
 (s/def :entity/build
   (-> (s/keys :req-un [:entity/build-id :entity/customer-id :entity/repo-id :entity/idx]
-              :opt-un [:build/status])
+              :opt-un [:build/status :entity/jobs])
       (s/merge :entity/timed)))
+
+(s/def :entity/jobs (s/coll-of :entity/job))
 
 (s/def :entity/job
   (-> (s/keys :req-un [:display/id]

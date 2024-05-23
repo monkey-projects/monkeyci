@@ -1,6 +1,5 @@
 (ns monkey.ci.entities.user
-  (:require [honey.sql :as sql]
-            [monkey.ci.entities.core :as ec]))
+  (:require [monkey.ci.entities.core :as ec]))
 
 (defn select-user-customer-cuids
   "Fetches all customers cuids linked to a user"

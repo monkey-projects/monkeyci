@@ -5,7 +5,8 @@
             [medley.core :as mc]
             [monkey.ci
              [cuid :as cuid]
-             [edn :as edn]]
+             [edn :as edn]
+             [utils :as u]]
             [monkey.ci.entities.types]
             [next.jdbc :as jdbc]
             [next.jdbc
@@ -178,21 +179,30 @@
 (defentity webhook)
 (defentity user)
 
-(defn- or-nil [f]
-  (fn [x]
-    (when x
-      (f x))))
+(defprotocol EpochConvertable
+  (->epoch [x]))
+
+(extend-protocol EpochConvertable
+  java.sql.Timestamp
+  (->epoch [ts]
+    (.getTime ts))
+  java.time.Instant
+  (->epoch [i]
+    (.toEpochMilli i))
+  java.lang.Long
+  (->epoch [l]
+    l))
 
 (defn- time->int [k x]
-  (mc/update-existing x k (or-nil (memfn getTime))))
+  (mc/update-existing x k (u/or-nil ->epoch)))
 
 (defn- int->time [k x]
-  (mc/update-existing x k (or-nil #(java.sql.Timestamp. %))))
+  (mc/update-existing x k (u/or-nil #(java.sql.Timestamp. %))))
 
 (def start-time->int (partial time->int :start-time))
 (def int->start-time (partial int->time :start-time))
 
-(def end-time->int (partial time->int :start-time))
+(def end-time->int (partial time->int :end-time))
 (def int->end-time (partial int->time :end-time))
 
 (defn- status->str [x]
@@ -202,8 +212,7 @@
   (mc/update-existing x :status keyword))
 
 (def prepare-timed (comp status->str int->start-time int->end-time))
-;; Seems like timestamps are read as long?  So no need to convert back.
-(def convert-timed str->status)
+(def convert-timed (comp str->status start-time->int end-time->int))
 
 (defentity build {:before-insert prepare-timed
                   :after-insert  convert-timed
@@ -212,10 +221,10 @@
                   :after-select  convert-timed})
 
 (defn- prop->edn [prop b]
-  (mc/update-existing b prop (or-nil edn/->edn)))
+  (mc/update-existing b prop (u/or-nil edn/->edn)))
 
 (defn- edn->prop [prop b]
-  (mc/update-existing b prop (or-nil edn/edn->)))
+  (mc/update-existing b prop (u/or-nil edn/edn->)))
 
 (defn- copy-prop [prop [r e]]
   [(assoc r prop (prop e)) e])

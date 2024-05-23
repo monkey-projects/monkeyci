@@ -6,9 +6,11 @@
             [clojure.tools.logging :as log]
             [medley.core :as mc]
             [monkey.ci.entities
+             [build :as eb]
              [core :as ec]
              [customer :as ecu]
              [param :as eparam]
+             [repo :as er]
              [ssh-key :as essh]
              [user :as eu]
              [webhook :as ewh]]
@@ -17,7 +19,8 @@
              [protocols :as p]
              [sid :as sid]
              [spec :as spec]
-             [storage :as st]]
+             [storage :as st]
+             [utils :as u]]
             [monkey.ci.spec.db-entities]
             [monkey.ci.spec.entities]))
 
@@ -309,6 +312,79 @@
         true (drop-nil)
         (not-empty cust) (assoc :customers cust)))))
 
+(defn build? [sid]
+  (and (= "builds" (first sid))
+       (= 4 (count sid))))
+
+(defn build-repo? [sid]
+  (and (= "builds" (first sid))
+       (= 3 (count sid))))
+
+(defn- build->db [build]
+  (-> build
+      (select-keys [:status :start-time :end-time :idx])
+      (mc/update-existing :status name)
+      (assoc :display-id (:build-id build))))
+
+(defn- db->build [build]
+  (-> build
+      (select-keys [:status :start-time :end-time :idx])
+      (mc/update-existing :status keyword)
+      (ec/start-time->int)
+      (ec/end-time->int)
+      (assoc :build-id (:display-id build))))
+
+(defn- job->db [job]
+  (-> job
+      (select-keys [:status :start-time :end-time])
+      (mc/update-existing :status name)
+      (assoc :display-id (:id job)
+             :details (dissoc job :id :status :start-time :end-time))))
+
+(defn- db->job [job]
+  (-> job
+      (select-keys [:status :start-time :end-time])
+      (merge (:details job))
+      (mc/update-existing :status keyword)
+      (assoc :id (:display-id job))
+      (drop-nil)))
+
+(defn- insert-jobs [conn jobs build-id]
+  (doseq [j jobs]
+    (ec/insert-job conn (assoc (job->db j) :build-id build-id))))
+
+(defn- insert-build [conn build]
+  (when-let [repo-id (er/repo-for-build-sid conn (:customer-id build) (:repo-id build))]
+    (let [{:keys [id]} (ec/insert-build conn (-> (build->db build)
+                                                 (assoc :repo-id repo-id)))]
+      (insert-jobs conn (:jobs build) id))))
+
+(defn- update-build [conn build]
+  ;; TODO
+  )
+
+(defn- upsert-build [conn build]
+  ;; Fetch build by customer cuild and repo and build display ids
+  (if-let [existing (eb/select-build-by-sid conn (:customer-id build) (:repo-id build) (:build-id build))]
+    (update-build conn build existing)
+    (insert-build conn build)))
+
+(defn- select-jobs [conn build-id]
+  (->> (ec/select-jobs conn (ec/by-build build-id))
+       (map db->job)))
+
+(defn- select-build [conn [cust-id repo-id build-id :as sid]]
+  (when-let [build (apply eb/select-build-by-sid conn sid)]
+    (-> (db->build build)
+        (assoc :customer-id cust-id
+               :repo-id repo-id
+               :jobs (select-jobs conn (:id build)))
+        (drop-nil))))
+
+(defn- select-repo-builds [conn [cust-id repo-id]]
+  ;; TODO
+  )
+
 (defrecord SqlStorage [conn]
   p/Storage
   (read-obj [_ sid]
@@ -322,7 +398,9 @@
       (params? sid)
       (select-params conn (second sid))
       (user? sid)
-      (select-user conn (drop 2 sid))))
+      (select-user conn (drop 2 sid))
+      (build? sid)
+      (select-build conn (rest sid))))
   
   (write-obj [_ sid obj]
     (cond
@@ -335,7 +413,9 @@
       (params? sid)
       (upsert-params conn obj)
       (user? sid)
-      (upsert-user conn obj))
+      (upsert-user conn obj)
+      (build? sid)
+      (upsert-build conn obj))
     sid)
 
   (obj-exists? [_ sid]
@@ -344,8 +424,13 @@
 
   (delete-obj [_ sid]
     (deleted?
+     ;; TODO Allow deleting other entities
      (when (customer? sid)
-       (delete-customer conn (global-sid->cuid sid))))))
+       (delete-customer conn (global-sid->cuid sid)))))
+
+  (list-obj [_ sid]
+    (when (build-repo? sid)
+      (select-repo-builds conn (rest sid)))))
 
 (defn select-watched-github-repos [{:keys [conn]} github-id]
   (let [matches (ec/select-repos conn [:= :github-id github-id])

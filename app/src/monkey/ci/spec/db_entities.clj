@@ -45,7 +45,7 @@
 
 (s/def :db/build
   (-> (s/keys :req-un [:db/repo-id :db/idx]
-              :opt-un [:build/status])
+              :opt-un [:build/status :db/display-id])
       (s/merge :db/timed)))
 
 (s/def :job/details map?)

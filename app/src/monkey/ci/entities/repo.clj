@@ -14,3 +14,16 @@
                     (ec/select-repo-labels conn)
                     (group-by :repo-id))]
     (map #(mc/assoc-some % :labels (get labels (:id %))) repos)))
+
+(defn repo-for-build-sid
+  "Finds the repository id given a customer cuid and repo display id."
+  [conn cust-cuid display-id]
+  (-> (ec/select conn
+                 {:select [:r.id]
+                  :from [[:repos :r]]
+                  :join [[:customers :c] [:= :c.id :r.customer-id]]
+                  :where [:and
+                          [:= :c.cuid cust-cuid]
+                          [:= :r.display-id display-id]]})
+      (first)
+      :id))
