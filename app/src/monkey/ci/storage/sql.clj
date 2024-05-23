@@ -353,15 +353,41 @@
   (doseq [j jobs]
     (ec/insert-job conn (assoc (job->db j) :build-id build-id))))
 
+(defn- update-jobs [conn jobs]
+  (doseq [[upd ex] jobs]
+    (let [upd (merge ex (job->db upd))]
+      (ec/update-job conn upd))))
+
 (defn- insert-build [conn build]
   (when-let [repo-id (er/repo-for-build-sid conn (:customer-id build) (:repo-id build))]
     (let [{:keys [id]} (ec/insert-build conn (-> (build->db build)
                                                  (assoc :repo-id repo-id)))]
-      (insert-jobs conn (:jobs build) id))))
+      (insert-jobs conn (vals (:jobs build)) id))))
 
-(defn- update-build [conn build]
-  ;; TODO
-  )
+(defn- update-build [conn {:keys [jobs] :as build} existing]
+  (ec/update-build conn (merge existing (build->db build)))
+  (let [ex-jobs (ec/select-jobs conn (ec/by-build (:id existing)))
+        new-ids (set (keys jobs))
+        existing-ids (set (map :display-id ex-jobs))
+        to-delete (cset/difference existing-ids new-ids)
+        to-insert (apply dissoc jobs existing-ids)
+        to-update (reduce (fn [r ej]
+                            (let [n (get jobs (:display-id ej))]
+                              (cond-> r
+                                ;; TODO Only update modified jobs
+                                n (conj [n ej]))))
+                          []
+                          ex-jobs)]
+    (when-not (empty? to-delete)
+      ;; Delete all removed jobs (although this is a situation that probably never happens)
+      (ec/delete-jobs conn [:and
+                            [:= :build-id (:id existing)]
+                            [:in :display-id to-delete]]))
+    (when-not (empty? to-update)
+      (update-jobs conn to-update))
+    (when-not (empty? to-insert)
+      ;; Insert new jobs
+      (insert-jobs conn (vals to-insert) (:id existing)))))
 
 (defn- upsert-build [conn build]
   ;; Fetch build by customer cuild and repo and build display ids
@@ -371,7 +397,9 @@
 
 (defn- select-jobs [conn build-id]
   (->> (ec/select-jobs conn (ec/by-build build-id))
-       (map db->job)))
+       (map db->job)
+       (map (fn [j] [(:id j) j]))
+       (into {})))
 
 (defn- select-build [conn [cust-id repo-id build-id :as sid]]
   (when-let [build (apply eb/select-build-by-sid conn sid)]
@@ -381,9 +409,8 @@
                :jobs (select-jobs conn (:id build)))
         (drop-nil))))
 
-(defn- select-repo-builds [conn [cust-id repo-id]]
-  ;; TODO
-  )
+(defn- select-repo-builds [conn sid]
+  (apply eb/select-build-ids-for-repo conn sid))
 
 (defrecord SqlStorage [conn]
   p/Storage

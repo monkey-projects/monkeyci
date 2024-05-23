@@ -50,7 +50,7 @@
               :opt-un [:build/status :entity/jobs])
       (s/merge :entity/timed)))
 
-(s/def :entity/jobs (s/coll-of :entity/job))
+(s/def :entity/jobs (s/map-of :display/id :entity/job))
 
 (s/def :entity/job
   (-> (s/keys :req-un [:display/id]

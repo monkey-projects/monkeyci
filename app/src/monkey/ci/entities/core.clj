@@ -206,10 +206,10 @@
 (def int->end-time (partial int->time :end-time))
 
 (defn- status->str [x]
-  (mc/update-existing x :status name))
+  (mc/update-existing x :status (u/or-nil name)))
 
 (defn- str->status [x]
-  (mc/update-existing x :status keyword))
+  (mc/update-existing x :status (u/or-nil keyword)))
 
 (def prepare-timed (comp status->str int->start-time int->end-time))
 (def convert-timed (comp str->status start-time->int end-time->int))

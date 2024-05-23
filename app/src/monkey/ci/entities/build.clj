@@ -13,6 +13,11 @@
 (defn select-builds-for-repo [conn cust-cuid repo-id]
   (ec/select conn (build-query cust-cuid repo-id)))
 
+(defn select-build-ids-for-repo [conn cust-cuid repo-id]
+  (->> (ec/select conn (-> (build-query cust-cuid repo-id)
+                           (assoc :select [:b.display-id])))
+       (map :display-id)))
+
 (defn select-build-by-sid
   "Finds build for customer, repo and display id"
   [conn cust-cuid repo-id build-id]

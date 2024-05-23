@@ -35,7 +35,15 @@
   (gen-entity :entity/user))
 
 (defn- gen-build []
-  (gen-entity :entity/build))
+  (-> (gen-entity :entity/build)
+      ;; TODO Put this in the spec itself
+      (update :jobs (fn [jobs]
+                      (->> jobs
+                           (mc/map-kv-vals #(assoc %2 :id %1))
+                           (into {}))))))
+
+(defn- gen-job []
+  (gen-entity :entity/job))
 
 (defmacro with-storage [conn s & body]
   `(eh/with-prepared-db ~conn
@@ -261,6 +269,22 @@
           (is (= build (-> (st/find-build s build-sid)
                            (select-keys (keys build))))))
 
-        (testing "can update jobs")
+        (testing "can replace jobs"
+          (let [job (gen-job)
+                jobs {(:id job) job}]
+            (is (sid/sid? (st/save-build s (assoc build :jobs jobs))))
+            (is (= 1 (count (ec/select conn {:select :*
+                                             :from :jobs}))))
+            (is (= jobs (:jobs (st/find-build s build-sid))))))
 
-        (testing "can list")))))
+        (testing "can update jobs"
+          (let [job (assoc (gen-job) :status :pending)
+                jobs {(:id job) job}
+                upd (assoc job :status :running)]
+            (is (sid/sid? (st/save-build s (assoc build :jobs jobs))))
+            (is (sid/sid? (st/save-build s (assoc-in build [:jobs (:id job)] upd))))
+            (is (= upd (get-in (st/find-build s build-sid) [:jobs (:id job)])))))
+
+        (testing "can list"
+          (is (= [(:build-id build)]
+                 (st/list-builds s [(:id cust) (:id repo)]))))))))
