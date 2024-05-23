@@ -2,24 +2,32 @@
   "Storage implementation that uses an SQL database for persistence.  This namespace provides
    a layer on top of the entities namespace to perform the required queries whenever a 
    document is saved or loaded."
-  (:require [clojure.tools.logging :as log]
+  (:require [clojure.set :as cset]
+            [clojure.tools.logging :as log]
             [medley.core :as mc]
             [monkey.ci.entities
+             [build :as eb]
              [core :as ec]
              [customer :as ecu]
              [param :as eparam]
+             [repo :as er]
              [ssh-key :as essh]
+             [user :as eu]
              [webhook :as ewh]]
             [monkey.ci
              [labels :as lbl]
              [protocols :as p]
              [sid :as sid]
              [spec :as spec]
-             [storage :as st]]
+             [storage :as st]
+             [utils :as u]]
             [monkey.ci.spec.db-entities]
             [monkey.ci.spec.entities]))
 
 (def deleted? (fnil pos? 0))
+
+(defn- drop-nil [m]
+  (mc/filter-vals some? m))
 
 (defn- db->labels [labels]
   (map #(select-keys % [:name :value]) labels))
@@ -42,8 +50,7 @@
           (dissoc :cuid :customer-id :display-id)
           (assoc :id (:display-id re))
           (mc/update-existing :labels db->labels)
-          ;; Drop nil properties
-          (as-> x (mc/filter-vals some? x)))
+          (drop-nil))
       f (f re)))
 
 (defn- insert-repo-labels [conn labels re]
@@ -260,6 +267,151 @@
   ;; Select customer params and values for customer cuid
   (eparam/select-customer-params-with-values conn customer-id))
 
+(defn user? [sid]
+  (and (= 4 (count sid))
+       (= [st/global "users"] (take 2 sid))))
+
+(defn- user->db [user]
+  (-> (select-keys user [:type :type-id :email])
+      (assoc :cuid (:id user))
+      (mc/update-existing :type name)
+      (mc/update-existing :type-id str)))
+
+(defn- db->user [user]
+  (-> (select-keys user [:type :type-id :email])
+      (mc/update-existing :type keyword)
+      (assoc :id (:cuid user))))
+
+(defn- insert-user [conn user]
+  (let [{:keys [id]} (ec/insert-user conn (user->db user))
+        ids (ecu/customer-ids-by-cuids conn (:customers user))]
+    (ec/insert-user-customers conn id ids)))
+
+(defn- update-user [conn user {user-id :id :as existing}]
+  (when (ec/update-user conn (merge existing (user->db user)))
+    ;; Update user/customer links
+    (let [existing-cust (set (eu/select-user-customer-cuids conn user-id))
+          new-cust (set (:customers user))
+          to-add (cset/difference new-cust existing-cust)
+          to-remove (cset/difference existing-cust new-cust)]
+      (ec/insert-user-customers conn user-id (ecu/customer-ids-by-cuids conn to-add))
+      (when-not (empty? to-remove)
+        (ec/delete-user-customers conn [:in :customer-id (ecu/customer-ids-by-cuids conn to-remove)])))))
+
+(defn- upsert-user [conn user]
+  (let [existing (ec/select-user conn (ec/by-cuid (:id user)))]
+    (update-user conn user existing)
+    (insert-user conn user)))
+
+(defn- select-user [conn [type type-id]]
+  (when-let [r (ec/select-user conn [:and
+                                     [:= :type type]
+                                     [:= :type-id type-id]])]
+    (let [cust (eu/select-user-customer-cuids conn (:id r))]
+      (cond-> (db->user r)
+        true (drop-nil)
+        (not-empty cust) (assoc :customers cust)))))
+
+(defn build? [sid]
+  (and (= "builds" (first sid))
+       (= 4 (count sid))))
+
+(defn build-repo? [sid]
+  (and (= "builds" (first sid))
+       (= 3 (count sid))))
+
+(defn- build->db [build]
+  (-> build
+      (select-keys [:status :start-time :end-time :idx])
+      (mc/update-existing :status name)
+      (assoc :display-id (:build-id build))))
+
+(defn- db->build [build]
+  (-> build
+      (select-keys [:status :start-time :end-time :idx])
+      (mc/update-existing :status keyword)
+      (ec/start-time->int)
+      (ec/end-time->int)
+      (assoc :build-id (:display-id build))))
+
+(defn- job->db [job]
+  (-> job
+      (select-keys [:status :start-time :end-time])
+      (mc/update-existing :status name)
+      (assoc :display-id (:id job)
+             :details (dissoc job :id :status :start-time :end-time))))
+
+(defn- db->job [job]
+  (-> job
+      (select-keys [:status :start-time :end-time])
+      (merge (:details job))
+      (mc/update-existing :status keyword)
+      (assoc :id (:display-id job))
+      (drop-nil)))
+
+(defn- insert-jobs [conn jobs build-id]
+  (doseq [j jobs]
+    (ec/insert-job conn (assoc (job->db j) :build-id build-id))))
+
+(defn- update-jobs [conn jobs]
+  (doseq [[upd ex] jobs]
+    (let [upd (merge ex (job->db upd))]
+      (ec/update-job conn upd))))
+
+(defn- insert-build [conn build]
+  (when-let [repo-id (er/repo-for-build-sid conn (:customer-id build) (:repo-id build))]
+    (let [{:keys [id]} (ec/insert-build conn (-> (build->db build)
+                                                 (assoc :repo-id repo-id)))]
+      (insert-jobs conn (vals (:jobs build)) id))))
+
+(defn- update-build [conn {:keys [jobs] :as build} existing]
+  (ec/update-build conn (merge existing (build->db build)))
+  (let [ex-jobs (ec/select-jobs conn (ec/by-build (:id existing)))
+        new-ids (set (keys jobs))
+        existing-ids (set (map :display-id ex-jobs))
+        to-delete (cset/difference existing-ids new-ids)
+        to-insert (apply dissoc jobs existing-ids)
+        to-update (reduce (fn [r ej]
+                            (let [n (get jobs (:display-id ej))]
+                              (cond-> r
+                                ;; TODO Only update modified jobs
+                                n (conj [n ej]))))
+                          []
+                          ex-jobs)]
+    (when-not (empty? to-delete)
+      ;; Delete all removed jobs (although this is a situation that probably never happens)
+      (ec/delete-jobs conn [:and
+                            [:= :build-id (:id existing)]
+                            [:in :display-id to-delete]]))
+    (when-not (empty? to-update)
+      (update-jobs conn to-update))
+    (when-not (empty? to-insert)
+      ;; Insert new jobs
+      (insert-jobs conn (vals to-insert) (:id existing)))))
+
+(defn- upsert-build [conn build]
+  ;; Fetch build by customer cuild and repo and build display ids
+  (if-let [existing (eb/select-build-by-sid conn (:customer-id build) (:repo-id build) (:build-id build))]
+    (update-build conn build existing)
+    (insert-build conn build)))
+
+(defn- select-jobs [conn build-id]
+  (->> (ec/select-jobs conn (ec/by-build build-id))
+       (map db->job)
+       (map (fn [j] [(:id j) j]))
+       (into {})))
+
+(defn- select-build [conn [cust-id repo-id build-id :as sid]]
+  (when-let [build (apply eb/select-build-by-sid conn sid)]
+    (-> (db->build build)
+        (assoc :customer-id cust-id
+               :repo-id repo-id
+               :jobs (select-jobs conn (:id build)))
+        (drop-nil))))
+
+(defn- select-repo-builds [conn sid]
+  (apply eb/select-build-ids-for-repo conn sid))
+
 (defrecord SqlStorage [conn]
   p/Storage
   (read-obj [_ sid]
@@ -271,7 +423,11 @@
       (ssh-key? sid)
       (select-ssh-keys conn (second sid))
       (params? sid)
-      (select-params conn (second sid))))
+      (select-params conn (second sid))
+      (user? sid)
+      (select-user conn (drop 2 sid))
+      (build? sid)
+      (select-build conn (rest sid))))
   
   (write-obj [_ sid obj]
     (cond
@@ -282,7 +438,11 @@
       (ssh-key? sid)
       (upsert-ssh-keys conn obj)
       (params? sid)
-      (upsert-params conn obj))
+      (upsert-params conn obj)
+      (user? sid)
+      (upsert-user conn obj)
+      (build? sid)
+      (upsert-build conn obj))
     sid)
 
   (obj-exists? [_ sid]
@@ -291,8 +451,13 @@
 
   (delete-obj [_ sid]
     (deleted?
+     ;; TODO Allow deleting other entities
      (when (customer? sid)
-       (delete-customer conn (global-sid->cuid sid))))))
+       (delete-customer conn (global-sid->cuid sid)))))
+
+  (list-obj [_ sid]
+    (when (build-repo? sid)
+      (select-repo-builds conn (rest sid)))))
 
 (defn select-watched-github-repos [{:keys [conn]} github-id]
   (let [matches (ec/select-repos conn [:= :github-id github-id])

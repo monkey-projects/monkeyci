@@ -45,7 +45,7 @@
 
 (s/def :db/build
   (-> (s/keys :req-un [:db/repo-id :db/idx]
-              :opt-un [:build/status])
+              :opt-un [:build/status :db/display-id])
       (s/merge :db/timed)))
 
 (s/def :job/details map?)
@@ -81,3 +81,12 @@
 
 (s/def :db/parameter-value
   (s/keys :req-un [:db/params-id :db/name :label/value]))
+
+(s/def :db/type string?)
+(s/def :db/type-id string?)
+(s/def :db/email string?)
+
+(s/def :db/user
+  (-> (s/keys :req-un [:db/type :db/type-id]
+              :opt-un [:db/email])
+      (s/merge :db/common)))

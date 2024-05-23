@@ -3,6 +3,7 @@ CREATE TABLE builds (
   cuid CHAR(24) NOT NULL,
   idx INTEGER NOT NULL,
   repo_id INTEGER NOT NULL,
+  display_id VARCHAR(50),
   start_time TIMESTAMP,
   end_time TIMESTAMP,
   status VARCHAR(30),

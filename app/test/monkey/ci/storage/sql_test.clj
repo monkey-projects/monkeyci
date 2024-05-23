@@ -31,6 +31,20 @@
 (defn- gen-customer-params []
   (gen-entity :entity/customer-params))
 
+(defn- gen-user []
+  (gen-entity :entity/user))
+
+(defn- gen-build []
+  (-> (gen-entity :entity/build)
+      ;; TODO Put this in the spec itself
+      (update :jobs (fn [jobs]
+                      (->> jobs
+                           (mc/map-kv-vals #(assoc %2 :id %1))
+                           (into {}))))))
+
+(defn- gen-job []
+  (gen-entity :entity/job))
+
 (defmacro with-storage [conn s & body]
   `(eh/with-prepared-db ~conn
      (let [~s (sut/make-storage ~conn)]
@@ -213,3 +227,64 @@
                      :value "new value"}]]
             (is (sid/sid? (st/save-params s cust-id [(assoc params :parameters pv)])))
             (is (= pv (-> (st/find-params s cust-id) first :parameters)))))))))
+
+(deftest ^:sql users
+  (with-storage conn s
+    (testing "users"
+      (let [user (-> (gen-user)
+                     (dissoc :customers))
+            user->id (juxt :type :type-id)]
+        (testing "can save and find"
+          (is (sid/sid? (st/save-user s user)))
+          (is (= user (st/find-user s (user->id user)))))
+
+        (testing "can link to customer"
+          (let [cust (gen-cust)
+                user (assoc user :customers [(:id cust)])]
+            (is (sid/sid? (st/save-customer s cust)))
+            (is (sid/sid? (st/save-user s user)))
+            (is (= (:customers user)
+                   (-> (st/find-user s (user->id user)) :customers)))))
+
+        (testing "can unlink from customer"
+          (is (sid/sid? (st/save-user s (dissoc user :customers))))
+          (is (empty? (-> (st/find-user s (user->id user)) :customers))))))))
+
+(deftest ^:sql builds
+  (with-storage conn s
+    (testing "builds"
+      (let [repo (gen-repo)
+            cust (-> (gen-cust)
+                     (assoc-in [:repos (:id repo)] repo))
+            build (-> (gen-build)
+                      (assoc :customer-id (:id cust)
+                             :repo-id (:id repo)))
+            build-sid (st/ext-build-sid build)]
+        (is (sid/sid? (st/save-customer s cust)))
+
+        (testing "can save and retrieve"
+          (is (sid/sid? (st/save-build s build)))
+          (is (= 1 (count (ec/select conn {:select :*
+                                           :from :builds}))))
+          (is (= build (-> (st/find-build s build-sid)
+                           (select-keys (keys build))))))
+
+        (testing "can replace jobs"
+          (let [job (gen-job)
+                jobs {(:id job) job}]
+            (is (sid/sid? (st/save-build s (assoc build :jobs jobs))))
+            (is (= 1 (count (ec/select conn {:select :*
+                                             :from :jobs}))))
+            (is (= jobs (:jobs (st/find-build s build-sid))))))
+
+        (testing "can update jobs"
+          (let [job (assoc (gen-job) :status :pending)
+                jobs {(:id job) job}
+                upd (assoc job :status :running)]
+            (is (sid/sid? (st/save-build s (assoc build :jobs jobs))))
+            (is (sid/sid? (st/save-build s (assoc-in build [:jobs (:id job)] upd))))
+            (is (= upd (get-in (st/find-build s build-sid) [:jobs (:id job)])))))
+
+        (testing "can list"
+          (is (= [(:build-id build)]
+                 (st/list-builds s [(:id cust) (:id repo)]))))))))
