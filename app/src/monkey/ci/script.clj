@@ -51,13 +51,16 @@
       (assoc :job (j/job->event job)
              :message "Job started")))
 
-(defn- job-end-evt [{:keys [job] :as rt} {:keys [status message exception]}]
-  (-> (base-event rt :job/end)
-      (assoc :message "Job completed"
-             :job (cond-> (j/job->event job)
-                    true (assoc :status status)
-                    (some? exception) (assoc :message (or message (.getMessage exception))
-                                             :stack-trace (u/stack-trace exception))))))
+(defn- job-end-evt [{:keys [job] :as rt} {:keys [status message exception] :as r}]
+  (let [r (dissoc r :status :exception)]
+    (-> (base-event rt :job/end)
+        (assoc :message "Job completed"
+               :job (cond-> (j/job->event job)
+                      true (assoc :status status)
+                      ;; Add any extra information to the result key
+                      (not-empty r) (assoc :result r)
+                      (some? exception) (assoc :message (or message (.getMessage exception))
+                                               :stack-trace (u/stack-trace exception)))))))
 
 ;; Wraps a job so it fires an event before and after execution, and also
 ;; catches any exceptions.
