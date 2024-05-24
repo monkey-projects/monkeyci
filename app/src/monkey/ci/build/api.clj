@@ -25,5 +25,5 @@
   (let [client (rt->api-client rt)
         sid (b/get-sid rt)]
     (log/debug "Downloading artifact for build" sid ":" id)
-    @(client {:url (apply format "/customer/%s/repo/%s/build/%s/artifact/%s/download" (conj sid id))
+    @(client {:url (apply format "/customer/%s/repo/%s/builds/%s/artifact/%s/download" (conj sid id))
               :method :get})))

@@ -16,7 +16,7 @@
 (deftest download-artifact
   (testing "invokes artifact download endpoint on client"
     (let [m (fn [req]
-              (when (= "/customer/test-cust/repo/test-repo/build/test-build/artifact/test-artifact/download"
+              (when (= "/customer/test-cust/repo/test-repo/builds/test-build/artifact/test-artifact/download"
                        (:url req))
                 (md/success-deferred "test artifact contents")))
           rt {:api {:client m}

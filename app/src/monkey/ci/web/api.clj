@@ -300,7 +300,7 @@
 (defn- with-artifacts [req f]
   (if-let [b (fetch-build-details (c/req->storage req)
                                   (build-sid req))]
-    (let [res (->> (b/success-jobs b)
+    (let [res (->> (b/success-jobs b) ; TODO Maybe we also want to fetch artifacts of failed jobs?
                    (mapcat :save-artifacts)
                    (f))
           ->response (fn [res]
