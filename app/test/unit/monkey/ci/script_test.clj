@@ -94,7 +94,8 @@
   (testing "client invokes http request, parses body as edn"
     (with-redefs [http/request (constantly (md/success-deferred
                                             {:status 200
-                                             :body "\"ok\""}))]
+                                             :body "\"ok\""
+                                             :headers {"content-type" "application/edn"}}))]
       (let [c (sut/make-client {:api {:url "http://test"}})]
         (is (= "ok" @(c {:method :get :url "/something"}))))))
 
@@ -109,9 +110,18 @@
     (with-redefs [http/request (fn [{:keys [url]}]
                                  (md/success-deferred
                                   {:status 200
-                                   :body (pr-str url)}))]
+                                   :body (pr-str url)
+                                   :headers {"content-type" "application/edn"}}))]
       (let [c (sut/make-client {:api {:url "http://test"}})]
-        (is (= "http://test/something" @(c {:method :get :url "/something"})))))))
+        (is (= "http://test/something" @(c {:method :get :url "/something"}))))))
+
+  (testing "returns non-edn input as input stream"
+    (with-redefs [http/request (constantly (md/success-deferred
+                                            {:status 200
+                                             :body "ok"
+                                             :headers {"content-type" "text/plain"}}))]
+      (let [c (sut/make-client {:api {:url "http://test"}})]
+        (is (= "ok" (slurp @(c {:method :get :url "/something"}))))))))
 
 (deftest run-all-jobs
   (testing "success if no pipelines"

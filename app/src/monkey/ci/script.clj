@@ -133,9 +133,12 @@
             (if (>= status 400)
               (md/error-deferred (ex-info "Failed to invoke API call" r))
               r))
-          (parse-body [{:keys [body]}]
-            (with-open [r (bs/to-reader body)]
-              (u/parse-edn r)))]
+          (parse-body [{:keys [body headers]}]
+            (if (= "application/edn" (get headers "content-type"))
+              (with-open [r (bs/to-reader body)]
+                (u/parse-edn r))
+              ;; Return non-edn contents as input stream
+              (bs/to-input-stream body)))]
     (log/debug "Connecting to API at" url)
     (fn [req]
       (-> req
