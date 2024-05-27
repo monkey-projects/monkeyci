@@ -301,7 +301,6 @@
   (if-let [b (fetch-build-details (c/req->storage req)
                                   (build-sid req))]
     (do 
-      (log/debug "Build details:" b)
       (let [res (->> (b/all-jobs b)
                      (mapcat :save-artifacts)
                      (f))
@@ -320,7 +319,6 @@
   (with-artifacts req identity))
 
 (defn- artifact-by-id [id art]
-  (log/debug "Looking for artifact" id "in" art)
   (->> art
        (filter (comp (partial = id) :id))
        (first)))
