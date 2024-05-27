@@ -6,14 +6,14 @@
             [re-frame.core :as rf]))
 
 (def alerts ::alerts)
-(def log-tabs-id ::log-tabs)
+(def details-tabs-id ::details-tabs)
 
 (rf/reg-event-fx
  :job/init
  (fn [{:keys [db]} _]
    {:dispatch-n [[:customer/maybe-load]
                  [:build/maybe-load]
-                 [:tab/tab-changed log-tabs-id nil]]
+                 [:tab/tab-changed details-tabs-id nil]]
     :db (-> db
             (db/clear-alerts)
             (db/set-log-files nil)

@@ -8,7 +8,10 @@
    job properties, the associated extension code is executed.  Extensions can
    be executed before or after a job (or both)."
   (:require [manifold.deferred :as md]
-            [monkey.ci.jobs :as j]))
+            [monkey.ci
+             [build :as b]
+             [jobs :as j]
+             [runtime :as rt]]))
 
 (def new-register {})
 
@@ -54,7 +57,12 @@
 (defrecord ExtensionWrappingJob [target registered-ext]
   j/Job
   (execute! [job rt]
-    (let [rt (assoc rt :job target)]
+    (let [rt (assoc rt :job target)
+          post-update (fn [rt]
+                        (rt/post-events rt {:type :job/updated
+                                            :sid (b/get-sid rt)
+                                            :job (j/job->event (:job rt))})
+                        rt)]
       ;; FIXME This is fairly dirty: jobs don't return the runtime, but extensions use it,
       ;; so maybe we need to think about reworking this.
       (-> rt
@@ -63,6 +71,9 @@
           (md/chain
            ;; Add the result to the job in runtime
            (partial assoc-in rt [:job :result])
+           ;; Dispatch an update event already.  Some extensions may require information
+           ;; from the api that has not been sent yet, so we do it here.
+           post-update
            ;; Let any extensions work on it
            #(apply-extensions-after % registered-ext)
            ;; Return the job result (possibly modified by extensions)

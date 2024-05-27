@@ -188,6 +188,9 @@
     (testing "handles `job/start`"
       (verify-job-event :job/start))
 
+    (testing "handles `job/updated`"
+      (verify-job-event :job/updated))
+
     (testing "handles `job/end`"
       (verify-job-event :job/end)))  
 

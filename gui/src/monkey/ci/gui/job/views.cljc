@@ -4,8 +4,10 @@
             [monkey.ci.gui.job.events :as e]
             [monkey.ci.gui.job.subs]
             [monkey.ci.gui.layout :as l]
+            [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.tabs :as tabs]
+            [monkey.ci.gui.test-results :as tr]
             [monkey.ci.gui.time :as t]
             [re-frame.core :as rf]))
 
@@ -28,7 +30,7 @@
        (into [:ul])))
 
 (defn- job-details []
-  (when-let [{:keys [start-time end-time labels] deps :dependencies :as job} @(rf/subscribe [:job/current])]
+  (when-let [{:keys [start-time end-time labels message] deps :dependencies :as job} @(rf/subscribe [:job/current])]
     [info
      ["Status:" [co/build-result (:status job)]]
      (when start-time
@@ -40,7 +42,9 @@
      (when-not (empty? labels)
        ["Labels:" [job-labels labels]])
      (when-not (empty? deps)
-       ["Dependent on:" (cs/join ", " deps)])]))
+       ["Dependent on:" (cs/join ", " deps)])
+     (when-not (empty? message)
+       ["Message: " message])]))
 
 (defn- path->file [p]
   (some-> p
@@ -56,7 +60,21 @@
      (when (and @log (not-empty @log))
        [co/log-contents @log])]))
 
-(defn- log-tabs [job]
+(defn- test-results [job]
+  (when-let [tr (get-in job [:results :monkey.ci/tests])]
+    {:header "Test Results"
+     :contents [tr/test-results tr]}))
+
+(defn- error-trace [job]
+  (when-let [st (:stack-trace job)]
+    {:header "Error Trace"
+     :contents [co/log-contents (-> st
+                                    (cs/split #"\n")
+                                    (as-> x (interpose [:br] x)))]}))
+
+(defn- details-tabs
+  "Renders tabs to display the job details.  These tabs include logs and test results."
+  [job]
   (when-let [files (rf/subscribe [:job/log-files])]
     (if (empty? @files)
       [:p "No log information available.  You may want to try again later."]
@@ -65,12 +83,16 @@
                           {:header (path->file p)
                            :contents [log-contents job p]
                            :current? (zero? idx)}))
-           (conj [tabs/tabs e/log-tabs-id])))))
+           (concat [(error-trace job) (test-results job)])
+           (remove nil?)
+           (conj [tabs/tabs e/details-tabs-id])))))
 
-(defn- load-log-tabs []
+(defn- load-details-tabs
+  "Loads any additional job details and renders the tabs to display them."
+  []
   (when-let [job @(rf/subscribe [:job/current])]
     (rf/dispatch [:job/load-log-files job])
-    [log-tabs job]))
+    [details-tabs job]))
 
 (defn page [_]
   (rf/dispatch [:job/init])
@@ -81,4 +103,4 @@
       [:div.mb-2
        [job-details]]
       [co/alerts [:job/alerts]]
-      [load-log-tabs]]]))
+      [load-details-tabs]]]))

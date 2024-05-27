@@ -126,6 +126,7 @@
   "Posts one or more events using the event poster in the runtime"
   [{:keys [events]} evt]
   (let [evt (prepare-events evt)]
+    (log/trace "Posting events:" evt)
     (cond
       (satisfies? p/EventPoster events)
       (p/post-events events evt)

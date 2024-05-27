@@ -97,7 +97,7 @@
 (defn- with-fire-events
   "Wraps job so events are fired on start and end."
   [job]
-  (map->EventFiringJob (-> (select-keys job [j/job-id j/deps j/labels])
+  (map->EventFiringJob (-> (j/job->event job)
                            (assoc :target job))))
 
 (def with-extensions

@@ -300,16 +300,18 @@
 (defn- with-artifacts [req f]
   (if-let [b (fetch-build-details (c/req->storage req)
                                   (build-sid req))]
-    (let [res (->> (b/success-jobs b) ; TODO Maybe we also want to fetch artifacts of failed jobs?
-                   (mapcat :save-artifacts)
-                   (f))
-          ->response (fn [res]
-                       (if (or (nil? res) (and (sequential? res) (empty? res)))
-                         (rur/status 204)
-                         (rur/response res)))]
-      (if (md/deferred? res)
-        (md/chain res ->response)
-        (->response res)))
+    (do 
+      (log/debug "Build details:" b)
+      (let [res (->> (b/all-jobs b)
+                     (mapcat :save-artifacts)
+                     (f))
+            ->response (fn [res]
+                         (if (or (nil? res) (and (sequential? res) (empty? res)))
+                           (rur/status 204)
+                           (rur/response res)))]
+        (if (md/deferred? res)
+          (md/chain res ->response)
+          (->response res))))
     (rur/not-found nil)))
 
 (defn get-build-artifacts
@@ -318,6 +320,7 @@
   (with-artifacts req identity))
 
 (defn- artifact-by-id [id art]
+  (log/debug "Looking for artifact" id "in" art)
   (->> art
        (filter (comp (partial = id) :id))
        (first)))
@@ -334,9 +337,11 @@
    files directly from the blob store.  It is up to the caller to unzip the archive."
   [req]
   (letfn [(get-contents [{:keys [id]}]
-            (let [store (a/artifact-store (c/req->rt req))
-                  path (a/build-sid->artifact-path (build-sid req) id)]
-              (blob/input-stream store path)))]
+            (when id
+              (let [store (a/artifact-store (c/req->rt req))
+                    path (a/build-sid->artifact-path (build-sid req) id)]
+                (log/debug "Downloading artifact for id" id "from path" path)
+                (blob/input-stream store path))))]
     (with-artifacts req (comp get-contents
                               (partial artifact-by-id (artifact-id req))))))
 
@@ -352,7 +357,8 @@
         st (c/req->storage req)
         repo (st/find-repo st (repo-sid req))
         ssh-keys (->> (st/find-ssh-keys st (customer-id req))
-                      (lbl/filter-by-label repo))]
+                      (lbl/filter-by-label repo))
+        rt (c/req->rt req)]
     (-> acc
         (select-keys [:customer-id :repo-id])
         (assoc :source :api
@@ -360,7 +366,7 @@
                :git (-> (:query p)
                         (select-keys [:commit-id :branch])
                         (assoc :url (:url repo)
-                               :ssh-keys-dir (rt/ssh-keys-dir (c/req->rt req) bid))
+                               :ssh-keys-dir (rt/ssh-keys-dir rt bid))
                         (mc/assoc-some :ref (params->ref p)
                                        :ssh-keys ssh-keys
                                        :main-branch (:main-branch repo)))
@@ -369,7 +375,7 @@
                         (st/ext-build-sid))
                :start-time (u/now)
                :status :running
-               :cleanup? true))))
+               :cleanup? (not (rt/dev-mode? rt))))))
 
 (defn trigger-build [req]
   (let [{p :parameters} req]

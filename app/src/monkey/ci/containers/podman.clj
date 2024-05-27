@@ -56,11 +56,13 @@
         cn (b/get-job-id rt)
         wd (b/job-work-dir rt)
         cwd "/home/monkeyci"
-        base-cmd ["/usr/bin/podman" "run"
-                  "-t" "--rm"
-                  "--name" cn
-                  "-v" (str wd ":" cwd ":Z")
-                  "-w" cwd]]
+        base-cmd (cond-> ["/usr/bin/podman" "run"
+                          "-t"
+                          "--name" cn
+                          "-v" (str wd ":" cwd ":Z")
+                          "-w" cwd]
+                   ;; Do not delete container in dev mode
+                   (not (rt/dev-mode? rt)) (conj "--rm"))]
     (concat
      ;; TODO Allow for more options to be passed in
      base-cmd
