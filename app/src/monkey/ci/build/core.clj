@@ -183,5 +183,4 @@
    checks if any of the files match the regex.  If `p` is a function, it is applied
    as a predicate against the files, until one matches."
   ;; Wrap the args in a vector because some-fn only passes one argument
-  #_(comp (some-fn added? modified? removed?) vector)
-  (constantly true))
+  (comp (some-fn added? modified? removed?) vector))
