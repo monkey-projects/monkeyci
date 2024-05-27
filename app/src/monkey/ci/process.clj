@@ -156,7 +156,7 @@
                        (log/debug "Script process exited with code" exit ", cleaning up")
                        (when out
                          (log/debug "Process output:" (out->str out)))
-                       (when err
+                       (when (and err (not= 0 exit))
                          (log/warn "Process error output:" (out->str err)))
                        (md/success! result {:process p
                                             :exit exit})))})

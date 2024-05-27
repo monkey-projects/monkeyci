@@ -430,7 +430,19 @@
                                                 :repo-id rid})
                  (sut/make-build-ctx "test-build")
                  :git
-                 :main-branch))))))
+                 :main-branch)))))
+
+  (testing "sets cleanup flag when not in dev mode"
+    (is (true? (:cleanup? (sut/make-build-ctx (-> (h/test-rt)
+                                                  (assoc-in [:config :dev-mode] false)
+                                                  (h/->req))
+                                              "test-build")))))
+
+  (testing "does not set cleanup flag when in dev mode"
+    (is (false? (:cleanup? (sut/make-build-ctx (-> (h/test-rt)
+                                                   (assoc-in [:config :dev-mode] true)
+                                                   (h/->req))
+                                               "test-build"))))))
 
 (deftest update-user
   (testing "updates user in storage"

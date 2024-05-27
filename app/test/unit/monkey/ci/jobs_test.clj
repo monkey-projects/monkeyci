@@ -260,11 +260,14 @@
     (is (sut/job? (bc/container-job ::test-job {:container/image "test-img"}))))
 
   (testing "runs container on execution"
-    (with-redefs [co/run-container (constantly ::ok)]
-      (is (= ::ok (-> (bc/container-job ::test-job {})
-                      (sut/execute! {})
-                      (deref)
-                      :result)))))
+    (let [invoked? (atom false)]
+      (with-redefs [co/run-container (fn [_]
+                                       (reset! invoked? true)
+                                       (md/success-deferred {:exit 0}))]
+        (is (bc/success? (-> (bc/container-job ::test-job {})
+                             (sut/execute! {})
+                             (deref))))
+        (is (true? @invoked?)))))
 
   (testing "adds status according to exit code"
     (with-redefs [co/run-container (constantly (md/success-deferred {:exit 1}))]

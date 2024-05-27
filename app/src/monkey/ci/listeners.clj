@@ -42,6 +42,7 @@
 
 (def update-handlers
   {:job/start    update-job
+   :job/updated  update-job
    :job/end      update-job
    :script/start update-script
    :script/end   update-script

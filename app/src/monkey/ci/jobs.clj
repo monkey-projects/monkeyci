@@ -19,6 +19,7 @@
 (def deps "Get job dependencies" :dependencies)
 (def status "Get job status" :status)
 (def labels "Get job labels" :labels)
+(def save-artifacts "Gets artifacts saved by job" :save-artifacts)
 (def job-id "Gets job id" :id)
 
 (defprotocol Job
@@ -88,10 +89,10 @@
     (md/chain
      (co/run-container (assoc rt :job this))
      (fn [r]
-       (assoc (if (= 0 (:exit r))
-                bc/success
-                bc/failure)
-              :result r)))))
+       ;; Don't add the full result otherwise it will be sent out as an event
+       (if (= 0 (:exit r))
+         bc/success
+         bc/failure)))))
 
 (defn- find-dependents
   "Finds all jobs that are dependent on this job"
@@ -337,6 +338,6 @@
   (letfn [(art->event [a]
             (select-keys a [:id :path]))]
     (-> job
-        (select-keys [:status :start-time :end-time deps labels :save-artifacts :extensions])
+        (select-keys [:status :start-time :end-time deps labels save-artifacts :extensions])
         (mc/update-existing :save-artifacts (partial map art->event))
         (assoc :id (bc/job-id job)))))

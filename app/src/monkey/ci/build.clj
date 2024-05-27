@@ -183,13 +183,14 @@
   [rt p]
   (u/abs-path (job-work-dir rt) p))
 
+(def all-jobs "Retrieves all jobs known to the build"
+  (comp vals :jobs :script))
+
 (defn success-jobs
   "Returns all successful jobs in the build"
   [b]
   (->> b
-       :script
-       :jobs
-       vals
+       (all-jobs)
        (filter (comp (partial = :success) :status))))
 
 (defmethod rt/setup-runtime :build [conf _]

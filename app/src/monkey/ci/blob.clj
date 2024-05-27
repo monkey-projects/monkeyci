@@ -74,17 +74,18 @@
 (deftype DiskBlobStore [dir]
   p/BlobStore
   (save-blob [_ src dest]
-    (if (fs/exists? src)
-      (let [f (io/file dir dest)]
-        (log/debug "Saving archive" src "to" f)
-        (md/chain
-         (make-archive src f)
-         ;; Return destination path
-         (constantly (u/abs-path f))))
-      (md/success-deferred nil)))
+    (md/success-deferred 
+     (if (fs/exists? src)
+       (let [f (io/file dir dest)]
+         (log/debug "Saving blob" src "to" f)
+         (make-archive src f))
+       (do
+         (log/warn "Unable to archive" src ": path does not exist")
+         nil))))
 
   (get-blob-stream [_ src]
     (let [srcf (io/file dir src)]
+      (log/debug "Retrieving blob stream for" srcf)
       (md/success-deferred
        (when (fs/exists? srcf)
          (io/input-stream srcf)))))
@@ -93,13 +94,15 @@
     (let [f (io/file dest)
           os (PipedOutputStream.)
           srcf (io/file dir src)]
+      (log/debug "Restoring blob from" srcf)
       (md/future
         (when (fs/exists? srcf)
           (-> (a/extract srcf f)
               (assoc :src src)))))))
 
 (defmethod make-blob-store :disk [conf k]
-  (->DiskBlobStore (get-in conf [k :dir])))
+  ;; Make storage dir relative to the work dir
+  (->DiskBlobStore (u/abs-path (:work-dir conf) (get-in conf [k :dir]))))
 
 (defn- tmp-dir [{:keys [tmp-dir]}]
   (or tmp-dir (u/tmp-dir)))

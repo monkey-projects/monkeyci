@@ -433,7 +433,7 @@
 (defn- with-repo [f & [rt]]
   (h/with-memory-store st
     (let [events (atom [])
-          app (sut/make-app (merge
+          app (sut/make-app (u/deep-merge
                              {:storage st
                               :events {:poster (partial swap! events conj)}
                               :config {:dev-mode true}
@@ -537,12 +537,6 @@
              (is (= (take 2 sid) (take 2 bsid)))
              (is (= (:build-id @runner-args)
                     (last bsid)))))))
-      
-      (testing "sets cleanup flag"
-        (verify-runner
-         "/trigger"
-         (fn [{:keys [sid runner-args]}]
-           (is (true? (:cleanup? @runner-args))))))
       
       (testing "creates build in storage"
         (verify-runner

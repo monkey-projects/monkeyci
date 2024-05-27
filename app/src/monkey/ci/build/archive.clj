@@ -41,6 +41,12 @@
 (defn- archive-stream [is]
   (.createArchiveInputStream stream-factory ArchiveStreamFactory/TAR is))
 
+(defn- copy-to-tmp [is]
+  (let [tmp (java.io.File/createTempFile "archive-" ".tgz")]
+    (log/debug "Storing downloaded archive in" tmp)
+    (io/copy is tmp)
+    (io/input-stream tmp)))
+
 (defn- decompress
   "Decompresses a source file.  Returns an input stream that will contain the
    decompressed archive."
@@ -49,9 +55,11 @@
         is (BufferedInputStream. (PipedInputStream. os))]
     ;; Decompress to the output stream
     (doto (Thread. (fn []
+                     (log/debug "Decompressing source:" src)
                      (try 
                        (cc/decompress
-                        (io/input-stream src)
+                        #_(io/input-stream src)
+                        (copy-to-tmp src)
                         os
                         compression-type)
                        (catch Exception ex
