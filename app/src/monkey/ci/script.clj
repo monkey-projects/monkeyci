@@ -21,7 +21,8 @@
              [oci]
              [podman]]
             [monkey.ci.events.core :as ec]
-            [monkey.ci.spec.build :as sb])
+            [monkey.ci.spec.build :as sb]
+            [muuntaja.parse :as mp])
   (:import java.nio.channels.SocketChannel
            [java.net UnixDomainSocketAddress StandardProtocolFamily]))
 
@@ -134,7 +135,9 @@
               (md/error-deferred (ex-info "Failed to invoke API call" r))
               r))
           (parse-body [{:keys [body headers]}]
-            (if (= "application/edn" (get headers "content-type"))
+            (if (= "application/edn" (-> (get headers "content-type")
+                                         (mp/parse-content-type)
+                                         first))
               (with-open [r (bs/to-reader body)]
                 (u/parse-edn r))
               ;; Return non-edn contents as input stream

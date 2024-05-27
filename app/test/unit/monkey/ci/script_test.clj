@@ -121,7 +121,15 @@
                                              :body "ok"
                                              :headers {"content-type" "text/plain"}}))]
       (let [c (sut/make-client {:api {:url "http://test"}})]
-        (is (= "ok" (slurp @(c {:method :get :url "/something"}))))))))
+        (is (= "ok" (slurp @(c {:method :get :url "/something"})))))))
+
+  (testing "handles content type header with charset"
+    (with-redefs [http/request (constantly (md/success-deferred
+                                            {:status 200
+                                             :body (pr-str "ok")
+                                             :headers {"content-type" "application/edn; charset=utf-8"}}))]
+      (let [c (sut/make-client {:api {:url "http://test"}})]
+        (is (= "ok" @(c {:method :get :url "/something"})))))))
 
 (deftest run-all-jobs
   (testing "success if no pipelines"
