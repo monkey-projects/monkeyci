@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.job.views
   (:require [clojure.string :as cs]
+            [monkey.ci.gui.charts :as charts]
             [monkey.ci.gui.components :as co]
             [monkey.ci.gui.job.events :as e]
             [monkey.ci.gui.job.subs]
@@ -60,10 +61,15 @@
      (when (and @log (not-empty @log))
        [co/log-contents @log])]))
 
+(defn- test-results-details [tr]
+  [:div
+   [tr/timing-chart :test-timings tr]
+   [tr/test-results tr]])
+
 (defn- test-results [job]
-  (when-let [tr (get-in job [:results :monkey.ci/tests])]
+  (when-let [tr (get-in job [:result :monkey.ci/tests])]
     {:header "Test Results"
-     :contents [tr/test-results tr]}))
+     :contents [test-results-details tr]}))
 
 (defn- error-trace [job]
   (when-let [st (:stack-trace job)]
@@ -75,17 +81,19 @@
 (defn- details-tabs
   "Renders tabs to display the job details.  These tabs include logs and test results."
   [job]
-  (when-let [files (rf/subscribe [:job/log-files])]
-    (if (empty? @files)
-      [:p "No log information available.  You may want to try again later."]
-      (->> @files
-           (map-indexed (fn [idx p]
-                          {:header (path->file p)
-                           :contents [log-contents job p]
-                           :current? (zero? idx)}))
-           (concat [(error-trace job) (test-results job)])
-           (remove nil?)
-           (conj [tabs/tabs e/details-tabs-id])))))
+  (let [files (rf/subscribe [:job/log-files])
+        log-tabs (when @files
+                   (->> @files
+                        (map (fn [p]
+                               {:header (path->file p)
+                                :contents [log-contents job p]}))))
+        [f :as tabs] (->> log-tabs
+                          (concat [(error-trace job) (test-results job)])
+                          (remove nil?))]
+    (if (empty? tabs)
+      [:p "No job details available.  You may want to try again later."]
+      (conj [tabs/tabs e/details-tabs-id]
+            (replace {f (assoc f :current? true)} tabs)))))
 
 (defn- load-details-tabs
   "Loads any additional job details and renders the tabs to display them."

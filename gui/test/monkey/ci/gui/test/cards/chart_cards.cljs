@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.test.cards.chart-cards
   (:require [devcards.core :refer-macros [defcard-rg]]
+            [monkey.ci.gui.charts :as sut]
             [monkey.ci.gui.layout :as l]
             [monkey.ci.gui.logging :as log]
             [reagent.core :as rc]
@@ -10,89 +11,66 @@
             #_["chart.js" :refer [BarController BarElement CategoryScale LinearScale
                                   Chart]]))
 
-(defn- set-chart-config [db id conf]
-  (assoc-in db [::chart-config id] conf))
-
-(defn- chart-config [db id]
-  (get-in db [::chart-config id]))
-
-(defn- configure-chart! [id chart config]
-  ;; FIXME No matter what, the chart always re-renders, so the change check doesn't work.
-  (when (or (nil? chart)
-            ;; Only update when the chart data has changed
-            (not= (js->clj (.-data chart)) (:data config)))
-    (when chart
-      (.destroy chart))
-    (if-let [el (.getElementById js/document (name id))]
-      (Chart. el (clj->js config))
-      (log/warn "Element" (name id) "not found in document"))))
-
-(rf/reg-cofx
- :chart/configurator
- (fn [cofx _]
-   (assoc cofx :chart/configurator configure-chart!)))
-
-#_(rf/reg-fx
- :chart/configure
- (fn [[id config]]
-   (log/debug "Configuring chart:" (name id))
-   (if-let [el (.getElementById js/document (name id))]
-     ;; We need to directly manipulate the app db because the chart
-     ;; is directly modifying the DOM.
-     (set-chart-config @rdb/app-db id (Chart. el (clj->js config)))
-     (log/warn "Element" (name id) "not found in document"))))
-
-#_(rf/reg-fx
- :chart/set-data
- (fn [[chart data]]
-   (when chart
-     (log/debug "Updating chart data")
-     (set! (.-data chart) data))))
-
-#_(rf/reg-fx
- :chart/destroy
- (fn [chart]
-   (when chart
-     (.destroy chart))))
-
-(rf/reg-event-fx
- :chart/update
- [(rf/inject-cofx :chart/configurator)]
- (fn [{:keys [db :chart/configurator]} [_ chart-id new-config]]
-   (let [old-config (chart-config db chart-id)]
-     {:db (set-chart-config db chart-id (configurator chart-id old-config new-config))})))
-
-#_(rf/reg-sub
- :chart/config
- (fn [db [_ id]]
-   (chart-config db id)))
-
-(defn chart-component [id]
-  [:canvas {:id id}]
-  #_(rc/create-class
-     {:reagent-render
-      (fn [id config]
-        ;; Render the component, chart js will fill it up after mount
-        [:canvas {:id id}])
-      :component-did-mount
-      (fn [this]
-        #_(Chart. (.getElementById js/document id) (clj->js config))
-        #_(rf/dispatch [:chart/update id config]))}))
+(defn chart-component-2 [id config]
+  ;; The main issue with the chart component is that it requires an existing
+  ;; DOM object before it can render the chart.  So we can't really use the
+  ;; regular system of "prepare the data and set it in the hiccup structure".
+  (letfn [(make-chart [conf]
+            (Chart. (.getElementById js/document id) (clj->js conf)))
+          (remake-chart [chart conf]
+            (log/debug "Destroying chart")
+            (.-destroy chart) ; Has no effect?
+            (make-chart conf))]
+    (let [state (rc/atom nil)]
+      (rc/create-class
+       {:display-name "chart-component"
+        :reagent-render
+        (fn [id config]
+          ;; Render the component, chart js will fill it up after mount
+          (log/debug "Rendering component")
+          @config ; Dereference the config so reagent will re-render on changes
+          [:canvas {:id id}])
+        :component-did-update
+        (fn [this argv]
+          (let [conf @(nth argv 2)]
+            (log/debug "Component updated:" (str conf))
+            (swap! state remake-chart conf)))
+        :component-did-mount
+        (fn [this]
+          (log/debug "Component mounted")
+          (reset! state (make-chart @config)))}))))
 
 (defcard-rg bar-chart
   "Simple bar chart"
   (let [id "bar-chart"
         data {:labels (range 10)
               :datasets [{:label "Values"
-                          :data [5 3 6 7 3 2 5 6 8 7]
-                          :borderWidth 1}]}
+                          :data [5 3 6 7 3 2 5 6 8 7]}]}
         config {:type "bar"
                 :data data}]
     (rf/dispatch [:chart/update id config])
     [l/error-boundary
      [:div
       [:h2 "Bar chart"]
-      [chart-component id]]]))
+      [sut/chart-component id]]]))
+
+(defcard-rg bar-chart-2
+  "Simple bar chart with react class"
+  (let [id "bar-chart-2"
+        create-config (fn []
+                        {:type "bar"
+                         :data {:labels (range 10)
+                                :datasets [{:label "Values"
+                                            :data (repeatedly 10 (comp inc #(rand-int 10)))}]}})
+        config (rc/atom (create-config))
+        reset-config (fn []
+                       (println "Resetting config")
+                       (reset! config (create-config)))]
+    [l/error-boundary
+     [:div
+      [:h2 "Bar chart 2"]
+      [chart-component-2 id config]
+      [:button.btn.btn-primary {:on-click #(reset-config)} "Reset"]]]))
 
 (defcard-rg line-chart
   "Simple line chart"
@@ -107,7 +85,7 @@
     [l/error-boundary
      [:div
       [:h2 "Line chart"]
-      [chart-component id]]]))
+      [sut/chart-component id]]]))
 
 (defcard-rg donut-chart
   "Donut chart"
@@ -122,4 +100,4 @@
     [l/error-boundary
      [:div
       [:h2 "Test durations by suite"]
-      [chart-component id]]]))
+      [sut/chart-component id]]]))
