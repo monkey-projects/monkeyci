@@ -135,9 +135,9 @@
               (md/error-deferred (ex-info "Failed to invoke API call" r))
               r))
           (parse-body [{:keys [body headers]}]
-            (if (= "application/edn" (-> (get headers "content-type")
-                                         (mp/parse-content-type)
-                                         first))
+            (if (= "application/edn" (some-> (get headers "content-type")
+                                             (mp/parse-content-type)
+                                             first))
               (with-open [r (bs/to-reader body)]
                 (u/parse-edn r))
               ;; Return non-edn contents as input stream
