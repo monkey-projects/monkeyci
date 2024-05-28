@@ -28,8 +28,16 @@
         (mapcat suite-rows)
         (into [:tbody]))])
 
-(defn- timings->chart [results n]
-  (let [cases (->> results
+(def all-suites "$all$")
+
+(defn- timings->chart
+  "Converts test result information into bar chart data for the top `n` slowest tests
+   matching the suite (if any)."
+  [results {:keys [suite] n :count}]
+  (let [matches-suite? (fn [{:keys [name]}]
+                         (or (= all-suites suite) (= suite name)))
+        cases (->> results
+                   (filter matches-suite?)
                    (mapcat :test-cases)
                    (remove (comp nil? :time))
                    (take n)
@@ -43,7 +51,8 @@
 (def default-chart-form {:count 5})
 
 (defn- timing-chart-form [db id]
-  (get-in db [::timing-chart id] default-chart-form))
+  (merge default-chart-form
+         (get-in db [::timing-chart id])))
 
 (defn- timing-chart-results [db id]
   (get-in db [::timing-chart-results id]))
@@ -62,7 +71,7 @@
  ::timing-chart-init
  (fn [{:keys [db]} [_ id results]]
    {:db (assoc-in db [::timing-chart-results id] results)
-    :dispatch [:chart/update id (timings->chart results (:count (timing-chart-form db id)))]}))
+    :dispatch [:chart/update id (timings->chart results (timing-chart-form db id))]}))
 
 (rf/reg-event-fx
  ::timing-chart-changed
@@ -70,13 +79,13 @@
    (let [results (timing-chart-results db id)
          db (assoc-in db [::timing-chart id prop] v)]
      {:db db
-      :dispatch [:chart/update id (timings->chart results (:count (timing-chart-form db id)))]})))
+      :dispatch [:chart/update id (timings->chart results (timing-chart-form db id))]})))
 
 (defn suite-dropdown [suites id name]
   (let [v (rf/subscribe [::timing-chart-val id :suite])]
     (->> (concat [nil] suites)
          (map (fn [{:keys [name]}]
-                [:option {:value name} (or name "All")]))
+                [:option {:value (or name all-suites)} (or name "All")]))
          (into [:select.form-select
                 {:name name
                  :aria-label "suite"
@@ -113,4 +122,5 @@
        [:div.col-2
         [test-count-dropdown id count-id]]]]
      (rf/dispatch [::timing-chart-init id results])
-     [charts/chart-component id]]))
+     #_[charts/chart-component id]
+     [:canvas {:id id :height "100px"}]]))
