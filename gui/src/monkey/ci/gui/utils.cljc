@@ -25,11 +25,11 @@
     #?(:cljs (.preventDefault e true))
     (rf/dispatch evt)))
 
-(defn- evt->value [e]
+(defn evt->value [e]
   #?(:cljs (-> e .-target .-value)
      :clj (:value e)))
 
-(defn- evt->checked [e]
+(defn evt->checked [e]
   #?(:cljs (-> e .-target .-checked)
      :clj (:value e)))
 
@@ -87,3 +87,9 @@
     (login-on-401
      {:db (f db evt)}
      (last evt))))
+
+(defn parse-int [x]
+  (if (string? x)
+    #?(:cljs (js/parseInt x)
+       :clj (Integer/parseInt x))
+    x))

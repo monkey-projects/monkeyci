@@ -174,6 +174,7 @@
      {:id "publish-gui-img"
       :context "gui"
       :image gui-img
+      :memory 3 ;GB
       ;; Restore artifacts but modify the path because work dir is not the same
       :opts {:restore-artifacts [(update gui-release-artifact :path (partial str "gui/"))
                                  image-creds-artifact]
