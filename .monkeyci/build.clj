@@ -12,26 +12,18 @@
 ;; TODO Determine automatically
 (def snapshot-version "0.5.4-SNAPSHOT")
 
-(defn git-ref [ctx]
-  (get-in ctx [:build :git :ref]))
-
 (def tag-regex #"^refs/tags/(\d+\.\d+\.\d+(\.\d+)?$)")
 
 (defn ref?
   "Returns a predicate that checks if the ref matches the given regex"
   [re]
-  (fn [ctx]
-    (some? (some->> (git-ref ctx)
-                    (re-matches re)))))
-
-(def main-branch?
-  (ref? #"^refs/heads/main$"))
+  #(core/ref-regex % re))
 
 (def release?
   (ref? tag-regex))
 
 (def should-publish?
-  (some-fn main-branch? release?))
+  (some-fn core/main-branch? release?))
 
 (defn app-changed? [ctx]
   (core/touched? ctx #"^app/.*"))
@@ -42,13 +34,13 @@
 (def build-app? (some-fn app-changed? release?))
 (def build-gui? (some-fn gui-changed? release?))
 
-(def publish-app? (every-pred app-changed? should-publish?))
-(def publish-gui? (every-pred gui-changed? should-publish?))
+(def publish-app? (some-fn (every-pred app-changed? should-publish?) release?))
+(def publish-gui? (some-fn (every-pred gui-changed? should-publish?) release?))
 
 (defn tag-version
   "Extracts the version from the tag"
   [ctx]
-  (some->> (git-ref ctx)
+  (some->> (core/git-ref ctx)
            (re-matches tag-regex)
            (second)))
 
