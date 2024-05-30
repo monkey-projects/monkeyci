@@ -11,8 +11,13 @@
   {:status v})
 
 (def success (status :success))
-(def failure (status :failure))
 (def skipped (status :skipped))
+
+(defn failure
+  ([]
+   (status :skipped))
+  ([msg]
+   (assoc (failure) :message msg)))
 
 (defn status?
   "Checks if the given object is a job status"

@@ -36,9 +36,10 @@
        (first)))
 
 (defn- add-repo-btn [id]
-  [:a.btn.btn-success.me-2
-   {:href (r/path-for :page/add-repo {:customer-id id})}
-   [:span.me-1 [co/icon :plus-square]] "Add Repository"])
+  [:a.btn.btn-outline-dark.me-2
+   {:href (r/path-for :page/add-repo {:customer-id id})
+    :title "Link an existing GitHub repository"}
+   [:span.me-1 [co/icon :github]] "Follow Repository"])
 
 (defn- customer-details [id]
   (let [c (rf/subscribe [:customer/info])]

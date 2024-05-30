@@ -23,7 +23,9 @@
   {:target :node-test
    :output-to "target/js/node.js"
    :compiler-options
-   {:reader-features #{:node}}}
+   {:reader-features #{:node}}
+   ;; Output as junit
+   :main monkey.shadow.junit.runner/run-tests}
 
   :cards
   {:target :browser-test
