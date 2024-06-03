@@ -74,7 +74,9 @@
    :subcommands [run-build-cmd
                  verify-build-cmd
                  list-build-cmd
-                 watch-cmd]})
+                 watch-cmd
+                 ;; TODO Run build tests
+                 ]})
 
 (def server-cmd
   {:command "server"

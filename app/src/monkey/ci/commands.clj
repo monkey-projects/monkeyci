@@ -12,52 +12,9 @@
             [monkey.ci.web.handler :as h]
             [aleph.http :as http]
             [clj-commons.byte-streams :as bs]
-            [manifold
-             [deferred :as md]
-             [time :as mt]]))
+            [manifold.deferred :as md]))
 
-;; (defn- print-result [state]
-;;   (log/info "Build summary:")
-;;   (let [{:keys [pipelines]} @state]
-;;     (doseq [[pn p] pipelines]
-;;       (log/info "Pipeline:" pn)
-;;       (doseq [[sn {:keys [name status start-time end-time]}] (:steps p)]
-;;         (log/info "  Step:" (or name sn)
-;;                   ", result:" (clojure.core/name status)
-;;                   ", elapsed:" (- end-time start-time) "ms")))))
-
-;; (defn- report-evt [ctx e]
-;;   (rt/report ctx
-;;              {:type :build/event
-;;               :event e}))
-
-;; (defn result-accumulator
-;;   "Returns a map of event types and handlers that can be registered in the bus.
-;;    These handlers will monitor the build progress and update an internal state
-;;    accordingly.  When the build completes, the result is logged."
-;;   [ctx]
-;;   (let [state (atom {})
-;;         now (fn [] (System/currentTimeMillis))]
-;;     {:state state
-;;      :handlers
-;;      {:step/start
-;;       (fn [{:keys [index name pipeline] :as e}]
-;;         (report-evt ctx e)
-;;         (swap! state assoc-in [:pipelines (:name pipeline) :steps index] {:start-time (now)
-;;                                                                           :name name}))
-;;       :step/end
-;;       (fn [{:keys [index pipeline status] :as e}]
-;;         (report-evt ctx e)
-;;         (swap! state update-in [:pipelines (:name pipeline) :steps index]
-;;                assoc :end-time (now) :status status))
-;;       :build/completed
-;;       (fn [_]
-;;         (print-result state))}}))
-
-;; (defn register-all-handlers [bus m]
-;;   (when bus
-;;     (doseq [[t h] m]
-;;       (e/register-handler bus t h))))
+(def exit-error 1)
 
 (defn run-build
   "Performs a build, using the runner from the context.  Returns a deferred
@@ -72,34 +29,35 @@
           (r rt))
       (catch Exception ex
         (log/error "Unable to start build" ex)
-        (let [exit-code 1]
-          (rt/post-events rt (b/build-end-evt (assoc (rt/build rt) :message (ex-message ex))
-                                              exit-code))
-          exit-code)))))
+        (rt/post-events rt (b/build-end-evt (assoc (rt/build rt) :message (ex-message ex))
+                                            exit-error))
+        exit-error))))
 
 (defn verify-build
   "Verifies the build in the current directory by loading the script files in-process
    and resolving the jobs.  This is useful when checking if there are any compilation
    errors in the script."
   [rt]
-  (try
-    ;; TODO Git branch and other options
-    (let [jobs (-> rt
-                   (assoc :build (b/make-build-ctx rt))
-                   (script/load-jobs))]
-      (rt/report
-       rt
-       (if (not-empty jobs)
-         {:type :verify/success
-          :jobs jobs}
-         {:type :verify/failed
-          :message "No jobs found in build script"}))
-      (if (empty? jobs) 1 0))
-    (catch Exception ex
-      (log/error "Error verifying build" ex)
-      (rt/report rt {:type :verify/failed
-                     :message (ex-message ex)})
-      2)))
+  (letfn [(report [rep]
+            (rt/report rt rep)
+            (if (= :verify/success (:type rep)) 0 exit-error))]
+    (try
+      ;; TODO Git branch and other options
+      ;; TODO Use child process if there is a deps.edn
+      ;; TODO Build parameters
+      (let [jobs (-> rt
+                     (assoc :build (b/make-build-ctx rt))
+                     (script/load-jobs))]
+        (report
+         (if (not-empty jobs)
+           {:type :verify/success
+            :jobs jobs}
+           {:type :verify/failed
+            :message "No jobs found in build script"})))
+      (catch Exception ex
+        (log/error "Error verifying build" ex)
+        (report {:type :verify/failed
+                 :message (ex-message ex)})))))
 
 (defn list-builds [rt]
   (->> (http/get (apply format "%s/customer/%s/repo/%s/builds"
