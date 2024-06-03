@@ -19,9 +19,11 @@
     (when chart
       (.destroy chart))
     (log/debug "Configuring chart on element:" (name id))
-    (if-let [el (.getElementById js/document (name id))]
-      (Chart. el (clj->js config))
-      (log/warn "Element" (name id) "not found in document"))))
+    ;; In node there is no document
+    (when (exists? js/document)
+      (if-let [el (.getElementById js/document (name id))]
+        (Chart. el (clj->js config))
+        (log/warn "Element" (name id) "not found in document")))))
 
 (rf/reg-cofx
  :chart/configurator
