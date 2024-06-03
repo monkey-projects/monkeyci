@@ -6,7 +6,8 @@
             [monkey.ci.build
              [api :as api]
              [core :as core]
-             [shell :as shell]]))
+             [shell :as shell]]
+            [monkey.ci.plugin.junit]))
 
 ;; Version assigned when building main branch
 ;; TODO Determine automatically
@@ -80,7 +81,9 @@
   (when (build-app? ctx)
     (-> (clj-container "test-app" "app" "-M:test:junit:coverage")
         (assoc :save-artifacts [app-junit-artifact
-                                app-coverage-artifact]))))
+                                app-coverage-artifact]
+               :junit {:artifact-id (:id app-junit-artifact)
+                       :path (:path app-junit-artifact)}))))
 
 (def uberjar-artifact
   {:id "uberjar"

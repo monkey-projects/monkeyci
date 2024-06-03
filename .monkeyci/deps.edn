@@ -1,1 +1,2 @@
-{:deps {ch.qos.logback/logback-classic {:mvn/version "1.4.11"}}}
+{:deps {ch.qos.logback/logback-classic {:mvn/version "1.4.11"}
+        com.monkeyci/plugin-junit {:mvn/version "0.1.0-SNAPSHOT"}}}
