@@ -199,9 +199,15 @@
 
 (defn test-gui [ctx]
   (when (build-gui? ctx)
-    (-> (shadow-release "test-gui" :test/node)
-        ;; Explicitly run the tests, since :autorun always returns zero
-        (update :script conj "node target/js/node.js"))))
+    (let [art-id "junit-gui"
+          junit "junit.xml"]
+      (-> (shadow-release "test-gui" :test/node)
+          ;; Explicitly run the tests, since :autorun always returns zero
+          (update :script conj (str "node target/js/node.js > " junit))
+          (assoc :save-artifacts [{:id art-id
+                                   :path junit}]
+                 :junit {:artifact-id art-id
+                         :path junit})))))
 
 (defn build-gui-release [ctx]
   (when (publish-gui? ctx)

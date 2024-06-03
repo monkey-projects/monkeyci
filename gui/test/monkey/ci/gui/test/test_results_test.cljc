@@ -29,7 +29,7 @@
       (is (= 5 @s)))))
 
 (deftest timing-chart-changed-evt
-  (let [id (random-uuid)
+  (let [id (str (random-uuid))
         s (rf/subscribe [::sut/timing-chart-form id])]
     
     (testing "updates selected suite"

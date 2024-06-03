@@ -29,6 +29,13 @@
     (is (true? (sut/status? sut/success)))
     (is (false? (sut/status? {:something "else"})))))
 
+(deftest with-message
+  (testing "adds message to result"
+    (is (= "test message"
+           (-> sut/success
+               (sut/with-message "test message")
+               :message)))))
+
 (deftest step->job
   (testing "converts map with action into action job"
     (is (sut/action-job? (sut/step->job {:action (constantly sut/success)}))))

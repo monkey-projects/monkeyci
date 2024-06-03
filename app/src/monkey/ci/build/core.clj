@@ -11,13 +11,8 @@
   {:status v})
 
 (def success (status :success))
+(def failure (status :failure))
 (def skipped (status :skipped))
-
-(defn failure
-  ([]
-   (status :skipped))
-  ([msg]
-   (assoc (failure) :message msg)))
 
 (defn status?
   "Checks if the given object is a job status"
@@ -33,6 +28,9 @@
 
 (defn skipped? [{:keys [status]}]
   (= :skipped status))
+
+(defn with-message [r msg]
+  (assoc r :message msg))
 
 ;; Job that executes a function
 (defrecord ActionJob [id status action])
@@ -109,6 +107,16 @@
   "Adds dependencies to the given job"
   [job ids]
   (update job :dependencies (comp vec distinct concat) ids))
+
+(defn save-artifacts
+  "Adds given artifacts to the job saved artifacts"
+  [job artifacts]
+  (update job :save-artifacts (comp vec concat) artifacts))
+
+(defn restore-artifacts
+  "Adds given artifacts to the job restored artifacts"
+  [job artifacts]
+  (update job :restore-artifacts (comp vec concat) artifacts))
 
 (defn git-ref
   "Gets the git ref from the context"
