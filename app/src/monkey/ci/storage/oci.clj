@@ -48,7 +48,7 @@
 (defn- strip-prefix [prefix s]
   (subs s (count prefix)))
 
-(deftype OciObjectStorage [client conf]
+(defrecord OciObjectStorage [client conf]
   p/Storage
   (read-obj [this sid]
     (let [args (object-args client conf sid)]

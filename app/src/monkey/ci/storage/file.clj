@@ -32,8 +32,7 @@
         (cs/ends-with? n ext) (subs 0 (- (count n) (count ext))))
       n)))
 
-;; Must be a type, not a record, otherwise it gets lost in reitit data processing
-(deftype FileStorage [dir]
+(defrecord FileStorage [dir]
   p/Storage
   (read-obj [_ loc]
     (let [f (->file dir loc)]
