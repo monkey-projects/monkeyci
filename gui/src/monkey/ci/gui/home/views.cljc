@@ -2,19 +2,26 @@
   (:require [monkey.ci.gui.components :as co]
             [monkey.ci.gui.layout :as l]
             [monkey.ci.gui.routing :as r]
+            [monkey.ci.gui.home.events]
+            [monkey.ci.gui.home.subs]
             [re-frame.core :as rf]))
 
-(defn- cust-item [id]
-  [:li [:a {:href (r/path-for :page/customer {:customer-id id})} id]])
+(defn- cust-item [{:keys [id name]}]
+  [:li [:a {:href (r/path-for :page/customer {:customer-id id})} name]])
+
+(defn customers []
+  (let [c (rf/subscribe [:user/customers])]
+    (when @c
+      [:<>
+       [:h3 "Your Customers"]
+       (->> (map cust-item @c)
+            (into [:ul]))])))
 
 (defn user-home [u]
+  (rf/dispatch [:user/load-customers])
   [:<>
-   [:div.clearfix
-    [:h3.float-start "Customers for " (:name u)]
-    [co/user-avatar u]]
-   (->> (:customers u)
-        (map cust-item)
-        (into [:ul]))])
+   [co/alerts [:user/alerts]]
+   [customers]])
 
 (defn redirect-to-login []
   [:p "One moment, redirecting you to the login page"]

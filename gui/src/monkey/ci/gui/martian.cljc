@@ -58,6 +58,11 @@
      :path-schema customer-schema})
 
    (api-route
+    {:route-name :get-user-customers
+     :path-parts ["/user/" :user-id "/customers"]
+     :path-schema {:user-id s/Str}})
+
+   (api-route
     {:route-name :get-repo
      :method :get
      :path-parts repo-path
@@ -175,7 +180,7 @@
    (log/debug "Got error:" (clj->js err))
    {:dispatch (if (= 401 (:status err))
                 [:route/goto :page/login]
-                target-evt)}))
+                (conj target-evt err))}))
 
 ;; Takes the token from the db and adds it to the martian request
 (rf/reg-event-fx
