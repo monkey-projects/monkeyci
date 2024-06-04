@@ -106,6 +106,13 @@
                         :getter (comp repos->out st/find-customer)
                         :saver st/save-customer})
 
+(defn search-customers [req]
+  (let [f (get-in req [:parameters :query])]
+    (if (empty? f)
+      (-> (rur/response {:message "Query must be specified"})
+          (rur/status 400))
+      (rur/response (st/search-customers (c/req->storage req) f)))))
+
 (make-entity-endpoints "repo"
                        ;; The repo is part of the customer, so combine the ids
                        {:get-id (id-getter (juxt :customer-id :repo-id))

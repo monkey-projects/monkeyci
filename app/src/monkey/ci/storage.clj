@@ -87,8 +87,11 @@
     (p/write-obj s sid (apply updater obj args))))
 
 (def global "global")
-(defn global-sid [type id]
-  [global (name type) id])
+(defn global-sid
+  ([type id]
+   [global (name type) id])
+  ([type]
+   [global (name type)]))
 
 (def customer-sid (partial global-sid :customers))
 
@@ -97,6 +100,25 @@
 
 (defn find-customer [s id]
   (p/read-obj s (customer-sid id)))
+
+(def search-customers
+  "Searches customers using given filter"
+  (override-or
+   [:customer :search]
+   (fn [s {:keys [id name]}]
+     (cond
+       id
+       (->> [(find-customer s id)]
+            (remove nil?))
+       
+       name
+       ;; Naive approach, should be overridden by implementations
+       (->> (p/list-obj s (global-sid :customers))
+            (map (partial find-customer s))
+            (filter (comp #(cs/includes? % name) :name)))
+       
+       :else
+       []))))
 
 (def save-repo
   "Saves the repository by updating the customer it belongs to"

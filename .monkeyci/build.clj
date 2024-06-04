@@ -83,7 +83,7 @@
         (assoc :save-artifacts [app-junit-artifact
                                 app-coverage-artifact]
                :junit {:artifact-id (:id app-junit-artifact)
-                       :path (:path app-junit-artifact)}))))
+                       :path "junit.xml"}))))
 
 (def uberjar-artifact
   {:id "uberjar"
@@ -222,7 +222,7 @@
 ;; We could do a git push with updated kustomization file.
 ;; But running sanity checks requires a running app.  Either we could rely on
 ;; argocd to do a blue/green deploy, or start it as a service (somehow) and
-;; run the checks here.  This latter preferred as it is contained inside the
+;; run the checks here.  The latter is preferred as it is contained inside the
 ;; build process.
 
 ;; List of jobs

@@ -84,7 +84,18 @@
           (is (true? (p/delete-obj s (st/customer-sid (:id cust))))
               "expected to delete customer record")
           (is (nil? (st/find-customer s (:id cust)))
-              "did not expect to find customer after deletion"))))))
+              "did not expect to find customer after deletion")))
+
+      (testing "can search"
+        (let [cust (-> (gen-cust)
+                       (assoc :name "test customer"))]
+          (is (sid/sid? (st/save-customer s cust)))
+          
+          (testing "by name"
+            (is (= [cust] (st/search-customers s {:name "test"}))))
+
+          (testing "by id"
+            (is (= [cust] (st/search-customers s {:id (:id cust)})))))))))
 
 (deftest ^:sql repos
   (with-storage conn s

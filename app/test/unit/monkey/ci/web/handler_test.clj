@@ -226,6 +226,13 @@
                             :updated-entity {:name "updated customer"}
                             :creator st/save-customer})
 
+  (testing "`GET /customer` searches for customer"
+    (h/with-memory-store st
+      (let [app (make-test-app st)]
+        (is (= 200 (-> (mock/request :get "/customer" {:name "test"})
+                       (app)
+                       :status))))))
+
   (h/with-memory-store st
     (let [kp (auth/generate-keypair)
           rt (test-rt {:storage st

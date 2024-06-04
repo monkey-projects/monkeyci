@@ -88,6 +88,34 @@
                    (sut/update-customer)
                    :status)))))
 
+(deftest search-customers
+  (let [{st :storage :as rt} (h/test-rt)
+        cust {:id (st/new-id)
+              :name "Test customer"}
+        sid (st/save-customer st cust)]
+    (testing "retrieves customer by id"
+      (is (= [cust]
+             (-> rt
+                 (h/->req)
+                 (h/with-query-param :id (:id cust))
+                 (sut/search-customers)
+                 :body))))
+    
+    (testing "searches customers by name"
+      (is (= [cust]
+             (-> rt
+                 (h/->req)
+                 (h/with-query-param :name "Test")
+                 (sut/search-customers)
+                 :body))))
+    
+    (testing "fails if no query params given"
+      (is (= 400
+             (-> rt
+                 (h/->req)
+                 (sut/search-customers)
+                 :status))))))
+
 (deftest create-repo
   (testing "generates id from repo name"
     (let [repo {:name "Test repo"

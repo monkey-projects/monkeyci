@@ -129,6 +129,9 @@
 (defn with-path-param [r k v]
   (assoc-in r [:parameters :path k] v))
 
+(defn with-query-param [r k v]
+  (assoc-in r [:parameters :query k] v))
+
 (defn with-path-params [r p]
   (update-in r [:parameters :path] merge p))
 

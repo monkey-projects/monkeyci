@@ -109,6 +109,17 @@
       (select-keys [:name])
       (assoc :cuid (:id cust))))
 
+(defn- db->cust [c]
+  (letfn [(entities->repos [repos]
+            (reduce-kv (fn [r _ v]
+                         (assoc r (:display-id v) (db->repo v)))
+                       {}
+                       repos))]
+    (-> c
+        (dissoc :cuid)
+        (assoc :id (str (:cuid c)))
+        (mc/update-existing :repos entities->repos))))
+
 (defn- insert-customer [conn cust]
   (let [cust-id (:id (ec/insert-customer conn (cust->db cust)))]
     (upsert-repos conn cust cust-id)
@@ -129,19 +140,9 @@
     (insert-customer conn cust)))
 
 (defn- select-customer [conn cuid]
-  (letfn [(entities->repos [repos]
-            (reduce-kv (fn [r _ v]
-                         (assoc r (:display-id v) (db->repo v)))
-                       {}
-                       repos))
-          (db->cust [c]
-            (-> c
-                (dissoc :cuid)
-                (assoc :id (str (:cuid c)))
-                (update :repos entities->repos)))]
-    (when cuid
-      (some-> (ecu/customer-with-repos conn (ec/by-cuid cuid))
-              (db->cust)))))
+  (when cuid
+    (some-> (ecu/customer-with-repos conn (ec/by-cuid cuid))
+            (db->cust))))
 
 (defn- customer-exists? [conn cuid]
   (some? (ec/select-customer conn (ec/by-cuid cuid))))
@@ -149,6 +150,16 @@
 (defn- delete-customer [conn cuid]
   (when cuid
     (ec/delete-customers conn (ec/by-cuid cuid))))
+
+(defn- select-customers
+  "Finds customers by filter"
+  [{:keys [conn]} {:keys [id name]}]
+  (let [query (cond
+                id (ec/by-cuid id)
+                ;; By default, this will use case insensitive search (depends on collation)
+                name [:like :name (str "%" name "%")])]
+    (->> (ec/select-customers conn query)
+         (map db->cust))))
 
 (defn- global-sid? [type sid]
   (= [st/global (name type)] (take 2 sid)))
@@ -518,7 +529,9 @@
   {:watched-github-repos
    {:find select-watched-github-repos
     :watch watch-github-repo
-    :unwatch unwatch-github-repo}})
+    :unwatch unwatch-github-repo}
+   :customer
+   {:search select-customers}})
 
 (defn make-storage [conn]
   (map->SqlStorage {:conn conn

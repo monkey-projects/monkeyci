@@ -56,6 +56,10 @@
 (s/defschema UpdateCustomer
   (assoc-id NewCustomer))
 
+(s/defschema SearchCustomer
+  {(s/optional-key :name) s/Str
+   (s/optional-key :id) s/Str})
+
 (s/defschema NewWebhook
   {:customer-id Id
    :repo-id Id})
@@ -112,9 +116,12 @@
 (defn- generic-routes
   "Generates generic entity routes.  If child routes are given, they are added
    as additional routes after the full path."
-  [{:keys [getter creator updater id-key new-schema update-schema child-routes]}]
-  [["" {:post {:handler creator
-               :parameters {:body new-schema}}}]
+  [{:keys [getter creator updater id-key new-schema update-schema child-routes
+           searcher search-schema]}]
+  [["" (cond-> {:post {:handler creator
+                       :parameters {:body new-schema}}}
+         searcher (assoc :get {:handler searcher
+                               :parameters {:query search-schema}}))]
    [(str "/" id-key)
     {:parameters {:path {id-key Id}}}
     (cond-> [["" {:get {:handler getter}
@@ -230,8 +237,10 @@
     {:creator api/create-customer
      :updater api/update-customer
      :getter  api/get-customer
+     :searcher api/search-customers
      :new-schema NewCustomer
      :update-schema UpdateCustomer
+     :search-schema SearchCustomer
      :id-key :customer-id
      :child-routes [repo-routes
                     customer-parameter-routes
