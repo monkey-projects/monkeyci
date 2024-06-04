@@ -64,9 +64,10 @@
   (c/normalize-typed k conf normalize-storage-config))
 
 (defmethod rt/setup-runtime :storage [conf _]
-  ;; Always make it cached, unless it's memory storage
-  (cond-> (make-storage conf)
-    (not= :memory (get-in conf [:storage :type])) (cached/->CachedStorage (make-memory-storage))))
+  ;; Wrap in cache if so requested by storage object
+  (let [st (make-storage conf)]
+    (cond-> st
+      (:cached? st) (cached/->CachedStorage (make-memory-storage)))))
 
 (defn- override-or
   "Invokes the override function in the storage at given path, or calls the

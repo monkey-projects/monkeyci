@@ -4,11 +4,13 @@
    document is saved or loaded."
   (:require [clojure.set :as cset]
             [clojure.tools.logging :as log]
+            [com.stuartsierra.component :as co]
             [medley.core :as mc]
             [monkey.ci.entities
              [build :as eb]
              [core :as ec]
              [customer :as ecu]
+             [migrations :as emig]
              [param :as eparam]
              [repo :as er]
              [ssh-key :as essh]
@@ -22,7 +24,9 @@
              [storage :as st]
              [utils :as u]]
             [monkey.ci.spec.db-entities]
-            [monkey.ci.spec.entities]))
+            [monkey.ci.spec.entities]
+            [next.jdbc.connection :as conn])
+  (:import com.zaxxer.hikari.HikariDataSource))
 
 (def deleted? (fnil pos? 0))
 
@@ -107,14 +111,16 @@
 
 (defn- insert-customer [conn cust]
   (let [cust-id (:id (ec/insert-customer conn (cust->db cust)))]
-    (upsert-repos conn cust cust-id)))
+    (upsert-repos conn cust cust-id)
+    cust))
 
 (defn- update-customer [conn cust existing]
   (let [ce (cust->db cust)]
     (spec/valid? :db/customer ce)
     (when (not= ce existing)
       (ec/update-customer conn (merge existing ce)))
-    (upsert-repos conn cust (:id existing))))
+    (upsert-repos conn cust (:id existing))
+    cust))
 
 (defn- upsert-customer [conn cust]
   (spec/valid? :entity/customer cust)
@@ -210,7 +216,8 @@
 
 (defn- upsert-ssh-keys [conn ssh-keys]
   (doseq [k ssh-keys]
-    (upsert-ssh-key conn k)))
+    (upsert-ssh-key conn k))
+  ssh-keys)
 
 (defn- select-ssh-keys [conn customer-id]
   (essh/select-ssh-keys-as-entity conn customer-id))
@@ -261,7 +268,8 @@
   (when-not (empty? params)
     (let [{cust-id :id} (ec/select-customer conn (ec/by-cuid (:customer-id (first params))))]
       (doseq [p params]
-        (upsert-param conn p cust-id)))))
+        (upsert-param conn p cust-id))
+      params)))
 
 (defn- select-params [conn customer-id]
   ;; Select customer params and values for customer cuid
@@ -283,9 +291,10 @@
       (assoc :id (:cuid user))))
 
 (defn- insert-user [conn user]
-  (let [{:keys [id]} (ec/insert-user conn (user->db user))
+  (let [{:keys [id] :as ins} (ec/insert-user conn (user->db user))
         ids (ecu/customer-ids-by-cuids conn (:customers user))]
-    (ec/insert-user-customers conn id ids)))
+    (ec/insert-user-customers conn id ids)
+    ins))
 
 (defn- update-user [conn user {user-id :id :as existing}]
   (when (ec/update-user conn (merge existing (user->db user)))
@@ -296,7 +305,8 @@
           to-remove (cset/difference existing-cust new-cust)]
       (ec/insert-user-customers conn user-id (ecu/customer-ids-by-cuids conn to-add))
       (when-not (empty? to-remove)
-        (ec/delete-user-customers conn [:in :customer-id (ecu/customer-ids-by-cuids conn to-remove)])))))
+        (ec/delete-user-customers conn [:in :customer-id (ecu/customer-ids-by-cuids conn to-remove)]))
+      user)))
 
 (defn- upsert-user [conn user]
   (let [existing (ec/select-user conn (ec/by-cuid (:id user)))]
@@ -360,9 +370,10 @@
 
 (defn- insert-build [conn build]
   (when-let [repo-id (er/repo-for-build-sid conn (:customer-id build) (:repo-id build))]
-    (let [{:keys [id]} (ec/insert-build conn (-> (build->db build)
-                                                 (assoc :repo-id repo-id)))]
-      (insert-jobs conn (vals (:jobs build)) id))))
+    (let [{:keys [id] :as ins} (ec/insert-build conn (-> (build->db build)
+                                                         (assoc :repo-id repo-id)))]
+      (insert-jobs conn (vals (:jobs build)) id)
+      ins)))
 
 (defn- update-build [conn {:keys [jobs] :as build} existing]
   (ec/update-build conn (merge existing (build->db build)))
@@ -387,7 +398,8 @@
       (update-jobs conn to-update))
     (when-not (empty? to-insert)
       ;; Insert new jobs
-      (insert-jobs conn (vals to-insert) (:id existing)))))
+      (insert-jobs conn (vals to-insert) (:id existing)))
+    build))
 
 (defn- upsert-build [conn build]
   ;; Fetch build by customer cuild and repo and build display ids
@@ -418,32 +430,34 @@
     (cond
       (customer? sid)
       (select-customer conn (global-sid->cuid sid))
+      (user? sid)
+      (select-user conn (drop 2 sid))
+      (build? sid)
+      (select-build conn (rest sid))
       (webhook? sid)
       (select-webhook conn (global-sid->cuid sid))
       (ssh-key? sid)
       (select-ssh-keys conn (second sid))
       (params? sid)
-      (select-params conn (second sid))
-      (user? sid)
-      (select-user conn (drop 2 sid))
-      (build? sid)
-      (select-build conn (rest sid))))
+      (select-params conn (second sid))))
   
   (write-obj [_ sid obj]
-    (cond
-      (customer? sid)
-      (upsert-customer conn obj)
-      (webhook? sid)
-      (upsert-webhook conn obj)
-      (ssh-key? sid)
-      (upsert-ssh-keys conn obj)
-      (params? sid)
-      (upsert-params conn obj)
-      (user? sid)
-      (upsert-user conn obj)
-      (build? sid)
-      (upsert-build conn obj))
-    sid)
+    (when (cond
+            (customer? sid)
+            (upsert-customer conn obj)
+            (user? sid)
+            (upsert-user conn obj)
+            (build? sid)
+            (upsert-build conn obj)
+            (webhook? sid)
+            (upsert-webhook conn obj)
+            (ssh-key? sid)
+            (upsert-ssh-keys conn obj)
+            (params? sid)
+            (upsert-params conn obj)
+            :else
+            (log/warn "Unrecognized sid when writing:" sid))
+      sid))
 
   (obj-exists? [_ sid]
     (when (customer? sid)
@@ -457,7 +471,19 @@
 
   (list-obj [_ sid]
     (when (build-repo? sid)
-      (select-repo-builds conn (rest sid)))))
+      (select-repo-builds conn (rest sid))))
+
+  co/Lifecycle
+  (start [this]
+    (log/debug "Starting DB connection")
+    (emig/run-migrations! (:ds conn))
+    this)
+
+  (stop [this]
+    (when-let [ds (:ds conn)]
+      (log/debug "Closing DB connection")
+      (.close ds))
+    this))
 
 (defn select-watched-github-repos [{:keys [conn]} github-id]
   (let [matches (ec/select-repos conn [:= :github-id github-id])
@@ -497,3 +523,11 @@
 (defn make-storage [conn]
   (map->SqlStorage {:conn conn
                     :overrides overrides}))
+
+(defmethod st/make-storage :sql [{conf :storage}]
+  (log/info "Using SQL storage with configuration:" conf)
+  (let [conn {:ds (conn/->pool HikariDataSource (-> conf
+                                                    (dissoc :url :type)
+                                                    (assoc :jdbcUrl (:url conf))))
+              :sql-opts {:dialect :mysql :quoted-snake true}}]
+    (make-storage conn)))

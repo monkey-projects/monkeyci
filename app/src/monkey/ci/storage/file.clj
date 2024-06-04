@@ -61,7 +61,8 @@
 
 (defn make-file-storage [dir]
   (log/debug "File storage location:" dir)
-  (->FileStorage dir))
+  (-> (->FileStorage dir)
+      (assoc :cached? true)))
 
 (defmethod s/make-storage :file [{conf :storage}]
   (log/info "Using file storage with configuration:" conf)

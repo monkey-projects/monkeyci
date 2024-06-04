@@ -99,7 +99,8 @@
   [conf]
   (when-not (:region conf)
     (throw (ex-info "Region must be specified" conf)))
-  (->OciObjectStorage (os/make-client conf) conf))
+  (-> (->OciObjectStorage (os/make-client conf) conf)
+      (assoc :cached? true)))
 
 (defmethod st/make-storage :oci [conf]
   (log/debug "Creating oci storage with config:" (:storage conf))
