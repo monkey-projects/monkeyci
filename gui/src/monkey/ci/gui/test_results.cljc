@@ -35,17 +35,17 @@
    matching the suite (if any)."
   [results {:keys [suite] n :count}]
   (let [matches-suite? (fn [{:keys [name]}]
-                         (or (= all-suites suite) (= suite name)))
+                         (or (nil? suite) (= all-suites suite) (= suite name)))
         cases (->> results
                    (filter matches-suite?)
                    (mapcat :test-cases)
                    (remove (comp nil? :time))
-                   (take n)
                    (sort-by :time)
-                   (reverse))]
+                   (reverse)
+                   (take n))]
     {:type "bar"
      :data {:labels (map :test-case cases)
-            :datasets [{:label "Seconds"
+            :datasets [{:label "Seconds Elapsed"
                         :data (map :time cases)}]}}))
 
 (def default-chart-form {:count 5})
