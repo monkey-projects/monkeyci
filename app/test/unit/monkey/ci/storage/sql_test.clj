@@ -288,3 +288,10 @@
         (testing "can list"
           (is (= [(:build-id build)]
                  (st/list-builds s [(:id cust) (:id repo)]))))))))
+
+(deftest make-storage
+  (testing "creates sql storage object using connection settings"
+    (let [s (st/make-storage {:storage {:type :sql
+                                        :url (:jdbcUrl eh/h2-config)}})]
+      (is (some? s))
+      (is (some? (-> s :conn :ds))))))

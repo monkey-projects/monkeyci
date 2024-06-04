@@ -25,9 +25,23 @@
         (.isDirectory f)
         (migrate-dir f (concat sid [(.getName f)]) st)))))
 
-(defn migrate-storage
+(defn migrate-from-file-storage
   "Migrates all files from given directory to destiny storage."
   [dir st]
   (let [f (io/file dir)]
     (log/info "Migrating storage from" (.getCanonicalPath f))
     (migrate-dir f [] st)))
+
+(defn- migrate-customer [cust-id src dest]
+  (log/debug "Migrating customer:" cust-id)
+  (let [cust (s/find-customer src cust-id)]
+    (s/save-customer dest cust)))
+
+(defn migrate-to-storage
+  "Migrates entities from the given storage to the destination storage by
+   listing the customers and migrating their properties and builds."
+  [src dest]
+  (let [cust (p/list-obj src [s/global "customers"])]
+    (log/info "Migrating" (count cust) "customers")
+    (doseq [c cust]
+      (migrate-customer c src dest))))

@@ -145,4 +145,3 @@
       :config
       ;; Child processes never start an event server
       (mc/update-existing :events dissoc :server)))
-

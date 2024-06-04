@@ -30,7 +30,8 @@
             [monkey.ci.storage
              [cached]
              [file]
-             [oci]]))
+             [oci]
+             [sql]]))
 
 (defn system-invoker
   "The event invoker starts a subsystem according to the command requirements,

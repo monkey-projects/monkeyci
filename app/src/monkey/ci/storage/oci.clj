@@ -48,7 +48,7 @@
 (defn- strip-prefix [prefix s]
   (subs s (count prefix)))
 
-(deftype OciObjectStorage [client conf]
+(defrecord OciObjectStorage [client conf]
   p/Storage
   (read-obj [this sid]
     (let [args (object-args client conf sid)]
@@ -99,7 +99,8 @@
   [conf]
   (when-not (:region conf)
     (throw (ex-info "Region must be specified" conf)))
-  (->OciObjectStorage (os/make-client conf) conf))
+  (-> (->OciObjectStorage (os/make-client conf) conf)
+      (assoc :cached? true)))
 
 (defmethod st/make-storage :oci [conf]
   (log/debug "Creating oci storage with config:" (:storage conf))

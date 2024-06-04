@@ -7,7 +7,7 @@
              [api :as api]
              [core :as core]
              [shell :as shell]]
-            [monkey.ci.plugin.junit]))
+            [monkey.ci.ext.junit]))
 
 ;; Version assigned when building main branch
 ;; TODO Determine automatically

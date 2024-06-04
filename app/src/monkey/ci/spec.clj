@@ -45,7 +45,7 @@
 (s/def :conf/containers (s/keys :req-un [:containers/type]))
 
 ;; Storage configuration
-(s/def :storage/type #{:memory :file :oci})
+(s/def :storage/type #{:memory :file :oci :sql})
 (s/def :storage/dir string?)
 (s/def :oci/bucket-name string?)
 (s/def :oci/credentials (s/merge ::oci-sign/config))
@@ -64,6 +64,14 @@
 (defmethod storage-type :oci [_]
   (s/keys :req-un [:storage/type :oci/bucket-name :oci/region]
           :opt-un [:oci/credentials]))
+
+(s/def :sql/url string?)
+(s/def :sql/username string?)
+(s/def :sql/password string?)
+
+(defmethod storage-type :sql [_]
+  (s/keys :req-un [:storage/type :sql/url]
+          :opt-un [:sql/username :sql/password]))
 
 (s/def :conf/storage (s/multi-spec storage-type :type))
 
