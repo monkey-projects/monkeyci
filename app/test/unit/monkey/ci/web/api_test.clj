@@ -486,5 +486,5 @@
                                          {:name "updated user"}})
                      (sut/update-user)
                      :status)))
-      (is (= "updated user" (-> (st/find-user st [:github 543])
+      (is (= "updated user" (-> (st/find-user-by-type st [:github 543])
                                 :name))))))
