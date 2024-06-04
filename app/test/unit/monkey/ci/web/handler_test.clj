@@ -322,35 +322,43 @@
   (testing "/user"
     (let [user {:type "github"
                 :type-id 456
-                :email "testuser@monkeyci.com"}]
+                :email "testuser@monkeyci.com"}
+          user->sid (juxt (comp keyword :type) :type-id)
+          st (st/make-memory-storage)
+          app (make-test-app st)]
       
       (testing "`POST` creates new user"
-        (let [st (st/make-memory-storage)
-              app (make-test-app st)
-              r (-> (h/json-request :post "/user" user)
+        (let [r (-> (h/json-request :post "/user" user)
                     (app))]
           (is (= 201 (:status r)))
-          (is (= user (-> (st/find-user st [:github 456])
+          (is (= user (-> (st/find-user-by-type st (user->sid user))
                           (select-keys (keys user)))))))
 
       (testing "`GET /:type/:id` retrieves existing user"
-        (let [st (st/make-memory-storage)
-              _ (st/save-user st user)
-              app (make-test-app st)
-              r (-> (mock/request :get (str "/user/github/" (:type-id user)))
+        (let [r (-> (mock/request :get (str "/user/github/" (:type-id user)))
                     (app))]
           (is (= 200 (:status r)))
           (is (= (:type-id user) (some-> r :body slurp (h/parse-json) :type-id)))))
 
       (testing "`PUT /:type/:id` updates existing user"
-        (let [st (st/make-memory-storage)
-              _ (st/save-user st user)
-              app (make-test-app st)
-              r (-> (h/json-request :put (str "/user/github/" (:type-id user))
+        (let [r (-> (h/json-request :put (str "/user/github/" (:type-id user))
                                     (assoc user :email "updated@monkeyci.com"))
                     (app))]
           (is (= 200 (:status r)))
-          (is (= "updated@monkeyci.com" (some-> r :body slurp (h/parse-json) :email))))))))
+          (is (= "updated@monkeyci.com" (some-> r :body slurp (h/parse-json) :email)))))
+
+      (testing "`GET /customers` retrieves customers for user"
+        (let [cust {:id (st/new-id)
+                    :name "test customer"}
+              user (st/find-user-by-type st (user->sid user))
+              user-id (:id user)]
+          (is (some? (st/save-customer st cust)))
+          (is (some? (st/save-user st (assoc user :customers [(:id cust)]))))
+          (is (= [cust] (-> (mock/request :get (str "/user/" user-id "/customers"))
+                            (app)
+                            :body
+                            slurp
+                            h/parse-json))))))))
 
 (defn- verify-label-filter-like-endpoints [path desc entity prep-match]
   (let [st (st/make-memory-storage)

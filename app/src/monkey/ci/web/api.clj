@@ -128,8 +128,15 @@
 
 (make-entity-endpoints "user"
                        {:get-id (id-getter (juxt :user-type :type-id))
-                        :getter st/find-user
+                        :getter st/find-user-by-type
                         :saver st/save-user})
+
+(defn get-user-customers
+  "Retrieves all users linked to the customer in the request path"
+  [req]
+  (let [user-id (get-in req [:parameters :path :user-id])
+        st (c/req->storage req)]
+    (rur/response (st/list-user-customers st user-id))))
 
 ;; Override webhook creation
 (defn- assign-webhook-secret

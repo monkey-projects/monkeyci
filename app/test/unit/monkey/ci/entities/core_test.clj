@@ -1,11 +1,8 @@
 (ns monkey.ci.entities.core-test
   (:require [clojure.test :refer [deftest testing is]]
-            [clojure.spec.alpha :as s]
-            [clojure.spec.gen.alpha :as gen]
             [monkey.ci.entities
              [core :as sut]
              [helpers :as eh]]
-            [monkey.ci.spec.entities]
             [next.jdbc :as jdbc]
             [next.jdbc.result-set :as rs]))
 
@@ -23,33 +20,9 @@
                                             {:builder-fn rs/as-unqualified-lower-maps})
                          :c)))))))
 
-(defn- gen-spec [s]
-  (gen/generate (s/gen s)))
-
-(defn gen-customer []
-  (gen-spec :db/customer))
-
-(defn gen-repo []
-  (gen-spec :db/repo))
-
-(defn gen-build []
-  (gen-spec :db/build))
-
-(defn gen-job []
-  (gen-spec :db/job))
-
-(defn gen-ssh-key []
-  (gen-spec :db/ssh-key))
-
-(defn gen-customer-param []
-  (gen-spec :db/customer-param))
-
-(defn gen-param-value []
-  (gen-spec :db/parameter-value))
-
 (deftest ^:sql customer-entities
   (eh/with-prepared-db conn
-    (let [cust (gen-customer)
+    (let [cust (eh/gen-customer)
           r (sut/insert-customer conn cust)]
       (testing "can insert"
         (is (some? (:cuid r)))
@@ -74,8 +47,8 @@
 
 (deftest ^:sql repo-entities
   (eh/with-prepared-db conn
-    (let [cust (sut/insert-customer conn (gen-customer))
-          r (sut/insert-repo conn (-> (gen-repo)
+    (let [cust (sut/insert-customer conn (eh/gen-customer))
+          r (sut/insert-repo conn (-> (eh/gen-repo)
                                       (assoc :customer-id (:id cust))))]
       (testing "can insert"
         (is (some? (:cuid r)))
@@ -130,10 +103,10 @@
   (eh/with-prepared-db conn
     (let [cust  (sut/insert-customer
                  conn
-                 (gen-customer))
+                 (eh/gen-customer))
           param (sut/insert-customer-param
                  conn
-                 (assoc (gen-customer-param) :customer-id (:id cust)))]
+                 (assoc (eh/gen-customer-param) :customer-id (:id cust)))]
       (testing "can insert"
         (is (number? (:id param))))
 
@@ -149,13 +122,13 @@
   (eh/with-prepared-db conn
     (let [cust  (sut/insert-customer
                  conn
-                 (gen-customer))
+                 (eh/gen-customer))
           param (sut/insert-customer-param
                  conn
-                 (assoc (gen-customer-param) :customer-id (:id cust)))
+                 (assoc (eh/gen-customer-param) :customer-id (:id cust)))
           value (sut/insert-customer-param-value
                  conn
-                 (assoc (gen-param-value) :params-id (:id param)))]
+                 (assoc (eh/gen-param-value) :params-id (:id param)))]
       (testing "can insert"
         (is (number? (:id value))))
 
@@ -170,7 +143,7 @@
   (eh/with-prepared-db conn
     (let [cust (sut/insert-customer
                 conn
-                (gen-customer))
+                (eh/gen-customer))
           repo (sut/insert-repo
                 conn
                 {:name "test repo"
@@ -194,10 +167,10 @@
   (eh/with-prepared-db conn
     (let [cust (sut/insert-customer
                 conn
-                (gen-customer))
+                (eh/gen-customer))
           key  (sut/insert-ssh-key
                 conn
-                (assoc (gen-ssh-key) :customer-id (:id cust)))]
+                (assoc (eh/gen-ssh-key) :customer-id (:id cust)))]
       (testing "can insert"
         (is (number? (:id key))))
 
@@ -212,14 +185,14 @@
   (eh/with-prepared-db conn
     (let [cust  (sut/insert-customer
                  conn
-                 (gen-customer))
+                 (eh/gen-customer))
           repo  (sut/insert-repo
                  conn
-                 (-> (gen-repo)
+                 (-> (eh/gen-repo)
                      (assoc :customer-id (:id cust))))
           build (sut/insert-build
                  conn
-                 (-> (gen-build)
+                 (-> (eh/gen-build)
                      (assoc :repo-id (:id repo)
                             :status :pending)))]
       (testing "can insert"
@@ -236,18 +209,18 @@
   (eh/with-prepared-db conn
     (let [cust  (sut/insert-customer
                  conn
-                 (gen-customer))
+                 (eh/gen-customer))
           repo  (sut/insert-repo
                  conn
-                 (-> (gen-repo)
+                 (-> (eh/gen-repo)
                      (assoc :customer-id (:id cust))))
           build (sut/insert-build
                 conn
-                (-> (gen-build)
+                (-> (eh/gen-build)
                     (assoc :repo-id (:id repo))))
           job   (sut/insert-job
                  conn
-                 (-> (gen-job)
+                 (-> (eh/gen-job)
                      (assoc :build-id (:id build)
                             :details {:image "test-image"})))]
       (testing "can insert"

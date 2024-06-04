@@ -234,7 +234,7 @@
    a new one."
   [user req]
   (let [st (c/req->storage req)]
-    (-> (or (s/find-user st [:github (:id user)])
+    (-> (or (s/find-user-by-type st [:github (:id user)])
             (let [u {:type "github"
                      :type-id (:id user)
                      ;; Keep track of email for reporting purposes

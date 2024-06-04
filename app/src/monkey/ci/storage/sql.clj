@@ -324,14 +324,24 @@
     (update-user conn user existing)
     (insert-user conn user)))
 
-(defn- select-user [conn [type type-id]]
-  (when-let [r (ec/select-user conn [:and
-                                     [:= :type type]
-                                     [:= :type-id type-id]])]
+(defn- select-user-by-filter [conn f]
+  (when-let [r (ec/select-user conn f)]
     (let [cust (eu/select-user-customer-cuids conn (:id r))]
       (cond-> (db->user r)
         true (drop-nil)
         (not-empty cust) (assoc :customers cust)))))
+
+(defn- select-user-by-type [conn [type type-id]]
+  (select-user-by-filter conn [:and
+                               [:= :type type]
+                               [:= :type-id type-id]]))
+
+(defn- select-user [{:keys [conn]} id]
+  (select-user-by-filter conn (ec/by-cuid id)))
+
+(defn- select-user-customers [{:keys [conn]} id]
+  (->> (eu/select-user-customers conn id)
+       (map db->cust)))
 
 (defn build? [sid]
   (and (= "builds" (first sid))
@@ -442,7 +452,7 @@
       (customer? sid)
       (select-customer conn (global-sid->cuid sid))
       (user? sid)
-      (select-user conn (drop 2 sid))
+      (select-user-by-type conn (drop 2 sid))
       (build? sid)
       (select-build conn (rest sid))
       (webhook? sid)
@@ -531,7 +541,10 @@
     :watch watch-github-repo
     :unwatch unwatch-github-repo}
    :customer
-   {:search select-customers}})
+   {:search select-customers}
+   :user
+   {:find select-user
+    :customers select-user-customers}})
 
 (defn make-storage [conn]
   (map->SqlStorage {:conn conn

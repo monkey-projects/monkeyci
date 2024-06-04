@@ -1,7 +1,10 @@
 (ns monkey.ci.entities.helpers
   "Helper functions for testing database entities"
-  (:require [config.core :as cc]
+  (:require [clojure.spec.alpha :as s]
+            [clojure.spec.gen.alpha :as gen]
+            [config.core :as cc]
             [monkey.ci.entities.migrations :as m]
+            [monkey.ci.spec.entities]
             [next.jdbc :as jdbc]
             [next.jdbc.connection :as conn])
   (:import com.zaxxer.hikari.HikariDataSource))
@@ -50,3 +53,30 @@
   `(with-prepared-db*
      (fn [~conn]
        ~@body)))
+
+(defn- gen-spec [s]
+  (gen/generate (s/gen s)))
+
+(defn gen-customer []
+  (gen-spec :db/customer))
+
+(defn gen-repo []
+  (gen-spec :db/repo))
+
+(defn gen-build []
+  (gen-spec :db/build))
+
+(defn gen-job []
+  (gen-spec :db/job))
+
+(defn gen-user []
+  (gen-spec :db/user))
+
+(defn gen-ssh-key []
+  (gen-spec :db/ssh-key))
+
+(defn gen-customer-param []
+  (gen-spec :db/customer-param))
+
+(defn gen-param-value []
+  (gen-spec :db/parameter-value))

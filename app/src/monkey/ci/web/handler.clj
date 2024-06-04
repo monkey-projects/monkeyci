@@ -261,10 +261,18 @@
 
 (def user-routes
   ["/user"
+   {:conflicting true}
    [[""
      {:post
       {:handler api/create-user
        :parameters {:body User}}}]
+    ;; TODO Add endpoints that use the cuid instead for consistency
+    ["/:user-id"
+     {:parameters
+      {:path {:user-id s/Str}}}
+     [["/customers"
+       {:get
+        {:handler api/get-user-customers}}]]]
     ["/:user-type/:type-id"
      {:parameters
       {:path {:user-type s/Str
@@ -286,7 +294,7 @@
    user-routes])
 
 (defn- stringify-body
-  "Since the raw body could be read more than once (security, content negotation...),
+  "Since the raw body could be read more than once (security, content negotiation...),
    this interceptor replaces it with a string that can be read multiple times.  This
    should only be used for requests that have reasonably small bodies!  In other
    cases, the body could be written to a temp file."

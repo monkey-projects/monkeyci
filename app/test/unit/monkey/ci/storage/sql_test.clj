@@ -247,7 +247,10 @@
             user->id (juxt :type :type-id)]
         (testing "can save and find"
           (is (sid/sid? (st/save-user s user)))
-          (is (= user (st/find-user s (user->id user)))))
+          (is (= user (st/find-user-by-type s (user->id user)))))
+
+        (testing "can find by cuid"
+          (is (= user (st/find-user s (:id user)))))
 
         (testing "can link to customer"
           (let [cust (gen-cust)
@@ -255,11 +258,14 @@
             (is (sid/sid? (st/save-customer s cust)))
             (is (sid/sid? (st/save-user s user)))
             (is (= (:customers user)
-                   (-> (st/find-user s (user->id user)) :customers)))))
+                   (-> (st/find-user s (:id user)) :customers)))))
 
+        (testing "can find customers"
+          (is (not-empty (st/list-user-customers s (:id user)))))
+        
         (testing "can unlink from customer"
           (is (sid/sid? (st/save-user s (dissoc user :customers))))
-          (is (empty? (-> (st/find-user s (user->id user)) :customers))))))))
+          (is (empty? (-> (st/find-user s (:id user)) :customers))))))))
 
 (deftest ^:sql builds
   (with-storage conn s

@@ -113,15 +113,21 @@
         (is (= ssh-keys (sut/find-ssh-keys st cid)))))))
 
 (deftest users
-  (testing "can save and find github user"
-    (h/with-memory-store st
-      (let [u {:type "github"
+  (let [u {:type "github"
                :type-id 1234
                :id (sut/new-id)
                :name "test user"
-               :email "test@monkeyci.com"}]
+           :email "test@monkeyci.com"}]
+    
+    (testing "can save and find github user"
+      (h/with-memory-store st
         (is (sut/sid? (sut/save-user st u)))
-        (is (= u (sut/find-user st [:github 1234])) "can retrieve user by github id")))))
+        (is (= u (sut/find-user-by-type st [:github 1234])) "can retrieve user by github id")))
+
+    (testing "can save and find user by cuid"
+      (h/with-memory-store st
+        (is (sut/sid? (sut/save-user st u)))
+        (is (= u (sut/find-user st (:id u))) "can retrieve user by id")))))
 
 (deftest update-repo
   (testing "updates repo in customer object"

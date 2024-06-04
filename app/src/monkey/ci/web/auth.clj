@@ -128,7 +128,7 @@
     (let [id (sid/parse-sid sub)]
       (when (= 2 (count id))
         (log/debug "Looking up user with id" id)
-        (some-> (st/find-user storage id)
+        (some-> (st/find-user-by-type storage id)
                 (update :customers set))))))
 
 (defmethod resolve-token role-build [{:keys [storage]} {:keys [sub] :as token}]

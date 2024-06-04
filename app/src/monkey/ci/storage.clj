@@ -297,6 +297,34 @@
 (defn save-user [s u]
   (p/write-obj s (user->sid u) u))
 
-(defn find-user [s id]
-  (when id
-    (p/read-obj s (user-sid id))))
+(def find-user-by-type
+  "Find user by type id (e.g. github)"
+  (override-or
+   [:user :find-by-type]
+   (fn [s id]
+     (when id
+       (p/read-obj s (user-sid id))))))
+
+(def find-user
+  "Find user by cuid"
+  (override-or
+   [:user :find]
+   (fn [s id]
+     ;; Very slow for many users.  Use dedicated query in override.
+     (letfn [(find-typed-users [t]
+               (->> (p/list-obj s [global users t])
+                    (map #(find-user-by-type s [(keyword t) %]))))]
+       (when id
+         (->> (p/list-obj s [global users])
+              (mapcat find-typed-users)
+              (filter (comp (partial = id) :id))
+              (first)))))))
+
+(def list-user-customers
+  (override-or
+   [:user :customers]
+   (fn [s id]
+     (some->> id
+              (find-user s)
+              :customers
+              (map (partial find-customer s))))))
