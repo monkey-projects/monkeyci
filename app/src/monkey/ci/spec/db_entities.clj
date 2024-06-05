@@ -3,6 +3,7 @@
    record entities for testing, but also to validate entities before persisting 
    them."
   (:require [clojure.spec.alpha :as s]
+            [clojure.spec.gen.alpha :as gen]
             [monkey.ci.spec
              [build]
              [common :as c]]))
@@ -82,7 +83,10 @@
 (s/def :db/parameter-value
   (s/keys :req-un [:db/params-id :db/name :label/value]))
 
-(s/def :db/type string?)
+(s/def :db/type (s/with-gen
+                  string?
+                  #(gen/fmap clojure.string/join
+                             (gen/vector (gen/char-alphanumeric) 20))))
 (s/def :db/type-id string?)
 (s/def :db/email string?)
 
