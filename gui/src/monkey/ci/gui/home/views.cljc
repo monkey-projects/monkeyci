@@ -6,6 +6,16 @@
             [monkey.ci.gui.home.subs]
             [re-frame.core :as rf]))
 
+(defn- create-cust-btn []
+  [:a.btn.btn-primary
+   {:href (r/path-for :page/customer-new)}
+   [:span.me-2 [co/icon :plus-square]] "Create New Customer"])
+
+(defn- join-cust-btn []
+  [:a.btn.btn-primary
+   {:href (r/path-for :page/customer-join)}
+   [:span.me-2 [co/icon :arrow-right-square]] "Join Customer"])
+
 (defn- cust-item [{:keys [id name]}]
   [:li [:a {:href (r/path-for :page/customer {:customer-id id})} name]])
 
@@ -13,9 +23,18 @@
   (let [c (rf/subscribe [:user/customers])]
     (when @c
       [:<>
-       [:h3 "Your Customers"]
-       (->> (map cust-item @c)
-            (into [:ul]))])))
+       [:h3 "Your Linked Customers"]
+       (if (empty? @c)
+         [:<>
+          [:p "No customers have been linked to your account.  You could either "
+           [:a {:href (r/path-for :page/customer-new)} "create a new one"]
+           " or "
+           [:a {:href (r/path-for :page/customer-join)} "request to join an existing one"] "."]
+          [:div
+           [:span.me-2 [create-cust-btn]]
+           [join-cust-btn]]]
+         (->> (map cust-item @c)
+              (into [:ul])))])))
 
 (defn user-home [u]
   (rf/dispatch [:user/load-customers])

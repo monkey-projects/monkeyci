@@ -382,7 +382,7 @@
                  (-> req
                      (sut/login)
                      :status)))
-          (is (some? (st/find-user st [:github (:id u)])))))))
+          (is (some? (st/find-user-by-type st [:github (:id u)])))))))
 
   (testing "sets user id in token"
     (with-github-user

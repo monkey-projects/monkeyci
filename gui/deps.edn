@@ -1,6 +1,6 @@
 {:deps {day8.re-frame/http-fx {:mvn/version "0.2.4"}
         com.github.oliyh/martian-re-frame {:mvn/version "0.1.26"}
-        metosin/reitit-frontend {:mvn/version "0.7.0-alpha7"}
+        metosin/reitit-frontend {:mvn/version "0.7.0"}
         org.clojure/core.async {:mvn/version "1.6.681"}
         reagent/reagent {:mvn/version "1.2.0"}
         re-frame/re-frame {:mvn/version "1.4.3"}
