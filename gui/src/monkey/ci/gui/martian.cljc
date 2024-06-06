@@ -63,6 +63,12 @@
      :path-schema {:user-id s/Str}})
 
    (api-route
+    {:route-name :search-customers
+     :path-parts ["/customer"]
+     :query-schema {(s/optional-key :name) s/Str
+                    (s/optional-key :id) s/Str}})
+
+   (api-route
     {:route-name :get-repo
      :method :get
      :path-parts repo-path

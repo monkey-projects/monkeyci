@@ -49,6 +49,10 @@
   (f/router
    [["/" :page/root]
     ["/login" :page/login]
+    ["/c/join" {:conflicting true
+                :name :page/customer-join}]
+    ["/c/new" {:conflicting true
+               :name :page/customer-new}]
     ["/c/:customer-id" {:conflicting true
                         :name :page/customer}]
     ["/c/:customer-id/add-repo" :page/add-repo]
@@ -56,10 +60,6 @@
     ["/c/:customer-id/r/:repo-id/edit" :page/repo-edit]
     ["/c/:customer-id/r/:repo-id/b/:build-id" :page/build]
     ["/c/:customer-id/r/:repo-id/b/:build-id/j/:job-id" :page/job]
-    ["/c/join" {:conflicting true
-                :name :page/customer-join}]
-    ["/c/new" {:conflicting true
-               :name :page/customer-new}]
     ["/github/callback" :page/github-callback]]))
 
 (defn on-route-change [match history]

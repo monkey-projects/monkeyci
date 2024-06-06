@@ -17,6 +17,7 @@
    :page/login login/page
    :page/github-callback login/github-callback
    :page/customer customer/page
+   :page/customer-join home/page-join
    :page/add-repo customer/add-repo-page
    :page/repo repo/page
    :page/repo-edit repo/edit

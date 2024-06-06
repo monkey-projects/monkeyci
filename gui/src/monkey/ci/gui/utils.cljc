@@ -93,3 +93,9 @@
     #?(:cljs (js/parseInt x)
        :clj (Integer/parseInt x))
     x))
+
+(defn pluralize [s n & [plural]]
+  (cond
+    (= 1 n) s
+    plural plural
+    :else (str s "s")))

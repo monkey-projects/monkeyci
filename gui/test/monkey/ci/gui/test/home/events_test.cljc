@@ -44,3 +44,47 @@
     (is (= :danger (-> (db/alerts @app-db)
                        first
                        :type)))))
+
+(deftest customer-search
+  (testing "sends request to api"
+    (rf-test/run-test-sync
+     (let [cust [{:name "test customer"}]
+           c (h/catch-fx :martian.re-frame/request)]
+       (h/initialize-martian {:search-customers {:status 200
+                                                 :body cust
+                                                 :error-code :no-error}})
+       (is (some? (:martian.re-frame/martian @app-db)))
+       (rf/dispatch [:customer/search {:customer-search ["test customer"]}])
+       (is (= 1 (count @c)))
+       (is (= :search-customers (-> @c first (nth 2)))))))
+
+  (testing "marks searching in db"
+    (rf/dispatch-sync [:customer/search {}])
+    (is (true? (db/customer-searching? @app-db))))
+
+  (testing "clears alerts"
+    (is (some? (reset! app-db (db/set-join-alerts {} [{:type :info}]))))
+    (rf/dispatch-sync [:customer/search {}])
+    (is (nil? (db/join-alerts @app-db)))))
+
+(deftest customer-search--success
+  (testing "unmarks seaching"
+    (is (some? (reset! app-db (db/set-customer-searching {} true))))
+    (rf/dispatch-sync [:customer/search--success {:body [{:name "test customer"}]}])
+    (is (not (db/customer-searching? @app-db))))
+
+  (testing "sets search result in db"
+    (let [matches [{:name "test customer"}]]
+      (rf/dispatch-sync [:customer/search--success {:body matches}])
+      (is (= matches (db/search-results @app-db))))))
+
+(deftest customer-search--failed
+  (testing "unmarks seaching"
+    (is (some? (reset! app-db (db/set-customer-searching {} true))))
+    (rf/dispatch-sync [:customer/search--failed "test error"])
+    (is (not (db/customer-searching? @app-db))))
+
+  (testing "sets error alert"
+    (rf/dispatch-sync [:customer/search--failed "test error"])
+    (is (= 1 (count (db/join-alerts @app-db))))
+    (is (= :danger (-> (db/join-alerts @app-db) first :type)))))

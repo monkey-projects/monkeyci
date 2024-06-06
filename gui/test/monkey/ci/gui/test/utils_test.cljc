@@ -20,3 +20,14 @@
              :end-time 100}
           e (sut/build-elapsed b)]
       (is (= 90 e)))))
+
+(deftest pluralize
+  (testing "returns first arg if singular"
+    (is (= "single" (sut/pluralize "single" 1))))
+
+  (testing "returns pluralized arg if multiple or zero"
+    (is (= "singles" (sut/pluralize "single" 10)))
+    (is (= "singles" (sut/pluralize "single" 0))))
+
+  (testing "returns plural if specified"
+    (is (= "cities" (sut/pluralize "city" 2 "cities")))))
