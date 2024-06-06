@@ -100,13 +100,18 @@
     [join-btn cust]))
 
 (defn customers-table []
-  [t/paged-table
-   {:id :customer/search-results
-    :items-sub [:customer/join-list]
-    :columns [{:label "Name"
-               :value :name}
-              {:label "Actions"
-               :value join-actions}]}])
+  (letfn [(customer-name [{:keys [id name joined?]}]
+            (if joined?
+              ;; Display link to go to customer if already joined
+              [:a {:href (r/path-for :page/customer {:customer-id id})} name]
+              name))]
+    [t/paged-table
+     {:id :customer/search-results
+      :items-sub [:customer/join-list]
+      :columns [{:label "Name"
+                 :value customer-name}
+                {:label "Actions"
+                 :value join-actions}]}]))
 
 (defn search-results []
   (let [r (rf/subscribe [:customer/join-list])]

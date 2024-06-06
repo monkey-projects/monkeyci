@@ -88,3 +88,7 @@
     (rf/dispatch-sync [:customer/search--failed "test error"])
     (is (= 1 (count (db/join-alerts @app-db))))
     (is (= :danger (-> (db/join-alerts @app-db) first :type)))))
+
+(deftest customer-join
+  (testing "sends request to backend")
+  (testing "marks customer joining"))

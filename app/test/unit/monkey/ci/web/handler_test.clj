@@ -324,7 +324,7 @@
                 :type-id 456
                 :email "testuser@monkeyci.com"}
           user->sid (juxt (comp keyword :type) :type-id)
-          st (st/make-memory-storage)
+          st (st/make-memory-storage)          
           app (make-test-app st)]
       
       (testing "`POST` creates new user"
@@ -348,17 +348,38 @@
           (is (= "updated@monkeyci.com" (some-> r :body slurp (h/parse-json) :email)))))
 
       (testing "`GET /customers` retrieves customers for user"
-        (let [cust {:id (st/new-id)
-                    :name "test customer"}
-              user (st/find-user-by-type st (user->sid user))
-              user-id (:id user)]
+        (let [user (st/find-user-by-type st (user->sid user))
+              user-id (:id user)
+              cust {:id (st/new-id)
+                    :name "test customer"}]
           (is (some? (st/save-customer st cust)))
           (is (some? (st/save-user st (assoc user :customers [(:id cust)]))))
           (is (= [cust] (-> (mock/request :get (str "/user/" user-id "/customers"))
                             (app)
                             :body
                             slurp
-                            h/parse-json))))))))
+                            h/parse-json)))))
+
+      (testing "/join-request"
+        (let [user (st/find-user-by-type st (user->sid user))
+              user-id (:id user)
+              cust {:id (st/new-id)
+                    :name "joining customer"}
+              base-path (str "/user/" user-id "/join-request")]
+
+          (is (some? (st/save-customer st cust)))
+          
+          (testing "`POST` create new join request"
+            (let [r (-> (h/json-request :post base-path 
+                                        {:customer-id (:id cust)})
+                        (app))]
+              (is (= 200 (:status r)))))
+
+          (testing "`GET` lists join requests"
+            (let [r (-> (mock/request :get base-path)
+                        (app))]
+              (is (= 200 (:status r)))
+              (is (not-empty (-> r :body slurp h/parse-json))))))))))
 
 (defn- verify-label-filter-like-endpoints [path desc entity prep-match]
   (let [st (st/make-memory-storage)

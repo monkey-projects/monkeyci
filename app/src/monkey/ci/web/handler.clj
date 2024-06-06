@@ -17,6 +17,7 @@
              [auth :as auth]
              [common :as c]
              [github :as github]]
+            [monkey.ci.web.api.join-request :as jr-api]
             [reitit.coercion.schema]
             [reitit.ring :as ring]
             [ring.middleware.cors :as cors]
@@ -117,16 +118,19 @@
   "Generates generic entity routes.  If child routes are given, they are added
    as additional routes after the full path."
   [{:keys [getter creator updater id-key new-schema update-schema child-routes
-           searcher search-schema]}]
+           searcher search-schema deleter]}]
   [["" (cond-> {:post {:handler creator
                        :parameters {:body new-schema}}}
          searcher (assoc :get {:handler searcher
                                :parameters {:query search-schema}}))]
    [(str "/" id-key)
     {:parameters {:path {id-key Id}}}
-    (cond-> [["" {:get {:handler getter}
-                  :put {:handler updater
-                        :parameters {:body update-schema}}}]]
+    (cond-> [["" (cond-> {:get {:handler getter}}
+                   updater (assoc :put
+                                  {:handler updater
+                                   :parameters {:body update-schema}})
+                   deleter (assoc :delete
+                                  {:handler deleter}))]]
       child-routes (concat child-routes))]])
 
 (def webhook-routes
@@ -259,6 +263,20 @@
                  {:handler auth/jwks
                   :produces #{"application/json"}}}])
 
+(s/defschema JoinRequestSchema
+  {:customer-id Id
+   (s/optional-key :message) s/Str})
+
+(def join-request-routes
+  ["/join-request"
+   (generic-routes
+    {:creator jr-api/create-join-request
+     :getter jr-api/get-join-request
+     :searcher jr-api/search-join-requests
+     :deleter jr-api/delete-join-request
+     :id-key :join-request-id
+     :new-schema JoinRequestSchema})])
+
 (def user-routes
   ["/user"
    {:conflicting true}
@@ -272,7 +290,8 @@
       {:path {:user-id s/Str}}}
      [["/customers"
        {:get
-        {:handler api/get-user-customers}}]]]
+        {:handler api/get-user-customers}}]
+      join-request-routes]]
     ["/:user-type/:type-id"
      {:parameters
       {:path {:user-type s/Str
