@@ -18,7 +18,7 @@
                 lambdaisland/kaocha-cljs2 {:mvn/version "0.2.72"}
                 day8.re-frame/test {:mvn/version "0.1.5"}
                 devcards/devcards {:mvn/version "0.2.7"}
-                com.monkeyprojects/shadow-junit-xml {:mvn/version "0.1.0-SNAPSHOT"}}}
+                com.monkeyprojects/shadow-junit-xml {:mvn/version "0.2.0-SNAPSHOT"}}}
 
   :test/clj
   {:extra-deps {com.monkeyprojects/build {:mvn/version "0.2.0"}}
