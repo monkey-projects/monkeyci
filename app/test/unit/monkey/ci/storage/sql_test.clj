@@ -45,6 +45,9 @@
 (defn- gen-job []
   (gen-entity :entity/job))
 
+(defn- gen-join-request []
+  (gen-entity :entity/join-request))
+
 (defmacro with-storage [conn s & body]
   `(eh/with-prepared-db ~conn
      (let [~s (sut/make-storage ~conn)]
@@ -215,57 +218,55 @@
 
 (deftest ^:sql customer-params
   (with-storage conn s
-    (testing "customer params"
-      (let [{cust-id :id :as cust} (gen-cust)
-            params (assoc (gen-customer-params) :customer-id cust-id)]
-        (is (sid/sid? (st/save-customer s cust)))
-        
-        (testing "can create and retrieve"
-          (let [ce (ec/select-customer conn (ec/by-cuid cust-id))]
-            (is (sid/sid? (st/save-params s cust-id [params])))
-            (is (= [params] (st/find-params s cust-id)))))
+    (let [{cust-id :id :as cust} (gen-cust)
+          params (assoc (gen-customer-params) :customer-id cust-id)]
+      (is (sid/sid? (st/save-customer s cust)))
+      
+      (testing "can create and retrieve"
+        (let [ce (ec/select-customer conn (ec/by-cuid cust-id))]
+          (is (sid/sid? (st/save-params s cust-id [params])))
+          (is (= [params] (st/find-params s cust-id)))))
 
-        (testing "can update label filters"
-          (let [lf [[{:label "test-label"
-                      :value "test-value"}]]]
-            (is (sid/sid? (st/save-params s cust-id [(assoc params :label-filters lf)])))
-            (let [matches (st/find-params s cust-id)]
-              (is (= 1 (count matches)))
-              (is (= lf (-> matches first :label-filters))))))
+      (testing "can update label filters"
+        (let [lf [[{:label "test-label"
+                    :value "test-value"}]]]
+          (is (sid/sid? (st/save-params s cust-id [(assoc params :label-filters lf)])))
+          (let [matches (st/find-params s cust-id)]
+            (is (= 1 (count matches)))
+            (is (= lf (-> matches first :label-filters))))))
 
-        (testing "can update parameter values"
-          (let [pv [{:name "new-param"
-                     :value "new value"}]]
-            (is (sid/sid? (st/save-params s cust-id [(assoc params :parameters pv)])))
-            (is (= pv (-> (st/find-params s cust-id) first :parameters)))))))))
+      (testing "can update parameter values"
+        (let [pv [{:name "new-param"
+                   :value "new value"}]]
+          (is (sid/sid? (st/save-params s cust-id [(assoc params :parameters pv)])))
+          (is (= pv (-> (st/find-params s cust-id) first :parameters))))))))
 
 (deftest ^:sql users
   (with-storage conn s
-    (testing "users"
-      (let [user (-> (gen-user)
-                     (dissoc :customers))
-            user->id (juxt :type :type-id)]
-        (testing "can save and find"
+    (let [user (-> (gen-user)
+                   (dissoc :customers))
+          user->id (juxt :type :type-id)]
+      (testing "can save and find"
+        (is (sid/sid? (st/save-user s user)))
+        (is (= user (st/find-user-by-type s (user->id user)))))
+
+      (testing "can find by cuid"
+        (is (= user (st/find-user s (:id user)))))
+
+      (testing "can link to customer"
+        (let [cust (gen-cust)
+              user (assoc user :customers [(:id cust)])]
+          (is (sid/sid? (st/save-customer s cust)))
           (is (sid/sid? (st/save-user s user)))
-          (is (= user (st/find-user-by-type s (user->id user)))))
+          (is (= (:customers user)
+                 (-> (st/find-user s (:id user)) :customers)))))
 
-        (testing "can find by cuid"
-          (is (= user (st/find-user s (:id user)))))
-
-        (testing "can link to customer"
-          (let [cust (gen-cust)
-                user (assoc user :customers [(:id cust)])]
-            (is (sid/sid? (st/save-customer s cust)))
-            (is (sid/sid? (st/save-user s user)))
-            (is (= (:customers user)
-                   (-> (st/find-user s (:id user)) :customers)))))
-
-        (testing "can find customers"
-          (is (not-empty (st/list-user-customers s (:id user)))))
-        
-        (testing "can unlink from customer"
-          (is (sid/sid? (st/save-user s (dissoc user :customers))))
-          (is (empty? (-> (st/find-user s (:id user)) :customers))))))))
+      (testing "can find customers"
+        (is (not-empty (st/list-user-customers s (:id user)))))
+      
+      (testing "can unlink from customer"
+        (is (sid/sid? (st/save-user s (dissoc user :customers))))
+        (is (empty? (-> (st/find-user s (:id user)) :customers)))))))
 
 (deftest ^:sql builds
   (with-storage conn s
@@ -305,6 +306,31 @@
         (testing "can list"
           (is (= [(:build-id build)]
                  (st/list-builds s [(:id cust) (:id repo)]))))))))
+
+(deftest ^:sql join-requests
+  (with-storage conn s
+    (let [cust (gen-cust)
+          user (gen-user)
+          _ (st/save-customer s cust)
+          _ (st/save-user s user)
+          jr (-> (gen-join-request)
+                 (assoc :user-id (:id user)
+                        :customer-id (:id cust)
+                        :status :pending
+                        :request-msg "test request")
+                 (dissoc :response-msg))]
+      (testing "can create and retrieve"
+        (is (sid/sid? (st/save-join-request s jr)))
+        (is (= jr (st/find-join-request s (:id jr)))))
+
+      (testing "can update"
+        (is (sid/sid? (st/save-join-request s (assoc jr :status :approved))))
+        (is (= :approved (-> (st/find-join-request s (:id jr))
+                             :status))))
+
+      (testing "can list for user"
+        (is (= [(:id jr)] (->> (st/list-user-join-requests s (:id user))
+                               (map :id))))))))
 
 (deftest make-storage
   (testing "creates sql storage object using connection settings"

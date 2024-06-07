@@ -97,7 +97,7 @@
   [req]
   (assoc-in req [:parameters :body :secret-key] (auth/generate-secret-key)))
 
-(def create-webhook (comp (entity-creator st/save-webhook-details c/default-id)
+(def create-webhook (comp (c/entity-creator st/save-webhook-details c/default-id)
                           assign-webhook-secret))
 
 (def repo-sid (comp (juxt :customer-id :repo-id)

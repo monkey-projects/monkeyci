@@ -292,3 +292,5 @@
   (->> values
        (map (juxt :params-id :name :value))
        (insert-entities conn :customer-param-values [:params-id :name :value])))
+
+(defentity join-request)

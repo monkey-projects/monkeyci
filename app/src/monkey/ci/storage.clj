@@ -329,8 +329,8 @@
               :customers
               (map (partial find-customer s))))))
 
-(def join-request "join-request")
-(def join-request-sid (partial global-sid :join-request))
+(def join-requests "join-requests")
+(def join-request-sid (partial global-sid (keyword join-requests)))
 
 (def save-join-request
   (override-or

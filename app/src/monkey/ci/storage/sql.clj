@@ -10,6 +10,7 @@
              [build :as eb]
              [core :as ec]
              [customer :as ecu]
+             [join-request :as jr]
              [migrations :as emig]
              [param :as eparam]
              [repo :as er]
@@ -445,38 +446,76 @@
 (defn- select-repo-builds [conn sid]
   (apply eb/select-build-ids-for-repo conn sid))
 
+(def join-request? (partial global-sid? st/join-requests))
+
+(defn- insert-join-request [conn jr]
+  (let [user (ec/select-user conn (ec/by-cuid (:user-id jr)))
+        cust (ec/select-customer conn (ec/by-cuid (:customer-id jr)))
+        e (-> (select-keys jr [:status :request-msg :response-msg])
+              (update :status name)
+              (assoc :cuid (:id jr)
+                     :customer-id (:id cust)
+                     :user-id (:id user)))]
+    (ec/insert-join-request conn e)))
+
+(defn- update-join-request [conn jr existing]
+  (ec/update-join-request conn
+                          (-> (select-keys jr [:status :request-msg :response-msg])
+                              (update :status name)
+                              (as-> x (merge existing x)))))
+
+(defn- upsert-join-request [conn jr]
+  (if-let [existing (ec/select-join-request conn (ec/by-cuid (:id jr)))]
+    (update-join-request conn jr existing)
+    (insert-join-request conn jr)))
+
+(defn- select-join-request [conn cuid]
+  (jr/select-join-request-as-entity conn cuid))
+
+(defn- select-user-join-requests [{:keys [conn]} user-cuid]
+  (letfn [(db->jr [r]
+            (update r :status keyword))]
+    (->> (jr/select-user-join-requests conn user-cuid)
+         (map db->jr))))
+
+(defn- sid-pred [t sid]
+  (t sid))
+
 (defrecord SqlStorage [conn]
   p/Storage
   (read-obj [_ sid]
-    (cond
-      (customer? sid)
+    (condp sid-pred sid
+      customer?
       (select-customer conn (global-sid->cuid sid))
-      (user? sid)
+      user?
       (select-user-by-type conn (drop 2 sid))
-      (build? sid)
+      build?
       (select-build conn (rest sid))
-      (webhook? sid)
+      webhook?
       (select-webhook conn (global-sid->cuid sid))
-      (ssh-key? sid)
+      ssh-key?
       (select-ssh-keys conn (second sid))
-      (params? sid)
-      (select-params conn (second sid))))
+      params?
+      (select-params conn (second sid))
+      join-request?
+      (select-join-request conn (global-sid->cuid sid))))
   
   (write-obj [_ sid obj]
-    (when (cond
-            (customer? sid)
+    (when (condp sid-pred sid
+            customer?
             (upsert-customer conn obj)
-            (user? sid)
+            user?
             (upsert-user conn obj)
-            (build? sid)
+            join-request?
+            (upsert-join-request conn obj)
+            build?
             (upsert-build conn obj)
-            (webhook? sid)
+            webhook?
             (upsert-webhook conn obj)
-            (ssh-key? sid)
+            ssh-key?
             (upsert-ssh-keys conn obj)
-            (params? sid)
+            params?
             (upsert-params conn obj)
-            :else
             (log/warn "Unrecognized sid when writing:" sid))
       sid))
 
@@ -544,7 +583,9 @@
    {:search select-customers}
    :user
    {:find select-user
-    :customers select-user-customers}})
+    :customers select-user-customers}
+   :join-request
+   {:list-user select-user-join-requests}})
 
 (defn make-storage [conn]
   (map->SqlStorage {:conn conn

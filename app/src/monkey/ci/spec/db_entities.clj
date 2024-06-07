@@ -94,3 +94,13 @@
   (-> (s/keys :req-un [:db/type :db/type-id]
               :opt-un [:db/email])
       (s/merge :db/common)))
+
+(s/def :db/user-id id?)
+(s/def :join-request-db/status #{"pending" "approved" "rejected"})
+(s/def :join-request-db/request-msg string?)
+(s/def :join-request-db/response-msg string?)
+
+(s/def :db/join-request
+  (-> (s/keys :req-un [:db/user-id :db/customer-id :join-request-db/status]
+              :opt-un [:join-request-db/request-msg :join-request-db/response-msg])
+      (s/merge :db/common)))

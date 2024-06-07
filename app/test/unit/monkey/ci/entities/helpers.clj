@@ -80,3 +80,6 @@
 
 (defn gen-param-value []
   (gen-spec :db/parameter-value))
+
+(defn gen-join-request []
+  (gen-spec :db/join-request))
