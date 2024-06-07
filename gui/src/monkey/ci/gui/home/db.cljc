@@ -39,14 +39,22 @@
 (defn set-join-requests [db jr]
   (assoc db join-requests jr))
 
+(defn update-join-requests [db f & args]
+  (apply update db join-requests f args))
+
 (defn customer-joining?
   "Checks if we're in the process of sending a join request to the given customer."
-  [db cust-id]
-  (some? (when-let [ids (::customer-joining db)]
-           (ids cust-id))))
+  ([db cust-id]
+   (some? (when-let [ids (::customer-joining db)]
+            (ids cust-id))))
+  ([db]
+   (::customer-joining db)))
 
 (defn mark-customer-joining [db cust-id]
   (update db ::customer-joining (fnil conj #{}) cust-id))
 
 (defn unmark-customer-joining [db cust-id]
   (update db ::customer-joining disj cust-id))
+
+(defn clear-customer-joining [db]
+  (dissoc db ::customer-joining))

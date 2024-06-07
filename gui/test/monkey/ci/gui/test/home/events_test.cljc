@@ -46,6 +46,22 @@
                        first
                        :type)))))
 
+(deftest customer-join-init
+  (testing "clears search results"
+    (is (some? (reset! app-db (db/set-search-results {} ::results))))
+    (rf/dispatch-sync [:customer/join-init])
+    (is (nil? (db/search-results @app-db))))
+
+  (testing "clears join requests"
+    (is (some? (reset! app-db (db/set-join-requests {} ::results))))
+    (rf/dispatch-sync [:customer/join-init])
+    (is (nil? (db/join-requests @app-db))))
+
+  (testing "clears joining flags"
+    (is (some? (reset! app-db (db/mark-customer-joining {} "test-cust"))))
+    (rf/dispatch-sync [:customer/join-init])
+    (is (not (db/customer-joining? @app-db "test-cust")))))
+
 (deftest customer-search
   (testing "sends request to api"
     (rf-test/run-test-sync
@@ -138,6 +154,40 @@
        (is (db/customer-joining? @app-db cust-id))))))
 
 (deftest customer-join--success
-  (testing "unmarks customer joining")
-  (testing "updates customer join list")
-  (testing "updates join request list"))
+  (testing "unmarks customer joining"
+    (let [cust-id "test-id"]
+      (is (some? (reset! app-db (db/mark-customer-joining {} cust-id))))
+      (rf/dispatch-sync [:customer/join--success {:body {:customer-id cust-id}}])
+      (is (not (db/customer-joining? @app-db cust-id)))))
+  
+  (testing "updates join request list"
+    (let [jr {:id "test-id"
+              :customer-id "test-cust"
+              :user-id "test-user"}]
+      (is (empty? (reset! app-db {})))
+      (rf/dispatch-sync [:customer/join--success {:body jr}])
+      (is (= [jr] (db/join-requests @app-db))))))
+
+(deftest customer-join--failed
+  (testing "unmarks customer joining"
+    (let [cust-id "test-cust"]
+      (is (some? (reset! app-db (db/mark-customer-joining {} cust-id))))
+      (rf/dispatch-sync [:customer/join--failed cust-id "test error"])
+      (is (not (db/customer-joining? @app-db cust-id)))))
+
+  (testing "sets error alert"
+    (rf/dispatch-sync [:customer/join--failed "test-cust" "test error"])
+    (is (= 1 (count (db/join-alerts @app-db))))
+    (is (= :danger (-> (db/join-alerts @app-db) first :type)))))
+
+(deftest join-request-delete
+  (testing "sends delete request to backend")
+  (testing "marks deleting"))
+
+(deftest join-request-delete--success
+  (testing "removes join request from list")
+  (testing "unmarks deleting"))
+
+(deftest join-request-delete--failed
+  (testing "sets error alert")
+  (testing "unmarks deleting"))

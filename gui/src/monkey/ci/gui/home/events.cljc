@@ -29,6 +29,14 @@
    (db/set-alerts db [{:type :danger
                        :message (str "Could not retrieve linked customers: " (u/error-msg err))}])))
 
+(rf/reg-event-db
+ :customer/join-init
+ (fn [db _]
+   (-> db
+       (db/set-search-results nil)
+       (db/set-join-requests nil)
+       (db/clear-customer-joining))))
+
 (rf/reg-event-fx
  :customer/search
  (fn [{:keys [db]} [_ {:keys [customer-search]}]]
@@ -89,5 +97,20 @@
                   {:customer-id cust-id}
                   :user-id (:id user)}
                  [:customer/join--success]
-                 [:customer/join--failed]]
+                 [:customer/join--failed cust-id]]
       :db (db/mark-customer-joining db cust-id)})))
+
+(rf/reg-event-db
+ :customer/join--success
+ (fn [db [_ {:keys [body]}]]
+   (-> db
+       (db/unmark-customer-joining (:customer-id body))
+       (db/update-join-requests (fnil conj []) body))))
+
+(rf/reg-event-db
+ :customer/join--failed
+ (fn [db [_ cust-id err]]
+   (-> db
+       (db/unmark-customer-joining cust-id)
+       (db/set-join-alerts [{:type :danger
+                             :message (str "Failed to send join request: " (u/error-msg err))}]))))

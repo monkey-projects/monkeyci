@@ -11,11 +11,16 @@
   (update req :parameters (fn [p]
                             (assoc-in p [:body :user-id] (get-in p [:path :user-id])))))
 
+
+(defn- mark-pending [req]
+  (assoc-in req [:parameters :body :status] :pending))
+
 (def create-join-request
   (comp
    (c/entity-creator
     st/save-join-request
     c/default-id)
+   mark-pending
    user-id->body))
 
 (def get-join-request

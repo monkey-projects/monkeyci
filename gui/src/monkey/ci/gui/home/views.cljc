@@ -87,19 +87,23 @@
     [:div.col
      [search-btn]]]])
 
-(defn- join-btn [{:keys [id]}]
-  (let [joining? (rf/subscribe [:customer/joining? id])]
-    [:button.btn.btn-sm.btn-success
-     {:on-click #(rf/dispatch [:customer/join id])
-      :disabled @joining?}
-     [:span.me-2 [co/icon :arrow-right-square]] "Join"]))
+(defn- join-btn [{:keys [id]} disabled?]
+  [:button.btn.btn-sm.btn-success
+   {:on-click #(rf/dispatch [:customer/join id])
+    :disabled disabled?}
+   [:span.me-2 [co/icon :arrow-right-square]] "Join"])
 
-(defn- join-actions [{:keys [joined?] :as cust}]
-  (if joined?
+(defn- join-actions [{:keys [status] :as cust}]
+  (case status
+    :joined
     [:span.badge.text-bg-success
      {:title "You have already joined this customer"}
      "joined"]
-    [join-btn cust]))
+    :pending
+    [:span.badge.text-bg-warning
+     {:title "Sending request to join"}
+     "pending"]
+    [join-btn cust (= :joining status)]))
 
 (defn customers-table []
   (letfn [(customer-name [{:keys [id name joined?]}]
@@ -128,8 +132,9 @@
   (let [cl (condp = status
              :pending  :text-bg-warning
              :approved :text-bg-success
-             :rejected :text-bg-danger)]
-    [:span {:class (str "badge " (name cl))} (name status)]))
+             :rejected :text-bg-danger
+             :text-bg-warning)]
+    [:span {:class (str "badge " (name cl))} (some-> status (name))]))
 
 (defn- join-requests-table []
   (letfn [(request-actions [jr]
@@ -162,16 +167,18 @@
 (defn page-join
   "Displays the 'join customer' page"
   []
-  [l/default
-   [:div.row
-    [:div.col-lg-8
-     [:h3 "Join Existing Customer"]
-     [:p
-      "On this page you can search for a customer and request to join it.  A user "
-      "with administrator permissions for that customer can approve your request."]
-     [co/alerts [:customer/join-alerts]]
-     [search-customer]
-     [:div.mt-2
-      [search-results]]]
-    [:div.col-lg-4
-     [join-requests]]]])
+  (rf/dispatch-sync [:customer/join-init])
+  (fn []
+    [l/default
+     [:div.row
+      [:div.col-lg-8
+       [:h3 "Join Existing Customer"]
+       [:p
+        "On this page you can search for a customer and request to join it.  A user "
+        "with administrator permissions for that customer can approve your request."]
+       [co/alerts [:customer/join-alerts]]
+       [search-customer]
+       [:div.mt-2
+        [search-results]]]
+      [:div.col-lg-4
+       [join-requests]]]]))

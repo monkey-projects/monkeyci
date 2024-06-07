@@ -371,7 +371,8 @@
               (is (= 201 (:status r)))
               (let [created (h/reply->json r)]
                 (is (some? (:id created)))
-                (is (= user-id (:user-id created))))))
+                (is (= user-id (:user-id created)))
+                (is (= "pending" (:status created)) "marks created request as pending"))))
 
           (testing "`GET` lists join requests for user"
             (let [r (-> (mock/request :get base-path)

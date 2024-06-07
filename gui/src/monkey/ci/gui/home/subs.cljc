@@ -12,18 +12,23 @@
 (u/db-sub :user/join-requests db/join-requests)
 
 (rf/reg-sub
+ :customer/joining?
+ (fn [db [_ cust-id]]
+   (if cust-id
+     (db/customer-joining? db cust-id)
+     (or (db/customer-joining? db) #{}))))
+
+(rf/reg-sub
  :customer/join-list
  :<- [:customer/search-results]
  :<- [:login/user]
- (fn [[r u] _]
+ :<- [:user/join-requests]
+ :<- [:customer/joining?]
+ (fn [[r u jr j?] _]
    (when r
      (let [cust (set (:customers u))
            mark-joined (fn [{:keys [id] :as c}]
                          (cond-> c
-                           (cust id) (assoc :joined? true)))]
+                           (cust id) (assoc :status :joined)
+                           (j? id) (assoc :status :joining)))]
        (map mark-joined r)))))
-
-(rf/reg-sub
- :customer/joining?
- (fn [db [_ cust-id]]
-   (db/customer-joining? db cust-id)))

@@ -79,6 +79,7 @@
 
    (api-route
     {:route-name :create-user-join-request
+     :method :post
      :path-parts (into user-path "/join-request")
      :path-schema user-schema
      :body-schema {:join-request
