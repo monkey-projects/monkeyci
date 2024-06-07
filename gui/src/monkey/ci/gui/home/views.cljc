@@ -87,26 +87,37 @@
     [:div.col
      [search-btn]]]])
 
-(defn- join-btn [{:keys [id]}]
+(defn- join-btn [{:keys [id]} disabled?]
   [:button.btn.btn-sm.btn-success
-   {:on-click #(rf/dispatch [:customer/join id])}
+   {:on-click #(rf/dispatch [:customer/join id])
+    :disabled disabled?}
    [:span.me-2 [co/icon :arrow-right-square]] "Join"])
 
-(defn- join-actions [{:keys [joined?] :as cust}]
-  (if joined?
+(defn- join-actions [{:keys [status] :as cust}]
+  (case status
+    :joined
     [:span.badge.text-bg-success
      {:title "You have already joined this customer"}
      "joined"]
-    [join-btn cust]))
+    :pending
+    [:span.badge.text-bg-warning
+     {:title "Sending request to join"}
+     "pending"]
+    [join-btn cust (= :joining status)]))
 
 (defn customers-table []
-  [t/paged-table
-   {:id :customer/search-results
-    :items-sub [:customer/join-list]
-    :columns [{:label "Name"
-               :value :name}
-              {:label "Actions"
-               :value join-actions}]}])
+  (letfn [(customer-name [{:keys [id name joined?]}]
+            (if joined?
+              ;; Display link to go to customer if already joined
+              [:a {:href (r/path-for :page/customer {:customer-id id})} name]
+              name))]
+    [t/paged-table
+     {:id :customer/search-results
+      :items-sub [:customer/join-list]
+      :columns [{:label "Name"
+                 :value customer-name}
+                {:label "Actions"
+                 :value join-actions}]}]))
 
 (defn search-results []
   (let [r (rf/subscribe [:customer/join-list])]
@@ -117,16 +128,57 @@
          [:p "Found " (count @r) " matching " (u/pluralize "customer" (count @r)) "."]
          [customers-table]]))))
 
+(defn- request-status [{:keys [status]}]
+  (let [cl (condp = status
+             :pending  :text-bg-warning
+             :approved :text-bg-success
+             :rejected :text-bg-danger
+             :text-bg-warning)]
+    [:span {:class (str "badge " (name cl))} (some-> status (name))]))
+
+(defn- join-requests-table []
+  (letfn [(request-actions [jr]
+            [:button.btn.btn-sm.btn-danger
+             {:on-click #(rf/dispatch [:join-request/delete (:id jr)])}
+             [:span {:title "Delete"} [co/icon :trash]]])]
+    [t/paged-table
+     {:id :user/join-requests
+      :items-sub [:user/join-requests]
+      :columns [{:label "Customer"
+                 ;; TODO Find a way to get customer names here.  Either we need a special request
+                 ;; to the backend, or launch a request per record (to be avoided).
+                 :value :customer-id}
+                {:label "Status"
+                 :value request-status}
+                {:label "Actions"
+                 :value request-actions}]}]))
+
+(defn join-requests []
+  (rf/dispatch [:join-request/load])
+  (let [r (rf/subscribe [:user/join-requests])]
+    [:<>
+     [:h3 "Pending Join Requests"]
+     (if (nil? @r)
+       [:p "Loading information..."]
+       (if (empty? @r)
+         [:p "No requests pending."]
+         [join-requests-table]))]))
+
 (defn page-join
   "Displays the 'join customer' page"
   []
-  [l/default
-   [:<>
-    [:h3 "Join Existing Customer"]
-    [:p
-     "On this page you can search for a customer and request to join it.  A user "
-     "with administrator permissions for that customer can approve your request."]
-    [co/alerts [:customer/join-alerts]]
-    [search-customer]
-    [:div.mt-2
-     [search-results]]]])
+  (rf/dispatch-sync [:customer/join-init])
+  (fn []
+    [l/default
+     [:div.row
+      [:div.col-lg-8
+       [:h3 "Join Existing Customer"]
+       [:p
+        "On this page you can search for a customer and request to join it.  A user "
+        "with administrator permissions for that customer can approve your request."]
+       [co/alerts [:customer/join-alerts]]
+       [search-customer]
+       [:div.mt-2
+        [search-results]]]
+      [:div.col-lg-4
+       [join-requests]]]]))

@@ -20,55 +20,7 @@
              [common :as c]]
             [ring.util.response :as rur]))
 
-(def body (comp :body :parameters))
-
-(defn- id-getter [id-key]
-  (comp id-key :path :parameters))
-
-(defn- entity-getter [get-id getter]
-  (fn [req]
-    (let [id (get-id req)]
-      (if-let [match (some-> (c/req->storage req)
-                             (getter id))]
-        (rur/response match)
-        (do
-          (log/warn "Entity not found:" id)
-          (rur/not-found nil))))))
-
-(defn- entity-creator [saver id-generator]
-  (fn [req]
-    (let [body (body req)
-          st (c/req->storage req)
-          c (assoc body :id (id-generator st body))]
-      (when (saver st c)
-        ;; TODO Return full url to the created entity
-        (rur/created (:id c) c)))))
-
-(defn- entity-updater [get-id getter saver]
-  (fn [req]
-    (let [st (c/req->storage req)]
-      (if-let [match (getter st (get-id req))]
-        (let [upd (merge match (body req))]
-          (when (saver st upd)
-            (rur/response upd)))
-        ;; If no entity to update is found, return a 404.  Alternatively,
-        ;; we could create it here instead and return a 201.  This could
-        ;; be useful should we ever want to restore lost data.
-        (rur/not-found nil)))))
-
-(defn- default-id [_ _]
-  (st/new-id))
-
-(defn- make-entity-endpoints
-  "Creates default api functions for the given entity using the configuration"
-  [entity {:keys [get-id getter saver new-id] :or {new-id default-id}}]
-  (letfn [(make-ep [[p f]]
-            (intern *ns* (symbol (str p entity)) f))]
-    (->> {"get-" (entity-getter get-id getter)
-          "create-" (entity-creator saver new-id)
-          "update-" (entity-updater get-id getter saver)}
-         (map make-ep)
-         (doall))))
+(def body c/body)
 
 (defn- id-from-name
   "Generates id from the object name.  It looks up the customer by `:customer-id`
@@ -101,10 +53,10 @@
   (some-> p
           (mc/update-existing :repos (comp (partial map repo->out) vals))))
 
-(make-entity-endpoints "customer"
-                       {:get-id (id-getter :customer-id)
-                        :getter (comp repos->out st/find-customer)
-                        :saver st/save-customer})
+(c/make-entity-endpoints "customer"
+                         {:get-id (c/id-getter :customer-id)
+                          :getter (comp repos->out st/find-customer)
+                          :saver st/save-customer})
 
 (defn search-customers [req]
   (let [f (get-in req [:parameters :query])]
@@ -113,23 +65,23 @@
           (rur/status 400))
       (rur/response (st/search-customers (c/req->storage req) f)))))
 
-(make-entity-endpoints "repo"
-                       ;; The repo is part of the customer, so combine the ids
-                       {:get-id (id-getter (juxt :customer-id :repo-id))
-                        :getter st/find-repo
-                        :saver st/save-repo
-                        :new-id repo-id})
+(c/make-entity-endpoints "repo"
+                         ;; The repo is part of the customer, so combine the ids
+                         {:get-id (c/id-getter (juxt :customer-id :repo-id))
+                          :getter st/find-repo
+                          :saver st/save-repo
+                          :new-id repo-id})
 
-(make-entity-endpoints "webhook"
-                       {:get-id (id-getter :webhook-id)
-                        :getter (comp #(dissoc % :secret-key)
-                                      st/find-details-for-webhook)
-                        :saver st/save-webhook-details})
+(c/make-entity-endpoints "webhook"
+                         {:get-id (c/id-getter :webhook-id)
+                          :getter (comp #(dissoc % :secret-key)
+                                        st/find-details-for-webhook)
+                          :saver st/save-webhook-details})
 
-(make-entity-endpoints "user"
-                       {:get-id (id-getter (juxt :user-type :type-id))
-                        :getter st/find-user-by-type
-                        :saver st/save-user})
+(c/make-entity-endpoints "user"
+                         {:get-id (c/id-getter (juxt :user-type :type-id))
+                          :getter st/find-user-by-type
+                          :saver st/save-user})
 
 (defn get-user-customers
   "Retrieves all users linked to the customer in the request path"
@@ -145,7 +97,7 @@
   [req]
   (assoc-in req [:parameters :body :secret-key] (auth/generate-secret-key)))
 
-(def create-webhook (comp (entity-creator st/save-webhook-details default-id)
+(def create-webhook (comp (c/entity-creator st/save-webhook-details c/default-id)
                           assign-webhook-secret))
 
 (def repo-sid (comp (juxt :customer-id :repo-id)

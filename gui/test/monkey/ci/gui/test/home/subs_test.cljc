@@ -71,9 +71,40 @@
       (is (some? (reset! app-db (db/set-search-results {} [{:id "test customer"}]))))
       (is (= ["test customer"] (map :id @r))))
 
-    (testing "sets `joined?` if user is already linked"
+    (testing "sets status to `:joined` if user is already linked"
       (is (some? (reset! app-db (-> {}
                                     (db/set-search-results [{:id "joined-cust"}])
                                     (ldb/set-user {:id "test-user"
                                                    :customers ["joined-cust"]})))))
-      (is (true? (-> @r first :joined?))))))
+      (is (= :joined (-> @r first :status))))
+
+    (testing "sets status to `:joining` if join request is being sent"
+      (let [cust-id "test-customer"]
+        (is (some? (reset! app-db (-> {}
+                                      (db/set-search-results [{:id "test-customer"}])
+                                      (db/mark-customer-joining "test-customer")))))
+        (is (= :joining (-> @r first :status)))))))
+
+(deftest user-join-requests
+  (let [r (rf/subscribe [:user/join-requests])]
+    (testing "exists"
+      (is (some? r)))
+
+    (testing "returns join requests"
+      (is (nil? @r))
+      (is (some? (reset! app-db (db/set-join-requests {} ::results))))
+      (is (= ::results @r)))))
+
+(deftest customer-joining?
+  (let [cust-id "test-customer"
+        c (rf/subscribe [:customer/joining? cust-id])]
+    (testing "exists"
+      (is (some? c)))
+
+    (testing "`true` if currently joining customer"
+      (is (false? @c))
+      (is (some? (reset! app-db (db/mark-customer-joining {} cust-id))))
+      (is (true? @c)))
+
+    (testing "returns all when no customer id given"
+      (is (= #{cust-id} @(rf/subscribe [:customer/joining?]))))))

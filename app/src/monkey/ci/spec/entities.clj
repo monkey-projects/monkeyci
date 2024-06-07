@@ -99,3 +99,13 @@
   (-> (s/keys :req-un [:user/type :user/type-id]
               :opt-un [:entity/email :user/customers])
       (s/merge :entity/common)))
+
+(s/def :entity/user-id ::c/cuid)
+(s/def :join-request/status #{:pending :approved :rejected})
+(s/def :join-request/request-msg string?)
+(s/def :join-request/response-msg string?)
+
+(s/def :entity/join-request
+  (-> (s/keys :req-un [:entity/user-id :entity/customer-id :join-request/status]
+              :opt-un [:join-request/request-msg :join-request/response-msg])
+      (s/merge :entity/common)))

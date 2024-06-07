@@ -3,6 +3,7 @@
             [clojure.string :as cs]
             [monkey.ci
              [config :as c]
+             [sid :as sid]
              [storage :as sut]]
             [monkey.ci.helpers :as h]))
 
@@ -14,7 +15,7 @@
     (h/with-memory-store st
       (let [id (str (random-uuid))
             d {:id id}]
-        (is (sut/sid? (sut/save-webhook-details st d)))
+        (is (sid/sid? (sut/save-webhook-details st d)))
         (is (= d (sut/find-details-for-webhook st id)))))))
 
 (deftest build-metadata
@@ -24,7 +25,7 @@
             md {:build-id build-id
                 :repo-id "test-repo"
                 :customer-id "test-cust"}]
-        (is (sut/sid? (sut/create-build-metadata st md)))
+        (is (sid/sid? (sut/create-build-metadata st md)))
         (is (= md (sut/find-build-metadata st md)))))))
 
 (deftest build-sid
@@ -40,7 +41,7 @@
             md {:build-id build-id
                 :repo-id "test-repo"
                 :customer-id "test-cust"}]
-        (is (sut/sid? (sut/save-build-results st md {:status :success})))
+        (is (sid/sid? (sut/save-build-results st md {:status :success})))
         (is (= :success (:status (sut/find-build-results st md))))))))
 
 (defn- test-build-sid []
@@ -50,7 +51,7 @@
   (testing "reads result, applies f with args, then writes result back"
     (h/with-memory-store st
       (let [sid (test-build-sid)]
-        (is (sut/sid? (sut/patch-build-results st sid assoc :key "value")))
+        (is (sid/sid? (sut/patch-build-results st sid assoc :key "value")))
         (is (= {:key "value"}
                (sut/find-build-results st sid)))))))
 
@@ -60,7 +61,7 @@
       (let [[cust-id repo-id build-id :as sid] (test-build-sid)
             build (-> (zipmap [:customer-id :repo-id :build-id] sid)
                       (assoc :start-time 100))]
-        (is (sut/sid? (sut/save-build st build)))
+        (is (sid/sid? (sut/save-build st build)))
         (is (true? (sut/build-exists? st sid)))
         (is (= build (sut/find-build st sid)))))))
 
@@ -69,7 +70,7 @@
     (h/with-memory-store st
       (let [[cust-id repo-id build-id :as sid] (test-build-sid)
             build (zipmap [:customer-id :repo-id :build-id] sid)]
-        (is (sut/sid? (sut/save-build st build)))
+        (is (sid/sid? (sut/save-build st build)))
         (is (nil? (sut/find-build st nil)))))))
 
 (deftest parameters
@@ -83,7 +84,7 @@
                       :value "value 2"}]
                     :label-filters
                     [[{:label "test-label" :value "test-value"}]]}]
-        (is (sut/sid? (sut/save-params st cid params)))
+        (is (sid/sid? (sut/save-params st cid params)))
         (is (= params (sut/find-params st cid)))))))
 
 (deftest list-builds
@@ -95,7 +96,7 @@
                         (take 2))]
         (doseq [b builds]
           (let [sid (conj repo-sid b)]
-            (is (sut/sid? (sut/save-build
+            (is (sid/sid? (sut/save-build
                            st
                            (zipmap [:customer-id :repo-id :build-id] sid))))))
         (let [l (sut/list-builds st repo-sid)]
@@ -109,7 +110,7 @@
             ssh-keys [{:id (sut/new-id)
                        :description "test ssh key"
                        :private-key "test-key"}]]
-        (is (sut/sid? (sut/save-ssh-keys st cid ssh-keys)))
+        (is (sid/sid? (sut/save-ssh-keys st cid ssh-keys)))
         (is (= ssh-keys (sut/find-ssh-keys st cid)))))))
 
 (deftest users
@@ -121,12 +122,12 @@
     
     (testing "can save and find github user"
       (h/with-memory-store st
-        (is (sut/sid? (sut/save-user st u)))
+        (is (sid/sid? (sut/save-user st u)))
         (is (= u (sut/find-user-by-type st [:github 1234])) "can retrieve user by github id")))
 
     (testing "can save and find user by cuid"
       (h/with-memory-store st
-        (is (sut/sid? (sut/save-user st u)))
+        (is (sid/sid? (sut/save-user st u)))
         (is (= u (sut/find-user st (:id u))) "can retrieve user by id")))))
 
 (deftest update-repo
@@ -152,15 +153,15 @@
         (let [sid (sut/watch-github-repo st repo)]
           
           (testing "creates repo"
-            (is (sut/sid? sid))
+            (is (sid/sid? sid))
             (is (= repo (sut/find-repo st [cid rid]))))
 
           (testing "adds to watched repos"
             (is (= [repo] (sut/find-watched-github-repos st gid))))))
 
       (testing "sets github id in existing repo"
-        (is (sut/sid? (sut/save-repo st (dissoc repo :github-id))))
-        (is (sut/sid? (sut/watch-github-repo st repo)))
+        (is (sid/sid? (sut/save-repo st (dissoc repo :github-id))))
+        (is (sid/sid? (sut/watch-github-repo st repo)))
         (is (= gid (:github-id (sut/find-repo st [cid rid]))))))))
 
 (deftest unwatch-github-repo
@@ -181,6 +182,17 @@
       (testing "removes github id from repo"
         (is (= (dissoc repo :github-id)
                (-> (sut/find-repo st [cid rid]))))))))
+
+(deftest join-requests
+  (h/with-memory-store st
+    (let [req (->> (repeatedly 3 sut/new-id)
+                   (zipmap [:id :user-id :customer-id]))]
+      (testing "can save and find"
+        (is (sid/sid? (sut/save-join-request st req)))
+        (is (= req (sut/find-join-request st (:id req)))))
+
+      (testing "can list for user"
+        (is (= [req] (sut/list-user-join-requests st (:user-id req))))))))
 
 (deftest normalize-key
   (testing "normalizes string type"

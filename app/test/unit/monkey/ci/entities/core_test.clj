@@ -264,3 +264,21 @@
                                                   [:= :customer-id (:id cust)]])))
         (is (= 1 (sut/delete-users conn (sut/by-id (:id user)))))
         (is (empty? (sut/select-users conn (sut/by-id (:id user)))))))))
+
+(deftest ^:sql join-requests
+  (eh/with-prepared-db conn
+    (let [cust (sut/insert-customer conn (eh/gen-customer))
+          user (sut/insert-user conn (eh/gen-user))]
+      (testing "can insert"
+        (is (number? (:id (sut/insert-join-request
+                           conn
+                           (-> (eh/gen-join-request)
+                               (assoc :user-id (:id user)
+                                      :customer-id (:id cust))))))))
+
+      (testing "can select by user id"
+        (is (some? (sut/select-join-request conn (sut/by-user (:id user))))))
+
+      (testing "can delete"
+        (is (= 1 (sut/delete-join-requests conn (sut/by-user (:id user)))))
+        (is (empty? (sut/select-join-requests conn (sut/by-customer (:id cust)))))))))

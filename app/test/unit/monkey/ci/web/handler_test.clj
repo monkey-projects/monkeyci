@@ -195,10 +195,7 @@
                       (mock/header :accept "application/json")
                       (app))]
             (is (= 200 (:status r)))
-            (is (= entity (some-> r
-                                  :body
-                                  slurp
-                                  h/parse-json)))))
+            (is (= entity (h/reply->json r)))))
 
         (testing (str "`PUT` updates existing " name)
           (let [id (st/new-id)
@@ -324,7 +321,7 @@
                 :type-id 456
                 :email "testuser@monkeyci.com"}
           user->sid (juxt (comp keyword :type) :type-id)
-          st (st/make-memory-storage)
+          st (st/make-memory-storage)          
           app (make-test-app st)]
       
       (testing "`POST` creates new user"
@@ -338,27 +335,58 @@
         (let [r (-> (mock/request :get (str "/user/github/" (:type-id user)))
                     (app))]
           (is (= 200 (:status r)))
-          (is (= (:type-id user) (some-> r :body slurp (h/parse-json) :type-id)))))
+          (is (= (:type-id user) (some-> r (h/reply->json) :type-id)))))
 
       (testing "`PUT /:type/:id` updates existing user"
         (let [r (-> (h/json-request :put (str "/user/github/" (:type-id user))
                                     (assoc user :email "updated@monkeyci.com"))
                     (app))]
           (is (= 200 (:status r)))
-          (is (= "updated@monkeyci.com" (some-> r :body slurp (h/parse-json) :email)))))
+          (is (= "updated@monkeyci.com" (some-> r (h/reply->json) :email)))))
 
       (testing "`GET /customers` retrieves customers for user"
-        (let [cust {:id (st/new-id)
-                    :name "test customer"}
-              user (st/find-user-by-type st (user->sid user))
-              user-id (:id user)]
+        (let [user (st/find-user-by-type st (user->sid user))
+              user-id (:id user)
+              cust {:id (st/new-id)
+                    :name "test customer"}]
           (is (some? (st/save-customer st cust)))
           (is (some? (st/save-user st (assoc user :customers [(:id cust)]))))
           (is (= [cust] (-> (mock/request :get (str "/user/" user-id "/customers"))
                             (app)
-                            :body
-                            slurp
-                            h/parse-json))))))))
+                            (h/reply->json))))))
+
+      (testing "/join-request"
+        (let [user (st/find-user-by-type st (user->sid user))
+              user-id (:id user)
+              cust {:id (st/new-id)
+                    :name "joining customer"}
+              base-path (str "/user/" user-id "/join-request")]
+
+          (is (some? (st/save-customer st cust)))
+          
+          (testing "`POST` create new join request"
+            (let [r (-> (h/json-request :post base-path 
+                                        {:customer-id (:id cust)})
+                        (app))]
+              (is (= 201 (:status r)))
+              (let [created (h/reply->json r)]
+                (is (some? (:id created)))
+                (is (= user-id (:user-id created)))
+                (is (= "pending" (:status created)) "marks created request as pending"))))
+
+          (testing "`GET` lists join requests for user"
+            (let [r (-> (mock/request :get base-path)
+                        (app))]
+              (is (= 200 (:status r)))
+              (is (not-empty (h/reply->json r)))))
+
+          (testing "`DELETE /:id` deletes join request by id"
+            (let [req (-> (st/list-user-join-requests st user-id)
+                          first)
+                  r (-> (mock/request :delete (str base-path "/" (:id req)))
+                        (app))]
+              (is (= 204 (:status r)))
+              (is (empty? (st/list-user-join-requests st user-id))))))))))
 
 (defn- verify-label-filter-like-endpoints [path desc entity prep-match]
   (let [st (st/make-memory-storage)
@@ -367,9 +395,7 @@
         (fn [path]
           (some-> (mock/request :get path)
                   (app)
-                  :body
-                  slurp
-                  (h/parse-json)))
+                  (h/reply->json)))
         save-entity
         (fn [path params]
           (-> (h/json-request :put path entity)
@@ -473,10 +499,7 @@
       (fn [{:keys [path app] [_ _ build-id] :sid}]
         (let [l (-> (mock/request :get path)
                     (app))
-              b (-> l
-                    :body
-                    slurp
-                    h/parse-json)]
+              b (h/reply->json l)]
           (is (= 200 (:status l)))
           (is (= 1 (count b)))
           (is (some? (first b)))
@@ -569,7 +592,7 @@
             (let [props [:customer-id :repo-id]
                   r (-> (mock/request :post (str path "/trigger"))
                         (app))]
-              (is (string? (-> r :body slurp h/parse-json :build-id)))))))
+              (is (string? (-> r (h/reply->json) :build-id)))))))
 
       (testing "returns 404 (not found) when repo does not exist")
 
@@ -581,10 +604,7 @@
         (testing "retrieves latest build for repo"
           (let [l (-> (mock/request :get (str path "/latest"))
                       (app))
-                b (some-> l
-                          :body
-                          slurp
-                          h/parse-json)]
+                b (h/reply->json l)]
             (is (= 200 (:status l)))
             (is (map? b))
             (is (= build-id (:build-id b)) "should contain build id")
