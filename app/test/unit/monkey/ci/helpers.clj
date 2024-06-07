@@ -63,6 +63,14 @@
 (defn parse-json [s]
   (json/parse-string s csk/->kebab-case-keyword))
 
+(defn reply->json
+  "Takes the reply body and parses it from json"
+  [rep]
+  (some-> rep
+          :body
+          slurp
+          parse-json))
+
 (defn to-json
   "Converts object to json and converts keys to camelCase"
   [obj]

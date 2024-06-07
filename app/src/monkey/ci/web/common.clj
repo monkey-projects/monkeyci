@@ -8,7 +8,8 @@
             [muuntaja.core :as mc]
             [monkey.ci
              [build :as b]
-             [runtime :as rt]]
+             [runtime :as rt]
+             [storage :as st]]
             [reitit.ring :as ring]
             [reitit.ring.coercion :as rrc]
             [reitit.ring.middleware
@@ -17,6 +18,9 @@
              [parameters :as rrmp]]
             [ring.util.response :as rur]))
 
+(def body
+  "Retrieves request body"
+  (comp :body :parameters))
 
 ;; Reitit rewrites records in the data to hashmaps, so wrap it in a type
 (deftype RuntimeWrapper [runtime])
@@ -36,6 +40,68 @@
   "Retrieves storage object from the request context"
   [req]
   (from-rt req :storage))
+
+(defn id-getter [id-key]
+  (comp id-key :path :parameters))
+
+(defn entity-getter
+  "Creates a generic request handler to retrieve a single entity by id"
+  [get-id getter]
+  (fn [req]
+    (let [id (get-id req)]
+      (if-let [match (some-> (req->storage req)
+                             (getter id))]
+        (rur/response match)
+        (do
+          (log/warn "Entity not found:" id)
+          (rur/not-found nil))))))
+
+(defn entity-creator
+  "Request handler to create a new entity"
+  [saver id-generator]
+  (fn [req]
+    (let [body (body req)
+          st (req->storage req)
+          c (assoc body :id (id-generator st body))]
+      (when (saver st c)
+        ;; TODO Return full url to the created entity
+        (rur/created (:id c) c)))))
+
+(defn entity-updater
+  "Request handler to update and existing entity"
+  [get-id getter saver]
+  (fn [req]
+    (let [st (req->storage req)]
+      (if-let [match (getter st (get-id req))]
+        (let [upd (merge match (body req))]
+          (when (saver st upd)
+            (rur/response upd)))
+        ;; If no entity to update is found, return a 404.  Alternatively,
+        ;; we could create it here instead and return a 201.  This could
+        ;; be useful should we ever want to restore lost data.
+        (rur/not-found nil)))))
+
+(defn entity-deleter
+  "Request handler to delete an entity"
+  [get-id deleter]
+  (fn [req]
+    (rur/status (if (deleter (req->storage req) (get-id req))
+                  204
+                  404))))
+
+(defn default-id [_ _]
+  (st/new-id))
+
+(defn make-entity-endpoints
+  "Creates default api functions for the given entity using the configuration"
+  [entity {:keys [get-id getter saver new-id] :or {new-id default-id}}]
+  (letfn [(make-ep [[p f]]
+            (intern *ns* (symbol (str p entity)) f))]
+    (->> {"get-" (entity-getter get-id getter)
+          "create-" (entity-creator saver new-id)
+          "update-" (entity-updater get-id getter saver)}
+         (map make-ep)
+         (doall))))
 
 (defn make-muuntaja
   "Creates muuntaja instance with custom settings"

@@ -328,3 +328,33 @@
               (find-user s)
               :customers
               (map (partial find-customer s))))))
+
+(def join-request "join-request")
+(def join-request-sid (partial global-sid :join-request))
+
+(def save-join-request
+  (override-or
+   [:join-request :save]
+   (fn [s req]
+     (p/write-obj s (join-request-sid (:id req)) req))))
+
+(def find-join-request
+  (override-or
+   [:join-request :find]
+   (fn [s id]
+     (p/read-obj s (join-request-sid id)))))
+
+(def list-user-join-requests
+  "Retrieves all customer join requests for that user"
+  (override-or
+   [:join-request :list-user]
+   (fn [s user-id]
+     (->> (p/list-obj s (join-request-sid))
+          (map (partial find-join-request s))
+          (filter (comp (partial = user-id) :user-id))))))
+
+(def delete-join-request
+  (override-or
+   [:join-request :delete]
+   (fn [s id]
+     (p/delete-obj s (join-request-sid id)))))
