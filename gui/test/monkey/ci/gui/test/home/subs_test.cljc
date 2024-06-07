@@ -77,3 +77,24 @@
                                     (ldb/set-user {:id "test-user"
                                                    :customers ["joined-cust"]})))))
       (is (true? (-> @r first :joined?))))))
+
+(deftest user-join-requests
+  (let [r (rf/subscribe [:user/join-requests])]
+    (testing "exists"
+      (is (some? r)))
+
+    (testing "returns join requests"
+      (is (nil? @r))
+      (is (some? (reset! app-db (db/set-join-requests {} ::results))))
+      (is (= ::results @r)))))
+
+(deftest customer-joining?
+  (let [cust-id "test-customer"
+        c (rf/subscribe [:customer/joining? cust-id])]
+    (testing "exists"
+      (is (some? c)))
+
+    (testing "`true` if currently joining customer"
+      (is (false? @c))
+      (is (some? (reset! app-db (db/mark-customer-joining {} cust-id))))
+      (is (true? @c)))))

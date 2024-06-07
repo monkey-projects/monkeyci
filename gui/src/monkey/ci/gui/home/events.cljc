@@ -55,3 +55,39 @@
        (db/reset-customer-searching)
        (db/set-join-alerts [{:type :danger
                              :message (str "Failed to search for customers: " (u/error-msg err))}]))))
+
+(rf/reg-event-fx
+ :join-request/load
+ (fn [{:keys [db]} _]
+   (let [user (ldb/user db)]
+     {:dispatch [:secure-request
+                 :get-user-join-requests
+                 {:user-id (:id user)}
+                 [:join-request/load--success]
+                 [:join-request/load--failed]]})))
+
+(rf/reg-event-db
+ :join-request/load--success
+ (fn [db [_ {:keys [body]}]]
+   (db/set-join-requests db body)))
+
+(rf/reg-event-db
+ :join-request/load--failed
+ (fn [db [_ err]]
+   (-> db
+       (db/set-join-requests [])
+       (db/set-join-alerts [{:type :danger
+                             :message (str "Failed to retrieve requests: " (u/error-msg err))}]))))
+
+(rf/reg-event-fx
+ :customer/join
+ (fn [{:keys [db]} [_ cust-id]]
+   (let [user (ldb/user db)]
+     {:dispatch [:secure-request
+                 :create-user-join-request
+                 {:join-request
+                  {:customer-id cust-id}
+                  :user-id (:id user)}
+                 [:customer/join--success]
+                 [:customer/join--failed]]
+      :db (db/mark-customer-joining db cust-id)})))

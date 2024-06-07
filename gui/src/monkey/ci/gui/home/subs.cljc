@@ -9,6 +9,7 @@
 (u/db-sub :customer/join-alerts db/join-alerts)
 (u/db-sub :customer/searching? (comp true? db/customer-searching?))
 (u/db-sub :customer/search-results db/search-results)
+(u/db-sub :user/join-requests db/join-requests)
 
 (rf/reg-sub
  :customer/join-list
@@ -21,3 +22,8 @@
                          (cond-> c
                            (cust id) (assoc :joined? true)))]
        (map mark-joined r)))))
+
+(rf/reg-sub
+ :customer/joining?
+ (fn [db [_ cust-id]]
+   (db/customer-joining? db cust-id)))

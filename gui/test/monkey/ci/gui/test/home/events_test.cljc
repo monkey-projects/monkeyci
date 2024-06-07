@@ -4,6 +4,7 @@
             [day8.re-frame.test :as rf-test]
             [monkey.ci.gui.home.events :as sut]
             [monkey.ci.gui.home.db :as db]
+            [monkey.ci.gui.login.db :as ldb]
             [monkey.ci.gui.test.fixtures :as f]
             [monkey.ci.gui.test.helpers :as h]
             [re-frame.core :as rf]
@@ -89,6 +90,54 @@
     (is (= 1 (count (db/join-alerts @app-db))))
     (is (= :danger (-> (db/join-alerts @app-db) first :type)))))
 
+(deftest join-request-load
+  (testing "sends request to api using current user id"
+    (rf-test/run-test-sync
+     (let [jr [{:customer-id "test-cust"}]
+           c (h/catch-fx :martian.re-frame/request)]
+       (is (some? (reset! app-db (ldb/set-user {} {:id "test-user"}))))
+       (h/initialize-martian {:get-user-join-requests {:status 200
+                                                       :body jr
+                                                       :error-code :no-error}})
+       (is (some? (:martian.re-frame/martian @app-db)))
+       (rf/dispatch [:join-request/load])
+       (is (= 1 (count @c)))
+       (is (= "test-user" (-> @c first (nth 3) :user-id)))))))
+
+(deftest join-request-load--success
+  (testing "sets join requests in db"
+    (rf/dispatch-sync [:join-request/load--success {:body ::test-requests}])
+    (is (= ::test-requests (db/join-requests @app-db)))))
+
+(deftest join-request-load--failed
+  (testing "clears join requests"
+    (is (some? (reset! app-db (db/set-join-requests {} ::requests))))
+    (rf/dispatch-sync [:join-request/load--failed "test error"])
+    (is (empty? (db/join-requests @app-db))))
+
+  (testing "sets error alert"
+    (rf/dispatch-sync [:join-request/load--failed "test error"])
+    (is (= 1 (count (db/join-alerts @app-db))))
+    (is (= :danger (-> (db/join-alerts @app-db) first :type)))))
+
 (deftest customer-join
-  (testing "sends request to backend")
-  (testing "marks customer joining"))
+  (rf-test/run-test-sync
+   (let [cust-id "test-customer"
+         c (h/catch-fx :martian.re-frame/request)]
+     (is (some? (reset! app-db (ldb/set-user {} {:id "test-user"}))))
+     (h/initialize-martian {:create-user-join-requests {:status 200
+                                                        :body {:customer-id cust-id}
+                                                        :error-code :no-error}})
+     (is (some? (:martian.re-frame/martian @app-db)))
+     (rf/dispatch [:customer/join cust-id])
+     (testing "sends request to backend"
+       (is (= 1 (count @c)))
+       (is (= "test-user" (-> @c first (nth 3) :user-id))))
+     
+     (testing "marks customer joining"
+       (is (db/customer-joining? @app-db cust-id))))))
+
+(deftest customer-join--success
+  (testing "unmarks customer joining")
+  (testing "updates customer join list")
+  (testing "updates join request list"))

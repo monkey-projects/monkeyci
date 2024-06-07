@@ -10,6 +10,7 @@
 (def customer-path ["/customer/" :customer-id])
 (def repo-path (into customer-path ["/repo/" :repo-id]))
 (def build-path (into repo-path ["/builds/" :build-id]))
+(def user-path ["/user/" :user-id])
 
 (def customer-schema
   {:customer-id s/Str})
@@ -20,6 +21,9 @@
 
 (def build-schema
   (assoc repo-schema :build-id s/Str))
+
+(def user-schema
+  {:user-id s/Str})
 
 ;; TODO Use the same source as backend for this
 (s/defschema Label
@@ -58,15 +62,27 @@
      :path-schema customer-schema})
 
    (api-route
-    {:route-name :get-user-customers
-     :path-parts ["/user/" :user-id "/customers"]
-     :path-schema {:user-id s/Str}})
-
-   (api-route
     {:route-name :search-customers
      :path-parts ["/customer"]
      :query-schema {(s/optional-key :name) s/Str
                     (s/optional-key :id) s/Str}})
+
+   (api-route
+    {:route-name :get-user-customers
+     :path-parts (into user-path ["/customers"])
+     :path-schema user-schema})
+
+   (api-route
+    {:route-name :get-user-join-requests
+     :path-parts (into user-path "/join-request")
+     :path-schema user-schema})
+
+   (api-route
+    {:route-name :create-user-join-request
+     :path-parts (into user-path "/join-request")
+     :path-schema user-schema
+     :body-schema {:join-request
+                   {:customer-id s/Str}}})
 
    (api-route
     {:route-name :get-repo

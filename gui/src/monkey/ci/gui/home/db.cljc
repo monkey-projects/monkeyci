@@ -33,3 +33,20 @@
 
 (defn set-search-results [db r]
   (assoc db search-results r))
+
+(def join-requests ::join-requests)
+
+(defn set-join-requests [db jr]
+  (assoc db join-requests jr))
+
+(defn customer-joining?
+  "Checks if we're in the process of sending a join request to the given customer."
+  [db cust-id]
+  (some? (when-let [ids (::customer-joining db)]
+           (ids cust-id))))
+
+(defn mark-customer-joining [db cust-id]
+  (update db ::customer-joining (fnil conj #{}) cust-id))
+
+(defn unmark-customer-joining [db cust-id]
+  (update db ::customer-joining disj cust-id))
