@@ -7,6 +7,8 @@ CREATE TABLE builds (
   start_time TIMESTAMP,
   end_time TIMESTAMP,
   status VARCHAR(30),
+  script_dir VARCHAR(300),
+  git TEXT,
   FOREIGN KEY (repo_id) REFERENCES repos(id) ON DELETE CASCADE
 );
 --;;

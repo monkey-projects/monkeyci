@@ -18,6 +18,7 @@
   <logger name="net" level="WARN"/>
   <logger name="io" level="WARN"/>
   <logger name="monkey.ci" level="DEBUG"/>
+  <logger name="migration" level="DEBUG"/>
 
   <root level="INFO">
     <appender-ref ref="FILE"/>

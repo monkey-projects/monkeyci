@@ -37,10 +37,10 @@
 (defn- gen-build []
   (-> (gen-entity :entity/build)
       ;; TODO Put this in the spec itself
-      (update :jobs (fn [jobs]
-                      (->> jobs
-                           (mc/map-kv-vals #(assoc %2 :id %1))
-                           (into {}))))))
+      (update-in [:script :jobs] (fn [jobs]
+                                   (->> jobs
+                                        (mc/map-kv-vals #(assoc %2 :id %1))
+                                        (into {}))))))
 
 (defn- gen-job []
   (gen-entity :entity/job))
@@ -290,22 +290,25 @@
         (testing "can replace jobs"
           (let [job (gen-job)
                 jobs {(:id job) job}]
-            (is (sid/sid? (st/save-build s (assoc build :jobs jobs))))
+            (is (sid/sid? (st/save-build s (assoc-in build [:script :jobs] jobs))))
             (is (= 1 (count (ec/select conn {:select :*
                                              :from :jobs}))))
-            (is (= jobs (:jobs (st/find-build s build-sid))))))
+            (is (= jobs (-> (st/find-build s build-sid) :script :jobs)))))
 
         (testing "can update jobs"
           (let [job (assoc (gen-job) :status :pending)
                 jobs {(:id job) job}
                 upd (assoc job :status :running)]
-            (is (sid/sid? (st/save-build s (assoc build :jobs jobs))))
-            (is (sid/sid? (st/save-build s (assoc-in build [:jobs (:id job)] upd))))
-            (is (= upd (get-in (st/find-build s build-sid) [:jobs (:id job)])))))
+            (is (sid/sid? (st/save-build s (assoc-in build [:script :jobs] jobs))))
+            (is (sid/sid? (st/save-build s (assoc-in build [:script :jobs (:id job)] upd))))
+            (is (= upd (get-in (st/find-build s build-sid) [:script :jobs (:id job)])))))
 
         (testing "can list"
           (is (= [(:build-id build)]
-                 (st/list-builds s [(:id cust) (:id repo)]))))))))
+                 (st/list-builds s [(:id cust) (:id repo)]))))
+
+        (testing "can check for existence"
+          (is (true? (st/build-exists? s build-sid))))))))
 
 (deftest ^:sql join-requests
   (with-storage conn s

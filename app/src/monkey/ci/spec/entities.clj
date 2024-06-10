@@ -47,8 +47,13 @@
 
 (s/def :entity/build
   (-> (s/keys :req-un [:entity/build-id :entity/customer-id :entity/repo-id :entity/idx]
-              :opt-un [:build/status :entity/jobs])
+              :opt-un [:build/status :entity/script :build/git])
       (s/merge :entity/timed)))
+
+(s/def :script/script-dir string?)
+
+(s/def :entity/script
+  (s/keys :opt-un [:script/script-dir :entity/jobs]))
 
 (s/def :entity/jobs (s/map-of :display/id :entity/job))
 

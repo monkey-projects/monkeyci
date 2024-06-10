@@ -214,12 +214,6 @@
 (def prepare-timed (comp status->str int->start-time int->end-time))
 (def convert-timed (comp str->status start-time->int end-time->int))
 
-(defentity build {:before-insert prepare-timed
-                  :after-insert  convert-timed
-                  :before-update prepare-timed
-                  :after-update  convert-timed
-                  :after-select  convert-timed})
-
 (defn- prop->edn [prop b]
   (mc/update-existing b prop (u/or-nil edn/->edn)))
 
@@ -228,6 +222,20 @@
 
 (defn- copy-prop [prop [r e]]
   [(assoc r prop (prop e)) e])
+
+(def git->edn (partial prop->edn :git))
+(def edn->git (partial edn->prop :git))
+(def git->build (partial copy-prop :git))
+
+(def prepare-build (comp git->edn prepare-timed))
+(def convert-build (comp git->build convert-timed))
+(def convert-build-select (comp edn->git convert-timed))
+
+(defentity build {:before-insert prepare-build
+                  :after-insert  convert-build
+                  :before-update prepare-build
+                  :after-update  convert-build
+                  :after-select  convert-build-select})
 
 (def details->edn (partial prop->edn :details))
 (def edn->details (partial edn->prop :details))
