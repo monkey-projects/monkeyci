@@ -214,6 +214,15 @@
 (def prepare-timed (comp status->str int->start-time int->end-time))
 (def convert-timed (comp str->status start-time->int end-time->int))
 
+(defn- prop->edn [prop b]
+  (mc/update-existing b prop (u/or-nil edn/->edn)))
+
+(defn- edn->prop [prop b]
+  (mc/update-existing b prop (u/or-nil edn/edn->)))
+
+(defn- copy-prop [prop [r e]]
+  [(assoc r prop (prop e)) e])
+
 (def git->edn (partial prop->edn :git))
 (def edn->git (partial edn->prop :git))
 (def git->build (partial copy-prop :git))
@@ -227,15 +236,6 @@
                   :before-update prepare-build
                   :after-update  convert-build
                   :after-select  convert-build-select})
-
-(defn- prop->edn [prop b]
-  (mc/update-existing b prop (u/or-nil edn/->edn)))
-
-(defn- edn->prop [prop b]
-  (mc/update-existing b prop (u/or-nil edn/edn->)))
-
-(defn- copy-prop [prop [r e]]
-  [(assoc r prop (prop e)) e])
 
 (def details->edn (partial prop->edn :details))
 (def edn->details (partial edn->prop :details))
