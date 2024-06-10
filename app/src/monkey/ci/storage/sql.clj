@@ -354,22 +354,24 @@
 
 (defn- build->db [build]
   (-> build
-      (select-keys [:status :start-time :end-time :idx])
+      (select-keys [:status :start-time :end-time :idx :git])
       (mc/update-existing :status name)
-      (assoc :display-id (:build-id build))))
+      (assoc :display-id (:build-id build)
+             :script-dir (get-in build [:script :script-dir]))))
 
 (defn- db->build [build]
   (-> build
-      (select-keys [:status :start-time :end-time :idx])
+      (select-keys [:status :start-time :end-time :idx :git])
       (mc/update-existing :status keyword)
       (ec/start-time->int)
       (ec/end-time->int)
-      (assoc :build-id (:display-id build))))
+      (assoc :build-id (:display-id build)
+             :script (select-keys build [:script-dir]))))
 
 (defn- job->db [job]
   (-> job
       (select-keys [:status :start-time :end-time])
-      (mc/update-existing :status name)
+      (mc/update-existing :status (fnil name :error))
       (assoc :display-id (:id job)
              :details (dissoc job :id :status :start-time :end-time))))
 
@@ -394,12 +396,13 @@
   (when-let [repo-id (er/repo-for-build-sid conn (:customer-id build) (:repo-id build))]
     (let [{:keys [id] :as ins} (ec/insert-build conn (-> (build->db build)
                                                          (assoc :repo-id repo-id)))]
-      (insert-jobs conn (vals (:jobs build)) id)
+      (insert-jobs conn (-> build :script :jobs vals) id)
       ins)))
 
-(defn- update-build [conn {:keys [jobs] :as build} existing]
+(defn- update-build [conn build existing]
   (ec/update-build conn (merge existing (build->db build)))
-  (let [ex-jobs (ec/select-jobs conn (ec/by-build (:id existing)))
+  (let [jobs (get-in build [:script :jobs])
+        ex-jobs (ec/select-jobs conn (ec/by-build (:id existing)))
         new-ids (set (keys jobs))
         existing-ids (set (map :display-id ex-jobs))
         to-delete (cset/difference existing-ids new-ids)
@@ -439,9 +442,13 @@
   (when-let [build (apply eb/select-build-by-sid conn sid)]
     (-> (db->build build)
         (assoc :customer-id cust-id
-               :repo-id repo-id
-               :jobs (select-jobs conn (:id build)))
+               :repo-id repo-id)
+        (assoc-in [:script :jobs] (select-jobs conn (:id build)))
+        (update :script drop-nil)
         (drop-nil))))
+
+(defn build-exists? [conn sid]
+  (some? (apply eb/select-build-by-sid conn sid)))
 
 (defn- select-repo-builds [conn sid]
   (apply eb/select-build-ids-for-repo conn sid))
@@ -520,8 +527,12 @@
       sid))
 
   (obj-exists? [_ sid]
-    (when (customer? sid)
-      (customer-exists? conn (global-sid->cuid sid))))
+    (condp sid-pred sid
+      customer?
+      (customer-exists? conn (global-sid->cuid sid))
+      build?
+      (build-exists? conn (rest sid))
+      nil))
 
   (delete-obj [_ sid]
     (deleted?
@@ -530,8 +541,10 @@
        (delete-customer conn (global-sid->cuid sid)))))
 
   (list-obj [_ sid]
-    (when (build-repo? sid)
-      (select-repo-builds conn (rest sid))))
+    (condp sid-pred sid
+      build-repo?
+      (select-repo-builds conn (rest sid))
+      (log/warn "Unable to list objects for sid" sid)))
 
   co/Lifecycle
   (start [this]

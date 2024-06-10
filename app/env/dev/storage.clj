@@ -13,8 +13,10 @@
       (config/normalize-config {} {})))
 
 (defn make-storage
-  []
-  (s/make-storage (storage-config)))
+  ([conf]
+   (s/make-storage conf))
+  ([]
+   (make-storage (storage-config))))
 
 (defn get-customer
   "Retrieves customer info for the current config"

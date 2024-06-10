@@ -11,7 +11,8 @@
            [:= :r.display-id repo-id]]})
 
 (defn select-builds-for-repo [conn cust-cuid repo-id]
-  (ec/select conn (build-query cust-cuid repo-id)))
+  (->> (ec/select conn (build-query cust-cuid repo-id))
+       (map ec/convert-build-select)))
 
 (defn select-build-ids-for-repo [conn cust-cuid repo-id]
   (->> (ec/select conn (-> (build-query cust-cuid repo-id)
@@ -24,7 +25,8 @@
   (-> (ec/select conn
                  (-> (build-query cust-cuid repo-id)
                      (update :where conj [:= :b.display-id build-id])))
-      (first)))
+      (first)
+      (ec/convert-build-select)))
 
 #_(defn select-customer-cuid-and-repo-id [conn repo-id]
   (-> (ec/select conn

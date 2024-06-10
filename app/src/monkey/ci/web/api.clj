@@ -224,7 +224,7 @@
         builds (st/list-builds s sid)]
     (->> builds
          (f)
-         ;; TODO This is slow when there are many builds
+         ;; TODO This is slow when there are many builds, replace with dedicated storage fn
          (map (partial fetch-and-convert s sid)))))
 
 (defn get-builds
