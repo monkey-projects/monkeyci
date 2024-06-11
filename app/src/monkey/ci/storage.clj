@@ -274,8 +274,8 @@
   (p/list-obj s (concat [builds] sid)))
 
 (def list-builds-with-details
-  "Lists all builds for the repo, and fetches the build details (similar to `find-build`)
-   as well."
+  "Lists all builds for the repo, and fetches the build details, similar to `find-build`
+   but does not contain the job details."
   (override-or
    [:build :list-with-details]
    (fn [s sid]

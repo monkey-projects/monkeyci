@@ -7,7 +7,8 @@
              [api :as api]
              [core :as core]
              [shell :as shell]]
-            [monkey.ci.ext.junit]))
+            [monkey.ci.ext.junit]
+            [monkey.ci.plugin.infra :as infra]))
 
 ;; Version assigned when building main branch
 ;; TODO Determine automatically
@@ -46,9 +47,12 @@
            (second)))
 
 (defn image-version
-  "Retrieves image version from the tag, or `latest` if this is the main branch."
+  "Retrieves image version from the tag, or the build id if this is the main branch."
   [ctx]
-  (or (tag-version ctx)
+  ;; Prefix prod images with "release" for image retention policies
+  (or (some->> (tag-version ctx) (str "release-"))
+      (get-in ctx [:build :build-id])
+      ;; Fallback
       "latest"))
 
 (defn lib-version
@@ -218,6 +222,27 @@
         (core/depends-on ["test-gui"])
         (assoc :save-artifacts [gui-release-artifact]))))
 
+(defn deploy
+  "Job that auto-deploys the image to staging by pushing the new image tag to infra repo."
+  [img-name deps ctx]
+  (when (and (should-publish? ctx) (not (release? ctx)))
+    (core/action-job
+     "deploy-staging"
+     (fn [ctx]
+       (if-let [token (get (api/build-params ctx) "github-token")]
+         ;; Patch the kustomization file
+         (if (infra/patch+commit! (infra/make-client token)
+                                  (get-env ctx)
+                                  img-name
+                                  (image-version ctx))
+           bc/success
+           (assoc bc/failure :message "Unable to patch version in infra repo"))
+         (assoc bc/failure :message "No github token provided")))
+     {:dependencies deps})))
+
+(def deploy-api (partial deploy "monkeyci-api" ["publish-app-img"]))
+(def deploy-gui (partial deploy "monkeyci-gui" ["publish-gui-img"]))
+
 ;; TODO Add jobs that auto-deploy to staging after running some sanity checks
 ;; We could do a git push with updated kustomization file.
 ;; But running sanity checks requires a running app.  Either we could rely on
@@ -233,4 +258,6 @@
  build-gui-release
  image-creds
  build-app-image
- build-gui-image]
+ build-gui-image
+ deploy-api
+ deploy-gui]
