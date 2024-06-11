@@ -267,29 +267,6 @@
       (is (= 200 (:status r)))
       (is (= build (:body r))))))
 
-(deftest fetch-build-details
-  (testing "retrieves regular build"
-    (h/with-memory-store st
-      (let [build {:build-id "test-build"
-                   :customer-id "test-cust"
-                   :repo-id "test-repo"}]
-        (is (st/sid? (st/save-build st build)))
-        (is (= build (sut/fetch-build-details st (st/ext-build-sid build)))))))
-
-  (testing "retrieves legacy build"
-    (h/with-memory-store st
-      (let [md {:customer-id "test-cust"
-                :repo-id "test-repo"
-                :build-id "test-build"}
-            results {:jobs {"test-job" {:status :success}}}
-            sid (st/ext-build-sid md)]
-        (is (st/sid? (st/create-build-metadata st md)))
-        (is (st/sid? (st/save-build-results st sid results)))
-        (let [r (sut/fetch-build-details st (st/ext-build-sid md))]
-          (is (some? (:jobs r)))
-          (is (= "test-cust" (:customer-id r)))
-          (is (true? (:legacy? r))))))))
-
 (deftest build->out
   (testing "regular build"
     (testing "converts jobs to sequential"

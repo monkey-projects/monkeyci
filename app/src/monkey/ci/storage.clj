@@ -261,12 +261,38 @@
   "Finds build by sid"
   [s sid]
   (when sid
-    (p/read-obj s (concat [builds] sid))))
+    ;; TODO Remove this legacy stuff after a while
+    (if (legacy-build-exists? s sid)
+      (-> (find-build-metadata s sid)
+          (merge (find-build-results s sid))
+          (assoc :legacy? true))
+      (p/read-obj s (concat [builds] sid)))))
 
 (defn list-builds
   "Lists the ids of the builds for given repo sid"
   [s sid]
   (p/list-obj s (concat [builds] sid)))
+
+(def list-builds-with-details
+  "Lists all builds for the repo, and fetches the build details (similar to `find-build`)
+   as well."
+  (override-or
+   [:build :list-with-details]
+   (fn [s sid]
+     ;; Will be slow for large number of builds
+     (->> (list-builds s sid)
+          (map (comp (partial find-build s) (partial conj (->sid sid))))))))
+
+(def find-latest-build
+  "Retrieves the latest build for the repo"
+  (override-or
+   [:build :find-latest]
+   (fn [s sid]
+     (->> (list-builds s sid)
+          (sort)   ; This assumes the build name is time-based
+          (last)
+          (conj (->sid sid))
+          (find-build s)))))
 
 (defn params-sid [customer-id]
   ;; All parameters for a customer are stored together

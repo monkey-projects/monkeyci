@@ -1,4 +1,5 @@
 (ns monkey.ci.entities.build
+  "Custom queries for builds"
   (:require [monkey.ci.entities.core :as ec]))
 
 (defn- build-query [cust-cuid repo-id]

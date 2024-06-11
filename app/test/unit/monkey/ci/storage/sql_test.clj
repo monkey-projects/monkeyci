@@ -270,45 +270,49 @@
 
 (deftest ^:sql builds
   (with-storage conn s
-    (testing "builds"
-      (let [repo (gen-repo)
-            cust (-> (gen-cust)
-                     (assoc-in [:repos (:id repo)] repo))
-            build (-> (gen-build)
-                      (assoc :customer-id (:id cust)
-                             :repo-id (:id repo)))
-            build-sid (st/ext-build-sid build)]
-        (is (sid/sid? (st/save-customer s cust)))
+    (let [repo (gen-repo)
+          cust (-> (gen-cust)
+                   (assoc-in [:repos (:id repo)] repo))
+          build (-> (gen-build)
+                    (assoc :customer-id (:id cust)
+                           :repo-id (:id repo)
+                           :script {:script-dir "test-dir"}))
+          build-sid (st/ext-build-sid build)]
+      (is (sid/sid? (st/save-customer s cust)))
 
-        (testing "can save and retrieve"
-          (is (sid/sid? (st/save-build s build)))
+      (testing "can save and retrieve"
+        (is (sid/sid? (st/save-build s build)))
+        (is (= 1 (count (ec/select conn {:select :*
+                                         :from :builds}))))
+        (is (= build (-> (st/find-build s build-sid)
+                         (select-keys (keys build))))))
+
+      (testing "can replace jobs"
+        (let [job (gen-job)
+              jobs {(:id job) job}]
+          (is (sid/sid? (st/save-build s (assoc-in build [:script :jobs] jobs))))
           (is (= 1 (count (ec/select conn {:select :*
-                                           :from :builds}))))
-          (is (= build (-> (st/find-build s build-sid)
-                           (select-keys (keys build))))))
+                                           :from :jobs}))))
+          (is (= jobs (-> (st/find-build s build-sid) :script :jobs)))))
 
-        (testing "can replace jobs"
-          (let [job (gen-job)
-                jobs {(:id job) job}]
-            (is (sid/sid? (st/save-build s (assoc-in build [:script :jobs] jobs))))
-            (is (= 1 (count (ec/select conn {:select :*
-                                             :from :jobs}))))
-            (is (= jobs (-> (st/find-build s build-sid) :script :jobs)))))
+      (testing "can update jobs"
+        (let [job (assoc (gen-job) :status :pending)
+              jobs {(:id job) job}
+              upd (assoc job :status :running)]
+          (is (sid/sid? (st/save-build s (assoc-in build [:script :jobs] jobs))))
+          (is (sid/sid? (st/save-build s (assoc-in build [:script :jobs (:id job)] upd))))
+          (is (= upd (get-in (st/find-build s build-sid) [:script :jobs (:id job)])))))
 
-        (testing "can update jobs"
-          (let [job (assoc (gen-job) :status :pending)
-                jobs {(:id job) job}
-                upd (assoc job :status :running)]
-            (is (sid/sid? (st/save-build s (assoc-in build [:script :jobs] jobs))))
-            (is (sid/sid? (st/save-build s (assoc-in build [:script :jobs (:id job)] upd))))
-            (is (= upd (get-in (st/find-build s build-sid) [:script :jobs (:id job)])))))
+      (testing "can list"
+        (is (= [(:build-id build)]
+               (st/list-builds s [(:id cust) (:id repo)]))))
 
-        (testing "can list"
-          (is (= [(:build-id build)]
-                 (st/list-builds s [(:id cust) (:id repo)]))))
+      (testing "can check for existence"
+        (is (true? (st/build-exists? s build-sid))))
 
-        (testing "can check for existence"
-          (is (true? (st/build-exists? s build-sid))))))))
+      (testing "can list with details, excluding jobs"
+        (is (= [(update build :script dissoc :jobs)]
+               (st/list-builds-with-details s (take 2 build-sid))))))))
 
 (deftest ^:sql join-requests
   (with-storage conn s

@@ -366,7 +366,8 @@
       (ec/start-time->int)
       (ec/end-time->int)
       (assoc :build-id (:display-id build)
-             :script (select-keys build [:script-dir]))))
+             :script (select-keys build [:script-dir]))
+      (drop-nil)))
 
 (defn- job->db [job]
   (-> job
@@ -440,12 +441,26 @@
 
 (defn- select-build [conn [cust-id repo-id build-id :as sid]]
   (when-let [build (apply eb/select-build-by-sid conn sid)]
-    (-> (db->build build)
-        (assoc :customer-id cust-id
-               :repo-id repo-id)
-        (assoc-in [:script :jobs] (select-jobs conn (:id build)))
-        (update :script drop-nil)
-        (drop-nil))))
+    (let [jobs (select-jobs conn (:id build))]
+      (cond-> (-> (db->build build)
+                  (assoc :customer-id cust-id
+                         :repo-id repo-id)
+                  (update :script drop-nil)
+                  (drop-nil))
+        (not-empty jobs) (assoc-in [:script :jobs] jobs)))))
+
+(defn- select-repo-build-details
+  "Retrieves all builds and their details for given repository"
+  [{:keys [conn]} [cust-id repo-id]]
+  (letfn [(add-ids [b]
+            (assoc b
+                   :customer-id cust-id
+                   :repo-id repo-id))]
+    ;; Fetch all build details, don't include jobs since we don't need them at this point
+    ;; and they can become a very large dataset.
+    (->> (eb/select-builds-for-repo conn cust-id repo-id)
+         (map db->build)
+         (map add-ids))))
 
 (defn build-exists? [conn sid]
   (some? (apply eb/select-build-by-sid conn sid)))
@@ -598,7 +613,9 @@
    {:find select-user
     :customers select-user-customers}
    :join-request
-   {:list-user select-user-join-requests}})
+   {:list-user select-user-join-requests}
+   :build
+   {:list-with-details select-repo-build-details}})
 
 (defn make-storage [conn]
   (map->SqlStorage {:conn conn

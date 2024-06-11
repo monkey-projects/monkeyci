@@ -71,7 +71,29 @@
       (let [[cust-id repo-id build-id :as sid] (test-build-sid)
             build (zipmap [:customer-id :repo-id :build-id] sid)]
         (is (sid/sid? (sut/save-build st build)))
-        (is (nil? (sut/find-build st nil)))))))
+        (is (nil? (sut/find-build st nil))))))
+
+  (testing "retrieves regular build"
+    (h/with-memory-store st
+      (let [build {:build-id "test-build"
+                   :customer-id "test-cust"
+                   :repo-id "test-repo"}]
+        (is (sid/sid? (sut/save-build st build)))
+        (is (= build (sut/find-build st (sut/ext-build-sid build)))))))
+
+  (testing "retrieves legacy build"
+    (h/with-memory-store st
+      (let [md {:customer-id "test-cust"
+                :repo-id "test-repo"
+                :build-id "test-build"}
+            results {:jobs {"test-job" {:status :success}}}
+            sid (sut/ext-build-sid md)]
+        (is (sid/sid? (sut/create-build-metadata st md)))
+        (is (sid/sid? (sut/save-build-results st sid results)))
+        (let [r (sut/find-build st (sut/ext-build-sid md))]
+          (is (some? (:jobs r)))
+          (is (= "test-cust" (:customer-id r)))
+          (is (true? (:legacy? r))))))))
 
 (deftest parameters
   (testing "can store on customer level"
@@ -102,6 +124,38 @@
         (let [l (sut/list-builds st repo-sid)]
           (is (= (count builds) (count l)))
           (is (= builds l)))))))
+
+(deftest list-builds-with-detais
+  (testing "lists and fetches all builds for given repo"
+    (h/with-memory-store st
+      (let [repo-sid ["test-customer" "test-repo"]
+            builds (->> (range)
+                        (map (partial format "build-%d"))
+                        (take 2))]
+        (doseq [b builds]
+          (let [sid (conj repo-sid b)]
+            (is (sid/sid? (sut/save-build
+                           st
+                           (zipmap [:customer-id :repo-id :build-id] sid))))))
+        (let [l (sut/list-builds-with-details st repo-sid)]
+          (is (= (count builds) (count l)))
+          (is (= builds (map :build-id l))))))))
+
+(deftest find-latest-build
+  (testing "retrieves latest build by build id"
+    (h/with-memory-store st
+      (let [repo-sid ["test-customer" "test-repo"]
+            build-ids (->> (range)
+                           (map (partial format "build-%d"))
+                           (take 2))
+            builds (map (comp (partial zipmap [:customer-id :repo-id :build-id])
+                              (partial conj repo-sid))
+                        build-ids)]
+        (doseq [b builds]
+          (let [sid (conj repo-sid b)]
+            (is (sid/sid? (sut/save-build st b)))))
+        (let [l (sut/find-latest-build st repo-sid)]
+          (is (= (last builds) l)))))))
 
 (deftest save-ssh-keys
   (testing "writes ssh keys object"
