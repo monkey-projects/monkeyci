@@ -232,7 +232,7 @@
        (if-let [token (get (api/build-params ctx) "github-token")]
          ;; Patch the kustomization file
          (if (infra/patch+commit! (infra/make-client token)
-                                  (get-env ctx)
+                                  :staging ; Only staging for now
                                   img-name
                                   (image-version ctx))
            bc/success
