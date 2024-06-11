@@ -235,9 +235,9 @@
                                   :staging ; Only staging for now
                                   img-name
                                   (image-version ctx))
-           bc/success
-           (assoc bc/failure :message "Unable to patch version in infra repo"))
-         (assoc bc/failure :message "No github token provided")))
+           core/success
+           (assoc core/failure :message "Unable to patch version in infra repo"))
+         (assoc core/failure :message "No github token provided")))
      {:dependencies deps})))
 
 (def deploy-api (partial deploy "monkeyci-api" ["publish-app-img"]))
