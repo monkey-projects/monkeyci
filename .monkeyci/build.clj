@@ -224,10 +224,10 @@
 
 (defn deploy
   "Job that auto-deploys the image to staging by pushing the new image tag to infra repo."
-  [img-name deps ctx]
+  [id img-name deps ctx]
   (when (and (should-publish? ctx) (not (release? ctx)))
     (core/action-job
-     "deploy-staging"
+     id
      (fn [ctx]
        (if-let [token (get (api/build-params ctx) "github-token")]
          ;; Patch the kustomization file
@@ -240,8 +240,8 @@
          (assoc core/failure :message "No github token provided")))
      {:dependencies deps})))
 
-(def deploy-api (partial deploy "monkeyci-api" ["publish-app-img"]))
-(def deploy-gui (partial deploy "monkeyci-gui" ["publish-gui-img"]))
+(def deploy-api (partial deploy "deploy-api" "monkeyci-api" ["publish-app-img"]))
+(def deploy-gui (partial deploy "deploy-gui" "monkeyci-gui" ["publish-gui-img"]))
 
 ;; TODO Add jobs that auto-deploy to staging after running some sanity checks
 ;; We could do a git push with updated kustomization file.
