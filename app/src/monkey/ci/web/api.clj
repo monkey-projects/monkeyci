@@ -155,16 +155,6 @@
 (def update-ssh-keys
   (partial update-for-customer st/save-ssh-keys))
 
-(defn fetch-build-details [s sid]
-  (log/debug "Fetching details for build" sid)
-  ;; TODO Remove this legacy stuff after a while
-  (if (st/legacy-build-exists? s sid)
-    (-> (st/find-build-metadata s sid)
-        (merge (st/find-build-results s sid))
-        (assoc :legacy? true))
-    (when (st/build-exists? s sid)
-      (st/find-build s sid))))
-
 (defn- add-index [[idx p]]
   (assoc p :index idx))
 
@@ -211,46 +201,29 @@
       (convert-legacy b)
       (convert-regular b))))
 
-(defn- fetch-and-convert [s sid id]
-  (-> (fetch-build-details s (st/->sid (concat sid [id])))
-      (build->out)))
-
-(defn- get-builds*
-  "Helper function that retrieves the builds using the request, then
-   applies `f` to the resultset and fetches the details of the remaining builds."
-  [req f]
-  (let [s (c/req->storage req)
-        sid (repo-sid req)
-        builds (st/list-builds s sid)]
-    (->> builds
-         (f)
-         ;; TODO This is slow when there are many builds, replace with dedicated storage fn
-         (map (partial fetch-and-convert s sid)))))
-
 (defn get-builds
   "Lists all builds for the repository"
   [req]
-  (-> req
-      (get-builds* identity)
-      (rur/response)))
+  (->> (st/list-builds-with-details (c/req->storage req) (repo-sid req))
+       (map build->out)
+       (rur/response)))
 
 (defn get-latest-build
   "Retrieves the latest build for the repository."
   [req]
-  (if-let [r (-> req
-                 ;; This assumes the build name is time-based
-                 (get-builds* (comp (partial take-last 1) sort))
-                 first)]
+  (if-let [r (some-> (st/find-latest-build (c/req->storage req) (repo-sid req))
+                     (build->out))]
     (rur/response r)
     (rur/status 204)))
 
 (defn get-build
   "Retrieves build by id"
   [req]
-  (if-let [b (fetch-and-convert
-              (c/req->storage req)
-              (repo-sid req)
-              (get-in req [:parameters :path :build-id]))]
+  (if-let [b (some-> (st/find-build
+                      (c/req->storage req)
+                      (st/->sid (concat (repo-sid req)
+                                        [(get-in req [:parameters :path :build-id])])))
+                     (build->out))]
     (rur/response b)
     (rur/not-found nil)))
 
@@ -264,8 +237,8 @@
                      :parameters))
 
 (defn- with-artifacts [req f]
-  (if-let [b (fetch-build-details (c/req->storage req)
-                                  (build-sid req))]
+  (if-let [b (st/find-build (c/req->storage req)
+                            (build-sid req))]
     (do 
       (let [res (->> (b/all-jobs b)
                      (mapcat :save-artifacts)

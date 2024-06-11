@@ -197,3 +197,7 @@
    as a predicate against the files, until one matches."
   ;; Wrap the args in a vector because some-fn only passes one argument
   (comp (some-fn added? modified? removed?) vector))
+
+(def build-id
+  "Retrieves this build id from the context"
+  (comp :build-id :build))
