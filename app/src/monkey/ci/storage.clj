@@ -184,11 +184,15 @@
 
 (def webhook-sid (partial global-sid :webhooks))
 
-(defn save-webhook-details [s details]
+(defn save-webhook [s details]
   (p/write-obj s (webhook-sid (:id details)) details))
 
-(defn find-details-for-webhook [s id]
+(def ^:deprecated save-webhook-details save-webhook)
+
+(defn find-webhook [s id]
   (p/read-obj s (webhook-sid id)))
+
+(def ^:deprecated find-details-for-webhook find-webhook)
 
 (def builds "builds")
 (def build-sid-keys [:customer-id :repo-id :build-id])

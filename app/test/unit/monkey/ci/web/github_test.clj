@@ -3,6 +3,7 @@
             [clojure.math :as cm]
             [buddy.sign.jwt :as jwt]
             [monkey.ci
+             [cuid :as cuid]
              [protocols :as p]
              [storage :as st]]
             [monkey.ci.web
@@ -38,7 +39,7 @@
   (testing "invokes runner from runtime"
     (let [inv (atom nil)
           st (st/make-memory-storage)
-          _ (st/save-webhook-details st {:id "test-hook"})
+          _ (st/save-webhook st {:id "test-hook"})
           req (-> {:runner (partial swap! inv conj)
                    :storage st}
                   (h/->req)
@@ -62,7 +63,7 @@
   (testing "ignores ref delete events"
     (let [inv (atom nil)
           st (st/make-memory-storage)
-          _ (st/save-webhook-details st {:id "test-hook"})
+          _ (st/save-webhook st {:id "test-hook"})
           req (-> {:runner (partial swap! inv conj)
                    :storage st}
                   (h/->req)
@@ -76,7 +77,7 @@
 
   (testing "fires build end event on failure"
     (let [st (st/make-memory-storage)
-          _ (st/save-webhook-details st {:id "test-hook"})
+          _ (st/save-webhook st {:id "test-hook"})
           {:keys [recv] :as e} (h/fake-events)
           req (-> {:runner (fn [rt]
                              (throw (ex-info "Test error" {:runtime rt})))
@@ -169,7 +170,7 @@
   (testing "creates build record for customer/repo"
     (h/with-memory-store s
       (let [wh (test-webhook)]
-        (is (st/sid? (st/save-webhook-details s wh)))
+        (is (st/sid? (st/save-webhook s wh)))
         (let [r (sut/create-webhook-build {:storage s}
                                           (:id wh)
                                           {})]
@@ -182,7 +183,7 @@
   (testing "build contains commit message"
     (h/with-memory-store s
       (let [wh (test-webhook)]
-        (is (st/sid? (st/save-webhook-details s wh)))
+        (is (st/sid? (st/save-webhook s wh)))
         (let [r (sut/create-webhook-build {:storage s}
                                           (:id wh)
                                           {:head-commit {:message "test message"}})
@@ -195,7 +196,7 @@
   (testing "adds start time as current epoch millis"
     (h/with-memory-store s
       (let [wh (test-webhook)]
-        (is (st/sid? (st/save-webhook-details s wh)))
+        (is (st/sid? (st/save-webhook s wh)))
         (let [r (sut/create-webhook-build {:storage s}
                                           (:id wh)
                                           {:head-commit {:timestamp "2023-10-10"}})
@@ -214,7 +215,7 @@
   (testing "uses clone url for public repos"
     (h/with-memory-store s
       (let [wh (test-webhook)]
-        (is (st/sid? (st/save-webhook-details s wh)))
+        (is (st/sid? (st/save-webhook s wh)))
         (let [r (sut/create-webhook-build {:storage s}
                                           (:id wh)
                                           {:repository {:ssh-url "ssh-url"
@@ -224,7 +225,7 @@
   (testing "uses ssh url if repo is private"
     (h/with-memory-store s
       (let [wh (test-webhook)]
-        (is (st/sid? (st/save-webhook-details s wh)))
+        (is (st/sid? (st/save-webhook s wh)))
         (let [r (sut/create-webhook-build {:storage s}
                                           (:id wh)
                                           {:repository {:ssh-url "ssh-url"
@@ -235,7 +236,7 @@
   (testing "does not include secret key in metadata"
     (h/with-memory-store s
       (let [wh (assoc (test-webhook) :secret-key "very very secret!")]
-        (is (st/sid? (st/save-webhook-details s wh)))
+        (is (st/sid? (st/save-webhook s wh)))
         (let [r (sut/create-webhook-build {:storage s}
                                           (:id wh)
                                           {:head-commit {:message "test message"
@@ -247,7 +248,7 @@
   (testing "adds payload ref to build"
     (h/with-memory-store s
       (let [wh (test-webhook)]
-        (is (st/sid? (st/save-webhook-details s wh)))
+        (is (st/sid? (st/save-webhook s wh)))
         (let [r (sut/create-webhook-build {:storage s}
                                           (:id wh)
                                           {:ref "test-ref"})]
@@ -256,7 +257,7 @@
   (testing "sets `main-branch`"
     (h/with-memory-store s
       (let [wh (test-webhook)]
-        (is (st/sid? (st/save-webhook-details s wh)))
+        (is (st/sid? (st/save-webhook s wh)))
         (let [r (sut/create-webhook-build {:storage s}
                                           (:id wh)
                                           {:ref "test-ref"
@@ -267,7 +268,7 @@
   (testing "sets `commit-id`"
     (h/with-memory-store s
       (let [wh (test-webhook)]
-        (is (st/sid? (st/save-webhook-details s wh)))
+        (is (st/sid? (st/save-webhook s wh)))
         (let [r (sut/create-webhook-build {:storage s}
                                           (:id wh)
                                           {:head-commit {:id "test-commit-id"}})]
@@ -281,7 +282,7 @@
             rid (:repo-id wh)
             ssh-key {:id "test-key"
                      :private-key "test-ssh-key"}]
-        (is (st/sid? (st/save-webhook-details s wh)))
+        (is (st/sid? (st/save-webhook s wh)))
         (is (st/sid? (st/save-repo s {:customer cid
                                       :id rid
                                       :labels [{:name "ssh-lbl"
@@ -299,7 +300,7 @@
       (let [wh (test-webhook)
             cid (:customer-id wh)
             rid (:repo-id wh)]
-        (is (st/sid? (st/save-webhook-details s wh)))
+        (is (st/sid? (st/save-webhook s wh)))
         (is (st/sid? (st/save-repo s {:customer cid
                                       :id rid})))
         (let [r (sut/create-webhook-build {:storage s}
@@ -382,7 +383,9 @@
                  (-> req
                      (sut/login)
                      :status)))
-          (is (some? (st/find-user-by-type st [:github (:id u)])))))))
+          (let [c (st/find-user-by-type st [:github (:id u)])]
+            (is (some? c))
+            (is (cuid/cuid? (:id c)) "user should have a cuid"))))))
 
   (testing "sets user id in token"
     (with-github-user

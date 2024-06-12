@@ -24,20 +24,20 @@
             [ring.util.response :as rur]
             [schema.core :as s]))
 
-(defn health [_]
-  ;; TODO Make this more meaningful
-  (-> (rur/response "ok")
+(defn- text-response [txt]
+  (-> (rur/response txt)
       (rur/content-type "text/plain")))
 
+(defn health [_]
+  ;; TODO Make this more meaningful
+  (text-response "ok"))
+
 (defn version [_]
-  (-> (rur/response (config/version))
-      (rur/content-type "text/plain")))
+  (text-response (config/version)))
 
 (defn metrics [req]
   (if-let [m (c/from-rt req :metrics)]
-    (-> (metrics/scrape m)
-        (rur/response)
-        (rur/content-type "text/plain"))
+    (text-response (metrics/scrape m))
     (rur/status 204)))
 
 (def not-empty-str (s/constrained s/Str not-empty))

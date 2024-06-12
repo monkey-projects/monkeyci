@@ -101,19 +101,56 @@
     ;; Return updated state
     (update state :customers (fnil conj []) dest-cust-id)))
 
+(defn- migrate-webhook [{:keys [src dest] :as state} id]
+  (let [state (new-id-mapping state id)
+        in (s/find-webhook src (s/webhook-sid id))]
+    (s/save-webhook dest (-> in
+                             (update :customer-id (partial new-id state))
+                             (assoc :id (new-id state id))))
+    state))
+
+(defn- migrate-webhooks [{:keys [src] :as state}]
+  (let [webhooks (p/list-obj src (s/webhook-sid))]
+    (log/info "Migrating" (count webhooks) "webhooks")
+    (reduce migrate-webhook state webhooks)))
+
+(defn- migrate-user [{:keys [src dest] :as state} id]
+  (log/debug "Migrating user:" id)
+  (let [in (s/find-user-by-type src id)
+        state (new-id-mapping state (:id in))
+        update-customers (fn [cust]
+                           (map (partial new-id state) cust))]
+    (s/save-user dest (-> in
+                          (assoc :id (new-id state (:id in)))
+                          (update :customers update-customers)))
+    state))
+
+(defn- migrate-user-type [{:keys [src] :as state} type]
+  (let [users (p/list-obj src [s/global s/users type])]
+    (log/info "Migrating" (count users) "users for type" type)
+    (reduce (fn [s uid]
+              (migrate-user s [type uid]))
+            state
+            users)))
+
+(defn- migrate-users [{:keys [src] :as state}]
+  (->> (p/list-obj src [s/global s/users])
+       (reduce migrate-user-type state)))
+
 (defn migrate-to-storage
   "Migrates entities from the given storage to the destination storage by
    listing the customers and migrating their properties and builds."
   [src dest]
   (let [cust (p/list-obj src (s/global-sid :customers))]
     (log/info "Migrating" (count cust) "customers")
-    (reduce (fn [state cust-id]
-              (migrate-customer state cust-id))
-            {:src src
-             :dest dest}
-            cust)
-    ;; TODO Webhooks
-    ))
+    (-> (reduce (fn [state cust-id]
+                  (migrate-customer state cust-id))
+                {:src src
+                 :dest dest}
+                cust)
+        ;; Must be done after migrating customers
+        (migrate-webhooks)
+        (migrate-users))))
 
 (defn- make-mem-db-storage []
   (s/make-storage {:storage {:type :sql
@@ -123,11 +160,12 @@
 
 (defn migrate-to-mem!
   "Runs migration from the configured storage to an in-memory h2 db"
-  []
-  (let [src (make-storage)
-        dest (make-mem-db-storage)]
-    (em/run-migrations! (-> dest :conn :ds))
-    (migrate-to-storage src dest)))
+  ([src]
+   (let [dest (make-mem-db-storage)]
+     (em/run-migrations! (-> dest :conn :ds))
+     (migrate-to-storage src dest)))
+  ([]
+   (migrate-to-mem! (make-storage))))
 
 (defn close-dest [{:keys [dest customers]}]
   (some-> dest :conn :ds .close)
