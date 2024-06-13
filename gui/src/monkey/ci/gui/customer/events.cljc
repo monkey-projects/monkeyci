@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.customer.events
-  (:require [monkey.ci.gui.github :as github]
+  (:require [medley.core :as mc]
+            [monkey.ci.gui.github :as github]
             [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.martian]
             [monkey.ci.gui.customer.db :as db]
@@ -142,7 +143,6 @@
 (rf/reg-event-fx
  :repo/unwatch
  (fn [{:keys [db]} [_ repo]]
-   (log/debug "Unwatching:" (str repo))
    {:dispatch [:secure-request
                :unwatch-github-repo
                {:repo-id (get-in repo [:monkeyci/repo :id])
@@ -160,3 +160,32 @@
  (fn [db [_ err]]
    (db/set-repo-alerts db [{:type :danger
                             :message (str "Failed to unwatch repo: " (u/error-msg err))}])))
+
+(rf/reg-event-fx
+ :customer/create
+ (fn [{:keys [db]} [_ cust]]
+   {:dispatch [:secure-request
+               :create-customer
+               {:customer (mc/map-vals first cust)}
+               [:customer/create--success]
+               [:customer/create--failed]]
+    :db (-> db
+            (db/mark-customer-creating)
+            (db/reset-create-alerts))}))
+
+(rf/reg-event-fx
+ :customer/create--success
+ (fn [{:keys [db]} [_ {:keys [body]}]]
+   {:db (-> db
+            (db/unmark-customer-creating)
+            (db/set-customer body)
+            (db/set-alerts [{:type :success
+                             :message [:span "Customer " [:b (:name body)] " has been created."]}]))
+    ;; Redirect to customer page
+    :dispatch [:route/goto :page/customer {:customer-id (:id body)}]}))
+
+(rf/reg-event-db
+ :customer/create--failed
+ (fn [db [_ err]]
+   (db/set-create-alerts db [{:type :danger
+                              :message (str "Failed to create customer: " (u/error-msg err))}])))

@@ -85,7 +85,8 @@
        :placeholder "Name or id"}]]]
    [:div.row
     [:div.col
-     [search-btn]]]])
+     [:span.me-2 [search-btn]]
+     [co/cancel-btn [:route/goto :page/root]]]]])
 
 (defn- join-btn [{:keys [id]} disabled?]
   [:button.btn.btn-sm.btn-success

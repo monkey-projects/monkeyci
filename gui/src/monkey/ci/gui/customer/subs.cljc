@@ -8,6 +8,8 @@
 (u/db-sub :customer/repo-alerts db/repo-alerts)
 (u/db-sub :customer/loading? db/loading?)
 (u/db-sub ::github-repos db/github-repos)
+(u/db-sub :customer/create-alerts db/create-alerts)
+(u/db-sub :customer/creating? db/customer-creating?)
 
 (rf/reg-sub
  :customer/repos

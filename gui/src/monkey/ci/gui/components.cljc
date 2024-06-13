@@ -27,10 +27,17 @@
   [:i {:class (str "bi bi-" (name n))}])
 
 (defn icon-btn [i lbl evt & [opts]]
-  [:button.btn.btn-primary (merge {:on-click #(rf/dispatch evt)} opts) [:span [icon i] " " lbl]])
+  [:button.btn.btn-primary (merge {:on-click (u/link-evt-handler evt)} opts) [:span.me-2 [icon i]] lbl])
 
 (defn reload-btn [evt & [opts]]
   (icon-btn :arrow-clockwise "Reload" evt opts))
+
+(defn cancel-btn
+  "Generic cancel button.  Posts given event when pressed."
+  [evt]
+  [:button.btn.btn-outline-danger
+   {:on-click (u/link-evt-handler evt)}
+   [:span.me-2 [icon :x-square]] "Cancel"])
 
 (defn breadcrumb [parts]
   [:nav {:aria-label "breadcrumb"}

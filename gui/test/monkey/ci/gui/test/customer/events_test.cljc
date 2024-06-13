@@ -225,3 +225,59 @@
     (let [a (db/repo-alerts @app-db)]
       (is (= 1 (count a)))
       (is (= :danger (:type (first a)))))))
+
+(deftest customer-create
+  (testing "posts request to backend"
+    (rf-test/run-test-sync
+     (let [cust {:name "test customer"}
+           c (h/catch-fx :martian.re-frame/request)]
+       (h/initialize-martian {:create-customer {:status 200
+                                                :body cust
+                                                :error-code :no-error}})
+       (is (some? (:martian.re-frame/martian @app-db)))
+       (rf/dispatch [:customer/create {:name ["test customer"]}])
+       (is (= 1 (count @c)))
+       (is (= :create-customer (-> @c first (nth 2))))
+       (is (= {:customer cust} (-> @c first (nth 3)))))))
+
+  (testing "marks creating"
+    (is (nil? (rf/dispatch-sync [:customer/create {:name "new customer"}])))
+    (is (true? (db/customer-creating? @app-db))))
+
+  (testing "clears alerts"
+    (is (some? (reset! app-db (db/set-create-alerts {} [{:type :info}]))))
+    (is (nil? (rf/dispatch-sync [:customer/create {:name "new customer"}])))
+    (is (empty? (db/create-alerts @app-db)))))
+
+(deftest customer-create--success
+  (h/catch-fx :route/goto)
+  
+  (testing "unmarks creating"
+    (is (some? (reset! app-db (db/mark-customer-creating {}))))
+    (rf/dispatch-sync [:customer/create--success {:body {:id "test-cust"}}])
+    (is (not (db/customer-creating? @app-db))))
+
+  (testing "sets customer in db"
+    (let [cust {:id "test-cust"}]
+      (rf/dispatch-sync [:customer/create--success {:body cust}])
+      (is (= cust (db/customer @app-db)))))
+
+  (testing "redirects to customer page"
+    (rf-test/run-test-sync
+     (let [e (h/catch-fx :route/goto)]
+       (rf/dispatch [:customer/create--success {:body {:id "test-cust"}}])
+       (is (= 1 (count @e)))
+       (is (= (r/path-for :page/customer {:customer-id "test-cust"}) (first @e))))))
+
+  (testing "sets success alert for customer"
+    (let [a (db/alerts @app-db)]
+      (rf/dispatch-sync [:customer/create--success {:body {:name "test customer"}}])
+      (is (not-empty a))
+      (is (= :success (-> a first :type))))))
+
+(deftest customer-create--failed
+  (testing "sets error alert"
+    (rf/dispatch-sync [:customer/create--failed {:message "test error"}])
+    (let [a (db/create-alerts @app-db)]
+      (is (= 1 (count a)))
+      (is (= :danger (:type (first a)))))))

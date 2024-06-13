@@ -26,6 +26,9 @@
   {:user-id s/Str})
 
 ;; TODO Use the same source as backend for this
+(s/defschema NewCustomer
+  {:name s/Str})
+
 (s/defschema Label
   {:name s/Str
    :value s/Str})
@@ -60,6 +63,12 @@
     {:route-name :get-customer
      :path-parts customer-path
      :path-schema customer-schema})
+
+   (api-route
+    {:route-name :create-customer
+     :method :post
+     :path-parts ["/customer"]
+     :body-schema {:customer NewCustomer}})
 
    (api-route
     {:route-name :search-customers
@@ -178,7 +187,7 @@
   {:enter (fn [ctx]
             (assoc-in ctx [:request :with-credentials?] false))})
 
-(defn init
+(defn ^:dev/after-load init
   "Initializes using the fixed routes"
   []
   (log/debug "Initializing" (count routes) "routes")

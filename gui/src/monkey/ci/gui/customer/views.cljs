@@ -2,6 +2,7 @@
   (:require [monkey.ci.gui.components :as co]
             [monkey.ci.gui.customer.events]
             [monkey.ci.gui.customer.subs]
+            [monkey.ci.gui.forms :as f]
             [monkey.ci.gui.layout :as l]
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.table :as t]
@@ -104,3 +105,20 @@
       [co/alerts [:customer/repo-alerts]]
       [repo-table]
       [:a {:href (r/path-for :page/customer (r/path-params @route))} "Back to customer"]])))
+
+(defn page-new
+  "New customer page"
+  []
+  (l/default
+   [:<>
+    [:h3 "New Customer"]
+    [:form.mb-3
+     {:on-submit (f/submit-handler [:customer/create])}
+     [:div.mb-3
+      [:label.form-label {:for :name} "Name"]
+      [:input#name.form-control {:aria-describedby :name-help :name :name}]
+      [:div#name-help.form-text "The customer name.  We recommend to make it as unique as possible."]]
+     [:div
+      [:button.btn.btn-primary.me-2 {:type :submit} [:span.me-2 [co/icon :save]] "Create Customer"]
+      [co/cancel-btn [:route/goto :page/root]]]]
+    [co/alerts [:customer/create-alerts]]]))
