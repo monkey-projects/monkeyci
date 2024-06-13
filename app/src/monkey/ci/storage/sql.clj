@@ -321,7 +321,7 @@
       user)))
 
 (defn- upsert-user [conn user]
-  (let [existing (ec/select-user conn (ec/by-cuid (:id user)))]
+  (if-let [existing (ec/select-user conn (ec/by-cuid (:id user)))]
     (update-user conn user existing)
     (insert-user conn user)))
 

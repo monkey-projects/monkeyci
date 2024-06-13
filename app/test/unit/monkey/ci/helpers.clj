@@ -149,6 +149,9 @@
 (defn with-body [r v]
   (assoc-in r [:parameters :body] v))
 
+(defn with-identity [r id]
+  (assoc r :identity id))
+
 (defn test-rt []
   {:storage (s/make-memory-storage)
    :jwk (auth/keypair->rt (auth/generate-keypair))})

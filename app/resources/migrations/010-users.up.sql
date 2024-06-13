@@ -6,6 +6,6 @@ CREATE TABLE users (
   email VARCHAR(100)
 );
 --;;
-CREATE INDEX user_cuid_idx ON users (cuid);
+CREATE UNIQUE INDEX user_cuid_idx ON users (cuid);
 --;;
 CREATE INDEX user_type_idx ON users (type, type_id);

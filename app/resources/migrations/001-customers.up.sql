@@ -4,4 +4,4 @@ CREATE TABLE customers (
   `name` VARCHAR(200) NOT NULL UNIQUE
 );
 --;;
-CREATE INDEX customer_cuid_idx ON customers (cuid);
+CREATE UNIQUE INDEX customer_cuid_idx ON customers (cuid);

@@ -179,8 +179,8 @@
         (is (some? (st/save-customer s (assoc-in cust [:repos (:id repo)] repo))))
         
         (testing "can create and retrieve"
-          (is (sid/sid? (st/save-webhook-details s wh)))
-          (is (= wh (st/find-details-for-webhook s (:id wh)))))))))
+          (is (sid/sid? (st/save-webhook s wh)))
+          (is (= wh (st/find-webhook s (:id wh)))))))))
 
 (deftest ^:sql customer-params
   (with-storage conn s
