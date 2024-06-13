@@ -24,6 +24,10 @@
 (def role-user "user")
 (def role-build "build")
 
+(def user-id
+  "Retrieves current user id from request"
+  (comp :id :identity))
+
 (defn- make-token [role sid]
   {:role role
    :sub (sid/serialize-sid sid)})
@@ -124,7 +128,7 @@
 (defmulti resolve-token (fn [_ {:keys [role]}] role))
 
 (defmethod resolve-token role-user [{:keys [storage]} {:keys [sub] :as token}]
-  (when (and (not (expired? token))  sub)
+  (when (and (not (expired? token)) sub)
     (let [id (sid/parse-sid sub)]
       (when (= 2 (count id))
         (log/debug "Looking up user with id" id)

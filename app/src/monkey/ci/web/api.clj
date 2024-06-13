@@ -58,6 +58,16 @@
                           :getter (comp repos->out st/find-customer)
                           :saver st/save-customer})
 
+(defn create-customer [req]
+  (let [creator (c/entity-creator st/save-customer c/default-id)
+        user? (every-pred :type)]
+    (when-let [reply (creator req)]
+      (let [user (:identity req)]
+        ;; When a user is creating the customer, link them up
+        (when (user? user)
+          (st/save-user (c/req->storage req) (update user :customers conj (get-in reply [:body :id]))))
+        reply))))
+
 (defn search-customers [req]
   (let [f (get-in req [:parameters :query])]
     (if (empty? f)
@@ -75,8 +85,8 @@
 (c/make-entity-endpoints "webhook"
                          {:get-id (c/id-getter :webhook-id)
                           :getter (comp #(dissoc % :secret-key)
-                                        st/find-details-for-webhook)
-                          :saver st/save-webhook-details})
+                                        st/find-webhook)
+                          :saver st/save-webhook})
 
 (c/make-entity-endpoints "user"
                          {:get-id (c/id-getter (juxt :user-type :type-id))
@@ -97,7 +107,7 @@
   [req]
   (assoc-in req [:parameters :body :secret-key] (auth/generate-secret-key)))
 
-(def create-webhook (comp (c/entity-creator st/save-webhook-details c/default-id)
+(def create-webhook (comp (c/entity-creator st/save-webhook c/default-id)
                           assign-webhook-secret))
 
 (def repo-sid (comp (juxt :customer-id :repo-id)

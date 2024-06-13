@@ -65,7 +65,22 @@
                 (sut/create-customer)
                 :body)]
       (is (= "new customer" (:name r)))
-      (is (string? (:id r))))))
+      (is (string? (:id r)))))
+
+  (testing "links current user to customer"
+    (let [user (-> (h/gen-user)
+                   (dissoc :customers))
+          {st :storage :as rt} (h/test-rt)
+          r (-> rt
+                (h/->req)
+                (h/with-body {:name "another customer"})
+                (h/with-identity user)
+                (sut/create-customer)
+                :body)]
+      (is (some? r))
+      (is (= [(:id r)] (-> (st/find-user st (:id user))
+                           :customers)))
+      (is (= [r] (st/list-user-customers st (:id user)))))))
 
 (deftest update-customer
   (testing "returns customer in body"

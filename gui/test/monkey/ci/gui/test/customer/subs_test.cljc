@@ -85,3 +85,24 @@
                                    (db/set-customer {:repos [{:url "ssh@ssh-url"
                                                               :id "test-repo"}]})))))
       (is (= "test-repo" (-> @r first :monkeyci/repo :id))))))
+
+(deftest create-alerts
+  (let [s (rf/subscribe [:customer/create-alerts])]
+    (testing "exists"
+      (is (some? s)))
+
+    (testing "returns alerts from db"
+      (let [a [{:type :info
+                :message "Test alert"}]]
+        (is (map? (reset! app-db (db/set-create-alerts {} a))))
+        (is (= a @s))))))
+
+(deftest customer-creating?
+  (let [l (rf/subscribe [:customer/creating?])]
+    (testing "exists"
+      (is (some? l)))
+
+    (testing "holds creating state from db"
+      (is (not @l))
+      (is (map? (reset! app-db (db/mark-customer-creating {}))))
+      (is (true? @l)))))

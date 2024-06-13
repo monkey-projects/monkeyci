@@ -374,14 +374,22 @@
    (fn [s id]
      (p/read-obj s (join-request-sid id)))))
 
+(defn- list-join-requests [s f]
+  (->> (p/list-obj s (join-request-sid))
+       (map (partial find-join-request s))
+       (filter f)))
+
 (def list-user-join-requests
   "Retrieves all customer join requests for that user"
   (override-or
    [:join-request :list-user]
-   (fn [s user-id]
-     (->> (p/list-obj s (join-request-sid))
-          (map (partial find-join-request s))
-          (filter (comp (partial = user-id) :user-id))))))
+   #(list-join-requests %1 (comp (partial = %2) :user-id))))
+
+(def list-customer-join-requests
+  "Retrieves all customer join requests for that customer"
+  (override-or
+   [:join-request :list-customer]
+   #(list-join-requests %1 (comp (partial = %2) :customer-id))))
 
 (def delete-join-request
   (override-or

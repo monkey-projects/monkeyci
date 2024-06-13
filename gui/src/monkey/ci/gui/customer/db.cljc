@@ -47,3 +47,19 @@
 
 (defn set-github-repos [db r]
   (assoc db github-repos r))
+
+(def customer-creating? ::customer-creating)
+
+(defn mark-customer-creating [db]
+  (assoc db customer-creating? true))
+
+(defn unmark-customer-creating [db]
+  (dissoc db customer-creating?))
+
+(def create-alerts ::create-alerts)
+
+(defn set-create-alerts [db a]
+  (assoc db create-alerts a))
+
+(defn reset-create-alerts [db]
+  (dissoc db create-alerts))

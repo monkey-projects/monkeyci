@@ -3,9 +3,12 @@
   (:require [camel-snake-kebab.core :as csk]
             [clojure.java.io :as io]
             [clojure.core.async :as ca]
+            [clojure.spec.alpha :as spec]
+            [clojure.spec.gen.alpha :as gen]
             [cheshire.core :as json]
             [clojure.string :as cs]
             [manifold.deferred :as md]
+            [medley.core :as mc]
             [monkey.ci
              [blob :as blob]
              [protocols :as p]
@@ -146,6 +149,9 @@
 (defn with-body [r v]
   (assoc-in r [:parameters :body] v))
 
+(defn with-identity [r id]
+  (assoc r :identity id))
+
 (defn test-rt []
   {:storage (s/make-memory-storage)
    :jwk (auth/keypair->rt (auth/generate-keypair))})
@@ -192,3 +198,40 @@
       (second)
       (base64->)
       (parse-json)))
+
+;;; Entity generators
+
+(defn gen-entity [t]
+  (gen/generate (spec/gen t)))
+
+(defn gen-cust []
+  (gen-entity :entity/customer))
+
+(defn gen-repo []
+  (gen-entity :entity/repo))
+
+(defn gen-webhook []
+  (gen-entity :entity/webhook))
+
+(defn gen-ssh-key []
+  (gen-entity :entity/ssh-key))
+
+(defn gen-customer-params []
+  (gen-entity :entity/customer-params))
+
+(defn gen-user []
+  (gen-entity :entity/user))
+
+(defn gen-build []
+  (-> (gen-entity :entity/build)
+      ;; TODO Put this in the spec itself
+      (update-in [:script :jobs] (fn [jobs]
+                                   (->> jobs
+                                        (mc/map-kv-vals #(assoc %2 :id %1))
+                                        (into {}))))))
+
+(defn gen-job []
+  (gen-entity :entity/job))
+
+(defn gen-join-request []
+  (gen-entity :entity/join-request))

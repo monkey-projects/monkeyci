@@ -201,11 +201,9 @@
       [:div.row
        [:div.col
         [save-btn]
-        [:a.btn.btn-outline-danger
-         {:href (r/path-for :page/repo (-> route
-                                           (r/path-params)
-                                           (select-keys [:repo-id :customer-id])))}
-         [:span.me-2 [co/icon :x-square]] "Cancel"]]]]]))
+        [co/cancel-btn [:route/goto :page/repo (-> route
+                                                   (r/path-params)
+                                                   (select-keys [:repo-id :customer-id]))]]]]]]))
 
 (defn edit
   "Displays repo editing page"
