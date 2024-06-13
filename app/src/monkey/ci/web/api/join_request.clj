@@ -40,3 +40,34 @@
 
 (def delete-join-request
   (c/entity-deleter (c/id-getter :join-request-id) st/delete-join-request))
+
+(defn list-customer-join-requests [req]
+  ;; TODO Allow filtering by status
+  (rur/response (st/list-customer-join-requests
+                 (c/req->storage req)
+                 (get-in req [:parameters :path :customer-id]))))
+
+(defn- find-join-request
+  "Retrieves join request by id from storage.  Returns `nil` if not found,
+   or if the customer id in the request does not match the customer id in
+   the join request."
+  [req]
+  (let [st (c/req->storage req)
+        {:keys [request-id customer-id]} (get-in req [:parameters :path])
+        jr (st/find-join-request st request-id)]
+    (when (and jr (= customer-id (:customer-id jr)))
+      jr)))
+
+(defn- respond-to-join-request [new-status req]
+  (let [st (c/req->storage req)]
+    (if-let [jr (find-join-request req)]
+      (let [upd (assoc jr
+                       :status new-status
+                       :response-msg (:message (c/body req)))]
+        (st/save-join-request st upd)
+        (rur/response upd))
+      (rur/status 404))))
+
+(def approve-join-request (partial respond-to-join-request :approved))
+(def reject-join-request (partial respond-to-join-request :rejected))
+

@@ -10,43 +10,9 @@
              [sid :as sid]
              [storage :as st]]
             [monkey.ci.entities.core :as ec]
+            [monkey.ci.helpers :as h]
             [monkey.ci.spec.entities :as se]
             [monkey.ci.storage.sql :as sut]))
-
-(defn- gen-entity [t]
-  (gen/generate (spec/gen t)))
-
-(defn- gen-cust []
-  (gen-entity :entity/customer))
-
-(defn- gen-repo []
-  (gen-entity :entity/repo))
-
-(defn- gen-webhook []
-  (gen-entity :entity/webhook))
-
-(defn- gen-ssh-key []
-  (gen-entity :entity/ssh-key))
-
-(defn- gen-customer-params []
-  (gen-entity :entity/customer-params))
-
-(defn- gen-user []
-  (gen-entity :entity/user))
-
-(defn- gen-build []
-  (-> (gen-entity :entity/build)
-      ;; TODO Put this in the spec itself
-      (update-in [:script :jobs] (fn [jobs]
-                                   (->> jobs
-                                        (mc/map-kv-vals #(assoc %2 :id %1))
-                                        (into {}))))))
-
-(defn- gen-job []
-  (gen-entity :entity/job))
-
-(defn- gen-join-request []
-  (gen-entity :entity/join-request))
 
 (defmacro with-storage [conn s & body]
   `(eh/with-prepared-db ~conn
@@ -57,7 +23,7 @@
   (with-storage conn s
     (testing "customers"
       (testing "can write and read"
-        (let [cust (gen-cust)]
+        (let [cust (h/gen-cust)]
           (is (sid/sid? (st/save-customer s cust)))
           (is (= 1 (count (ec/select-customers conn [:is :id [:not nil]]))))
           (is (some? (ec/select-customer conn (ec/by-cuid (:id cust)))))
@@ -65,7 +31,7 @@
                  (st/find-customer s (:id cust))))))
 
       (testing "can write and read with repos"
-        (let [cust (gen-cust)
+        (let [cust (h/gen-cust)
               repo {:name "test repo"
                     :customer-id (:id cust)
                     :id "test-repo"
@@ -76,7 +42,7 @@
                  (st/find-customer s (:id cust))))))
 
       (testing "can delete with repos"
-        (let [cust (gen-cust)
+        (let [cust (h/gen-cust)
               repo {:name "test repo"
                     :customer-id (:id cust)
                     :id "test-repo"
@@ -90,7 +56,7 @@
               "did not expect to find customer after deletion")))
 
       (testing "can search"
-        (let [cust (-> (gen-cust)
+        (let [cust (-> (h/gen-cust)
                        (assoc :name "test customer"))]
           (is (sid/sid? (st/save-customer s cust)))
           
@@ -106,7 +72,7 @@
       (let [repo {:name "test repo"
                   :id "test-repo"}
             lbl (str "test-label-" (cuid/random-cuid))
-            cust (-> (gen-cust)
+            cust (-> (h/gen-cust)
                      (assoc-in [:repos (:id repo)] repo))
             sid [(:id cust) (:id repo)]]
         
@@ -159,7 +125,7 @@
 
 (deftest ^:sql watched-github-repos
   (with-storage conn s
-    (let [cust (gen-cust)
+    (let [cust (h/gen-cust)
           github-id 64253
           repo {:name "github test"
                 :id "github-test"
@@ -181,8 +147,8 @@
 (deftest ^:sql ssh-keys
   (with-storage conn s
     (testing "ssh keys"
-      (let [{cust-id :id :as cust} (gen-cust)
-            k (assoc (gen-ssh-key) :customer-id cust-id)]
+      (let [{cust-id :id :as cust} (h/gen-cust)
+            k (assoc (h/gen-ssh-key) :customer-id cust-id)]
         (is (sid/sid? (st/save-customer s cust)))
         
         (testing "can create and retrieve"
@@ -204,10 +170,10 @@
 (deftest ^:sql webhooks
   (with-storage conn s
     (testing "webhooks"
-      (let [cust (gen-cust)
-            repo (-> (gen-repo)
+      (let [cust (h/gen-cust)
+            repo (-> (h/gen-repo)
                      (assoc :customer-id (:id cust)))
-            wh (-> (gen-webhook)
+            wh (-> (h/gen-webhook)
                    (assoc :customer-id (:id cust)
                           :repo-id (:id repo)))]
         (is (some? (st/save-customer s (assoc-in cust [:repos (:id repo)] repo))))
@@ -218,8 +184,8 @@
 
 (deftest ^:sql customer-params
   (with-storage conn s
-    (let [{cust-id :id :as cust} (gen-cust)
-          params (assoc (gen-customer-params) :customer-id cust-id)]
+    (let [{cust-id :id :as cust} (h/gen-cust)
+          params (assoc (h/gen-customer-params) :customer-id cust-id)]
       (is (sid/sid? (st/save-customer s cust)))
       
       (testing "can create and retrieve"
@@ -243,7 +209,7 @@
 
 (deftest ^:sql users
   (with-storage conn s
-    (let [user (-> (gen-user)
+    (let [user (-> (h/gen-user)
                    (dissoc :customers))
           user->id (juxt :type :type-id)]
       (testing "can save and find"
@@ -254,7 +220,7 @@
         (is (= user (st/find-user s (:id user)))))
 
       (testing "can link to customer"
-        (let [cust (gen-cust)
+        (let [cust (h/gen-cust)
               user (assoc user :customers [(:id cust)])]
           (is (sid/sid? (st/save-customer s cust)))
           (is (sid/sid? (st/save-user s user)))
@@ -270,10 +236,10 @@
 
 (deftest ^:sql builds
   (with-storage conn s
-    (let [repo (gen-repo)
-          cust (-> (gen-cust)
+    (let [repo (h/gen-repo)
+          cust (-> (h/gen-cust)
                    (assoc-in [:repos (:id repo)] repo))
-          build (-> (gen-build)
+          build (-> (h/gen-build)
                     (assoc :customer-id (:id cust)
                            :repo-id (:id repo)
                            :script {:script-dir "test-dir"}))
@@ -288,7 +254,7 @@
                          (select-keys (keys build))))))
 
       (testing "can replace jobs"
-        (let [job (gen-job)
+        (let [job (h/gen-job)
               jobs {(:id job) job}]
           (is (sid/sid? (st/save-build s (assoc-in build [:script :jobs] jobs))))
           (is (= 1 (count (ec/select conn {:select :*
@@ -296,7 +262,7 @@
           (is (= jobs (-> (st/find-build s build-sid) :script :jobs)))))
 
       (testing "can update jobs"
-        (let [job (assoc (gen-job) :status :pending)
+        (let [job (assoc (h/gen-job) :status :pending)
               jobs {(:id job) job}
               upd (assoc job :status :running)]
           (is (sid/sid? (st/save-build s (assoc-in build [:script :jobs] jobs))))
@@ -316,11 +282,11 @@
 
 (deftest ^:sql join-requests
   (with-storage conn s
-    (let [cust (gen-cust)
-          user (gen-user)
+    (let [cust (h/gen-cust)
+          user (h/gen-user)
           _ (st/save-customer s cust)
           _ (st/save-user s user)
-          jr (-> (gen-join-request)
+          jr (-> (h/gen-join-request)
                  (assoc :user-id (:id user)
                         :customer-id (:id cust)
                         :status :pending

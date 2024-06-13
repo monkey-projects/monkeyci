@@ -112,8 +112,8 @@
             app (sut/make-app (test-rt {:storage st
                                         :runner (constantly nil)
                                         :config {:dev-mode false}}))]
-        (is (st/sid? (st/save-webhook-details st {:id hook-id
-                                                  :secret-key github-secret})))
+        (is (st/sid? (st/save-webhook st {:id hook-id
+                                          :secret-key github-secret})))
         (is (= 202 (-> (mock/request :post (str "/webhook/github/" hook-id))
                        (mock/body payload)
                        (mock/header :x-hub-signature-256 (str "sha256=" signature))
@@ -230,6 +230,84 @@
                        (app)
                        :status))))))
 
+  (testing "`/:id`"
+    (testing "`/join-request`"
+      (h/with-memory-store st
+        (let [app (make-test-app st)
+              cust (h/gen-cust)
+              user (h/gen-user)
+              jr {:id (st/new-id)
+                  :status "pending"
+                  :customer-id (:id cust)
+                  :user-id (:id user)}]
+          (is (some? (st/save-customer st cust)))
+          (is (some? (st/save-user st user)))
+          (is (some? (st/save-join-request st jr)))
+          
+          (testing "`GET` retrieves join requests for customer"
+            (is (= [jr]
+                   (-> (mock/request :get (str "/customer/" (:id cust) "/join-request"))
+                       (app)
+                       (h/reply->json)))))
+
+          (testing "allows filtering by status")
+
+          (testing "`POST /:request-id/approve`"
+            (testing "approves join request with message"
+              (is (= 200
+                     (-> (h/json-request
+                          :post (str "/customer/" (:id cust) "/join-request/" (:id jr) "/approve")
+                          {:message "Very well"})
+                         (app)
+                         :status)))
+              (let [m (st/find-join-request st (:id jr))]
+                (is (= :approved (:status m)))
+                (is (= "Very well" (:response-msg m)))))
+            
+            (testing "returns 404 not found for non existing request"
+              (is (= 404
+                     (-> (h/json-request
+                          :post (str "/customer/" (:id cust) "/join-request/" (st/new-id) "/approve")
+                          {})
+                         (app)
+                         :status))))
+
+            (testing "returns 404 not found when customer id does not match request"
+              (is (= 404
+                     (-> (h/json-request
+                          :post (str "/customer/" (st/new-id) "/join-request/" (:id jr) "/approve")
+                          {})
+                         (app)
+                         :status)))))
+
+          (testing "`POST /:request-id/reject`"
+            (testing "rejects join request with message"
+              (is (= 200
+                     (-> (h/json-request
+                          :post (str "/customer/" (:id cust) "/join-request/" (:id jr) "/reject")
+                          {:message "No way"})
+                         (app)
+                         :status)))
+              (let [m (st/find-join-request st (:id jr))]
+                (is (= :rejected (:status m)))
+                (is (= "No way" (:response-msg m)))))
+            
+            (testing "returns 404 not found for non existing request"
+              (is (= 404
+                     (-> (h/json-request
+                          :post (str "/customer/" (:id cust) "/join-request/" (st/new-id) "/reject")
+                          {})
+                         (app)
+                         :status))))
+
+            (testing "returns 404 not found when customer id does not match request"
+              (is (= 404
+                     (-> (h/json-request
+                          :post (str "/customer/" (st/new-id) "/join-request/" (:id jr) "/reject")
+                          {})
+                         (app)
+                         :status)))))))))
+
   (h/with-memory-store st
     (let [kp (auth/generate-keypair)
           rt (test-rt {:storage st
@@ -313,7 +391,7 @@
                             :base-entity {:customer-id "test-cust"
                                           :repo-id "test-repo"}
                             :updated-entity {:repo-id "updated-repo"}
-                            :creator st/save-webhook-details}))
+                            :creator st/save-webhook}))
 
 (deftest user-endpoints
   (testing "/user"

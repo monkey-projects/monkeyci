@@ -230,6 +230,25 @@
                         github-unwatch-route]})
        (conj github-watch-route))])
 
+(s/defschema JoinRequestSchema
+  {:customer-id Id
+   (s/optional-key :message) s/Str})
+
+(s/defschema JoinRequestResponse
+  {(s/optional-key :message) s/Str})
+
+(def customer-join-request-routes
+  ["/join-request"
+   [["" {:get {:handler jr-api/list-customer-join-requests}}]
+    ["/:request-id"
+     {:parameters {:path {:request-id Id}}}
+     [["/approve"
+       {:post {:handler jr-api/approve-join-request
+               :parameters {:body JoinRequestResponse}}}]
+      ["/reject"
+       {:post {:handler jr-api/reject-join-request
+               :parameters {:body JoinRequestResponse}}}]]]]])
+
 (def event-stream-routes
   ["/events" {:get {:handler api/event-stream
                     :parameters {:query {(s/optional-key :authorization) s/Str}}}}])
@@ -249,6 +268,7 @@
      :child-routes [repo-routes
                     customer-parameter-routes
                     customer-ssh-keys-routes
+                    customer-join-request-routes
                     event-stream-routes]})])
 
 (def github-routes
@@ -263,11 +283,7 @@
                  {:handler auth/jwks
                   :produces #{"application/json"}}}])
 
-(s/defschema JoinRequestSchema
-  {:customer-id Id
-   (s/optional-key :message) s/Str})
-
-(def join-request-routes
+(def user-join-request-routes
   ["/join-request"
    (generic-routes
     {:creator jr-api/create-join-request
@@ -291,7 +307,7 @@
      [["/customers"
        {:get
         {:handler api/get-user-customers}}]
-      join-request-routes]]
+      user-join-request-routes]]
     ["/:user-type/:type-id"
      {:parameters
       {:path {:user-type s/Str
