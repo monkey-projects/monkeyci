@@ -16,6 +16,7 @@
    :page/build build/page
    :page/login login/page
    :page/github-callback login/github-callback
+   :page/bitbucket-callback login/bitbucket-callback
    :page/customer customer/page
    :page/customer-new customer/page-new
    :page/customer-join home/page-join

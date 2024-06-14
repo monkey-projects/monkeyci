@@ -21,7 +21,9 @@
         [:label.form-label {:for "password"} "Password"]
         [:input#password.form-control {:name :password :type :password}]]
        [:button.btn.btn-primary.me-1
-        (cond-> {:type :submit}
+        (cond-> {:type :submit
+                 :disabled true
+                 :title "Not supported"}
           @submitting? (assoc :disabled true))
         "Login"]
        [:a.btn.btn-outline-dark
@@ -45,11 +47,11 @@
      [login-form]]]
    [l/footer]])
 
-(defn github-callback [req]
+(defn- callback-page [req evt]
   (let [q (get-in req [:parameters :query])]
     (if-let [code (:code q)]
       (do
-        (rf/dispatch [:login/github-code-received code])
+        (rf/dispatch (conj evt code))
         [l/default
          [:<>
           [:p "Authentication succeeded, logging in to MonkeyCI..."]
@@ -59,3 +61,9 @@
                         :message [:<>
                                   [:h4 "Unable to Authenticate"]
                                   [:p (:error_description q)]]}]])))
+
+(defn github-callback [req]
+  (callback-page req [:login/github-code-received]))
+
+(defn bitbucket-callback [req]
+  (callback-page req [:login/bitbucket-code-received]))

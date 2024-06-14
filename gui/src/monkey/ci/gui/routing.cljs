@@ -60,7 +60,8 @@
     ["/c/:customer-id/r/:repo-id/edit" :page/repo-edit]
     ["/c/:customer-id/r/:repo-id/b/:build-id" :page/build]
     ["/c/:customer-id/r/:repo-id/b/:build-id/j/:job-id" :page/job]
-    ["/github/callback" :page/github-callback]]))
+    ["/github/callback" :page/github-callback]
+    ["/bitbucket/callback" :page/bitbucket-callback]]))
 
 (defn on-route-change [match history]
   (log/debug "Route changed:" match)
