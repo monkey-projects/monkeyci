@@ -564,7 +564,7 @@
   co/Lifecycle
   (start [this]
     (log/debug "Starting DB connection")
-    (emig/run-migrations! (:ds conn))
+    (emig/run-migrations! conn)
     this)
 
   (stop [this]
