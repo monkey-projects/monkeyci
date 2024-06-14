@@ -46,7 +46,7 @@
 (defn with-prepared-db* [f]
   (with-test-db*
     (fn [conn]
-      (m/with-migrations (:ds conn)
+      (m/with-migrations conn
         #(f conn)))))
 
 (defmacro with-prepared-db [conn & body]
