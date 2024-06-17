@@ -58,6 +58,39 @@
                   :on-failure [:github/load-user--failed]})
     :local-storage [storage-token-id (select-keys u [:github-token :token])]}))
 
+(defn- redirect-evt
+  "Constructs the event to dispatch to redirect to the desired destination after login."
+  [user local-storage]
+  (let [redir (:redirect-to local-storage)]
+    (log/debug "Redirect route:" redir)
+    (cond
+      (and redir (not= "/" redir))
+      ;; If a redirect path was stored, go there
+      [:route/goto-path redir]
+      ;; If the user only has one customer, go directly there
+      (= 1 (count (:customers user)))
+      [:route/goto :page/customer {:customer-id (first (:customers user))}]
+      ;; Any other case, go to the root page
+      :else
+      [:route/goto :page/root])))
+
+(rf/reg-event-fx
+ :github/load-user--success
+ [(rf/inject-cofx :local-storage storage-redir-id)]
+ (fn [{:keys [db local-storage]} [_ github-user]]
+   (let [redir (:redirect-to local-storage)]
+     (log/debug "Github user details:" #?(:cljs (clj->js github-user)
+                                          :clj github-user))
+     {:db (db/set-github-user db github-user)
+      :dispatch (redirect-evt (db/user db) local-storage)
+      :local-storage [storage-redir-id (dissoc local-storage :redirect-to)]})))
+
+(rf/reg-event-db
+ :github/load-user--failed
+ (fn [db [_ err]]
+   (db/set-alerts db [{:type :danger
+                       :message (str "Unable to retrieve user details from Github: " (u/error-msg err))}])))
+
 (rf/reg-event-db
  :login/github-login--failed
  (fn [db [_ err]]
@@ -83,34 +116,64 @@
  (fn [db [_ err]]
    (db/set-alerts db
                   [{:type :danger
-                    :message (str "Unable to load github config:" (u/error-msg err))}])))
+                    :message (str "Unable to load Github config:" (u/error-msg err))}])))
 
 (rf/reg-event-fx
- :github/load-user--success
- [(rf/inject-cofx :local-storage storage-redir-id)]
- (fn [{:keys [db local-storage]} [_ github-user]]
-   (let [redir (:redirect-to local-storage)
-         u (db/user db)]
-     (log/debug "Redirect route:" redir)
-     (log/debug "Github user details:" (str github-user))
-     {:db (db/set-github-user db github-user)
-      :dispatch (cond
-                  (and redir (not= "/" redir))
-                  ;; If a redirect path was stored, go there
-                  [:route/goto-path redir]
-                  ;; If the user only has one customer, go directly there
-                  (= 1 (count (:customers u)))
-                  [:route/goto :page/customer {:customer-id (first (:customers u))}]
-                  ;; Any other case, go to the root page
-                  :else
-                  [:route/goto :page/root])
-      :local-storage [storage-redir-id (dissoc local-storage :redirect-to)]})))
+ :login/load-bitbucket-config
+ (fn [{:keys [db]} [_ code]]
+   {:dispatch [:martian.re-frame/request
+               :get-bitbucket-config
+               {}
+               [:login/load-bitbucket-config--success]
+               [:login/load-bitbucket-config--failed]]}))
 
 (rf/reg-event-db
- :github/load-user--failed
+ :login/load-bitbucket-config--success
+ (fn [db [_ {config :body}]]
+   (db/set-bitbucket-config db config)))
+
+(rf/reg-event-db
+ :login/load-bitbucket-config--failed
+ (fn [db [_ err]]
+   (db/set-alerts db
+                  [{:type :danger
+                    :message (str "Unable to load BitBucket config:" (u/error-msg err))}])))
+
+(rf/reg-event-fx
+ :login/bitbucket-code-received
+ (fn [{:keys [db]} [_ code]]
+   {:dispatch [:martian.re-frame/request
+               :bitbucket-login
+               {:code code}
+               [:login/bitbucket-login--success]
+               [:login/bitbucket-login--failed]]
+    :db (-> db
+            (db/clear-alerts)
+            (db/set-user nil))}))
+
+(rf/reg-event-fx
+ :login/bitbucket-login--success
+ (fn [{:keys [db local-storage]} [_ {{:keys [bitbucket-token] :as u} :body}]]
+   {:db (-> db
+            (db/set-user (dissoc u :token :bitbucket-token))
+            (db/set-token (:token u))
+            (db/set-bitbucket-token bitbucket-token))
+    ;; TODO Fetch user details
+    ;; :http-xhrio (bitbucket/api-request
+    ;;              db
+    ;;              {:method :get
+    ;;               :path "/user"
+    ;;               :token bitbucket-token
+    ;;               :on-success [:bitbucket/load-user--success]
+    ;;               :on-failure [:bitbucket/load-user--failed]})
+    :dispatch (redirect-evt u local-storage)
+    :local-storage [storage-token-id (select-keys u [:bitbucket-token :token])]}))
+
+(rf/reg-event-db
+ :login/bitbucket-login--failed
  (fn [db [_ err]]
    (db/set-alerts db [{:type :danger
-                       :message (str "Unable to retrieve user details from Github: " (u/error-msg err))}])))
+                       :message (str "Unable to fetch Bitbucket user token: " (u/error-msg err))}])))
 
 (rf/reg-event-fx
  :login/sign-off

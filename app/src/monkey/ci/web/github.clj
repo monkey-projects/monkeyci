@@ -16,7 +16,8 @@
              [utils :as u]]
             [monkey.ci.web
              [auth :as auth]
-             [common :as c]]
+             [common :as c]
+             [oauth2 :as oauth2]]
             ;; TODO Replace httpkit with aleph
             [org.httpkit.client :as http]
             [ring.util.response :as rur]))
@@ -196,7 +197,7 @@
       (rur/response (s/find-repo st sid))
       (rur/status 404))))
 
-(defn- process-reply [{:keys [status] :as r}]
+(defn- process-reply [r]
   (log/trace "Got github reply:" r)
   (update r :body c/parse-json))
 
@@ -210,54 +211,26 @@
                      :headers {"Accept" "application/json"}})
         (process-reply))))
 
-(defn- request-user-info [token]
+(defn- ->oauth-user [{:keys [id email]}]
+  {:email email
+   :sid [:github id]})
+
+(defn- request-user-info
+  "Fetch github user details in order to get the id and email (although
+   the latter is not strictly necessary).  We need the id in order to
+   link the Github user to the MonkeyCI user."
+  [token]
   (-> @(http/get "https://api.github.com/user"
                  {:headers {"Accept" "application/json"
                             "Authorization" (str "Bearer " token)}})
       (process-reply)
       ;; TODO Check for failures
       :body
-      (select-keys [:id :email])
-      ;; Return token to frontend, we'll need it when doing github requests.
-      (assoc :github-token token)))
+      (->oauth-user)))
 
-(defn- generate-jwt [req user]
-  ;; Perhaps we should use the internal user id instead?
-  ;; TODO Add user permissions
-  (auth/generate-jwt req (auth/user-token ["github" (:type-id user)])))
-
-(defn- add-jwt [user req]
-  (assoc user :token (generate-jwt req user)))
-
-(defn- fetch-or-create-user
-  "Given the github user info, finds the matching user in the database, or creates
-   a new one."
-  [user req]
-  (let [st (c/req->storage req)]
-    (-> (or (s/find-user-by-type st [:github (:id user)])
-            (let [u {:id (s/new-id)
-                     :type "github"
-                     :type-id (:id user)
-                     ;; Keep track of email for reporting purposes
-                     :email (:email user)}]
-              (s/save-user st u)
-              u))
-        (merge (select-keys user [:github-token])))))
-
-(defn login
-  "Invoked by the frontend during OAuth2 login flow.  It requests a Github
-   user access token using the given authorization code."
-  [req]
-  (let [token-reply (request-access-token req)]
-    (if (and (= 200 (:status token-reply)) (nil? (get-in token-reply [:body :error])))
-      ;; Request user info, generate JWT
-      (-> (request-user-info (get-in token-reply [:body :access-token]))
-          (fetch-or-create-user req)
-          (add-jwt req)
-          (rur/response))
-      ;; Failure
-      ;; TODO Don't treat all responses as client errors
-      (rur/bad-request (:body token-reply)))))
+(def login (oauth2/login-handler
+            request-access-token
+            request-user-info))
 
 (defn get-config
   "Lists public github configuration to use"

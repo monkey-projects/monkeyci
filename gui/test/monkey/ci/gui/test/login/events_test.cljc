@@ -168,6 +168,81 @@
       (is (= :danger (-> a first :type)))
       (is (string? (-> a first :message))))))
 
+(deftest load-bitbucket-config
+  (testing "sends request to backend to fetch config"
+    (rf-test/run-test-sync
+      (let [c (h/catch-fx :martian.re-frame/request)]
+        (h/initialize-martian {:get-bitbucket-config {:status 200
+                                                      :body "ok"
+                                                      :error-code :no-error}})
+        (rf/dispatch [:login/load-bitbucket-config])
+        (is (= 1 (count @c)))))))
+
+(deftest load-bitbucket-config--success
+  (testing "sets bitbucket config in db"
+    (rf/dispatch-sync [:login/load-bitbucket-config--success {:body ::test-config}])
+    (is (= ::test-config (db/bitbucket-config @app-db)))))
+
+(deftest bitbucket-code-received
+  (testing "sends exchange request to backend"
+    (rf-test/run-test-sync
+     (let [c (h/catch-fx :martian.re-frame/request)]
+       (h/initialize-martian {:bitbucket-login {:status 200
+                                                :body "ok"
+                                                :error-code :no-error}})
+       (rf/dispatch [:login/bitbucket-code-received "test-code"])
+       (is (= 1 (count @c))))))
+
+  (testing "clears alerts in db"
+    (is (map? (reset! app-db (db/set-alerts {} [{:type :info}]))))
+    (rf/dispatch-sync [:login/bitbucket-code-received "test-code"])
+    (is (empty? (db/alerts @app-db))))
+
+  (testing "clears user in db"
+    (is (map? (reset! app-db (db/set-user {} ::test-user))))
+    (rf/dispatch-sync [:login/bitbucket-code-received "test-code"])
+    (is (nil? (db/user @app-db)))))
+
+(deftest bitbucket-login--success
+  ;; Safety
+  (h/catch-fx :http-xhrio)
+  (h/catch-fx :route/goto)
+  
+  (testing "sets user in db"
+    (rf/dispatch-sync [:login/bitbucket-login--success {:body {:id ::test-user}}])
+    (is (= {:id ::test-user} (db/user @app-db))))
+
+  (testing "sets token in db"
+    (rf/dispatch-sync [:login/bitbucket-login--success {:body {:token "test-token"}}])
+    (is (= "test-token" (db/token @app-db))))
+
+  (testing "sets bitbucket token in db"
+    (rf/dispatch-sync [:login/bitbucket-login--success {:body {:bitbucket-token "test-token"}}])
+    (is (= "test-token" (db/bitbucket-token @app-db))))
+
+  #_(testing "fetches bitbucket user details"
+    (let [e (h/catch-fx :http-xhrio)]
+      (rf/dispatch-sync [:login/bitbucket-login--success {:body {:token "test-token"}}])
+      (is (= 1 (count @e)))
+      (is (= {:method :get
+              :uri "https://api.bitbucket.com/user"}
+             (select-keys (first @e) [:method :uri])))))
+
+  (testing "saves tokens to local storage"
+    (let [e (h/catch-fx :local-storage)]
+      (rf/dispatch-sync [:login/bitbucket-login--success {:body {:token "test-token"
+                                                                 :bitbucket-token "test-bitbucket"}}])
+      (is (= [["login-tokens" {:token "test-token"
+                               :bitbucket-token "test-bitbucket"}]]
+             @e)))))
+
+(deftest bitbucket-login--failed
+  (testing "sets error alert"
+    (rf/dispatch-sync [:login/bitbucket-login--failed {:message "test error"}])
+    (is (= :danger (-> (db/alerts @app-db)
+                       (first)
+                       :type)))))
+
 (deftest login-sign-off
   (h/catch-fx :route/goto)
   

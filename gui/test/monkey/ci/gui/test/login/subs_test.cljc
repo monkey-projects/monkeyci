@@ -75,3 +75,13 @@
       (is (nil? @s))
       (is (map? (reset! app-db (db/set-github-config {} {:client-id "test-github-client-id"}))))
       (is (= "test-github-client-id" @s)))))
+
+(deftest bitbucket-client-id
+  (let [s (rf/subscribe [:login/bitbucket-client-id])]
+    (testing "exists"
+      (is (some? s)))
+
+    (testing "returns client-id from db"
+      (is (nil? @s))
+      (is (map? (reset! app-db (db/set-bitbucket-config {} {:client-id "test-bitbucket-client-id"}))))
+      (is (= "test-bitbucket-client-id" @s)))))

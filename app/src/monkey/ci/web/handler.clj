@@ -15,6 +15,7 @@
             [monkey.ci.web
              [api :as api]
              [auth :as auth]
+             [bitbucket :as bitbucket]
              [common :as c]
              [github :as github]]
             [monkey.ci.web.api.join-request :as jr-api]
@@ -278,6 +279,13 @@
               ["/config" {:get
                           {:handler github/get-config}}]]])
 
+(def bitbucket-routes
+  ["/bitbucket" [["/login" {:post
+                            {:handler bitbucket/login
+                             :parameters {:query {:code s/Str}}}}]
+                 ["/config" {:get
+                             {:handler bitbucket/get-config}}]]])
+
 (def auth-routes
   ["/auth/jwks" {:get
                  {:handler auth/jwks
@@ -325,6 +333,7 @@
    webhook-routes
    customer-routes
    github-routes
+   bitbucket-routes
    auth-routes
    user-routes])
 

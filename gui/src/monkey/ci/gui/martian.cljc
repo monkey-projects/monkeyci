@@ -172,7 +172,23 @@
 
    (public-route
     {:route-name :get-github-config
-     :path-parts ["/github/config"]})])
+     :path-parts ["/github/config"]})
+
+   (public-route
+    {:route-name :bitbucket-login
+     :method :post
+     :path-parts ["/bitbucket/login"]
+     :query-schema {:code s/Str}})
+
+   (public-route
+    {:route-name :bitbucket-login
+     :method :post
+     :path-parts ["/bitbucket/login"]
+     :query-schema {:code s/Str}})
+
+   (public-route
+    {:route-name :get-bitbucket-config
+     :path-parts ["/bitbucket/config"]})])
 
 ;; The api url.  This should be configured in a `config.js`.
 (def url #?(:clj "http://localhost:3000"

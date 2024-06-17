@@ -20,6 +20,7 @@
              [auth :as auth]
              [handler :as sut]]
             [monkey.ci.helpers :refer [try-take] :as h]
+            [monkey.ci.http-helpers :refer [with-fake-http]]
             [org.httpkit.fake :as hf]
             [reitit
              [core :as rc]
@@ -769,7 +770,8 @@
                         (fn [_ req _]
                           (let [auth (get-in req [:headers "Authorization"])]
                             (if (= "Bearer test-token" auth)
-                              {:status 200 :body (h/to-raw-json {:name "test-user"
+                              {:status 200 :body (h/to-raw-json {:id 4567
+                                                                 :name "test-user"
                                                                  :other-key "other-value"})}
                               {:status 400 :body (str "invalid auth header: " auth)})))]
       (let [app (-> (test-rt {:config {:github {:client-id "test-client-id"
@@ -789,6 +791,61 @@
     (let [app (-> (test-rt {:config {:github {:client-id "test-client-id"}}})
                   (sut/make-app))
           r (-> (mock/request :get "/github/config")
+                (app))]
+      (is (= 200 (:status r)))
+      (is (= "test-client-id" (some-> r :body slurp h/parse-json :client-id))))))
+
+(defn- matches-basic-auth? [req user pass]
+  (let [prefix "Basic "]
+    (when-let [auth (get-in req [:headers "Authorization"])]
+      (when (.startsWith auth prefix)
+        (= (str user ":" pass) (-> (subs auth (count prefix))
+                                   (h/base64->)))))))
+
+(deftest bitbucket-endpoints
+  (testing "`POST /bitbucket/login` requests token from bitbucket and fetches user info"
+    (with-fake-http [[{:url "https://bitbucket.org/site/oauth2/access_token"
+                       :request-method :post}
+                      (fn [req]
+                        (cond
+                          (not= {:grant_type "authorization_code"
+                                 :code "1234"}
+                                (:form-params req))
+                          {:status 400 :body (str "Invalid form params: " (:form-params req))}
+                          (not (matches-basic-auth? req "test-client-id" "test-secret"))
+                          {:status 400 :body (str "Invalid auth code: " (:headers req))}
+                          :else
+                          {:status 200
+                           :body (h/to-raw-json {:access_token "test-token"})
+                           :headers {"content-type" "application/json"}}))]
+                     [{:url "https://api.bitbucket.org/2.0/user"
+                       :request-method :get}
+                      (fn [req]
+                        (let [auth (get-in req [:headers "Authorization"])]
+                          (if (= "Bearer test-token" auth)
+                            {:status 200
+                             :body (h/to-raw-json {:name "test-user"
+                                                   :other-key "other-value"})
+                             :headers {"content-type" "application/json"}}
+                            {:status 400 :body (str "invalid auth header: " auth)})))]]
+      
+      (let [app (-> (test-rt {:config {:github {:client-id "test-client-id"
+                                                :client-secret "test-secret"}}
+                              :jwk (auth/keypair->rt (auth/generate-keypair))})
+                    (sut/make-app))
+            r (-> (mock/request :post "/bitbucket/login?code=1234")
+                  (app))]
+        (is (= 200 (:status r)))
+        (is (= "test-token"
+               (some-> (:body r)
+                         (slurp)
+                         (h/parse-json)
+                         :bitbucket-token))))))
+
+  (testing "`GET /bitbucket/config` returns client id"
+    (let [app (-> (test-rt {:config {:bitbucket {:client-id "test-client-id"}}})
+                  (sut/make-app))
+          r (-> (mock/request :get "/bitbucket/config")
                 (app))]
       (is (= 200 (:status r)))
       (is (= "test-client-id" (some-> r :body slurp h/parse-json :client-id))))))
