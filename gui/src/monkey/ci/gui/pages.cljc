@@ -26,7 +26,7 @@
    :page/job job/page})
 
 (def route-name (comp :name :data))
-(def public? #{:page/login :page/github-callback})
+(def public? #{:page/login :page/github-callback :page/bitbucket-callback})
 
 (defn render-page [route]
   (log/debug "Rendering page for route:" (str (route-name route)))

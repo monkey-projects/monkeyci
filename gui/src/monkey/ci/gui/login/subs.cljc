@@ -9,11 +9,22 @@
 (u/db-sub :login/github-client-id (comp :client-id db/github-config))
 (u/db-sub :login/bitbucket-client-id (comp :client-id db/bitbucket-config))
 
+(defn- add-github-user [u db]
+  (let [gu (db/github-user db)]
+    (cond-> u
+      gu (-> (assoc :github gu)
+             (merge (select-keys gu [:name :avatar-url]))))))
+
+(defn- add-bitbucket-user [u db]
+  (let [bu (db/bitbucket-user db)]
+    (cond-> u
+      bu (assoc :bitbucket bu
+                :name (:display-name bu)
+                :avatar-url (get-in bu [:links :avatar :href])))))
+
 (rf/reg-sub
  :login/user
  (fn [db _]
-   (let [gu (db/github-user db)]
-     (some-> (db/user db)
-             (assoc :github gu)
-             (merge (select-keys gu [:name :avatar-url]))))))
-
+   (-> (db/user db)
+       (add-github-user db)
+       (add-bitbucket-user db))))

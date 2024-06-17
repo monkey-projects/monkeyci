@@ -51,3 +51,8 @@
 
 (defn set-github-user [db u]
   (assoc db github-user u))
+
+(def bitbucket-user ::bitbucket-user)
+
+(defn set-bitbucket-user [db u]
+  (assoc db bitbucket-user u))

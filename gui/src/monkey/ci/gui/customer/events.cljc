@@ -1,6 +1,6 @@
 (ns monkey.ci.gui.customer.events
   (:require [medley.core :as mc]
-            [monkey.ci.gui.github :as github]
+            [monkey.ci.gui.apis.github :as github]
             [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.martian]
             [monkey.ci.gui.customer.db :as db]

@@ -796,11 +796,7 @@
       (is (= "test-client-id" (some-> r :body slurp h/parse-json :client-id))))))
 
 (defn- matches-basic-auth? [req user pass]
-  (let [prefix "Basic "]
-    (when-let [auth (get-in req [:headers "Authorization"])]
-      (when (.startsWith auth prefix)
-        (= (str user ":" pass) (-> (subs auth (count prefix))
-                                   (h/base64->)))))))
+  (= [user pass] (:basic-auth req)))
 
 (deftest bitbucket-endpoints
   (testing "`POST /bitbucket/login` requests token from bitbucket and fetches user info"
@@ -813,7 +809,7 @@
                                 (:form-params req))
                           {:status 400 :body (str "Invalid form params: " (:form-params req))}
                           (not (matches-basic-auth? req "test-client-id" "test-secret"))
-                          {:status 400 :body (str "Invalid auth code: " (:headers req))}
+                          {:status 400 :body (str "Invalid auth code: " (:basic-auth req))}
                           :else
                           {:status 200
                            :body (h/to-raw-json {:access_token "test-token"})
@@ -829,8 +825,8 @@
                              :headers {"content-type" "application/json"}}
                             {:status 400 :body (str "invalid auth header: " auth)})))]]
       
-      (let [app (-> (test-rt {:config {:github {:client-id "test-client-id"
-                                                :client-secret "test-secret"}}
+      (let [app (-> (test-rt {:config {:bitbucket {:client-id "test-client-id"
+                                                   :client-secret "test-secret"}}
                               :jwk (auth/keypair->rt (auth/generate-keypair))})
                     (sut/make-app))
             r (-> (mock/request :post "/bitbucket/login?code=1234")

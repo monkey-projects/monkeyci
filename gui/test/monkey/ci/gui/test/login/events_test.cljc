@@ -206,7 +206,6 @@
 (deftest bitbucket-login--success
   ;; Safety
   (h/catch-fx :http-xhrio)
-  (h/catch-fx :route/goto)
   
   (testing "sets user in db"
     (rf/dispatch-sync [:login/bitbucket-login--success {:body {:id ::test-user}}])
@@ -220,12 +219,12 @@
     (rf/dispatch-sync [:login/bitbucket-login--success {:body {:bitbucket-token "test-token"}}])
     (is (= "test-token" (db/bitbucket-token @app-db))))
 
-  #_(testing "fetches bitbucket user details"
+  (testing "fetches bitbucket user details"
     (let [e (h/catch-fx :http-xhrio)]
       (rf/dispatch-sync [:login/bitbucket-login--success {:body {:token "test-token"}}])
       (is (= 1 (count @e)))
       (is (= {:method :get
-              :uri "https://api.bitbucket.com/user"}
+              :uri "https://api.bitbucket.org/2.0/user"}
              (select-keys (first @e) [:method :uri])))))
 
   (testing "saves tokens to local storage"
@@ -242,6 +241,56 @@
     (is (= :danger (-> (db/alerts @app-db)
                        (first)
                        :type)))))
+
+(deftest bitbucket-load-user--success
+  ;; Failsafe
+  (h/catch-fx :route/goto)
+
+  (testing "sets bitbucket user in db"
+    (rf/dispatch-sync [:bitbucket/load-user--success ::bitbucket-user])
+    (is (= ::bitbucket-user (db/bitbucket-user @app-db))))
+  
+  (testing "redirects to root page if multiple customers"
+    (rf-test/run-test-sync
+     (let [c (h/catch-fx :route/goto)]
+       (reset! app-db (db/set-user {} {:customers ["cust-1" "cust-2"]}))
+       (rf/dispatch [:bitbucket/load-user--success {}])
+       (is (= "/" (first @c))))))
+
+  (testing "redirects to customer page if only one customer"
+    (rf-test/run-test-sync
+     (let [c (h/catch-fx :route/goto)]
+       (reset! app-db (db/set-user {} {:customers ["test-cust"]}))
+       (rf/dispatch [:bitbucket/load-user--success {}])
+       (is (= "/c/test-cust" (first @c))))))
+
+  (testing "redirects to redirect page if set"
+    (rf-test/run-test-sync
+     (rf/reg-cofx
+      :local-storage
+      (fn [cofx]
+        (assoc cofx :local-storage {:redirect-to "/c/test-cust"})))
+     (let [c (h/catch-fx :route/goto)]
+       (rf/dispatch [:bitbucket/load-user--success {}])
+       (is (= "/c/test-cust" (first @c))))))
+
+  (testing "ignores redirect page if `/`"
+    (rf-test/run-test-sync
+     (rf/reg-cofx
+      :local-storage
+      (fn [cofx]
+        (assoc cofx :local-storage {:redirect-to "/"})))
+     (let [c (h/catch-fx :route/goto)]
+       (reset! app-db (db/set-user {} {:customers ["test-cust"]}))
+       (rf/dispatch [:bitbucket/load-user--success {}])
+       (is (= "/c/test-cust" (first @c)))))))
+
+(deftest bitbucket-load-user--failed
+  (testing "sets error alert"
+    (rf/dispatch-sync [:bitbucket/load-user--failed {:response "test error"}])
+    (let [a (db/alerts @app-db)]
+      (is (= :danger (-> a first :type)))
+      (is (string? (-> a first :message))))))
 
 (deftest login-sign-off
   (h/catch-fx :route/goto)

@@ -44,6 +44,21 @@
                                                          :avatar-url "http://test-avatar"})))))
       (is (= {:name "github user"
               :avatar-url "http://test-avatar"}
+             (select-keys @s [:name :avatar-url]))))
+
+    (testing "adds bitbucket user details"
+      (is (some? (reset! app-db (-> {}
+                                    (db/set-user {:id "test-user"})
+                                    (db/set-bitbucket-user {:name "bitbucket user"})))))
+      (is (= "bitbucket user" (-> @s :bitbucket :name))))
+
+    (testing "adds avatar url and name to user from bitbucket"
+      (is (some? (reset! app-db (-> {}
+                                    (db/set-user {:id "test-user"})
+                                    (db/set-bitbucket-user {:display-name "bitbucket user"
+                                                            :links {:avatar {:href "http://test-avatar"}}})))))
+      (is (= {:name "bitbucket user"
+              :avatar-url "http://test-avatar"}
              (select-keys @s [:name :avatar-url]))))))
 
 (deftest alerts

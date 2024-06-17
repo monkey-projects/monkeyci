@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.login.events
-  (:require [monkey.ci.gui.github :as github]
+  (:require [monkey.ci.gui.apis.bitbucket :as bitbucket]
+            [monkey.ci.gui.apis.github :as github]
             [monkey.ci.gui.local-storage :as ls]
             [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.login.db :as db]
@@ -158,16 +159,31 @@
             (db/set-user (dissoc u :token :bitbucket-token))
             (db/set-token (:token u))
             (db/set-bitbucket-token bitbucket-token))
-    ;; TODO Fetch user details
-    ;; :http-xhrio (bitbucket/api-request
-    ;;              db
-    ;;              {:method :get
-    ;;               :path "/user"
-    ;;               :token bitbucket-token
-    ;;               :on-success [:bitbucket/load-user--success]
-    ;;               :on-failure [:bitbucket/load-user--failed]})
-    :dispatch (redirect-evt u local-storage)
+    :http-xhrio (bitbucket/api-request
+                 db
+                 {:method :get
+                  :path "/user"
+                  :token bitbucket-token
+                  :on-success [:bitbucket/load-user--success]
+                  :on-failure [:bitbucket/load-user--failed]})
     :local-storage [storage-token-id (select-keys u [:bitbucket-token :token])]}))
+
+(rf/reg-event-fx
+ :bitbucket/load-user--success
+ [(rf/inject-cofx :local-storage storage-redir-id)]
+ (fn [{:keys [db local-storage]} [_ bitbucket-user]]
+   (let [redir (:redirect-to local-storage)]
+     (log/debug "Bitbucket user details:" #?(:cljs (clj->js bitbucket-user)
+                                             :clj bitbucket-user))
+     {:db (db/set-bitbucket-user db bitbucket-user)
+      :dispatch (redirect-evt (db/user db) local-storage)
+      :local-storage [storage-redir-id (dissoc local-storage :redirect-to)]})))
+
+(rf/reg-event-db
+ :bitbucket/load-user--failed
+ (fn [db [_ err]]
+   (db/set-alerts db [{:type :danger
+                       :message (str "Unable to retrieve user details from Bitbucket: " (u/error-msg err))}])))
 
 (rf/reg-event-db
  :login/bitbucket-login--failed
