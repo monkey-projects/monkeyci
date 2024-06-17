@@ -7,32 +7,36 @@
             [monkey.ci.gui.routing :as r]
             [re-frame.core :as rf]))
 
-(defn login-form []
+(defn- github-btn []
   (rf/dispatch [:login/load-github-config])
-  (fn []
-    (let [submitting? (rf/subscribe [:login/submitting?])
-          callback-url (str (r/origin) (r/path-for :page/github-callback))
-          github-client-id (rf/subscribe [:login/github-client-id])]
-      [:form#login-form {:on-submit (f/submit-handler [:login/submit])}
-       [:div.mb-1
-        [:label.form-label {:for "username"} "Username"]
-        [:input#username.form-control {:name :username}]]
-       [:div.mb-3
-        [:label.form-label {:for "password"} "Password"]
-        [:input#password.form-control {:name :password :type :password}]]
-       [:button.btn.btn-primary.me-1
-        (cond-> {:type :submit
-                 :disabled true
-                 :title "Not supported"}
-          @submitting? (assoc :disabled true))
-        "Login"]
-       [:a.btn.btn-outline-dark
-        (cond-> {:href (str "https://github.com/login/oauth/authorize?client_id=" @github-client-id
-                            "&redirect_uri=" (r/uri-encode callback-url))
-                 :title "Redirects you to GitHub for authentication, then takes you back here."}
-          (nil? @github-client-id) (assoc :class :disabled))
-        [:img.me-2 {:src "/img/github-mark.svg" :height "20px"}]
-        "Login with GitHub"]])))
+  (let [callback-url (str (r/origin) (r/path-for :page/github-callback))
+        github-client-id (rf/subscribe [:login/github-client-id])]
+    [:a.btn.btn-outline-dark
+     (cond-> {:href (str "https://github.com/login/oauth/authorize?client_id=" @github-client-id
+                         "&redirect_uri=" (r/uri-encode callback-url))
+              :title "Redirects you to GitHub for authentication, then takes you back here."}
+       (nil? @github-client-id) (assoc :class :disabled))
+     [:img.me-2 {:src "/img/github-mark.svg" :height "20px"}]
+     "Login with GitHub"]))
+
+(defn- bitbucket-btn []
+  (rf/dispatch [:login/load-bitbucket-config])
+  (let [bitbucket-client-id (rf/subscribe [:login/bitbucket-client-id])]
+    ;; Unfortunately, bitbucket does not allow to specify callback url, so it's the one
+    ;; that is configured in the app.
+    [:a.btn.btn-outline-dark
+     (cond-> {:href (str "https://bitbucket.com/site/oauth2/authorize?client_id=" @bitbucket-client-id
+                         "&response_type=code")
+              :title "Redirects you to Bitbucket for authentication, then takes you back here."}
+       (nil? @bitbucket-client-id) (assoc :class :disabled))
+     [:img.me-2 {:src "/img/mark-gradient-blue-bitbucket.svg" :height "20px"}]
+     "Login with Bitbucket"]))
+
+(defn login-form []
+  [:div
+   [:span.me-2
+    [github-btn]]
+   [bitbucket-btn]])
 
 (defn page [_]
   [:div
@@ -60,7 +64,7 @@
        [c/render-alert {:type :danger
                         :message [:<>
                                   [:h4 "Unable to Authenticate"]
-                                  [:p (:error_description q)]]}]])))
+                                  [:p (or (:error_description q) q)]]}]])))
 
 (defn github-callback [req]
   (callback-page req [:login/github-code-received]))

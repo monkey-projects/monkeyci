@@ -37,6 +37,16 @@
 (defn set-github-config [db c]
   (assoc db github-config c))
 
+(def bitbucket-config :auth/bitbucket-config)
+
+(defn set-bitbucket-config [db c]
+  (assoc db bitbucket-config c))
+
+(def bitbucket-token :bitbucket/token)
+
+(defn set-bitbucket-token [db t]
+  (assoc db bitbucket-token t))
+
 (def github-user ::github-user)
 
 (defn set-github-user [db u]

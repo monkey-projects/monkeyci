@@ -215,7 +215,11 @@
   {:email email
    :sid [:github id]})
 
-(defn- request-user-info [token]
+(defn- request-user-info
+  "Fetch github user details in order to get the id and email (although
+   the latter is not strictly necessary).  We need the id in order to
+   link the Github user to the MonkeyCI user."
+  [token]
   (-> @(http/get "https://api.github.com/user"
                  {:headers {"Accept" "application/json"
                             "Authorization" (str "Bearer " token)}})

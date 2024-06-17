@@ -28,8 +28,7 @@
         (process-reply))))
 
 (defn- ->oauth-user [{:keys [id email]}]
-  {:email email
-   :sid [:bitbucket id]})
+  {:sid [:bitbucket id]})
 
 (defn- request-user-info [token]
   (when token 

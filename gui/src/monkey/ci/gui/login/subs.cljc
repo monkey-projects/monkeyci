@@ -1,11 +1,13 @@
 (ns monkey.ci.gui.login.subs
   (:require [monkey.ci.gui.login.db :as db]
+            [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
-(rf/reg-sub
- :login/submitting?
- (fn [db _]
-   (db/submitting? db)))
+(u/db-sub :login/submitting? db/submitting?)
+(u/db-sub :login/alerts db/alerts)
+(u/db-sub :login/token db/token)
+(u/db-sub :login/github-client-id (comp :client-id db/github-config))
+(u/db-sub :login/bitbucket-client-id (comp :client-id db/bitbucket-config))
 
 (rf/reg-sub
  :login/user
@@ -15,22 +17,3 @@
              (assoc :github gu)
              (merge (select-keys gu [:name :avatar-url]))))))
 
-(rf/reg-sub
- :login/alerts
- (fn [db _]
-   (db/alerts db)))
-
-(rf/reg-sub
- :login/token
- (fn [db _]
-   (db/token db)))
-
-(rf/reg-sub
- :login/token
- (fn [db _]
-   (db/token db)))
-
-(rf/reg-sub
- :login/github-client-id
- (fn [db _]
-   (:client-id (db/github-config db))))
