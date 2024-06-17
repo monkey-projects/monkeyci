@@ -206,6 +206,7 @@
 (deftest bitbucket-login--success
   ;; Safety
   (h/catch-fx :http-xhrio)
+  (h/catch-fx :route/goto)
   
   (testing "sets user in db"
     (rf/dispatch-sync [:login/bitbucket-login--success {:body {:id ::test-user}}])

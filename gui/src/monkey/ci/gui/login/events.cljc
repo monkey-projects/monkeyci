@@ -58,26 +58,31 @@
                   :on-failure [:github/load-user--failed]})
     :local-storage [storage-token-id (select-keys u [:github-token :token])]}))
 
+(defn- redirect-evt
+  "Constructs the event to dispatch to redirect to the desired destination after login."
+  [user local-storage]
+  (let [redir (:redirect-to local-storage)]
+    (log/debug "Redirect route:" redir)
+    (cond
+      (and redir (not= "/" redir))
+      ;; If a redirect path was stored, go there
+      [:route/goto-path redir]
+      ;; If the user only has one customer, go directly there
+      (= 1 (count (:customers user)))
+      [:route/goto :page/customer {:customer-id (first (:customers user))}]
+      ;; Any other case, go to the root page
+      :else
+      [:route/goto :page/root])))
+
 (rf/reg-event-fx
  :github/load-user--success
  [(rf/inject-cofx :local-storage storage-redir-id)]
  (fn [{:keys [db local-storage]} [_ github-user]]
-   (let [redir (:redirect-to local-storage)
-         u (db/user db)]
-     (log/debug "Redirect route:" redir)
+   (let [redir (:redirect-to local-storage)]
      (log/debug "Github user details:" #?(:cljs (clj->js github-user)
                                           :clj github-user))
      {:db (db/set-github-user db github-user)
-      :dispatch (cond
-                  (and redir (not= "/" redir))
-                  ;; If a redirect path was stored, go there
-                  [:route/goto-path redir]
-                  ;; If the user only has one customer, go directly there
-                  (= 1 (count (:customers u)))
-                  [:route/goto :page/customer {:customer-id (first (:customers u))}]
-                  ;; Any other case, go to the root page
-                  :else
-                  [:route/goto :page/root])
+      :dispatch (redirect-evt (db/user db) local-storage)
       :local-storage [storage-redir-id (dissoc local-storage :redirect-to)]})))
 
 (rf/reg-event-db
@@ -153,7 +158,7 @@
             (db/set-user (dissoc u :token :bitbucket-token))
             (db/set-token (:token u))
             (db/set-bitbucket-token bitbucket-token))
-    ;; TODO
+    ;; TODO Fetch user details
     ;; :http-xhrio (bitbucket/api-request
     ;;              db
     ;;              {:method :get
@@ -161,6 +166,7 @@
     ;;               :token bitbucket-token
     ;;               :on-success [:bitbucket/load-user--success]
     ;;               :on-failure [:bitbucket/load-user--failed]})
+    :dispatch (redirect-evt u local-storage)
     :local-storage [storage-token-id (select-keys u [:bitbucket-token :token])]}))
 
 (rf/reg-event-db
