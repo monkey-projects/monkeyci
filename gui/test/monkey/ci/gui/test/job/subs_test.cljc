@@ -87,3 +87,28 @@
       (is (nil? @a))
       (is (some? (reset! app-db (db/set-alerts {} path ::alerts))))
       (is (= ::alerts @a)))))
+
+(deftest job-test-cases
+  (let [tc (rf/subscribe [:job/test-cases])]
+    (testing "exists"
+      (is (some? tc)))
+
+    (testing "returns all tests cases from all suites"
+      (is (some? (reset! app-db (-> {}
+                                    (r/set-current
+                                     {:parameters
+                                      {:path
+                                       {:job-id "test-job"}}})
+                                    (bdb/set-build
+                                     {:script
+                                      {:jobs
+                                       {"test-job"
+                                        {:id "test-job"
+                                         :result {:monkey.ci/tests
+                                                  [{:name "test suite"
+                                                    :test-cases [{:name "case 1"}]}
+                                                   {:name "other suite"
+                                                    :test-cases [{:name "case 2"}]}]}}}}})))))
+      (is (= [{:name "case 1"}
+              {:name "case 2"}]
+             @tc)))))

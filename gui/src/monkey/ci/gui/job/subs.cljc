@@ -39,3 +39,10 @@
         :result
         first
         convert-result)))
+
+(rf/reg-sub
+ :job/test-cases
+ :<- [:job/current]
+ (fn [job _]
+   (->> (get-in job [:result :monkey.ci/tests])
+        (mapcat :test-cases))))

@@ -64,7 +64,7 @@
 (defn- test-results-details [tr]
   [:div
    [tr/timing-chart :test-timings tr]
-   [tr/test-results tr]])
+   [tr/test-results :test-results [:job/test-cases]]])
 
 (defn- test-results [job]
   (when-let [tr (get-in job [:result :monkey.ci/tests])]

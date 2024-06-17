@@ -3,6 +3,7 @@
   (:require [monkey.ci.gui.charts :as charts]
             [monkey.ci.gui.components :as co]
             [monkey.ci.gui.logging :as log]
+            [monkey.ci.gui.table :as t]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
@@ -17,16 +18,20 @@
 (defn- suite-rows [suite]
   (map test-row (:test-cases suite)))
 
-(defn test-results [suites]
-  [:table.table.table-striped
-   [:thead
-    [:tr
-     [:th "Test case"]
-     [:th "Result"]
-     [:th "Elapsed"]]]
-   (->> suites
-        (mapcat suite-rows)
-        (into [:tbody]))])
+(defn test-results
+  "Renders a paged table with given id that retrieves test result info from 
+   the specified sub."
+  [id tr-sub]
+  (letfn [(result-val [tc]
+            (co/build-result (if (success? tc) "success" "failure")) )]
+    [t/paged-table {:id id
+                    :items-sub tr-sub
+                    :columns [{:label "Test case"
+                               :value :test-case}
+                              {:label "Result"
+                               :value result-val}
+                              {:label "Elapsed"
+                               :value #(str (:time %) "s")}]}]))
 
 (def all-suites "$all$")
 
