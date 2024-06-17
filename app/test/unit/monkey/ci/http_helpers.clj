@@ -1,7 +1,6 @@
 (ns monkey.ci.http-helpers
   "Helper functions to work with http clients"
   (:require [aleph.http :as aleph]
-            [clojure.tools.logging :as log]
             [manifold.deferred :as md]))
 
 (defn- map->handler [[exp-req rep]]
@@ -18,8 +17,6 @@
 (defn with-fake-http* [mocks body-fn]
   (let [handlers (atom (map as-handler mocks))]
     (with-redefs [aleph/request (fn [req]
-                                  (log/debug "Mocks:" mocks)
-                                  (log/debug "Remaining handlers:" @handlers)
                                   (md/success-deferred
                                    (if-let [h (first @handlers)]
                                      (do

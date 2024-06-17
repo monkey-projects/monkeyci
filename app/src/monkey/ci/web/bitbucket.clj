@@ -3,7 +3,8 @@
   (:require [aleph.http :as http]
             [monkey.ci
              [config :as config]
-             [runtime :as rt]]
+             [runtime :as rt]
+             [utils :as u]]
             [monkey.ci.web
              [common :as c]
              [oauth2 :as oauth2]]
@@ -21,24 +22,24 @@
         {:keys [client-secret client-id]} (c/from-rt req (comp :github rt/config))]
     (-> @(http/post "https://bitbucket.org/site/oauth2/access_token"
                     {:form-params {:grant_type "authorization_code"
-                                   ;; :client_id client-id
-                                   ;; :client_secret client-secret
                                    :code code}
-                     :headers {"Accept" "application/json"}})
+                     :headers {"Accept" "application/json"
+                               "Authorization" (str "Basic " (u/->base64 (str client-id ":" client-secret)))}})
         (process-reply))))
 
 (defn- ->oauth-user [{:keys [id email]}]
   {:email email
-   :sid [:github id]})
+   :sid [:bitbucket id]})
 
 (defn- request-user-info [token]
-  (-> @(http/get "https://api.bitbucket.org/2.0/user"
-                 {:headers {"Accept" "application/json"
-                            "Authorization" (str "Bearer " token)}})
-      (process-reply)
-      ;; TODO Check for failures
-      :body
-      (->oauth-user)))
+  (when token 
+    (-> @(http/get "https://api.bitbucket.org/2.0/user"
+                   {:headers {"Accept" "application/json"
+                              "Authorization" (str "Bearer " token)}})
+        (process-reply)
+        ;; TODO Check for failures
+        :body
+        (->oauth-user))))
 
 (def login (oauth2/login-handler
             request-access-token

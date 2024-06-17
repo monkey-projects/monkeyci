@@ -8,7 +8,6 @@
             [clojure.test :refer [deftest testing is]]
             [clojure.core.async :as ca]
             [clojure.string :as cs]
-            [clojure.tools.logging :as log]
             [monkey.ci
              [artifacts :as a]
              [config :as config]
@@ -798,7 +797,7 @@
 
 (defn- matches-basic-auth? [req user pass]
   (let [prefix "Basic "]
-    (when-let [auth (get-in req [:headers "authorization"])]
+    (when-let [auth (get-in req [:headers "Authorization"])]
       (when (.startsWith auth prefix)
         (= (str user ":" pass) (-> (subs auth (count prefix))
                                    (h/base64->)))))))
@@ -808,7 +807,6 @@
     (with-fake-http [[{:url "https://bitbucket.org/site/oauth2/access_token"
                        :request-method :post}
                       (fn [req]
-                        (log/info "Handling:" req)
                         (cond
                           (not= {:grant_type "authorization_code"
                                  :code "1234"}
@@ -817,14 +815,18 @@
                           (not (matches-basic-auth? req "test-client-id" "test-secret"))
                           {:status 400 :body (str "Invalid auth code: " (:headers req))}
                           :else
-                          {:status 200 :body (h/to-raw-json {:access_token "test-token"})}))]
+                          {:status 200
+                           :body (h/to-raw-json {:access_token "test-token"})
+                           :headers {"content-type" "application/json"}}))]
                      [{:url "https://api.bitbucket.org/2.0/user"
                        :request-method :get}
                       (fn [req]
                         (let [auth (get-in req [:headers "Authorization"])]
                           (if (= "Bearer test-token" auth)
-                            {:status 200 :body (h/to-raw-json {:name "test-user"
-                                                               :other-key "other-value"})}
+                            {:status 200
+                             :body (h/to-raw-json {:name "test-user"
+                                                   :other-key "other-value"})
+                             :headers {"content-type" "application/json"}}
                             {:status 400 :body (str "invalid auth header: " auth)})))]]
       
       (let [app (-> (test-rt {:config {:github {:client-id "test-client-id"
@@ -833,12 +835,12 @@
                     (sut/make-app))
             r (-> (mock/request :post "/bitbucket/login?code=1234")
                   (app))]
-        (is (= 200 (:status r)) (slurp (:body r)))
+        (is (= 200 (:status r)))
         (is (= "test-token"
                (some-> (:body r)
-                       (slurp)
-                       (h/parse-json)
-                       :bitbucket-token))))))
+                         (slurp)
+                         (h/parse-json)
+                         :bitbucket-token))))))
 
   (testing "`GET /bitbucket/config` returns client id"
     (let [app (-> (test-rt {:config {:bitbucket {:client-id "test-client-id"}}})
