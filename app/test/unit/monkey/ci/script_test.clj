@@ -247,8 +247,13 @@
           f (sut/->EventFiringJob job)]
       (is (some? @(j/execute! f rt)))
       
-      (testing "start event has `start-time`"
-        (is (number? (-> @recv first :job :start-time))))
+      (testing "start event"
+        (let [job (-> @recv first :job)]
+          (testing "has `start-time`"
+            (is (number? (:start-time job))))
+          
+          (testing "marks job running"
+            (is (= :running (:status job))))))
 
       (testing "end event has `start-time` and `end-time`"
         (let [job (-> @recv second :job)]

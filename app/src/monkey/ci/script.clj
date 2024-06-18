@@ -78,7 +78,7 @@
       (log/debug "Executing event firing job:" (bc/job-id target))
       (md/chain
        (rt/post-events rt (job-start-evt (-> rt-with-job
-                                             (assoc-in [:job :start-time] st))))
+                                             (update :job assoc :start-time st :status :running))))
        (fn [_]
          ;; Catch both sync and async errors
          (try 
