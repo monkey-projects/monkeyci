@@ -30,8 +30,10 @@
      [co/path-breadcrumb]]]])
 
 (defn footer []
-  [:div.footer.border-top.mt-3
-   [:p "built by " [:a {:href "https://www.monkey-projects.be"} "Monkey Projects"]]])
+  (let [v (rf/subscribe [:version])]
+    [:div.footer.border-top.mt-3
+     [:span "built by " [:a {:href "https://www.monkey-projects.be"} "Monkey Projects"]]
+     [:span.float-end.small "version " @v]]))
 
 (defn error-boundary [target]
   (rc/create-class

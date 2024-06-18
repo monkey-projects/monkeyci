@@ -10,7 +10,7 @@
   (str "https://api.github.com" path))
 
 (defn api-request
-  "Builds an xhrio request map to acces"
+  "Builds an xhrio request map to send a request to Github api"
   [db {:keys [path] :as opts}]
   ;; TODO Handle pagination (see the `link` header)
   (cond-> (c/api-request db (-> opts

@@ -77,3 +77,13 @@
       (is (= {:url "/c/test-cust/r/test-repo/b/test-build/j/test-job"
               :name "test-job"}
              (last @p))))))
+
+(deftest version
+  (let [v (rf/subscribe [:version])]
+    (testing "exists"
+      (is (some? v)))
+
+    (testing "returns version from db"
+      (is (nil? @v))
+      (is (some? (reset! app-db {:version "test-version"})))
+      (is (= "test-version" @v)))))

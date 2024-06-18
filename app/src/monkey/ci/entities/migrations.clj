@@ -97,7 +97,7 @@
    (entity-table-migration
     5 :webhooks
     [repo-col
-     [:secret [:varchar 50] [:not nil]]
+     [:secret [:varchar 100] [:not nil]]
      fk-repo]
     [(col-idx :webhooks :repo-id)])
 

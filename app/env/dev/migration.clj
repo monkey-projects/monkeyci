@@ -103,10 +103,14 @@
 
 (defn- migrate-webhook [{:keys [src dest] :as state} id]
   (let [state (new-id-mapping state id)
-        in (s/find-webhook src (s/webhook-sid id))]
-    (s/save-webhook dest (-> in
-                             (update :customer-id (partial new-id state))
-                             (assoc :id (new-id state id))))
+        in (s/find-webhook src id)
+        mig-cust (new-id state (:customer-id in))]
+    (log/debug "Migrating webhook:" in)
+    (if (some? mig-cust)
+      (s/save-webhook dest (assoc in
+                                  :customer-id mig-cust
+                                  :id (new-id state id)))
+      (log/warn "Unable to migrate webhook" id ", no matching customer found for" (:customer-id in)))
     state))
 
 (defn- migrate-webhooks [{:keys [src] :as state}]
@@ -162,7 +166,7 @@
   "Runs migration from the configured storage to an in-memory h2 db"
   ([src]
    (let [dest (make-mem-db-storage)]
-     (em/run-migrations! (-> dest :conn :ds))
+     (em/run-migrations! (-> dest :conn))
      (migrate-to-storage src dest)))
   ([]
    (migrate-to-mem! (make-storage))))

@@ -244,6 +244,8 @@
           (is (some? (st/save-customer st cust)))
           (is (some? (st/save-user st user)))
           (is (some? (st/save-join-request st jr)))
+
+          (testing "`POST` returns 400 when user has already joined that customer")
           
           (testing "`GET` retrieves join requests for customer"
             (is (= [jr]

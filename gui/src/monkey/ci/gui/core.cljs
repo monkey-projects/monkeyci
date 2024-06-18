@@ -30,4 +30,5 @@
   (routing/start!)
   (rf/dispatch-sync [:initialize-db])
   (m/init)
+  (rf/dispatch [:core/load-version])
   (reload))

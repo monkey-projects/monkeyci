@@ -163,6 +163,11 @@
      :method :post
      :path-parts (conj repo-path "github/unwatch")
      :path-schema repo-schema})
+
+   (public-route
+    {:route-name :get-version
+     :method :get
+     :path-parts ["/version"]})
    
    (public-route
     {:route-name :github-login

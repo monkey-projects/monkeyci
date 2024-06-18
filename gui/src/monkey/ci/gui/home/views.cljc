@@ -32,6 +32,8 @@
         (into [:ul]))
    [join-cust-btn]])
 
+(def free-credits 1000)
+
 (defn customers []
   (let [c (rf/subscribe [:user/customers])]
     (when @c
@@ -45,7 +47,12 @@
            [:a {:href (r/path-for :page/customer-join)} "request to join an existing one"] "."]
           [:div
            [:span.me-2 [create-cust-btn]]
-           [join-cust-btn]]]
+           [join-cust-btn]]
+          [:p
+           "You can create one customer per user account.  Creating a customer is free, a "
+           "credit card is not required.  Each customer gets " free-credits " free credits per month. "
+           "One credit can be spent on one cpu minute, or one memory GB per minute. "
+           "You can join an unlimited number of customers."]]
          [linked-customers @c])])))
 
 (defn user-home [u]

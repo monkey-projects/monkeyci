@@ -32,3 +32,5 @@
        job-id
        (conj {:url (r/path-for :page/job p)
               :name job-id})))))
+
+(u/db-sub :version :version)

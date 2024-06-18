@@ -41,7 +41,7 @@
   (s/keys :req-un [:entity/customer-id :entity/name :display/id]
           :opt-un [:git/url :git/main-branch :entity/github-id :entity/labels]))
 
-(s/def :entity/repo-id ::c/cuid)
+(s/def :entity/repo-id string?)
 (s/def :entity/build-id string?)
 (s/def :entity/idx int?)
 
