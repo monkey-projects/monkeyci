@@ -85,14 +85,16 @@
     (testing "container"
       (let [c (first (:containers inst))]
         
-        (testing "uses app version if no tag configured"
-          (is (cs/ends-with? (-> conf
-                                 (dissoc :image-tag)
-                                 (sut/instance-config build rt)
-                                 :containers
-                                 first
-                                 :image-url)
-                             (mc/version))))
+        (testing "uses configured image tag"
+          (is (= "test-tag"
+                 (-> conf
+                     (assoc :image-tag "test-tag")
+                     (sut/instance-config build rt)
+                     :containers
+                     first
+                     :image-url
+                     (.split ":")
+                     last))))
         
         (testing "configures basic properties"
           (is (string? (:display-name c))))
@@ -226,6 +228,14 @@
   (testing "uses app version if no image tag configured"
     (is (= (mc/version)
            (-> {:runner {:type :oci}}
+               (r/normalize-runner-config)
+               :runner
+               :image-tag))))
+
+  (testing "formats using app version if format string specified"
+    (is (= (str "format-" (mc/version))
+           (-> {:runner {:type :oci
+                         :image-tag "format-%s"}}
                (r/normalize-runner-config)
                :runner
                :image-tag))))

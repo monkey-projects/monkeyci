@@ -105,6 +105,9 @@
   (doseq [[id r] repos]
     (upsert-repo conn r cust-id)))
 
+(defn- select-repo-display-ids [{:keys [conn]} cust-id]
+  (er/repo-display-ids conn cust-id))
+
 (defn- cust->db [cust]
   (-> cust
       (select-keys [:name])
@@ -609,6 +612,8 @@
     :unwatch unwatch-github-repo}
    :customer
    {:search select-customers}
+   :repo
+   {:list-display-ids select-repo-display-ids}
    :user
    {:find select-user
     :customers select-user-customers}

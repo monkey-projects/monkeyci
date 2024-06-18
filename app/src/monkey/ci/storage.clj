@@ -146,6 +146,15 @@
    (fn [s [cust-id repo-id] f & args]
      (apply update-obj s (customer-sid cust-id) update-in [:repos repo-id] f args))))
 
+(def list-repo-display-ids
+  "Lists all display ids for the repos for given customer"
+  (override-or
+   [:repo :list-display-ids]
+   (fn [s cust-id]
+     (->> (find-customer s cust-id)
+          :repos
+          keys))))
+
 (def ext-repo-sid (partial take-last 2))
 (def watched-sid (comp (partial global-sid :watched) str))
 

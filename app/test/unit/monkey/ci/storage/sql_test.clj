@@ -121,7 +121,10 @@
             (is (= "new-repo" (get-in (st/find-customer s (:id cust)) [:repos "new-repo" :id])))
             (let [repo (st/find-repo s sid)]
               (is (some? repo))
-              (is (= labels (:labels repo))))))))))
+              (is (= labels (:labels repo))))))
+
+        (testing "lists display ids"
+          (is (= ["test-repo" "new-repo"] (st/list-repo-display-ids s (:id cust)))))))))
 
 (deftest ^:sql watched-github-repos
   (with-storage conn s

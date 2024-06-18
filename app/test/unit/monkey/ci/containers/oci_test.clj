@@ -414,4 +414,12 @@
            (->> {:containers {:type :oci}}
                 (c/normalize-key :containers)
                 :containers
+                :image-tag))))
+
+  (testing "formats using app version when format string specified"
+    (is (= (str "test-format-" (c/version))
+           (->> {:containers {:type :oci
+                              :image-tag "test-format-%s"}}
+                (c/normalize-key :containers)
+                :containers
                 :image-tag)))))

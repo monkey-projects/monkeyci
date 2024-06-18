@@ -148,7 +148,6 @@
   [conf build rt]
   (let [tags (oci/sid->tags (b/sid build))]
     (-> conf
-        (update :image-tag #(or % (config/version)))
         (oci/instance-config)
         (assoc :display-name (b/build-id build))
         ;; TODO Reduce this after we use in-process build
@@ -207,7 +206,7 @@
 
 (defmethod r/normalize-runner-config :oci [conf]
   (-> (oci/normalize-config conf :runner)
-      (update-in [:runner :image-tag] #(or % (config/version)))
+      (update-in [:runner :image-tag] #(format (or % "%s") (config/version)))
       (update :runner config/group-keys :events)
       ;; FIXME This is highly dependent on the events implementation
       (update-in [:runner :events] config/group-keys :client)))

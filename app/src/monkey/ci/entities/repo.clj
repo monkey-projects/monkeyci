@@ -28,3 +28,11 @@
                           [:= :r.display-id display-id]]})
       (first)
       :id))
+
+(defn repo-display-ids [conn cust-id]
+  (->> (ec/select conn
+                  {:select [:r.display-id]
+                   :from [[:repos :r]]
+                   :join [[:customers :c] [:= :c.id :r.customer-id]]
+                   :where [:= :c.cuid cust-id]})
+       (map :display-id)))

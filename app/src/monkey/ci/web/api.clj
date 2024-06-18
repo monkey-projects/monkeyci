@@ -22,14 +22,13 @@
 
 (def body c/body)
 
-(defn- id-from-name
-  "Generates id from the object name.  It looks up the customer by `:customer-id`
-   and finds existing objects using `existing-from-cust` to avoid collisions."
-  [existing-from-cust st obj]
+(defn- gen-display-id
+  "Generates id from the object name.  It lists existing repository display ids
+   and generates an id from the name.  If the display id is already taken, it adds
+   an index."
+  [st obj]
   (let [existing? (-> (:customer-id obj)
-                      (as-> cid (st/find-customer st cid))
-                      (existing-from-cust obj)
-                      (keys)
+                      (as-> cid (st/list-repo-display-ids st cid))
                       (set))
         ;; TODO Check what happens with special chars
         new-id (csk/->kebab-case (:name obj))]
@@ -42,7 +41,7 @@
                (inc idx))
         id))))
 
-(def repo-id (partial id-from-name :repos))
+(def repo-id gen-display-id)
 
 (defn- repo->out [r]
   (dissoc r :customer-id))

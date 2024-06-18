@@ -3,25 +3,26 @@
             [clojure.string :as cs]
             [monkey.ci
              [config :as c]
+             [cuid :as cuid]
              [sid :as sid]
              [storage :as sut]]
             [monkey.ci.helpers :as h]))
 
 (deftest webhook-details
-  (testing "sid is a vector"
-    (is (vector? (sut/webhook-sid "test-id"))))
+  (testing "webhook-sid is a sid"
+    (is (sid/sid? (sut/webhook-sid "test-id"))))
   
   (testing "can create and find"
     (h/with-memory-store st
-      (let [id (str (random-uuid))
+      (let [id (cuid/random-cuid)
             d {:id id}]
-        (is (sid/sid? (sut/save-webhook-details st d)))
-        (is (= d (sut/find-details-for-webhook st id)))))))
+        (is (sid/sid? (sut/save-webhook st d)))
+        (is (= d (sut/find-webhook st id)))))))
 
 (deftest build-metadata
   (testing "can create and find"
     (h/with-memory-store st
-      (let [build-id (str (random-uuid))
+      (let [build-id (cuid/random-cuid)
             md {:build-id build-id
                 :repo-id "test-repo"
                 :customer-id "test-cust"}]
@@ -37,7 +38,7 @@
 (deftest build-results
   (testing "can create and find"
     (h/with-memory-store st
-      (let [build-id (str (random-uuid))
+      (let [build-id (cuid/random-cuid)
             md {:build-id build-id
                 :repo-id "test-repo"
                 :customer-id "test-cust"}]
