@@ -145,7 +145,10 @@
 
       (testing "can unwatch"
         (is (true? (st/unwatch-github-repo s [(:id cust) (:id repo)])))
-        (is (empty? (st/find-watched-github-repos s github-id)))))))
+        (is (empty? (st/find-watched-github-repos s github-id))))
+
+      (testing "empty if no matches"
+        (is (empty? (st/find-watched-github-repos s 12432)))))))
 
 (deftest ^:sql ssh-keys
   (with-storage conn s

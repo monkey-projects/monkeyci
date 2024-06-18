@@ -579,13 +579,14 @@
 (defn select-watched-github-repos [{:keys [conn]} github-id]
   (let [matches (ec/select-repos conn [:= :github-id github-id])
         ;; Select all customer records for the repos
-        customers (->> matches
-                       (map :customer-id)
-                       (distinct)
-                       (vector :in :id)
-                       (ec/select-customers conn)
-                       (group-by :id)
-                       (mc/map-vals first))
+        customers (when (not-empty matches)
+                    (->> matches
+                         (map :customer-id)
+                         (distinct)
+                         (vector :in :id)
+                         (ec/select-customers conn)
+                         (group-by :id)
+                         (mc/map-vals first)))
         add-cust-cuid (fn [r e]
                         (assoc r :customer-id (str (get-in customers [(:customer-id e) :cuid]))))
         convert (fn [e]

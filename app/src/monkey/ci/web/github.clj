@@ -54,7 +54,7 @@
    (validate-security h (fn [req]
                           ;; Find the secret key by looking up the webhook from storage
                           (some-> (c/req->storage req)
-                                  (s/find-details-for-webhook (req->webhook-id req))
+                                  (s/find-webhook (req->webhook-id req))
                                   :secret-key)))))
 
 (defn github-event [req]
@@ -111,7 +111,7 @@
       (assoc build :sid (s/ext-build-sid build)))))
 
 (defn create-webhook-build [{st :storage :as rt} id payload]
-  (if-let [details (s/find-details-for-webhook st id)]
+  (if-let [details (s/find-webhook st id)]
     (create-build
      rt
      (-> details
