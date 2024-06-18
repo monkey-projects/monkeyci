@@ -37,7 +37,7 @@
   (let [job-id (:id job)]
     (log/debug "Updating job for sid" sid ":" job-id)
     (if-let [build (st/find-build storage sid)]
-      (save-build storage sid (assoc-in build [:script :jobs job-id] job))
+      (save-build storage sid (assoc-in build [:script :jobs job-id] (update job :status #(or % :running))))
       (log/warn "Build not found when updating job:" sid))))
 
 (def update-handlers

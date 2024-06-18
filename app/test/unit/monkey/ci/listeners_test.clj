@@ -117,20 +117,36 @@
           (is (= 200 (:end-time job))))))))
 
 (deftest update-job
-  (testing "patches build script with job info"
-    (h/with-memory-store st
-      (let [{:keys [sid] :as build} (test-build)
-            stored-build (dissoc build :sid)
-            evt {:type :job/start
-                 :sid sid
-                 :job {:id "test-job"
-                       :start-time 120}
-                 :message "Starting job"}]
-        (is (st/sid? (st/save-build st stored-build)))
-        (is (= sid (:sid (sut/update-job st evt))))
-        (is (= (:job evt)
-               (-> (st/find-build st sid)
-                   (get-in [:script :jobs "test-job"]))))))))
+  (h/with-memory-store st
+    (let [{:keys [sid] :as build} (test-build)
+          stored-build (dissoc build :sid)]
+      
+      (is (st/sid? (st/save-build st stored-build)))
+      
+      (testing "patches build script with job info"
+        (let [job {:id "test-job"
+                   :start-time 120
+                   :status :success}
+              evt {:type :job/start
+                   :sid sid
+                   :job job
+                   :message "Starting job"}]
+          (is (= sid (:sid (sut/update-job st evt))))
+          (is (= job
+                 (-> (st/find-build st sid)
+                     (get-in [:script :jobs "test-job"]))))))
+
+      (testing "marks running when no status"
+        (let [evt {:type :job/start
+                   :sid sid
+                   :job {:id "running-job"
+                         :start-time 120}
+                   :message "Starting job"}]
+          (is (= sid (:sid (sut/update-job st evt))))
+          (is (= :running
+                 (-> (st/find-build st sid)
+                     (get-in [:script :jobs "running-job"])
+                     :status))))))))
 
 (deftest build-update-handler
   (testing "creates a fn"
