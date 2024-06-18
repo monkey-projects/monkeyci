@@ -153,10 +153,31 @@
                               (partial conj repo-sid))
                         build-ids)]
         (doseq [b builds]
-          (let [sid (conj repo-sid b)]
-            (is (sid/sid? (sut/save-build st b)))))
+          (is (sid/sid? (sut/save-build st b))))
         (let [l (sut/find-latest-build st repo-sid)]
           (is (= (last builds) l)))))))
+
+(deftest find-next-build-idx
+  (testing "max build idx plus one for this repo"
+    (h/with-memory-store st
+      (let [repo-sid (sid/->sid (repeatedly 2 cuid/random-cuid))
+            build-ids (->> (range)
+                           (map (partial format "build-%d"))
+                           (take 2))
+            builds (->> (range)
+                        (map (fn [idx]
+                               (-> (zipmap [:customer-id :repo-id :build-id]
+                                           (conj repo-sid (format "build-%d" idx)))
+                                   (assoc :idx (inc idx)))))
+                        (take 10))]
+        (doseq [b builds]
+          (is (sid/sid? (sut/save-build st b))))
+        (is (= (->> builds
+                    (map :idx)
+                    sort
+                    last
+                    inc)
+               (sut/find-next-build-idx st repo-sid)))))))
 
 (deftest save-ssh-keys
   (testing "writes ssh keys object"

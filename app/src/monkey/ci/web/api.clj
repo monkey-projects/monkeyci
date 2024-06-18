@@ -301,7 +301,8 @@
   [{p :parameters :as req} bid]
   (let [acc (:path p)
         st (c/req->storage req)
-        repo (st/find-repo st (repo-sid req))
+        repo-sid (repo-sid req)
+        repo (st/find-repo st repo-sid)
         ssh-keys (->> (st/find-ssh-keys st (customer-id req))
                       (lbl/filter-by-label repo))
         rt (c/req->rt req)]
@@ -309,6 +310,7 @@
         (select-keys [:customer-id :repo-id])
         (assoc :source :api
                :build-id bid
+               :idx (st/find-next-build-idx st repo-sid)
                :git (-> (:query p)
                         (select-keys [:commit-id :branch])
                         (assoc :url (:url repo)

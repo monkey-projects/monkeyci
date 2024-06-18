@@ -666,6 +666,14 @@
              (is (some? build))
              (is (= :api (:source build)))
              (is (= "refs/heads/test-branch" (get-in build [:git :ref])))))))
+
+      (testing "assigns index to build"
+        (verify-runner
+         "/trigger"
+         (fn [{:keys [runner-args] st :storage}]
+           (let [bsid (:sid @runner-args)
+                 build (st/find-build st bsid)]
+             (is (number? (:idx build)))))))
       
       (testing "returns build id"
         (with-repo

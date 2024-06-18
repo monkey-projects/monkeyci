@@ -84,11 +84,11 @@
   "Looks up details for the given github webhook.  If the webhook refers to a valid 
    configuration, a build entity is created and a build structure is returned, which
    eventually will be passed on to the runner."
-  [{st :storage :as rt} init-build payload]
+  [{st :storage :as rt} {:keys [customer-id repo-id] :as init-build} payload]
   (let [{:keys [master-branch clone-url ssh-url private]} (:repository payload)
         build-id (u/new-build-id)
         commit-id (get-in payload [:head-commit :id])
-        ssh-keys (find-ssh-keys st (:customer-id init-build) (:repo-id init-build))
+        ssh-keys (find-ssh-keys st customer-id repo-id)
         build (-> init-build
                   (assoc :git (-> payload
                                   :head-commit
@@ -104,6 +104,7 @@
                          :start-time (u/now)
                          :status :running
                          :build-id build-id
+                         :idx (s/find-next-build-idx st [customer-id repo-id])
                          :cleanup? true
                          :changes (file-changes payload)))]
     (when (s/save-build st build)

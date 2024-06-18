@@ -68,63 +68,62 @@
 
 (deftest ^:sql repos
   (with-storage conn s
-    (testing "repos"
-      (let [repo {:name "test repo"
-                  :id "test-repo"}
-            lbl (str "test-label-" (cuid/random-cuid))
-            cust (-> (h/gen-cust)
-                     (assoc-in [:repos (:id repo)] repo))
-            sid [(:id cust) (:id repo)]]
-        
-        (testing "saved with customer"
-          (is (sid/sid? (st/save-customer s cust)))
-          (is (= (assoc repo :customer-id (:id cust))
-                 (st/find-repo s sid))))
+    (let [repo {:name "test repo"
+                :id "test-repo"}
+          lbl (str "test-label-" (cuid/random-cuid))
+          cust (-> (h/gen-cust)
+                   (assoc-in [:repos (:id repo)] repo))
+          sid [(:id cust) (:id repo)]]
+      
+      (testing "saved with customer"
+        (is (sid/sid? (st/save-customer s cust)))
+        (is (= (assoc repo :customer-id (:id cust))
+               (st/find-repo s sid))))
 
-        (testing "saved with `save-repo`"
-          (let [r (assoc repo :customer-id (:id cust))
-                sid (vec (take-last 2 (st/save-repo s r)))]
-            (is (sid/sid? sid))
-            (is (= [(:id cust) (:id repo)] sid))
-            (is (= r (st/find-repo s sid)))))
+      (testing "saved with `save-repo`"
+        (let [r (assoc repo :customer-id (:id cust))
+              sid (vec (take-last 2 (st/save-repo s r)))]
+          (is (sid/sid? sid))
+          (is (= [(:id cust) (:id repo)] sid))
+          (is (= r (st/find-repo s sid)))))
 
-        (testing "can add labels"
-          (let [labels [{:name lbl
-                         :value "test value"}]]
-            (is (sid/sid? (st/update-repo s sid assoc :labels labels)))
-            (is (= labels (-> (st/find-repo s sid)
-                              :labels)))
-            (is (= 1 (count (ec/select-repo-labels conn [:= :name lbl]))))))
+      (testing "can add labels"
+        (let [labels [{:name lbl
+                       :value "test value"}]]
+          (is (sid/sid? (st/update-repo s sid assoc :labels labels)))
+          (is (= labels (-> (st/find-repo s sid)
+                            :labels)))
+          (is (= 1 (count (ec/select-repo-labels conn [:= :name lbl]))))))
 
-        (testing "can update labels"
-          (let [labels [{:name lbl
-                         :value "updated value"}]]
-            (is (sid/sid? (st/update-repo s sid assoc :labels labels)))
-            (is (= labels (-> (st/find-repo s sid)
-                              :labels)))
-            (is (= 1 (count (ec/select-repo-labels conn [:= :name lbl]))))))
+      (testing "can update labels"
+        (let [labels [{:name lbl
+                       :value "updated value"}]]
+          (is (sid/sid? (st/update-repo s sid assoc :labels labels)))
+          (is (= labels (-> (st/find-repo s sid)
+                            :labels)))
+          (is (= 1 (count (ec/select-repo-labels conn [:= :name lbl]))))))
 
-        (testing "can remove labels"
-          (is (sid/sid? (st/update-repo s sid dissoc :labels)))
-          (is (empty? (ec/select-repo-labels conn [:= :name lbl]))))
+      (testing "can remove labels"
+        (is (sid/sid? (st/update-repo s sid dissoc :labels)))
+        (is (empty? (ec/select-repo-labels conn [:= :name lbl]))))
 
-        (testing "creates labels on new repo"
-          (let [labels [{:name "test-label"
-                         :value "test value"}]
-                saved-sid (st/save-repo s {:name "new repo"
-                                           :id "new-repo"
-                                           :customer-id (:id cust)
-                                           :labels labels})
-                sid [(:id cust) "new-repo"]]
-            (is (= sid (take-last 2 saved-sid)))
-            (is (= 1 (count (ec/select-repo-labels conn [:= :name "test-label"]))))
-            (is (= "new-repo" (get-in (st/find-customer s (:id cust)) [:repos "new-repo" :id])))
-            (let [repo (st/find-repo s sid)]
-              (is (some? repo))
-              (is (= labels (:labels repo))))))
+      (testing "creates labels on new repo"
+        (let [labels [{:name "test-label"
+                       :value "test value"}]
+              saved-sid (st/save-repo s {:name "new repo"
+                                         :id "new-repo"
+                                         :customer-id (:id cust)
+                                         :labels labels})
+              sid [(:id cust) "new-repo"]]
+          (is (= sid (take-last 2 saved-sid)))
+          (is (= 1 (count (ec/select-repo-labels conn [:= :name "test-label"]))))
+          (is (= "new-repo" (get-in (st/find-customer s (:id cust)) [:repos "new-repo" :id])))
+          (let [repo (st/find-repo s sid)]
+            (is (some? repo))
+            (is (= labels (:labels repo))))))
 
-        (testing "lists display ids"
-          (is (= ["test-repo" "new-repo"] (st/list-repo-display-ids s (:id cust)))))))))
+      (testing "lists display ids"
+        (is (= ["test-repo" "new-repo"] (st/list-repo-display-ids s (:id cust))))))))
 
 (deftest ^:sql watched-github-repos
   (with-storage conn s
@@ -284,7 +283,20 @@
 
       (testing "can list with details, excluding jobs"
         (is (= [(update build :script dissoc :jobs)]
-               (st/list-builds-with-details s (take 2 build-sid))))))))
+               (st/list-builds-with-details s (take 2 build-sid)))))
+
+      (testing "can get next idx"
+        (let [repo (-> (h/gen-repo)
+                       (assoc :customer-id (:id cust)))
+              repo-sid [(:id cust) (:id repo)]]
+          (is (some? (st/save-repo s repo)))
+          (is (= 1 (st/find-next-build-idx s repo-sid))
+              "initial index is one")
+          (is (some? (st/save-build s (-> (h/gen-build)
+                                          (assoc :customer-id (:id cust)
+                                                 :repo-id (:id repo)
+                                                 :idx 100)))))
+          (is (= 101 (st/find-next-build-idx s repo-sid))))))))
 
 (deftest ^:sql join-requests
   (with-storage conn s

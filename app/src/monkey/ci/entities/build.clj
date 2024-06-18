@@ -37,3 +37,10 @@
                   :join [[:customers :c] [:= :c.id :r.customer-id]]
                   :where [:= :r.id repo-id]})
       (first)))
+
+(defn select-max-idx [conn cust-cuid repo-id]
+  (-> (ec/select conn
+                 (-> (build-query cust-cuid repo-id)
+                     (assoc :select [[:%max.idx :last]])))
+      first
+      :last))

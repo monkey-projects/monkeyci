@@ -21,8 +21,6 @@
    that will complete when the build finishes."
   [rt]
   (let [r (:runner rt)]
-    #_(report-evt ctx {:type :script/start})
-    #_(register-all-handlers event-bus (:handlers acc))
     (try
       (-> rt
           (b/make-build-ctx)

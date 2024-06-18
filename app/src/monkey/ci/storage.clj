@@ -405,3 +405,16 @@
    [:join-request :delete]
    (fn [s id]
      (p/delete-obj s (join-request-sid id)))))
+
+(def find-next-build-idx
+  "Retrieves the next integer build index to use.  This is supposed to be the highest
+   build index + 1."
+  (override-or
+   [:repo :find-next-build-idx]
+   (fn [s repo-sid]
+     (or (some->> (list-builds-with-details s repo-sid)
+                  (map :idx)
+                  sort
+                  last
+                  inc)
+         1))))

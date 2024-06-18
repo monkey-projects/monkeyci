@@ -471,6 +471,9 @@
 (defn- select-repo-builds [conn sid]
   (apply eb/select-build-ids-for-repo conn sid))
 
+(defn- select-max-build-idx [{:keys [conn]} [cust-id repo-id]]
+  (eb/select-max-idx conn cust-id repo-id))
+
 (def join-request? (partial global-sid? st/join-requests))
 
 (defn- insert-join-request [conn jr]
@@ -614,7 +617,8 @@
    :customer
    {:search select-customers}
    :repo
-   {:list-display-ids select-repo-display-ids}
+   {:list-display-ids select-repo-display-ids
+    :find-next-build-idx (comp (fnil inc 0) select-max-build-idx)}
    :user
    {:find select-user
     :customers select-user-customers}

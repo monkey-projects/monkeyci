@@ -307,7 +307,21 @@
                                           (:id wh)
                                           {:ref "test-ref"
                                            :repository {:master-branch "test-main"}})]
-          (is (true? (:cleanup? r))))))))
+          (is (true? (:cleanup? r)))))))
+
+  (testing "assigns idx"
+    (h/with-memory-store s
+      (let [wh (test-webhook)
+            cid (:customer-id wh)
+            rid (:repo-id wh)]
+        (is (st/sid? (st/save-webhook s wh)))
+        (is (st/sid? (st/save-repo s {:customer cid
+                                      :id rid})))
+        (let [r (sut/create-webhook-build {:storage s}
+                                          (:id wh)
+                                          {:ref "test-ref"
+                                           :repository {:master-branch "test-main"}})]
+          (is (number? (:idx r))))))))
 
 (defn- with-github-user
   "Sets up fake http communication with github to return the given user"
