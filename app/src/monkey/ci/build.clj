@@ -64,7 +64,8 @@
   (= build-sid-length (count sid)))
 
 (defn make-build-ctx
-  "Creates a build context that can be added to the runtime."
+  "Creates a build context that can be added to the runtime.  This is used when
+   running a build from cli."
   [rt]
   (let [work-dir (rt/work-dir rt)
         orig-sid (or (some->> (:sid (rt/args rt))
@@ -72,6 +73,8 @@
                               (take build-sid-length))
                      (get-sid rt))
         ;; Either generate a new build id, or use the one given
+        ;; TODO Get rid of deprecated timestamp based build id and either
+        ;; assign a 'local' id, or ask the api to reserve a new index.
         sid (sid/->sid (if (or (empty? orig-sid) (includes-build-id? orig-sid))
                          orig-sid
                          (concat orig-sid [(u/new-build-id)])))

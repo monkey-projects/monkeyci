@@ -78,7 +78,8 @@
   [dir]
   (FileUtils/deleteDirectory (io/file dir)))
 
-(defn new-build-id []
+;; Use build index instead
+(defn ^:deprecated new-build-id []
   ;; TODO Generate a more unique build id
   (format "build-%d" (System/currentTimeMillis)))
 

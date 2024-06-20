@@ -238,7 +238,7 @@
     (let [{st :storage :as rt} (h/test-rt)
           wh {:id (st/new-id)
               :secret-key "very secret key"}
-          _ (st/save-webhook-details st wh)
+          _ (st/save-webhook st wh)
           r (-> rt
                 (h/->req)
                 (h/with-path-param :webhook-id (:id wh))

@@ -298,10 +298,12 @@
 
 (defn make-build-ctx
   "Creates a build object from the request"
-  [{p :parameters :as req} bid]
+  [{p :parameters :as req}]
   (let [acc (:path p)
         st (c/req->storage req)
         repo-sid (repo-sid req)
+        idx (st/find-next-build-idx st repo-sid)
+        bid (str "build-" idx)
         repo (st/find-repo st repo-sid)
         ssh-keys (->> (st/find-ssh-keys st (customer-id req))
                       (lbl/filter-by-label repo))
@@ -310,7 +312,7 @@
         (select-keys [:customer-id :repo-id])
         (assoc :source :api
                :build-id bid
-               :idx (st/find-next-build-idx st repo-sid)
+               :idx idx
                :git (-> (:query p)
                         (select-keys [:commit-id :branch])
                         (assoc :url (:url repo)
@@ -329,16 +331,15 @@
   (let [{p :parameters} req]
     ;; TODO If no branch is specified, use the default
     (let [acc (:path p)
-          bid (u/new-build-id)
           st (c/req->storage req)
           runner (c/from-rt req :runner)
-          build (make-build-ctx req bid)]
+          build (make-build-ctx req)]
       (log/debug "Triggering build for repo sid:" (repo-sid req))
       (if (st/save-build st build)
         (do
           ;; Trigger the build but don't wait for the result
           (c/run-build-async (c/req->rt req) build)
-          (-> (rur/response {:build-id bid})
+          (-> (rur/response (select-keys build [:build-id]))
               (rur/status 202)))
         (-> (rur/response {:message "Unable to create build"})
             (rur/status 500))))))

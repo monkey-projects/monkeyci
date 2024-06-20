@@ -674,6 +674,15 @@
            (let [bsid (:sid @runner-args)
                  build (st/find-build st bsid)]
              (is (number? (:idx build)))))))
+
+      (testing "build id incorporates index"
+        (verify-runner
+         "/trigger"
+         (fn [{:keys [runner-args] st :storage}]
+           (let [bsid (:sid @runner-args)
+                 build (st/find-build st bsid)]
+             (is (= (str "build-" (:idx build))
+                    (:build-id build)))))))
       
       (testing "returns build id"
         (with-repo

@@ -321,7 +321,8 @@
                                           (:id wh)
                                           {:ref "test-ref"
                                            :repository {:master-branch "test-main"}})]
-          (is (number? (:idx r))))))))
+          (is (number? (:idx r)))
+          (is (= (str "build-" (:idx r)) (:build-id r))))))))
 
 (defn- with-github-user
   "Sets up fake http communication with github to return the given user"

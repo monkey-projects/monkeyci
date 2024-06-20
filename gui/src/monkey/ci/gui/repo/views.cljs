@@ -89,8 +89,8 @@
        [table/paged-table
         {:id ::builds
          :items-sub [:repo/builds]
-         :columns [{:label "Id"
-                    :value (fn [b] [:a {:href (r/path-for :page/build b)} (:build-id b)])}
+         :columns [{:label "Build"
+                    :value (fn [b] [:a {:href (r/path-for :page/build b)} (:idx b)])}
                    {:label "Time"
                     :value (fn [b]
                              [:span.text-nowrap (t/reformat (:start-time b))])}
