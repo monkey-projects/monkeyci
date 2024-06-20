@@ -411,7 +411,7 @@
            (-> (h/test-rt)
                (h/->req)
                (assoc-in [:parameters :query :branch] "test-branch")
-               (sut/make-build-ctx "test-build")
+               (sut/make-build-ctx)
                :git
                :ref))))
 
@@ -420,7 +420,7 @@
            (-> (h/test-rt)
                (h/->req)
                (assoc-in [:parameters :query :tag] "test-tag")
-               (sut/make-build-ctx "test-build")
+               (sut/make-build-ctx)
                :git
                :ref))))
 
@@ -434,7 +434,7 @@
              (-> (h/->req rt)
                  (assoc-in [:parameters :path] {:customer-id cid
                                                 :repo-id rid})
-                 (sut/make-build-ctx "test-build")
+                 (sut/make-build-ctx)
                  :git
                  :ssh-keys)))))
 
@@ -448,21 +448,19 @@
              (-> (h/->req rt)
                  (assoc-in [:parameters :path] {:customer-id cid
                                                 :repo-id rid})
-                 (sut/make-build-ctx "test-build")
+                 (sut/make-build-ctx)
                  :git
                  :main-branch)))))
 
   (testing "sets cleanup flag when not in dev mode"
     (is (true? (:cleanup? (sut/make-build-ctx (-> (h/test-rt)
                                                   (assoc-in [:config :dev-mode] false)
-                                                  (h/->req))
-                                              "test-build")))))
+                                                  (h/->req)))))))
 
   (testing "does not set cleanup flag when in dev mode"
     (is (false? (:cleanup? (sut/make-build-ctx (-> (h/test-rt)
                                                    (assoc-in [:config :dev-mode] true)
-                                                   (h/->req))
-                                               "test-build"))))))
+                                                   (h/->req))))))))
 
 (deftest update-user
   (testing "updates user in storage"
