@@ -472,6 +472,7 @@
   (apply eb/select-build-ids-for-repo conn sid))
 
 (defn- select-max-build-idx [{:keys [conn]} [cust-id repo-id]]
+  ;; TODO Use repo-indices table instead
   (eb/select-max-idx conn cust-id repo-id))
 
 (def join-request? (partial global-sid? st/join-requests))
