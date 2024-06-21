@@ -172,7 +172,13 @@
      fk-customer
      fk-user]
     [(col-idx :join-requests :customer-id)
-     (col-idx :join-requests :user-id)])])
+     (col-idx :join-requests :user-id)])
+
+   (table-migration
+    14 :repo-indices
+    [[:repo-id :integer [:not nil] [:primary-key]]
+     (fk :repo-id :repos :id)]
+    [])])
 
 (defn- format-migration [sql-opts m]
   (letfn [(format-sql [stmt]
