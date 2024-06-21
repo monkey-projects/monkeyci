@@ -1,0 +1,8 @@
+// The url to contact for api calls
+//const apiRoot = "http://localhost:3000";
+//const apiRoot = "https://api.internal.staging.monkeyci.com";
+//const apiRoot = "https://api.internal.monkeyci.com";
+const apiRoot = "https://api.staging.monkeyci.com/v1";
+//const eventsRoot = "http://localhost:3000";
+
+const logUrl = "https://logs.monkeyci.com/loki/api/v1";
