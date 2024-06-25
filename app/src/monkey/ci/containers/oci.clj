@@ -347,12 +347,12 @@
                              (first))]
            (log/debug "Containers:" containers)
            ;; Either return the first error result, or the result of the job container
-           (-> (or nonzero job-cont)
-               :result
-               ;; FIXME This doesn't belong here
-               (assoc :credit-multiplier (credit-multiplier job)))))))))
+           (:result (or nonzero job-cont))))))))
 
 (defmethod mcc/normalize-containers-config :oci [conf]
   (-> (oci/normalize-config conf :containers)
       ;; Take app version if no image version specified
       (update-in [:containers :image-tag] #(format (or % "%s") (c/version)))))
+
+(defmethod mcc/credit-multiplier-fn :oci [_]
+  credit-multiplier)

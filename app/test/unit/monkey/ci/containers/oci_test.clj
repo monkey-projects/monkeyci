@@ -426,17 +426,7 @@
       (is (= 123 (-> (mcc/run-container {:containers {:type :oci}
                                          :build {:checkout-dir "/tmp"}})
                      (deref)
-                     :exit)))))
-
-  (testing "returns credit multiplier"
-    (with-redefs [oci/run-instance (constantly (md/success-deferred
-                                                {:status 200
-                                                 :body {:containers [{:display-name sut/job-container-name
-                                                                      :result {:exit 0}}]}}))]
-      (is (= 3 (-> (mcc/run-container {:containers {:type :oci}
-                                       :build {:checkout-dir "/tmp"}})
-                   (deref)
-                   :credit-multiplier))))))
+                     :exit))))))
 
 (deftest normalize-key
   (testing "merges with oci"

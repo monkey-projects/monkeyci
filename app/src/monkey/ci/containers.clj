@@ -22,6 +22,11 @@
        (mc/map-keys (comp keyword name))
        (update-env)))
 
+(defmulti credit-multiplier-fn (comp :type :containers))
+
+(defmethod credit-multiplier-fn :default [_]
+  (constantly 0))
+
 ;;; Configuration handling
 
 (defmulti normalize-containers-config (comp :type :containers))
@@ -34,7 +39,8 @@
 
 (defmethod rt/setup-runtime :containers [conf _]
   ;; Just return the config, will be reworked later to be more consistent with other runtimes
-  (get conf :containers))
+  (-> (get conf :containers)
+      (assoc :credit-consumer (credit-multiplier-fn conf))))
 
 (def image :image)
 (def env :container/env)

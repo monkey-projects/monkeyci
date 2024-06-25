@@ -253,7 +253,10 @@
             (is (number? (:start-time job))))
           
           (testing "marks job running"
-            (is (= :running (:status job))))))
+            (is (= :running (:status job))))
+
+          (testing "contains `credit-multiplier`"
+            (is (number? (:credit-multiplier job))))))
 
       (testing "end event has `start-time` and `end-time`"
         (let [job (-> @recv second :job)]
