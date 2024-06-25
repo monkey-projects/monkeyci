@@ -8,7 +8,9 @@
              [cuid :as cuid]
              [protocols :as p]
              [storage :as s]]
-            [monkey.ci.entities.migrations :as em]))
+            [monkey.ci.entities
+             [core :as ec]
+             [migrations :as em]]))
 
 (defn- migrate-dir [p sid st]
   (let [files (seq (.listFiles p))
@@ -174,3 +176,27 @@
 (defn close-dest [{:keys [dest customers]}]
   (some-> dest :conn :ds .close)
   customers)
+
+(defn reindex-builds
+  "Reindexes all builds from all repos.  This to fix an earlier migration issue
+   where builds were not sorted by timestamp.  Also, a number of builds have
+   a zero index because the functionality was not implemented yet."
+  [st]
+  (let [builds (ec/select (:conn st)
+                          {:select [:id :repo-id :start-time :idx]
+                           :from [:builds]})
+        by-repo (group-by :repo-id builds)
+        update-build-idx (fn [{:keys [id idx]}]
+                           (ec/update-entity (:conn st)
+                                             :builds
+                                             {:idx idx
+                                              :id id}))]
+    (log/info "Found" (count builds) "builds to reindex")
+    (doseq [l (vals by-repo)]
+      (->> l
+           (sort-by :start-time)
+           (map-indexed (fn [i b]
+                          (assoc b :idx (inc i))))
+           (map update-build-idx)
+           (doall)))
+    (log/info "Done.")))
