@@ -228,7 +228,7 @@
                     (assoc r
                            (job-id j)
                            (md/chain
-                            ;; Ensure this execute async by wrapping it in a future
+                            ;; Ensure this executes async by wrapping it in a future
                             (md/future (execute! j (assoc-in rt [:build :jobs] state)))
                             (partial vector j))))
                   {}

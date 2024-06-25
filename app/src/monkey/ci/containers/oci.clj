@@ -349,6 +349,7 @@
            ;; Either return the first error result, or the result of the job container
            (-> (or nonzero job-cont)
                :result
+               ;; FIXME This doesn't belong here
                (assoc :credit-multiplier (credit-multiplier job)))))))))
 
 (defmethod mcc/normalize-containers-config :oci [conf]
