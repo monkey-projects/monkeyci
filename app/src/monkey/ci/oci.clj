@@ -215,6 +215,9 @@
   [{ads :availability-domains ad :availability-domain}]
   (or ad (when ads (nth (vec ads) (rand-int (count ads))))))
 
+(def default-cpu-count 1)
+(def default-memory-gb 2)
+
 (defn instance-config
   "Generates a skeleton instance configuration, generated from the oci configuration."
   [conf]
@@ -222,8 +225,8 @@
       (select-keys [:compartment-id :image-pull-secrets :vnics :freeform-tags])
       (assoc :container-restart-policy "NEVER"
              :shape "CI.Standard.A1.Flex" ; Use ARM shape, it's cheaper
-             :shape-config {:ocpus 1
-                            :memory-in-g-bs 2}
+             :shape-config {:ocpus default-cpu-count
+                            :memory-in-g-bs default-memory-gb}
              :availability-domain (pick-ad conf)
              :volumes [{:name checkout-vol
                         :volume-type "EMPTYDIR"

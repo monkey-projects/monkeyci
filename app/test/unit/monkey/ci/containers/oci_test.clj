@@ -82,6 +82,43 @@
                  :shape-config
                  :memory-in-g-bs)))))
 
+  (testing "pod architecture"
+    (testing "has default value"
+      (is (= "CI.Standard.A1.Flex"
+             (-> (sut/instance-config {} default-rt)
+                 :shape))))
+
+    (testing "can choose ARM"
+      (is (= "CI.Standard.A1.Flex"
+             (-> (sut/instance-config {} (assoc-in default-rt
+                                                   [:job :arch] :arm))
+                 :shape))))
+
+    (testing "can choose AMD"
+      (is (= "CI.Standard.E4.Flex"
+             (-> (sut/instance-config {} (assoc-in default-rt
+                                                   [:job :arch] :amd))
+                 :shape)))))
+
+  (testing "pod cpus"
+    (testing "has default value"
+      (is (number? (-> (sut/instance-config {} default-rt)
+                       :shape-config
+                       :ocpus))))
+
+    (testing "can specify custom cpus limit"
+      (is (= 4 (-> (sut/instance-config {} (-> default-rt
+                                               (assoc-in [:job :cpus] 4)))
+                   :shape-config
+                   :ocpus))))
+
+    (testing "limited to max cpus"
+      (is (= sut/max-pod-cpus
+             (-> (sut/instance-config {} (-> default-rt
+                                             (assoc-in [:job :cpus] 10000)))
+                 :shape-config
+                 :ocpus)))))
+  
   (testing "job container"
     (let [jc (->> {:job {:script ["first" "second"]
                          :container/env {"TEST_ENV" "test-val"}
@@ -389,7 +426,17 @@
       (is (= 123 (-> (mcc/run-container {:containers {:type :oci}
                                          :build {:checkout-dir "/tmp"}})
                      (deref)
-                     :exit))))))
+                     :exit)))))
+
+  (testing "returns credit multiplier"
+    (with-redefs [oci/run-instance (constantly (md/success-deferred
+                                                {:status 200
+                                                 :body {:containers [{:display-name sut/job-container-name
+                                                                      :result {:exit 0}}]}}))]
+      (is (= 3 (-> (mcc/run-container {:containers {:type :oci}
+                                       :build {:checkout-dir "/tmp"}})
+                   (deref)
+                   :credit-multiplier))))))
 
 (deftest normalize-key
   (testing "merges with oci"

@@ -22,7 +22,10 @@
             [monkey.ci.events.core :as ec]
             [monkey.oci.container-instance.core :as ci]))
 
+;; TODO Get this information from the OCI shapes endpoint
 (def max-pod-memory "Max memory that can be assigned to a pod, in gbs" 64)
+(def max-pod-cpus "Max number of cpu's to assign to a pod" 16)
+
 (def work-dir oci/work-dir)
 (def script-dir "/opt/monkeyci/script")
 (def log-dir (oci/checkout-subdir "log"))
@@ -44,6 +47,24 @@
 (def promtail-config-vol "promtail-config")
 (def promtail-config-dir "/etc/promtail")
 (def promtail-config-file "config.yml")
+
+;; Cpu architectures
+(def arch-arm :arm)
+(def arch-amd :amd)
+(def valid-architectures #{arch-arm arch-amd})
+
+(def arch-shapes
+  "Architectures mapped to OCI shapes"
+  {arch-arm
+   {:shape "CI.Standard.A1.Flex"
+    :credits 1}
+   arch-amd
+   {:shape "CI.Standard.E4.Flex"
+    :credits 2}})
+(def default-arch arch-arm)
+
+(defn- job-arch [job]
+  (get job :arch default-arch))
 
 (defn- job-work-dir
   "The work dir to use for the job in the container.  This is the external job
@@ -191,10 +212,23 @@
                        (oci/config-entry config-file (rt->edn rt))]
                 log-config (conj (oci/config-entry "logback.xml" log-config)))}))
 
-(defn- set-pod-resources [ic rt]
+(defn- set-pod-shape [ic rt]
+  (assoc ic :shape (get-in arch-shapes [(job-arch (:job rt)) :shape])))
+
+(defn- set-pod-memory [ic rt]
   (-> ic
       (update :shape-config mc/assoc-some :memory-in-g-bs (get-in rt [:job :memory]))
       (mc/update-existing-in [:shape-config :memory-in-g-bs] min max-pod-memory)))
+
+(defn- set-pod-cpus [ic rt]
+  (-> ic
+      (update :shape-config mc/assoc-some :ocpus (get-in rt [:job :cpus]))
+      (mc/update-existing-in [:shape-config :ocpus] min max-pod-cpus)))
+
+(defn- set-pod-resources [ic rt]
+  (-> ic
+      (set-pod-memory rt)
+      (set-pod-cpus rt)))
 
 (defn instance-config
   "Generates the configuration for the container instance.  It has 
@@ -216,6 +250,7 @@
         (update :volumes conj
                 (script-vol-config rt)
                 (config-vol-config rt))
+        (set-pod-shape rt)
         (set-pod-resources rt)
         ;; Note that promtail will never terminate, so we rely on the script to
         ;; delete the container instance when the sidecar and the job have completed.
@@ -271,8 +306,16 @@
        ;; exited completely when the events have arrived, so we use the event values instead.
        (update-in details [:body :containers] (partial map add-exit))))))
 
-(defmethod mcc/run-container :oci [rt]
-  (log/debug "Running job as OCI instance:" (:job rt))
+(defn- credit-multiplier
+  "Calculates the credit multiplier that needs to be applied for the job.  This 
+   varies depending on the architecture, number of cpu's and amount of memory."
+  [job]
+  (+ (* (get job :cpus oci/default-cpu-count)     
+        (get-in arch-shapes [(job-arch job) :credits] 1))
+     (get job :memory oci/default-memory-gb)))
+
+(defmethod mcc/run-container :oci [{:keys [job] :as rt}]
+  (log/debug "Running job as OCI instance:" job)
   (let [conf (:containers rt)
         client (-> conf
                    (oci/->oci-config)
@@ -304,7 +347,9 @@
                              (first))]
            (log/debug "Containers:" containers)
            ;; Either return the first error result, or the result of the job container
-           (:result (or nonzero job-cont))))))))
+           (-> (or nonzero job-cont)
+               :result
+               (assoc :credit-multiplier (credit-multiplier job)))))))))
 
 (defmethod mcc/normalize-containers-config :oci [conf]
   (-> (oci/normalize-config conf :containers)
