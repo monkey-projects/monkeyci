@@ -148,3 +148,8 @@
   (->> raw
        (map ->html)
        (into [:p.text-bg-dark.font-monospace.overflow-auto.text-nowrap.h-100.p-1])))
+
+(defn build-elapsed [b]
+  (let [e (u/build-elapsed b)]
+    (when (pos? e)
+      (t/format-seconds (int (/ e 1000))))))
