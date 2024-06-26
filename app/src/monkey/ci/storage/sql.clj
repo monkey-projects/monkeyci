@@ -357,19 +357,20 @@
 
 (defn- build->db [build]
   (-> build
-      (select-keys [:status :start-time :end-time :idx :git])
+      (select-keys [:status :start-time :end-time :idx :git :credits])
       (mc/update-existing :status name)
       (assoc :display-id (:build-id build)
              :script-dir (get-in build [:script :script-dir]))))
 
 (defn- db->build [build]
   (-> build
-      (select-keys [:status :start-time :end-time :idx :git])
+      (select-keys [:status :start-time :end-time :idx :git :credits])
       (mc/update-existing :status keyword)
       (ec/start-time->int)
       (ec/end-time->int)
       (assoc :build-id (:display-id build)
              :script (select-keys build [:script-dir]))
+      (update :credits (fnil int 0))
       (drop-nil)))
 
 (defn- job->db [job]

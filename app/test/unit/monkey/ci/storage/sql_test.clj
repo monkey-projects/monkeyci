@@ -282,8 +282,10 @@
         (is (true? (st/build-exists? s build-sid))))
 
       (testing "can list with details, excluding jobs"
-        (is (= [(update build :script dissoc :jobs)]
-               (st/list-builds-with-details s (take 2 build-sid)))))
+        (let [d (st/list-builds-with-details s (take 2 build-sid))]
+          (is (= 1 (count d)))
+          (is (= (update build :script dissoc :jobs)
+                 (select-keys (first d) (keys build))))))
 
       (testing "can get next idx"
         (let [repo (-> (h/gen-repo)
