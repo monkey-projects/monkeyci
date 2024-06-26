@@ -48,8 +48,11 @@
   (h/create-index (keyword (str (name table) "-" (name col) "-idx"))
                   [table col]))
 
+(defn- mig-id [idx desc]
+  (format "%03d-%s" idx desc))
+
 (defn table-migration [idx table cols indices]
-  (migration (format "%03d-%s" idx (name table))
+  (migration (mig-id idx (name table))
              (concat [(-> (h/create-table table)
                           (h/with-columns cols))]
                      indices)
@@ -178,7 +181,21 @@
     14 :repo-indices
     [[:repo-id :integer [:not nil] [:primary-key]]
      (fk :repo-id :repos :id)]
-    [])])
+    [])
+
+   (migration
+    (mig-id 15 :job-credit-multiplier)
+    [{:alter-table :jobs
+      :add-column [:credit-multiplier [:decimal 4 2] :default 0]}]
+    [{:alter-table :jobs
+      :drop-column :credit-multiplier}])
+
+   (migration
+    (mig-id 16 :build-credits)
+    [{:alter-table :builds
+      :add-column [:credits [:decimal 10 2] :default 0]}]
+    [{:alter-table :builds
+      :drop-column :credits}])])
 
 (defn- format-migration [sql-opts m]
   (letfn [(format-sql [stmt]

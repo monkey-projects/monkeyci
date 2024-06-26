@@ -178,3 +178,33 @@
   (testing "does not set status when no exit"
     (is (nil? (-> (sut/build-end-evt {} nil)
                   (get-in [:build :status]))))))
+
+(deftest calc-credits
+  (testing "zero if no jobs"
+    (is (zero? (sut/calc-credits {}))))
+
+  (testing "sum of consumed credits for all jobs"
+    (let [build {:script
+                 {:jobs
+                  {:job-1 {:id "job-1"
+                           :start-time 0
+                           :end-time 60000
+                           :credit-multiplier 3}
+                   :job-2 {:id "job-2"
+                           :start-time 0
+                           :end-time 120000
+                           :credit-multiplier 4}}}}]
+      (is (= 11 (sut/calc-credits build)))))
+
+  (testing "rounds up"
+    (let [build {:script
+                 {:jobs
+                  {:job-1 {:id "job-1"
+                           :start-time 0
+                           :end-time 10000
+                           :credit-multiplier 3}
+                   :job-2 {:id "job-2"
+                           :start-time 0
+                           :end-time 20000
+                           :credit-multiplier 4}}}}]
+      (is (= 2 (sut/calc-credits build))))))

@@ -55,7 +55,9 @@
        ~@body)))
 
 (defn- gen-spec [s]
-  (gen/generate (s/gen s)))
+  (-> (gen/generate (s/gen s))
+      ;; id is auto generated
+      (dissoc :id)))
 
 (defn gen-customer []
   (gen-spec :db/customer))

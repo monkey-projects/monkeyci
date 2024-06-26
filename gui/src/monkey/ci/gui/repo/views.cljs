@@ -12,10 +12,7 @@
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
-(defn- elapsed [b]
-  (let [e (u/build-elapsed b)]
-    (when (pos? e)
-      (t/format-seconds (int (/ e 1000))))))
+(def elapsed co/build-elapsed)
 
 (defn- trigger-build-btn []
   (let [show? (rf/subscribe [:repo/show-trigger-form?])]

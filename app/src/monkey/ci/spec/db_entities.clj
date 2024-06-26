@@ -43,19 +43,21 @@
 
 (s/def :db/repo-id id?)
 (s/def :db/idx int?)
+(s/def :db/credits int?)
 
 (s/def :db/build
   (-> (s/keys :req-un [:db/repo-id :db/idx]
-              :opt-un [:build/status :db/display-id :build/git])
+              :opt-un [:build/status :db/display-id :build/git :db/credits])
       (s/merge :db/timed)))
 
 (s/def :job/details map?)
 
 (s/def :db/build-id id?)
+(s/def :db/credit-multiplier (s/int-in 0 10))
 
 (s/def :db/job
   (-> (s/keys :req-un [:db/build-id :db/display-id :job/details]
-              :opt-un [:job/status])
+              :opt-un [:job/status :db/credit-multiplier])
       (s/merge :db/timed)))
 
 (s/def :db/webhook

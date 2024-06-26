@@ -63,7 +63,22 @@
         (is (st/sid? (st/save-build st build)))
         (is (map? (sut/update-build st evt)))
         (let [match (st/find-build st sid)]
-          (is (= script (:script match))))))))
+          (is (= script (:script match)))))))
+
+  (testing "`build/end` calculates consumed credits"
+    (h/with-memory-store st
+      (let [sid (random-sid)
+            build (-> (test-build sid)
+                      (assoc-in [:script :jobs] {:job-1 {:id "job-1"
+                                                         :start-time 100
+                                                         :end-time 200
+                                                         :credit-multiplier 1}}))
+            handler (sut/build-update-handler st (h/fake-events))]
+        (is (some? (st/save-build st build)))
+        (is (some? (sut/update-build st {:type :build/end
+                                         :build build})))
+        (is (number? (-> (st/find-build st sid)
+                         :credits)))))))
 
 (deftest update-script
   (testing "updates script in build"

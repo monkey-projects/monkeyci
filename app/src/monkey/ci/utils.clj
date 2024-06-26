@@ -5,7 +5,9 @@
              [string :as cs]
              [walk :as cw]]
             [clojure.java.io :as io]
-            [clojure.repl :as cr]
+            [clojure
+             [math :as math]
+             [repl :as cr]]
             [medley.core :as mc]
             [monkey.ci
              [edn :as ce]
@@ -176,3 +178,10 @@
   (fn [x]
     (when x
       (f x))))
+
+(defn round-up
+  "Rounds the decimal argument up to the next integer value"
+  [x]
+  (let [r (int (math/round x))]
+    (cond-> r
+      (< r x) inc)))

@@ -12,6 +12,7 @@
              [build :as build]
              [cache :as cache]
              [containers :as co]
+             [credits :as cr]
              [labels :as lbl]
              [protocols :as p]
              [utils :as u]]))
@@ -228,7 +229,7 @@
                     (assoc r
                            (job-id j)
                            (md/chain
-                            ;; Ensure this execute async by wrapping it in a future
+                            ;; Ensure this executes async by wrapping it in a future
                             (md/future (execute! j (assoc-in rt [:build :jobs] state)))
                             (partial vector j))))
                   {}
@@ -338,6 +339,15 @@
   (letfn [(art->event [a]
             (select-keys a [:id :path]))]
     (-> job
-        (select-keys [:status :start-time :end-time deps labels save-artifacts :extensions])
+        (select-keys [:status :start-time :end-time deps labels save-artifacts :extensions :credit-multiplier])
         (mc/update-existing :save-artifacts (partial map art->event))
         (assoc :id (bc/job-id job)))))
+
+(extend-protocol cr/CreditConsumer
+  monkey.ci.build.core.ActionJob
+  (credit-multiplier [job rt]
+    ((cr/runner-credit-consumer-fn rt) job))
+
+  monkey.ci.build.core.ContainerJob
+  (credit-multiplier [job rt]
+    ((cr/container-credit-consumer-fn rt) job)))

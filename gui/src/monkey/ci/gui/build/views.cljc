@@ -16,16 +16,26 @@
   "Displays the build details by looking it up in the list of repo builds."
   []
   (let [d (rf/subscribe [:build/current])
-        v (-> @d
-              (select-keys [:id :message :start-time :end-time])
-              (assoc :ref (get-in @d [:git :ref]))
-              (update :start-time t/reformat)
-              (update :end-time t/reformat))]
-    (->> v
-         (map (fn [[k v]]
-                [:li [:b k ": "] v]))
-         (concat [[:li [:b "Result: "] [co/build-result (:status @d)]]])
-         (into [:ul]))))
+        {:keys [message]} @d]
+    (letfn [(item [k v]
+              [:<>
+               [:div.col-md-2 [:b k]]
+               [:div.col-md-2 v]])]
+      [:div.mb-3
+       [:div.row
+        (item "Result" [co/build-result (:status @d)])
+        (item "Start time" (t/reformat (:start-time @d)))]
+       [:div.row
+        (item "Git ref" (get-in @d [:git :ref]))
+        (item "End time" (t/reformat (:end-time @d)))]
+       [:div.row
+        (item "Credits" (or (:credits @d) 0))
+        (item [:span {:title "Total time that has passed between build start and end"} "Elapsed"]
+              [co/build-elapsed @d])]
+       (when message
+         [:div.row
+          [:div.col-md-2 [:b "Message"]]
+          [:div.col-md-10 message]])])))
 
 (defn build-result []
   (let [b (rf/subscribe [:build/current])]

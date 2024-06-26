@@ -196,6 +196,24 @@
        (all-jobs)
        (filter (comp (partial = :success) :status))))
 
+(def minutes
+  "msecs per minute"
+  60000)
+
+(defn calc-credits
+  "Calculates the consumed credits for this build"
+  [build]
+  (with-precision 2
+    (letfn [(job-credits [{cm :credit-multiplier s :start-time e :end-time}]
+              (if (every? number? [cm s e])
+                (* (bigdec (/ (- e s) minutes)) cm)))]
+      (->> build
+           (all-jobs)
+           (map job-credits)
+           (remove nil?)
+           (reduce + 0)
+           (u/round-up)))))
+
 (defmethod rt/setup-runtime :build [conf _]
   ;; Just copy the build info to the runtime
   (get conf :build))

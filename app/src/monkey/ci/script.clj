@@ -11,6 +11,7 @@
              [build :as build]
              [cache :as cache]
              [containers :as c]
+             [credits :as cr]
              [extensions :as ext]
              [jobs :as j]
              [runtime :as rt]
@@ -77,8 +78,12 @@
           st (u/now)]
       (log/debug "Executing event firing job:" (bc/job-id target))
       (md/chain
-       (rt/post-events rt (job-start-evt (-> rt-with-job
-                                             (update :job assoc :start-time st :status :running))))
+       (rt/post-events rt (job-start-evt
+                           (-> rt-with-job
+                               (update :job
+                                       merge {:start-time st
+                                              :status :running
+                                              :credit-multiplier (cr/credit-multiplier target rt)}))))
        (fn [_]
          ;; Catch both sync and async errors
          (try 
@@ -89,10 +94,11 @@
        (fn [r]
          (log/debug "Job ended with response:" r)
          (md/chain
-          (rt/post-events rt (job-end-evt (update rt-with-job :job assoc
-                                                  :start-time st
-                                                  :end-time (u/now))
-                                          r))
+          (rt/post-events rt (job-end-evt
+                              (update rt-with-job :job
+                                      merge {:start-time st
+                                             :end-time (u/now)})
+                              r))
           (constantly r)))))))
 
 (defn- with-fire-events

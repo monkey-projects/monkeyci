@@ -3,6 +3,7 @@
             [com.stuartsierra.component :as co]
             [manifold.stream :as ms]
             [monkey.ci
+             [build :as b]
              [runtime :as rt]
              [storage :as st]
              [utils :as u]]
@@ -14,13 +15,15 @@
   (st/save-build storage build)
   (assoc build :sid sid))
 
-(defn update-build [storage {:keys [sid build]}]
+(defn update-build [storage {:keys [sid build] :as evt}]
   (log/debug "Updating build:" sid)
-  (let [existing (st/find-build storage sid)]
+  (let [existing (st/find-build storage sid)
+        upd (-> (merge existing (dissoc build :script))
+                (dissoc :sid :cleanup?))]
     (-> (save-build storage
                     sid
-                    (-> (merge existing (dissoc build :script))
-                        (dissoc :sid :cleanup?)))
+                    (cond-> upd
+                      (= :build/end (:type evt))(assoc :credits (b/calc-credits upd))))
         (assoc :sid sid))))
 
 (defn update-script [storage {:keys [sid script]}]
