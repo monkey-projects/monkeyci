@@ -44,7 +44,7 @@
 (s/def :entity/repo-id string?)
 (s/def :entity/build-id string?)
 (s/def :entity/idx int?)
-(s/def :entit/credits int?)
+(s/def :entity/credits int?)
 
 (s/def :entity/build
   (-> (s/keys :req-un [:entity/build-id :entity/customer-id :entity/repo-id :entity/idx]
