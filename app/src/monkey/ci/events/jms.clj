@@ -1,44 +1,55 @@
 (ns monkey.ci.events.jms
-  "Uses JMS (with bowerick) to connect to an event broker.  Can also
-   starts its own broker server, although this is mostly meant for
-   development and testing purposes."
-  (:require [bowerick.jms :as jms]
-            [clojure.java.io :as io]
+  "Uses JMS to connect to an event broker.  Can also starts its own broker 
+   server, although this is mostly meant for development and testing purposes."
+  (:require [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
             [medley.core :as mc]
             [monkey.ci
              [protocols :as p]
-             [utils :as u]]))
+             [utils :as u]]
+            [monkey.jms :as jms])
+  (:import org.apache.activemq.artemis.core.server.embedded.EmbeddedActiveMQ
+           org.apache.activemq.artemis.core.config.impl.ConfigurationImpl
+           org.apache.activemq.artemis.api.core.TransportConfiguration
+           org.apache.activemq.artemis.core.remoting.impl.netty.NettyAcceptorFactory))
 
-(def jms-ns 'bowerick.jms)
+(defn transport-config [port]
+  (TransportConfiguration.
+   (.getName NettyAcceptorFactory)
+   {"port" (str port)
+    "protocols" "AMQP"}))
 
-(defmacro with-logs [& body]
-  ;; Bowerick uses println to log, so we need to redirect it here.
-  ;; Don't use this with bodies that use regular logs because when
-  ;; that prints to stdout, it will stack overflow.
-  ;; Also, for some strange reason, it prints regular logs to stderr and
-  ;; errors to stdout *facepalm*...
-  `(log/with-logs [jms-ns :debug :debug] ~@body))
+(defn- start-broker
+  "Starts an embedded Artemis broker with AMQP connector"
+  [port]
+  (log/info "Starting AMQP broker at port" port)
+  (doto (EmbeddedActiveMQ.)
+    (.setConfiguration
+     (.. (ConfigurationImpl.)
+         (setPersistenceEnabled false)
+         (setJournalDirectory "target/data/journal")
+         (setSecurityEnabled false)
+         (addAcceptorConfiguration (transport-config port))))
+    (.start)))
+
+(defn- stop-broker [b]
+  (.stop b))
+
+(defn- url->port [url]
+  (or (some-> url
+              (java.net.URI.)
+              (.getPort))
+      5672))
 
 (defn- maybe-start-broker [{:keys [enabled url]}]
   (when enabled
-    (with-logs
-      (jms/start-broker url))))
+    (start-broker (url->port url))))
 
-(defn- wrap-creds [{:keys [username password]} h]
-  (if (and username password)
-    (binding [jms/*user-name* username
-              jms/*user-password* password]
-      (h))
-    (h)))
-
-(defn- make-producer [{:keys [url dest] :as conf}]
-  ;; TODO Auto reconnect
-  (with-logs
-    (wrap-creds
-     conf
-     #(jms/create-producer url dest 1 (comp (memfn getBytes) pr-str)))))
+(defn- make-producer [ctx {:keys [dest] :as conf}]
+  (let [serializer (fn [ctx msg]
+                     (jms/make-text-message ctx (pr-str msg)))]
+    (jms/make-producer ctx dest {:serializer serializer})))
 
 (defn filtering-listener [pred l]
   (fn [evt]
@@ -55,16 +66,10 @@
     (doseq [l @listeners]
       ((:listener l) evt))))
 
-(defn- parse-edn [buf]
-  (with-open [r (io/reader buf)]
-    (u/parse-edn r)))
-
-(defn- make-consumer [{:keys [url dest] :as conf} listeners]
-  ;; TODO Auto reconnect
-  (with-logs
-    (wrap-creds
-     conf
-     #(jms/create-consumer url dest (event-handler listeners) 1 parse-edn))))
+(defn- make-consumer [ctx {:keys [dest] :as conf} listeners]
+  (jms/make-consumer ctx dest
+                     (event-handler listeners)
+                     {:deserializer (comp u/parse-edn-str jms/message->str)}))
 
 (defrecord JmsEvents [config matches-event? listeners broker producer consumer]
   p/EventPoster
@@ -86,22 +91,22 @@
 
   co/Lifecycle
   (start [this]
-    (-> this
-        (mc/assoc-some :broker (maybe-start-broker (:server config)))
-        ;; Note that this opens 2 connections to the broker and also 3 sessions
-        ;; per connection.  We may want to replace this in the future.
-        (assoc :producer (make-producer (:client config))
-               :consumer (make-consumer (:client config) listeners))))
+    (let [broker (maybe-start-broker (:server config))
+          cc (:client config)
+          ctx (jms/connect cc)]
+      (-> this
+          (mc/assoc-some :broker broker)
+          (assoc :context ctx)
+          (assoc :producer (make-producer ctx cc)
+                 :consumer (make-consumer ctx cc listeners)))))
 
-  (stop [{:keys [broker producer consumer] :as this}]
-    (with-logs
-      (when producer
-        (jms/close producer))
-      (when consumer
-        (jms/close consumer))
-      (when broker
-        (jms/stop broker)))
-    (assoc this :broker nil :producer nil :consumer nil)))
+  (stop [{:keys [broker context producer consumer] :as this}]
+    (when consumer
+      (.close consumer))
+    (jms/disconnect context)
+    (when broker
+      (.stop broker))
+    (assoc this :broker nil :producer nil :consumer nil :context nil)))
 
 (defn make-jms-events [config matches-event?]
   (->JmsEvents config matches-event? (atom []) nil nil nil))

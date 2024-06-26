@@ -8,10 +8,10 @@
 (def default-config
   {:server
    {:enabled true
-    :url "tcp://0.0.0.0:4001"}
+    :url "amqp://0.0.0.0:4001"}
    :client
-   {:url "tcp://localhost:4001"
-    :dest "/topic/test"}})
+   {:url "failover:amqp://localhost:4001"
+    :dest "topic://topic/test"}})
 
 (deftest jms-events
   (ast/async-tests (partial sut/make-jms-events default-config)))
