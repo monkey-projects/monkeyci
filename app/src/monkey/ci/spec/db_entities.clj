@@ -52,10 +52,11 @@
 (s/def :job/details map?)
 
 (s/def :db/build-id id?)
+(s/def :db/credit-multiplier (s/int-in 0 10))
 
 (s/def :db/job
   (-> (s/keys :req-un [:db/build-id :db/display-id :job/details]
-              :opt-un [:job/status])
+              :opt-un [:job/status :db/credit-multiplier])
       (s/merge :db/timed)))
 
 (s/def :db/webhook

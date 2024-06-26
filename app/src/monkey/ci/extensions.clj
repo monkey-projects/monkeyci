@@ -10,6 +10,7 @@
   (:require [manifold.deferred :as md]
             [monkey.ci
              [build :as b]
+             [credits :as cr]
              [jobs :as j]
              [runtime :as rt]]))
 
@@ -77,7 +78,11 @@
            ;; Let any extensions work on it
            #(apply-extensions-after % registered-ext)
            ;; Return the job result (possibly modified by extensions)
-           (comp :result :job))))))
+           (comp :result :job)))))
+
+  cr/CreditConsumer
+  (credit-multiplier [_ rt]
+    (cr/credit-multiplier target rt)))
 
 (defn wrap-job
   "Wraps job so that extensions are invoked before and after it."

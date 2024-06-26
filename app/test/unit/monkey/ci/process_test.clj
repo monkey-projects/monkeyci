@@ -46,7 +46,8 @@
                         {:config-file (.getAbsolutePath config-file)}
                         {:monkeyci-containers-type "podman"
                          :monkeyci-api-socket "/tmp/test.sock"})))
-            (is (= {:type :podman} (:containers @captured-args)))
+            (is (= :podman (-> (:containers @captured-args)
+                               :type)))
             (is (= {:socket "/tmp/test.sock"} (get-in @captured-args [:config :api])))))))))
 
 (deftype FakeProcess [exitValue])
