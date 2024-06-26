@@ -43,7 +43,7 @@
 
 (s/def :db/repo-id id?)
 (s/def :db/idx int?)
-(s/def :db/credits int?)
+(s/def :db/credits (s/int-in 0 10000))
 
 (s/def :db/build
   (-> (s/keys :req-un [:db/repo-id :db/idx]

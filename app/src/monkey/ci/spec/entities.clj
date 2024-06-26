@@ -44,7 +44,7 @@
 (s/def :entity/repo-id string?)
 (s/def :entity/build-id string?)
 (s/def :entity/idx int?)
-(s/def :entity/credits int?)
+(s/def :entity/credits (s/int-in 0 10000))
 
 (s/def :entity/build
   (-> (s/keys :req-un [:entity/build-id :entity/customer-id :entity/repo-id :entity/idx]
@@ -57,10 +57,11 @@
   (s/keys :opt-un [:script/script-dir :entity/jobs]))
 
 (s/def :entity/jobs (s/map-of :display/id :entity/job))
+(s/def :job/credit-multiplier (s/int-in 0 100))
 
 (s/def :entity/job
   (-> (s/keys :req-un [:display/id]
-              :opt-un [:job/status :entity/labels])
+              :opt-un [:job/status :entity/labels :job/credit-multiplier])
       (s/merge :entity/timed)))
 
 (s/def :entity/secret-key string?)
