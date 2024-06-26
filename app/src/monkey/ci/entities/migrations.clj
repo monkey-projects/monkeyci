@@ -188,7 +188,14 @@
     [{:alter-table :jobs
       :add-column [:credit-multiplier [:decimal 4 2] :default 0]}]
     [{:alter-table :jobs
-      :drop-column :credit-multiplier}])])
+      :drop-column :credit-multiplier}])
+
+   (migration
+    (mig-id 16 :build-credits)
+    [{:alter-table :builds
+      :add-column [:credits [:decimal 10 2] :default 0]}]
+    [{:alter-table :builds
+      :drop-column :credits}])])
 
 (defn- format-migration [sql-opts m]
   (letfn [(format-sql [stmt]

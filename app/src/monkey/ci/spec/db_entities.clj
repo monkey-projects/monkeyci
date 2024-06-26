@@ -43,10 +43,11 @@
 
 (s/def :db/repo-id id?)
 (s/def :db/idx int?)
+(s/def :db/credits int?)
 
 (s/def :db/build
   (-> (s/keys :req-un [:db/repo-id :db/idx]
-              :opt-un [:build/status :db/display-id :build/git])
+              :opt-un [:build/status :db/display-id :build/git :db/credits])
       (s/merge :db/timed)))
 
 (s/def :job/details map?)

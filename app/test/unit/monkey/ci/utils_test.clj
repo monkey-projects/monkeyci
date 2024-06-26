@@ -59,3 +59,9 @@
            (sut/prune-tree {:parent {:child {:name "test"
                                              :other {}}}})))))
 
+(deftest round-up
+  (testing "int to int"
+    (is (= 10 (sut/round-up 10M))))
+
+  (testing "rounds to next integer"
+    (is (= 5 (sut/round-up 4.3M)))))
