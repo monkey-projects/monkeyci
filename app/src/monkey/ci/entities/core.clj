@@ -205,11 +205,17 @@
 (def end-time->int (partial time->int :end-time))
 (def int->end-time (partial int->time :end-time))
 
-(defn- status->str [x]
-  (mc/update-existing x :status (u/or-nil name)))
+(defn- keyword->str [k x]
+  (mc/update-existing x k (u/or-nil name)))
 
-(defn- str->status [x]
-  (mc/update-existing x :status (u/or-nil keyword)))
+(defn- str->keyword [k x]
+  (mc/update-existing x k (u/or-nil keyword)))
+
+(def status->str (partial keyword->str :status))
+(def str->status (partial str->keyword :status))
+
+(def source->str (partial keyword->str :source))
+(def str->source (partial str->keyword :source))
 
 (def prepare-timed (comp status->str int->start-time int->end-time))
 (def convert-timed (comp str->status start-time->int end-time->int))
@@ -227,9 +233,9 @@
 (def edn->git (partial edn->prop :git))
 (def git->build (partial copy-prop :git))
 
-(def prepare-build (comp git->edn prepare-timed))
-(def convert-build (comp git->build convert-timed))
-(def convert-build-select (comp edn->git convert-timed))
+(def prepare-build (comp source->str git->edn prepare-timed))
+(def convert-build (comp str->source git->build convert-timed))
+(def convert-build-select (comp str->source edn->git convert-timed))
 
 (defentity build {:before-insert prepare-build
                   :after-insert  convert-build

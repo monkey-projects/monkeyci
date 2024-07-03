@@ -259,5 +259,6 @@
  image-creds
  build-app-image
  build-gui-image
- deploy-api
- deploy-gui]
+ ;; TODO Replace this with updating the container instance
+ #_deploy-api
+ #_deploy-gui]

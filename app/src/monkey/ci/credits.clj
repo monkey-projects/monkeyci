@@ -5,7 +5,8 @@
   "Jobs that consume credits implement this protocol"
   (credit-multiplier [job rt]
     "Calculates the credit multiplier for the given job.  This depends on the type
-     of job, the type of container runner and the resources required by the job."))
+     of job, the type of container runner and the resources required by the job.
+     This can be considered the 'credit consumption per minute' for the job."))
 
 (defn runner-credit-consumer-fn
   "Returns the credit consumer function from the runtime associated with the

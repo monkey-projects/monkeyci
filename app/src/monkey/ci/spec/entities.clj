@@ -47,7 +47,7 @@
 (s/def :entity/credits (s/int-in 0 10000))
 
 (s/def :entity/build
-  (-> (s/keys :req-un [:entity/build-id :entity/customer-id :entity/repo-id :entity/idx]
+  (-> (s/keys :req-un [:entity/build-id :entity/customer-id :entity/repo-id :entity/idx :build/source]
               :opt-un [:build/status :entity/script :build/git :entity/credits])
       (s/merge :entity/timed)))
 

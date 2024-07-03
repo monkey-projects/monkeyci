@@ -195,7 +195,14 @@
     [{:alter-table :builds
       :add-column [:credits [:decimal 10 2] :default 0]}]
     [{:alter-table :builds
-      :drop-column :credits}])])
+      :drop-column :credits}])
+
+   (migration
+    (mig-id 17 :build-source)
+    [{:alter-table :builds
+      :add-column [:source [:varchar 30]]}]
+    [{:alter-table :builds
+      :drop-column :source}])])
 
 (defn- format-migration [sql-opts m]
   (letfn [(format-sql [stmt]

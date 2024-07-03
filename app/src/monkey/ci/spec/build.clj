@@ -71,7 +71,7 @@
 (s/def :build/webhook-id id?)
 (s/def :build/customer-id id?)
 (s/def :build/repo-id id?)
-(s/def :build/source keyword?)
+(s/def :build/source #{:github-webhook :github-app :api})
 (s/def :build/checkout-dir path?)
 (s/def :build/status build-states)
 
