@@ -18,8 +18,8 @@
 (defprotocol LogCapturer
   "Used to allow processes to store log information.  Depending on the implementation,
    this can be local on disk, or some cloud object storage."
-  (log-output [this])
-  (handle-stream [this in]))
+  (log-output [this] "Returns something that can be passed to child processes for logging")
+  (handle-stream [this in] "Does some async processing on a stream, if necessary"))
 
 (defmulti make-logger (comp :type :logging))
 

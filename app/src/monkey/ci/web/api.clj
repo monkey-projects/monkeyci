@@ -145,7 +145,8 @@
 
 (def get-customer-params
   "Retrieves all parameters configured on the customer.  This is for administration purposes."
-  (partial get-list-for-customer st/find-params))
+  (partial get-list-for-customer (comp (partial map #(dissoc % :id :customer-id))
+                                       st/find-params)))
 
 (def get-repo-params
   "Retrieves the parameters that are available for the given repository.  This depends

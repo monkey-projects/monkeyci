@@ -75,6 +75,20 @@
           v (mapv constantly jobs)]
       (is (= jobs (sut/resolve-jobs jobs {})))))
 
+  (testing "resolves combination of vector and job"
+    (let [jobs [(constantly (dummy-job))
+                (dummy-job)]
+          r (sut/resolve-jobs jobs {})]
+      (is (= 2 (count r)))
+      (is (every? bc/action-job? r))))
+
+  (testing "resolves combination of vector and fn"
+    (let [jobs [(constantly (dummy-job))
+                [(dummy-job)]]
+          r (sut/resolve-jobs jobs {})]
+      (is (= 2 (count r)))
+      (is (every? bc/action-job? r))))
+
   (testing "pipelines"
     (testing "returns jobs from pipeline vector"
       (let [[a b :as jobs] (repeatedly 2 dummy-job)]
@@ -106,7 +120,7 @@
 
     (testing "converts functions that return legacy actions to jobs"
       (is (bc/action-job? (-> (constantly {:action (constantly bc/success)
-                                                   :name "legacy-step"})
+                                           :name "legacy-step"})
                               (sut/resolve-jobs {})
                               first))))
 
