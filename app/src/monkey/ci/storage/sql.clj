@@ -279,9 +279,9 @@
     (update-param conn param cust-id existing)
     (insert-param conn param cust-id)))
 
-(defn- upsert-params [conn params]
+(defn- upsert-params [conn cust-cuid params]
   (when-not (empty? params)
-    (let [{cust-id :id} (ec/select-customer conn (ec/by-cuid (:customer-id (first params))))]
+    (let [{cust-id :id} (ec/select-customer conn (ec/by-cuid cust-cuid))]
       (doseq [p params]
         (upsert-param conn p cust-id))
       params)))
@@ -545,7 +545,7 @@
             ssh-key?
             (upsert-ssh-keys conn obj)
             params?
-            (upsert-params conn obj)
+            (upsert-params conn (last sid) obj)
             (log/warn "Unrecognized sid when writing:" sid))
       sid))
 
