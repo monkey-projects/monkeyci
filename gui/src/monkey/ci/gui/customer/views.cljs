@@ -42,6 +42,18 @@
     :title "Link an existing GitHub repository"}
    [:span.me-1 [co/icon :github]] "Follow Repository"])
 
+(defn- params-btn [id]
+  [:a.btn.btn-outline-primary.me-2
+   {:href (r/path-for :page/customer-params {:customer-id id})
+    :title "Configure build parameters"}
+   [:span.me-2 [co/icon :gear]] "Parameters"])
+
+(defn- customer-actions [id]
+  [:<>
+   [add-repo-btn id]
+   [params-btn id]
+   [co/reload-btn [:customer/load id]]])
+
 (defn- customer-details [id]
   (let [c (rf/subscribe [:customer/info])]
     (->> (:repos @c)
@@ -52,13 +64,12 @@
                 [:div.clearfix.mb-3
                  [:h3.float-start (:name @c)]
                  [:span.float-end
-                  [add-repo-btn id]
-                  [co/reload-btn [:customer/load id]]]]]))))
+                  [customer-actions id]]]]))))
 
 (defn page
   "Customer overview page"
   [route]
-  (let [id (get-in route [:parameters :path :customer-id])]
+  (let [id (-> route (r/path-params) :customer-id)]
     (load-customer id)
     (l/default
      [:div
@@ -122,3 +133,11 @@
       [:button.btn.btn-primary.me-2 {:type :submit} [:span.me-2 [co/icon :save]] "Create Customer"]
       [co/cancel-btn [:route/goto :page/root]]]]
     [co/alerts [:customer/create-alerts]]]))
+
+(defn page-params
+  "Customer parameters overview"
+  [route]
+  (let [id (-> route (r/path-params) :customer-id)]
+    (rf/dispatch [:customer/maybe-load id])
+    (l/default
+     [:h3 "Build Parameters"])))

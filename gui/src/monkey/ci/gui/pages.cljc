@@ -20,6 +20,7 @@
    :page/customer customer/page
    :page/customer-new customer/page-new
    :page/customer-join home/page-join
+   :page/customer-params customer/page-params
    :page/add-repo customer/add-repo-page
    :page/repo repo/page
    :page/repo-edit repo/edit

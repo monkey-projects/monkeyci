@@ -12,6 +12,7 @@
  (fn [{:keys [db]} _]
    (when-not (db/initialized? db)
      {:dispatch-n [[:build/load]
+                   [:customer/maybe-load (r/customer-id db)]
                    ;; Make sure we stop listening to events when we leave this page
                    [:route/on-page-leave [:build/leave]]
                    ;; TODO Only start reading events when the build has not finished yet
