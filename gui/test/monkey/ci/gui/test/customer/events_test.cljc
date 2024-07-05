@@ -281,8 +281,3 @@
     (let [a (db/create-alerts @app-db)]
       (is (= 1 (count a)))
       (is (= :danger (:type (first a)))))))
-
-(deftest build-params-load
-  (testing "sends request to backend")
-
-  (testing "marks loading"))

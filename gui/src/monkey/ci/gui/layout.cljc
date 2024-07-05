@@ -53,7 +53,9 @@
           (if-let [error (.. this -state -error)]
             [:div
              [:h3 "Something went wrong"]
-             [:p "An error has occurred in this component.  We're looking in to it."]]
+             [:p "An error has occurred in this component.  We're looking in to it."]
+             [co/render-alert {:type :danger
+                               :message (str error)}]]
             ;; No error, just render target
             target)))})
      :clj [target]))

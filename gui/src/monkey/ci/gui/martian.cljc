@@ -77,6 +77,11 @@
                     (s/optional-key :id) s/Str}})
 
    (api-route
+    {:route-name :get-customer-params
+     :path-parts (into customer-path ["/param"])
+     :path-schema customer-schema})
+
+   (api-route
     {:route-name :get-user-customers
      :path-parts (into user-path ["/customers"])
      :path-schema user-schema})

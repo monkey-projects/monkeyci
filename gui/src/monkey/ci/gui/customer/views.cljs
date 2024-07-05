@@ -133,11 +133,3 @@
       [:button.btn.btn-primary.me-2 {:type :submit} [:span.me-2 [co/icon :save]] "Create Customer"]
       [co/cancel-btn [:route/goto :page/root]]]]
     [co/alerts [:customer/create-alerts]]]))
-
-(defn page-params
-  "Customer parameters overview"
-  [route]
-  (let [id (-> route (r/path-params) :customer-id)]
-    (rf/dispatch [:customer/maybe-load id])
-    (l/default
-     [:h3 "Build Parameters"])))
