@@ -171,6 +171,8 @@
     (is (not (db/saving? @app-db)))))
 
 (deftest cancel-all
+  (h/catch-fx :route/goto) ; Safety
+  
   (testing "resets all form data to original db values"
     (is (some? (reset! app-db (-> {}
                                   (db/set-params [{:description "original set"}
@@ -180,7 +182,13 @@
     (rf/dispatch-sync [:params/cancel-all])
     (is (= [{:description "original set"}
             {:description "second set"}]
-           (db/edit-params @app-db)))))
+           (db/edit-params @app-db))))
+
+  (testing "redirects to customer page"
+    (let [e (h/catch-fx :route/goto)]
+      (rf-test/run-test-sync
+       (rf/dispatch [:params/cancel-all])
+       (is (= 1 (count @e)))))))
 
 (deftest description-changed
   (testing "updates set description"
