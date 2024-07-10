@@ -203,7 +203,15 @@
 
       (testing "can delete"
         (is (= 1 (sut/delete-builds conn (sut/by-id (:id build)))))
-        (is (empty? (sut/select-builds conn (sut/by-repo (:id repo)))))))))
+        (is (empty? (sut/select-builds conn (sut/by-repo (:id repo))))))
+
+      (testing "can save message"
+        (let [build (-> (eh/gen-build)
+                        (assoc :repo-id (:id repo)
+                               :message "test message")
+                        (as-> x (sut/insert-build conn x)))]
+          (is (= "test message" (-> (sut/select-build conn (:id build))
+                                    :message))))))))
 
 (deftest ^:sql jobs
   (eh/with-prepared-db conn

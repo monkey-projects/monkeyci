@@ -45,10 +45,11 @@
 (s/def :entity/build-id string?)
 (s/def :entity/idx int?)
 (s/def :entity/credits (s/int-in 0 10000))
+(s/def :entity/message string?)
 
 (s/def :entity/build
   (-> (s/keys :req-un [:entity/build-id :entity/customer-id :entity/repo-id :entity/idx :build/source]
-              :opt-un [:build/status :entity/script :build/git :entity/credits])
+              :opt-un [:build/status :entity/script :build/git :entity/credits :entity/message])
       (s/merge :entity/timed)))
 
 (s/def :script/script-dir string?)

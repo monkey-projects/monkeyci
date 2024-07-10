@@ -202,7 +202,14 @@
     [{:alter-table :builds
       :add-column [:source [:varchar 30]]}]
     [{:alter-table :builds
-      :drop-column :source}])])
+      :drop-column :source}])
+
+   (migration
+    (mig-id 18 :build-message)
+    [{:alter-table :builds
+      :add-column [:message :text]}]
+    [{:alter-table :builds
+      :drop-column :message}])])
 
 (defn- format-migration [sql-opts m]
   (letfn [(format-sql [stmt]

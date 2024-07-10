@@ -357,14 +357,14 @@
 
 (defn- build->db [build]
   (-> build
-      (select-keys [:status :start-time :end-time :idx :git :credits :source])
+      (select-keys [:status :start-time :end-time :idx :git :credits :source :message])
       (mc/update-existing :status name)
       (assoc :display-id (:build-id build)
              :script-dir (get-in build [:script :script-dir]))))
 
 (defn- db->build [build]
   (-> build
-      (select-keys [:status :start-time :end-time :idx :git :credits :source])
+      (select-keys [:status :start-time :end-time :idx :git :credits :source :message])
       (mc/update-existing :status keyword)
       (ec/start-time->int)
       (ec/end-time->int)
