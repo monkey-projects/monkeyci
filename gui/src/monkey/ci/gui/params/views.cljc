@@ -2,30 +2,32 @@
   (:require [monkey.ci.gui.components :as co]
             [monkey.ci.gui.customer.events]
             [monkey.ci.gui.layout :as l]
+            [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.params.events]
             [monkey.ci.gui.params.subs]
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
-(defn- param-form [parent-idx idx {:keys [name value]}]
-  [:div.row.mb-2
-   [:div.col-md-3
-    [:input.form-control
-     {:type :input
-      :id (str "label-" idx)
-      :value name
-      :on-change (u/form-evt-handler [:params/label-changed parent-idx idx])}]]
-   [:div.col-md-8
-    [:textarea.form-control
-     {:id (str "value-" idx)
-      :value value
-      :on-change (u/form-evt-handler [:params/value-changed parent-idx idx])}]]
-   [:div.col-md-1
-    [:button.btn.btn-outline-danger
-     {:title "Delete parameter"
-      :on-click (u/link-evt-handler [:param/delete-param parent-idx idx])}
-     [co/icon :trash]]]])
+(defn- param-form [set-idx param-idx]
+  (let [{:keys [name value] :as p} @(rf/subscribe [:customer/param set-idx param-idx])]
+    [:div.row.mb-2
+     [:div.col-md-3
+      [:input.form-control
+       {:type :input
+        :id (str "label-" param-idx)
+        :value name
+        :on-change (u/form-evt-handler [:params/label-changed set-idx param-idx])}]]
+     [:div.col-md-8
+      [:textarea.form-control
+       {:id (str "value-" param-idx)
+        :value value
+        :on-change (u/form-evt-handler [:params/value-changed set-idx param-idx])}]]
+     [:div.col-md-1
+      [:button.btn.btn-outline-danger
+       {:title "Delete parameter"
+        :on-click (u/link-evt-handler [:params/delete-param set-idx param-idx])}
+       [co/icon :trash]]]]))
 
 (defn- label-filters-desc [lf]
   (letfn [(disj-desc [idx items]
@@ -46,39 +48,48 @@
             (map-indexed disj-desc)
             (into [:ul]))])))
 
-(defn- params-actions []
+(defn- params-actions [idx]
   [:<>
    #_[:button.btn.btn-primary.me-2
     {:on-click (u/link-evt-handler [:params/save-set])}
     [:span.me-2 [co/icon :save]] "Save Changes"]
    [:button.btn.btn-outline-primary.me-2
     {:title "Discards all unsaved changes"
-     :on-click (u/link-evt-handler [:params/cancel-set])}
+     :on-click (u/link-evt-handler [:params/cancel-set idx])}
     [:span.me-2 [co/icon :x-square]] "Cancel"]
    [:button.btn.btn-outline-success.me-2
     {:title "Adds a new parameter to this set"
-     :on-click (u/link-evt-handler [:params/new-param])}
+     :on-click (u/link-evt-handler [:params/new-param idx])}
     [:span.me-2 [co/icon :plus-square]] "Add Row"]
    [:button.btn.btn-outline-danger
     {:title "Deletes all parameters in this set"
-     :on-click (u/link-evt-handler [:params/delete-set])}
+     :on-click (u/link-evt-handler [:params/delete-set idx])}
     [:span.me-2 [co/icon :trash]] "Delete"]])
 
 (defn- params-card [idx {:keys [description label-filters parameters]}]
   [:div.card.mb-4
    [:div.card-body
-    (when description
+    #_(when description
       [:h5.card-title description])
+    [:div.row.mb-2
+     [:div.col-md-3
+      [:h6 "Description"]]
+     [:div.col-md-8
+      [:input.form-control
+       {:id (str "description-" idx)
+        :value description
+        :on-changed (u/form-evt-handler [:params/description-changed idx])}]]]
     [:p.card-text
      [:div.row
-      [:div.col [:h6 "Label"]]
-      [:div.col [:h6 "Value"]]]
+      [:div.col-md-3 [:h6 "Label"]]
+      [:div.col-md-8 [:h6 "Value"]]]
      (->> parameters
           (map-indexed (partial param-form idx))
           (into [:form]))]
     [:div.card-body
+     ;; TODO Make this editable
      [:div.mb-2 [label-filters-desc label-filters]]
-     [params-actions]]]])
+     [params-actions idx]]]])
 
 (defn- params-list []
   (let [loading? (rf/subscribe [:params/loading?])

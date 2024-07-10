@@ -182,6 +182,13 @@
             {:description "second set"}]
            (db/edit-params @app-db)))))
 
+(deftest description-changed
+  (testing "updates set description"
+    (is (some? (reset! app-db (db/set-edit-params {} [{:description "original desc"}]))))
+    (rf/dispatch-sync [:params/description-changed 0 "updated desc"])
+    (is (= [{:description "updated desc"}]
+           (db/edit-params @app-db)))))
+
 (deftest label-changed
   (testing "updates param label"
     (is (some? (reset! app-db (db/set-edit-params {}

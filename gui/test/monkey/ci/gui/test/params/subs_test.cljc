@@ -18,6 +18,19 @@
                 [::test-params]
                 nil))
 
+(deftest customer-param
+  (let [cp (rf/subscribe [:customer/param 0 0])]
+    (testing "exists"
+      (is (some? cp)))
+
+    (testing "returns customer edit param in set"
+      (is (some? (reset! app-db (db/set-edit-params {} [{:parameters
+                                                         [{:name "param name"
+                                                           :value "param value"}]}]))))
+      (is (= {:name "param name"
+              :value "param value"}
+             @cp)))))
+
 (deftest params-alerts
   (h/verify-sub [:params/alerts]
                 #(db/set-alerts % ::test-alerts)

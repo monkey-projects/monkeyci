@@ -104,4 +104,4 @@
 (defn update-nth
   "Updates an item in a sequential collection"
   [coll idx f & args]
-  (mc/replace-nth idx (apply f (get coll idx) args) coll))
+  (mc/replace-nth idx (apply f (nth coll idx) args) coll))

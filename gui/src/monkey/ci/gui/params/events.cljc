@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.params.events
   (:require [medley.core :as mc]
+            [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.params.db :as db]
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.utils :as u]
@@ -44,7 +45,9 @@
  :params/cancel-set
  (fn [db [_ idx]]
    ;; Replace with original, or remove if there is no original
-   (if-let [orig (get (db/params db) idx)]
+   (if-let [orig (let [p (db/params db)]
+                   (when (< idx (count p))
+                     (nth p idx)))]
      (db/set-edit-params db (vec (mc/replace-nth idx orig (db/edit-params db))))
      (db/update-edit-params db (comp vec (partial mc/remove-nth idx))))))
 
@@ -56,9 +59,8 @@
 (rf/reg-event-db
  :params/new-param
  (fn [db [_ idx]]
-   (let [orig (get (db/edit-params db) idx)]
-     (db/set-edit-params db (vec (mc/replace-nth idx (update orig :parameters conj {})
-                                                 (db/edit-params db)))))))
+   (let [orig (nth (db/edit-params db) idx)]
+     (db/update-edit-param-set db idx update :parameters concat [{}]))))
 
 (rf/reg-event-db
  :params/delete-param
@@ -98,6 +100,11 @@
  :params/cancel-all
  (fn [db _]
    (db/set-edit-params db (db/params db))))
+
+(rf/reg-event-db
+ :params/description-changed
+ (fn [db [_ set-idx desc]]
+   (db/update-edit-param-set db set-idx assoc :description desc)))
 
 (rf/reg-event-db
  :params/label-changed

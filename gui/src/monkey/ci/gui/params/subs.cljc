@@ -7,3 +7,12 @@
 (u/db-sub :params/alerts db/alerts)
 (u/db-sub :params/loading? (comp true? db/loading?))
 (u/db-sub :params/saving? (comp true? db/saving?))
+
+(rf/reg-sub
+ :customer/param
+ :<- [:customer/params]
+ (fn [params [_ set-idx param-idx]]
+   (some-> params
+           (nth set-idx)
+           :parameters
+           (nth param-idx))))
