@@ -1,8 +1,10 @@
 (ns monkey.ci.gui.test.helpers
-  (:require [martian.core :as martian]
+  (:require [cljs.test :refer-macros [testing is]]
+            [martian.core :as martian]
             [martian.test :as mt]
             [monkey.ci.gui.martian :as mm]
-            [re-frame.core :as rf]))
+            [re-frame.core :as rf]
+            [re-frame.db :refer [app-db]]))
 
 (defn catch-fx [fx]
   (let [inv (atom [])]
@@ -19,3 +21,18 @@
               (mt/respond-with responses))]
     (rf/dispatch [:martian.re-frame/init m])))
 
+(defn verify-sub
+  "Runs basic verifications agains a sub"
+  [sub setter exp-val default-val]
+  (testing (str "sub " sub)
+    (let [s (rf/subscribe sub)]
+      (testing "exists"
+        (is (some? s)))
+
+      (when default-val
+        (testing "has default value"
+          (is (= default-val @s))))
+
+      (testing "returns expected value"
+        (is (some? (reset! app-db (setter {}))))
+        (is (= exp-val @s))))))

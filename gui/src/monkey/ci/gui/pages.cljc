@@ -8,6 +8,7 @@
             [monkey.ci.gui.job.views :as job]
             [monkey.ci.gui.customer.views :as customer]
             [monkey.ci.gui.home.views :as home]
+            [monkey.ci.gui.params.views :as params]
             [monkey.ci.gui.repo.views :as repo]
             [re-frame.core :as rf]))
 
@@ -20,6 +21,7 @@
    :page/customer customer/page
    :page/customer-new customer/page-new
    :page/customer-join home/page-join
+   :page/customer-params params/page
    :page/add-repo customer/add-repo-page
    :page/repo repo/page
    :page/repo-edit repo/edit

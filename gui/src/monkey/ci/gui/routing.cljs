@@ -56,6 +56,7 @@
     ["/c/:customer-id" {:conflicting true
                         :name :page/customer}]
     ["/c/:customer-id/add-repo" :page/add-repo]
+    ["/c/:customer-id/params" :page/customer-params]
     ["/c/:customer-id/r/:repo-id" :page/repo]
     ["/c/:customer-id/r/:repo-id/edit" :page/repo-edit]
     ["/c/:customer-id/r/:repo-id/b/:build-id" :page/build]

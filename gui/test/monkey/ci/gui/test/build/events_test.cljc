@@ -16,6 +16,7 @@
 (deftest build-init
   (letfn [(mock-handlers []
             (rf/reg-event-db :build/load (constantly nil))
+            (rf/reg-event-db :customer/maybe-load (constantly nil))
             (rf/reg-event-db :event-stream/start (constantly nil))
             (rf/reg-event-db :route/on-page-leave (constantly nil)))]
     
@@ -25,6 +26,14 @@
          (let [c (atom [])]
            (mock-handlers)
            (rf/reg-event-db :build/load (fn [_ evt] (swap! c conj evt)))
+           (rf/dispatch [:build/init])
+           (is (= 1 (count @c))))))
+
+      (testing "dispatches customer load event"
+        (rft/run-test-sync
+         (let [c (atom [])]
+           (mock-handlers)
+           (rf/reg-event-db :customer/maybe-load (fn [_ evt] (swap! c conj evt)))
            (rf/dispatch [:build/init])
            (is (= 1 (count @c))))))
       

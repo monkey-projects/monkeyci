@@ -20,10 +20,10 @@
    [:div.row.border-bottom
     [:div.col-1
      [:div.mt-2 [:a {:href "/"} [co/logo]]]]
-    [:div.col-9
+    [:div.col-8
      [:h1 "MonkeyCI"]
-     [:p.lead "Welcome to MonkeyCI, the CI/CD tool that makes your life (and the planet) better!"]]
-    [:div.col-2.text-end
+     [:p.lead "The CI/CD tool that makes your life (and the planet) better!"]]
+    [:div.col-3.text-end
      [user-info]]]
    [:div.row.mt-1
     [:div.col
@@ -36,25 +36,29 @@
      [:span.float-end.small "version " @v]]))
 
 (defn error-boundary [target]
-  (rc/create-class
-   {:constructor
-    (fn [this props]
-      (set! (.-state this) #js {:error nil}))
-    :component-did-catch
-    (fn [this e info]
-      (log/error "An error occurred:" e))
-    :get-derived-state-from-error
-    (fn [error]
-      #js {:error error})
-    :render
-    (fn [this]
-      (rc/as-element
-       (if-let [error (.. this -state -error)]
-         [:div
-          [:h3 "Something went wrong"]
-          [:p "An error has occurred in this component.  We're looking in to it."]]
-         ;; No error, just render target
-         target)))}))
+  #?(:cljs
+     (rc/create-class
+      {:constructor
+       (fn [this props]
+         (set! (.-state this) #js {:error nil}))
+       :component-did-catch
+       (fn [this e info]
+         (log/error "An error occurred:" e))
+       :get-derived-state-from-error
+       (fn [error]
+         #js {:error error})
+       :render
+       (fn [this]
+         (rc/as-element
+          (if-let [error (.. this -state -error)]
+            [:div
+             [:h3 "Something went wrong"]
+             [:p "An error has occurred in this component.  We're looking in to it."]
+             [co/render-alert {:type :danger
+                               :message (str error)}]]
+            ;; No error, just render target
+            target)))})
+     :clj [target]))
 
 (defn welcome
   "Renders welcome panel with the subpanel as a child"

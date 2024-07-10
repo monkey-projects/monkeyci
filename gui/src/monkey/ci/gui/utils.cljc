@@ -1,6 +1,7 @@
 (ns monkey.ci.gui.utils
   (:require [clojure.string :as cs]
             [goog.string :as gstring]
+            [medley.core :as mc]
             [monkey.ci.gui.time :as t]
             [re-frame.core :as rf]))
 
@@ -99,3 +100,8 @@
     (= 1 n) s
     plural plural
     :else (str s "s")))
+
+(defn update-nth
+  "Updates an item in a sequential collection"
+  [coll idx f & args]
+  (mc/replace-nth idx (apply f (nth coll idx) args) coll))
