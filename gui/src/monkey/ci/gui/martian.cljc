@@ -47,6 +47,14 @@
    :direction s/Str
    (s/optional-key :end) s/Int})
 
+(s/defschema UpdateParam
+  {:name s/Str
+   :value s/Str})
+
+(s/defschema UpdateParamSet
+  {(s/optional-key :description) s/Str
+   :parameters [UpdateParam]})
+
 (defn public-route [conf]
   (merge {:method :get
           :produces #{"application/edn"}
@@ -80,6 +88,13 @@
     {:route-name :get-customer-params
      :path-parts (into customer-path ["/param"])
      :path-schema customer-schema})
+
+   (api-route
+    {:route-name :update-customer-params
+     :path-parts (into customer-path ["/param"])
+     :path-schema customer-schema
+     :method :post
+     :body-schema {:params [UpdateParamSet]}})
 
    (api-route
     {:route-name :get-user-customers

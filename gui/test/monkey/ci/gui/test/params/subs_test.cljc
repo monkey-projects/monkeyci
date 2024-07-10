@@ -14,8 +14,8 @@
 
 (deftest customer-params
   (h/verify-sub [:customer/params]
-                #(db/set-params % ::test-params)
-                ::test-params
+                #(db/set-edit-params % [::test-params])
+                [::test-params]
                 nil))
 
 (deftest params-alerts
@@ -27,5 +27,11 @@
 (deftest params-loading?
   (h/verify-sub [:params/loading?]
                 #(db/mark-loading %)
+                true
+                false))
+
+(deftest params-saving?
+  (h/verify-sub [:params/saving?]
+                #(db/mark-saving %)
                 true
                 false))

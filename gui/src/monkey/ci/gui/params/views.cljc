@@ -14,15 +14,17 @@
     [:input.form-control
      {:type :input
       :id (str "label-" idx)
-      :value name}]]
+      :value name
+      :on-change (u/form-evt-handler [:params/label-changed parent-idx idx])}]]
    [:div.col-md-8
     [:textarea.form-control
      {:id (str "value-" idx)
-      :value value}]]
+      :value value
+      :on-change (u/form-evt-handler [:params/value-changed parent-idx idx])}]]
    [:div.col-md-1
     [:button.btn.btn-outline-danger
      {:title "Delete parameter"
-      :on-click (u/link-evt-handler [:param/delete parent-idx idx])}
+      :on-click (u/link-evt-handler [:param/delete-param parent-idx idx])}
      [co/icon :trash]]]])
 
 (defn- label-filters-desc [lf]
@@ -46,16 +48,20 @@
 
 (defn- params-actions []
   [:<>
-   [:button.btn.btn-primary.me-2
+   #_[:button.btn.btn-primary.me-2
+    {:on-click (u/link-evt-handler [:params/save-set])}
     [:span.me-2 [co/icon :save]] "Save Changes"]
    [:button.btn.btn-outline-primary.me-2
-    {:title "Discards all unsaved changes"}
+    {:title "Discards all unsaved changes"
+     :on-click (u/link-evt-handler [:params/cancel-set])}
     [:span.me-2 [co/icon :x-square]] "Cancel"]
    [:button.btn.btn-outline-success.me-2
-    {:title "Adds a new parameter to this set"}
+    {:title "Adds a new parameter to this set"
+     :on-click (u/link-evt-handler [:params/new-param])}
     [:span.me-2 [co/icon :plus-square]] "Add Row"]
    [:button.btn.btn-outline-danger
-    {:title "Deletes all parameters in this set"}
+    {:title "Deletes all parameters in this set"
+     :on-click (u/link-evt-handler [:params/delete-set])}
     [:span.me-2 [co/icon :trash]] "Delete"]])
 
 (defn- params-card [idx {:keys [description label-filters parameters]}]
@@ -71,7 +77,7 @@
           (map-indexed (partial param-form idx))
           (into [:form]))]
     [:div.card-body
-     [:div.col [label-filters-desc label-filters]]
+     [:div.mb-2 [label-filters-desc label-filters]]
      [params-actions]]]])
 
 (defn- params-list []
@@ -83,9 +89,18 @@
        (->> @params
             (map-indexed params-card)
             (into [:<>]))
-       [:button.btn.btn-primary.mt-2
-        {:title "Adds a new empty parameter set"}
-        [:span.me-2 [co/icon :plus-square]] "Add Set"]])))
+       [:div.mt-2
+        [:button.btn.btn-primary.me-2
+         {:on-click (u/link-evt-handler [:params/save-all])}
+         [:span.me-2 [co/icon :save]] "Save All Changes"]
+        [:button.btn.btn-outline-primary.me-2
+         {:title "Discards all unsaved changes"
+          :on-click (u/link-evt-handler [:params/cancel-all])}
+         [:span.me-2 [co/icon :x-square]] "Cancel"]
+        [:button.btn.btn-outline-success
+         {:title "Adds a new empty parameter set"
+          :on-click (u/link-evt-handler [:params/new-set])}
+         [:span.me-2 [co/icon :plus-square]] "Add Set"]]])))
 
 (defn page
   "Customer parameters overview"

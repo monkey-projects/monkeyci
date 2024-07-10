@@ -31,3 +31,8 @@
 
   (testing "returns plural if specified"
     (is (= "cities" (sut/pluralize "city" 2 "cities")))))
+
+(deftest update-nth
+  (testing "applies `f` to the nth item in the list"
+    (is (= [0 2 2]
+           (sut/update-nth [0 1 2] 1 inc)))))

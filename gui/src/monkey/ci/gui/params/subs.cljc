@@ -3,6 +3,7 @@
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
-(u/db-sub :customer/params db/params)
+(u/db-sub :customer/params db/edit-params)
 (u/db-sub :params/alerts db/alerts)
 (u/db-sub :params/loading? (comp true? db/loading?))
+(u/db-sub :params/saving? (comp true? db/saving?))
