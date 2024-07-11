@@ -430,3 +430,6 @@
 
 (defn list-email-registrations [s]
   (p/list-obj s (email-registration-sid)))
+
+(defn delete-email-registration [s id]
+  (p/delete-obj s (email-registration-sid id)))

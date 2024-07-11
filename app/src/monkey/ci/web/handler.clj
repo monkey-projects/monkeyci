@@ -115,6 +115,9 @@
    (s/optional-key :email) s/Str
    (s/optional-key :customers) [Id]})
 
+(s/defschema EmailRegistration
+  {:email s/Str})
+
 (defn- generic-routes
   "Generates generic entity routes.  If child routes are given, they are added
    as additional routes after the full path."
@@ -326,6 +329,14 @@
       {:handler api/update-user
        :parameters {:body User}}}]]])
 
+(def email-registration-routes
+  ["/email-registration"
+   (generic-routes {:getter api/get-email-registration
+                    :creator api/create-email-registration
+                    :deleter api/delete-email-registration
+                    :id-key :email-registration-id
+                    :new-schema EmailRegistration})])
+
 (def routes
   [["/health" {:get health}]
    ["/version" {:get version}]
@@ -335,7 +346,8 @@
    github-routes
    bitbucket-routes
    auth-routes
-   user-routes])
+   user-routes
+   email-registration-routes])
 
 (defn- stringify-body
   "Since the raw body could be read more than once (security, content negotiation...),

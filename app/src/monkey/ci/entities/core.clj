@@ -78,9 +78,9 @@
 (defn select-entities
   "Selects entity from table using filter"
   [conn table f]
-  (select conn {:select :*
-                :from [table]
-                :where f}))
+  (select conn (cond-> {:select :*
+                        :from [table]}
+                 f (assoc :where f))))
 
 (defn select-entity [conn table f]
   (first (select-entities conn table f)))

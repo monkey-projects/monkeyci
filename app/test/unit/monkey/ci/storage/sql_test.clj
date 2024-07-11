@@ -334,7 +334,11 @@
 
       (testing "can list"
         (is (= [(:id er)] (->> (st/list-email-registrations s)
-                               (map :id))))))))
+                               (map :id)))))
+
+      (testing "can delete"
+        (is (true? (st/delete-email-registration s (:id er))))
+        (is (empty? (st/list-email-registrations s)))))))
 
 (deftest make-storage
   (testing "creates sql storage object using connection settings"
