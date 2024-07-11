@@ -204,8 +204,15 @@
     [{:alter-table :builds
       :drop-column :source}])
 
+   (migration
+    (mig-id 18 :build-message)
+    [{:alter-table :builds
+      :add-column [:message :text]}]
+    [{:alter-table :builds
+      :drop-column :message}])
+
    (entity-table-migration
-    18 :email-registrations
+    19 :email-registrations
     [[:email [:varchar 200]]]
     [])])
 

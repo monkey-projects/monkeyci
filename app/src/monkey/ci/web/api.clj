@@ -143,10 +143,11 @@
            (rur/response))
       (rur/not-found {:message (format "Repository %s does not exist" sid)}))))
 
+(def drop-ids (partial map #(dissoc % :id :customer-id)))
+
 (def get-customer-params
   "Retrieves all parameters configured on the customer.  This is for administration purposes."
-  (partial get-list-for-customer (comp (partial map #(dissoc % :id :customer-id))
-                                       st/find-params)))
+  (partial get-list-for-customer (comp drop-ids st/find-params)))
 
 (def get-repo-params
   "Retrieves the parameters that are available for the given repository.  This depends
@@ -157,10 +158,10 @@
   (partial update-for-customer st/save-params))
 
 (def get-customer-ssh-keys
-  (partial get-list-for-customer st/find-ssh-keys))
+  (partial get-list-for-customer (comp drop-ids st/find-ssh-keys)))
 
 (def get-repo-ssh-keys
-  (partial get-for-repo-by-label st/find-ssh-keys (map :private-key)))
+  (partial get-for-repo-by-label (comp drop-ids st/find-ssh-keys) (map :private-key)))
 
 (def update-ssh-keys
   (partial update-for-customer st/save-ssh-keys))

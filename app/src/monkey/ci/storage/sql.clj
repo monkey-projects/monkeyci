@@ -208,31 +208,32 @@
 
 (defn- ssh-key->db [k]
   (-> k
-      (assoc :cuid (:id k))
-      (dissoc :id :customer-id)))
+      (dissoc :id :customer-id)
+      (assoc :cuid (:id k))))
 
-(defn- insert-ssh-key [conn ssh-key]
+(defn- insert-ssh-key [conn ssh-key cust-id]
   (log/debug "Inserting ssh key:" ssh-key)
-  (if-let [cust (ec/select-customer conn (ec/by-cuid (:customer-id ssh-key)))]
-    (ec/insert-ssh-key conn (-> ssh-key
-                                (ssh-key->db)
-                                (assoc :customer-id (:id cust))))
-    (throw (ex-info "Customer not found when inserting ssh key" ssh-key))))
+  (ec/insert-ssh-key conn (-> ssh-key
+                              (ssh-key->db)
+                              (assoc :customer-id cust-id))))
 
 (defn- update-ssh-key [conn ssh-key existing]
   (log/debug "Updating ssh key:" ssh-key)
   (ec/update-ssh-key conn (merge existing (ssh-key->db ssh-key))))
 
-(defn- upsert-ssh-key [conn ssh-key]
+(defn- upsert-ssh-key [conn cust-id ssh-key]
   (spec/valid? :entity/ssh-key ssh-key)
   (if-let [existing (ec/select-ssh-key conn (ec/by-cuid (:id ssh-key)))]
     (update-ssh-key conn ssh-key existing)
-    (insert-ssh-key conn ssh-key)))
+    (insert-ssh-key conn ssh-key cust-id)))
 
-(defn- upsert-ssh-keys [conn ssh-keys]
-  (doseq [k ssh-keys]
-    (upsert-ssh-key conn k))
-  ssh-keys)
+(defn- upsert-ssh-keys [conn cust-cuid ssh-keys]
+  (when (not-empty ssh-keys)
+    (if-let [{cust-id :id} (ec/select-customer conn (ec/by-cuid cust-cuid))]
+      (doseq [k ssh-keys]
+        (upsert-ssh-key conn cust-id k))
+      (throw (ex-info "Customer not found when upserting ssh keys" {:customer-id cust-cuid})))
+    ssh-keys))
 
 (defn- select-ssh-keys [conn customer-id]
   (essh/select-ssh-keys-as-entity conn customer-id))
@@ -357,14 +358,14 @@
 
 (defn- build->db [build]
   (-> build
-      (select-keys [:status :start-time :end-time :idx :git :credits :source])
+      (select-keys [:status :start-time :end-time :idx :git :credits :source :message])
       (mc/update-existing :status name)
       (assoc :display-id (:build-id build)
              :script-dir (get-in build [:script :script-dir]))))
 
 (defn- db->build [build]
   (-> build
-      (select-keys [:status :start-time :end-time :idx :git :credits :source])
+      (select-keys [:status :start-time :end-time :idx :git :credits :source :message])
       (mc/update-existing :status keyword)
       (ec/start-time->int)
       (ec/end-time->int)
@@ -569,7 +570,7 @@
             webhook?
             (upsert-webhook conn obj)
             ssh-key?
-            (upsert-ssh-keys conn obj)
+            (upsert-ssh-keys conn (last sid) obj)
             params?
             (upsert-params conn (last sid) obj)
             email-registration?
