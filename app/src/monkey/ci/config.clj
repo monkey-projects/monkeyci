@@ -14,7 +14,9 @@
             [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [medley.core :as mc]
-            [monkey.ci.utils :as u]))
+            [monkey.ci
+             [sid :as sid]
+             [utils :as u]]))
 
 (def ^:dynamic *global-config-file* "/etc/monkeyci/config.edn")
 (def ^:dynamic *home-config-file* (-> (System/getProperty "user.home")
@@ -186,7 +188,7 @@
                         (-> b
                             (group-keys :git)
                             (group-keys :script)
-                            (mc/update-existing :sid u/parse-sid)
+                            (mc/update-existing :sid sid/parse-sid)
                             (mc/update-existing :git group-keys :author)))))
 
 (defn normalize-config

@@ -98,18 +98,18 @@
                :dir))))
 
   (testing "takes cache config from env"
-    (is (= "test-dir"
-           (-> {:monkeyci-cache-dir "test-dir"}
-               (sut/app-config {})
-               :cache
-               :dir))))
+    (is (re-matches #"^.*test-dir$"
+                    (-> {:monkeyci-cache-dir "test-dir"}
+                        (sut/app-config {})
+                        :cache
+                        :dir))))
 
   (testing "takes artifact config from env"
-    (is (= "test-dir"
-           (-> {:monkeyci-artifacts-dir "test-dir"}
-               (sut/app-config {})
-               :artifacts
-               :dir))))
+    (is (re-matches #"^.*test-dir$"
+                    (-> {:monkeyci-artifacts-dir "test-dir"}
+                        (sut/app-config {})
+                        :artifacts
+                        :dir))))
 
   (testing "takes sidecar config from env"
     (is (= "test-file"

@@ -49,7 +49,7 @@
                   [table col]))
 
 (defn- mig-id [idx desc]
-  (format "%03d-%s" idx desc))
+  (format "%03d-%s" idx (name desc)))
 
 (defn table-migration [idx table cols indices]
   (migration (mig-id idx (name table))
