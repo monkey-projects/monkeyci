@@ -209,7 +209,12 @@
     [{:alter-table :builds
       :add-column [:message :text]}]
     [{:alter-table :builds
-      :drop-column :message}])])
+      :drop-column :message}])
+
+   (entity-table-migration
+    19 :email-registrations
+    [[:email [:varchar 200]]]
+    [])])
 
 (defn- format-migration [sql-opts m]
   (letfn [(format-sql [stmt]

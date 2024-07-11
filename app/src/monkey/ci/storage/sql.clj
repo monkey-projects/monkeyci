@@ -509,6 +509,30 @@
     (->> (jr/select-user-join-requests conn user-cuid)
          (map db->jr))))
 
+(def email-registration? (partial global-sid? st/email-registrations))
+
+(defn- db->email-registration [reg]
+  (-> reg
+      (dissoc :cuid)
+      (assoc :id (:cuid reg))))
+
+(defn- select-email-registration [conn cuid]
+  (-> (ec/select-email-registration conn (ec/by-cuid cuid))
+      (db->email-registration)))
+
+(defn- select-email-registrations [conn]
+  (->> (ec/select-email-registrations conn nil)
+       (map db->email-registration)))
+
+(defn- insert-email-registration [conn reg]
+  ;; Updates not supported
+  (ec/insert-email-registration conn (-> reg
+                                         (assoc :cuid (:id reg))
+                                         (dissoc :id))))
+
+(defn- delete-email-registration [conn cuid]
+  (ec/delete-email-registrations conn (ec/by-cuid cuid)))
+
 (defn- sid-pred [t sid]
   (t sid))
 
@@ -529,7 +553,9 @@
       params?
       (select-params conn (second sid))
       join-request?
-      (select-join-request conn (global-sid->cuid sid))))
+      (select-join-request conn (global-sid->cuid sid))
+      email-registration?
+      (select-email-registration conn (global-sid->cuid sid))))
   
   (write-obj [_ sid obj]
     (when (condp sid-pred sid
@@ -547,6 +573,8 @@
             (upsert-ssh-keys conn (last sid) obj)
             params?
             (upsert-params conn (last sid) obj)
+            email-registration?
+            (insert-email-registration conn obj)
             (log/warn "Unrecognized sid when writing:" sid))
       sid))
 
@@ -561,13 +589,19 @@
   (delete-obj [_ sid]
     (deleted?
      ;; TODO Allow deleting other entities
-     (when (customer? sid)
-       (delete-customer conn (global-sid->cuid sid)))))
+     (condp sid-pred sid
+       customer?
+       (delete-customer conn (global-sid->cuid sid))
+       email-registration?
+       (delete-email-registration conn (global-sid->cuid sid))
+       (log/warn "Deleting entity" sid "is not supported"))))
 
   (list-obj [_ sid]
     (condp sid-pred sid
       build-repo?
       (select-repo-builds conn (rest sid))
+      email-registration?
+      (select-email-registrations conn)
       (log/warn "Unable to list objects for sid" sid)))
 
   co/Lifecycle

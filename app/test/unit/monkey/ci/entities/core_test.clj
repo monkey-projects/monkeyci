@@ -290,3 +290,17 @@
       (testing "can delete"
         (is (= 1 (sut/delete-join-requests conn (sut/by-user (:id user)))))
         (is (empty? (sut/select-join-requests conn (sut/by-customer (:id cust)))))))))
+
+(deftest ^:sql email-registration
+  (eh/with-prepared-db conn
+    (let [reg (eh/gen-email-registration)]
+      (testing "can insert"
+        (is (number? (:id (sut/insert-email-registration conn reg)))))
+
+      (testing "can select by cuid"
+        (is (= reg (-> (sut/select-email-registration conn (sut/by-cuid (:cuid reg)))
+                       (select-keys (keys reg))))))
+
+      (testing "can delete"
+        (is (= 1 (sut/delete-email-registrations conn (sut/by-cuid (:cuid reg)))))
+        (is (nil? (sut/select-email-registration conn (sut/by-cuid (:cuid reg)))))))))

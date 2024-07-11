@@ -96,10 +96,11 @@
                         :message (str "Failed to save customer params: " (u/error-msg err))}])
        (db/unmark-saving))))
 
-(rf/reg-event-db
+(rf/reg-event-fx
  :params/cancel-all
- (fn [db _]
-   (db/set-edit-params db (db/params db))))
+ (fn [{:keys [db]} _]
+   {:db (db/set-edit-params db (db/params db))
+    :dispatch [:route/goto :page/customer {:customer-id (r/customer-id db)}]}))
 
 (rf/reg-event-db
  :params/description-changed

@@ -403,3 +403,9 @@
         ;; See https://www.nginx.com/resources/wiki/start/topics/examples/x-accel/#x-accel-buffering
         (rur/header "x-accel-buffering" "no")
         (rur/header "cache-control" "no-cache"))))
+
+(c/make-entity-endpoints "email-registration"
+                         {:get-id (c/id-getter :email-registration-id)
+                          :getter st/find-email-registration
+                          :saver st/save-email-registration
+                          :deleter st/delete-email-registration})

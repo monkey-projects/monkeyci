@@ -117,3 +117,9 @@
   (-> (s/keys :req-un [:entity/user-id :entity/customer-id :join-request/status]
               :opt-un [:join-request/request-msg :join-request/response-msg])
       (s/merge :entity/common)))
+
+;; Email registrations are created then an anonymous user registers their email
+;; in order to receive mailing updates.
+(s/def :entity/email-registration
+  (-> (s/keys :req-un [:entity/email])
+      (s/merge :entity/common)))

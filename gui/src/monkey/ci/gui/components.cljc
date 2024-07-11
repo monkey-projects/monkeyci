@@ -66,13 +66,13 @@
 (defn build-result [r]
   (let [r (or r "running")
         type (condp = (keyword r)
-               :error :text-bg-danger
-               :failure :text-bg-danger
-               :success :text-bg-success
-               :running :text-bg-primary
-               :canceled :text-bg-warning
-               :skipped :text-bg-warning
-               :text-bg-secondary)]
+               :error :bg-danger
+               :failure :bg-danger
+               :success :bg-success
+               :running :bg-primary
+               :canceled :bg-warning
+               :skipped :bg-warning
+               :bg-secondary)]
     [:span {:class (str "badge " (name type))} r]))
 
 (defn- item-id [id idx]

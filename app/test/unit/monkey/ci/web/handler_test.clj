@@ -176,7 +176,8 @@
                        (app)
                        :status)))))))
 
-(defn- verify-entity-endpoints [{:keys [path base-entity updated-entity name creator]}]
+(defn- verify-entity-endpoints [{:keys [path base-entity updated-entity name creator can-update? can-delete?]
+                                 :or {can-update? true can-delete? false}}]
   (let [st (st/make-memory-storage)
         app (make-test-app st)
         path (or path (str "/" name))]
@@ -198,14 +199,23 @@
             (is (= 200 (:status r)))
             (is (= entity (h/reply->json r)))))
 
-        (testing (str "`PUT` updates existing " name)
-          (let [id (st/new-id)
-                _ (creator st (assoc base-entity :id id))
-                r (-> (h/json-request :put (str path "/" id)
-                                      (cond-> base-entity
-                                        updated-entity (merge updated-entity)))
-                      (app))]
-            (is (= 200 (:status r)))))))))
+        (when can-update?
+          (testing (str "`PUT` updates existing " name)
+            (let [id (st/new-id)
+                  _ (creator st (assoc base-entity :id id))
+                  r (-> (h/json-request :put (str path "/" id)
+                                        (cond-> base-entity
+                                          updated-entity (merge updated-entity)))
+                        (app))]
+              (is (= 200 (:status r))))))
+
+        (when can-delete?
+          (testing (str "`DELETE` deletes existing " name)
+            (let [id (st/new-id)
+                  _ (creator st (assoc base-entity :id id))
+                  r (-> (mock/request :delete (str path "/" id))
+                        (app))]
+              (is (= 204 (:status r))))))))))
 
 (deftype TestLogRetriever [logs]
   l/LogRetriever
@@ -1010,3 +1020,9 @@
 
     (testing "`DELETE /:id` deletes artifact")))
 
+(deftest email-registration-endpoints
+  (verify-entity-endpoints {:name "email-registration"
+                            :base-entity {:email "test@monkeyci.com"}
+                            :creator st/save-email-registration
+                            :can-update? false
+                            :can-delete? true}))

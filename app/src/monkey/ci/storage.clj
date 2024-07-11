@@ -418,3 +418,18 @@
                   last
                   inc)
          1))))
+
+(def email-registrations :email-registrations)
+(def email-registration-sid (partial global-sid email-registrations))
+
+(defn save-email-registration [s reg]
+  (p/write-obj s (email-registration-sid (:id reg)) reg))
+
+(defn find-email-registration [s id]
+  (p/read-obj s (email-registration-sid id)))
+
+(defn list-email-registrations [s]
+  (p/list-obj s (email-registration-sid)))
+
+(defn delete-email-registration [s id]
+  (p/delete-obj s (email-registration-sid id)))
