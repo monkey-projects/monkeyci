@@ -508,6 +508,16 @@
     (->> (jr/select-user-join-requests conn user-cuid)
          (map db->jr))))
 
+(def email-registration? (partial global-sid? st/email-registrations))
+
+(defn- select-email-registration [conn cuid]
+  ;; TODO
+  )
+
+(defn- upsert-email-registration [conn reg]
+  ;; TODO
+  )
+
 (defn- sid-pred [t sid]
   (t sid))
 
@@ -528,7 +538,9 @@
       params?
       (select-params conn (second sid))
       join-request?
-      (select-join-request conn (global-sid->cuid sid))))
+      (select-join-request conn (global-sid->cuid sid))
+      email-registration?
+      (select-email-registration conn (global-sid->cuid sid))))
   
   (write-obj [_ sid obj]
     (when (condp sid-pred sid
@@ -546,6 +558,8 @@
             (upsert-ssh-keys conn obj)
             params?
             (upsert-params conn (last sid) obj)
+            email-registration?
+            (upsert-email-registration conn obj)
             (log/warn "Unrecognized sid when writing:" sid))
       sid))
 

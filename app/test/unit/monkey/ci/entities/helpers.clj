@@ -85,3 +85,6 @@
 
 (defn gen-join-request []
   (gen-spec :db/join-request))
+
+(defn gen-email-registration []
+  (gen-spec :db/email-registration))

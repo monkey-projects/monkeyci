@@ -235,3 +235,6 @@
 
 (defn gen-join-request []
   (gen-entity :entity/join-request))
+
+(defn gen-email-registration []
+  (gen-entity :entity/email-registration))

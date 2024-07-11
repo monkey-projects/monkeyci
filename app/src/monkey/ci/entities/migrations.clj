@@ -202,7 +202,12 @@
     [{:alter-table :builds
       :add-column [:source [:varchar 30]]}]
     [{:alter-table :builds
-      :drop-column :source}])])
+      :drop-column :source}])
+
+   (entity-table-migration
+    18 :email-registrations
+    [[:email [:varchar 200]]]
+    [])])
 
 (defn- format-migration [sql-opts m]
   (letfn [(format-sql [stmt]

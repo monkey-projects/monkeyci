@@ -325,6 +325,17 @@
         (is (= [(:id jr)] (->> (st/list-user-join-requests s (:id user))
                                (map :id))))))))
 
+(deftest ^:sql email-registrations
+  (with-storage conn s
+    (let [er (h/gen-email-registration)]
+      (testing "can create and retrieve"
+        (is (sid/sid? (st/save-email-registration s er)))
+        (is (= er (st/find-email-registration s (:id er)))))
+
+      (testing "can list"
+        (is (= [(:id er)] (->> (st/list-email-registrations s)
+                               (map :id))))))))
+
 (deftest make-storage
   (testing "creates sql storage object using connection settings"
     (let [s (st/make-storage {:storage {:type :sql

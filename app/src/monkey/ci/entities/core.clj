@@ -308,3 +308,4 @@
        (insert-entities conn :customer-param-values [:params-id :name :value])))
 
 (defentity join-request)
+(defentity email-registration)

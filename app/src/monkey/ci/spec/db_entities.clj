@@ -106,3 +106,7 @@
   (-> (s/keys :req-un [:db/user-id :db/customer-id :join-request-db/status]
               :opt-un [:join-request-db/request-msg :join-request-db/response-msg])
       (s/merge :db/common)))
+
+(s/def :db/email-registration
+  (-> (s/keys :req-un [:db/email])
+      (s/merge :db/common)))
