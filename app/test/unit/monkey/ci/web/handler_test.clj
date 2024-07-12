@@ -500,9 +500,13 @@
           
           (testing (str "empty when no " desc)
             (is (empty? (get-entity full-path))))
-          
-          (testing (str "can write " desc)
-            (is (= 200 (:status (save-entity full-path entity)))))
+
+          (let [r (save-entity full-path entity)]
+            (testing (str "can write " desc)
+              (is (= 200 (:status r))))
+            
+            (testing "returns ids on newly created entities"
+              (is (every? (comp some? :id) (h/reply->json r)))))
 
           (testing (str "can partially update using `PATCH`"))
           

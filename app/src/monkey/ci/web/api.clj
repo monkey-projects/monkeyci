@@ -123,7 +123,11 @@
       (rur/response)))
 
 (defn- update-for-customer [updater req]
-  (let [p (body req)]
+  (let [assign-id (fn [{:keys [id] :as obj}]
+                    (cond-> obj
+                      (nil? id) (assoc :id (st/new-id))))
+        p (->> (body req)
+               (map assign-id))]
     ;; TODO Allow patching values so we don't have to send back all secrets to client
     (when (updater (c/req->storage req) (customer-id req) p)
       (rur/response p))))
