@@ -411,5 +411,15 @@
 (c/make-entity-endpoints "email-registration"
                          {:get-id (c/id-getter :email-registration-id)
                           :getter st/find-email-registration
-                          :saver st/save-email-registration
                           :deleter st/delete-email-registration})
+
+(defn create-email-registration
+  "Custom creation endpoint that ensures emails are not registered twice."
+  [req]
+  (let [st (c/req->storage req)
+        {:keys [email] :as body} (-> (c/body req)
+                                     (assoc :id (st/new-id)))]
+    (if-let [existing (st/find-email-registration-by-email st email)]
+      (rur/response existing)
+      (when (st/save-email-registration st body)
+        (rur/created (:id body) body)))))

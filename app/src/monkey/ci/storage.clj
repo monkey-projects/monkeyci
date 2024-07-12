@@ -428,8 +428,20 @@
 (defn find-email-registration [s id]
   (p/read-obj s (email-registration-sid id)))
 
-(defn list-email-registrations [s]
-  (p/list-obj s (email-registration-sid)))
+(def list-email-registrations
+  (override-or
+   [:email-registration :list]
+   (fn [s]
+     (->> (p/list-obj s (email-registration-sid))
+          (map (partial find-email-registration s))))))
+
+(def find-email-registration-by-email
+  (override-or
+   [:email-registration :find-by-email]
+   (fn [s email]
+     (->> (list-email-registrations s)
+          (filter (comp (partial = email) :email))
+          (first)))))
 
 (defn delete-email-registration [s id]
   (p/delete-obj s (email-registration-sid id)))

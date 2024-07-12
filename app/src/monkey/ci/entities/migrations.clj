@@ -214,7 +214,12 @@
    (entity-table-migration
     19 :email-registrations
     [[:email [:varchar 200]]]
-    [])])
+    [])
+
+   (migration
+    (mig-id 20 :email-reg-uniqueness)
+    [(h/create-index [:unique :email-reg-idx] [:email-registrations :email])]
+    [(h/drop-index :email-reg-idx)])])
 
 (defn- format-migration [sql-opts m]
   (letfn [(format-sql [stmt]

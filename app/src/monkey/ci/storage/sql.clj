@@ -521,7 +521,11 @@
   (-> (ec/select-email-registration conn (ec/by-cuid cuid))
       (db->email-registration)))
 
-(defn- select-email-registrations [conn]
+(defn- select-email-registration-by-email [{:keys [conn]} email]
+  (-> (ec/select-email-registration conn [:= :email email])
+      (db->email-registration)))
+
+(defn- select-email-registrations [{:keys [conn]}]
   (->> (ec/select-email-registrations conn nil)
        (map db->email-registration)))
 
@@ -601,8 +605,6 @@
     (condp sid-pred sid
       build-repo?
       (select-repo-builds conn (rest sid))
-      email-registration?
-      (select-email-registrations conn)
       (log/warn "Unable to list objects for sid" sid)))
 
   co/Lifecycle
@@ -663,7 +665,10 @@
    :join-request
    {:list-user select-user-join-requests}
    :build
-   {:list-with-details select-repo-build-details}})
+   {:list-with-details select-repo-build-details}
+   :email-registration
+   {:list select-email-registrations
+    :find-by-email select-email-registration-by-email}})
 
 (defn make-storage [conn]
   (map->SqlStorage {:conn conn

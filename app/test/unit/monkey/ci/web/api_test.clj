@@ -478,3 +478,14 @@
                      :status)))
       (is (= "updated user" (-> (st/find-user-by-type st [:github 543])
                                 :name))))))
+
+(deftest create-email-registration
+  (testing "does not create same email twice"
+    (let [{st :storage :as rt} (h/test-rt)
+          email "duplicate@monkeyci.com"
+          req (-> rt
+                  (h/->req)
+                  (h/with-body {:email email}))]
+      (is (some? (st/save-email-registration st {:email email})))
+      (is (= 200 (:status (sut/create-email-registration req))))
+      (is (= 1 (count (st/list-email-registrations st)))))))

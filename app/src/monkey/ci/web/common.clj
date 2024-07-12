@@ -97,9 +97,9 @@
   [entity {:keys [get-id getter saver deleter new-id] :or {new-id default-id}}]
   (letfn [(make-ep [[p f]]
             (intern *ns* (symbol (str p entity)) f))]
-    (->> (cond-> {"get-" (entity-getter get-id getter)
-                  "create-" (entity-creator saver new-id)
-                  "update-" (entity-updater get-id getter saver)}
+    (->> (cond-> {"get-" (entity-getter get-id getter)}
+           saver (assoc "create-" (entity-creator saver new-id)
+                        "update-" (entity-updater get-id getter saver))
            deleter (assoc "delete-" (entity-deleter get-id deleter)))
          (map make-ep)
          (doall))))

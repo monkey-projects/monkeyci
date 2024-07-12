@@ -337,6 +337,9 @@
         (is (sid/sid? (st/save-email-registration s er)))
         (is (= er (st/find-email-registration s (:id er)))))
 
+      (testing "can retrieve by email"
+        (is (= er (st/find-email-registration-by-email s (:email er)))))
+
       (testing "can list"
         (is (= [(:id er)] (->> (st/list-email-registrations s)
                                (map :id)))))

@@ -12,7 +12,7 @@
 
 ;; Version assigned when building main branch
 ;; TODO Determine automatically
-(def snapshot-version "0.6.5-SNAPSHOT")
+(def snapshot-version "0.6.6-SNAPSHOT")
 
 (def tag-regex #"^refs/tags/(\d+\.\d+\.\d+(\.\d+)?$)")
 
@@ -225,28 +225,29 @@
 (defn deploy
   "Job that auto-deploys the image to staging by pushing the new image tag to infra repo."
   [ctx]
-  (when (and (should-publish? ctx) (not (release? ctx)))
-    (core/action-job
-     "deploy"
-     (fn [ctx]
-       (let [images (->> (zipmap ((juxt publish-app? publish-gui?) ctx)
+  (let [images (->> (zipmap ((juxt publish-app? publish-gui?) ctx)
                                  ["monkeyci-api" "monkeyci-gui"])
                          (filter (comp true? first))
                          (map (fn [[_ img]]
                                 [img (image-version ctx)]))
                          (into {}))]
-         (when-not (empty? images)
-           (if-let [token (get (api/build-params ctx) "github-token")]
-             ;; Patch the kustomization file
-             (if (infra/patch+commit! (infra/make-client token)
-                                      :staging ; Only staging for now
-                                      images)
-               core/success
-               (assoc core/failure :message "Unable to patch version in infra repo"))
-             (assoc core/failure :message "No github token provided")))))
-     {:dependencies (->> [(when (publish-app? ctx) "publish-app-img")
-                          (when (publish-gui? ctx) "publish-gui-img")]
-                         (remove nil?))})))
+    (when (and (should-publish? ctx)
+               (not (release? ctx))
+               (not-empty images))
+      (core/action-job
+       "deploy"
+       (fn [ctx]
+         (if-let [token (get (api/build-params ctx) "github-token")]
+           ;; Patch the kustomization file
+           (if (infra/patch+commit! (infra/make-client token)
+                                    :staging ; Only staging for now
+                                    images)
+             core/success
+             (assoc core/failure :message "Unable to patch version in infra repo"))
+           (assoc core/failure :message "No github token provided")))
+       {:dependencies (->> [(when (publish-app? ctx) "publish-app-img")
+                            (when (publish-gui? ctx) "publish-gui-img")]
+                           (remove nil?))}))))
 
 ;; TODO Add jobs that auto-deploy to staging after running some sanity checks
 ;; We could do a git push with updated kustomization file.
