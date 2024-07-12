@@ -227,7 +227,7 @@
   [ctx]
   (when (and (should-publish? ctx) (not (release? ctx)))
     (core/action-job
-     id
+     "deploy"
      (fn [ctx]
        (let [images (->> (zipmap ((juxt publish-app? publish-gui?) ctx)
                                  ["monkeyci-api" "monkeyci-gui"])
