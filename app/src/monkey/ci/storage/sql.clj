@@ -253,7 +253,8 @@
     (ec/update-customer-param-value conn pv)))
 
 (defn- delete-param-values [conn values]
-  (ec/delete-customer-param-values conn [:in :id (map :id values)]))
+  (when-not (empty? values)
+    (ec/delete-customer-param-values conn [:in :id (map :id values)])))
 
 (defn- param->db [param cust-id]
   (-> param

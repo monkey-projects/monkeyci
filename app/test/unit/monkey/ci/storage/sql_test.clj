@@ -210,7 +210,12 @@
         (let [pv [{:name "new-param"
                    :value "new value"}]]
           (is (sid/sid? (st/save-params s cust-id [(assoc params :parameters pv)])))
-          (is (= pv (-> (st/find-params s cust-id) first :parameters))))))))
+          (let [matches (st/find-params s cust-id)]
+            (is (= 1 (count matches)))
+            (is (= pv (-> matches first :parameters))))))
+
+      (testing "empty for nonexisting customer"
+        (is (empty? (st/find-params s (cuid/random-cuid))))))))
 
 (deftest ^:sql users
   (with-storage conn s

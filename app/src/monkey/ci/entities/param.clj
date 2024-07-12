@@ -26,10 +26,11 @@
                               (ec/convert-label-filters-select)
                               (as-> x (mc/remove-vals nil? x))))
                         params))]
-    (->> {:select [:pv.*]
-          :from [[:customer-param-values :pv]]
-          :join [[:customer-params :cp] [:= :cp.id :pv.params-id]]
-          :where [:in :cp.id (map :id params)]}
-         (ec/select conn)
-         (group-by :params-id)
-         (->params))))
+    (when-not (empty? params)
+      (->> {:select [:pv.*]
+            :from [[:customer-param-values :pv]]
+            :join [[:customer-params :cp] [:= :cp.id :pv.params-id]]
+            :where [:in :cp.id (map :id params)]}
+           (ec/select conn)
+           (group-by :params-id)
+           (->params)))))

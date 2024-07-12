@@ -98,12 +98,14 @@
   [LabelFilterConjunction])
 
 (s/defschema Parameters
-  {:parameters [ParameterValue]
+  {(s/optional-key :id) Id
+   :parameters [ParameterValue]
    (s/optional-key :description) s/Str
    :label-filters [LabelFilter]})
 
 (s/defschema SshKeys
-  {:private-key s/Str
+  {(s/optional-key :id) Id
+   :private-key s/Str
    :public-key s/Str ; TODO It may be possible to extract public key from private
    (s/optional-key :description) s/Str
    :label-filters [LabelFilter]})

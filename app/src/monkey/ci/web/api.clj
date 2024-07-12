@@ -143,7 +143,7 @@
            (rur/response))
       (rur/not-found {:message (format "Repository %s does not exist" sid)}))))
 
-(def drop-ids (partial map #(dissoc % :id :customer-id)))
+(def drop-ids (partial map #(dissoc % :customer-id)))
 
 (def get-customer-params
   "Retrieves all parameters configured on the customer.  This is for administration purposes."
