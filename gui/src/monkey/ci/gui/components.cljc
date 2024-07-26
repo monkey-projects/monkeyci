@@ -69,7 +69,7 @@
                :error :bg-danger
                :failure :bg-danger
                :success :bg-success
-               :running :bg-primary
+               :running :bg-info
                :canceled :bg-warning
                :skipped :bg-warning
                :bg-secondary)]

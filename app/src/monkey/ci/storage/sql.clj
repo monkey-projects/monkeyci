@@ -518,12 +518,12 @@
       (assoc :id (:cuid reg))))
 
 (defn- select-email-registration [conn cuid]
-  (-> (ec/select-email-registration conn (ec/by-cuid cuid))
-      (db->email-registration)))
+  (some-> (ec/select-email-registration conn (ec/by-cuid cuid))
+          (db->email-registration)))
 
 (defn- select-email-registration-by-email [{:keys [conn]} email]
-  (-> (ec/select-email-registration conn [:= :email email])
-      (db->email-registration)))
+  (some-> (ec/select-email-registration conn [:= :email email])
+          (db->email-registration)))
 
 (defn- select-email-registrations [{:keys [conn]}]
   (->> (ec/select-email-registrations conn nil)

@@ -340,6 +340,9 @@
       (testing "can retrieve by email"
         (is (= er (st/find-email-registration-by-email s (:email er)))))
 
+      (testing "`nil` if not found by email"
+        (is (nil? (st/find-email-registration-by-email s "nonexisting"))))
+
       (testing "can list"
         (is (= [(:id er)] (->> (st/list-email-registrations s)
                                (map :id)))))
