@@ -22,7 +22,7 @@
      [:div.mt-2 [:a {:href "/"} [co/logo]]]]
     [:div.col-8
      [:h1 "MonkeyCI"]
-     [:p.lead "The CI/CD tool that makes your life (and the planet) better!"]]
+     [:p.lead "Unleashing full power to build your code!"]]
     [:div.col-3.text-end
      [user-info]]]
    [:div.row.mt-1
