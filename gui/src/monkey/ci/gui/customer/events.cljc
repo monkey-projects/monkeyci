@@ -4,6 +4,7 @@
             [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.martian]
             [monkey.ci.gui.customer.db :as db]
+            [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.login.db :as ldb]
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.utils :as u]
@@ -192,28 +193,20 @@
 
 (rf/reg-event-fx
  :customer/load-recent-builds
- (fn [{:keys [db]} [_ cust-id]]
-   {:dispatch [:secure-request
-               :get-recent-builds
-               {:customer-id cust-id}
-               [:customer/load-recent-builds--success]
-               [:customer/load-recent-builds--failed]]
-    :db (-> db
-            (db/set-loading db/recent-builds)
-            (db/reset-alerts db/recent-builds))}))
+ (lo/loader-fn db/recent-builds
+               (fn [_ _ [_ cust-id]]
+                 [:secure-request
+                  :get-recent-builds
+                  {:customer-id cust-id}
+                  [:customer/load-recent-builds--success]
+                  [:customer/load-recent-builds--failed]])))
 
 (rf/reg-event-db
  :customer/load-recent-builds--success
- (fn [db [_ {builds :body}]]
-   (-> db
-       (db/set-recent-builds builds)
-       (db/unset-loading db/recent-builds))))
+ (fn [db [_ resp]]
+   (lo/on-success db db/recent-builds resp)))
 
 (rf/reg-event-db
  :customer/load-recent-builds--failed
  (fn [db [_ err]]
-   (-> db
-       (db/set-alerts db/recent-builds
-                      [{:type :danger
-                        :message (str "Failed to load recent builds: " (u/error-msg err))}])
-       (db/unset-loading db/recent-builds))))
+   (lo/on-failure db db/recent-builds "Failed to load recent builds: " err)))
