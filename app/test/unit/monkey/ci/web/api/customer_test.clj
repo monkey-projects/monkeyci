@@ -7,7 +7,7 @@
              [utils :as u]]
             [monkey.ci.web.api.customer :as sut]))
 
-(deftest latest-builds
+(deftest recent-builds
   (h/with-memory-store st
     (testing "status `404` if customer does not exist"
       (is (= 404 (-> {:storage st}
@@ -15,10 +15,10 @@
                      (assoc :parameters
                             {:path
                              {:customer-id "non-existing"}})
-                     (sut/latest-builds)
+                     (sut/recent-builds)
                      :status))))
 
-    (testing "retrieves builds started in latest 24h"
+    (testing "retrieves builds started in recent 24h"
       (let [repo (h/gen-repo)
             cust (-> (h/gen-cust)
                      (assoc :repos {(:id repo) repo}))
@@ -44,5 +44,5 @@
                    (assoc :parameters
                           {:path
                            {:customer-id (:id cust)}})
-                   (sut/latest-builds)
+                   (sut/recent-builds)
                    :body)))))))

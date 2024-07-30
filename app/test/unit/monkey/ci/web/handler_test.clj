@@ -327,8 +327,8 @@
               cust (h/gen-cust)]
           (is (some? (st/save-customer st cust)))
           
-          (testing "`/latest` retrieves builds from latest 24h"
-            (is (= 200 (-> (mock/request :get (str "/customer/" (:id cust) "/builds/latest"))
+          (testing "`/recent` retrieves builds from latest 24h"
+            (is (= 200 (-> (mock/request :get (str "/customer/" (:id cust) "/builds/recent"))
                            (app)
                            :status))))))))
 

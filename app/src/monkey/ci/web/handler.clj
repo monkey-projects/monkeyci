@@ -263,7 +263,7 @@
 
 (def customer-build-routes
   ["/builds"
-   [["/latest" {:get {:handler cust-api/latest-builds}}]]])
+   [["/recent" {:get {:handler cust-api/recent-builds}}]]])
 
 (def customer-routes
   ["/customer"

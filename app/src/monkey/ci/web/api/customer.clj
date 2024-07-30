@@ -6,7 +6,7 @@
             [monkey.ci.web.common :as c]
             [ring.util.response :as rur]))
 
-(defn latest-builds [req]
+(defn recent-builds [req]
   (let [st (c/req->storage req)
         cid (c/customer-id req)]
     (if-let [cust (st/find-customer st cid)]
