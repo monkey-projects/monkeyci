@@ -455,7 +455,7 @@
                   (drop-nil))
         (not-empty jobs) (assoc-in [:script :jobs] jobs)))))
 
-(defn- select-repo-build-details
+(defn- select-repo-builds
   "Retrieves all builds and their details for given repository"
   [{:keys [conn]} [cust-id repo-id]]
   (letfn [(add-ids [b]
@@ -471,8 +471,12 @@
 (defn build-exists? [conn sid]
   (some? (apply eb/select-build-by-sid conn sid)))
 
-(defn- select-repo-builds [conn sid]
+(defn- select-repo-build-ids [conn sid]
   (apply eb/select-build-ids-for-repo conn sid))
+
+(defn- select-customer-builds-since [{:keys [conn]} cust-id ts]
+  (->> (eb/select-builds-for-customer-since conn cust-id ts)
+       (map db->build)))
 
 (defn- select-max-build-idx [{:keys [conn]} [cust-id repo-id]]
   ;; TODO Use repo-indices table instead
@@ -604,7 +608,7 @@
   (list-obj [_ sid]
     (condp sid-pred sid
       build-repo?
-      (select-repo-builds conn (rest sid))
+      (select-repo-build-ids conn (rest sid))
       (log/warn "Unable to list objects for sid" sid)))
 
   co/Lifecycle
@@ -665,7 +669,8 @@
    :join-request
    {:list-user select-user-join-requests}
    :build
-   {:list-with-details select-repo-build-details}
+   {:list select-repo-builds
+    :list-since select-customer-builds-since}
    :email-registration
    {:list select-email-registrations
     :find-by-email select-email-registration-by-email}})

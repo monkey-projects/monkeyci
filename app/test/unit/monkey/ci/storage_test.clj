@@ -110,8 +110,8 @@
         (is (sid/sid? (sut/save-params st cid params)))
         (is (= params (sut/find-params st cid)))))))
 
-(deftest list-builds
-  (testing "lists all builds for given repo"
+(deftest list-build-ids
+  (testing "lists all build ids for given repo"
     (h/with-memory-store st
       (let [repo-sid ["test-customer" "test-repo"]
             builds (->> (range)
@@ -122,11 +122,11 @@
             (is (sid/sid? (sut/save-build
                            st
                            (zipmap [:customer-id :repo-id :build-id] sid))))))
-        (let [l (sut/list-builds st repo-sid)]
+        (let [l (sut/list-build-ids st repo-sid)]
           (is (= (count builds) (count l)))
           (is (= builds l)))))))
 
-(deftest list-builds-with-detais
+(deftest list-builds
   (testing "lists and fetches all builds for given repo"
     (h/with-memory-store st
       (let [repo-sid ["test-customer" "test-repo"]
@@ -138,7 +138,7 @@
             (is (sid/sid? (sut/save-build
                            st
                            (zipmap [:customer-id :repo-id :build-id] sid))))))
-        (let [l (sut/list-builds-with-details st repo-sid)]
+        (let [l (sut/list-builds st repo-sid)]
           (is (= (count builds) (count l)))
           (is (= builds (map :build-id l))))))))
 
@@ -156,6 +156,23 @@
           (is (sid/sid? (sut/save-build st b))))
         (let [l (sut/find-latest-build st repo-sid)]
           (is (= (last builds) l)))))))
+
+(deftest list-builds-since
+  (testing "retrieves builds since given timestamp"
+    (h/with-memory-store st
+      (let [cust-id (sut/new-id)
+            repo-id (sut/new-id)
+            old-build {:customer-id cust-id
+                       :repo-id repo-id
+                       :start-time 100}
+            new-build {:customer-id cust-id
+                       :repo-id repo-id
+                       :start-time 200}]
+        (is (sid/sid? (sut/save-customer st {:id cust-id
+                                             :repos {repo-id {:id repo-id}}})))
+        (is (sid/sid? (sut/save-build st old-build)))
+        (is (sid/sid? (sut/save-build st new-build)))
+        (is (= [new-build] (sut/list-builds-since st cust-id 150)))))))
 
 (deftest find-next-build-idx
   (testing "max build idx plus one for this repo"

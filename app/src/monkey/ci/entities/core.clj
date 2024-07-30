@@ -196,8 +196,12 @@
 (defn- time->int [k x]
   (mc/update-existing x k (u/or-nil ->epoch)))
 
+(defn ->ts [s]
+  (when s
+    (java.sql.Timestamp. s)))
+
 (defn- int->time [k x]
-  (mc/update-existing x k (u/or-nil #(java.sql.Timestamp. %))))
+  (mc/update-existing x k ->ts))
 
 (def start-time->int (partial time->int :start-time))
 (def int->start-time (partial int->time :start-time))

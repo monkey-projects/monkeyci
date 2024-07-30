@@ -11,7 +11,8 @@
             [medley.core :as mc]
             [monkey.ci
              [edn :as ce]
-             [sid :as sid]])
+             [sid :as sid]
+             [time :as t]])
   (:import org.apache.commons.io.FileUtils))
 
 (defn cwd
@@ -164,8 +165,7 @@
       (slurp f)
       x)))
 
-(defn now []
-  (System/currentTimeMillis))
+(def now t/now)
 
 (defn ->seq
   "Converts `x` into a sequential"
