@@ -89,10 +89,10 @@
 (defn reset-create-alerts [db]
   (dissoc db create-alerts))
 
-(def latest-builds ::latest-builds)
+(def recent-builds ::recent-builds)
 
-(defn get-latest-builds [db]
-  (get-value db latest-builds))
+(defn get-recent-builds [db]
+  (get-value db recent-builds))
 
-(defn set-latest-builds [db b]
-  (set-value db latest-builds b))
+(defn set-recent-builds [db b]
+  (set-value db recent-builds b))

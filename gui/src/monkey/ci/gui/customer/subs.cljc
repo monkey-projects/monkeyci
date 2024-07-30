@@ -42,8 +42,8 @@
           gr))))
 
 (rf/reg-sub
- :customer/latest-builds
+ :customer/recent-builds
  (fn [db _]
-   (->> (db/get-latest-builds db)
+   (->> (db/get-recent-builds db)
         (sort-by :start-time)
         (reverse))))

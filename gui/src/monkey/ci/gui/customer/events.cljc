@@ -191,29 +191,29 @@
                               :message (str "Failed to create customer: " (u/error-msg err))}])))
 
 (rf/reg-event-fx
- :customer/load-latest-builds
+ :customer/load-recent-builds
  (fn [{:keys [db]} [_ cust-id]]
    {:dispatch [:secure-request
-               :get-latest-builds
+               :get-recent-builds
                {:customer-id cust-id}
-               [:customer/load-latest-builds--success]
-               [:customer/load-latest-builds--failed]]
+               [:customer/load-recent-builds--success]
+               [:customer/load-recent-builds--failed]]
     :db (-> db
-            (db/set-loading db/latest-builds)
-            (db/reset-alerts db/latest-builds))}))
+            (db/set-loading db/recent-builds)
+            (db/reset-alerts db/recent-builds))}))
 
 (rf/reg-event-db
- :customer/load-latest-builds--success
+ :customer/load-recent-builds--success
  (fn [db [_ {builds :body}]]
    (-> db
-       (db/set-latest-builds builds)
-       (db/unset-loading db/latest-builds))))
+       (db/set-recent-builds builds)
+       (db/unset-loading db/recent-builds))))
 
 (rf/reg-event-db
- :customer/load-latest-builds--failed
+ :customer/load-recent-builds--failed
  (fn [db [_ err]]
    (-> db
-       (db/set-alerts db/latest-builds
+       (db/set-alerts db/recent-builds
                       [{:type :danger
-                        :message (str "Failed to load latest builds: " (u/error-msg err))}])
-       (db/unset-loading db/latest-builds))))
+                        :message (str "Failed to load recent builds: " (u/error-msg err))}])
+       (db/unset-loading db/recent-builds))))

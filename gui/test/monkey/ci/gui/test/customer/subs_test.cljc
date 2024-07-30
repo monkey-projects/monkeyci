@@ -116,21 +116,21 @@
       (is (map? (reset! app-db (db/mark-customer-creating {}))))
       (is (true? @l)))))
 
-(deftest customer-latest-builds
-  (let [l (rf/subscribe [:customer/latest-builds])]
+(deftest customer-recent-builds
+  (let [l (rf/subscribe [:customer/recent-builds])]
     (testing "exists"
       (is (some? l)))
 
-    (testing "holds latest builds from db"
+    (testing "holds recent builds from db"
       (let [builds [{:id "test build"}]]
         (is (empty? @l))
-        (is (map? (reset! app-db (db/set-latest-builds {} builds))))
+        (is (map? (reset! app-db (db/set-recent-builds {} builds))))
         (is (= builds @l))))
 
-    (testing "returns latest first"
+    (testing "returns recent first"
       (let [[old new :as builds] [{:id "first"
                                    :start-time 100}
                                   {:id "second"
                                    :start-time 200}]]
-        (is (map? (reset! app-db (db/set-latest-builds {} builds))))
+        (is (map? (reset! app-db (db/set-recent-builds {} builds))))
         (is (= new (first @l)))))))

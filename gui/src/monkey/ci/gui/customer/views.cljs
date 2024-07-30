@@ -75,13 +75,13 @@
            (into [:<>
                   [:p "Repository overview, grouped by project."]])))))
 
-(defn- latest-builds [id]
-  (rf/dispatch [:customer/load-latest-builds id])
+(defn- recent-builds [id]
+  (rf/dispatch [:customer/load-recent-builds id])
   [:<>
    [:p "All builds, most recent first."]
    [t/paged-table
-    {:id ::latest-builds
-     :items-sub [:customer/latest-builds]
+    {:id ::recent-builds
+     :items-sub [:customer/recent-builds]
      :columns rv/table-columns}]])
 
 (defn- overview-tabs
@@ -91,8 +91,8 @@
    [{:header "Repositories"
      :contents [customer-repos]
      :current? true}
-    {:header "Latest Builds"
-     :contents [latest-builds id]}]])
+    {:header "Recent Builds"
+     :contents [recent-builds id]}]])
 
 (defn- customer-details [id]
   [:<>
