@@ -8,7 +8,9 @@
              [core :as core]
              [shell :as shell]]
             [monkey.ci.ext.junit]
-            [monkey.ci.plugin.infra :as infra]))
+            [monkey.ci.plugin
+             [github :as gh]
+             [infra :as infra]]))
 
 ;; Version assigned when building main branch
 ;; TODO Determine automatically
@@ -192,6 +194,10 @@
   (some-> (publish ctx "publish-app" "app")
           (core/depends-on ["test-app"])))
 
+(def github-release
+  "Creates a release in github"
+  (gh/release-job {:dependencies ["publish-app"]}))
+
 (defn- shadow-release [id build]
   (core/container-job
    id
@@ -260,6 +266,7 @@
 [test-app
  app-uberjar
  publish-app
+ github-release
  test-gui
  build-gui-release
  image-creds

@@ -33,12 +33,12 @@
   (letfn [(disj-desc [idx items]
             (into [:li
                    (when (pos? idx)
-                     [:b.me-1 "AND"])]
+                     [:b.me-1 "OR"])]
                   (map-indexed conj-desc items)))
           (conj-desc [idx {:keys [label value]}]
             [:span
              (when (pos? idx)
-               [:b.me-1 "OR"])
+               [:b.me-1 "AND"])
              (str label " = " value)])]
     (if (empty? lf)
       [:i "Applies to all builds for this customer."]
