@@ -281,19 +281,19 @@
           (assoc :legacy? true))
       (p/read-obj s (concat [builds] sid)))))
 
-(defn list-builds
+(defn list-build-ids
   "Lists the ids of the builds for given repo sid"
   [s sid]
   (p/list-obj s (concat [builds] sid)))
 
-(def list-builds-with-details
+(def list-builds
   "Lists all builds for the repo, and fetches the build details, similar to `find-build`
    but does not contain the job details."
   (override-or
-   [:build :list-with-details]
+   [:build :list]
    (fn [s sid]
      ;; Will be slow for large number of builds
-     (->> (list-builds s sid)
+     (->> (list-build-ids s sid)
           (map (comp (partial find-build s) (partial conj (->sid sid))))))))
 
 (def find-latest-build
@@ -301,11 +301,24 @@
   (override-or
    [:build :find-latest]
    (fn [s sid]
-     (->> (list-builds s sid)
+     (->> (list-build-ids s sid)
           (sort)   ; This assumes the build name is time-based
           (last)
           (conj (->sid sid))
           (find-build s)))))
+
+(def list-builds-since
+  "Retrieves all builds for customer since the given timestamp"
+  (override-or
+   [:build :list-since]
+   (fn [s cust-id ts]
+     (letfn [(since? [b]
+               (>= (:start-time b) ts))]
+       (->> (find-customer s cust-id)
+            :repos
+            keys
+            (mapcat #(list-builds s [cust-id %]))
+            (filter since?))))))
 
 (defn params-sid [customer-id]
   ;; All parameters for a customer are stored together
@@ -412,7 +425,7 @@
   (override-or
    [:repo :find-next-build-idx]
    (fn [s repo-sid]
-     (or (some->> (list-builds-with-details s repo-sid)
+     (or (some->> (list-builds s repo-sid)
                   (map :idx)
                   sort
                   last

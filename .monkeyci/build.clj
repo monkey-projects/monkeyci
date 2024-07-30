@@ -225,12 +225,12 @@
 (defn deploy
   "Job that auto-deploys the image to staging by pushing the new image tag to infra repo."
   [ctx]
-  (let [images (->> (zipmap ((juxt publish-app? publish-gui?) ctx)
-                                 ["monkeyci-api" "monkeyci-gui"])
-                         (filter (comp true? first))
-                         (map (fn [[_ img]]
-                                [img (image-version ctx)]))
-                         (into {}))]
+  (let [images (->> (zipmap ["monkeyci-api" "monkeyci-gui"]
+                            ((juxt publish-app? publish-gui?) ctx))
+                    (filter (comp true? second))
+                    (map (fn [[img _]]
+                           [img (image-version ctx)]))
+                    (into {}))]
     (when (and (should-publish? ctx)
                (not (release? ctx))
                (not-empty images))

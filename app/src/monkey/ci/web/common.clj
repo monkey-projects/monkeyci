@@ -22,6 +22,8 @@
   "Retrieves request body"
   (comp :body :parameters))
 
+(def customer-id (comp :customer-id :path :parameters))
+
 ;; Reitit rewrites records in the data to hashmaps, so wrap it in a type
 (deftype RuntimeWrapper [runtime])
 

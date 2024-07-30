@@ -18,7 +18,9 @@
              [bitbucket :as bitbucket]
              [common :as c]
              [github :as github]]
-            [monkey.ci.web.api.join-request :as jr-api]
+            [monkey.ci.web.api
+             [customer :as cust-api]
+             [join-request :as jr-api]]
             [reitit.coercion.schema]
             [reitit.ring :as ring]
             [ring.middleware.cors :as cors]
@@ -259,6 +261,10 @@
   ["/events" {:get {:handler api/event-stream
                     :parameters {:query {(s/optional-key :authorization) s/Str}}}}])
 
+(def customer-build-routes
+  ["/builds"
+   [["/recent" {:get {:handler cust-api/recent-builds}}]]])
+
 (def customer-routes
   ["/customer"
    {:middleware [:customer-check]}
@@ -275,7 +281,8 @@
                     customer-parameter-routes
                     customer-ssh-keys-routes
                     customer-join-request-routes
-                    event-stream-routes]})])
+                    event-stream-routes
+                    customer-build-routes]})])
 
 (def github-routes
   ["/github" [["/login" {:post
@@ -427,19 +434,13 @@
       (c/make-app)
       (auth/secure-ring-app rt)))
 
-(def default-http-opts
-  ;; Virtual threads are still a preview feature
-  { ;;:worker-pool (java.util.concurrent.Executors/newVirtualThreadPerTaskExecutor)
-   :legacy-return-value? false})
-
 (defn start-server
   "Starts http server.  Returns a server object that can be passed to
    `stop-server`."
   [rt]
   (let [http-opts (merge {:port 3000} (:http (rt/config rt)))]
     (log/info "Starting HTTP server at port" (:port http-opts))
-    (aleph/start-server (make-app rt)
-                        (merge http-opts default-http-opts))))
+    (aleph/start-server (make-app rt) http-opts)))
 
 (defn stop-server [s]
   (when s

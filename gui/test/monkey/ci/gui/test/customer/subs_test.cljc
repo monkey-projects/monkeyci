@@ -17,7 +17,16 @@
       (let [a [{:type :info
                 :message "Test alert"}]]
         (is (map? (reset! app-db (db/set-alerts {} a))))
-        (is (= a @s))))))
+        (is (= a @s)))))
+
+  (testing "with id, returns alerts for given id"
+    (let [id ::test-id
+          s (rf/subscribe [:customer/alerts id])
+          a [{:type :info
+              :message "Another test alert"}]]
+      (is (nil? @s))
+      (is (some? (reset! app-db (db/set-alerts {} id a))))
+      (is (= a @s)))))
 
 (deftest customer-info
   (let [ci (rf/subscribe [:customer/info])]
@@ -106,3 +115,30 @@
       (is (not @l))
       (is (map? (reset! app-db (db/mark-customer-creating {}))))
       (is (true? @l)))))
+
+(deftest customer-recent-builds
+  (let [l (rf/subscribe [:customer/recent-builds])]
+    (testing "exists"
+      (is (some? l)))
+
+    (testing "holds recent builds from db"
+      (let [builds [{:id "test build"}]]
+        (is (empty? @l))
+        (is (map? (reset! app-db (db/set-recent-builds {} builds))))
+        (is (= builds (->> @l (map #(select-keys % [:id])))))))
+
+    (testing "returns recent first"
+      (let [[old new :as builds] [{:id "first"
+                                   :start-time 100}
+                                  {:id "second"
+                                   :start-time 200}]]
+        (is (map? (reset! app-db (db/set-recent-builds {} builds))))
+        (is (= (:id new) (:id (first @l))))))
+
+    (testing "adds repo name from customer info"
+      (is (some? (reset! app-db (-> {}
+                                    (db/set-recent-builds [{:id "test-build"
+                                                            :repo-id "test-repo"}])
+                                    (db/set-customer {:repos [{:id "test-repo"
+                                                               :name "test repo name"}]})))))
+      (is (= "test repo name" (-> @l first :repo :name))))))

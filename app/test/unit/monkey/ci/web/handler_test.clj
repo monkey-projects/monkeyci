@@ -264,7 +264,7 @@
                        (h/reply->json)))))
 
           (testing "allows filtering by status")
-
+          
           (testing "`POST /:request-id/approve`"
             (testing "approves join request with message"
               (is (= 200
@@ -319,7 +319,18 @@
                           :post (str "/customer/" (st/new-id) "/join-request/" (:id jr) "/reject")
                           {})
                          (app)
-                         :status)))))))))
+                         :status))))))))
+
+    (testing "`/builds`"
+      (h/with-memory-store st
+        (let [app (make-test-app st)
+              cust (h/gen-cust)]
+          (is (some? (st/save-customer st cust)))
+          
+          (testing "`/recent` retrieves builds from latest 24h"
+            (is (= 200 (-> (mock/request :get (str "/customer/" (:id cust) "/builds/recent"))
+                           (app)
+                           :status))))))))
 
   (h/with-memory-store st
     (let [kp (auth/generate-keypair)
@@ -727,7 +738,7 @@
                 path (repo-path sid)
                 l (-> (mock/request :get (str path "/latest"))
                       (app))]
-            (is (empty? (st/list-builds st (drop-last sid))))
+            (is (empty? (st/list-build-ids st (drop-last sid))))
             (is (= 204 (:status l)))
             (is (nil? (:body l)))))
 

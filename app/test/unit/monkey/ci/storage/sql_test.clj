@@ -21,50 +21,49 @@
 
 (deftest ^:sql customers
   (with-storage conn s
-    (testing "customers"
-      (testing "can write and read"
-        (let [cust (h/gen-cust)]
-          (is (sid/sid? (st/save-customer s cust)))
-          (is (= 1 (count (ec/select-customers conn [:is :id [:not nil]]))))
-          (is (some? (ec/select-customer conn (ec/by-cuid (:id cust)))))
-          (is (= (assoc cust :repos {})
-                 (st/find-customer s (:id cust))))))
+    (testing "can write and read"
+      (let [cust (h/gen-cust)]
+        (is (sid/sid? (st/save-customer s cust)))
+        (is (= 1 (count (ec/select-customers conn [:is :id [:not nil]]))))
+        (is (some? (ec/select-customer conn (ec/by-cuid (:id cust)))))
+        (is (= (assoc cust :repos {})
+               (st/find-customer s (:id cust))))))
 
-      (testing "can write and read with repos"
-        (let [cust (h/gen-cust)
-              repo {:name "test repo"
-                    :customer-id (:id cust)
-                    :id "test-repo"
-                    :url "http://test-repo"}]
-          (is (sid/sid? (st/save-customer s cust)))
-          (is (sid/sid? (st/save-repo s repo)))
-          (is (= (assoc cust :repos {(:id repo) (dissoc repo :customer-id)})
-                 (st/find-customer s (:id cust))))))
+    (testing "can write and read with repos"
+      (let [cust (h/gen-cust)
+            repo {:name "test repo"
+                  :customer-id (:id cust)
+                  :id "test-repo"
+                  :url "http://test-repo"}]
+        (is (sid/sid? (st/save-customer s cust)))
+        (is (sid/sid? (st/save-repo s repo)))
+        (is (= (assoc cust :repos {(:id repo) (dissoc repo :customer-id)})
+               (st/find-customer s (:id cust))))))
 
-      (testing "can delete with repos"
-        (let [cust (h/gen-cust)
-              repo {:name "test repo"
-                    :customer-id (:id cust)
-                    :id "test-repo"
-                    :url "http://test-repo"}]
-          (is (sid/sid? (st/save-customer s cust)))
-          (is (sid/sid? (st/save-repo s repo)))
-          (is (some? (st/find-customer s (:id cust))))
-          (is (true? (p/delete-obj s (st/customer-sid (:id cust))))
-              "expected to delete customer record")
-          (is (nil? (st/find-customer s (:id cust)))
-              "did not expect to find customer after deletion")))
+    (testing "can delete with repos"
+      (let [cust (h/gen-cust)
+            repo {:name "test repo"
+                  :customer-id (:id cust)
+                  :id "test-repo"
+                  :url "http://test-repo"}]
+        (is (sid/sid? (st/save-customer s cust)))
+        (is (sid/sid? (st/save-repo s repo)))
+        (is (some? (st/find-customer s (:id cust))))
+        (is (true? (p/delete-obj s (st/customer-sid (:id cust))))
+            "expected to delete customer record")
+        (is (nil? (st/find-customer s (:id cust)))
+            "did not expect to find customer after deletion")))
 
-      (testing "can search"
-        (let [cust (-> (h/gen-cust)
-                       (assoc :name "test customer"))]
-          (is (sid/sid? (st/save-customer s cust)))
-          
-          (testing "by name"
-            (is (= [cust] (st/search-customers s {:name "test"}))))
+    (testing "can search"
+      (let [cust (-> (h/gen-cust)
+                     (assoc :name "test customer"))]
+        (is (sid/sid? (st/save-customer s cust)))
+        
+        (testing "by name"
+          (is (= [cust] (st/search-customers s {:name "test"}))))
 
-          (testing "by id"
-            (is (= [cust] (st/search-customers s {:id (:id cust)})))))))))
+        (testing "by id"
+          (is (= [cust] (st/search-customers s {:id (:id cust)}))))))))
 
 (deftest ^:sql repos
   (with-storage conn s
@@ -281,13 +280,13 @@
 
       (testing "can list"
         (is (= [(:build-id build)]
-               (st/list-builds s [(:id cust) (:id repo)]))))
+               (st/list-build-ids s [(:id cust) (:id repo)]))))
 
       (testing "can check for existence"
         (is (true? (st/build-exists? s build-sid))))
 
       (testing "can list with details, excluding jobs"
-        (let [d (st/list-builds-with-details s (take 2 build-sid))]
+        (let [d (st/list-builds s (take 2 build-sid))]
           (is (= 1 (count d)))
           (is (= (update build :script dissoc :jobs)
                  (select-keys (first d) (keys build))))))
@@ -303,7 +302,27 @@
                                           (assoc :customer-id (:id cust)
                                                  :repo-id (:id repo)
                                                  :idx 100)))))
-          (is (= 101 (st/find-next-build-idx s repo-sid))))))))
+          (is (= 101 (st/find-next-build-idx s repo-sid)))))
+
+      (testing "can list builds since timestamp"
+        (let [repo (h/gen-repo)
+              cust (-> (h/gen-cust)
+                       (assoc :repos {(:id repo) repo}))
+              old-build (-> (h/gen-build)
+                            (assoc :customer-id (:id cust)
+                                   :repo-id (:id repo)
+                                   :start-time 100)
+                            (dissoc :script))
+              new-build (-> (h/gen-build)
+                            (assoc :customer-id (:id cust)
+                                   :repo-id (:id repo)
+                                   :start-time 200)
+                            (dissoc :script))]
+          (is (sid/sid? (st/save-customer s cust)))
+          (is (sid/sid? (st/save-build s old-build)))
+          (is (sid/sid? (st/save-build s new-build)))
+          (is (= [(:id new-build)] (->> (st/list-builds-since s (:id cust) 150)
+                                        (map :id)))))))))
 
 (deftest ^:sql join-requests
   (with-storage conn s

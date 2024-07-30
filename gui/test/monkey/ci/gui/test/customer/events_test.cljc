@@ -281,3 +281,50 @@
     (let [a (db/create-alerts @app-db)]
       (is (= 1 (count a)))
       (is (= :danger (:type (first a)))))))
+
+(deftest customer-load-recent-builds
+  (testing "sends request to backend"
+    (rf-test/run-test-sync
+     (let [builds []
+           c (h/catch-fx :martian.re-frame/request)]
+       (h/initialize-martian {:get-recent-builds {:status 200
+                                                  :body builds
+                                                  :error-code :no-error}})
+       (is (some? (:martian.re-frame/martian @app-db)))
+       (rf/dispatch [:customer/load-recent-builds "test-customer"])
+       (is (= 1 (count @c)))
+       (is (= :get-recent-builds (-> @c first (nth 2)))))))
+
+  (testing "marks as loading"
+    (rf-test/run-test-sync
+     (rf/dispatch [:customer/load-recent-builds "customer-test-id"])
+     (is (true? (db/loading? @app-db db/recent-builds)))))
+
+  (testing "clears alerts"
+    (rf-test/run-test-sync
+     (reset! app-db (db/set-alerts {} db/recent-builds [{:type :info
+                                                         :message "test alert"}]))
+     (rf/dispatch [:customer/load-recent-builds "customer-test-id"])
+     (is (empty? (db/get-alerts @app-db db/recent-builds))))))
+
+(deftest customer-load-recent-builds--success
+  (testing "sets builds in db"
+    (let [builds [{:id ::test-build}]]
+      (rf/dispatch-sync [:customer/load-recent-builds--success {:body builds}])
+      (is (= builds (db/get-recent-builds @app-db)))))
+  
+  (testing "unmarks loading"
+    (reset! app-db (db/set-loading {} db/recent-builds))
+    (rf/dispatch-sync [:customer/load-recent-builds--success {:body []}])
+    (is (not (db/loading? @app-db db/recent-builds)))))
+
+(deftest customer-load-recent-builds--failed
+  (testing "sets error in db"
+    (rf/dispatch-sync [:customer/load-recent-builds--failed "test error"])
+    (is (= [:danger] (->> (db/get-alerts @app-db db/recent-builds)
+                          (map :type)))))
+  
+  (testing "unmarks loading"
+    (reset! app-db (db/set-loading {} db/recent-builds))
+    (rf/dispatch-sync [:customer/load-recent-builds--failed "test error"])
+    (is (not (db/loading? @app-db db/recent-builds)))))

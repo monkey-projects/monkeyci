@@ -114,7 +114,7 @@
                     :parameters))
 (def params-sid (comp (partial remove nil?)
                       repo-sid))
-(def customer-id (comp :customer-id :path :parameters))
+(def customer-id c/customer-id)
 
 (defn- get-list-for-customer [finder req]
   (-> (c/req->storage req)
@@ -219,7 +219,7 @@
 (defn get-builds
   "Lists all builds for the repository"
   [req]
-  (->> (st/list-builds-with-details (c/req->storage req) (repo-sid req))
+  (->> (st/list-builds (c/req->storage req) (repo-sid req))
        (map build->out)
        (rur/response)))
 

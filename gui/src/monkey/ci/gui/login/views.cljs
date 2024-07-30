@@ -42,7 +42,7 @@
    [bitbucket-btn]])
 
 (defn page [_]
-  [:div
+  [:<>
    [:div.row
     [:div.col
      [c/logo]
