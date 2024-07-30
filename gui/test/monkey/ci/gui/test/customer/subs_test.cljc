@@ -125,7 +125,7 @@
       (let [builds [{:id "test build"}]]
         (is (empty? @l))
         (is (map? (reset! app-db (db/set-recent-builds {} builds))))
-        (is (= builds @l))))
+        (is (= builds (->> @l (map #(select-keys % [:id])))))))
 
     (testing "returns recent first"
       (let [[old new :as builds] [{:id "first"
@@ -133,4 +133,12 @@
                                   {:id "second"
                                    :start-time 200}]]
         (is (map? (reset! app-db (db/set-recent-builds {} builds))))
-        (is (= new (first @l)))))))
+        (is (= (:id new) (:id (first @l))))))
+
+    (testing "adds repo name from customer info"
+      (is (some? (reset! app-db (-> {}
+                                    (db/set-recent-builds [{:id "test-build"
+                                                            :repo-id "test-repo"}])
+                                    (db/set-customer {:repos [{:id "test-repo"
+                                                               :name "test repo name"}]})))))
+      (is (= "test repo name" (-> @l first :repo :name))))))

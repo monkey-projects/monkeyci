@@ -78,11 +78,13 @@
 (defn- recent-builds [id]
   (rf/dispatch [:customer/load-recent-builds id])
   [:<>
-   [:p "All builds, most recent first."]
+   [:p "Recent builds for all repositories."]
    [t/paged-table
     {:id ::recent-builds
      :items-sub [:customer/recent-builds]
-     :columns rv/table-columns}]])
+     :columns (concat [{:label "Repository"
+                        :value (comp :name :repo)}]
+                      rv/table-columns)}]])
 
 (defn- overview-tabs
   "Displays tab pages for various customer overview screens"

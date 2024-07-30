@@ -91,7 +91,7 @@
 
    (api-route
     {:route-name :get-recent-builds
-     :path-parts (into customer-path ["/builds/latest"])
+     :path-parts (into customer-path ["/builds/recent"])
      :path-schema customer-schema})
 
    (api-route

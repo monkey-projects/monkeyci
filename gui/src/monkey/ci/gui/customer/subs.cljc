@@ -44,6 +44,12 @@
 (rf/reg-sub
  :customer/recent-builds
  (fn [db _]
-   (->> (db/get-recent-builds db)
-        (sort-by :start-time)
-        (reverse))))
+   (let [repos (->> (db/customer db)
+                    :repos
+                    (group-by :id))
+         add-repo (fn [{:keys [repo-id] :as b}]
+                    (assoc b :repo (-> repos (get repo-id) first)))]
+     (->> (db/get-recent-builds db)
+          (sort-by :start-time)
+          (reverse)
+          (map add-repo)))))
