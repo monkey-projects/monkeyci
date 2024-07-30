@@ -22,7 +22,10 @@
  (fn [db [_ id changed]]
    (assoc-in db [::tabs id :current] changed)))
 
-(defn tabs [id headers]
+(defn tabs
+  "Controlled tabs component.  The headers are a list of tab configs that
+   have a `:header` and `:contents`.  Current tab is indicated by `:current?`."
+  [id headers]
   (log/info "Rendering tabs:" id)
   (let [curr (rf/subscribe [:tab/current id])]
     (when-not @curr

@@ -90,6 +90,11 @@
      :path-schema customer-schema})
 
    (api-route
+    {:route-name :get-latest-builds
+     :path-parts (into customer-path ["/builds/latest"])
+     :path-schema customer-schema})
+
+   (api-route
     {:route-name :update-customer-params
      :path-parts (into customer-path ["/param"])
      :path-schema customer-schema

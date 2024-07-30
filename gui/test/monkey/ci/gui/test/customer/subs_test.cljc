@@ -17,7 +17,16 @@
       (let [a [{:type :info
                 :message "Test alert"}]]
         (is (map? (reset! app-db (db/set-alerts {} a))))
-        (is (= a @s))))))
+        (is (= a @s)))))
+
+  (testing "with id, returns alerts for given id"
+    (let [id ::test-id
+          s (rf/subscribe [:customer/alerts id])
+          a [{:type :info
+              :message "Another test alert"}]]
+      (is (nil? @s))
+      (is (some? (reset! app-db (db/set-alerts {} id a))))
+      (is (= a @s)))))
 
 (deftest customer-info
   (let [ci (rf/subscribe [:customer/info])]
@@ -106,3 +115,22 @@
       (is (not @l))
       (is (map? (reset! app-db (db/mark-customer-creating {}))))
       (is (true? @l)))))
+
+(deftest customer-latest-builds
+  (let [l (rf/subscribe [:customer/latest-builds])]
+    (testing "exists"
+      (is (some? l)))
+
+    (testing "holds latest builds from db"
+      (let [builds [{:id "test build"}]]
+        (is (empty? @l))
+        (is (map? (reset! app-db (db/set-latest-builds {} builds))))
+        (is (= builds @l))))
+
+    (testing "returns latest first"
+      (let [[old new :as builds] [{:id "first"
+                                   :start-time 100}
+                                  {:id "second"
+                                   :start-time 200}]]
+        (is (map? (reset! app-db (db/set-latest-builds {} builds))))
+        (is (= new (first @l)))))))

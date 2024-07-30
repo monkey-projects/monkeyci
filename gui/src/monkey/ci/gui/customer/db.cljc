@@ -1,12 +1,28 @@
 (ns monkey.ci.gui.customer.db)
 
-(def loading? ::loading?)
+(defn loading?
+  ([db]
+   (::loading? db))
+  ([db id]
+   (true? (get-in db [id :loading?]))))
 
-(defn set-loading [db]
-  (assoc db loading? true))
+(defn set-loading
+  ([db]
+   (assoc db ::loading? true))
+  ([db id]
+   (assoc-in db [id :loading?] true)))
 
-(defn unset-loading [db]
-  (dissoc db loading?))
+(defn unset-loading
+  ([db]
+   (dissoc db ::loading?))
+  ([db id]
+   (update db id dissoc :loading?)))
+
+(defn set-value [db id d]
+  (assoc-in db [id :value] d))
+
+(defn get-value [db id]
+  (get-in db [id :value]))
 
 (def customer ::customer)
 
@@ -29,11 +45,20 @@
 
 (def alerts ::alerts)
 
-(defn set-alerts [db a]
-  (assoc db alerts a))
+(defn set-alerts
+  ([db a]
+   (assoc db alerts a))
+  ([db id a]
+   (assoc-in db [id :alerts] a)))
 
-(defn reset-alerts [db]
-  (dissoc db alerts))
+(defn get-alerts [db id]
+  (get-in db [id :alerts]))
+
+(defn reset-alerts
+  ([db]
+   (dissoc db alerts))
+  ([db id]
+   (update db id dissoc :alerts)))
 
 (def repo-alerts ::repo-alerts)
 
@@ -63,3 +88,11 @@
 
 (defn reset-create-alerts [db]
   (dissoc db create-alerts))
+
+(def latest-builds ::latest-builds)
+
+(defn get-latest-builds [db]
+  (get-value db latest-builds))
+
+(defn set-latest-builds [db b]
+  (set-value db latest-builds b))

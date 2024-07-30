@@ -31,9 +31,10 @@
 
 (defn footer []
   (let [v (rf/subscribe [:version])]
-    [:div.footer.border-top.mt-3
-     [:span "built by " [:a {:href "https://www.monkey-projects.be"} "Monkey Projects"]]
-     [:span.float-end.small "version " @v]]))
+    [:footer.footer.mt-auto.mb-2
+     [:div.border-top.mt-2
+      [:span "built by " [:a {:href "https://www.monkey-projects.be"} "Monkey Projects"]]
+      [:span.float-end.small "version " @v]]]))
 
 (defn error-boundary [target]
   #?(:cljs
@@ -73,7 +74,7 @@
    [footer]])
 
 (defn default [subpanel]
-  [:div
+  [:<>
    [header]
    [error-boundary subpanel]
    [footer]])

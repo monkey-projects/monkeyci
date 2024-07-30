@@ -4,12 +4,11 @@
             [monkey.ci.gui.customer.subs]
             [monkey.ci.gui.forms :as f]
             [monkey.ci.gui.layout :as l]
+            [monkey.ci.gui.repo.views :as rv]
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.table :as t]
+            [monkey.ci.gui.tabs :as tabs]
             [re-frame.core :as rf]))
-
-(defn- load-customer [id]
-  (rf/dispatch [:customer/load id]))
 
 (defn- show-repo [c p r]
   [:div.repo.card-body
@@ -54,23 +53,57 @@
    [params-btn id]
    [co/reload-btn [:customer/load id]]])
 
-(defn- customer-details [id]
+(defn- customer-header []
   (let [c (rf/subscribe [:customer/info])]
-    (->> (:repos @c)
-         (group-by project-lbl)
-         (sort-by first)
-         (map (partial show-project @c))
-         (into [:<>
-                [:div.clearfix.mb-3
-                 [:h3.float-start (:name @c)]
-                 [:span.float-end
-                  [customer-actions id]]]]))))
+    [:div.clearfix.mb-3
+     [:h3.float-start (:name @c)]
+     [:span.float-end
+      [customer-actions (:id @c)]]]))
+
+(defn- customer-repos
+  "Displays a list of customer repositories, grouped by project"
+  []
+  (let [c (rf/subscribe [:customer/info])]
+    (if (empty? (:repos @c))
+      [:p "No repositories configured for this customer.  You can start by"
+       [:a.mx-1 {:href (r/path-for :page/add-repo {:customer-id (:id @c)})} "following one."]]
+      (->> (:repos @c)
+           ;; TODO Allow grouping by any custom label
+           (group-by project-lbl)
+           (sort-by first)
+           (map (partial show-project @c))
+           (into [:<>
+                  [:p "Repository overview, grouped by project."]])))))
+
+(defn- latest-builds [id]
+  (rf/dispatch [:customer/load-latest-builds id])
+  [:<>
+   [:p "All builds, most recent first."]
+   [t/paged-table
+    {:id ::latest-builds
+     :items-sub [:customer/latest-builds]
+     :columns rv/table-columns}]])
+
+(defn- overview-tabs
+  "Displays tab pages for various customer overview screens"
+  [id]
+  [tabs/tabs ::overview
+   [{:header "Repositories"
+     :contents [customer-repos]
+     :current? true}
+    {:header "Latest Builds"
+     :contents [latest-builds id]}]])
+
+(defn- customer-details [id]
+  [:<>
+   [customer-header]
+   [overview-tabs id]])
 
 (defn page
   "Customer overview page"
   [route]
   (let [id (-> route (r/path-params) :customer-id)]
-    (load-customer id)
+    (rf/dispatch [:customer/load id])
     (l/default
      [:div
       [co/alerts [:customer/alerts]]

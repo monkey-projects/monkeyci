@@ -189,3 +189,31 @@
  (fn [db [_ err]]
    (db/set-create-alerts db [{:type :danger
                               :message (str "Failed to create customer: " (u/error-msg err))}])))
+
+(rf/reg-event-fx
+ :customer/load-latest-builds
+ (fn [{:keys [db]} [_ cust-id]]
+   {:dispatch [:secure-request
+               :get-latest-builds
+               {:customer-id cust-id}
+               [:customer/load-latest-builds--success]
+               [:customer/load-latest-builds--failed]]
+    :db (-> db
+            (db/set-loading db/latest-builds)
+            (db/reset-alerts db/latest-builds))}))
+
+(rf/reg-event-db
+ :customer/load-latest-builds--success
+ (fn [db [_ {builds :body}]]
+   (-> db
+       (db/set-latest-builds builds)
+       (db/unset-loading db/latest-builds))))
+
+(rf/reg-event-db
+ :customer/load-latest-builds--failed
+ (fn [db [_ err]]
+   (-> db
+       (db/set-alerts db/latest-builds
+                      [{:type :danger
+                        :message (str "Failed to load latest builds: " (u/error-msg err))}])
+       (db/unset-loading db/latest-builds))))

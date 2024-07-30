@@ -71,6 +71,26 @@
       (subs ref (count prefix))
       ref)))
 
+(def table-columns
+  [{:label "Build"
+    :value (fn [b] [:a {:href (r/path-for :page/build b)} (:idx b)])}
+   {:label "Time"
+    :value (fn [b]
+             [:span.text-nowrap (t/reformat (:start-time b))])}
+   {:label "Elapsed"
+    :value elapsed}
+   {:label "Trigger"
+    :value :source}
+   {:label "Ref"
+    :value (fn [b]
+             [:span.text-nowrap (trim-ref (get-in b [:git :ref]))])}
+   {:label "Result"
+    :value (fn [b] [:div.text-center [co/build-result (:status b)]])}
+   {:label "Message"
+    :value (fn [b]
+             [:span (or (get-in b [:git :message])
+                        (:message b))])}])
+
 (defn- builds [repo]
   (let [b (rf/subscribe [:repo/builds])]
     (if-not @b
@@ -86,24 +106,7 @@
        [table/paged-table
         {:id ::builds
          :items-sub [:repo/builds]
-         :columns [{:label "Build"
-                    :value (fn [b] [:a {:href (r/path-for :page/build b)} (:idx b)])}
-                   {:label "Time"
-                    :value (fn [b]
-                             [:span.text-nowrap (t/reformat (:start-time b))])}
-                   {:label "Elapsed"
-                    :value elapsed}
-                   {:label "Trigger"
-                    :value :source}
-                   {:label "Ref"
-                    :value (fn [b]
-                             [:span.text-nowrap (trim-ref (get-in b [:git :ref]))])}
-                   {:label "Result"
-                    :value (fn [b] [:div.text-center [co/build-result (:status b)]])}
-                   {:label "Message"
-                    :value (fn [b]
-                             [:span (or (get-in b [:git :message])
-                                        (:message b))])}]}]])))
+         :columns table-columns}]])))
 
 (defn page [route]
   (rf/dispatch [:repo/init])
