@@ -12,42 +12,31 @@
 
 (rf/reg-event-fx
  :customer/load
- (fn [{:keys [db]} [_ id]]
-   (log/debug "Loading customer:" id)
-   {:db (-> db (db/set-loading)
-            (db/set-alerts [{:type :info
-                             :message "Retrieving customer information..."}]))
-    :dispatch [:secure-request
-               :get-customer
-               {:customer-id id}
-               [:customer/load--success]
-               [:customer/load--failed id]]}))
+ (lo/loader-fn db/customer
+               (fn [_ _ [_ id]]
+                 [:secure-request
+                  :get-customer
+                  {:customer-id id}
+                  [:customer/load--success]
+                  [:customer/load--failed id]])))
 
 (rf/reg-event-fx
  :customer/maybe-load
  (fn [{:keys [db]} [_ id]]
-   (let [existing (db/customer db)
+   (let [existing (lo/get-value db db/customer)
          id (or id (r/customer-id db))]
      (when-not (= (:id existing) id)
        {:dispatch [:customer/load id]}))))
 
 (rf/reg-event-db
  :customer/load--success
- (fn [db [_ {cust :body}]]
-   (log/debug "Customer details loaded:" (clj->js cust))
-   (-> db
-       (db/unset-loading)
-       (db/set-customer cust)
-       (db/reset-alerts))))
+ (fn [db [_ resp]]
+   (lo/on-success db db/customer resp)))
 
 (rf/reg-event-db
  :customer/load--failed
  (fn [db [_ id err]]
-   (-> db
-       (db/set-alerts [{:type :danger
-                        :message (str "Could not load details for customer " id ": "
-                                      (u/error-msg err))}])
-       (db/unset-loading))))
+   (lo/on-failure db db/customer err (str "Could not load details for customer " id ": "))))
 
 (rf/reg-event-fx
  :customer/load-github-repos
@@ -180,7 +169,8 @@
    {:db (-> db
             (db/unmark-customer-creating)
             (db/set-customer body)
-            (db/set-alerts [{:type :success
+            (lo/set-alerts db/customer
+                           [{:type :success
                              :message [:span "Customer " [:b (:name body)] " has been created."]}]))
     ;; Redirect to customer page
     :dispatch [:route/goto :page/customer {:customer-id (:id body)}]}))

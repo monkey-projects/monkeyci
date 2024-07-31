@@ -3,30 +3,25 @@
                :clj [clojure.test :refer [deftest testing is use-fixtures]])
             [monkey.ci.gui.customer.db :as db]
             [monkey.ci.gui.customer.subs :as sut]
+            [monkey.ci.gui.loader :as lo]
+            [monkey.ci.gui.test.fixtures :as f]
             [re-frame.core :as rf]
             [re-frame.db :refer [app-db]]))
 
 (rf/clear-subscription-cache!)
+
+(use-fixtures :each f/reset-db)
 
 (deftest alerts
   (let [s (rf/subscribe [:customer/alerts])]
     (testing "exists"
       (is (some? s)))
 
-    (testing "returns alerts from db"
+    (testing "returns customer alerts from db"
       (let [a [{:type :info
                 :message "Test alert"}]]
-        (is (map? (reset! app-db (db/set-alerts {} a))))
-        (is (= a @s)))))
-
-  (testing "with id, returns alerts for given id"
-    (let [id ::test-id
-          s (rf/subscribe [:customer/alerts id])
-          a [{:type :info
-              :message "Another test alert"}]]
-      (is (nil? @s))
-      (is (some? (reset! app-db (db/set-alerts {} id a))))
-      (is (= a @s)))))
+        (is (map? (reset! app-db (lo/set-alerts {} db/customer a))))
+        (is (= a @s))))))
 
 (deftest customer-info
   (let [ci (rf/subscribe [:customer/info])]
@@ -45,7 +40,7 @@
 
     (testing "holds loading state from db"
       (is (not @l))
-      (is (map? (reset! app-db (db/set-loading {}))))
+      (is (map? (reset! app-db (lo/set-loading {} db/customer))))
       (is (true? @l)))))
 
 (deftest repo-alerts
@@ -124,7 +119,7 @@
     (testing "holds recent builds from db"
       (let [builds [{:id "test build"}]]
         (is (empty? @l))
-        (is (map? (reset! app-db (db/set-recent-builds {} builds))))
+        (is (map? (reset! app-db (lo/set-value {} db/recent-builds builds))))
         (is (= builds (->> @l (map #(select-keys % [:id])))))))
 
     (testing "returns recent first"
@@ -132,13 +127,13 @@
                                    :start-time 100}
                                   {:id "second"
                                    :start-time 200}]]
-        (is (map? (reset! app-db (db/set-recent-builds {} builds))))
+        (is (map? (reset! app-db (lo/set-value {} db/recent-builds builds))))
         (is (= (:id new) (:id (first @l))))))
 
     (testing "adds repo name from customer info"
       (is (some? (reset! app-db (-> {}
-                                    (db/set-recent-builds [{:id "test-build"
-                                                            :repo-id "test-repo"}])
+                                    (lo/set-value db/recent-builds [{:id "test-build"
+                                                                     :repo-id "test-repo"}])
                                     (db/set-customer {:repos [{:id "test-repo"
                                                                :name "test repo name"}]})))))
       (is (= "test repo name" (-> @l first :repo :name))))))

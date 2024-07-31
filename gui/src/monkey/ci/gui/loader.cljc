@@ -13,6 +13,8 @@
   (:require [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
+;;; DB functions
+
 (defn loading?
   [db id]
   (true? (get-in db [id :loading?])))
@@ -28,6 +30,9 @@
 (defn set-value [db id d]
   (assoc-in db [id :value] d))
 
+(defn update-value [db id f & args]
+  (apply update-in db [id :value] f args))
+
 (defn get-value [db id]
   (get-in db [id :value]))
 
@@ -42,6 +47,13 @@
   [db id]
   (update db id dissoc :alerts))
 
+(defn clear-all
+  "Removes all loader info associated with given id"
+  [db id]
+  (dissoc db id))
+
+;;; Event handler utilities
+
 (defn before-request
   "Sets properties in db before the request"
   [db id]
@@ -54,9 +66,9 @@
    and prepares db using `before-request`.  The request builder is passed the id
    event context, and event vector as received by the handler."
   [id request-builder]
- (fn [{:keys [db] :as ctx} evt]
-   {:dispatch (request-builder id ctx evt)
-    :db (before-request db id)}))
+  (fn [{:keys [db] :as ctx} evt]
+    {:dispatch (request-builder id ctx evt)
+     :db (before-request db id)}))
 
 (defn on-success
   "Handles the success response for given id"
@@ -72,3 +84,9 @@
       (reset-loading id)
       (set-alerts id [{:type :danger
                        :message (str msg (u/error-msg err))}])))
+
+;;; Common subs
+
+(u/db-sub :loader/alerts get-alerts)
+(u/db-sub :loader/loading? loading?)
+(u/db-sub :loader/value get-value)

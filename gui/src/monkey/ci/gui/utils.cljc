@@ -71,7 +71,7 @@
 (defn db-sub
   "Registers a sub that returns a single value from db"
   [id f]
-  (rf/reg-sub id (fn [db _] (f db))))
+  (rf/reg-sub id (fn [db [_ & args]] (apply f db args))))
 
 (defn unescape-entity [e]
   (gstring/unescapeEntities e))

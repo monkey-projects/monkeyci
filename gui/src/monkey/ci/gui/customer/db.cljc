@@ -1,36 +1,13 @@
-(ns monkey.ci.gui.customer.db)
-
-(defn loading?
-  ([db]
-   (::loading? db))
-  ([db id]
-   (true? (get-in db [id :loading?]))))
-
-(defn set-loading
-  ([db]
-   (assoc db ::loading? true))
-  ([db id]
-   (assoc-in db [id :loading?] true)))
-
-(defn unset-loading
-  ([db]
-   (dissoc db ::loading?))
-  ([db id]
-   (update db id dissoc :loading?)))
-
-(defn set-value [db id d]
-  (assoc-in db [id :value] d))
-
-(defn get-value [db id]
-  (get-in db [id :value]))
+(ns monkey.ci.gui.customer.db
+  (:require [monkey.ci.gui.loader :as lo]))
 
 (def customer ::customer)
 
 (defn set-customer [db i]
-  (assoc db customer i))
+  (lo/set-value db customer i))
 
 (defn update-customer [db f & args]
-  (apply update db customer f args))
+  (apply lo/update-value db customer f args))
 
 (defn replace-repo
   "Updates customer repos by replacing the existing repo with the same id."
@@ -42,23 +19,6 @@
               (replace {match updated-repo} repos)
               (conj repos updated-repo)))]
     (update-customer db update :repos replace-with)))
-
-(def alerts ::alerts)
-
-(defn set-alerts
-  ([db a]
-   (assoc db alerts a))
-  ([db id a]
-   (assoc-in db [id :alerts] a)))
-
-(defn get-alerts [db id]
-  (get-in db [id :alerts]))
-
-(defn reset-alerts
-  ([db]
-   (dissoc db alerts))
-  ([db id]
-   (update db id dissoc :alerts)))
 
 (def repo-alerts ::repo-alerts)
 
@@ -90,9 +50,3 @@
   (dissoc db create-alerts))
 
 (def recent-builds ::recent-builds)
-
-(defn get-recent-builds [db]
-  (get-value db recent-builds))
-
-(defn set-recent-builds [db b]
-  (set-value db recent-builds b))

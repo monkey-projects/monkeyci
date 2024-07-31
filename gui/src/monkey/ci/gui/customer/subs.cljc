@@ -1,21 +1,28 @@
 (ns monkey.ci.gui.customer.subs
   (:require [monkey.ci.gui.customer.db :as db]
+            [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
-(u/db-sub :customer/info db/customer)
 (u/db-sub :customer/repo-alerts db/repo-alerts)
-(u/db-sub :customer/loading? db/loading?)
 (u/db-sub ::github-repos db/github-repos)
 (u/db-sub :customer/create-alerts db/create-alerts)
 (u/db-sub :customer/creating? db/customer-creating?)
 
 (rf/reg-sub
+ :customer/info
+ :<- [:loader/value db/customer]
+ identity)
+
+(rf/reg-sub
+ :customer/loading?
+ :<- [:loader/loading? db/customer]
+ identity)
+
+(rf/reg-sub
  :customer/alerts
- (fn [db [_ id]]
-   (if id
-     (db/get-alerts db id)
-     (db/alerts db))))
+ (fn [db _]
+   (lo/get-alerts db db/customer)))
 
 (rf/reg-sub
  :customer/repos
@@ -43,13 +50,15 @@
 
 (rf/reg-sub
  :customer/recent-builds
- (fn [db _]
-   (let [repos (->> (db/customer db)
+ :<- [:loader/value db/customer]
+ :<- [:loader/value db/recent-builds]
+ (fn [[cust rb] _]
+   (let [repos (->> cust
                     :repos
                     (group-by :id))
          add-repo (fn [{:keys [repo-id] :as b}]
                     (assoc b :repo (-> repos (get repo-id) first)))]
-     (->> (db/get-recent-builds db)
+     (->> rb
           (sort-by :start-time)
           (reverse)
           (map add-repo)))))

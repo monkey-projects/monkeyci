@@ -4,6 +4,7 @@
             [day8.re-frame.test :as rf-test]
             [monkey.ci.gui.customer.db :as db]
             [monkey.ci.gui.customer.events :as sut]
+            [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.login.db :as ldb]
             [monkey.ci.gui.login.events]
             [monkey.ci.gui.routing :as r]
@@ -20,12 +21,7 @@
   (testing "sets state to loading"
     (rf-test/run-test-sync
      (rf/dispatch [:customer/load "load-customer"])
-     (is (true? (db/loading? @app-db)))))
-
-  (testing "sets alert"
-    (rf-test/run-test-sync
-     (rf/dispatch [:customer/load "fail-customer"])
-     (is (= 1 (count (db/alerts @app-db))))))
+     (is (true? (lo/loading? @app-db db/customer)))))
 
   (testing "sends request to api and sets customer"
     (rf-test/run-test-sync
@@ -90,21 +86,25 @@
 
 (deftest customer-load--success
   (testing "unmarks loading"
-    (is (map? (reset! app-db (db/set-loading {}))))
+    (is (map? (reset! app-db (lo/set-loading {} db/customer))))
     (rf/dispatch-sync [:customer/load--success "test-customer"])
-    (is (not (db/loading? @app-db)))))
+    (is (not (lo/loading? @app-db db/customer))))
+
+  (testing "sets customer value"
+    (rf/dispatch-sync [:customer/load--success {:body ::test-customer}])
+    (is (= ::test-customer (lo/get-value @app-db db/customer)))))
 
 (deftest customer-load--failed
   (testing "sets error alert"
     (rf/dispatch-sync [:customer/load--failed "test-cust" "test error"])
-    (let [[err] (db/alerts @app-db)]
+    (let [[err] (lo/get-alerts @app-db db/customer)]
       (is (= :danger (:type err)))
       (is (re-matches #".*test-cust.*" (:message err)))))
 
   (testing "unmarks loading"
-    (is (map? (reset! app-db (db/set-loading {}))))
+    (is (map? (reset! app-db (lo/set-loading {} db/customer))))
     (rf/dispatch-sync [:customer/load--failed "test-id" "test-customer"])
-    (is (not (db/loading? @app-db)))))
+    (is (not (lo/loading? @app-db db/customer)))))
 
 (deftest customer-load-github-repos
   (testing "invokes repos and orgs url from github user"
@@ -182,7 +182,7 @@
     (is (some? (reset! app-db (db/set-customer {} {:repos []}))))
     (rf/dispatch-sync [:repo/watch--success {:body {:id "test-repo"}}])
     (is (= {:repos [{:id "test-repo"}]}
-           (db/customer @app-db)))))
+           (lo/get-value @app-db db/customer)))))
 
 (deftest repo-watch--failed
   (testing "sets error alert"
@@ -217,7 +217,7 @@
                                                               :github-id "test-github-id"}]}))))
       (rf/dispatch-sync [:repo/unwatch--success {:body {:id repo-id}}])
       (is (= {:repos [{:id "test-repo"}]}
-             (db/customer @app-db))))))
+             (lo/get-value @app-db db/customer))))))
 
 (deftest repo-unwatch--failed
   (testing "sets error alert"
@@ -260,7 +260,7 @@
   (testing "sets customer in db"
     (let [cust {:id "test-cust"}]
       (rf/dispatch-sync [:customer/create--success {:body cust}])
-      (is (= cust (db/customer @app-db)))))
+      (is (= cust (lo/get-value @app-db db/customer)))))
 
   (testing "redirects to customer page"
     (rf-test/run-test-sync
@@ -270,7 +270,7 @@
        (is (= (r/path-for :page/customer {:customer-id "test-cust"}) (first @e))))))
 
   (testing "sets success alert for customer"
-    (let [a (db/alerts @app-db)]
+    (let [a (lo/get-alerts @app-db db/customer)]
       (rf/dispatch-sync [:customer/create--success {:body {:name "test customer"}}])
       (is (not-empty a))
       (is (= :success (-> a first :type))))))
@@ -293,38 +293,16 @@
        (is (some? (:martian.re-frame/martian @app-db)))
        (rf/dispatch [:customer/load-recent-builds "test-customer"])
        (is (= 1 (count @c)))
-       (is (= :get-recent-builds (-> @c first (nth 2)))))))
-
-  (testing "marks as loading"
-    (rf-test/run-test-sync
-     (rf/dispatch [:customer/load-recent-builds "customer-test-id"])
-     (is (true? (db/loading? @app-db db/recent-builds)))))
-
-  (testing "clears alerts"
-    (rf-test/run-test-sync
-     (reset! app-db (db/set-alerts {} db/recent-builds [{:type :info
-                                                         :message "test alert"}]))
-     (rf/dispatch [:customer/load-recent-builds "customer-test-id"])
-     (is (empty? (db/get-alerts @app-db db/recent-builds))))))
+       (is (= :get-recent-builds (-> @c first (nth 2))))))))
 
 (deftest customer-load-recent-builds--success
   (testing "sets builds in db"
     (let [builds [{:id ::test-build}]]
       (rf/dispatch-sync [:customer/load-recent-builds--success {:body builds}])
-      (is (= builds (db/get-recent-builds @app-db)))))
-  
-  (testing "unmarks loading"
-    (reset! app-db (db/set-loading {} db/recent-builds))
-    (rf/dispatch-sync [:customer/load-recent-builds--success {:body []}])
-    (is (not (db/loading? @app-db db/recent-builds)))))
+      (is (= builds (lo/get-value @app-db db/recent-builds))))))
 
 (deftest customer-load-recent-builds--failed
   (testing "sets error in db"
     (rf/dispatch-sync [:customer/load-recent-builds--failed "test error"])
-    (is (= [:danger] (->> (db/get-alerts @app-db db/recent-builds)
-                          (map :type)))))
-  
-  (testing "unmarks loading"
-    (reset! app-db (db/set-loading {} db/recent-builds))
-    (rf/dispatch-sync [:customer/load-recent-builds--failed "test error"])
-    (is (not (db/loading? @app-db db/recent-builds)))))
+    (is (= [:danger] (->> (lo/get-alerts @app-db db/recent-builds)
+                          (map :type))))))
