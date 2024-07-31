@@ -23,7 +23,7 @@
 (rf/reg-event-fx
  :customer/maybe-load
  (fn [{:keys [db]} [_ id]]
-   (let [existing (lo/get-value db db/customer)
+   (let [existing (db/get-customer db)
          id (or id (r/customer-id db))]
      (when-not (= (:id existing) id)
        {:dispatch [:customer/load id]}))))

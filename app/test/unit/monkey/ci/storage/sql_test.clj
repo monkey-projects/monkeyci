@@ -321,8 +321,10 @@
           (is (sid/sid? (st/save-customer s cust)))
           (is (sid/sid? (st/save-build s old-build)))
           (is (sid/sid? (st/save-build s new-build)))
-          (is (= [(:id new-build)] (->> (st/list-builds-since s (:id cust) 150)
-                                        (map :id)))))))))
+          (let [r (st/list-builds-since s (:id cust) 150)]
+            (is (= [(:id new-build)] (map :id r)))
+            (is (= (:id cust) (:customer-id (first r))))
+            (is (= (:id repo) (:repo-id (first r))))))))))
 
 (deftest ^:sql join-requests
   (with-storage conn s

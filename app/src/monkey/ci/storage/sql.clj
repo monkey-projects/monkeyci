@@ -102,7 +102,7 @@
       (insert-repo conn re repo))))
 
 (defn- upsert-repos [conn {:keys [repos]} cust-id]
-  (doseq [[id r] repos]
+  (doseq [[_ r] repos]
     (upsert-repo conn r cust-id)))
 
 (defn- select-repo-display-ids [{:keys [conn]} cust-id]
@@ -373,6 +373,8 @@
       (assoc :build-id (:display-id build)
              :script (select-keys build [:script-dir]))
       (update :credits (fnil int 0))
+      (mc/assoc-some :customer-id (:customer-cuid build)
+                     :repo-id (:repo-display-id build))
       (drop-nil)))
 
 (defn- job->db [job]

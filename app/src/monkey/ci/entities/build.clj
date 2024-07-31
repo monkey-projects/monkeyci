@@ -27,11 +27,11 @@
 (defn select-build-by-sid
   "Finds build for customer, repo and display id"
   [conn cust-cuid repo-id build-id]
-  (-> (ec/select conn
+  (some-> (ec/select conn
                  (-> (build-query cust-cuid repo-id)
                      (update :where conj [:= :b.display-id build-id])))
-      (first)
-      (ec/convert-build-select)))
+          (first)
+          (ec/convert-build-select)))
 
 #_(defn select-customer-cuid-and-repo-id [conn repo-id]
   (-> (ec/select conn
@@ -51,6 +51,7 @@
 
 (defn select-builds-for-customer-since [conn cust-cuid ts]
   (->> (ec/select conn (assoc basic-query
+                              :select [:b.* [:r.display-id :repo-display-id] [:c.cuid :customer-cuid]]
                               :where [:and
                                       [:= :c.cuid cust-cuid]
                                       [:>= :b.start-time (ec/->ts ts)]]))

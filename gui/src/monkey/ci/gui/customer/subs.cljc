@@ -1,6 +1,7 @@
 (ns monkey.ci.gui.customer.subs
   (:require [monkey.ci.gui.customer.db :as db]
             [monkey.ci.gui.loader :as lo]
+            [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
@@ -58,6 +59,8 @@
                     (group-by :id))
          add-repo (fn [{:keys [repo-id] :as b}]
                     (assoc b :repo (-> repos (get repo-id) first)))]
+     (log/debug "Repos:" (str repos))
+     (log/debug "Recent builds:" (str rb))
      (->> rb
           (sort-by :start-time)
           (reverse)

@@ -6,6 +6,9 @@
 (defn set-customer [db i]
   (lo/set-value db customer i))
 
+(defn get-customer [db]
+  (lo/get-value db customer))
+
 (defn update-customer [db f & args]
   (apply lo/update-value db customer f args))
 
