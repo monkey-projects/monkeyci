@@ -1,12 +1,6 @@
 (ns monkey.ci.gui.repo.db)
 
-(def initialized? ::initialized?)
-
-(defn set-initialized [db i]
-  (assoc db initialized? i))
-
-(defn unset-initialized [db]
-  (dissoc db initialized?))
+(def id ::repo)
 
 (def alerts ::alerts)
 

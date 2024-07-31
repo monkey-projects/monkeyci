@@ -17,6 +17,18 @@
 
 ;; Not using run-test-async cause it tends to block and there are issues when
 ;; there are multiple async blocks in one test.
+
+(deftest customer-init
+  (rf-test/run-test-sync
+   (rf/reg-event-db :customer/load (fn [db _] (assoc db ::loading? true)))
+   (rf/dispatch [:customer/init "test-customer"])
+   
+   (testing "loads customer"
+     (is (true? (::loading? @app-db))))
+
+   (testing "marks initialized"
+     (is (true? (lo/initialized? @app-db db/customer))))))
+
 (deftest customer-load
   (testing "sets state to loading"
     (rf-test/run-test-sync
@@ -306,3 +318,35 @@
     (rf/dispatch-sync [:customer/load-recent-builds--failed "test error"])
     (is (= [:danger] (->> (lo/get-alerts @app-db db/recent-builds)
                           (map :type))))))
+
+(deftest customer-event
+  (testing "does nothing when recent builds not loaded"
+    (rf/dispatch-sync [:customer/handle-event {:type :build/updated
+                                               :build {:id "test-build"}}])
+    (is (empty? @app-db)))
+  
+  (testing "adds build to recent builds"
+    (let [build {:id "test-build"}]
+      (is (some? (reset! app-db (lo/set-loaded {} db/recent-builds))))
+      (rf/dispatch-sync [:customer/handle-event {:type :build/updated
+                                                 :build build}])
+      (is (= [build] (lo/get-value @app-db db/recent-builds)))))
+
+  (testing "updates build in recent builds"
+    (let [build {:id "test-build"
+                 :status :pending
+                 :start-time 200}
+          other-build {:id "other-build"
+                       :status :success
+                       :start-time 100}]
+      (is (some? (reset! app-db (-> {}
+                                    (lo/set-loaded db/recent-builds)
+                                    (lo/set-value db/recent-builds [build
+                                                                    other-build])))))
+      (rf/dispatch-sync [:customer/handle-event {:type :build/updated
+                                                 :build (assoc build :status :running)}])
+      (is (= [{:id "test-build"
+               :status :running
+               :start-time 200}
+              other-build]
+             (lo/get-value @app-db db/recent-builds))))))

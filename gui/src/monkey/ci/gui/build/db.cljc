@@ -1,13 +1,7 @@
-(ns monkey.ci.gui.build.db)
+(ns monkey.ci.gui.build.db
+  (:require [monkey.ci.gui.loader :as lo]))
 
-(def initialized? ::initialized)
-
-(defn set-initialized [db v]
-  (assoc db initialized? v))
-
-(defn unset-initialized [db]
-  (dissoc db initialized?))
-
+(def id ::build-id)
 (def alerts ::alerts)
 
 (defn set-alerts [db a]

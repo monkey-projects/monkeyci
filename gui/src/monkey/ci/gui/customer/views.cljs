@@ -83,7 +83,8 @@
     {:id ::recent-builds
      :items-sub [:customer/recent-builds]
      :columns (concat [{:label "Repository"
-                        :value (comp :name :repo)}]
+                        :value (fn [b]
+                                 [:a {:href (r/path-for :page/repo b)} (get-in b [:repo :name])])}]
                       rv/table-columns)}]])
 
 (defn- overview-tabs
@@ -105,7 +106,7 @@
   "Customer overview page"
   [route]
   (let [id (-> route (r/path-params) :customer-id)]
-    (rf/dispatch [:customer/load id])
+    (rf/dispatch [:customer/init id])
     (l/default
      [:div
       [co/alerts [:customer/alerts]]
