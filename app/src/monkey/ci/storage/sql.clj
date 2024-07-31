@@ -361,6 +361,9 @@
   (-> build
       (select-keys [:status :start-time :end-time :idx :git :credits :source :message])
       (mc/update-existing :status name)
+      ;; Drop some sensitive information
+      (mc/update-existing :git dissoc :ssh-keys-dir)
+      (mc/update-existing-in [:git :ssh-keys] (partial map #(select-keys % [:id :description])))
       (assoc :display-id (:build-id build)
              :script-dir (get-in build [:script :script-dir]))))
 

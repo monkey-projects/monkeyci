@@ -251,7 +251,8 @@
           build (-> (h/gen-build)
                     (assoc :customer-id (:id cust)
                            :repo-id (:id repo)
-                           :script {:script-dir "test-dir"}))
+                           :script {:script-dir "test-dir"})
+                    (mc/update-existing :git dissoc :ssh-keys-dir :ssh-keys))
           build-sid (st/ext-build-sid build)]
       (is (sid/sid? (st/save-customer s cust)))
 
@@ -261,6 +262,16 @@
                                          :from :builds}))))
         (is (= build (-> (st/find-build s build-sid)
                          (select-keys (keys build))))))
+
+      (testing "removes ssh private keys"
+        (let [ssh-key {:id (st/new-id)
+                       :description "test key"
+                       :private-key "secret private key"}
+              build (assoc-in build [:git :ssh-keys] [ssh-key])
+              _ (st/save-build s build)
+              match (st/find-build s (st/ext-build-sid build))]
+          (is (= (select-keys ssh-key [:id :description])
+                 (-> match :git :ssh-keys first)))))
 
       (testing "can replace jobs"
         (let [job (h/gen-job)
