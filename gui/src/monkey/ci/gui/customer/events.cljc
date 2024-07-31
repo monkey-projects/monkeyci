@@ -12,6 +12,20 @@
             [re-frame.core :as rf]))
 
 (rf/reg-event-fx
+ :customer/init
+ (fn [{:keys [db]} [_ id]]
+   (lo/on-initialize
+    db db/customer
+    {:init-events         [[:customer/load id]]
+     :leave-event         [:customer/leave]
+     :event-handler-event [:customer/handle-event]})))
+
+(rf/reg-event-fx
+ :customer/leave
+ (fn [{:keys [db]} _]
+   (lo/on-leave db db/customer)))
+
+(rf/reg-event-fx
  :customer/load
  (lo/loader-evt-handler
   db/customer
@@ -203,3 +217,18 @@
  :customer/load-recent-builds--failed
  (fn [db [_ err]]
    (lo/on-failure db db/recent-builds "Failed to load recent builds: " err)))
+
+(rf/reg-event-db
+ :customer/handle-event
+ (fn [db [_ {:keys [build] :as evt}]]
+   (when (and (= :build/updated (:type evt))
+              (lo/loaded? db db/recent-builds))
+     (letfn [(update-build [builds]
+               (->> (if-let [match (->> builds
+                                        (filter (comp (partial = (:id build)) :id))
+                                        (first))]
+                      (replace {match build} builds)
+                      (conj builds build))
+                    (sort-by :start-time)
+                    (reverse)))]
+       (lo/update-value db db/recent-builds update-build)))))

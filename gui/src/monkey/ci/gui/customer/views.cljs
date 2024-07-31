@@ -106,7 +106,7 @@
   "Customer overview page"
   [route]
   (let [id (-> route (r/path-params) :customer-id)]
-    (rf/dispatch [:customer/load id])
+    (rf/dispatch [:customer/init id])
     (l/default
      [:div
       [co/alerts [:customer/alerts]]

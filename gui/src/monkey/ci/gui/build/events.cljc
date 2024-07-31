@@ -86,14 +86,9 @@
            (r/path-params)
            (get-id)))))
 
-(defmulti handle-event (fn [_ evt] (:type evt)))
-
-(defmethod handle-event :build/updated [db evt]
-  (db/set-build db (:build evt)))
-
-(defmethod handle-event :default [db evt]
-  ;; Ignore
-  db)
+(defn handle-event [db evt]
+  (cond-> db
+    (= :build/updated (:type evt)) (db/set-build (:build evt))))
 
 (rf/reg-event-db
  :build/handle-event

@@ -58,23 +58,11 @@
    (db/set-alerts db [{:type :danger
                        :message (str "Could not load builds: " (u/error-msg err))}])))
 
-(defmulti handle-event (fn [_ evt] (:type evt)))
+(def should-handle-evt? #{:build/start :build/pending :build/updated})
 
-(defn- update-build [db build]
-  (db/update-build db build))
-
-(defmethod handle-event :build/start [db evt]
-  (update-build db (:build evt)))
-
-(defmethod handle-event :build/pending [db evt]
-  (update-build db (:build evt)))
-
-(defmethod handle-event :build/updated [db evt]
-  (update-build db (:build evt)))
-
-(defmethod handle-event :default [db evt]
-  ;; Ignore
-  db)
+(defn handle-event [db evt]
+  (cond-> db
+    (should-handle-evt? (:type evt)) (db/update-build (:build evt))))
 
 (defn- for-repo? [db evt]
   (let [get-id (juxt :customer-id :repo-id)]
