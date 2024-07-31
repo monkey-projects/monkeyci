@@ -83,7 +83,8 @@
     {:id ::recent-builds
      :items-sub [:customer/recent-builds]
      :columns (concat [{:label "Repository"
-                        :value (comp :name :repo)}]
+                        :value (fn [b]
+                                 [:a {:href (r/path-for :page/repo b)} (get-in b [:repo :name])])}]
                       rv/table-columns)}]])
 
 (defn- overview-tabs

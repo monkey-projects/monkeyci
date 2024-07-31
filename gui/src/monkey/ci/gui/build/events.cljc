@@ -1,29 +1,24 @@
 (ns monkey.ci.gui.build.events
   (:require [monkey.ci.gui.build.db :as db]
-            [monkey.ci.gui.logging :as log]
+            [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
-(def stream-id ::event-stream)
-
 (rf/reg-event-fx
  :build/init
  (fn [{:keys [db]} _]
-   (when-not (db/initialized? db)
-     {:dispatch-n [[:build/load]
-                   [:customer/maybe-load (r/customer-id db)]
-                   ;; Make sure we stop listening to events when we leave this page
-                   [:route/on-page-leave [:build/leave]]
-                   ;; TODO Only start reading events when the build has not finished yet
-                   [:event-stream/start stream-id (r/customer-id db) [:build/handle-event]]]
-      :db (db/set-initialized db true)})))
+   (lo/on-initialize
+    db db/id
+    {:init-events         [[:build/load]
+                           [:customer/maybe-load (r/customer-id db)]]
+     :leave-event         [:build/leave]
+     :event-handler-event [:build/handle-event]})))
 
 (rf/reg-event-fx
  :build/leave
  (fn [{:keys [db]} _]
-   {:dispatch [:event-stream/stop stream-id]
-    :db (db/unset-initialized db)}))
+   (lo/on-leave db db/id)))
 
 (defn load-build-req [db]
   [:secure-request

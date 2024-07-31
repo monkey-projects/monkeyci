@@ -57,13 +57,11 @@
                                  :name :trigger-ref
                                  :default-value (:main-branch @repo)}]]]
          [:div.row
-          [:div.col-2
+          [:div.col
            [:button.btn.btn-primary.me-1
             {:type :submit}
             "Trigger"]
-           [:button.btn.btn-outline-danger
-            {:on-click (u/link-evt-handler [:repo/hide-trigger-build])}
-            "Cancel"]]]]]])))
+           [co/cancel-btn [:repo/hide-trigger-build]]]]]]])))
 
 (defn- trim-ref [ref]
   (let [prefix "refs/heads/"]

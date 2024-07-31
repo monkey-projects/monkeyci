@@ -10,7 +10,8 @@
    in that case, don't load it again (optionally).
    
    This namespace provides functionality to support this pattern."
-  (:require [monkey.ci.gui.utils :as u]
+  (:require [monkey.ci.gui.routing :as r]
+            [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
 ;;; DB functions
@@ -26,6 +27,30 @@
 (defn reset-loading
   [db id]
   (update db id dissoc :loading?))
+
+(defn loaded?
+  [db id]
+  (true? (get-in db [id :loaded?])))
+
+(defn set-loaded
+  [db id]
+  (assoc-in db [id :loaded?] true))
+
+(defn reset-loaded
+  [db id]
+  (update db id dissoc :loaded?))
+
+(defn initialized?
+  [db id]
+  (true? (get-in db [id :initialized?])))
+
+(defn set-initialized
+  [db id]
+  (assoc-in db [id :initialized?] true))
+
+(defn reset-initialized
+  [db id]
+  (update db id dissoc :initialized?))
 
 (defn set-value [db id d]
   (assoc-in db [id :value] d))
@@ -61,7 +86,7 @@
       (set-loading id)
       (reset-alerts id)))
 
-(defn loader-fn
+(defn loader-evt-handler
   "Creates a fn that is an fx event handler that dispatches a request event
    and prepares db using `before-request`.  The request builder is passed the id
    event context, and event vector as received by the handler."
@@ -75,7 +100,8 @@
   [db id resp]
   (-> db
       (set-value id (:body resp))
-      (reset-loading id)))
+      (reset-loading id)
+      (set-loaded id)))
 
 (defn on-failure
   "Handles the failure response for given id"
@@ -84,6 +110,32 @@
       (reset-loading id)
       (set-alerts id [{:type :danger
                        :message (str msg (u/error-msg err))}])))
+
+(defn on-initialize
+  "Creates an fx context when initializing a screen that prepares the db, and
+   dispatches any initialization events.  If an event handler is provided, it
+   will also start an event stream using the id."
+  [db id {:keys [init-events leave-event event-handler-event]}]
+  (when-not (initialized? db id)
+    (cond-> {:db (set-initialized db id)}
+      init-events
+      (assoc :dispatch-n init-events)
+
+      leave-event
+      (update :dispatch-n (fnil conj []) [:route/on-page-leave leave-event])
+
+      event-handler-event
+      (update :dispatch-n (fnil conj []) [:event-stream/start id (r/customer-id db) event-handler-event]))))
+
+;;(defn initializer-evt-handler [])
+
+(defn on-leave
+  "Creates a context for an leave fx handler that clears the initialized flag
+   and dispatches a stream stop event."
+  [db id]
+  ;; It would be cleaner if we only dispatched this event if there was actually a started stream
+  {:dispatch [:event-stream/stop id]
+   :db (reset-initialized db id)})
 
 ;;; Common subs
 

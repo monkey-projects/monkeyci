@@ -5,6 +5,7 @@
             [monkey.ci.gui.customer.db :as cdb]
             [monkey.ci.gui.build.db :as db]
             [monkey.ci.gui.build.events :as sut]
+            [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.test.fixtures :as f]
             [monkey.ci.gui.test.helpers :as h]
@@ -58,10 +59,10 @@
          (mock-handlers)
          (reset! app-db {})
          (rf/dispatch [:build/init])
-         (is (true? (db/initialized? @app-db))))))
+         (is (true? (lo/initialized? @app-db db/id))))))
 
     (testing "does nothing when initialized"
-      (reset! app-db (db/set-initialized {} true))
+      (reset! app-db (lo/set-initialized {} db/id))
       (rft/run-test-sync
        (mock-handlers)
        (let [c (atom [])

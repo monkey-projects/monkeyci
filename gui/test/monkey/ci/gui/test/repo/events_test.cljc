@@ -3,6 +3,7 @@
                :clj [clojure.test :refer [deftest testing is use-fixtures]])
             [day8.re-frame.test :as rft]
             [monkey.ci.gui.customer.db :as cdb]
+            [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.repo.db :as db]
             [monkey.ci.gui.repo.events :as sut]
             [monkey.ci.gui.test.fixtures :as f]
@@ -32,7 +33,7 @@
   (testing "does nothing if initialized"
     (rft/run-test-sync
      (let [c (h/catch-fx :martian.re-frame/request)]
-       (reset! app-db (db/set-initialized {} true))
+       (reset! app-db (lo/set-initialized {} db/id))
        (h/initialize-martian {:get-customer {:error-code :unexpected}})
 
        (rf/dispatch [:repo/init])
@@ -49,7 +50,7 @@
          (is (= 1 (count @c))))
 
        (testing "sets initialized"
-         (is (db/initialized? @app-db)))))))
+         (is (lo/initialized? @app-db db/id)))))))
 
 (deftest repo-load
   (testing "loads customer if not existing"
@@ -237,7 +238,7 @@
      (rf/dispatch [:repo/load+edit--success {:body cust}])
      
      (testing "sets current customer"
-       (is (= cust (cdb/customer @app-db))))
+       (is (= cust (lo/get-value @app-db cdb/customer))))
      
      (testing "sets repo for editing"
        (is (= repo (db/editing @app-db)))))))
@@ -342,7 +343,7 @@
                                                    :name "updated repo"}}])
     (is (= "updated repo"
            (-> @app-db
-               (cdb/customer)
+               (lo/get-value cdb/customer)
                :repos
                first
                :name))))

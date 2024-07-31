@@ -7,18 +7,20 @@
             [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.login.db :as ldb]
             [monkey.ci.gui.routing :as r]
+            [monkey.ci.gui.server-events]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
 (rf/reg-event-fx
  :customer/load
- (lo/loader-fn db/customer
-               (fn [_ _ [_ id]]
-                 [:secure-request
-                  :get-customer
-                  {:customer-id id}
-                  [:customer/load--success]
-                  [:customer/load--failed id]])))
+ (lo/loader-evt-handler
+  db/customer
+  (fn [_ _ [_ id]]
+    [:secure-request
+     :get-customer
+     {:customer-id id}
+     [:customer/load--success]
+     [:customer/load--failed id]])))
 
 (rf/reg-event-fx
  :customer/maybe-load
@@ -183,13 +185,14 @@
 
 (rf/reg-event-fx
  :customer/load-recent-builds
- (lo/loader-fn db/recent-builds
-               (fn [_ _ [_ cust-id]]
-                 [:secure-request
-                  :get-recent-builds
-                  {:customer-id cust-id}
-                  [:customer/load-recent-builds--success]
-                  [:customer/load-recent-builds--failed]])))
+ (lo/loader-evt-handler
+  db/recent-builds
+  (fn [_ _ [_ cust-id]]
+    [:secure-request
+     :get-recent-builds
+     {:customer-id cust-id}
+     [:customer/load-recent-builds--success]
+     [:customer/load-recent-builds--failed]])))
 
 (rf/reg-event-db
  :customer/load-recent-builds--success

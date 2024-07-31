@@ -3,6 +3,7 @@
                :clj [clojure.test :refer [deftest testing is use-fixtures]])
             [monkey.ci.gui.test.fixtures :as f]
             [monkey.ci.gui.loader :as sut]
+            [monkey.ci.gui.routing :as r] 
             [re-frame.core :as rf]
             [re-frame.db :refer [app-db]]))
 
@@ -32,8 +33,8 @@
                       (sut/before-request id)
                       (sut/get-alerts id)))))))
 
-(deftest loader-fn
-  (let [loader (sut/loader-fn ::test-id (constantly ::request))]
+(deftest loader-evt-handler
+  (let [loader (sut/loader-evt-handler ::test-id (constantly ::request))]
     (testing "returns a fn"
       (is (fn? loader)))
 
@@ -59,7 +60,10 @@
       (is (not (-> {}
                    (sut/set-loading id)
                    (sut/on-success id {:body ::test-value})
-                   (sut/loading? id)))))))
+                   (sut/loading? id))))))
+
+  (testing "marks loaded"
+    (is (sut/loaded? (sut/on-success {} ::test-id {}) ::test-id))))
 
 (deftest on-failure
   (let [id ::test-id]
@@ -75,6 +79,54 @@
                  (sut/on-failure id "test error" ::test-error)
                  (sut/get-alerts id)
                  (as-> a (map :type a))))))))
+
+(deftest on-initialize
+  (let [id ::init-id]
+    (testing "`nil` when already initialized"
+      (is (nil? (-> {}
+                    (sut/set-initialized id)
+                    (sut/on-initialize id {})))))
+
+    (testing "marks initialized"
+      (is (sut/initialized? (-> {}
+                                (sut/on-initialize id {})
+                                :db)
+                            id)))
+
+    (testing "dispatches init events"
+      (let [init-events [[:test/load]
+                         [:test/other-load]]]
+        (is (= init-events (-> {}
+                               (sut/on-initialize id {:init-events init-events})
+                               :dispatch-n)))))
+
+    (testing "dispatches leave event if provided"
+      (is (= [[:route/on-page-leave [::leave-evt]]]
+             (-> {}
+                 (sut/on-initialize id {:leave-event [::leave-evt]})
+                 :dispatch-n))))
+
+    (testing "dispatches stream start event for customer if handler provided"
+      (is (= [[:event-stream/start id "test-customer" [::handler-evt]]]
+             (-> {}
+                 (r/set-current {:parameters {:path {:customer-id "test-customer"}}}) 
+                 (sut/on-initialize id {:event-handler-event [::handler-evt]})
+                 :dispatch-n))))))
+
+(deftest on-leave
+  (let [id ::leave-test]
+    (testing "unmarks initialized"
+      (is (not (sut/initialized?
+                (-> {}
+                    (sut/set-initialized id)
+                    (sut/on-leave id)
+                    :db)
+                id))))
+
+    (testing "dispatches stream stop event"
+      (is (= [:event-stream/stop id]
+             (-> (sut/on-leave {} id)
+                 :dispatch))))))
 
 (deftest alerts-sub
   (let [id ::test-alerts
