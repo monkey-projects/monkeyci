@@ -23,6 +23,8 @@
   [re]
   #(core/ref-regex % re))
 
+;; TODO Also run jobs if triggered from the api, in which case no files are touched
+
 (def release?
   (ref? tag-regex))
 

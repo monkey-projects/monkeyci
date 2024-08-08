@@ -201,3 +201,7 @@
 (def build-id
   "Retrieves this build id from the context"
   (comp :build-id :build))
+
+(def trigger-src
+  "Returns build trigger source (api, github-app, etc..."
+  (comp :source :build))

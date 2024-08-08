@@ -213,3 +213,7 @@
 
       (testing "`true` if predicate matches"
         (is (sut/touched? rt #(clojure.string/includes? % "add")))))))
+
+(deftest trigger-src
+  (testing "returns build source"
+    (is (= :api (sut/trigger-src {:build {:source :api}})))))

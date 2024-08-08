@@ -23,9 +23,7 @@
              [podman]]
             [monkey.ci.events.core :as ec]
             [monkey.ci.spec.build :as sb]
-            [muuntaja.parse :as mp])
-  (:import java.nio.channels.SocketChannel
-           [java.net UnixDomainSocketAddress StandardProtocolFamily]))
+            [muuntaja.parse :as mp]))
 
 (defn- wrapped
   "Sets the event poster in the runtime."
