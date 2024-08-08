@@ -792,7 +792,7 @@
                 (is (= 404 (:status l)))))))))))
 
 (deftest event-stream
-  (testing "'GET /customer/:customer-id/events' exists"
+  (testing "`GET /customer/:customer-id/events` exists"
     (is (not= 404
               (-> (mock/request :get "/customer/test-cust/events")
                   (test-app)
