@@ -35,8 +35,8 @@
         com.stuartsierra/component {:mvn/version "1.1.0"}
         commons-io/commons-io {:mvn/version "2.16.1"}
         http-kit/http-kit {:mvn/version "2.8.0"}
-        io.micrometer/micrometer-registry-prometheus {:mvn/version "1.13.2"}
-        io.micrometer/micrometer-core {:mvn/version "1.13.2"}
+        io.micrometer/micrometer-registry-prometheus {:mvn/version "1.12.8"}
+        io.micrometer/micrometer-core {:mvn/version "1.12.8"}
         io.resonant/micrometer-clj {:mvn/version "0.0.4"}
         medley/medley {:mvn/version "1.4.0"}
         metosin/reitit-middleware {:mvn/version "0.7.1"}
