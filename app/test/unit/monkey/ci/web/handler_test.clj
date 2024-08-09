@@ -203,11 +203,12 @@
           (testing (str "`PUT` updates existing " name)
             (let [id (st/new-id)
                   _ (creator st (assoc base-entity :id id))
-                  r (-> (h/json-request :put (str path "/" id)
-                                        (cond-> base-entity
-                                          updated-entity (merge updated-entity)))
+                  upd (cond-> base-entity
+                        updated-entity (merge updated-entity))
+                  r (-> (h/json-request :put (str path "/" id) upd)
                         (app))]
-              (is (= 200 (:status r))))))
+              (is (= 200 (:status r))
+                  upd))))
 
         (when can-delete?
           (testing (str "`DELETE` deletes existing " name)
@@ -550,7 +551,22 @@
        :value "test value"}]
      :description "test params"
      :label-filters []}]
-   :parameters))
+   :parameters)
+
+  (let [cust-id (st/new-id)
+        param {:parameters [{:name "test-param"
+                             :value "test value"}]
+               :description "original desc"
+               :customer-id cust-id
+               :label-filters []}]
+    (verify-entity-endpoints
+     {:name "customer param"
+      :path (format "/customer/%s/param" cust-id)
+      :base-entity param
+      :updated-entity {:description "updated description"}
+      :creator (fn [s p]
+                 (st/save-param s (assoc p :customer-id cust-id)))
+      :can-delete? true})))
 
 (deftest ssh-keys-endpoints
   (verify-label-filter-like-endpoints

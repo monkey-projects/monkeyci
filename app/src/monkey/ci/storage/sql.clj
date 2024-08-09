@@ -292,6 +292,17 @@
   ;; Select customer params and values for customer cuid
   (eparam/select-customer-params-with-values conn customer-id))
 
+(defn- upsert-customer-param [{:keys [conn]} {:keys [customer-id] :as param}]
+  (let [{db-id :id} (ec/select-customer conn (ec/by-cuid customer-id))]
+    (upsert-param conn param db-id)
+    (st/params-sid customer-id (:id param))))
+
+(defn- select-customer-param [{:keys [conn]} [_ _ param-id]]
+  (eparam/select-param-with-values conn param-id))
+
+(defn- delete-customer-param [{:keys [conn]} [_ _ param-id]]
+  (pos? (ec/delete-customer-params conn (ec/by-cuid param-id))))
+
 (defn user? [sid]
   (and (= 4 (count sid))
        (= [st/global "users"] (take 2 sid))))
@@ -678,7 +689,11 @@
     :list-since select-customer-builds-since}
    :email-registration
    {:list select-email-registrations
-    :find-by-email select-email-registration-by-email}})
+    :find-by-email select-email-registration-by-email}
+   :param
+   {:save upsert-customer-param
+    :find select-customer-param
+    :delete delete-customer-param}})
 
 (defn make-storage [conn]
   (map->SqlStorage {:conn conn

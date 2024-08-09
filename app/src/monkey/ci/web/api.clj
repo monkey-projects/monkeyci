@@ -109,66 +109,16 @@
 (def create-webhook (comp (c/entity-creator st/save-webhook c/default-id)
                           assign-webhook-secret))
 
-(def repo-sid (comp (juxt :customer-id :repo-id)
-                    :path
-                    :parameters))
-(def params-sid (comp (partial remove nil?)
-                      repo-sid))
 (def customer-id c/customer-id)
 
-(defn- get-list-for-customer [finder req]
-  (-> (c/req->storage req)
-      (finder (customer-id req))
-      (or [])
-      (rur/response)))
-
-(defn- update-for-customer [updater req]
-  (let [assign-id (fn [{:keys [id] :as obj}]
-                    (cond-> obj
-                      (nil? id) (assoc :id (st/new-id))))
-        p (->> (body req)
-               (map assign-id))]
-    ;; TODO Allow patching values so we don't have to send back all secrets to client
-    (when (updater (c/req->storage req) (customer-id req) p)
-      (rur/response p))))
-
-(defn- get-for-repo-by-label
-  "Uses the finder to retrieve a list of entities for the repository specified
-   by the request.  Then filters them using the repo labels and their configured
-   label filters.  Applies the transducer `tx` before constructing the response."
-  [finder tx req]
-  (let [st (c/req->storage req)
-        sid (repo-sid req)
-        repo (st/find-repo st sid)]
-    (if repo
-      (->> (finder st (customer-id req))
-           (lbl/filter-by-label repo)
-           (into [] tx)
-           (rur/response))
-      (rur/not-found {:message (format "Repository %s does not exist" sid)}))))
-
-(def drop-ids (partial map #(dissoc % :customer-id)))
-
-(def get-customer-params
-  "Retrieves all parameters configured on the customer.  This is for administration purposes."
-  (partial get-list-for-customer (comp drop-ids st/find-params)))
-
-(def get-repo-params
-  "Retrieves the parameters that are available for the given repository.  This depends
-   on the parameter label filters and the repository labels."
-  (partial get-for-repo-by-label st/find-params (mapcat :parameters)))
-
-(def update-params
-  (partial update-for-customer st/save-params))
-
 (def get-customer-ssh-keys
-  (partial get-list-for-customer (comp drop-ids st/find-ssh-keys)))
+  (partial c/get-list-for-customer (comp c/drop-ids st/find-ssh-keys)))
 
 (def get-repo-ssh-keys
-  (partial get-for-repo-by-label (comp drop-ids st/find-ssh-keys) (map :private-key)))
+  (partial c/get-for-repo-by-label (comp c/drop-ids st/find-ssh-keys) (map :private-key)))
 
 (def update-ssh-keys
-  (partial update-for-customer st/save-ssh-keys))
+  (partial c/update-for-customer st/save-ssh-keys))
 
 (defn- add-index [[idx p]]
   (assoc p :index idx))
@@ -219,14 +169,14 @@
 (defn get-builds
   "Lists all builds for the repository"
   [req]
-  (->> (st/list-builds (c/req->storage req) (repo-sid req))
+  (->> (st/list-builds (c/req->storage req) (c/repo-sid req))
        (map build->out)
        (rur/response)))
 
 (defn get-latest-build
   "Retrieves the latest build for the repository."
   [req]
-  (if-let [r (some-> (st/find-latest-build (c/req->storage req) (repo-sid req))
+  (if-let [r (some-> (st/find-latest-build (c/req->storage req) (c/repo-sid req))
                      (build->out))]
     (rur/response r)
     (rur/status 204)))
@@ -236,7 +186,7 @@
   [req]
   (if-let [b (some-> (st/find-build
                       (c/req->storage req)
-                      (st/->sid (concat (repo-sid req)
+                      (st/->sid (concat (c/repo-sid req)
                                         [(get-in req [:parameters :path :build-id])])))
                      (build->out))]
     (rur/response b)
@@ -307,7 +257,7 @@
   [{p :parameters :as req}]
   (let [acc (:path p)
         st (c/req->storage req)
-        repo-sid (repo-sid req)
+        repo-sid (c/repo-sid req)
         idx (st/find-next-build-idx st repo-sid)
         bid (str "build-" idx)
         repo (st/find-repo st repo-sid)

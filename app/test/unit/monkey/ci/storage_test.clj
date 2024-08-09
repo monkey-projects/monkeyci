@@ -100,15 +100,33 @@
   (testing "can store on customer level"
     (h/with-memory-store st
       (let [cid (sut/new-id)
-            params {:parameters
-                    [{:name "param-1"
-                      :value "value 1"}
-                     {:name "param-2"
-                      :value "value 2"}]
-                    :label-filters
-                    [[{:label "test-label" :value "test-value"}]]}]
+            params [{:parameters
+                     [{:name "param-1"
+                       :value "value 1"}
+                      {:name "param-2"
+                       :value "value 2"}]
+                     :label-filters
+                     [[{:label "test-label" :value "test-value"}]]}]]
         (is (sid/sid? (sut/save-params st cid params)))
-        (is (= params (sut/find-params st cid)))))))
+        (is (= params (sut/find-params st cid))))))
+
+  (testing "can store and fetch single param"
+    (h/with-memory-store st
+      (let [param (h/gen-customer-params)
+            cid (:customer-id param)]
+        (is (some? cid))
+        (is (sid/sid? (sut/save-param st param)))
+        (is (= param (sut/find-param st (sut/params-sid cid (:id param))))))))
+
+  (testing "can delete param"
+    (h/with-memory-store st
+      (let [param (h/gen-customer-params)
+            cid (:customer-id param)
+            sid (sut/params-sid cid (:id param))]
+        (is (some? cid))
+        (is (sid/sid? (sut/save-param st param)))
+        (is (true? (sut/delete-param st sid)))
+        (is (nil? (sut/find-param st sid)))))))
 
 (deftest list-build-ids
   (testing "lists all build ids for given repo"

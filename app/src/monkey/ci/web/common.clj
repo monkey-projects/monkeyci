@@ -8,6 +8,7 @@
             [muuntaja.core :as mc]
             [monkey.ci
              [build :as b]
+             [labels :as lbl]
              [runtime :as rt]
              [storage :as st]]
             [reitit.ring :as ring]
@@ -23,6 +24,10 @@
   (comp :body :parameters))
 
 (def customer-id (comp :customer-id :path :parameters))
+
+(def repo-sid (comp (juxt :customer-id :repo-id)
+                    :path
+                    :parameters))
 
 ;; Reitit rewrites records in the data to hashmaps, so wrap it in a type
 (deftype RuntimeWrapper [runtime])
@@ -90,7 +95,6 @@
     (rur/status (if (deleter (req->storage req) (get-id req))
                   204
                   404))))
-
 (defn default-id [_ _]
   (st/new-id))
 
@@ -105,6 +109,45 @@
            deleter (assoc "delete-" (entity-deleter get-id deleter)))
          (map make-ep)
          (doall))))
+
+(def drop-ids (partial map #(dissoc % :customer-id)))
+
+(defn get-list-for-customer
+  "Utility function that uses the `finder` to fetch a list of things from storage
+   using the customer id from the request.  Returns the result as a http response."
+  [finder req]
+  (-> (req->storage req)
+      (finder (customer-id req))
+      (or [])
+      (rur/response)))
+
+(defn update-for-customer
+  "Uses the `updater` to save the request body using the customer id.  Returns the 
+   body with an id as a http response."
+  [updater req]
+  (let [assign-id (fn [{:keys [id] :as obj}]
+                    (cond-> obj
+                      (nil? id) (assoc :id (st/new-id))))
+        p (->> (body req)
+               (map assign-id))]
+    ;; TODO Allow patching values so we don't have to send back all secrets to client
+    (when (updater (req->storage req) (customer-id req) p)
+      (rur/response p))))
+
+(defn get-for-repo-by-label
+  "Uses the finder to retrieve a list of entities for the repository specified
+   by the request.  Then filters them using the repo labels and their configured
+   label filters.  Applies the transducer `tx` before constructing the response."
+  [finder tx req]
+  (let [st (req->storage req)
+        sid (repo-sid req)
+        repo (st/find-repo st sid)]
+    (if repo
+      (->> (finder st (customer-id req))
+           (lbl/filter-by-label repo)
+           (into [] tx)
+           (rur/response))
+      (rur/not-found {:message (format "Repository %s does not exist" sid)}))))
 
 (defn make-muuntaja
   "Creates muuntaja instance with custom settings"

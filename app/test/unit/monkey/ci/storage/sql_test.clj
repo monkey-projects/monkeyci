@@ -189,14 +189,20 @@
 (deftest ^:sql customer-params
   (with-storage conn s
     (let [{cust-id :id :as cust} (h/gen-cust)
-          params (assoc (h/gen-customer-params) :customer-id cust-id)]
+          params (assoc (h/gen-customer-params) :customer-id cust-id)
+          sid (st/params-sid cust-id (:id params))]
       (is (sid/sid? (st/save-customer s cust)))
       
-      (testing "can create and retrieve"
+      (testing "can create and retrieve multiple"
         (let [ce (ec/select-customer conn (ec/by-cuid cust-id))]
           (is (sid/sid? (st/save-params s cust-id [params])))
           (is (= [params] (st/find-params s cust-id)))))
 
+      (testing "can create and retrieve single"
+        (let [ce (ec/select-customer conn (ec/by-cuid cust-id))]
+          (is (sid/sid? (st/save-param s params)))
+          (is (= params (st/find-param s sid)))))
+      
       (testing "can update label filters"
         (let [lf [[{:label "test-label"
                     :value "test-value"}]]]
@@ -214,7 +220,17 @@
             (is (= pv (-> matches first :parameters))))))
 
       (testing "empty for nonexisting customer"
-        (is (empty? (st/find-params s (cuid/random-cuid))))))))
+        (is (empty? (st/find-params s (cuid/random-cuid)))))
+
+      (testing "can update single"
+        (let [params (-> (st/find-param s sid)
+                         (assoc :description "updated description"))]
+          (is (sid/sid? (st/save-param s params)))
+          (is (= params (st/find-param s sid)))))
+
+      (testing "can delete single"
+        (is (true? (st/delete-param s sid)))
+        (is (nil? (st/find-param s sid)))))))
 
 (deftest ^:sql users
   (with-storage conn s
