@@ -11,7 +11,8 @@
  (fn [{:keys [db]} [_ cust-id]]
    {:db (-> db
             (db/mark-loading)
-            (db/clear-alerts))
+            (db/clear-alerts)
+            (db/clear-editing))
     :dispatch [:secure-request
                :get-customer-params
                {:customer-id cust-id}
@@ -22,10 +23,7 @@
  :params/load--success
  (fn [db [_ {params :body}]]
    (-> db
-       ;; Set both original and edit params.  This will be used when
-       ;; user wants to save a part of the params, or cancel editing.
        (db/set-params params)
-       (db/set-edit-params params)
        (db/unmark-loading))))
 
 (rf/reg-event-db
@@ -36,83 +34,122 @@
                         :message (str "Failed to load customer params: " (u/error-msg err))}])
        (db/unmark-loading))))
 
+(def new-set? (comp (some-fn nil? db/temp-id?) :id))
+
 (rf/reg-event-db
  :params/new-set
  (fn [db _]
-   (db/update-edit-params db conj {})))
+   (let [id (db/new-temp-id)]
+     (db/set-editing db id {:id id
+                            :parameters []
+                            :label-filters []}))))
+
+(rf/reg-event-db
+ :params/edit-set
+ (fn [db [_ id]]
+   (let [ps (->> (db/params db)
+                 (filter (comp (partial = id) :id))
+                 (first))]
+     (db/set-editing db id ps))))
 
 (rf/reg-event-db
  :params/cancel-set
- (fn [db [_ idx]]
-   ;; Replace with original, or remove if there is no original
-   (if-let [orig (let [p (db/params db)]
-                   (when (< idx (count p))
-                     (nth p idx)))]
-     (db/set-edit-params db (vec (mc/replace-nth idx orig (db/edit-params db))))
-     (db/update-edit-params db (comp vec (partial mc/remove-nth idx))))))
+ (fn [db [_ id]]
+   (db/unset-editing db id)))
+
+(rf/reg-event-fx
+ :params/delete-set
+ (fn [{:keys [db]} [_ id]]
+   {:dispatch [:secure-request
+               :delete-param-set
+               {:customer-id (r/customer-id db)
+                :param-id id}
+               [:params/delete-set--success id]
+               [:params/delete-set--failed id]]
+    :db (db/mark-set-deleting db id)}))
 
 (rf/reg-event-db
- :params/delete-set
- (fn [db [_ idx]]
-   (db/update-edit-params db (comp vec (partial mc/remove-nth idx)))))
+ :params/delete-set--success
+ (fn [db [_ id]]
+   (-> db
+       (db/unset-editing id)
+       (db/unmark-set-deleting id))))
+
+(rf/reg-event-db
+ :params/delete-set--failed
+ (fn [db [_ id err]]
+   (-> db
+       (db/set-set-alerts id
+                          [{:type :danger
+                            :message (str "Failed to delete parameter set: " (u/error-msg err))}])
+       (db/unmark-set-deleting id))))
 
 (rf/reg-event-db
  :params/new-param
- (fn [db [_ idx]]
-   (let [orig (nth (db/edit-params db) idx)]
-     (db/update-edit-param-set db idx update :parameters concat [{}]))))
+ (fn [db [_ id]]
+   (db/update-editing db id update :parameters concat [{}])))
 
 (rf/reg-event-db
  :params/delete-param
- (fn [db [_ set-idx param-idx]]
-   (db/update-edit-param-set db set-idx update :parameters (comp vec (partial mc/remove-nth param-idx)))))
-
-(rf/reg-event-fx
- :params/save-all
- (fn [{:keys [db]} _]
-   {:dispatch [:secure-request
-               :update-customer-params
-               {:customer-id (r/customer-id db)
-                :params (db/edit-params db)}
-               [:params/save-all--success]
-               [:params/save-all--failed]]
-    :db (-> db
-            (db/mark-saving)
-            (db/clear-alerts))}))
-
-(rf/reg-event-db
- :params/save-all--success
- (fn [db [_ {:keys [body]}]]
-   (-> db
-       (db/unmark-saving)
-       (db/set-params body)
-       (db/set-edit-params body))))
-
-(rf/reg-event-db
- :params/save-all--failed
- (fn [db [_ err]]
-   (-> db
-       (db/set-alerts [{:type :danger
-                        :message (str "Failed to save customer params: " (u/error-msg err))}])
-       (db/unmark-saving))))
+ (fn [db [_ set-id param-idx]]
+   (db/update-editing db set-id update :parameters (comp vec (partial mc/remove-nth param-idx)))))
 
 (rf/reg-event-fx
  :params/cancel-all
  (fn [{:keys [db]} _]
-   {:db (db/set-edit-params db (db/params db))
+   {:db (db/clear-editing db)
     :dispatch [:route/goto :page/customer {:customer-id (r/customer-id db)}]}))
 
 (rf/reg-event-db
  :params/description-changed
- (fn [db [_ set-idx desc]]
-   (db/update-edit-param-set db set-idx assoc :description desc)))
+ (fn [db [_ set-id desc]]
+   (db/update-editing db set-id assoc :description desc)))
 
 (rf/reg-event-db
  :params/label-changed
- (fn [db [_ set-idx param-idx new-val]]
-   (db/update-edit-param db set-idx param-idx assoc :name new-val)))
+ (fn [db [_ set-id param-idx new-val]]
+   (db/update-editing-param db set-id param-idx assoc :name new-val)))
 
 (rf/reg-event-db
  :params/value-changed
- (fn [db [_ set-idx param-idx new-val]]
-   (db/update-edit-param db set-idx param-idx assoc :value new-val)))
+ (fn [db [_ set-id param-idx new-val]]
+   (db/update-editing-param db set-id param-idx assoc :value new-val)))
+
+(rf/reg-event-fx
+ :params/save-set
+ (fn [{:keys [db]} [_ id]]
+   (let [new? (db/temp-id? id)]
+     {:dispatch [:secure-request
+                 (if new? :create-param-set :update-param-set)
+                 (cond-> {:customer-id (r/customer-id db)
+                          :params (db/get-editing db id)}
+                   (not new?) (assoc :param-id id)
+                   new? (update :params dissoc :id))
+                 [:params/save-set--success id]
+                 [:params/save-set--failed id]]
+      :db (-> db
+              (db/mark-saving id)
+              (db/clear-set-alerts id))})))
+
+(rf/reg-event-db
+ :params/save-set--success
+ (fn [db [_ id {params :body}]]
+   (letfn [(replace-or-add [existing]
+             (if-let [match (->> existing
+                                 (filter (comp (partial = id) :id))
+                                 (first))]
+               (replace {match params} existing)
+               (conj (vec existing) params)))]
+     (-> db
+         (db/unmark-saving id)
+         (db/unset-editing id)
+         (db/set-params (->> (db/params db)
+                             (replace-or-add)))))))
+
+(rf/reg-event-db
+ :params/save-set--failed
+ (fn [db [_ id err]]
+   (-> db
+       (db/unmark-saving id)
+       (db/set-set-alerts id [{:type :danger
+                               :message (str "Failed to save parameter set: " (u/error-msg err))}]))))

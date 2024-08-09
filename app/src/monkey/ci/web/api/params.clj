@@ -16,6 +16,13 @@
   :saver st/save-param
   :deleter st/delete-param})
 
+(defn- assign-customer-id [req]
+  (update-in req [:parameters :body] assoc :customer-id (c/customer-id req)))
+
+(def create-param 
+  (comp (c/entity-creator st/save-param c/default-id)
+        assign-customer-id))
+
 (def get-repo-params
   "Retrieves the parameters that are available for the given repository.  This depends
    on the parameter label filters and the repository labels."
