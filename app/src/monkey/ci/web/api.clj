@@ -290,7 +290,7 @@
           st (c/req->storage req)
           runner (c/from-rt req :runner)
           build (make-build-ctx req)]
-      (log/debug "Triggering build for repo sid:" (repo-sid req))
+      (log/debug "Triggering build for repo sid:" (c/repo-sid req))
       (if (st/save-build st build)
         (do
           ;; Trigger the build but don't wait for the result
