@@ -293,7 +293,7 @@
   (eparam/select-customer-params-with-values conn customer-id))
 
 (defn- upsert-customer-param [{:keys [conn]} {:keys [customer-id] :as param}]
-  (let [{db-id :id} (ec/select-customer conn (ec/by-cuid customer-id))]
+  (when-let [{db-id :id} (ec/select-customer conn (ec/by-cuid customer-id))]
     (upsert-param conn param db-id)
     (st/params-sid customer-id (:id param))))
 

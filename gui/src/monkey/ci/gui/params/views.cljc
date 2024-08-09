@@ -67,7 +67,7 @@
        :on-click (u/link-evt-handler [:params/delete-set id])}
       [:span.me-2 [co/icon :trash]] "Delete"])])
 
-(defn- edit-params-card [{:keys [id description label-filters parameters] :as p}]
+(defn- edit-params-card [{:keys [id label-filters] :as p}]
   (let [param (rf/subscribe [:params/editing id])]
     [:div.card.mb-4
      [:div.card-body
@@ -77,13 +77,13 @@
        [:div.col-md-8
         [:input.form-control
          {:id (str "description-" id)
-          :value description
-          :on-changed (u/form-evt-handler [:params/description-changed id])}]]]
+          :value (:description @param)
+          :on-change (u/form-evt-handler [:params/description-changed id])}]]]
       [:p.card-text
        [:div.row
         [:div.col-md-3 [:h6 "Name"]]
         [:div.col-md-8 [:h6 "Value"]]]
-       (->> parameters
+       (->> (:parameters @param)
             (map-indexed (partial param-form id))
             (into [:form]))]
       [:div.card-body

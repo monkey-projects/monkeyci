@@ -125,7 +125,14 @@
   (testing "unmarks deleting"
     (is (some? (reset! app-db (db/mark-set-deleting {} ::test-id))))
     (rf/dispatch-sync [:params/delete-set--success ::test-id])
-    (is (false? (db/set-deleting? @app-db ::test-id)))))
+    (is (false? (db/set-deleting? @app-db ::test-id))))
+  
+  (testing "removes set from params"
+    (let [id (random-uuid)]
+      (is (some? (reset! app-db (db/set-params {} [{:id id
+                                                    :description "deleted set"}]))))
+      (rf/dispatch-sync [:params/delete-set--success id])
+      (is (empty? (db/params @app-db))))))
 
 (deftest delete-set-failed
   (let [id (random-uuid)]
@@ -224,7 +231,8 @@
   (testing "sends request for existing set"
     (rf-test/run-test-sync
      (let [params {:id "test-id"
-                   :parameters {}}
+                   :parameters {}
+                   :label-filters []}
            c (h/catch-fx :martian.re-frame/request)]
        (is (some? (reset! app-db (db/set-editing {} (:id params) params))))
        (h/initialize-martian {:update-param-set {:status 200
@@ -239,7 +247,8 @@
   (testing "sends request for new set"
     (rf-test/run-test-sync
      (let [params {:id (db/new-temp-id)
-                   :parameters {}}
+                   :parameters {}
+                   :label-filters []}
            c (h/catch-fx :martian.re-frame/request)]
        (is (some? (reset! app-db (db/set-editing {} (:id params) params))))
        (h/initialize-martian {:create-param-set {:status 201
@@ -252,6 +261,19 @@
        (is (= (dissoc params :id)
               (-> @c first (nth 3) :params))))))
 
+  (testing "ensures label filters key is present"
+    (rf-test/run-test-sync
+     (let [params {:id "test-id"
+                   :parameters {}}
+           c (h/catch-fx :martian.re-frame/request)]
+       (is (some? (reset! app-db (db/set-editing {} (:id params) params))))
+       (h/initialize-martian {:update-param-set {:status 200
+                                                 :body params
+                                                 :error-code :no-error}})
+       (is (some? (:martian.re-frame/martian @app-db)))
+       (rf/dispatch [:params/save-set "test-id"])
+       (is (some? (-> @c first (nth 3) :params :label-filters))))))
+  
   (testing "marks saving"
     (let [id (random-uuid)]
       (rf/dispatch-sync [:params/save-set id])

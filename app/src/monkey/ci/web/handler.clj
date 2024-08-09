@@ -169,7 +169,8 @@
    [["" {:get  {:handler param-api/get-customer-params}
          :put  {:handler param-api/update-params
                 :parameters {:body [Parameters]}}
-         :post {:handler param-api/create-param}}]
+         :post {:handler param-api/create-param
+                :parameters {:body Parameters}}}]
     ["/:param-id"
      {:parameters {:path {:param-id Id}}
       :get {:handler param-api/get-param}

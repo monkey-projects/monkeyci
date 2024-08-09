@@ -73,7 +73,10 @@
  (fn [db [_ id]]
    (-> db
        (db/unset-editing id)
-       (db/unmark-set-deleting id))))
+       (db/unmark-set-deleting id)
+       (db/set-params (->> (db/params db)
+                           (remove (comp (partial = id) :id))
+                           (vec))))))
 
 (rf/reg-event-db
  :params/delete-set--failed
@@ -119,10 +122,12 @@
  :params/save-set
  (fn [{:keys [db]} [_ id]]
    (let [new? (db/temp-id? id)]
+     (log/debug "Saving parameter set:" (str (db/get-editing db id)))
      {:dispatch [:secure-request
                  (if new? :create-param-set :update-param-set)
                  (cond-> {:customer-id (r/customer-id db)
-                          :params (db/get-editing db id)}
+                          :params (-> (db/get-editing db id)
+                                      (update :label-filters #(or % [])))}
                    (not new?) (assoc :param-id id)
                    new? (update :params dissoc :id))
                  [:params/save-set--success id]
