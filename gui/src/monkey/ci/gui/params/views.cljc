@@ -58,10 +58,6 @@
     {:title "Discards all unsaved changes"
      :on-click (u/link-evt-handler [:params/cancel-set id])}
     [:span.me-2 [co/icon :x-square]] "Cancel"]
-   [:button.btn.btn-outline-success.me-2
-    {:title "Adds a new parameter to this set"
-     :on-click (u/link-evt-handler [:params/new-param id])}
-    [:span.me-2 [co/icon :plus-square]] "Add Row"]
    (when-not (e/new-set? p)
      [:button.btn.btn-outline-danger
       {:title "Deletes all parameters in this set"
@@ -86,6 +82,10 @@
       (->> (:parameters @param)
            (map-indexed (partial param-form id))
            (into [:form]))
+      [:button.btn.btn-outline-success.mb-2
+       {:title "Adds a new parameter to this set"
+        :on-click (u/link-evt-handler [:params/new-param id])}
+       [:span.me-2 [co/icon :plus-square]] "Add Parameter"]
       [:div.mb-2 [lbl/edit-label-filters (e/labels-id id)]]
       [params-actions p]
       [:div.mt-2
