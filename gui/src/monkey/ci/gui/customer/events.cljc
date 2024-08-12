@@ -225,7 +225,7 @@
               (lo/loaded? db db/recent-builds))
      (letfn [(update-build [builds]
                (->> (if-let [match (->> builds
-                                        (filter (comp (partial = (:id build)) :id))
+                                        (filter (comp (partial = (:sid build)) :sid))
                                         (first))]
                       (replace {match build} builds)
                       (conj builds build))

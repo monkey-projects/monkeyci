@@ -74,7 +74,7 @@
    [footer]])
 
 (defn default [subpanel]
-  [:<>
+  [:div
    [header]
    [error-boundary subpanel]
    [footer]])
