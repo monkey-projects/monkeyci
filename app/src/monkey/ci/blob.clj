@@ -135,8 +135,8 @@
                                                (select-keys [:ns :bucket-name])
                                                (assoc :object-name obj-name
                                                       :input-stream is
-                                                      ;; Increase buffer size to 1MB
-                                                      :buf-size 0x100000
+                                                      ;; Increase buffer size to 16MB
+                                                      :buf-size 0x1000000
                                                       :close? true)))
               (md/chain (constantly obj-name))
               (md/finally #(fs/delete arch)))))

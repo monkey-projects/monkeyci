@@ -10,6 +10,7 @@
 (def customer-path ["/customer/" :customer-id])
 (def repo-path (into customer-path ["/repo/" :repo-id]))
 (def build-path (into repo-path ["/builds/" :build-id]))
+(def param-path (into customer-path ["/param/" :param-id]))
 (def user-path ["/user/" :user-id])
 
 (def customer-schema
@@ -21,6 +22,10 @@
 
 (def build-schema
   (assoc repo-schema :build-id s/Str))
+
+(def param-schema
+  (assoc customer-schema
+         :param-id s/Str))
 
 (def user-schema
   {:user-id s/Str})
@@ -51,9 +56,21 @@
   {:name s/Str
    :value s/Str})
 
-(s/defschema UpdateParamSet
+(s/defschema LabelFilterConjunction
+  {:label s/Str
+   :value s/Str})
+
+(s/defschema LabelFilterDisjunction
+  [LabelFilterConjunction])
+
+(s/defschema NewParamSet
   {(s/optional-key :description) s/Str
-   :parameters [UpdateParam]})
+   :parameters [UpdateParam]
+   :label-filters [LabelFilterDisjunction]})
+
+(s/defschema UpdateParamSet
+  (assoc NewParamSet
+         :id s/Str))
 
 (defn public-route [conf]
   (merge {:method :get
@@ -100,6 +117,26 @@
      :path-schema customer-schema
      :method :post
      :body-schema {:params [UpdateParamSet]}})
+
+   (api-route
+    {:route-name :create-param-set
+     :path-parts (into customer-path ["/param"])
+     :path-schema customer-schema
+     :method :post
+     :body-schema {:params NewParamSet}})
+
+   (api-route
+    {:route-name :update-param-set
+     :path-parts param-path
+     :path-schema param-schema
+     :method :put
+     :body-schema {:params UpdateParamSet}})
+
+   (api-route
+    {:route-name :delete-param-set
+     :path-parts param-path
+     :path-schema param-schema
+     :method :delete})
 
    (api-route
     {:route-name :get-user-customers

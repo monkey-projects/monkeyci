@@ -20,7 +20,8 @@
              [github :as github]]
             [monkey.ci.web.api
              [customer :as cust-api]
-             [join-request :as jr-api]]
+             [join-request :as jr-api]
+             [params :as param-api]]
             [reitit.coercion.schema]
             [reitit.ring :as ring]
             [ring.middleware.cors :as cors]
@@ -101,6 +102,7 @@
 
 (s/defschema Parameters
   {(s/optional-key :id) Id
+   (s/optional-key :customer-id) Id
    :parameters [ParameterValue]
    (s/optional-key :description) s/Str
    :label-filters [LabelFilter]})
@@ -163,12 +165,21 @@
                  :middleware [:github-security]}]]]))])
 
 (def customer-parameter-routes
-  ["/param" {:get {:handler api/get-customer-params}
-             :put {:handler api/update-params
-                   :parameters {:body [Parameters]}}}])
+  ["/param"
+   [["" {:get  {:handler param-api/get-customer-params}
+         :put  {:handler param-api/update-params
+                :parameters {:body [Parameters]}}
+         :post {:handler param-api/create-param
+                :parameters {:body Parameters}}}]
+    ["/:param-id"
+     {:parameters {:path {:param-id Id}}
+      :get {:handler param-api/get-param}
+      :put {:handler param-api/update-param
+            :parameters {:body Parameters}}
+      :delete {:handler param-api/delete-param}}]]])
 
 (def repo-parameter-routes
-  ["/param" {:get {:handler api/get-repo-params}}])
+  ["/param" {:get {:handler param-api/get-repo-params}}])
 
 (def customer-ssh-keys-routes
   ["/ssh-keys" {:get {:handler api/get-customer-ssh-keys}

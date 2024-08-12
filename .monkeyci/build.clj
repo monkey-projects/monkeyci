@@ -28,14 +28,25 @@
 (def release?
   (ref? tag-regex))
 
+(def api-trigger?
+  (comp (partial = :api)
+        core/trigger-src))
+
 (def should-publish?
   (some-fn core/main-branch? release?))
 
+(defn- dir-changed?
+  "True if files have been touched for the given regex, or the 
+   build was triggered from the api."
+  [ctx re]
+  (or (core/touched? ctx re)
+      (api-trigger? ctx)))
+
 (defn app-changed? [ctx]
-  (core/touched? ctx #"^app/.*"))
+  (dir-changed? ctx #"^app/.*"))
 
 (defn gui-changed? [ctx]
-  (core/touched? ctx #"^gui/.*"))
+  (dir-changed? ctx #"^gui/.*"))
 
 (def build-app? (some-fn app-changed? release?))
 (def build-gui? (some-fn gui-changed? release?))

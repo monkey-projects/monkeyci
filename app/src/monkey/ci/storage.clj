@@ -320,15 +320,59 @@
             (mapcat #(list-builds s [cust-id %]))
             (filter since?))))))
 
-(defn params-sid [customer-id]
+(defn params-sid [customer-id & [param-id]]
   ;; All parameters for a customer are stored together
-  ["build-params" customer-id])
+  (cond-> ["build-params" customer-id]
+    param-id (conj param-id)))
 
 (defn find-params [s cust-id]
   (p/read-obj s (params-sid cust-id)))
 
-(defn save-params [s cust-id p]
+(defn save-params
+  "Saves all customer parameters at once"
+  [s cust-id p]
   (p/write-obj s (params-sid cust-id) p))
+
+(def find-param
+  "Retrieves a single parameter by sid"
+  (override-or
+   [:param :find]
+   (fn [s [_ cust-id param-id]]
+     (->> (find-params s cust-id)
+          (filter (u/prop-pred :id param-id))
+          (first)))))
+
+(def save-param
+  "Saves a single customer parameter"
+  (override-or
+   [:param :save]
+   (fn [s {:keys [customer-id] :as p}]
+     (let [all (find-params s customer-id)
+           match (->> all
+                      (filter (u/prop-pred :id (:id p)))
+                      (first))]
+       (when (save-params
+              s
+              customer-id
+              (if match
+                (replace {match p} all)
+                (conj (vec all) p)))
+         (params-sid customer-id (:id p)))))))
+
+(def delete-param
+  "Deletes a single parameter set by sid"
+  (override-or
+   [:param :delete]
+   (fn [s [_ customer-id param-id]]
+     (let [all (find-params s customer-id)
+           matcher (u/prop-pred :id param-id)
+           exists? (some matcher all)]
+       (when exists?
+         (save-params
+          s
+          customer-id
+          (remove matcher all))
+         true)))))
 
 (defn ssh-keys-sid [cust-id]
   ["ssh-keys" cust-id])
