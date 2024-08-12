@@ -1,6 +1,7 @@
 (ns monkey.ci.gui.params.views
   (:require [monkey.ci.gui.components :as co]
             [monkey.ci.gui.customer.events]
+            [monkey.ci.gui.labels :as lbl]
             [monkey.ci.gui.layout :as l]
             [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.params.events :as e]
@@ -38,7 +39,7 @@
           (conj-desc [idx {:keys [label value]}]
             [:span
              (when (pos? idx)
-               [:b.me-1 "AND"])
+               [:b.mx-1 "AND"])
              (str label " = " value)])]
     (if (empty? lf)
       [:i "Applies to all builds for this customer."]
@@ -79,19 +80,16 @@
          {:id (str "description-" id)
           :value (:description @param)
           :on-change (u/form-evt-handler [:params/description-changed id])}]]]
-      [:p.card-text
-       [:div.row
-        [:div.col-md-3 [:h6 "Name"]]
-        [:div.col-md-8 [:h6 "Value"]]]
-       (->> (:parameters @param)
-            (map-indexed (partial param-form id))
-            (into [:form]))]
-      [:div.card-body
-       ;; TODO Make this editable
-       [:div.mb-2 [label-filters-desc label-filters]]
-       [params-actions p]
-       [:div.mt-2
-        [co/alerts [:params/set-alerts id]]]]]]))
+      [:div.row
+       [:div.col-md-3 [:h6 "Name"]]
+       [:div.col-md-8 [:h6 "Value"]]]
+      (->> (:parameters @param)
+           (map-indexed (partial param-form id))
+           (into [:form]))
+      [:div.mb-2 [lbl/edit-label-filters (e/labels-id id)]]
+      [params-actions p]
+      [:div.mt-2
+       [co/alerts [:params/set-alerts id]]]]]))
 
 (defn- delete-set-btn [id]
   (let [deleting? (rf/subscribe [:params/set-deleting? id])]

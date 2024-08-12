@@ -2,6 +2,7 @@
   (:require #?(:cljs [cljs.test :refer-macros [deftest testing is use-fixtures async]]
                :clj [clojure.test :refer [deftest testing is use-fixtures]])
             [day8.re-frame.test :as rf-test]
+            [monkey.ci.gui.labels :as lbl]
             [monkey.ci.gui.params.db :as db]
             [monkey.ci.gui.params.events :as sut]
             [monkey.ci.gui.test.fixtures :as f]
@@ -79,21 +80,38 @@
     (is (false? (sut/new-set? {:id "existing-set-id"})))))
 
 (deftest edit-set
-  (testing "marks set being edited"
-    (let [id (random-uuid)]
-      (is (some? (reset! app-db (db/set-params {} [{:id id
-                                                    :parameters [{:name "test" :value "test val"}]}]))))
-      (rf/dispatch-sync [:params/edit-set id])
+  (let [id (random-uuid)]
+    (is (some? (reset! app-db (db/set-params {} [{:id id
+                                                  :parameters
+                                                  [{:name "test" :value "test val"}]
+                                                  :label-filters
+                                                  [[{:label "test-label" :value "test-value"}]]}]))))
+    (rf/dispatch-sync [:params/edit-set id])
+    
+    (testing "marks set being edited"
       (is (= [id] (keys (db/edit-sets @app-db))))
       (is (not-empty (db/get-editing @app-db id)))
-      (is (true? (db/editing? @app-db id))))))
+      (is (true? (db/editing? @app-db id))))
+
+    (testing "sets labels for set id"
+      (is (= [[{:label "test-label" :value "test-value"}]]
+             (lbl/get-labels @app-db [:params id]))))))
 
 (deftest cancel-set
-  (testing "clears editing data for set"
-    (let [id (random-uuid)]
-      (is (some? (reset! app-db (db/set-editing {} id ::test-params))))
-      (rf/dispatch-sync [:params/cancel-set id])
-      (is (nil? (db/get-editing @app-db id))))))
+  (let [id (random-uuid)
+        param {:id id
+               :description "test param"
+               :label-filters ::test-labels}]
+    (is (some? (reset! app-db (-> {}
+                                  (db/set-editing id param)
+                                  (lbl/set-labels (sut/labels-id id) (:label-filters param))))))
+    (rf/dispatch-sync [:params/cancel-set id])
+    
+    (testing "clears editing data for set"
+      (is (nil? (db/get-editing @app-db id))))
+
+    (testing "clears label data for set"
+      (is (nil? (lbl/get-labels @app-db (sut/labels-id id)))))))
 
 (deftest delete-set
   (let [id (str (random-uuid))]
@@ -132,7 +150,13 @@
       (is (some? (reset! app-db (db/set-params {} [{:id id
                                                     :description "deleted set"}]))))
       (rf/dispatch-sync [:params/delete-set--success id])
-      (is (empty? (db/params @app-db))))))
+      (is (empty? (db/params @app-db)))))
+
+  (testing "removes set labels"
+    (let [id (random-uuid)]
+      (is (some? (reset! app-db (lbl/set-labels {} (sut/labels-id id) ::test-labels))))
+      (rf/dispatch-sync [:params/delete-set--success id])
+      (is (nil? (lbl/get-labels @app-db (sut/labels-id id)))))))
 
 (deftest delete-set-failed
   (let [id (random-uuid)]
@@ -273,6 +297,24 @@
        (is (some? (:martian.re-frame/martian @app-db)))
        (rf/dispatch [:params/save-set "test-id"])
        (is (some? (-> @c first (nth 3) :params :label-filters))))))
+
+  (testing "adds label filters from label editor"
+    (rf-test/run-test-sync
+     (let [params {:id "test-id"
+                   :parameters {}}
+           lbl-filters [[{:label "test-label"
+                          :value "test value"}]]
+           c (h/catch-fx :martian.re-frame/request)]
+       (is (some? (reset! app-db (-> {}
+                                     (db/set-editing (:id params) params)
+                                     (lbl/set-labels (sut/labels-id (:id params)) lbl-filters)))))
+       (h/initialize-martian {:update-param-set {:status 200
+                                                 :body params
+                                                 :error-code :no-error}})
+       (is (some? (:martian.re-frame/martian @app-db)))
+       (rf/dispatch [:params/save-set "test-id"])
+       (is (= lbl-filters
+              (-> @c first (nth 3) :params :label-filters))))))
   
   (testing "marks saving"
     (let [id (random-uuid)]

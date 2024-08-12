@@ -1,10 +1,14 @@
 (ns monkey.ci.gui.params.events
   (:require [medley.core :as mc]
+            [monkey.ci.gui.labels :as lbl]
             [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.params.db :as db]
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
+
+(defn labels-id [id]
+  [:params id])
 
 (rf/reg-event-fx
  :params/load
@@ -50,12 +54,16 @@
    (let [ps (->> (db/params db)
                  (filter (comp (partial = id) :id))
                  (first))]
-     (db/set-editing db id ps))))
+     (-> db
+         (db/set-editing id ps)
+         (lbl/set-labels (labels-id id) (:label-filters ps))))))
 
 (rf/reg-event-db
  :params/cancel-set
  (fn [db [_ id]]
-   (db/unset-editing db id)))
+   (-> db
+       (db/unset-editing id)
+       (lbl/clear-labels (labels-id id)))))
 
 (rf/reg-event-fx
  :params/delete-set
@@ -76,7 +84,8 @@
        (db/unmark-set-deleting id)
        (db/set-params (->> (db/params db)
                            (remove (comp (partial = id) :id))
-                           (vec))))))
+                           (vec)))
+       (lbl/clear-labels (labels-id id)))))
 
 (rf/reg-event-db
  :params/delete-set--failed
@@ -121,13 +130,15 @@
 (rf/reg-event-fx
  :params/save-set
  (fn [{:keys [db]} [_ id]]
-   (let [new? (db/temp-id? id)]
-     (log/debug "Saving parameter set:" (str (db/get-editing db id)))
+   (let [new? (db/temp-id? id)
+         lbls (lbl/get-labels db (labels-id id))
+         param (-> (db/get-editing db id)
+                   (assoc :label-filters (or lbls [])))]
+     (log/debug "Saving parameter set:" (str param))
      {:dispatch [:secure-request
                  (if new? :create-param-set :update-param-set)
                  (cond-> {:customer-id (r/customer-id db)
-                          :params (-> (db/get-editing db id)
-                                      (update :label-filters #(or % [])))}
+                          :params param}
                    (not new?) (assoc :param-id id)
                    new? (update :params dissoc :id))
                  [:params/save-set--success id]
