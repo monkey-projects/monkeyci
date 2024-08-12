@@ -333,10 +333,12 @@
       (is (= [build] (lo/get-value @app-db db/recent-builds)))))
 
   (testing "updates build in recent builds"
-    (let [build {:id "test-build"
+    (let [build {:id (random-uuid)
+                 :sid "test-build"
                  :status :pending
                  :start-time 200}
-          other-build {:id "other-build"
+          other-build {:id (random-uuid)
+                       :sid "other-build"
                        :status :success
                        :start-time 100}]
       (is (some? (reset! app-db (-> {}
@@ -345,8 +347,9 @@
                                                                     other-build])))))
       (rf/dispatch-sync [:customer/handle-event {:type :build/updated
                                                  :build (assoc build :status :running)}])
-      (is (= [{:id "test-build"
+      (is (= [{:sid "test-build"
                :status :running
-               :start-time 200}
+               :start-time 200
+               :id (:id build)}
               other-build]
              (lo/get-value @app-db db/recent-builds))))))

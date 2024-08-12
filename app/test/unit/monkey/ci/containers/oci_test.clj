@@ -10,6 +10,7 @@
              [oci :as oci]
              [runtime :as rt]
              [utils :as u]]
+            [monkey.ci.common.preds :as cp]
             [monkey.ci.containers.oci :as sut]
             [monkey.ci.events.core :as ec]
             [monkey.ci.helpers :as h]))
@@ -126,7 +127,7 @@
                    :build {:checkout-dir "/tmp/test-build"}}
                   (sut/instance-config {})
                   :containers
-                  (mc/find-first (u/prop-pred :display-name "job")))]
+                  (mc/find-first (cp/prop-pred :display-name "job")))]
       
       (testing "uses shell mounted script"
         (is (= ["/bin/sh" (str sut/script-dir "/job.sh")] (:command jc)))
@@ -149,7 +150,7 @@
                             :build {:checkout-dir "/tmp/test-build"}}
                            (sut/instance-config {})
                            :containers
-                           (mc/find-first (u/prop-pred :display-name "job"))
+                           (mc/find-first (cp/prop-pred :display-name "job"))
                            :environment-variables)]
               (is (= "/opt/monkeyci/checkout/work/test-build/sub" (get env "MONKEYCI_WORK_DIR")))))
 
@@ -183,7 +184,7 @@
                   (sut/instance-config {:credentials {:private-key pk}}))
           sc (->> ic
                   :containers
-                  (mc/find-first (u/prop-pred :display-name "sidecar")))]
+                  (mc/find-first (cp/prop-pred :display-name "sidecar")))]
 
       (testing "passes config file as arg"
         (is (= "/home/monkeyci/config/config.edn" (second (:arguments sc)))))
@@ -257,7 +258,7 @@
     (let [v (->> (assoc default-rt :job {:script ["first" "second"]})
                  (sut/instance-config {})
                  :volumes
-                 (mc/find-first (u/prop-pred :name "scripts"))
+                 (mc/find-first (cp/prop-pred :name "scripts"))
                  :configs)
           by-name (->> v
                        (group-by :file-name)
@@ -287,14 +288,14 @@
                   (sut/instance-config {}))
           pc (->> ci
                   :containers
-                  (mc/find-first (u/prop-pred :display-name "promtail")))]
+                  (mc/find-first (cp/prop-pred :display-name "promtail")))]
       (testing "added to instance"
         (is (some? pc)))
 
       (testing "refers to mounted config file"
         (is (= ["-config.file" "/etc/promtail/config.yml"]
                (:arguments pc)))
-        (is (some? (mc/find-first (u/prop-pred :volume-name "promtail-config")
+        (is (some? (mc/find-first (cp/prop-pred :volume-name "promtail-config")
                                   (:volume-mounts pc)))))
 
       (testing "monitors script log dir"
@@ -325,7 +326,7 @@
                       {:checkout-dir "/tmp/test-build"}}
                      (sut/instance-config {})
                      :containers
-                     (mc/find-first (u/prop-pred :display-name "promtail"))))))))
+                     (mc/find-first (cp/prop-pred :display-name "promtail"))))))))
 
 (deftest wait-for-instance-end-events
   (testing "returns a deferred that holds the container and job end events"

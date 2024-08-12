@@ -152,11 +152,6 @@
 
 (def ^:deprecated serialize-sid sid/serialize-sid)
 
-(defn prop-pred
-  "Returns a fn that is a predicate to match property `p` with value `v`"
-  [p v]
-  (comp (partial = v) p))
-
 (defn try-slurp
   "Reads the file if it exists, or just returns x"
   [x]

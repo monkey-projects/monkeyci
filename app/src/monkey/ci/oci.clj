@@ -11,6 +11,7 @@
              [config :as c]
              [pem :as pem]
              [utils :as u]]
+            [monkey.ci.common.preds :as cp]
             [monkey.oci.container-instance.core :as ci]
             [monkey.oci.os
              [martian :as os]
@@ -241,13 +242,13 @@
 (defn find-mount
   "Finds mount with given volume name in the container"
   [c n]
-  (mc/find-first (u/prop-pred :volume-name n)
+  (mc/find-first (cp/prop-pred :volume-name n)
                  (:volume-mounts c)))
 
 (defn find-volume
   "Finds volume with given name in the container instance"
   [ci n]
-  (mc/find-first (u/prop-pred :name n)
+  (mc/find-first (cp/prop-pred :name n)
                  (:volumes ci)))
 
 (defn config-entry

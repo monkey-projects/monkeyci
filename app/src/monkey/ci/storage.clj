@@ -10,8 +10,8 @@
              [cuid :as cuid]
              [protocols :as p]
              [runtime :as rt]
-             [sid :as sid]
-             [utils :as u]]
+             [sid :as sid]]
+            [monkey.ci.common.preds :as cp]
             [monkey.ci.storage.cached :as cached])
   (:import [java.io File PushbackReader]))
 
@@ -339,7 +339,7 @@
    [:param :find]
    (fn [s [_ cust-id param-id]]
      (->> (find-params s cust-id)
-          (filter (u/prop-pred :id param-id))
+          (filter (cp/prop-pred :id param-id))
           (first)))))
 
 (def save-param
@@ -349,7 +349,7 @@
    (fn [s {:keys [customer-id] :as p}]
      (let [all (find-params s customer-id)
            match (->> all
-                      (filter (u/prop-pred :id (:id p)))
+                      (filter (cp/prop-pred :id (:id p)))
                       (first))]
        (when (save-params
               s
@@ -365,7 +365,7 @@
    [:param :delete]
    (fn [s [_ customer-id param-id]]
      (let [all (find-params s customer-id)
-           matcher (u/prop-pred :id param-id)
+           matcher (cp/prop-pred :id param-id)
            exists? (some matcher all)]
        (when exists?
          (save-params
