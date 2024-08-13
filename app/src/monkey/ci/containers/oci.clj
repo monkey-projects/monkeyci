@@ -86,7 +86,9 @@
   (let [wd (job-work-dir rt)]
     {:image-url (or (:image job) (:container/image job))
      :display-name job-container-name
-     ;; Override entrytpoint
+     ;; Override entrypoint
+     ;; TODO Only do this if a script was specified, otherwise use user-provided args and command
+     ;; TODO Allow for user-specified :shell path in case /bin/sh is not available
      :command ["/bin/sh" (str script-dir "/" job-script)]
      ;; One file arg per script line, with index as name
      :arguments (->> (count (:script job))
