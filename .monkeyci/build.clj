@@ -14,7 +14,7 @@
 
 ;; Version assigned when building main branch
 ;; TODO Determine automatically
-(def snapshot-version "0.6.7-SNAPSHOT")
+(def snapshot-version "0.7.1-SNAPSHOT")
 
 (def tag-regex #"^refs/tags/(\d+\.\d+\.\d+(\.\d+)?$)")
 
@@ -48,11 +48,16 @@
 (defn gui-changed? [ctx]
   (dir-changed? ctx #"^gui/.*"))
 
+(defn common-changed? [ctx]
+  (dir-changed? ctx #"^common/.*"))
+
 (def build-app? (some-fn app-changed? release?))
 (def build-gui? (some-fn gui-changed? release?))
+(def build-common? (some-fn common-changed? release?))
 
 (def publish-app? (some-fn (every-pred app-changed? should-publish?) release?))
 (def publish-gui? (some-fn (every-pred gui-changed? should-publish?) release?))
+(def publish-common? (some-fn (every-pred common-changed? should-publish?) release?))
 
 (defn tag-version
   "Extracts the version from the tag"
@@ -88,21 +93,30 @@
     :caches [{:id "mvn-local-repo"
               :path "m2"}]}))
 
-(def app-junit-artifact
-  {:id "app-junit"
-   :path "app/junit.xml"})
+(defn- junit-artifact [dir]
+  {:id (str dir "-junit")
+   :path (str dir "/junit.xml")})
 
-(def app-coverage-artifact
-  {:id "app-coverage"
-   :path "app/target/coverage"})
+(defn coverage-artifact [dir]
+  {:id (str dir "-coverage")
+   :path (str dir "/target/coverage")})
 
 (defn test-app [ctx]
-  (when (build-app? ctx)
-    (-> (clj-container "test-app" "app" "-M:test:junit:coverage")
-        (assoc :save-artifacts [app-junit-artifact
-                                app-coverage-artifact]
-               :junit {:artifact-id (:id app-junit-artifact)
-                       :path "junit.xml"}))))
+  (let [junit-artifact (junit-artifact "app")]
+    (when (build-app? ctx)
+      (-> (clj-container "test-app" "app" "-M:test:junit:coverage")
+          (assoc :save-artifacts [junit-artifact
+                                  (coverage-artifact "app")]
+                 :junit {:artifact-id (:id junit-artifact)
+                         :path "junit.xml"})))))
+
+(defn test-common [ctx]
+  (let [junit-artifact (junit-artifact "common")]
+    (when (build-common? ctx)
+      (-> (clj-container "test-common" "common" "-X:test:junit")
+          (assoc :save-artifacts [junit-artifact]
+                 :junit {:artifact-id (:id junit-artifact)
+                         :path "junit.xml"})))))
 
 (def uberjar-artifact
   {:id "uberjar"
@@ -200,12 +214,19 @@
     (let [env (-> (api/build-params ctx)
                   (select-keys ["CLOJARS_USERNAME" "CLOJARS_PASSWORD"])
                   (assoc "MONKEYCI_VERSION" (lib-version ctx)))]
-      (-> (clj-container id dir "-X:jar:deploy")
+      (-> (clj-container id dir
+                         "-X:jar:deploy")
           (assoc :container/env env)))))
 
 (defn publish-app [ctx]
+  ;; App is dependent on the common lib, so we should replace version here
+  ;; (format "-Sdeps '{:override-deps {:mvn/version \"%s\"}}'" (lib-version ctx))
   (some-> (publish ctx "publish-app" "app")
           (core/depends-on ["test-app"])))
+
+(defn publish-common [ctx]
+  (some-> (publish ctx "publish-common" "common")
+          (core/depends-on ["test-common"])))
 
 (def github-release
   "Creates a release in github"

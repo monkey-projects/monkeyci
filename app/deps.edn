@@ -19,7 +19,8 @@
         com.github.oliyh/martian-httpkit {:mvn/version "0.1.26"}
         com.github.seancorfield/honeysql {:mvn/version "2.6.1147"}
         com.github.seancorfield/next.jdbc {:mvn/version "1.3.939"}
-        com.monkeyci/common {:local/root "../common"}
+        ;; TODO Use this instead of external path
+        ;; com.monkeyci/common {:local/root "../common"}
         com.monkeyprojects/clompress {:mvn/version "0.1.1"}
         com.monkeyprojects/monkey-jms {:mvn/version "0.2.0"}
         com.monkeyprojects/oci-container-instance {:mvn/version "0.1.0"}
@@ -52,8 +53,9 @@
         org.zeromq/jeromq {:mvn/version "0.6.0"} ; Java implementation of zeromq
         ring-cors/ring-cors {:mvn/version "0.1.13"}
         yogthos/config {:mvn/version "1.2.0"}}
- 
- :paths ["src" "resources"]
+
+ ;; TODO Remove external path, replace with lib
+ :paths ["src" "../common/src" "resources"]
  
  :aliases
  {:dev
