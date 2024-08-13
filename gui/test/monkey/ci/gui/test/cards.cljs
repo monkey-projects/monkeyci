@@ -2,9 +2,7 @@
   "Devcards entry point"
   (:require [devcards.core :as dc :include-macros true]
             ["highlight.js" :as hljs]
-            ["marked" :as marked]
-            [monkey.ci.gui.test.cards.table-cards]
-            [monkey.ci.gui.test.cards.timer-cards]))
+            ["marked" :as marked]))
 
 #_(defn marked-parse [x]
   (.parse marked x))

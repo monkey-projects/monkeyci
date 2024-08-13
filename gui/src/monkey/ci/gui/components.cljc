@@ -147,7 +147,7 @@
 (defn log-contents [raw]
   (->> raw
        (map ->html)
-       (into [:p.text-bg-dark.font-monospace.overflow-auto.text-nowrap.h-100.p-1])))
+       (into [:p.bg-dark.text-white.font-monospace.overflow-auto.text-nowrap.h-100.p-1])))
 
 (defn build-elapsed [b]
   (let [e (u/build-elapsed b)]
