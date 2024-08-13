@@ -14,7 +14,7 @@
 
 ;; Version assigned when building main branch
 ;; TODO Determine automatically
-(def snapshot-version "0.7.1-SNAPSHOT")
+(def snapshot-version "0.7.2-SNAPSHOT")
 
 (def tag-regex #"^refs/tags/(\d+\.\d+\.\d+(\.\d+)?$)")
 
@@ -172,7 +172,7 @@
       (core/container-job
        id
        (merge
-        {:image "docker.io/monkeyci/kaniko:1.21.0"
+        {:image "docker.io/monkeyci/kaniko:1.23.2"
          :script [(format "/kaniko/executor --dockerfile %s --destination %s --context dir://%s"
                           (str ctx-dir "/" (or dockerfile "Dockerfile"))
                           (str image ":" (or tag (image-version ctx)))
@@ -235,7 +235,7 @@
 (defn- shadow-release [id build]
   (core/container-job
    id
-   {:image "docker.io/dormeur/clojure-node:1.11.1"
+   {:image "docker.io/monkeyci/clojure-node:1.11.4"
     :work-dir "gui"
     :script ["npm install"
              (str "clojure -Sdeps '{:mvn/local-repo \".m2\"}' -M:test -m shadow.cljs.devtools.cli release " build)]
