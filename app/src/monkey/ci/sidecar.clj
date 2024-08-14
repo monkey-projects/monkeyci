@@ -132,7 +132,7 @@
 (defn run
   "Runs sidecar by restoring workspace, artifacts and caches, and then polling for events.
    After the event loop has terminated, saves artifacts and caches and returns a deferred
-   containing the runtime with an `:exit-code` added."
+   containing the runtime with an `:exit` added."
   [rt]
   (log/info "Running sidecar with configuration:" (get-in rt [rt/config :sidecar]))
   ;; Restore caches and artifacts before starting the job

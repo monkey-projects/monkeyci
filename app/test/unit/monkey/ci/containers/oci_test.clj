@@ -121,23 +121,60 @@
                  :ocpus)))))
   
   (testing "job container"
-    (let [jc (->> {:job {:script ["first" "second"]
+    (let [find-job-container (fn [ic]
+                               (->> ic
+                                    :containers
+                                    (mc/find-first (cp/prop-pred :display-name "job"))))
+          jc (->> {:job {:script ["first" "second"]
                          :container/env {"TEST_ENV" "test-val"}
                          :work-dir "/tmp/test-build/sub"}
                    :build {:checkout-dir "/tmp/test-build"}}
                   (sut/instance-config {})
-                  :containers
-                  (mc/find-first (cp/prop-pred :display-name "job")))]
+                  (find-job-container))]
       
       (testing "uses shell mounted script"
         (is (= ["/bin/sh" (str sut/script-dir "/job.sh")] (:command jc)))
         (is (= ["0" "1"] (:arguments jc))))
-      
+
       (testing "includes a script volume"
         (let [v (oci/find-mount jc "scripts")]
           (is (some? v))
           (is (= sut/script-dir (:mount-path v)))))
 
+      (testing "uses shell from job config"
+        (let [jc (->> {:job {:script ["test-script"]
+                             :shell "/bin/bash"}
+                       :build {:checkout-dir "/tmp"}}
+                      (sut/instance-config {})
+                      (find-job-container))]
+          (is (= "/bin/bash" (-> jc :command first)))))
+
+      (testing "ignores command and arguments when script specified"
+        (let [jc (->> {:job {:script ["test-script"]
+                             :container/cmd ["test-command"]
+                             :container/args ["test-args"]
+                             :shell "/bin/bash"}
+                       :build {:checkout-dir "/tmp"}}
+                      (sut/instance-config {})
+                      (find-job-container))]
+          (is (not= ["test-command"] (:command jc)))
+          (is (not= ["test-args"] (:arguments jc)))))
+
+      (testing "without script"
+        (let [jc (->> {:job {:container/cmd ["test-command"]
+                             :container/args ["test" "args"]}
+                       :build {:checkout-dir "/tmp"}}
+                      (sut/instance-config {})
+                      (find-job-container))]
+          (testing "uses command from job"
+            (is (= ["test-command"] (:command jc))))
+          
+          (testing "uses arguments from job"
+            (is (= ["test" "args"] (:arguments jc))))
+          
+          (testing "does not include script volume"
+            (is (nil? (oci/find-mount jc "scripts"))))))
+      
       (testing "environment"
         (let [env (:environment-variables jc)]
           (testing "sets work dir to job work dir"

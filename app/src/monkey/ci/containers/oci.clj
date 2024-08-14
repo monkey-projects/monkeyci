@@ -84,23 +84,28 @@
    events to a file, that are then picked up by the sidecar."
   [{:keys [job] :as rt}]
   (let [wd (job-work-dir rt)]
-    {:image-url (or (:image job) (:container/image job))
-     :display-name job-container-name
-     ;; Override entrytpoint
-     :command ["/bin/sh" (str script-dir "/" job-script)]
-     ;; One file arg per script line, with index as name
-     :arguments (->> (count (:script job))
-                     (range)
-                     (mapv str))
-     :environment-variables (merge
-                             (:container/env job)
-                             {"MONKEYCI_WORK_DIR" wd
-                              "MONKEYCI_LOG_DIR" log-dir
-                              "MONKEYCI_SCRIPT_DIR" script-dir
-                              "MONKEYCI_START_FILE" start-file
-                              "MONKEYCI_ABORT_FILE" abort-file
-                              "MONKEYCI_EVENT_FILE" event-file})
-     :working-directory wd}))
+    (cond-> {:image-url (or (:image job) (:container/image job))
+             :display-name job-container-name
+             ;; In container instances, command or entrypoint are treated the same
+             :command (or (:container/cmd job)
+                          (:container/entrypoint job))
+             :arguments (:container/args job)
+             :environment-variables (:container/env job)
+             :working-directory wd}
+      ;; Override some props if script is specified
+      (:script job) (-> (assoc :command [(get job :shell "/bin/sh") (str script-dir "/" job-script)]
+                               ;; One file arg per script line, with index as name
+                               :arguments (->> (count (:script job))
+                                               (range)
+                                               (mapv str)))
+                        (update :environment-variables
+                                merge
+                                {"MONKEYCI_WORK_DIR" wd
+                                 "MONKEYCI_LOG_DIR" log-dir
+                                 "MONKEYCI_SCRIPT_DIR" script-dir
+                                 "MONKEYCI_START_FILE" start-file
+                                 "MONKEYCI_ABORT_FILE" abort-file
+                                 "MONKEYCI_EVENT_FILE" event-file})))))
 
 (defn- sidecar-container [{[c] :containers}]
   (assoc c
@@ -156,10 +161,11 @@
   (cs/join "-" [(:build-id build)
                 (bc/job-id job)]))
 
-(defn- script-mount [{{:keys [script]} :job}]
-  {:volume-name script-vol
-   :is-read-only false
-   :mount-path script-dir})
+(defn- script-mount [rt]
+  (when (get-in rt [:job :script])
+    {:volume-name script-vol
+     :is-read-only false
+     :mount-path script-dir}))
 
 (defn- config-mount [_]
   {:volume-name config-vol
@@ -172,17 +178,17 @@
 (defn- script-vol-config
   "Adds the job script and a file for each script line as a configmap volume."
   [{{:keys [script]} :job}]
-  (when (log/enabled? :debug)
-    (log/debug "Executing script lines in container:")
-    (doseq [l script]
-      (log/debug "  " l)))
-  ;; TODO Also handle :container/cmd key
-  {:name script-vol
-   :volume-type "CONFIGFILE"
-   :configs (->> script
-                 (map-indexed (fn [i s]
-                                (oci/config-entry (str i) s)))
-                 (into [(job-script-entry)]))})
+  (when-not (empty? script)
+    (when (log/enabled? :debug)
+      (log/debug "Executing script lines in container:")
+      (doseq [l script]
+        (log/debug "  " l)))
+    {:name script-vol
+     :volume-type "CONFIGFILE"
+     :configs (->> script
+                   (map-indexed (fn [i s]
+                                  (oci/config-entry (str i) s)))
+                   (into [(job-script-entry)]))}))
 
 (defn- job-details->edn [rt]
   (pr-str {:job (-> (:job rt)
@@ -241,15 +247,15 @@
                (update :volume-mounts conj (config-mount rt)))
         jc (-> (job-container rt)
                ;; Use common volume for logs and events
-               (assoc :volume-mounts [(find-checkout-vol ic)
-                                      (script-mount rt)]))]
+               (assoc :volume-mounts (filter some? [(find-checkout-vol ic)
+                                                    (script-mount rt)])))]
     (-> ic
         (assoc :containers [sc jc]
                :display-name (display-name rt))
         (update :freeform-tags merge (oci/sid->tags (get-in rt [:build :sid])))
-        (update :volumes conj
-                (script-vol-config rt)
-                (config-vol-config rt))
+        (update :volumes concat
+                (filter some? [(script-vol-config rt)
+                               (config-vol-config rt)]))
         (set-pod-shape rt)
         (set-pod-resources rt)
         ;; Note that promtail will never terminate, so we rely on the script to
@@ -333,7 +339,7 @@
                                                     #(oci/get-full-instance-details client id)))})
      (fn [r]
        (letfn [(maybe-log-output [{:keys [exit-code display-name logs] :as c}]
-                 (when (and (not (nil? exit-code)) (not= 0 exit-code))
+                 (when (and (some? exit-code) (not= 0 exit-code))
                    (log/warn "Container" display-name "returned a nonzero exit code:" exit-code)
                    (log/warn "Captured output:" logs))
                  c)]
