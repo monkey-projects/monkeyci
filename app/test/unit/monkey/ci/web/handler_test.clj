@@ -602,12 +602,15 @@
                               :config {:dev-mode true}
                               :runner (constantly nil)}
                              rt))
-          sid (generate-build-sid)
+          [_ repo-id _ :as sid] (generate-build-sid)
           build (-> (zipmap [:customer-id :repo-id :build-id] sid)
                     (assoc :status :success
                            :message "test msg"
                            :git {:message "test meta"}))
           path (repo-path sid)]
+      (is (st/sid? (st/save-customer st {:id (first sid)
+                                         :repos {repo-id {:id repo-id
+                                                          :name "test repo"}}})))
       (is (st/sid? (st/save-build st build)))
       (f {:events events
           :storage st

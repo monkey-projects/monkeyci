@@ -215,6 +215,7 @@
      {:post {:handler api/trigger-build
              ;; TODO Read additional parameters from body instead
              :parameters {:query {(s/optional-key :branch) s/Str
+                                  (s/optional-key :tag) s/Str
                                   (s/optional-key :commit-id) s/Str}}}}]
     ["/latest"
      {:get {:handler api/get-latest-build}}]
