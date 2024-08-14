@@ -137,13 +137,17 @@
 
 (defn build-app-image [ctx]
   (when (publish-app? ctx)
-    (kaniko/image
-     {:job-id "publish-app-img"
-      :dockerfile "docker/Dockerfile"
+    (kaniko/multi-platform-image
+     {:dockerfile "docker/Dockerfile"
+      :archs [:arm :amd]
       :target-img app-img
-      :container-opts
-      {:restore-artifacts [uberjar-artifact]
-       :dependencies ["app-uberjar"]}})))
+      :image
+      {:job-id "publish-app-img"
+       :container-opts
+       {:restore-artifacts [uberjar-artifact]
+        :dependencies ["app-uberjar"]}}
+      :manifest
+      {:job-id "app-img-manifest"}})))
 
 (def gui-release-artifact
   {:id "gui-release"
@@ -240,7 +244,7 @@
              core/success
              (assoc core/failure :message "Unable to patch version in infra repo"))
            (assoc core/failure :message "No github token provided")))
-       {:dependencies (->> [(when (publish-app? ctx) "publish-app-img")
+       {:dependencies (->> [(when (publish-app? ctx) "app-img-manifest")
                             (when (publish-gui? ctx) "publish-gui-img")]
                            (remove nil?))}))))
 
