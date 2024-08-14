@@ -10,7 +10,8 @@
             [monkey.ci.ext.junit]
             [monkey.ci.plugin
              [github :as gh]
-             [infra :as infra]]))
+             [infra :as infra]
+             [kaniko :as kaniko]]))
 
 ;; Version assigned when building main branch
 ;; TODO Determine automatically
@@ -130,67 +131,19 @@
          :save-artifacts [uberjar-artifact])
         (core/depends-on ["test-app"]))))
 
-(def image-creds-artifact
-  {:id "image-creds"
-   ;; File must be called config.json for kaniko
-   :path ".docker/config.json"})
-
-;; Full path to the docker config file, used to push images
-(defn img-repo-auth [ctx]
-  (shell/in-work ctx (:path image-creds-artifact)))
-
-(defn create-image-creds
-  "Fetches credentials from the params and writes them to Docker `config.json`"
-  [ctx]
-  (let [auth-file (img-repo-auth ctx)]
-    (println "Writing docker credentials to" auth-file)
-    (when-not (fs/exists? auth-file)
-      (shell/param-to-file ctx "dockerhub-creds" auth-file))))
-
-(defn image-creds [ctx]
-  (when (should-publish? ctx)
-    (core/action-job
-     "image-creds"
-     create-image-creds
-     {:save-artifacts [image-creds-artifact]})))
-
 (def img-base "fra.ocir.io/frjdhmocn5qi")
 (def app-img (str img-base "/monkeyci"))
 (def gui-img (str img-base "/monkeyci-gui"))
 
-(defn- make-context [ctx dir]
-  (cond-> (:checkout-dir ctx)
-    (some? dir) (str "/" dir)))
-
-(defn kaniko-build-img
-  "Creates a step that builds and uploads an image using kaniko"
-  [{:keys [id dockerfile context image tag opts]}]
-  (fn [ctx]
-    (let [wd (shell/container-work-dir ctx)
-          ctx-dir (cond-> wd 
-                    context (str "/" context))]
-      (core/container-job
-       id
-       (merge
-        {:image "docker.io/monkeyci/kaniko:1.23.2"
-         :script [(format "/kaniko/executor --dockerfile %s --destination %s --context dir://%s"
-                          (str ctx-dir "/" (or dockerfile "Dockerfile"))
-                          (str image ":" (or tag (image-version ctx)))
-                          ctx-dir)]
-         ;; Set docker config credentials location
-         :container/env {"DOCKER_CONFIG" (str wd "/.docker")}
-         :restore-artifacts [image-creds-artifact]
-         :dependencies ["image-creds"]}
-        opts)))))
-
 (defn build-app-image [ctx]
   (when (publish-app? ctx)
-    (kaniko-build-img
-     {:id "publish-app-img"
+    (kaniko/image
+     {:job-id "publish-app-img"
       :dockerfile "docker/Dockerfile"
-      :image app-img
-      :opts {:restore-artifacts [uberjar-artifact image-creds-artifact]
-             :dependencies ["image-creds" "app-uberjar"]}})))
+      :target-img app-img
+      :container-opts
+      {:restore-artifacts [uberjar-artifact]
+       :dependencies ["app-uberjar"]}})))
 
 (def gui-release-artifact
   {:id "gui-release"
@@ -198,15 +151,17 @@
 
 (defn build-gui-image [ctx]
   (when (publish-gui? ctx)
-    (kaniko-build-img
-     {:id "publish-gui-img"
-      :context "gui"
-      :image gui-img
-      :memory 3 ;GB
-      ;; Restore artifacts but modify the path because work dir is not the same
-      :opts {:restore-artifacts [(update gui-release-artifact :path (partial str "gui/"))
-                                 image-creds-artifact]
-             :dependencies ["image-creds" "release-gui"]}})))
+    (kaniko/image
+     {:job-id "publish-gui-img"
+      :subdir "gui"
+      :dockerfile "gui/Dockerfile"
+      :target-img gui-img
+      :container-opts
+      {:memory 3 ;GB
+       ;; Restore artifacts but modify the path because work dir is not the same
+       :restore-artifacts [(update gui-release-artifact :path (partial str "gui/"))]
+       :dependencies ["release-gui"]}}
+     ctx)))
 
 (defn publish [ctx id dir]
   "Executes script in clojure container that has clojars publish env vars"
@@ -303,7 +258,6 @@
  github-release
  test-gui
  build-gui-release
- image-creds
  build-app-image
  build-gui-image
  deploy]
