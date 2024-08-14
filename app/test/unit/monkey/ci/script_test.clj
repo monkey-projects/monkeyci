@@ -258,10 +258,14 @@
           (testing "contains `credit-multiplier`"
             (is (number? (:credit-multiplier job))))))
 
-      (testing "end event has `start-time` and `end-time`"
+      (testing "end event"
         (let [job (-> @recv second :job)]
-          (is (number? (:start-time job)))
-          (is (number? (:end-time job))))))
+          (testing "has `start-time` and `end-time`"
+            (is (number? (:start-time job)))
+            (is (number? (:end-time job))))
+
+          (testing "contains `credit-multiplier`"
+            (is (number? (:credit-multiplier job)))))))
 
   (testing "catches sync errors, returns failure"
     (let [{:keys [recv] :as e} (h/fake-events)

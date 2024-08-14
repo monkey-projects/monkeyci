@@ -305,6 +305,12 @@
           (is (sid/sid? (st/save-build s (assoc-in build [:script :jobs (:id job)] upd))))
           (is (= upd (get-in (st/find-build s build-sid) [:script :jobs (:id job)])))))
 
+      (testing "stores credit multiplier"
+        (let [job (assoc (h/gen-job) :credit-multiplier 3)
+              jobs {(:id job) job}]
+          (is (sid/sid? (st/save-build s (assoc-in build [:script :jobs] jobs))))
+          (is (= 3 (get-in (st/find-build s build-sid) [:script :jobs (:id job) :credit-multiplier])))))
+
       (testing "can list"
         (is (= [(:build-id build)]
                (st/list-build-ids s [(:id cust) (:id repo)]))))

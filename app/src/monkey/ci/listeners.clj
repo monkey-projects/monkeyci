@@ -23,7 +23,7 @@
     (-> (save-build storage
                     sid
                     (cond-> upd
-                      (= :build/end (:type evt))(assoc :credits (b/calc-credits upd))))
+                      (= :build/end (:type evt)) (assoc :credits (b/calc-credits upd))))
         (assoc :sid sid))))
 
 (defn update-script [storage {:keys [sid script]}]

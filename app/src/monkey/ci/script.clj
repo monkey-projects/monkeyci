@@ -73,7 +73,8 @@
                          (assoc bc/failure
                                 :exception ex
                                 :message (.getMessage ex)))
-          st (u/now)]
+          st (u/now)
+          cred-mult (cr/credit-multiplier target rt)]
       (log/debug "Executing event firing job:" (bc/job-id target))
       (md/chain
        (rt/post-events rt (job-start-evt
@@ -81,7 +82,7 @@
                                (update :job
                                        merge {:start-time st
                                               :status :running
-                                              :credit-multiplier (cr/credit-multiplier target rt)}))))
+                                              :credit-multiplier cred-mult}))))
        (fn [_]
          ;; Catch both sync and async errors
          (try 
@@ -95,7 +96,8 @@
           (rt/post-events rt (job-end-evt
                               (update rt-with-job :job
                                       merge {:start-time st
-                                             :end-time (u/now)})
+                                             :end-time (u/now)
+                                             :credit-multiplier cred-mult})
                               r))
           (constantly r)))))))
 
