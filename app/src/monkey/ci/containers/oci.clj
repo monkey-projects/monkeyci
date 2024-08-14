@@ -87,6 +87,10 @@
     (cond-> {:image-url (or (:image job) (:container/image job))
              :display-name job-container-name
              ;; In container instances, command or entrypoint are treated the same
+             ;; Note that when using container commands directly, the job will most
+             ;; likely start without the workspace being restored.  This is a limitation
+             ;; of container instances, that don't allow init containers or mounting
+             ;; pre-populated file systems (apart from configmaps).
              :command (or (:container/cmd job)
                           (:container/entrypoint job))
              :arguments (:container/args job)

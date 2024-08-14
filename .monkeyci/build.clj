@@ -147,7 +147,8 @@
        {:restore-artifacts [uberjar-artifact]
         :dependencies ["app-uberjar"]}}
       :manifest
-      {:job-id "app-img-manifest"}})))
+      {:job-id "app-img-manifest"}}
+     ctx)))
 
 (def gui-release-artifact
   {:id "gui-release"
