@@ -140,7 +140,7 @@
     (kaniko/multi-platform-image
      {:dockerfile "docker/Dockerfile"
       :archs [:arm :amd]
-      :target-img app-img
+      :target-img (str app-img ":" (image-version ctx))
       :image
       {:job-id "publish-app-img"
        :container-opts
@@ -160,7 +160,7 @@
      {:job-id "publish-gui-img"
       :subdir "gui"
       :dockerfile "gui/Dockerfile"
-      :target-img gui-img
+      :target-img (str gui-img ":" (image-version ctx))
       :container-opts
       {:memory 3 ;GB
        ;; Restore artifacts but modify the path because work dir is not the same

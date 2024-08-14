@@ -1,9 +1,14 @@
 (ns monkey.ci.integration-test.process-test
   (:require [clojure.test :refer [deftest testing is]]
+            [clojure.java.io :as io]
             [monkey.ci
+             [cuid :as cuid]
              [logging :as l]
              [process :as sut]
              [utils :as u]]))
+
+(defn example [subdir]
+  (.getAbsolutePath (io/file (u/cwd) "examples" subdir)))
 
 (deftest ^:integration execute!
   (let [rt {:config {:dev-mode true}
@@ -11,14 +16,14 @@
     
     (testing "executes build script in separate process"
       (is (zero? (-> {:script {:script-dir (example "basic-clj")}
-                      :build-id (u/new-build-id)}
+                      :build-id (cuid/random-cuid)}
                      (sut/execute! rt)
                      deref
                      :exit))))
 
     (testing "fails when script fails"
       (is (pos? (-> {:script {:script-dir (example "failing")}
-                     :build-id (u/new-build-id)}
+                     :build-id (cuid/random-cuid)}
                     (sut/execute! rt)
                     deref
                     :exit))))

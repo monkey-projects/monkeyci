@@ -346,7 +346,7 @@
            (-> (h/test-rt)
                (h/->req)
                (assoc-in [:parameters :query :branch] "test-branch")
-               (sut/make-build-ctx)
+               (sut/make-build-ctx {})
                :git
                :ref))))
 
@@ -355,7 +355,7 @@
            (-> (h/test-rt)
                (h/->req)
                (assoc-in [:parameters :query :tag] "test-tag")
-               (sut/make-build-ctx)
+               (sut/make-build-ctx {})
                :git
                :ref))))
 
@@ -369,33 +369,37 @@
              (-> (h/->req rt)
                  (assoc-in [:parameters :path] {:customer-id cid
                                                 :repo-id rid})
-                 (sut/make-build-ctx)
+                 (sut/make-build-ctx {})
                  :git
                  :ssh-keys)))))
 
   (testing "adds main branch from repo"
-    (let [{st :storage :as rt} (h/test-rt)
-          [cid rid] (repeatedly st/new-id)]
-      (is (st/sid? (st/save-repo st {:customer-id cid
-                                     :id rid
-                                     :main-branch "test-branch"})))
-      (is (= "test-branch"
-             (-> (h/->req rt)
-                 (assoc-in [:parameters :path] {:customer-id cid
-                                                :repo-id rid})
-                 (sut/make-build-ctx)
-                 :git
-                 :main-branch)))))
+    (is (= "test-branch"
+           (-> (h/test-rt)
+               (h/->req)
+               (sut/make-build-ctx {:main-branch "test-branch"})
+               :git
+               :main-branch))))
+
+  (testing "when no branch or tag specified, uses default branch"
+    (is (= "refs/heads/main"
+           (-> (h/test-rt)
+               (h/->req)
+               (sut/make-build-ctx {:main-branch "main"})
+               :git
+               :ref))))
 
   (testing "sets cleanup flag when not in dev mode"
     (is (true? (:cleanup? (sut/make-build-ctx (-> (h/test-rt)
                                                   (assoc-in [:config :dev-mode] false)
-                                                  (h/->req)))))))
+                                                  (h/->req))
+                                              {})))))
 
   (testing "does not set cleanup flag when in dev mode"
     (is (false? (:cleanup? (sut/make-build-ctx (-> (h/test-rt)
                                                    (assoc-in [:config :dev-mode] true)
-                                                   (h/->req))))))))
+                                                   (h/->req))
+                                               {}))))))
 
 (deftest update-user
   (testing "updates user in storage"
@@ -424,3 +428,143 @@
       (is (some? (st/save-email-registration st {:email email})))
       (is (= 200 (:status (sut/create-email-registration req))))
       (is (= 1 (count (st/list-email-registrations st)))))))
+
+(deftest trigger-build
+  (h/with-memory-store st
+    (letfn [(with-repo [f]
+              (let [cust-id (st/new-id)
+                    repo (-> (h/gen-repo)
+                             (assoc :customer-id cust-id))
+                    cust (-> (h/gen-cust)
+                             (assoc :repos {(:id repo) repo}))]
+                (st/save-customer st cust)
+                (f cust repo)))
+
+            (make-rt []
+              {:storage st})
+
+            (make-req [runner params]
+              (-> (make-rt)
+                  (assoc :runner runner)
+                  (h/->req)
+                  (assoc :parameters params)))
+            
+            (verify-runner [p f]
+              (let [runner-args (atom nil)
+                    runner (fn [build _]
+                             (reset! runner-args build))]
+                (with-repo
+                  (fn [cust repo]
+                    (let [rt (-> (make-rt)
+                                 (assoc :runner runner))]
+                      (is (= 202 (-> rt
+                                     (h/->req)
+                                     (assoc :parameters p)
+                                     (assoc-in [:parameters :path] {:customer-id (:id cust)
+                                                                    :repo-id (:id repo)})
+                                     (sut/trigger-build)
+                                     :status)))
+                      (h/wait-until #(some? @runner-args) 500)
+                      (f (assoc rt
+                                :sid [(:id cust) (:id repo)]
+                                :runner-args runner-args)))))))]
+      
+      (testing "starts new build for repo using runner"
+        (verify-runner
+         {}
+         (fn [{:keys [runner-args]}]
+           (is (some? @runner-args)))))
+      
+      (testing "looks up url in repo config"
+        (let [runner-args (atom nil)
+              runner (fn [build _]
+                       (reset! runner-args build))]
+          (with-repo
+            (fn [{customer-id :id} {repo-id :id}]
+              (is (some? (st/save-customer st {:id customer-id
+                                               :repos
+                                               {repo-id
+                                                {:id repo-id
+                                                 :url "http://test-url"}}})))
+              (is (= 202 (-> (make-req runner {:path {:customer-id customer-id
+                                                      :repo-id repo-id}})
+                             (sut/trigger-build)
+                             :status)))
+              (is (not= :timeout (h/wait-until #(not-empty @runner-args) 1000)))
+              (is (= "http://test-url"
+                     (-> @runner-args :git :url)))))))
+      
+      (testing "adds commit id from query params"
+        (verify-runner
+         {:query {:commit-id "test-id"}}
+         (fn [{:keys [runner-args]}]
+           (is (= "test-id"
+                  (-> @runner-args :git :commit-id))))))
+
+      (testing "adds branch from query params as ref"
+        (verify-runner
+         {:query {:branch "test-branch"}}
+         (fn [{:keys [runner-args]}]
+           (is (= "refs/heads/test-branch"
+                  (-> @runner-args :git :ref))))))
+
+      (testing "adds tag from query params as ref"
+        (verify-runner
+         {:query {:tag "test-tag"}}
+         (fn [{:keys [runner-args]}]
+           (is (= "refs/tags/test-tag"
+                  (-> @runner-args :git :ref))))))
+
+      (testing "adds `sid` to build props"
+        (verify-runner
+         {}
+         (fn [{:keys [sid runner-args]}]
+           (let [bsid (:sid @runner-args)]
+             (is (= 3 (count bsid)) "expected sid to contain repo path and build id")
+             (is (= (take 2 sid) (take 2 bsid)))
+             (is (= (:build-id @runner-args)
+                    (last bsid)))))))
+      
+      (testing "creates build in storage"
+        (verify-runner
+         {:query {:branch "test-branch"}}
+         (fn [{:keys [runner-args] st :storage}]
+           (let [bsid (:sid @runner-args)
+                 build (st/find-build st bsid)]
+             (is (some? build))
+             (is (= :api (:source build)))
+             (is (= "refs/heads/test-branch" (get-in build [:git :ref])))))))
+
+      (testing "assigns index to build"
+        (verify-runner
+         {}
+         (fn [{:keys [runner-args] st :storage}]
+           (let [bsid (:sid @runner-args)
+                 build (st/find-build st bsid)]
+             (is (number? (:idx build)))))))
+
+      (testing "build id incorporates index"
+        (verify-runner
+         {}
+         (fn [{:keys [runner-args] st :storage}]
+           (let [bsid (:sid @runner-args)
+                 build (st/find-build st bsid)]
+             (is (= (str "build-" (:idx build))
+                    (:build-id build)))))))
+      
+      (testing "returns build id"
+        (with-repo
+          (fn [cust repo]
+            (is (string? (-> (make-req (constantly "ok")
+                                       {:path {:customer-id (:id cust)
+                                               :repo-id (:id repo)}})
+                             (sut/trigger-build)
+                             :body
+                             :build-id))))))
+
+      (testing "returns 404 (not found) when repo does not exist"
+        (is (= 404 (-> (make-req (constantly nil)
+                                 {:path {:customer-id "nonexisting"
+                                         :repo-id "also-nonexisting"}})
+                       (sut/trigger-build)
+                       :status)))))))

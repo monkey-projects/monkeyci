@@ -2,7 +2,8 @@
   (:require [config :as c]
             [logging :as l]
             [server :as server]
-            [storage :as s]))
+            [storage :as s]
+            [clojure.tools.namespace.repl :refer [refresh]]))
 
 (defn global-config []
   @c/global-config)

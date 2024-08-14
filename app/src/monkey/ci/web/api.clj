@@ -253,14 +253,12 @@
            (as-ref :tag "tags")))
 
 (defn make-build-ctx
-  "Creates a build object from the request"
-  [{p :parameters :as req}]
+  "Creates a build object from the request for the repo"
+  [{p :parameters :as req} repo]
   (let [acc (:path p)
         st (c/req->storage req)
-        repo-sid (c/repo-sid req)
-        idx (st/find-next-build-idx st repo-sid)
+        idx (st/find-next-build-idx st (c/repo-sid req))
         bid (str "build-" idx)
-        repo (st/find-repo st repo-sid)
         ssh-keys (->> (st/find-ssh-keys st (customer-id req))
                       (lbl/filter-by-label repo))
         rt (c/req->rt req)]
@@ -273,7 +271,8 @@
                         (select-keys [:commit-id :branch])
                         (assoc :url (:url repo)
                                :ssh-keys-dir (rt/ssh-keys-dir rt bid))
-                        (mc/assoc-some :ref (params->ref p)
+                        (mc/assoc-some :ref (or (params->ref p)
+                                                (some->> (:main-branch repo) (str "refs/heads/")))
                                        :ssh-keys ssh-keys
                                        :main-branch (:main-branch repo)))
                :sid (-> acc
@@ -289,16 +288,20 @@
     (let [acc (:path p)
           st (c/req->storage req)
           runner (c/from-rt req :runner)
-          build (make-build-ctx req)]
-      (log/debug "Triggering build for repo sid:" (c/repo-sid req))
-      (if (st/save-build st build)
-        (do
-          ;; Trigger the build but don't wait for the result
-          (c/run-build-async (c/req->rt req) build)
-          (-> (rur/response (select-keys build [:build-id]))
-              (rur/status 202)))
-        (-> (rur/response {:message "Unable to create build"})
-            (rur/status 500))))))
+          repo-sid (c/repo-sid req)
+          repo (st/find-repo st repo-sid)
+          build (make-build-ctx req repo)]
+      (log/debug "Triggering build for repo sid:" repo-sid)
+      (if repo
+        (if (st/save-build st build)
+          (do
+            ;; Trigger the build but don't wait for the result
+            (c/run-build-async (c/req->rt req) build)
+            (-> (rur/response (select-keys build [:build-id]))
+                (rur/status 202)))
+          (-> (rur/response {:message "Unable to create build"})
+              (rur/status 500)))
+        (rur/not-found {:message "Repository does not exist"})))))
 
 (defn list-build-logs [req]
   (let [build-sid (st/ext-build-sid (get-in req [:parameters :path]))

@@ -90,7 +90,8 @@
              ;; Note that when using container commands directly, the job will most
              ;; likely start without the workspace being restored.  This is a limitation
              ;; of container instances, that don't allow init containers or mounting
-             ;; pre-populated file systems (apart from configmaps).
+             ;; pre-populated file systems (apart from configmaps).  Also capturing
+             ;; logs is problematic, since we can't redirect to a file.
              :command (or (:container/cmd job)
                           (:container/entrypoint job))
              :arguments (:container/args job)

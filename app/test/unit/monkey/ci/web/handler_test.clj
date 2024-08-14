@@ -634,12 +634,11 @@
                              (reset! runner-args build))]
                 (with-repo
                   (fn [{:keys [app path] :as ctx}]
-                    (let [props [:customer-id :repo-id]]
-                      (is (= 202 (-> (mock/request :post (str path p))
-                                     (app)
-                                     :status)))
-                      (h/wait-until #(some? @runner-args) 500)
-                      (f (assoc ctx :runner-args runner-args))))
+                    (is (= 202 (-> (mock/request :post (str path p))
+                                   (app)
+                                   :status)))
+                    (h/wait-until #(some? @runner-args) 500)
+                    (f (assoc ctx :runner-args runner-args)))
                   {:runner runner})))]
       
       (testing "starts new build for repo using runner"
@@ -647,25 +646,6 @@
          "/trigger"
          (fn [{:keys [runner-args]}]
            (is (some? @runner-args)))))
-      
-      (testing "looks up url in repo config"
-        (let [runner-args (atom nil)
-              runner (fn [build _]
-                       (reset! runner-args build))]
-          (with-repo
-            (fn [{:keys [app path] [customer-id repo-id] :sid st :storage}]
-              (is (some? (st/save-customer st {:id customer-id
-                                               :repos
-                                               {repo-id
-                                                {:id repo-id
-                                                 :url "http://test-url"}}})))
-              (is (= 202 (-> (mock/request :post (str path "/trigger"))
-                             (app)
-                             :status)))
-              (is (not= :timeout (h/wait-until #(not-empty @runner-args) 1000)))
-              (is (= "http://test-url"
-                     (-> @runner-args :git :url))))
-            {:runner runner})))
       
       (testing "adds commit id from query params"
         (verify-runner
@@ -686,56 +666,7 @@
          "/trigger?tag=test-tag"
          (fn [{:keys [runner-args]}]
            (is (= "refs/tags/test-tag"
-                  (-> @runner-args :git :ref))))))
-
-      (testing "adds `sid` to build props"
-        (verify-runner
-         "/trigger"
-         (fn [{:keys [sid runner-args]}]
-           (let [bsid (:sid @runner-args)]
-             (is (= 3 (count bsid)) "expected sid to contain repo path and build id")
-             (is (= (take 2 sid) (take 2 bsid)))
-             (is (= (:build-id @runner-args)
-                    (last bsid)))))))
-      
-      (testing "creates build in storage"
-        (verify-runner
-         "/trigger?branch=test-branch"
-         (fn [{:keys [runner-args] st :storage}]
-           (let [bsid (:sid @runner-args)
-                 build (st/find-build st bsid)]
-             (is (some? build))
-             (is (= :api (:source build)))
-             (is (= "refs/heads/test-branch" (get-in build [:git :ref])))))))
-
-      (testing "assigns index to build"
-        (verify-runner
-         "/trigger"
-         (fn [{:keys [runner-args] st :storage}]
-           (let [bsid (:sid @runner-args)
-                 build (st/find-build st bsid)]
-             (is (number? (:idx build)))))))
-
-      (testing "build id incorporates index"
-        (verify-runner
-         "/trigger"
-         (fn [{:keys [runner-args] st :storage}]
-           (let [bsid (:sid @runner-args)
-                 build (st/find-build st bsid)]
-             (is (= (str "build-" (:idx build))
-                    (:build-id build)))))))
-      
-      (testing "returns build id"
-        (with-repo
-          (fn [{:keys [app path] :as ctx}]
-            (let [props [:customer-id :repo-id]
-                  r (-> (mock/request :post (str path "/trigger"))
-                        (app))]
-              (is (string? (-> r (h/reply->json) :build-id)))))))
-
-      (testing "returns 404 (not found) when repo does not exist")
-
-      (testing "when no branch specified, uses default branch")))
+                  (-> @runner-args :git :ref))))))))
   
   (testing "`GET /latest`"
     (with-repo
