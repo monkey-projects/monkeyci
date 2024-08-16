@@ -333,23 +333,25 @@
       (is (= [build] (lo/get-value @app-db db/recent-builds)))))
 
   (testing "updates build in recent builds"
-    (let [build {:id (random-uuid)
-                 :sid "test-build"
-                 :status :pending
-                 :start-time 200}
-          other-build {:id (random-uuid)
-                       :sid "other-build"
-                       :status :success
-                       :start-time 100}]
+    (let [make-build (fn [opts]
+                       (merge {:id (random-uuid)
+                               :customer-id "test-cust"
+                               :repo-id "test-repo"
+                               :build-id (random-uuid)}
+                              opts))
+          build       (make-build {:build-id "build-1"
+                                   :status :pending
+                                   :start-time 200})
+          other-build (make-build {:build-id "build-2"
+                                   :status :success
+                                   :start-time 100})
+          upd (assoc build :status :running)]
       (is (some? (reset! app-db (-> {}
                                     (lo/set-loaded db/recent-builds)
                                     (lo/set-value db/recent-builds [build
                                                                     other-build])))))
       (rf/dispatch-sync [:customer/handle-event {:type :build/updated
-                                                 :build (assoc build :status :running)}])
-      (is (= [{:sid "test-build"
-               :status :running
-               :start-time 200
-               :id (:id build)}
+                                                 :build upd}])
+      (is (= [upd
               other-build]
              (lo/get-value @app-db db/recent-builds))))))

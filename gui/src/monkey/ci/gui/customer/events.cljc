@@ -224,11 +224,12 @@
    (when (and (= :build/updated (:type evt))
               (lo/loaded? db db/recent-builds))
      (letfn [(update-build [builds]
-               (->> (if-let [match (->> builds
-                                        (filter (comp (partial = (:sid build)) :sid))
-                                        (first))]
-                      (replace {match build} builds)
-                      (conj builds build))
-                    (sort-by :start-time)
-                    (reverse)))]
+               (let [sid (juxt :customer-id :repo-id :build-id)]
+                 (->> (if-let [match (->> builds
+                                          (filter (comp (partial = (sid build)) sid))
+                                          (first))]
+                        (replace {match build} builds)
+                        (conj builds build))
+                      (sort-by :start-time)
+                      (reverse))))]
        (lo/update-value db db/recent-builds update-build)))))
