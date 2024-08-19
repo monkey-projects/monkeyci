@@ -20,7 +20,7 @@
      (cond-> {:type :button
               :on-click #(rf/dispatch [:repo/show-trigger-build])}
        @show? (assoc :disabled true))
-     "Trigger Build"]))
+     [:span.me-1 [co/icon :boxes]] "Trigger Build"]))
 
 (defn- edit-repo-btn []
   (let [c (rf/subscribe [:route/current])]
