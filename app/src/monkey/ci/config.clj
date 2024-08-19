@@ -15,6 +15,7 @@
             [clojure.tools.logging :as log]
             [medley.core :as mc]
             [monkey.ci
+             [edn :as edn]
              [sid :as sid]
              [utils :as u]]))
 
@@ -79,7 +80,7 @@
   "Parses the input file as `edn` and converts keys to kebab-case."
   [p]
   (with-open [r (io/reader p)]
-    (->> (u/parse-edn r)
+    (->> (edn/edn-> r)
          (cw/prewalk (fn [x]
                        (if (map-entry? x)
                          (let [[k v] x]
@@ -226,22 +227,6 @@
   [env args]
   (-> (load-raw-config (:config-file args))
       (normalize-config (strip-env-prefix env) args)))
-
-(defn- flatten-nested
-  "Recursively flattens a map of maps.  Each key in the resulting map is a
-   combination of the path of the parent keys."
-  [path c]
-  (letfn [(make-key [k]
-            (->> (conj path k)
-                 (map name)
-                 (cs/join "-")
-                 (keyword)))]
-    (reduce-kv (fn [r k v]
-                 (if (map? v)
-                   (merge r (flatten-nested (conj path k) v))
-                   (assoc r (make-key k) v)))
-               {}
-               c)))
 
 (defn normalize-typed
   "Convenience function that converts the `:type` of an entry into a keyword and

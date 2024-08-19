@@ -1,6 +1,7 @@
 (ns monkey.ci.gui.test-results
   "Displays test results"
-  (:require [monkey.ci.gui.charts :as charts]
+  (:require #_[monkey.ci.gui.charts :as charts]
+            [monkey.ci.gui.colors :as colors]
             [monkey.ci.gui.components :as co]
             [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.table :as t]
@@ -51,7 +52,8 @@
     {:type "bar"
      :data {:labels (map :test-case cases)
             :datasets [{:label "Seconds Elapsed"
-                        :data (map :time cases)}]}}))
+                        :data (map :time cases)
+                        :backgroundColor colors/primary}]}}))
 
 (def default-chart-form {:count 5})
 
