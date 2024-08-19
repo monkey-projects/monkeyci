@@ -159,7 +159,7 @@
     (kaniko/image
      {:job-id "publish-gui-img"
       :subdir "gui"
-      :dockerfile "gui/Dockerfile"
+      :dockerfile "Dockerfile"
       :target-img (str gui-img ":" (image-version ctx))
       :container-opts
       {:memory 3 ;GB
