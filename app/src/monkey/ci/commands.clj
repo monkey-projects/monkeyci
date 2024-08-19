@@ -123,12 +123,12 @@
   [rt]
   (let [sid (b/get-sid rt)
         ;; Add job info from the sidecar config
-        {:keys [job] :as rt} (merge rt (get-in rt [rt/config :sidecar :job-config]))]
+        job (:job (get-in rt [rt/config :sidecar :job-config]))]
     (let [result (try
                    (rt/post-events rt {:type :sidecar/start
                                        :sid sid
                                        :job (jobs/job->event job)})
-                   (let [r @(sidecar/run rt)
+                   (let [r @(sidecar/run rt job)
                          e (:exit r)]
                      (ec/make-result (b/exit-code->status e) e (:message r)))
                    (catch Throwable t

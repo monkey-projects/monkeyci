@@ -42,10 +42,6 @@
       (fs/create-dirs p)))
   (fs/create-file f))
 
-#_(defn- make-rw [f]
-  ;; Grant read/write to the world, in case the job runs as another user
-  (fs/set-posix-file-permissions f "rw-rw-rw-"))
-
 (defn- touch-file [rt k]
   (let [f (get-config rt k)]
     (when (not-empty f)
@@ -85,7 +81,7 @@
 
 (defn poll-events
   "Reads events from the job container events file and posts them to the event service."
-  [{:keys [job] :as rt}]
+  [job rt]
   (let [f (-> (get-config rt :events-file)
               (maybe-create-file))
         read-next (fn [r]
@@ -134,10 +130,10 @@
   "Runs sidecar by restoring workspace, artifacts and caches, and then polling for events.
    After the event loop has terminated, saves artifacts and caches and returns a deferred
    containing the runtime with an `:exit` added."
-  [rt]
+  [rt job]
   (log/info "Running sidecar with configuration:" (get-in rt [rt/config :sidecar]))
   ;; Restore caches and artifacts before starting the job
-  (let [h (-> (comp poll-events mark-start)
+  (let [h (-> (comp (partial poll-events job) mark-start)
               (art/wrap-artifacts)
               (cache/wrap-caches))
         error-result (fn [ex]
@@ -146,6 +142,7 @@
                         :exception ex})]
     (try
       (-> rt
+          (assoc :job job) ; Job needed for artifacts and caches
           (restore-src)
           (md/chain h)
           (md/catch

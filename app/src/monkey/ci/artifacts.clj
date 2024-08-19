@@ -30,13 +30,12 @@
   ;; The blob archive path is the build sid with the blob id added.
   (build-sid->artifact-path (:sid build) id))
 
-(defn- job-blobs [rt {:keys [store-key job-key]}]
-  (let [c (get-in rt [:job job-key])]
-    (when (get-store rt store-key)
-      c)))
+(defn- job-blobs [job rt {:keys [store-key job-key]}]
+  (when (get-store rt store-key)
+    (job-key job)))
 
 (defn- do-with-blobs [rt conf f]
-  (->> (job-blobs rt conf)
+  (->> (job-blobs (:job rt) rt conf)
        (map (partial f rt))
        (apply md/zip)))
 
