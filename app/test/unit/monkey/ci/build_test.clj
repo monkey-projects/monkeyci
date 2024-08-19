@@ -135,13 +135,6 @@
     (is (nil? (sut/get-sid {:config {:account {:repo-id "r"}}})))
     (is (nil? (sut/get-sid {:config {:account {:customer-id "c"}}})))))
 
-(deftest get-job-id
-  (testing "combines build and job id"
-    (is (= "test-build-test-job"
-           (-> {:build {:build-id "test-build"}
-                :job {:id "test-job"}}
-               (sut/get-job-id))))))
-
 (deftest job-work-dir
   (testing "returns job work dir as absolute path"
     (is (= "/job/work/dir"

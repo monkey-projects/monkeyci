@@ -12,12 +12,11 @@
   (mc/update-existing cc :env (partial map (fn [[k v]]
                                              (str k "=" v)))))
 
-(defn rt->container-config
+(defn job->container-config
   "Extracts all keys from the context step that have the `container` namespace,
    and drops that namespace."
-  [rt]
-  (->> rt
-       :job
+  [job]
+  (->> job
        (mc/filter-keys (comp (partial = "container") namespace))
        (mc/map-keys (comp keyword name))
        (update-env)))

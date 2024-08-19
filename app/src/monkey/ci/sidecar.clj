@@ -91,10 +91,11 @@
         read-next (fn [r]
                     (u/parse-edn r {:eof ::eof}))
         interval (get-in rt [rt/config :sidecar :poll-interval] 1000)
+        build (rt/build rt)
         ;; TODO Remove explicit log uploads, the promtail container takes care of this now.
         log-maker (rt/log-maker rt)
-        log-base (b/get-job-sid rt)
-        logger (when log-maker (comp (partial log-maker (rt/build rt))
+        log-base (b/get-job-sid job build)
+        logger (when log-maker (comp (partial log-maker build)
                                      (partial concat log-base)))
         set-exit (fn [v] (assoc rt :exit v))
         sid (b/get-sid rt)]

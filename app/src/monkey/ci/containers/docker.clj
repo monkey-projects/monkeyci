@@ -195,7 +195,7 @@
   (let [remote-wd "/home/build"
         work-dir (b/job-work-dir rt)
         output-dir (log-dir rt)]
-    (merge (mcc/rt->container-config rt)
+    (merge (mcc/job->container-config (:job rt))
            {:cmd ["/bin/sh"]
             :open-stdin true
             :attach-stdin false

@@ -31,16 +31,12 @@
         (when (= (dec build-sid-length) (count sid))
           sid))))
 
-(def get-job-sid
+(defn get-job-sid
   "Creates a job sid using the build id and job id.  Note that this does
    not include the customer and repo ids, so this is only unique within the repo."
-  (comp (partial mapv str)
-        (juxt (comp build-id rt/build)
-              (comp bc/job-id :job))))
-
-(def get-job-id
-  "Creates a string representation of the job sid"
-  (comp (partial cs/join "-") get-job-sid))
+  [job build]
+  (->> [(build-id build) (bc/job-id job)]
+       (mapv str)))
 
 (def rt->job-id (comp bc/job-id :job))
 
