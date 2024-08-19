@@ -75,15 +75,16 @@
      ;; TODO Execute script job by job
      (make-script-cmd (:script job)))))
 
-(defmethod mcc/run-container :podman [{:keys [job] {:keys [build-id]} :build :as rt}]
-  (log/info "Running build job " build-id "/" (bc/job-id job) "as podman container")
+(defmethod mcc/run-container :podman [{:keys [job] :as rt}]
   (let [log-maker (rt/log-maker rt)
+        build (rt/build rt)
         ;; Don't prefix the sid here, that's the responsability of the logger
         log-base (b/get-job-sid rt)
         [out-log err-log :as loggers] (->> ["out.txt" "err.txt"]
                                            (map (partial conj log-base))
-                                           (map (partial log-maker rt)))
+                                           (map (partial log-maker build)))
         cmd (build-cmd-args rt)]
+    (log/info "Running build job " log-base "as podman container")
     (log/debug "Log base is:" log-base)
     (log/debug "Podman command:" cmd)
     ((-> (fn [rt]

@@ -31,13 +31,11 @@
         (when (= (dec build-sid-length) (count sid))
           sid))))
 
-(def get-build-id (comp build-id rt/build))
-
 (def get-job-sid
   "Creates a job sid using the build id and job id.  Note that this does
    not include the customer and repo ids, so this is only unique within the repo."
   (comp (partial mapv str)
-        (juxt get-build-id
+        (juxt (comp build-id rt/build)
               (comp bc/job-id :job))))
 
 (def get-job-id

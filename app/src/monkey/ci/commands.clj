@@ -43,15 +43,13 @@
       ;; TODO Git branch and other options
       ;; TODO Use child process if there is a deps.edn
       ;; TODO Build parameters
-      (let [jobs (-> rt
-                     (assoc :build (b/make-build-ctx rt))
-                     (script/load-jobs))]
+      (let [jobs (script/load-jobs (b/make-build-ctx rt) rt)]
         (report
          (if (not-empty jobs)
            {:type :verify/success
             :jobs jobs}
            {:type :verify/failed
-            :message "No jobs found in build script"})))
+            :message "No jobs found in build script for the active configuration"})))
       (catch Exception ex
         (log/error "Error verifying build" ex)
         (report {:type :verify/failed

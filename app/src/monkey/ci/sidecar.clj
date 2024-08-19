@@ -94,7 +94,7 @@
         ;; TODO Remove explicit log uploads, the promtail container takes care of this now.
         log-maker (rt/log-maker rt)
         log-base (b/get-job-sid rt)
-        logger (when log-maker (comp (partial log-maker rt)
+        logger (when log-maker (comp (partial log-maker (rt/build rt))
                                      (partial concat log-base)))
         set-exit (fn [v] (assoc rt :exit v))
         sid (b/get-sid rt)]

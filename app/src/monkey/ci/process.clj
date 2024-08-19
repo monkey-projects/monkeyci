@@ -27,8 +27,7 @@
             [monkey.ci.storage
              [file]
              [sql]]
-            [monkey.ci.web.auth :as auth]
-            [monkey.socket-async.uds :as uds]))
+            [monkey.ci.web.auth :as auth]))
 
 (def default-script-config
   "Default configuration for the script runner."
@@ -67,6 +66,15 @@
 
   ([args]
    (run args cc/env)))
+
+(defn verify
+  "Run function that verifies the build by attempting to load the build script using
+   some given configuration."
+  ([args env]
+   ;; TODO
+   )
+  ([args]
+   (verify args cc/env)))
 
 (defn- find-log-config
   "Finds logback configuration file, either configured on the runner, or present 
@@ -123,8 +131,9 @@
   (or (rt/log-maker rt) (l/make-logger {})))
 
 (defn- make-logger [rt type]
-  (let [id (get-in rt [:build :build-id])]
-    ((log-maker rt) rt [id (str (name type) ".log")])))
+  (let [build (rt/build rt)
+        id (b/build-id build)]
+    ((log-maker rt) build [id (str (name type) ".log")])))
 
 (defn- out->str [x]
   (if (instance? java.io.InputStream x)
