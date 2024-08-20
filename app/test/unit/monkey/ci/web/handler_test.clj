@@ -5,6 +5,7 @@
             [buddy.core
              [codecs :as codecs]
              [mac :as mac]]
+            [clj-commons.byte-streams :as bs]
             [clojure.test :refer [deftest testing is]]
             [clojure.core.async :as ca]
             [clojure.string :as cs]
@@ -19,9 +20,9 @@
             [monkey.ci.web
              [auth :as auth]
              [handler :as sut]]
-            [monkey.ci.helpers :refer [try-take] :as h]
-            [monkey.ci.http-helpers :refer [with-fake-http]]
-            [org.httpkit.fake :as hf]
+            [monkey.ci
+             [aleph-test :as at]
+             [helpers :refer [try-take] :as h]]
             [reitit
              [core :as rc]
              [ring :as ring]]
@@ -750,27 +751,35 @@
 
 (deftest github-endpoints
   (testing "`POST /github/login` requests token from github and fetches user info"
-    (hf/with-fake-http [{:url "https://github.com/login/oauth/access_token"
-                         :method :post}
-                        (fn [_ req _]
+    (at/with-fake-http [{:url "https://github.com/login/oauth/access_token"
+                         :request-method :post}
+                        (fn [req]
                           (if (= {:client_id "test-client-id"
                                   :client_secret "test-secret"
                                   :code "1234"}
                                  (:query-params req))
-                            {:status 200 :body (h/to-raw-json {:access_token "test-token"})}
-                            {:status 400 :body (str "invalid query params:" (:query-params req))}))
+                            {:status 200
+                             :body (h/to-raw-json {:access_token "test-token"})
+                             :headers {"Content-Type" "application/json"}}
+                            {:status 400
+                             :body (str "invalid query params:" (:query-params req))
+                             :headers ["Content-Type" "text/plain"]}))
                         {:url "https://api.github.com/user"
-                         :method :get}
-                        (fn [_ req _]
+                         :request-method :get}
+                        (fn [req]
                           (let [auth (get-in req [:headers "Authorization"])]
                             (if (= "Bearer test-token" auth)
-                              {:status 200 :body (h/to-raw-json {:id 4567
-                                                                 :name "test-user"
-                                                                 :other-key "other-value"})}
-                              {:status 400 :body (str "invalid auth header: " auth)})))]
+                              {:status 200
+                               :body (h/to-raw-json {:id 4567
+                                                     :name "test-user"
+                                                     :other-key "other-value"})
+                               :headers {"Content-Type" "application/json"}}
+                              {:status 400
+                               :body (str "invalid auth header: " auth)
+                               :headers {"Content-Type" "text/plain"}})))]
       (let [app (-> (test-rt {:config {:github {:client-id "test-client-id"
                                                 :client-secret "test-secret"}}
-                               :jwk (auth/keypair->rt (auth/generate-keypair))})
+                              :jwk (auth/keypair->rt (auth/generate-keypair))})
                     (sut/make-app))
             r (-> (mock/request :post "/github/login?code=1234")
                   (app))]
@@ -794,30 +803,30 @@
 
 (deftest bitbucket-endpoints
   (testing "`POST /bitbucket/login` requests token from bitbucket and fetches user info"
-    (with-fake-http [[{:url "https://bitbucket.org/site/oauth2/access_token"
-                       :request-method :post}
-                      (fn [req]
-                        (cond
-                          (not= {:grant_type "authorization_code"
-                                 :code "1234"}
-                                (:form-params req))
-                          {:status 400 :body (str "Invalid form params: " (:form-params req))}
-                          (not (matches-basic-auth? req "test-client-id" "test-secret"))
-                          {:status 400 :body (str "Invalid auth code: " (:basic-auth req))}
-                          :else
-                          {:status 200
-                           :body (h/to-raw-json {:access_token "test-token"})
-                           :headers {"content-type" "application/json"}}))]
-                     [{:url "https://api.bitbucket.org/2.0/user"
-                       :request-method :get}
-                      (fn [req]
-                        (let [auth (get-in req [:headers "Authorization"])]
-                          (if (= "Bearer test-token" auth)
+    (at/with-fake-http [{:url "https://bitbucket.org/site/oauth2/access_token"
+                         :request-method :post}
+                        (fn [req]
+                          (cond
+                            (not= {:grant_type "authorization_code"
+                                   :code "1234"}
+                                  (:form-params req))
+                            {:status 400 :body (str "Invalid form params: " (:form-params req))}
+                            (not (matches-basic-auth? req "test-client-id" "test-secret"))
+                            {:status 400 :body (str "Invalid auth code: " (:basic-auth req))}
+                            :else
                             {:status 200
-                             :body (h/to-raw-json {:name "test-user"
-                                                   :other-key "other-value"})
-                             :headers {"content-type" "application/json"}}
-                            {:status 400 :body (str "invalid auth header: " auth)})))]]
+                             :body (h/to-raw-json {:access_token "test-token"})
+                             :headers {"Content-Type" "application/json"}}))
+                        {:url "https://api.bitbucket.org/2.0/user"
+                         :request-method :get}
+                        (fn [req]
+                          (let [auth (get-in req [:headers "Authorization"])]
+                            (if (= "Bearer test-token" auth)
+                              {:status 200
+                               :body (h/to-raw-json {:name "test-user"
+                                                     :other-key "other-value"})
+                               :headers {"Content-Type" "application/json"}}
+                              {:status 400 :body (str "invalid auth header: " auth)})))]
       
       (let [app (-> (test-rt {:config {:bitbucket {:client-id "test-client-id"
                                                    :client-secret "test-secret"}}

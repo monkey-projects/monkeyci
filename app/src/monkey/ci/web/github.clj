@@ -3,8 +3,6 @@
   (:require [buddy.core
              [codecs :as codecs]
              [mac :as mac]]
-            [clojure.core.async :refer [go <!! <!]]
-            [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
             [medley.core :as mc]
@@ -15,11 +13,9 @@
              [storage :as s]
              [utils :as u]]
             [monkey.ci.web
-             [auth :as auth]
              [common :as c]
              [oauth2 :as oauth2]]
-            ;; TODO Replace httpkit with aleph
-            [org.httpkit.client :as http]
+            [aleph.http :as http]
             [ring.util.response :as rur]))
 
 (defn extract-signature [s]
@@ -200,36 +196,39 @@
       (rur/response (s/find-repo st sid))
       (rur/status 404))))
 
-(defn- process-reply [r]
-  (log/trace "Got github reply:" r)
-  (update r :body c/parse-json))
+(def user-agent (str "MonkeyCI:" (config/version)))
 
 (defn- request-access-token [req]
   (let [code (get-in req [:parameters :query :code])
         {:keys [client-secret client-id]} (c/from-rt req (comp :github rt/config))]
-    (-> @(http/post "https://github.com/login/oauth/access_token"
-                    {:query-params {:client_id client-id
-                                    :client_secret client-secret
-                                    :code code}
-                     :headers {"Accept" "application/json"}})
-        (process-reply))))
+    (-> (http/post "https://github.com/login/oauth/access_token"
+                   {:query-params {:client_id client-id
+                                   :client_secret client-secret
+                                   :code code}
+                    :headers {"Accept" "application/json"
+                              "User-Agent" user-agent}})
+        (md/chain c/parse-body)
+        deref)))
 
 (defn- ->oauth-user [{:keys [id email]}]
   {:email email
    :sid [:github id]})
 
-(defn- request-user-info
+(defn request-user-info
   "Fetch github user details in order to get the id and email (although
    the latter is not strictly necessary).  We need the id in order to
    link the Github user to the MonkeyCI user."
   [token]
-  (-> @(http/get "https://api.github.com/user"
-                 {:headers {"Accept" "application/json"
-                            "Authorization" (str "Bearer " token)}})
-      (process-reply)
-      ;; TODO Check for failures
-      :body
-      (->oauth-user)))
+  (-> (http/get "https://api.github.com/user"
+                {:headers {"Accept" "application/json"
+                           "Authorization" (str "Bearer " token)
+                           ;; Required by github
+                           "User-Agent" user-agent}})
+      (md/chain
+       c/parse-body
+       :body
+       ->oauth-user)
+      deref))
 
 (def login (oauth2/login-handler
             request-access-token

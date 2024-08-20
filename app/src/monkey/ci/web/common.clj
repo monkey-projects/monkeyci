@@ -1,7 +1,7 @@
 (ns monkey.ci.web.common
   (:require [buddy.auth :as ba]
             [camel-snake-kebab.core :as csk]
-            [cheshire.core :as json]
+            [clj-commons.byte-streams :as bs]
             [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
@@ -168,7 +168,7 @@
       (h req)
       (catch Exception ex
         ;; Log and rethrow
-        (log/error (str "Got error while handling request" (:uri req)) ex)
+        (log/error (str "Got error while handling request: " (:uri req)) ex)
         (throw ex)))))
 
 (def exception-middleware
@@ -197,11 +197,26 @@
     (ring/redirect-trailing-slash-handler)
     (ring/create-default-handler))))
 
-(defn parse-json [s]
-  (if (string? s)
-    (json/parse-string s csk/->kebab-case-keyword)
-    (with-open [r (io/reader s)]
-      (json/parse-stream r csk/->kebab-case-keyword))))
+(def m-decoder
+  "Muuntaja decoder used to parse response bodies"
+  (mc/create
+   (assoc-in
+    mc/default-options
+    [:formats "application/json" :decoder-opts]
+    {:decode-key-fn csk/->kebab-case-keyword})))
+
+(defn parse-body
+  "Parses response body according to content type.  Throws an exception if 
+   the content type is not supported."
+  [{:keys [body] :as resp}]
+  (let [body (if (string? body)
+               body
+               (bs/to-string body))]
+    (try
+      (update resp :body #(mc/decode-response-body m-decoder (assoc resp :body %)))
+      (catch Exception ex
+        (throw (ex-info "Unable to decode body" {:cause ex
+                                                 :body body}))))))
 
 (defn run-build-async
   "Starts the build in a new thread"

@@ -19,7 +19,7 @@
             (Chart. (.getElementById js/document id) (clj->js conf)))
           (remake-chart [chart conf]
             (log/debug "Destroying chart")
-            (.-destroy chart) ; Has no effect?
+            (.-destroy chart)           ; Has no effect?
             (make-chart conf))]
     (let [state (rc/atom nil)]
       (rc/create-class
@@ -45,7 +45,8 @@
   (let [id "bar-chart"
         data {:labels (range 10)
               :datasets [{:label "Values"
-                          :data [5 3 6 7 3 2 5 6 8 7]}]}
+                          :data [5 3 6 7 3 2 5 6 8 7]
+                          :backgroundColor "#008060"}]}
         config {:type "bar"
                 :data data}]
     (rf/dispatch [:chart/update id config])
