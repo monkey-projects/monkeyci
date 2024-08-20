@@ -18,8 +18,7 @@
              [auth :as auth]
              [common :as c]
              [oauth2 :as oauth2]]
-            ;; TODO Replace httpkit with aleph
-            [org.httpkit.client :as http]
+            [aleph.http :as http]
             [ring.util.response :as rur]))
 
 (defn extract-signature [s]
@@ -207,12 +206,13 @@
 (defn- request-access-token [req]
   (let [code (get-in req [:parameters :query :code])
         {:keys [client-secret client-id]} (c/from-rt req (comp :github rt/config))]
-    (-> @(http/post "https://github.com/login/oauth/access_token"
-                    {:query-params {:client_id client-id
-                                    :client_secret client-secret
-                                    :code code}
-                     :headers {"Accept" "application/json"}})
-        (process-reply))))
+    (-> (http/post "https://github.com/login/oauth/access_token"
+                   {:query-params {:client_id client-id
+                                   :client_secret client-secret
+                                   :code code}
+                    :headers {"Accept" "application/json"}})
+        (md/chain process-reply)
+        deref)))
 
 (defn- ->oauth-user [{:keys [id email]}]
   {:email email
@@ -223,13 +223,15 @@
    the latter is not strictly necessary).  We need the id in order to
    link the Github user to the MonkeyCI user."
   [token]
-  (-> @(http/get "https://api.github.com/user"
+  (-> (http/get "https://api.github.com/user"
                  {:headers {"Accept" "application/json"
                             "Authorization" (str "Bearer " token)}})
-      (process-reply)
-      ;; TODO Check for failures
-      :body
-      (->oauth-user)))
+      (md/chain
+       process-reply
+       ;; TODO Check for failures
+       :body
+       ->oauth-user)
+      deref))
 
 (def login (oauth2/login-handler
             request-access-token

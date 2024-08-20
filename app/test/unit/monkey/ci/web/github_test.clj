@@ -10,8 +10,9 @@
              [auth :as auth]
              [common :as wc]
              [github :as sut]]
-            [monkey.ci.helpers :as h]
-            [org.httpkit.fake :as hf]
+            [monkey.ci
+             [aleph-test :as af]
+             [helpers :as h]]
             [ring.mock.request :as mock]))
 
 (deftest valid-security?
@@ -327,10 +328,12 @@
 (defn- with-github-user
   "Sets up fake http communication with github to return the given user"
   ([u f]
-   (hf/with-fake-http ["https://github.com/login/oauth/access_token"
+   (af/with-fake-http [{:url "https://github.com/login/oauth/access_token"
+                        :request-method :post}
                        {:status 200
                         :body (h/to-json {:access-token "test-token"})}
-                       "https://api.github.com/user"
+                       {:url "https://api.github.com/user"
+                        :request-method :get}
                        {:status 200
                         :body (h/to-json u)}]
      (f u)))
@@ -341,7 +344,7 @@
 
 (deftest login
   (testing "when exchange fails at github, returns body and 400 status code"
-    (hf/with-fake-http ["https://github.com/login/oauth/access_token"
+    (af/with-fake-http ["https://github.com/login/oauth/access_token"
                         {:status 401
                          :body (h/to-json {:message "invalid access code"})}]
       (is (= 400 (-> {:parameters

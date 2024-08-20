@@ -2,6 +2,7 @@
   (:require [buddy.auth :as ba]
             [camel-snake-kebab.core :as csk]
             [cheshire.core :as json]
+            [clj-commons.byte-streams :as bs]
             [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
