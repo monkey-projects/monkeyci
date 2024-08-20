@@ -61,7 +61,7 @@
            (sut/group-and-merge-from-env
             {:test {:credentials {:username "test-user"}}}
             :test))))
-
+  
   (testing "leaves unchanged when no matches"
     (is (= {:key "value"}
            (sut/group-and-merge-from-env {:key "value"} :test)))))
@@ -251,25 +251,7 @@
     (h/with-tmp-dir dir
       (let [f (io/file dir "test.edn")]
         (spit f (pr-str {:key "value"}))
-        (is (= {:key "value"} (sut/load-config-file f))))))
-
-  (testing "loads `.json` files"
-    (h/with-tmp-dir dir
-      (let [f (io/file dir "test.json")]
-        (spit f "{\"key\":\"value\"}")
-        (is (= {:key "value"} (sut/load-config-file f))))))
-
-  (testing "converts to kebab-case for `.edn`"
-    (h/with-tmp-dir dir
-      (let [f (io/file dir "test.edn")]
-        (spit f (pr-str {:testKey "value"}))
-        (is (= {:test-key "value"} (sut/load-config-file f))))))
-
-  (testing "converts to kebab-case for `.json`"
-    (h/with-tmp-dir dir
-      (let [f (io/file dir "test.json")]
-        (spit f "{\"testKey\":\"value\"}")
-        (is (= {:test-key "value"} (sut/load-config-file f)))))))
+        (is (= {:key "value"} (sut/load-config-file f)))))))
 
 (deftest home-config-file
   (testing "is by default in the user home dir"

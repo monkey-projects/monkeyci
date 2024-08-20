@@ -52,8 +52,7 @@
    that can be passed to OCI context creators."
   [{:keys [credentials] :as conf}]
   (-> conf
-      ;; TODO Remove this, it's already done when normalizing the config
-      (merge (mc/update-existing credentials :private-key u/load-privkey))
+      (merge credentials)
       (dissoc :credentials)))
 
 (defn stream-to-bucket

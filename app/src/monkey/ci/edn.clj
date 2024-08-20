@@ -1,7 +1,7 @@
 (ns monkey.ci.edn
   "Functionality for serializing objects to edn and deserializing them back."
-  (:require [clojure.edn :as edn]
-            [clojure.java.io :as io]
+  (:require [clj-commons.byte-streams :as bs]
+            [clojure.edn :as edn]
             [clojure.walk :as cw]
             [monkey.ci.pem :as pem]))
 
@@ -22,7 +22,7 @@
 (defn- ->reader [x]
   (if (string? x)
     (java.io.StringReader. x)
-    (io/reader x)))
+    (bs/to-reader x)))
 
 (def default-opts {:readers {pk-sym read-pk}})
 

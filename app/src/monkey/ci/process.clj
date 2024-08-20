@@ -39,8 +39,7 @@
   (System/exit exit-code))
 
 (defn- load-config [{:keys [config-file]}]
-  (with-open [r (io/reader config-file)]
-    (utils/parse-edn r)))
+  (config/load-config-file config-file))
 
 (defn run
   "Run function for when a build task is executed using clojure tools.  This function
