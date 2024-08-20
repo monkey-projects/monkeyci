@@ -11,20 +11,7 @@
             [monkey.ci.web
              [common :as c]
              [oauth2 :as oauth2]]
-            [muuntaja.parse :as mp]
             [ring.util.response :as rur]))
-
-(defn- process-reply [r]
-  (let [r (update r :body bs/to-string)
-        ct (some-> (get-in r [:headers "content-type"])
-                   (mp/parse-content-type)
-                   first)]
-    (log/debug "Processing reply for content type:" ct)
-    (if (<= 400 (:status r))
-      (throw (ex-info "Got error response" r)))
-    (cond-> r
-      (= "application/json" ct)
-      (update :body c/parse-json))))
 
 (defn- handle-error [ex]
   (log/error "Got Bitbucket error:" ex)
@@ -43,7 +30,7 @@
                                    :code code}
                      :basic-auth [client-id client-secret]
                      :headers {"Accept" "application/json"}})
-         (md/chain process-reply)
+         (md/chain c/parse-body)
          (md/catch handle-error))))
 
 (defn- ->oauth-user [{:keys [uuid email] :as u}]
@@ -55,8 +42,7 @@
     (-> @(http/get "https://api.bitbucket.org/2.0/user"
                    {:headers {"Accept" "application/json"
                               "Authorization" (str "Bearer " token)}})
-        (process-reply)
-        ;; TODO Check for failures
+        (c/parse-body)
         :body
         (->oauth-user))))
 

@@ -331,11 +331,13 @@
    (af/with-fake-http [{:url "https://github.com/login/oauth/access_token"
                         :request-method :post}
                        {:status 200
-                        :body (h/to-json {:access-token "test-token"})}
+                        :body (h/to-json {:access-token "test-token"})
+                        :headers {"Content-Type" "application/json"}}
                        {:url "https://api.github.com/user"
                         :request-method :get}
                        {:status 200
-                        :body (h/to-json u)}]
+                        :body (h/to-json u)
+                        :headers {"Content-Type" "application/json"}}]
      (f u)))
   ([f]
    (with-github-user {:name "test user"
@@ -346,7 +348,8 @@
   (testing "when exchange fails at github, returns body and 400 status code"
     (af/with-fake-http ["https://github.com/login/oauth/access_token"
                         {:status 401
-                         :body (h/to-json {:message "invalid access code"})}]
+                         :body (h/to-json {:message "invalid access code"})
+                         :headers {"Content-Type" "application/json"}}]
       (is (= 400 (-> {:parameters
                       {:query
                        {:code "test-code"}}}

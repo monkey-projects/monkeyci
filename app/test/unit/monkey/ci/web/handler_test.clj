@@ -758,17 +758,25 @@
                                   :client_secret "test-secret"
                                   :code "1234"}
                                  (:query-params req))
-                            {:status 200 :body (h/to-raw-json {:access_token "test-token"})}
-                            {:status 400 :body (str "invalid query params:" (:query-params req))}))
+                            {:status 200
+                             :body (h/to-raw-json {:access_token "test-token"})
+                             :headers {"Content-Type" "application/json"}}
+                            {:status 400
+                             :body (str "invalid query params:" (:query-params req))
+                             :headers ["Content-Type" "text/plain"]}))
                         {:url "https://api.github.com/user"
                          :request-method :get}
                         (fn [req]
                           (let [auth (get-in req [:headers "Authorization"])]
                             (if (= "Bearer test-token" auth)
-                              {:status 200 :body (h/to-raw-json {:id 4567
-                                                                 :name "test-user"
-                                                                 :other-key "other-value"})}
-                              {:status 400 :body (str "invalid auth header: " auth)})))]
+                              {:status 200
+                               :body (h/to-raw-json {:id 4567
+                                                     :name "test-user"
+                                                     :other-key "other-value"})
+                               :headers {"Content-Type" "application/json"}}
+                              {:status 400
+                               :body (str "invalid auth header: " auth)
+                               :headers {"Content-Type" "text/plain"}})))]
       (let [app (-> (test-rt {:config {:github {:client-id "test-client-id"
                                                 :client-secret "test-secret"}}
                               :jwk (auth/keypair->rt (auth/generate-keypair))})
@@ -808,7 +816,7 @@
                             :else
                             {:status 200
                              :body (h/to-raw-json {:access_token "test-token"})
-                             :headers {"content-type" "application/json"}}))
+                             :headers {"Content-Type" "application/json"}}))
                         {:url "https://api.bitbucket.org/2.0/user"
                          :request-method :get}
                         (fn [req]
@@ -817,7 +825,7 @@
                               {:status 200
                                :body (h/to-raw-json {:name "test-user"
                                                      :other-key "other-value"})
-                               :headers {"content-type" "application/json"}}
+                               :headers {"Content-Type" "application/json"}}
                               {:status 400 :body (str "invalid auth header: " auth)})))]
       
       (let [app (-> (test-rt {:config {:bitbucket {:client-id "test-client-id"

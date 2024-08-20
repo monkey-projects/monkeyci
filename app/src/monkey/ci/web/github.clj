@@ -3,8 +3,6 @@
   (:require [buddy.core
              [codecs :as codecs]
              [mac :as mac]]
-            [clojure.core.async :refer [go <!! <!]]
-            [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
             [medley.core :as mc]
@@ -15,7 +13,6 @@
              [storage :as s]
              [utils :as u]]
             [monkey.ci.web
-             [auth :as auth]
              [common :as c]
              [oauth2 :as oauth2]]
             [aleph.http :as http]
@@ -199,9 +196,7 @@
       (rur/response (s/find-repo st sid))
       (rur/status 404))))
 
-(defn- process-reply [r]
-  (log/trace "Got github reply:" r)
-  (update r :body c/parse-json))
+(def user-agent (str "MonkeyCI:" (config/version)))
 
 (defn- request-access-token [req]
   (let [code (get-in req [:parameters :query :code])
@@ -210,25 +205,27 @@
                    {:query-params {:client_id client-id
                                    :client_secret client-secret
                                    :code code}
-                    :headers {"Accept" "application/json"}})
-        (md/chain process-reply)
+                    :headers {"Accept" "application/json"
+                              "User-Agent" user-agent}})
+        (md/chain c/parse-body)
         deref)))
 
 (defn- ->oauth-user [{:keys [id email]}]
   {:email email
    :sid [:github id]})
 
-(defn- request-user-info
+(defn request-user-info
   "Fetch github user details in order to get the id and email (although
    the latter is not strictly necessary).  We need the id in order to
    link the Github user to the MonkeyCI user."
   [token]
   (-> (http/get "https://api.github.com/user"
-                 {:headers {"Accept" "application/json"
-                            "Authorization" (str "Bearer " token)}})
+                {:headers {"Accept" "application/json"
+                           "Authorization" (str "Bearer " token)
+                           ;; Required by github
+                           "User-Agent" user-agent}})
       (md/chain
-       process-reply
-       ;; TODO Check for failures
+       c/parse-body
        :body
        ->oauth-user)
       deref))
