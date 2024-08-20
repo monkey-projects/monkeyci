@@ -117,7 +117,7 @@
       (merge-configs)
       (u/prune-tree)))
 
-(defmulti normalize-key
+(defmulti ^:deprecated normalize-key
   "Normalizes the config as read from files and env, for the specific key.
    The method receives the entire config, that also holds the env and args
    and should return the updated config."
