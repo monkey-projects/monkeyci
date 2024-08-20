@@ -11,6 +11,7 @@
             [camel-snake-kebab.core :as csk]
             [clojure.tools.logging :as log]
             [medley.core :as mc]
+            [meta-merge.core :as mm]
             [monkey.aero] ; Aero extensions
             [monkey.ci
              [sid :as sid]
@@ -106,7 +107,7 @@
    {:type :disk :dir "tmp/cache"}})
 
 (defn- merge-configs [configs]
-  (reduce u/deep-merge default-app-config configs))
+  (reduce mm/meta-merge default-app-config configs))
 
 (defn load-raw-config
   "Loads raw (not normalized) configuration from its various sources"

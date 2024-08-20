@@ -2,11 +2,11 @@
   (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
             [common :as c]
+            [meta-merge.core :as mm]
             [monkey.ci
              [config :as config]
              [oci :as oci]
-             [storage]
-             [utils :as u]]
+             [storage]]
             [monkey.ci.storage.oci])
   (:import java.io.PushbackReader))
 
@@ -23,7 +23,7 @@
 (defn load-config!
   "Loads config from `f` and adds it to the state"
   [f]
-  (swap! global-config u/deep-merge (load-config f)))
+  (swap! global-config mm/meta-merge (load-config f)))
 
 (defn reset-config! []
   (reset! global-config {}))

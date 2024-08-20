@@ -4,6 +4,7 @@
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
             [medley.core :as mc]
+            [meta-merge.core :as mm]
             [monkey.ci
              [build :as b]
              [config :as config]
@@ -11,8 +12,7 @@
              [oci :as oci]
              [runners :as r]
              [runtime :as rt]
-             [spec :as s]
-             [utils :as u]]
+             [spec :as s]]
             [monkey.ci.events.core :as ec]
             [monkey.ci.spec.build :as sb]
             [monkey.ci.web.auth :as auth]
@@ -55,7 +55,7 @@
            (dissoc :app-mode :git :github :http :args :jwk :checkout-base-dir :storage
                    :ssh-keys-dir :work-dir :oci :runner)
            (assoc :build (dissoc build :ssh-keys :cleanup? :status))
-           (update :events u/deep-merge (get-in rt [rt/config :runner :events])))
+           (update :events mm/meta-merge (get-in rt [rt/config :runner :events])))
        (prepare-config-for-oci)
        (add-ssh-keys-dir build)
        (add-log-config-path rt)

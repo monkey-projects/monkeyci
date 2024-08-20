@@ -6,6 +6,7 @@
              [deferred :as md]
              [time :as mt]]
             [medley.core :as mc]
+            [meta-merge.core :as mm]
             [monkey.ci
              [build :as b]
              [config :as c]
@@ -41,7 +42,7 @@
             (parse-edn-prop c :availability-domains))]
     (->> [(:oci (c/group-and-merge-from-env conf :oci)) (k conf)]
          (map group-credentials)
-         (apply u/deep-merge)
+         (apply mm/meta-merge)
          (load-key)
          (parse-vnics)
          (parse-ads)

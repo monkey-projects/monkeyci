@@ -9,6 +9,7 @@
             [clojure.test :refer [deftest testing is]]
             [clojure.core.async :as ca]
             [clojure.string :as cs]
+            [meta-merge.core :as mm]
             [monkey.ci
              [artifacts :as a]
              [config :as config]
@@ -597,7 +598,7 @@
 (defn- with-repo [f & [rt]]
   (h/with-memory-store st
     (let [events (atom [])
-          app (sut/make-app (u/deep-merge
+          app (sut/make-app (mm/meta-merge
                              {:storage st
                               :events {:poster (partial swap! events conj)}
                               :config {:dev-mode true}

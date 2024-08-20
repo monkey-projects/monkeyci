@@ -57,6 +57,9 @@
 (defn- includes-build-id? [sid]
   (= build-sid-length (count sid)))
 
+(defn local-build-id []
+  (str "local-build-" (System/currentTimeMillis)))
+
 (defn make-build-ctx
   "Creates a build context that can be added to the runtime.  This is used when
    running a build from cli."
@@ -71,8 +74,8 @@
         ;; assign a 'local' id, or ask the api to reserve a new index.
         sid (sid/->sid (if (or (empty? orig-sid) (includes-build-id? orig-sid))
                          orig-sid
-                         (concat orig-sid [(u/new-build-id)])))
-        id (or (last sid) (u/new-build-id))]
+                         (concat orig-sid [(local-build-id)])))
+        id (or (last sid) (local-build-id))]
     (maybe-set-git-opts
      (merge (get-in rt [rt/config :build])
             {:customer-id (first sid)

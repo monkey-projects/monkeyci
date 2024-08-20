@@ -9,7 +9,6 @@
              [math :as math]
              [repl :as cr]]
             [medley.core :as mc]
-            [meta-merge.core :refer [meta-merge]]
             [monkey.ci
              [edn :as ce]
              [sid :as sid]
@@ -82,11 +81,6 @@
   [dir]
   (FileUtils/deleteDirectory (io/file dir)))
 
-;; Use build index instead
-(defn ^:deprecated new-build-id []
-  ;; TODO Generate a more unique build id
-  (format "build-%d" (System/currentTimeMillis)))
-
 (defn load-privkey
   "Load private key from file or from string"
   [f]
@@ -133,17 +127,6 @@
                 (cond-> x
                   (map? x) (prune-map)))
               t))
-
-(def deep-merge meta-merge)
-#_(defn deep-merge
-    "Recursively merges maps."
-    ;; Copied from https://dnaeon.github.io/recursively-merging-maps-in-clojure/
-    [& maps]
-    (letfn [(m [& xs]
-              (if (some #(and (map? %) (not (record? %))) xs)
-                (apply merge-with m xs)
-                (last xs)))]
-      (reduce m maps)))
 
 (defn ->base64 [s]
   (.. (java.util.Base64/getEncoder)
