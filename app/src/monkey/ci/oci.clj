@@ -6,23 +6,14 @@
              [deferred :as md]
              [time :as mt]]
             [medley.core :as mc]
-            [meta-merge.core :as mm]
             [monkey.ci
              [build :as b]
-             [config :as c]
-             [pem :as pem]
              [utils :as u]]
             [monkey.ci.common.preds :as cp]
             [monkey.oci.container-instance.core :as ci]
             [monkey.oci.os
              [martian :as os]
              [stream :as s]]))
-
-(defn ^:deprecated group-credentials
-  "Assuming the conf is taken from env, groups all keys that start with `credentials-`
-   into the `:credentials` submap."
-  [conf]
-  (c/group-keys conf :credentials))
 
 (defn stream-to-bucket
   "Pipes an input stream to a bucket object using multipart uploads.
