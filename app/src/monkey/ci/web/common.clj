@@ -199,11 +199,7 @@
 
 (def m-decoder
   "Muuntaja decoder used to parse response bodies"
-  (mc/create
-   (assoc-in
-    mc/default-options
-    [:formats "application/json" :decoder-opts]
-    {:decode-key-fn csk/->kebab-case-keyword})))
+  (make-muuntaja))
 
 (defn parse-body
   "Parses response body according to content type.  Throws an exception if 

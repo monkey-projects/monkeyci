@@ -1,5 +1,6 @@
 (ns monkey.ci.build.api-test
   (:require [clojure.test :refer [deftest testing is]]
+            [aleph.http :as http]
             [manifold.deferred :as md]
             [monkey.ci.build.api :as sut]))
 
@@ -20,6 +21,34 @@
       (is (string? (:token s)))
       (is (string? (:socket s)))
       (is (nil? (.close (:server s)))))))
+
+(deftest api-server
+  (let [s (sut/start-server {})
+        make-url (fn [path]
+                   (format "http://localhost:%d/%s" (:port s) path))]
+    (with-open [srv (:server s)]
+
+      (testing "returns 401 if no token given"
+        (is (= 401 (-> {:url (make-url "swagger.json")
+                        :method :get
+                        :throw-exceptions false}
+                       (http/request)
+                       deref
+                       :status))))
+      
+      (testing "returns 401 if wrong token given"
+        (is (= 401 (-> {:url (make-url "swagger.json")
+                        :method :get
+                        :headers {"Authorization" "Bearer wrong token"}
+                        :throw-exceptions false}
+                       (http/request)
+                       deref
+                       :status)))))))
+
+(deftest get-ip-addr
+  (testing "returns ipv4 address"
+    (is (re-matches #"\d+\.\d+\.\d+\.\d+"
+                    (sut/get-ip-addr)))))
 
 (deftest build-params
   (testing "invokes `params` endpoint on client"

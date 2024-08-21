@@ -6,25 +6,100 @@
             [babashka.fs :as fs]
             [clojure.tools.logging :as log]
             [monkey.ci.build :as b]
-            [monkey.ci.spec :as spec]
-            [monkey.ci.spec.build]))
+            [monkey.ci
+             [runtime :as rt]
+             [spec :as spec]]
+            [monkey.ci.spec.build]
+            [monkey.ci.web.common :as c]
+            [reitit
+             [ring :as ring]
+             [swagger :as swagger]]
+            [ring.util.response :as rur]
+            [schema.core :as s]))
 
-(defn generate-token []
+(defn generate-token
+  "Generates a new API security token.  This token can be set in the API server
+   and should be passed on to the build script."
+  []
   (str (random-uuid)))
 
-(def handler (constantly {:status 204}))
+(defn get-params [req]
+  (rur/response ;; TODO
+                ))
+
+(defn get-ip-addr
+  "Determines the ip address of this VM"
+  []
+  ;; TODO There could be more than one
+  (.. (java.net.Inet4Address/getLocalHost) (getHostAddress)))
+
+(defn post-event [req]
+  (let [evt (get-in req [:parameters :body])]
+    (log/debug "Received event from build script:" evt)
+    (try 
+      {:status (if (rt/post-events (c/req->rt req) evt)
+                 202
+                 500)}
+      (catch Exception ex
+        (log/error "Unable to dispatch event" ex)
+        {:status 500}))))
+
+(def edn #{"application/edn"})
+
+(def routes ["" {:swagger {:id :monkeyci/build-api}}
+             [["/swagger.json"
+               {:no-doc true
+                :get (swagger/create-swagger-handler)}]
+              ["/params"
+               {:get get-params
+                :summary "Retrieve configured build parameters"
+                :operationId :get-params
+                :responses {200 {:body {s/Str s/Str}}}
+                :produces edn}]
+              ["/event"
+               {:post post-event
+                :summary "Post an event to the bus"
+                :operationId :post-event
+                :parameters {:body {s/Keyword s/Any}}
+                :responses {202 {}}
+                :consumes edn}]]])
+
+(defn security-middleware
+  "Middleware that checks if the authorization header matches the specified token"
+  [handler token]
+  (fn [req]
+    (let [auth (get-in req [:headers "authorization"])]
+      (if (= auth (str "Bearer " token))
+        (handler req)
+        (rur/status 401)))))
+
+(defn make-router
+  ([opts routes]
+   (ring/router
+    routes
+    {:data {:middleware (concat [[security-middleware (:token opts)]]
+                                c/default-middleware)
+            :muuntaja (c/make-muuntaja)
+            :coercion reitit.coercion.schema/coercion
+            ::config opts}}))
+  ([opts]
+   (make-router opts routes)))
+
+(defn make-app [opts]
+  (c/make-app (make-router opts)))
 
 (defn start-server
   "Starts a build API server with a randomly generated token.  Returns the server
    and token."
   [{:keys [port] :or {port 0} :as conf}]
   {:pre [(spec/valid? :api/config conf)]}
-  (let [srv (http/start-server
-             handler
+  (let [token (generate-token)
+        srv (http/start-server
+             (make-app (assoc conf :token token))
              {:port port})]
     {:server srv
      :port (an/port srv)
-     :token (generate-token)}))
+     :token token}))
 
 (def rt->api-client (comp :client :api))
 
