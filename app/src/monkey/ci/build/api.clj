@@ -1,7 +1,30 @@
 (ns monkey.ci.build.api
   "Functions for invoking the build script API."
-  (:require [clojure.tools.logging :as log]
-            [monkey.ci.build :as b]))
+  (:require [aleph
+             [http :as http]
+             [netty :as an]]
+            [babashka.fs :as fs]
+            [clojure.tools.logging :as log]
+            [monkey.ci.build :as b]
+            [monkey.ci.spec :as spec]
+            [monkey.ci.spec.build]))
+
+(defn generate-token []
+  (str (random-uuid)))
+
+(def handler (constantly {:status 204}))
+
+(defn start-server
+  "Starts a build API server with a randomly generated token.  Returns the server
+   and token."
+  [{:keys [port] :or {port 0} :as conf}]
+  {:pre [(spec/valid? :api/config conf)]}
+  (let [srv (http/start-server
+             handler
+             {:port port})]
+    {:server srv
+     :port (an/port srv)
+     :token (generate-token)}))
 
 (def rt->api-client (comp :client :api))
 

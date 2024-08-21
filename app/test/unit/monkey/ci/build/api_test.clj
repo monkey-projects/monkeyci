@@ -3,6 +3,24 @@
             [manifold.deferred :as md]
             [monkey.ci.build.api :as sut]))
 
+(deftest start-server
+  (testing "can start tcp server"
+    (let [s (sut/start-server {})]
+      (is (map? s))
+      (is (some? (:server s)))
+      (is (string? (:token s)))
+      (is (pos? (:port s)))
+      (is (nil? (.close (:server s))))))
+
+  ;; Not supported by netty 4
+  #_(testing "can start uds server"
+    (let [s (sut/start-server {:type :local})]
+      (is (map? s))
+      (is (some? (:server s)))
+      (is (string? (:token s)))
+      (is (string? (:socket s)))
+      (is (nil? (.close (:server s)))))))
+
 (deftest build-params
   (testing "invokes `params` endpoint on client"
     (let [m (fn [req]

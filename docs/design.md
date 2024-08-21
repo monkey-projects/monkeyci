@@ -57,6 +57,8 @@ How should scripts be run?  I would like to reuse the Clojure tools `deps.edn` a
 much as possible.  So essentially it would be no more than running that build in
 a separate container or process.
 
+For more on this, see the [builds section](build.md).
+
 ## Plugins ##
 
 The Clojure-as-script concept should also allow builders to easily create plugins that
