@@ -7,7 +7,7 @@
 
 (deftest make-build-ctx
   (testing "adds build id"
-    (is (re-matches #"build-\d+"
+    (is (re-matches #"local-build-\d+"
                     (-> (sut/make-build-ctx {})
                         :build-id))))
 
