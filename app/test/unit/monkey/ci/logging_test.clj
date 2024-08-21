@@ -29,22 +29,11 @@
                                      :dir dir}})]
         
         (testing "creates logger that returns file name including sid without build id"
-          (let [l (maker {:build
-                          {:sid ["test-cust" "test-repo" "test-build"]}}
+          (let [l (maker {:sid ["test-cust" "test-repo" "test-build"]}
                          ["test.txt"])
                 f (sut/log-output l)]
             (is (file? f))
             (is (= (io/file dir "test-cust/test-repo/test.txt") f))))
-
-        (testing "defaults to subdir from runtime work dir"
-          (let [maker (sut/make-logger {:logging
-                                        {:type :file}})
-                l (maker {:work-dir dir
-                          :build {:sid ["test-sid" "test-build"]}}
-                         ["test.txt"])
-                f (sut/log-output l)]
-            (is (file? f))
-            (is (= (io/file dir "logs" "test-sid" "test.txt") f))))
 
         (testing "creates parent dir"
           (let [l (maker {} ["logs" "test.txt"])
@@ -71,7 +60,7 @@
         (let [maker (sut/make-logger {:logging
                                       {:type :oci
                                        :bucket-name "test-bucket"}})
-              l (maker {:build {:sid ["test-cust" "test-repo" "test-build"]}}
+              l (maker {:sid ["test-cust" "test-repo" "test-build"]}
                        ["test-build" "test.log"])
               r @(sut/handle-stream l :test-stream)]
           (is (= :test-stream (:stream r)))
@@ -87,7 +76,7 @@
                                       {:type :oci
                                        :bucket-name "test-bucket"
                                        :prefix "logs"}})
-              l (maker {:build {:sid ["test-cust" "test-repo" "test-build"]}}
+              l (maker {:sid ["test-cust" "test-repo" "test-build"]}
                        ["test-build" "test.log"])
               r @(sut/handle-stream l :test-stream)]
           (is (= "logs/test-cust/test-repo/test-build/test.log"

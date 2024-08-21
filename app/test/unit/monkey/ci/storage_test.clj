@@ -309,12 +309,4 @@
   (testing "normalizes string type"
     (is (= :memory (-> (c/normalize-key :storage {:storage {:type "memory"}})
                        :storage
-                       :type))))
-
-  (testing "normalizes oci credentials"
-    (is (map? (-> (c/normalize-key :storage {:storage
-                                             {:type :oci}
-                                             :oci
-                                             {:credentials {:fingerprint "test-fingerprint"}}})
-                  :storage
-                  :credentials)))))
+                       :type)))))

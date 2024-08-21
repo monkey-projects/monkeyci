@@ -1,11 +1,11 @@
 (ns migration
   (:require [clojure.java.io :as io]
             [clojure.tools.logging :as log]
-            [config :refer [load-edn]]
             [storage :refer [make-storage]]
             [medley.core :as mc]
             [monkey.ci
              [cuid :as cuid]
+             [edn :as edn]
              [protocols :as p]
              [storage :as s]]
             [monkey.ci.entities
@@ -25,7 +25,7 @@
         (.isFile f)
         (do
           (log/info "Migrating:" f)
-          (p/write-obj st (make-sid f) (load-edn f)))
+          (p/write-obj st (make-sid f) (edn/edn-> f)))
         (.isDirectory f)
         (migrate-dir f (concat sid [(.getName f)]) st)))))
 

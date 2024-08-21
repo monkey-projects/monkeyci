@@ -43,15 +43,13 @@
       ;; TODO Git branch and other options
       ;; TODO Use child process if there is a deps.edn
       ;; TODO Build parameters
-      (let [jobs (-> rt
-                     (assoc :build (b/make-build-ctx rt))
-                     (script/load-jobs))]
+      (let [jobs (script/load-jobs (b/make-build-ctx rt) rt)]
         (report
          (if (not-empty jobs)
            {:type :verify/success
             :jobs jobs}
            {:type :verify/failed
-            :message "No jobs found in build script"})))
+            :message "No jobs found in build script for the active configuration"})))
       (catch Exception ex
         (log/error "Error verifying build" ex)
         (report {:type :verify/failed
@@ -125,12 +123,12 @@
   [rt]
   (let [sid (b/get-sid rt)
         ;; Add job info from the sidecar config
-        {:keys [job] :as rt} (merge rt (get-in rt [rt/config :sidecar :job-config]))]
+        job (:job (get-in rt [rt/config :sidecar :job-config]))]
     (let [result (try
                    (rt/post-events rt {:type :sidecar/start
                                        :sid sid
                                        :job (jobs/job->event job)})
-                   (let [r @(sidecar/run rt)
+                   (let [r @(sidecar/run rt job)
                          e (:exit r)]
                      (ec/make-result (b/exit-code->status e) e (:message r)))
                    (catch Throwable t

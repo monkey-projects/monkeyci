@@ -328,9 +328,7 @@
 (defmethod mcc/run-container :oci [{:keys [job] :as rt}]
   (log/debug "Running job as OCI instance:" job)
   (let [conf (:containers rt)
-        client (-> conf
-                   (oci/->oci-config)
-                   (ci/make-context))
+        client (ci/make-context conf)
         ic (instance-config conf rt)
         max-job-timeout (* 20 60 1000)]
     (md/chain
@@ -361,9 +359,8 @@
            (:result (or nonzero job-cont))))))))
 
 (defmethod mcc/normalize-containers-config :oci [conf]
-  (-> (oci/normalize-config conf :containers)
-      ;; Take app version if no image version specified
-      (update-in [:containers :image-tag] #(format (or % "%s") (c/version)))))
+  ;; Take app version if no image version specified
+  (update-in conf [:containers :image-tag] #(format (or % "%s") (c/version))))
 
 (defmethod mcc/credit-multiplier-fn :oci [_]
   credit-multiplier)

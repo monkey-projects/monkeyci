@@ -208,15 +208,8 @@
 (defn parse-body
   "Parses response body according to content type.  Throws an exception if 
    the content type is not supported."
-  [{:keys [body] :as resp}]
-  (let [body (if (string? body)
-               body
-               (bs/to-string body))]
-    (try
-      (update resp :body #(mc/decode-response-body m-decoder (assoc resp :body %)))
-      (catch Exception ex
-        (throw (ex-info "Unable to decode body" {:cause ex
-                                                 :body body}))))))
+  [resp]
+  (assoc resp :body (mc/decode-response-body m-decoder resp)))
 
 (defn run-build-async
   "Starts the build in a new thread"

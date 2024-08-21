@@ -34,11 +34,9 @@
              [sql]]))
 
 (defn system-invoker
-  "The event invoker starts a subsystem according to the command requirements,
-   and posts the `command/invoked` event.  This event should be picked up by a
-   handler in the system.  When the command is complete, it should post a
-   `command/completed` event for the same command.  By default it uses the base
-   system, but you can specify your own for testing purposes."
+  "Creates a new runtime and invokes the command using the specified application 
+   mode.  By default it uses the base system, but you can specify your own for 
+   testing purposes."
   [{:keys [command app-mode] :as cmd} env]
   (fn [args]
     (log/debug "Invoking command with arguments:" args)

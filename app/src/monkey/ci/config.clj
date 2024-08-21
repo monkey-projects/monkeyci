@@ -6,23 +6,22 @@
    do some actual work.  This allows us to change the behaviour of the application with
    configuration, but also makes it possible to inject dummy functions for testing 
    purposes."
-  (:require [camel-snake-kebab.core :as csk]
-            [cheshire.core :as json]
-            [clojure
-             [string :as cs]
-             [walk :as cw]]
-            [clojure.java.io :as io]
+  (:require [aero.core :as ac]
+            [babashka.fs :as fs]
+            [camel-snake-kebab.core :as csk]
             [clojure.tools.logging :as log]
             [medley.core :as mc]
+            [meta-merge.core :as mm]
+            [monkey.aero] ; Aero extensions
             [monkey.ci
-             [edn :as edn]
              [sid :as sid]
              [utils :as u]]))
 
 (def ^:dynamic *global-config-file* "/etc/monkeyci/config.edn")
 (def ^:dynamic *home-config-file* (-> (System/getProperty "user.home")
-                                      (io/file ".monkeyci" "config.edn")
-                                      (.getCanonicalPath)))
+                                      (fs/path ".monkeyci" "config.edn")
+                                      (fs/canonicalize)
+                                      str))
 
 (def env-prefix "monkeyci")
 
@@ -76,37 +75,13 @@
     (mc/update-existing v :type keyword)
     v))
 
-(defn- parse-edn
-  "Parses the input file as `edn` and converts keys to kebab-case."
-  [p]
-  (with-open [r (io/reader p)]
-    (->> (edn/edn-> r)
-         (cw/prewalk (fn [x]
-                       (if (map-entry? x)
-                         (let [[k v] x]
-                           [(csk/->kebab-case-keyword (name k)) v])
-                         x))))))
-
-(defn- parse-json
-  "Parses the file as `json`, converting keys to kebab-case."
-  [p]
-  (with-open [r (io/reader p)]
-    (json/parse-stream r csk/->kebab-case-keyword)))
-
 (defn load-config-file
   "Loads configuration from given file.  This supports json and edn and converts
    keys always to kebab-case."
   [f]
-  (when-let [p (some-> f
-                       u/abs-path
-                       io/file)]
-    (when (.exists p)
-      (log/debug "Reading configuration file:" p)
-      (letfn [(has-ext? [ext s]
-                (cs/ends-with? s ext))]
-        (condp has-ext? f
-          ".edn" (parse-edn p)
-          ".json" (parse-json p))))))
+  (when (fs/exists? f)
+    ;; Load using Aero
+    (ac/read-config f)))
 
 (def default-app-config
   "Default configuration for the application, without env vars or args applied."
@@ -132,7 +107,7 @@
    {:type :disk :dir "tmp/cache"}})
 
 (defn- merge-configs [configs]
-  (reduce u/deep-merge default-app-config configs))
+  (reduce mm/meta-merge default-app-config configs))
 
 (defn load-raw-config
   "Loads raw (not normalized) configuration from its various sources"
@@ -143,7 +118,7 @@
       (merge-configs)
       (u/prune-tree)))
 
-(defmulti normalize-key
+(defmulti ^:deprecated normalize-key
   "Normalizes the config as read from files and env, for the specific key.
    The method receives the entire config, that also holds the env and args
    and should return the updated config."

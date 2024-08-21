@@ -31,18 +31,12 @@
         (when (= (dec build-sid-length) (count sid))
           sid))))
 
-(def get-build-id (comp build-id rt/build))
-
-(def get-job-sid
+(defn get-job-sid
   "Creates a job sid using the build id and job id.  Note that this does
    not include the customer and repo ids, so this is only unique within the repo."
-  (comp (partial mapv str)
-        (juxt get-build-id
-              (comp bc/job-id :job))))
-
-(def get-job-id
-  "Creates a string representation of the job sid"
-  (comp (partial cs/join "-") get-job-sid))
+  [job build]
+  (->> [(build-id build) (bc/job-id job)]
+       (mapv str)))
 
 (def rt->job-id (comp bc/job-id :job))
 
@@ -63,6 +57,9 @@
 (defn- includes-build-id? [sid]
   (= build-sid-length (count sid)))
 
+(defn local-build-id []
+  (str "local-build-" (System/currentTimeMillis)))
+
 (defn make-build-ctx
   "Creates a build context that can be added to the runtime.  This is used when
    running a build from cli."
@@ -77,8 +74,8 @@
         ;; assign a 'local' id, or ask the api to reserve a new index.
         sid (sid/->sid (if (or (empty? orig-sid) (includes-build-id? orig-sid))
                          orig-sid
-                         (concat orig-sid [(u/new-build-id)])))
-        id (or (last sid) (u/new-build-id))]
+                         (concat orig-sid [(local-build-id)])))
+        id (or (last sid) (local-build-id))]
     (maybe-set-git-opts
      (merge (get-in rt [rt/config :build])
             {:customer-id (first sid)

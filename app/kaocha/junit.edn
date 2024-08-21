@@ -1,6 +1,7 @@
 #kaocha/v1
 #meta-merge
 [#include "default.edn"
- {:kaocha/plugins [:kaocha.plugin/junit-xml
+ {:kaocha/fail-fast? false
+  :kaocha/plugins [:kaocha.plugin/junit-xml
                    :kaocha.plugin/profiling]
   :kaocha.plugin.junit-xml/target-file "junit.xml"}]

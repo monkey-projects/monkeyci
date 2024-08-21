@@ -4,6 +4,7 @@
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
             [medley.core :as mc]
+            [meta-merge.core :as mm]
             [monkey.ci
              [build :as b]
              [config :as config]
@@ -11,8 +12,7 @@
              [oci :as oci]
              [runners :as r]
              [runtime :as rt]
-             [spec :as s]
-             [utils :as u]]
+             [spec :as s]]
             [monkey.ci.events.core :as ec]
             [monkey.ci.spec.build :as sb]
             [monkey.ci.web.auth :as auth]
@@ -55,7 +55,7 @@
            (dissoc :app-mode :git :github :http :args :jwk :checkout-base-dir :storage
                    :ssh-keys-dir :work-dir :oci :runner)
            (assoc :build (dissoc build :ssh-keys :cleanup? :status))
-           (update :events u/deep-merge (get-in rt [rt/config :runner :events])))
+           (update :events mm/meta-merge (get-in rt [rt/config :runner :events])))
        (prepare-config-for-oci)
        (add-ssh-keys-dir build)
        (add-log-config-path rt)
@@ -199,14 +199,8 @@
 
 (defmethod r/make-runner :oci [rt]
   (let [conf (:runner rt)
-        client (-> conf
-                   (oci/->oci-config)
-                   (ci/make-context))]
+        client (ci/make-context conf)]
     (partial oci-runner client conf)))
 
 (defmethod r/normalize-runner-config :oci [conf]
-  (-> (oci/normalize-config conf :runner)
-      (update-in [:runner :image-tag] #(format (or % "%s") (config/version)))
-      (update :runner config/group-keys :events)
-      ;; FIXME This is highly dependent on the events implementation
-      (update-in [:runner :events] config/group-keys :client)))
+  (update-in conf [:runner :image-tag] #(format (or % "%s") (config/version))))

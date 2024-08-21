@@ -249,8 +249,8 @@
 
 (defn load-jobs
   "Loads the script and resolves the jobs"
-  [rt]
-  (-> (load-script (build/rt->script-dir rt) (build/get-build-id rt))
+  [build rt]
+  (-> (load-script (build/script-dir build) (build/build-id build))
       (resolve-jobs rt)))
 
 (defn exec-script!
@@ -266,7 +266,7 @@
     (log/debug "Executing script for build" build-id "at:" script-dir)
     (log/debug "Build map:" build)
     (try 
-      (let [jobs (load-jobs rt)]
+      (let [jobs (load-jobs build rt)]
         (log/trace "Jobs:" jobs)
         (log/debug "Loaded" (count jobs) "jobs:" (map bc/job-id jobs))
         (run-all-jobs* rt jobs))

@@ -2,11 +2,11 @@
   (:require [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
             [manifold.stream :as ms]
+            [meta-merge.core :as mm]
             [monkey.ci
              [build :as b]
              [runtime :as rt]
-             [storage :as st]
-             [utils :as u]]
+             [storage :as st]]
             [monkey.ci.events.core :as ec]))
 
 (defn- save-build
@@ -33,7 +33,7 @@
       (save-build storage
                   sid
                   (assoc build
-                         :script (u/deep-merge (:script build) script))))
+                         :script (mm/meta-merge (:script build) script))))
     (log/warn "Build not found when updating script:" sid)))
 
 (defn update-job [storage {:keys [sid job]}]

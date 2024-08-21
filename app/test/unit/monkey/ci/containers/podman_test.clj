@@ -186,7 +186,7 @@
       (is (contains-subseq? (sut/build-cmd-args {:containers {:platform "test-platform"}})
                             ["--platform" "test-platform"])))
 
-    (testing "uses job id as container name"
+    (testing "uses build and job id as container name"
       (is (contains-subseq? (sut/build-cmd-args base-ctx)
                             ["--name" "test-build-test-job"])))
 

@@ -206,7 +206,8 @@
                                    :client_secret client-secret
                                    :code code}
                     :headers {"Accept" "application/json"
-                              "User-Agent" user-agent}})
+                              "User-Agent" user-agent}
+                    :throw-exceptions false})
         (md/chain c/parse-body)
         deref)))
 
@@ -223,7 +224,8 @@
                 {:headers {"Accept" "application/json"
                            "Authorization" (str "Bearer " token)
                            ;; Required by github
-                           "User-Agent" user-agent}})
+                           "User-Agent" user-agent}
+                 :throw-exceptions false})
       (md/chain
        c/parse-body
        :body

@@ -1,5 +1,6 @@
 (ns monkey.ci.web.common-test
   (:require [clojure.test :refer [deftest testing is]]
+            [clj-commons.byte-streams :as bs]
             [monkey.ci.web.common :as sut]
             [monkey.ci.helpers :as h]))
 
@@ -16,3 +17,18 @@
         (is (= :build/pending (:type evt)))
         (is (= build (:build evt)))
         (is (= (:sid build) (:sid evt)))))))
+
+(deftest parse-body
+  (testing "parses string body according to content type"
+    (is (= {:test-key "test value"}
+           (-> {:body "{\"test_key\": \"test value\"}"
+                :headers {"Content-Type" "application/json"}}
+               (sut/parse-body)
+               :body))))
+
+  (testing "parses input stream body according to content type"
+    (is (= {:test-key "test value"}
+           (-> {:body (bs/to-input-stream (.getBytes "{\"test_key\": \"test value\"}"))
+                :headers {"Content-Type" "application/json"}}
+               (sut/parse-body)
+               :body)))))

@@ -49,11 +49,15 @@
     (nil? cmd)
     ["--entrypoint" "/bin/sh"]))
 
+(defn get-job-id [job build]
+  "Creates a string representation of the job sid"
+  (cs/join "-" (b/get-job-sid job build)))
+
 (defn build-cmd-args
   "Builds command line args for the podman executable"
   [{:keys [job] :as rt}]
-  (let [conf (mcc/rt->container-config rt)
-        cn (b/get-job-id rt)
+  (let [conf (mcc/job->container-config job)
+        cn (get-job-id job (rt/build rt))
         wd (b/job-work-dir rt)
         cwd "/home/monkeyci"
         base-cmd (cond-> ["/usr/bin/podman" "run"
@@ -75,15 +79,16 @@
      ;; TODO Execute script job by job
      (make-script-cmd (:script job)))))
 
-(defmethod mcc/run-container :podman [{:keys [job] {:keys [build-id]} :build :as rt}]
-  (log/info "Running build job " build-id "/" (bc/job-id job) "as podman container")
+(defmethod mcc/run-container :podman [{:keys [job] :as rt}]
   (let [log-maker (rt/log-maker rt)
+        build (rt/build rt)
         ;; Don't prefix the sid here, that's the responsability of the logger
-        log-base (b/get-job-sid rt)
+        log-base (b/get-job-sid job build)
         [out-log err-log :as loggers] (->> ["out.txt" "err.txt"]
                                            (map (partial conj log-base))
-                                           (map (partial log-maker rt)))
+                                           (map (partial log-maker build)))
         cmd (build-cmd-args rt)]
+    (log/info "Running build job " log-base "as podman container")
     (log/debug "Log base is:" log-base)
     (log/debug "Podman command:" cmd)
     ((-> (fn [rt]

@@ -71,39 +71,6 @@
           (is (= :build/list (:type r)))
           (is (= builds (:builds r))))))))
 
-#_(deftest result-accumulator
-  (testing "returns a map of type handlers"
-    (is (map? (:handlers (sut/result-accumulator {})))))
-
-  (testing "updates pipeline and step states"
-    (let [{:keys [handlers state]} (sut/result-accumulator {})
-          start-step (:step/start handlers)
-          end-step (:step/end handlers)]
-      (is (some? (start-step {:name "step-1"
-                              :index 0
-                              :pipeline {:index 0
-                                         :name "test-pipeline"}})))
-      (is (some? (end-step {:name "step-1"
-                            :index 0
-                            :pipeline {:index 0
-                                       :name "test-pipeline"}
-                            :status :success})))
-      (is (= :success (get-in @state [:pipelines "test-pipeline" :steps 0 :status])))))
-
-  (testing "has build completed handler"
-    (let [acc (sut/result-accumulator {})
-          c (get-in acc [:handlers :build/completed])]
-      (is (fn? c))
-      (is (some? (reset! (:state acc) {:pipelines
-                                       {"test-pipeline"
-                                        {:steps
-                                         {0
-                                          {:name "test-step"
-                                           :start-time 0
-                                           :end-time 100
-                                           :status :success}}}}})))
-      (is (nil? (c {}))))))
-
 (deftest http-server
   (with-redefs [wh/on-server-close (constantly (md/success-deferred nil))]
     (testing "returns a deferred"

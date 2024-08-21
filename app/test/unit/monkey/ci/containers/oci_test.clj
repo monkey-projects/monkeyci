@@ -467,15 +467,6 @@
                      :exit))))))
 
 (deftest normalize-key
-  (testing "merges with oci"
-    (is (= {:type :oci
-            :key "value"}
-           (-> (c/normalize-key :containers
-                                {:containers {:type :oci}
-                                 :oci {:key "value"}})
-               :containers
-               (select-keys [:type :key])))))
-
   (testing "takes configured tag"
     (is (= "test-version"
            (->> {:containers {:type :oci

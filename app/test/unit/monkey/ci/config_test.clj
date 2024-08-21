@@ -61,7 +61,7 @@
            (sut/group-and-merge-from-env
             {:test {:credentials {:username "test-user"}}}
             :test))))
-
+  
   (testing "leaves unchanged when no matches"
     (is (= {:key "value"}
            (sut/group-and-merge-from-env {:key "value"} :test)))))
@@ -223,15 +223,6 @@
                :url))))
 
   (testing "oci"
-    (testing "provides credentials from env"
-      (is (= "env-fingerprint"
-             (-> {:monkeyci-logging-credentials-key-fingerprint "env-fingerprint"
-                  :monkeyci-logging-type "oci"}
-                 (sut/app-config {})
-                 :logging
-                 :credentials
-                 :key-fingerprint))))
-    
     (testing "keeps credentials from config file"
       (with-home-config
         {:logging
@@ -251,25 +242,7 @@
     (h/with-tmp-dir dir
       (let [f (io/file dir "test.edn")]
         (spit f (pr-str {:key "value"}))
-        (is (= {:key "value"} (sut/load-config-file f))))))
-
-  (testing "loads `.json` files"
-    (h/with-tmp-dir dir
-      (let [f (io/file dir "test.json")]
-        (spit f "{\"key\":\"value\"}")
-        (is (= {:key "value"} (sut/load-config-file f))))))
-
-  (testing "converts to kebab-case for `.edn`"
-    (h/with-tmp-dir dir
-      (let [f (io/file dir "test.edn")]
-        (spit f (pr-str {:testKey "value"}))
-        (is (= {:test-key "value"} (sut/load-config-file f))))))
-
-  (testing "converts to kebab-case for `.json`"
-    (h/with-tmp-dir dir
-      (let [f (io/file dir "test.json")]
-        (spit f "{\"testKey\":\"value\"}")
-        (is (= {:test-key "value"} (sut/load-config-file f)))))))
+        (is (= {:key "value"} (sut/load-config-file f)))))))
 
 (deftest home-config-file
   (testing "is by default in the user home dir"
@@ -314,44 +287,6 @@
                 {:http-port 3000}
                 {})
                :http))))
-
-  (testing "merges global oci config in type specific"
-    (is (= {:type :oci
-            :bucket-name "test-bucket"
-            :region "test-region"}
-           (-> (sut/normalize-config
-                {:oci
-                 {:region "test-region"}
-                 :storage
-                 {:type :oci
-                  :bucket-name "test-bucket"}}
-                {}
-                {})
-               :storage))))
-
-  (testing "merges global oci config in type specific from env"
-    (is (= {:type :oci
-            :bucket-name "test-bucket"
-            :region "test-region"}
-           (-> (sut/normalize-config
-                {}
-                {:oci-region "test-region"
-                 :storage-type "oci"
-                 :storage-bucket-name "test-bucket"}
-                {})
-               :storage))))
-
-  (testing "adds credentials from global oci config"
-    (is (= {:user "test-user"}
-           (-> (sut/normalize-config
-                {:oci
-                 {:credentials {:user "test-user"}}
-                 :storage
-                 {:type :oci
-                  :bucket-name "test-storage-bucket"}}
-                {} {})
-               :storage
-               :credentials))))
 
   (testing "removes processed env properties"
     (is (not (contains? (sut/normalize-config

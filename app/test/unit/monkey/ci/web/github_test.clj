@@ -41,7 +41,8 @@
     (let [inv (atom nil)
           st (st/make-memory-storage)
           _ (st/save-webhook st {:id "test-hook"})
-          req (-> {:runner (partial swap! inv conj)
+          req (-> {:runner (fn [_ build]
+                             (swap! inv conj build))
                    :storage st}
                   (h/->req)
                   (assoc :headers {"x-github-event" "push"}
@@ -53,7 +54,8 @@
 
   (testing "ignores non-push events"
     (let [inv (atom nil)
-          req (-> {:runner (partial swap! inv conj)}
+          req (-> {:runner (fn [_ build]
+                             (swap! inv conj build))}
                   (h/->req)
                   (assoc :headers {"x-github-event" "ping"}
                          :parameters {:body 
@@ -65,7 +67,8 @@
     (let [inv (atom nil)
           st (st/make-memory-storage)
           _ (st/save-webhook st {:id "test-hook"})
-          req (-> {:runner (partial swap! inv conj)
+          req (-> {:runner (fn [_ build]
+                             (swap! inv conj build))
                    :storage st}
                   (h/->req)
                   (assoc :headers {"x-github-event" "push"}
@@ -80,7 +83,7 @@
     (let [st (st/make-memory-storage)
           _ (st/save-webhook st {:id "test-hook"})
           {:keys [recv] :as e} (h/fake-events)
-          req (-> {:runner (fn [rt]
+          req (-> {:runner (fn [rt _]
                              (throw (ex-info "Test error" {:runtime rt})))
                    :storage st
                    :events e}
@@ -104,7 +107,8 @@
                                          :github-id gid})
             runs (atom [])
             req (-> {:storage s
-                     :runner (partial swap! runs conj)}
+                     :runner (fn [_ build]
+                               (swap! runs conj build))}
                     (h/->req)
                     (assoc :headers {"x-github-event" "push"}
                            :parameters {:body
@@ -123,7 +127,8 @@
                                          :github-id gid})
             runs (atom [])
             req (-> {:storage s
-                     :runner (partial swap! runs conj)}
+                     :runner (fn [_ build]
+                               (swap! runs conj build))}
                     (h/->req)
                     (assoc :headers {"x-github-event" "other"}
                            :parameters {:body
@@ -138,7 +143,8 @@
       (let [gid "test-id"
             runs (atom [])
             req (-> {:storage s
-                     :runner (partial swap! runs conj)}
+                     :runner (fn [_ build]
+                               (swap! runs conj build))}
                     (h/->req)
                     (assoc :headers {"x-github-event" "push"}
                            :parameters {:body

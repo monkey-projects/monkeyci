@@ -7,7 +7,7 @@
 
 (deftest make-build-ctx
   (testing "adds build id"
-    (is (re-matches #"build-\d+"
+    (is (re-matches #"local-build-\d+"
                     (-> (sut/make-build-ctx {})
                         :build-id))))
 
@@ -134,13 +134,6 @@
   (testing "`nil` if incomplete account"
     (is (nil? (sut/get-sid {:config {:account {:repo-id "r"}}})))
     (is (nil? (sut/get-sid {:config {:account {:customer-id "c"}}})))))
-
-(deftest get-job-id
-  (testing "combines build and job id"
-    (is (= "test-build-test-job"
-           (-> {:build {:build-id "test-build"}
-                :job {:id "test-job"}}
-               (sut/get-job-id))))))
 
 (deftest job-work-dir
   (testing "returns job work dir as absolute path"

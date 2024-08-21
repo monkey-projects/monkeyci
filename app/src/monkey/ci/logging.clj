@@ -55,13 +55,13 @@
   (fn [& _]
     (->InheritLogger)))
 
-(deftype FileLogger [conf rt path]
+(deftype FileLogger [conf build path]
   LogCapturer
   (log-output [_]
     ;; FIXME Refactor to separate build from rt
     (let [f (apply io/file
-                   (or (:dir conf) (io/file (:work-dir rt) "logs"))
-                   (concat (drop-last (b/get-sid rt)) path))]
+                   (:dir conf)
+                   (concat (drop-last (b/sid build)) path))]
       (.mkdirs (.getParentFile f))
       f))
 
@@ -99,24 +99,24 @@
        (remove nil?)
        (cs/join "/")))
 
-(deftype OciBucketLogger [conf rt path]
+(deftype OciBucketLogger [conf build path]
   LogCapturer
   (log-output [_]
     :stream)
 
   (handle-stream [_ in]
-    (let [sid (b/get-sid rt)
+    (let [sid (b/sid build)
           ;; Since the configured path already includes the build id,
           ;; we only use repo id to build the path
-          on (sid->path conf path (u/sid->repo-sid sid))]
+          on (sid->path conf path (sid/sid->repo-sid sid))]
       (-> (oci/stream-to-bucket (assoc conf :object-name on) in)
           (ensure-cleanup)))))
 
 (defmethod make-logger :oci [conf]
-  (fn [rt path]
+  (fn [build path]
     (-> conf
         :logging
-        (->OciBucketLogger rt path))))
+        (->OciBucketLogger build path))))
 
 (defn handle-process-streams
   "Given a process return value (as from `babashka.process/process`) and two
@@ -204,9 +204,7 @@
       bs/to-input-stream)))
 
 (defmethod make-log-retriever :oci [conf]
-  (let [oci-conf (-> conf
-                     :logging
-                     (oci/->oci-config))
+  (let [oci-conf (:logging conf)
         client (os/make-client oci-conf)]
     (->OciBucketLogRetriever client oci-conf)))
 
@@ -221,8 +219,7 @@
   (update-in conf [:logging :dir] #(or (u/abs-path %) (u/combine (c/abs-work-dir conf) "logs"))))
 
 (defmethod normalize-logging-config :oci [conf]
-  (-> (oci/normalize-config conf :logging)
-      (update :logging select-keys [:type :credentials :ns :compartment-id :bucket-name :region])))
+  (update conf :logging select-keys [:type :credentials :ns :compartment-id :bucket-name :region]))
 
 (defmethod c/normalize-key :logging [k conf]
   (c/normalize-typed k conf normalize-logging-config))
