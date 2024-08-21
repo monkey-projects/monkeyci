@@ -90,15 +90,5 @@
   (testing "can make oci storage"
     (is (some? (st/make-storage {:storage
                                  {:type :oci
-                                  :region "test-region"}}))))
-
-  (testing "merges credentials in config"
-    (let [creds {:tenancy-ocid "test-tenancy"
-                 :user-ocid "test-user"}]
-      (is (= creds (-> (st/make-storage {:storage
-                                         {:type :oci
-                                          :region "test-region"
-                                          :credentials creds}})
-                       (.conf)
-                       (select-keys (keys creds))))))))
+                                  :region "test-region"}})))))
 

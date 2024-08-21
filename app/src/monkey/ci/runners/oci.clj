@@ -199,14 +199,8 @@
 
 (defmethod r/make-runner :oci [rt]
   (let [conf (:runner rt)
-        client (-> conf
-                   (oci/->oci-config)
-                   (ci/make-context))]
+        client (ci/make-context conf)]
     (partial oci-runner client conf)))
 
 (defmethod r/normalize-runner-config :oci [conf]
-  (-> (oci/normalize-config conf :runner)
-      (update-in [:runner :image-tag] #(format (or % "%s") (config/version)))
-      (update :runner config/group-keys :events)
-      ;; FIXME This is highly dependent on the events implementation
-      (update-in [:runner :events] config/group-keys :client)))
+  (update-in conf [:runner :image-tag] #(format (or % "%s") (config/version))))

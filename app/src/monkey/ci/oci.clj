@@ -18,43 +18,11 @@
              [martian :as os]
              [stream :as s]]))
 
-(defn group-credentials
+(defn ^:deprecated group-credentials
   "Assuming the conf is taken from env, groups all keys that start with `credentials-`
    into the `:credentials` submap."
   [conf]
   (c/group-keys conf :credentials))
-
-(defn normalize-config
-  "Normalizes the given OCI config key, by grouping the credentials both in the given key
-   and in the `oci` key, and merging them."
-  [conf k]
-  (letfn [(load-key [c]
-            (mc/update-existing-in c [:credentials :private-key] u/load-privkey))
-          (maybe-parse [s]
-            (cond-> s
-              (string? s)
-              (u/parse-edn-str)))
-          (parse-edn-prop [c k]
-            (mc/update-existing c k maybe-parse))
-          (parse-vnics [c]
-            (parse-edn-prop c :vnics))
-          (parse-ads [c]
-            (parse-edn-prop c :availability-domains))]
-    (->> [(:oci (c/group-and-merge-from-env conf :oci)) (k conf)]
-         (map group-credentials)
-         (apply mm/meta-merge)
-         (load-key)
-         (parse-vnics)
-         (parse-ads)
-         (assoc conf k))))
-
-(defn ->oci-config
-  "Given a configuration map with credentials, turns it into a config map
-   that can be passed to OCI context creators."
-  [{:keys [credentials] :as conf}]
-  (-> conf
-      (merge credentials)
-      (dissoc :credentials)))
 
 (defn stream-to-bucket
   "Pipes an input stream to a bucket object using multipart uploads.
@@ -63,10 +31,9 @@
   [conf ^java.io.InputStream in]
   (log/debug "Piping stream to bucket" (:bucket-name conf) "at" (:object-name conf))
   (log/trace "Piping stream to bucket using config" conf)
-  (let [ctx (-> conf
-                (->oci-config)
-                (os/make-context))]
-    (s/input-stream->multipart ctx (assoc conf :input-stream in))))
+  (-> conf
+      (os/make-context)
+      (s/input-stream->multipart (assoc conf :input-stream in))))
 
 (def terminated? #{"INACTIVE" "DELETED" "FAILED"})
 

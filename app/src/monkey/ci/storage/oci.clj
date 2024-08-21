@@ -96,8 +96,7 @@
   (log/debug "Creating oci storage with config:" (:storage conf))
   (-> conf
       :storage
-      (oci/->oci-config)
       (make-oci-storage)))
 
 (defmethod st/normalize-storage-config :oci [conf]
-  (oci/normalize-config conf :storage))
+  conf)

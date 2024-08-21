@@ -179,9 +179,7 @@
 
 (defmethod make-blob-store :oci [conf k]
   (let [oci-conf (get conf k)
-        client (-> oci-conf
-                   (oci/->oci-config)
-                   (os/make-client))]
+        client (os/make-client oci-conf)]
     (->OciBlobStore client oci-conf)))
 
 (defmulti normalize-blob-config (fn [t conf] (get-in conf [t :type])))
@@ -193,6 +191,4 @@
   (update-in config [t :dir] (partial u/abs-path (co/abs-work-dir config))))
 
 (defmethod normalize-blob-config :oci [t config]
-  (-> config
-      (oci/normalize-config t)
-      (update t select-keys [:type :ns :region :bucket-name :credentials :prefix])))
+  (update config t select-keys [:type :ns :region :bucket-name :credentials :prefix]))
