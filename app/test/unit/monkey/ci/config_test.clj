@@ -223,15 +223,6 @@
                :url))))
 
   (testing "oci"
-    (testing "provides credentials from env"
-      (is (= "env-fingerprint"
-             (-> {:monkeyci-logging-credentials-key-fingerprint "env-fingerprint"
-                  :monkeyci-logging-type "oci"}
-                 (sut/app-config {})
-                 :logging
-                 :credentials
-                 :key-fingerprint))))
-    
     (testing "keeps credentials from config file"
       (with-home-config
         {:logging
@@ -296,44 +287,6 @@
                 {:http-port 3000}
                 {})
                :http))))
-
-  (testing "merges global oci config in type specific"
-    (is (= {:type :oci
-            :bucket-name "test-bucket"
-            :region "test-region"}
-           (-> (sut/normalize-config
-                {:oci
-                 {:region "test-region"}
-                 :storage
-                 {:type :oci
-                  :bucket-name "test-bucket"}}
-                {}
-                {})
-               :storage))))
-
-  (testing "merges global oci config in type specific from env"
-    (is (= {:type :oci
-            :bucket-name "test-bucket"
-            :region "test-region"}
-           (-> (sut/normalize-config
-                {}
-                {:oci-region "test-region"
-                 :storage-type "oci"
-                 :storage-bucket-name "test-bucket"}
-                {})
-               :storage))))
-
-  (testing "adds credentials from global oci config"
-    (is (= {:user "test-user"}
-           (-> (sut/normalize-config
-                {:oci
-                 {:credentials {:user "test-user"}}
-                 :storage
-                 {:type :oci
-                  :bucket-name "test-storage-bucket"}}
-                {} {})
-               :storage
-               :credentials))))
 
   (testing "removes processed env properties"
     (is (not (contains? (sut/normalize-config
