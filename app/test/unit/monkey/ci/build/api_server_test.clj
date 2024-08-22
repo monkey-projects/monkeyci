@@ -6,7 +6,8 @@
             [monkey.ci
              [aleph-test :as at]
              [helpers :as h]]
-            [monkey.ci.storage :as st]))
+            [monkey.ci.storage :as st]
+            [ring.mock.request :as mock]))
 
 (deftest start-server
   (testing "can start tcp server"
@@ -105,3 +106,31 @@
   (testing "returns ipv4 address"
     (is (re-matches #"\d+\.\d+\.\d+\.\d+"
                     (sut/get-ip-addr)))))
+
+(deftest api-server-routes
+  (let [token (sut/generate-token)
+        app (sut/make-app {:token token
+                           :events (h/fake-events)
+                           :storage (st/make-memory-storage)})
+        auth (fn [req]
+               (mock/header req "Authorization" (str "Bearer " token)))]
+    (testing "`/test` returns ok"
+      (is (= 200 (-> (mock/request :get "/test")
+                     (auth)
+                     (app)
+                     :status))))
+
+    (testing "`GET /params` retrieves build params"
+      (is (= 200 (-> (mock/request :get "/params")
+                     (auth)
+                     (app)
+                     deref
+                     :status))))
+
+    (testing "`POST /event` dispatches event"
+      (is (= 202 (-> (mock/request :post "/event")
+                     (mock/body (pr-str {:type ::test-event}))
+                     (mock/content-type "application/edn")
+                     (auth)
+                     (app)
+                     :status))))))

@@ -106,7 +106,7 @@
   (let [evt (get-in req [:parameters :body])]
     (log/debug "Received event from build script:" evt)
     (try 
-      {:status (if (rt/post-events (c/req->rt req) evt)
+      {:status (if (rt/post-events (req->ctx req) evt)
                  202
                  500)}
       (catch Exception ex
