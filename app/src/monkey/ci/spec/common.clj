@@ -18,3 +18,5 @@
                 #(gen/fmap clojure.string/join
                            (gen/vector (gen/elements cuid/cuid-chars) cuid/cuid-length))))
 
+(s/def ::url (s/with-gen url?
+               #(gen/fmap (partial format "http://%s") (gen/string-alphanumeric))))
