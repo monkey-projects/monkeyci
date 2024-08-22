@@ -16,7 +16,10 @@
             [monkey.ci
              [labels :as lbl]
              [runtime :as rt]
+             [spec :as spec]
              [storage :as st]]
+            ;; Very strange, but including this causes spec gen exceptions when using cloverage :confused:
+            ;; [monkey.ci.spec.build]
             [monkey.ci.web.common :as c]
             [reitit
              [ring :as ring]
@@ -165,7 +168,6 @@
   "Starts a build API server with a randomly generated token.  Returns the server
    and token."
   [{:keys [port] :or {port 0} :as conf}]
-  ;; Very strange, but enabling this causes spec gen exceptions when using cloverage :confused:
   ;;{:pre [(spec/valid? :api/config conf)]}
   (let [token (generate-token)
         srv (http/start-server

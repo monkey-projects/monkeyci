@@ -104,7 +104,7 @@
                        :build/changes])
       (s/merge ::generic-entity)))
 
-(s/def :api/type #{:local :tcp})
-(s/def :api/port int?)
-(s/def :api/config
-  (s/keys [:req-un [:api/type :api/port]]))
+;; (s/def :api/type #{:local :tcp})
+;; (s/def :api/port int?)
+;; (s/def :api/config
+;;   (s/keys :req-un [:api/type :api/port]))

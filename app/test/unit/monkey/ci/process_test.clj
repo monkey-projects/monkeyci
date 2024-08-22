@@ -1,5 +1,6 @@
 (ns monkey.ci.process-test
-  (:require [babashka.process :as bp]
+  (:require [aleph.http :as http]
+            [babashka.process :as bp]
             [clojure.test :refer :all]
             [clojure.java.io :as io]
             [clojure.string :as cs]
@@ -53,12 +54,16 @@
 (deftype FakeProcess [exitValue])
 
 (deftest execute!
-  (let [server-started? (atom nil)]
+  (let [server-started? (atom nil)
+        server-closed? (atom nil)]
     (with-redefs [bp/process (fn [{:keys [exit-fn] :as args}]
                                (do
                                  (when (fn? exit-fn)
                                    (exit-fn {:proc (->FakeProcess 1234)
-                                             :args args}))))]
+                                             :args args}))))
+                  http/start-server (fn [& _]
+                                      (reset! server-started? true)
+                                      (h/->FakeServer server-closed?))]
 
       (testing "returns deferred"
         (is (md/deferred? (sut/execute!
@@ -88,7 +93,14 @@
                             :process
                             :args
                             :cmd
-                            last)))))))
+                            last))))
+
+      (testing "starts and stops api server"
+        (is (nil? (reset! server-started? nil)))
+        (is (nil? (reset! server-closed? nil)))
+        (is (some? (sut/execute! {} {})))
+        (is (true? @server-started?))
+        (is (true? @server-closed?))))))
 
 (deftest generate-deps
   (testing "adds log config file, relative to work dir if configured"
@@ -106,20 +118,34 @@
                     :jvm-opts
                     first))))))
 
-  (testing "adds log config file as absolute path"
-    (h/with-tmp-dir dir
-      (let [logfile (io/file dir "logback-test.xml")]
-        (is (nil? (spit logfile "test file")))
-        (is (= (str "-Dlogback.configurationFile=" logfile)
-               (->> {:config {:runner
-                              {:type :child
-                               :log-config (.getAbsolutePath logfile)}
-                              :work-dir "other"}}
-                    (sut/generate-deps {})
-                    :aliases
-                    :monkeyci/build
-                    :jvm-opts
-                    first))))))
+  (testing "log config"
+    (letfn [(get-jvm-opts [deps]
+              (-> deps
+                  :aliases
+                  :monkeyci/build
+                  :jvm-opts
+                  first))]
+      (testing "adds log config file as absolute path"
+        (h/with-tmp-dir dir
+          (let [logfile (io/file dir "logback-test.xml")]
+            (is (nil? (spit logfile "test file")))
+            (is (= (str "-Dlogback.configurationFile=" logfile)
+                   (->> {:config {:runner
+                                  {:type :child
+                                   :log-config (.getAbsolutePath logfile)}
+                                  :work-dir "other"}}
+                        (sut/generate-deps {})
+                        (get-jvm-opts)))))))
+
+      (testing "adds log config file from script dir"
+        (h/with-tmp-dir dir
+          (let [logfile (io/file dir "logback.xml")]
+            (is (nil? (spit logfile "test file")))
+            (is (= (str "-Dlogback.configurationFile=" logfile)
+                   (-> {:script
+                        {:script-dir dir}}
+                       (sut/generate-deps {})
+                       (get-jvm-opts)))))))))  
 
   (testing "adds script dir as paths"
     (is (= ["test-dir"] (-> {:script {:script-dir "test-dir"}}

@@ -1,6 +1,7 @@
 (ns monkey.ci.helpers
   "Helper functions for testing"
-  (:require [camel-snake-kebab.core :as csk]
+  (:require [aleph.netty :as an]
+            [camel-snake-kebab.core :as csk]
             [clojure.java.io :as io]
             [clojure.core.async :as ca]
             [clojure.spec.alpha :as spec]
@@ -183,6 +184,14 @@
 
 (defn fake-events-receiver []
   (->FakeEventReceiver (atom {})))
+
+(defrecord FakeServer [closed?]
+  java.lang.AutoCloseable
+  (close [_]
+    (reset! closed? true))
+  an/AlephServer
+  (port [_]
+    0))
 
 (defn base64->
   "Converts from base64"

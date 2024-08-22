@@ -20,7 +20,9 @@
              [sidecar]
              [utils :as utils]
              [workspace]]
-            [monkey.ci.build.core :as bc]
+            [monkey.ci.build
+             [api-server :as as]
+             [core :as bc]]
             ;; Need to require these for the multimethod discovery
             [monkey.ci.containers.oci]
             [monkey.ci.events.core]
@@ -78,11 +80,11 @@
 (defn- find-log-config
   "Finds logback configuration file, either configured on the runner, or present 
    in the script dir"
-  [rt]
+  [build rt]
   ;; TODO Use some sort of templating engine to generate a custom log config to add
   ;; the build id as a label to the logs (e.g. moustache).  That would make it easier
   ;; to fetch logs for a specific build.
-  (->> [(io/file (get-in rt [:build :script-dir]) "logback.xml")
+  (->> [(io/file (get-in build [:script :script-dir]) "logback.xml")
         (some->> (get-in rt [:config :runner :log-config])
                  (utils/abs-path (rt/work-dir rt)))]
        (filter fs/exists?)
@@ -99,7 +101,7 @@
                      (if (rt/dev-mode? rt)
                        {:local/root (f)}
                        {:mvn/version (version)}))
-        log-config (find-log-config rt)]
+        log-config (find-log-config build rt)]
     (log/debug "Child process log config:" log-config)
     {:paths [(b/script-dir build)]
      :aliases
@@ -129,15 +131,18 @@
 (defn- log-maker [rt]
   (or (rt/log-maker rt) (l/make-logger {})))
 
-(defn- make-logger [rt type]
-  (let [build (rt/build rt)
-        id (b/build-id build)]
+(defn- make-logger [rt build type]
+  (let [id (b/build-id build)]
     ((log-maker rt) build [id (str (name type) ".log")])))
 
 (defn- out->str [x]
   (if (instance? java.io.InputStream x)
     (slurp x)
     x))
+
+(defn- start-api-server [build rt]
+  ;; TODO pass config
+  (as/start-server {}))
 
 (defn execute!
   "Executes the build script located in given directory.  This actually runs the
@@ -146,15 +151,18 @@
   [{:keys [checkout-dir build-id] :as build} rt]
   (log/info "Executing build process for" build-id "in" checkout-dir)
   (let [script-dir (b/script-dir build)
-        ;; FIXME Loggers still require the build in the runtime, refactor this
-        [out err :as loggers] (map (partial make-logger (assoc rt :build build)) [:out :err])
+        [out err :as loggers] (map (partial make-logger rt build) [:out :err])
         result (md/deferred)
         cmd ["clojure"
              "-Sdeps" (pr-str (generate-deps build rt))
              "-X:monkeyci/build"
-             (pr-str {:config-file (config->edn build rt)})]]
+             (pr-str {:config-file (config->edn build rt)})]
+        api-srv (start-api-server build rt)
+        stop-server (fn []
+                      (some-> api-srv :server (.close)))]
     (log/debug "Running in script dir:" script-dir ", this command:" cmd)
-    ;; TODO Run as another unprivileged user for security
+    ;; TODO Run as another unprivileged user for security (we'd need `su -c` for that)
+    ;; TODO Start api server
     (-> (bp/process
          {:dir script-dir
           :out (l/log-output out)
@@ -171,4 +179,6 @@
                                             :exit exit})))})
         ;; Depending on settings, some process streams need handling
         (l/handle-process-streams loggers))
-    result))
+    (md/finally
+      result
+      stop-server)))

@@ -88,10 +88,11 @@
                           (.removeShutdownHook (Runtime/getRuntime) t)
                           (catch Exception _
                             (log/warn "Unable to remove shutdown hook, process is probably already shutting down.")))))]
-    (when (md/deferred? d)
-      (.addShutdownHook (Runtime/getRuntime) t)
-      (md/on-realized d remove-hook remove-hook))
-    d))
+    (if (md/deferred? d)
+      (do
+        (.addShutdownHook (Runtime/getRuntime) t)
+        (md/finally d remove-hook))
+      d)))
 
 (defn sid->path [{:keys [prefix]} path sid]
   (->> (concat [prefix] sid path)

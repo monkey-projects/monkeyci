@@ -48,11 +48,6 @@
 
 (def test-app (make-test-app))
 
-(defrecord FakeServer [closed?]
-  java.lang.AutoCloseable
-  (close [_]
-    (reset! closed? true)))
-
 (deftest start-server
   (with-redefs [aleph/start-server (fn [h opts]
                                      {:handler h
@@ -74,7 +69,7 @@
 (deftest stop-server
   (testing "stops the server"
     (let [stopped? (atom false)
-          s (->FakeServer stopped?)]
+          s (h/->FakeServer stopped?)]
       (is (nil? (sut/stop-server s)))
       (is (true? @stopped?))))
 
@@ -944,7 +939,7 @@
 
   (testing "start fn returns another fn that stops the server"
     (let [stopped? (atom false)]
-      (with-redefs [aleph/start-server (constantly (->FakeServer stopped?))]
+      (with-redefs [aleph/start-server (constantly (h/->FakeServer stopped?))]
         (let [h (rt/setup-runtime {:http {}} :http)
               s (h {})]
           (is (ifn? s))
