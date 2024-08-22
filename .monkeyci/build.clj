@@ -105,11 +105,7 @@
 (defn test-app [ctx]
   (let [junit-artifact (junit-artifact "app")]
     (when (build-app? ctx)
-      ;; Disabled coverage temporarily.  At some point tests started to fail with coverage
-      ;; enabled:
-      ;; Unable to construct gen at: [:url] for: :url
-      ;; #:clojure.spec.alpha{:path [:url], :form :url, :failure :no-gen}
-      (-> (clj-container "test-app" "app" "-M:test:junit" #_"-M:test:junit:coverage")
+      (-> (clj-container "test-app" "app" "-M:test:junit:coverage")
           (assoc :save-artifacts [junit-artifact
                                   (coverage-artifact "app")]
                  :junit {:artifact-id (:id junit-artifact)
