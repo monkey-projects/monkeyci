@@ -23,9 +23,15 @@
   []
   (str (random-uuid)))
 
+(defn req->config
+  "Gets the config map from the request"
+  [req]
+  (get-in req [:reitit.core/match :data ::config]))
+
 (defn get-params [req]
-  (rur/response ;; TODO
-                ))
+  (let [conf (req->config req)]
+    (rur/response ;; TODO invoke api or get from db storage
+     )))
 
 (defn get-ip-addr
   "Determines the ip address of this VM"

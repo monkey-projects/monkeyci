@@ -58,10 +58,9 @@
 (deftype FileLogger [conf build path]
   LogCapturer
   (log-output [_]
-    ;; FIXME Refactor to separate build from rt
     (let [f (apply io/file
                    (:dir conf)
-                   (concat (drop-last (b/sid build)) path))]
+                   (concat (remove nil? (drop-last (b/sid build))) path))]
       (.mkdirs (.getParentFile f))
       f))
 

@@ -18,7 +18,8 @@
              [spec :as s]
              [utils :as u]]))
 
-(defmulti setup-runtime (fn [_ k] k))
+;; To be replaced with components
+(defmulti ^:deprecated setup-runtime (fn [_ k] k))
 
 (defmethod setup-runtime :default [_ k]
   {})
