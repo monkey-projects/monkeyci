@@ -90,6 +90,7 @@
   "Loads private and public keys from the app config, returns a map that can be
    used in the context `:jwk`."
   [conf]
+  ;; TODO Move this to aero config readers
   (let [m {:private-key bk/private-key
            :public-key bk/public-key}
         loaded-keys (mapv (fn [[k f]]
