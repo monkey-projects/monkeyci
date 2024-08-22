@@ -1,54 +1,25 @@
 (ns monkey.ci.build.api-test
   (:require [clojure.test :refer [deftest testing is]]
-            [aleph.http :as http]
             [manifold.deferred :as md]
-            [monkey.ci.build.api :as sut]))
+            [martian.core :as mc]
+            [monkey.ci.build
+             [api :as sut]
+             [api-server :as server]]))
 
-(deftest start-server
-  (testing "can start tcp server"
-    (let [s (sut/start-server {})]
-      (is (map? s))
-      (is (some? (:server s)))
-      (is (string? (:token s)))
-      (is (pos? (:port s)))
-      (is (nil? (.close (:server s))))))
-
-  ;; Not supported by netty 4
-  #_(testing "can start uds server"
-    (let [s (sut/start-server {:type :local})]
-      (is (map? s))
-      (is (some? (:server s)))
-      (is (string? (:token s)))
-      (is (string? (:socket s)))
-      (is (nil? (.close (:server s)))))))
-
-(deftest api-server
-  (let [s (sut/start-server {})
+(deftest api-client
+  (let [{:keys [token] :as s} (server/start-server {})
+        base-url (format "http://localhost:%d" (:port s))
         make-url (fn [path]
-                   (format "http://localhost:%d/%s" (:port s) path))]
+                   (str base-url "/" path))
+        client (sut/make-client (make-url "swagger.json") token)]
     (with-open [srv (:server s)]
-
-      (testing "returns 401 if no token given"
-        (is (= 401 (-> {:url (make-url "swagger.json")
-                        :method :get
-                        :throw-exceptions false}
-                       (http/request)
-                       deref
-                       :status))))
       
-      (testing "returns 401 if wrong token given"
-        (is (= 401 (-> {:url (make-url "swagger.json")
-                        :method :get
-                        :headers {"Authorization" "Bearer wrong token"}
-                        :throw-exceptions false}
-                       (http/request)
-                       deref
-                       :status)))))))
+      (testing "can create api client"
+        (is (some? client)))
 
-(deftest get-ip-addr
-  (testing "returns ipv4 address"
-    (is (re-matches #"\d+\.\d+\.\d+\.\d+"
-                    (sut/get-ip-addr)))))
+      (testing "can invoke test endpoint"
+        (is (= {:result "ok"}
+               @(mc/response-for client :test {})))))))
 
 (deftest build-params
   (testing "invokes `params` endpoint on client"

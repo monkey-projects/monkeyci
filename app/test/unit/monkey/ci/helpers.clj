@@ -129,13 +129,16 @@
 (defn strict-fake-blob-store [stored]
   (->FakeBlobStore stored true))
 
+(defn ->match-data [obj]
+  {:reitit.core/match
+   {:data obj}})
+
 (defn ->req
   "Takes a runtime and creates a request object from it that can be passed to
    an api handler function."
   [rt]
-  {:reitit.core/match
-   {:data
-    {:monkey.ci.web.common/runtime (wc/->RuntimeWrapper rt)}}})
+  (->match-data
+   {:monkey.ci.web.common/runtime (wc/->RuntimeWrapper rt)}))
 
 (defn with-path-param [r k v]
   (assoc-in r [:parameters :path k] v))
