@@ -23,6 +23,7 @@
             [reitit
              [ring :as ring]
              [swagger :as swagger]]
+            [reitit.coercion.schema]
             [ring.util.response :as rur]
             [schema.core :as s]))
 
