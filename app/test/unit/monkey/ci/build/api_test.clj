@@ -4,10 +4,11 @@
             [martian.core :as mc]
             [monkey.ci.build
              [api :as sut]
-             [api-server :as server]]))
+             [api-server :as server]]
+            [monkey.ci.test.api-server :as tas]))
 
 (deftest api-client
-  (let [{:keys [token] :as s} (server/start-server {})
+  (let [{:keys [token] :as s} (server/start-server (tas/test-config))
         base-url (format "http://localhost:%d" (:port s))
         make-url (fn [path]
                    (str base-url "/" path))

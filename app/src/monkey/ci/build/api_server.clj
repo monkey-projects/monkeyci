@@ -13,6 +13,7 @@
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
             [martian.interceptors :as mi]
+            [medley.core :as mc]
             [monkey.ci
              [labels :as lbl]
              [runtime :as rt]
@@ -20,6 +21,7 @@
              [storage :as st]]
             ;; Very strange, but including this causes spec gen exceptions when using cloverage :confused:
             ;; [monkey.ci.spec.build]
+            [monkey.ci.spec.api-server :as aspec]
             [monkey.ci.web.common :as c]
             [reitit
              [ring :as ring]
@@ -162,13 +164,15 @@
    (make-router opts routes)))
 
 (defn make-app [opts]
+  {:pre [(spec/valid? ::aspec/app-config opts)]}
   (c/make-app (make-router opts)))
 
 (defn start-server
   "Starts a build API server with a randomly generated token.  Returns the server
    and token."
   [{:keys [port] :or {port 0} :as conf}]
-  ;;{:pre [(spec/valid? :api/config conf)]}
+  {:pre [(spec/valid? ::aspec/config conf)]}
+  (log/debug "Starting API server at ip address" (get-ip-addr) "with config" conf)
   (let [token (generate-token)
         srv (http/start-server
              (make-app (assoc conf :token token))
@@ -176,3 +180,13 @@
     {:server srv
      :port (an/port srv)
      :token token}))
+
+(defn rt->api-server-config
+  "Creates a config map for the api server from the given runtime"
+  [rt]
+  (->> {:port (rt/runner-api-port rt)}
+       (merge (select-keys rt [:events :artifacts :cache :workspace :storage]))
+       (mc/filter-vals some?)))
+
+(defn with-build [conf b]
+  (assoc conf :build b))

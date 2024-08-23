@@ -141,8 +141,9 @@
     x))
 
 (defn- start-api-server [build rt]
-  ;; TODO pass config
-  (as/start-server {}))
+  (-> (as/rt->api-server-config rt)
+      (as/with-build build)
+      (as/start-server)))
 
 (defn execute!
   "Executes the build script located in given directory.  This actually runs the
@@ -153,16 +154,17 @@
   (let [script-dir (b/script-dir build)
         [out err :as loggers] (map (partial make-logger rt build) [:out :err])
         result (md/deferred)
+        ;; Start api server
+        api-srv (start-api-server build rt)
         cmd ["clojure"
              "-Sdeps" (pr-str (generate-deps build rt))
              "-X:monkeyci/build"
+             ;; TODO Pass api server port
              (pr-str {:config-file (config->edn build rt)})]
-        api-srv (start-api-server build rt)
         stop-server (fn []
                       (some-> api-srv :server (.close)))]
     (log/debug "Running in script dir:" script-dir ", this command:" cmd)
     ;; TODO Run as another unprivileged user for security (we'd need `su -c` for that)
-    ;; TODO Start api server
     (-> (bp/process
          {:dir script-dir
           :out (l/log-output out)

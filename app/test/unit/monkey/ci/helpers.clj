@@ -124,8 +124,11 @@
      (when (contains? @stored src)
        (io/input-stream (.getBytes "This is a test stream"))))))
 
-(defn fake-blob-store [stored]
-  (->FakeBlobStore stored false))
+(defn fake-blob-store
+  ([stored]
+   (->FakeBlobStore stored false))
+  ([]
+   (fake-blob-store (atom {}))))
 
 (defn strict-fake-blob-store [stored]
   (->FakeBlobStore stored true))

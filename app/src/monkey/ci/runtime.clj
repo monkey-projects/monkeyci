@@ -80,6 +80,8 @@
 (def runner :runner)
 (def ^:deprecated build "Gets build info from runtime" :build)
 
+(def runner-api-port (from-config (comp :port :api :runner)))
+
 (defn events-receiver [{:keys [events]}]
   (if (satisfies? p/EventReceiver events)
     events

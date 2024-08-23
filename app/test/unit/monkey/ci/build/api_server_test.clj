@@ -1,17 +1,28 @@
 (ns monkey.ci.build.api-server-test
   (:require [clojure.test :refer [deftest testing is]]
             [aleph.http :as http]
+            [clojure.spec.alpha :as s]
             [manifold.deferred :as md]
             [monkey.ci.build.api-server :as sut]
             [monkey.ci
              [aleph-test :as at]
              [helpers :as h]]
+            [monkey.ci.spec.api-server :as aspec]
             [monkey.ci.storage :as st]
+            [monkey.ci.test
+             [api-server :as tas]
+             [runtime :as trt]]
             [ring.mock.request :as mock]))
+
+(def test-config (tas/test-config))
+
+(deftest test-config-spec
+  (testing "satisfies spec"
+    (is (s/valid? ::aspec/config test-config))))
 
 (deftest start-server
   (testing "can start tcp server"
-    (let [s (sut/start-server {})]
+    (let [s (sut/start-server test-config)]
       (is (map? s))
       (is (some? (:server s)))
       (is (string? (:token s)))
@@ -20,15 +31,15 @@
 
   ;; Not supported by netty 4
   #_(testing "can start uds server"
-    (let [s (sut/start-server {:type :local})]
-      (is (map? s))
-      (is (some? (:server s)))
-      (is (string? (:token s)))
-      (is (string? (:socket s)))
-      (is (nil? (.close (:server s)))))))
+      (let [s (sut/start-server {:type :local})]
+        (is (map? s))
+        (is (some? (:server s)))
+        (is (string? (:token s)))
+        (is (string? (:socket s)))
+        (is (nil? (.close (:server s)))))))
 
 (deftest api-server
-  (let [{:keys [token] :as s} (sut/start-server {})
+  (let [{:keys [token] :as s} (sut/start-server test-config)
         base-url (format "http://localhost:%d" (:port s))
         make-url (fn [path]
                    (str base-url "/" path))
@@ -109,9 +120,9 @@
 
 (deftest api-server-routes
   (let [token (sut/generate-token)
-        app (sut/make-app {:token token
-                           :events (h/fake-events)
-                           :storage (st/make-memory-storage)})
+        app (sut/make-app (-> test-config
+                              (assoc :token token
+                                     :storage (st/make-memory-storage))))
         auth (fn [req]
                (mock/header req "Authorization" (str "Bearer " token)))]
     (testing "`/test` returns ok"
@@ -134,3 +145,20 @@
                      (auth)
                      (app)
                      :status))))))
+
+(deftest rt->api-server-config
+  (testing "adds port from runner config"
+    (is (= 1234 (-> {:config
+                     {:runner
+                      {:api
+                       {:port 1234}}}}
+                    (sut/rt->api-server-config)
+                    :port))))
+
+  (testing "adds required modules from runtime"
+    (let [rt (trt/test-runtime)
+          conf (sut/rt->api-server-config rt)]
+      (is (some? (:events conf)))
+      (is (some? (:artifacts conf)))
+      (is (some? (:cache conf)))
+      (is (some? (:workspace conf))))))
