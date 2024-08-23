@@ -18,7 +18,6 @@
              [spec :as s]
              [utils :as u]]
             [monkey.ci.containers
-             [docker]
              [oci]
              [podman]]
             [monkey.ci.events.core :as ec]

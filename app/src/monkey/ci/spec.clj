@@ -40,7 +40,7 @@
 (s/def :conf/runner (s/keys :req-un [:runner/type]))
 
 ;; Container runner configuration
-(s/def :containers/type #{:docker :podman :oci})
+(s/def :containers/type #{:podman :oci})
 (s/def :containers/platform string?)
 (s/def :conf/containers (s/keys :req-un [:containers/type]))
 
