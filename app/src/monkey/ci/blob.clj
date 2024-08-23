@@ -191,4 +191,4 @@
   (update-in config [t :dir] (partial u/abs-path (co/abs-work-dir config))))
 
 (defmethod normalize-blob-config :oci [t config]
-  (update config t select-keys [:type :ns :region :bucket-name :credentials :prefix]))
+  config)
