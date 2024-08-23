@@ -118,80 +118,78 @@
           (is (not-empty @stored)))))))
 
 (deftest build-cmd-args
-  (let [base-ctx {:build {:build-id "test-build"
+  (let [job {:id "test-job"
+             :container/image "test-img"
+             :script ["first" "second"]}
+        base-ctx {:build {:build-id "test-build"
                           :checkout-dir "/test-dir/checkout"}
-                  :work-dir "test-dir"
-                  :job {:id "test-job"
-                        :container/image "test-img"
-                        :script ["first" "second"]}}]
+                  :work-dir "test-dir"}]
     
     (testing "when no command given, assumes `/bin/sh` and fails on errors"
-      (let [r (sut/build-cmd-args base-ctx)]
+      (let [r (sut/build-cmd-args job base-ctx)]
         (is (= "-ec" (last (drop-last r))))))
     
     (testing "cmd overrides sh command"
-      (let [r (-> base-ctx
-                  (assoc-in [:job :container/cmd] ["test-entry"])
-                  sut/build-cmd-args)]
+      (let [r (sut/build-cmd-args (assoc job :container/cmd ["test-entry"]) base-ctx)]
         (is (= "test-entry" (last (drop-last r))))))
 
     (testing "adds all script entries as a single arg"
-      (let [r (sut/build-cmd-args base-ctx)]
+      (let [r (sut/build-cmd-args job base-ctx)]
         (is (= "first && second" (last r)))))
 
     (testing "image"
       (testing "adds when namespace is `:container`"
-        (is (contains-subseq? (sut/build-cmd-args base-ctx)
+        (is (contains-subseq? (sut/build-cmd-args job base-ctx)
                               ["test-img"])))
 
       (testing "adds when keyword is `:image`"
-        (is (contains-subseq? (-> base-ctx
-                                  (update :job dissoc :container/image)
-                                  (update :job assoc :image "test-img")
-                                  (sut/build-cmd-args))
+        (is (contains-subseq? (-> job
+                                  (dissoc :container/image)
+                                  (assoc :image "test-img")
+                                  (sut/build-cmd-args base-ctx))
                               ["test-img"]))))
 
     (testing "mounts"
       
       (testing "adds shared mounts to args"
-        (let [r (sut/build-cmd-args (assoc-in base-ctx
-                                              [:job :container/mounts] [["/host/path" "/container/path"]]))]
+        (let [r (sut/build-cmd-args (assoc job :container/mounts [["/host/path" "/container/path"]])
+                                    base-ctx)]
           (is (contains-subseq? r ["-v" "/host/path:/container/path"])))))
 
     (testing "adds env vars"
-      (let [r (-> base-ctx
-                  (assoc-in [:job :container/env] {"VAR1" "value1"
-                                                   "VAR2" "value2"})
-                  (sut/build-cmd-args))]
+      (let [r (sut/build-cmd-args
+               (assoc job :container/env {"VAR1" "value1"
+                                          "VAR2" "value2"})
+               base-ctx)]
         (is (contains-subseq? r ["-e" "VAR1=value1"]))
         (is (contains-subseq? r ["-e" "VAR2=value2"]))))
 
     (testing "passes entrypoint as json if specified"
-      (let [r (-> base-ctx
-                  (assoc-in [:job :container/entrypoint] ["test-ep"])
-                  (sut/build-cmd-args))]
+      (let [r (-> job
+                  (assoc :container/entrypoint ["test-ep"])
+                  (sut/build-cmd-args base-ctx))]
         (is (contains-subseq? r ["--entrypoint" "'[\"test-ep\"]'"]))))
     
     (testing "overrides entrypoint for script"
-      (let [r (sut/build-cmd-args base-ctx)]
+      (let [r (sut/build-cmd-args job base-ctx)]
         (is (contains-subseq? r ["--entrypoint" "/bin/sh"]))))
 
     (testing "adds platform if specified"
-      (let [r (-> base-ctx
-                  (assoc-in [:job :container/platform] "linux/arm64")
-                  (sut/build-cmd-args))]
+      (let [r (-> job 
+                  (assoc :container/platform "linux/arm64")
+                  (sut/build-cmd-args base-ctx))]
         (is (contains-subseq? r ["--platform" "linux/arm64"]))))
 
     (testing "adds default platform from app config"
-      (is (contains-subseq? (sut/build-cmd-args {:containers {:platform "test-platform"}})
+      (is (contains-subseq? (sut/build-cmd-args job {:platform "test-platform"})
                             ["--platform" "test-platform"])))
 
     (testing "uses build and job id as container name"
-      (is (contains-subseq? (sut/build-cmd-args base-ctx)
+      (is (contains-subseq? (sut/build-cmd-args job base-ctx)
                             ["--name" "test-build-test-job"])))
 
     (testing "makes job work dir relative to build checkout dir"
-      (is (contains-subseq? (-> base-ctx
-                                (assoc-in [:job :work-dir] "sub-dir")
-                                (sut/build-cmd-args))
+      (is (contains-subseq? (-> job
+                                (assoc :work-dir "sub-dir")
+                                (sut/build-cmd-args base-ctx))
                             ["-v" "/test-dir/checkout/sub-dir:/home/monkeyci:Z"])))))

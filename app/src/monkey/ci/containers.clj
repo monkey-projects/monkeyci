@@ -6,7 +6,7 @@
              [runtime :as rt]]))
 
 ;; TODO Rework to use a container runner fn instead
-(defmulti run-container (comp :type :containers))
+(defmulti ^:deprecated run-container (comp :type :containers))
 
 (defn- update-env [cc]
   (mc/update-existing cc :env (partial map (fn [[k v]]
@@ -41,8 +41,9 @@
   (-> (get conf :containers)
       (assoc :credit-consumer (credit-multiplier-fn conf))))
 
-(def image :image)
+(def image (some-fn :container/image :image))
 (def env :container/env)
 (def cmd :container/cmd)
 (def mounts :container/mounts)
 (def entrypoint :container/entrypoint)
+(def platform :container/platform)

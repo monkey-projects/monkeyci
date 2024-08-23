@@ -84,7 +84,7 @@
     ;; Ensure thread terminates
     (md/catch res interrupt)))
 
-(defrecord LokiLogger [conf rt path]
+(defrecord LokiLogger [conf build path]
   l/LogCapturer
   (log-output [this]
     :stream)

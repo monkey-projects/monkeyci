@@ -139,7 +139,7 @@
       :else
       (log/warn "No event poster configured"))))
 
-(defn rt->config
+(defn ^:deprecated rt->config
   "Returns a map that can be serialized to `edn`.  This is used
    to pass application configuration to child processes or containers."
   [rt]

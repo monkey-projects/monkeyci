@@ -167,16 +167,18 @@
 (defn job-work-dir
   "Given a runtime, determines the job working directory.  This is either the
    work dir as configured on the job, or the context work dir, or the process dir."
-  [rt]
-  (-> (if-let [jwd (get-in rt [:job :work-dir])]
-        (if (fs/absolute? jwd)
-          jwd
-          (if-let [cd (rt->checkout-dir rt)]
-            (fs/path cd jwd)
-            jwd))
-        (or (rt->checkout-dir rt) (u/cwd)))
-      (fs/canonicalize)
-      (str)))
+  ([rt] ;; Deprecated, use 2 arg variant
+   (job-work-dir (:job rt) (rt/build rt)))
+  ([job build]
+   (-> (if-let [jwd (:work-dir job)]
+         (if (fs/absolute? jwd)
+           jwd
+           (if-let [cd (checkout-dir build)]
+             (fs/path cd jwd)
+             jwd))
+         (or (checkout-dir build) (u/cwd)))
+       (fs/canonicalize)
+       (str))))
 
 (defn job-relative-dir
   "Calculates path `p` as relative to the work dir for the current job"

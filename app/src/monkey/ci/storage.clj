@@ -51,6 +51,9 @@
 
 (defmulti make-storage (comp :type :storage))
 
+(defmethod make-storage :default [_]
+  nil)
+
 (defmethod make-storage :memory [_]
   (log/info "Using memory storage (only for dev purposes!)")
   (make-memory-storage))

@@ -35,3 +35,7 @@
   (get-blob-stream [store src] "Gets a blob file as an `InputStream`"))
 
 (def blob-store? (partial satisfies? BlobStore))
+
+(defprotocol ContainerRunner
+  (run-container [this job]
+    "Runs the given container job.  Returns a deferred that will hold the result."))

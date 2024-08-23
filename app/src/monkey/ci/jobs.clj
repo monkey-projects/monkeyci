@@ -22,6 +22,7 @@
 (def labels "Get job labels" :labels)
 (def save-artifacts "Gets artifacts saved by job" :save-artifacts)
 (def job-id "Gets job id" :id)
+(def work-dir "Gets job work dir" :work-dir)
 
 (defprotocol Job
   "Base job protocol that is able to execute it, taking the runtime as argument."
