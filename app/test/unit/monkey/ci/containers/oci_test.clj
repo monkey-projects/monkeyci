@@ -13,7 +13,8 @@
             [monkey.ci.common.preds :as cp]
             [monkey.ci.containers.oci :as sut]
             [monkey.ci.events.core :as ec]
-            [monkey.ci.helpers :as h]))
+            [monkey.ci.helpers :as h]
+            [monkey.ci.test.runtime :as trt]))
 
 (defn- find-volume-entry [vol n]
   (->> vol :configs (filter (comp (partial = n) :file-name)) first))
@@ -26,7 +27,8 @@
     (with-open [r (io/reader (java.io.ByteArrayInputStream. b))]
       (u/parse-edn r))))
 
-(def default-rt {:build {:checkout-dir "/tmp"}})
+(def default-rt (-> (trt/test-runtime)
+                    (assoc :build {:checkout-dir "/tmp"})))
 
 (deftest instance-config
   (testing "creates configuration map"

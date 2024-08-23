@@ -14,7 +14,9 @@
              [config :as c]
              [containers :as mcc]
              [edn :as edn]
+             [jobs :as j]
              [oci :as oci]
+             [protocols :as p]
              [runtime :as rt]
              [utils :as u]]
             [monkey.ci.build.core :as bc]
@@ -69,22 +71,22 @@
 (defn- job-work-dir
   "The work dir to use for the job in the container.  This is the external job
    work dir, rebased onto the base work dir."
-  [rt]
-  (let [cd (b/rt->checkout-dir rt)]
+  [job build]
+  (let [cd (b/checkout-dir build)]
     (log/debug "Determining job work dir using checkout dir" cd
-               ", job dir" (get-in rt [:job :work-dir])
-               "and base dir" (oci/base-work-dir rt))
-    (-> (get-in rt [:job :work-dir] cd)
-        (u/rebase-path cd (oci/base-work-dir rt)))))
+               ", job dir" (j/work-dir job)
+               "and base dir" (oci/base-work-dir build))
+    (-> (or (j/work-dir job) cd)
+        (u/rebase-path cd (oci/base-work-dir build)))))
 
 (defn- job-container
   "Configures the job container.  It runs the image as configured in
    the job, but the script that's being executed is replaced by a
    custom shell script that also redirects the output and dispatches
    events to a file, that are then picked up by the sidecar."
-  [{:keys [job] :as rt}]
-  (let [wd (job-work-dir rt)]
-    (cond-> {:image-url (or (:image job) (:container/image job))
+  [job build]
+  (let [wd (job-work-dir job build)]
+    (cond-> {:image-url (mcc/image job)
              :display-name job-container-name
              ;; In container instances, command or entrypoint are treated the same
              ;; Note that when using container commands directly, the job will most
@@ -92,10 +94,10 @@
              ;; of container instances, that don't allow init containers or mounting
              ;; pre-populated file systems (apart from configmaps).  Also capturing
              ;; logs is problematic, since we can't redirect to a file.
-             :command (or (:container/cmd job)
-                          (:container/entrypoint job))
-             :arguments (:container/args job)
-             :environment-variables (:container/env job)
+             :command (or (mcc/cmd job)
+                          (mcc/entrypoint job))
+             :arguments (mcc/args job)
+             :environment-variables (mcc/env job)
              :working-directory wd}
       ;; Override some props if script is specified
       (:script job) (-> (assoc :command [(get job :shell "/bin/sh") (str script-dir "/" job-script)]
@@ -166,8 +168,8 @@
   (cs/join "-" [(:build-id build)
                 (bc/job-id job)]))
 
-(defn- script-mount [rt]
-  (when (get-in rt [:job :script])
+(defn- script-mount [job]
+  (when (:script job)
     {:volume-name script-vol
      :is-read-only false
      :mount-path script-dir}))
@@ -182,7 +184,7 @@
 
 (defn- script-vol-config
   "Adds the job script and a file for each script line as a configmap volume."
-  [{{:keys [script]} :job}]
+  [{:keys [script]}]
   (when-not (empty? script)
     (when (log/enabled? :debug)
       (log/debug "Executing script lines in container:")
@@ -195,13 +197,16 @@
                                   (oci/config-entry (str i) s)))
                    (into [(job-script-entry)]))}))
 
-(defn- job-details->edn [rt]
-  (pr-str {:job (-> (:job rt)
-                     (select-keys [:id :save-artifacts :restore-artifacts :caches :dependencies])
-                     (assoc :work-dir (job-work-dir rt)))}))
+(defn- job-details->edn [{:keys [job] :as rt}]
+  (pr-str {:job (-> job
+                    (select-keys [:id :save-artifacts :restore-artifacts :caches :dependencies])
+                    (assoc :work-dir (job-work-dir job (rt/build rt))))}))
 
-(defn- rt->config [rt]
-  (let [wd (oci/base-work-dir rt)]
+(defn- rt->config
+  "Creates a configuration map using the runtime, that can then be passed on to the
+   sidecar container."
+  [rt]
+  (let [wd (oci/base-work-dir (rt/build rt))]
     (-> (rt/rt->config rt)
         ;; Remove some unnecessary values
         (dissoc :args :checkout-base-dir :jwk :containers :storage) 
@@ -246,20 +251,21 @@
    a container that runs the job, as configured in the `:job`, and
    next to that a sidecar that is responsible for capturing the output
    and dispatching events.  If configured, it also "
-  [conf rt]
+  [conf {:keys [job] :as rt}]
   (let [ic (oci/instance-config conf)
+        build (rt/build rt)
         sc (-> (sidecar-container ic)
                (update :volume-mounts conj (config-mount rt)))
-        jc (-> (job-container rt)
+        jc (-> (job-container job build)
                ;; Use common volume for logs and events
                (assoc :volume-mounts (filter some? [(find-checkout-vol ic)
-                                                    (script-mount rt)])))]
+                                                    (script-mount job)])))]
     (-> ic
         (assoc :containers [sc jc]
                :display-name (display-name rt))
-        (update :freeform-tags merge (oci/sid->tags (get-in rt [:build :sid])))
+        (update :freeform-tags merge (oci/sid->tags (b/sid build)))
         (update :volumes concat
-                (filter some? [(script-vol-config rt)
+                (filter some? [(script-vol-config job)
                                (config-vol-config rt)]))
         (set-pod-shape rt)
         (set-pod-resources rt)
@@ -364,3 +370,9 @@
 
 (defmethod mcc/credit-multiplier-fn :oci [_]
   credit-multiplier)
+
+(defrecord OciContainerRunner [conf]
+  p/ContainerRunner
+  (run-container [this job]
+    ;; TODO
+    ))
