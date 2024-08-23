@@ -126,12 +126,18 @@
                         ws (assoc :workspace ws))))]
     (md/future (c/run-container rt))))
 
+(defn- throw-error! [{:keys [status] :as resp}]
+  (if (or (nil? status) (>= status 400))
+    (throw (ex-info "Got remote error" resp))
+    resp))
+
 (defn- instance-call
   ([f conf-fn res-fn]
    (let [conf (co/oci-container-config)
          client (ci/make-context conf)]
      (md/chain
       (f client (conf-fn conf))
+      throw-error!
       :body
       res-fn)))
   ([f conf-fn]

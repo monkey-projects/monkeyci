@@ -156,13 +156,13 @@
         result (md/deferred)
         ;; Start api server
         api-srv (start-api-server build rt)
+        stop-server (fn []
+                      (some-> api-srv :server (.close)))
         cmd ["clojure"
              "-Sdeps" (pr-str (generate-deps build rt))
              "-X:monkeyci/build"
              ;; TODO Pass api server port
-             (pr-str {:config-file (config->edn build rt)})]
-        stop-server (fn []
-                      (some-> api-srv :server (.close)))]
+             (pr-str {:config-file (config->edn build rt)})]]
     (log/debug "Running in script dir:" script-dir ", this command:" cmd)
     ;; TODO Run as another unprivileged user for security (we'd need `su -c` for that)
     (-> (bp/process

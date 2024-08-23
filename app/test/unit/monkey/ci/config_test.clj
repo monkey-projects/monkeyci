@@ -242,7 +242,14 @@
     (h/with-tmp-dir dir
       (let [f (io/file dir "test.edn")]
         (spit f (pr-str {:key "value"}))
-        (is (= {:key "value"} (sut/load-config-file f)))))))
+        (is (= {:key "value"} (sut/load-config-file f))))))
+
+  (testing "can load private key from file"
+    (h/with-tmp-dir dir
+      (let [pk (h/generate-private-key)
+            f (io/file dir "pk.edn")]
+        (spit f (pr-str {:key pk}))
+        (is (= pk (:key (sut/load-config-file f))))))))
 
 (deftest home-config-file
   (testing "is by default in the user home dir"
