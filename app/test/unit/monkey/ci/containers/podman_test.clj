@@ -5,7 +5,17 @@
              [containers :as mcc]
              [logging :as l]]
             [monkey.ci.containers.podman :as sut]
-            [monkey.ci.helpers :as h :refer [contains-subseq?]]))
+            [monkey.ci.helpers :as h :refer [contains-subseq?]]
+            [monkey.ci.test.runtime :as trt]))
+
+(defn test-rt [dir]
+  {:containers {:type :podman}
+   :build {:build-id "test-build"}
+   :work-dir dir
+   :logging {:maker (l/make-logger {})}
+   :job {:id "test-job"
+         :container/image "test-img"
+         :script ["first" "second"]}})
 
 (deftest run-container
   (with-redefs [bp/process (fn [args]
@@ -13,14 +23,7 @@
     
     (testing "starts podman process"   
       (h/with-tmp-dir dir
-        (let [r @(mcc/run-container
-                  {:containers {:type :podman}
-                   :build {:build-id "test-build"}
-                   :work-dir dir
-                   :logging {:maker (l/make-logger {})}
-                   :job {:id "test-job"
-                         :container/image "test-img"
-                         :script ["first" "second"]}})]
+        (let [r @(mcc/run-container (test-rt dir))]
           (is (map? r))
           (is (= "/usr/bin/podman" (-> r :cmd first)))
           (is (contains? (set (:cmd r))
@@ -31,15 +34,10 @@
       (h/with-tmp-dir dir
         (let [log-paths (atom [])
               r @(mcc/run-container
-                  {:containers {:type :podman}
-                   :build {:build-id "test-build"}
-                   :work-dir dir
-                   :job {:id "test-job"
-                         :container/image "test-img"
-                         :script ["first" "second"]}
-                   :logging {:maker (fn [_ path]
-                                      (swap! log-paths conj path)
-                                      (l/->InheritLogger))}})]
+                  (-> (test-rt dir)
+                      (assoc-in [:logging :maker] (fn [_ path]
+                                                    (swap! log-paths conj path)
+                                                    (l/->InheritLogger)))))]
           (is (= 2 (count @log-paths)))
           (is (= ["test-build" "test-job"] (->> @log-paths
                                                 first
@@ -49,15 +47,11 @@
       (h/with-tmp-dir dir
         (let [log-paths (atom [])
               r @(mcc/run-container
-                  {:containers {:type :podman}
-                   :work-dir dir
-                   :job {:id "test-job"
-                         :container/image "test-img"
-                         :script ["first" "second"]}
-                   :pipeline {:name "test-pipeline"}
-                   :logging {:maker (fn [_ path]
-                                      (swap! log-paths conj path)
-                                      (l/->InheritLogger))}})]
+                  (-> (test-rt dir) 
+                      (update :build dissoc :build-id)
+                      (assoc-in [:logging :maker] (fn [_ path]
+                                                    (swap! log-paths conj path)
+                                                    (l/->InheritLogger)))))]
           (is (= "unknown-build" (->> @log-paths
                                       ffirst))))))
 
@@ -66,16 +60,10 @@
         (let [stored (atom {})
               cache (h/fake-blob-store stored)
               r @(mcc/run-container
-                  {:containers {:type :podman}
-                   :build {:build-id "test-build"}
-                   :work-dir dir
-                   :job {:id "test-job"
-                         :container/image "test-img"
-                         :script ["first" "second"]
-                         :caches [{:id "test-cache"
-                                   :path "test-path"}]}
-                   :logging {:maker (l/make-logger {})}
-                   :cache cache})]
+                  (-> (test-rt dir)
+                      (assoc-in [:job :caches] [{:id "test-cache"
+                                                 :path "test-path"}])
+                      (trt/set-cache cache)))]
           (is (some? r))
           (is (not-empty @stored)))))
     
@@ -84,17 +72,11 @@
         (let [stored (atom {"test-cust/test-build/test-artifact.tgz" ::test})
               store (h/fake-blob-store stored)
               r @(mcc/run-container
-                  {:containers {:type :podman}
-                   :build {:build-id "test-build"
-                           :sid ["test-cust" "test-build"]}
-                   :work-dir dir
-                   :job {:id "test-job"
-                         :container/image "test-img"
-                         :script ["first" "second"]
-                         :restore-artifacts [{:id "test-artifact"
-                                              :path "test-path"}]}
-                   :logging {:maker (l/make-logger {})}
-                   :artifacts store})]
+                  (-> (test-rt dir)
+                      (assoc-in [:build :sid] ["test-cust" "test-build"])
+                      (assoc-in [:job :restore-artifacts] [{:id "test-artifact"
+                                                            :path "restore-path"}])
+                      (trt/set-artifacts store)))]
           (is (some? r))
           (is (empty? @stored)))))
 
@@ -103,17 +85,10 @@
         (let [stored (atom {})
               store (h/fake-blob-store stored)
               r @(mcc/run-container
-                  {:containers {:type :podman}
-                   :build {:build-id "test-build"
-                           :sid ["test-cust" "test-build"]}
-                   :work-dir dir
-                   :job {:id "test-job"
-                         :container/image "test-img"
-                         :script ["first" "second"]
-                         :save-artifacts [{:id "test-artifact"
-                                           :path "test-path"}]}
-                   :logging {:maker (l/make-logger {})}
-                   :artifacts store})]
+                  (-> (test-rt dir)
+                      (assoc-in [:job :save-artifacts] [{:id "test-artifact"
+                                                         :path "save-path"}])
+                      (trt/set-artifacts store)))]
           (is (some? r))
           (is (not-empty @stored)))))))
 
@@ -121,63 +96,63 @@
   (let [job {:id "test-job"
              :container/image "test-img"
              :script ["first" "second"]}
-        base-ctx {:build {:build-id "test-build"
-                          :checkout-dir "/test-dir/checkout"}
-                  :work-dir "test-dir"}]
+        base-conf {:build {:build-id "test-build"
+                           :checkout-dir "/test-dir/checkout"}
+                   :work-dir "test-dir"}]
     
     (testing "when no command given, assumes `/bin/sh` and fails on errors"
-      (let [r (sut/build-cmd-args job base-ctx)]
+      (let [r (sut/build-cmd-args job base-conf)]
         (is (= "-ec" (last (drop-last r))))))
     
     (testing "cmd overrides sh command"
-      (let [r (sut/build-cmd-args (assoc job :container/cmd ["test-entry"]) base-ctx)]
+      (let [r (sut/build-cmd-args (assoc job :container/cmd ["test-entry"]) base-conf)]
         (is (= "test-entry" (last (drop-last r))))))
 
     (testing "adds all script entries as a single arg"
-      (let [r (sut/build-cmd-args job base-ctx)]
+      (let [r (sut/build-cmd-args job base-conf)]
         (is (= "first && second" (last r)))))
 
     (testing "image"
       (testing "adds when namespace is `:container`"
-        (is (contains-subseq? (sut/build-cmd-args job base-ctx)
+        (is (contains-subseq? (sut/build-cmd-args job base-conf)
                               ["test-img"])))
 
       (testing "adds when keyword is `:image`"
         (is (contains-subseq? (-> job
                                   (dissoc :container/image)
                                   (assoc :image "test-img")
-                                  (sut/build-cmd-args base-ctx))
+                                  (sut/build-cmd-args base-conf))
                               ["test-img"]))))
 
     (testing "mounts"
       
       (testing "adds shared mounts to args"
         (let [r (sut/build-cmd-args (assoc job :container/mounts [["/host/path" "/container/path"]])
-                                    base-ctx)]
+                                    base-conf)]
           (is (contains-subseq? r ["-v" "/host/path:/container/path"])))))
 
     (testing "adds env vars"
       (let [r (sut/build-cmd-args
                (assoc job :container/env {"VAR1" "value1"
                                           "VAR2" "value2"})
-               base-ctx)]
+               base-conf)]
         (is (contains-subseq? r ["-e" "VAR1=value1"]))
         (is (contains-subseq? r ["-e" "VAR2=value2"]))))
 
     (testing "passes entrypoint as json if specified"
       (let [r (-> job
                   (assoc :container/entrypoint ["test-ep"])
-                  (sut/build-cmd-args base-ctx))]
+                  (sut/build-cmd-args base-conf))]
         (is (contains-subseq? r ["--entrypoint" "'[\"test-ep\"]'"]))))
     
     (testing "overrides entrypoint for script"
-      (let [r (sut/build-cmd-args job base-ctx)]
+      (let [r (sut/build-cmd-args job base-conf)]
         (is (contains-subseq? r ["--entrypoint" "/bin/sh"]))))
 
     (testing "adds platform if specified"
       (let [r (-> job 
                   (assoc :container/platform "linux/arm64")
-                  (sut/build-cmd-args base-ctx))]
+                  (sut/build-cmd-args base-conf))]
         (is (contains-subseq? r ["--platform" "linux/arm64"]))))
 
     (testing "adds default platform from app config"
@@ -185,11 +160,11 @@
                             ["--platform" "test-platform"])))
 
     (testing "uses build and job id as container name"
-      (is (contains-subseq? (sut/build-cmd-args job base-ctx)
+      (is (contains-subseq? (sut/build-cmd-args job base-conf)
                             ["--name" "test-build-test-job"])))
 
     (testing "makes job work dir relative to build checkout dir"
       (is (contains-subseq? (-> job
                                 (assoc :work-dir "sub-dir")
-                                (sut/build-cmd-args base-ctx))
+                                (sut/build-cmd-args base-conf))
                             ["-v" "/test-dir/checkout/sub-dir:/home/monkeyci:Z"])))))

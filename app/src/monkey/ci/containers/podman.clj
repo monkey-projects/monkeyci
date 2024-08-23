@@ -67,7 +67,7 @@
                           "-v" (str wd ":" cwd ":Z")
                           "-w" cwd]
                    ;; Do not delete container in dev mode
-                   (not (rt/dev-mode? conf)) (conj "--rm"))]
+                   (not (:dev-mode? conf)) (conj "--rm"))]
     (concat
      ;; TODO Allow for more options to be passed in
      base-cmd
@@ -81,7 +81,7 @@
      (make-script-cmd (:script job)))))
 
 (defn- run-container [job conf]
-  (let [log-maker (rt/log-maker conf)
+  (let [log-maker (:log-maker conf)
         build (:build conf)
         ;; Don't prefix the sid here, that's the responsability of the logger
         log-base (b/get-job-sid job build)
@@ -101,10 +101,18 @@
     (log/info "Running build job " log-base "as podman container")
     (log/debug "Log base is:" log-base)
     (log/debug "Podman command:" cmd)
-    (wrapped-runner conf)))
+    ;; Job is required by the blob wrappers in the config
+    (wrapped-runner (assoc conf :job job))))
+
+(defn- rt->config [rt]
+  (-> rt
+      (select-keys [:artifacts :cache])
+      (assoc :dev-mode? (rt/dev-mode? rt)
+             :build (rt/build rt)
+             :log-maker (rt/log-maker rt))))
 
 (defmethod mcc/run-container :podman [{:keys [job] :as rt}]
-  (run-container job rt))
+  (run-container job (rt->config rt)))
 
 (defrecord PodmanContainerRunner [config]
   p/ContainerRunner

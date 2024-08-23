@@ -5,10 +5,6 @@
              [containers :as sut]
              [runtime :as rt]]))
 
-(deftest job->container-config
-  (testing "extracts all keys with `container` namespace"
-    (is (= {:key "value"} (sut/job->container-config {:container/key "value"})))))
-
 (deftest normalize-key
   (testing "handles string type"
     (is (= :podman (-> (c/normalize-key :containers {:containers {:type "podman"}})
