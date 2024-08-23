@@ -1,6 +1,7 @@
 (ns monkey.ci.helpers
   "Helper functions for testing"
-  (:require [camel-snake-kebab.core :as csk]
+  (:require [aleph.netty :as an]
+            [camel-snake-kebab.core :as csk]
             [clojure.java.io :as io]
             [clojure.core.async :as ca]
             [clojure.spec.alpha :as spec]
@@ -123,19 +124,25 @@
      (when (contains? @stored src)
        (io/input-stream (.getBytes "This is a test stream"))))))
 
-(defn fake-blob-store [stored]
-  (->FakeBlobStore stored false))
+(defn fake-blob-store
+  ([stored]
+   (->FakeBlobStore stored false))
+  ([]
+   (fake-blob-store (atom {}))))
 
 (defn strict-fake-blob-store [stored]
   (->FakeBlobStore stored true))
+
+(defn ->match-data [obj]
+  {:reitit.core/match
+   {:data obj}})
 
 (defn ->req
   "Takes a runtime and creates a request object from it that can be passed to
    an api handler function."
   [rt]
-  {:reitit.core/match
-   {:data
-    {:monkey.ci.web.common/runtime (wc/->RuntimeWrapper rt)}}})
+  (->match-data
+   {:monkey.ci.web.common/runtime (wc/->RuntimeWrapper rt)}))
 
 (defn with-path-param [r k v]
   (assoc-in r [:parameters :path k] v))
@@ -180,6 +187,14 @@
 
 (defn fake-events-receiver []
   (->FakeEventReceiver (atom {})))
+
+(defrecord FakeServer [closed?]
+  java.lang.AutoCloseable
+  (close [_]
+    (reset! closed? true))
+  an/AlephServer
+  (port [_]
+    0))
 
 (defn base64->
   "Converts from base64"

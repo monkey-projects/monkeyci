@@ -1,7 +1,26 @@
 (ns monkey.ci.build.api-test
   (:require [clojure.test :refer [deftest testing is]]
             [manifold.deferred :as md]
-            [monkey.ci.build.api :as sut]))
+            [martian.core :as mc]
+            [monkey.ci.build
+             [api :as sut]
+             [api-server :as server]]
+            [monkey.ci.test.api-server :as tas]))
+
+(deftest api-client
+  (let [{:keys [token] :as s} (server/start-server (tas/test-config))
+        base-url (format "http://localhost:%d" (:port s))
+        make-url (fn [path]
+                   (str base-url "/" path))
+        client (sut/make-client (make-url "swagger.json") token)]
+    (with-open [srv (:server s)]
+      
+      (testing "can create api client"
+        (is (some? client)))
+
+      (testing "can invoke test endpoint"
+        (is (= {:result "ok"}
+               @(mc/response-for client :test {})))))))
 
 (deftest build-params
   (testing "invokes `params` endpoint on client"

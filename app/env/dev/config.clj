@@ -33,8 +33,7 @@
   ([env type]
    (-> (load-config (format "oci/%s-config.edn" (name env)))
        (config/normalize-config {} {})
-       (get type)
-       (oci/->oci-config)))
+       (get type)))
   ([type]
    (load-oci-config @c/env type)))
 
@@ -44,8 +43,7 @@
   [type]
   (-> @global-config
       (config/normalize-config {} {})
-      (get type)
-      (oci/->oci-config)))
+      (get type)))
 
 (defn oci-runner-config []
   (oci-config :runner))

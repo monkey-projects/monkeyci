@@ -35,7 +35,6 @@
                                 :exclusions [org.zeromq/jzmq]}
         com.stuartsierra/component {:mvn/version "1.1.0"}
         commons-io/commons-io {:mvn/version "2.16.1"}
-        http-kit/http-kit {:mvn/version "2.8.0"}
         io.micrometer/micrometer-registry-prometheus {:mvn/version "1.12.8"}
         io.micrometer/micrometer-core {:mvn/version "1.12.8"}
         io.resonant/micrometer-clj {:mvn/version "0.0.4"}
@@ -50,6 +49,7 @@
         org.clojure/core.async {:mvn/version "1.6.681"}
         org.clojure/tools.logging {:mvn/version "1.3.0"}
         org.zeromq/jeromq {:mvn/version "0.6.0"} ; Java implementation of zeromq
+        prismatic/schema {:mvn/version "1.4.1"}
         ring-cors/ring-cors {:mvn/version "0.1.13"}
         yogthos/config {:mvn/version "1.2.0"}}
 
@@ -66,6 +66,7 @@
   :test
   {:extra-paths [:test-paths]
    :extra-deps {com.monkeyprojects/build {:mvn/version "0.2.0"}
+                com.github.oliyh/martian-test {:mvn/version "0.1.26"}
                 com.h2database/h2 {:mvn/version "2.3.230"}
                 org.clojure/test.check {:mvn/version "1.1.1"}
                 ring/ring-mock {:mvn/version "0.4.0"}}
@@ -89,7 +90,10 @@
   {:extra-deps {org.clojure/tools.namespace {:mvn/version "1.5.0"}}
    :exec-fn monkey.test/watch
    ;; Skip integration and slow tests
-   :exec-args {:kaocha.filter/skip-meta [:integration :slow]}}
+   :exec-args {:kaocha.filter/skip-meta [:integration :slow]
+               :kaocha/plugins [:kaocha.plugin/notifier]
+               ;; Send notifications to desktop
+               :kaocha.plugin.notifier/command "notify-send -a Kaocha %{title} %{message} -i %{icon} -u %{urgency}"}}
   
   :run
   {:main-opts ["-m" "monkey.ci.core"]}

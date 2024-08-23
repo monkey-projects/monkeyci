@@ -1,5 +1,6 @@
 (ns monkey.ci.process-test
-  (:require [babashka.process :as bp]
+  (:require [aleph.http :as http]
+            [babashka.process :as bp]
             [clojure.test :refer :all]
             [clojure.java.io :as io]
             [clojure.string :as cs]
@@ -12,7 +13,8 @@
              [sid :as sid]]
             [monkey.ci.utils :as u]
             [monkey.ci.build.core :as bc]
-            [monkey.ci.helpers :as h]))
+            [monkey.ci.helpers :as h]
+            [monkey.ci.test.runtime :as trt]))
 
 (def cwd (u/cwd))
 
@@ -53,29 +55,31 @@
 (deftype FakeProcess [exitValue])
 
 (deftest execute!
-  (let [server-started? (atom nil)]
+  (let [server-args (atom nil)
+        server-closed? (atom nil)
+        test-build {:script
+                    {:script-dir "test-dir"}}
+        test-rt (-> (trt/test-runtime)
+                    (merge {:args {:dev-mode true}}))]
     (with-redefs [bp/process (fn [{:keys [exit-fn] :as args}]
                                (do
                                  (when (fn? exit-fn)
                                    (exit-fn {:proc (->FakeProcess 1234)
-                                             :args args}))))]
+                                             :args args}))))
+                  http/start-server (fn [& args]
+                                      (reset! server-args args)
+                                      (h/->FakeServer server-closed?))]
 
       (testing "returns deferred"
         (is (md/deferred? (sut/execute!
-                           {:script
-                            {:script-dir (example "failing")}}
-                           {:args {:dev-mode true}}))))
+                           test-build test-rt))))
       
       (testing "returns exit code"
         (is (= 1234 (:exit @(sut/execute!
-                             {:script
-                              {:script-dir (example "failing")}}
-                             {:args {:dev-mode true}})))))
+                             test-build test-rt)))))
 
       (testing "invokes in script dir"
-        (is (= "test-dir" (-> @(sut/execute! {:script
-                                              {:script-dir "test-dir"}}
-                                             {})
+        (is (= "test-dir" (-> @(sut/execute! test-build test-rt)
                               :process
                               :args
                               :dir))))
@@ -83,12 +87,25 @@
       (testing "passes config file in edn"
         (is (re-matches #"^\{:config-file \".*\.edn\"}" 
                         (-> {:checkout-dir "work-dir"}
-                            (sut/execute! {})
+                            (sut/execute! test-rt)
                             (deref)
                             :process
                             :args
                             :cmd
-                            last)))))))
+                            last))))
+
+      (testing "api server"
+        (is (nil? (reset! server-args nil)))
+        (is (nil? (reset! server-closed? nil)))
+        (is (some? (sut/execute! {} (-> test-rt
+                                        (assoc :config {:runner {:api {:port 6543}}})))))
+        
+        (testing "started and stopped"
+          (is (some? @server-args))
+          (is (true? @server-closed?)))
+
+        (testing "passes required config to server"
+          (is (= 6543 (-> @server-args second :port))))))))
 
 (deftest generate-deps
   (testing "adds log config file, relative to work dir if configured"
@@ -106,20 +123,34 @@
                     :jvm-opts
                     first))))))
 
-  (testing "adds log config file as absolute path"
-    (h/with-tmp-dir dir
-      (let [logfile (io/file dir "logback-test.xml")]
-        (is (nil? (spit logfile "test file")))
-        (is (= (str "-Dlogback.configurationFile=" logfile)
-               (->> {:config {:runner
-                              {:type :child
-                               :log-config (.getAbsolutePath logfile)}
-                              :work-dir "other"}}
-                    (sut/generate-deps {})
-                    :aliases
-                    :monkeyci/build
-                    :jvm-opts
-                    first))))))
+  (testing "log config"
+    (letfn [(get-jvm-opts [deps]
+              (-> deps
+                  :aliases
+                  :monkeyci/build
+                  :jvm-opts
+                  first))]
+      (testing "adds log config file as absolute path"
+        (h/with-tmp-dir dir
+          (let [logfile (io/file dir "logback-test.xml")]
+            (is (nil? (spit logfile "test file")))
+            (is (= (str "-Dlogback.configurationFile=" logfile)
+                   (->> {:config {:runner
+                                  {:type :child
+                                   :log-config (.getAbsolutePath logfile)}
+                                  :work-dir "other"}}
+                        (sut/generate-deps {})
+                        (get-jvm-opts)))))))
+
+      (testing "adds log config file from script dir"
+        (h/with-tmp-dir dir
+          (let [logfile (io/file dir "logback.xml")]
+            (is (nil? (spit logfile "test file")))
+            (is (= (str "-Dlogback.configurationFile=" logfile)
+                   (-> {:script
+                        {:script-dir dir}}
+                       (sut/generate-deps {})
+                       (get-jvm-opts)))))))))  
 
   (testing "adds script dir as paths"
     (is (= ["test-dir"] (-> {:script {:script-dir "test-dir"}}

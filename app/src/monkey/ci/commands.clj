@@ -104,10 +104,10 @@
          (http/get (str url "/events"))
          :body
          bs/to-reader
-         #(java.io.PushbackReader. %))
-        (md/on-realized pipe-events
-                        (fn [err]
-                          (log/error "Unable to receive server events:" err))))
+         #(java.io.PushbackReader. %)
+         pipe-events)
+        (md/catch (fn [err]
+                    (log/error "Unable to receive server events:" err))))
     ;; Return a deferred that only resolves when the event stream stops
     d))
 

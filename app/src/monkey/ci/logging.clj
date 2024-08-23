@@ -58,10 +58,9 @@
 (deftype FileLogger [conf build path]
   LogCapturer
   (log-output [_]
-    ;; FIXME Refactor to separate build from rt
     (let [f (apply io/file
                    (:dir conf)
-                   (concat (drop-last (b/sid build)) path))]
+                   (concat (remove nil? (drop-last (b/sid build))) path))]
       (.mkdirs (.getParentFile f))
       f))
 
@@ -89,10 +88,11 @@
                           (.removeShutdownHook (Runtime/getRuntime) t)
                           (catch Exception _
                             (log/warn "Unable to remove shutdown hook, process is probably already shutting down.")))))]
-    (when (md/deferred? d)
-      (.addShutdownHook (Runtime/getRuntime) t)
-      (md/on-realized d remove-hook remove-hook))
-    d))
+    (if (md/deferred? d)
+      (do
+        (.addShutdownHook (Runtime/getRuntime) t)
+        (md/finally d remove-hook))
+      d)))
 
 (defn sid->path [{:keys [prefix]} path sid]
   (->> (concat [prefix] sid path)

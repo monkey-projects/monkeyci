@@ -201,3 +201,12 @@
                            :end-time 20000
                            :credit-multiplier 4}}}}]
       (is (= 2 (sut/calc-credits build))))))
+
+(deftest sid
+  (testing "returns `:sid` from build"
+    (is (= ::test-sid (sut/sid {:sid ::test-sid}))))
+
+  (testing "when no `sid`, returns customer and repo id"
+    (is (= [::test-cust ::test-repo]
+           (sut/sid {:customer-id ::test-cust
+                     :repo-id ::test-repo})))))

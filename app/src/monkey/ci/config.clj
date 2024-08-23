@@ -14,6 +14,7 @@
             [meta-merge.core :as mm]
             [monkey.aero] ; Aero extensions
             [monkey.ci
+             [edn]
              [sid :as sid]
              [utils :as u]]))
 

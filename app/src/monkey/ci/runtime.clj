@@ -18,7 +18,8 @@
              [spec :as s]
              [utils :as u]]))
 
-(defmulti setup-runtime (fn [_ k] k))
+;; To be replaced with components
+(defmulti ^:deprecated setup-runtime (fn [_ k] k))
 
 (defmethod setup-runtime :default [_ k]
   {})
@@ -78,6 +79,8 @@
 (def ssh-keys-dir (from-config :ssh-keys-dir))
 (def runner :runner)
 (def ^:deprecated build "Gets build info from runtime" :build)
+
+(def runner-api-port (from-config (comp :port :api :runner)))
 
 (defn events-receiver [{:keys [events]}]
   (if (satisfies? p/EventReceiver events)

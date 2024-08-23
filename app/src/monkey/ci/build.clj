@@ -17,7 +17,7 @@
 
 (def sid
   "Gets the sid from the build"
-  :sid)
+  (some-fn :sid account->sid))
 
 (def build-id (some-fn :build-id (constantly "unknown-build")))
 
@@ -25,7 +25,7 @@
   "Gets current build sid from the runtime.  This is either specified directly,
    or taken from account settings."
   [rt]
-  (or (get-in rt [:build sid])
+  (or (get-in rt [:build :sid])
       (let [sid (->> (account->sid (rt/account rt))
                      (take-while some?))]
         (when (= (dec build-sid-length) (count sid))

@@ -9,7 +9,7 @@
 (s/def ::context (s/keys :req-un [::api ::b/build :script/job]))
 
 ;; Needed to create a client
-(s/def :api/url c/url?)
+(s/def :api/url ::c/url)
 (s/def :api/token string?)
 
 ;; The api client itself is just a fn

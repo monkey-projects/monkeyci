@@ -82,8 +82,7 @@
                       (.interrupt thread)))]
     (.start thread)
     ;; Ensure thread terminates
-    (md/on-realized res (constantly nil) interrupt)
-    res))
+    (md/catch res interrupt)))
 
 (defrecord LokiLogger [conf rt path]
   l/LogCapturer

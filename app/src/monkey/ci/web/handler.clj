@@ -414,7 +414,6 @@
                                        :access-control-allow-methods [:get :put :post :delete]
                                        :access-control-allow-credentials true]]
                                      c/default-middleware
-                                     ;; TODO Authorization checks
                                      [kebab-case-query
                                       log-request]))
             :muuntaja (c/make-muuntaja)

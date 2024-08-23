@@ -76,8 +76,7 @@
 (s/def :build/status build-states)
 
 ;; GIT configuration
-(s/def :git/url (s/with-gen c/url?
-                  #(gen/fmap (partial format "http://%s") (gen/string-alphanumeric))))
+(s/def :git/url ::c/url)
 (s/def :git/ref string?)
 (s/def :git/commit-id string?)
 (s/def :git/dir path?)

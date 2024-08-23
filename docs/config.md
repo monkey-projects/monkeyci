@@ -29,15 +29,17 @@ The configuration is hierarchical, like this:
  {:port 3000}}
 ```
 
+Configuration files are read using [Aero](https://github.com/juxt/aero), which allows
+to include other files, refer to other parts of the file, etc...  You can also include
+environment variables.
+
 ## Environment Variables
 
-Environment variables are also used to specify configuration.  These are read from all
-env vars that start with `MONKEYCI_` and are then internally mapped to the hierarchical
-structure.  For example, to overwrite the http port in the environment, you'd do this:
-
-```bash
-$ export MONKEYCI_HTTP_PORT=3000
-```
+Environment variables are non-hierarchical and it turns out to be problematic.  Originally
+a system was included to automatically map the hierarchy to the structured way as in the
+config file.  But this results in many problems, e.g. with regards to typing.  So currently
+environment variables are not directly supported.  If they are needed, they can be referred
+to via the `#env` reader tag provided by Aero.
 
 ## Command-line
 

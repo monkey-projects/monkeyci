@@ -98,7 +98,7 @@
 (s/def :entity/parameter-value
   (s/keys :req-un [:entity/name :label/value]))
 
-(s/def :user/type #{:github})
+(s/def :user/type #{:github :bitbucket})
 (s/def :user/type-id string?)
 (s/def :entity/email string?)
 (s/def :user/customers (s/coll-of :entity/id))
