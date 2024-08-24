@@ -330,8 +330,7 @@
 
 (defn run-container [{:keys [job] :as conf}]
   (log/debug "Running job as OCI instance:" job)
-  (let [oci-conf (:oci conf)
-        client (ci/make-context oci-conf)
+  (let [client (ci/make-context (:oci conf))
         ic (instance-config conf)
         max-job-timeout (* 20 60 1000)]
     (md/chain
