@@ -10,9 +10,8 @@
              [auth :as auth]
              [common :as wc]
              [github :as sut]]
-            [monkey.ci
-             [aleph-test :as af]
-             [helpers :as h]]
+            [monkey.ci.helpers :as h]
+            [monkey.ci.test.aleph-test :as af]
             [ring.mock.request :as mock]))
 
 (deftest valid-security?

@@ -159,7 +159,9 @@
 (defn with-identity [r id]
   (assoc r :identity id))
 
-(defn test-rt []
+(defn ^:deprecated test-rt
+  "Deprecated, use `runtime/test-runtime`"
+  []
   {:storage (s/make-memory-storage)
    :jwk (auth/keypair->rt (auth/generate-keypair))})
 

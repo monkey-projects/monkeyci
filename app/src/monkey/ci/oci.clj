@@ -224,8 +224,8 @@
 
 (defn base-work-dir
   "Determines the base work dir to use inside the container"
-  [rt]
-  (some->> (b/rt->checkout-dir rt)
+  [build]
+  (some->> (b/checkout-dir build)
            (fs/file-name)
            (fs/path work-dir)
            (str)))

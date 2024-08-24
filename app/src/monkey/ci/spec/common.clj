@@ -26,3 +26,5 @@
 (s/def ::storage (partial satisfies? p/Storage))
 (s/def ::events (partial satisfies? p/EventPoster))
 (s/def ::blob-store (partial satisfies? p/BlobStore))
+(s/def ::artifacts ::blob-store)
+(s/def ::cache ::blob-store)

@@ -4,9 +4,8 @@
             [clojure.spec.alpha :as s]
             [manifold.deferred :as md]
             [monkey.ci.build.api-server :as sut]
-            [monkey.ci
-             [aleph-test :as at]
-             [helpers :as h]]
+            [monkey.ci.helpers :as h]
+            [monkey.ci.test.aleph-test :as at]
             [monkey.ci.spec.api-server :as aspec]
             [monkey.ci.storage :as st]
             [monkey.ci.test

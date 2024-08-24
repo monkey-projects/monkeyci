@@ -21,9 +21,8 @@
             [monkey.ci.web
              [auth :as auth]
              [handler :as sut]]
-            [monkey.ci
-             [aleph-test :as at]
-             [helpers :refer [try-take] :as h]]
+            [monkey.ci.helpers :refer [try-take] :as h]
+            [monkey.ci.test.aleph-test :as at]
             [reitit
              [core :as rc]
              [ring :as ring]]

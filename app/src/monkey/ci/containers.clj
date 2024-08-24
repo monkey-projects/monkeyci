@@ -1,25 +1,11 @@
 (ns monkey.ci.containers
   "Generic functionality for running containers"
-  (:require [medley.core :as mc]
-            [monkey.ci
+  (:require [monkey.ci
              [config :as c]
              [runtime :as rt]]))
 
 ;; TODO Rework to use a container runner fn instead
-(defmulti run-container (comp :type :containers))
-
-(defn- update-env [cc]
-  (mc/update-existing cc :env (partial map (fn [[k v]]
-                                             (str k "=" v)))))
-
-(defn job->container-config
-  "Extracts all keys from the context step that have the `container` namespace,
-   and drops that namespace."
-  [job]
-  (->> job
-       (mc/filter-keys (comp (partial = "container") namespace))
-       (mc/map-keys (comp keyword name))
-       (update-env)))
+(defmulti ^:deprecated run-container (comp :type :containers))
 
 (defmulti credit-multiplier-fn (comp :type :containers))
 
@@ -41,8 +27,10 @@
   (-> (get conf :containers)
       (assoc :credit-consumer (credit-multiplier-fn conf))))
 
-(def image :image)
+(def image (some-fn :container/image :image))
 (def env :container/env)
 (def cmd :container/cmd)
+(def args :container/args)
 (def mounts :container/mounts)
 (def entrypoint :container/entrypoint)
+(def platform :container/platform)

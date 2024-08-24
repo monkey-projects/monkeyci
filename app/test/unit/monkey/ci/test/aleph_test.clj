@@ -1,4 +1,4 @@
-(ns monkey.ci.aleph-test
+(ns monkey.ci.test.aleph-test
   "Provides functions for faking Aleph http requests"
   (:require [aleph.http :as http]
             [manifold.deferred :as md]))

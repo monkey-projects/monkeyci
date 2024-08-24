@@ -157,40 +157,44 @@
                             (sut/generate-deps {})
                             :paths)))))
 
-(deftest rt->config
+(deftest child-config
   (testing "adds build to config"
     (let [build {:build-id "test-build"}
-          e (sut/rt->config build {:config {:config-key "value"}})]
+          e (sut/child-config build (-> trt/empty-runtime
+                                        (trt/set-config {:config-key "value"})))]
       (is (= build (:build e)))
       (is (= "value" (:config-key e)))))
 
   (testing "adds api token"
-    (is (not-empty (-> (sut/rt->config {} (h/test-rt))
+    (is (not-empty (-> (sut/child-config {} (trt/test-runtime))
                        (get-in [:api :token])))))
 
   (testing "api token contains build sid in sub"
     (let [sid (repeatedly 3 (comp str random-uuid))
           build {:sid sid}
-          payload (-> (sut/rt->config build (h/test-rt))
+          payload (-> (sut/child-config build (trt/test-runtime))
                       (get-in [:api :token])
                       (h/parse-token-payload))]
       (is (= (sid/serialize-sid sid) (:sub payload)))))
 
   (testing "no token if no jwk keys configured"
-    (is (nil? (-> (sut/rt->config {} {})
+    (is (nil? (-> (sut/child-config {} trt/empty-runtime)
                   (get-in [:api :token])))))
 
   (testing "does not overwrite token if no jwk config"
     (is (= "test-token"
-           (-> (sut/rt->config {} {:config {:api {:token "test-token"}}})
+           (-> (sut/child-config {} (-> trt/empty-runtime
+                                        (trt/set-config {:api {:token "test-token"}})))
                (get-in [:api :token])))))
 
   (testing "overwrites event config with runner settings"
-    (let [rt {:config {:events
-                       {:type :manifold}
-                       :runner
-                       {:events
-                        {:type :zmq}}}}]
-      (is (= :zmq (-> (sut/rt->config {} rt)
+    (let [rt (-> trt/empty-runtime
+                 (trt/set-config
+                  {:events
+                   {:type :manifold}
+                   :runner
+                   {:events
+                    {:type :zmq}}}))]
+      (is (= :zmq (-> (sut/child-config {} rt)
                       :events
                       :type))))))

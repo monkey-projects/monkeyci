@@ -14,10 +14,11 @@
              [config :as c]
              [containers :as mcc]
              [edn :as edn]
+             [jobs :as j]
              [oci :as oci]
+             [protocols :as p]
              [runtime :as rt]
              [utils :as u]]
-            [monkey.ci.build.core :as bc]
             [monkey.ci.containers.promtail :as pt]
             [monkey.ci.events.core :as ec]
             [monkey.oci.container-instance.core :as ci]))
@@ -42,7 +43,6 @@
 (def config-file "config.edn")
 
 (def sidecar-container-name "sidecar")
-(def sidecar-config (comp :sidecar rt/config))
 
 (def promtail-config-vol "promtail-config")
 (def promtail-config-dir "/etc/promtail")
@@ -69,22 +69,22 @@
 (defn- job-work-dir
   "The work dir to use for the job in the container.  This is the external job
    work dir, rebased onto the base work dir."
-  [rt]
-  (let [cd (b/rt->checkout-dir rt)]
+  [job build]
+  (let [cd (b/checkout-dir build)]
     (log/debug "Determining job work dir using checkout dir" cd
-               ", job dir" (get-in rt [:job :work-dir])
-               "and base dir" (oci/base-work-dir rt))
-    (-> (get-in rt [:job :work-dir] cd)
-        (u/rebase-path cd (oci/base-work-dir rt)))))
+               ", job dir" (j/work-dir job)
+               "and base dir" (oci/base-work-dir build))
+    (-> (or (j/work-dir job) cd)
+        (u/rebase-path cd (oci/base-work-dir build)))))
 
 (defn- job-container
   "Configures the job container.  It runs the image as configured in
    the job, but the script that's being executed is replaced by a
    custom shell script that also redirects the output and dispatches
    events to a file, that are then picked up by the sidecar."
-  [{:keys [job] :as rt}]
-  (let [wd (job-work-dir rt)]
-    (cond-> {:image-url (or (:image job) (:container/image job))
+  [job build]
+  (let [wd (job-work-dir job build)]
+    (cond-> {:image-url (mcc/image job)
              :display-name job-container-name
              ;; In container instances, command or entrypoint are treated the same
              ;; Note that when using container commands directly, the job will most
@@ -92,10 +92,10 @@
              ;; of container instances, that don't allow init containers or mounting
              ;; pre-populated file systems (apart from configmaps).  Also capturing
              ;; logs is problematic, since we can't redirect to a file.
-             :command (or (:container/cmd job)
-                          (:container/entrypoint job))
-             :arguments (:container/args job)
-             :environment-variables (:container/env job)
+             :command (or (mcc/cmd job)
+                          (mcc/entrypoint job))
+             :arguments (mcc/args job)
+             :environment-variables (mcc/env job)
              :working-directory wd}
       ;; Override some props if script is specified
       (:script job) (-> (assoc :command [(get job :shell "/bin/sh") (str script-dir "/" job-script)]
@@ -152,8 +152,8 @@
 (defn- add-promtail-container
   "Adds promtail container configuration to the existing instance config.
    It will be configured to push all logs from the script log dir."
-  [ic rt]
-  (let [conf (pt/rt->config rt)
+  [ic {:keys [promtail job build]}]
+  (let [conf (pt/make-config promtail job build)
         add? (some? (:loki-url conf))]
     (cond-> ic
       add?
@@ -162,17 +162,17 @@
                                                               (promtail-config-mount)])))
           (update :volumes conj (promtail-config-vol-config conf))))))
 
-(defn- display-name [{:keys [build job]}]
+(defn- display-name [job build]
   (cs/join "-" [(:build-id build)
-                (bc/job-id job)]))
+                (j/job-id job)]))
 
-(defn- script-mount [rt]
-  (when (get-in rt [:job :script])
+(defn- script-mount [job]
+  (when (:script job)
     {:volume-name script-vol
      :is-read-only false
      :mount-path script-dir}))
 
-(defn- config-mount [_]
+(defn- config-mount []
   {:volume-name config-vol
    :is-read-only true
    :mount-path config-dir})
@@ -182,7 +182,7 @@
 
 (defn- script-vol-config
   "Adds the job script and a file for each script line as a configmap volume."
-  [{{:keys [script]} :job}]
+  [{:keys [script]}]
   (when-not (empty? script)
     (when (log/enabled? :debug)
       (log/debug "Executing script lines in container:")
@@ -195,13 +195,16 @@
                                   (oci/config-entry (str i) s)))
                    (into [(job-script-entry)]))}))
 
-(defn- job-details->edn [rt]
-  (pr-str {:job (-> (:job rt)
-                     (select-keys [:id :save-artifacts :restore-artifacts :caches :dependencies])
-                     (assoc :work-dir (job-work-dir rt)))}))
+(defn- job-details->edn [job build]
+  (pr-str {:job (-> job
+                    (select-keys [:id :save-artifacts :restore-artifacts :caches :dependencies])
+                    (assoc :work-dir (job-work-dir job build)))}))
 
-(defn- rt->config [rt]
-  (let [wd (oci/base-work-dir rt)]
+(defn- make-sidecar-config
+  "Creates a configuration map using the runtime, that can then be passed on to the
+   sidecar container."
+  [{:keys [build] rt :runtime}]
+  (let [wd (oci/base-work-dir build)]
     (-> (rt/rt->config rt)
         ;; Remove some unnecessary values
         (dissoc :args :checkout-base-dir :jwk :containers :storage) 
@@ -210,62 +213,62 @@
                :checkout-base-dir work-dir)
         (assoc-in [:build :checkout-dir] wd))))
 
-(defn- rt->edn [rt]
-  (edn/->edn (rt->config rt)))
+(defn- rt->edn [conf]
+  (edn/->edn (make-sidecar-config conf)))
 
 (defn- config-vol-config
   "Configuration files for the sidecar (e.g. logging)"
-  [rt]
-  (let [{:keys [log-config]} (sidecar-config rt)]
+  [{:keys [job build sidecar] :as conf}]
+  (let [{:keys [log-config]} sidecar]
     {:name config-vol
      :volume-type "CONFIGFILE"
-     :configs (cond-> [(oci/config-entry job-config-file (job-details->edn rt))
-                       (oci/config-entry config-file (rt->edn rt))]
+     :configs (cond-> [(oci/config-entry job-config-file (job-details->edn job build))
+                       (oci/config-entry config-file (rt->edn conf))]
                 log-config (conj (oci/config-entry "logback.xml" log-config)))}))
 
-(defn- set-pod-shape [ic rt]
-  (assoc ic :shape (get-in arch-shapes [(job-arch (:job rt)) :shape])))
+(defn- set-pod-shape [ic job]
+  (assoc ic :shape (get-in arch-shapes [(job-arch job) :shape])))
 
-(defn- set-pod-memory [ic rt]
+(defn- set-pod-memory [ic job]
   (-> ic
-      (update :shape-config mc/assoc-some :memory-in-g-bs (get-in rt [:job :memory]))
+      (update :shape-config mc/assoc-some :memory-in-g-bs (:memory job))
       (mc/update-existing-in [:shape-config :memory-in-g-bs] min max-pod-memory)))
 
-(defn- set-pod-cpus [ic rt]
+(defn- set-pod-cpus [ic job]
   (-> ic
-      (update :shape-config mc/assoc-some :ocpus (get-in rt [:job :cpus]))
+      (update :shape-config mc/assoc-some :ocpus (:cpus job))
       (mc/update-existing-in [:shape-config :ocpus] min max-pod-cpus)))
 
-(defn- set-pod-resources [ic rt]
+(defn- set-pod-resources [ic job]
   (-> ic
-      (set-pod-memory rt)
-      (set-pod-cpus rt)))
+      (set-pod-memory job)
+      (set-pod-cpus job)))
 
 (defn instance-config
   "Generates the configuration for the container instance.  It has 
    a container that runs the job, as configured in the `:job`, and
    next to that a sidecar that is responsible for capturing the output
    and dispatching events.  If configured, it also "
-  [conf rt]
-  (let [ic (oci/instance-config conf)
+  [{:keys [job build oci] :as conf}]
+  (let [ic (oci/instance-config oci)
         sc (-> (sidecar-container ic)
-               (update :volume-mounts conj (config-mount rt)))
-        jc (-> (job-container rt)
+               (update :volume-mounts conj (config-mount)))
+        jc (-> (job-container job build)
                ;; Use common volume for logs and events
                (assoc :volume-mounts (filter some? [(find-checkout-vol ic)
-                                                    (script-mount rt)])))]
+                                                    (script-mount job)])))]
     (-> ic
         (assoc :containers [sc jc]
-               :display-name (display-name rt))
-        (update :freeform-tags merge (oci/sid->tags (get-in rt [:build :sid])))
+               :display-name (display-name job build))
+        (update :freeform-tags merge (oci/sid->tags (b/sid build)))
         (update :volumes concat
-                (filter some? [(script-vol-config rt)
-                               (config-vol-config rt)]))
-        (set-pod-shape rt)
-        (set-pod-resources rt)
+                (filter some? [(script-vol-config job)
+                               (config-vol-config conf)]))
+        (set-pod-shape job)
+        (set-pod-resources job)
         ;; Note that promtail will never terminate, so we rely on the script to
         ;; delete the container instance when the sidecar and the job have completed.
-        (add-promtail-container rt))))
+        (add-promtail-container conf))))
 
 (defn wait-for-instance-end-events
   "Checks the incoming events to see if a container and job end event has been received.
@@ -291,11 +294,11 @@
   "Waits for the container end event, or times out.  Afterwards, the full container
    instance details are fetched.  The exit codes in the received events are used for
    the container exit codes."
-  [rt max-timeout get-details]
+  [{:keys [events job build]} max-timeout get-details]
   (md/chain
-   (wait-for-instance-end-events (:events rt)
-                                 (b/get-sid rt)
-                                 (b/rt->job-id rt)
+   (wait-for-instance-end-events events
+                                 (b/sid build)
+                                 (j/job-id job)
                                  max-timeout)
    (fn [r]
      (log/debug "Job instance terminated with these events:" r)
@@ -325,11 +328,11 @@
         (get-in arch-shapes [(job-arch job) :credits] 1))
      (get job :memory oci/default-memory-gb)))
 
-(defmethod mcc/run-container :oci [{:keys [job] :as rt}]
+(defn run-container [{:keys [job] :as conf}]
   (log/debug "Running job as OCI instance:" job)
-  (let [conf (:containers rt)
-        client (ci/make-context conf)
-        ic (instance-config conf rt)
+  (let [oci-conf (:oci conf)
+        client (ci/make-context oci-conf)
+        ic (instance-config conf)
         max-job-timeout (* 20 60 1000)]
     (md/chain
      (oci/run-instance client ic
@@ -338,7 +341,7 @@
                                    ;; TODO When a start event has not been received after
                                    ;; a sufficient period of time, start polling anyway.
                                    ;; For now, we add a max timeout.
-                                   (wait-or-timeout rt max-job-timeout
+                                   (wait-or-timeout conf max-job-timeout
                                                     #(oci/get-full-instance-details client id)))})
      (fn [r]
        (letfn [(maybe-log-output [{:keys [exit-code display-name logs] :as c}]
@@ -358,9 +361,26 @@
            ;; Either return the first error result, or the result of the job container
            (:result (or nonzero job-cont))))))))
 
+(defn- rt->container-config [rt]
+  {:runtime rt ; TODO Get rid of the runtime
+   :job (:job rt)
+   :build (rt/build rt)
+   :promtail (get-in rt [rt/config :promtail])
+   :events (:events rt)
+   :oci (:containers rt)})
+
+;; Will be replaced with OciContainerRunner component
+(defmethod mcc/run-container :oci [rt]
+  (run-container (rt->container-config rt)))
+
 (defmethod mcc/normalize-containers-config :oci [conf]
   ;; Take app version if no image version specified
   (update-in conf [:containers :image-tag] #(format (or % "%s") (c/version))))
 
 (defmethod mcc/credit-multiplier-fn :oci [_]
   credit-multiplier)
+
+(defrecord OciContainerRunner [conf]
+  p/ContainerRunner
+  (run-container [this job]
+    (run-container (assoc conf :job job))))

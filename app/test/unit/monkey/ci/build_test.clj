@@ -206,7 +206,8 @@
   (testing "returns `:sid` from build"
     (is (= ::test-sid (sut/sid {:sid ::test-sid}))))
 
-  (testing "when no `sid`, returns customer and repo id"
-    (is (= [::test-cust ::test-repo]
+  (testing "when no `sid`, returns customer, repo and build id"
+    (is (= [::test-cust ::test-repo ::test-build]
            (sut/sid {:customer-id ::test-cust
-                     :repo-id ::test-repo})))))
+                     :repo-id ::test-repo
+                     :build-id ::test-build})))))

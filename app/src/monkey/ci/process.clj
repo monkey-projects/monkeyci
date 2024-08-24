@@ -4,6 +4,7 @@
   (:require [babashka
              [fs :as fs]
              [process :as bp]]
+            [clj-commons.byte-streams :as bs]
             [clojure.java.io :as io]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
@@ -33,9 +34,7 @@
 
 (def default-script-config
   "Default configuration for the script runner."
-  {:containers {:type :podman}
-   :storage {:type :memory}
-   :logging {:type :inherit}})
+  {:containers {:type :build-api}})
 
 (defn exit! [exit-code]
   (System/exit exit-code))
@@ -111,7 +110,9 @@
         log-config (assoc :jvm-opts
                           [(str "-Dlogback.configurationFile=" log-config)]))}}))
 
-(defn rt->config [build rt]
+(defn child-config
+  "Creates a configuration map that can then be passed to the child process."
+  [build rt]
   (-> (rt/rt->config rt)
       (assoc :build build)
       ;; Generate an API token and add it to the config
@@ -123,7 +124,7 @@
   "Writes the configuration to an edn file that is then passed as command line to the app."
   [build rt]
   (let [f (utils/tmp-file "config" ".edn")]
-    (->> (rt->config build rt)
+    (->> (child-config build rt)
          (edn/->edn)
          (spit f))
     f))
@@ -134,11 +135,6 @@
 (defn- make-logger [rt build type]
   (let [id (b/build-id build)]
     ((log-maker rt) build [id (str (name type) ".log")])))
-
-(defn- out->str [x]
-  (if (instance? java.io.InputStream x)
-    (slurp x)
-    x))
 
 (defn- start-api-server [build rt]
   (-> (as/rt->api-server-config rt)
@@ -174,9 +170,9 @@
                      (let [exit (or (some-> proc (.exitValue)) 0)]
                        (log/debug "Script process exited with code" exit ", cleaning up")
                        (when out
-                         (log/debug "Process output:" (out->str out)))
+                         (log/debug "Process output:" (bs/to-string out)))
                        (when (and err (not= 0 exit))
-                         (log/warn "Process error output:" (out->str err)))
+                         (log/warn "Process error output:" (bs/to-string err)))
                        (md/success! result {:process p
                                             :exit exit})))})
         ;; Depending on settings, some process streams need handling

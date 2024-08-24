@@ -13,7 +13,8 @@
             [monkey.ci.common.preds :as cp]
             [monkey.ci.containers.oci :as sut]
             [monkey.ci.events.core :as ec]
-            [monkey.ci.helpers :as h]))
+            [monkey.ci.helpers :as h]
+            [monkey.ci.test.runtime :as trt]))
 
 (defn- find-volume-entry [vol n]
   (->> vol :configs (filter (comp (partial = n) :file-name)) first))
@@ -26,11 +27,16 @@
     (with-open [r (io/reader (java.io.ByteArrayInputStream. b))]
       (u/parse-edn r))))
 
-(def default-rt {:build {:checkout-dir "/tmp"}})
+(def default-rt (-> (trt/test-runtime)
+                    (assoc :build {:checkout-dir "/tmp"})))
+
+(def default-config
+  {:runtime default-rt
+   :build (:build default-rt)})
 
 (deftest instance-config
   (testing "creates configuration map"
-    (let [ic (sut/instance-config {} default-rt)]
+    (let [ic (sut/instance-config default-config)]
       (is (map? ic))
       (is (string? (:shape ic)))))
 
@@ -39,21 +45,22 @@
            (->> {:build {:build-id "test-build"
                          :checkout-dir "/tmp"}
                  :job {:id "test-job"}}
-                (sut/instance-config {})
+                (sut/instance-config)
                 :display-name))))
 
   (testing "has tags from sid"
     (let [tags (->> {:build {:sid ["test-cust" "test-repo"]
                              :checkout-dir "/tmp"}}
-                    (sut/instance-config {})
+                    (sut/instance-config)
                     :freeform-tags)]
       (is (= "test-cust" (get tags "customer-id")))
       (is (= "test-repo" (get tags "repo-id")))))
 
   (testing "merges in existing tags"
     (let [tags (->> {:build {:sid ["test-cust" "test-repo"]
-                             :checkout-dir "/tmp"}}
-                    (sut/instance-config {:freeform-tags {"env" "test"}})
+                             :checkout-dir "/tmp"}
+                     :oci {:freeform-tags {"env" "test"}}}
+                    (sut/instance-config)
                     :freeform-tags)]
       (is (= "test-cust" (get tags "customer-id")))
       (is (= "test" (get tags "env")))))
@@ -62,61 +69,61 @@
     (letfn [(has-checkout-vol? [c]
               (some (comp (partial = oci/checkout-vol) :volume-name)
                     (:volume-mounts c)))]
-      (is (every? has-checkout-vol? (:containers (sut/instance-config {} default-rt))))))
+      (is (every? has-checkout-vol? (:containers (sut/instance-config default-config))))))
 
   (testing "pod memory"
     (testing "has default value"
-      (is (number? (-> (sut/instance-config {} default-rt)
+      (is (number? (-> (sut/instance-config default-config)
                        :shape-config
                        :memory-in-g-bs))))
 
     (testing "can specify custom memory limit"
-      (is (= 4 (-> (sut/instance-config {} (-> default-rt
-                                               (assoc-in [:job :memory] 4)))
+      (is (= 4 (-> (sut/instance-config (-> default-config
+                                            (assoc-in [:job :memory] 4)))
                    :shape-config
                    :memory-in-g-bs))))
 
     (testing "limited to max memory"
       (is (= sut/max-pod-memory
-             (-> (sut/instance-config {} (-> default-rt
-                                             (assoc-in [:job :memory] 10000)))
+             (-> (sut/instance-config (-> default-config
+                                          (assoc-in [:job :memory] 10000)))
                  :shape-config
                  :memory-in-g-bs)))))
 
   (testing "pod architecture"
     (testing "has default value"
       (is (= "CI.Standard.A1.Flex"
-             (-> (sut/instance-config {} default-rt)
+             (-> (sut/instance-config default-config)
                  :shape))))
 
     (testing "can choose ARM"
       (is (= "CI.Standard.A1.Flex"
-             (-> (sut/instance-config {} (assoc-in default-rt
-                                                   [:job :arch] :arm))
+             (-> (sut/instance-config (assoc-in default-config
+                                                [:job :arch] :arm))
                  :shape))))
 
     (testing "can choose AMD"
       (is (= "CI.Standard.E4.Flex"
-             (-> (sut/instance-config {} (assoc-in default-rt
-                                                   [:job :arch] :amd))
+             (-> (sut/instance-config (assoc-in default-config
+                                                [:job :arch] :amd))
                  :shape)))))
 
   (testing "pod cpus"
     (testing "has default value"
-      (is (number? (-> (sut/instance-config {} default-rt)
+      (is (number? (-> (sut/instance-config default-config)
                        :shape-config
                        :ocpus))))
 
     (testing "can specify custom cpus limit"
-      (is (= 4 (-> (sut/instance-config {} (-> default-rt
-                                               (assoc-in [:job :cpus] 4)))
+      (is (= 4 (-> (sut/instance-config (-> default-config
+                                            (assoc-in [:job :cpus] 4)))
                    :shape-config
                    :ocpus))))
 
     (testing "limited to max cpus"
       (is (= sut/max-pod-cpus
-             (-> (sut/instance-config {} (-> default-rt
-                                             (assoc-in [:job :cpus] 10000)))
+             (-> (sut/instance-config (-> default-config
+                                          (assoc-in [:job :cpus] 10000)))
                  :shape-config
                  :ocpus)))))
   
@@ -129,7 +136,7 @@
                          :container/env {"TEST_ENV" "test-val"}
                          :work-dir "/tmp/test-build/sub"}
                    :build {:checkout-dir "/tmp/test-build"}}
-                  (sut/instance-config {})
+                  (sut/instance-config)
                   (find-job-container))]
       
       (testing "uses shell mounted script"
@@ -145,7 +152,7 @@
         (let [jc (->> {:job {:script ["test-script"]
                              :shell "/bin/bash"}
                        :build {:checkout-dir "/tmp"}}
-                      (sut/instance-config {})
+                      (sut/instance-config)
                       (find-job-container))]
           (is (= "/bin/bash" (-> jc :command first)))))
 
@@ -155,7 +162,7 @@
                              :container/args ["test-args"]
                              :shell "/bin/bash"}
                        :build {:checkout-dir "/tmp"}}
-                      (sut/instance-config {})
+                      (sut/instance-config)
                       (find-job-container))]
           (is (not= ["test-command"] (:command jc)))
           (is (not= ["test-args"] (:arguments jc)))))
@@ -164,7 +171,7 @@
         (let [jc (->> {:job {:container/cmd ["test-command"]
                              :container/args ["test" "args"]}
                        :build {:checkout-dir "/tmp"}}
-                      (sut/instance-config {})
+                      (sut/instance-config)
                       (find-job-container))]
           (testing "uses command from job"
             (is (= ["test-command"] (:command jc))))
@@ -185,7 +192,7 @@
                                   :container/env {"TEST_ENV" "test-val"}
                                   :work-dir "sub"}
                             :build {:checkout-dir "/tmp/test-build"}}
-                           (sut/instance-config {})
+                           (sut/instance-config)
                            :containers
                            (mc/find-first (cp/prop-pred :display-name "job"))
                            :environment-variables)]
@@ -217,8 +224,10 @@
                          :work-dir "/tmp/test-checkout/sub"}
                    :build {:build-id "test-build"
                            :checkout-dir "/tmp/test-checkout"}
-                   :config conf}
-                  (sut/instance-config {:credentials {:private-key pk}}))
+                   :config conf
+                   :oci {:credentials {:private-key pk}}
+                   :runtime {:config conf}}
+                  (sut/instance-config))
           sc (->> ic
                   :containers
                   (mc/find-first (cp/prop-pred :display-name "sidecar")))]
@@ -283,17 +292,17 @@
 
     (testing "adds logback config file to config mount"
       (let [vol (-> {:job {:script ["test"]}
-                     :config {:sidecar {:log-config "test log config"}}
+                     :sidecar {:log-config "test log config"}
                      :build {:checkout-dir "/tmp"}}
-                    (as-> c (sut/instance-config {} c))
+                    (as-> c (sut/instance-config c))
                     (oci/find-volume "config"))]
         (is (some? vol))
         (is (not-empty(:configs vol)))
         (is (some? (find-volume-entry vol "logback.xml"))))))
 
   (testing "script volume"
-    (let [v (->> (assoc default-rt :job {:script ["first" "second"]})
-                 (sut/instance-config {})
+    (let [v (->> (assoc default-config :job {:script ["first" "second"]})
+                 (sut/instance-config)
                  :volumes
                  (mc/find-first (cp/prop-pred :name "scripts"))
                  :configs)
@@ -320,9 +329,9 @@
                     :work-dir "/tmp/test-build/sub"}
                    :build
                    {:checkout-dir "/tmp/test-build"}
-                   :config {:promtail
-                            {:loki-url "http://loki"}}}
-                  (sut/instance-config {}))
+                   :promtail
+                   {:loki-url "http://loki"}}
+                  (sut/instance-config))
           pc (->> ci
                   :containers
                   (mc/find-first (cp/prop-pred :display-name "promtail")))]
@@ -361,7 +370,7 @@
                        :work-dir "/tmp/test-build/sub"}
                       :build
                       {:checkout-dir "/tmp/test-build"}}
-                     (sut/instance-config {})
+                     (sut/instance-config)
                      :containers
                      (mc/find-first (cp/prop-pred :display-name "promtail"))))))))
 
@@ -395,54 +404,59 @@
     (let [events (ec/make-events {:events {:type :manifold}})
           sid (repeatedly 3 random-uuid)
           job-id "test-job"
-          rt {:events events
-              :job {:id job-id}}
+          conf {:events events
+                :job {:id job-id}
+                :build {:sid sid}}
           details {:body
                    {:containers [{:display-name sut/sidecar-container-name}
                                  {:display-name sut/job-container-name}]}}
-          res (sut/wait-or-timeout rt 1000 (constantly details))]
-      (is (some? (rt/post-events rt [{:type :sidecar/end
-                                      :sid sid
-                                      :job {:id job-id}}
-                                     {:type :container/end
-                                      :sid sid
-                                      :job {:id job-id}}])))
+          res (sut/wait-or-timeout conf 1000 (constantly details))]
+      (is (some? (rt/post-events conf [{:type :sidecar/end
+                                        :sid sid
+                                        :job {:id job-id}}
+                                       {:type :container/end
+                                        :sid sid
+                                        :job {:id job-id}}])))
       (is (sequential? (get-in @res [:body :containers])))))
 
   (testing "adds exit codes from events"
     (let [events (ec/make-events {:events {:type :manifold}})
           sid (repeatedly 3 random-uuid)
           job-id "test-job"
-          rt {:events events
-              :job {:id job-id}}
+          conf {:events events
+                :job {:id job-id}
+                :build {:sid sid}}
           details {:body
                    {:containers [{:display-name sut/sidecar-container-name}
                                  {:display-name sut/job-container-name}]}}
-          res (sut/wait-or-timeout rt 1000 (constantly details))]
-      (is (some? (rt/post-events rt [{:type :sidecar/end
-                                      :sid sid
-                                      :job {:id job-id}
-                                      :result {:exit 1}}
-                                     {:type :container/end
-                                      :sid sid
-                                      :job {:id job-id}
-                                      :result {:exit 2}}])))
+          res (sut/wait-or-timeout conf 1000 (constantly details))]
+      (is (some? (rt/post-events conf
+                                 [{:type :sidecar/end
+                                   :sid sid
+                                   :job {:id job-id}
+                                   :result {:exit 1}}
+                                  {:type :container/end
+                                   :sid sid
+                                   :job {:id job-id}
+                                   :result {:exit 2}}])))
       (is (= [1 2] (->> @res :body :containers (map ec/result-exit))))))
 
   (testing "marks timeout as failure"
     (let [events (ec/make-events {:events {:type :manifold}})
           sid (repeatedly 3 random-uuid)
           job-id "test-job"
-          rt {:events events
-              :job {:id job-id}}
+          conf {:events events
+                :job {:id job-id}
+                :build {:sid sid}}
           details {:body
                    {:containers [{:display-name sut/sidecar-container-name}
                                  {:display-name sut/job-container-name}]}}
-          res (sut/wait-or-timeout rt 100 (constantly details))]
-      (is (some? (rt/post-events rt [{:type :sidecar/end
-                                      :sid sid
-                                      :job {:id job-id}
-                                      :result {:exit 0}}])))
+          res (sut/wait-or-timeout conf 100 (constantly details))]
+      (is (some? (rt/post-events conf
+                                 [{:type :sidecar/end
+                                   :sid sid
+                                   :job {:id job-id}
+                                   :result {:exit 0}}])))
       (is (= 1 (->> @res :body :containers second ec/result-exit))))))
 
 (deftest run-container
