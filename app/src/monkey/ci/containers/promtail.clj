@@ -62,22 +62,20 @@
   {:image-url (str (or image-url promtail-image) ":" (or image-tag promtail-version))
    :display-name "promtail"})
 
-(defn make-config [pt-config job build token]
+(defn make-config [pt-config job build]
   (-> pt-config
       (merge (b/sid->props build))
-      (assoc :job-id (j/job-id job))
-      (mc/assoc-some :token token)))
+      (assoc :job-id (j/job-id job))))
 
 (defn ^:deprecated rt->config
   "Extracts necessary values from the runtime to create a promtail config map, that
    can be passed to `promtail-config`."
   [rt]
   (let [pt-config (get-in rt [:config :promtail])]
-    (make-config pt-config
+    (make-config (-> pt-config
+                     (mc/assoc-some :token (-> (rt/config rt) :api :token)))
                  (:job rt)
-                 (rt/build rt)
-                 (or (-> (rt/config rt) :api :token)
-                     (:token pt-config)))))
+                 (rt/build rt))))
 
 (defmethod c/normalize-key :promtail [_ conf]
   conf)

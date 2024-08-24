@@ -11,10 +11,12 @@
              [utils :as u]]
             [monkey.ci.build.core :as bc]))
 
+(def sid-props [:customer-id :repo-id :build-id])
+
 (def account->sid (juxt :customer-id :repo-id))
 (def props->sid
   "Constructs sid from build properties"
-  (juxt :customer-id :repo-id :build-id))
+  (apply juxt sid-props))
 
 (def build-sid-length 3)
 
@@ -26,8 +28,8 @@
   "Constructs map of `customer-id`, `repo-id` and `build-id` from the build or it's sid"
   [b]
   (if-let [{:keys [sid]} b]
-    (zipmap [:customer-id :repo-id :build-id] sid)
-    (props->sid b)))
+    (zipmap sid-props sid)
+    (select-keys b sid-props)))
 
 (def build-id (some-fn :build-id (constantly "unknown-build")))
 
