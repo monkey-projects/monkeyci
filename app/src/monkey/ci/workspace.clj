@@ -10,3 +10,4 @@
 (defmethod rt/setup-runtime :workspace [conf k]
   (when (k conf)
     (b/make-blob-store conf k)))
+

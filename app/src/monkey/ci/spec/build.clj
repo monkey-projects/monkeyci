@@ -74,6 +74,7 @@
 (s/def :build/source #{:github-webhook :github-app :api})
 (s/def :build/checkout-dir path?)
 (s/def :build/status build-states)
+(s/def :build/workspace string?)
 
 ;; GIT configuration
 (s/def :git/url ::c/url)
@@ -101,5 +102,5 @@
   (-> (s/keys :req-un [:build/customer-id :build/repo-id :build/build-id :build/sid
                        :build/source :build/status]
               :opt-un [:build/git :build/cleanup? :build/webhook-id :build/script :build/checkout-dir
-                       :build/changes])
+                       :build/changes :build/workspace])
       (s/merge ::generic-entity)))

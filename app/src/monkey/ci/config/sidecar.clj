@@ -2,7 +2,10 @@
   "Functions for handling sidecar configuration"
   (:require [medley.core :as mc]
             [monkey.ci.spec :as s]
-            [monkey.ci.spec.sidecar :as ss]))
+            [monkey.ci.spec
+             [blob :as bs]
+             [events :as es]
+             [sidecar :as ss]]))
 
 (defn- ns-keys [m]
   (mc/map-keys (comp (partial keyword "monkey.ci.spec.sidecar") name)))
@@ -26,10 +29,10 @@
 
 (def build (comp ::ss/build ::ss/job-config))
 
-(def events ::ss/events)
+(def events ::es/events)
 
 (defn set-events [conf e]
-  (assoc conf ::ss/events e))
+  (assoc conf ::es/events e))
 
 (def log-maker ::ss/log-maker)
 
@@ -57,3 +60,17 @@
 (defn set-abort-file [conf f]
   (assoc conf ::ss/abort-file f))
                        
+(def workspace ::bs/workspace)
+
+(defn set-workspace [conf ws]
+  (assoc conf ::bs/workspace ws))
+                       
+(def artifacts ::bs/artifacts)
+
+(defn set-artifacts [conf ws]
+  (assoc conf ::bs/artifacts ws))
+                       
+(def cache ::bs/cache)
+
+(defn set-cache [conf ws]
+  (assoc conf ::bs/cache ws))

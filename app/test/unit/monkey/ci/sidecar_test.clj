@@ -373,7 +373,11 @@
                  (cs/set-job {:id "test-job"})
                  (cs/set-build {:build-id "test-build"
                                 :workspace "test-ws"})
-                 (cs/set-poll-interval 100))
+                 (cs/set-poll-interval 100)
+                 (cs/set-events {:type :sync})
+                 (cs/set-workspace {:type :disk})
+                 (cs/set-artifacts {:type :disk})
+                 (cs/set-cache {:type :disk}))
         rt (sut/make-runtime conf)]
 
     (testing "config matches spec"
@@ -396,4 +400,19 @@
       (is (= "test-build" (get-in rt [:build :build-id]))))
 
     (testing "adds poll interval"
-      (is (= 100 (:poll-interval rt))))))
+      (is (= 100 (:poll-interval rt))))
+
+    (testing "creates events"
+      (is (satisfies? p/EventPoster (:events rt))))
+    
+    (testing "creates log maker"
+      (is (fn? (:log-maker rt))))
+    
+    (testing "creates workspace"
+      (is (p/blob-store? (:workspace rt))))
+    
+    (testing "creates artifacts"
+      (is (p/blob-store? (:artifacts rt))))
+    
+    (testing "creates cache"
+      (is (p/blob-store? (:cache rt))))))
