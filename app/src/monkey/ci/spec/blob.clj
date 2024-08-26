@@ -5,6 +5,7 @@
 (s/def ::type #{:disk :oci})
 
 (s/def ::blob-config
+  ;; TODO Multimethod
   (s/keys :req-un [::type]))
 
 (s/def ::workspace

@@ -129,7 +129,7 @@
   "Runs sidecar by restoring workspace, artifacts and caches, and then polling for events.
    After the event loop has terminated, saves artifacts and caches and returns a deferred
    containing the runtime with an `:exit` added."
-  [rt & [job]]
+  [rt]
   {:pre [(spec/valid? ::ss/runtime rt)]}
   (log/info "Running sidecar with configuration:" (get-in rt [rt/config :sidecar]))
   ;; Restore caches and artifacts before starting the job
@@ -142,7 +142,6 @@
                         :exception ex})]
     (try
       (-> rt
-          (mc/assoc-some :job job) ; Job needed for artifacts and caches
           (restore-src)
           (md/chain h)
           (md/catch
