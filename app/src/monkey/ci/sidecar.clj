@@ -13,11 +13,13 @@
              [config :as c]
              [logging :as l]
              [runtime :as rt]
-             [utils :as u]]))
+             [utils :as u]]
+            [monkey.ci.config.sidecar :as cs]
+            [monkey.ci.events.core :as ec]
+            [monkey.ci.spec.sidecar :as ss]))
 
-(defn restore-src [{:keys [build] :as rt}]
-  (let [store (get rt :workspace)
-        ws (:workspace build)
+(defn restore-src [{:keys [build] store :workspace :as rt}]
+  (let [ws (:workspace build)
         ;; Check out to the parent because the archive contains the directory
         checkout (some-> (:checkout-dir build)
                          (fs/parent)
@@ -68,7 +70,7 @@
         (with-open [is (io/input-stream path)]
           (let [capt (logger [(fs/file-name path)])
                 d (l/handle-stream capt is)]
-            (when (md/deferred? d)
+            (when  (md/deferred? d)
               @d)))))))
 
 (defn upload-logs
@@ -79,22 +81,23 @@
       (upload-log logger l)
       (log/debug "File uploaded:" l))))
 
+(defn- get-logger [conf]
+  (let [build (cs/build conf)
+        log-maker (cs/log-maker conf)
+        log-base (b/get-job-sid (cs/job conf) build)]
+    (when log-maker (comp (partial log-maker build)
+                                     (partial concat log-base)))))
+
 (defn poll-events
   "Reads events from the job container events file and posts them to the event service."
-  [job rt]
-  (let [f (-> (get-config rt :events-file)
-              (maybe-create-file))
+  [conf]
+  (let [f (maybe-create-file (cs/events-file conf))
         read-next (fn [r]
                     (u/parse-edn r {:eof ::eof}))
-        interval (get-in rt [rt/config :sidecar :poll-interval] 1000)
-        build (rt/build rt)
-        ;; TODO Remove explicit log uploads, the promtail container takes care of this now.
-        log-maker (rt/log-maker rt)
-        log-base (b/get-job-sid job build)
-        logger (when log-maker (comp (partial log-maker build)
-                                     (partial concat log-base)))
-        set-exit (fn [v] (assoc rt :exit v))
-        sid (b/get-sid rt)]
+        interval (cs/poll-interval conf)
+        logger (get-logger conf)
+        events (cs/events conf)
+        set-exit (fn [v] (assoc conf :exit v))]
     (log/info "Polling events from" f)
     (md/future
       (try
@@ -114,9 +117,9 @@
                           ;; TODO Start uploading logs as soon as the file is created instead
                           ;; of when the command has finished.
                           (upload-logs evt logger))
-                        (rt/post-events rt (assoc evt
-                                                  :sid sid
-                                                  :job job))))
+                        (ec/post-events events (assoc evt
+                                                      :sid (b/sid (cs/build conf))
+                                                      :job (cs/job conf)))))
                 (if (:done? evt)
                   (set-exit 0)
                   (recur (read-next r)))))))
@@ -133,7 +136,7 @@
   [rt job]
   (log/info "Running sidecar with configuration:" (get-in rt [rt/config :sidecar]))
   ;; Restore caches and artifacts before starting the job
-  (let [h (-> (comp (partial poll-events job) mark-start)
+  (let [h (-> (comp poll-events mark-start)
               (art/wrap-artifacts)
               (cache/wrap-caches))
         error-result (fn [ex]
@@ -164,3 +167,9 @@
       (add-from-args :start-file)
       (add-from-args :abort-file)
       (add-from-args :job-config)))
+
+(defn make-runtime
+  "Creates a runtime for the sidecar using the config map"
+  [conf]
+  ;; TODO
+  )

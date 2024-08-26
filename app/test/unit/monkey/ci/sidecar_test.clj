@@ -14,6 +14,7 @@
              [protocols :as p]
              [sidecar :as sut]
              [spec :as spec]]
+            [monkey.ci.config.sidecar :as cs]
             [monkey.ci.helpers :as h]))
 
 (defrecord TestLogger [streams path]
@@ -31,11 +32,12 @@
             evt {:type :test/event
                  :message "This is a test event"}
             {:keys [recv] :as e} (h/fake-events)
-            rt {:events e
-                :config {:sidecar {:poll-interval 10
-                                   :events-file f}}}
+            conf (-> {}
+                     (cs/set-events e)
+                     (cs/set-events-file f)
+                     (cs/set-poll-interval 10))
             _ (spit f (prn-str evt))
-            c (sut/poll-events {} rt)]
+            c (sut/poll-events conf)]
         (is (md/deferred? c))
         (is (not= :timeout (h/wait-until #(not-empty @recv) 500)))
         (is (= evt (-> (first @recv)
@@ -49,10 +51,11 @@
             evt {:type :test/event
                  :message "This is a test event"}
             {:keys [recv] :as e} (h/fake-events)
-            rt {:events e
-                :config {:sidecar {:events-file f
-                                   :poll-interval 10}}}
-            c (sut/poll-events {} rt)]
+            conf (-> {}
+                     (cs/set-events e)
+                     (cs/set-events-file f)
+                     (cs/set-poll-interval 10))
+            c (sut/poll-events conf)]
         ;; Post the event after sidecar has started
         (is (nil? (spit f (prn-str evt))))
         (is (not= :timeout (h/wait-until #(not-empty @recv) 500)))
@@ -69,11 +72,13 @@
             {:keys [recv] :as e} (h/fake-events)
             sid (repeatedly 3 random-uuid)
             job {:id "test-job"}
-            rt {:events e
-                :build {:sid sid}
-                :config {:sidecar {:events-file f
-                                   :poll-interval 10}}}
-            c (sut/poll-events job rt)]
+            conf (-> {}
+                     (cs/set-events e)
+                     (cs/set-events-file f)
+                     (cs/set-poll-interval 10)
+                     (cs/set-job job)
+                     (cs/set-build {:sid sid}))
+            c (sut/poll-events conf)]
         ;; Post the event after sidecar has started
         (is (nil? (spit f (prn-str evt))))
         (is (not= :timeout (h/wait-until #(not-empty @recv) 500)))
@@ -90,10 +95,11 @@
                  :message "This is a test event"
                  :done? true}
             {:keys [recv] :as e} (h/fake-events)
-            rt {:events e
-                :config {:sidecar {:events-file f
-                                   :poll-interval 10}}}
-            c (sut/poll-events {} rt)]
+            conf (-> {}
+                     (cs/set-events e)
+                     (cs/set-events-file f)
+                     (cs/set-poll-interval 10))
+            c (sut/poll-events conf)]
         ;; Post the event after sidecar has started
         (is (nil? (spit f (prn-str evt))))
         (is (not= :timeout (h/wait-until #(not-empty @recv) 500)))
@@ -112,13 +118,15 @@
                  :exit 0
                  :done? true}
             streams (atom [])
-            rt {:events {:poster (constantly true)}
-                :config {:sidecar {:events-file f
-                                   :poll-interval 10}}
-                :build {:build-id "test-build"}
-                :logging {:maker (fn [_ path]
-                                   (->TestLogger streams path))}}
-            c (sut/poll-events {:id "test-job"} rt)]
+            conf (-> {}
+                     (cs/set-events (h/fake-events))
+                     (cs/set-events-file f)
+                     (cs/set-poll-interval 10)
+                     (cs/set-log-maker (fn [_ path]
+                                         (->TestLogger streams path)))
+                     (cs/set-build {:build-id "test-build"})
+                     (cs/set-job {:id "test-job"}))
+            c (sut/poll-events conf)]
         (is (nil? (spit f (prn-str evt))))
         (is (not= :timeout (h/wait-until #(not-empty @streams) 500)))
         (is (= 0 (wait-for-exit c)))
@@ -228,12 +236,12 @@
 
 (deftest run
   (with-redefs [sut/mark-start identity
-                sut/poll-events (fn [_ rt]
+                sut/poll-events (fn [rt]
                                   (md/success-deferred (assoc rt :exit-code 0)))]
     
     (testing "restores src from workspace"
       (with-redefs [sut/restore-src (constantly {:stage ::restored})
-                    sut/poll-events (fn [_ rt]
+                    sut/poll-events (fn [rt]
                                       (when (= ::restored (:stage rt))
                                         {:stage ::polling}))]
         (is (= ::polling (:stage @(sut/run {} {}))))))
@@ -245,8 +253,7 @@
               _ (fs/create-file (fs/path dir path))
               cache (h/fake-blob-store stored)
               r (sut/run
-                  {:containers {:type :podman}
-                   :build {:build-id "test-build"
+                  {:build {:build-id "test-build"
                            :checkout-dir dir}
                    :logging {:maker (l/make-logger {})}
                    :cache cache}
@@ -257,7 +264,6 @@
                              :path path}]})]
           (is (map? (deref r 500 :timeout)))
           (is (not-empty @stored)))))
-    
     
     (testing "restores artifacts if configured"
       (h/with-tmp-dir dir
