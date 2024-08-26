@@ -5,14 +5,19 @@
              [cuid :as cuid]
              [logging :as l]
              [process :as sut]
-             [utils :as u]]))
+             [utils :as u]]
+            [monkey.ci.helpers :as h]))
 
 (defn example [subdir]
   (.getAbsolutePath (io/file (u/cwd) "examples" subdir)))
 
 (deftest ^:integration execute!
   (let [rt {:config {:dev-mode true}
-            :logging {:maker (l/make-logger {:logging {:type :inherit}})}}]
+            :logging {:maker (l/make-logger {:logging {:type :inherit}})}
+            :events (h/fake-events)
+            :workspace (h/fake-blob-store)
+            :artifacts (h/fake-blob-store)
+            :cache (h/fake-blob-store)}]
     
     (testing "executes build script in separate process"
       (is (zero? (-> {:script {:script-dir (example "basic-clj")}

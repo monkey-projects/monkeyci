@@ -111,6 +111,17 @@
     ;; Return a deferred that only resolves when the event stream stops
     d))
 
+(defn- ^:deprecated ->sidecar-rt
+  "Creates a runtime for the sidecar from the generic runtime.  To be removed."
+  [rt]
+  (let [conf (get-in rt [rt/config :sidecar])]
+    (-> rt
+        (select-keys [:build :events :workspace :artifacts :cache])
+        (assoc :job (:job-config conf)
+               :log-maker (rt/log-maker rt)
+               :poll-interval (get-in rt [rt/config :sidecar :poll-interval])
+               :paths (select-keys conf [:events-file :start-file :abort-file])))))
+
 (defn sidecar
   "Runs the application as a sidecar, that is meant to capture events 
    and logs from a container process.  This is necessary because when
@@ -123,19 +134,19 @@
   [rt]
   (let [sid (b/get-sid rt)
         ;; Add job info from the sidecar config
-        job (:job (get-in rt [rt/config :sidecar :job-config]))]
-    (let [result (try
-                   (rt/post-events rt {:type :sidecar/start
-                                       :sid sid
-                                       :job (jobs/job->event job)})
-                   (let [r @(sidecar/run rt job)
-                         e (:exit r)]
-                     (ec/make-result (b/exit-code->status e) e (:message r)))
-                   (catch Throwable t
-                     (ec/exception-result t)))]
-      (log/info "Sidecar terminated")
-      (rt/post-events rt (-> {:type :sidecar/end
-                              :sid sid
-                              :job (jobs/job->event job)}
-                             (ec/set-result result)))
-      (:exit result))))
+        job (:job (get-in rt [rt/config :sidecar :job-config]))
+        result (try
+                 (rt/post-events rt {:type :sidecar/start
+                                     :sid sid
+                                     :job (jobs/job->event job)})
+                 (let [r @(sidecar/run (->sidecar-rt rt))
+                       e (:exit r)]
+                   (ec/make-result (b/exit-code->status e) e (:message r)))
+                 (catch Throwable t
+                   (ec/exception-result t)))]
+    (log/info "Sidecar terminated")
+    (rt/post-events rt (-> {:type :sidecar/end
+                            :sid sid
+                            :job (jobs/job->event job)}
+                           (ec/set-result result)))
+    (:exit result)))

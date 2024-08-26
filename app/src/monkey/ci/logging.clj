@@ -23,6 +23,9 @@
 
 (defmulti make-logger (comp :type :logging))
 
+(defn ->config [conf]
+  {:logging conf})
+
 ;; Note that inherit logger redirects output to the stdout of the parent,
 ;; which is not necessarily the same as the log output.  For example, logging
 ;; to Loki does not capture stdout, only the log appender sends to Loki.

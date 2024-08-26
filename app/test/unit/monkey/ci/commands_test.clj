@@ -94,21 +94,32 @@
         (is (not-empty @reported))))))
 
 (deftest sidecar
-  (with-redefs [sc/run (constantly (md/success-deferred {:exit ::test-exit}))]
-    (testing "runs sidecar poll loop, returns exit code"
-      (is (= ::test-exit (sut/sidecar {:config {:dev-mode true}}))))
+  (let [inv-args (atom nil)]
+    (with-redefs [sc/run (fn [args]
+                           (reset! inv-args args)
+                           (md/success-deferred {:exit ::test-exit}))]
+      (testing "runs sidecar poll loop, returns exit code"
+        (is (= ::test-exit (sut/sidecar {:config {:dev-mode true}}))))
 
-    (testing "posts start and end events"
-      (let [{:keys [recv] :as e} (h/fake-events)]
-        (is (some? (sut/sidecar {:events e
-                                 :config {:dev-mode true}})))
-        (is (= [:sidecar/start :sidecar/end]
-               (map :type @recv)))))
+      (testing "passes events from runtime"
+        (is (some? (sut/sidecar {:events ::test-events})))
+        (is (= ::test-events (:events @inv-args))))
 
-    (testing "events contain job details from config"
-      (let [{:keys [recv] :as e} (h/fake-events)
-            job {:id "test-job"}]
-        (is (some? (sut/sidecar {:events e
-                                 :config {:sidecar {:job-config {:job job}}
-                                          :dev-mode true}})))
-        (is (= job (-> @recv first :job)))))))
+      (testing "passes file paths"
+        (is (some? (sut/sidecar {:config {:sidecar {:events-file "test-events"}}})))
+        (is (= "test-events" (get-in @inv-args [:paths :events-file]))))
+
+      (testing "posts start and end events"
+        (let [{:keys [recv] :as e} (h/fake-events)]
+          (is (some? (sut/sidecar {:events e
+                                   :config {:dev-mode true}})))
+          (is (= [:sidecar/start :sidecar/end]
+                 (map :type @recv)))))
+
+      (testing "events contain job details from config"
+        (let [{:keys [recv] :as e} (h/fake-events)
+              job {:id "test-job"}]
+          (is (some? (sut/sidecar {:events e
+                                   :config {:sidecar {:job-config {:job job}}
+                                            :dev-mode true}})))
+          (is (= job (-> @recv first :job))))))))

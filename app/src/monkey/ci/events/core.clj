@@ -88,6 +88,11 @@
 (defmethod make-events :zmq [config]
   (zmq/make-zeromq-events (:events config) matches-event?))
 
+(defn ->config
+  "Creates a valid events config object that can be passed to `make-events`"
+  [obj]
+  {:events obj})
+
 (defmethod rt/setup-runtime :events [conf _]
   (when (:events conf)
     (make-events conf)))
