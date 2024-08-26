@@ -47,3 +47,13 @@
 (defn set-events-file [conf f]
   (assoc conf ::ss/events-file f))
                        
+(def start-file ::ss/start-file)
+
+(defn set-start-file [conf f]
+  (assoc conf ::ss/start-file f))
+
+(def abort-file ::ss/abort-file)
+
+(defn set-abort-file [conf f]
+  (assoc conf ::ss/abort-file f))
+                       

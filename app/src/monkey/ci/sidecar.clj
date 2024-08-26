@@ -13,6 +13,7 @@
              [config :as c]
              [logging :as l]
              [runtime :as rt]
+             [spec :as spec]
              [utils :as u]]
             [monkey.ci.config.sidecar :as cs]
             [monkey.ci.events.core :as ec]
@@ -34,9 +35,6 @@
       (and store ws checkout)
       (restore))))
 
-(defn- get-config [rt k]
-  (-> rt rt/config :sidecar k))
-
 (defn- create-file-with-dirs [f]
   (let [p (fs/parent f)]
     (when-not (fs/exists? p)
@@ -45,7 +43,7 @@
   (fs/create-file f))
 
 (defn- touch-file [rt k]
-  (let [f (get-config rt k)]
+  (let [f (get-in rt [:paths k])]
     (when (not-empty f)
       (log/debug "Creating file:" f)
       (create-file-with-dirs f))
@@ -81,23 +79,20 @@
       (upload-log logger l)
       (log/debug "File uploaded:" l))))
 
-(defn- get-logger [conf]
-  (let [build (cs/build conf)
-        log-maker (cs/log-maker conf)
-        log-base (b/get-job-sid (cs/job conf) build)]
+(defn- get-logger [{:keys [build job log-maker]}]
+  (let [log-base (b/get-job-sid job build)]
     (when log-maker (comp (partial log-maker build)
-                                     (partial concat log-base)))))
+                          (partial concat log-base)))))
 
 (defn poll-events
   "Reads events from the job container events file and posts them to the event service."
-  [conf]
-  (let [f (maybe-create-file (cs/events-file conf))
+  [{:keys [job build events] :as rt}]
+  (let [f (maybe-create-file (get-in rt [:paths :events-file]))
         read-next (fn [r]
                     (u/parse-edn r {:eof ::eof}))
-        interval (cs/poll-interval conf)
-        logger (get-logger conf)
-        events (cs/events conf)
-        set-exit (fn [v] (assoc conf :exit v))]
+        interval (:poll-interval rt)
+        logger (get-logger rt)
+        set-exit (fn [v] (assoc rt :exit v))]
     (log/info "Polling events from" f)
     (md/future
       (try
@@ -118,8 +113,8 @@
                           ;; of when the command has finished.
                           (upload-logs evt logger))
                         (ec/post-events events (assoc evt
-                                                      :sid (b/sid (cs/build conf))
-                                                      :job (cs/job conf)))))
+                                                      :sid (b/sid build)
+                                                      :job job))))
                 (if (:done? evt)
                   (set-exit 0)
                   (recur (read-next r)))))))
@@ -133,7 +128,8 @@
   "Runs sidecar by restoring workspace, artifacts and caches, and then polling for events.
    After the event loop has terminated, saves artifacts and caches and returns a deferred
    containing the runtime with an `:exit` added."
-  [rt job]
+  [rt & [job]]
+  {:pre [(spec/valid? ::ss/runtime rt)]}
   (log/info "Running sidecar with configuration:" (get-in rt [rt/config :sidecar]))
   ;; Restore caches and artifacts before starting the job
   (let [h (-> (comp poll-events mark-start)
@@ -145,7 +141,7 @@
                         :exception ex})]
     (try
       (-> rt
-          (assoc :job job) ; Job needed for artifacts and caches
+          (mc/assoc-some :job job) ; Job needed for artifacts and caches
           (restore-src)
           (md/chain h)
           (md/catch
@@ -171,5 +167,7 @@
 (defn make-runtime
   "Creates a runtime for the sidecar using the config map"
   [conf]
-  ;; TODO
-  )
+  (let [props (juxt cs/job cs/build cs/poll-interval)
+        paths (juxt cs/events-file cs/start-file cs/abort-file)]
+    (-> (zipmap [:job :build :poll-interval] (props conf))
+        (assoc :paths (zipmap [:events-file :start-file :abort-file] (paths conf))))))
