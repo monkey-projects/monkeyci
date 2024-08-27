@@ -1,6 +1,10 @@
 (ns monkey.ci.commands
   "Event handlers for commands"
-  (:require [clojure.tools.logging :as log]
+  (:require [aleph.http :as http]
+            [clj-commons.byte-streams :as bs]
+            [clojure.tools.logging :as log]
+            [manifold.deferred :as md]
+            [medley.core :as mc]
             [monkey.ci
              [build :as b]
              [jobs :as jobs]
@@ -9,10 +13,7 @@
              [sidecar :as sidecar]
              [utils :as u]]
             [monkey.ci.events.core :as ec]
-            [monkey.ci.web.handler :as h]
-            [aleph.http :as http]
-            [clj-commons.byte-streams :as bs]
-            [manifold.deferred :as md]))
+            [monkey.ci.web.handler :as h]))
 
 (def exit-error 1)
 
@@ -111,16 +112,20 @@
     ;; Return a deferred that only resolves when the event stream stops
     d))
 
+(defn- sidecar-rt->job [rt]
+  (get-in rt [rt/config :args :job-config :job]))
+
 (defn- ^:deprecated ->sidecar-rt
   "Creates a runtime for the sidecar from the generic runtime.  To be removed."
   [rt]
-  (let [conf (get-in rt [rt/config :sidecar])]
+  (let [conf (get-in rt [rt/config :sidecar])
+        args (get-in rt [rt/config :args])]
     (-> rt
         (select-keys [:build :events :workspace :artifacts :cache])
-        (assoc :job (:job-config conf)
+        (assoc :job (sidecar-rt->job rt)
                :log-maker (rt/log-maker rt)
-               :poll-interval (get-in rt [rt/config :sidecar :poll-interval])
-               :paths (select-keys conf [:events-file :start-file :abort-file])))))
+               :paths (select-keys args [:events-file :start-file :abort-file]))
+        (mc/assoc-some :poll-interval (get-in rt [rt/config :sidecar :poll-interval])))))
 
 (defn sidecar
   "Runs the application as a sidecar, that is meant to capture events 
@@ -134,7 +139,7 @@
   [rt]
   (let [sid (b/get-sid rt)
         ;; Add job info from the sidecar config
-        job (:job (get-in rt [rt/config :sidecar :job-config]))
+        job (sidecar-rt->job rt)
         result (try
                  (rt/post-events rt {:type :sidecar/start
                                      :sid sid

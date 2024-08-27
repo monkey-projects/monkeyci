@@ -66,6 +66,7 @@
 ;;; Build: contains information about a single build, like id, git info, and script
 
 (s/def :build/id id?)
+(s/def :build/build-id id?)
 (s/def :build/sid vector?)
 (s/def :build/cleanup? boolean?)
 (s/def :build/webhook-id id?)
