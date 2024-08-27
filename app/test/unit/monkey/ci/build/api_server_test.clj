@@ -1,6 +1,7 @@
 (ns monkey.ci.build.api-server-test
   (:require [clojure.test :refer [deftest testing is]]
             [aleph.http :as http]
+            [clj-commons.byte-streams :as bs]
             [clojure.spec.alpha :as s]
             [manifold.deferred :as md]
             [monkey.ci.build.api-server :as sut]
@@ -130,6 +131,26 @@
       (is (= 200 (:status res)))
       (is (not-empty (slurp (:body res)))))))
 
+(deftest upload-artifact
+  (let [bs (h/fake-blob-store)
+        id (str (random-uuid))]
+    (testing "stores artifact in blob store"
+      (is (= 200 (-> {:artifacts bs}
+                     (->req)
+                     (assoc :parameters
+                            {:path {:artifact-id id}}
+                            :body (bs/to-input-stream (.getBytes "test body")))
+                     (sut/upload-artifact)
+                     deref
+                     :status))))
+
+    (testing "client error if no body"
+      (is (= 400 (-> {:artifacts bs}
+                     (->req)
+                     (assoc-in [:parameters :path :artifact-id] id)
+                     (sut/upload-artifact)
+                     :status))))))
+
 (deftest get-ip-addr
   (testing "returns ipv4 address"
     (is (re-matches #"\d+\.\d+\.\d+\.\d+"
@@ -166,7 +187,28 @@
       (is (= 204 (-> (mock/request :get "/workspace")
                      (auth)
                      (app)
-                     :status))))))
+                     :status))))
+
+    (testing "`/artifact`"
+      (let [artifact-id (str (random-uuid))]
+        (testing "`PUT` uploads artifact"
+          (is (= 200 (-> (mock/request :put (str "/artifact/" artifact-id)
+                                       {:body "test body"})
+                         (auth)
+                         (app)
+                         deref
+                         :status))))
+
+        (testing "`GET` downloads artifact"
+          (is (= 200 (-> (mock/request :get (str "/artifact/" artifact-id))
+                         (auth)
+                         (app)
+                         :status))))))
+
+    (testing "`/cache`"
+      (testing "`PUT` uploads cache")
+      
+      (testing "`GET` downloads cache"))))
 
 (deftest rt->api-server-config
   (testing "adds port from runner config"

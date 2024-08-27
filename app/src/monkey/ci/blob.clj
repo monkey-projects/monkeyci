@@ -84,13 +84,6 @@
          (log/warn "Unable to archive" src ": path does not exist")
          nil))))
 
-  (get-blob-stream [_ src]
-    (let [srcf (io/file dir src)]
-      (log/debug "Retrieving blob stream for" srcf)
-      (md/success-deferred
-       (when (fs/exists? srcf)
-         (io/input-stream srcf)))))
-
   (restore-blob [_ src dest]
     (let [f (io/file dest)
           os (PipedOutputStream.)
@@ -99,7 +92,22 @@
       (md/future
         (when (fs/exists? srcf)
           (-> (a/extract srcf f)
-              (assoc :src src)))))))
+              (assoc :src src))))))
+
+  (get-blob-stream [_ src]
+    (let [srcf (io/file dir src)]
+      (log/debug "Retrieving blob stream for" srcf)
+      (md/success-deferred
+       (when (fs/exists? srcf)
+         (io/input-stream srcf)))))
+
+  (put-blob-stream [_ src dest]
+    (let [f (io/file dir dest)]
+      (u/mkdirs! (.getParentFile f))
+      (io/copy src f)
+      (md/success-deferred
+       {:src src
+        :dest f}))))
 
 (defmethod make-blob-store :disk [conf k]
   ;; Make storage dir relative to the work dir

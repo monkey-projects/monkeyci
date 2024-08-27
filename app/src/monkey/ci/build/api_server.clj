@@ -7,8 +7,10 @@
    the global API will not be overloaded by malfunctioning (or misbehaving) builds."
   (:require [aleph
              [http :as http]
-             [netty :as an]]
-            [aleph.http.client-middleware :as acmw]
+             [netty :as an]]            
+            [aleph.http
+             [client-middleware :as acmw]
+             [multipart :as mp]]
             [clj-commons.byte-streams :as bs]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
@@ -56,6 +58,9 @@
 
 (def req->workspace
   (comp :workspace req->ctx))
+
+(def req->artifacts
+  (comp :artifacts req->ctx))
 
 (def repo-id
   (comp (juxt :customer-id :repo-id) req->build))
@@ -135,6 +140,29 @@
              ;; TODO Return correct content type according to stream
              #(rur/content-type % "application/octet-stream")))))
 
+(defn upload-artifact
+  "Uploads a new artifact.  The body should be a multipart request that contains the
+   contents."
+  [req]
+  (let [store (req->artifacts req)
+        id (get-in req [:parameters :path :artifact-id])
+        stream (:body req)]
+    (log/info "Received uploaded artifact:" id)
+    (log/debug "Content type:" (get-in req [:headers "content-type"]))
+    (if stream
+      (-> (md/chain
+           (p/put-blob-stream store stream id)
+           (constantly (rur/response (pr-str {:artifact-id id}))))
+          (md/finally
+            #(.close stream)))
+      (rur/status 400))))
+
+(defn download-artifact
+  "Downloads an artifact.  The body contains the artifact as a stream."
+  [req]
+  ;; TODO Use local disk storage to avoid re-downloading it from persistent storage
+  (rur/response "TODO"))
+
 (def edn #{"application/edn"})
 
 (def routes ["" {:swagger {:id :monkeyci/build-api}}
@@ -164,7 +192,18 @@
                {:get download-workspace
                 :summary "Downloads workspace for the build"
                 :operationId :download-workspace
-                :responses {200 {}}}]]])
+                :responses {200 {}}}]
+              ["/artifact/:artifact-id"
+               {:parameters {:path {:artifact-id s/Str}}
+                :put {:handler #'upload-artifact
+                      :summary "Uploads a new artifact"
+                      :operationId :upload-artifact
+                      :responses {200 {}}
+                      :produces edn}
+                :get {:handler download-artifact
+                      :summary "Downloads an artifact"
+                      :operationId :download-artifact
+                      :responses {200 {}}}}]]])
 
 (defn security-middleware
   "Middleware that checks if the authorization header matches the specified token"
