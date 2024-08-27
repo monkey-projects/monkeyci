@@ -91,7 +91,7 @@
   (let [f (maybe-create-file (get-in rt [:paths :events-file]))
         read-next (fn [r]
                     (u/parse-edn r {:eof ::eof}))
-        interval (:poll-interval rt)
+        interval (get rt :poll-interval cs/default-poll-interval)
         logger (get-logger rt)
         set-exit (fn [v] (assoc rt :exit v))]
     (log/info "Polling events from" f)

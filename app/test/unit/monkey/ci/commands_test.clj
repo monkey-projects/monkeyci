@@ -105,8 +105,10 @@
         (is (some? (sut/sidecar {:events ::test-events})))
         (is (= ::test-events (:events @inv-args))))
 
-      (testing "passes file paths"
-        (is (some? (sut/sidecar {:config {:sidecar {:events-file "test-events"}}})))
+      (testing "passes file paths from args"
+        (is (some? (sut/sidecar {:config
+                                 {:args
+                                  {:events-file "test-events"}}})))
         (is (= "test-events" (get-in @inv-args [:paths :events-file]))))
 
       (testing "posts start and end events"
@@ -120,6 +122,6 @@
         (let [{:keys [recv] :as e} (h/fake-events)
               job {:id "test-job"}]
           (is (some? (sut/sidecar {:events e
-                                   :config {:sidecar {:job-config {:job job}}
+                                   :config {:args {:job-config {:job job}}
                                             :dev-mode true}})))
           (is (= job (-> @recv first :job))))))))

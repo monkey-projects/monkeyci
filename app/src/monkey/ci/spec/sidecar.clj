@@ -13,13 +13,14 @@
 (s/def ::job-config
   (s/keys :req [::job ::build]))
 
-(s/def ::job map?) ; TODO Specify
+(s/def ::job
+  (s/keys :req-un [:job/id]))
 
 (s/def ::checkout-dir string?)
 
 (s/def ::build
-  (s/keys :req-un [:build/workspace]
-          :opt-un [::checkout-dir]))
+  (s/keys :req-un [:build/workspace :build/build-id]
+          :opt-un [::checkout-dir :build/sid]))
 
 (s/def ::config
   (s/keys :req [::events-file ::start-file ::abort-file ::job-config ::e/events]))

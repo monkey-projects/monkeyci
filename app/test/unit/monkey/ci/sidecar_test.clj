@@ -260,7 +260,7 @@
                     :logging {:maker (l/make-logger {})}
                     :cache cache
                     :job 
-                    {:name "test-job"
+                    {:id "test-job"
                      :container/image "test-img"
                      :script ["first" "second"]
                      :caches [{:id "test-cache"
@@ -283,7 +283,7 @@
                     :logging {:maker (l/make-logger {})}
                     :artifacts store
                     :job 
-                    {:name "test-job"
+                    {:id "test-job"
                      :container/image "test-img"
                      :script ["first" "second"]
                      :restore-artifacts [{:id "test-artifact"
@@ -306,7 +306,7 @@
                     :logging {:maker (l/make-logger {})}
                     :artifacts store
                     :job 
-                    {:name "test-job"
+                    {:id "test-job"
                      :container/image "test-img"
                      :script ["first" "second"]
                      :save-artifacts [{:id "test-artifact"
@@ -316,7 +316,8 @@
     (testing "waits until artifacts have been stored"
       ;; Set up blob saving so it takes a while
       (is (= ::timeout (-> {:artifacts (->SlowBlobStore 1000)
-                            :job {:save-artifacts [{:id "test-artifact"
+                            :job {:id "test-job"
+                                  :save-artifacts [{:id "test-artifact"
                                                     :path "test-path"}]}}
                            (trs/make-test-rt)
                            (sut/run)
@@ -337,7 +338,8 @@
     (testing "blocks until caches have been stored"
       ;; Set up blob saving so it takes a while
       (is (= ::timeout (-> {:cache (->SlowBlobStore 1000)
-                            :job {:caches [{:id "test-artifact"
+                            :job {:id "test-job"
+                                  :caches [{:id "test-artifact"
                                             :path "test-path"}]}}
                            (trs/make-test-rt)
                            (sut/run)

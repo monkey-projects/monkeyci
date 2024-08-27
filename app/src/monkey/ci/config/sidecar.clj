@@ -39,8 +39,10 @@
 (defn set-log-maker [conf l]
   (assoc conf ::ss/log-maker l))
 
+(def default-poll-interval 1000)
+
 (defn poll-interval [conf]
-  (get conf ::ss/poll-interval 1000))
+  (get conf ::ss/poll-interval default-poll-interval))
 
 (defn set-poll-interval [conf v]
   (assoc conf ::ss/poll-interval v))
