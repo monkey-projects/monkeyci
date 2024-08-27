@@ -15,7 +15,11 @@
              [oci :as oci]
              [runtime :as rt]]))
 
-(defn- do-with-blobs [{:keys [job store job-key]} f]
+(defn- do-with-blobs
+  "Fetches blobs configurations from the job using the job key, then
+   applies `f` to each of them.  This is only executed if a blob store 
+   is configured."
+  [{:keys [job store job-key]} f]
   (md/chain
    (->> (when store
           (job-key job))
@@ -85,7 +89,9 @@
   ;; The blob archive path is the build sid with the blob id added.
   (build-sid->artifact-path (b/sid build) id))
 
-(defn- rt->config [{:keys [build] :as rt}]
+(defn- rt->config
+  "Creates a configuration object for artifacts from the runtime"
+  [{:keys [build] :as rt}]
   (-> (select-keys rt [:job :build])
       (assoc :store (rt/artifacts rt)
              :build-path (partial artifact-archive-path build))))
@@ -103,7 +109,12 @@
       (assoc :job-key :restore-artifacts)
       (restore-generic)))
 
-(defn wrap-artifacts [f]
+(defn wrap-artifacts
+  "Wraps `f`, which is a 1-arity function that takes a runtime configuration,
+   so that artifacts are restored of the job found in the runtime.  After the 
+   invocation of `f`, saves any published artifacts.  Returns a deferred with
+   the updated runtime."
+  [f]
   (fn [rt]
     (md/chain
      (restore-artifacts rt)

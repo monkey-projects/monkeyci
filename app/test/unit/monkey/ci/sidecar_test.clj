@@ -13,7 +13,8 @@
              [config :as c]
              [logging :as l]
              [protocols :as p]
-             [sidecar :as sut]]
+             [sidecar :as sut]
+             [workspace :as ws]]
             [monkey.ci.config.sidecar :as cs]
             [monkey.ci.spec.sidecar :as ss]
             [monkey.ci.helpers :as h]
@@ -134,22 +135,6 @@
         (is (= 0 (wait-for-exit c)))
         (is (= ["test-build" "test-job" "out.log"] (first @streams)))))))
 
-(deftest restore-src
-  (testing "nothing if no workspace in build"
-    (let [rt {}]
-      (is (= rt (sut/restore-src rt)))))
-
-  (testing "restores using the workspace path in build into checkout dir"
-    (let [stored (atom {"path/to/workspace" "local"})
-          store (h/strict-fake-blob-store stored)
-          rt {:build {:workspace "path/to/workspace"
-                      :checkout-dir "local/dir"}
-              :workspace store}]
-      (is (true? (-> (sut/restore-src rt)
-                     (deref)
-                     (get-in [:build :workspace/restored?]))))
-      (is (empty? @stored)))))
-
 (deftest mark-start
   (testing "creates start file"
     (h/with-tmp-dir dir
@@ -240,7 +225,7 @@
                                   (md/success-deferred (assoc rt :exit-code 0)))]
     
     (testing "restores src from workspace"
-      (with-redefs [sut/restore-src (constantly {:stage ::restored})
+      (with-redefs [ws/restore (constantly {:stage ::restored})
                     sut/poll-events (fn [rt]
                                       (when (= ::restored (:stage rt))
                                         {:stage ::polling}))]
@@ -357,7 +342,7 @@
             (is (fs/exists? abort-file))))))
 
     (testing "aborts on exception thrown"
-      (with-redefs [sut/restore-src (fn [_] (throw (ex-info "test error" {})))]
+      (with-redefs [ws/restore (fn [_] (throw (ex-info "test error" {})))]
         (h/with-tmp-dir dir
           (let [abort-file (io/file dir "abort")]
             (is (some? (-> (trs/make-test-rt)

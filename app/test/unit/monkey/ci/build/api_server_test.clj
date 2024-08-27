@@ -143,7 +143,10 @@
                      (mock/content-type "application/edn")
                      (auth)
                      (app)
-                     :status))))))
+                     :status))))
+
+    (testing "`GET /workspace` downloads workspace"
+      )))
 
 (deftest rt->api-server-config
   (testing "adds port from runner config"
