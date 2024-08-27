@@ -240,7 +240,7 @@
   [req]
   (letfn [(get-contents [{:keys [id]}]
             (when id
-              (let [store (a/artifact-store (c/req->rt req))
+              (let [store (rt/artifacts (c/req->rt req))
                     path (a/build-sid->artifact-path (build-sid req) id)]
                 (log/debug "Downloading artifact for id" id "from path" path)
                 (blob/input-stream store path))))]

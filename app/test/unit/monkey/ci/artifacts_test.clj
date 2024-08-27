@@ -48,9 +48,8 @@
     (let [src (io/file "src")
           dest (io/file "dest")
           bs (h/fake-blob-store (atom {src dest}))
-          r @(sut/restore-blob {:store-key :test-store
+          r @(sut/restore-blob {:store bs
                                 :build-path (constantly src)}
-                               {:test-store bs}
                                {:id "test-cache"
                                 :path "test-path"})]
       (is (map? r))

@@ -81,6 +81,7 @@
 (def ^:deprecated build "Gets build info from runtime" :build)
 
 (def runner-api-port (from-config (comp :port :api :runner)))
+(def artifacts :artifacts)
 
 (defn events-receiver [{:keys [events]}]
   (if (satisfies? p/EventReceiver events)
