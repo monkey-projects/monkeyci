@@ -17,6 +17,7 @@
             [monkey.ci
              [labels :as lbl]
              [runtime :as rt]
+             [protocols :as p]
              [spec :as spec]
              [storage :as st]]
             ;; Very strange, but including this causes spec gen exceptions when using cloverage :confused:
@@ -52,6 +53,9 @@
 
 (def req->api
   (comp :api req->ctx))
+
+(def req->workspace
+  (comp :workspace req->ctx))
 
 (def repo-id
   (comp (juxt :customer-id :repo-id) req->build))
@@ -116,6 +120,21 @@
         (log/error "Unable to dispatch event" ex)
         {:status 500}))))
 
+(defn download-workspace [req]
+  (let [ws (req->workspace req)
+        path (:workspace (req->build req))
+        stream (when (and ws path)
+                 (p/get-blob-stream ws path))]
+    (cond
+      (not ws) (-> (rur/response {:message "Workspace not configured"})
+                   (rur/status 500))
+      (not stream) (rur/status 204)
+      :else (md/chain
+             stream
+             rur/response
+             ;; TODO Return correct content type according to stream
+             #(rur/content-type % "application/octet-stream")))))
+
 (def edn #{"application/edn"})
 
 (def routes ["" {:swagger {:id :monkeyci/build-api}}
@@ -140,7 +159,12 @@
                 :operationId :post-events
                 :parameters {:body [{s/Keyword s/Any}]}
                 :responses {202 {}}
-                :consumes edn}]]])
+                :consumes edn}]
+              ["/workspace"
+               {:get download-workspace
+                :summary "Downloads workspace for the build"
+                :operationId :download-workspace
+                :responses {200 {}}}]]])
 
 (defn security-middleware
   "Middleware that checks if the authorization header matches the specified token"

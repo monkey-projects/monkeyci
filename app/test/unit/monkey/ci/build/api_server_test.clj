@@ -112,6 +112,24 @@
                    deref
                    :body)))))))
 
+(deftest download-workspace
+  (testing "returns 204 no content if no workspace"
+    (is (= 204 (-> {:workspace (h/fake-blob-store)}
+                   (->req)
+                   (sut/download-workspace)
+                   :status))))
+
+  (testing "returns workspace as stream"
+    (let [ws-path "test/workspace"
+          ws (h/fake-blob-store (atom {ws-path "Dummy contents"}))
+          res (-> {:workspace ws
+                   :build {:workspace ws-path}}
+                  (->req)
+                  (sut/download-workspace)
+                  deref)]
+      (is (= 200 (:status res)))
+      (is (not-empty (slurp (:body res)))))))
+
 (deftest get-ip-addr
   (testing "returns ipv4 address"
     (is (re-matches #"\d+\.\d+\.\d+\.\d+"
@@ -120,8 +138,7 @@
 (deftest api-server-routes
   (let [token (sut/generate-token)
         app (sut/make-app (-> test-config
-                              (assoc :token token
-                                     :storage (st/make-memory-storage))))
+                              (assoc :token token)))
         auth (fn [req]
                (mock/header req "Authorization" (str "Bearer " token)))]
     (testing "`/test` returns ok"
@@ -146,7 +163,10 @@
                      :status))))
 
     (testing "`GET /workspace` downloads workspace"
-      )))
+      (is (= 204 (-> (mock/request :get "/workspace")
+                     (auth)
+                     (app)
+                     :status))))))
 
 (deftest rt->api-server-config
   (testing "adds port from runner config"
