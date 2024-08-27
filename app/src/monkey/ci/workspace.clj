@@ -8,9 +8,8 @@
              [config :as c]
              [runtime :as rt]]))
 
-(defn create-workspace [{:keys [checkout-dir sid] :as build} rt]
-  (let [ws (:workspace rt)
-        dest (str (cs/join "/" sid) b/extension)]
+(defn create-workspace [{:keys [checkout-dir sid] :as build} {ws :workspace}]
+  (let [dest (str (cs/join "/" sid) b/extension)]
     (when checkout-dir
       (log/info "Creating workspace using files from" checkout-dir)
       @(md/chain

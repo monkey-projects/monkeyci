@@ -137,9 +137,9 @@
                      deref
                      :status))))
 
-    (testing "`POST /event` dispatches event"
-      (is (= 202 (-> (mock/request :post "/event")
-                     (mock/body (pr-str {:type ::test-event}))
+    (testing "`POST /events` dispatches events"
+      (is (= 202 (-> (mock/request :post "/events")
+                     (mock/body (pr-str [{:type ::test-event}]))
                      (mock/content-type "application/edn")
                      (auth)
                      (app)

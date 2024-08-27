@@ -105,9 +105,9 @@
   ;; TODO There could be more than one
   (.. (java.net.Inet4Address/getLocalHost) (getHostAddress)))
 
-(defn post-event [req]
+(defn post-events [req]
   (let [evt (get-in req [:parameters :body])]
-    (log/debug "Received event from build script:" evt)
+    (log/debug "Received events from build script:" evt)
     (try 
       {:status (if (rt/post-events (req->ctx req) evt)
                  202
@@ -134,11 +134,11 @@
                 :operationId :get-params
                 :responses {200 {:body {s/Str s/Str}}}
                 :produces edn}]
-              ["/event"
-               {:post post-event
-                :summary "Post an event to the bus"
-                :operationId :post-event
-                :parameters {:body {s/Keyword s/Any}}
+              ["/events"
+               {:post post-events
+                :summary "Post a events to the bus"
+                :operationId :post-events
+                :parameters {:body [{s/Keyword s/Any}]}
                 :responses {202 {}}
                 :consumes edn}]]])
 
