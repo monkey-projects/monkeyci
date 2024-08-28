@@ -4,7 +4,7 @@
              [config :as c]
              [runtime :as rt]]))
 
-;; TODO Rework to use a container runner fn instead
+;; TODO Rework to use a container runner fn instead with components
 (defmulti ^:deprecated run-container (comp :type :containers))
 
 (defmulti credit-multiplier-fn (comp :type :containers))

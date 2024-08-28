@@ -15,72 +15,52 @@
              [oci :as oci]
              [runtime :as rt]]))
 
-(defn- get-store [rt k]
-  (get rt k))
+(defn- do-with-blobs
+  "Fetches blobs configurations from the job using the job key, then
+   applies `f` to each of them.  This is only executed if a blob store 
+   is configured."
+  [{:keys [job store job-key]} f]
+  (md/chain
+   (->> (when store
+          (job-key job))
+        (map f)
+        (apply md/zip))
+   (partial remove nil?)))
 
-(defn artifact-store [rt]
-  (get-store rt :artifacts))
-
-(defn build-sid->artifact-path
-  "Returns the path to the artifact with specified id for given build sid"
-  [sid id]
-  (str (cs/join "/" (concat sid [id])) ".tgz"))
-
-(defn artifact-archive-path [{:keys [build]} id]
-  ;; The blob archive path is the build sid with the blob id added.
-  (build-sid->artifact-path (b/sid build) id))
-
-(defn- job-blobs [job rt {:keys [store-key job-key]}]
-  (when (get-store rt store-key)
-    (job-key job)))
-
-(defn- do-with-blobs [rt conf f]
-  (->> (job-blobs (:job rt) rt conf)
-       (map (partial f rt))
-       (apply md/zip)))
-
-(defn- mb [f]
+(defn- mb
+  "Returns file size in MB"
+  [f]
   (if (fs/exists? f)
     (float (/ (fs/size f) (* 1024 1024)))
     0.0))
 
-(defn save-blob
-  "Saves a single blob path"
-  [{:keys [build-path store-key]} rt {:keys [path id]}]
+(defn- save-blob
+  "Saves a single blob path, using the blob configuration and artifact info."
+  [{:keys [job build store build-path]} {:keys [path id]}]
   ;; TODO Make paths relative to checkout dir because using job work dir can be wroing
   ;; when the work dir of the saving job is not the same as the restoring job.
-  (let [fullp (b/job-relative-dir rt path)]
+  (let [fullp (b/job-relative-dir job build path)]
     (log/debug "Saving blob:" id "at path" path "(full path:" fullp ")")
     (md/chain
-     (blob/save (get-store rt store-key)
+     (blob/save store
                 fullp
-                (build-path rt id))
+                (build-path id))
      (fn [{:keys [dest entries] :as r}]
        (if (not-empty entries)
          (log/debugf "Zipped %d entries to %s (%.2f MB)" (count entries) dest (mb dest))
          (log/warn "No files to archive for" id "at" path))
        r))))
 
-(defn save-generic [rt conf]
-  (md/chain
-   (do-with-blobs rt conf (partial save-blob conf))
-   (partial remove nil?)))
+(defn save-generic [conf]
+  (do-with-blobs conf (partial save-blob conf)))
 
-(defn save-artifacts
-  "Saves all artifacts according to the job configuration."
-  [rt]
-  (save-generic rt
-                {:job-key :save-artifacts
-                 :store-key :artifacts
-                 :build-path artifact-archive-path}))
-
-(defn restore-blob [{:keys [store-key build-path]} rt {:keys [id path]}]
+(defn restore-blob [{:keys [store build-path job build]} {:keys [id path]}]
   (log/debug "Restoring blob:" id "to path" path)
   (md/chain
-   (blob/restore (get-store rt store-key)
-                 (build-path rt id)
+   (blob/restore store
+                 (build-path id)
                  ;; Restore to the parent path because the dir name will be in the archive
-                 (-> (b/job-relative-dir rt path)
+                 (-> (b/job-relative-dir job build path)
                      (fs/parent)
                      (fs/canonicalize)
                      (str)))
@@ -93,17 +73,48 @@
          (log/debugf "Unzipped %d entries from %s (%.2f MB) to %s" (count entries) src (mb src) dest))
        r))))
 
-(defn restore-generic [rt conf]
-  (do-with-blobs rt conf (partial restore-blob conf)))
+(defn restore-generic [conf]
+  (do-with-blobs conf (partial restore-blob conf)))
+
+;;; Artifact specific functions
+
+(defn build-sid->artifact-path
+  "Returns the path to the artifact with specified id for given build sid"
+  [sid id]
+  (str (cs/join "/" (concat sid [id])) blob/extension))
+
+(defn artifact-archive-path
+  "Returns path for the archive in the given build"
+  [build id]
+  ;; The blob archive path is the build sid with the blob id added.
+  (build-sid->artifact-path (b/sid build) id))
+
+(defn- rt->config
+  "Creates a configuration object for artifacts from the runtime"
+  [{:keys [build] :as rt}]
+  (-> (select-keys rt [:job :build])
+      (assoc :store (rt/artifacts rt)
+             :build-path (partial artifact-archive-path build))))
+
+(defn save-artifacts
+  "Saves all artifacts according to the job configuration."
+  [rt]
+  (-> (rt->config rt)
+      (assoc :job-key :save-artifacts)
+      (save-generic)))
 
 (defn restore-artifacts
   [rt]
-  (restore-generic rt
-                   {:job-key :restore-artifacts
-                    :store-key :artifacts
-                    :build-path artifact-archive-path}))
+  (-> (rt->config rt)
+      (assoc :job-key :restore-artifacts)
+      (restore-generic)))
 
-(defn wrap-artifacts [f]
+(defn wrap-artifacts
+  "Wraps `f`, which is a 1-arity function that takes a runtime configuration,
+   so that artifacts are restored of the job found in the runtime.  After the 
+   invocation of `f`, saves any published artifacts.  Returns a deferred with
+   the updated runtime."
+  [f]
   (fn [rt]
     (md/chain
      (restore-artifacts rt)

@@ -1,11 +1,13 @@
 (ns monkey.ci.blob-test
   (:require [clojure.test :refer [deftest testing is]]
             [babashka.fs :as fs]
+            [clj-commons.byte-streams :as bs]
             [clojure.java.io :as io]
             [clompress.archivers :as ca]
             [manifold.deferred :as md]
             [monkey.ci
              [blob :as sut]
+             [protocols :as p]
              [utils :as u]]
             [monkey.ci.helpers :as h]
             [monkey.oci.os
@@ -77,7 +79,18 @@
 
   (testing "`nil` stream if blob does not exist"
     (with-disk-blob dir blob
-      (is (nil? @(sut/input-stream blob "nonexisting"))))))
+      (is (nil? @(sut/input-stream blob "nonexisting")))))
+
+  (testing "can put raw blob stream"
+    (with-disk-blob dir blob
+      (let [data "this is test data"
+            id "test-id"]
+        (with-open [stream (bs/to-input-stream (.getBytes data))]
+          (let [res @(p/put-blob-stream blob stream id)]
+            (is (map? res))
+            (is (some? (:dest res)))
+            (is (fs/exists? (:dest res)))
+            (is (= data (slurp (:dest res))))))))))
 
 (deftest oci-blob
   (testing "created by `make-blob-store`"

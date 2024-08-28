@@ -194,8 +194,10 @@
 
 (defn job-relative-dir
   "Calculates path `p` as relative to the work dir for the current job"
-  [rt p]
-  (u/abs-path (job-work-dir rt) p))
+  ([rt p] ;; Deprecated, use 3 arg variant
+   (u/abs-path (job-work-dir rt) p))
+  ([job build p]
+   (u/abs-path (job-work-dir job build) p)))
 
 (def all-jobs "Retrieves all jobs known to the build"
   (comp vals :jobs :script))

@@ -7,22 +7,29 @@
    the global API will not be overloaded by malfunctioning (or misbehaving) builds."
   (:require [aleph
              [http :as http]
-             [netty :as an]]
-            [aleph.http.client-middleware :as acmw]
+             [netty :as an]]            
+            [aleph.http
+             [client-middleware :as acmw]
+             [multipart :as mp]]
             [clj-commons.byte-streams :as bs]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
             [martian.interceptors :as mi]
             [medley.core :as mc]
             [monkey.ci
+             [artifacts :as art]
+             [cache :as cache]
              [labels :as lbl]
              [runtime :as rt]
+             [protocols :as p]
              [spec :as spec]
              [storage :as st]]
             ;; Very strange, but including this causes spec gen exceptions when using cloverage :confused:
             ;; [monkey.ci.spec.build]
             [monkey.ci.spec.api-server :as aspec]
-            [monkey.ci.web.common :as c]
+            [monkey.ci.web
+             [common :as c]
+             [handler :as h]]
             [reitit
              [ring :as ring]
              [swagger :as swagger]]
@@ -53,6 +60,15 @@
 (def req->api
   (comp :api req->ctx))
 
+(def req->workspace
+  (comp :workspace req->ctx))
+
+(def req->artifacts
+  (comp :artifacts req->ctx))
+
+(def req->cache
+  (comp :cache req->ctx))
+
 (def repo-id
   (comp (juxt :customer-id :repo-id) req->build))
 
@@ -80,8 +96,7 @@
       (->> params
            (lbl/filter-by-label repo)
            (mapcat :parameters)
-           (rur/response)
-           (md/success-deferred)))))
+           (rur/response)))))
 
 (defn- params-from-api
   "Sends a request to the global api to retrieve build parameters."
@@ -91,9 +106,9 @@
       (api-request api {:path (format "/customer/%s/repo/%s/param" (:customer-id build) (:repo-id build))
                         :method :get}))))
 
-(defn- invalid-config [_]
-  (md/error-deferred (ex-info "Invalid or incomplete API context configuration"
-                              {:status 500})))
+(defn- invalid-config [& _]
+  (-> (rur/response {:error "Invalid or incomplete API context configuration"})
+      (rur/status 500)))
 
 (def get-params (some-fn params-from-storage
                          params-from-api
@@ -105,9 +120,9 @@
   ;; TODO There could be more than one
   (.. (java.net.Inet4Address/getLocalHost) (getHostAddress)))
 
-(defn post-event [req]
+(defn post-events [req]
   (let [evt (get-in req [:parameters :body])]
-    (log/debug "Received event from build script:" evt)
+    (log/debug "Received events from build script:" evt)
     (try 
       {:status (if (rt/post-events (req->ctx req) evt)
                  202
@@ -115,6 +130,68 @@
       (catch Exception ex
         (log/error "Unable to dispatch event" ex)
         {:status 500}))))
+
+(defn- stream-response [s & [nil-code]]
+  (if s
+    (-> (rur/response s)
+        ;; TODO Return correct content type according to stream
+        (rur/content-type "application/octet-stream"))
+    (rur/status (or nil-code 404))))
+
+(defn- download-stream [req store path nil-stream-code]
+  ;; TODO Use local disk storage to avoid re-downloading it from persistent storage
+  (let [stream (when (and store path)
+                 (p/get-blob-stream store path))]
+    (cond
+      (not store) (invalid-config)
+      (not stream) (rur/status nil-stream-code)
+      :else (stream-response @stream nil-stream-code))))
+
+(defn- upload-stream [{stream :body :as req} store path success-resp]
+  (cond
+    (some nil? [stream path]) (rur/status 400)
+    (nil? store) (invalid-config)
+    :else
+    (try
+      @(p/put-blob-stream store stream path)
+      (rur/response success-resp)
+      (finally
+        (.close stream)))))
+
+(defn download-workspace [req]
+  (let [ws (req->workspace req)
+        path (:workspace (req->build req))]
+    (download-stream req ws path 204)))
+
+(defn upload-artifact
+  "Uploads a new artifact.  The body should contain the file contents."
+  [req]
+  (let [store (req->artifacts req)
+        id (get-in req [:parameters :path :artifact-id])
+        path (when id (art/artifact-archive-path (req->build req) id))]
+    (log/info "Received uploaded artifact:" id)
+    (upload-stream req store path {:artifact-id id})))
+
+(defn download-artifact
+  "Downloads an artifact.  The body contains the artifact as a stream."
+  [req]
+  (let [store (req->artifacts req)
+        id (get-in req [:parameters :path :artifact-id])
+        path (when id (art/artifact-archive-path (req->build req) id))]
+    (download-stream req store path 404)))
+
+(defn upload-cache [req]
+  (let [store (req->cache req)
+        id (get-in req [:parameters :path :cache-id])
+        path (when id (cache/cache-archive-path (req->build req) id))]
+    (log/info "Received uploaded cache:" id)
+    (upload-stream req store path {:cache-id id})))
+
+(defn download-cache [req]
+  (let [store (req->cache req)
+        id (get-in req [:parameters :path :cache-id])
+        path (when id (cache/cache-archive-path (req->build req) id))]
+    (download-stream req store path 404)))
 
 (def edn #{"application/edn"})
 
@@ -132,15 +209,42 @@
                {:get get-params
                 :summary "Retrieve configured build parameters"
                 :operationId :get-params
-                :responses {200 {:body {s/Str s/Str}}}
+                :responses {200 {:body [h/ParameterValue]}}
                 :produces edn}]
-              ["/event"
-               {:post post-event
-                :summary "Post an event to the bus"
-                :operationId :post-event
-                :parameters {:body {s/Keyword s/Any}}
+              ["/events"
+               {:post post-events
+                :summary "Post a events to the bus"
+                :operationId :post-events
+                :parameters {:body [{s/Keyword s/Any}]}
                 :responses {202 {}}
-                :consumes edn}]]])
+                :consumes edn}]
+              ["/workspace"
+               {:get download-workspace
+                :summary "Downloads workspace for the build"
+                :operationId :download-workspace
+                :responses {200 {}}}]
+              ["/artifact/:artifact-id"
+               {:parameters {:path {:artifact-id s/Str}}
+                :put {:handler upload-artifact
+                      :summary "Uploads a new artifact"
+                      :operationId :upload-artifact
+                      :responses {200 {}}
+                      :produces edn}
+                :get {:handler download-artifact
+                      :summary "Downloads an artifact"
+                      :operationId :download-artifact
+                      :responses {200 {}}}}]
+              ["/cache/:cache-id"
+               {:parameters {:path {:cache-id s/Str}}
+                :put {:handler upload-cache
+                      :summary "Uploads a new cache"
+                      :operationId :upload-cache
+                      :responses {200 {}}
+                      :produces edn}
+                :get {:handler download-cache
+                      :summary "Downloads an cache"
+                      :operationId :download-cache
+                      :responses {200 {}}}}]]])
 
 (defn security-middleware
   "Middleware that checks if the authorization header matches the specified token"

@@ -20,22 +20,6 @@
             [monkey.ci.events.core :as ec]
             [monkey.ci.spec.sidecar :as ss]))
 
-(defn restore-src [{:keys [build] store :workspace :as rt}]
-  (let [ws (:workspace build)
-        ;; Check out to the parent because the archive contains the directory
-        checkout (some-> (:checkout-dir build)
-                         (fs/parent)
-                         str)
-        restore (fn [rt]
-                  (log/info "Restoring workspace" ws)
-                  (md/chain
-                   (blob/restore store ws checkout)
-                   (fn [_]
-                     (assoc-in rt [:build :workspace/restored?] true))))]
-    (cond-> rt
-      (and store ws checkout)
-      (restore))))
-
 (defn- create-file-with-dirs [f]
   (let [p (fs/parent f)]
     (when-not (fs/exists? p)
@@ -142,7 +126,7 @@
                         :exception ex})]
     (try
       (-> rt
-          (restore-src)
+          (ws/restore)
           (md/chain h)
           (md/catch
               (fn [ex]

@@ -17,7 +17,7 @@
                                :path "test-path"}]}}]
       (is (some? @(sut/save-caches ctx)))
       (is (= 1 (count @stored)))
-      (is (cs/ends-with? (-> @stored first second)
+      (is (cs/ends-with? (-> @stored ffirst)
                          "test-cust/test-cache.tgz"))))
 
   (testing "nothing if no cache store"

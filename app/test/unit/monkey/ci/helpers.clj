@@ -104,9 +104,10 @@
           (recur (rest t)))))))
 
 (defrecord FakeBlobStore [stored strict?]
-  p/BlobStore
+  p/BlobStore  
   (save-blob [_ src dest]
-    (md/success-deferred (swap! stored assoc src dest)))
+    (md/success-deferred (swap! stored assoc dest src)))
+
   (restore-blob [_ src dest]
     (if (or (not strict?)
             (= dest (get @stored src)))
@@ -119,10 +120,14 @@
       (md/error-deferred (ex-info
                           (format "destination path was not as expected: %s, actual: %s" (get @stored src) dest)
                           @stored))))
+  
   (get-blob-stream [_ src]
     (md/success-deferred
      (when (contains? @stored src)
-       (io/input-stream (.getBytes "This is a test stream"))))))
+       (io/input-stream (.getBytes "This is a test stream")))))
+
+  (put-blob-stream [this src dest]
+    (p/save-blob this src dest)))
 
 (defn fake-blob-store
   ([stored]

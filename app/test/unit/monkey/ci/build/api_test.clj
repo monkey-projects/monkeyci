@@ -5,10 +5,14 @@
             [monkey.ci.build
              [api :as sut]
              [api-server :as server]]
+            [monkey.ci.events.build-api :as events]
+            [monkey.ci.helpers :as h]
+            [monkey.ci.protocols :as p]
             [monkey.ci.test.api-server :as tas]))
 
 (deftest api-client
-  (let [{:keys [token] :as s} (server/start-server (tas/test-config))
+  (let [config (tas/test-config)
+        {:keys [token] :as s} (server/start-server config)
         base-url (format "http://localhost:%d" (:port s))
         make-url (fn [path]
                    (str base-url "/" path))
@@ -20,7 +24,16 @@
 
       (testing "can invoke test endpoint"
         (is (= {:result "ok"}
-               @(mc/response-for client :test {})))))))
+               @(mc/response-for client :test {}))))
+
+      (testing "can post events"
+        (let [ep (events/make-event-poster client)
+              recv (-> config :events :recv)
+              event {:type ::test-event :message "test event"}]
+          (is (some? (p/post-events ep event)))
+          (is (not= :timeout (h/wait-until #(not-empty @recv) 1000)))
+          (is (= event (-> (first @recv)
+                           (select-keys (keys event))))))))))
 
 (deftest build-params
   (testing "invokes `params` endpoint on client"

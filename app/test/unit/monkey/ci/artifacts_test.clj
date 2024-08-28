@@ -22,7 +22,7 @@
                                          :path "test-path"}]}}]
         (is (some? @(sut/save-artifacts ctx)))
         (is (= 1 (count @stored)))
-        (let [[p dest] (first @stored)]
+        (let [[dest p] (first @stored)]
           (is (cs/ends-with? dest "test-cust/test-build/test-artifact.tgz"))
           (is (= (str dir "/test-path") p))))))
 
@@ -48,9 +48,8 @@
     (let [src (io/file "src")
           dest (io/file "dest")
           bs (h/fake-blob-store (atom {src dest}))
-          r @(sut/restore-blob {:store-key :test-store
+          r @(sut/restore-blob {:store bs
                                 :build-path (constantly src)}
-                               {:test-store bs}
                                {:id "test-cache"
                                 :path "test-path"})]
       (is (map? r))

@@ -13,7 +13,8 @@
              [runtime :as rt]
              [script :as s]
              [spec :as spec]
-             [utils :as u]]
+             [utils :as u]
+             [workspace :as ws]]
             [monkey.ci.build.core :as bc]
             [monkey.ci.spec.build :as sb]))
 
@@ -97,22 +98,13 @@
   (cond-> build
     (not-empty (:git build)) (download-git rt)))
 
-(defn create-workspace [{:keys [checkout-dir sid] :as build} rt]
-  (let [ws (:workspace rt)
-        dest (str (cs/join "/" sid) b/extension)]
-    (when checkout-dir
-      (log/info "Creating workspace using files from" checkout-dir)
-      @(md/chain
-        (b/save ws checkout-dir dest) ; TODO Check for errors
-        (constantly (assoc build :workspace dest))))))
-
 (defn store-src
   "If a workspace configuration is present, uses it to store the source in
    the workspace.  This can then be used by other processes to download the
    cached files as needed."
   [build rt]
   (cond-> build
-    (some? (:workspace rt)) (create-workspace rt)))
+    (some? (:workspace rt)) (ws/create-workspace rt)))
 
 ;; Creates a runner fn according to its type
 (defmulti make-runner (comp :type :runner))
