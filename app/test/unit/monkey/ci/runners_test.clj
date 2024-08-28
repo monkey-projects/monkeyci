@@ -152,7 +152,7 @@
           build {:checkout-dir "test-checkout"
                  :sid ["test-cust" "test-repo" "test-build"]}]
       (is (some? (sut/store-src build rt)))
-      (is (= {"test-checkout" "test-cust/test-repo/test-build.tgz"} @stored))))
+      (is (= {"test-cust/test-repo/test-build.tgz" "test-checkout"} @stored))))
 
   (testing "returns updated build"
     (let [rt {:workspace (h/fake-blob-store (atom {}))}

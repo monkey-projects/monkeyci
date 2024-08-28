@@ -22,7 +22,7 @@
                                          :path "test-path"}]}}]
         (is (some? @(sut/save-artifacts ctx)))
         (is (= 1 (count @stored)))
-        (let [[p dest] (first @stored)]
+        (let [[dest p] (first @stored)]
           (is (cs/ends-with? dest "test-cust/test-build/test-artifact.tgz"))
           (is (= (str dir "/test-path") p))))))
 
