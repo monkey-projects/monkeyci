@@ -112,19 +112,21 @@
 
 (defn child-config
   "Creates a configuration map that can then be passed to the child process."
-  [build rt]
+  [build rt api-srv]
   (-> (rt/rt->config rt)
       (assoc :build build)
       ;; Generate an API token and add it to the config
       (update :api mc/assoc-some :token (auth/generate-jwt-from-rt rt (auth/build-token (b/sid build))))
+      (update :api merge {:address (as/get-ip-addr)
+                          :port (:port api-srv)})
       ;; Overwrite event settings with runner-specific config
       (mc/assoc-some :events (get-in rt [rt/config :runner :events]))))
 
 (defn- config->edn
   "Writes the configuration to an edn file that is then passed as command line to the app."
-  [build rt]
+  [config]
   (let [f (utils/tmp-file "config" ".edn")]
-    (->> (child-config build rt)
+    (->> config
          (edn/->edn)
          (spit f))
     f))
@@ -158,7 +160,7 @@
              "-Sdeps" (pr-str (generate-deps build rt))
              "-X:monkeyci/build"
              ;; TODO Pass api server port
-             (pr-str {:config-file (config->edn build rt)})]]
+             (pr-str {:config-file (config->edn (child-config build rt api-srv))})]]
     (log/debug "Running in script dir:" script-dir ", this command:" cmd)
     ;; TODO Run as another unprivileged user for security (we'd need `su -c` for that)
     (-> (bp/process
