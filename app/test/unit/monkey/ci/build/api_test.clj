@@ -16,15 +16,16 @@
         base-url (format "http://localhost:%d" (:port s))
         make-url (fn [path]
                    (str base-url "/" path))
-        client (sut/make-client (make-url "swagger.json") token)]
+        client (sut/make-client base-url token)]
     (with-open [srv (:server s)]
       
       (testing "can create api client"
-        (is (some? client)))
+        (is (fn? client)))
 
       (testing "can invoke test endpoint"
         (is (= {:result "ok"}
-               @(mc/response-for client :test {}))))
+               (:body @(client (sut/as-edn {:path "/test"
+                                            :method :get}))))))
 
       (testing "can post events"
         (let [ep (events/make-event-poster client)

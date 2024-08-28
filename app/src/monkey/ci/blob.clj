@@ -190,6 +190,8 @@
         client (os/make-client oci-conf)]
     (->OciBlobStore client oci-conf)))
 
+;;; Configuration functionality
+
 (defmulti normalize-blob-config (fn [t conf] (get-in conf [t :type])))
 
 (defmethod normalize-blob-config :default [_ config]

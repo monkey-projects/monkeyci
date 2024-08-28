@@ -4,6 +4,7 @@
    used for different jobs in the same build.  Artifacts can also be exposed to
    the outside world."
   (:require [babashka.fs :as fs]
+            [clojure.java.io :as io]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
@@ -13,7 +14,10 @@
              [build :as b]
              [config :as config]
              [oci :as oci]
-             [runtime :as rt]]))
+             [runtime :as rt]]
+            [monkey.ci.build
+             [api :as api]
+             [archive :as archive]]))
 
 (defn- do-with-blobs
   "Fetches blobs configurations from the job using the job key, then
@@ -125,6 +129,51 @@
        (md/chain
         (save-artifacts rt)
         (constantly r))))))
+
+(defprotocol ArtifactRepository
+  (download-artifact [this id dest]
+    "Downloads artifact with given id to the specified destination.  Returns the
+     destination.  If `dest` is `:stream`, returns it as an input stream.")
+  (upload-artifact [this id src]
+    "Uploads the artifact with given id from `src`, which can be a file or an
+     input stream."))
+
+(defrecord BlobArtifactRepository [store build]
+  ArtifactRepository
+  (download-artifact [this id dest]
+    (blob/restore store (artifact-archive-path build id) dest))
+
+  (upload-artifact [this id src]
+    (blob/save store src (artifact-archive-path build id))))
+
+(defn- artifact-path [id]
+  (str "/artifact/" id))
+
+(defrecord BuildApiArtifactRepository [client]
+  ArtifactRepository
+  (download-artifact [this id dest]
+    (md/chain
+     (client {:method :get
+              :path (artifact-path id)
+              :as :stream})
+     :body
+     #(archive/extract % dest)))
+
+  (upload-artifact [this id src]
+    (let [tmp (fs/create-temp-file)
+          arch (blob/make-archive src (fs/file tmp))
+          stream (io/input-stream (fs/file tmp))]
+      (-> (client (api/as-edn {:method :put
+                               :path (artifact-path id)
+                               :body stream}))
+          (md/chain
+           :body
+           (partial merge arch))
+          (md/finally
+            ;; Clean up
+            (fn []
+              (.close stream)
+              (fs/delete tmp)))))))
 
 ;;; Config handling
 

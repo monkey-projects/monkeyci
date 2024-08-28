@@ -15,7 +15,7 @@
 
 ;; Version assigned when building main branch
 ;; TODO Determine automatically
-(def snapshot-version "0.7.3-SNAPSHOT")
+(def snapshot-version "0.7.4-SNAPSHOT")
 
 (def tag-regex #"^refs/tags/(\d+\.\d+\.\d+(\.\d+)?$)")
 

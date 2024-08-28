@@ -14,7 +14,6 @@
             [clj-commons.byte-streams :as bs]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
-            [martian.interceptors :as mi]
             [medley.core :as mc]
             [monkey.ci
              [artifacts :as art]
@@ -163,35 +162,43 @@
         path (:workspace (req->build req))]
     (download-stream req ws path 204)))
 
-(defn upload-artifact
+(defn- with-artifact
+  "Applies `f` to artifacts using values retrieved from request"
+  [f]
+  (fn [req]
+    (let [store (req->artifacts req)
+          id (get-in req [:parameters :path :artifact-id])
+          path (when id (art/artifact-archive-path (req->build req) id))]
+    (f req store path id))))
+
+(def upload-artifact
   "Uploads a new artifact.  The body should contain the file contents."
-  [req]
-  (let [store (req->artifacts req)
-        id (get-in req [:parameters :path :artifact-id])
-        path (when id (art/artifact-archive-path (req->build req) id))]
-    (log/info "Received uploaded artifact:" id)
-    (upload-stream req store path {:artifact-id id})))
+  (with-artifact
+    (fn [req store path id]
+      (upload-stream req store path {:artifact-id id}))))
 
-(defn download-artifact
+(def download-artifact
   "Downloads an artifact.  The body contains the artifact as a stream."
-  [req]
-  (let [store (req->artifacts req)
-        id (get-in req [:parameters :path :artifact-id])
-        path (when id (art/artifact-archive-path (req->build req) id))]
-    (download-stream req store path 404)))
+  (with-artifact
+    (fn [req store path _]
+      (download-stream req store path 404))))
 
-(defn upload-cache [req]
-  (let [store (req->cache req)
-        id (get-in req [:parameters :path :cache-id])
-        path (when id (cache/cache-archive-path (req->build req) id))]
-    (log/info "Received uploaded cache:" id)
-    (upload-stream req store path {:cache-id id})))
+(defn- with-cache
+  "Applies `f` to cache using values retrieved from request"
+  [f]
+  (fn [req]
+    (let [store (req->cache req)
+          id (get-in req [:parameters :path :cache-id])
+          path (when id (cache/cache-archive-path (req->build req) id))]
+      (f req store path id))))
 
-(defn download-cache [req]
-  (let [store (req->cache req)
-        id (get-in req [:parameters :path :cache-id])
-        path (when id (cache/cache-archive-path (req->build req) id))]
-    (download-stream req store path 404)))
+(def upload-cache
+  (with-cache (fn [req store path id]
+                (upload-stream req store path {:cache-id id}))))
+
+(def download-cache
+  (with-cache (fn [req store path _]
+                (download-stream req store path 404))))
 
 (def edn #{"application/edn"})
 
@@ -229,7 +236,8 @@
                       :summary "Uploads a new artifact"
                       :operationId :upload-artifact
                       :responses {200 {}}
-                      :produces edn}
+                      :produces edn
+                      :parameters {:body s/Any}}
                 :get {:handler download-artifact
                       :summary "Downloads an artifact"
                       :operationId :download-artifact
@@ -244,7 +252,9 @@
                 :get {:handler download-cache
                       :summary "Downloads an cache"
                       :operationId :download-cache
-                      :responses {200 {}}}}]]])
+                      :responses {200 {}}}}]
+              ;; TODO Log uploads
+              ]])
 
 (defn security-middleware
   "Middleware that checks if the authorization header matches the specified token"

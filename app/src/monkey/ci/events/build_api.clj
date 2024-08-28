@@ -2,7 +2,6 @@
   "Events implementation that uses the build api to send events"
   (:require [clojure.tools.logging :as log]
             [manifold.deferred :as md]
-            [martian.core :as mc]
             [monkey.ci.protocols :as p]
             [monkey.ci.build.api :as api]))
 
@@ -12,7 +11,11 @@
     (let [e (cond-> evts
               (not (sequential? evts)) vector)]
       @(md/chain
-        (mc/response-for client :post-events {:body e})
+        (client (api/as-edn {:method :post
+                             :path "/events"
+                             :body (pr-str e)
+                             :content-type :edn
+                             :throw-exceptions false}))
         (fn [{:keys [status] :as resp}]
           (when (or (nil? status) (>= status 400))
             (log/warn "Unable to post event" resp)))

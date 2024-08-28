@@ -1,36 +1,38 @@
 (ns monkey.ci.build.api
   "Functions for invoking the build script API."
-  (:require [babashka.fs :as fs]
+  (:require [aleph.http :as http]
+            [aleph.http.client-middleware :as mw]
             [clojure.tools.logging :as log]
-            [monkey.ci.build :as b]
-            [monkey.martian.aleph :as mma]))
+            [monkey.ci.build :as b]))
 
-(defn- token->auth-headers [token]
-  {"Authorization" (str "Bearer " token)})
+(defn as-edn [req]
+  (-> req
+      (assoc :accept :edn
+             :as :clojure)))
 
-(defn authorization-interceptor [token]
-  {:name ::authorization
-   :enter (fn [ctx]
-            (update-in ctx [:request :headers] merge (token->auth-headers token)))})
-
-(def process-response
-  {:name ::process-response
-   :leave (fn [{resp :response :as ctx}]
-            (if (>= (:status resp) 400)
-              (throw (ex-info "Got error response" resp))
-              ;; Unwrap the response
-              (update ctx :response :body)))})
+(def api-middleware
+  [mw/wrap-method
+   mw/wrap-url
+   mw/wrap-oauth
+   mw/wrap-accept
+   mw/wrap-query-params
+   mw/wrap-content-type
+   mw/wrap-exceptions])
 
 (defn make-client
-  "Creates a new api client using Martian for the given url.  It downloads
-   the swagger page and automatically configures available routes.  An
-   authentication token is required."
+  "Creates a new api client function for the given url.  It returns a function
+   that requires a request object that will send a http request.  The function 
+   returns a deferred with the result body.  An authentication token is required."
   [url token]
-  (mma/bootstrap-openapi
-   url
-   (update mma/default-opts :interceptors (partial concat [(authorization-interceptor token)
-                                                           process-response]))
-   {:headers (token->auth-headers token)}))
+  (letfn [(build-request [req]
+            (assoc req
+                   :url (str url (:path req))
+                   :oauth-token token
+                   :middelware api-middleware))]
+    (fn [req]
+      (-> req
+          (build-request)
+          (http/request)))))
 
 (def ctx->api-client (comp :client :api))
 (def ^:deprecated rt->api-client ctx->api-client)
