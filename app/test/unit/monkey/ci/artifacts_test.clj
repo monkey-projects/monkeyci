@@ -66,7 +66,7 @@
 (deftest blob-artifact-repository
   (let [build {:sid (take 3 (repeatedly (comp str random-uuid)))}
         store (h/fake-blob-store)
-        repo (sut/->BlobArtifactRepository store build)
+        repo (sut/make-blob-repository store build)
         src-art "test source artifact"
         art-id (str (random-uuid))]
 
@@ -95,7 +95,7 @@
           out-dir (fs/path dir "output")
           _ (fs/create-dir in-dir)
           _ (spit (fs/file (fs/path in-dir "test.txt")) "This is a test file")
-          repo (sut/->BuildApiArtifactRepository client)]
+          repo (sut/make-build-api-repository client)]
       (with-open [s (:server server)]
         (testing "uploads artifact using api"
           (is (= art-id (:artifact-id @(sut/upload-artifact repo art-id (str in-dir))))))

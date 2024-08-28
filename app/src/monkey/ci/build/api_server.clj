@@ -113,11 +113,19 @@
                          params-from-api
                          invalid-config))
 
+(defn get-all-ip-addresses
+  "Lists all non-loopback, non-virtual site local ip addresses"
+  []
+  (->> (enumeration-seq (java.net.NetworkInterface/getNetworkInterfaces))
+       (remove (some-fn (memfn isLoopback) (memfn isVirtual)))
+       (mapcat (comp enumeration-seq (memfn getInetAddresses)))
+       (filter (memfn isSiteLocalAddress))
+       (map (memfn getHostAddress))))
+
 (defn get-ip-addr
   "Determines the ip address of this VM"
   []
-  ;; TODO There could be more than one
-  (.. (java.net.Inet4Address/getLocalHost) (getHostAddress)))
+  (first (get-all-ip-addresses)))
 
 (defn post-events [req]
   (let [evt (get-in req [:parameters :body])]

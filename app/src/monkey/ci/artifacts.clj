@@ -146,15 +146,14 @@
   (upload-artifact [this id src]
     (blob/save store src (artifact-archive-path build id))))
 
-(defn- artifact-path [id]
-  (str "/artifact/" id))
+(def make-blob-repository ->BlobArtifactRepository)
 
-(defrecord BuildApiArtifactRepository [client]
+(defrecord BuildApiArtifactRepository [client base-path]
   ArtifactRepository
   (download-artifact [this id dest]
     (md/chain
      (client {:method :get
-              :path (artifact-path id)
+              :path (str base-path id)
               :as :stream})
      :body
      #(archive/extract % dest)))
@@ -164,7 +163,7 @@
           arch (blob/make-archive src (fs/file tmp))
           stream (io/input-stream (fs/file tmp))]
       (-> (client (api/as-edn {:method :put
-                               :path (artifact-path id)
+                               :path (str base-path id)
                                :body stream}))
           (md/chain
            :body
@@ -174,6 +173,9 @@
             (fn []
               (.close stream)
               (fs/delete tmp)))))))
+
+(defn make-build-api-repository [client]
+  (->BuildApiArtifactRepository client "/artifact/"))
 
 ;;; Config handling
 
