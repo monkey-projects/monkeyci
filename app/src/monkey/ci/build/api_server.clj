@@ -18,6 +18,7 @@
             [medley.core :as mc]
             [monkey.ci
              [artifacts :as art]
+             [cache :as cache]
              [labels :as lbl]
              [runtime :as rt]
              [protocols :as p]
@@ -64,6 +65,9 @@
 
 (def req->artifacts
   (comp :artifacts req->ctx))
+
+(def req->cache
+  (comp :cache req->ctx))
 
 (def repo-id
   (comp (juxt :customer-id :repo-id) req->build))
@@ -135,12 +139,24 @@
     (rur/status (or nil-code 404))))
 
 (defn- download-stream [req store path nil-stream-code]
+  ;; TODO Use local disk storage to avoid re-downloading it from persistent storage
   (let [stream (when (and store path)
                  (p/get-blob-stream store path))]
     (cond
       (not store) (invalid-config)
       (not stream) (rur/status nil-stream-code)
       :else (stream-response @stream nil-stream-code))))
+
+(defn- upload-stream [{stream :body :as req} store path success-resp]
+  (cond
+    (some nil? [stream path]) (rur/status 400)
+    (nil? store) (invalid-config)
+    :else
+    (try
+      @(p/put-blob-stream store stream path)
+      (rur/response success-resp)
+      (finally
+        (.close stream)))))
 
 (defn download-workspace [req]
   (let [ws (req->workspace req)
@@ -152,28 +168,29 @@
   [req]
   (let [store (req->artifacts req)
         id (get-in req [:parameters :path :artifact-id])
-        path (when id (art/artifact-archive-path (req->build req) id))
-        stream (:body req)]
+        path (when id (art/artifact-archive-path (req->build req) id))]
     (log/info "Received uploaded artifact:" id)
-    (log/debug "Content type:" (get-in req [:headers "content-type"]))
-    (log/debug "Saving to path:" path)
-    (cond
-      (some nil? [stream path]) (rur/status 400)
-      (nil? store) (invalid-config)
-      :else
-      (try
-        @(p/put-blob-stream store stream path)
-        (rur/response {:artifact-id id})
-        (finally
-          (.close stream))))))
+    (upload-stream req store path {:artifact-id id})))
 
 (defn download-artifact
   "Downloads an artifact.  The body contains the artifact as a stream."
   [req]
-  ;; TODO Use local disk storage to avoid re-downloading it from persistent storage
   (let [store (req->artifacts req)
         id (get-in req [:parameters :path :artifact-id])
         path (when id (art/artifact-archive-path (req->build req) id))]
+    (download-stream req store path 404)))
+
+(defn upload-cache [req]
+  (let [store (req->cache req)
+        id (get-in req [:parameters :path :cache-id])
+        path (when id (cache/cache-archive-path (req->build req) id))]
+    (log/info "Received uploaded cache:" id)
+    (upload-stream req store path {:cache-id id})))
+
+(defn download-cache [req]
+  (let [store (req->cache req)
+        id (get-in req [:parameters :path :cache-id])
+        path (when id (cache/cache-archive-path (req->build req) id))]
     (download-stream req store path 404)))
 
 (def edn #{"application/edn"})
@@ -216,6 +233,17 @@
                 :get {:handler download-artifact
                       :summary "Downloads an artifact"
                       :operationId :download-artifact
+                      :responses {200 {}}}}]
+              ["/cache/:cache-id"
+               {:parameters {:path {:cache-id s/Str}}
+                :put {:handler upload-cache
+                      :summary "Uploads a new cache"
+                      :operationId :upload-cache
+                      :responses {200 {}}
+                      :produces edn}
+                :get {:handler download-cache
+                      :summary "Downloads an cache"
+                      :operationId :download-cache
                       :responses {200 {}}}}]]])
 
 (defn security-middleware

@@ -151,7 +151,7 @@
 
 (deftest download-artifact
   (let [build {:sid ["test-cust" "test-repo" "test-build"]}]
-    (testing "returns 404 no content if no artifact"
+    (testing "returns 404 not found if no artifact"
       (is (= 404 (-> {:artifacts (h/fake-blob-store)
                       :build build}
                      (->req)
@@ -167,6 +167,46 @@
                     (->req)
                     (assoc-in [:parameters :path :artifact-id] art-id)
                     (sut/download-artifact))]
+        (is (= 200 (:status res)))
+        (is (not-empty (slurp (:body res))))))))
+
+(deftest upload-cache
+  (let [bs (h/fake-blob-store)
+        id (str (random-uuid))]
+    (testing "stores cache in blob store"
+      (is (= 200 (-> {:cache bs}
+                     (->req)
+                     (assoc :parameters
+                            {:path {:cache-id id}}
+                            :body (bs/to-input-stream (.getBytes "test body")))
+                     (sut/upload-cache)
+                     :status))))
+
+    (testing "client error if no body"
+      (is (= 400 (-> {:cache bs}
+                     (->req)
+                     (assoc-in [:parameters :path :cache-id] id)
+                     (sut/upload-cache)
+                     :status))))))
+
+(deftest download-cache
+  (let [build {:sid ["test-cust" "test-repo" "test-build"]}]
+    (testing "returns 404 not found if no cache"
+      (is (= 404 (-> {:cache (h/fake-blob-store)
+                      :build build}
+                     (->req)
+                     (assoc-in [:parameters :path :cache-id] "nonexisting")
+                     (sut/download-cache)
+                     :status))))
+
+    (testing "returns cache as stream"
+      (let [cache-id "test-cache"
+            bs (h/fake-blob-store (atom {(str "test-cust/test-repo/" cache-id ".tgz") "Dummy contents"}))
+            res (-> {:cache bs
+                     :build build}
+                    (->req)
+                    (assoc-in [:parameters :path :cache-id] cache-id)
+                    (sut/download-cache))]
         (is (= 200 (:status res)))
         (is (not-empty (slurp (:body res))))))))
 
@@ -226,9 +266,20 @@
                          :status))))))
 
     (testing "`/cache`"
-      (testing "`PUT` uploads cache")
-      
-      (testing "`GET` downloads cache"))))
+      (let [cache-id (str (random-uuid))]
+        (testing "`PUT` uploads cache"
+          (is (= 200 (-> (mock/request :put (str "/cache/" cache-id)
+                                       {:body "test body"})
+                         (auth)
+                         (app)
+                         :status)))
+          (is (not-empty (-> config :cache :stored deref))))
+
+        (testing "`GET` downloads cache"
+          (is (= 200 (-> (mock/request :get (str "/cache/" cache-id))
+                         (auth)
+                         (app)
+                         :status))))))))
 
 (deftest rt->api-server-config
   (testing "adds port from runner config"

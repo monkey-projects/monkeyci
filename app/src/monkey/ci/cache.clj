@@ -15,7 +15,7 @@
 (defn cache-archive-path [build id]
   ;; The cache archive path is the repo sid with the cache id added.
   ;; Build id is not used since caches are meant to supersede builds.
-  (str (cs/join "/" (concat (butlast (b/sid build)) [id])) ".tgz"))
+  (str (cs/join "/" (concat (butlast (b/sid build)) [id])) blob/extension))
 
 (defn- rt->config [rt]
   (-> (select-keys rt [:job :build])
