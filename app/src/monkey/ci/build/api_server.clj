@@ -17,6 +17,7 @@
             [martian.interceptors :as mi]
             [medley.core :as mc]
             [monkey.ci
+             [artifacts :as art]
              [labels :as lbl]
              [runtime :as rt]
              [protocols :as p]
@@ -25,7 +26,9 @@
             ;; Very strange, but including this causes spec gen exceptions when using cloverage :confused:
             ;; [monkey.ci.spec.build]
             [monkey.ci.spec.api-server :as aspec]
-            [monkey.ci.web.common :as c]
+            [monkey.ci.web
+             [common :as c]
+             [handler :as h]]
             [reitit
              [ring :as ring]
              [swagger :as swagger]]
@@ -89,8 +92,7 @@
       (->> params
            (lbl/filter-by-label repo)
            (mapcat :parameters)
-           (rur/response)
-           (md/success-deferred)))))
+           (rur/response)))))
 
 (defn- params-from-api
   "Sends a request to the global api to retrieve build parameters."
@@ -100,9 +102,9 @@
       (api-request api {:path (format "/customer/%s/repo/%s/param" (:customer-id build) (:repo-id build))
                         :method :get}))))
 
-(defn- invalid-config [_]
-  (md/error-deferred (ex-info "Invalid or incomplete API context configuration"
-                              {:status 500})))
+(defn- invalid-config [& _]
+  (-> (rur/response {:error "Invalid or incomplete API context configuration"})
+      (rur/status 500)))
 
 (def get-params (some-fn params-from-storage
                          params-from-api
@@ -125,43 +127,54 @@
         (log/error "Unable to dispatch event" ex)
         {:status 500}))))
 
+(defn- stream-response [s & [nil-code]]
+  (if s
+    (-> (rur/response s)
+        ;; TODO Return correct content type according to stream
+        (rur/content-type "application/octet-stream"))
+    (rur/status (or nil-code 404))))
+
+(defn- download-stream [req store path nil-stream-code]
+  (let [stream (when (and store path)
+                 (p/get-blob-stream store path))]
+    (cond
+      (not store) (invalid-config)
+      (not stream) (rur/status nil-stream-code)
+      :else (stream-response @stream nil-stream-code))))
+
 (defn download-workspace [req]
   (let [ws (req->workspace req)
-        path (:workspace (req->build req))
-        stream (when (and ws path)
-                 (p/get-blob-stream ws path))]
-    (cond
-      (not ws) (-> (rur/response {:message "Workspace not configured"})
-                   (rur/status 500))
-      (not stream) (rur/status 204)
-      :else (md/chain
-             stream
-             rur/response
-             ;; TODO Return correct content type according to stream
-             #(rur/content-type % "application/octet-stream")))))
+        path (:workspace (req->build req))]
+    (download-stream req ws path 204)))
 
 (defn upload-artifact
-  "Uploads a new artifact.  The body should be a multipart request that contains the
-   contents."
+  "Uploads a new artifact.  The body should contain the file contents."
   [req]
   (let [store (req->artifacts req)
         id (get-in req [:parameters :path :artifact-id])
+        path (when id (art/artifact-archive-path (req->build req) id))
         stream (:body req)]
     (log/info "Received uploaded artifact:" id)
     (log/debug "Content type:" (get-in req [:headers "content-type"]))
-    (if stream
-      (-> (md/chain
-           (p/put-blob-stream store stream id)
-           (constantly (rur/response (pr-str {:artifact-id id}))))
-          (md/finally
-            #(.close stream)))
-      (rur/status 400))))
+    (log/debug "Saving to path:" path)
+    (cond
+      (some nil? [stream path]) (rur/status 400)
+      (nil? store) (invalid-config)
+      :else
+      (try
+        @(p/put-blob-stream store stream path)
+        (rur/response {:artifact-id id})
+        (finally
+          (.close stream))))))
 
 (defn download-artifact
   "Downloads an artifact.  The body contains the artifact as a stream."
   [req]
   ;; TODO Use local disk storage to avoid re-downloading it from persistent storage
-  (rur/response "TODO"))
+  (let [store (req->artifacts req)
+        id (get-in req [:parameters :path :artifact-id])
+        path (when id (art/artifact-archive-path (req->build req) id))]
+    (download-stream req store path 404)))
 
 (def edn #{"application/edn"})
 
@@ -179,7 +192,7 @@
                {:get get-params
                 :summary "Retrieve configured build parameters"
                 :operationId :get-params
-                :responses {200 {:body {s/Str s/Str}}}
+                :responses {200 {:body [h/ParameterValue]}}
                 :produces edn}]
               ["/events"
                {:post post-events
@@ -195,7 +208,7 @@
                 :responses {200 {}}}]
               ["/artifact/:artifact-id"
                {:parameters {:path {:artifact-id s/Str}}
-                :put {:handler #'upload-artifact
+                :put {:handler upload-artifact
                       :summary "Uploads a new artifact"
                       :operationId :upload-artifact
                       :responses {200 {}}

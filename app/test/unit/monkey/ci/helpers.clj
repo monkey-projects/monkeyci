@@ -106,7 +106,7 @@
 (defrecord FakeBlobStore [stored strict?]
   p/BlobStore  
   (save-blob [_ src dest]
-    (md/success-deferred (swap! stored assoc src dest)))
+    (md/success-deferred (swap! stored assoc dest src)))
 
   (restore-blob [_ src dest]
     (if (or (not strict?)

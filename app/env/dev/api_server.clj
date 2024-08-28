@@ -3,7 +3,8 @@
   (:require [babashka.fs :as fs]
             [monkey.ci.blob :as blob]
             [monkey.ci.build.api-server :as bas]
-            [monkey.ci.events.core :as ec]))
+            [monkey.ci.events.core :as ec]
+            [monkey.ci.storage :as st]))
 
 (defonce server (atom nil))
 
@@ -12,11 +13,16 @@
 (defn abs-wd [subdir]
   (str (fs/canonicalize (fs/path work-dir subdir))))
 
+(defn- blob [dir]
+  (blob/->DiskBlobStore (abs-wd dir)))
+
 (def default-config
   {:events (ec/make-events {:events {:type :manifold}})
-   :workspace (blob/->DiskBlobStore (abs-wd "workspace"))
-   :artifacts (blob/->DiskBlobStore (abs-wd "artifacts"))
-   :cache (blob/->DiskBlobStore (abs-wd "cache"))})
+   :workspace (blob "workspace")
+   :artifacts (blob "artifacts")
+   :cache (blob "cache")
+   :storage (st/make-memory-storage)
+   :build {:sid ["test-cust" "test-repo" "test-build"]}})
 
 (defn stop-server []
   (swap! server (fn [s]

@@ -81,7 +81,7 @@
 (defn build-sid->artifact-path
   "Returns the path to the artifact with specified id for given build sid"
   [sid id]
-  (str (cs/join "/" (concat sid [id])) ".tgz"))
+  (str (cs/join "/" (concat sid [id])) blob/extension))
 
 (defn artifact-archive-path
   "Returns path for the archive in the given build"

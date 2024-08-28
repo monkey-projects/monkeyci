@@ -96,7 +96,7 @@
                           :build build})]
           (is (some? (st/save-params st (:id cust) params)))
           (is (= param-values
-                 (:body @(sut/get-params req)))))))
+                 (:body (sut/get-params req)))))))
 
     (testing "retrieves from remote api if no db"
       ;; Requests look differend because of applied middleware
@@ -126,8 +126,7 @@
           res (-> {:workspace ws
                    :build {:workspace ws-path}}
                   (->req)
-                  (sut/download-workspace)
-                  deref)]
+                  (sut/download-workspace))]
       (is (= 200 (:status res)))
       (is (not-empty (slurp (:body res)))))))
 
@@ -141,7 +140,6 @@
                             {:path {:artifact-id id}}
                             :body (bs/to-input-stream (.getBytes "test body")))
                      (sut/upload-artifact)
-                     deref
                      :status))))
 
     (testing "client error if no body"
@@ -151,6 +149,27 @@
                      (sut/upload-artifact)
                      :status))))))
 
+(deftest download-artifact
+  (let [build {:sid ["test-cust" "test-repo" "test-build"]}]
+    (testing "returns 404 no content if no artifact"
+      (is (= 404 (-> {:artifacts (h/fake-blob-store)
+                      :build build}
+                     (->req)
+                     (assoc-in [:parameters :path :artifact-id] "nonexisting")
+                     (sut/download-artifact)
+                     :status))))
+
+    (testing "returns artifact as stream"
+      (let [art-id "test-artifact"
+            bs (h/fake-blob-store (atom {(str "test-cust/test-repo/test-build/" art-id ".tgz") "Dummy contents"}))
+            res (-> {:artifacts bs
+                     :build build}
+                    (->req)
+                    (assoc-in [:parameters :path :artifact-id] art-id)
+                    (sut/download-artifact))]
+        (is (= 200 (:status res)))
+        (is (not-empty (slurp (:body res))))))))
+
 (deftest get-ip-addr
   (testing "returns ipv4 address"
     (is (re-matches #"\d+\.\d+\.\d+\.\d+"
@@ -158,8 +177,10 @@
 
 (deftest api-server-routes
   (let [token (sut/generate-token)
-        app (sut/make-app (-> test-config
-                              (assoc :token token)))
+        config (-> test-config
+                   (assoc :token token
+                          :build {:sid ["test-cust" "test-repo" "test-build"]}))
+        app (sut/make-app config)
         auth (fn [req]
                (mock/header req "Authorization" (str "Bearer " token)))]
     (testing "`/test` returns ok"
@@ -172,7 +193,6 @@
       (is (= 200 (-> (mock/request :get "/params")
                      (auth)
                      (app)
-                     deref
                      :status))))
 
     (testing "`POST /events` dispatches events"
@@ -196,8 +216,8 @@
                                        {:body "test body"})
                          (auth)
                          (app)
-                         deref
-                         :status))))
+                         :status)))
+          (is (not-empty (-> config :artifacts :stored deref))))
 
         (testing "`GET` downloads artifact"
           (is (= 200 (-> (mock/request :get (str "/artifact/" artifact-id))
