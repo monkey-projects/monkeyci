@@ -5,7 +5,9 @@
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
             [medley.core :as mc]
-            [monkey.ci.build.core :as bc]
+            [monkey.ci.build
+             [api :as api]
+             [core :as bc]]
             [monkey.ci
              [artifacts :as art]
              [build :as build]
@@ -125,41 +127,25 @@
 
 ;;; Script client functions
 
+(defn- client-url [{:keys [port url]}]
+  (if port
+    ;; Child process always connects to localhost
+    (format "http://localhost:%d" port)
+    url))
+
 (defn make-client
   "Creates an API client function, that can be invoked by build scripts to 
    perform certain operations, like retrieve build parameters.  The client
    uses the token passed by the spawning process to gain access to those
    resources."
-  [{{:keys [url token]} :api}]
-  (letfn [(throw-on-error [{:keys [status] :as r}]
-            (if (>= status 400)
-              (md/error-deferred (ex-info "Failed to invoke API call" r))
-              r))
-          (parse-body [{:keys [body headers]}]
-            (if (= "application/edn" (some-> (get headers "content-type")
-                                             (mp/parse-content-type)
-                                             first))
-              (with-open [r (bs/to-reader body)]
-                (u/parse-edn r))
-              ;; Return non-edn contents as input stream
-              (bs/to-input-stream body)))]
-    (log/debug "Connecting to API at" url)
-    (fn [req]
-      (-> req
-          (update :url (partial str url))
-          (assoc-in [:headers "authorization"] (str "Bearer " token))
-          (assoc-in [:headers "accept"] "application/edn")
-          (http/request)
-          (md/chain
-           throw-on-error
-           parse-body)))))
-
-(def valid-config? (every-pred :url :token))
+  [{:keys [token] :as conf}]
+  (when-let [url (client-url conf)]
+    (when token
+      (api/make-client url token))))
 
 (defmethod rt/setup-runtime :api [conf _]
   (when-let [c (:api conf)]
-    (when (valid-config? c)
-      {:client (make-client conf)})))
+    {:client (make-client c)}))
 
 ;;; Script loading
 

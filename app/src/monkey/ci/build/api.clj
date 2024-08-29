@@ -46,6 +46,7 @@
     (log/debug "Fetching repo params for" cust-id repo-id)
     (->> @(client {:url (str (repo-path ctx) "/param")
                    :method :get})
+         :body
          (map (juxt :name :value))
          (into {}))))
 
@@ -59,5 +60,6 @@
   (let [client (ctx->api-client ctx)
         sid (b/get-sid ctx)]
     (log/debug "Downloading artifact for build" sid ":" id)
-    @(client {:url (format (str (repo-path ctx) "/builds/%s/artifact/%s/download") (last sid) id)
-              :method :get})))
+    (-> @(client {:url (format (str (repo-path ctx) "/builds/%s/artifact/%s/download") (last sid) id)
+                  :method :get})
+        :body)))

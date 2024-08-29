@@ -40,8 +40,9 @@
   (testing "invokes `params` endpoint on client"
     (let [m (fn [req]
               (when (= "/customer/test-cust/repo/test-repo/param" (:url req))
-                (md/success-deferred [{:name "key"
-                                       :value "value"}])))
+                (md/success-deferred {:body
+                                      [{:name "key"
+                                        :value "value"}]})))
           rt {:api {:client m}
               :build {:sid ["test-cust" "test-repo" "test-build"]}}]
       (is (= {"key" "value"} (sut/build-params rt))))))
@@ -51,7 +52,7 @@
     (let [m (fn [req]
               (when (= "/customer/test-cust/repo/test-repo/builds/test-build/artifact/test-artifact/download"
                        (:url req))
-                (md/success-deferred "test artifact contents")))
+                (md/success-deferred {:body "test artifact contents"})))
           rt {:api {:client m}
               :build {:sid ["test-cust" "test-repo" "test-build"]}}]
       (is (= "test artifact contents"
