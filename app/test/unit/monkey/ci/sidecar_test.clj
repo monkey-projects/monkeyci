@@ -10,6 +10,7 @@
             [monkey.ci
              [artifacts :as art]
              [blob :as b]
+             [cache :as ca]
              [config :as c]
              [logging :as l]
              [protocols :as p]
@@ -236,12 +237,13 @@
         (let [stored (atom {})
               path "test-path"
               _ (fs/create-file (fs/path dir path))
-              cache (h/fake-blob-store stored)
+              build {:build-id "test-build"
+                     :checkout-dir dir
+                     :workspace "test-ws"}
+              cache (ca/make-blob-repository (h/fake-blob-store stored) build)
               r (sut/run
                   (trs/make-test-rt
-                   {:build {:build-id "test-build"
-                            :checkout-dir dir
-                            :workspace "test-ws"}
+                   {:build build
                     :logging {:maker (l/make-logger {})}
                     :cache cache
                     :job 
@@ -256,17 +258,18 @@
     (testing "restores artifacts if configured"
       (h/with-tmp-dir dir
         (let [stored (atom {"test-cust/test-build/test-artifact.tgz" "/tmp/checkout"})
-              store (h/fake-blob-store stored)
+              build {:build-id "test-build"
+                     :sid ["test-cust" "test-build"]
+                     :checkout-dir "/tmp/checkout"
+                     :workspace "test-ws"}
+              repo (art/make-blob-repository (h/fake-blob-store stored) build)
               r (sut/run
                   (trs/make-test-rt
                    {:containers {:type :podman}
-                    :build {:build-id "test-build"
-                            :sid ["test-cust" "test-build"]
-                            :checkout-dir "/tmp/checkout"
-                            :workspace "test-ws"}
+                    :build build
                     :work-dir dir
                     :logging {:maker (l/make-logger {})}
-                    :artifacts store
+                    :artifacts repo
                     :job 
                     {:id "test-job"
                      :container/image "test-img"
@@ -280,16 +283,17 @@
         (let [stored (atom {})
               path "test-artifact"
               _ (fs/create-file (fs/path dir path))
-              store (h/fake-blob-store stored)
+              build {:build-id "test-build"
+                     :sid ["test-cust" "test-build"]
+                     :checkout-dir dir
+                     :workspace "test-ws"}
+              repo (art/make-blob-repository (h/fake-blob-store stored) build)
               r (sut/run
                   (trs/make-test-rt
                    {:containers {:type :podman}
-                    :build {:build-id "test-build"
-                            :sid ["test-cust" "test-build"]
-                            :checkout-dir dir
-                            :workspace "test-ws"}
+                    :build build
                     :logging {:maker (l/make-logger {})}
-                    :artifacts store
+                    :artifacts repo
                     :job 
                     {:id "test-job"
                      :container/image "test-img"
@@ -300,7 +304,7 @@
 
     (testing "waits until artifacts have been stored"
       ;; Set up blob saving so it takes a while
-      (is (= ::timeout (-> {:artifacts (->SlowBlobStore 1000)
+      (is (= ::timeout (-> {:artifacts (art/make-blob-repository (->SlowBlobStore 1000) {})
                             :job {:id "test-job"
                                   :save-artifacts [{:id "test-artifact"
                                                     :path "test-path"}]}}
@@ -322,7 +326,7 @@
 
     (testing "blocks until caches have been stored"
       ;; Set up blob saving so it takes a while
-      (is (= ::timeout (-> {:cache (->SlowBlobStore 1000)
+      (is (= ::timeout (-> {:cache (ca/make-blob-repository (->SlowBlobStore 1000) {})
                             :job {:id "test-job"
                                   :caches [{:id "test-artifact"
                                             :path "test-path"}]}}
@@ -399,7 +403,7 @@
       (is (p/blob-store? (:workspace rt))))
     
     (testing "creates artifacts"
-      (is (p/blob-store? (:artifacts rt))))
+      (is (art/repo? (:artifacts rt))))
     
     (testing "creates cache"
-      (is (p/blob-store? (:cache rt))))))
+      (is (art/repo? (:cache rt))))))

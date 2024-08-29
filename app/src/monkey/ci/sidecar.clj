@@ -161,10 +161,14 @@
   (config-blob conf cs/workspace :workspace))
 
 (defn- config-artifacts [conf]
-  (config-blob conf cs/artifacts :artifacts))
+  (art/make-blob-repository
+   (config-blob conf cs/artifacts :artifacts)
+   (cs/build conf)))
 
 (defn- config-cache [conf]
-  (config-blob conf cs/cache :cache))
+  (cache/make-blob-repository
+   (config-blob conf cs/cache :cache)
+   (cs/build conf)))
 
 (defn make-runtime
   "Creates a runtime for the sidecar using the config map"
