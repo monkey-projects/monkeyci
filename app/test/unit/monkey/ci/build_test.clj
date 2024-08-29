@@ -52,6 +52,16 @@
                  (sut/make-build-ctx)
                  :git))))
 
+    (testing "sets tag"
+      (is (= "test-tag"
+             (-> {:config
+                  {:args {:git-url "test-url"
+                          :tag "test-tag"
+                          :commit-id "test-id"}}}
+                 (sut/make-build-ctx)
+                 :git
+                 :tag))))
+
     (testing "sets script dir to arg"
       (is (= "test-script"
              (-> {:config

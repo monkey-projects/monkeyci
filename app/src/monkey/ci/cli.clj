@@ -28,6 +28,10 @@
            :option "branch"
            :short "b"
            :type :string}
+          {:as "Repository tag"
+           :option "tag"
+           :short "t"
+           :type :string}
           {:as "Commit id"
            :option "commit-id"
            :type :string}

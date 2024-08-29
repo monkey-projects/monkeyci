@@ -56,13 +56,14 @@
   "If a git url is specified, updates the build with git information, taken from
    the arguments and from runtime."
   [build rt]
-  (let [{:keys [git-url branch commit-id dir]} (rt/args rt)
+  (let [{:keys [git-url branch tag commit-id dir]} (rt/args rt)
         existing (get-in rt [:build :git])]
     (cond-> build
-      git-url (-> (assoc :git (assoc existing
-                                     :url git-url
-                                     :branch (or branch "main")
-                                     :id commit-id))
+      git-url (-> (assoc :git (-> existing
+                                  (assoc :url git-url
+                                         :branch (or branch "main")
+                                         :id commit-id)
+                                  (mc/assoc-some :tag tag)))
                   ;; Overwrite script dir cause it will be calculated by the git checkout
                   (assoc-in [:script :script-dir] dir)))))
 

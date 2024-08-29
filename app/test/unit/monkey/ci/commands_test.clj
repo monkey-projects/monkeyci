@@ -44,8 +44,10 @@
       (is (= 1 (-> {:runner (fn [_] (throw (ex-info "test error" {})))
                     :events e}
                    (sut/run-build))))
-      (is (= 1 (count @recv)))      
-      (is (= :build/end (:type (first @recv)))))))
+      (is (= 1 (count @recv)))
+      (let [evt (first @recv)]
+        (is (= :build/end (:type evt)))
+        (is (some? (:build evt)))))))
 
 (deftest verify-build
   (testing "zero when successful"

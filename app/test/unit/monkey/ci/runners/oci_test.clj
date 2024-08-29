@@ -78,10 +78,15 @@
     (testing "fails when no git url specified"
       (is (thrown? Exception (sut/instance-config conf (update build :git dissoc :url) rt))))
 
-    (testing "fails when no git branch or commit-id specified"
+    (testing "fails when no git branch, tag or commit-id specified"
       (is (thrown? Exception (sut/instance-config conf
                                                   (update build :git dissoc :branch :commit-id)
-                                                  rt))))
+                                                  rt)))
+      (is (some? (sut/instance-config conf
+                                      (-> build
+                                          (update :git dissoc :branch :commit-id)
+                                          (assoc-in [:git :tag] "test-tag"))
+                                      rt))))
 
     (testing "container"
       (let [c (first (:containers inst))]

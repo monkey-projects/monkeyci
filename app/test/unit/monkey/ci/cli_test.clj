@@ -58,6 +58,10 @@
             (let [lc (run-cli "build" "run" "--branch" "test-branch")]
               (is (= "test-branch" (get-in lc [:args :branch])))))
 
+          (testing "accepts git tag"
+            (let [lc (run-cli "build" "run" "--tag" "test-tag")]
+              (is (= "test-tag" (get-in lc [:args :tag])))))
+
           (testing "accepts commit id"
             (let [lc (run-cli "build" "run" "--commit-id" "test-id")]
               (is (= "test-id" (get-in lc [:args :commit-id])))))

@@ -21,14 +21,13 @@
   "Performs a build, using the runner from the context.  Returns a deferred
    that will complete when the build finishes."
   [rt]
-  (let [r (:runner rt)]
+  (let [r (:runner rt)
+        build (b/make-build-ctx rt)]
     (try
-      (-> rt
-          (b/make-build-ctx)
-          (r rt))
+      (r build rt)
       (catch Exception ex
         (log/error "Unable to start build" ex)
-        (rt/post-events rt (b/build-end-evt (assoc (rt/build rt) :message (ex-message ex))
+        (rt/post-events rt (b/build-end-evt (assoc build :message (ex-message ex))
                                             exit-error))
         exit-error))))
 
