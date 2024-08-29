@@ -7,7 +7,8 @@
              [blob :as b]
              [config :as c]
              [protocols :as p]
-             [runtime :as rt]]))
+             [runtime :as rt]]
+            [monkey.ci.build.archive :as arch]))
 
 (defn create-workspace [{:keys [checkout-dir sid] :as build} {ws :workspace}]
   (let [dest (str (cs/join "/" sid) b/extension)]
@@ -40,6 +41,17 @@
    (fn [r?]
      (cond-> rt
        r? (assoc-in [:build :workspace/restored?] true)))))
+
+(defrecord BuildApiWorkspace [client build]
+  p/Workspace
+  (restore-workspace [_]
+    (md/chain
+     (client {:path "/workspace"
+              :method :get})
+     :body
+     #(arch/extract % (:checkout-dir build)))))
+
+(def make-build-api-workspace ->BuildApiWorkspace)
 
 ;;; Configuration handling
 

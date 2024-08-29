@@ -1,13 +1,15 @@
 (ns monkey.ci.runtime.sidecar
   "Functions for creating a runtime for a build-aware environment for the sidecar"
   (:require [com.stuartsierra.component :as co]
-            [monkey.ci.artifacts :as art]
-            [monkey.ci.blob :as blob]
+            [monkey.ci
+             [artifacts :as art]
+             [blob :as blob]
+             [cache :as cache]
+             [logging :as l]
+             [workspace :as ws]]
             [monkey.ci.build.api :as api]
-            [monkey.ci.cache :as cache]
             [monkey.ci.config.sidecar :as cs]
-            [monkey.ci.events.build-api :as eba]
-            [monkey.ci.logging :as l]))
+            [monkey.ci.events.build-api :as eba]))
 
 (defrecord SidecarRuntime [events log-maker workspace artifacts cache]
   co/Lifecycle
@@ -35,8 +37,7 @@
   (l/make-logger {:logging (cs/log-maker config)}))
 
 (defn- new-workspace [config]
-  ;; TODO Use api client
-  (blob/make-blob-store {:workspace (cs/workspace config)} :workspace))
+  (ws/make-build-api-workspace nil (cs/build config)))
 
 (defn- new-artifacts []
   (art/make-build-api-repository nil))
@@ -57,7 +58,9 @@
                 (new-events)
                 {:client :api-client})
    :log-maker (new-log-maker config)
-   :workspace (new-workspace config)
+   :workspace (co/using
+               (new-workspace config)
+               {:client :api-client})
    :artifacts (co/using
                (new-artifacts)
                {:client :api-client})

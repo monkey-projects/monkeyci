@@ -36,7 +36,7 @@
 (s/def ::paths
   (s/keys :req-un [::events-file ::start-file ::abort-file]))
 
-(s/def ::workspace ::c/blob-store)
+(s/def ::workspace ::c/workspace)
 
 (s/def ::runtime
   (s/keys :req-un [::job ::build ::paths]

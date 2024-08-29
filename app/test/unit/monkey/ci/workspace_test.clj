@@ -1,6 +1,12 @@
 (ns monkey.ci.workspace-test
   (:require [clojure.test :refer [deftest testing is]]
-            [monkey.ci.workspace :as sut]
+            [babashka.fs :as fs]
+            [clojure.java.io :as io]
+            [manifold.deferred :as md]
+            [monkey.ci
+             [blob :as blob]
+             [protocols :as p]
+             [workspace :as sut]]
             [monkey.ci.helpers :as h]))
 
 (deftest restore
@@ -19,3 +25,20 @@
                      (get-in [:build :workspace/restored?]))))
       (is (empty? @stored)))))
 
+(deftest build-api-workspace
+  (testing "downloads and extracts workspace via client"
+    (h/with-tmp-dir dir
+      (let [src (fs/create-dir (fs/path dir "src"))
+            dest (fs/create-dir (fs/path dir "dest"))
+            arch (fs/path dir "archive.tgz")
+            contents "This is a test file"
+            build {:checkout-dir (str dest)}
+            client (fn [_]
+                     (md/success-deferred {:status 200
+                                           :body (io/input-stream (fs/file arch))}))
+            ws (sut/make-build-api-workspace client build)]
+        (is (nil? (spit (fs/file (fs/path src "test.txt")) contents)))
+        (is (not-empty (:entries (blob/make-archive (fs/file src) (fs/file arch)))))
+        (is (fs/exists? arch))
+        (is (not-empty (:entries @(p/restore-workspace ws))))
+        (is (fs/exists? (fs/path dest "src" "test.txt")))))))

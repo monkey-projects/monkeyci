@@ -28,3 +28,4 @@
 (s/def ::blob-store (partial satisfies? p/BlobStore))
 (s/def ::artifacts ::blob-store)
 (s/def ::cache ::blob-store)
+(s/def ::workspace (partial satisfies? p/Workspace))
