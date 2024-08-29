@@ -22,8 +22,14 @@
   (s/keys :req-un [:build/workspace :build/build-id]
           :opt-un [::checkout-dir :build/sid]))
 
+(s/def ::url (s/and string? not-empty))
+(s/def ::token (s/and string? not-empty))
+
+(s/def ::api
+  (s/keys :req-un [::url ::token]))
+
 (s/def ::config
-  (s/keys :req [::events-file ::start-file ::abort-file ::job-config ::e/events]))
+  (s/keys :req [::events-file ::start-file ::abort-file ::job-config ::api]))
 
 (s/def ::events ::c/events)
 (s/def ::log-maker fn?)

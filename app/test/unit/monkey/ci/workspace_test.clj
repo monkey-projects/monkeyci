@@ -6,7 +6,7 @@
 (deftest restore
   (testing "nothing if no workspace in build"
     (let [rt {}]
-      (is (= rt (sut/restore rt)))))
+      (is (= rt @(sut/restore rt)))))
 
   (testing "restores using the workspace path in build into checkout dir"
     (let [stored (atom {"path/to/workspace" "local"})

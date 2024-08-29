@@ -29,6 +29,11 @@
 
 (def build (comp ::ss/build ::ss/job-config))
 
+(def api ::es/api)
+
+(defn set-api [conf api]
+  (assoc conf ::es/api api))
+
 (def events ::es/events)
 
 (defn set-events [conf e]

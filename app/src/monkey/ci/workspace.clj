@@ -6,6 +6,7 @@
             [monkey.ci
              [blob :as b]
              [config :as c]
+             [protocols :as p]
              [runtime :as rt]]))
 
 (defn create-workspace [{:keys [checkout-dir sid] :as build} {ws :workspace}]
@@ -16,23 +17,31 @@
         (b/save ws checkout-dir dest) ; TODO Check for errors
         (constantly (assoc build :workspace dest))))))
 
+(defrecord BlobWorkspace [store build]
+  p/Workspace
+  (restore-workspace [_]
+    (let [ws       (:workspace build)
+          ;; Check out to the parent because the archive contains the directory
+          checkout (some-> (:checkout-dir build)
+                           (fs/parent)
+                           str)]
+      (if (and store ws checkout)
+        (do
+          (log/info "Restoring workspace" ws)
+          (b/restore store ws checkout))
+        ;; Did nothing if not configured
+        (md/success-deferred nil)))))
+
 (defn restore
   "Restores the workspace as configured in the build"
   [{:keys [build] store :workspace :as rt}]
-  (let [ws (:workspace build)
-        ;; Check out to the parent because the archive contains the directory
-        checkout (some-> (:checkout-dir build)
-                         (fs/parent)
-                         str)
-        restore (fn [rt]
-                  (log/info "Restoring workspace" ws)
-                  (md/chain
-                   (b/restore store ws checkout)
-                   (fn [_]
-                     (assoc-in rt [:build :workspace/restored?] true))))]
-    (cond-> rt
-      (and store ws checkout)
-      (restore))))
+  (md/chain
+   (p/restore-workspace (->BlobWorkspace store build))
+   (fn [r?]
+     (cond-> rt
+       r? (assoc-in [:build :workspace/restored?] true)))))
+
+;;; Configuration handling
 
 (defmethod c/normalize-key :workspace [k conf]
   (c/normalize-typed k conf (partial b/normalize-blob-config k)))

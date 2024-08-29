@@ -40,3 +40,7 @@
 (defprotocol ContainerRunner
   (run-container [this job]
     "Runs the given container job.  Returns a deferred that will hold the result."))
+
+(defprotocol Workspace
+  (restore-workspace [this]
+    "Restores the workspace associated with the current build"))
