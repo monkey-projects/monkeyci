@@ -7,7 +7,8 @@
              [utils :as u]]
             [monkey.ci.events.core :as ec]
             [monkey.ci.web.api :as sut]
-            [monkey.ci.helpers :as h]))
+            [monkey.ci.helpers :as h]
+            [monkey.ci.test.runtime :as trt]))
 
 (defn- parse-edn [s]
   (with-open [r (java.io.StringReader. s)]
@@ -23,7 +24,7 @@
   (testing "returns customer in body"
     (let [cust {:id "test-customer"
                 :name "Test customer"}
-          {st :storage :as rt} (h/test-rt)
+          {st :storage :as rt} (trt/test-runtime)
           req (-> rt
                   (h/->req)
                   (h/with-path-param :customer-id (:id cust)))]
@@ -31,7 +32,7 @@
       (is (= cust (:body (sut/get-customer req))))))
 
   (testing "404 not found when no match"
-    (is (= 404 (-> (h/test-rt)
+    (is (= 404 (-> (trt/test-runtime)
                    (h/->req)
                    (h/with-path-param :customer-id "nonexisting")
                    (sut/get-customer)
@@ -43,7 +44,7 @@
           repo {:id "test-repo"
                 :name "Test repository"
                 :customer-id (:id cust)}
-          {st :storage :as rt} (h/test-rt)]
+          {st :storage :as rt} (trt/test-runtime)]
       (is (st/sid? (st/save-customer st cust)))
       (is (st/sid? (st/save-repo st repo)))
       (let [r (-> rt
@@ -59,7 +60,7 @@
 
 (deftest create-customer
   (testing "returns created customer with id"
-    (let [r (-> (h/test-rt)
+    (let [r (-> (trt/test-runtime)
                 (h/->req)
                 (h/with-body {:name "new customer"})
                 (sut/create-customer)
@@ -70,7 +71,7 @@
   (testing "links current user to customer"
     (let [user (-> (h/gen-user)
                    (dissoc :customers))
-          {st :storage :as rt} (h/test-rt)
+          {st :storage :as rt} (trt/test-runtime)
           r (-> rt
                 (h/->req)
                 (h/with-body {:name "another customer"})
@@ -86,7 +87,7 @@
   (testing "returns customer in body"
     (let [cust {:id "test-customer"
                 :name "Test customer"}
-          {st :storage :as rt} (h/test-rt)
+          {st :storage :as rt} (trt/test-runtime)
           req (-> rt
                   (h/->req)
                   (h/with-path-param :customer-id (:id cust))
@@ -97,14 +98,14 @@
              (:body (sut/update-customer req))))))
 
   (testing "404 not found when no match"
-    (is (= 404 (-> (h/test-rt)
+    (is (= 404 (-> (trt/test-runtime)
                    (h/->req)
                    (h/with-path-param :customer-id "nonexisting")
                    (sut/update-customer)
                    :status)))))
 
 (deftest search-customers
-  (let [{st :storage :as rt} (h/test-rt)
+  (let [{st :storage :as rt} (trt/test-runtime)
         cust {:id (st/new-id)
               :name "Test customer"}
         sid (st/save-customer st cust)]
@@ -135,7 +136,7 @@
   (testing "generates id from repo name"
     (let [repo {:name "Test repo"
                 :customer-id (st/new-id)}
-          {st :storage :as rt} (h/test-rt)
+          {st :storage :as rt} (trt/test-runtime)
           r (-> rt
                 (h/->req)
                 (h/with-body repo)
@@ -146,7 +147,7 @@
   (testing "on id collision, appends index"
     (let [repo {:name "Test repo"
                 :customer-id (st/new-id)}
-          {st :storage :as rt} (h/test-rt)
+          {st :storage :as rt} (trt/test-runtime)
           _ (st/save-repo st (-> repo
                                  (select-keys [:customer-id])
                                  (assoc :id "test-repo"
@@ -160,7 +161,7 @@
 
 (deftest create-webhook
   (testing "assigns secret key"
-    (let [{st :storage :as rt} (h/test-rt)
+    (let [{st :storage :as rt} (trt/test-runtime)
           r (-> rt
                 (h/->req)
                 (h/with-body {:customer-id "test-customer"})
@@ -170,7 +171,7 @@
 
 (deftest get-webhook
   (testing "does not return the secret key"
-    (let [{st :storage :as rt} (h/test-rt)
+    (let [{st :storage :as rt} (trt/test-runtime)
           wh {:id (st/new-id)
               :secret-key "very secret key"}
           _ (st/save-webhook st wh)
@@ -183,7 +184,7 @@
 
 (deftest get-latest-build
   (testing "returns latest build"
-    (let [{st :storage :as rt} (h/test-rt)
+    (let [{st :storage :as rt} (trt/test-runtime)
           md {:customer-id "test-cust"
               :repo-id "test-repo"}
           create-build (fn [ts]
@@ -202,7 +203,7 @@
 
 (deftest get-build
   (testing "retrieves build by id"
-    (let [{st :storage :as rt} (h/test-rt)
+    (let [{st :storage :as rt} (trt/test-runtime)
           id (st/new-id)
           build {:customer-id "test-cust"
                  :repo-id "test-repo"
@@ -295,7 +296,7 @@
                  :status))))))
 
 (defn- make-events []
-  (ec/make-events {:events {:type :sync}}))
+  (ec/make-events {:type :sync}))
 
 (deftest event-stream
   (testing "returns stream reply"
@@ -343,7 +344,7 @@
 (deftest make-build-ctx
   (testing "adds ref to build from branch query param"
     (is (= "refs/heads/test-branch"
-           (-> (h/test-rt)
+           (-> (trt/test-runtime)
                (h/->req)
                (assoc-in [:parameters :query :branch] "test-branch")
                (sut/make-build-ctx {})
@@ -352,7 +353,7 @@
 
   (testing "adds ref to build from tag query param"
     (is (= "refs/tags/test-tag"
-           (-> (h/test-rt)
+           (-> (trt/test-runtime)
                (h/->req)
                (assoc-in [:parameters :query :tag] "test-tag")
                (sut/make-build-ctx {})
@@ -360,7 +361,7 @@
                :ref))))
 
   (testing "adds configured ssh keys"
-    (let [{st :storage :as rt} (h/test-rt)
+    (let [{st :storage :as rt} (trt/test-runtime)
           [cid rid] (repeatedly st/new-id)
           ssh-key {:private-key "private-key"
                    :public-key "public-key"}]
@@ -375,7 +376,7 @@
 
   (testing "adds main branch from repo"
     (is (= "test-branch"
-           (-> (h/test-rt)
+           (-> (trt/test-runtime)
                (h/->req)
                (sut/make-build-ctx {:main-branch "test-branch"})
                :git
@@ -383,27 +384,27 @@
 
   (testing "when no branch or tag specified, uses default branch"
     (is (= "refs/heads/main"
-           (-> (h/test-rt)
+           (-> (trt/test-runtime)
                (h/->req)
                (sut/make-build-ctx {:main-branch "main"})
                :git
                :ref))))
 
   (testing "sets cleanup flag when not in dev mode"
-    (is (true? (:cleanup? (sut/make-build-ctx (-> (h/test-rt)
+    (is (true? (:cleanup? (sut/make-build-ctx (-> (trt/test-runtime)
                                                   (assoc-in [:config :dev-mode] false)
                                                   (h/->req))
                                               {})))))
 
   (testing "does not set cleanup flag when in dev mode"
-    (is (false? (:cleanup? (sut/make-build-ctx (-> (h/test-rt)
+    (is (false? (:cleanup? (sut/make-build-ctx (-> (trt/test-runtime)
                                                    (assoc-in [:config :dev-mode] true)
                                                    (h/->req))
                                                {}))))))
 
 (deftest update-user
   (testing "updates user in storage"
-    (let [{st :storage :as rt} (h/test-rt)]
+    (let [{st :storage :as rt} (trt/test-runtime)]
       (is (st/sid? (st/save-user st {:type "github"
                                      :type-id 543
                                      :name "test user"})))
@@ -420,7 +421,7 @@
 
 (deftest create-email-registration
   (testing "does not create same email twice"
-    (let [{st :storage :as rt} (h/test-rt)
+    (let [{st :storage :as rt} (trt/test-runtime)
           email "duplicate@monkeyci.com"
           req (-> rt
                   (h/->req)

@@ -11,17 +11,29 @@
     (is (string? (sut/generate-secret-key)))))
 
 (deftest config->keypair
-  (testing "`nil` if no keys configured"
-    (is (nil? (sut/config->keypair {}))))
+  (let [test-priv "dev-resources/test/jwk/privkey.pem"
+        test-pub "dev-resources/test/jwk/pubkey.pem"]
+    
+    (testing "`nil` if no keys configured"
+      (is (nil? (sut/config->keypair {}))))
 
-  (testing "returns private and public keys as map"
-    (let [rt (-> {:jwk {:private-key "dev-resources/test/jwk/privkey.pem"
-                        :public-key "dev-resources/test/jwk/pubkey.pem"}}
-                  (sut/config->keypair))]
-      (is (map? rt))
-      (is (= 2 (count rt)))
-      (is (bk/private-key? (:priv rt)))
-      (is (bk/public-key? (:pub rt))))))
+    (testing "returns private and public keys as map"
+      (let [rt (-> {:jwk {:private-key test-priv
+                          :public-key test-pub}}
+                   (sut/config->keypair))]
+        (is (map? rt))
+        (is (= 2 (count rt)))
+        (is (bk/private-key? (:priv rt)))
+        (is (bk/public-key? (:pub rt)))))
+
+    (testing "reads private and public keys from string"
+      (let [rt (-> {:jwk {:private-key (slurp test-priv)
+                          :public-key (slurp test-pub)}}
+                   (sut/config->keypair))]
+        (is (map? rt))
+        (is (= 2 (count rt)))
+        (is (bk/private-key? (:priv rt)))
+        (is (bk/public-key? (:pub rt)))))))
 
 (deftest secure-ring-app
   (testing "verifies bearer token using public key and puts user in request `:identity`"

@@ -13,7 +13,8 @@
             [monkey.ci.events.core :as ec]
             [monkey.ci.runners.oci :as sut]
             [monkey.ci.helpers :as h]
-            [monkey.oci.container-instance.core :as ci]))
+            [monkey.oci.container-instance.core :as ci]
+            [monkey.ci.test.runtime :as trt]))
 
 (deftest make-runner
   (testing "provides for `:oci` type"
@@ -49,7 +50,7 @@
                      :commit-id "test-commit"
                      :ssh-keys [{:private-key "test-privkey"
                                  :public-key "test-pubkey"}]}}
-        rt (h/test-rt)
+        rt (trt/test-runtime)
         conf {:availability-domain "test-ad"
               :compartment-id "test-compartment"
               :image-pull-secrets "test-secrets"
@@ -203,7 +204,7 @@
  
 (deftest wait-for-script-end-event
   (testing "returns a deferred that holds the script end event"
-    (let [events (ec/make-events {:events {:type :manifold}})
+    (let [events (ec/make-events {:type :manifold})
           sid (repeatedly 3 random-uuid)
           d (sut/wait-for-script-end-event events sid)]
       (is (md/deferred? d))

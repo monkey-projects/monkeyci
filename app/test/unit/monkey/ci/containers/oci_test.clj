@@ -376,7 +376,7 @@
 
 (deftest wait-for-instance-end-events
   (testing "returns a deferred that holds the container and job end events"
-    (let [events (ec/make-events {:events {:type :manifold}})
+    (let [events (ec/make-events {:type :manifold})
           sid (repeatedly 3 random-uuid)
           d (sut/wait-for-instance-end-events events sid "this-job" 1000)]
       (is (md/deferred? d))

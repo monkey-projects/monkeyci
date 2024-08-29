@@ -149,7 +149,7 @@
       (add-from-args :job-config)))
 
 (defn- config-events [conf]
-  (ec/make-events (ec/->config (cs/events conf))))
+  (ec/make-events (cs/events conf)))
 
 (defn- config-log-maker [conf]
   (l/make-logger (l/->config conf)))

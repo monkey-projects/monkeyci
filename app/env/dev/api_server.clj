@@ -17,7 +17,7 @@
   (blob/->DiskBlobStore (abs-wd dir)))
 
 (def default-config
-  {:events (ec/make-events {:events {:type :manifold}})
+  {:events (ec/make-events {:type :manifold})
    :workspace (blob "workspace")
    :artifacts (blob "artifacts")
    :cache (blob "cache")
