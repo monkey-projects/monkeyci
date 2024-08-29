@@ -47,6 +47,13 @@
         (save-caches rt)
         (constantly r))))))
 
+(def make-blob-repository art/->BlobArtifactRepository)
+
+(defn make-build-api-repository
+  "Creates an `ArtifactRepository` that can be used to upload/download caches"
+  [client]
+  (art/->BuildApiArtifactRepository client "/cache/"))
+
 ;;; Config handling
 
 (defmethod config/normalize-key :cache [k conf]

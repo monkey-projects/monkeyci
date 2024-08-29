@@ -1,6 +1,5 @@
 (ns monkey.ci.script-test
-  (:require [aleph.http :as http]
-            [clojure.test :refer :all]
+  (:require [clojure.test :refer :all]
             [manifold.deferred :as md]
             [monkey.ci
              [build :as b]
@@ -9,7 +8,8 @@
              [script :as sut]
              [utils :as u]]
             [monkey.ci.build.core :as bc]
-            [monkey.ci.helpers :as h]))
+            [monkey.ci.helpers :as h]
+            [monkey.ci.test.aleph-test :as at]))
 
 (defn dummy-job
   ([r]
@@ -85,51 +85,27 @@
                  (rt/setup-runtime :api)
                  :client))))
 
-  (testing "no client if not corretly configured"
+  (testing "creates client using host and port"
+    (is (fn? (-> {:api {:host "test-host"
+                        :port 8080
+                        :token "test-token"}}
+                 (rt/setup-runtime :api)
+                 :client))))
+
+  (testing "no client if not correctly configured"
     (is (nil? (-> {:api {:url "http://test"}}
                   (rt/setup-runtime :api)
                   :client)))))
 
 (deftest make-client
-  (testing "client invokes http request, parses body as edn"
-    (with-redefs [http/request (constantly (md/success-deferred
-                                            {:status 200
-                                             :body "\"ok\""
-                                             :headers {"content-type" "application/edn"}}))]
-      (let [c (sut/make-client {:api {:url "http://test"}})]
-        (is (= "ok" @(c {:method :get :url "/something"}))))))
+  (testing "returns client fn"
+    (is (fn? (sut/make-client {:url "http://test" :token "test-token"}))))
 
-  (testing "throws on error"
-    (with-redefs [http/request (constantly (md/success-deferred
-                                            {:status 400
-                                             :body "Client error"}))]
-      (let [c (sut/make-client {:api {:url "http://test"}})]
-        (is (thrown? Exception @(c {:method :get :url "/something"}))))))
-
-  (testing "prefixes url to path"
-    (with-redefs [http/request (fn [{:keys [url]}]
-                                 (md/success-deferred
-                                  {:status 200
-                                   :body (pr-str url)
-                                   :headers {"content-type" "application/edn"}}))]
-      (let [c (sut/make-client {:api {:url "http://test"}})]
-        (is (= "http://test/something" @(c {:method :get :url "/something"}))))))
-
-  (testing "returns non-edn input as input stream"
-    (with-redefs [http/request (constantly (md/success-deferred
-                                            {:status 200
-                                             :body "ok"
-                                             :headers {"content-type" "text/plain"}}))]
-      (let [c (sut/make-client {:api {:url "http://test"}})]
-        (is (= "ok" (slurp @(c {:method :get :url "/something"})))))))
-
-  (testing "handles content type header with charset"
-    (with-redefs [http/request (constantly (md/success-deferred
-                                            {:status 200
-                                             :body (pr-str "ok")
-                                             :headers {"content-type" "application/edn; charset=utf-8"}}))]
-      (let [c (sut/make-client {:api {:url "http://test"}})]
-        (is (= "ok" @(c {:method :get :url "/something"})))))))
+  (testing "client fn connects to localhost"
+    (at/with-fake-http ["http://localhost:8080/test" {:status 200}]
+      (let [client (sut/make-client {:host "test-host" :port 8080 :token "test-token"})]
+        (is (= 200 (:status @(client {:method :get
+                                      :path "/test"}))))))))
 
 (deftest run-all-jobs
   (testing "success if no pipelines"
@@ -140,7 +116,7 @@
                           (sut/run-all-jobs {})))))
   
   (testing "success if jobs skipped"
-      (is (bc/success? (->> [(dummy-job bc/skipped)]
+    (is (bc/success? (->> [(dummy-job bc/skipped)]
                           (sut/run-all-jobs {})))))
 
   (testing "fails if a job fails"
