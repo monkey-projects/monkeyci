@@ -401,7 +401,7 @@
 
 (deftest wait-or-timeout
   (testing "waits for sidecar and container end events, then fetches details"
-    (let [events (ec/make-events {:events {:type :manifold}})
+    (let [events (ec/make-events {:type :manifold})
           sid (repeatedly 3 random-uuid)
           job-id "test-job"
           conf {:events events
@@ -420,7 +420,7 @@
       (is (sequential? (get-in @res [:body :containers])))))
 
   (testing "adds exit codes from events"
-    (let [events (ec/make-events {:events {:type :manifold}})
+    (let [events (ec/make-events {:type :manifold})
           sid (repeatedly 3 random-uuid)
           job-id "test-job"
           conf {:events events
@@ -442,7 +442,7 @@
       (is (= [1 2] (->> @res :body :containers (map ec/result-exit))))))
 
   (testing "marks timeout as failure"
-    (let [events (ec/make-events {:events {:type :manifold}})
+    (let [events (ec/make-events {:type :manifold})
           sid (repeatedly 3 random-uuid)
           job-id "test-job"
           conf {:events events
