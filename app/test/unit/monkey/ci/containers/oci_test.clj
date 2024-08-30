@@ -2,6 +2,7 @@
   (:require [clojure.test :refer [deftest testing is]]
             [clj-yaml.core :as yaml]
             [clojure.java.io :as io]
+            [clojure.spec.alpha :as spec]
             [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
@@ -13,6 +14,7 @@
             [monkey.ci.common.preds :as cp]
             [monkey.ci.containers.oci :as sut]
             [monkey.ci.events.core :as ec]
+            [monkey.ci.spec.sidecar :as ss]
             [monkey.ci.helpers :as h]
             [monkey.ci.test.runtime :as trt]))
 
@@ -217,13 +219,17 @@
                 :events {:type :zmq
                          :client {:address "inproc://test"}
                          :server {:enabled true}}
+                :api {:url "http://test-api"
+                      :token "test-token"}
                 :args "test-args"}
-          ic (->> {:job {:script ["first" "second"]
+          ic (->> {:job {:id "test-job"
+                         :script ["first" "second"]
                          :save-artifacts [{:id "test-artifact"
                                            :path "somewhere"}]
                          :work-dir "/tmp/test-checkout/sub"}
                    :build {:build-id "test-build"
-                           :checkout-dir "/tmp/test-checkout"}
+                           :checkout-dir "/tmp/test-checkout"
+                           :workspace "test-build-ws"}
                    :config conf
                    :oci {:credentials {:private-key pk}}
                    :runtime {:config conf}}
@@ -284,8 +290,9 @@
               (testing "included in config volume"
                 (is (some? e)))
 
-              (testing "contains build details"
-                (is (contains? data :build)))))))
+              (testing "matches sidecar config spec"
+                (is (spec/valid? ::ss/config data)
+                    (spec/explain-str ::ss/config data)))))))
 
       (testing "runs as root to access mount volumes"
         (is (= 0 (-> sc :security-context :run-as-user)))))
