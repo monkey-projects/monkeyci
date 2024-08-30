@@ -9,7 +9,9 @@
              [workspace :as ws]]
             [monkey.ci.build.api :as api]
             [monkey.ci.config.sidecar :as cs]
-            [monkey.ci.events.build-api :as eba]))
+            [monkey.ci.events.build-api :as eba]
+            [monkey.ci.spec :as spec]
+            [monkey.ci.spec.sidecar :as ss]))
 
 (defrecord SidecarRuntime [events log-maker workspace artifacts cache]
   co/Lifecycle
@@ -49,6 +51,7 @@
   "Given a sidecar configuration object, creates component system.  When started,
    it contains a fully configured `runtime` component."
   [config]
+  {:pre [(spec/valid? ::ss/config config)]}
   (co/system-map
    :runtime    (co/using
                 (new-runtime config)
@@ -57,16 +60,16 @@
    :events     (co/using
                 (new-events)
                 {:client :api-client})
-   :log-maker (new-log-maker config)
-   :workspace (co/using
-               (new-workspace config)
-               {:client :api-client})
-   :artifacts (co/using
-               (new-artifacts)
-               {:client :api-client})
-   :cache     (co/using
-               (new-cache)
-               {:client :api-client})))
+   :log-maker  (new-log-maker config)
+   :workspace  (co/using
+                (new-workspace config)
+                {:client :api-client})
+   :artifacts  (co/using
+                (new-artifacts)
+                {:client :api-client})
+   :cache      (co/using
+                (new-cache)
+                {:client :api-client})))
 
 (defn with-runtime
   "Creates component system according to config, starts it and then 
@@ -81,4 +84,3 @@
         (co/stop sys)))))
 
 (def runtime? (partial instance? SidecarRuntime))
-

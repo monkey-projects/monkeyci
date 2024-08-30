@@ -7,7 +7,6 @@
             [medley.core :as mc]
             [monkey.ci
              [artifacts :as art]
-             [blob :as blob]
              [build :as b]
              [cache :as cache]
              [config :as c]

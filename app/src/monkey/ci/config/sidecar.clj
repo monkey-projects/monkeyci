@@ -29,10 +29,10 @@
 
 (def build (comp ::ss/build ::ss/job-config))
 
-(def api ::es/api)
+(def api ::ss/api)
 
 (defn set-api [conf api]
-  (assoc conf ::es/api api))
+  (assoc conf ::ss/api api))
 
 (def events ::es/events)
 

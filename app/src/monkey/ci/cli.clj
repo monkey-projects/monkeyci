@@ -118,7 +118,8 @@
            :short "t"
            :type :ednfile}]
    :runs {:command cmd/sidecar
-          :app-mode :script}})
+          :app-mode :script
+          :runtime? false}})
 
 (def base-config
   {:name "monkey-ci"

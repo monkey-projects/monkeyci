@@ -3,13 +3,17 @@
             [aleph.http :as http]
             [clj-commons.byte-streams :as bs]
             [clojure.java.io :as io]
+            [clojure.spec.alpha :as spec]
             [manifold.deferred :as md]
             [monkey.ci
              [commands :as sut]
-             [sidecar :as sc]
-             [spec :as spec]]
+             [edn :as edn]
+             [sidecar :as sc]]
+            [monkey.ci.config.sidecar :as cs]
             [monkey.ci.helpers :as h]
-            [monkey.ci.web.handler :as wh]))
+            [monkey.ci.spec.sidecar :as ss]
+            [monkey.ci.web.handler :as wh]
+            [monkey.ci.test.aleph-test :as at]))
 
 (deftest run-build
   (testing "invokes runner from context"
@@ -100,30 +104,46 @@
     (with-redefs [sc/run (fn [args]
                            (reset! inv-args args)
                            (md/success-deferred {:exit ::test-exit}))]
-      (testing "runs sidecar poll loop, returns exit code"
-        (is (= ::test-exit (sut/sidecar {:config {:dev-mode true}}))))
+      (letfn [(validate-sidecar [config job recv]
+                (let [result (sut/sidecar config)]
+                  (testing "runs sidecar poll loop, returns exit code"
+                    (is (= ::test-exit result)))
 
-      (testing "passes events from runtime"
-        (is (some? (sut/sidecar {:events ::test-events})))
-        (is (= ::test-events (:events @inv-args))))
+                  (testing "passes file paths from args"
+                    (is (= "test-events" (get-in @inv-args [:paths :events-file]))))
 
-      (testing "passes file paths from args"
-        (is (some? (sut/sidecar {:config
-                                 {:args
-                                  {:events-file "test-events"}}})))
-        (is (= "test-events" (get-in @inv-args [:paths :events-file]))))
+                  (testing "posts start and end events"
+                    (is (= [:sidecar/start :sidecar/end]
+                           (map :type (recv)))))
 
-      (testing "posts start and end events"
-        (let [{:keys [recv] :as e} (h/fake-events)]
-          (is (some? (sut/sidecar {:events e
-                                   :config {:dev-mode true}})))
-          (is (= [:sidecar/start :sidecar/end]
-                 (map :type @recv)))))
+                  (testing "events contain job details from config"
+                    (is (= job (-> (recv)
+                                   first
+                                   :job))))))]
+        
+        (testing "from general config"
+          (let [job {:id "test-job"}
+                config {:args {:job-config {:job job}
+                               :events-file "test-events"}
+                        :events {:type :fake}
+                        :dev-mode true}]
+            (validate-sidecar config job #(-> @inv-args :events (h/received-events)))))
 
-      (testing "events contain job details from config"
-        (let [{:keys [recv] :as e} (h/fake-events)
-              job {:id "test-job"}]
-          (is (some? (sut/sidecar {:events e
-                                   :config {:args {:job-config {:job job}}
-                                            :dev-mode true}})))
-          (is (= job (-> @recv first :job))))))))
+        (testing "from sidecar-specific config"
+          (let [job {:id (str (random-uuid))}
+                config (-> {}
+                           (cs/set-events-file "test-events")
+                           (cs/set-start-file "start")
+                           (cs/set-abort-file "abort")
+                           (cs/set-api {:url "http://test"
+                                        :token (str (random-uuid))})
+                           (cs/set-job job)
+                           (cs/set-build {:build-id "test-build"
+                                          :workspace "test-ws"}))
+                recv (atom [])]
+            (is (spec/valid? ::ss/config config)
+                (spec/explain-str ::ss/config config))
+            (at/with-fake-http ["http://test/events" (fn [req]
+                                                       (swap! recv concat (edn/edn-> (:body req)))
+                                                       (md/success-deferred {:status 200}))]
+              (validate-sidecar config job (fn [] @recv)))))))))
