@@ -18,14 +18,17 @@
         (b/save ws checkout-dir dest) ; TODO Check for errors
         (constantly (assoc build :workspace dest))))))
 
+(defn- checkout-dir [build]
+  ;; Check out to the parent because the archive contains the directory
+  (some-> (:checkout-dir build)
+          (fs/parent)
+          str))
+
 (defrecord BlobWorkspace [store build]
   p/Workspace
   (restore-workspace [_]
-    (let [ws       (:workspace build)
-          ;; Check out to the parent because the archive contains the directory
-          checkout (some-> (:checkout-dir build)
-                           (fs/parent)
-                           str)]
+    (let [ws (:workspace build)
+          checkout (checkout-dir build)]
       (if (and store ws checkout)
         (do
           (log/info "Restoring workspace" ws)
@@ -35,12 +38,16 @@
 
 (defn restore
   "Restores the workspace as configured in the build"
-  [{:keys [build] store :workspace :as rt}]
-  (md/chain
-   (p/restore-workspace (->BlobWorkspace store build))
-   (fn [r?]
-     (cond-> rt
-       r? (assoc-in [:build :workspace/restored?] true)))))
+  [{:keys [build] ws :workspace :as rt}]
+  (letfn [(->workspace [x build]
+            (cond-> x
+              (not (p/workspace? x))
+              (->BlobWorkspace build)))]
+    (md/chain
+     (p/restore-workspace (->workspace ws build))
+     (fn [r?]
+       (cond-> rt
+         r? (assoc-in [:build :workspace/restored?] true))))))
 
 (defrecord BuildApiWorkspace [client build]
   p/Workspace
@@ -49,7 +56,7 @@
      (client {:path "/workspace"
               :method :get})
      :body
-     #(arch/extract % (:checkout-dir build)))))
+     #(arch/extract % (checkout-dir build)))))
 
 (def make-build-api-workspace ->BuildApiWorkspace)
 

@@ -14,12 +14,25 @@
     (let [rt {}]
       (is (= rt @(sut/restore rt)))))
 
-  (testing "restores using the workspace path in build into checkout dir"
+  (testing "restores using blob with the workspace path in build into checkout dir"
     (let [stored (atom {"path/to/workspace" "local"})
           store (h/strict-fake-blob-store stored)
           rt {:build {:workspace "path/to/workspace"
                       :checkout-dir "local/dir"}
               :workspace store}]
+      (is (true? (-> (sut/restore rt)
+                     (deref)
+                     (get-in [:build :workspace/restored?]))))
+      (is (empty? @stored))))
+
+  (testing "restores using workspace given"
+    (let [stored (atom {"path/to/workspace" "local"})
+          store (h/strict-fake-blob-store stored)
+          build {:workspace "path/to/workspace"
+                 :checkout-dir "local/dir"}
+          ws (sut/->BlobWorkspace store build)
+          rt {:build build
+              :workspace ws}]
       (is (true? (-> (sut/restore rt)
                      (deref)
                      (get-in [:build :workspace/restored?]))))
@@ -29,7 +42,7 @@
   (testing "downloads and extracts workspace via client"
     (h/with-tmp-dir dir
       (let [src (fs/create-dir (fs/path dir "src"))
-            dest (fs/create-dir (fs/path dir "dest"))
+            dest (fs/create-dirs (fs/path dir "dest/src"))
             arch (fs/path dir "archive.tgz")
             contents "This is a test file"
             build {:checkout-dir (str dest)}
@@ -41,4 +54,4 @@
         (is (not-empty (:entries (blob/make-archive (fs/file src) (fs/file arch)))))
         (is (fs/exists? arch))
         (is (not-empty (:entries @(p/restore-workspace ws))))
-        (is (fs/exists? (fs/path dest "src" "test.txt")))))))
+        (is (fs/exists? (fs/path dest "test.txt")))))))

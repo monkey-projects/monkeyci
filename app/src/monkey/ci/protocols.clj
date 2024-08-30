@@ -44,3 +44,5 @@
 (defprotocol Workspace
   (restore-workspace [this]
     "Restores the workspace associated with the current build"))
+
+(def workspace? (partial satisfies? Workspace))
