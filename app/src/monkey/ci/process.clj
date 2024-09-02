@@ -27,6 +27,7 @@
             ;; Need to require these for the multimethod discovery
             [monkey.ci.containers.oci]
             [monkey.ci.events.core]
+            [monkey.ci.runtime.script :as rs]
             [monkey.ci.storage
              [file]
              [sql]]))
@@ -52,10 +53,11 @@
        (when (-> (config/normalize-config (merge default-script-config config)
                                           (config/strip-env-prefix env)
                                           nil)
-                 (rt/with-runtime :script rt
+                 (rs/with-runtime
+                   (fn [rt]
                      (log/debug "Executing script with config" (:config rt))
                      (log/debug "Script working directory:" (utils/cwd))
-                     (script/exec-script! rt))
+                     (script/exec-script! rt)))
                  (bc/failed?))
          (exit! 1)))
      (catch Exception ex
