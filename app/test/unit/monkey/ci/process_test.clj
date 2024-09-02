@@ -167,34 +167,14 @@
       (is (= build (:build e)))
       (is (= "value" (:config-key e)))))
 
-  (testing "adds api token"
-    (is (not-empty (-> (sut/child-config {} (trt/test-runtime) {})
-                       (get-in [:api :token])))))
-
-  (testing "api token contains build sid in sub"
-    (let [sid (repeatedly 3 (comp str random-uuid))
-          build {:sid sid}
-          payload (-> (sut/child-config build (trt/test-runtime) {})
-                      (get-in [:api :token])
-                      (h/parse-token-payload))]
-      (is (= (sid/serialize-sid sid) (:sub payload)))))
-
-  (testing "adds api server port and ip address"
+  (testing "adds api server url and ip address"
     (let [conf (sut/child-config {} (trt/test-runtime) {:port 1234})]
-      (is (string? (get-in conf [:api :address])))
+      (is (string? (get-in conf [:api :url])))
       (is (= 1234 (get-in conf [:api :port])))))
 
-  (testing "no token if no jwk keys configured"
-    (is (nil? (-> (sut/child-config {} trt/empty-runtime {})
-                  (get-in [:api :token])))))
-
-  (testing "does not overwrite token if no jwk config"
-    (is (= "test-token"
-           (-> (sut/child-config {}
-                                 (-> trt/empty-runtime
-                                     (trt/set-config {:api {:token "test-token"}}))
-                                 {})
-               (get-in [:api :token])))))
+  (testing "adds api server token"
+    (let [conf (sut/child-config {} (trt/test-runtime) {:token "test-token"})]
+      (is (= "test-token" (get-in conf [:api :token])))))
 
   (testing "overwrites event config with runner settings"
     (let [rt (-> trt/empty-runtime

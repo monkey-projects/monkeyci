@@ -119,7 +119,7 @@
   [build rt api-srv]
   (-> (rt/rt->config rt)
       (assoc :build build)
-      (assoc :api (src->api-config api-src))
+      (assoc :api (srv->api-config api-srv))
       ;; Overwrite event settings with runner-specific config
       (mc/assoc-some :events (get-in rt [rt/config :runner :events]))))
 
