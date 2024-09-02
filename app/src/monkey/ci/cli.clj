@@ -28,6 +28,10 @@
            :option "branch"
            :short "b"
            :type :string}
+          {:as "Repository tag"
+           :option "tag"
+           :short "t"
+           :type :string}
           {:as "Commit id"
            :option "commit-id"
            :type :string}
@@ -114,7 +118,8 @@
            :short "t"
            :type :ednfile}]
    :runs {:command cmd/sidecar
-          :app-mode :script}})
+          :app-mode :script
+          :runtime? false}})
 
 (def base-config
   {:name "monkey-ci"

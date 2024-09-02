@@ -2,6 +2,7 @@
   (:require [clojure.test :refer [deftest testing is]]
             [clj-yaml.core :as yaml]
             [clojure.java.io :as io]
+            [clojure.spec.alpha :as spec]
             [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
@@ -11,8 +12,10 @@
              [runtime :as rt]
              [utils :as u]]
             [monkey.ci.common.preds :as cp]
+            [monkey.ci.config.sidecar :as cs]
             [monkey.ci.containers.oci :as sut]
             [monkey.ci.events.core :as ec]
+            [monkey.ci.spec.sidecar :as ss]
             [monkey.ci.helpers :as h]
             [monkey.ci.test.runtime :as trt]))
 
@@ -217,13 +220,17 @@
                 :events {:type :zmq
                          :client {:address "inproc://test"}
                          :server {:enabled true}}
+                :api {:url "http://test-api"
+                      :token "test-token"}
                 :args "test-args"}
-          ic (->> {:job {:script ["first" "second"]
+          ic (->> {:job {:id "test-job"
+                         :script ["first" "second"]
                          :save-artifacts [{:id "test-artifact"
                                            :path "somewhere"}]
                          :work-dir "/tmp/test-checkout/sub"}
                    :build {:build-id "test-build"
-                           :checkout-dir "/tmp/test-checkout"}
+                           :checkout-dir "/tmp/test-checkout"
+                           :workspace "test-build-ws"}
                    :config conf
                    :oci {:credentials {:private-key pk}}
                    :runtime {:config conf}}
@@ -263,29 +270,24 @@
             (is (some? v))
             (is (= sut/config-dir (:mount-path mnt))))
 
-          (testing "job details"
-            (let [e (find-volume-entry v "job.edn")
-                  data (some-> e :data (parse-b64-edn))]
-              (testing "included in config volume"
-                (is (some? e)))
-
-              (testing "contains job details"
-                (is (contains? data :job)))
-
-              (testing "recalculates job work dir"
-                (is (= "/opt/monkeyci/checkout/work/test-checkout/sub"
-                       (-> data
-                           :job
-                           :work-dir))))))
-
           (testing "config file"
             (let [e (find-volume-entry v "config.edn")
                   data (some-> e :data (parse-b64-edn))]
               (testing "included in config volume"
                 (is (some? e)))
 
-              (testing "contains build details"
-                (is (contains? data :build)))))))
+              (testing "matches sidecar config spec"
+                (is (spec/valid? ::ss/config data)
+                    (spec/explain-str ::ss/config data)))
+
+              (testing "contains job details"
+                (is (some? (cs/job data))))
+
+              (testing "recalculates job work dir"
+                (is (= "/opt/monkeyci/checkout/work/test-checkout/sub"
+                       (-> data
+                           (cs/job)
+                           :work-dir))))))))
 
       (testing "runs as root to access mount volumes"
         (is (= 0 (-> sc :security-context :run-as-user)))))
@@ -376,7 +378,7 @@
 
 (deftest wait-for-instance-end-events
   (testing "returns a deferred that holds the container and job end events"
-    (let [events (ec/make-events {:events {:type :manifold}})
+    (let [events (ec/make-events {:type :manifold})
           sid (repeatedly 3 random-uuid)
           d (sut/wait-for-instance-end-events events sid "this-job" 1000)]
       (is (md/deferred? d))
@@ -401,7 +403,7 @@
 
 (deftest wait-or-timeout
   (testing "waits for sidecar and container end events, then fetches details"
-    (let [events (ec/make-events {:events {:type :manifold}})
+    (let [events (ec/make-events {:type :manifold})
           sid (repeatedly 3 random-uuid)
           job-id "test-job"
           conf {:events events
@@ -420,7 +422,7 @@
       (is (sequential? (get-in @res [:body :containers])))))
 
   (testing "adds exit codes from events"
-    (let [events (ec/make-events {:events {:type :manifold}})
+    (let [events (ec/make-events {:type :manifold})
           sid (repeatedly 3 random-uuid)
           job-id "test-job"
           conf {:events events
@@ -442,7 +444,7 @@
       (is (= [1 2] (->> @res :body :containers (map ec/result-exit))))))
 
   (testing "marks timeout as failure"
-    (let [events (ec/make-events {:events {:type :manifold}})
+    (let [events (ec/make-events {:type :manifold})
           sid (repeatedly 3 random-uuid)
           job-id "test-job"
           conf {:events events

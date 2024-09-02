@@ -20,9 +20,11 @@
       (let [p (doto (fs/path dir "test-path")
                 (fs/create-file))
             stored (atom {})
+            build {:sid ["test-cust" "test-build"]}
             bs (h/fake-blob-store stored)
-            ctx {:artifacts bs
-                 :build {:sid ["test-cust" "test-build"]}
+            repo (sut/make-blob-repository bs build)
+            ctx {:artifacts repo
+                 :build build
                  :job {:work-dir dir
                        :save-artifacts [{:id "test-artifact"
                                          :path "test-path"}]}}]
@@ -32,31 +34,35 @@
           (is (cs/ends-with? dest "test-cust/test-build/test-artifact.tgz"))
           (is (= (str dir "/test-path") p))))))
 
-  (testing "nothing if no cache store"
+  (testing "nothing if no artifact repo"
     (is (empty? @(sut/save-artifacts
                   {:job {:save-artifacts [{:id "test-artifact"
                                            :path "test-path"}]}})))))
 
 (deftest restore-artifacts
-  (testing "restores path using blob store"
-    (let [stored (atom {"test-cust/test-build/test-artifact.tgz" ::dest})
-          bs (h/fake-blob-store stored)
-          ctx {:artifacts bs
-               :build {:sid ["test-cust" "test-build"]}
-               :job {:work-dir "work"
-                     :restore-artifacts [{:id "test-artifact"
-                                          :path "test-path"}]}}]
-      (is (some? @(sut/restore-artifacts ctx)))
+  (testing "restores path using artifact repo"
+    (let [job {:work-dir "work"
+               :restore-artifacts [{:id "test-artifact"
+                                    :path "test-path"}]}
+          stored (atom {"test-cust/test-build/test-artifact.tgz" (str (fs/canonicalize (:work-dir job)))})
+          bs (h/strict-fake-blob-store stored)
+          build {:sid ["test-cust" "test-build"]}
+          ctx {:artifacts (sut/make-blob-repository bs build)
+               :build build
+               :job job}]
+      (is (not-empty @(sut/restore-artifacts ctx)))
       (is (empty? @stored) "expected entry to be restored"))))
 
 (deftest restore-blob
   (testing "returns paths as strings and entry count"
-    (let [src (io/file "src")
-          dest (io/file "dest")
+    (let [dest (io/file "dest")
+          art-id "test-artifact"
+          build {:sid ["test-sid"]}
+          src (io/file "test-sid" (str art-id ".tgz"))
           bs (h/fake-blob-store (atom {src dest}))
-          r @(sut/restore-blob {:store bs
-                                :build-path (constantly src)}
-                               {:id "test-cache"
+          art (sut/make-blob-repository bs build)
+          r @(sut/restore-blob {:repo art}
+                               {:id art-id
                                 :path "test-path"})]
       (is (map? r))
       (is (= (.getCanonicalPath src) (:src r)))
@@ -71,11 +77,11 @@
         art-id (str (random-uuid))]
 
     (testing "uploads artifact to blob store"
-      (is (some? @(sut/upload-artifact repo art-id src-art)))
+      (is (some? @(sut/save-artifact repo art-id src-art)))
       (is (= 1 (-> store :stored deref count))))
     
     (testing "downloads artifact via blob store"
-      (is (some? @(sut/download-artifact repo art-id ::test-destination)))
+      (is (some? @(sut/restore-artifact repo art-id ::test-destination)))
 
       (is (empty? (-> store :stored deref))))))
 
@@ -98,8 +104,8 @@
           repo (sut/make-build-api-repository client)]
       (with-open [s (:server server)]
         (testing "uploads artifact using api"
-          (is (= art-id (:artifact-id @(sut/upload-artifact repo art-id (str in-dir))))))
+          (is (= art-id (:artifact-id @(sut/save-artifact repo art-id (str in-dir))))))
         
         (testing "downloads artifact using api"
-          (is (some? @(sut/download-artifact repo art-id (str out-dir))))
+          (is (some? @(sut/restore-artifact repo art-id (str out-dir))))
           (is (fs/exists? (fs/path out-dir "input" "test.txt"))))))))

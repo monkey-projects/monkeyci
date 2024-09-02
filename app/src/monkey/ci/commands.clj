@@ -2,17 +2,21 @@
   "Event handlers for commands"
   (:require [aleph.http :as http]
             [clj-commons.byte-streams :as bs]
+            [clojure.spec.alpha :as spec]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
              [build :as b]
              [jobs :as jobs]
+             [protocols :as p]
              [runtime :as rt]
              [script :as script]
              [sidecar :as sidecar]
              [utils :as u]]
             [monkey.ci.events.core :as ec]
+            [monkey.ci.runtime.sidecar :as rs]
+            [monkey.ci.spec.sidecar :as ss]
             [monkey.ci.web.handler :as h]))
 
 (def exit-error 1)
@@ -21,14 +25,13 @@
   "Performs a build, using the runner from the context.  Returns a deferred
    that will complete when the build finishes."
   [rt]
-  (let [r (:runner rt)]
+  (let [r (:runner rt)
+        build (b/make-build-ctx rt)]
     (try
-      (-> rt
-          (b/make-build-ctx)
-          (r rt))
+      (r build rt)
       (catch Exception ex
         (log/error "Unable to start build" ex)
-        (rt/post-events rt (b/build-end-evt (assoc (rt/build rt) :message (ex-message ex))
+        (rt/post-events rt (b/build-end-evt (assoc build :message (ex-message ex))
                                             exit-error))
         exit-error))))
 
@@ -127,6 +130,34 @@
                :paths (select-keys args [:events-file :start-file :abort-file]))
         (mc/assoc-some :poll-interval (get-in rt [rt/config :sidecar :poll-interval])))))
 
+(defn- run-sidecar [{:keys [events job] :as rt}]
+  (let [sid (b/get-sid rt)
+        base-evt {:sid sid
+                  :job (jobs/job->event job)}
+        result (try
+                 (p/post-events events (assoc base-evt :type :sidecar/start))
+                 (let [r @(sidecar/run rt)
+                       e (:exit r)]
+                   (ec/make-result (b/exit-code->status e) e (:message r)))
+                 (catch Throwable t
+                   (ec/exception-result t)))]
+    (log/info "Sidecar terminated")
+    (p/post-events events (-> base-evt
+                              (assoc :type :sidecar/end)
+                              (ec/set-result result)))
+    (:exit result)))
+
+(defn- ^:deprecated sidecar-legacy
+  "Legacy implementation, run from old generic config"
+  [conf]
+  (rt/with-runtime conf :cli rt
+    (run-sidecar (->sidecar-rt rt))))
+
+(defn- sidecar-new
+  "Run sidecar from spec-compliant config"
+  [conf]
+  (rs/with-runtime conf run-sidecar))
+
 (defn sidecar
   "Runs the application as a sidecar, that is meant to capture events 
    and logs from a container process.  This is necessary because when
@@ -136,22 +167,7 @@
    which are then picked up by the sidecar to dispatch or store.  
 
    The sidecar loop will stop when the events file is deleted."
-  [rt]
-  (let [sid (b/get-sid rt)
-        ;; Add job info from the sidecar config
-        job (sidecar-rt->job rt)
-        result (try
-                 (rt/post-events rt {:type :sidecar/start
-                                     :sid sid
-                                     :job (jobs/job->event job)})
-                 (let [r @(sidecar/run (->sidecar-rt rt))
-                       e (:exit r)]
-                   (ec/make-result (b/exit-code->status e) e (:message r)))
-                 (catch Throwable t
-                   (ec/exception-result t)))]
-    (log/info "Sidecar terminated")
-    (rt/post-events rt (-> {:type :sidecar/end
-                            :sid sid
-                            :job (jobs/job->event job)}
-                           (ec/set-result result)))
-    (:exit result)))
+  [conf]
+  (if (spec/valid? ::ss/config conf)
+    (sidecar-new conf)
+    (sidecar-legacy conf)))

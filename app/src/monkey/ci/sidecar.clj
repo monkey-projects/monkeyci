@@ -7,7 +7,6 @@
             [medley.core :as mc]
             [monkey.ci
              [artifacts :as art]
-             [blob :as blob]
              [build :as b]
              [cache :as cache]
              [config :as c]
@@ -147,34 +146,3 @@
       (add-from-args :start-file)
       (add-from-args :abort-file)
       (add-from-args :job-config)))
-
-(defn- config-events [conf]
-  (ec/make-events (ec/->config (cs/events conf))))
-
-(defn- config-log-maker [conf]
-  (l/make-logger (l/->config conf)))
-
-(defn- config-blob [conf config-getter blob-key]
-  (blob/make-blob-store {blob-key (config-getter conf)} blob-key))
-
-(defn- config-workspace [conf]
-  (config-blob conf cs/workspace :workspace))
-
-(defn- config-artifacts [conf]
-  (config-blob conf cs/artifacts :artifacts))
-
-(defn- config-cache [conf]
-  (config-blob conf cs/cache :cache))
-
-(defn make-runtime
-  "Creates a runtime for the sidecar using the config map"
-  [conf]
-  (let [props (juxt cs/job cs/build cs/poll-interval)
-        paths (juxt cs/events-file cs/start-file cs/abort-file)]
-    (-> (zipmap [:job :build :poll-interval] (props conf))
-        (assoc :paths (zipmap [:events-file :start-file :abort-file] (paths conf))
-               :events (config-events conf)
-               :log-maker (config-log-maker conf)
-               :workspace (config-workspace conf)
-               :artifacts (config-artifacts conf)
-               :cache (config-cache conf)))))

@@ -120,20 +120,25 @@
                                     :volume-name config-volume}))
 
 (defn- patch-container [[conf] build rt]
-  (let [{:keys [url branch commit-id] :as git} (:git build)]
+  (let [{:keys [url branch tag commit-id] :as git} (:git build)]
     (when (nil? url)
       (throw (ex-info "Git URL must be specified" {:git git})))
-    ;; FIXME Also allow tags
-    (when (and (nil? branch) (nil? commit-id))
-      (throw (ex-info "Either branch or commit id must be specified" {:git git})))
+    (when (every? nil? [branch tag commit-id])
+      (throw (ex-info "Either branch, tag or commit id must be specified" {:git git})))
     [(-> conf
          (assoc :display-name build-container
-                ;; TODO Run build script in-process, it saves memory and time
+                ;; Run the build as a child process.  This allows us to add dependencies
+                ;; in the build, but also isolates the untrusted build script.  Alternatively,
+                ;; we could try to run the clj process directly but then we'd have to set up
+                ;; and external build api server for the script to communicate with in order
+                ;; to shield off any sensitive info, or use the general API server.  This
+                ;; could lead to performance bottlenecks and could lead to higher costs wrt.
+                ;; the API gateway.
                 :arguments (cond-> ["-w" oci/checkout-dir "build" "run"
                                     "--sid" (format-sid (b/sid build))
                                     "-u" url]
-                             ;; TODO Add support for tags as well
                              branch (concat ["-b" branch])
+                             tag (concat ["-t" tag])
                              commit-id (concat ["--commit-id" commit-id]))
                 ;; Run as root, because otherwise we can't write to the shared volumes
                 :security-context {:security-context-type "LINUX"

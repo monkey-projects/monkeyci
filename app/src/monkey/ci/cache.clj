@@ -19,7 +19,7 @@
 
 (defn- rt->config [rt]
   (-> (select-keys rt [:job :build])
-      (assoc :store (:cache rt)
+      (assoc :repo (:cache rt)
              :job-key :caches
              :build-path (partial cache-archive-path (:build rt)))))
 
@@ -47,7 +47,8 @@
         (save-caches rt)
         (constantly r))))))
 
-(def make-blob-repository art/->BlobArtifactRepository)
+(defn make-blob-repository [store build]
+  (art/->BlobArtifactRepository store (partial cache-archive-path build)))
 
 (defn make-build-api-repository
   "Creates an `ArtifactRepository` that can be used to upload/download caches"

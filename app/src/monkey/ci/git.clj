@@ -53,7 +53,7 @@
       {:key-dir ssh-keys-dir
        :name (list-private-keys ssh-keys-dir)})))
 
-(def opts->branch (some-fn :ref :branch))
+(def opts->branch (some-fn :ref :tag :branch))
 
 (defn clone
   "Clones the repo at given url, and checks out the given branch.  Writes the

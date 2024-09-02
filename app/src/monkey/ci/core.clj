@@ -37,13 +37,15 @@
   "Creates a new runtime and invokes the command using the specified application 
    mode.  By default it uses the base system, but you can specify your own for 
    testing purposes."
-  [{:keys [command app-mode] :as cmd} env]
+  [{:keys [command app-mode runtime?] :as cmd :or {runtime? true}} env]
   (fn [args]
     (log/debug "Invoking command with arguments:" args)
     (let [config (config/app-config env args)]
-      (rt/with-runtime config app-mode runtime
-        (log/info "Executing command:" command)
-        (command runtime)))))
+      (log/info "Executing command:" command)
+      (if runtime?
+        (rt/with-runtime config app-mode runtime
+          (command runtime))
+        (command config)))))
 
 (defn make-cli-config [{:keys [cmd-invoker env] :or {cmd-invoker system-invoker}}]
   (letfn [(invoker [cmd]

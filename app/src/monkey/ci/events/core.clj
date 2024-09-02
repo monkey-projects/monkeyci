@@ -74,28 +74,23 @@
                        #(c/group-keys % :server)
                        c/keywordize-type)))
 
-(defmulti make-events (comp :type :events))
+(defmulti make-events :type)
 
 (defmethod make-events :sync [_]
   (make-sync-events matches-event?))
 
 (defmethod make-events :jms [config]
-  (jms/make-jms-events (:events config) matches-event?))
+  (jms/make-jms-events config matches-event?))
 
 (defmethod make-events :manifold [_]
   (manifold/make-manifold-events matches-event?))
 
 (defmethod make-events :zmq [config]
-  (zmq/make-zeromq-events (:events config) matches-event?))
-
-(defn ->config
-  "Creates a valid events config object that can be passed to `make-events`"
-  [obj]
-  {:events obj})
+  (zmq/make-zeromq-events config matches-event?))
 
 (defmethod rt/setup-runtime :events [conf _]
-  (when (:events conf)
-    (make-events conf)))
+  (when-let [ec (:events conf)]
+    (make-events ec)))
 
 (defn wrapped
   "Returns a new function that wraps `f` and posts an event before 

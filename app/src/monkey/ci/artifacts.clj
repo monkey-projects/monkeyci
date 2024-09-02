@@ -19,13 +19,24 @@
              [api :as api]
              [archive :as archive]]))
 
+(defprotocol ArtifactRepository
+  (restore-artifact [this id dest]
+    "Downloads and extracts artifact with given id to the specified destination 
+     directory.  Returns the destination.")
+  (save-artifact [this id src]
+    "Creates an archive and uploads the artifact with given id from `src`, which 
+     can be a directory or file."))
+
+(defn repo? [x]
+  (satisfies? ArtifactRepository x))
+
 (defn- do-with-blobs
   "Fetches blobs configurations from the job using the job key, then
    applies `f` to each of them.  This is only executed if a blob store 
    is configured."
-  [{:keys [job store job-key]} f]
+  [{:keys [job repo job-key]} f]
   (md/chain
-   (->> (when store
+   (->> (when repo
           (job-key job))
         (map f)
         (apply md/zip))
@@ -40,15 +51,13 @@
 
 (defn- save-blob
   "Saves a single blob path, using the blob configuration and artifact info."
-  [{:keys [job build store build-path]} {:keys [path id]}]
-  ;; TODO Make paths relative to checkout dir because using job work dir can be wroing
+  [{:keys [job build repo]} {:keys [path id]}]
+  ;; TODO Make paths relative to checkout dir because using job work dir can be wrong
   ;; when the work dir of the saving job is not the same as the restoring job.
   (let [fullp (b/job-relative-dir job build path)]
     (log/debug "Saving blob:" id "at path" path "(full path:" fullp ")")
     (md/chain
-     (blob/save store
-                fullp
-                (build-path id))
+     (save-artifact repo id fullp)
      (fn [{:keys [dest entries] :as r}]
        (if (not-empty entries)
          (log/debugf "Zipped %d entries to %s (%.2f MB)" (count entries) dest (mb dest))
@@ -58,16 +67,16 @@
 (defn save-generic [conf]
   (do-with-blobs conf (partial save-blob conf)))
 
-(defn restore-blob [{:keys [store build-path job build]} {:keys [id path]}]
+(defn restore-blob [{:keys [repo job build]} {:keys [id path]}]
   (log/debug "Restoring blob:" id "to path" path)
   (md/chain
-   (blob/restore store
-                 (build-path id)
-                 ;; Restore to the parent path because the dir name will be in the archive
-                 (-> (b/job-relative-dir job build path)
-                     (fs/parent)
-                     (fs/canonicalize)
-                     (str)))
+   (restore-artifact repo
+                     id
+                     ;; Restore to the parent path because the dir name will be in the archive
+                     (-> (b/job-relative-dir job build path)
+                         (fs/parent)
+                         (fs/canonicalize)
+                         (str)))
    (fn [{:keys [entries src dest] :as r}]
      (let [r (-> r
                  (mc/update-existing :src (comp str fs/canonicalize))
@@ -79,6 +88,42 @@
 
 (defn restore-generic [conf]
   (do-with-blobs conf (partial restore-blob conf)))
+
+;;; Protocol implementations
+
+(defrecord BlobArtifactRepository [store path-fn]
+  ArtifactRepository
+  (restore-artifact [this id dest]
+    (blob/restore store (path-fn id) dest))
+
+  (save-artifact [this id src]
+    (blob/save store src (path-fn id))))
+
+(defrecord BuildApiArtifactRepository [client base-path]
+  ArtifactRepository
+  (restore-artifact [this id dest]
+    (md/chain
+     (client {:method :get
+              :path (str base-path id)
+              :as :stream})
+     :body
+     #(archive/extract % dest)))
+
+  (save-artifact [this id src]
+    (let [tmp (fs/create-temp-file)
+          arch (blob/make-archive src (fs/file tmp))
+          stream (io/input-stream (fs/file tmp))]
+      (-> (client (api/as-edn {:method :put
+                               :path (str base-path id)
+                               :body stream}))
+          (md/chain
+           :body
+           (partial merge arch))
+          (md/finally
+            ;; Clean up
+            (fn []
+              (.close stream)
+              (fs/delete tmp)))))))
 
 ;;; Artifact specific functions
 
@@ -95,10 +140,9 @@
 
 (defn- rt->config
   "Creates a configuration object for artifacts from the runtime"
-  [{:keys [build] :as rt}]
+  [rt]
   (-> (select-keys rt [:job :build])
-      (assoc :store (rt/artifacts rt)
-             :build-path (partial artifact-archive-path build))))
+      (assoc :repo (:artifacts rt))))
 
 (defn save-artifacts
   "Saves all artifacts according to the job configuration."
@@ -130,49 +174,8 @@
         (save-artifacts rt)
         (constantly r))))))
 
-(defprotocol ArtifactRepository
-  (download-artifact [this id dest]
-    "Downloads artifact with given id to the specified destination.  Returns the
-     destination.  If `dest` is `:stream`, returns it as an input stream.")
-  (upload-artifact [this id src]
-    "Uploads the artifact with given id from `src`, which can be a file or an
-     input stream."))
-
-(defrecord BlobArtifactRepository [store build]
-  ArtifactRepository
-  (download-artifact [this id dest]
-    (blob/restore store (artifact-archive-path build id) dest))
-
-  (upload-artifact [this id src]
-    (blob/save store src (artifact-archive-path build id))))
-
-(def make-blob-repository ->BlobArtifactRepository)
-
-(defrecord BuildApiArtifactRepository [client base-path]
-  ArtifactRepository
-  (download-artifact [this id dest]
-    (md/chain
-     (client {:method :get
-              :path (str base-path id)
-              :as :stream})
-     :body
-     #(archive/extract % dest)))
-
-  (upload-artifact [this id src]
-    (let [tmp (fs/create-temp-file)
-          arch (blob/make-archive src (fs/file tmp))
-          stream (io/input-stream (fs/file tmp))]
-      (-> (client (api/as-edn {:method :put
-                               :path (str base-path id)
-                               :body stream}))
-          (md/chain
-           :body
-           (partial merge arch))
-          (md/finally
-            ;; Clean up
-            (fn []
-              (.close stream)
-              (fs/delete tmp)))))))
+(defn make-blob-repository [store build]
+  (->BlobArtifactRepository store (partial artifact-archive-path build)))
 
 (defn make-build-api-repository [client]
   (->BuildApiArtifactRepository client "/artifact/"))

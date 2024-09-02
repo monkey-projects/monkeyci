@@ -39,15 +39,15 @@
 
 (deftest make-events
   (testing "can make sync events"
-    (is (some? (sut/make-events {:events {:type :sync}}))))
+    (is (some? (sut/make-events {:type :sync}))))
 
   (testing "can make manifold events"
-    (is (some? (sut/make-events {:events {:type :manifold}}))))
+    (is (some? (sut/make-events {:type :manifold}))))
   
   (testing "can make zeromq server events"
-    (is (some? (sut/make-events {:events {:type :zmq
-                                          :server
-                                          {:addresses ["tcp://0.0.0.0:3001"]}}})))))
+    (is (some? (sut/make-events {:type :zmq
+                                 :server
+                                 {:addresses ["tcp://0.0.0.0:3001"]}})))))
 
 (deftest matches-event?
   (testing "matches event that contains one of the specified types"

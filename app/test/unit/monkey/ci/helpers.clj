@@ -15,6 +15,7 @@
              [protocols :as p]
              [storage :as s]
              [utils :as u]]
+            [monkey.ci.events.core :as ec]
             [monkey.ci.web
              [common :as wc]
              [auth :as auth]]
@@ -183,6 +184,12 @@
    queried for received events."
   []
   (->FakeEvents (atom [])))
+
+(defn received-events [fake]
+  @(:recv fake))
+
+(defmethod ec/make-events :fake [_]
+  (fake-events))
 
 (defrecord FakeEventReceiver [listeners]
   p/EventReceiver

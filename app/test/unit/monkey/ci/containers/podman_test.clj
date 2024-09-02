@@ -2,6 +2,8 @@
   (:require [clojure.test :refer [deftest testing is]]
             [babashka.process :as bp]
             [monkey.ci
+             [artifacts :as art]
+             [cache :as ca]
              [containers :as mcc]
              [logging :as l]]
             [monkey.ci.containers.podman :as sut]
@@ -58,7 +60,7 @@
     (testing "restores and saves caches if configured"
       (h/with-tmp-dir dir
         (let [stored (atom {})
-              cache (h/fake-blob-store stored)
+              cache (ca/make-blob-repository (h/fake-blob-store stored) {})
               r @(mcc/run-container
                   (-> (test-rt dir)
                       (assoc-in [:job :caches] [{:id "test-cache"
@@ -70,10 +72,11 @@
     (testing "restores artifacts if configured"
       (h/with-tmp-dir dir
         (let [stored (atom {"test-cust/test-build/test-artifact.tgz" ::test})
-              store (h/fake-blob-store stored)
+              build {:sid ["test-cust" "test-build"]}
+              store (art/make-blob-repository (h/fake-blob-store stored) build)
               r @(mcc/run-container
                   (-> (test-rt dir)
-                      (assoc-in [:build :sid] ["test-cust" "test-build"])
+                      (assoc :build build)
                       (assoc-in [:job :restore-artifacts] [{:id "test-artifact"
                                                             :path "restore-path"}])
                       (trt/set-artifacts store)))]
@@ -83,7 +86,7 @@
     (testing "saves artifacts if configured"
       (h/with-tmp-dir dir
         (let [stored (atom {})
-              store (h/fake-blob-store stored)
+              store (art/make-blob-repository (h/fake-blob-store stored) {})
               r @(mcc/run-container
                   (-> (test-rt dir)
                       (assoc-in [:job :save-artifacts] [{:id "test-artifact"

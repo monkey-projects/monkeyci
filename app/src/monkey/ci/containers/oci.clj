@@ -19,6 +19,7 @@
              [protocols :as p]
              [runtime :as rt]
              [utils :as u]]
+            [monkey.ci.config.sidecar :as cos]
             [monkey.ci.containers.promtail :as pt]
             [monkey.ci.events.core :as ec]
             [monkey.oci.container-instance.core :as ci]))
@@ -195,23 +196,19 @@
                                   (oci/config-entry (str i) s)))
                    (into [(job-script-entry)]))}))
 
-(defn- job-details->edn [job build]
-  (pr-str {:job (-> job
-                    (select-keys [:id :save-artifacts :restore-artifacts :caches :dependencies])
-                    (assoc :work-dir (job-work-dir job build)))}))
-
 (defn- make-sidecar-config
   "Creates a configuration map using the runtime, that can then be passed on to the
    sidecar container."
-  [{:keys [build] rt :runtime}]
-  (let [wd (oci/base-work-dir build)]
-    (-> (rt/rt->config rt)
-        ;; Remove some unnecessary values
-        (dissoc :args :checkout-base-dir :jwk :containers :storage) 
-        (update :build dissoc :git :jobs :cleanup?)
-        (assoc :work-dir wd
-               :checkout-base-dir work-dir)
-        (assoc-in [:build :checkout-dir] wd))))
+  [{:keys [build job] :as conf}]
+  (-> {}
+      (cos/set-build build)
+      (cos/set-job (-> job
+                       (select-keys [:id :save-artifacts :restore-artifacts :caches :dependencies])
+                       (assoc :work-dir (job-work-dir job build))))
+      (cos/set-events-file event-file)
+      (cos/set-start-file start-file)
+      (cos/set-abort-file abort-file)
+      (cos/set-api (get-in conf [:runtime :config :api]))))
 
 (defn- rt->edn [conf]
   (edn/->edn (make-sidecar-config conf)))
@@ -222,8 +219,7 @@
   (let [{:keys [log-config]} sidecar]
     {:name config-vol
      :volume-type "CONFIGFILE"
-     :configs (cond-> [(oci/config-entry job-config-file (job-details->edn job build))
-                       (oci/config-entry config-file (rt->edn conf))]
+     :configs (cond-> [(oci/config-entry config-file (rt->edn conf))]
                 log-config (conj (oci/config-entry "logback.xml" log-config)))}))
 
 (defn- set-pod-shape [ic job]
