@@ -177,7 +177,8 @@
     (let [store (req->artifacts req)
           id (get-in req [:parameters :path :artifact-id])
           path (when id (art/artifact-archive-path (req->build req) id))]
-    (f req store path id))))
+      (log/debug "Uploading artifact:" id ", storing it at path" path)
+      (f req store path id))))
 
 (def upload-artifact
   "Uploads a new artifact.  The body should contain the file contents."
@@ -198,6 +199,7 @@
     (let [store (req->cache req)
           id (get-in req [:parameters :path :cache-id])
           path (when id (cache/cache-archive-path (req->build req) id))]
+      (log/debug "Uploading cache:" id ", storing it at path" path)
       (f req store path id))))
 
 (def upload-cache
