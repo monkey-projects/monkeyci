@@ -257,10 +257,6 @@
         (is (h/contains-subseq? (:arguments sc)
                                 ["--abort-file" sut/abort-file])))
 
-      (testing "passes job config as arg"
-        (is (h/contains-subseq? (:arguments sc)
-                                ["--job-config" "/home/monkeyci/config/job.edn"])))
-
       (testing "config volume"
         (let [mnt (oci/find-mount sc "config")
               v (oci/find-volume ic "config")]

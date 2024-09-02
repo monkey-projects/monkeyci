@@ -39,7 +39,6 @@
 (def job-script "job.sh")
 (def config-vol "config")
 (def config-dir "/home/monkeyci/config")
-(def job-config-file "job.edn")
 (def job-container-name "job")
 (def config-file "config.edn")
 
@@ -120,8 +119,7 @@
                      "sidecar"
                      "--events-file" event-file
                      "--start-file" start-file
-                     "--abort-file" abort-file
-                     "--job-config" (str config-dir "/" job-config-file)]
+                     "--abort-file" abort-file]
          ;; Run as root, because otherwise we can't write to the shared volumes
          :security-context {:security-context-type "LINUX"
                             :run-as-user 0}))

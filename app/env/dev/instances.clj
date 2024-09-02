@@ -124,7 +124,7 @@
                                :sid ["test-customer" "test-repo" build-id]
                                :checkout-dir oci-cont/work-dir}
                         ws (assoc :workspace ws))))]
-    (md/future (c/run-container rt))))
+    (c/run-container rt)))
 
 (defn- throw-error! [{:keys [status] :as resp}]
   (if (or (nil? status) (>= status 400))
