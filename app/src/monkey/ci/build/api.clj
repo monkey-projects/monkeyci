@@ -37,14 +37,10 @@
 (def ctx->api-client (comp :client :api))
 (def ^:deprecated rt->api-client ctx->api-client)
 
-(defn- repo-path [ctx]
-  (apply format "/customer/%s/repo/%s" (b/get-sid ctx)))
-
 (defn- fetch-params* [ctx]
-  (let [client (ctx->api-client ctx)
-        [cust-id repo-id] (b/get-sid ctx)]
-    (log/debug "Fetching repo params for" cust-id repo-id)
-    (->> @(client {:url (str (repo-path ctx) "/param")
+  (let [client (ctx->api-client ctx)]
+    (log/debug "Fetching repo params for" (b/get-sid ctx))
+    (->> @(client {:path "/params"
                    :method :get})
          :body
          (map (juxt :name :value))
@@ -57,9 +53,8 @@
   "Downloads the artifact with given id for the current job.  Returns an input
    stream that can then be written to disk, or unzipped using archive functions."
   [ctx id]
-  (let [client (ctx->api-client ctx)
-        sid (b/get-sid ctx)]
-    (log/debug "Downloading artifact for build" sid ":" id)
-    (-> @(client {:url (format (str (repo-path ctx) "/builds/%s/artifact/%s/download") (last sid) id)
+  (let [client (ctx->api-client ctx)]
+    (log/debug "Downloading artifact for build" (b/get-sid ctx) ":" id)
+    (-> @(client {:path (str "/artifact/" id)
                   :method :get})
         :body)))

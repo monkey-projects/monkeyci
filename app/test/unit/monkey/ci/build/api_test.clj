@@ -39,7 +39,7 @@
 (deftest build-params
   (testing "invokes `params` endpoint on client"
     (let [m (fn [req]
-              (when (= "/customer/test-cust/repo/test-repo/param" (:url req))
+              (when (= "/params" (:path req))
                 (md/success-deferred {:body
                                       [{:name "key"
                                         :value "value"}]})))
@@ -50,8 +50,8 @@
 (deftest download-artifact
   (testing "invokes artifact download endpoint on client"
     (let [m (fn [req]
-              (when (= "/customer/test-cust/repo/test-repo/builds/test-build/artifact/test-artifact/download"
-                       (:url req))
+              (when (= "/artifact/test-artifact"
+                       (:path req))
                 (md/success-deferred {:body "test artifact contents"})))
           rt {:api {:client m}
               :build {:sid ["test-cust" "test-repo" "test-build"]}}]

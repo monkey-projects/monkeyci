@@ -114,7 +114,6 @@
    containing the runtime with an `:exit` added."
   [rt]
   {:pre [(spec/valid? ::ss/runtime rt)]}
-  (log/info "Running sidecar with configuration:" (get-in rt [rt/config :sidecar]))
   ;; Restore caches and artifacts before starting the job
   (let [h (-> (comp poll-events mark-start)
               (art/wrap-artifacts)
