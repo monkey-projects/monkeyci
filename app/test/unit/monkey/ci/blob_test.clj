@@ -182,5 +182,11 @@
 
       (testing "`nil` if blob does not exist"
         (with-redefs [os/head-object (constantly false)]
-          (is (nil? @(sut/input-stream blob path))))))))
+          (is (nil? @(sut/input-stream blob path)))))
+
+      (testing "can upload raw stream"
+        (with-redefs [oss/input-stream->multipart (constantly (md/success-deferred nil))]
+          (is (= "test-dest" @(p/put-blob-stream blob
+                                                 (bs/to-input-stream (.getBytes "test stream"))
+                                                 "test-dest"))))))))
 

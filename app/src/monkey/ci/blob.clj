@@ -152,19 +152,6 @@
         (log/warn "Unable to save blob, path does not exist:" src)
         (md/success-deferred nil))))
 
-  (get-blob-stream [_ src]
-    (let [obj-name (archive-obj-name conf src)
-          params (-> conf
-                     (select-keys [:ns :bucket-name])
-                     (assoc :object-name obj-name))]
-      (md/chain
-       (os/head-object client params)
-       (fn [exists?]
-         (when exists?
-           (md/chain
-            (os/get-object client params)
-            bs/to-input-stream))))))
-
   (restore-blob [_ src dest]
     (let [obj-name (archive-obj-name conf src)
           f (io/file dest)
@@ -183,7 +170,33 @@
                 #(assoc % :src src)))
            ;; FIXME It may occur that a file is not yet available if it is read immediately after writing
            ;; In that case we should retry.
-           (log/warn "Blob not found in bucket:" obj-name)))))))
+           (log/warn "Blob not found in bucket:" obj-name))))))
+
+  (get-blob-stream [_ src]
+    (let [obj-name (archive-obj-name conf src)
+          params (-> conf
+                     (select-keys [:ns :bucket-name])
+                     (assoc :object-name obj-name))]
+      (md/chain
+       (os/head-object client params)
+       (fn [exists?]
+         (when exists?
+           (md/chain
+            (os/get-object client params)
+            bs/to-input-stream))))))
+
+  (put-blob-stream [_ src dest]
+    (let [obj-name (archive-obj-name conf dest)]
+      (md/chain
+       (oss/input-stream->multipart client
+                                    (-> conf
+                                        (select-keys [:ns :bucket-name])
+                                        (assoc :object-name obj-name
+                                               :input-stream src
+                                               ;; Increase buffer size to 16MB
+                                               :buf-size 0x1000000
+                                               :close? true)))
+       (constantly obj-name)))))
 
 (defmethod make-blob-store :oci [conf k]
   (let [oci-conf (get conf k)
