@@ -29,8 +29,7 @@
             [monkey.ci.events.core]
             [monkey.ci.storage
              [file]
-             [sql]]
-            [monkey.ci.web.auth :as auth]))
+             [sql]]))
 
 (def default-script-config
   "Default configuration for the script runner."
@@ -110,15 +109,17 @@
         log-config (assoc :jvm-opts
                           [(str "-Dlogback.configurationFile=" log-config)]))}}))
 
+(defn- srv->api-config [{:keys [port token]}]
+  {:port port
+   :url (format "http:%s:%d" (as/get-ip-addr) port)
+   :token token})
+
 (defn child-config
   "Creates a configuration map that can then be passed to the child process."
   [build rt api-srv]
   (-> (rt/rt->config rt)
       (assoc :build build)
-      ;; Generate an API token and add it to the config
-      (update :api mc/assoc-some :token (auth/generate-jwt-from-rt rt (auth/build-token (b/sid build))))
-      (update :api merge {:address (as/get-ip-addr)
-                          :port (:port api-srv)})
+      (assoc :api (src->api-config api-src))
       ;; Overwrite event settings with runner-specific config
       (mc/assoc-some :events (get-in rt [rt/config :runner :events]))))
 
@@ -159,7 +160,6 @@
         cmd ["clojure"
              "-Sdeps" (pr-str (generate-deps build rt))
              "-X:monkeyci/build"
-             ;; TODO Pass api server port
              (pr-str {:config-file (config->edn (child-config build rt api-srv))})]]
     (log/debug "Running in script dir:" script-dir ", this command:" cmd)
     ;; TODO Run as another unprivileged user for security (we'd need `su -c` for that)

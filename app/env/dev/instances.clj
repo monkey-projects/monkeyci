@@ -112,6 +112,10 @@
         rt (-> @co/global-config
                (config/normalize-config {} {})
                (assoc-in [:containers :image-tag] version)
+               ;; Dummy api config
+               (assoc :api {:url "http://test"
+                            :port 12243
+                            :token "dummy-token"})
                (rt/config->runtime)
                (assoc :job
                       {:id "test-job"
