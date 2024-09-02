@@ -354,13 +354,14 @@
            ;; Either return the first error result, or the result of the job container
            (:result (or nonzero job-cont))))))))
 
-(defn- rt->container-config [rt]
+(defn rt->container-config [rt]
   {:runtime rt ; TODO Get rid of the runtime
    :job (:job rt)
    :build (rt/build rt)
    :promtail (get-in rt [rt/config :promtail])
    :events (:events rt)
-   :oci (:containers rt)})
+   :oci (:containers rt)
+   :sidecar (get-in rt [rt/config :sidecar])})
 
 ;; Will be replaced with OciContainerRunner component
 (defmethod mcc/run-container :oci [rt]

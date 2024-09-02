@@ -478,6 +478,12 @@
                      (deref)
                      :exit))))))
 
+(deftest rt->container-config
+  (testing "includes sidecar config"
+    (is (= ::sidecar-config (-> {:config {:sidecar ::sidecar-config}}
+                                (sut/rt->container-config)
+                                :sidecar)))))
+
 (deftest normalize-key
   (testing "takes configured tag"
     (is (= "test-version"
