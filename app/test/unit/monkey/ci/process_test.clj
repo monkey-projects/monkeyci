@@ -10,9 +10,10 @@
              [containers]
              [process :as sut]
              [script :as script]
-             [sid :as sid]]
-            [monkey.ci.utils :as u]
+             [sid :as sid]
+             [utils :as u]]
             [monkey.ci.build.core :as bc]
+            [monkey.ci.spec.common :as sc]
             [monkey.ci.helpers :as h]
             [monkey.ci.test.runtime :as trt]))
 
@@ -169,7 +170,7 @@
 
   (testing "adds api server url and ip address"
     (let [conf (sut/child-config {} (trt/test-runtime) {:port 1234})]
-      (is (string? (get-in conf [:api :url])))
+      (is (sc/url? (get-in conf [:api :url])))
       (is (= 1234 (get-in conf [:api :port])))))
 
   (testing "adds api server token"

@@ -111,7 +111,7 @@
 
 (defn- srv->api-config [{:keys [port token]}]
   {:port port
-   :url (format "http:%s:%d" (as/get-ip-addr) port)
+   :url (format "http://%s:%d" (as/get-ip-addr) port)
    :token token})
 
 (defn child-config
