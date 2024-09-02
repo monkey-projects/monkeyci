@@ -150,7 +150,7 @@
 (defn- ^:deprecated sidecar-legacy
   "Legacy implementation, run from old generic config"
   [conf]
-  (log/info "Running sidecar in legacy mode with config:" config)
+  (log/info "Running sidecar in legacy mode with config:" conf)
   (rt/with-runtime conf :cli rt
     (run-sidecar (->sidecar-rt rt))))
 
