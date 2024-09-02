@@ -12,6 +12,7 @@
              [runtime :as rt]
              [utils :as u]]
             [monkey.ci.common.preds :as cp]
+            [monkey.ci.config.sidecar :as cs]
             [monkey.ci.containers.oci :as sut]
             [monkey.ci.events.core :as ec]
             [monkey.ci.spec.sidecar :as ss]
@@ -269,21 +270,6 @@
             (is (some? v))
             (is (= sut/config-dir (:mount-path mnt))))
 
-          (testing "job details"
-            (let [e (find-volume-entry v "job.edn")
-                  data (some-> e :data (parse-b64-edn))]
-              (testing "included in config volume"
-                (is (some? e)))
-
-              (testing "contains job details"
-                (is (contains? data :job)))
-
-              (testing "recalculates job work dir"
-                (is (= "/opt/monkeyci/checkout/work/test-checkout/sub"
-                       (-> data
-                           :job
-                           :work-dir))))))
-
           (testing "config file"
             (let [e (find-volume-entry v "config.edn")
                   data (some-> e :data (parse-b64-edn))]
@@ -292,7 +278,16 @@
 
               (testing "matches sidecar config spec"
                 (is (spec/valid? ::ss/config data)
-                    (spec/explain-str ::ss/config data)))))))
+                    (spec/explain-str ::ss/config data)))
+
+              (testing "contains job details"
+                (is (some? (cs/job data))))
+
+              (testing "recalculates job work dir"
+                (is (= "/opt/monkeyci/checkout/work/test-checkout/sub"
+                       (-> data
+                           (cs/job)
+                           :work-dir))))))))
 
       (testing "runs as root to access mount volumes"
         (is (= 0 (-> sc :security-context :run-as-user)))))
