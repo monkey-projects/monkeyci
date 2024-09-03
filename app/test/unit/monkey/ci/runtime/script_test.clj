@@ -15,17 +15,17 @@
 
 (deftest with-runtime
   (testing "invokes target function with runtime"
-    (is (= ::invoked (sut/with-runtime {:key :value} (constantly ::invoked)))))
+    (is (= ::invoked (sut/with-runtime test-config (constantly ::invoked)))))
 
   (testing "drops workspace from runtime"
-    (is (nil? (sut/with-runtime {} :workspace))))
+    (is (nil? (sut/with-runtime test-config :workspace))))
 
   (testing "adds artifact repo"
     (is (art/repo? (sut/with-runtime
-                     {:artifacts {:type :disk :dir "/tmp"}}
+                     test-config
                      :artifacts))))
 
   (testing "adds cache repo"
     (is (art/repo? (sut/with-runtime
-                     {:cache {:type :disk :dir "/tmp"}}
+                     test-config
                      :cache)))))

@@ -23,6 +23,7 @@
              [oci]
              [podman]]
             [monkey.ci.events.core :as ec]
+            [monkey.ci.runtime.script :as rs]
             [monkey.ci.spec.build :as sb]
             [muuntaja.parse :as mp]))
 
@@ -238,23 +239,26 @@
   (-> (load-script (build/script-dir build) (build/build-id build))
       (resolve-jobs rt)))
 
+(defn rt->context [rt]
+  ;; TODO Replace the runtime with a specific context when passing it to a job
+  rt)
+
 (defn exec-script!
   "Loads a script from a directory and executes it.  The script is executed in 
    this same process."
-  [rt+build]
-  (let [build (rt/build rt+build)
-        rt rt+build ; TODO Remove build from runtime
+  [rt]
+  (let [build (rs/build rt)
         build-id (build/build-id build)
-        script-dir (build/script-dir build)]
+        script-dir (build/script-dir build)
+        ctx (rt->context rt)]
     (s/valid? ::sb/build build)
-    ;; TODO Replace the runtime with a specific context when passing it to a job
     (log/debug "Executing script for build" build-id "at:" script-dir)
     (log/debug "Build map:" build)
-    (try 
-      (let [jobs (load-jobs build rt)]
+    (try
+      (let [jobs (load-jobs build ctx)]
         (log/trace "Jobs:" jobs)
         (log/debug "Loaded" (count jobs) "jobs:" (map bc/job-id jobs))
-        (run-all-jobs* rt jobs))
+        (run-all-jobs* ctx jobs))
       (catch Exception ex
         (log/error "Unable to load build script" ex)
         (let [msg ((some-fn (comp ex-message ex-cause)

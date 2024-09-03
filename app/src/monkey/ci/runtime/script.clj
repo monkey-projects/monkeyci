@@ -12,7 +12,7 @@
             [monkey.ci.runtime.common :as rc]
             [monkey.ci.spec.script :as ss]))
 
-(defrecord ScriptRuntime [events artifacts cache build]
+(defrecord ScriptRuntime [events artifacts cache build api-client]
   co/Lifecycle
   (start [{:keys [config] :as this}]
     (assoc this :build (cs/build config)))
@@ -46,7 +46,7 @@
   (co/system-map
    :runtime    (co/using
                 (new-runtime config)
-                [:events :artifacts :cache])
+                [:events :artifacts :cache :api-client])
    :api-client (new-api-client config)
    :events     (co/using
                 (new-events)
@@ -60,3 +60,5 @@
 
 (defn with-runtime [config f]
   (rc/with-runtime (make-system config) f))
+
+(def build :build)
