@@ -16,6 +16,7 @@
              [credits :as cr]
              [extensions :as ext]
              [jobs :as j]
+             [protocols :as p]
              [runtime :as rt]
              [spec :as s]
              [utils :as u]]
@@ -23,6 +24,7 @@
              [oci]
              [podman]]
             [monkey.ci.events.core :as ec]
+            [monkey.ci.runtime.script :as rs]
             [monkey.ci.spec.build :as sb]
             [muuntaja.parse :as mp]))
 
@@ -40,7 +42,7 @@
       (apply w rt more))))
 
 (defn- base-event
-  "Creates an skeleton event with basic properties"
+  "Creates a skeleton event with basic properties"
   [rt type]
   {:type type
    :src :script
@@ -65,44 +67,45 @@
 
 ;; Wraps a job so it fires an event before and after execution, and also
 ;; catches any exceptions.
-(defrecord EventFiringJob [target]
+(defrecord EventFiringJob [events target]
   j/Job
-  (execute! [job rt]
-    (let [rt-with-job (assoc rt :job target)
+  (execute! [job ctx]
+    (let [ctx-with-job (assoc ctx :job target)
           handle-error (fn [ex]
                          (log/error "Got job exception:" ex)
                          (assoc bc/failure
                                 :exception ex
                                 :message (.getMessage ex)))
           base-props {:start-time (u/now)
-                      :credit-multiplier (cr/credit-multiplier target rt)}]
+                      :credit-multiplier (cr/credit-multiplier target ctx)}]
       (log/debug "Executing event firing job:" (bc/job-id target))
       (md/chain
-       (rt/post-events rt (job-start-evt
-                           (-> rt-with-job
-                               (update :job
-                                       merge base-props {:status :running}))))
+       (p/post-events events (job-start-evt
+                              (-> ctx-with-job
+                                  (update :job
+                                          merge base-props {:status :running}))))
        (fn [_]
          ;; Catch both sync and async errors
          (try 
-           (-> (j/execute! target rt-with-job)
+           (-> (j/execute! target ctx-with-job)
                (md/catch handle-error))
            (catch Exception ex
              (handle-error ex))))
        (fn [r]
          (log/debug "Job ended with response:" r)
          (md/chain
-          (rt/post-events rt (job-end-evt
-                              (update rt-with-job :job
-                                      merge base-props {:end-time (u/now)})
-                              r))
+          (p/post-events events (job-end-evt
+                                 (update ctx-with-job :job
+                                         merge base-props {:end-time (u/now)})
+                                 r))
           (constantly r)))))))
 
 (defn- with-fire-events
   "Wraps job so events are fired on start and end."
-  [job]
+  [events job]
   (map->EventFiringJob (-> (j/job->event job)
-                           (assoc :target job))))
+                           (assoc :target job
+                                  :events events))))
 
 (def with-extensions
   "Wraps the job so any registered extensions get executed."
@@ -114,13 +117,13 @@
 
 (defn run-all-jobs
   "Executes all jobs in the set, in dependency order."
-  [{:keys [pipeline] :as rt} jobs]
+  [{:keys [pipeline events] :as ctx} jobs]
   (let [pf (cond->> jobs
              ;; Filter jobs by pipeline, if given
              pipeline (j/filter-jobs (j/label-filter (pipeline-filter pipeline)))
-             true (map (comp with-fire-events with-extensions)))]
+             true (map (comp (partial with-fire-events events) with-extensions)))]
     (log/debug "Found" (count pf) "matching jobs:" (map bc/job-id pf))
-    (let [result @(j/execute-jobs! pf rt)]
+    (let [result @(j/execute-jobs! pf ctx)]
       (log/debug "Jobs executed, result is:" result)
       {:status (if (some (comp bc/failed? :result) (vals result)) :failure :success)
        :jobs result})))
@@ -238,23 +241,26 @@
   (-> (load-script (build/script-dir build) (build/build-id build))
       (resolve-jobs rt)))
 
+(defn rt->context [rt]
+  ;; TODO Replace the runtime with a specific context when passing it to a job
+  rt)
+
 (defn exec-script!
   "Loads a script from a directory and executes it.  The script is executed in 
    this same process."
-  [rt+build]
-  (let [build (rt/build rt+build)
-        rt rt+build ; TODO Remove build from runtime
+  [rt]
+  (let [build (rs/build rt)
         build-id (build/build-id build)
-        script-dir (build/script-dir build)]
+        script-dir (build/script-dir build)
+        ctx (rt->context rt)]
     (s/valid? ::sb/build build)
-    ;; TODO Replace the runtime with a specific context when passing it to a job
     (log/debug "Executing script for build" build-id "at:" script-dir)
     (log/debug "Build map:" build)
-    (try 
-      (let [jobs (load-jobs build rt)]
+    (try
+      (let [jobs (load-jobs build ctx)]
         (log/trace "Jobs:" jobs)
         (log/debug "Loaded" (count jobs) "jobs:" (map bc/job-id jobs))
-        (run-all-jobs* rt jobs))
+        (run-all-jobs* ctx jobs))
       (catch Exception ex
         (log/error "Unable to load build script" ex)
         (let [msg ((some-fn (comp ex-message ex-cause)

@@ -27,6 +27,9 @@
 (defn set-jwk [rt k]
   (assoc rt :jwk k))
 
+(defn set-containers [rt c]
+  (assoc rt :containers c))
+
 (defn test-runtime []
   (-> empty-runtime
       (set-artifacts (h/fake-blob-store))
@@ -34,4 +37,5 @@
       (set-workspace (h/fake-blob-store))
       (set-events (h/fake-events))
       (set-storage (s/make-memory-storage))
-      (set-jwk (auth/keypair->rt (auth/generate-keypair)))))
+      (set-jwk (auth/keypair->rt (auth/generate-keypair)))
+      (set-containers (h/fake-container-runner))))

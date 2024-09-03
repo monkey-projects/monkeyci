@@ -4,6 +4,7 @@
             [clojure.test :refer :all]
             [clojure.java.io :as io]
             [clojure.string :as cs]
+            [clojure.spec.alpha :as s]
             [manifold.deferred :as md]
             [monkey.ci
              [logging :as l]
@@ -13,7 +14,10 @@
              [sid :as sid]
              [utils :as u]]
             [monkey.ci.build.core :as bc]
-            [monkey.ci.spec.common :as sc]
+            [monkey.ci.config.script :as cos]
+            [monkey.ci.spec
+             [common :as sc]
+             [script :as ss]]
             [monkey.ci.helpers :as h]
             [monkey.ci.test.runtime :as trt]))
 
@@ -23,35 +27,24 @@
   (.getAbsolutePath (io/file cwd "examples" subdir)))
 
 (deftest run
-  (with-redefs [sut/exit! (constantly nil)]
-    (testing "parses arg as config file"
-      (h/with-tmp-dir dir
-        (let [captured-args (atom nil)
-              config-file (io/file dir "config.edn")]
-          (with-redefs [script/exec-script! (fn [args]
-                                              (reset! captured-args args)
-                                              bc/success)]
-            (is (nil? (spit config-file (pr-str {:build {:build-id "test-build"}}))))
-            (is (nil? (sut/run {:config-file (.getAbsolutePath config-file)})))
-            (is (= {:build-id "test-build"}
-                   (-> @captured-args
-                       :build)))))))
-
-    (testing "merges config with env vars"
-      (h/with-tmp-dir dir
-        (let [captured-args (atom nil)
-              config-file (io/file dir "config.edn")]
-          (with-redefs [script/exec-script! (fn [args]
-                                              (reset! captured-args args)
-                                              bc/success)]
-            (is (nil? (spit config-file (pr-str {:build {:build-id "test-build"}}))))
-            (is (nil? (sut/run
-                        {:config-file (.getAbsolutePath config-file)}
-                        {:monkeyci-containers-type "podman"
-                         :monkeyci-api-socket "/tmp/test.sock"})))
-            (is (= :podman (-> (:containers @captured-args)
-                               :type)))
-            (is (= {:socket "/tmp/test.sock"} (get-in @captured-args [:config :api])))))))))
+  (let [build {:build-id "test-build"}
+        config (-> cos/empty-config
+                   (cos/set-build build)
+                   (cos/set-api {:url "http://test"
+                                 :token "test-token"}))]    
+    (with-redefs [sut/exit! (constantly nil)]
+      (testing "parses arg as config file"
+        (h/with-tmp-dir dir
+          (let [captured-args (atom nil)
+                config-file (io/file dir "config.edn")]
+            (with-redefs [script/exec-script! (fn [args]
+                                                (reset! captured-args args)
+                                                bc/success)]
+              (is (nil? (spit config-file (pr-str config))))
+              (is (nil? (sut/run {:config-file (.getAbsolutePath config-file)})))
+              (is (= build
+                     (-> @captured-args
+                         :build))))))))))
 
 (deftype FakeProcess [exitValue])
 
@@ -159,32 +152,21 @@
                             :paths)))))
 
 (deftest child-config
+  (testing "satisfies spec"
+    (is (s/valid? ::ss/config (sut/child-config {:build-id "test-build"}
+                                                {:port 1234
+                                                 :token "test-token"}))))
+  
   (testing "adds build to config"
     (let [build {:build-id "test-build"}
-          e (sut/child-config build
-                              (-> trt/empty-runtime
-                                  (trt/set-config {:config-key "value"}))
-                              {})]
-      (is (= build (:build e)))
-      (is (= "value" (:config-key e)))))
+          e (sut/child-config build {})]
+      (is (= build (cos/build e)))))
 
   (testing "adds api server url and ip address"
-    (let [conf (sut/child-config {} (trt/test-runtime) {:port 1234})]
-      (is (sc/url? (get-in conf [:api :url])))
-      (is (= 1234 (get-in conf [:api :port])))))
+    (let [conf (sut/child-config {}  {:port 1234})]
+      (is (sc/url? (:url (cos/api conf))))
+      (is (= 1234 (:port (cos/api conf))))))
 
   (testing "adds api server token"
-    (let [conf (sut/child-config {} (trt/test-runtime) {:token "test-token"})]
-      (is (= "test-token" (get-in conf [:api :token])))))
-
-  (testing "overwrites event config with runner settings"
-    (let [rt (-> trt/empty-runtime
-                 (trt/set-config
-                  {:events
-                   {:type :manifold}
-                   :runner
-                   {:events
-                    {:type :zmq}}}))]
-      (is (= :zmq (-> (sut/child-config {} rt {})
-                      :events
-                      :type))))))
+    (let [conf (sut/child-config {} {:token "test-token"})]
+      (is (= "test-token" (:token (cos/api conf)))))))

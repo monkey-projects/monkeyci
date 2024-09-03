@@ -89,8 +89,7 @@
   monkey.ci.build.core.ContainerJob
   (execute! [this rt]
     (md/chain
-     ;; TODO Use ContainerRunner protocol instead
-     (co/run-container (assoc rt :job this))
+     (p/run-container (:containers rt) this)
      (fn [r]
        ;; Don't add the full result otherwise it will be sent out as an event
        (if (= 0 (:exit r))

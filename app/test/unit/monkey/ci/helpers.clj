@@ -12,6 +12,7 @@
             [medley.core :as mc]
             [monkey.ci
              [blob :as blob]
+             [containers :as containers]
              [protocols :as p]
              [storage :as s]
              [utils :as u]]
@@ -177,7 +178,13 @@
 (defrecord FakeEvents [recv]
   p/EventPoster
   (post-events [this evt]
-    (swap! recv (comp vec concat) (u/->seq evt))))
+    (swap! recv (comp vec concat) (u/->seq evt)))
+
+  p/EventReceiver
+  (add-listener [this ef h]
+    nil)
+  (remove-listener [this ef h]
+    nil))
 
 (defn fake-events
   "Set up fake events implementation.  It returns an event poster that can be
@@ -267,3 +274,15 @@
 
 (defn gen-email-registration []
   (gen-entity :entity/email-registration))
+
+(defrecord FakeContainerRunner [credit-consumer runs result]
+  p/ContainerRunner
+  (run-container [this job]
+    (swap! runs (fnil conj []) job)
+    (md/success-deferred result)))
+
+(defn fake-container-runner [& [result]]
+  (->FakeContainerRunner nil (atom []) (or result {:exit 0})))
+
+(defmethod containers/make-container-runner :fake [_]
+  (fake-container-runner))

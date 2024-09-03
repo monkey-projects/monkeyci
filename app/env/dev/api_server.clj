@@ -43,4 +43,3 @@
                   (when-let [server (:server s)]
                     (.close server))
                   (bas/start-server (merge default-config conf)))))
-

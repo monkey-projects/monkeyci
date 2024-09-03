@@ -6,7 +6,8 @@
              [artifacts :as art]
              [cache :as cache]
              [containers :as co]
-             [jobs :as sut]]))
+             [jobs :as sut]]
+            [monkey.ci.helpers :as h]))
 
 (defn dummy-job
   ([id & [opts]]
@@ -274,20 +275,16 @@
     (is (sut/job? (bc/container-job ::test-job {:container/image "test-img"}))))
 
   (testing "runs container on execution"
-    (let [invoked? (atom false)]
-      (with-redefs [co/run-container (fn [_]
-                                       (reset! invoked? true)
-                                       (md/success-deferred {:exit 0}))]
-        (is (bc/success? (-> (bc/container-job ::test-job {})
-                             (sut/execute! {})
-                             (deref))))
-        (is (true? @invoked?)))))
+    (let [runner (h/fake-container-runner)]
+      (is (bc/success? (-> (bc/container-job ::test-job {})
+                           (sut/execute! {:containers runner})
+                           (deref))))
+      (is (= 1 (count @(:runs runner))))))
 
   (testing "adds status according to exit code"
-    (with-redefs [co/run-container (constantly (md/success-deferred {:exit 1}))]
-      (is (bc/failed? (-> (bc/container-job ::test-job {})
-                          (sut/execute! {})
-                          (deref)))))))
+    (is (bc/failed? (-> (bc/container-job ::test-job {})
+                        (sut/execute! {:containers (h/fake-container-runner {:exit 1})})
+                        (deref))))))
 
 (deftest filter-jobs
   (testing "applies filter to jobs"

@@ -24,10 +24,11 @@
             [monkey.ci.build
              [api-server :as as]
              [core :as bc]]
+            [monkey.ci.config.script :as cos]
             ;; Need to require these for the multimethod discovery
             [monkey.ci.containers.oci]
             [monkey.ci.events.core]
-            [monkey.ci.runtime.script :as rs]
+            [monkey.ci.runtime.script :as rs]            
             [monkey.ci.storage
              [file]
              [sql]]))
@@ -118,12 +119,10 @@
 
 (defn child-config
   "Creates a configuration map that can then be passed to the child process."
-  [build rt api-srv]
-  (-> (rt/rt->config rt)
-      (assoc :build build)
-      (assoc :api (srv->api-config api-srv))
-      ;; Overwrite event settings with runner-specific config
-      (mc/assoc-some :events (get-in rt [rt/config :runner :events]))))
+  [build api-srv]
+  (-> cos/empty-config
+      (cos/set-build build)
+      (cos/set-api (srv->api-config api-srv))))
 
 (defn- config->edn
   "Writes the configuration to an edn file that is then passed as command line to the app."
@@ -162,7 +161,7 @@
         cmd ["clojure"
              "-Sdeps" (pr-str (generate-deps build rt))
              "-X:monkeyci/build"
-             (pr-str {:config-file (config->edn (child-config build rt api-srv))})]]
+             (pr-str {:config-file (config->edn (child-config build api-srv))})]]
     (log/debug "Running in script dir:" script-dir ", this command:" cmd)
     ;; TODO Run as another unprivileged user for security (we'd need `su -c` for that)
     (-> (bp/process
