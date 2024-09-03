@@ -3,7 +3,9 @@
             [monkey.ci
              [config :as c]
              [containers :as sut]
-             [runtime :as rt]]))
+             [protocols :as p]
+             [runtime :as rt]]
+            [monkey.ci.helpers]))
 
 (deftest normalize-key
   (testing "handles string type"
@@ -12,7 +14,10 @@
                        :type)))))
 
 (deftest setup-runtime
-  (testing "adds credit-consumer fn"
-    (is (fn? (-> {:containers {}}
-                 (rt/setup-runtime :containers)
-                 :credit-consumer)))))
+  (let [conf (-> {:containers {:type :fake}}
+                 (rt/setup-runtime :containers))]
+    #_(testing "creates container runner"
+      (is (p/container-runner? conf)))
+    
+    (testing "adds credit-consumer fn"
+      (is (fn? (:credit-consumer conf))))))

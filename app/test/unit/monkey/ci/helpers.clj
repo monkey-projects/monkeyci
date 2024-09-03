@@ -12,6 +12,7 @@
             [medley.core :as mc]
             [monkey.ci
              [blob :as blob]
+             [containers :as containers]
              [protocols :as p]
              [storage :as s]
              [utils :as u]]
@@ -267,3 +268,13 @@
 
 (defn gen-email-registration []
   (gen-entity :entity/email-registration))
+
+(defrecord FakeContainerRunner [credit-consumer]
+  p/ContainerRunner
+  (run-container [this job]
+    (md/success-deferred 0)))
+
+(def fake-container-runner ->FakeContainerRunner)
+
+(defmethod containers/make-container-runner :fake [_]
+  (fake-container-runner nil))

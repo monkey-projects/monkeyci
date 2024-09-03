@@ -114,7 +114,10 @@
 (defmethod mcc/run-container :podman [{:keys [job] :as rt}]
   (run-container job (rt->config rt)))
 
-(defrecord PodmanContainerRunner [config]
+(defrecord PodmanContainerRunner [config credit-consumer]
   p/ContainerRunner
   (run-container [this job]
     (run-container job config)))
+
+(defmethod mcc/make-container-runner :podman [config]
+  (->PodmanContainerRunner config nil))

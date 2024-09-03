@@ -29,9 +29,7 @@
             [monkey.ci.web
              [common :as c]
              [handler :as h]]
-            [reitit
-             [ring :as ring]
-             [swagger :as swagger]]
+            [reitit.ring :as ring]
             [reitit.coercion.schema]
             [ring.util.response :as rur]
             [schema.core :as s]))
@@ -210,59 +208,68 @@
   (with-cache (fn [req store path _]
                 (download-stream req store path 404))))
 
+(defn start-container [req]
+  ;; TODO
+  (-> (rur/response {:message "todo"})
+      (rur/status 202)))
+
 (def edn #{"application/edn"})
 
-(def routes ["" {:swagger {:id :monkeyci/build-api}}
-             [["/swagger.json"
-               {:no-doc true
-                :get (swagger/create-swagger-handler)}]
-              ["/test"
+(def params-routes
+  ["/params"
+   {:get get-params
+    :responses {200 {:body [h/ParameterValue]}}
+    :produces edn}])
+
+(def events-routes
+  ["/events"
+   ;; TODO Receive events through GET
+   {:post post-events
+    :parameters {:body [{s/Keyword s/Any}]}
+    :responses {202 {}}
+    :consumes edn}])
+
+(def workspace-routes
+  ["/workspace"
+   {:get download-workspace
+    :responses {200 {}}}])
+
+(def artifact-routes
+  ["/artifact/:artifact-id"
+   {:parameters {:path {:artifact-id s/Str}}
+    :put {:handler upload-artifact
+          :responses {200 {}}
+          :produces edn
+          :parameters {:body s/Any}}
+    :get {:handler download-artifact
+          :responses {200 {}}}}])
+
+(def cache-routes
+  ["/cache/:cache-id"
+   {:parameters {:path {:cache-id s/Str}}
+    :put {:handler upload-cache
+          :responses {200 {}}
+          :produces edn}
+    :get {:handler download-cache
+          :responses {200 {}}}}])
+
+(def container-routes
+  ["/container"
+   {:post {:handler start-container
+           :responses {202 {}}
+           :produces edn}}])
+
+(def routes [""
+             [["/test"
                {:get (constantly (rur/response {:result "ok"}))
-                :summary "Test endpoint"
-                :operationId :test
                 :responses {200 {:body {:result s/Str}}}
                 :produces edn}]
-              ["/params"
-               {:get get-params
-                :summary "Retrieve configured build parameters"
-                :operationId :get-params
-                :responses {200 {:body [h/ParameterValue]}}
-                :produces edn}]
-              ["/events"
-               {:post post-events
-                :summary "Post a events to the bus"
-                :operationId :post-events
-                :parameters {:body [{s/Keyword s/Any}]}
-                :responses {202 {}}
-                :consumes edn}]
-              ["/workspace"
-               {:get download-workspace
-                :summary "Downloads workspace for the build"
-                :operationId :download-workspace
-                :responses {200 {}}}]
-              ["/artifact/:artifact-id"
-               {:parameters {:path {:artifact-id s/Str}}
-                :put {:handler upload-artifact
-                      :summary "Uploads a new artifact"
-                      :operationId :upload-artifact
-                      :responses {200 {}}
-                      :produces edn
-                      :parameters {:body s/Any}}
-                :get {:handler download-artifact
-                      :summary "Downloads an artifact"
-                      :operationId :download-artifact
-                      :responses {200 {}}}}]
-              ["/cache/:cache-id"
-               {:parameters {:path {:cache-id s/Str}}
-                :put {:handler upload-cache
-                      :summary "Uploads a new cache"
-                      :operationId :upload-cache
-                      :responses {200 {}}
-                      :produces edn}
-                :get {:handler download-cache
-                      :summary "Downloads an cache"
-                      :operationId :download-cache
-                      :responses {200 {}}}}]
+              params-routes
+              events-routes
+              workspace-routes
+              artifact-routes
+              cache-routes
+              container-routes
               ;; TODO Log uploads
               ]])
 

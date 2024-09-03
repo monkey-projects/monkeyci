@@ -40,7 +40,7 @@
       (apply w rt more))))
 
 (defn- base-event
-  "Creates an skeleton event with basic properties"
+  "Creates a skeleton event with basic properties"
   [rt type]
   {:type type
    :src :script

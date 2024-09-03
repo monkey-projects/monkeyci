@@ -374,7 +374,10 @@
 (defmethod mcc/credit-multiplier-fn :oci [_]
   credit-multiplier)
 
-(defrecord OciContainerRunner [conf]
+(defrecord OciContainerRunner [conf credit-consumer]
   p/ContainerRunner
   (run-container [this job]
     (run-container (assoc conf :job job))))
+
+(defmethod mcc/make-container-runner :oci [conf]
+  (->OciContainerRunner conf nil))

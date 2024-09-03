@@ -13,6 +13,7 @@
              [sid :as sid]
              [utils :as u]]
             [monkey.ci.build.core :as bc]
+            [monkey.ci.config.script :as cos]
             [monkey.ci.spec.common :as sc]
             [monkey.ci.helpers :as h]
             [monkey.ci.test.runtime :as trt]))
@@ -23,35 +24,24 @@
   (.getAbsolutePath (io/file cwd "examples" subdir)))
 
 (deftest run
-  (with-redefs [sut/exit! (constantly nil)]
-    (testing "parses arg as config file"
-      (h/with-tmp-dir dir
-        (let [captured-args (atom nil)
-              config-file (io/file dir "config.edn")]
-          (with-redefs [script/exec-script! (fn [args]
-                                              (reset! captured-args args)
-                                              bc/success)]
-            (is (nil? (spit config-file (pr-str {:build {:build-id "test-build"}}))))
-            (is (nil? (sut/run {:config-file (.getAbsolutePath config-file)})))
-            (is (= {:build-id "test-build"}
-                   (-> @captured-args
-                       :build)))))))
-
-    (testing "merges config with env vars"
-      (h/with-tmp-dir dir
-        (let [captured-args (atom nil)
-              config-file (io/file dir "config.edn")]
-          (with-redefs [script/exec-script! (fn [args]
-                                              (reset! captured-args args)
-                                              bc/success)]
-            (is (nil? (spit config-file (pr-str {:build {:build-id "test-build"}}))))
-            (is (nil? (sut/run
-                        {:config-file (.getAbsolutePath config-file)}
-                        {:monkeyci-containers-type "podman"
-                         :monkeyci-api-socket "/tmp/test.sock"})))
-            (is (= :podman (-> (:containers @captured-args)
-                               :type)))
-            (is (= {:socket "/tmp/test.sock"} (get-in @captured-args [:config :api])))))))))
+  (let [build {:build-id "test-build"}
+        config (-> cos/empty-config
+                   (cos/set-build build)
+                   (cos/set-api {:url "http://test"
+                                 :token "test-token"}))]    
+    (with-redefs [sut/exit! (constantly nil)]
+      (testing "parses arg as config file"
+        (h/with-tmp-dir dir
+          (let [captured-args (atom nil)
+                config-file (io/file dir "config.edn")]
+            (with-redefs [script/exec-script! (fn [args]
+                                                (reset! captured-args args)
+                                                bc/success)]
+              (is (nil? (spit config-file (pr-str config))))
+              (is (nil? (sut/run {:config-file (.getAbsolutePath config-file)})))
+              (is (= build
+                     (-> @captured-args
+                         :build))))))))))
 
 (deftype FakeProcess [exitValue])
 

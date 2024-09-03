@@ -4,6 +4,6 @@
   (:require [monkey.ci.containers :as mcc]))
 
 (defmethod mcc/run-container :build-api [conf]
-  ;; TODO Start container
-  ;; TODO Poll for status updates, or use stream?
+  ;; TODO Start container using http api
+  ;; TODO Check events
   )

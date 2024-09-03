@@ -50,15 +50,8 @@
                        (dissoc :path)))]
     (with-open [srv (:server s)]
 
-      (testing "provides swagger"
-        (is (= 200 (-> (make-req {:path "swagger.json"
-                                  :method :get})
-                       (http/request)
-                       deref
-                       :status))))
-
       (testing "returns 401 if no token given"
-        (is (= 401 (-> {:url (make-url "swagger.json")
+        (is (= 401 (-> {:url (make-url "test")
                         :method :get
                         :throw-exceptions false}
                        (http/request)
@@ -66,7 +59,7 @@
                        :status))))
       
       (testing "returns 401 if wrong token given"
-        (is (= 401 (-> {:url (make-url "swagger.json")
+        (is (= 401 (-> {:url (make-url "test")
                         :method :get
                         :headers {"Authorization" "Bearer wrong token"}
                         :throw-exceptions false}
@@ -210,6 +203,11 @@
         (is (= 200 (:status res)))
         (is (not-empty (slurp (:body res))))))))
 
+#_(deftest start-container
+  (testing "invokes registered container runner with job settings from body"
+    (let [rt {:containers
+              {}}])))
+
 (deftest get-ip-addr
   (testing "returns ipv4 address"
     (is (re-matches #"\d+\.\d+\.\d+\.\d+"
@@ -279,7 +277,14 @@
           (is (= 200 (-> (mock/request :get (str "/cache/" cache-id))
                          (auth)
                          (app)
-                         :status))))))))
+                         :status))))))
+
+    (testing "`/container`"
+      (testing "POST `/` starts container job"
+        (is (= 202 (-> (mock/request :post "/container")
+                       (auth)
+                       (app)
+                       :status)))))))
 
 (deftest rt->api-server-config
   (testing "adds port from runner config"

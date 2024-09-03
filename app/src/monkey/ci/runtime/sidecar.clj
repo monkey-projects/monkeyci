@@ -10,6 +10,7 @@
             [monkey.ci.build.api :as api]
             [monkey.ci.config.sidecar :as cs]
             [monkey.ci.events.build-api :as eba]
+            [monkey.ci.runtime.common :as rc]
             [monkey.ci.spec :as spec]
             [monkey.ci.spec.sidecar :as ss]))
 
@@ -76,11 +77,6 @@
    passes the `runtime` component from the started system to `f`.  When
    complete, shuts down the system."
   [config f]
-  (let [sys (-> (make-system config)
-                (co/start))]
-    (try
-      (f (:runtime sys))
-      (finally
-        (co/stop sys)))))
+  (rc/with-runtime (make-system config) f))
 
 (def runtime? (partial instance? SidecarRuntime))
