@@ -2,16 +2,19 @@
   "Functions for doing events over http"
   (:require [clojure.tools.logging :as log]
             [manifold.stream :as ms]
+            [monkey.ci.edn :as edn]
             [monkey.ci.events.core :as ec]
             [ring.util.response :as rur]))
 
+(def evt-prefix "data: ")
+
 (defn event-stream
   "Sets up an event stream for the specified filter."
-  [req events evt-filter]
+  [events evt-filter]
   (let [stream (ms/stream 1)
         make-reply (fn [evt]
                      ;; Format according to sse specs, with double newline at the end
-                     (str "data: " (pr-str evt) "\n\n"))
+                     (str evt-prefix (pr-str evt) "\n\n"))
         listener (fn [evt]
                    (ms/put! stream (make-reply evt)))]
     (ms/on-drained stream
@@ -35,3 +38,8 @@
         ;; See https://www.nginx.com/resources/wiki/start/topics/examples/x-accel/#x-accel-buffering
         (rur/header "x-accel-buffering" "no")
         (rur/header "cache-control" "no-cache"))))
+
+
+(defn parse-event-line [line]
+  (when (and line (.startsWith line evt-prefix))
+    (edn/edn-> (subs line (count evt-prefix)))))

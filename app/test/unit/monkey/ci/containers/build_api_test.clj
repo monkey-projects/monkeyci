@@ -1,6 +1,9 @@
 (ns monkey.ci.containers.build-api-test
   (:require [clojure.test :refer [deftest testing is]]
-            [manifold.deferred :as md]
+            [clojure.java.io :as io]
+            [manifold
+             [deferred :as md]
+             [stream :as ms]]
             [monkey.ci.build.api :as api]
             [monkey.ci
              [containers :as mcc]
@@ -28,4 +31,19 @@
                                                         (throw (ex-info "test error" {})))]
         (is (thrown? Exception (deref (p/run-container runner job) 1000 ::timeout)))))
 
-    (testing "reads events until sidecar/end and job/end have been received")))
+    (testing "reads events until `container-job/end` event has been received"
+      (at/with-fake-http ["http://test-api/container"
+                          (fn [req]
+                            (swap! invocations conj req)
+                            {:status 202})
+                          "http://test-api/events"
+                          {:status 200
+                           :body (-> (str "data: " (pr-str {:type :container-job/end
+                                                            :job-id (:id job)
+                                                            :result ::test-result})
+                                          "\n\n")
+                                     (.getBytes)
+                                     (io/input-stream))}]
+        (let [r (p/run-container runner job)]
+          (is (md/deferred? r))
+          (is (= ::test-result (deref r 1000 ::timeout))))))))

@@ -19,6 +19,7 @@
              [artifacts :as art]
              [build :as build]
              [cache :as cache]
+             [jobs :as j]
              [labels :as lbl]
              [runtime :as rt]
              [protocols :as p]
@@ -145,7 +146,7 @@
         {:status 500}))))
 
 (defn dispatch-events [req]
-  (eh/event-stream req (req->events req) {:sid (build/sid (req->build req))}))
+  (eh/event-stream (req->events req) {:sid (build/sid (req->build req))}))
 
 (defn- stream-response [s & [nil-code]]
   (if s
@@ -221,10 +222,16 @@
 
 (defn start-container [req]
   (let [job (get-in req [:parameters :body :job])
-        containers (req->containers req)]
+        containers (req->containers req)
+        fire-end-event (fn [res]
+                         (p/post-events (req->events req)
+                                        {:type :container-job/end
+                                         :job-id (j/job-id job)
+                                         :result res}))]
     ;; Start the container, don't wait for the result.  It's up to the client
-    ;; to monitor job start/end events.
-    (p/run-container containers job)
+    ;; to monitor job end event.
+    (-> (p/run-container containers job)
+        (md/chain fire-end-event))
     (-> (rur/response {:job job})
         (rur/status 202))))
 

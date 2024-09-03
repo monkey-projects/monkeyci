@@ -204,15 +204,23 @@
         (is (not-empty (slurp (:body res))))))))
 
 (deftest start-container
-  (testing "invokes registered container runner with job settings from body"
-    (let [rt {:containers (h/fake-container-runner)}
-          job {:id "test-job"}
-          res (-> rt
-                  (->req)
-                  (assoc-in [:parameters :body] {:job job})
-                  (sut/start-container))]
-      (is (= 202 (:status res)))
-      (is (= [job] (-> rt :containers :runs deref))))))
+  (let [events (h/fake-events)
+        rt {:containers (h/fake-container-runner)
+            :events events}]
+    (testing "invokes registered container runner with job settings from body"
+      (let [job {:id "test-job"}
+            res (-> rt
+                    (->req)
+                    (assoc-in [:parameters :body] {:job job})
+                    (sut/start-container))]
+        (is (= 202 (:status res)))
+        (is (= [job] (-> rt :containers :runs deref)))))
+
+    (testing "fires `:container/job-end` event"
+      (is (= {:type :container-job/end
+              :job-id "test-job"
+              :result {:exit 0}}
+             (first @(:recv events)))))))
 
 (deftest get-ip-addr
   (testing "returns ipv4 address"

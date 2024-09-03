@@ -327,8 +327,7 @@
 (defn event-stream
   "Sets up an event stream for the specified filter."
   [req]
-  (eh/event-stream req
-                   (c/from-rt req rt/events-receiver)
+  (eh/event-stream (c/from-rt req rt/events-receiver)
                    {:types allowed-events
                     :sid [(customer-id req)]}))
 

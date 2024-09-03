@@ -133,12 +133,11 @@
             (when (or (nil? pred) (pred evt))
               (log/debug "Matching event has arrived")
               (md/success! r evt)))
-        unregister (fn [_]
+        unregister (fn []
                      (remove-listener events ef l))]
-    ;; Make sure to unregister the listener in any case
-    (md/on-realized r unregister unregister)
     (add-listener events ef l)
-    r))
+    ;; Make sure to unregister the listener in any case
+    (md/finally r unregister)))
 
 ;;; Utility functions for building events
 
