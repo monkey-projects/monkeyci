@@ -1,9 +1,7 @@
 (ns monkey.ci.web.api
   (:require [camel-snake-kebab.core :as csk]
             [clojure.tools.logging :as log]
-            [manifold
-             [deferred :as md]
-             [stream :as ms]]
+            [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
              [artifacts :as a]
@@ -14,7 +12,7 @@
              [runtime :as rt]
              [storage :as st]
              [utils :as u]]
-            [monkey.ci.events.core :as ec]
+            [monkey.ci.events.http :as eh]
             [monkey.ci.web
              [auth :as auth]
              [common :as c]]
@@ -329,37 +327,10 @@
 (defn event-stream
   "Sets up an event stream for the specified filter."
   [req]
-  (let [cid (customer-id req)
-        recv (c/from-rt req rt/events-receiver)
-        stream (ms/stream 1)
-        make-reply (fn [evt]
-                     ;; Format according to sse specs, with double newline at the end
-                     (str "data: " (pr-str evt) "\n\n"))
-        listener (fn [evt]
-                   (ms/put! stream (make-reply evt)))
-        cid-filter {:types allowed-events
-                    :sid [cid]}]
-    (ms/on-drained stream
-                   (fn []
-                     (log/info "Closing event stream")
-                     (ec/remove-listener recv cid-filter listener)))
-    ;; Only send events for the customer specified in the url
-    (ec/add-listener recv cid-filter listener)
-    ;; Set up a keepalive, which pings the client periodically to keep the connection open.
-    ;; The initial ping will make the browser "open" the connection.  The timeout must always
-    ;; be lower than the read timeout of the client, or any intermediate proxy server.
-    ;; TODO Ideally we should not send a ping if another event has been sent more recently.
-    ;; TODO Make the ping timeout configurable
-    (ms/connect (ms/periodically 30000 0 (constantly (make-reply {:type :ping})))
-                stream
-                {:upstream? true})
-    (-> (rur/response stream)
-        (rur/header "content-type" "text/event-stream")
-        (rur/header "access-control-allow-origin" "*")
-        ;; For nginx, set buffering to no.  This will disable buffering on Nginx proxy side.
-        ;; See https://www.nginx.com/resources/wiki/start/topics/examples/x-accel/#x-accel-buffering
-        (rur/header "x-accel-buffering" "no")
-        (rur/header "cache-control" "no-cache"))))
+  (eh/event-stream req
+                   (c/from-rt req rt/events-receiver)
+                   {:types allowed-events
+                    :sid [(customer-id req)]}))
 
 (c/make-entity-endpoints "email-registration"
                          {:get-id (c/id-getter :email-registration-id)

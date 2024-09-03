@@ -203,10 +203,16 @@
         (is (= 200 (:status res)))
         (is (not-empty (slurp (:body res))))))))
 
-#_(deftest start-container
+(deftest start-container
   (testing "invokes registered container runner with job settings from body"
-    (let [rt {:containers
-              {}}])))
+    (let [rt {:containers (h/fake-container-runner)}
+          job {:id "test-job"}
+          res (-> rt
+                  (->req)
+                  (assoc-in [:parameters :body] {:job job})
+                  (sut/start-container))]
+      (is (= 202 (:status res)))
+      (is (= [job] (-> rt :containers :runs deref))))))
 
 (deftest get-ip-addr
   (testing "returns ipv4 address"
@@ -237,6 +243,12 @@
       (is (= 202 (-> (mock/request :post "/events")
                      (mock/body (pr-str [{:type ::test-event}]))
                      (mock/content-type "application/edn")
+                     (auth)
+                     (app)
+                     :status))))
+
+    (testing "`GET /events` receives events"
+      (is (= 200 (-> (mock/request :get "/events")
                      (auth)
                      (app)
                      :status))))

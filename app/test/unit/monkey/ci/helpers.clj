@@ -178,7 +178,13 @@
 (defrecord FakeEvents [recv]
   p/EventPoster
   (post-events [this evt]
-    (swap! recv (comp vec concat) (u/->seq evt))))
+    (swap! recv (comp vec concat) (u/->seq evt)))
+
+  p/EventReceiver
+  (add-listener [this ef h]
+    nil)
+  (remove-listener [this ef h]
+    nil))
 
 (defn fake-events
   "Set up fake events implementation.  It returns an event poster that can be
@@ -269,12 +275,14 @@
 (defn gen-email-registration []
   (gen-entity :entity/email-registration))
 
-(defrecord FakeContainerRunner [credit-consumer]
+(defrecord FakeContainerRunner [credit-consumer runs]
   p/ContainerRunner
   (run-container [this job]
+    (swap! runs (fnil conj []) job)
     (md/success-deferred 0)))
 
-(def fake-container-runner ->FakeContainerRunner)
+(defn fake-container-runner []
+  (->FakeContainerRunner nil (atom [])))
 
 (defmethod containers/make-container-runner :fake [_]
-  (fake-container-runner nil))
+  (fake-container-runner))

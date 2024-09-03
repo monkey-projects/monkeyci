@@ -17,6 +17,7 @@
             [medley.core :as mc]
             [monkey.ci
              [artifacts :as art]
+             [build :as build]
              [cache :as cache]
              [labels :as lbl]
              [runtime :as rt]
@@ -25,6 +26,7 @@
              [storage :as st]]
             ;; Very strange, but including this causes spec gen exceptions when using cloverage :confused:
             ;; [monkey.ci.spec.build]
+            [monkey.ci.events.http :as eh]
             [monkey.ci.spec.api-server :as aspec]
             [monkey.ci.web
              [common :as c]
@@ -57,6 +59,9 @@
 (def req->api
   (comp :api req->ctx))
 
+(def req->events
+  (comp :events req->ctx))
+
 (def req->workspace
   (comp :workspace req->ctx))
 
@@ -65,6 +70,9 @@
 
 (def req->cache
   (comp :cache req->ctx))
+
+(def req->containers
+  (comp :containers req->ctx))
 
 (def repo-id
   (comp (juxt :customer-id :repo-id) req->build))
@@ -135,6 +143,9 @@
       (catch Exception ex
         (log/error "Unable to dispatch event" ex)
         {:status 500}))))
+
+(defn dispatch-events [req]
+  (eh/event-stream req (req->events req) {:sid (build/sid (req->build req))}))
 
 (defn- stream-response [s & [nil-code]]
   (if s
@@ -209,9 +220,13 @@
                 (download-stream req store path 404))))
 
 (defn start-container [req]
-  ;; TODO
-  (-> (rur/response {:message "todo"})
-      (rur/status 202)))
+  (let [job (get-in req [:parameters :body :job])
+        containers (req->containers req)]
+    ;; Start the container, don't wait for the result.  It's up to the client
+    ;; to monitor job start/end events.
+    (p/run-container containers job)
+    (-> (rur/response {:job job})
+        (rur/status 202))))
 
 (def edn #{"application/edn"})
 
@@ -223,11 +238,13 @@
 
 (def events-routes
   ["/events"
-   ;; TODO Receive events through GET
-   {:post post-events
-    :parameters {:body [{s/Keyword s/Any}]}
-    :responses {202 {}}
-    :consumes edn}])
+   {:post {:handler post-events
+           :parameters {:body [{s/Keyword s/Any}]}
+           :responses {202 {}}
+           :consumes edn}
+    :get  {:handler dispatch-events
+           :response {200 {}}
+           :produces "text/event-stream"}}])
 
 (def workspace-routes
   ["/workspace"
@@ -257,7 +274,8 @@
   ["/container"
    {:post {:handler start-container
            :responses {202 {}}
-           :produces edn}}])
+           :produces edn
+           :parameters {:body s/Any}}}])
 
 (def routes [""
              [["/test"
@@ -316,7 +334,7 @@
   "Creates a config map for the api server from the given runtime"
   [rt]
   (->> {:port (rt/runner-api-port rt)}
-       (merge (select-keys rt [:events :artifacts :cache :workspace :storage]))
+       (merge (select-keys rt [:events :artifacts :cache :workspace :storage :containers]))
        (mc/filter-vals some?)))
 
 (defn with-build [conf b]

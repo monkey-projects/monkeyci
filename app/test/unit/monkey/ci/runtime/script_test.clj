@@ -1,6 +1,8 @@
 (ns monkey.ci.runtime.script-test
   (:require [clojure.test :refer [deftest testing is]]
-            [monkey.ci.artifacts :as art]
+            [monkey.ci
+             [artifacts :as art]
+             [protocols :as p]]
             [monkey.ci.config.script :as cs]
             [monkey.ci.runtime.script :as sut]))
 
@@ -28,4 +30,9 @@
   (testing "adds cache repo"
     (is (art/repo? (sut/with-runtime
                      test-config
-                     :cache)))))
+                     :cache))))
+
+  (testing "adds container runner"
+    (is (p/container-runner? (sut/with-runtime
+                               test-config
+                               :containers)))))

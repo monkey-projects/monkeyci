@@ -55,7 +55,8 @@
 
 (deftest exec-script!
   (letfn [(exec-in-dir [d]
-            (-> {:build (b/set-script-dir {} (str "examples/" d))}
+            (-> {:build (b/set-script-dir {} (str "examples/" d))
+                 :events (h/fake-events)}
                 (sut/exec-script!)))]
     
     (testing "executes basic clj script from location"
@@ -108,39 +109,40 @@
                                       :path "/test"}))))))))
 
 (deftest run-all-jobs
-  (testing "success if no pipelines"
-    (is (bc/success? (sut/run-all-jobs {} []))))
+  (let [rt {:events (h/fake-events)}]
+    (testing "success if no pipelines"
+      (is (bc/success? (sut/run-all-jobs rt []))))
 
-  (testing "success if all jobs succeed"
-    (is (bc/success? (->> [(dummy-job bc/success)]
-                          (sut/run-all-jobs {})))))
-  
-  (testing "success if jobs skipped"
-    (is (bc/success? (->> [(dummy-job bc/skipped)]
-                          (sut/run-all-jobs {})))))
+    (testing "success if all jobs succeed"
+      (is (bc/success? (->> [(dummy-job bc/success)]
+                            (sut/run-all-jobs rt)))))
+    
+    (testing "success if jobs skipped"
+      (is (bc/success? (->> [(dummy-job bc/skipped)]
+                            (sut/run-all-jobs rt)))))
 
-  (testing "fails if a job fails"
-    (is (bc/failed? (->> [(dummy-job bc/failure)]
-                         (sut/run-all-jobs {})))))
+    (testing "fails if a job fails"
+      (is (bc/failed? (->> [(dummy-job bc/failure)]
+                           (sut/run-all-jobs rt)))))
 
-  (testing "success if job returns `nil`"
-    (is (bc/success? (->> [(dummy-job nil)]
-                          (sut/run-all-jobs {})))))
+    (testing "success if job returns `nil`"
+      (is (bc/success? (->> [(dummy-job nil)]
+                            (sut/run-all-jobs rt)))))
 
-  (testing "runs jobs filtered by pipeline name"
-    (is (bc/success? (->> [(bc/pipeline {:name "first"
-                                         :jobs [(dummy-job bc/success)]})
-                           (bc/pipeline {:name "second"
-                                         :jobs [(dummy-job bc/failure)]})]
-                          (sut/run-all-jobs {:pipeline "first"})))))
+    (testing "runs jobs filtered by pipeline name"
+      (is (bc/success? (->> [(bc/pipeline {:name "first"
+                                           :jobs [(dummy-job bc/success)]})
+                             (bc/pipeline {:name "second"
+                                           :jobs [(dummy-job bc/failure)]})]
+                            (sut/run-all-jobs (assoc rt :pipeline "first"))))))
 
-  (testing "returns all job results"
-    (let [job (bc/action-job "test-job" (constantly bc/success))
-          result (->> [job]
-                      (sut/run-all-jobs {})
-                      :jobs)]
-      (is (= ["test-job"] (keys result)))
-      (is (= bc/success (get-in result ["test-job" :result]))))))
+    (testing "returns all job results"
+      (let [job (bc/action-job "test-job" (constantly bc/success))
+            result (->> [job]
+                        (sut/run-all-jobs rt)
+                        :jobs)]
+        (is (= ["test-job"] (keys result)))
+        (is (= bc/success (get-in result ["test-job" :result])))))))
 
 (deftest run-all-jobs*
   (letfn [(verify-script-evt [evt-type jobs verifier]
@@ -205,13 +207,13 @@
 
 (deftest event-firing-job
   (testing "invokes target"
-    (is (bc/success? @(j/execute! (sut/->EventFiringJob (dummy-job)) {}))))
+    (is (bc/success? @(j/execute! (sut/->EventFiringJob (h/fake-events) (dummy-job)) {}))))
   
   (testing "posts event at start and stop"
     (let [{:keys [recv] :as e} (h/fake-events)
           rt {:events e}
           job (dummy-job)
-          f (sut/->EventFiringJob job)]
+          f (sut/->EventFiringJob e job)]
       (is (some? @(j/execute! f rt)))
       (is (= 2 (count @recv)))
       (is (= :job/start (:type (first @recv))))
@@ -220,7 +222,7 @@
     (let [{:keys [recv] :as e} (h/fake-events)
           rt {:events e}
           job (dummy-job)
-          f (sut/->EventFiringJob job)]
+          f (sut/->EventFiringJob e job)]
       (is (some? @(j/execute! f rt)))
       
       (testing "start event"
@@ -247,7 +249,7 @@
     (let [{:keys [recv] :as e} (h/fake-events)
           rt {:events e}
           job (bc/action-job ::failing-job (fn [_] (throw (ex-info "Test error" {}))))
-          f (sut/->EventFiringJob job)]
+          f (sut/->EventFiringJob e job)]
       (is (bc/failed? @(j/execute! f rt)))
       (is (= 2 (count @recv)) "expected job end event")))
 
@@ -255,7 +257,7 @@
     (let [{:keys [recv] :as e} (h/fake-events)
           rt {:events e}
           job (bc/action-job ::failing-async-job (fn [_] (md/error-deferred (ex-info "Test error" {}))))
-          f (sut/->EventFiringJob job)]
+          f (sut/->EventFiringJob e job)]
       (is (bc/failed? @(j/execute! f rt)))
       (is (= 2 (count @recv)) "expected job end event")))
 
@@ -263,7 +265,7 @@
     (let [{:keys [recv] :as e} (h/fake-events)
           rt {:events e}
           job (dummy-job)
-          f (sut/->EventFiringJob job)]
+          f (sut/->EventFiringJob e job)]
       (is (bc/success? @(j/execute! f rt)))
       (is (every? (comp (partial = (:id job)) :id :job) @recv))))
 
@@ -273,7 +275,7 @@
           rt {:events e
               :build {:sid sid}}
           job (dummy-job)
-          f (sut/->EventFiringJob job)]
+          f (sut/->EventFiringJob e job)]
       (is (bc/success? @(j/execute! f rt)))
       (is (every? (comp some? :sid) @recv))))
 
@@ -283,7 +285,7 @@
           rt {:events e
               :build {:sid sid}}
           job (bc/action-job ::extension-job (constantly (assoc bc/success ::extension-result "test")))
-          f (sut/->EventFiringJob job)]
+          f (sut/->EventFiringJob e job)]
       (is (some? @(j/execute! f rt)))
       (is (= "test" (-> @recv last :job :result ::extension-result)))))
 
@@ -296,7 +298,7 @@
                   (assoc :save-artifacts [{:id "test-art"
                                            :path "/test/path"
                                            :entries ::test-entries}]))
-          f (sut/->EventFiringJob job)]
+          f (sut/->EventFiringJob e job)]
       (is (bc/success? @(j/execute! f rt)))
       (is (= [{:id "test-art"
                :path "/test/path"}]

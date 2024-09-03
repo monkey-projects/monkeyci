@@ -46,11 +46,11 @@
 (defn matches-event?
   "Matches events against event filters.  This checks event types and possible sid."
   [evt {:keys [types sid] :as ef}]
+  ;; TODO Allow for more generic filter fn
   (letfn [(matches-type? [evt]
             (or (nil? types) (contains? types (:type evt))))
           (matches-sid? [evt]
             (or (nil? sid) (= sid (take (count sid) (:sid evt)))))]
-    ;; TODO Add sid check
     (or (nil? ef)
         ((every-pred matches-type? matches-sid?) evt))))
 

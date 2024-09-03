@@ -266,7 +266,7 @@
 
 (defn wait-for-instance-end-events
   "Checks the incoming events to see if a container and job end event has been received.
-   Returns a deferred that will contain both events."
+   Returns a deferred that will contain both events, or that times out after `max-timeout`."
   [events sid job-id max-timeout]
   (letfn [(wait-for [t]
             ;; FIXME Seems like the timeout does not always work.
