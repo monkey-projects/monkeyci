@@ -20,4 +20,5 @@
    This is used to calculate the credit multiplier for a container job.  If
    none is specified, it always returns zero."
   [rt]
+  ;; TODO Use protocols instead
   (get-in rt [:containers :credit-consumer] (constantly 0)))

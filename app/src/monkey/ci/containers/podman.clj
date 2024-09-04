@@ -120,4 +120,4 @@
     (run-container job config)))
 
 (defmethod mcc/make-container-runner :podman [config]
-  (->PodmanContainerRunner config nil))
+  (->PodmanContainerRunner config (constantly 0)))

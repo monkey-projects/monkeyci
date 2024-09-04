@@ -282,7 +282,7 @@
     (md/success-deferred result)))
 
 (defn fake-container-runner [& [result]]
-  (->FakeContainerRunner nil (atom []) (or result {:exit 0})))
+  (->FakeContainerRunner (constantly 0) (atom []) (or result {:exit 0})))
 
 (defmethod containers/make-container-runner :fake [_]
   (fake-container-runner))

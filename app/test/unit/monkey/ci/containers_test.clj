@@ -16,7 +16,7 @@
 (deftest setup-runtime
   (let [conf (-> {:containers {:type :fake}}
                  (rt/setup-runtime :containers))]
-    #_(testing "creates container runner"
+    (testing "creates container runner"
       (is (p/container-runner? conf)))
     
     (testing "adds credit-consumer fn"

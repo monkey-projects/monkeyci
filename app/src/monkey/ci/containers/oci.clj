@@ -371,13 +371,10 @@
   ;; Take app version if no image version specified
   (update-in conf [:containers :image-tag] #(format (or % "%s") (c/version))))
 
-(defmethod mcc/credit-multiplier-fn :oci [_]
-  credit-multiplier)
-
 (defrecord OciContainerRunner [conf credit-consumer]
   p/ContainerRunner
   (run-container [this job]
     (run-container (assoc conf :job job))))
 
 (defmethod mcc/make-container-runner :oci [conf]
-  (->OciContainerRunner conf nil))
+  (->OciContainerRunner conf credit-multiplier))

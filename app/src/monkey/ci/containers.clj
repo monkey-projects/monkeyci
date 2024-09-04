@@ -11,11 +11,6 @@
 (defn run-container-comp [rt job]
   (p/run-container (:containers rt) job))
 
-(defmulti credit-multiplier-fn (comp :type :containers))
-
-(defmethod credit-multiplier-fn :default [_]
-  (constantly 0))
-
 (defmulti make-container-runner :type)
 
 ;;; Configuration handling
@@ -29,10 +24,8 @@
   (c/normalize-typed k conf normalize-containers-config))
 
 (defmethod rt/setup-runtime :containers [conf _]
-  ;; Just return the config, will be reworked later to be more consistent with other runtimes
-  (-> (get conf :containers)
-      #_(make-container-runner)
-      (assoc :credit-consumer (credit-multiplier-fn conf))))
+  (some-> (get conf :containers)
+          (make-container-runner)))
 
 (def image (some-fn :container/image :image))
 (def env :container/env)
