@@ -324,6 +324,7 @@
 
 (defn run-container [{:keys [job] :as conf}]
   (log/debug "Running job as OCI instance:" job)
+  (log/debug "OCI container configuration:" conf)
   (let [client (ci/make-context (:oci conf))
         ic (instance-config conf)
         max-job-timeout (* 20 60 1000)]
@@ -356,7 +357,6 @@
 
 (defn rt->container-config [rt]
   {:runtime rt ; TODO Get rid of the runtime
-   :job (:job rt)
    :build (rt/build rt)
    :promtail (get-in rt [rt/config :promtail])
    :events (:events rt)
@@ -372,5 +372,5 @@
   (run-container [this job]
     (run-container (assoc conf :job job))))
 
-(defmethod mcc/make-container-runner :oci [conf]
-  (->OciContainerRunner (rt->container-config conf) credit-multiplier))
+(defmethod mcc/make-container-runner :oci [rt]
+  (->OciContainerRunner (rt->container-config rt) credit-multiplier))

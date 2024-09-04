@@ -34,6 +34,7 @@
                               first
                               :body
                               edn/edn->
+                              :job
                               :image)))))
 
     (testing "fails on api call error"

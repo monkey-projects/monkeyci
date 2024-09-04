@@ -18,7 +18,7 @@
     (let [r (md/deferred)]
       (-> (client {:request-method :post
                    :path "/container"
-                   :body (edn/->edn (j/as-serializable job))
+                   :body (edn/->edn {:job (j/as-serializable job)})
                    :headers {"content-type" "application/edn"}})
           ;; Listen to events to realize deferred
           (md/chain
