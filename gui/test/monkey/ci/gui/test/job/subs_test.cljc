@@ -109,6 +109,28 @@
                                                     :test-cases [{:name "case 1"}]}
                                                    {:name "other suite"
                                                     :test-cases [{:name "case 2"}]}]}}}}})))))
-      (is (= [{:name "case 1"}
-              {:name "case 2"}]
-             @tc)))))
+      (is (= #{{:name "case 1"}
+               {:name "case 2"}}
+             (set @tc))))
+
+    (testing "sorts with failed tests first"
+      (let [tests [{:name "unit tests"
+                    :test-cases
+                    [{:name "success"}
+                     {:name "failed"
+                      :failures [{:message "some failure"}]}
+                     {:name "errored"
+                      :errors [{:message "some error"}]}]}]
+            job-id "failed-job"]
+        (is (some? (reset! app-db (-> {}
+                                      (r/set-current {:parameters {:path {:job-id job-id}}})
+                                      (bdb/set-build
+                                       {:script
+                                        {:jobs
+                                         {job-id
+                                          {:id job-id
+                                           :result {:monkey.ci/tests tests}}}}})))))
+        (is (= ["errored"
+                "failed"
+                "success"]
+               (map :name @tc)))))))

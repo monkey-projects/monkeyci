@@ -40,9 +40,14 @@
         first
         convert-result)))
 
+(defn- error-count [{:keys [errors failures]}]
+  (+ (count errors) (count failures)))
+
 (rf/reg-sub
  :job/test-cases
  :<- [:job/current]
  (fn [job _]
    (->> (get-in job [:result :monkey.ci/tests])
-        (mapcat :test-cases))))
+        (mapcat :test-cases)
+        (sort-by error-count)
+        (reverse))))

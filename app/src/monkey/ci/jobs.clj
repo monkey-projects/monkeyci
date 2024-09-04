@@ -334,16 +334,16 @@
 (defn as-serializable
   "Converts job into something that can be converted to edn"
   [job]
-  (letfn [(art->event [a]
+  (letfn [(art->ser [a]
             (select-keys a [:id :path]))]
     (-> job
         (select-keys (concat [:status :start-time :end-time deps labels :extensions :credit-multiplier :script
                               :memory :cpus :arch
                               save-artifacts :restore-artifacts :caches]
                              co/props))
-        (mc/update-existing :save-artifacts (partial map art->event))
-        (mc/update-existing :restore-artifacts (partial map art->event))
-        (mc/update-existing :caches (partial map art->event))
+        (mc/update-existing :save-artifacts (partial map art->ser))
+        (mc/update-existing :restore-artifacts (partial map art->ser))
+        (mc/update-existing :caches (partial map art->ser))
         (assoc :id (bc/job-id job)))))
 
 (def job->event
