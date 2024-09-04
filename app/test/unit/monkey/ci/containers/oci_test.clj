@@ -9,6 +9,7 @@
              [config :as c]
              [containers :as mcc]
              [oci :as oci]
+             [protocols :as p]
              [runtime :as rt]
              [utils :as u]]
             [monkey.ci.common.preds :as cp]
@@ -458,25 +459,25 @@
       (is (= 1 (->> @res :body :containers second ec/result-exit))))))
 
 (deftest run-container
-  (testing "can run using type `oci`, returns zero exit code on success"
-    (with-redefs [oci/run-instance (constantly (md/success-deferred
-                                                {:status 200
-                                                 :body {:containers [{:display-name sut/job-container-name
-                                                                      :result {:exit 0}}]}}))]
-      (is (= 0 (-> (mcc/run-container {:containers {:type :oci}
-                                       :build {:checkout-dir "/tmp"}})
-                   (deref)
-                   :exit)))))
-
-  (testing "returns first nonzero exit code"
-    (with-redefs [oci/run-instance (constantly (md/success-deferred
-                                                {:status 200
-                                                 :body {:containers [{:result {:exit 0}}
-                                                                     {:result {:exit 123}}]}}))]
-      (is (= 123 (-> (mcc/run-container {:containers {:type :oci}
-                                         :build {:checkout-dir "/tmp"}})
+  (let [runner (sut/->OciContainerRunner {:build {:checkout-dir "/tmp"}} (constantly 0))
+        job {:id "test-job"}]
+    (testing "can run using type `oci`, returns zero exit code on success"
+      (with-redefs [oci/run-instance (constantly (md/success-deferred
+                                                  {:status 200
+                                                   :body {:containers [{:display-name sut/job-container-name
+                                                                        :result {:exit 0}}]}}))]
+        (is (= 0 (-> (p/run-container runner job)
                      (deref)
-                     :exit))))))
+                     :exit)))))
+
+    (testing "returns first nonzero exit code"
+      (with-redefs [oci/run-instance (constantly (md/success-deferred
+                                                  {:status 200
+                                                   :body {:containers [{:result {:exit 0}}
+                                                                       {:result {:exit 123}}]}}))]
+        (is (= 123 (-> (p/run-container runner job)
+                       (deref)
+                       :exit)))))))
 
 (deftest rt->container-config
   (testing "includes sidecar config"

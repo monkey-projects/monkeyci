@@ -8,6 +8,7 @@
              [config :as config]
              [containers :as c]
              [oci :as oci]
+             [protocols :as p]
              [runtime :as rt]
              [utils :as u]]
             [monkey.ci.containers.oci :as oci-cont]
@@ -127,8 +128,9 @@
                       (cond-> {:build-id build-id
                                :sid ["test-customer" "test-repo" build-id]
                                :checkout-dir oci-cont/work-dir}
-                        ws (assoc :workspace ws))))]
-    (c/run-container rt)))
+                        ws (assoc :workspace ws))))
+        runner (c/make-container-runner rt)]
+    (p/run-container runner (:job rt))))
 
 (defn- throw-error! [{:keys [status] :as resp}]
   (if (or (nil? status) (>= status 400))

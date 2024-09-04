@@ -363,10 +363,6 @@
    :oci (:containers rt)
    :sidecar (get-in rt [rt/config :sidecar])})
 
-;; Will be replaced with OciContainerRunner component
-(defmethod mcc/run-container :oci [rt]
-  (run-container (rt->container-config rt)))
-
 (defmethod mcc/normalize-containers-config :oci [conf]
   ;; Take app version if no image version specified
   (update-in conf [:containers :image-tag] #(format (or % "%s") (c/version))))
@@ -377,4 +373,4 @@
     (run-container (assoc conf :job job))))
 
 (defmethod mcc/make-container-runner :oci [conf]
-  (->OciContainerRunner conf credit-multiplier))
+  (->OciContainerRunner (rt->container-config conf) credit-multiplier))

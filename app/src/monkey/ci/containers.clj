@@ -5,13 +5,7 @@
              [protocols :as p]
              [runtime :as rt]]))
 
-;; TODO Rework to use a container runner fn instead with components
-(defmulti ^:deprecated run-container (comp :type :containers))
-
-(defn run-container-comp [rt job]
-  (p/run-container (:containers rt) job))
-
-(defmulti make-container-runner :type)
+(defmulti make-container-runner (comp :type :containers))
 
 ;;; Configuration handling
 
@@ -24,8 +18,8 @@
   (c/normalize-typed k conf normalize-containers-config))
 
 (defmethod rt/setup-runtime :containers [conf _]
-  (some-> (get conf :containers)
-          (make-container-runner)))
+  (when (get conf :containers)
+    (make-container-runner conf)))
 
 (def image (some-fn :container/image :image))
 (def env :container/env)

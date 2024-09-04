@@ -5,7 +5,8 @@
              [artifacts :as art]
              [cache :as ca]
              [containers :as mcc]
-             [logging :as l]]
+             [logging :as l]
+             [protocols :as p]]
             [monkey.ci.containers.podman :as sut]
             [monkey.ci.helpers :as h :refer [contains-subseq?]]
             [monkey.ci.test.runtime :as trt]))
@@ -19,13 +20,15 @@
          :container/image "test-img"
          :script ["first" "second"]}})
 
-(deftest run-container
+(deftest container-runner
   (with-redefs [bp/process (fn [args]
                              (future args))]
     
     (testing "starts podman process"   
       (h/with-tmp-dir dir
-        (let [r @(mcc/run-container (test-rt dir))]
+        (let [rt (test-rt dir)
+              runner (mcc/make-container-runner rt)
+              r @(p/run-container runner (:job rt))]
           (is (map? r))
           (is (= "/usr/bin/podman" (-> r :cmd first)))
           (is (contains? (set (:cmd r))
@@ -35,11 +38,12 @@
     (testing "passes build and job ids for output capturing"
       (h/with-tmp-dir dir
         (let [log-paths (atom [])
-              r @(mcc/run-container
-                  (-> (test-rt dir)
-                      (assoc-in [:logging :maker] (fn [_ path]
-                                                    (swap! log-paths conj path)
-                                                    (l/->InheritLogger)))))]
+              rt (-> (test-rt dir)
+                     (assoc-in [:logging :maker] (fn [_ path]
+                                                   (swap! log-paths conj path)
+                                                   (l/->InheritLogger))))
+              runner (mcc/make-container-runner rt)
+              r @(p/run-container runner (:job rt))]
           (is (= 2 (count @log-paths)))
           (is (= ["test-build" "test-job"] (->> @log-paths
                                                 first
@@ -48,12 +52,13 @@
     (testing "uses dummy build id when none given"
       (h/with-tmp-dir dir
         (let [log-paths (atom [])
-              r @(mcc/run-container
-                  (-> (test-rt dir) 
-                      (update :build dissoc :build-id)
-                      (assoc-in [:logging :maker] (fn [_ path]
-                                                    (swap! log-paths conj path)
-                                                    (l/->InheritLogger)))))]
+              rt (-> (test-rt dir) 
+                     (update :build dissoc :build-id)
+                     (assoc-in [:logging :maker] (fn [_ path]
+                                                   (swap! log-paths conj path)
+                                                   (l/->InheritLogger))))
+              runner (mcc/make-container-runner rt)
+              r @(p/run-container runner (:job rt))]
           (is (= "unknown-build" (->> @log-paths
                                       ffirst))))))
 
@@ -61,11 +66,12 @@
       (h/with-tmp-dir dir
         (let [stored (atom {})
               cache (ca/make-blob-repository (h/fake-blob-store stored) {})
-              r @(mcc/run-container
-                  (-> (test-rt dir)
-                      (assoc-in [:job :caches] [{:id "test-cache"
-                                                 :path "test-path"}])
-                      (trt/set-cache cache)))]
+              rt (-> (test-rt dir)
+                     (assoc-in [:job :caches] [{:id "test-cache"
+                                                :path "test-path"}])
+                     (trt/set-cache cache))
+              runner (mcc/make-container-runner rt)
+              r @(p/run-container runner (:job rt))]
           (is (some? r))
           (is (not-empty @stored)))))
     
@@ -74,12 +80,13 @@
         (let [stored (atom {"test-cust/test-build/test-artifact.tgz" ::test})
               build {:sid ["test-cust" "test-build"]}
               store (art/make-blob-repository (h/fake-blob-store stored) build)
-              r @(mcc/run-container
-                  (-> (test-rt dir)
-                      (assoc :build build)
-                      (assoc-in [:job :restore-artifacts] [{:id "test-artifact"
-                                                            :path "restore-path"}])
-                      (trt/set-artifacts store)))]
+              rt (-> (test-rt dir)
+                     (assoc :build build)
+                     (assoc-in [:job :restore-artifacts] [{:id "test-artifact"
+                                                           :path "restore-path"}])
+                     (trt/set-artifacts store))
+              runner (mcc/make-container-runner rt)
+              r @(p/run-container runner (:job rt))]
           (is (some? r))
           (is (empty? @stored)))))
 
@@ -87,11 +94,12 @@
       (h/with-tmp-dir dir
         (let [stored (atom {})
               store (art/make-blob-repository (h/fake-blob-store stored) {})
-              r @(mcc/run-container
-                  (-> (test-rt dir)
-                      (assoc-in [:job :save-artifacts] [{:id "test-artifact"
-                                                         :path "save-path"}])
-                      (trt/set-artifacts store)))]
+              rt (-> (test-rt dir)
+                     (assoc-in [:job :save-artifacts] [{:id "test-artifact"
+                                                        :path "save-path"}])
+                     (trt/set-artifacts store))
+              runner (mcc/make-container-runner rt)
+              r @(p/run-container runner (:job rt))]
           (is (some? r))
           (is (not-empty @stored)))))))
 
