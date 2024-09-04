@@ -4,9 +4,12 @@
             [manifold
              [deferred :as md]
              [stream :as ms]]
-            [monkey.ci.build.api :as api]
+            [monkey.ci.build
+             [api :as api]
+             [core :as bc]]
             [monkey.ci
              [containers :as mcc]
+             [edn :as edn]
              [protocols :as p]]
             [monkey.ci.containers.build-api :as sut]
             [monkey.ci.test.aleph-test :as at]))
@@ -15,16 +18,23 @@
   (let [invocations (atom [])
         client (api/make-client "http://test-api" "test-token")
         runner (sut/->BuildApiContainerRunner client)
-        job {:id "test-job"}]
+        job (bc/container-job "test-job"
+                              {:image "test-img"
+                               :script ["test-cmd"]})]
 
-    (testing "invokes endpoint on api server"
+    (testing "invokes endpoint on api server with serialized job"
       (at/with-fake-http [{:url "http://test-api/container"
                            :request-method :post}
                           (fn [req]
                             (swap! invocations conj req)
                             {:status 202})]
         (is (md/deferred? (p/run-container runner job)))
-        (is (= 1 (count @invocations)))))
+        (is (= 1 (count @invocations)))
+        (is (= "test-img" (-> @invocations
+                              first
+                              :body
+                              edn/edn->
+                              :image)))))
 
     (testing "fails on api call error"
       (at/with-fake-http ["http://test-api/container" (fn [_]

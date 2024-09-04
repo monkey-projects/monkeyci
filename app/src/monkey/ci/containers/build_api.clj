@@ -18,7 +18,7 @@
     (let [r (md/deferred)]
       (-> (client {:request-method :post
                    :path "/container"
-                   :body (edn/->edn job)
+                   :body (edn/->edn (j/as-serializable job))
                    :headers {"content-type" "application/edn"}})
           ;; Listen to events to realize deferred
           (md/chain
@@ -31,6 +31,9 @@
            (partial ms/filter not-empty)
            (partial ms/map eh/parse-event-line)
            (fn [events]
+             ;; TODO Make sure the stream is closed on success
+             ;; TODO Set a timeout
+             ;; TODO Refactor to an event listener, so we can use existing code
              (ms/consume (fn [{:keys [type job-id result]}]
                            (when (and (= :container-job/end type)
                                       (= job-id (j/job-id job)))

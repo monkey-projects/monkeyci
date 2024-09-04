@@ -41,3 +41,7 @@
 (def mounts :container/mounts)
 (def entrypoint :container/entrypoint)
 (def platform :container/platform)
+
+(def props
+  "Serializable properties for container jobs"
+  [:image :container/image env cmd args entrypoint])

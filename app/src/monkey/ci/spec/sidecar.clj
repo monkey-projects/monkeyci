@@ -17,7 +17,9 @@
   (s/keys :req [::job ::build]))
 
 (s/def ::job
-  (s/keys :req-un [:job/id]))
+  (s/keys :req-un [:job/id]
+          :opt-un [:job/caches :job/save-artifacts :job/restore-artifacts :job/script
+                   :job/memory :job/cpus :job/arch]))
 
 (s/def ::checkout-dir string?)
 
