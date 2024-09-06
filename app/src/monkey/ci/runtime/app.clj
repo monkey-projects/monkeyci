@@ -58,10 +58,10 @@
                         :api (bas/srv->api-config api-config)))
              events)))
 
-(defrecord DelayedContainerRunner [config events build api-server]
+(defrecord DelayedContainerRunner [config events build api-config]
   co/Lifecycle
   (start [this]
-    (assoc this :target-runner (make-container-runner config events build api-server)))
+    (assoc this :target-runner (make-container-runner config events build api-config)))
   (stop [this]
     this)
   p/ContainerRunner

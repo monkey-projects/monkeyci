@@ -4,6 +4,7 @@
             [monkey.ci
              [runtime :as rt]
              [protocols :as p]]
+            [monkey.ci.containers.oci :as cco]
             [monkey.ci.runtime.app :as sut]
             [monkey.ci.spec.runner :as sr]
             [monkey.ci.test.config :as tc]
@@ -51,6 +52,14 @@
 
     (testing "provides containers"
       (is (some? (:containers rt))))
+
+    (testing "passes api config to oci container runner"
+      (let [sys (-> runner-config
+                    (assoc :containers {:type :oci})
+                    (sut/with-runner-system identity))]
+        (with-redefs [cco/run-container :api]
+          (is (= (get-in sys [:api-config :token])
+                 (:token (p/run-container (:containers sys) {})))))))
 
     (testing "provides runner"
       (is (ifn? (:runner sys))))
