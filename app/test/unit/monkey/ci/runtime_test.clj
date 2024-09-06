@@ -50,9 +50,6 @@
   (testing "provides storage"
     (verify-runtime :storage {:type :memory} some?))
 
-  (testing "provides container runner"
-    (verify-runtime :containers {:type :podman} some?))
-
   (testing "provides workspace"
     (verify-runtime :workspace {:type :disk :dir "/tmp"} some?))
 

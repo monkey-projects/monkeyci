@@ -29,3 +29,6 @@
 (s/def ::artifacts ::blob-store)
 (s/def ::cache ::blob-store)
 (s/def ::workspace (partial satisfies? p/Workspace))
+(s/def ::containers p/container-runner?)
+;;(s/def ::build-containers (partial satisfies? p/BuildContainerRunner))
+(s/def ::params (partial satisfies? p/BuildParams))

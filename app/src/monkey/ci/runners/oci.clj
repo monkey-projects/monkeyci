@@ -33,7 +33,6 @@
 (defn- prepare-config-for-oci [config]
   (-> config
       ;; Enforce child runner
-      ;; TODO Run in-process instead
       (assoc :runner {:type :child})))
 
 (defn- add-ssh-keys-dir [build conf]
@@ -88,6 +87,7 @@
                                                         :volume-name ssh-keys-volume})))
 
 (defn- log-config-volume-config [rt]
+  ;; TODO Allow for log config read by aero tags
   (when-let [f (log-config rt)]
     (if (fs/exists? f)
       {:name log-config-volume
@@ -155,8 +155,6 @@
     (-> conf
         (oci/instance-config)
         (assoc :display-name (b/build-id build))
-        ;; TODO Reduce this after we use in-process build
-        ;;(assoc-in [:shape-config :memory-in-g-bs] 4)
         (update :freeform-tags merge tags)
         (update :containers patch-container build rt)
         (add-ssh-keys-volume build)
@@ -167,7 +165,8 @@
   "Returns a deferred that realizes when the script/end event has been received."
   [events sid]
   (ec/wait-for-event events
-                     {:types #{:script/end}
+                     ;; Also capture build/end, in case of initialization error
+                     {:types #{:script/end :build/end}
                       :sid sid}))
 
 (def max-script-timeout
@@ -190,7 +189,9 @@
                                      (fn [r]
                                        (when (= r ::timeout)
                                          (log/warn "Build script timed out after" max-script-timeout "msecs"))
-                                       (log/debug "Script end event received, fetching full instance details")
+                                       (if (= :script/end (:type r))
+                                         (log/debug "Script end event received, fetching full instance details")
+                                         (log/warn "Script failed to initialize"))
                                        (oci/get-full-instance-details client id))))})
       (md/chain
        (fn [r]

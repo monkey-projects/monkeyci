@@ -16,7 +16,9 @@
 (defrecord ScriptRuntime [events artifacts cache build containers api-client]
   co/Lifecycle
   (start [{:keys [config] :as this}]
-    (assoc this :build (cs/build config)))
+    (assoc this
+           :build (cs/build config)
+           :api {:client api-client}))
   
   (stop [this]
     this))

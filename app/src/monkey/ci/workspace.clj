@@ -5,17 +5,23 @@
             [manifold.deferred :as md]
             [monkey.ci
              [blob :as b]
+             [build :as build]
              [config :as c]
              [protocols :as p]
              [runtime :as rt]]
             [monkey.ci.build.archive :as arch]))
 
-(defn create-workspace [{:keys [checkout-dir sid] :as build} {ws :workspace}]
-  (let [dest (str (cs/join "/" sid) b/extension)]
+(defn workspace-dest
+  "Determines the workspace destination path for this build"
+  [build]
+  (str (cs/join "/" (build/sid build)) b/extension))
+
+(defn create-workspace [{:keys [checkout-dir] :as build} {ws :workspace}]
+  (let [dest (workspace-dest build)]
     (when checkout-dir
       (log/info "Creating workspace using files from" checkout-dir)
       @(md/chain
-        (b/save ws checkout-dir dest) ; TODO Check for errors
+        (b/save ws checkout-dir dest)   ; TODO Check for errors
         (constantly (assoc build :workspace dest))))))
 
 (defn- checkout-dir [build]

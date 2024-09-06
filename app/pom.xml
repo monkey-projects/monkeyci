@@ -4,7 +4,7 @@
   <packaging>jar</packaging>
   <groupId>com.monkeyci</groupId>
   <artifactId>app</artifactId>
-  <version>0.6.7-SNAPSHOT</version>
+  <version>0.7.4-SNAPSHOT</version>
   <name>app</name>
   <repositories>
     <repository>
@@ -66,11 +66,6 @@
       <groupId>com.github.loki4j</groupId>
       <artifactId>loki-logback-appender</artifactId>
       <version>1.6.0-m1</version>
-    </dependency>
-    <dependency>
-      <groupId>com.github.oliyh</groupId>
-      <artifactId>martian-httpkit</artifactId>
-      <version>0.1.26</version>
     </dependency>
     <dependency>
       <groupId>org.clojars.lispyclouds</groupId>
@@ -163,6 +158,11 @@
       <version>1.12.8</version>
     </dependency>
     <dependency>
+      <groupId>com.monkeyprojects</groupId>
+      <artifactId>aero-ext</artifactId>
+      <version>0.2.0</version>
+    </dependency>
+    <dependency>
       <groupId>com.github.seancorfield</groupId>
       <artifactId>next.jdbc</artifactId>
       <version>1.3.939</version>
@@ -176,6 +176,11 @@
       <groupId>clj-commons</groupId>
       <artifactId>clj-yaml</artifactId>
       <version>1.0.27</version>
+    </dependency>
+    <dependency>
+      <groupId>prismatic</groupId>
+      <artifactId>schema</artifactId>
+      <version>1.4.1</version>
     </dependency>
     <dependency>
       <groupId>com.mysql</groupId>
@@ -247,11 +252,6 @@
       <version>0.4.3</version>
     </dependency>
     <dependency>
-      <groupId>com.monkeyprojects</groupId>
-      <artifactId>socket-async</artifactId>
-      <version>0.1.0</version>
-    </dependency>
-    <dependency>
       <groupId>medley</groupId>
       <artifactId>medley</artifactId>
       <version>1.4.0</version>
@@ -265,11 +265,6 @@
       <groupId>org.clojure</groupId>
       <artifactId>core.async</artifactId>
       <version>1.6.681</version>
-    </dependency>
-    <dependency>
-      <groupId>http-kit</groupId>
-      <artifactId>http-kit</artifactId>
-      <version>2.8.0</version>
     </dependency>
   </dependencies>
   <build>

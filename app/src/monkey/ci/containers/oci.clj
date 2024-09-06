@@ -117,6 +117,7 @@
          :display-name sidecar-container-name
          :arguments ["-c" (str config-dir "/" config-file)
                      "sidecar"
+                     ;; TODO Move this to config file
                      "--events-file" event-file
                      "--start-file" start-file
                      "--abort-file" abort-file]
@@ -206,7 +207,7 @@
       (cos/set-events-file event-file)
       (cos/set-start-file start-file)
       (cos/set-abort-file abort-file)
-      (cos/set-api (get-in conf [:runtime :config :api]))))
+      (cos/set-api (:api conf))))
 
 (defn- rt->edn [conf]
   (edn/->edn (make-sidecar-config conf)))
@@ -322,9 +323,9 @@
         (get-in arch-shapes [(job-arch job) :credits] 1))
      (get job :memory oci/default-memory-gb)))
 
-(defn run-container [{:keys [job] :as conf}]
+(defn run-container [{:keys [events job] :as conf}]
   (log/debug "Running job as OCI instance:" job)
-  (log/debug "OCI container configuration:" conf)
+  (log/debug "Build details:" (:build conf))
   (let [client (ci/make-context (:oci conf))
         ic (instance-config conf)
         max-job-timeout (* 20 60 1000)]
@@ -355,22 +356,17 @@
            ;; Either return the first error result, or the result of the job container
            (:result (or nonzero job-cont))))))))
 
-(defn rt->container-config [rt]
-  {:runtime rt ; TODO Get rid of the runtime
-   :build (rt/build rt)
-   :promtail (get-in rt [rt/config :promtail])
-   :events (:events rt)
-   :oci (:containers rt)
-   :sidecar (get-in rt [rt/config :sidecar])})
-
 (defmethod mcc/normalize-containers-config :oci [conf]
   ;; Take app version if no image version specified
   (update-in conf [:containers :image-tag] #(format (or % "%s") (c/version))))
 
-(defrecord OciContainerRunner [conf credit-consumer]
+(defrecord OciContainerRunner [conf events credit-consumer]
   p/ContainerRunner
   (run-container [this job]
-    (run-container (assoc conf :job job))))
+    (run-container (assoc conf
+                          :events events
+                          :job job))))
 
-(defmethod mcc/make-container-runner :oci [rt]
-  (->OciContainerRunner (rt->container-config rt) credit-multiplier))
+(defn make-container-runner [conf events]
+  (->OciContainerRunner conf events credit-multiplier))
+

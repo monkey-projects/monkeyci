@@ -189,14 +189,14 @@
 (defn fake-events
   "Set up fake events implementation.  It returns an event poster that can be
    queried for received events."
-  []
-  (->FakeEvents (atom [])))
+  [& [recv]]
+  (->FakeEvents (or recv (atom []))))
 
 (defn received-events [fake]
   @(:recv fake))
 
-(defmethod ec/make-events :fake [_]
-  (fake-events))
+(defmethod ec/make-events :fake [{:keys [recv]}]
+  (fake-events recv))
 
 (defrecord FakeEventReceiver [listeners]
   p/EventReceiver
@@ -284,5 +284,12 @@
 (defn fake-container-runner [& [result]]
   (->FakeContainerRunner (constantly 0) (atom []) (or result {:exit 0})))
 
-(defmethod containers/make-container-runner :fake [_]
-  (fake-container-runner))
+;; (defrecord FakeBuildContainerRunner [runs]
+;;   p/BuildContainerRunner
+;;   (run-build-container [this build job]
+;;     (swap! runs (fnil conj []) {:build build :job job})
+;;     (md/success-deferred {:exit 0})))
+
+;; (defn fake-build-container-runner []
+;;   (->FakeBuildContainerRunner (atom [])))
+

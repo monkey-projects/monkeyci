@@ -13,11 +13,3 @@
                        :containers
                        :type)))))
 
-(deftest setup-runtime
-  (let [conf (-> {:containers {:type :fake}}
-                 (rt/setup-runtime :containers))]
-    (testing "creates container runner"
-      (is (p/container-runner? conf)))
-    
-    (testing "adds credit-consumer fn"
-      (is (fn? (:credit-consumer conf))))))

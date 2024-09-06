@@ -16,7 +16,7 @@
 (s/def ::events ::c/events)
 (s/def ::artifacts art/repo?)
 (s/def ::cache art/repo?)
-(s/def ::containers p/container-runner?)
+(s/def ::containers ::c/containers)
 
 (s/def ::runtime
   (s/keys :req-un [::containers ::artifacts ::cache ::events]))

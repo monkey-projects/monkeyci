@@ -1,0 +1,78 @@
+{:build
+ #meta-merge
+ [{:build-id "test-build"
+   :git {:url "https://github.com/monkey-projects/oci-common.git"
+         :branch "main"}}
+  #include "../../user/build.edn"]
+
+ :oci
+ {:region "eu-frankfurt-1"
+  :credentials
+  {:tenancy-ocid "ocid1.tenancy.oc1..aaaaaaaaaelsxbhoxnxwsvj6gnetml6rct3z7myetnptr5bibc3bdfbwiveq"
+   :user-ocid "ocid1.user.oc1..aaaaaaaagunozd7t7fs5rqwqrnshl2bgkfjufycyavx37gflyordcmhzicxa"
+   :key-fingerprint "3c:0e:fa:d9:66:00:98:fa:df:d9:5d:8a:db:b3:32:d2"
+   :private-key #privkey #file #envf ["%s/.ssh/monkey-oci-dev" HOME]}
+  
+  ;; Container related config
+  :containers
+  #merge
+  [{:image-url "fra.ocir.io/frjdhmocn5qi/monkeyci"
+    :image-tag "latest"
+    :compartment-id "ocid1.compartment.oc1..aaaaaaaahxfsiiidq5pdesassc3pnnvozwd3fbi5raj6twjutodnfpinv6ba"
+    :availability-domain "GARu:EU-FRANKFURT-1-AD-1"
+    :vnics
+    [{:subnet-id "ocid1.subnet.oc1.eu-frankfurt-1.aaaaaaaasbiuwybxsnmmg4weerznc32nmapcqtd2hbc24qgdkcusgg6b6a7a"}]
+    :region #ref [:oci :region]}
+   #ref [:oci :credentials]]
+  
+  ;; Bucket related config
+  :buckets
+  #merge
+  [{:type :oci
+    :bucket-name "test-dev"
+    :ns "frjdhmocn5qi"
+    :region #ref [:oci :region]}
+   #ref [:oci :credentials]]}
+ 
+ :events
+ {:type :jms
+  :client
+  {:url "failover:(amqp://artemis.monkeyci.com:61616)"
+   :dest "topic://monkeyci.dev.events"
+   :username "monkeyci-staging-api"
+   :password "monkeyci-staging-api"}
+  :server
+  {:enabled false}}
+ :runner
+ #merge
+ [{:type :oci
+   :log-config "dev-resources/logback-script.xml"}
+  #ref [:oci :containers]]
+ :containers
+ #merge
+ [{:type :oci}
+  #ref [:oci :containers]]
+ :logging
+ {:type :string}
+ :workspace
+ #merge
+ [{:type :oci
+   :prefix "workspaces"}
+  #ref [:oci :buckets]]
+ :cache
+ #merge
+ [{:type :oci
+   :prefix "caches"}
+  #ref [:oci :buckets]]
+ :artifacts
+ #merge
+ [{:type :oci
+   :prefix "artifacts"}
+  #ref [:oci :buckets]]
+ :sidecar
+ {:log-config #file "logback-sidecar.xml"}
+ :promtail
+ {:loki-url "http://loki.monkey-projects.be/loki/api/v1/push"}
+ :jwk #include "../../user/jwk.edn"
+ :api #include "../../user/api.edn"}
+

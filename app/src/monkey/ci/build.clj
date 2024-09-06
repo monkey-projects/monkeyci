@@ -83,8 +83,6 @@
                               (take build-sid-length))
                      (get-sid rt))
         ;; Either generate a new build id, or use the one given
-        ;; TODO Get rid of deprecated timestamp based build id and either
-        ;; assign a 'local' id, or ask the api to reserve a new index.
         sid (sid/->sid (if (or (empty? orig-sid) (includes-build-id? orig-sid))
                          orig-sid
                          (concat orig-sid [(local-build-id)])))
@@ -115,22 +113,17 @@
   (comp script-dir rt/build))
 
 (defn- build-related-dir
-  ([base-dir-key rt build-id]
-   (some-> rt
-           (base-dir-key)
-           (u/combine build-id)))
-  ([base-dir-key rt]
-   ;; DEPRECATED Use the 3-arg fn
-   (build-related-dir base-dir-key rt (get-in rt [:build :build-id]))))
+  [base-dir-key rt build-id]
+  (some-> rt
+          (base-dir-key)
+          (u/combine build-id)))
 
 (defn calc-checkout-dir
   "Calculates the checkout directory for the build, by combining the checkout
    base directory and the build id."
-  ([rt build]
-   (build-related-dir (rt/from-config :checkout-base-dir) rt (:build-id build)))
-  ([rt]
-   ;; DEPRECATED Use the 2 arg fun
-   (build-related-dir (rt/from-config :checkout-base-dir) rt (get-in rt [:build :build-id]))))
+  [rt build]
+  (some-> (get-in rt [rt/config :checkout-base-dir])
+          (u/combine (:build-id build))))
 
 (def checkout-dir
   "Gets the checkout dir as stored in the build structure"

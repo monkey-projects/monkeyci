@@ -27,7 +27,7 @@
     (testing "starts podman process"   
       (h/with-tmp-dir dir
         (let [rt (test-rt dir)
-              runner (mcc/make-container-runner rt)
+              runner (sut/make-container-runner rt)
               r @(p/run-container runner (:job rt))]
           (is (map? r))
           (is (= "/usr/bin/podman" (-> r :cmd first)))
@@ -42,7 +42,7 @@
                      (assoc-in [:logging :maker] (fn [_ path]
                                                    (swap! log-paths conj path)
                                                    (l/->InheritLogger))))
-              runner (mcc/make-container-runner rt)
+              runner (sut/make-container-runner rt)
               r @(p/run-container runner (:job rt))]
           (is (= 2 (count @log-paths)))
           (is (= ["test-build" "test-job"] (->> @log-paths
@@ -57,7 +57,7 @@
                      (assoc-in [:logging :maker] (fn [_ path]
                                                    (swap! log-paths conj path)
                                                    (l/->InheritLogger))))
-              runner (mcc/make-container-runner rt)
+              runner (sut/make-container-runner rt)
               r @(p/run-container runner (:job rt))]
           (is (= "unknown-build" (->> @log-paths
                                       ffirst))))))
@@ -70,7 +70,7 @@
                      (assoc-in [:job :caches] [{:id "test-cache"
                                                 :path "test-path"}])
                      (trt/set-cache cache))
-              runner (mcc/make-container-runner rt)
+              runner (sut/make-container-runner rt)
               r @(p/run-container runner (:job rt))]
           (is (some? r))
           (is (not-empty @stored)))))
@@ -85,7 +85,7 @@
                      (assoc-in [:job :restore-artifacts] [{:id "test-artifact"
                                                            :path "restore-path"}])
                      (trt/set-artifacts store))
-              runner (mcc/make-container-runner rt)
+              runner (sut/make-container-runner rt)
               r @(p/run-container runner (:job rt))]
           (is (some? r))
           (is (empty? @stored)))))
@@ -98,7 +98,7 @@
                      (assoc-in [:job :save-artifacts] [{:id "test-artifact"
                                                         :path "save-path"}])
                      (trt/set-artifacts store))
-              runner (mcc/make-container-runner rt)
+              runner (sut/make-container-runner rt)
               r @(p/run-container runner (:job rt))]
           (is (some? r))
           (is (not-empty @stored)))))))

@@ -5,8 +5,6 @@
              [protocols :as p]
              [runtime :as rt]]))
 
-(defmulti make-container-runner (comp :type :containers))
-
 ;;; Configuration handling
 
 (defmulti normalize-containers-config (comp :type :containers))
@@ -16,10 +14,6 @@
 
 (defmethod c/normalize-key :containers [k conf]
   (c/normalize-typed k conf normalize-containers-config))
-
-(defmethod rt/setup-runtime :containers [conf _]
-  (when (get conf :containers)
-    (make-container-runner conf)))
 
 (def image (some-fn :container/image :image))
 (def env :container/env)

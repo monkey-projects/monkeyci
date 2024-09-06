@@ -11,6 +11,9 @@
             [aleph.http
              [client-middleware :as acmw]
              [multipart :as mp]]
+            [buddy.core
+             [codecs :as bcc]
+             [nonce :as bcn]]
             [clj-commons.byte-streams :as bs]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
@@ -24,7 +27,7 @@
              [runtime :as rt]
              [protocols :as p]
              [spec :as spec]
-             [storage :as st]]
+             [utils :as u]]
             ;; Very strange, but including this causes spec gen exceptions when using cloverage :confused:
             ;; [monkey.ci.spec.build]
             [monkey.ci.events.http :as eh]
@@ -41,7 +44,7 @@
   "Generates a new API security token.  This token can be set in the API server
    and should be passed on to the build script."
   []
-  (str (random-uuid)))
+  (bcc/bytes->b64-str (bcn/random-bytes 40)))
 
 (def context ::context)
 
@@ -53,12 +56,6 @@
 (def req->build
   "Gets current build configuration from the request"
   (comp :build req->ctx))
-
-(def req->storage
-  (comp :storage req->ctx))
-
-(def req->api
-  (comp :api req->ctx))
 
 (def req->events
   (comp :events req->ctx))
@@ -75,6 +72,9 @@
 (def req->containers
   (comp :containers req->ctx))
 
+(def req->params
+  (comp :params req->ctx))
+
 (def repo-id
   (comp (juxt :customer-id :repo-id) req->build))
 
@@ -90,7 +90,7 @@
                          :as :clojure)
                   (dissoc :path))))
 
-(defn- params-from-storage
+#_(defn- params-from-storage
   "Fetches parameters from storage, using the current build configuration.
    Returns a deferred, or `nil` if there is no storage configuration in the
    context."
@@ -104,21 +104,16 @@
            (mapcat :parameters)
            (rur/response)))))
 
-(defn- params-from-api
-  "Sends a request to the global api to retrieve build parameters."
-  [req]
-  (when-let [api (req->api req)]
-    (let [build (req->build req)]
-      (api-request api {:path (format "/customer/%s/repo/%s/param" (:customer-id build) (:repo-id build))
-                        :method :get}))))
+(defn get-params-from-api [api build]
+  (api-request api {:path (format "/customer/%s/repo/%s/param" (:customer-id build) (:repo-id build))
+                    :method :get}))
 
 (defn- invalid-config [& _]
   (-> (rur/response {:error "Invalid or incomplete API context configuration"})
       (rur/status 500)))
 
-(def get-params (some-fn params-from-storage
-                         params-from-api
-                         invalid-config))
+(defn get-params [req]
+  (rur/response @(p/get-build-params (req->params req))))
 
 (defn get-all-ip-addresses
   "Lists all non-loopback, non-virtual site local ip addresses"
@@ -326,10 +321,10 @@
 (defn start-server
   "Starts a build API server with a randomly generated token.  Returns the server
    and token."
-  [{:keys [port] :or {port 0} :as conf}]
+  [{:keys [port token] :or {port 0} :as conf}]
   {:pre [(spec/valid? ::aspec/config conf)]}
-  (log/debug "Starting API server at ip address" (get-ip-addr) "with config" conf)
-  (let [token (generate-token)
+  (log/debug "Starting API server at ip address" (get-ip-addr) "and port" port)
+  (let [token (or token (generate-token))
         srv (http/start-server
              (make-app (assoc conf :token token))
              {:port port})]
@@ -341,8 +336,15 @@
   "Creates a config map for the api server from the given runtime"
   [rt]
   (->> {:port (rt/runner-api-port rt)}
-       (merge (select-keys rt [:events :artifacts :cache :workspace :storage :containers]))
+       (merge (select-keys rt [:events :artifacts :cache :workspace :containers]))
        (mc/filter-vals some?)))
 
 (defn with-build [conf b]
   (assoc conf :build b))
+
+(defn srv->api-config
+  "Creates a configuration object that can be passed to build runners, that includes the url"
+  [{:keys [port] :as conf}]
+  (-> conf
+      (select-keys [:port :token])
+      (assoc :url (format "http://%s:%d" (get-ip-addr) port))))

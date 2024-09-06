@@ -112,17 +112,12 @@
         log-config (assoc :jvm-opts
                           [(str "-Dlogback.configurationFile=" log-config)]))}}))
 
-(defn- srv->api-config [{:keys [port token]}]
-  {:port port
-   :url (format "http://%s:%d" (as/get-ip-addr) port)
-   :token token})
-
 (defn child-config
   "Creates a configuration map that can then be passed to the child process."
-  [build api-srv]
+  [build api-conf]
   (-> cos/empty-config
       (cos/set-build build)
-      (cos/set-api (srv->api-config api-srv))))
+      (cos/set-api (as/srv->api-config api-conf))))
 
 (defn- config->edn
   "Writes the configuration to an edn file that is then passed as command line to the app."
@@ -140,7 +135,7 @@
   (let [id (b/build-id build)]
     ((log-maker rt) build [id (str (name type) ".log")])))
 
-(defn- start-api-server [build rt]
+#_(defn- start-api-server [build rt]
   (-> (as/rt->api-server-config rt)
       (as/with-build build)
       (as/start-server)))
@@ -155,13 +150,13 @@
         [out err :as loggers] (map (partial make-logger rt build) [:out :err])
         result (md/deferred)
         ;; Start api server
-        api-srv (start-api-server build rt)
-        stop-server (fn []
-                      (some-> api-srv :server (.close)))
+        ;; api-srv (start-api-server build rt)
+        ;; stop-server (fn []
+        ;;               (some-> api-srv :server (.close)))
         cmd ["clojure"
              "-Sdeps" (pr-str (generate-deps build rt))
              "-X:monkeyci/build"
-             (pr-str {:config-file (config->edn (child-config build api-srv))})]]
+             (pr-str {:config-file (config->edn (child-config build (:api-config rt)))})]]
     (log/debug "Running in script dir:" script-dir ", this command:" cmd)
     ;; TODO Run as another unprivileged user for security (we'd need `su -c` for that)
     (-> (bp/process
@@ -180,6 +175,7 @@
                                             :exit exit})))})
         ;; Depending on settings, some process streams need handling
         (l/handle-process-streams loggers))
-    (md/finally
+    #_(md/finally
       result
-      stop-server)))
+      stop-server)
+    result))

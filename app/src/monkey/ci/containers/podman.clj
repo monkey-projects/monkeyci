@@ -81,7 +81,7 @@
      (make-script-cmd (:script job)))))
 
 (defn- run-container [job conf]
-  (let [log-maker (:log-maker conf)
+  (let [log-maker (rt/log-maker conf)
         build (:build conf)
         ;; Don't prefix the sid here, that's the responsability of the logger
         log-base (b/get-job-sid job build)
@@ -116,5 +116,5 @@
   (run-container [this job]
     (run-container job config)))
 
-(defmethod mcc/make-container-runner :podman [rt]
-  (->PodmanContainerRunner (rt->config rt) (constantly 0)))
+(defn make-container-runner [conf]
+  (->PodmanContainerRunner conf (constantly 0)))
