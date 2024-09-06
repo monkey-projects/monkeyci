@@ -8,7 +8,9 @@
             [monkey.ci.helpers :as h]
             [monkey.ci.test.aleph-test :as at]
             [monkey.ci.spec.api-server :as aspec]
-            [monkey.ci.storage :as st]
+            [monkey.ci
+             [protocols :as p]
+             [storage :as st]]
             [monkey.ci.test
              [api-server :as tas]
              [runtime :as trt]]
@@ -18,7 +20,8 @@
 
 (deftest test-config-spec
   (testing "satisfies spec"
-    (is (s/valid? ::aspec/config test-config))))
+    (is (s/valid? ::aspec/config test-config)
+        (s/explain-str ::aspec/config test-config))))
 
 (deftest start-server
   (testing "can start tcp server"
@@ -72,37 +75,57 @@
   [ctx]
   (h/->match-data {sut/context ctx}))
 
+(defrecord FakeParams [params]
+  p/BuildParams
+  (get-build-params [_]
+    (md/success-deferred params)))
+
 (deftest get-params
   (let [repo (h/gen-repo)
         cust (-> (h/gen-cust)
                  (assoc :repos {(:id repo) repo}))
         param-values [{:name "test-param"
                        :value "test value"}]
-        params [{:customer-id (:id cust)
-                 :parameters param-values}]
+        ;; params [{:customer-id (:id cust)
+        ;;          :parameters param-values}]
         build {:customer-id (:id cust)
                :repo-id (:id repo)}]
     
-    (testing "fetches params from local db if configured"
-      (h/with-memory-store st
-        (let [req (->req {:storage st
-                          :build build})]
-          (is (some? (st/save-params st (:id cust) params)))
-          (is (= param-values
-                 (:body (sut/get-params req)))))))
+    #_(testing "fetches params from local db if configured"
+        (h/with-memory-store st
+          (let [req (->req {:storage st
+                            :build build})]
+            (is (some? (st/save-params st (:id cust) params)))
+            (is (= param-values
+                   (:body (sut/get-params req)))))))
 
-    (testing "retrieves from remote api if no db"
-      ;; Requests look differend because of applied middleware
+    (testing "fetches params using build params"
+      (let [rec (->FakeParams param-values)
+            req (->req {:params rec
+                        :build build})]
+        (is (= param-values
+               (:body (sut/get-params req))))))))
+
+(deftest get-params-from-api
+  (let [repo (h/gen-repo)
+        cust (-> (h/gen-cust)
+                 (assoc :repos {(:id repo) repo}))
+        param-values [{:name "test-param"
+                       :value "test value"}]
+        build {:customer-id (:id cust)
+               :repo-id (:id repo)}]
+    
+    (testing "retrieves from remote api"
+      ;; Requests look different because of applied middleware
       (at/with-fake-http [{:request-url (format "http://test-api/customer/%s/repo/%s/param" (:id cust) (:id repo))
                            :request-method :get}
                           {:status 200
                            :body (pr-str param-values)
                            :headers {"Content-Type" "application/edn"}}]
         (is (= param-values
-               (-> {:api {:url "http://test-api"}
-                    :build build}
-                   (->req)
-                   (sut/get-params)
+               (-> (sut/get-params-from-api {:url "http://test-api"
+                                             :token "test-token"}
+                                            build)
                    deref
                    :body)))))))
 
@@ -205,7 +228,9 @@
 
 (deftest start-container
   (let [events (h/fake-events)
+        build {:build-id "test-build"}
         rt {:containers (h/fake-container-runner)
+            :build build
             :events events}]
     (testing "invokes registered container runner with job settings from body"
       (let [job {:id "test-job"}
@@ -214,7 +239,8 @@
                     (assoc-in [:parameters :body] {:job job})
                     (sut/start-container))]
         (is (= 202 (:status res)))
-        (is (= [job] (-> rt :containers :runs deref)))))
+        (is (= [job]
+               (-> rt :containers :runs deref)))))
 
     (testing "fires `:container/job-end` event"
       (is (= {:type :container-job/end
@@ -242,10 +268,11 @@
                      :status))))
 
     (testing "`GET /params` retrieves build params"
-      (is (= 200 (-> (mock/request :get "/params")
+      (let [r (-> (mock/request :get "/params")
                      (auth)
-                     (app)
-                     :status))))
+                     (app))]
+        (is (= 200 (:status r))
+            (bs/to-string (:body r)))))
 
     (testing "`POST /events` dispatches events"
       (is (= 202 (-> (mock/request :post "/events")

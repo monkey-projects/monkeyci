@@ -217,13 +217,6 @@
 
   (testing "sidecar container"
     (let [pk (h/generate-private-key)
-          conf {:oci {:credentials {:private-key pk}}
-                :events {:type :zmq
-                         :client {:address "inproc://test"}
-                         :server {:enabled true}}
-                :api {:url "http://test-api"
-                      :token "test-token"}
-                :args "test-args"}
           ic (->> {:job {:id "test-job"
                          :script ["first" "second"]
                          :save-artifacts [{:id "test-artifact"
@@ -232,9 +225,10 @@
                    :build {:build-id "test-build"
                            :checkout-dir "/tmp/test-checkout"
                            :workspace "test-build-ws"}
-                   :config conf
-                   :oci {:credentials {:private-key pk}}
-                   :runtime {:config conf}}
+                   :events {:type :manifold}
+                   :api {:url "http://test-api"
+                         :token "test-token"}
+                   :oci {:credentials {:private-key pk}}}
                   (sut/instance-config))
           sc (->> ic
                   :containers
@@ -459,7 +453,9 @@
       (is (= 1 (->> @res :body :containers second ec/result-exit))))))
 
 (deftest run-container
-  (let [runner (sut/->OciContainerRunner {:build {:checkout-dir "/tmp"}} (constantly 0))
+  (let [runner (sut/->OciContainerRunner {:build {:checkout-dir "/tmp"}}
+                                         (h/fake-events)
+                                         (constantly 0))
         job {:id "test-job"}]
     (testing "can run using type `oci`, returns zero exit code on success"
       (with-redefs [oci/run-instance (constantly (md/success-deferred
@@ -478,12 +474,6 @@
         (is (= 123 (-> (p/run-container runner job)
                        (deref)
                        :exit)))))))
-
-(deftest rt->container-config
-  (testing "includes sidecar config"
-    (is (= ::sidecar-config (-> {:config {:sidecar ::sidecar-config}}
-                                (sut/rt->container-config)
-                                :sidecar)))))
 
 (deftest normalize-key
   (testing "takes configured tag"

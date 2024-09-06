@@ -43,8 +43,17 @@
 
 (def container-runner? (partial satisfies? ContainerRunner))
 
+;; (defprotocol BuildContainerRunner
+;;   (run-build-container [this build job]
+;;     "Runs the container job for the specific build.  Use this in the runner, where the build
+;;      is not fully known at startup time."))
+
 (defprotocol Workspace
   (restore-workspace [this]
     "Restores the workspace associated with the current build"))
 
 (def workspace? (partial satisfies? Workspace))
+
+(defprotocol BuildParams
+  (get-build-params [this]
+    "Retrieves build parameters for this build"))

@@ -35,4 +35,7 @@
   (testing "adds container runner"
     (is (p/container-runner? (sut/with-runtime
                                test-config
-                               :containers)))))
+                               :containers))))
+
+  (testing "adds api client"
+    (is (some? (-> (sut/with-runtime test-config (comp :client :api)))))))

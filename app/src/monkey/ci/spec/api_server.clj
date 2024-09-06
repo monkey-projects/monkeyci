@@ -7,12 +7,13 @@
 (s/def ::cache ::c/blob-store)
 (s/def ::artifacts ::c/blob-store)
 (s/def ::workspace ::c/blob-store)
-(s/def ::storage ::c/storage)
+(s/def ::params ::c/params)
 (s/def ::events ::c/events)
+(s/def ::containers ::c/containers)
 
 (s/def ::base-config
-  (s/keys :req-un [::artifacts ::workspace ::events]
-          :opt-un [::cache ::storage]))
+  (s/keys :req-un [::artifacts ::workspace ::events ::containers ::params]
+          :opt-un [::cache]))
 
 (s/def ::config
   (-> (s/merge ::base-config

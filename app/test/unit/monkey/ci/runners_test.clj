@@ -90,15 +90,18 @@
       (is (= build (sut/download-src build {})))))
 
   (testing "gets src using git fn"
-    (is (= "test/dir" (-> {:git {:url "http://git.test"}}
-                          (sut/download-src {:git {:clone (constantly "test/dir")}})
+    (is (= "test/dir" (-> {:git {:url "http://git.test"}
+                           :build-id "test-build"}
+                          (sut/download-src {:git {:clone (constantly "test/dir")}
+                                             :config {:checkout-base-dir "/tmp"}})
                           :checkout-dir))))
 
   (testing "passes git config to git fn"
     (let [git-config {:url "http://test"
                       :branch "main"
                       :id "test-id"}]
-      (is (= "ok" (-> {:git git-config}
+      (is (= "ok" (-> {:git git-config
+                       :build-id "test-build"}
                       (sut/download-src
                        {:git {:clone (fn [c]
                                        (if (= (select-keys c (keys git-config)) git-config)
@@ -126,8 +129,10 @@
   (testing "calculates script dir"
     (is (re-matches #".*test/dir/test-script$"
                     (-> {:git {:url "http://git.test"}
-                         :script {:script-dir "test-script"}}
-                        (sut/download-src {:git {:clone (constantly "test/dir")}})
+                         :script {:script-dir "test-script"}
+                         :build-id "test-build"}
+                        (sut/download-src {:git {:clone (constantly "test/dir")}
+                                           :config {:checkout-base-dir "/tmp"}})
                         :script
                         :script-dir))))
 

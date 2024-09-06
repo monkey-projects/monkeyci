@@ -86,20 +86,7 @@
                             :process
                             :args
                             :cmd
-                            last))))
-
-      (testing "api server"
-        (is (nil? (reset! server-args nil)))
-        (is (nil? (reset! server-closed? nil)))
-        (is (some? (sut/execute! {} (-> test-rt
-                                        (assoc :config {:runner {:api {:port 6543}}})))))
-        
-        (testing "started and stopped"
-          (is (some? @server-args))
-          (is (true? @server-closed?)))
-
-        (testing "passes required config to server"
-          (is (= 6543 (-> @server-args second :port))))))))
+                            last)))))))
 
 (deftest generate-deps
   (testing "adds log config file, relative to work dir if configured"

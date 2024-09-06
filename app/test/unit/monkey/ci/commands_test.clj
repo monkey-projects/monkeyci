@@ -8,50 +8,52 @@
             [monkey.ci
              [commands :as sut]
              [edn :as edn]
+             [runners :as r]
              [sidecar :as sc]]
             [monkey.ci.config.sidecar :as cs]
             [monkey.ci.helpers :as h]
             [monkey.ci.spec.sidecar :as ss]
             [monkey.ci.web.handler :as wh]
-            [monkey.ci.test.aleph-test :as at]))
+            [monkey.ci.test
+             [config :as tc]
+             [aleph-test :as at]]))
+
+(defmethod r/make-runner ::dummy [_]
+  (constantly :invoked))
+
+(defmethod r/make-runner ::build [_]
+  (fn [build _]
+    build))
+
+(defmethod r/make-runner ::failing [_]
+  (fn [& _]
+    (throw (ex-info "test error" {}))))
 
 (deftest run-build
-  (testing "invokes runner from context"
-    (let [ctx {:runner (constantly :invoked)}]
-      (is (= :invoked (sut/run-build ctx)))))
+  (let [config (assoc tc/base-config
+                      :build {:build-id "test-build"})]
+    (testing "invokes runner from context"
+      (is (= :invoked (sut/run-build (assoc config :runner {:type ::dummy})))))
 
-  (letfn [(test-runner [build _] build)]
     (testing "adds `build` to runtime"
-      (is (map? (-> {:config {:args {:git-url "test-url"
-                                     :branch "test-branch"
-                                     :commit-id "test-id"}}
-                     :runner test-runner}
+      (is (map? (-> config
+                    (assoc :args {:git-url "test-url"
+                                  :branch "test-branch"
+                                  :commit-id "test-id"}
+                           :runner {:type ::build})
                     (sut/run-build)))))
 
-    (testing "adds build sid to build config"
-      (let [{:keys [sid build-id]} (-> {:config {:args {:sid "a/b/c"}}
-                                        :runner test-runner}
-                                       (sut/run-build))]
-        (is (= build-id (last sid)))
-        (is (= ["a" "b" "c"] (take 3 sid)))))
-
-    (testing "constructs `sid` from account settings if not specified"
-      (let [{:keys [sid build-id]} (-> {:runner test-runner
-                                        :config {:account {:customer-id "a"
-                                                           :repo-id "b"}}}
-                                       (sut/run-build))]
-        (is (= build-id (last sid)))
-        (is (= ["a" "b"] (take 2 sid))))))
-
-  (testing "posts `build/end` event on exception"
-    (let [{:keys [recv] :as e} (h/fake-events)]
-      (is (= 1 (-> {:runner (fn [_] (throw (ex-info "test error" {})))
-                    :events e}
-                   (sut/run-build))))
-      (is (= 1 (count @recv)))
-      (let [evt (first @recv)]
-        (is (= :build/end (:type evt)))
-        (is (some? (:build evt)))))))
+    (testing "posts `build/end` event on exception"
+      (let [recv (atom [])]
+        (is (= 1 (-> config
+                     (assoc :runner {:type ::failing}
+                            :events {:type :fake
+                                     :recv recv})
+                     (sut/run-build))))
+        (is (= 1 (count @recv)))
+        (let [evt (first @recv)]
+          (is (= :build/end (:type evt)))
+          (is (some? (:build evt))))))))
 
 (deftest verify-build
   (testing "zero when successful"

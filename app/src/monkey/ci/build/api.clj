@@ -40,8 +40,8 @@
 (defn- fetch-params* [ctx]
   (let [client (ctx->api-client ctx)]
     (log/debug "Fetching repo params for" (b/get-sid ctx))
-    (->> @(client {:path "/params"
-                   :method :get})
+    (->> @(client (as-edn {:path "/params"
+                           :method :get}))
          :body
          (map (juxt :name :value))
          (into {}))))

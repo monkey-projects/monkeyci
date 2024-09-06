@@ -129,7 +129,8 @@
                                :sid ["test-customer" "test-repo" build-id]
                                :checkout-dir oci-cont/work-dir}
                         ws (assoc :workspace ws))))
-        runner (c/make-container-runner rt)]
+        ;; FIXME Rewrite to use app specific runtime
+        runner (oci-cont/make-container-runner (get-in rt [:config :containers]) (:events rt))]
     (p/run-container runner (:job rt))))
 
 (defn- throw-error! [{:keys [status] :as resp}]

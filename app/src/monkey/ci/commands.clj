@@ -15,7 +15,9 @@
              [sidecar :as sidecar]
              [utils :as u]]
             [monkey.ci.events.core :as ec]
-            [monkey.ci.runtime.sidecar :as rs]
+            [monkey.ci.runtime
+             [app :as ra]
+             [sidecar :as rs]]
             [monkey.ci.spec.sidecar :as ss]
             [monkey.ci.web.handler :as h]))
 
@@ -24,16 +26,22 @@
 (defn run-build
   "Performs a build, using the runner from the context.  Returns a deferred
    that will complete when the build finishes."
-  [rt]
-  (let [r (:runner rt)
-        build (b/make-build-ctx rt)]
-    (try
-      (r build rt)
-      (catch Exception ex
-        (log/error "Unable to start build" ex)
-        (rt/post-events rt (b/build-end-evt (assoc build :message (ex-message ex))
-                                            exit-error))
-        exit-error))))
+  [config]
+  (ra/with-runner-system config
+    (fn [{:keys [runner events build]}]
+      (try
+        (log/debug "Starting runner for build" build)
+        (runner)
+        (catch Exception ex
+          (log/error "Unable to start build" ex)
+          (ec/post-events events (b/build-end-evt (assoc build :message (ex-message ex))
+                                                  exit-error))
+          exit-error)))))
+
+(defn run-build-local
+  "Run a build locally, normally from local source but can also be from a git checkout."
+  ;; TODO
+  [config])
 
 (defn verify-build
   "Verifies the build in the current directory by loading the script files in-process
@@ -150,7 +158,7 @@
 (defn- ^:deprecated sidecar-legacy
   "Legacy implementation, run from old generic config"
   [conf]
-  (log/info "Running sidecar in legacy mode with config:" conf)
+  (log/warn "Running sidecar in legacy mode. Reason:" (spec/explain-str ::ss/config conf))
   (rt/with-runtime conf :cli rt
     (run-sidecar (->sidecar-rt rt))))
 
