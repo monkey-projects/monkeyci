@@ -1,7 +1,6 @@
 {:build
  #meta-merge
- [{:build-id "test-build"
-   :git {:url "https://github.com/monkey-projects/oci-common.git"
+ [{:git {:url "https://github.com/monkey-projects/oci-common.git"
          :branch "main"}}
   #include "../../user/build.edn"]
 

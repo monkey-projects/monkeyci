@@ -141,7 +141,9 @@
         {:status 500}))))
 
 (defn dispatch-events [req]
-  (eh/event-stream (req->events req) {:sid (build/sid (req->build req))}))
+  (let [sid (build/sid (req->build req))]
+    (log/info "Dispatching event stream to client for build" sid)
+    (eh/event-stream (req->events req) {:sid sid})))
 
 (defn- stream-response [s & [nil-code]]
   (if s
@@ -221,6 +223,7 @@
         fire-end-event (fn [res]
                          (p/post-events (req->events req)
                                         {:type :container-job/end
+                                         :sid (build/sid (req->build req))
                                          :job-id (j/job-id job)
                                          :result res}))]
     ;; Start the container, don't wait for the result.  It's up to the client

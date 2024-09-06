@@ -228,7 +228,9 @@
 
 (deftest start-container
   (let [events (h/fake-events)
-        build {:build-id "test-build"}
+        sid (repeatedly 3 (comp str random-uuid))
+        build {:build-id "test-build"
+               :sid sid}
         rt {:containers (h/fake-container-runner)
             :build build
             :events events}]
@@ -245,6 +247,7 @@
     (testing "fires `:container/job-end` event"
       (is (= {:type :container-job/end
               :job-id "test-job"
+              :sid sid
               :result {:exit 0}}
              (first @(:recv events)))))))
 

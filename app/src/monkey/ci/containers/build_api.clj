@@ -2,6 +2,7 @@
   "Container runner that invokes an endpoint on the build api.  This is meant to
    be used by child processes that do not have full infra permissions."
   (:require [clj-commons.byte-streams :as bs]
+            [clojure.tools.logging :as log]
             [manifold
              [deferred :as md]
              [stream :as ms]]
@@ -23,6 +24,7 @@
           ;; Listen to events to realize deferred
           (md/chain
            (fn [_]
+             (log/debug "Listening to events for container job to end for job" (j/job-id job))
              (client {:request-method :get
                       :path "/events"}))
            :body
@@ -34,9 +36,11 @@
              ;; TODO Make sure the stream is closed on success
              ;; TODO Set a timeout
              ;; TODO Refactor to an event listener, so we can use existing code
-             (ms/consume (fn [{:keys [type job-id result]}]
+             (ms/consume (fn [{:keys [type job-id result] :as evt}]
+                           (log/debug "Got event while waiting for container to end:" evt)
                            (when (and (= :container-job/end type)
                                       (= job-id (j/job-id job)))
+                             (log/debug "Container job completed:" result)
                              (md/success! r result)))
                          events)))
           (md/catch (fn [ex]
