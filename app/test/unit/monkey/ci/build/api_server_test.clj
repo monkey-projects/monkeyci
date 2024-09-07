@@ -126,8 +126,7 @@
                (-> (sut/get-params-from-api {:url "http://test-api"
                                              :token "test-token"}
                                             build)
-                   deref
-                   :body)))))))
+                   deref)))))))
 
 (deftest download-workspace
   (testing "returns 204 no content if no workspace"

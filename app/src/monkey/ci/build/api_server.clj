@@ -22,6 +22,7 @@
              [artifacts :as art]
              [build :as build]
              [cache :as cache]
+             [edn :as edn]
              [jobs :as j]
              [labels :as lbl]
              [runtime :as rt]
@@ -83,12 +84,14 @@
 (defn- api-request
   "Sends a request to the global API according to configuration"
   [{:keys [url token]} req]
-  (api-client (-> req
-                  (assoc :url (str url (:path req))
-                         :accept "application/edn"
-                         :oauth-token token
-                         :as :clojure)
-                  (dissoc :path))))
+  (md/chain
+   (api-client (-> req
+                   (assoc :url (str url (:path req))
+                          :accept "application/edn"
+                          :oauth-token token)
+                   (dissoc :path)))
+   :body
+   edn/edn->))
 
 #_(defn- params-from-storage
   "Fetches parameters from storage, using the current build configuration.
