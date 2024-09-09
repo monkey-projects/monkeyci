@@ -90,13 +90,13 @@
   "Loads private and public keys from the app config, returns a map that can be
    used in the context `:jwk`."
   [conf]
+  (log/debug "Configured JWK:" (:jwk conf))
   (let [m {:private-key (comp bk/str->private-key u/try-slurp)
            :public-key (comp bk/str->public-key u/try-slurp)}
         loaded-keys (mapv (fn [[k f]]
                             (when-let [v (get-in conf [:jwk k])]
                               (f v)))
                           m)]
-    (log/debug "Configured JWK:" (:jwk conf))
     (when (every? some? loaded-keys)
       (zipmap [:priv :pub] loaded-keys))))
 

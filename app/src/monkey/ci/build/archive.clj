@@ -24,8 +24,8 @@
         (throw ex)))))
 
 (defn- extract-entry [ai e dest]
-  (log/trace "Extracting entry from archive:" (.getName e))
   (let [f (io/file dest (.getName e))]
+    (log/trace "Extracting entry from archive:" (.getName e) "into" f)
     (cond
       (.isDirectory e)
       (u/mkdirs! f)
@@ -58,7 +58,6 @@
                      (log/debug "Decompressing source:" src)
                      (try 
                        (cc/decompress
-                        #_(io/input-stream src)
                         (copy-to-tmp src)
                         os
                         compression-type)

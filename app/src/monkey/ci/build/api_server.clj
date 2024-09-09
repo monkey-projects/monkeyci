@@ -84,14 +84,21 @@
 (defn- api-request
   "Sends a request to the global API according to configuration"
   [{:keys [url token]} req]
-  (md/chain
-   (api-client (-> req
-                   (assoc :url (str url (:path req))
-                          :accept "application/edn"
-                          :oauth-token token)
-                   (dissoc :path)))
-   :body
-   edn/edn->))
+  (letfn [(handle-error [ex]
+            (throw (ex-info
+                    (ex-message ex)
+                    (-> (ex-data ex)
+                        ;; Read the response body in case of error
+                        (mc/update-existing :body bs/to-string)))))]
+    (-> (api-client (-> req
+                        (assoc :url (str url (:path req))
+                               :accept "application/edn"
+                               :oauth-token token)
+                        (dissoc :path)))
+        (md/chain
+         :body
+         edn/edn->)
+        (md/catch handle-error))))
 
 #_(defn- params-from-storage
   "Fetches parameters from storage, using the current build configuration.

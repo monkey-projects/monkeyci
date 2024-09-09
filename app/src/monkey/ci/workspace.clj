@@ -58,6 +58,7 @@
 (defrecord BuildApiWorkspace [client build]
   p/Workspace
   (restore-workspace [_]
+    (log/info "Restoring workspace for build" (build/sid build) "using build api")
     (md/chain
      (client {:path "/workspace"
               :method :get})

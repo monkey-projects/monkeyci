@@ -138,7 +138,7 @@
                                     (mc/find-first (cp/prop-pred :display-name "job"))))
           jc (->> {:job {:script ["first" "second"]
                          :container/env {"TEST_ENV" "test-val"}
-                         :work-dir "/tmp/test-build/sub"}
+                         :work-dir "sub"}
                    :build {:checkout-dir "/tmp/test-build"}}
                   (sut/instance-config)
                   (find-job-container))]
@@ -221,7 +221,7 @@
                          :script ["first" "second"]
                          :save-artifacts [{:id "test-artifact"
                                            :path "somewhere"}]
-                         :work-dir "/tmp/test-checkout/sub"}
+                         :work-dir "sub"}
                    :build {:build-id "test-build"
                            :checkout-dir "/tmp/test-checkout"
                            :workspace "test-build-ws"}
@@ -319,7 +319,7 @@
     (let [ci (->> {:job
                    {:script ["first" "second"]
                     :container/env {"TEST_ENV" "test-val"}
-                    :work-dir "/tmp/test-build/sub"}
+                    :work-dir "sub"}
                    :build
                    {:checkout-dir "/tmp/test-build"}
                    :promtail
@@ -360,7 +360,7 @@
       (is (nil? (->> {:job
                       {:script ["first" "second"]
                        :container/env {"TEST_ENV" "test-val"}
-                       :work-dir "/tmp/test-build/sub"}
+                       :work-dir "sub"}
                       :build
                       {:checkout-dir "/tmp/test-build"}}
                      (sut/instance-config)

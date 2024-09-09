@@ -66,16 +66,18 @@
 (defn- job-arch [job]
   (get job :arch default-arch))
 
+(defn- checkout-dir
+  "Checkout dir for the build in the job container"
+  [build]
+  (u/combine work-dir (fs/file-name (b/checkout-dir build))))
+
 (defn- job-work-dir
   "The work dir to use for the job in the container.  This is the external job
-   work dir, rebased onto the base work dir."
+   work dir, relative to the container checkout dir."
   [job build]
-  (let [cd (b/checkout-dir build)]
-    (log/debug "Determining job work dir using checkout dir" cd
-               ", job dir" (j/work-dir job)
-               "and base dir" (oci/base-work-dir build))
-    (-> (or (j/work-dir job) cd)
-        (u/rebase-path cd (oci/base-work-dir build)))))
+  (let [wd (j/work-dir job)]
+    (cond-> (checkout-dir build)
+      wd (u/combine wd))))
 
 (defn- job-container
   "Configures the job container.  It runs the image as configured in

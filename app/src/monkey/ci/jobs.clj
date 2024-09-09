@@ -46,8 +46,8 @@
 (defn- make-job-dir-absolute
   "Rewrites the job dir in the context so it becomes an absolute path, calculated
    relative to the checkout dir."
-  [{:keys [job] :as rt}]
-  (let [checkout-dir (build/rt->checkout-dir rt)]
+  [{:keys [job build] :as rt}]
+  (let [checkout-dir (build/checkout-dir build)]
     (update-in rt [:job :work-dir]
                (fn [d]
                  (if d
