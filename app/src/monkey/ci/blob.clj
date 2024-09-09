@@ -52,15 +52,16 @@
     p))
 
 (defn make-archive
-  "Archives the `src` directory or file into `dest` file."
+  "Archives the `src` directory or file into `dest`, which should be something
+   that can be converted into an `OutputStream`."
   [src dest]
   (let [prefix (u/abs-path
                 (fs/file (fs/parent src)))
         entries (atom [])
         gatherer (entry-gathering-resolver entries)]
     (log/debug "Archiving" src "and stripping prefix" prefix)
-    (u/mkdirs! (.getParentFile dest))
-    (with-open [os (io/output-stream dest)]
+    (u/ensure-dir-exists! dest)
+    (with-open [os (bs/to-output-stream dest)]
       (ca/archive
        {:output-stream os
         :compression compression-type
@@ -126,6 +127,10 @@
        (remove nil?)
        (cs/join "/")))
 
+(def default-oci-put-params
+  ;; Increase buffer size to 16MB
+  {:buf-size 0x1000000})
+
 (deftype OciBlobStore [client conf]
   p/BlobStore
   (save-blob [_ src dest]
@@ -141,10 +146,9 @@
           (-> (oss/input-stream->multipart client
                                            (-> conf
                                                (select-keys [:ns :bucket-name])
+                                               (merge default-oci-put-params)
                                                (assoc :object-name obj-name
                                                       :input-stream is
-                                                      ;; Increase buffer size to 16MB
-                                                      :buf-size 0x1000000
                                                       :close? true)))
               (md/chain (constantly obj-name))
               (md/finally #(fs/delete arch)))))
@@ -191,10 +195,9 @@
        (oss/input-stream->multipart client
                                     (-> conf
                                         (select-keys [:ns :bucket-name])
+                                        (merge default-oci-put-params)
                                         (assoc :object-name obj-name
                                                :input-stream src
-                                               ;; Increase buffer size to 16MB
-                                               :buf-size 0x1000000
                                                :close? true)))
        (constantly obj-name)))))
 

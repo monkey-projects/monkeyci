@@ -156,6 +156,7 @@
     (eh/event-stream (req->events req) {:sid sid})))
 
 (defn- stream-response [s & [nil-code]]
+  (log/debug "Sending stream to client:" s)
   (if s
     (-> (rur/response s)
         ;; TODO Return correct content type according to stream
@@ -231,6 +232,7 @@
   (let [job (get-in req [:parameters :body :job])
         containers (req->containers req)
         fire-end-event (fn [res]
+                         (log/debug "Container finished, dispatching :container-job/end event")
                          (p/post-events (req->events req)
                                         {:type :container-job/end
                                          :sid (build/sid (req->build req))

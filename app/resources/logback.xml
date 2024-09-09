@@ -18,7 +18,8 @@
   <logger name="net" level="WARN"/>
   <logger name="io" level="WARN"/>
   <logger name="monkey.ci" level="DEBUG"/>
-  <logger name="monkey.ci.build.archive" level="TRACE"/>
+  <logger name="monkey.ci.build.archive" level="DEBUG"/>
+  <logger name="monkey.oci" level="DEBUG"/>
 
   <root level="INFO">
     <appender-ref ref="FILE"/>

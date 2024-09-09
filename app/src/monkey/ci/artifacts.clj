@@ -111,6 +111,7 @@
 
   (save-artifact [this id src]
     (let [tmp (fs/create-temp-file)
+          ;; TODO Skip the tmp file intermediate step
           arch (blob/make-archive src (fs/file tmp))
           stream (io/input-stream (fs/file tmp))]
       (-> (client (api/as-edn {:method :put
