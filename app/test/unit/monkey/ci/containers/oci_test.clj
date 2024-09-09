@@ -1,5 +1,6 @@
 (ns monkey.ci.containers.oci-test
   (:require [clojure.test :refer [deftest testing is]]
+            [babashka.fs :as fs]
             [clj-yaml.core :as yaml]
             [clojure.java.io :as io]
             [clojure.spec.alpha :as spec]
@@ -273,6 +274,15 @@
 
               (testing "contains job details"
                 (is (some? (cs/job data))))
+
+              (testing "contains build details"
+                (is (some? (cs/build data))))
+
+              (testing "build checkout dir parent is container work dir"
+                (is (= sut/work-dir (-> (cs/build data)
+                                        :checkout-dir
+                                        (fs/parent)
+                                        str))))
 
               (testing "recalculates job work dir"
                 (is (= "/opt/monkeyci/checkout/work/test-checkout/sub"

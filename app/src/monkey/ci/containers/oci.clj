@@ -202,7 +202,9 @@
    sidecar container."
   [{:keys [build job] :as conf}]
   (-> {}
-      (cos/set-build (select-keys build [:build-id :checkout-dir :sid :workspace]))
+      (cos/set-build (-> build
+                         (select-keys [:build-id :sid :workspace])
+                         (assoc :checkout-dir (checkout-dir build))))
       (cos/set-job (-> job
                        (select-keys [:id :save-artifacts :restore-artifacts :caches :dependencies])
                        (assoc :work-dir (job-work-dir job build))))
