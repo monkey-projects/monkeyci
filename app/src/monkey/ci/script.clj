@@ -9,13 +9,15 @@
              [extensions :as ext]
              [jobs :as j]
              [protocols :as p]
-             [runtime :as rt]
              [spec :as s]
              [utils :as u]]
             [monkey.ci.build.core :as bc]
             [monkey.ci.events.core :as ec]
             [monkey.ci.runtime.script :as rs]
             [monkey.ci.spec.build :as sb]))
+
+(defn rt->context [rt]
+  (select-keys rt [:build :api]))
 
 (defn- wrapped
   "Sets the event poster in the runtime."
@@ -106,13 +108,13 @@
 
 (defn run-all-jobs
   "Executes all jobs in the set, in dependency order."
-  [{:keys [pipeline events] :as ctx} jobs]
+  [{:keys [pipeline events] :as rt} jobs]
   (let [pf (cond->> jobs
              ;; Filter jobs by pipeline, if given
              pipeline (j/filter-jobs (j/label-filter (pipeline-filter pipeline)))
              true (map (comp (partial with-fire-events events) with-extensions)))]
     (log/debug "Found" (count pf) "matching jobs:" (map bc/job-id pf))
-    (let [result @(j/execute-jobs! pf ctx)]
+    (let [result @(j/execute-jobs! pf (rt->context rt))]
       (log/debug "Jobs executed, result is:" result)
       {:status (if (some (comp bc/failed? :result) (vals result)) :failure :success)
        :jobs result})))
@@ -144,7 +146,7 @@
   [rt f]
   (-> rt
       (base-event nil)
-      (assoc :script (-> rt :build build/script))
+      (assoc :script (-> rt rs/build build/script))
       (f)))
 
 (defn- job->evt [job]
@@ -208,33 +210,29 @@
   (-> (load-script (build/script-dir build) (build/build-id build))
       (resolve-jobs rt)))
 
-(defn rt->context [rt]
-  ;; TODO Replace the runtime with a specific context when passing it to a job
-  rt)
-
 (defn exec-script!
   "Loads a script from a directory and executes it.  The script is executed in 
    this same process."
   [rt]
   (let [build (rs/build rt)
         build-id (build/build-id build)
-        script-dir (build/script-dir build)
-        ctx (rt->context rt)]
+        script-dir (build/script-dir build)]
     (s/valid? ::sb/build build)
     (log/debug "Executing script for build" build-id "at:" script-dir)
     (log/debug "Build map:" build)
     (try
-      (let [jobs (load-jobs build ctx)]
+      (let [jobs (load-jobs build (rt->context rt))]
         (log/trace "Jobs:" jobs)
         (log/debug "Loaded" (count jobs) "jobs:" (map bc/job-id jobs))
-        (run-all-jobs* ctx jobs))
+        (run-all-jobs* rt jobs))
       (catch Exception ex
         (log/error "Unable to load build script" ex)
         (let [msg ((some-fn (comp ex-message ex-cause)
                             ex-message) ex)]
-          (rt/post-events rt [(-> (base-event rt :script/end)
-                                  (assoc :script (build/script build)
-                                         :message msg))])
+          (ec/post-events (:events rt)
+                          [(-> (base-event rt :script/end)
+                               (assoc :script (build/script build)
+                                      :message msg))])
           (assoc bc/failure
                  :message msg
                  :exception ex))))))

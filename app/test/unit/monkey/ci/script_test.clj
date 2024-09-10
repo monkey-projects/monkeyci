@@ -80,7 +80,8 @@
           (is (= "Unable to resolve symbol: This in this context" (:message r))))))))
 
 (deftest run-all-jobs
-  (let [rt {:events (h/fake-events)}]
+  (let [rt {:events (h/fake-events)
+            :api {:client ::fake-api}}]
     (testing "success if no pipelines"
       (is (bc/success? (sut/run-all-jobs rt []))))
 
@@ -113,6 +114,16 @@
                         (sut/run-all-jobs rt)
                         :jobs)]
         (is (= ["test-job"] (keys result)))
+        (is (= bc/success (get-in result ["test-job" :result])))))
+
+    (testing "only passes build, api and current job to jobs"
+      (let [job (bc/action-job "test-job" (fn [ctx]
+                                            (if (= #{:build :api :job} (set (keys ctx)))
+                                              bc/success
+                                              (bc/with-message bc/failure (str "Keys:" (keys ctx))))))
+            result (->> [job]
+                        (sut/run-all-jobs rt)
+                        :jobs)]
         (is (= bc/success (get-in result ["test-job" :result])))))))
 
 (deftest run-all-jobs*
