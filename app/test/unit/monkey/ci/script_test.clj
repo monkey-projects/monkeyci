@@ -79,35 +79,6 @@
         (testing "returns compiler error"
           (is (= "Unable to resolve symbol: This in this context" (:message r))))))))
 
-(deftest setup-runtime
-  (testing "creates client if configured"
-    (is (fn? (-> {:api {:url "http://test"
-                        :token "test-token"}}
-                 (rt/setup-runtime :api)
-                 :client))))
-
-  (testing "creates client using host and port"
-    (is (fn? (-> {:api {:host "test-host"
-                        :port 8080
-                        :token "test-token"}}
-                 (rt/setup-runtime :api)
-                 :client))))
-
-  (testing "no client if not correctly configured"
-    (is (nil? (-> {:api {:url "http://test"}}
-                  (rt/setup-runtime :api)
-                  :client)))))
-
-(deftest make-client
-  (testing "returns client fn"
-    (is (fn? (sut/make-client {:url "http://test" :token "test-token"}))))
-
-  (testing "client fn connects to localhost"
-    (at/with-fake-http ["http://localhost:8080/test" {:status 200}]
-      (let [client (sut/make-client {:host "test-host" :port 8080 :token "test-token"})]
-        (is (= 200 (:status @(client {:method :get
-                                      :path "/test"}))))))))
-
 (deftest run-all-jobs
   (let [rt {:events (h/fake-events)}]
     (testing "success if no pipelines"

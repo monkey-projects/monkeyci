@@ -4,10 +4,12 @@
              [artifacts :as art]
              [protocols :as p]]
             [monkey.ci.config.script :as cs]
-            [monkey.ci.runtime.script :as sut]))
+            [monkey.ci.runtime.script :as sut]
+            [monkey.ci.test.aleph-test :as at]))
 
 (def test-config (-> cs/empty-config
                      (cs/set-api {:url "http://test"
+                                  :port 1234
                                   :token "test-token"})
                      (cs/set-build {:build-id "test-build"})))
 
@@ -37,5 +39,12 @@
                                test-config
                                :containers))))
 
-  (testing "adds api client"
-    (is (some? (-> (sut/with-runtime test-config (comp :client :api)))))))
+  (let [api-client (sut/with-runtime test-config (comp :client :api))]
+    (testing "adds api client"
+      (is (fn? api-client)))
+
+    (testing "api client connects to localhost"
+      (at/with-fake-http ["http://localhost:1234/test" {:status 200}]
+        (is (= 200 (-> (api-client {:path "/test" :request-method :get})
+                       (deref)
+                       :status)))))))

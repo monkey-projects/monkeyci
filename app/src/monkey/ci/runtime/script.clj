@@ -28,9 +28,15 @@
 (defn- new-runtime [config]
   (map->ScriptRuntime {:config config}))
 
+(defn- client-url [{:keys [url port]}]
+  (if port
+    ;; Script child process always connects to localhost
+    (format "http://localhost:%d" port)
+    url))
+
 (defn- new-api-client [config]
-  (let [{:keys [url token]} (cs/api config)]
-    (api/make-client url token)))
+  (let [{:keys [token] :as ac} (cs/api config)]
+    (api/make-client (client-url ac) token)))
 
 (defn- new-events []
   (eba/make-event-poster nil))
@@ -50,8 +56,9 @@
    {:client :api-client}))
 
 (defn make-system
-  "Given a sidecar configuration object, creates component system.  When started,
-   it contains a fully configured `runtime` component."
+  "Given a script configuration object, creates component system.  When started,
+   it contains a fully configured `runtime` component that can be passed to the
+   script functions."
   [config]
   {:pre [(spec/valid? ::ss/config config)]}
   (co/system-map

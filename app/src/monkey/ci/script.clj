@@ -1,18 +1,10 @@
 (ns monkey.ci.script
-  (:require [aleph.http :as http]
-            [clj-commons.byte-streams :as bs]
-            [clojure.java.io :as io]
+  (:require [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
             [medley.core :as mc]
-            [monkey.ci.build
-             [api :as api]
-             [core :as bc]]
             [monkey.ci
-             [artifacts :as art]
              [build :as build]
-             [cache :as cache]
-             [containers :as c]
              [credits :as cr]
              [extensions :as ext]
              [jobs :as j]
@@ -20,13 +12,10 @@
              [runtime :as rt]
              [spec :as s]
              [utils :as u]]
-            [monkey.ci.containers
-             [oci]
-             [podman]]
+            [monkey.ci.build.core :as bc]
             [monkey.ci.events.core :as ec]
             [monkey.ci.runtime.script :as rs]
-            [monkey.ci.spec.build :as sb]
-            [muuntaja.parse :as mp]))
+            [monkey.ci.spec.build :as sb]))
 
 (defn- wrapped
   "Sets the event poster in the runtime."
@@ -128,28 +117,6 @@
       {:status (if (some (comp bc/failed? :result) (vals result)) :failure :success)
        :jobs result})))
 
-;;; Script client functions
-
-(defn- client-url [{:keys [port url]}]
-  (if port
-    ;; Child process always connects to localhost
-    (format "http://localhost:%d" port)
-    url))
-
-(defn make-client
-  "Creates an API client function, that can be invoked by build scripts to 
-   perform certain operations, like retrieve build parameters.  The client
-   uses the token passed by the spawning process to gain access to those
-   resources."
-  [{:keys [token] :as conf}]
-  (when-let [url (client-url conf)]
-    (when token
-      (api/make-client url token))))
-
-(defmethod rt/setup-runtime :api [conf _]
-  (when-let [c (:api conf)]
-    {:client (make-client c)}))
-
 ;;; Script loading
 
 (defn- load-script
@@ -177,7 +144,7 @@
   [rt f]
   (-> rt
       (base-event nil)
-      (assoc :script (-> rt rt/build build/script))
+      (assoc :script (-> rt :build build/script))
       (f)))
 
 (defn- job->evt [job]
