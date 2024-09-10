@@ -14,7 +14,8 @@
              [build :as b]
              [config :as config]
              [oci :as oci]
-             [runtime :as rt]]
+             [runtime :as rt]
+             [utils :as u]]
             [monkey.ci.build
              [api :as api]
              [archive :as archive]]))
@@ -102,29 +103,34 @@
 (defrecord BuildApiArtifactRepository [client base-path]
   ArtifactRepository
   (restore-artifact [this id dest]
-    (md/chain
-     (client {:method :get
-              :path (str base-path id)
-              :as :stream})
-     :body
-     #(archive/extract % dest)))
+    (u/log-deferred-elapsed
+     (md/chain
+      (client {:method :get
+               :path (str base-path id)
+               :as :stream})
+      :body
+      #(archive/extract % dest))
+     (str "Restored artifact from build API: " id)))
 
   (save-artifact [this id src]
     (let [tmp (fs/create-temp-file)
-          ;; TODO Skip the tmp file intermediate step
+          ;; TODO Skip the tmp file intermediate step, it takes up disk space and is slower
           arch (blob/make-archive src (fs/file tmp))
           stream (io/input-stream (fs/file tmp))]
-      (-> (client (api/as-edn {:method :put
-                               :path (str base-path id)
-                               :body stream}))
-          (md/chain
-           :body
-           (partial merge arch))
-          (md/finally
-            ;; Clean up
-            (fn []
-              (.close stream)
-              (fs/delete tmp)))))))
+      (log/debugf "Uploading artifact/cache to api server: %s from %s (compressed size: %.2f MB)" id src (mb arch))
+      (u/log-deferred-elapsed
+       (-> (client (api/as-edn {:method :put
+                                :path (str base-path id)
+                                :body stream}))
+           (md/chain
+            :body
+            (partial merge arch))
+           (md/finally
+             ;; Clean up
+             (fn []
+               (.close stream)
+               (fs/delete tmp))))
+       (str "Saved artifact to build API: " id)))))
 
 ;;; Artifact specific functions
 

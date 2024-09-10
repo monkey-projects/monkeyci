@@ -202,12 +202,14 @@
   "Uploads a new artifact.  The body should contain the file contents."
   (with-artifact
     (fn [req store path id]
+      (log/debug "Receiving artifact from client:" id "at path" path)
       (upload-stream req store path {:artifact-id id}))))
 
 (def download-artifact
   "Downloads an artifact.  The body contains the artifact as a stream."
   (with-artifact
     (fn [req store path _]
+      (log/debug "Sending artifact to client:" path)
       (download-stream req store path 404))))
 
 (defn- with-cache
@@ -217,15 +219,16 @@
     (let [store (req->cache req)
           id (get-in req [:parameters :path :cache-id])
           path (when id (cache/cache-archive-path (req->build req) id))]
-      (log/debug "Uploading cache:" id ", storing it at path" path)
       (f req store path id))))
 
 (def upload-cache
   (with-cache (fn [req store path id]
+                (log/debug "Receiving cache from client:" id "at path" path)
                 (upload-stream req store path {:cache-id id}))))
 
 (def download-cache
   (with-cache (fn [req store path _]
+                (log/debug "Sending cache to client:" path)
                 (download-stream req store path 404))))
 
 (defn start-container [req]

@@ -143,15 +143,17 @@
         ;; Upload the temp file
         (log/debugf "Uploading archive %s to %s (%d bytes)" arch obj-name (fs/size arch))
         (let [is (io/input-stream arch)]
-          (-> (oss/input-stream->multipart client
-                                           (-> conf
-                                               (select-keys [:ns :bucket-name])
-                                               (merge default-oci-put-params)
-                                               (assoc :object-name obj-name
-                                                      :input-stream is
-                                                      :close? true)))
-              (md/chain (constantly obj-name))
-              (md/finally #(fs/delete arch)))))
+          (u/log-deferred-elapsed
+           (-> (oss/input-stream->multipart client
+                                            (-> conf
+                                                (select-keys [:ns :bucket-name])
+                                                (merge default-oci-put-params)
+                                                (assoc :object-name obj-name
+                                                       :input-stream is
+                                                       :close? true)))
+               (md/chain (constantly obj-name))
+               (md/finally #(fs/delete arch)))
+           (str "Saving blob to bucket: " dest))))
       (do
         (log/warn "Unable to save blob, path does not exist:" src)
         (md/success-deferred nil))))
@@ -162,44 +164,51 @@
           params (-> conf
                      (select-keys [:ns :bucket-name])
                      (assoc :object-name obj-name))]
-      (md/chain
-       (os/head-object client params)
-       (fn [exists?]
-         (if exists?
-           (-> (os/get-object client params)
-               (md/chain
-                bs/to-input-stream
-                ;; Unzip and unpack in one go
-                #(a/extract % dest)
-                #(assoc % :src src)))
-           ;; FIXME It may occur that a file is not yet available if it is read immediately after writing
-           ;; In that case we should retry.
-           (log/warn "Blob not found in bucket:" obj-name))))))
+      (u/log-deferred-elapsed
+       (md/chain
+        (os/head-object client params)
+        (fn [exists?]
+          (if exists?
+            (-> (os/get-object client params)
+                (md/chain
+                 bs/to-input-stream
+                 ;; Unzip and unpack in one go
+                 #(a/extract % dest)
+                 #(assoc % :src src)))
+            ;; FIXME It may occur that a file is not yet available if it is read immediately after writing
+            ;; In that case we should retry.
+            (log/warn "Blob not found in bucket:" obj-name))))
+       (str "Restored blob from bucket: " src))))
 
   (get-blob-stream [_ src]
     (let [obj-name (archive-obj-name conf src)
           params (-> conf
                      (select-keys [:ns :bucket-name])
                      (assoc :object-name obj-name))]
-      (md/chain
-       (os/head-object client params)
-       (fn [exists?]
-         (when exists?
-           (md/chain
-            (os/get-object client params)
-            bs/to-input-stream))))))
+      (u/log-deferred-elapsed
+       (md/chain
+        (os/head-object client params)
+        (fn [exists?]
+          (when exists?
+            (md/chain
+             (os/get-object client params)
+             bs/to-input-stream))))
+       (str "Downloaded blob stream from bucket: " src))))
 
   (put-blob-stream [_ src dest]
     (let [obj-name (archive-obj-name conf dest)]
-      (md/chain
-       (oss/input-stream->multipart client
-                                    (-> conf
-                                        (select-keys [:ns :bucket-name])
-                                        (merge default-oci-put-params)
-                                        (assoc :object-name obj-name
-                                               :input-stream src
-                                               :close? true)))
-       (constantly obj-name)))))
+      (log/debug "Uploading blob stream to" obj-name)
+      (u/log-deferred-elapsed
+       (md/chain
+        (oss/input-stream->multipart client
+                                     (-> conf
+                                         (select-keys [:ns :bucket-name])
+                                         (merge default-oci-put-params)
+                                         (assoc :object-name obj-name
+                                                :input-stream src
+                                                :close? true)))
+        (constantly obj-name))
+       (str "Uploaded blob stream to bucket: " dest)))))
 
 (defmethod make-blob-store :oci [conf k]
   (let [oci-conf (get conf k)

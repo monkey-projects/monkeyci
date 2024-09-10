@@ -5,9 +5,11 @@
              [string :as cs]
              [walk :as cw]]
             [clojure.java.io :as io]
+            [clojure.tools.logging :as log]
             [clojure
              [math :as math]
              [repl :as cr]]
+            [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
              [edn :as ce]
@@ -172,3 +174,11 @@
   (let [r (int (math/round x))]
     (cond-> r
       (< r x) inc)))
+
+(defn log-deferred-elapsed
+  "Given a deferred, keeps track of time elapsed and logs it"
+  [x msg]
+  (let [start (now)]
+    (md/finally x (fn []
+                    (let [elapsed (- (now) start)]
+                      (log/debugf "%s - Elapsed: %s ms, %.2f s" msg elapsed (float (/ elapsed 1000))))))))

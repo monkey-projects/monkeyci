@@ -53,5 +53,6 @@
     (str (fs/normalize (fs/path wd p)))))
 
 (def container-work-dir
-  "Returns the dir where the workspace would be mounted in a container."
+  "Returns the dir where the workspace would be mounted in a container.  Note that this
+   may vary, depending on the context where this is invoked."
   (comp b/checkout-dir :build))
