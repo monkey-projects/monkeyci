@@ -141,6 +141,10 @@
     (testing "executes action"
       (is (bc/success? @(sut/execute! job {})))))
 
+  (testing "only receives job, build and api in context"
+    (is (bc/success? @(sut/execute! (bc/action-job ::test-job #(when (:containers %) bc/failure))
+                                    {:containers ::test-containers}))))
+
   (testing "rewrites work dir to absolute path against checkout dir"
     (let [job (bc/action-job ::wd-job
                              (fn [rt]

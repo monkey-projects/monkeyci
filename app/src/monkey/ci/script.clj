@@ -16,9 +16,6 @@
             [monkey.ci.runtime.script :as rs]
             [monkey.ci.spec.build :as sb]))
 
-(defn rt->context [rt]
-  (select-keys rt [:build :api]))
-
 (defn- wrapped
   "Sets the event poster in the runtime."
   [f before after]
@@ -114,7 +111,7 @@
              pipeline (j/filter-jobs (j/label-filter (pipeline-filter pipeline)))
              true (map (comp (partial with-fire-events events) with-extensions)))]
     (log/debug "Found" (count pf) "matching jobs:" (map bc/job-id pf))
-    (let [result @(j/execute-jobs! pf (rt->context rt))]
+    (let [result @(j/execute-jobs! pf rt)]
       (log/debug "Jobs executed, result is:" result)
       {:status (if (some (comp bc/failed? :result) (vals result)) :failure :success)
        :jobs result})))
@@ -221,7 +218,7 @@
     (log/debug "Executing script for build" build-id "at:" script-dir)
     (log/debug "Build map:" build)
     (try
-      (let [jobs (load-jobs build (rt->context rt))]
+      (let [jobs (load-jobs build (j/rt->context rt))]
         (log/trace "Jobs:" jobs)
         (log/debug "Loaded" (count jobs) "jobs:" (map bc/job-id jobs))
         (run-all-jobs* rt jobs))

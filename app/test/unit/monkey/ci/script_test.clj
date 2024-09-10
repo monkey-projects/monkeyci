@@ -116,9 +116,9 @@
         (is (= ["test-job"] (keys result)))
         (is (= bc/success (get-in result ["test-job" :result])))))
 
-    (testing "only passes build, api and current job to jobs"
+    (testing "passes full runtime to jobs"
       (let [job (bc/action-job "test-job" (fn [ctx]
-                                            (if (= #{:build :api :job} (set (keys ctx)))
+                                            (if (every? (set (keys ctx)) [:build :api :job :events])
                                               bc/success
                                               (bc/with-message bc/failure (str "Keys:" (keys ctx))))))
             result (->> [job]

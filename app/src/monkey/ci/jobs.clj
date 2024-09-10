@@ -74,6 +74,9 @@
                                                     (assign-id))]
                              (execute! child (assoc rt :job child)))))))))
 
+(defn rt->context [rt]
+  (select-keys rt [:job :build :api]))
+
 (extend-protocol Job
   monkey.ci.build.core.ActionJob
   (execute! [job rt]
@@ -82,6 +85,7 @@
                 (art/wrap-artifacts))]
       (-> rt
           (make-job-dir-absolute)
+          (rt->context) ; Only pass necessary info
           (a)
           (md/chain 
            #(or % bc/success)))))
