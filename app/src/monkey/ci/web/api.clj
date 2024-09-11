@@ -282,7 +282,6 @@
 
 (defn trigger-build [req]
   (let [{p :parameters} req]
-    ;; TODO If no branch is specified, use the default
     (let [acc (:path p)
           st (c/req->storage req)
           runner (c/from-rt req :runner)

@@ -129,7 +129,23 @@
           (is (some? job))
           (is (= :skipped (:status job)))
           (is (= 100 (:start-time job)))
-          (is (= 200 (:end-time job))))))))
+          (is (= 200 (:end-time job)))))))
+
+  (testing "does not add dependencies twice"
+    (h/with-memory-store st
+      (let [{:keys [sid] :as build} (-> (test-build)
+                                        (assoc :script
+                                               {:jobs {"test-job" {:dependencies ["other-job"]}}}))
+            script {:jobs {"test-job" {:dependencies ["other-job"]}}}
+            evt {:type :script/start
+                 :sid sid
+                 :script script}]
+        (is (st/sid? (st/save-build st build)))
+        (is (map? (sut/update-script st evt)))
+        (let [match (st/find-build st sid)
+              job (get-in match [:script :jobs "test-job"])]
+          (is (some? job))
+          (is (= ["other-job"] (:dependencies job))))))))
 
 (deftest update-job
   (h/with-memory-store st

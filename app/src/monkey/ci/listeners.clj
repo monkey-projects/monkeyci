@@ -2,7 +2,7 @@
   (:require [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
             [manifold.stream :as ms]
-            [meta-merge.core :as mm]
+            [medley.core :as mc]
             [monkey.ci
              [build :as b]
              [runtime :as rt]
@@ -33,7 +33,8 @@
       (save-build storage
                   sid
                   (assoc build
-                         :script (mm/meta-merge (:script build) script))))
+                         ;; Don't use meta-merge, cause it will also merge vectors (like dependencies)
+                         :script (mc/deep-merge (:script build) script))))
     (log/warn "Build not found when updating script:" sid)))
 
 (defn update-job [storage {:keys [sid job]}]
