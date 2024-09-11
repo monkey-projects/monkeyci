@@ -82,7 +82,7 @@
 
   cr/CreditConsumer
   (credit-multiplier [_ rt]
-    (cr/credit-multiplier target rt)))
+    (cr/calc-credit-multiplier target rt)))
 
 (defn wrap-job
   "Wraps job so that extensions are invoked before and after it."

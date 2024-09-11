@@ -17,6 +17,11 @@
   ([]
    (dummy-job bc/success)))
 
+(defrecord FakeJob [id f]
+  j/Job
+  (execute! [this ctx]
+    (f ctx)))
+
 (deftest resolve-jobs
   (testing "invokes fn"
     (let [job (dummy-job)
@@ -117,10 +122,10 @@
         (is (= bc/success (get-in result ["test-job" :result])))))
 
     (testing "passes full runtime to jobs"
-      (let [job (bc/action-job "test-job" (fn [ctx]
-                                            (if (every? (set (keys ctx)) [:build :api :job :events])
-                                              bc/success
-                                              (bc/with-message bc/failure (str "Keys:" (keys ctx))))))
+      (let [job (->FakeJob "test-job" (fn [ctx]
+                                        (if (every? (set (keys ctx)) [:build :api :job :events])
+                                          bc/success
+                                          (bc/with-message bc/failure (str "Keys:" (keys ctx))))))
             result (->> [job]
                         (sut/run-all-jobs rt)
                         :jobs)]

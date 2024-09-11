@@ -8,6 +8,13 @@
      of job, the type of container runner and the resources required by the job.
      This can be considered the 'credit consumption per minute' for the job."))
 
+(def credit-consumer? (partial satisfies? CreditConsumer))
+
+(defn calc-credit-multiplier [x rt]
+  (if (credit-consumer? x)
+    (credit-multiplier x rt)
+    0))
+
 (defn runner-credit-consumer-fn
   "Returns the credit consumer function from the runtime associated with the
    build runner.  This is used to calculate the credit multiplier for an action 
