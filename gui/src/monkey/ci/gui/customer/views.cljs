@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.customer.views
   (:require [monkey.ci.gui.components :as co]
+            [monkey.ci.gui.customer.db :as db]
             [monkey.ci.gui.customer.events]
             [monkey.ci.gui.customer.subs]
             [monkey.ci.gui.forms :as f]
@@ -77,15 +78,22 @@
 
 (defn- recent-builds [id]
   (rf/dispatch [:customer/load-recent-builds id])
-  [:<>
-   [:p "Recent builds for all repositories."]
-   [t/paged-table
-    {:id ::recent-builds
-     :items-sub [:customer/recent-builds]
-     :columns (concat [{:label "Repository"
-                        :value (fn [b]
-                                 [:a {:href (r/path-for :page/repo b)} (get-in b [:repo :name])])}]
-                      rv/table-columns)}]])
+  (fn [id]
+    (let [loaded? (rf/subscribe [:loader/loaded? db/recent-builds])
+          recent (rf/subscribe [:customer/recent-builds])]
+      (if (and @loaded? (empty? @recent))
+        [:p "No recent builds found for this customer."]
+        [:<>
+         (if @loaded?
+           [:p "Recent builds for all repositories."]
+           [:p "Loading recent builds for all repositories..."])
+         [t/paged-table
+          {:id ::recent-builds
+           :items-sub [:customer/recent-builds]
+           :columns (concat [{:label "Repository"
+                              :value (fn [b]
+                                       [:a {:href (r/path-for :page/repo b)} (get-in b [:repo :name])])}]
+                            rv/table-columns)}]]))))
 
 (defn- overview-tabs
   "Displays tab pages for various customer overview screens"

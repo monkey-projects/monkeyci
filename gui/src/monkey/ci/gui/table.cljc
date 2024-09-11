@@ -124,22 +124,31 @@
          (map render-item)
          (into [:tbody]))))
 
-(defn paged-table [{:keys [id items-sub columns page-size]
+(defn paged-table [{:keys [id items-sub columns page-size loading]
                     :or {page-size 10}}]
   ;; TODO Add support for paginated requests (i.e. dispatch an event
   ;; when navigating to another page)
-  (when-let [items (rf/subscribe items-sub)]
-    (let [pag (rf/subscribe [:pagination/info id])
-          pc (int (cm/ceil (/ (count @items) page-size)))
-          cp (or (some-> pag (deref) :current) 0)
-          l (->> @items
-                 (drop (* cp page-size))
-                 (take page-size))]
-      (when (or (nil? @pag) (not= (:count pag) pc))
-        (rf/dispatch [:pagination/set id {:count pc :current cp}]))
+  (let [loading? (or (some-> loading :sub rf/subscribe deref)
+                     false)
+        loading-rows (get loading :rows 5)]
+    (if loading?
       [:<>
-       [:table.table.table-striped
+       [:table.table
         (render-thead columns)
-        (render-tbody columns l)]
-       (when (> pc 1)
-         [render-pagination id pc cp])])))
+        (render-tbody (mapv #(assoc % :value (fn [_] [:div.placeholder-glow [:span.placeholder "xxx"]])) columns)
+                      (repeat loading-rows {}))]]
+      (when-let [items (rf/subscribe items-sub)]
+        (let [pag (rf/subscribe [:pagination/info id])
+              pc (int (cm/ceil (/ (count @items) page-size)))
+              cp (or (some-> pag (deref) :current) 0)
+              l (->> @items
+                     (drop (* cp page-size))
+                     (take page-size))]
+          (when (or (nil? @pag) (not= (:count pag) pc))
+            (rf/dispatch [:pagination/set id {:count pc :current cp}]))
+          [:<>
+           [:table.table.table-striped
+            (render-thead columns)
+            (render-tbody columns l)]
+           (when (> pc 1)
+             [render-pagination id pc cp])])))))
