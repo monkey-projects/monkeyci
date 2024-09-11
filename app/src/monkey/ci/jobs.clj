@@ -341,7 +341,7 @@
             (select-keys a [:id :path]))]
     (-> job
         (select-keys (concat [:status :start-time :end-time deps labels :extensions :credit-multiplier :script
-                              :memory :cpus :arch
+                              :memory :cpus :arch :work-dir
                               save-artifacts :restore-artifacts :caches]
                              co/props))
         (mc/update-existing :save-artifacts (partial map art->ser))

@@ -20,7 +20,8 @@
         runner (sut/->BuildApiContainerRunner client)
         job (bc/container-job "test-job"
                               {:image "test-img"
-                               :script ["test-cmd"]})]
+                               :script ["test-cmd"]
+                               :work-dir "test/dir"})]
 
     (testing "invokes endpoint on api server with serialized job"
       (at/with-fake-http [{:url "http://test-api/container"
@@ -30,12 +31,13 @@
                             {:status 202})]
         (is (md/deferred? (p/run-container runner job)))
         (is (= 1 (count @invocations)))
-        (is (= "test-img" (-> @invocations
-                              first
-                              :body
-                              edn/edn->
-                              :job
-                              :image)))))
+        (let [ser (-> @invocations
+                      first
+                      :body
+                      edn/edn->
+                      :job)]
+          (is (= "test-img" (:image ser)))
+          (is (= "test/dir" (:work-dir ser))))))
 
     (testing "fails on api call error"
       (at/with-fake-http ["http://test-api/container" (fn [_]
