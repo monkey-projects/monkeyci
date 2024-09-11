@@ -4,7 +4,8 @@
             [monkey.ci
              [extensions :as sut]
              [jobs :as j]]
-            [monkey.ci.helpers :as h]))
+            [monkey.ci.helpers :as h]
+            [monkey.ci.test.runtime :as trt]))
 
 (defmacro with-extensions [& body]
   `(let [ext# @sut/registered-extensions]
@@ -92,7 +93,7 @@
                                              {(:key ext) ::extension-config})
                               reg)
         events (h/fake-events)
-        rt (-> (h/test-rt)
+        rt (-> (trt/test-runtime)
                (assoc :job wrapped
                       :events events))]
     (testing "creates job"

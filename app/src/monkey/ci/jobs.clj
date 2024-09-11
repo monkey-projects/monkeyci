@@ -75,7 +75,7 @@
                              (execute! child (assoc rt :job child)))))))))
 
 (defn rt->context [rt]
-  (select-keys rt [:job :build :api]))
+  (dissoc rt :events :containers :artifacts :cache))
 
 (extend-protocol Job
   monkey.ci.build.core.ActionJob
