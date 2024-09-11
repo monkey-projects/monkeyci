@@ -164,6 +164,7 @@
           params (-> conf
                      (select-keys [:ns :bucket-name])
                      (assoc :object-name obj-name))]
+      (log/debug "Restoring blob from" src "to" dest)
       (u/log-deferred-elapsed
        (md/chain
         (os/head-object client params)

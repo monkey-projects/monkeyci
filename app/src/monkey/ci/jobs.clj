@@ -54,6 +54,9 @@
                    (u/abs-path checkout-dir d)
                    checkout-dir)))))
 
+(defn rt->context [rt]
+  (dissoc rt :events :containers :artifacts :cache))
+
 (defn- recurse-action
   "An action may return another job definition, especially in legacy builds.
    This function checks the result, and if it's not a regular response, it
@@ -64,7 +67,7 @@
                       (cond-> j
                         (nil? (bc/job-id j)) (assoc :id (bc/job-id job))))]
       (md/chain
-       (action rt)
+       (action (rt->context rt)) ; Only pass necessary info
        (fn [r]
          (cond
            ;; Valid response
@@ -74,9 +77,6 @@
                                                     (assign-id))]
                              (execute! child (assoc rt :job child)))))))))
 
-(defn rt->context [rt]
-  (dissoc rt :events :containers :artifacts :cache))
-
 (extend-protocol Job
   monkey.ci.build.core.ActionJob
   (execute! [job rt]
@@ -85,7 +85,6 @@
                 (art/wrap-artifacts))]
       (-> rt
           (make-job-dir-absolute)
-          (rt->context) ; Only pass necessary info
           (a)
           (md/chain 
            #(or % bc/success)))))

@@ -103,6 +103,7 @@
 (defrecord BuildApiArtifactRepository [client base-path]
   ArtifactRepository
   (restore-artifact [this id dest]
+    (log/debug "Restoring artifact using build API:" id "to" dest)
     (u/log-deferred-elapsed
      (md/chain
       (client {:method :get
