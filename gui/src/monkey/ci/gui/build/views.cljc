@@ -169,6 +169,4 @@
           [co/alerts [:build/alerts]]
           [build-details]
           [build-result]
-          [build-jobs]]]
-        [:div.mt-2
-         [:a {:href (r/path-for :page/repo params)} "Back to repository"]]]])))
+          [build-jobs]]]]])))

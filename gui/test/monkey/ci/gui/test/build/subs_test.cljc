@@ -33,7 +33,22 @@
                                                            :status :success}}}}))))
       (is (= [{:id "test-job"
                :status :success}]
-             @jobs)))))
+             @jobs)))
+
+    (testing "sorts jobs in dependency order"
+      (let [job-list [{:id "dep-1" :dependencies ["root"]}
+                      {:id "dep-3" :dependencies ["dep-1" "dep-2"]}
+                      {:id "root"}
+                      {:id "dep-2" :dependencies ["root"]}]]
+        (is (some? (reset! app-db (db/set-build {} {:script
+                                                    {:jobs (->> job-list
+                                                                (map (juxt :id identity))
+                                                                (into {}))}}))))
+        (is (= ["root"
+                "dep-1"
+                "dep-2"
+                "dep-3"]
+               (map :id @jobs)))))))
 
 (deftest reloading?
   (let [r (rf/subscribe [:build/reloading?])]

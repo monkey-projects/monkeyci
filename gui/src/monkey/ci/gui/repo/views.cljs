@@ -117,9 +117,7 @@
         [co/alerts [:repo/alerts]]
         [:div.card
          [:div.card-body
-          [builds r]
-          [:div
-           [:a {:href (r/path-for :page/customer {:customer-id customer-id})} "Back to customer"]]]]]])))
+          [builds r]]]]])))
 
 (defn labels
   "Component that allows the user to edit, add or remove repo labels."
