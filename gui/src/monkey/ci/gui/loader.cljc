@@ -146,3 +146,9 @@
 (u/db-sub :loader/loading? loading?)
 (u/db-sub :loader/loaded? loaded?)
 (u/db-sub :loader/value get-value)
+
+(rf/reg-sub
+ :loader/init-loading?
+ (fn [db [_ id]]
+   ;; True when loading for the first time
+   (and (not (loaded? db id)) (loading? db id))))

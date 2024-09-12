@@ -93,7 +93,8 @@
            :columns (concat [{:label "Repository"
                               :value (fn [b]
                                        [:a {:href (r/path-for :page/repo b)} (get-in b [:repo :name])])}]
-                            rv/table-columns)}]]))))
+                            rv/table-columns)
+           :loading {:sub [:loader/init-loading? db/recent-builds]}}]]))))
 
 (defn- overview-tabs
   "Displays tab pages for various customer overview screens"

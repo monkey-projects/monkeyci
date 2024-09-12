@@ -124,19 +124,27 @@
          (map render-item)
          (into [:tbody]))))
 
-(defn paged-table [{:keys [id items-sub columns page-size loading]
-                    :or {page-size 10}}]
+(defn- render-loading [columns n-rows]
+  [:<>
+   [:table.table
+    (render-thead columns)
+    (render-tbody (mapv #(assoc % :value (fn [_] [:div.placeholder-glow [:span.w-75.placeholder "x"]]))
+                        columns)
+                  (repeat n-rows {}))]])
+
+(defn paged-table
+  "Table component with pagination.  The `items-sub` provides the items for the
+   table.  The `columns` is a list of column configurations.  If `loading` is
+   provided, it can hold a sub that indicates whether the table is loading, and
+   a number of placeholder rows that should be displayed in that case."
+  [{:keys [id items-sub columns page-size loading]
+    :or {page-size 10}}]
   ;; TODO Add support for paginated requests (i.e. dispatch an event
   ;; when navigating to another page)
   (let [loading? (or (some-> loading :sub rf/subscribe deref)
-                     false)
-        loading-rows (get loading :rows 5)]
+                     false)]
     (if loading?
-      [:<>
-       [:table.table
-        (render-thead columns)
-        (render-tbody (mapv #(assoc % :value (fn [_] [:div.placeholder-glow [:span.placeholder "xxx"]])) columns)
-                      (repeat loading-rows {}))]]
+      (render-loading columns (get loading :rows 5))
       (when-let [items (rf/subscribe items-sub)]
         (let [pag (rf/subscribe [:pagination/info id])
               pc (int (cm/ceil (/ (count @items) page-size)))
