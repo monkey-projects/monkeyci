@@ -165,9 +165,11 @@
          [:h2.float-start (:name @repo) " - " (:build-id params)]
          [:div.float-end
           [co/reload-btn [:build/reload] (when @reloading? {:disabled true})]]]
-        [co/alerts [:build/alerts]]
-        [build-details]
-        [build-result]
-        [build-jobs]
-        [:div
+        [:div.card
+         [:div.card-body
+          [co/alerts [:build/alerts]]
+          [build-details]
+          [build-result]
+          [build-jobs]]]
+        [:div.mt-2
          [:a {:href (r/path-for :page/repo params)} "Back to repository"]]]])))
