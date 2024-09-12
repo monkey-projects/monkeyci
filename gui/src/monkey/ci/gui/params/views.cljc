@@ -50,11 +50,11 @@
             (into [:ul]))])))
 
 (defn- params-actions [{:keys [id] :as p}]
-  [:<>
-   [:button.btn.btn-primary.me-2
+  [:div.d-flex.gap-2
+   [:button.btn.btn-primary
     {:on-click (u/link-evt-handler [:params/save-set id])}
     [:span.me-2 [co/icon :save]] "Save Changes"]
-   [:button.btn.btn-outline-primary.me-2
+   [:button.btn.btn-outline-primary
     {:title "Discards all unsaved changes"
      :on-click (u/link-evt-handler [:params/cancel-set id])}
     [:span.me-2 [co/icon :x-square]] "Cancel"]
@@ -100,8 +100,8 @@
      [:span.me-2 [co/icon :trash]] "Delete"]))
 
 (defn- view-set-actions [{:keys [id]}]
-  [:div
-   [:button.btn.btn-outline-success.me-2
+  [:div.d-flex.gap-2
+   [:button.btn.btn-outline-success
     {:title "Edits this parameter set"
      :on-click (u/link-evt-handler [:params/edit-set id])}
     [:span.me-2 [co/icon :pencil-square]] "Edit"]
@@ -133,8 +133,8 @@
       [view-params-card p])))
 
 (defn- global-actions []
-  [:div
-   [:button.btn.btn-outline-success.me-2
+  [:div.d-flex.gap-2
+   [:button.btn.btn-outline-success
     {:title "Adds a new empty parameter set"
      :on-click (u/link-evt-handler [:params/new-set])}
     [:span.me-2 [co/icon :plus-square]] "Add Set"]
