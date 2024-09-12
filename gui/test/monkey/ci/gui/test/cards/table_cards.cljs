@@ -42,3 +42,20 @@
                                  :value :number}
                                 {:label "Name"
                                  :value :name}]}]))
+
+(rf/reg-sub
+ ::loading?
+ (constantly true))
+
+(defcard-rg loading-table
+  "Table that is still loading"
+  (let [id ::loading-table]
+    [sut/paged-table
+     {:id        id
+      :items-sub [::large-table]
+      :loading   {:sub  [::loading?]
+                  :rows 5}
+      :columns   [{:label "Id"
+                   :value :number}
+                  {:label "Name"
+                   :value :name}]}]))

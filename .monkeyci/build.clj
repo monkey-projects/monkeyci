@@ -15,7 +15,7 @@
 
 ;; Version assigned when building main branch
 ;; TODO Determine automatically
-(def snapshot-version "0.7.4.2-SNAPSHOT")
+(def snapshot-version "0.7.5-SNAPSHOT")
 
 (def tag-regex #"^refs/tags/(\d+\.\d+\.\d+(\.\d+)?$)")
 
@@ -23,8 +23,6 @@
   "Returns a predicate that checks if the ref matches the given regex"
   [re]
   #(core/ref-regex % re))
-
-;; TODO Also run jobs if triggered from the api, in which case no files are touched
 
 (def release?
   (ref? tag-regex))
@@ -40,7 +38,7 @@
   "True if files have been touched for the given regex, or the 
    build was triggered from the api."
   [ctx re]
-  (or (core/touched? ctx re)
+  (or (core/touched? ctx re)      
       (api-trigger? ctx)))
 
 (defn app-changed? [ctx]
@@ -52,13 +50,16 @@
 (defn common-changed? [ctx]
   (dir-changed? ctx #"^common/.*"))
 
-(def build-app? (some-fn app-changed? release?))
+(def build-app? (some-fn app-changed? common-changed? release?))
 (def build-gui? (some-fn gui-changed? release?))
 (def build-common? (some-fn common-changed? release?))
 
-(def publish-app? (some-fn (every-pred app-changed? should-publish?) release?))
-(def publish-gui? (some-fn (every-pred gui-changed? should-publish?) release?))
-(def publish-common? (some-fn (every-pred common-changed? should-publish?) release?))
+(def publish-app? (some-fn (every-pred (some-fn app-changed? common-changed?)
+                                       should-publish?)
+                           release?))
+(def publish-gui? (some-fn (every-pred gui-changed? should-publish?)
+                           release?))
+#_(def publish-common? (some-fn (every-pred common-changed? should-publish?) release?))
 
 (defn tag-version
   "Extracts the version from the tag"
@@ -168,25 +169,21 @@
        :dependencies ["release-gui"]}}
      ctx)))
 
-(defn publish [ctx id dir]
+(defn publish [ctx id dir & [version]]
   "Executes script in clojure container that has clojars publish env vars"
-  (when (publish-app? ctx)
-    (let [env (-> (api/build-params ctx)
-                  (select-keys ["CLOJARS_USERNAME" "CLOJARS_PASSWORD"])
-                  (assoc "MONKEYCI_VERSION" (lib-version ctx)))]
-      (-> (clj-container id dir
-                         "-X:jar:deploy")
-          (assoc :container/env env)))))
+  (let [env (-> (api/build-params ctx)
+                (select-keys ["CLOJARS_USERNAME" "CLOJARS_PASSWORD"])
+                (assoc "MONKEYCI_VERSION" (or version (lib-version ctx))))]
+    (-> (clj-container id dir
+                       "-X:jar:deploy")
+        (assoc :container/env env))))
 
 (defn publish-app [ctx]
-  ;; App is dependent on the common lib, so we should replace version here
-  ;; (format "-Sdeps '{:override-deps {:mvn/version \"%s\"}}'" (lib-version ctx))
-  (some-> (publish ctx "publish-app" "app")
-          (core/depends-on ["test-app"])))
-
-(defn publish-common [ctx]
-  (some-> (publish ctx "publish-common" "common")
-          (core/depends-on ["test-common"])))
+  (when (publish-app? ctx)
+    ;; App is dependent on the common lib, so we should replace version here
+    ;; (format "-Sdeps '{:override-deps {:mvn/version \"%s\"}}'" (lib-version ctx))
+    (some-> (publish ctx "publish-app" "app")
+            (core/depends-on ["test-app"]))))
 
 (def github-release
   "Creates a release in github"
@@ -258,10 +255,12 @@
 
 ;; List of jobs
 [test-app
+ test-gui
+ 
  app-uberjar
  publish-app
  github-release
- test-gui
+ 
  build-gui-release
  build-app-image
  build-gui-image

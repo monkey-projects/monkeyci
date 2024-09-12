@@ -161,13 +161,12 @@
           reloading? (rf/subscribe [:build/reloading?])]
       [l/default
        [:<>
-        [:div.clearfix
-         [:h2.float-start (:name @repo) " - " (:build-id params)]
-         [:div.float-end
-          [co/reload-btn [:build/reload] (when @reloading? {:disabled true})]]]
-        [co/alerts [:build/alerts]]
-        [build-details]
-        [build-result]
-        [build-jobs]
-        [:div
-         [:a {:href (r/path-for :page/repo params)} "Back to repository"]]]])))
+        [:div.d-flex.gap-2.align-items-start.mb-2
+         [:h3.me-auto (:name @repo) " - " (:build-id params)]
+         [co/reload-btn [:build/reload] (when @reloading? {:disabled true})]]
+        [:div.card
+         [:div.card-body
+          [co/alerts [:build/alerts]]
+          [build-details]
+          [build-result]
+          [build-jobs]]]]])))

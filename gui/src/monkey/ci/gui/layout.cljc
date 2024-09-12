@@ -16,22 +16,24 @@
          "sign off"]]])))
 
 (defn header []
-  [:div.header
+  [:header.header.container
    [:div.row.border-bottom
-    [:div.col-1
+    [:div.col-2
      [:div.mt-2 [:a {:href "/"} [co/logo]]]]
-    [:div.col-8
-     [:h1 "MonkeyCI"]
-     [:p.lead "Unleashing full power to build your code!"]]
-    [:div.col-3.text-end
-     [user-info]]]
+    [:div.col-10
+     [:div.row
+      [:div.col-9
+       [:h1.display-4 "MonkeyCI"]
+       [:p.lead "Unleashing full power to build your code!"]]
+      [:div.col-3.text-end
+       [user-info]]]]]
    [:div.row.mt-1
     [:div.col
      [co/path-breadcrumb]]]])
 
 (defn footer []
   (let [v (rf/subscribe [:version])]
-    [:footer.footer.mt-auto.mb-2
+    [:footer.footer.mb-2.container
      [:div.border-top.mt-2
       [:span "built by " [:a {:href "https://www.monkey-projects.be"} "Monkey Projects"]]
       [:span.float-end.small "version " @v]]]))
@@ -61,20 +63,10 @@
             target)))})
      :clj [target]))
 
-(defn welcome
-  "Renders welcome panel with the subpanel as a child"
-  [subpanel]
-  [:div
-   [header]
-   [:div.row
-    [:div.col
-     [co/logo]]
-    [:div.col
-     subpanel]]
-   [footer]])
-
 (defn default [subpanel]
-  [:div
+  [:<>
    [header]
-   [error-boundary subpanel]
+   [:div.bg-soft-primary-light.flex-fill
+    [:div.container.my-4
+     [error-boundary subpanel]]]
    [footer]])

@@ -202,6 +202,7 @@
  (lo/loader-evt-handler
   db/recent-builds
   (fn [_ _ [_ cust-id]]
+    (log/debug "Loading recent builds for" cust-id)
     [:secure-request
      :get-recent-builds
      {:customer-id cust-id}

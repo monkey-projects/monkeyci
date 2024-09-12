@@ -10,7 +10,8 @@
    in that case, don't load it again (optionally).
    
    This namespace provides functionality to support this pattern."
-  (:require [monkey.ci.gui.routing :as r]
+  (:require [monkey.ci.gui.logging :as log]
+            [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
@@ -22,10 +23,12 @@
 
 (defn set-loading
   [db id]
+  (log/debug "Mark loading:" id)
   (assoc-in db [id :loading?] true))
 
 (defn reset-loading
   [db id]
+  (log/debug "Reset loading:" id)
   (update db id dissoc :loading?))
 
 (defn loaded?
@@ -141,4 +144,11 @@
 
 (u/db-sub :loader/alerts get-alerts)
 (u/db-sub :loader/loading? loading?)
+(u/db-sub :loader/loaded? loaded?)
 (u/db-sub :loader/value get-value)
+
+(rf/reg-sub
+ :loader/init-loading?
+ (fn [db [_ id]]
+   ;; True when loading for the first time
+   (and (not (loaded? db id)) (loading? db id))))

@@ -30,10 +30,8 @@
 
 (defn build-actions []
   [:<>
-   [:span.me-1
-    [co/reload-btn [:builds/load]]]
-   [:span.me-1
-    [trigger-build-btn]]
+   [co/reload-btn [:builds/reload]]
+   [trigger-build-btn]
    [edit-repo-btn]])
 
 (defn- trigger-type []
@@ -90,21 +88,19 @@
                         (:message b))])}])
 
 (defn- builds [repo]
-  (let [b (rf/subscribe [:repo/builds])]
-    (if-not @b
-      (rf/dispatch [:builds/load])
-      [:<>
-       [:div.clearfix
-        [:h4.float-start "Builds"]
-        (when @b
-          [:span.badge.text-bg-secondary.ms-2 (count @b)])
-        [:div.float-end
-         [build-actions]]]
-       [trigger-form repo]
-       [table/paged-table
-        {:id ::builds
-         :items-sub [:repo/builds]
-         :columns table-columns}]])))
+  (let [loaded? (rf/subscribe [:builds/loaded?])]
+    (when-not false #_@loaded?
+      (rf/dispatch [:builds/load]))
+    [:<>
+     [:div.d-flex.gap-1.align-items-start
+      [:h4.me-auto "Builds"]
+      [build-actions]]
+     [trigger-form repo]
+     [table/paged-table
+      {:id ::builds
+       :items-sub [:repo/builds]
+       :columns table-columns
+       :loading {:sub [:builds/init-loading?]}}]]))
 
 (defn page [route]
   (rf/dispatch [:repo/init])
@@ -119,9 +115,9 @@
           [cl/clipboard-copy (u/->sid p :customer-id :repo-id) "Click to save the sid to clipboard"]]]
         [:p "Repository url: " [:a {:href (:url @r)} (:url @r)]]
         [co/alerts [:repo/alerts]]
-        [builds r]
-        [:div
-         [:a {:href (r/path-for :page/customer {:customer-id customer-id})} "Back to customer"]]]])))
+        [:div.card
+         [:div.card-body
+          [builds r]]]]])))
 
 (defn labels
   "Component that allows the user to edit, add or remove repo labels."
@@ -213,5 +209,7 @@
       [l/default
        [:<>
         [:h3 "Edit Repository: " (:name @repo)]
-        [co/alerts [:repo/edit-alerts]]
-        [edit-form @route]]])))
+        [:div.card
+         [:div.card-body
+          [co/alerts [:repo/edit-alerts]]
+          [edit-form @route]]]]])))

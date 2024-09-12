@@ -36,22 +36,27 @@
      (nil? @bitbucket-client-id)]))
 
 (defn login-form []
-  [:div
-   [:span.me-2
-    [github-btn]]
+  [:div.d-flex.flex-wrap.gap-2
+   [github-btn]
    [bitbucket-btn]])
 
 (defn page [_]
   [:<>
-   [:div.row
-    [:div.col
-     [c/logo]
-     [:h1 "Welcome to MonkeyCI"]
-     [:p.lead
-      "A CI/CD tool designed to give you full power when building your applications."]]
-    [:div.col
-     [:h3.mt-2 "Please Sign On"]
-     [login-form]]]
+   [:div.bg-soft-primary-light
+    [:div.container.content-space-1.content-space-t-md-3
+     [:div.row.justify-content-center.align-items-lg-center
+      [:div.col-md-8.col-lg-6.mb-7.mb-lg-0
+       [:img.img-fluid.rounded {:src "/img/monkeyci-bw-small.png" :title "Placeholder Logo"}]
+       [:h1 "Welcome to MonkeyCI"]
+       [:p.lead
+        "A CI/CD tool designed to give you full power when building your applications."]]
+      [:div.col-md-8.col-lg-6
+       [:div.ps-lg-5
+        [:div.card.card-lg
+         [:div.card-body
+          [:h3.mt-2 "Sign On"]
+          [:p "Login using your existing account from one of these tools."]
+          [login-form]]]]]]]]
    [l/footer]])
 
 (defn- callback-page [req evt]

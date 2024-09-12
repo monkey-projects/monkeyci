@@ -146,7 +146,7 @@
     (testing "exists"
       (is (some? l)))
 
-    (testing "returns loading state id"
+    (testing "returns loading state for id"
       (is (false? @l))
       (is (some? (reset! app-db (sut/set-loading {} id))))
       (is (true? @l)))))
@@ -162,3 +162,29 @@
         (is (nil? @v))
         (is (some? (reset! app-db (sut/set-value {} id value))))
         (is (= value @v))))))
+
+(deftest loaded-sub
+  (let [id ::test-id
+        l (rf/subscribe [:loader/loaded? id])]
+    (testing "exists"
+      (is (some? l)))
+
+    (testing "returns loaded state for id"
+      (is (false? @l))
+      (is (some? (reset! app-db (sut/set-loaded {} id))))
+      (is (true? @l)))))
+
+(deftest init-loading-sub
+  (let [id ::test-id
+        l (rf/subscribe [:loader/init-loading? id])]
+    (testing "exists"
+      (is (some? l)))
+
+    (testing "`true` when loading but not yet loaded"
+      (is (false? @l) "initially false")
+      (is (some? (reset! app-db (sut/set-loading {} id))))
+      (is (true? @l) "true when loading for the first time")
+      (is (some? (reset! app-db (sut/set-loaded {} id))))
+      (is (false? @l) "false when loaded")
+      (is (some? (reset! app-db (sut/reset-loading {} id))))
+      (is (false? @l) "false when loading after the first time"))))

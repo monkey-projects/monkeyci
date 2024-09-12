@@ -76,13 +76,15 @@
   (testing "clears builds"
     (is (some? (reset! app-db (db/set-builds {} ::test-builds))))
     (rf/dispatch-sync [:repo/load "other-customer-id"])
-    (is (nil? (db/builds @app-db)))))
+    (is (nil? (db/get-builds @app-db)))))
+
+(deftest repo-leave
+  (testing "clears builds from db"
+    (is (some? (reset! app-db (db/set-builds {} ::test-builds))))
+    (rf/dispatch-sync [:repo/leave])
+    (is (nil? (db/get-builds @app-db)))))
 
 (deftest builds-load
-  (testing "sets alert"
-    (rf/dispatch-sync [:builds/load])
-    (is (= 1 (count (db/alerts @app-db)))))
-
   (testing "fetches builds from backend"
     (rft/run-test-sync
      (let [c (h/catch-fx :martian.re-frame/request)]
@@ -93,17 +95,16 @@
        (is (= 1 (count @c)))
        (is (= :get-builds (-> @c first (nth 2)))))))
 
-  (testing "clears current builds"
+  (testing "does not clear current builds"
     (is (map? (reset! app-db (db/set-builds {} [{:id "initial-build"}]))))
     (rf/dispatch-sync [:builds/load])
-    (is (nil? (db/builds @app-db)))))
+    (is (some? (db/get-builds @app-db)))))
 
 (deftest build-load-success
-  (testing "clears alerts"
-    (is (map? (reset! app-db (db/set-alerts {} [{:type :info
-                                                 :message "test notification"}]))))
-    (rf/dispatch-sync [:builds/load--success {:body []}])
-    (is (nil? (db/alerts @app-db)))))
+  (testing "sets builds"
+    (let [builds [{:id ::test-build}]]
+      (rf/dispatch-sync [:builds/load--success {:body builds}])
+      (is (= builds (db/get-builds @app-db))))))
 
 (deftest handle-event
   (testing "ignores events for other repos"
@@ -113,11 +114,11 @@
                                                                :repo-id "other-repo"
                                                                :build-id "other-build"
                                                                :git {:ref "main"}}}])))
-      (is (empty? (db/builds @app-db)))))
+      (is (empty? (db/get-builds @app-db)))))
 
   (testing "updates build list when build is started"
     (let [[cust repo build] (test-repo-path!)]
-      (is (empty? (db/builds @app-db)))
+      (is (empty? (db/get-builds @app-db)))
       (is (nil? (rf/dispatch-sync [:repo/handle-event {:type :build/start
                                                        :build {:customer-id cust
                                                                :repo-id repo
@@ -127,11 +128,11 @@
                :repo-id repo
                :build-id build
                :git {:ref "main"}}]
-             (db/builds @app-db)))))
+             (db/get-builds @app-db)))))
 
   (testing "updates build list when build is pending"
     (let [[cust repo build] (test-repo-path!)]
-      (is (empty? (db/builds @app-db)))
+      (is (empty? (db/get-builds @app-db)))
       (is (nil? (rf/dispatch-sync [:repo/handle-event {:type :build/pending
                                                        :build {:customer-id cust
                                                                :repo-id repo
@@ -141,7 +142,7 @@
                :repo-id repo
                :build-id build
                :git {:ref "main"}}]
-             (db/builds @app-db)))))
+             (db/get-builds @app-db)))))
 
   (testing "updates build list when build has updated"
     (let [[cust repo build] (test-repo-path!)
@@ -156,7 +157,7 @@
       (is (nil? (rf/dispatch-sync [:repo/handle-event {:type :build/updated
                                                        :build upd}])))
       (is (= [upd]
-             (db/builds @app-db))))))
+             (db/get-builds @app-db))))))
 
 (deftest show-trigger-build
   (testing "sets `show trigger form` flag in db"

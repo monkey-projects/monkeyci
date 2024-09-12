@@ -2,6 +2,7 @@
   (:require #?(:cljs [cljs.test :refer-macros [deftest testing is use-fixtures]]
                :clj [clojure.test :refer [deftest testing is use-fixtures]])
             [monkey.ci.gui.customer.db :as cdb]
+            [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.repo.db :as db]
             [monkey.ci.gui.repo.subs :as sut]
             [monkey.ci.gui.test.fixtures :as f]
@@ -120,3 +121,13 @@
     (testing "holds saving state from db"
       (is (map? (reset! app-db (db/set-saving {} true))))
       (is (true? @a)))))
+
+(deftest builds-loaded?
+  (let [l (rf/subscribe [:builds/loaded?])]
+    (testing "exists"
+      (is (some? l)))
+
+    (testing "holds loaded state for builds"
+      (is (false? @l))
+      (is (some? (reset! app-db (lo/set-loaded {} db/id))))
+      (is (true? @l)))))

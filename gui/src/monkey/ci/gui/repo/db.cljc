@@ -1,24 +1,27 @@
-(ns monkey.ci.gui.repo.db)
+(ns monkey.ci.gui.repo.db
+  (:require [monkey.ci.gui.loader :as lo]))
 
 (def id ::repo)
 
-(def alerts ::alerts)
+(defn alerts [db]
+  (lo/get-alerts db id))
 
 (defn set-alerts [db a]
-  (assoc db alerts a))
+  (lo/set-alerts db id a))
 
 (defn reset-alerts [db]
-  (dissoc db alerts))
+  (lo/reset-alerts db id))
 
-(def builds ::builds)
+(defn get-builds [db]
+  (lo/get-value db id))
 
 (defn set-builds [db b]
-  (assoc db builds b))
+  (lo/set-value db id b))
 
 (def build-uid (juxt :customer-id :repo-id :build-id))
 
 (defn find-build [db b]
-  (->> (builds db)
+  (->> (get-builds db)
        (filter (comp (partial = (build-uid b)) build-uid))
        (first)))
 
@@ -26,8 +29,8 @@
   "Replaces build in the list, or adds it if not present yet"
   [db b]
   (if-let [m (find-build db b)]
-    (update db builds (partial replace {m b}))
-    (update db builds conj b)))
+    (lo/update-value db id (partial replace {m b}))
+    (lo/update-value db id conj b)))
 
 (def latest-build ::latest-build)
 

@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.customer.views
   (:require [monkey.ci.gui.components :as co]
+            [monkey.ci.gui.customer.db :as db]
             [monkey.ci.gui.customer.events]
             [monkey.ci.gui.customer.subs]
             [monkey.ci.gui.forms :as f]
@@ -36,13 +37,13 @@
        (first)))
 
 (defn- add-repo-btn [id]
-  [:a.btn.btn-outline-dark.me-2
+  [:a.btn.btn-outline-dark
    {:href (r/path-for :page/add-repo {:customer-id id})
     :title "Link an existing GitHub repository"}
    [:span.me-1 [co/icon :github]] "Follow Repository"])
 
 (defn- params-btn [id]
-  [:a.btn.btn-outline-primary.me-2
+  [:a.btn.btn-outline-primary
    {:href (r/path-for :page/customer-params {:customer-id id})
     :title "Configure build parameters"}
    [:span.me-2 [co/icon :gear]] "Parameters"])
@@ -55,10 +56,9 @@
 
 (defn- customer-header []
   (let [c (rf/subscribe [:customer/info])]
-    [:div.clearfix.mb-3
-     [:h3.float-start (:name @c)]
-     [:span.float-end
-      [customer-actions (:id @c)]]]))
+    [:div.d-flex.gap-2
+     [:h3.me-auto (:name @c)]
+     [customer-actions (:id @c)]]))
 
 (defn- customer-repos
   "Displays a list of customer repositories, grouped by project"
@@ -77,15 +77,25 @@
 
 (defn- recent-builds [id]
   (rf/dispatch [:customer/load-recent-builds id])
-  [:<>
-   [:p "Recent builds for all repositories."]
-   [t/paged-table
-    {:id ::recent-builds
-     :items-sub [:customer/recent-builds]
-     :columns (concat [{:label "Repository"
-                        :value (fn [b]
-                                 [:a {:href (r/path-for :page/repo b)} (get-in b [:repo :name])])}]
-                      rv/table-columns)}]])
+  (fn [id]
+    (let [loaded? (rf/subscribe [:loader/loaded? db/recent-builds])
+          recent (rf/subscribe [:customer/recent-builds])]
+      (if (and @loaded? (empty? @recent))
+        [:p "No recent builds found for this customer."]
+        [:<>
+         (if @loaded?
+           [:p "Recent builds for all repositories."]
+           [:p "Loading recent builds for all repositories..."])
+         [:div.card
+          [:div.card-body
+           [t/paged-table
+            {:id ::recent-builds
+             :items-sub [:customer/recent-builds]
+             :columns (concat [{:label "Repository"
+                                :value (fn [b]
+                                         [:a {:href (r/path-for :page/repo b)} (get-in b [:repo :name])])}]
+                              rv/table-columns)
+             :loading {:sub [:loader/init-loading? db/recent-builds]}}]]]]))))
 
 (defn- overview-tabs
   "Displays tab pages for various customer overview screens"
@@ -108,7 +118,7 @@
   (let [id (-> route (r/path-params) :customer-id)]
     (rf/dispatch [:customer/init id])
     (l/default
-     [:div
+     [:<>
       [co/alerts [:customer/alerts]]
       [customer-details id]])))
 

@@ -16,8 +16,17 @@
       (assoc :path (:name l))
       (update :name (comp last split-log-path))))
 
+(def sorted-deps
+  (comp vec sort :dependencies))
+
+(defn sort-by-deps
+  "Sorts jobs by dependencies: jobs that are dependent on another job will occur after it"
+  [jobs]
+  ;; Just sort dependencies and compare those.  This is not really 100% correct but it's a start.
+  (sort-by sorted-deps jobs))
+
 (rf/reg-sub
  :build/jobs
  :<- [:build/current]
  (fn [b _]
-   (-> b :script :jobs vals)))
+   (-> b :script :jobs vals sort-by-deps)))

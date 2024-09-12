@@ -3,6 +3,6 @@
                :clj [clojure.test :refer [deftest testing is]])
             [monkey.ci.gui.layout :as sut]))
 
-(deftest welcome
-  (testing "renders welcome panel"
-    (is (vector? (sut/welcome [:p "Child panel"])))))
+(deftest default
+  (testing "renders contents in default layout"
+    (is (vector? (sut/default [:p "Child panel"])))))
