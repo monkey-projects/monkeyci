@@ -87,14 +87,16 @@
          (if @loaded?
            [:p "Recent builds for all repositories."]
            [:p "Loading recent builds for all repositories..."])
-         [t/paged-table
-          {:id ::recent-builds
-           :items-sub [:customer/recent-builds]
-           :columns (concat [{:label "Repository"
-                              :value (fn [b]
-                                       [:a {:href (r/path-for :page/repo b)} (get-in b [:repo :name])])}]
-                            rv/table-columns)
-           :loading {:sub [:loader/init-loading? db/recent-builds]}}]]))))
+         [:div.card
+          [:div.card-body
+           [t/paged-table
+            {:id ::recent-builds
+             :items-sub [:customer/recent-builds]
+             :columns (concat [{:label "Repository"
+                                :value (fn [b]
+                                         [:a {:href (r/path-for :page/repo b)} (get-in b [:repo :name])])}]
+                              rv/table-columns)
+             :loading {:sub [:loader/init-loading? db/recent-builds]}}]]]]))))
 
 (defn- overview-tabs
   "Displays tab pages for various customer overview screens"
@@ -117,7 +119,7 @@
   (let [id (-> route (r/path-params) :customer-id)]
     (rf/dispatch [:customer/init id])
     (l/default
-     [:div
+     [:<>
       [co/alerts [:customer/alerts]]
       [customer-details id]])))
 

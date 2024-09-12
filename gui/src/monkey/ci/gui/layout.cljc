@@ -16,7 +16,7 @@
          "sign off"]]])))
 
 (defn header []
-  [:header.header
+  [:header.header.container
    [:div.row.border-bottom
     [:div.col-2
      [:div.mt-2 [:a {:href "/"} [co/logo]]]]
@@ -77,7 +77,8 @@
 
 (defn default [subpanel]
   [:<>
-   [:div.container
-    [header]
-    [error-boundary subpanel]]
+   [header]
+   [:div.bg-soft-primary-light
+    [:div.container.my-4
+     [error-boundary subpanel]]]
    [footer]])

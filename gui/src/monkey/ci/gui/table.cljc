@@ -155,7 +155,7 @@
           (when (or (nil? @pag) (not= (:count pag) pc))
             (rf/dispatch [:pagination/set id {:count pc :current cp}]))
           [:<>
-           [:table.table.table-striped
+           [:table.table
             (render-thead columns)
             (render-tbody columns l)]
            (when (> pc 1)
