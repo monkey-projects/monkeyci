@@ -147,10 +147,10 @@
   [:div.card
    [:div.card-body
     [:h6 "Parameters"]
-    [:div.placeholder-glow
-     [:div.row.mb-1 [:div.col-3.placeholder]]
-     [:div.row.mb-1 [:div.col-4.placeholder]]
-     [:div.row [:div.col-3.placeholder]]]]])
+    ;; Generate some placeholders
+    (->> [100 120 90]
+         (map (fn [v] [:li [:div.placeholder {:style {:width (str v "px")}}]]))
+         (into [:ul.placeholder-glow]))]])
 
 (defn- params-list []
   (let [loading? (rf/subscribe [:params/loading?])
@@ -180,7 +180,7 @@
        "data, like hostnames or file paths.  They are grouped in " [:b "parameter sets"] ". "
        "Each set can be accessed by builds according to the configured " [:b "label filters"]
        ".  Builds from repositories with matching labels can access those parameters.  A set "
-       "can be access by multiple repositories, and a builds from a repository can potentially "
+       "can be accessed by multiple repositories, and builds from a repository can potentially "
        "access multiple sets.  When a parameter set has no label filters, all your builds can "
        "read that set."]
       [co/alerts [:params/alerts]]
