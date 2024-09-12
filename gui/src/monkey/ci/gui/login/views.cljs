@@ -36,9 +36,8 @@
      (nil? @bitbucket-client-id)]))
 
 (defn login-form []
-  [:div
-   [:span.me-2
-    [github-btn]]
+  [:div.d-flex.flex-wrap.gap-2
+   [github-btn]
    [bitbucket-btn]])
 
 (defn page [_]

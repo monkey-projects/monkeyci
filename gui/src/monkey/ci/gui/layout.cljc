@@ -33,7 +33,7 @@
 
 (defn footer []
   (let [v (rf/subscribe [:version])]
-    [:footer.footer.mt-auto.mb-2.container
+    [:footer.footer.mb-2.container
      [:div.border-top.mt-2
       [:span "built by " [:a {:href "https://www.monkey-projects.be"} "Monkey Projects"]]
       [:span.float-end.small "version " @v]]]))
@@ -63,22 +63,10 @@
             target)))})
      :clj [target]))
 
-(defn welcome
-  "Renders welcome panel with the subpanel as a child"
-  [subpanel]
-  [:<>
-   [header]
-   [:div.row
-    [:div.col
-     [co/logo]]
-    [:div.col
-     subpanel]]
-   [footer]])
-
 (defn default [subpanel]
   [:<>
    [header]
-   [:div.bg-soft-primary-light
+   [:div.bg-soft-primary-light.flex-fill
     [:div.container.my-4
      [error-boundary subpanel]]]
    [footer]])

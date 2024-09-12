@@ -37,13 +37,13 @@
        (first)))
 
 (defn- add-repo-btn [id]
-  [:a.btn.btn-outline-dark.me-2
+  [:a.btn.btn-outline-dark
    {:href (r/path-for :page/add-repo {:customer-id id})
     :title "Link an existing GitHub repository"}
    [:span.me-1 [co/icon :github]] "Follow Repository"])
 
 (defn- params-btn [id]
-  [:a.btn.btn-outline-primary.me-2
+  [:a.btn.btn-outline-primary
    {:href (r/path-for :page/customer-params {:customer-id id})
     :title "Configure build parameters"}
    [:span.me-2 [co/icon :gear]] "Parameters"])
@@ -56,10 +56,9 @@
 
 (defn- customer-header []
   (let [c (rf/subscribe [:customer/info])]
-    [:div.clearfix.mb-3
-     [:h3.float-start (:name @c)]
-     [:span.float-end
-      [customer-actions (:id @c)]]]))
+    [:div.d-flex.gap-2
+     [:h3.me-auto (:name @c)]
+     [customer-actions (:id @c)]]))
 
 (defn- customer-repos
   "Displays a list of customer repositories, grouped by project"

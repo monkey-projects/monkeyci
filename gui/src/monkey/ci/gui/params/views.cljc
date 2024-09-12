@@ -133,7 +133,7 @@
       [view-params-card p])))
 
 (defn- global-actions []
-  [:div.mt-2
+  [:div
    [:button.btn.btn-outline-success.me-2
     {:title "Adds a new empty parameter set"
      :on-click (u/link-evt-handler [:params/new-set])}
@@ -143,17 +143,28 @@
      :on-click (u/link-evt-handler [:params/cancel-all])}
     [:span.me-2 [co/icon :x-square]] "Close"]])
 
+(defn- loading-card []
+  [:div.card
+   [:div.card-body
+    [:h6 "Parameters"]
+    [:div.placeholder-glow
+     [:div.row.mb-1 [:div.col-3.placeholder]]
+     [:div.row.mb-1 [:div.col-4.placeholder]]
+     [:div.row [:div.col-3.placeholder]]]]])
+
 (defn- params-list []
   (let [loading? (rf/subscribe [:params/loading?])
         params (rf/subscribe [:customer/params])
         new-sets (rf/subscribe [:params/new-sets])]
     (if @loading?
-      [:p "Retrieving customer build parameters..."]
-      [:div
+      [loading-card]
+      [:<>
        (->> (map edit-params-card @new-sets)
             (concat (map params-card @params))
             (into [:<>]))
-       [global-actions]])))
+       [:div.card
+        [:div.card-body
+         [global-actions]]]])))
 
 (defn page
   "Customer parameters overview"

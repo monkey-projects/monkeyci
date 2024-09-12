@@ -30,10 +30,8 @@
 
 (defn build-actions []
   [:<>
-   [:span.me-1
-    [co/reload-btn [:builds/reload]]]
-   [:span.me-1
-    [trigger-build-btn]]
+   [co/reload-btn [:builds/reload]]
+   [trigger-build-btn]
    [edit-repo-btn]])
 
 (defn- trigger-type []
@@ -94,12 +92,9 @@
     (when-not false #_@loaded?
       (rf/dispatch [:builds/load]))
     [:<>
-     [:div.clearfix
-      [:h4.float-start "Builds"]
-      #_(when @b
-          [:span.badge.text-bg-secondary.ms-2 (count @b)])
-      [:div.float-end
-       [build-actions]]]
+     [:div.d-flex.gap-1.align-items-start
+      [:h4.me-auto "Builds"]
+      [build-actions]]
      [trigger-form repo]
      [table/paged-table
       {:id ::builds
