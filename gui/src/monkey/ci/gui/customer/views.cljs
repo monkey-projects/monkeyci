@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.customer.views
-  (:require [monkey.ci.gui.components :as co]
+  (:require [monkey.ci.gui.charts :as charts]
+            [monkey.ci.gui.components :as co]
             [monkey.ci.gui.customer.db :as db]
             [monkey.ci.gui.customer.events]
             [monkey.ci.gui.customer.subs]
@@ -9,7 +10,51 @@
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.table :as t]
             [monkey.ci.gui.tabs :as tabs]
+            [monkey.ci.gui.time :as time]
             [re-frame.core :as rf]))
+
+(defn- build-chart-config []
+  (let [days 10]
+    {:type :line
+     :data {:labels (->> (time/now)
+                         time/reverse-date-seq
+                         (take days)
+                         (map time/format-date)
+                         (reverse))
+            :datasets
+            ;; TODO Use actual data
+            [{:label "Elapsed seconds"
+              :data (repeatedly days (comp (partial + 3) #(rand-int 5)))
+              :cubicInterpolationMode "monotone"
+              :tension 0.4}
+             {:label "Consumed credits"
+              :data (repeatedly days #(rand-int 7))
+              :cubicInterpolationMode "monotone"
+              :tension 0.4}]}}))
+
+(defn- credits-chart-config []
+  {:type :doughnut
+   :data {:labels ["Consumed" "Available"]
+          :datasets
+          [{:label "Credits"
+            :data [850 150]}]}})
+
+(defn customer-stats [cust-id]
+  (rf/dispatch [:chart/update :customer/builds (build-chart-config)])
+  (rf/dispatch [:chart/update :customer/credits (credits-chart-config)])
+  [:div.row
+   [:div.col-6
+    [:div.card
+     [:div.card-body
+      [:h5 "Statistics"]
+      [:p "Display various charts about this customer's builds."]
+      [charts/chart-component :customer/builds]]]]
+   [:div.col-6
+    [:div.card
+     [:div.card-body
+      [:h5 "Credits"]
+      [:p "Charts and progress bar of this customer's credits."]
+      [charts/chart-component :customer/credits]]]]])
 
 (defn- show-repo [c p r]
   [:div.repo.card-body
@@ -101,11 +146,13 @@
   "Displays tab pages for various customer overview screens"
   [id]
   [tabs/tabs ::overview
-   [{:header "Repositories"
-     :contents [customer-repos]
-     :current? true}
+   [{:header "Overview"
+     :contents [customer-stats id]}
+    {:header "Repositories"
+     :contents [customer-repos]}
     {:header "Recent Builds"
-     :contents [recent-builds id]}]])
+     :contents [recent-builds id]
+     :current? true}]])
 
 (defn- customer-details [id]
   [:<>

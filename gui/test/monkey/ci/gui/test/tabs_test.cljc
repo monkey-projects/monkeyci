@@ -10,8 +10,9 @@
 (use-fixtures :each f/reset-db)
 
 (deftest tab-changed-evt
-  (testing "updates current tab in db"
+  (testing "updates current tab id in db"
     (let [id ::test-tab
+          tab {:id ::changed}
           c (rf/subscribe [:tab/current id])]
       (is (some? c))
       (is (nil? @c))
