@@ -30,22 +30,28 @@
               [:li k ": " v]))
        (into [:ul])))
 
-(defn- job-details []
-  (when-let [{:keys [start-time end-time labels message] deps :dependencies :as job} @(rf/subscribe [:job/current])]
-    [info
-     ["Status:" [co/build-result (:status job)]]
-     (when start-time
-       ["Started at:" [co/date-time start-time]])
-     (when end-time
-       ["Ended at:" [co/date-time end-time]])
-     (when (and start-time end-time)
-       ["Duration:" [t/format-seconds (int (/ (- end-time start-time) 1000))]])
-     (when-not (empty? labels)
-       ["Labels:" [job-labels labels]])
-     (when-not (empty? deps)
-       ["Dependent on:" (cs/join ", " deps)])
-     (when-not (empty? message)
-       ["Message: " message])]))
+(defn job-details  
+  ([details]
+   (when-let [{:keys [start-time end-time labels message] deps :dependencies :as job} details]
+     [:<>
+      [info
+       ["Status:" [co/build-result (:status job)]]
+       (when start-time
+         ["Started at:" [co/date-time start-time]])
+       (when end-time
+         ["Ended at:" [co/date-time end-time]])
+       (when (and start-time end-time)
+         ["Duration:" [t/format-seconds (int (/ (- end-time start-time) 1000))]])
+       (when-not (empty? labels)
+         ["Labels:" [job-labels labels]])
+       (when-not (empty? deps)
+         ["Dependent on:" (cs/join ", " deps)])]
+      (when-not (empty? message)
+        [:div.row
+         [:div.col-2 "Message: "]
+         [:div.col-10.text-truncate message]])]))
+  ([]
+   (job-details @(rf/subscribe [:job/current]))))
 
 (defn- path->file [p]
   (some-> p
