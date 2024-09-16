@@ -12,3 +12,10 @@
     (if-let [cust (st/find-customer st cid)]
       (rur/response (st/list-builds-since st cid (- (t/now) (t/hours->millis 24))))
       (rur/not-found {:message "Customer not found"}))))
+
+(defn stats
+  "Retrieves customer statistics"
+  [req]
+  (rur/response {:period {:start (t/now)
+                          :end (t/now)}
+                 :stats []}))

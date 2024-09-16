@@ -277,6 +277,9 @@
   ["/builds"
    [["/recent" {:get {:handler cust-api/recent-builds}}]]])
 
+(def stats-routes
+  ["/stats" {:get {:handler cust-api/stats}}])
+
 (def customer-routes
   ["/customer"
    {:middleware [:customer-check]}
@@ -294,7 +297,8 @@
                     customer-ssh-keys-routes
                     customer-join-request-routes
                     event-stream-routes
-                    customer-build-routes]})])
+                    customer-build-routes
+                    stats-routes]})])
 
 (def github-routes
   ["/github" [["/login" {:post

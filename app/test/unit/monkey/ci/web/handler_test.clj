@@ -318,16 +318,21 @@
                          (app)
                          :status))))))))
 
-    (testing "`/builds`"
-      (h/with-memory-store st
-        (let [app (make-test-app st)
-              cust (h/gen-cust)]
-          (is (some? (st/save-customer st cust)))
-          
+    (h/with-memory-store st
+      (let [app (make-test-app st)
+            cust (h/gen-cust)]
+        (is (some? (st/save-customer st cust)))
+        
+        (testing "`/builds`"
           (testing "`/recent` retrieves builds from latest 24h"
             (is (= 200 (-> (mock/request :get (str "/customer/" (:id cust) "/builds/recent"))
                            (app)
-                           :status))))))))
+                           :status)))))
+
+        (testing "`GET /stats` retrieves customer statistics"
+          (is (= 200 (-> (mock/request :get (str "/customer/" (:id cust) "/stats"))
+                         (app)
+                         :status)))))))
 
   (h/with-memory-store st
     (let [kp (auth/generate-keypair)
