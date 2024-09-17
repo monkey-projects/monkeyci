@@ -24,6 +24,8 @@
 (def job-id "Gets job id" :id)
 (def work-dir "Gets job work dir" :work-dir)
 
+(def max-job-timeout (* 20 60 1000))
+
 (defprotocol Job
   "Base job protocol that is able to execute it, taking the runtime as argument."
   (execute! [job rt]))

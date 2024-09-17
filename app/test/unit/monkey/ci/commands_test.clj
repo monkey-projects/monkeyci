@@ -123,14 +123,6 @@
                                    first
                                    :job))))))]
         
-        (testing "from general config"
-          (let [job {:id "test-job"}
-                config {:args {:job-config {:job job}
-                               :events-file "test-events"}
-                        :events {:type :fake}
-                        :dev-mode true}]
-            (validate-sidecar config job #(-> @inv-args :events (h/received-events)))))
-
         (testing "from sidecar-specific config"
           (let [job {:id (str (random-uuid))}
                 config (-> {}

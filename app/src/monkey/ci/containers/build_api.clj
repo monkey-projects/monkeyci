@@ -13,10 +13,13 @@
              [protocols :as p]]
             [monkey.ci.events.http :as eh]))
 
+;; FIXME Credit consumer?
 (defrecord BuildApiContainerRunner [client]
   p/ContainerRunner
   (run-container [this job]
-    (let [r (md/deferred)]
+    (let [r (-> (md/deferred)
+                (md/timeout! j/max-job-timeout))
+          evt-stream (promise)]
       (-> (client {:request-method :post
                    :path "/container"
                    :body (edn/->edn {:job (j/as-serializable job)})
@@ -28,21 +31,29 @@
              (client {:request-method :get
                       :path "/events"}))
            :body
+           (fn [is]
+             ;; Store it so we can close it later
+             (deliver evt-stream is)
+             is)
            bs/to-line-seq
            ms/->source
            (partial ms/filter not-empty)
            (partial ms/map eh/parse-event-line)
            (fn [events]
-             ;; TODO Make sure the stream is closed on success
-             ;; TODO Set a timeout
              ;; TODO Refactor to an event listener, so we can use existing code
              (ms/consume (fn [{:keys [type job-id result] :as evt}]
-                           (log/debug "Got event while waiting for container to end:" evt)
+                           (log/debug "Got event while waiting for container" (j/job-id job) "to end:" evt)
                            (when (and (= :container-job/end type)
                                       (= job-id (j/job-id job)))
-                             (log/debug "Container job completed:" result)
+                             (log/debug "Container job" (j/job-id job) "completed:" result)
                              (md/success! r result)))
                          events)))
           (md/catch (fn [ex]
                       (md/error! r ex))))
-      r)))
+      (md/finally
+        r
+        (fn []
+          (log/debug "Closing event stream on client side")
+          (if (realized? evt-stream)
+            (.close @evt-stream)
+            (log/warn "Unable to close event stream, not delivered yet.")))))))

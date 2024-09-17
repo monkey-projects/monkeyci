@@ -331,8 +331,7 @@
   (log/debug "Running job as OCI instance:" job)
   (log/debug "Build details:" (:build conf))
   (let [client (ci/make-context (:oci conf))
-        ic (instance-config conf)
-        max-job-timeout (* 20 60 1000)]
+        ic (instance-config conf)]
     (md/chain
      (oci/run-instance client ic
                        {:delete? true
@@ -340,7 +339,7 @@
                                    ;; TODO When a start event has not been received after
                                    ;; a sufficient period of time, start polling anyway.
                                    ;; For now, we add a max timeout.
-                                   (wait-or-timeout conf max-job-timeout
+                                   (wait-or-timeout conf j/max-job-timeout
                                                     #(oci/get-full-instance-details client id)))})
      (fn [r]
        (letfn [(maybe-log-output [{:keys [exit-code display-name logs] :as c}]
@@ -373,4 +372,3 @@
 
 (defn make-container-runner [conf events]
   (->OciContainerRunner conf events credit-multiplier))
-

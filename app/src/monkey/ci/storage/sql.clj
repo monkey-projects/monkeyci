@@ -393,7 +393,7 @@
 
 (defn- job->db [job]
   (-> job
-      (select-keys [:status :start-time :end-time])
+      (select-keys [:status :start-time :end-time :credit-multiplier])
       (mc/update-existing :status (fnil name :error))
       (assoc :display-id (:id job)
              :details (dissoc job :id :status :start-time :end-time))))

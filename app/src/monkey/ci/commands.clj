@@ -2,7 +2,6 @@
   "Event handlers for commands"
   (:require [aleph.http :as http]
             [clj-commons.byte-streams :as bs]
-            [clojure.spec.alpha :as spec]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
             [medley.core :as mc]
@@ -13,6 +12,7 @@
              [runtime :as rt]
              [script :as script]
              [sidecar :as sidecar]
+             [spec :as spec]
              [utils :as u]]
             [monkey.ci.events.core :as ec]
             [monkey.ci.runtime
@@ -155,19 +155,6 @@
                               (ec/set-result result)))
     (:exit result)))
 
-(defn- ^:deprecated sidecar-legacy
-  "Legacy implementation, run from old generic config"
-  [conf]
-  (log/warn "Running sidecar in legacy mode. Reason:" (spec/explain-str ::ss/config conf))
-  (rt/with-runtime conf :cli rt
-    (run-sidecar (->sidecar-rt rt))))
-
-(defn- sidecar-new
-  "Run sidecar from spec-compliant config"
-  [conf]
-  (log/info "Running sidecar with config:" conf)
-  (rs/with-runtime conf run-sidecar))
-
 (defn sidecar
   "Runs the application as a sidecar, that is meant to capture events 
    and logs from a container process.  This is necessary because when
@@ -178,6 +165,6 @@
 
    The sidecar loop will stop when the events file is deleted."
   [conf]
-  (if (spec/valid? ::ss/config conf)
-    (sidecar-new conf)
-    (sidecar-legacy conf)))
+  (spec/valid? ::ss/config conf)
+  (log/info "Running sidecar with config:" conf)
+  (rs/with-runtime conf run-sidecar))
