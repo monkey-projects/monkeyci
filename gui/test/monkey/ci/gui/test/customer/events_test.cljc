@@ -319,6 +319,31 @@
     (is (= [:danger] (->> (lo/get-alerts @app-db db/recent-builds)
                           (map :type))))))
 
+(deftest customer-load-stats
+  (testing "sends request to backend"
+    (rf-test/run-test-sync
+     (let [builds []
+           c (h/catch-fx :martian.re-frame/request)]
+       (h/initialize-martian {:get-customer-stats {:status 200
+                                                   :body builds
+                                                   :error-code :no-error}})
+       (is (some? (:martian.re-frame/martian @app-db)))
+       (rf/dispatch [:customer/load-stats "test-customer"])
+       (is (= 1 (count @c)))
+       (is (= :get-customer-stats (-> @c first (nth 2))))))))
+
+(deftest customer-load-stats--success
+  (testing "sets builds in db"
+    (let [stats [{:stats {:elapsed-seconds []}}]]
+      (rf/dispatch-sync [:customer/load-stats--success {:body stats}])
+      (is (= stats (lo/get-value @app-db db/stats))))))
+
+(deftest customer-load-stats--failed
+  (testing "sets error in db"
+    (rf/dispatch-sync [:customer/load-stats--failed "test error"])
+    (is (= [:danger] (->> (lo/get-alerts @app-db db/stats)
+                          (map :type))))))
+
 (deftest customer-event
   (testing "does nothing when recent builds not loaded"
     (rf/dispatch-sync [:customer/handle-event {:type :build/updated

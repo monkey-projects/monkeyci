@@ -124,6 +124,10 @@
 (s/defschema EmailRegistration
   {:email s/Str})
 
+(def since-params
+  {:query {(s/optional-key :since) s/Int
+           (s/optional-key :until) s/Int}})
+
 (defn- generic-routes
   "Generates generic entity routes.  If child routes are given, they are added
    as additional routes after the full path."
@@ -275,10 +279,13 @@
 
 (def customer-build-routes
   ["/builds"
-   [["/recent" {:get {:handler cust-api/recent-builds}}]]])
+   [["/recent" {:get {:handler cust-api/recent-builds
+                      :parameters since-params}}]]])
 
 (def stats-routes
-  ["/stats" {:get {:handler cust-api/stats}}])
+  ["/stats" {:get {:handler cust-api/stats
+                   :parameters (assoc since-params
+                                      (s/optional-key :zone-offset) s/Str)}}])
 
 (def customer-routes
   ["/customer"

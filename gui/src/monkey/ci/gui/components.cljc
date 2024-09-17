@@ -29,8 +29,17 @@
 (defn icon-btn [i lbl evt & [opts]]
   [:button.btn.btn-primary (merge {:on-click (u/link-evt-handler evt)} opts) [:span.me-2 [icon i]] lbl])
 
+(defn icon-btn-sm [i evt & [opts]]
+  [:button.btn.btn-primary.btn-icon.btn-sm
+   (merge {:on-click (u/link-evt-handler evt)} opts) [icon i]])
+
 (defn reload-btn [evt & [opts]]
   (icon-btn :arrow-clockwise "Reload" evt opts))
+
+(defn reload-btn-sm
+  "Small reload button, icon only"
+  [evt & [opts]]
+  (icon-btn-sm :arrow-clockwise evt (assoc opts :title "Reload")))
 
 (defn cancel-btn
   "Generic cancel button.  Posts given event when pressed."

@@ -53,3 +53,5 @@
   (dissoc db create-alerts))
 
 (def recent-builds ::recent-builds)
+
+(def stats ::stats)
