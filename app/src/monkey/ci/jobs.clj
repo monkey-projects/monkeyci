@@ -68,8 +68,9 @@
     (let [assign-id (fn [j]
                       (cond-> j
                         (nil? (bc/job-id j)) (assoc :id (bc/job-id job))))]
+      ;; TODO Fire job events here
       (md/chain
-       (action (rt->context rt)) ; Only pass necessary info
+       (action (rt->context rt))        ; Only pass necessary info
        (fn [r]
          (cond
            ;; Valid response
@@ -363,3 +364,6 @@
   monkey.ci.build.core.ContainerJob
   (credit-multiplier [job rt]
     ((cr/container-credit-consumer-fn rt) job)))
+
+(defn set-credit-multiplier [job cm]
+  (assoc job :credit-multiplier cm))

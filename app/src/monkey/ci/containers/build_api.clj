@@ -41,6 +41,7 @@
            (partial ms/map eh/parse-event-line)
            (fn [events]
              ;; TODO Refactor to an event listener, so we can use existing code
+             ;; TODO Wait for job events instead
              (ms/consume (fn [{:keys [type job-id result] :as evt}]
                            (log/debug "Got event while waiting for container" (j/job-id job) "to end:" evt)
                            (when (and (= :container-job/end type)

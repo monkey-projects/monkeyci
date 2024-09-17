@@ -332,6 +332,7 @@
   (log/debug "Build details:" (:build conf))
   (let [client (ci/make-context (:oci conf))
         ic (instance-config conf)]
+    ;; TODO Fire job events
     (md/chain
      (oci/run-instance client ic
                        {:delete? true

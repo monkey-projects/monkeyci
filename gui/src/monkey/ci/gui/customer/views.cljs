@@ -55,11 +55,12 @@
             [{:label "Credits"
               :data [consumed avail]}]}}))
 
+(def stats-period-days 30)
+
 (defn customer-stats [cust-id]
-  (rf/dispatch [:customer/load-stats cust-id])
+  (rf/dispatch [:customer/load-stats cust-id stats-period-days])
   (fn [cust-id]
-    (let [period-days 10
-          stats (rf/subscribe [:customer/stats])]
+    (let [stats (rf/subscribe [:customer/stats])]
       (rf/dispatch [:chart/update :customer/builds (build-chart-config (:stats @stats))])
       (rf/dispatch [:chart/update :customer/credits (credits-chart-config)])
       [:div.row
@@ -67,7 +68,7 @@
         [:div.card
          [:div.card-body
           [:h5 "Statistics"]
-          [:p (str "Build elapsed times and consumed credits over the past " period-days " days.")]
+          [:p (str "Build elapsed times and consumed credits over the past " stats-period-days " days.")]
           [charts/chart-component :customer/builds]]]]
        [:div.col-4
         [:div.card

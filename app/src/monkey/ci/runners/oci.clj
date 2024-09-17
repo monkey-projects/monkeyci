@@ -50,6 +50,7 @@
   (assoc-in conf [:api :token] (auth/generate-jwt-from-rt rt (auth/build-token (b/sid build)))))
 
 (defn- rt->config [build rt]
+  ;; TODO Also calculate credit multiplier for action jobs in this build
   (->> (-> (rt/rt->config rt)
            (dissoc :app-mode :git :github :http :args :jwk :checkout-base-dir :storage
                    :ssh-keys-dir :work-dir :oci :runner)

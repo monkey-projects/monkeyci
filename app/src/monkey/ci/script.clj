@@ -64,9 +64,10 @@
                          (assoc bc/failure
                                 :exception ex
                                 :message (.getMessage ex)))
-          base-props {:start-time (u/now)
-                      :credit-multiplier (cr/credit-multiplier target ctx)}]
+          base-props (-> {:start-time (u/now)}
+                         (j/set-credit-multiplier (cr/credit-multiplier target ctx)))]
       (log/debug "Executing event firing job:" (bc/job-id target))
+      ;; TODO Only fire events for action jobs
       (md/chain
        (p/post-events events (job-start-evt
                               (-> ctx-with-job

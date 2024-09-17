@@ -22,6 +22,7 @@
              [artifacts :as art]
              [build :as build]
              [cache :as cache]
+             [credits :as credits]
              [edn :as edn]
              [jobs :as j]
              [labels :as lbl]
@@ -245,7 +246,7 @@
     ;; to monitor job end event.
     (-> (p/run-container containers job)
         (md/chain fire-end-event))
-    (-> (rur/response {:job job})
+    (-> (rur/response {:job (j/set-credit-multiplier job (credits/container-credit-multiplier containers job))})
         (rur/status 202))))
 
 (def edn #{"application/edn"})

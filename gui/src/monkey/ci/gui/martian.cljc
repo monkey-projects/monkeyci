@@ -142,6 +142,8 @@
     {:route-name :get-customer-stats
      :path-parts (into customer-path ["/stats"])
      :path-schema customer-schema
+     :query-schema {(s/optional-key :since) s/Int
+                    (s/optional-key :until) s/Int}
      :method :get})
 
    (api-route
