@@ -111,7 +111,7 @@
           (map (comp render-col :label))
           (into [:tr]))]))
 
-(defn- render-tbody [cols items]
+(defn- render-tbody [cols items {:keys [on-row-click]}]
   (letfn [(render-cell [v]
             [:td v])
           (render-item [it]
@@ -119,7 +119,8 @@
                  (map (fn [{:keys [value]}]
                         (value it)))
                  (map render-cell)
-                 (into [:tr])))]
+                 (into [:tr (when on-row-click
+                              {:on-click #(on-row-click it)})])))]
     (->> items
          (map render-item)
          (into [:tbody]))))
@@ -130,7 +131,14 @@
     (render-thead columns)
     (render-tbody (mapv #(assoc % :value (fn [_] [:div.placeholder-glow [:span.w-75.placeholder "x"]]))
                         columns)
-                  (repeat n-rows {}))]])
+                  (repeat n-rows {})
+                  {})]])
+
+(defn- render-table [columns items opts]
+  [:table.table
+   (select-keys opts [:class])
+   (render-thead columns)
+   (render-tbody columns items opts)])
 
 (defn paged-table
   "Table component with pagination.  The `items-sub` provides the items for the
@@ -138,7 +146,8 @@
    provided, it can hold a sub that indicates whether the table is loading, and
    a number of placeholder rows that should be displayed in that case."
   [{:keys [id items-sub columns page-size loading]
-    :or {page-size 10}}]
+    :or {page-size 10}
+    :as opts}]
   ;; TODO Add support for paginated requests (i.e. dispatch an event
   ;; when navigating to another page)
   (let [loading? (or (some-> loading :sub rf/subscribe deref)
@@ -155,8 +164,6 @@
           (when (or (nil? @pag) (not= (:count pag) pc))
             (rf/dispatch [:pagination/set id {:count pc :current cp}]))
           [:<>
-           [:table.table
-            (render-thead columns)
-            (render-tbody columns l)]
+           [render-table columns l opts]
            (when (> pc 1)
              [render-pagination id pc cp])])))))

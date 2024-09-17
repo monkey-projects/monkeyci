@@ -1,5 +1,7 @@
 (ns monkey.ci.gui.customer.views
-  (:require [monkey.ci.gui.components :as co]
+  (:require [monkey.ci.gui.charts :as charts]
+            [monkey.ci.gui.colors :as colors]
+            [monkey.ci.gui.components :as co]
             [monkey.ci.gui.customer.db :as db]
             [monkey.ci.gui.customer.events]
             [monkey.ci.gui.customer.subs]
@@ -9,7 +11,70 @@
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.table :as t]
             [monkey.ci.gui.tabs :as tabs]
+            [monkey.ci.gui.time :as time]
             [re-frame.core :as rf]))
+
+(defn- build-chart-config [{:keys [elapsed-seconds consumed-credits]}]
+  (let [dates (->> (concat (map :date elapsed-seconds)
+                           (map :date consumed-credits))
+                   (set)
+                   (sort))]
+    {:type :line
+     :data {:labels (->> dates
+                         (map (comp time/format-date time/parse-epoch)))
+            :datasets
+            [{:label "Elapsed seconds"
+              :data (map :seconds elapsed-seconds)
+              :cubicInterpolationMode "monotone"
+              :tension 0.4
+              :yAxisID "y"}
+             {:label "Consumed credits"
+              :data (map :credits consumed-credits)
+              :cubicInterpolationMode "monotone"
+              :tension 0.4
+              :yAxisID "y1"}]}
+     :options
+     {:scales
+      {"y"
+       {:type :linear
+        :display true
+        :position :left}
+       "y1"
+       {:type :linear
+        :display true
+        :position :right
+        :grid
+        {:drawOnChartArea false}}}}}))
+
+(defn- credits-chart-config []
+  (let [consumed 850
+        avail (- 1000 consumed)]
+    {:type :doughnut
+     :data {:labels [(str consumed " consumed") (str avail " available")]
+            :datasets
+            [{:label "Credits"
+              :data [consumed avail]}]}}))
+
+(defn customer-stats [cust-id]
+  (rf/dispatch [:customer/load-stats cust-id])
+  (fn [cust-id]
+    (let [period-days 10
+          stats (rf/subscribe [:customer/stats])]
+      (rf/dispatch [:chart/update :customer/builds (build-chart-config (:stats @stats))])
+      (rf/dispatch [:chart/update :customer/credits (credits-chart-config)])
+      [:div.row
+       [:div.col-8
+        [:div.card
+         [:div.card-body
+          [:h5 "Statistics"]
+          [:p (str "Build elapsed times and consumed credits over the past " period-days " days.")]
+          [charts/chart-component :customer/builds]]]]
+       [:div.col-4
+        [:div.card
+         [:div.card-body
+          [:h5 "Credits"]
+          [:p "Credit consumption for this month."]
+          [charts/chart-component :customer/credits]]]]])))
 
 (defn- show-repo [c p r]
   [:div.repo.card-body
@@ -43,7 +108,7 @@
    [:span.me-1 [co/icon :github]] "Follow Repository"])
 
 (defn- params-btn [id]
-  [:a.btn.btn-outline-primary
+  [:a.btn.btn-soft-primary
    {:href (r/path-for :page/customer-params {:customer-id id})
     :title "Configure build parameters"}
    [:span.me-2 [co/icon :gear]] "Parameters"])
@@ -51,8 +116,7 @@
 (defn- customer-actions [id]
   [:<>
    [add-repo-btn id]
-   [params-btn id]
-   [co/reload-btn [:customer/load id]]])
+   [params-btn id]])
 
 (defn- customer-header []
   (let [c (rf/subscribe [:customer/info])]
@@ -73,7 +137,9 @@
            (sort-by first)
            (map (partial show-project @c))
            (into [:<>
-                  [:p "Repository overview, grouped by project."]])))))
+                  [:div.d-flex.mb-1
+                   [:p.me-auto "Repository overview, grouped by project."]
+                   [co/reload-btn-sm [:customer/load (:id @c)]]]])))))
 
 (defn- recent-builds [id]
   (rf/dispatch [:customer/load-recent-builds id])
@@ -101,11 +167,13 @@
   "Displays tab pages for various customer overview screens"
   [id]
   [tabs/tabs ::overview
-   [{:header "Repositories"
-     :contents [customer-repos]
-     :current? true}
+   [{:header "Overview"
+     :contents [customer-stats id]}
+    {:header "Repositories"
+     :contents [customer-repos]}
     {:header "Recent Builds"
-     :contents [recent-builds id]}]])
+     :contents [recent-builds id]
+     :current? true}]])
 
 (defn- customer-details [id]
   [:<>

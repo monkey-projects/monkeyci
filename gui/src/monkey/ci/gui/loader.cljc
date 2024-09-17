@@ -23,12 +23,10 @@
 
 (defn set-loading
   [db id]
-  (log/debug "Mark loading:" id)
   (assoc-in db [id :loading?] true))
 
 (defn reset-loading
   [db id]
-  (log/debug "Reset loading:" id)
   (update db id dissoc :loading?))
 
 (defn loaded?
@@ -112,6 +110,7 @@
   (-> db
       (reset-loading id)
       (set-alerts id [{:type :danger
+                       ;; TODO Replace this with a UI component (for future multilanguage)
                        :message (str msg (u/error-msg err))}])))
 
 (defn on-initialize

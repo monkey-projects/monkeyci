@@ -17,6 +17,10 @@
   (when d
     (.toLocaleString d (.-DATETIME_SHORT DateTime))))
 
+(defn format-date [^DateTime d]
+  (when d
+    (.toLocaleString d (.-DATE_SHORT DateTime))))
+
 (defn parse-iso
   "Parses ISO datetime string"
   [s]
@@ -29,6 +33,11 @@
 
 (defn to-epoch [^DateTime d]
   (.toMillis d))
+
+(defn same?
+  "Compares to dates"
+  [^DateTime a ^DateTime b]
+  (and a (.equals a b)))
 
 (defn parse [x]
   (cond
@@ -77,3 +86,13 @@
  :time/now
  (fn [cofx]
    (assoc cofx :time/now (to-epoch (now)))))
+
+(defn date-seq
+  "Lazy sequence of dates.  Each next item in the seq is the next day."
+  [^DateTime from]
+  (lazy-seq (cons from (date-seq (.plus from (clj->js {:days 1}))))))
+
+(defn reverse-date-seq
+  "Inverse lazy sequence of dates: each next item is the previous day"
+  [^DateTime until]
+  (lazy-seq (cons until (reverse-date-seq (.minus until (clj->js {:days 1}))))))

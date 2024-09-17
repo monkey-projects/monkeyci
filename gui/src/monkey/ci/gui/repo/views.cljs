@@ -89,7 +89,7 @@
 
 (defn- builds [repo]
   (let [loaded? (rf/subscribe [:builds/loaded?])]
-    (when-not false #_@loaded?
+    (when-not @loaded?
       (rf/dispatch [:builds/load]))
     [:<>
      [:div.d-flex.gap-1.align-items-start
@@ -100,7 +100,9 @@
       {:id ::builds
        :items-sub [:repo/builds]
        :columns table-columns
-       :loading {:sub [:builds/init-loading?]}}]]))
+       :loading {:sub [:builds/init-loading?]}
+       :class [:table-hover]
+       :on-row-click #(rf/dispatch [:route/goto :page/build %])}]]))
 
 (defn page [route]
   (rf/dispatch [:repo/init])

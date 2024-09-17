@@ -219,6 +219,27 @@
  (fn [db [_ err]]
    (lo/on-failure db db/recent-builds "Failed to load recent builds: " err)))
 
+(rf/reg-event-fx
+ :customer/load-stats
+ (lo/loader-evt-handler
+  db/stats
+  (fn [_ _ [_ cust-id]]
+    [:secure-request
+     :get-customer-stats
+     {:customer-id cust-id}
+     [:customer/load-stats--success]
+     [:customer/load-stats--failed]])))
+
+(rf/reg-event-db
+ :customer/load-stats--success
+ (fn [db [_ resp]]
+   (lo/on-success db db/stats resp)))
+
+(rf/reg-event-db
+ :customer/load-stats--failed
+ (fn [db [_ err]]
+   (lo/on-failure db db/stats "Failed to load statistics: " err)))
+
 (rf/reg-event-db
  :customer/handle-event
  (fn [db [_ {:keys [build] :as evt}]]

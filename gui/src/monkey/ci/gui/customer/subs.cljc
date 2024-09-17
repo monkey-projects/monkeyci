@@ -62,3 +62,8 @@
           (sort-by :start-time)
           (reverse)
           (map add-repo)))))
+
+(rf/reg-sub
+ :customer/stats
+ :<- [:loader/value db/stats]
+ identity)

@@ -29,6 +29,13 @@
                     :path
                     :parameters))
 
+(defn error-response
+  ([error-msg status]
+   (-> (rur/response {:error error-msg})
+       (rur/status status)))
+  ([error-msg]
+   (error-response error-msg 400)))
+
 ;; Reitit rewrites records in the data to hashmaps, so wrap it in a type
 (deftype RuntimeWrapper [runtime])
 

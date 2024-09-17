@@ -137,3 +137,13 @@
                                     (db/set-customer {:repos [{:id "test-repo"
                                                                :name "test repo name"}]})))))
       (is (= "test repo name" (-> @l first :repo :name))))))
+
+(deftest customer-stats
+  (let [s (rf/subscribe [:customer/stats])]
+    (testing "exists"
+      (is (some? s)))
+
+    (testing "returns customer stats from db"
+      (is (nil? @s))
+      (is (some? (reset! app-db (lo/set-value {} db/stats ::test-stats))))
+      (is (= ::test-stats @s)))))

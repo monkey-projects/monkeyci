@@ -139,6 +139,12 @@
      :method :delete})
 
    (api-route
+    {:route-name :get-customer-stats
+     :path-parts (into customer-path ["/stats"])
+     :path-schema customer-schema
+     :method :get})
+
+   (api-route
     {:route-name :get-user-customers
      :path-parts (into user-path ["/customers"])
      :path-schema user-schema})
