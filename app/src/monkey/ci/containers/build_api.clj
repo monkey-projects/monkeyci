@@ -65,4 +65,5 @@
           ;; closed if the input stream is closed.
           (if (realized? src)
             (ms/close! @src)
-            (log/warn "Unable to close source stream, not delivered yet.")))))))
+            (log/warn "Unable to close source stream, not delivered yet."))
+          (log/debug "Stream and sink closed"))))))

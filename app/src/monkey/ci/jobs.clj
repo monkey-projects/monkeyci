@@ -155,6 +155,7 @@
     (md/chain
      (p/run-container (:containers ctx) this)
      (fn [r]
+       (log/debug "Container job finished with result:" r)
        ;; Don't add the full result otherwise it will be sent out as an event
        (if (= 0 (:exit r))
          bc/success

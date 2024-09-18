@@ -78,6 +78,7 @@
                :error :bg-danger
                :failure :bg-danger
                :success :bg-success
+               :initializing :bg-warning
                :running :bg-info
                :canceled :bg-warning
                :skipped :bg-warning
