@@ -18,6 +18,7 @@
              [oci :as oci]
              [protocols :as p]
              [runtime :as rt]
+             [time :as t]
              [utils :as u]]
             [monkey.ci.config.sidecar :as cos]
             [monkey.ci.containers.promtail :as pt]
@@ -269,6 +270,23 @@
         ;; delete the container instance when the sidecar and the job have completed.
         (add-promtail-container conf))))
 
+(def container-start-timeout
+  "Max msecs to wait until container has started"
+  (* 5 60 1000))
+
+(defn wait-for-startup [events sid job-id]
+  (-> (ec/wait-for-event events
+                         {:types #{:container/start}
+                          :sid sid}
+                         #(= job-id (get-in % [:job :id])))
+      (md/timeout! container-start-timeout)
+      (md/chain
+       (fn [evt]
+         (ec/post-events events [{:type :job/start
+                                  :sid sid
+                                  :job (-> (:job evt)
+                                           (assoc :start-time (t/now)))}])))))
+
 (defn wait-for-instance-end-events
   "Checks the incoming events to see if a container and job end event has been received.
    Returns a deferred that will contain both events, or that times out after `max-timeout`."
@@ -280,25 +298,28 @@
                                 {:types #{t}
                                  :sid sid}
                                 #(= job-id (get-in % [:job :id])))
-             max-timeout (ec/set-result
-                          {:type t}
-                          (ec/make-result :error 1 (str "Timeout after " max-timeout " msecs")))))]
+             max-timeout
+             (ec/set-result
+              {:type t}
+              (ec/make-result :error 1 (str "Timeout after " max-timeout " msecs")))))]
     ;; TODO As soon as a failure for the sidecar has been received, we should return
     ;; because then container events won't be sent anymore anyway.
     (md/zip
      (wait-for :container/end)
      (wait-for :sidecar/end))))
 
-(defn wait-or-timeout
+(defn wait-for-results
   "Waits for the container end event, or times out.  Afterwards, the full container
    instance details are fetched.  The exit codes in the received events are used for
    the container exit codes."
   [{:keys [events job build]} max-timeout get-details]
   (md/chain
-   (wait-for-instance-end-events events
-                                 (b/sid build)
-                                 (j/job-id job)
-                                 max-timeout)
+   (wait-for-startup events (b/sid build) (j/job-id job))
+   (fn [_]
+     (wait-for-instance-end-events events
+                                   (b/sid build)
+                                   (j/job-id job)
+                                   max-timeout))
    (fn [r]
      (log/debug "Job instance terminated with these events:" r)
      (md/zip r (get-details)))
@@ -327,38 +348,72 @@
         (get-in arch-shapes [(job-arch job) :credits] 1))
      (get job :memory oci/default-memory-gb)))
 
-(defn run-container [{:keys [events job] :as conf}]
+(defn- base-event
+  "Creates a skeleton event with basic properties"
+  [type job build-sid]
+  {:type type
+   :src :script
+   :sid build-sid
+   :time (t/now)
+   :job (j/job->event job)})
+
+(defn- fire-job-initializing [job build-sid events]
+  (let [job (assoc job
+                   :status :initializing
+                   :init-time (t/now)
+                   :credit-multiplier (credit-multiplier job))]
+    (ec/post-events events [(j/job-initializing-evt job build-sid)])
+    job))
+
+(defn- fire-job-end [job build-sid result events]
+  (let [job (assoc job
+                   :status (b/exit-code->status (:exit result))
+                   :end-time (t/now))]
+    (ec/post-events events [(j/job-end-evt job build-sid result)])))
+
+(defn run-container [{:keys [events job build] :as conf}]
   (log/debug "Running job as OCI instance:" job)
-  (log/debug "Build details:" (:build conf))
+  (log/debug "Build details:" build)
   (let [client (ci/make-context (:oci conf))
-        ic (instance-config conf)]
-    ;; TODO Fire job events
-    (md/chain
-     (oci/run-instance client ic
-                       {:delete? true
-                        :exited? (fn [id]
-                                   ;; TODO When a start event has not been received after
-                                   ;; a sufficient period of time, start polling anyway.
-                                   ;; For now, we add a max timeout.
-                                   (wait-or-timeout conf j/max-job-timeout
-                                                    #(oci/get-full-instance-details client id)))})
-     (fn [r]
-       (letfn [(maybe-log-output [{:keys [exit-code display-name logs] :as c}]
-                 (when (and (some? exit-code) (not= 0 exit-code))
-                   (log/warn "Container" display-name "returned a nonzero exit code:" exit-code)
-                   (log/warn "Captured output:" logs))
-                 c)]
-         (let [containers (->> (get-in r [:body :containers])
-                               (mapv maybe-log-output))
-               nonzero (->> containers
-                            (filter (comp (complement (fnil zero? 0)) ec/result-exit))
-                            (first))
-               job-cont (->> containers
-                             (filter (comp (partial = job-container-name) :display-name))
-                             (first))]
-           (log/debug "Containers:" containers)
-           ;; Either return the first error result, or the result of the job container
-           (:result (or nonzero job-cont))))))))
+        ic (instance-config conf)
+        job (fire-job-initializing job (b/sid build) events)]
+    (-> (oci/run-instance client ic
+                          {:delete? true
+                           :exited? (fn [id]
+                                      ;; TODO When a start event has not been received after
+                                      ;; a sufficient period of time, start polling anyway.
+                                      ;; For now, we add a max timeout.
+                                      (wait-for-results conf j/max-job-timeout
+                                                        #(oci/get-full-instance-details client id)))})
+        (md/chain
+         (fn [r]
+           (letfn [(maybe-log-output [{:keys [exit-code display-name logs] :as c}]
+                     (when (and (some? exit-code) (not= 0 exit-code))
+                       (log/warn "Container" display-name "returned a nonzero exit code:" exit-code)
+                       (log/warn "Captured output:" logs))
+                     c)]
+             (let [containers (->> (get-in r [:body :containers])
+                                   (mapv maybe-log-output))
+                   nonzero (->> containers
+                                (filter (comp (complement (fnil zero? 0)) ec/result-exit))
+                                (first))
+                   job-cont (->> containers
+                                 (filter (comp (partial = job-container-name) :display-name))
+                                 (first))]
+               (log/debug "Containers:" containers)
+               ;; Either return the first error result, or the result of the job container
+               (if-let [res (:result (or nonzero job-cont))]
+                 (md/success-deferred res)
+                 ;; Result does not contain container info, so error
+                 (md/error-deferred r)))))
+         (fn [r]
+           (md/chain
+            (fire-job-end job (b/sid build) r events)
+            (constantly r))))
+        (md/catch (fn [ex]
+                    (log/error "Got error:" ex)
+                    (fire-job-end job (b/sid build) (j/ex->result ex) events)
+                    nil)))))
 
 (defmethod mcc/normalize-containers-config :oci [conf]
   ;; Take app version if no image version specified

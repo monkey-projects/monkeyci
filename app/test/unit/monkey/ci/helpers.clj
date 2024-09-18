@@ -195,6 +195,14 @@
 (defn received-events [fake]
   @(:recv fake))
 
+(defn reset-events [fake]
+  (reset! (:recv fake) []))
+
+(defn first-event-by-type [type events]
+  (->> events
+       (filter (comp (partial = type) :type))
+       (first)))
+
 (defmethod ec/make-events :fake [{:keys [recv]}]
   (fake-events recv))
 

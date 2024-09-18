@@ -104,7 +104,7 @@
 
     (testing "executes job without any extensions"
       (let [wrapped (sut/wrap-job (bc/action-job "regular-job" (constantly bc/success)))]
-        (is (= bc/success @(j/execute! wrapped {})))))
+        (is (= bc/success @(j/execute! wrapped rt)))))
     
     (testing "invokes `before` extension"
       (is (true? (::before? @(j/execute! wrapped rt)))))
@@ -113,6 +113,8 @@
       (is (true? (::after? @(j/execute! wrapped rt)))))
 
     (testing "dispatches `job/updated` event before invoking extensions"
-      (let [evt @(:recv events)]
+      (let [evt (h/received-events events)]
         (is (pos? (count evt)))
-        (is (= :job/updated (-> evt first :type)))))))
+        (is (= :job/updated
+               (-> (h/first-event-by-type :job/updated evt)
+                   :type)))))))

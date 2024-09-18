@@ -81,6 +81,7 @@
      (make-script-cmd (:script job)))))
 
 (defn- run-container [job conf]
+  ;; TODO Fire events
   (let [log-maker (rt/log-maker conf)
         build (:build conf)
         ;; Don't prefix the sid here, that's the responsability of the logger
