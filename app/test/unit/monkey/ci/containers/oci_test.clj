@@ -9,10 +9,12 @@
             [monkey.ci
              [config :as c]
              [containers :as mcc]
+             [cuid :as cuid]
              [oci :as oci]
              [protocols :as p]
              [runtime :as rt]
-             [utils :as u]]
+             [utils :as u]
+             [version :as v]]
             [monkey.ci.common.preds :as cp]
             [monkey.ci.config.sidecar :as cs]
             [monkey.ci.containers.oci :as sut]
@@ -31,6 +33,9 @@
               (.decode s))]
     (with-open [r (io/reader (java.io.ByteArrayInputStream. b))]
       (u/parse-edn r))))
+
+(defn random-build-sid []
+  (repeatedly 3 cuid/random-cuid))
 
 (def default-rt (-> (trt/test-runtime)
                     (assoc :build {:checkout-dir "/tmp"})))
@@ -380,7 +385,7 @@
 (deftest wait-for-instance-end-events
   (testing "returns a deferred that holds the container and job end events"
     (let [events (ec/make-events {:type :manifold})
-          sid (repeatedly 3 random-uuid)
+          sid (random-build-sid)
           d (sut/wait-for-instance-end-events events sid "this-job" 1000)]
       (is (md/deferred? d))
       (is (not (md/realized? d)) "should not be realized initially")
@@ -402,71 +407,109 @@
              (->> (deref d 100 :timeout)
                   (map :type)))))))
 
-(deftest wait-or-timeout
+(deftest wait-for-results
   (testing "waits for sidecar and container end events, then fetches details"
     (let [events (ec/make-events {:type :manifold})
-          sid (repeatedly 3 random-uuid)
-          job-id "test-job"
+          sid (random-build-sid)
+          job (h/gen-job)
           conf {:events events
-                :job {:id job-id}
+                :job job
                 :build {:sid sid}}
           details {:body
                    {:containers [{:display-name sut/sidecar-container-name}
                                  {:display-name sut/job-container-name}]}}
-          res (sut/wait-or-timeout conf 1000 (constantly details))]
-      (is (some? (rt/post-events conf [{:type :sidecar/end
+          res (sut/wait-for-results conf 1000 (constantly details))]
+      (is (some? (rt/post-events conf [{:type :container/start
                                         :sid sid
-                                        :job {:id job-id}}
+                                        :job job}
+                                       {:type :sidecar/end
+                                        :sid sid
+                                        :job job}
                                        {:type :container/end
                                         :sid sid
-                                        :job {:id job-id}}])))
+                                        :job job}])))
       (is (sequential? (get-in @res [:body :containers])))))
 
   (testing "adds exit codes from events"
     (let [events (ec/make-events {:type :manifold})
-          sid (repeatedly 3 random-uuid)
-          job-id "test-job"
+          sid (random-build-sid)
+          job (h/gen-job)
           conf {:events events
-                :job {:id job-id}
+                :job job
                 :build {:sid sid}}
           details {:body
                    {:containers [{:display-name sut/sidecar-container-name}
                                  {:display-name sut/job-container-name}]}}
-          res (sut/wait-or-timeout conf 1000 (constantly details))]
+          res (sut/wait-for-results conf 1000 (constantly details))]
       (is (some? (rt/post-events conf
-                                 [{:type :sidecar/end
+                                 [{:type :container/start
                                    :sid sid
-                                   :job {:id job-id}
+                                   :job job}
+                                  {:type :sidecar/end
+                                   :sid sid
+                                   :job job
                                    :result {:exit 1}}
                                   {:type :container/end
                                    :sid sid
-                                   :job {:id job-id}
+                                   :job job
                                    :result {:exit 2}}])))
       (is (= [1 2] (->> @res :body :containers (map ec/result-exit))))))
 
   (testing "marks timeout as failure"
     (let [events (ec/make-events {:type :manifold})
-          sid (repeatedly 3 random-uuid)
-          job-id "test-job"
+          sid (random-build-sid)
+          job (h/gen-job)
           conf {:events events
-                :job {:id job-id}
+                :job job
                 :build {:sid sid}}
           details {:body
                    {:containers [{:display-name sut/sidecar-container-name}
                                  {:display-name sut/job-container-name}]}}
-          res (sut/wait-or-timeout conf 100 (constantly details))]
+          res (sut/wait-for-results conf 100 (constantly details))]
       (is (some? (rt/post-events conf
-                                 [{:type :sidecar/end
+                                 [{:type :container/start
                                    :sid sid
-                                   :job {:id job-id}
+                                   :job job}
+                                  {:type :sidecar/end
+                                   :sid sid
+                                   :job job
                                    :result {:exit 0}}])))
-      (is (= 1 (->> @res :body :containers second ec/result-exit))))))
+      (is (= 1 (->> @res :body :containers second ec/result-exit)))))
+
+  (testing "dispatches `job/start` event on container start"
+    (let [events (ec/make-events {:type :manifold})
+          sid (random-build-sid)
+          job (h/gen-job)
+          conf {:events events
+                :job job
+                :build {:sid sid}}
+          details {:body
+                   {:containers [{:display-name sut/sidecar-container-name}
+                                 {:display-name sut/job-container-name}]}}
+          res (sut/wait-for-results conf 100 (constantly details))
+          evt (ec/wait-for-event events {:types #{:job/start}})]
+      (is (some? (rt/post-events conf
+                                 [{:type :container/start
+                                   :sid sid
+                                   :job job}
+                                  {:type :sidecar/end
+                                   :sid sid
+                                   :job job
+                                   :result {:exit 0}}])))
+      (is (some? res))
+      (let [evt (deref evt 1000 :timeout)]
+        (is (not= :timeout evt))
+        (is (= :job/start (:type evt)))))))
 
 (deftest run-container
-  (let [runner (sut/->OciContainerRunner {:build {:checkout-dir "/tmp"}}
-                                         (h/fake-events)
+  (let [events (h/fake-events)
+        sid (random-build-sid)
+        runner (sut/->OciContainerRunner {:build {:checkout-dir "/tmp"
+                                                  :sid sid}}
+                                         events
                                          (constantly 0))
         job {:id "test-job"}]
+    
     (testing "can run using type `oci`, returns zero exit code on success"
       (with-redefs [oci/run-instance (constantly (md/success-deferred
                                                   {:status 200
@@ -483,7 +526,56 @@
                                                                        {:result {:exit 123}}]}}))]
         (is (= 123 (-> (p/run-container runner job)
                        (deref)
-                       :exit)))))))
+                       :exit)))))
+
+    (testing "events"
+      (h/reset-events events)
+      (with-redefs [oci/run-instance (constantly (md/success-deferred
+                                                  {:status 200
+                                                   :body {:containers [{:display-name sut/job-container-name
+                                                                        :result {:exit 0}}]}}))]
+        (is (= 0 (-> (p/run-container runner job)
+                     (deref)
+                     :exit)))
+        
+        (testing "fires `job/initializing` event"
+          (let [evt (->> (h/received-events events)
+                         (h/first-event-by-type :job/initializing))]
+            (is (some? evt))
+            (is (= sid (:sid evt)))
+            (is (= :initializing (get-in evt [:job :status])))
+            (is (number? (get-in evt [:job :credit-multiplier])))))
+
+        (testing "fires `job/end` event"
+          (let [{:keys [job] :as evt} (->> (h/received-events events)
+                                           (h/first-event-by-type :job/end))]
+            (is (some? evt))
+            (is (= sid (:sid evt)))
+            (is (some? job))
+            (is (= {:exit 0} (:result job)))
+            (is (number? (:end-time job)))
+            (is (number? (get-in evt [:job :credit-multiplier]))))))
+
+      (testing "fires event in case of oci error"
+        (h/reset-events events)
+        (with-redefs [oci/run-instance (constantly (md/success-deferred
+                                                    {:status 500
+                                                     :exception (ex-info "oci error" {})}))]
+          (is (nil? @(p/run-container runner job)))
+          (let [evt (->> (h/received-events events)
+                         (h/first-event-by-type :job/end))]
+            (is (some? evt))
+            (is (= "oci error" (get-in evt [:job :message]))))))
+      
+      (testing "fires event in case of async exception"
+        (h/reset-events events)
+        (with-redefs [oci/run-instance (constantly (md/error-deferred
+                                                    (ex-info "infra error" {})))]
+          (is (nil? @(p/run-container runner job)))
+          (let [evt (->> (h/received-events events)
+                         (h/first-event-by-type :job/end))]
+            (is (some? evt))
+            (is (= "infra error" (get-in evt [:job :message])))))))))
 
 (deftest normalize-key
   (testing "takes configured tag"
@@ -495,14 +587,14 @@
                 :image-tag))))
 
   (testing "takes app version if no tag specified"
-    (is (= (c/version)
+    (is (= (v/version)
            (->> {:containers {:type :oci}}
                 (c/normalize-key :containers)
                 :containers
                 :image-tag))))
 
   (testing "formats using app version when format string specified"
-    (is (= (str "test-format-" (c/version))
+    (is (= (str "test-format-" (v/version))
            (->> {:containers {:type :oci
                               :image-tag "test-format-%s"}}
                 (c/normalize-key :containers)

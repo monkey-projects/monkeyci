@@ -11,7 +11,8 @@
             [monkey.ci
              [config :as config]
              [metrics :as metrics]
-             [runtime :as rt]]
+             [runtime :as rt]
+             [version :as v]]
             [monkey.ci.web
              [api :as api]
              [auth :as auth]
@@ -37,7 +38,7 @@
   (text-response "ok"))
 
 (defn version [_]
-  (text-response (config/version)))
+  (text-response (v/version)))
 
 (defn metrics [req]
   (if-let [m (c/from-rt req :metrics)]

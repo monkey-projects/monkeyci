@@ -12,12 +12,12 @@
             [meta-merge.core :as mm]
             [monkey.ci
              [artifacts :as a]
-             [config :as config]
              [logging :as l]
              [metrics :as m]
              [runtime :as rt]
              [storage :as st]
-             [utils :as u]]
+             [utils :as u]
+             [version :as v]]
             [monkey.ci.web
              [auth :as auth]
              [handler :as sut]]
@@ -85,7 +85,7 @@
     (let [r (-> (mock/request :get "/version")
                    (test-app))]
       (is (= 200 (:status r)))
-      (is (= (config/version) (:body r)))))
+      (is (= (v/version) (:body r)))))
 
   (testing "handles `nil` bodies"
     (is (= 200 (-> (mock/request :get "/health")

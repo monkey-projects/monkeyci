@@ -1,5 +1,6 @@
 (ns monkey.ci.containers.build-api-test
   (:require [clojure.test :refer [deftest testing is]]
+            [clj-commons.byte-streams :as bs]
             [clojure.java.io :as io]
             [manifold
              [deferred :as md]
@@ -10,6 +11,7 @@
             [monkey.ci
              [containers :as mcc]
              [edn :as edn]
+             [jobs :as j]
              [protocols :as p]]
             [monkey.ci.containers.build-api :as sut]
             [monkey.ci.test.aleph-test :as at]))
@@ -44,15 +46,16 @@
                                                         (throw (ex-info "test error" {})))]
         (is (thrown? Exception (deref (p/run-container runner job) 1000 ::timeout)))))
 
-    (testing "reads events until `container-job/end` event has been received"
+    (testing "reads events until `job/end` event has been received"
       (at/with-fake-http ["http://test-api/container"
                           (fn [req]
                             (swap! invocations conj req)
                             {:status 202})
                           "http://test-api/events"
                           {:status 200
-                           :body (-> (str "data: " (pr-str {:type :container-job/end
-                                                            :job-id (:id job)
+                           :body (-> (str "data: " (pr-str {:type :job/end
+                                                            :job (j/as-serializable job)
+                                                            :sid ["some" "sid"] 
                                                             :result ::test-result})
                                           "\n\n")
                                      (.getBytes)
@@ -60,3 +63,4 @@
         (let [r (p/run-container runner job)]
           (is (md/deferred? r))
           (is (= ::test-result (deref r 1000 ::timeout))))))))
+

@@ -11,7 +11,8 @@
              [labels :as lbl]
              [runtime :as rt]
              [storage :as s]
-             [utils :as u]]
+             [utils :as u]
+             [version :as v]]
             [monkey.ci.web
              [common :as c]
              [oauth2 :as oauth2]]
@@ -196,7 +197,7 @@
       (rur/response (s/find-repo st sid))
       (rur/status 404))))
 
-(def user-agent (str "MonkeyCI:" (config/version)))
+(def user-agent (str "MonkeyCI:" (v/version)))
 
 (defn- request-access-token [req]
   (let [code (get-in req [:parameters :query :code])

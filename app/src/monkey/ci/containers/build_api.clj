@@ -13,13 +13,14 @@
              [protocols :as p]]
             [monkey.ci.events.http :as eh]))
 
-;; FIXME Credit consumer?
 (defrecord BuildApiContainerRunner [client]
   p/ContainerRunner
   (run-container [this job]
     (let [r (-> (md/deferred)
                 (md/timeout! j/max-job-timeout))
-          evt-stream (promise)]
+          evt-stream (promise)
+          src (promise)
+          job-id (j/job-id job)]
       (-> (client {:request-method :post
                    :path "/container"
                    :body (edn/->edn {:job (j/as-serializable job)})
@@ -37,15 +38,18 @@
              is)
            bs/to-line-seq
            ms/->source
+           (fn [s]
+             (deliver src s)
+             s)
            (partial ms/filter not-empty)
            (partial ms/map eh/parse-event-line)
            (fn [events]
              ;; TODO Refactor to an event listener, so we can use existing code
-             (ms/consume (fn [{:keys [type job-id result] :as evt}]
-                           (log/debug "Got event while waiting for container" (j/job-id job) "to end:" evt)
-                           (when (and (= :container-job/end type)
+             (ms/consume (fn [{:keys [type result] :as evt}]
+                           (log/debug "Got event while waiting for container" job-id "to end:" evt)
+                           (when (and (= :job/end type)
                                       (= job-id (j/job-id job)))
-                             (log/debug "Container job" (j/job-id job) "completed:" result)
+                             (log/debug "Container job" job-id "completed:" result)
                              (md/success! r result)))
                          events)))
           (md/catch (fn [ex]
@@ -56,4 +60,9 @@
           (log/debug "Closing event stream on client side")
           (if (realized? evt-stream)
             (.close @evt-stream)
-            (log/warn "Unable to close event stream, not delivered yet.")))))))
+            (log/warn "Unable to close event inputstream, not delivered yet."))
+          ;; We need to close the stream explicitly, because it is not automatically
+          ;; closed if the input stream is closed.
+          (if (realized? src)
+            (ms/close! @src)
+            (log/warn "Unable to close source stream, not delivered yet.")))))))

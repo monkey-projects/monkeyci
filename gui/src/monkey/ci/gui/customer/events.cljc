@@ -8,6 +8,7 @@
             [monkey.ci.gui.login.db :as ldb]
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.server-events]
+            [monkey.ci.gui.time :as t]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
@@ -221,12 +222,14 @@
 
 (rf/reg-event-fx
  :customer/load-stats
+ [(rf/inject-cofx :time/now)]
  (lo/loader-evt-handler
   db/stats
-  (fn [_ _ [_ cust-id]]
+  (fn [_ ctx [_ cust-id days]]
     [:secure-request
      :get-customer-stats
-     {:customer-id cust-id}
+     (cond-> {:customer-id cust-id}
+       days (assoc :since (-> (:time/now ctx) (t/parse-epoch) (t/minus-days days) (t/to-epoch))))
      [:customer/load-stats--success]
      [:customer/load-stats--failed]])))
 

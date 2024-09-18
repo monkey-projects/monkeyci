@@ -4,7 +4,9 @@
             [clj-commons.byte-streams :as bs]
             [clojure.edn :as edn]
             [clojure.walk :as cw]
-            [monkey.ci.pem :as pem]))
+            [monkey.ci
+             [pem :as pem]
+             [version :as v]]))
 
 (def pk-sym 'com.monkeyci/PrivateKey)
 
@@ -38,3 +40,7 @@
 (defmethod ac/reader pk-sym
   [_ _ value]
   (read-pk value))
+
+(defmethod ac/reader 'version
+  [_ _ _]
+  (v/version))

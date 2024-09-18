@@ -53,9 +53,8 @@
                       (some? exception) (assoc :message (or message (.getMessage exception))
                                                :stack-trace (u/stack-trace exception)))))))
 
-;; Wraps a job so it fires an event before and after execution, and also
-;; catches any exceptions.
-(defrecord EventFiringJob [events target]
+;; Wraps a job so it catches any exceptions.
+(defrecord ErrorCatchingJob [target]
   j/Job
   (execute! [job ctx]
     (let [ctx-with-job (assoc ctx :job target)
@@ -63,37 +62,23 @@
                          (log/error "Got job exception:" ex)
                          (assoc bc/failure
                                 :exception ex
-                                :message (.getMessage ex)))
-          base-props {:start-time (u/now)
-                      :credit-multiplier (cr/credit-multiplier target ctx)}]
+                                :message (.getMessage ex)))]
       (log/debug "Executing event firing job:" (bc/job-id target))
       (md/chain
-       (p/post-events events (job-start-evt
-                              (-> ctx-with-job
-                                  (update :job
-                                          merge base-props {:status :running}))))
-       (fn [_]
-         ;; Catch both sync and async errors
-         (try 
-           (-> (j/execute! target ctx-with-job)
-               (md/catch handle-error))
-           (catch Exception ex
-             (handle-error ex))))
+       ;; Catch both sync and async errors
+       (try 
+         (-> (j/execute! target ctx-with-job)
+             (md/catch handle-error))
+         (catch Exception ex
+           (handle-error ex)))
        (fn [r]
          (log/debug "Job ended with response:" r)
-         (md/chain
-          (p/post-events events (job-end-evt
-                                 (update ctx-with-job :job
-                                         merge base-props {:end-time (u/now)})
-                                 r))
-          (constantly r)))))))
+         r)))))
 
-(defn- with-fire-events
-  "Wraps job so events are fired on start and end."
-  [events job]
-  (map->EventFiringJob (-> (j/job->event job)
-                           (assoc :target job
-                                  :events events))))
+(defn- with-catch
+  [job]
+  (map->ErrorCatchingJob (-> (j/job->event job)
+                             (assoc :target job))))
 
 (def with-extensions
   "Wraps the job so any registered extensions get executed."
@@ -109,7 +94,7 @@
   (let [pf (cond->> jobs
              ;; Filter jobs by pipeline, if given
              pipeline (j/filter-jobs (j/label-filter (pipeline-filter pipeline)))
-             true (map (comp (partial with-fire-events events) with-extensions)))]
+             true (map (comp with-catch with-extensions)))]
     (log/debug "Found" (count pf) "matching jobs:" (map bc/job-id pf))
     (let [result @(j/execute-jobs! pf rt)]
       (log/debug "Jobs executed, result is:" result)

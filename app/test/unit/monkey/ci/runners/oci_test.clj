@@ -5,11 +5,11 @@
             [clojure.string :as cs]
             [manifold.deferred :as md]
             [monkey.ci
-             [config :as mc]
              [oci :as oci]
              [runners :as r]
              [sid :as sid]
-             [utils :as u]]
+             [utils :as u]
+             [version :as v]]
             [monkey.ci.events.core :as ec]
             [monkey.ci.runners.oci :as sut]
             [monkey.ci.helpers :as h]
@@ -131,8 +131,13 @@
               (is (= 1 (count (:configs vol))))
               (is (= "config.edn" (:file-name (first (:configs vol))))))
 
-            (testing "enforces child runner"
-              (is (= :child (get-in parsed [:runner :type]))))
+            (testing "runner"
+              (let [r (:runner parsed)]
+                (testing "enforces child runner"
+                  (is (= :child (:type r))))
+
+                (testing "adds calculated credit multiplier"
+                  (is (number? (:credit-multiplier r))))))
             
             (testing "adds api token"
               (is (not-empty (get-in parsed [:api :token]))))
@@ -232,14 +237,14 @@
                :image-tag))))
 
   (testing "uses app version if no image tag configured"
-    (is (= (mc/version)
+    (is (= (v/version)
            (-> {:runner {:type :oci}}
                (r/normalize-runner-config)
                :runner
                :image-tag))))
 
   (testing "formats using app version if format string specified"
-    (is (= (str "format-" (mc/version))
+    (is (= (str "format-" (v/version))
            (-> {:runner {:type :oci
                          :image-tag "format-%s"}}
                (r/normalize-runner-config)

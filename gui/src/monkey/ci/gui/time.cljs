@@ -96,3 +96,6 @@
   "Inverse lazy sequence of dates: each next item is the previous day"
   [^DateTime until]
   (lazy-seq (cons until (reverse-date-seq (.minus until (clj->js {:days 1}))))))
+
+(defn minus-days [^DateTime t days]
+  (.minus t (clj->js {:days days})))

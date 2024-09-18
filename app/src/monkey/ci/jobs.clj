@@ -15,7 +15,9 @@
              [credits :as cr]
              [labels :as lbl]
              [protocols :as p]
-             [utils :as u]]))
+             [time :as t]
+             [utils :as u]]
+            [monkey.ci.events.core :as ec]))
 
 (def deps "Get job dependencies" :dependencies)
 (def status "Get job status" :status)
@@ -45,6 +47,54 @@
 (def failed?  (comp (partial = :failure) status))
 (def success? (comp (partial = :success) status))
 
+(defn as-serializable
+  "Converts job into something that can be converted to edn"
+  [job]
+  (letfn [(art->ser [a]
+            (select-keys a [:id :path]))]
+    (-> job
+        (select-keys (concat [:status :start-time :end-time deps labels :extensions :credit-multiplier :script
+                              :memory :cpus :arch :work-dir
+                              save-artifacts :restore-artifacts :caches]
+                             co/props))
+        (mc/update-existing :save-artifacts (partial map art->ser))
+        (mc/update-existing :restore-artifacts (partial map art->ser))
+        (mc/update-existing :caches (partial map art->ser))
+        (assoc :id (bc/job-id job)))))
+
+(def job->event
+  "Converts job into something that can be put in an event"
+  as-serializable)
+
+(defn base-event
+  "Creates a skeleton event with basic properties"
+  [type job build-sid]
+  {:type type
+   :src :script
+   :sid build-sid
+   :time (t/now)
+   :job (job->event job)})
+
+(def job-initializing-evt (partial base-event :job/initializing))
+(def job-start-evt (partial base-event :job/start))
+
+(defn job-end-evt [job build-sid {:keys [status message exception] :as r}]
+  (let [r (dissoc r :status :exception)]
+    (-> (base-event :job/end job build-sid)
+        (assoc :job (cond-> (job->event job)
+                      true (assoc :status status)
+                      ;; Add any extra information to the result key
+                      (not-empty r) (assoc :result r)
+                      (some? exception) (assoc :message (or message (ex-message exception))
+                                               :stack-trace (u/stack-trace exception)))))))
+
+(defn ex->result
+  "Creates result structure from an exception"
+  [ex]
+  (if (instance? java.lang.Exception ex)
+    (ec/exception-result ex)
+    ex))
+
 (defn- make-job-dir-absolute
   "Rewrites the job dir in the context so it becomes an absolute path, calculated
    relative to the checkout dir."
@@ -69,7 +119,7 @@
                       (cond-> j
                         (nil? (bc/job-id j)) (assoc :id (bc/job-id job))))]
       (md/chain
-       (action (rt->context rt)) ; Only pass necessary info
+       (action (rt->context rt))        ; Only pass necessary info
        (fn [r]
          (cond
            ;; Valid response
@@ -81,20 +131,29 @@
 
 (extend-protocol Job
   monkey.ci.build.core.ActionJob
-  (execute! [job rt]
-    (let [a (-> (recurse-action job)
+  (execute! [job ctx]
+    (let [build-sid (comp build/sid :build)
+          a (-> (recurse-action job)
                 (cache/wrap-caches)
-                (art/wrap-artifacts))]
-      (-> rt
+                (art/wrap-artifacts))
+          job (assoc job
+                     :start-time (t/now))]
+      (ec/post-events (:events ctx)
+                      [(job-start-evt (assoc job :status :running) build-sid)])
+      (-> ctx
           (make-job-dir-absolute)
           (a)
           (md/chain 
-           #(or % bc/success)))))
+           #(or % bc/success)
+           (fn [r]
+             (md/chain
+              (ec/post-events (:events ctx) [(job-end-evt (assoc job :end-time (t/now)) build-sid r)])
+              (constantly r)))))))
 
   monkey.ci.build.core.ContainerJob
-  (execute! [this rt]
+  (execute! [this ctx]
     (md/chain
-     (p/run-container (:containers rt) this)
+     (p/run-container (:containers ctx) this)
      (fn [r]
        ;; Don't add the full result otherwise it will be sent out as an event
        (if (= 0 (:exit r))
@@ -336,25 +395,6 @@
        (mapcat #(resolve-jobs % rt))
        (filter job?)))
 
-(defn as-serializable
-  "Converts job into something that can be converted to edn"
-  [job]
-  (letfn [(art->ser [a]
-            (select-keys a [:id :path]))]
-    (-> job
-        (select-keys (concat [:status :start-time :end-time deps labels :extensions :credit-multiplier :script
-                              :memory :cpus :arch :work-dir
-                              save-artifacts :restore-artifacts :caches]
-                             co/props))
-        (mc/update-existing :save-artifacts (partial map art->ser))
-        (mc/update-existing :restore-artifacts (partial map art->ser))
-        (mc/update-existing :caches (partial map art->ser))
-        (assoc :id (bc/job-id job)))))
-
-(def job->event
-  "Converts job into something that can be put in an event"
-  as-serializable)
-
 (extend-protocol cr/CreditConsumer
   monkey.ci.build.core.ActionJob
   (credit-multiplier [job rt]
@@ -363,3 +403,6 @@
   monkey.ci.build.core.ContainerJob
   (credit-multiplier [job rt]
     ((cr/container-credit-consumer-fn rt) job)))
+
+(defn set-credit-multiplier [job cm]
+  (assoc job :credit-multiplier cm))

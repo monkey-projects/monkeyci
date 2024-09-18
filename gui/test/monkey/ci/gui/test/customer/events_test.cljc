@@ -297,10 +297,9 @@
 (deftest customer-load-recent-builds
   (testing "sends request to backend"
     (rf-test/run-test-sync
-     (let [builds []
-           c (h/catch-fx :martian.re-frame/request)]
+     (let [c (h/catch-fx :martian.re-frame/request)]
        (h/initialize-martian {:get-recent-builds {:status 200
-                                                  :body builds
+                                                  :body []
                                                   :error-code :no-error}})
        (is (some? (:martian.re-frame/martian @app-db)))
        (rf/dispatch [:customer/load-recent-builds "test-customer"])
@@ -322,15 +321,24 @@
 (deftest customer-load-stats
   (testing "sends request to backend"
     (rf-test/run-test-sync
-     (let [builds []
-           c (h/catch-fx :martian.re-frame/request)]
+     (let [c (h/catch-fx :martian.re-frame/request)]
        (h/initialize-martian {:get-customer-stats {:status 200
-                                                   :body builds
+                                                   :body {:stats ::test}
                                                    :error-code :no-error}})
        (is (some? (:martian.re-frame/martian @app-db)))
        (rf/dispatch [:customer/load-stats "test-customer"])
        (is (= 1 (count @c)))
-       (is (= :get-customer-stats (-> @c first (nth 2))))))))
+       (is (= :get-customer-stats (-> @c first (nth 2)))))))
+
+  (testing "adds `since` query param if days given"
+    (rf-test/run-test-sync
+     (let [c (h/catch-fx :martian.re-frame/request)]
+       (h/initialize-martian {:get-customer-stats {:status 200
+                                                   :body {}
+                                                   :error-code :no-error}})
+       (is (some? (:martian.re-frame/martian @app-db)))
+       (rf/dispatch [:customer/load-stats "test-customer" 10])
+       (is (number? (-> @c first (nth 3) :since)))))))
 
 (deftest customer-load-stats--success
   (testing "sets builds in db"
