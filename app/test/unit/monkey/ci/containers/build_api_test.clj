@@ -1,5 +1,6 @@
 (ns monkey.ci.containers.build-api-test
   (:require [clojure.test :refer [deftest testing is]]
+            [clj-commons.byte-streams :as bs]
             [clojure.java.io :as io]
             [manifold
              [deferred :as md]
@@ -62,3 +63,4 @@
         (let [r (p/run-container runner job)]
           (is (md/deferred? r))
           (is (= ::test-result (deref r 1000 ::timeout))))))))
+
