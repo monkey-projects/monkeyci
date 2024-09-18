@@ -135,9 +135,11 @@
     (let [build-sid (comp build/sid :build)
           a (-> (recurse-action job)
                 (cache/wrap-caches)
-                (art/wrap-artifacts))]
+                (art/wrap-artifacts))
+          job (assoc job
+                     :start-time (t/now))]
       (ec/post-events (:events ctx)
-                      [(job-start-evt job build-sid)])
+                      [(job-start-evt (assoc job :status :running) build-sid)])
       (-> ctx
           (make-job-dir-absolute)
           (a)
@@ -145,7 +147,7 @@
            #(or % bc/success)
            (fn [r]
              (md/chain
-              (ec/post-events (:events ctx) [(job-end-evt job build-sid r)])
+              (ec/post-events (:events ctx) [(job-end-evt (assoc job :end-time (t/now)) build-sid r)])
               (constantly r)))))))
 
   monkey.ci.build.core.ContainerJob

@@ -15,6 +15,21 @@
              [martian :as os]
              [stream :as s]]))
 
+;; Cpu architectures
+(def arch-arm :arm)
+(def arch-amd :amd)
+(def valid-architectures #{arch-arm arch-amd})
+
+(def arch-shapes
+  "Architectures mapped to OCI shapes"
+  {arch-arm
+   {:shape "CI.Standard.A1.Flex"
+    :credits 1}
+   arch-amd
+   {:shape "CI.Standard.E4.Flex"
+    :credits 2}})
+(def default-arch arch-arm)
+
 (defn stream-to-bucket
   "Pipes an input stream to a bucket object using multipart uploads.
    Returns a deferred that will resolve when the upload completes.
@@ -183,7 +198,7 @@
   (-> conf
       (select-keys [:compartment-id :image-pull-secrets :vnics :freeform-tags])
       (assoc :container-restart-policy "NEVER"
-             :shape "CI.Standard.A1.Flex" ; Use ARM shape, it's cheaper
+             :shape (get-in arch-shapes [default-arch :shape]) ; Use ARM shape, it's cheaper
              :shape-config {:ocpus default-cpu-count
                             :memory-in-g-bs default-memory-gb}
              :availability-domain (pick-ad conf)
@@ -229,3 +244,12 @@
            (fs/file-name)
            (fs/path work-dir)
            (str)))
+
+(defn credit-multiplier
+  "Calculates the credit multiplier that needs to be applied for the container
+   instance.  This varies depending on the architecture, number of cpu's and 
+   amount of memory."
+  [arch cpus mem]
+  (+ (* cpus
+        (get-in arch-shapes [arch :credits] 1))
+     mem))

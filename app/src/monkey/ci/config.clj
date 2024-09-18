@@ -16,7 +16,8 @@
             [monkey.ci
              [edn]
              [sid :as sid]
-             [utils :as u]]))
+             [utils :as u]
+             [version :as v]]))
 
 (def ^:dynamic *global-config-file* "/etc/monkeyci/config.edn")
 (def ^:dynamic *home-config-file* (-> (System/getProperty "user.home")
@@ -25,10 +26,6 @@
                                       str))
 
 (def env-prefix "monkeyci")
-
-;; Determine version at compile time
-(defmacro version []
-  (or (System/getenv (csk/->SCREAMING_SNAKE_CASE (str env-prefix "-version"))) "0.1.0-SNAPSHOT"))
 
 (defn- key-filter [prefix]
   (let [exp (str (name prefix) "-")]

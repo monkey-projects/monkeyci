@@ -13,7 +13,8 @@
              [oci :as oci]
              [protocols :as p]
              [runtime :as rt]
-             [utils :as u]]
+             [utils :as u]
+             [version :as v]]
             [monkey.ci.common.preds :as cp]
             [monkey.ci.config.sidecar :as cs]
             [monkey.ci.containers.oci :as sut]
@@ -586,14 +587,14 @@
                 :image-tag))))
 
   (testing "takes app version if no tag specified"
-    (is (= (c/version)
+    (is (= (v/version)
            (->> {:containers {:type :oci}}
                 (c/normalize-key :containers)
                 :containers
                 :image-tag))))
 
   (testing "formats using app version when format string specified"
-    (is (= (str "test-format-" (c/version))
+    (is (= (str "test-format-" (v/version))
            (->> {:containers {:type :oci
                               :image-tag "test-format-%s"}}
                 (c/normalize-key :containers)

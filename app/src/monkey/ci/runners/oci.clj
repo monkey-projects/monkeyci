@@ -12,7 +12,8 @@
              [oci :as oci]
              [runners :as r]
              [runtime :as rt]
-             [spec :as s]]
+             [spec :as s]
+             [version :as v]]
             [monkey.ci.events.core :as ec]
             [monkey.ci.spec.build :as sb]
             [monkey.ci.web.auth :as auth]
@@ -33,33 +34,43 @@
 (defn- prepare-config-for-oci [config]
   (-> config
       ;; Enforce child runner
-      (assoc :runner {:type :child})))
+      (assoc :runner {:type :child
+                      ;; Credit multiplier for action jobs
+                      :credit-multiplier (oci/credit-multiplier
+                                          oci/default-arch
+                                          oci/default-cpu-count
+                                          oci/default-memory-gb)})))
 
-(defn- add-ssh-keys-dir [build conf]
+(defn- add-ssh-keys-dir [conf build]
   (cond-> conf
     (build-ssh-keys build) (assoc-in [:build :git :ssh-keys-dir] ssh-keys-dir)))
 
-(defn- add-log-config-path [rt conf]
+(defn- add-log-config-path [conf rt]
   (cond-> conf
     (log-config rt) (assoc-in [:runner :log-config] (str log-config-dir "/" log-config-file))))
 
 (defn- add-api-token
   "Generates a new API token that can be used by the build runner to invoke
    certain API calls."
-  [build rt conf]
+  [conf build rt]
   (assoc-in conf [:api :token] (auth/generate-jwt-from-rt rt (auth/build-token (b/sid build)))))
 
 (defn- rt->config [build rt]
   ;; TODO Also calculate credit multiplier for action jobs in this build
-  (->> (-> (rt/rt->config rt)
-           (dissoc :app-mode :git :github :http :args :jwk :checkout-base-dir :storage
-                   :ssh-keys-dir :work-dir :oci :runner)
-           (assoc :build (dissoc build :ssh-keys :cleanup? :status))
-           (update :events mm/meta-merge (get-in rt [rt/config :runner :events])))
-       (prepare-config-for-oci)
-       (add-ssh-keys-dir build)
-       (add-log-config-path rt)
-       (add-api-token build rt)))
+  (-> (rt/rt->config rt)
+      ;; TODO Move the config needed by the runner under the runner config itself
+      (select-keys [:containers :logging :workspace :cache :artifacts :sidecar :promtail])
+      #_(dissoc :app-mode :git :github :http :args :jwk :checkout-base-dir :storage
+                :ssh-keys-dir :work-dir :oci :runner)
+      (assoc :build (dissoc build :ssh-keys :cleanup? :status)
+             ;; TODO Use aero tags in the config, instead of doing this manually here
+             :events (-> (get-in rt [rt/config :events])
+                         (dissoc :server) ; Child processes never start an event server
+                         (mm/meta-merge (get-in rt [rt/config :runner :events]))))
+      (prepare-config-for-oci)
+      (add-ssh-keys-dir build)
+      (add-log-config-path rt)
+      (add-api-token build rt)))
 
 (defn- ->edn [build rt]
   (-> (rt->config build rt)
@@ -198,7 +209,8 @@
        (fn [r]
          (or (-> r :body :containers first :exit-code) 1)))
       ;; Do not launch build/end event, that is already done by the script container.
-      ;; FIXME In case of a request error (e.g. 429 status) the build never finishes, since an end event is not sent.
+      ;; FIXME In case of a request error (e.g. 429 status) the build never finishes,
+      ;; since an end event is not sent.
       (md/catch
           (fn [ex]
             (log/error "Got error from container instance:" ex)
@@ -210,4 +222,5 @@
     (partial oci-runner client conf)))
 
 (defmethod r/normalize-runner-config :oci [conf]
-  (update-in conf [:runner :image-tag] #(format (or % "%s") (config/version))))
+  ;; TODO Use aero reader tags instead
+  (update-in conf [:runner :image-tag] #(format (or % "%s") (v/version))))

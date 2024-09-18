@@ -13,14 +13,14 @@
             [medley.core :as mc]
             [monkey.ci
              [build :as b]
-             [config :refer [version] :as config]
+             [config :as config]
              [edn :as edn]
              [logging :as l]
              [runtime :as rt]
              [script :as script]
              [sidecar]
              [utils :as utils]
-             [workspace]]
+             [version :as v]]
             [monkey.ci.build
              [api-server :as as]
              [core :as bc]]
@@ -101,7 +101,7 @@
   (let [version-or (fn [f]
                      (if (rt/dev-mode? rt)
                        {:local/root (f)}
-                       {:mvn/version (version)}))
+                       {:mvn/version (v/version)}))
         log-config (find-log-config build rt)]
     (log/debug "Child process log config:" log-config)
     {:paths [(b/script-dir build)]
@@ -135,11 +135,6 @@
   (let [id (b/build-id build)]
     ((log-maker rt) build [id (str (name type) ".log")])))
 
-#_(defn- start-api-server [build rt]
-  (-> (as/rt->api-server-config rt)
-      (as/with-build build)
-      (as/start-server)))
-
 (defn execute!
   "Executes the build script located in given directory.  This actually runs the
    clojure cli with a generated `build` alias.  This expects absolute directories.
@@ -149,10 +144,6 @@
   (let [script-dir (b/script-dir build)
         [out err :as loggers] (map (partial make-logger rt build) [:out :err])
         result (md/deferred)
-        ;; Start api server
-        ;; api-srv (start-api-server build rt)
-        ;; stop-server (fn []
-        ;;               (some-> api-srv :server (.close)))
         cmd ["clojure"
              "-Sdeps" (pr-str (generate-deps build rt))
              "-X:monkeyci/build"
@@ -175,7 +166,4 @@
                                             :exit exit})))})
         ;; Depending on settings, some process streams need handling
         (l/handle-process-streams loggers))
-    #_(md/finally
-      result
-      stop-server)
     result))

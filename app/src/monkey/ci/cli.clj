@@ -3,7 +3,7 @@
             [monkey.ci
              [build :as b]
              [commands :as cmd]
-             [config :as config]]))
+             [version :as v]]))
 
 (def script-location-opt
   {:as "Script location"
@@ -125,7 +125,7 @@
 (def base-config
   {:name "monkey-ci"
    :description "MonkeyCI: Powerful build pipeline runner"
-   :version (config/version)
+   :version (v/version)
    :opts [{:as "Working directory"
            :option "workdir"
            :short "w"

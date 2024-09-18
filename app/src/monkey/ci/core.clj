@@ -21,6 +21,7 @@
              [runners]
              [sidecar]
              [utils :as u]
+             [version :as v]
              [workspace]]
             [monkey.ci.containers
              [oci]]
@@ -57,7 +58,7 @@
   "Main entry point for the application."
   [& args]
   (try
-    (log/info "Starting MonkeyCI version" (config/version))
+    (log/info "Starting MonkeyCI version" (v/version))
     (cli/run-cmd args (make-cli-config {:env env}))
     (catch Throwable ex
       (log/error "Failed to run application" ex)

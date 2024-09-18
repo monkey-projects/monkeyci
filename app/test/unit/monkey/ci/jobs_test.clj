@@ -239,11 +239,14 @@
     
     (testing "fires `job/start` event"
       (let [evt (h/first-event-by-type :job/start (h/received-events events))]
-        (is (some? evt))))
+        (is (some? evt))
+        (is (number? (get-in evt [:job :start-time])))))
 
     (testing "fires `job/end` event"
-      (let [evt (h/first-event-by-type :job/start (h/received-events events))]
-        (is (some? evt))))))
+      (let [{:keys [job] :as evt} (h/first-event-by-type :job/end (h/received-events events))]
+        (is (some? evt))
+        (is (number? (:start-time job)))
+        (is (number? (:end-time job)))))))
 
 (deftest execute-jobs!
   (let [ctx {:events (h/fake-events)}]

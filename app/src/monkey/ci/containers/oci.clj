@@ -11,7 +11,6 @@
             [medley.core :as mc]
             [monkey.ci
              [build :as b]
-             [config :as c]
              [containers :as mcc]
              [edn :as edn]
              [jobs :as j]
@@ -19,7 +18,8 @@
              [protocols :as p]
              [runtime :as rt]
              [time :as t]
-             [utils :as u]]
+             [utils :as u]
+             [version :as v]]
             [monkey.ci.config.sidecar :as cos]
             [monkey.ci.containers.promtail :as pt]
             [monkey.ci.events.core :as ec]
@@ -49,23 +49,8 @@
 (def promtail-config-dir "/etc/promtail")
 (def promtail-config-file "config.yml")
 
-;; Cpu architectures
-(def arch-arm :arm)
-(def arch-amd :amd)
-(def valid-architectures #{arch-arm arch-amd})
-
-(def arch-shapes
-  "Architectures mapped to OCI shapes"
-  {arch-arm
-   {:shape "CI.Standard.A1.Flex"
-    :credits 1}
-   arch-amd
-   {:shape "CI.Standard.E4.Flex"
-    :credits 2}})
-(def default-arch arch-arm)
-
 (defn- job-arch [job]
-  (get job :arch default-arch))
+  (get job :arch oci/default-arch))
 
 (defn- checkout-dir
   "Checkout dir for the build in the job container"
@@ -227,7 +212,7 @@
                 log-config (conj (oci/config-entry "logback.xml" log-config)))}))
 
 (defn- set-pod-shape [ic job]
-  (assoc ic :shape (get-in arch-shapes [(job-arch job) :shape])))
+  (assoc ic :shape (get-in oci/arch-shapes [(job-arch job) :shape])))
 
 (defn- set-pod-memory [ic job]
   (-> ic
@@ -344,9 +329,9 @@
   "Calculates the credit multiplier that needs to be applied for the job.  This 
    varies depending on the architecture, number of cpu's and amount of memory."
   [job]
-  (+ (* (get job :cpus oci/default-cpu-count)     
-        (get-in arch-shapes [(job-arch job) :credits] 1))
-     (get job :memory oci/default-memory-gb)))
+  (oci/credit-multiplier (job-arch job)
+                         (get job :cpus oci/default-cpu-count)
+                         (get job :memory oci/default-memory-gb)))
 
 (defn- base-event
   "Creates a skeleton event with basic properties"
@@ -417,7 +402,7 @@
 
 (defmethod mcc/normalize-containers-config :oci [conf]
   ;; Take app version if no image version specified
-  (update-in conf [:containers :image-tag] #(format (or % "%s") (c/version))))
+  (update-in conf [:containers :image-tag] #(format (or % "%s") (v/version))))
 
 (defrecord OciContainerRunner [conf events credit-consumer]
   p/ContainerRunner

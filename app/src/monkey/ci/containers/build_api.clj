@@ -64,5 +64,5 @@
           ;; We need to close the stream explicitly, because it is not automatically
           ;; closed if the input stream is closed.
           (if (realized? src)
-            (ms/close! src)
+            (ms/close! @src)
             (log/warn "Unable to close source stream, not delivered yet.")))))))
