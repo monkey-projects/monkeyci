@@ -13,13 +13,13 @@
              [protocols :as p]]
             [monkey.ci.events.http :as eh]))
 
-;; FIXME Credit consumer?
 (defrecord BuildApiContainerRunner [client]
   p/ContainerRunner
   (run-container [this job]
     (let [r (-> (md/deferred)
                 (md/timeout! j/max-job-timeout))
-          evt-stream (promise)]
+          evt-stream (promise)
+          job-id (j/job-id job)]
       (-> (client {:request-method :post
                    :path "/container"
                    :body (edn/->edn {:job (j/as-serializable job)})
@@ -41,12 +41,11 @@
            (partial ms/map eh/parse-event-line)
            (fn [events]
              ;; TODO Refactor to an event listener, so we can use existing code
-             ;; TODO Wait for job events instead
-             (ms/consume (fn [{:keys [type job-id result] :as evt}]
-                           (log/debug "Got event while waiting for container" (j/job-id job) "to end:" evt)
-                           (when (and (= :container-job/end type)
+             (ms/consume (fn [{:keys [type result] :as evt}]
+                           (log/debug "Got event while waiting for container" job-id "to end:" evt)
+                           (when (and (= :job/end type)
                                       (= job-id (j/job-id job)))
-                             (log/debug "Container job" (j/job-id job) "completed:" result)
+                             (log/debug "Container job" job-id "completed:" result)
                              (md/success! r result)))
                          events)))
           (md/catch (fn [ex]

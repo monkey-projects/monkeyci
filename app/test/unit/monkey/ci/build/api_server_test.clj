@@ -230,10 +230,10 @@
         sid (repeatedly 3 (comp str random-uuid))
         build {:build-id "test-build"
                :sid sid}
-        rt {:containers (-> (h/fake-container-runner)
-                            (assoc :credit-consumer (constantly 1)))
+        rt {:containers (h/fake-container-runner)
             :build build
             :events events}]
+    
     (testing "invokes registered container runner with job settings from body"
       (let [job {:id "test-job"}
             res (-> rt
@@ -242,22 +242,7 @@
                     (sut/start-container))]
         (is (= 202 (:status res)))
         (is (= [job]
-               (-> rt :containers :runs deref)))))
-
-    (testing "adds credit multiplier in the response"
-      (let [job {:id "test-job"}
-            res (-> rt
-                    (->req)
-                    (assoc-in [:parameters :body] {:job job})
-                    (sut/start-container))]
-        (is (= 1 (-> res :body :job :credit-multiplier)))))
-
-    (testing "fires `:container/job-end` event"
-      (is (= {:type :container-job/end
-              :job-id "test-job"
-              :sid sid
-              :result {:exit 0}}
-             (first @(:recv events)))))))
+               (-> rt :containers :runs deref)))))))
 
 (deftest get-ip-addr
   (testing "returns ipv4 address"

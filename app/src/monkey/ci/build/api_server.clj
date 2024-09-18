@@ -234,19 +234,11 @@
 
 (defn start-container [req]
   (let [job (get-in req [:parameters :body :job])
-        containers (req->containers req)
-        fire-end-event (fn [res]
-                         (log/debug "Container finished, dispatching :container-job/end event")
-                         (p/post-events (req->events req)
-                                        {:type :container-job/end
-                                         :sid (build/sid (req->build req))
-                                         :job-id (j/job-id job)
-                                         :result res}))]
+        containers (req->containers req)]
     ;; Start the container, don't wait for the result.  It's up to the client
     ;; to monitor job end event.
-    (-> (p/run-container containers job)
-        (md/chain fire-end-event))
-    (-> (rur/response {:job (j/set-credit-multiplier job (credits/container-credit-multiplier containers job))})
+    (p/run-container containers job)
+    (-> (rur/response {:job job})
         (rur/status 202))))
 
 (def edn #{"application/edn"})

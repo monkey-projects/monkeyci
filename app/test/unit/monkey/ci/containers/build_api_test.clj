@@ -10,6 +10,7 @@
             [monkey.ci
              [containers :as mcc]
              [edn :as edn]
+             [jobs :as j]
              [protocols :as p]]
             [monkey.ci.containers.build-api :as sut]
             [monkey.ci.test.aleph-test :as at]))
@@ -44,15 +45,16 @@
                                                         (throw (ex-info "test error" {})))]
         (is (thrown? Exception (deref (p/run-container runner job) 1000 ::timeout)))))
 
-    (testing "reads events until `container-job/end` event has been received"
+    (testing "reads events until `job/end` event has been received"
       (at/with-fake-http ["http://test-api/container"
                           (fn [req]
                             (swap! invocations conj req)
                             {:status 202})
                           "http://test-api/events"
                           {:status 200
-                           :body (-> (str "data: " (pr-str {:type :container-job/end
-                                                            :job-id (:id job)
+                           :body (-> (str "data: " (pr-str {:type :job/end
+                                                            :job (j/as-serializable job)
+                                                            :sid ["some" "sid"] 
                                                             :result ::test-result})
                                           "\n\n")
                                      (.getBytes)
