@@ -17,9 +17,10 @@
                      (str evt-prefix (pr-str evt) "\n\n"))
         listener (fn [evt]
                    (ms/put! stream (make-reply evt)))]
+    (log/info "Opening event stream for filter:" evt-filter)
     (ms/on-drained stream
                    (fn []
-                     (log/info "Closing event stream")
+                     (log/info "Closing event stream for filter" evt-filter)
                      (ec/remove-listener events evt-filter listener)))
     ;; Only process events matching the filter
     (ec/add-listener events evt-filter listener)

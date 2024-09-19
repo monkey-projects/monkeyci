@@ -59,7 +59,7 @@
   ;; TODO Also calculate credit multiplier for action jobs in this build
   (-> (rt/rt->config rt)
       ;; TODO Move the config needed by the runner under the runner config itself
-      (select-keys [:containers :logging :workspace :cache :artifacts :sidecar :promtail])
+      (select-keys [:containers :logging :workspace :cache :artifacts :sidecar :promtail :api])
       #_(dissoc :app-mode :git :github :http :args :jwk :checkout-base-dir :storage
                 :ssh-keys-dir :work-dir :oci :runner)
       (assoc :build (dissoc build :ssh-keys :cleanup? :status)

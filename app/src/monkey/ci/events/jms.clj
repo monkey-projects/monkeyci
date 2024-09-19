@@ -63,6 +63,7 @@
   [listeners]
   (fn [evt]
     (log/debug "Event received:" evt)
+    ;; It's important that no listeners block, otherwise the entire handler will stop working.
     (doseq [l @listeners]
       ((:listener l) evt))))
 
