@@ -315,12 +315,15 @@
       (rur/not-found nil))))
 
 (def allowed-events
-  #{:build/start
+  #{:build/initializing
+    :build/start
     :build/end
     :build/updated
     :script/start
     :script/end
+    :job/initializing
     :job/start
+    :job/updated
     :job/end})
 
 (defn event-stream
