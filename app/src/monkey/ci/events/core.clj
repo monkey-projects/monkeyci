@@ -131,7 +131,7 @@
   (let [r (md/deferred)
         l (fn [evt]
             (when (or (nil? pred) (pred evt))
-              (log/debug "Matching event has arrived")
+              (log/debug "Matching event has arrived for filter" ef ":" evt)
               (md/success! r evt)))
         unregister (fn []
                      (remove-listener events ef l))]

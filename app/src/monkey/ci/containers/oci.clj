@@ -260,6 +260,7 @@
   (* 5 60 1000))
 
 (defn wait-for-startup [events sid job-id]
+  (log/debug "Waiting for container startup:" job-id)
   (-> (ec/wait-for-event events
                          {:types #{:container/start}
                           :sid sid}
@@ -267,15 +268,19 @@
       (md/timeout! container-start-timeout)
       (md/chain
        (fn [evt]
-         (ec/post-events events [{:type :job/start
-                                  :sid sid
-                                  :job (-> (:job evt)
-                                           (assoc :start-time (t/now)))}])))))
+         (log/debug "Detected container start:" job-id)
+         (md/chain
+          (ec/post-events events [{:type :job/start
+                                   :sid sid
+                                   :job (-> (:job evt)
+                                            (assoc :start-time (t/now)))}])
+          (constantly evt))))))
 
 (defn wait-for-instance-end-events
   "Checks the incoming events to see if a container and job end event has been received.
    Returns a deferred that will contain both events, or that times out after `max-timeout`."
   [events sid job-id max-timeout]
+  (log/debug "Waiting for job containers to terminate:" job-id)
   (letfn [(wait-for [t]
             ;; FIXME Seems like the timeout does not always work.
             (md/timeout!
