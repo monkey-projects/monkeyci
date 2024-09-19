@@ -7,7 +7,8 @@
    themselves under a specific namespaced keyword.  If this key is found in
    job properties, the associated extension code is executed.  Extensions can
    be executed before or after a job (or both)."
-  (:require [manifold.deferred :as md]
+  (:require [clojure.tools.logging :as log]
+            [manifold.deferred :as md]
             [monkey.ci
              [build :as b]
              [credits :as cr]
@@ -34,13 +35,21 @@
   (when-let [m (get-method mm k)]
     #(m k %)))
 
+(defn- run-safe [f ctx]
+  (try
+    (f ctx)
+    (catch Exception ex
+      (log/error "Failed to apply extension" ex)
+      ;; Return context unchanged
+      ctx)))
+
 (defn- apply-extensions [{:keys [job] :as rt} registered rk mm]
   (->> (keys job)
        (reduce (fn [r k]
                  (let [b (or (get-in registered [k rk])
                              (find-mm k mm))]
-                   (cond-> r
-                     b (b))))
+                   (cond->> r
+                     b (run-safe b))))
                rt)))
 
 (defn apply-extensions-before

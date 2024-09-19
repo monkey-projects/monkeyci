@@ -50,7 +50,8 @@
                      :commit-id "test-commit"
                      :ssh-keys [{:private-key "test-privkey"
                                  :public-key "test-pubkey"}]}}
-        rt (trt/test-runtime)
+        rt (-> (trt/test-runtime)
+               (assoc-in [:config :api :url] "http://test-api"))
         conf {:availability-domain "test-ad"
               :compartment-id "test-compartment"
               :image-pull-secrets "test-secrets"
@@ -141,6 +142,9 @@
             
             (testing "adds api token"
               (is (not-empty (get-in parsed [:api :token]))))
+
+            (testing "copies configured api"
+              (is (some? (get-in parsed [:api :url]))))
 
             (testing "api token contains serialized build sid in sub"
               (is (= (sid/serialize-sid (:sid build))
