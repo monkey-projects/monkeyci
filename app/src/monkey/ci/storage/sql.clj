@@ -494,6 +494,10 @@
   (->> (eb/select-builds-for-customer-since conn cust-id ts)
        (map db->build)))
 
+(defn- select-latest-build [{:keys [conn]} [cust-id repo-id]]
+  (some-> (eb/select-latest-build conn cust-id repo-id)
+          (db->build)))
+
 (defn- select-max-build-idx [{:keys [conn]} [cust-id repo-id]]
   ;; TODO Use repo-indices table instead
   (eb/select-max-idx conn cust-id repo-id))
@@ -686,7 +690,8 @@
    {:list-user select-user-join-requests}
    :build
    {:list select-repo-builds
-    :list-since select-customer-builds-since}
+    :list-since select-customer-builds-since
+    :find-latest select-latest-build}
    :email-registration
    {:list select-email-registrations
     :find-by-email select-email-registration-by-email}

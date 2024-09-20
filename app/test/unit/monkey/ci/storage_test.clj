@@ -164,13 +164,13 @@
   (testing "retrieves latest build by build id"
     (h/with-memory-store st
       (let [repo-sid ["test-customer" "test-repo"]
-            build-ids (->> (range)
-                           (map (partial format "build-%d"))
-                           (take 2))
-            builds (map (comp (partial zipmap [:customer-id :repo-id :build-id])
-                              (partial conj repo-sid))
-                        build-ids)]
-        (doseq [b builds]
+            build-idxs (range 2)
+            builds (->> build-idxs
+                        (map (fn [idx]
+                               (-> (zipmap [:customer-id :repo-id] repo-sid)
+                                   (assoc :build-id (format "build-%d" idx)
+                                          :idx idx)))))]
+         (doseq [b builds]
           (is (sid/sid? (sut/save-build st b))))
         (let [l (sut/find-latest-build st repo-sid)]
           (is (= (last builds) l)))))))

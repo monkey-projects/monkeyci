@@ -355,9 +355,33 @@
           (is (sid/sid? (st/save-build s old-build)))
           (is (sid/sid? (st/save-build s new-build)))
           (let [r (st/list-builds-since s (:id cust) 150)]
-            (is (= [(:id new-build)] (map :id r)))
+            (is (= [(:build-id new-build)] (map :build-id r)))
             (is (= (:id cust) (:customer-id (first r))))
-            (is (= (:id repo) (:repo-id (first r))))))))))
+            (is (= (:id repo) (:repo-id (first r)))))))
+
+      (testing "can find latest by build index"
+        (let [repo (h/gen-repo)
+              cust (-> (h/gen-cust)
+                       (assoc :repos {(:id repo) repo}))
+              old-build (-> (h/gen-build)
+                            (assoc :customer-id (:id cust)
+                                   :repo-id (:id repo)
+                                   :start-time 100
+                                   :idx 9
+                                   :build-id "build-9")
+                            (dissoc :script))
+              new-build (-> (h/gen-build)
+                            (assoc :customer-id (:id cust)
+                                   :repo-id (:id repo)
+                                   :start-time 200
+                                   :idx 10
+                                   :build-id "build-10")
+                            (dissoc :script))]
+          (is (sid/sid? (st/save-customer s cust)))
+          (is (sid/sid? (st/save-build s old-build)))
+          (is (sid/sid? (st/save-build s new-build)))
+          (let [r (st/find-latest-build s [(:id cust) (:id repo)])]
+            (is (= (:build-id new-build) (:build-id r)))))))))
 
 (deftest ^:sql join-requests
   (with-storage conn s
