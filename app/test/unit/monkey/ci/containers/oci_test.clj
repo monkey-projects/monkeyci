@@ -499,7 +499,29 @@
       (is (some? res))
       (let [evt (deref evt 1000 :timeout)]
         (is (not= :timeout evt))
-        (is (= :job/start (:type evt)))))))
+        (is (= :job/start (:type evt))))))
+
+  (testing "fails when `sidecar/end` is received before `container/start`"
+    (let [events (ec/make-events {:type :manifold})
+          sid (random-build-sid)
+          job (h/gen-job)
+          conf {:events events
+                :job job
+                :build {:sid sid}}
+          details {:body
+                   {:containers [{:display-name sut/sidecar-container-name}
+                                 {:display-name sut/job-container-name}]}}
+          res (sut/wait-for-results conf 100 (constantly details))
+          evt (ec/wait-for-event events {:types #{:job/start :job/end}})]
+      (is (some? (rt/post-events conf
+                                 [{:type :sidecar/end
+                                   :sid sid
+                                   :job job
+                                   :result {:exit 1}}])))
+      (is (some? res))
+      (let [evt (deref evt 1000 :timeout)]
+        (is (not= :timeout evt))
+        (is (= :job/end (:type evt)))))))
 
 (deftest run-container
   (let [events (h/fake-events)

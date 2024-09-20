@@ -259,22 +259,43 @@
   "Max msecs to wait until container has started"
   (* 5 60 1000))
 
-(defn wait-for-startup [events sid job-id]
-  (log/debug "Waiting for container startup:" job-id)
-  (-> (ec/wait-for-event events
-                         {:types #{:container/start}
-                          :sid sid}
-                         #(= job-id (get-in % [:job :id])))
-      (md/timeout! container-start-timeout)
-      (md/chain
-       (fn [evt]
-         (log/debug "Detected container start:" job-id)
-         (md/chain
-          (ec/post-events events [{:type :job/start
-                                   :sid sid
-                                   :job (-> (:job evt)
-                                            (assoc :start-time (t/now)))}])
-          (constantly evt))))))
+(defn wait-for-startup
+  "Waits until a container start event has been received.  This is the indication
+   that user code is running, so we can send out a job/start event and register the
+   job start time.  If a sidecar error is received before that, it means something
+   is wrong."
+  [events sid job-id]
+  (letfn [(container-started [evt]
+            (log/debug "Detected container start:" job-id)
+            (md/chain
+             (ec/post-events events [{:type :job/start
+                                      :sid sid
+                                      :job (-> (:job evt)
+                                               (assoc :start-time (t/now)))}])
+             (constantly evt)))
+          (sidecar-failed [evt]
+            (let [now (t/now)]
+              (log/warn "Detected sidecar failure for job" job-id)
+              (md/chain
+               (ec/post-events events [{:type :job/end
+                                        :sid sid
+                                        :job (-> (:job evt)
+                                                 (assoc :start-time now
+                                                        :end-time now))}])
+               (constantly (md/error-deferred (ex-info "Sidecar failed to start" evt))))))]
+    (log/debug "Waiting for container startup:" job-id)
+    (-> (ec/wait-for-event events
+                           {:types #{:container/start :sidecar/end}
+                            :sid sid}
+                           #(= job-id (get-in % [:job :id])))
+        (md/timeout! container-start-timeout)
+        (md/chain
+         (fn [evt]
+           (condp = (:type evt)
+             :container/start
+             (container-started evt)
+             :sidecar/end
+             (sidecar-failed evt)))))))
 
 (defn wait-for-instance-end-events
   "Checks the incoming events to see if a container and job end event has been received.

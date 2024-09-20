@@ -2,9 +2,10 @@
   "Spec definitions for events"
   (:require [clojure.spec.alpha :as s]))
 
-(s/def ::type #{:sync :manifold :zmq :jms})
+(s/def ::type keyword?)
+(s/def ::message string?)
+(s/def ::time int?)
+(s/def ::src keyword?)
 
-(s/def ::config
-  (s/keys :req-un [::type]))
-
-(s/def ::events ::config)
+(s/def ::event (s/keys :req-un [::type ::time]
+                       :opt-un [::message ::src]))
