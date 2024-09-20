@@ -108,4 +108,7 @@
         
         (testing "downloads artifact using api"
           (is (some? @(sut/restore-artifact repo art-id (str out-dir))))
-          (is (fs/exists? (fs/path out-dir "input" "test.txt"))))))))
+          (is (fs/exists? (fs/path out-dir "input" "test.txt"))))
+
+        (testing "does nothing if artifact does not exist"
+          (is (nil? @(sut/restore-artifact repo "nonexisting" (str out-dir)))))))))

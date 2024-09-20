@@ -53,7 +53,7 @@
 (rf/reg-event-db
  :customer/load--failed
  (fn [db [_ id err]]
-   (lo/on-failure db db/customer err (str "Could not load details for customer " id ": "))))
+   (lo/on-failure db db/customer (str "Could not load details for customer " id ": ") err)))
 
 (rf/reg-event-fx
  :customer/load-github-repos

@@ -394,8 +394,11 @@
                                       ;; TODO When a start event has not been received after
                                       ;; a sufficient period of time, start polling anyway.
                                       ;; For now, we add a max timeout.
-                                      (wait-for-results conf j/max-job-timeout
-                                                        #(oci/get-full-instance-details client id)))})
+                                      (-> (wait-for-results conf j/max-job-timeout
+                                                            #(oci/get-full-instance-details client id))
+                                          ;; Just return the error data in case of error, which
+                                          ;; may contain http status
+                                          (md/catch ex-data)))})
         (md/chain
          (fn [r]
            (letfn [(maybe-log-output [{:keys [exit-code display-name logs] :as c}]

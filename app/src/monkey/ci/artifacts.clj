@@ -105,12 +105,16 @@
   (restore-artifact [this id dest]
     (log/debug "Restoring artifact using build API:" id "to" dest)
     (u/log-deferred-elapsed
-     (md/chain
-      (client {:method :get
-               :path (str base-path id)
-               :as :stream})
-      :body
-      #(archive/extract % dest))
+     (-> (client {:method :get
+                  :path (str base-path id)
+                  :as :stream})
+         (md/chain
+          :body
+          #(archive/extract % dest))
+         (md/catch (fn [ex]
+                     (if (= 404 (:status (ex-data ex)))
+                       (log/warn "Artifact not found:" id)
+                       (throw ex)))))
      (str "Restored artifact from build API: " id)))
 
   (save-artifact [this id src]
