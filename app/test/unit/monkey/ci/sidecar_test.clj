@@ -257,13 +257,13 @@
     
     (testing "restores artifacts if configured"
       (h/with-tmp-dir dir
-        (let [stored (atom {"test-cust/test-build/test-artifact.tgz" "/tmp/checkout"})
+        (let [stored (atom {"test-cust/test-repo/test-build/test-artifact.tgz" "/tmp/checkout"})
               build {:build-id "test-build"
-                     :sid ["test-cust" "test-build"]
+                     :sid ["test-cust" "test-repo" "test-build"]
                      :checkout-dir "/tmp/checkout"
                      :workspace "test-ws"}
               repo (art/make-blob-repository (h/fake-blob-store stored) build)
-              r (sut/run
+              tr (sut/run
                   (trs/make-test-rt
                    {:containers {:type :podman}
                     :build build
@@ -284,7 +284,7 @@
               path "test-artifact"
               _ (fs/create-file (fs/path dir path))
               build {:build-id "test-build"
-                     :sid ["test-cust" "test-build"]
+                     :sid ["test-cust" "test-repo" "test-build"]
                      :checkout-dir dir
                      :workspace "test-ws"}
               repo (art/make-blob-repository (h/fake-blob-store stored) build)
