@@ -5,6 +5,7 @@
             [medley.core :as mc]
             [monkey.ci
              [build :as b]
+             [jobs :as j]
              [runtime :as rt]
              [storage :as st]]
             [monkey.ci.events.core :as ec]))
@@ -15,43 +16,94 @@
   (st/save-build storage build)
   (assoc build :sid sid))
 
-(defn update-build [storage {:keys [sid build] :as evt}]
-  (log/debug "Updating build:" sid)
-  (let [existing (st/find-build storage sid)
-        upd (-> (merge existing (dissoc build :script))
-                (dissoc :sid :cleanup?))]
-    (-> (save-build storage
-                    sid
-                    (cond-> upd
-                      (= :build/end (:type evt)) (assoc :credits (b/calc-credits upd))))
-        (assoc :sid sid))))
+(defn create-build [storage {:keys [sid build] :as evt}]
+  (save-build storage
+              sid
+              (assoc build :status :initializing)))
 
-(defn update-script [storage {:keys [sid script]}]
-  (log/debug "Updating build script for sid" sid)
-  (if-let [build (st/find-build storage sid)]
-    (let [orig (get-in build [:script :jobs])]
-      (save-build storage
-                  sid
-                  (assoc build
-                         ;; Don't use meta-merge, cause it will also merge vectors (like dependencies)
-                         :script (mc/deep-merge (:script build) script))))
-    (log/warn "Build not found when updating script:" sid)))
+(defn patch-build
+  "Patches the existing build, by merging it with `patch`, which is either
+   a map, or a function that takes the existing build and returns the patch map.
+   Returns the updated build, or `nil` if the build was not found."
+  [storage sid patch]
+  (log/debug "Patching build:" sid)
+  (if-let [existing (st/find-build storage sid)]
+    (save-build storage
+                sid
+                (-> (merge existing (if (fn? patch)
+                                      (patch existing)
+                                      patch))))
+    (log/warn "Unable to patch build" sid ", record not found in db (initialize event missed?)")))
 
-(defn update-job [storage {:keys [sid job]}]
-  (let [job-id (:id job)]
-    (log/debug "Updating job for sid" sid ":" job-id)
-    (if-let [build (st/find-build storage sid)]
-      (save-build storage sid (assoc-in build [:script :jobs job-id] (update job :status #(or % :running))))
-      (log/warn "Build not found when updating job:" sid))))
+(defn start-build [storage {:keys [sid time credit-multiplier]}]
+  (patch-build storage sid {:start-time time
+                            :credit-multiplier credit-multiplier
+                            :status :running}))
+
+(defn end-build [storage {:keys [sid time status]}]
+  (patch-build storage sid (fn [build]
+                             {:end-time time
+                              :status status
+                              :credits (b/calc-credits build)})))
+
+(defn init-script [storage {:keys [sid script-dir]}]
+  (patch-build storage sid #(assoc-in % [:script :script-dir] script-dir)))
+
+(defn start-script [storage {:keys [sid jobs]}]
+  (patch-build storage sid
+               (fn [build]
+                 (assoc-in build [:script :jobs] (->> jobs
+                                                      (map #(vector (j/job-id %) %))
+                                                      (into {}))))))
+
+(defn end-script [storage {:keys [sid status]}]
+  (patch-build storage sid #(assoc-in % [:script :status] status)))
+
+(defn- patch-job [storage {:keys [sid job-id]} patch]
+  (patch-build storage sid
+               (fn [build]
+                 (update-in build [:script :jobs job-id]
+                            (if (fn? patch)
+                              patch
+                              #(merge % patch))))))
+
+(defn init-job [storage {:keys [credit-multiplier] :as evt}]
+  (patch-job storage evt {:status :initializing
+                          :credit-multiplier credit-multiplier}))
+
+(defn start-job [storage {:keys [time] :as evt}]
+  (patch-job storage evt {:status :running
+                          :start-time time}))
+
+(defn end-job [storage {:keys [time] :as evt}]
+  (patch-job storage evt (-> evt
+                             (select-keys [:status :result])
+                             (assoc :end-time time))))
 
 (def update-handlers
-  {:job/start    update-job
-   :job/updated  update-job
-   :job/end      update-job
-   :script/start update-script
-   :script/end   update-script
-   :build/start  update-build
-   :build/end    update-build})
+  {:build/initializing  create-build
+   :build/start         start-build
+   :build/end           end-build
+   :script/initializing init-script
+   :script/start        start-script
+   :script/end          end-script
+   :job/initializing    init-job
+   :job/start           start-job
+   :job/end             end-job})
+
+(defn handle-event [evt storage events]
+  (when-let [h (get update-handlers (:type evt))]
+    (log/debug "Handling:" evt)
+    (try
+      (when-let [build (h storage evt)]
+        ;; Dispatch consolidated build updated event
+        (ec/post-events events
+                        {:type :build/updated
+                         :sid (:sid evt)
+                         :build build}))
+      (catch Exception ex
+        ;; TODO Handle this better
+        (log/error "Unable to handle event" ex)))))
 
 (defn build-update-handler
   "Handles a build update event.  Because many events may come in close proximity,
@@ -60,19 +112,7 @@
   (let [stream (ms/stream 10)]
     ;; Naive implementation: process them in sequence.  This does not look 
     ;; to the sid for optimization, so it could be faster.
-    (ms/consume (fn [evt]
-                  (when-let [h (get update-handlers (:type evt))]
-                    (log/debug "Handling:" evt)
-                    (try
-                      (when-let [build (h storage evt)]
-                        ;; Dispatch consolidated build updated event
-                        (ec/post-events events
-                                        {:type :build/updated
-                                         :sid (:sid evt)
-                                         :build build}))
-                      (catch Exception ex
-                        ;; TODO Handle this better
-                        (log/error "Unable to handle event" ex)))))
+    (ms/consume #(handle-event % storage events)
                 stream)
     (fn [evt]
       (ms/put! stream evt)
