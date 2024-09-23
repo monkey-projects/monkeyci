@@ -73,18 +73,26 @@
    :src :script
    :sid build-sid
    :time (t/now)
+   :job-id (job-id job)
    :job (job->event job)})
 
-(def job-initializing-evt (partial base-event :job/initializing))
+(defn job-initializing-evt [job build-sid cm]
+  (-> (base-event :job/initializing job build-sid)
+      (assoc :credit-multiplier cm)))
+
 (def job-start-evt (partial base-event :job/start))
 
 (defn job-end-evt [job build-sid {:keys [status message exception] :as r}]
   (let [r (dissoc r :status :exception)]
     (-> (base-event :job/end job build-sid)
+        (assoc :status status
+               :result r)
+        ;; TODO Remove job from the event
         (assoc :job (cond-> (job->event job)
                       true (assoc :status status)
                       ;; Add any extra information to the result key
                       (not-empty r) (assoc :result r)
+                      ;; TODO Move this into the event
                       (some? exception) (assoc :message (or message (ex-message exception))
                                                :stack-trace (u/stack-trace exception)))))))
 

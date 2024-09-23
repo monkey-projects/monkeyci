@@ -85,7 +85,8 @@
                    :sid (h/gen-build-sid)
                    :job-id "test-job"
                    :job {:id "test-job"
-                         :type :container}})))
+                         :type :container}
+                   :credit-multiplier 1})))
   
   (testing "validates `:job/start` event"
     (is (not (s/valid? ::sut/event

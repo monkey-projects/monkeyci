@@ -16,6 +16,7 @@
 (s/def ::build map?) ; TODO Specify
 (s/def ::credit-multiplier int?)
 (s/def ::job-id c/id?)
+(s/def ::result map?)
 
 (s/def ::build-event
   (->> (s/keys :req-un [:build/sid])
@@ -52,14 +53,15 @@
        (s/merge ::build-event)))
 
 (defmethod event-type :job/initializing [_]
-  (->> (s/keys :req-un [:build/sid ::job-id :script/job])
-       (s/merge ::event-base)))
+  (->> (s/keys :req-un [:script/job ::credit-multiplier])
+       (s/merge ::job-event)))
 
 (defmethod event-type :job/start [_]
   ::job-event)
 
 (defmethod event-type :job/end [_]
-  (->> (s/keys :req-un [:job/status])
+  (->> (s/keys :req-un [:job/status]
+               :opt-un [::result])
        (s/merge ::job-event)))
 
 (s/def ::event (s/multi-spec event-type :type))
