@@ -1,5 +1,6 @@
 (ns monkey.ci.script-test
   (:require [clojure.test :refer :all]
+            [clojure.spec.alpha :as spec]
             [manifold.deferred :as md]
             [monkey.ci
              [build :as b]
@@ -8,6 +9,7 @@
              [script :as sut]
              [utils :as u]]
             [monkey.ci.build.core :as bc]
+            [monkey.ci.spec.events :as se]
             [monkey.ci.helpers :as h]
             [monkey.ci.test.aleph-test :as at]))
 
@@ -133,16 +135,15 @@
 
 (deftest run-all-jobs*
   (letfn [(verify-script-evt [evt-type jobs verifier]
-            (let [{:keys [recv] :as e} (h/fake-events)
+            (let [e (h/fake-events)
                   rt {:events e
-                      :build {:sid ["test-cust" "test-repo"]}}]
+                      :build {:sid (h/gen-build-sid)}}]
               (is (some? (sut/run-all-jobs* rt jobs)))
-              (is (not-empty @recv))
-              (is (contains? (set (map :type @recv)) :script/end))
-              (let [l (->> @recv
-                           (filter (comp (partial = evt-type) :type))
-                           (first))]
+              (let [l (->> (h/received-events e)
+                           (h/first-event-by-type evt-type))]
                 (is (some? l))
+                (is (spec/valid? ::se/event l)
+                    (spec/explain-str ::se/event l))
                 (verifier l))))
           (verify-script-end-evt [jobs verifier]
             (verify-script-evt :script/end jobs verifier))
@@ -154,43 +155,35 @@
         (verify-script-start-evt
          [job]
          (fn [evt]
-           (is (= 1 (count (get-in evt [:script :jobs]))))
-           (is (some? (get-in evt [:script :jobs "test-job"])))
-           (is (= :pending
-                  (get-in evt [:script :jobs "test-job" :status])))))))
+           (is (= 1 (count (:jobs evt))))
+           (let [job (-> evt :jobs first)]
+             (is (some? job))
+             (is (= :pending (:status job))))))))
     
-    (testing "posts `:script/end` event with job status"
+    (testing "posts `:script/end` event with script status"
       (let [result (assoc bc/success :message "Test result")
             job (bc/action-job "test-job" (constantly result))]
         (verify-script-end-evt
          [job]
          (fn [evt]
-           (is (= :success
-                  (get-in evt [:script :jobs "test-job" :status])))))))
+           (is (= :success (:status evt)))))))
 
     (testing "adds job labels to event"
-      (verify-script-end-evt
+      (verify-script-start-evt
        [(bc/action-job "test-job" (constantly bc/success) {:labels {:key "value"}})]
        (fn [evt]
          (is (= {:key "value"}
-                (get-in evt [:script :jobs "test-job" :labels]))))))
+                (-> evt :jobs first :labels))))))
 
-    (testing "adds job dependencies to end event"
+    (testing "adds job dependencies"
       (let [jobs [(bc/action-job "first-job" (constantly bc/success))
                   (bc/action-job "second-job" (constantly bc/success)
                                  {:dependencies ["first-job"]})]]
-        (verify-script-end-evt
+        (verify-script-start-evt
          jobs
          (fn [evt]
            (is (= ["first-job"]
-                  (get-in evt [:script :jobs "second-job" :dependencies])))))))
-
-    (testing "marks job as successful if it returns `nil`"
-      (verify-script-end-evt
-       [(bc/action-job "nil-job" (constantly nil))]
-       (fn [evt]
-         (is (bc/success?
-              (get-in evt [:script :jobs "nil-job" :status]))))))))
+                  (-> evt :jobs second :dependencies)))))))))
 
 (deftest error-catching-job
   (let [ctx {:events (h/fake-events)}]

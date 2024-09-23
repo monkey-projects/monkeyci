@@ -44,11 +44,10 @@
 (s/def :job/script (s/coll-of :job/command))
 
 (s/def :script/job
-  (-> (s/keys :req-un [:job/id :job/type]
-              :opt-un [:job/dependencies :job/caches :job/save-artifacts :job/restore-artifacts :job/script
-                       :job/memory :job/cpus :job/arch :job/status
-                       :job/credit-multiplier])
-      (s/merge ::generic-entity)))
+  (-> (s/keys :req-un [:job/id]
+              :opt-un [:job/type :job/dependencies :job/caches :job/save-artifacts :job/restore-artifacts
+                       :job/script :job/memory :job/cpus :job/arch :job/status
+                       :job/credit-multiplier])))
 
 (s/def :script/jobs (s/coll-of :script/job))
 
@@ -68,7 +67,7 @@
 
 (s/def :build/id id?)
 (s/def :build/build-id id?)
-(s/def :build/sid vector?)
+(s/def :build/sid (s/coll-of id? :count 3))
 (s/def :build/cleanup? boolean?)
 (s/def :build/webhook-id id?)
 (s/def :build/customer-id id?)

@@ -17,6 +17,7 @@
             [monkey.ci.config.script :as cos]
             [monkey.ci.spec
              [common :as sc]
+             [events :as se]
              [script :as ss]]
             [monkey.ci.helpers :as h]
             [monkey.ci.test.runtime :as trt]))
@@ -52,7 +53,8 @@
   (let [server-args (atom nil)
         server-closed? (atom nil)
         test-build {:script
-                    {:script-dir "test-dir"}}
+                    {:script-dir "test-dir"}
+                    :sid (h/gen-build-sid)}
         test-rt (-> (trt/test-runtime)
                     (merge {:args {:dev-mode true}}))]
     (with-redefs [bp/process (fn [{:keys [exit-fn] :as args}]
@@ -86,7 +88,16 @@
                             :process
                             :args
                             :cmd
-                            last)))))))
+                            last))))
+
+      (testing "posts `script/initializing` event"
+        (is (some? @(sut/execute! test-build test-rt)))
+        (let [evt (->> test-rt
+                       :events
+                       (h/received-events)
+                       (h/first-event-by-type :script/initializing))]
+          (is (some? evt))
+          (is (s/valid? ::se/event evt)))))))
 
 (deftest generate-deps
   (testing "adds log config file, relative to work dir if configured"

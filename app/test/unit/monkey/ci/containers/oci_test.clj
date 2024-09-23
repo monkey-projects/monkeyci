@@ -19,7 +19,9 @@
             [monkey.ci.config.sidecar :as cs]
             [monkey.ci.containers.oci :as sut]
             [monkey.ci.events.core :as ec]
-            [monkey.ci.spec.sidecar :as ss]
+            [monkey.ci.spec
+             [events :as se]
+             [sidecar :as ss]]
             [monkey.ci.helpers :as h]
             [monkey.ci.test.runtime :as trt]))
 
@@ -564,19 +566,19 @@
           (let [evt (->> (h/received-events events)
                          (h/first-event-by-type :job/initializing))]
             (is (some? evt))
+            (is (spec/valid? ::se/event evt))
             (is (= sid (:sid evt)))
-            (is (= :initializing (get-in evt [:job :status])))
-            (is (number? (get-in evt [:job :credit-multiplier])))))
+            (is (number? (:credit-multiplier evt)))))
 
         (testing "fires `job/end` event"
           (let [{:keys [job] :as evt} (->> (h/received-events events)
                                            (h/first-event-by-type :job/end))]
             (is (some? evt))
+            (is (spec/valid? ::se/event evt)
+                (spec/explain-str ::se/event evt))
             (is (= sid (:sid evt)))
             (is (some? job))
-            (is (= {:exit 0} (:result job)))
-            (is (number? (:end-time job)))
-            (is (number? (get-in evt [:job :credit-multiplier]))))))
+            (is (= {:exit 0} (:result job))))))
 
       (testing "fires event in case of oci error"
         (h/reset-events events)

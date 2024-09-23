@@ -8,6 +8,7 @@
             [monkey.ci
              [runtime :as rt]
              [sid :as sid]
+             [time :as t]
              [utils :as u]]
             [monkey.ci.build.core :as bc]))
 
@@ -130,7 +131,12 @@
   :checkout-dir)
 
 (defn set-checkout-dir [b d]
-  (assoc b :checkout-dir d))
+  (assoc b checkout-dir d))
+
+(def credit-multiplier :credit-multiplier)
+
+(defn set-credit-multiplier [b cm]
+  (assoc b credit-multiplier cm))
 
 (def ^:deprecated rt->checkout-dir (comp checkout-dir rt/build))
 
@@ -158,11 +164,27 @@
   [build]
   (mc/update-existing build :git dissoc :ssh-keys :ssh-keys-dir))
 
+(defn build-init-evt [build]
+  {:type :build/initializing
+   :sid (sid build)
+   :build (build->evt build)})
+
+(defn build-start-evt [build]
+  {:type :build/start
+   :sid (sid build)
+   :credit-multiplier (credit-multiplier build)
+   ;; TODO Remove this
+   :build (-> build
+              (build->evt)
+              (assoc :start-time (t/now)))})
+
 (defn build-end-evt
   "Creates a `build/end` event"
   [build & [exit-code]]
   {:type :build/end
-   :sid (:sid build)
+   :sid (sid build)
+   :status (exit-code->status exit-code)
+   ;; TODO Remove this
    :build (-> build
               (build->evt)
               (assoc :end-time (u/now))

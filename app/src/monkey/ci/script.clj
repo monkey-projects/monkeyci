@@ -10,6 +10,7 @@
              [jobs :as j]
              [protocols :as p]
              [spec :as s]
+             [time :as t]
              [utils :as u]]
             [monkey.ci.build.core :as bc]
             [monkey.ci.events.core :as ec]
@@ -31,27 +32,11 @@
 
 (defn- base-event
   "Creates a skeleton event with basic properties"
-  [rt type]
+  [build type]
   {:type type
    :src :script
-   :sid (build/get-sid rt)
-   :time (u/now)})
-
-(defn- job-start-evt [{:keys [job] :as rt}]
-  (-> (base-event rt :job/start)
-      (assoc :job (j/job->event job)
-             :message "Job started")))
-
-(defn- job-end-evt [{:keys [job] :as rt} {:keys [status message exception] :as r}]
-  (let [r (dissoc r :status :exception)]
-    (-> (base-event rt :job/end)
-        (assoc :message "Job completed"
-               :job (cond-> (j/job->event job)
-                      true (assoc :status status)
-                      ;; Add any extra information to the result key
-                      (not-empty r) (assoc :result r)
-                      (some? exception) (assoc :message (or message (.getMessage exception))
-                                               :stack-trace (u/stack-trace exception)))))))
+   :sid (build/sid build)
+   :time (t/now)})
 
 ;; Wraps a job so it catches any exceptions.
 (defrecord ErrorCatchingJob [target]
@@ -123,43 +108,19 @@
         (in-ns 'monkey.ci.script)
         (remove-ns tmp-ns)))))
 
-(defn- with-script-evt
-  "Creates an skeleton event with the script and invokes `f` on it"
-  [rt f]
-  (-> rt
-      (base-event nil)
-      (assoc :script (-> rt rs/build build/script))
-      (f)))
-
-(defn- job->evt [job]
-  (select-keys job [j/job-id j/deps j/labels]))
-
 (defn- script-start-evt [rt jobs]
   (letfn [(mark-pending [job]
             (assoc job :status :pending))]
-    (with-script-evt rt
-      #(-> %
-           (assoc :type :script/start
-                  :message "Script started")
-           ;; Add all info we already have about jobs
-           (assoc-in [:script :jobs] (->> jobs
-                                          (map (fn [{:keys [id] :as job}]
-                                                 [id job]))
-                                          (into {})
-                                          (mc/map-vals (comp mark-pending job->evt))))))))
+    (-> (base-event (:build rt) :script/start)
+        (assoc :jobs (map (comp mark-pending j/job->event) jobs)))))
 
-(defn- script-end-evt [rt jobs res]
-  (with-script-evt rt
-    (fn [evt]
-      (-> evt 
-          (assoc :type :script/end
-                 :message "Script completed")
-          ;; FIXME Jobs don't contain all info here, as they should (like start and end time)
-          (assoc-in [:script :jobs]
-                    (mc/map-vals (fn [r]
-                                   (-> (select-keys (:result r) [:status :message])
-                                       (merge (job->evt (:job r)))))
-                                 (:jobs res)))))))
+(defn- script-end-evt [rt _ res]
+  (-> (base-event (:build rt) :script/end)
+      (assoc :status (:status res))))
+
+(defn script-init-evt [build script-dir]
+  (-> (base-event build :script/initializing)
+      (assoc :script-dir script-dir)))
 
 (def run-all-jobs*
   (wrapped run-all-jobs
@@ -212,7 +173,7 @@
         (let [msg ((some-fn (comp ex-message ex-cause)
                             ex-message) ex)]
           (ec/post-events (:events rt)
-                          [(-> (base-event rt :script/end)
+                          [(-> (base-event build :script/end)
                                (assoc :script (build/script build)
                                       :message msg))])
           (assoc bc/failure

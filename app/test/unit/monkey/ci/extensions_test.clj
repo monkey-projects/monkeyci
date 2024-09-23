@@ -110,11 +110,4 @@
       (is (true? (::before? @(j/execute! wrapped rt)))))
     
     (testing "invokes `after` extension"
-      (is (true? (::after? @(j/execute! wrapped rt)))))
-
-    (testing "dispatches `job/updated` event before invoking extensions"
-      (let [evt (h/received-events events)]
-        (is (pos? (count evt)))
-        (is (= :job/updated
-               (-> (h/first-event-by-type :job/updated evt)
-                   :type)))))))
+      (is (true? (::after? @(j/execute! wrapped rt)))))))

@@ -369,17 +369,12 @@
    :job (j/job->event job)})
 
 (defn- fire-job-initializing [job build-sid events]
-  (let [job (assoc job
-                   :status :initializing
-                   :init-time (t/now)
-                   :credit-multiplier (credit-multiplier job))]
-    (ec/post-events events [(j/job-initializing-evt job build-sid)])
-    job))
+  (ec/post-events events [(j/job-initializing-evt job build-sid (credit-multiplier job))])
+  job)
 
 (defn- fire-job-end [job build-sid result events]
-  (let [job (assoc job
-                   :status (b/exit-code->status (:exit result))
-                   :end-time (t/now))]
+  (let [result (-> result
+                   (assoc :status (b/exit-code->status (:exit result))))]
     (ec/post-events events [(j/job-end-evt job build-sid result)])))
 
 (defn run-container [{:keys [events job build] :as conf}]
