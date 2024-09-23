@@ -47,8 +47,7 @@
   (-> (s/keys :req-un [:job/id :job/type]
               :opt-un [:job/dependencies :job/caches :job/save-artifacts :job/restore-artifacts :job/script
                        :job/memory :job/cpus :job/arch :job/status
-                       :job/credit-multiplier])
-      (s/merge ::generic-entity)))
+                       :job/credit-multiplier])))
 
 (s/def :script/jobs (s/coll-of :script/job))
 
