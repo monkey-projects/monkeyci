@@ -13,6 +13,7 @@
             [monkey.ci
              [blob :as blob]
              [containers :as containers]
+             [cuid :as cuid]
              [protocols :as p]
              [storage :as s]
              [utils :as u]]
@@ -301,3 +302,5 @@
 ;; (defn fake-build-container-runner []
 ;;   (->FakeBuildContainerRunner (atom [])))
 
+(defn gen-build-sid []
+  (repeatedly 3 cuid/random-cuid))

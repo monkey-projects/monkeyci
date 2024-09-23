@@ -2,6 +2,7 @@
   (:require [clojure.test :refer :all]
             [clojure.core.async :as ca]
             [clojure.java.io :as io]
+            [clojure.spec.alpha :as spec]
             [clojure.string :as cs]
             [manifold.deferred :as md]
             [monkey.ci
@@ -9,6 +10,7 @@
              [runners :as sut]
              [script :as script]
              [utils :as u]]
+            [monkey.ci.spec.events :as se]
             [monkey.ci.helpers :as h]))
 
 (deftest build-local
@@ -26,15 +28,15 @@
                      (deref)))))
 
       (testing "fires `:build/end` event with error status"
-        (let [{:keys [recv] :as e} (h/fake-events)]
-          (is (some? (-> {:script {:script-dir "nonexisting"}}
+        (let [e (h/fake-events)]
+          (is (some? (-> {:script {:script-dir "nonexisting"}
+                          :sid (h/gen-build-sid)}
                          (sut/build-local {:events e} )
                          (deref))))
-          (is (not-empty @recv))
-          (let [m (->> @recv
-                       (filter (comp (partial = :build/end) :type))
-                       (first))]
+          (let [m (->> (h/received-events e)
+                       (h/first-event-by-type :build/end))]
             (is (some? m))
+            (is (spec/valid? ::se/event m))
             (is (= :error (get-in m [:build :status])))))))
 
     (testing "deletes checkout dir"
@@ -74,14 +76,15 @@
           (is (true? (.exists checkout-dir))))))
 
     (testing "fires `build/start` event with sid"
-      (let [{:keys [recv] :as e} (h/fake-events)
+      (let [e (h/fake-events)
             rt {:events e}
             build {:build-id "test-build"
-                   :sid ["test" "build"]}]
+                   :sid (h/gen-build-sid)
+                   :credit-multiplier 1}]
         (is (some? @(sut/build-local build rt)))
-        (is (not-empty @recv))
-        (let [evt (first @recv)]
-          (is (= :build/start (:type evt)))
+        (let [evt (->> (h/received-events e)
+                       (h/first-event-by-type :build/start))]
+          (is (spec/valid? ::se/event evt))
           (is (= (:sid build) (:sid evt))))))))
 
 (deftest download-src

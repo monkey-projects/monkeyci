@@ -62,11 +62,7 @@
   [build rt]
   (spec/valid? ::sb/build build)
   (let [script-dir (build/script-dir build)]
-    (rt/post-events rt {:type :build/start
-                        :sid (build/sid build)
-                        :build (-> build
-                                   (build/build->evt)
-                                   (assoc :start-time (u/now)))})
+    (rt/post-events rt (build/build-start-evt build))
     (-> (md/chain
          (if (some-> (io/file script-dir) (.exists))
            (p/execute! build rt)
@@ -109,14 +105,15 @@
 ;; Creates a runner fn according to its type
 (defmulti make-runner (comp :type :runner))
 
-(defmethod make-runner :child [_]
+(defmethod make-runner :child [conf]
   (log/info "Using child process runner")
   (fn [build rt]
-    (log/debug "Running build in child process:" build)
-    (-> build
-        (download-src rt)
-        (store-src rt)
-        (build-local rt))))
+    (let [build (build/set-credit-multiplier build (get-in conf [:runner :credit-multiplier]))]
+      (log/debug "Running build in child process:" build)
+      (-> build
+          (download-src rt)
+          (store-src rt)
+          (build-local rt)))))
 
 (defmethod make-runner :noop [_]
   ;; For testing

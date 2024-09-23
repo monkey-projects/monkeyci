@@ -10,6 +10,7 @@
              [jobs :as j]
              [protocols :as p]
              [spec :as s]
+             [time :as t]
              [utils :as u]]
             [monkey.ci.build.core :as bc]
             [monkey.ci.events.core :as ec]
@@ -31,20 +32,20 @@
 
 (defn- base-event
   "Creates a skeleton event with basic properties"
-  [rt type]
+  [build type]
   {:type type
    :src :script
-   :sid (build/get-sid rt)
-   :time (u/now)})
+   :sid (build/sid build)
+   :time (t/now)})
 
-(defn- job-start-evt [{:keys [job] :as rt}]
-  (-> (base-event rt :job/start)
+(defn- job-start-evt [{:keys [job build] :as rt}]
+  (-> (base-event build :job/start)
       (assoc :job (j/job->event job)
              :message "Job started")))
 
-(defn- job-end-evt [{:keys [job] :as rt} {:keys [status message exception] :as r}]
+(defn- job-end-evt [{:keys [job build] :as rt} {:keys [status message exception] :as r}]
   (let [r (dissoc r :status :exception)]
-    (-> (base-event rt :job/end)
+    (-> (base-event build :job/end)
         (assoc :message "Job completed"
                :job (cond-> (j/job->event job)
                       true (assoc :status status)
@@ -126,7 +127,7 @@
 (defn- with-script-evt
   "Creates an skeleton event with the script and invokes `f` on it"
   [rt f]
-  (-> rt
+  (-> (:build rt)
       (base-event nil)
       (assoc :script (-> rt rs/build build/script))
       (f)))
@@ -160,6 +161,10 @@
                                    (-> (select-keys (:result r) [:status :message])
                                        (merge (job->evt (:job r)))))
                                  (:jobs res)))))))
+
+(defn script-init-evt [build script-dir]
+  (-> (base-event build :script/initializing)
+      (assoc :script-dir script-dir)))
 
 (def run-all-jobs*
   (wrapped run-all-jobs
@@ -212,7 +217,7 @@
         (let [msg ((some-fn (comp ex-message ex-cause)
                             ex-message) ex)]
           (ec/post-events (:events rt)
-                          [(-> (base-event rt :script/end)
+                          [(-> (base-event build :script/end)
                                (assoc :script (build/script build)
                                       :message msg))])
           (assoc bc/failure

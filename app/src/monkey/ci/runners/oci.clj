@@ -191,6 +191,7 @@
    the container exit code."
   [client conf build rt]
   (s/valid? ::sb/build build)
+  (rt/post-events rt (b/build-init-evt build))
   (-> (oci/run-instance client (instance-config conf build rt)
                         {:delete? true
                          :exited? (fn [id]
@@ -208,9 +209,8 @@
       (md/chain
        (fn [r]
          (or (-> r :body :containers first :exit-code) 1)))
-      ;; Do not launch build/end event, that is already done by the script container.
-      ;; FIXME In case of a request error (e.g. 429 status) the build never finishes,
-      ;; since an end event is not sent.
+      ;; Do not launch build/end event, that is already done by the script container, except
+      ;; when there is an error trying to start the instance.
       (md/catch
           (fn [ex]
             (log/error "Got error from container instance:" ex)

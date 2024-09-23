@@ -2,6 +2,7 @@
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.core.async :as ca]
             [clojure.java.io :as io]
+            [clojure.spec.alpha :as spec]
             [clojure.string :as cs]
             [manifold.deferred :as md]
             [monkey.ci
@@ -12,6 +13,7 @@
              [version :as v]]
             [monkey.ci.events.core :as ec]
             [monkey.ci.runners.oci :as sut]
+            [monkey.ci.spec.events :as se]
             [monkey.ci.helpers :as h]
             [monkey.oci.container-instance.core :as ci]
             [monkey.ci.test.runtime :as trt]))
@@ -24,14 +26,42 @@
     (is (fn? (r/make-runner {:runner {:type :oci}})))))
 
 (deftest oci-runner
-  (let [build {:git {:url "test-url"
-                     :branch "main"}}]
+  (let [build {:sid ["test-cust" "test-repo" "test-build"]
+               :git {:url "test-url"
+                     :branch "main"}}
+        rt (trt/test-runtime)]
     (testing "runs container instance"
       (with-redefs [oci/run-instance (constantly (md/success-deferred
                                                   {:status 200
                                                    :body {:containers [{:exit-code 0}]}}))]
-        (is (= 0 (-> (sut/oci-runner {} {} build {})
-                     (deref))))))))
+        (is (= 0 (-> (sut/oci-runner {} {} build rt)
+                     (deref))))))
+
+    (testing "posts `build/initializing` event"
+      (with-redefs [oci/run-instance (constantly (md/success-deferred
+                                                  {:status 200
+                                                   :body {:containers [{:exit-code 0}]}}))]
+        (is (some? (-> (sut/oci-runner {} {} build rt)
+                       (deref))))
+        (let [evt (->> rt
+                       :events
+                       (h/received-events)
+                       (h/first-event-by-type :build/initializing))]
+          (is (spec/valid? ::se/event evt))
+          (is (= build (:build evt))))))
+
+    (testing "posts `build/end` event on error"
+      (with-redefs [oci/run-instance (constantly (md/error-deferred
+                                                  {:status 500
+                                                   :body {:message "test error"}}))]
+        (is (some? (-> (sut/oci-runner {} {} build rt)
+                       (deref))))
+        (let [evt (->> rt
+                       :events
+                       (h/received-events)
+                       (h/first-event-by-type :build/end))]
+          (is (spec/valid? ::se/event evt))
+          (is (= :error (:status evt))))))))
 
 (defn- parse-config-vol [ic]
   (-> (oci/find-volume ic sut/config-volume)
