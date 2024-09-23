@@ -68,7 +68,7 @@
 
 (s/def :build/id id?)
 (s/def :build/build-id id?)
-(s/def :build/sid vector?)
+(s/def :build/sid (s/coll-of id? :count 3))
 (s/def :build/cleanup? boolean?)
 (s/def :build/webhook-id id?)
 (s/def :build/customer-id id?)
