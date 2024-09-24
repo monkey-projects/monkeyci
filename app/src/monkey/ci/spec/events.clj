@@ -28,6 +28,10 @@
 
 (defmulti event-type :type)
 
+(defmethod event-type :build/pending [_]
+  (->> (s/keys :req-un [::build])
+       (s/merge ::build-event)))
+
 (defmethod event-type :build/initializing [_]
   (->> (s/keys :req-un [::build])
        (s/merge ::build-event)))

@@ -68,13 +68,15 @@
 
 (defn base-event
   "Creates a skeleton event with basic properties"
-  [type job build-sid]
-  {:type type
-   :src :script
-   :sid build-sid
-   :time (t/now)
-   :job-id (job-id job)
-   :job (job->event job)})
+  [type job-or-id build-sid]
+  (let [id? (string? job-or-id)]
+    (cond-> (ec/make-event 
+             type
+             :src :script
+             :sid build-sid
+             :job-id (cond-> job-or-id
+                       (not id?) (job-id)))
+      (not id?) (assoc :job (job->event job-or-id)))))
 
 (defn job-initializing-evt [job build-sid cm]
   (-> (base-event :job/initializing job build-sid)
@@ -140,7 +142,7 @@
 (extend-protocol Job
   monkey.ci.build.core.ActionJob
   (execute! [job ctx]
-    (let [build-sid (comp build/sid :build)
+    (let [build-sid (-> ctx :build build/sid)
           a (-> (recurse-action job)
                 (cache/wrap-caches)
                 (art/wrap-artifacts))

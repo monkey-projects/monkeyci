@@ -315,7 +315,8 @@
       (rur/not-found nil))))
 
 (def allowed-events
-  #{:build/initializing
+  #{:build/pending
+    :build/initializing
     :build/start
     :build/end
     :build/updated

@@ -160,7 +160,7 @@
   (let [build (rs/build rt)
         build-id (build/build-id build)
         script-dir (build/script-dir build)]
-    (s/valid? ::sb/build build)
+    #_(s/valid? ::sb/build build)
     (log/debug "Executing script for build" build-id "at:" script-dir)
     (log/debug "Build map:" build)
     (try

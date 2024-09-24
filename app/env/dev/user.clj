@@ -9,6 +9,7 @@
   @c/global-config)
 
 (defn start-staging []
+  (c/reset-config!)
   (c/load-config! "staging.edn")
   (c/load-config! "oci/staging-config.edn")
   (c/load-config! "github/staging.edn")
@@ -16,6 +17,7 @@
   (server/start-server))
 
 (defn start-local []
+  (c/reset-config!)
   (c/load-config! "local.edn")
   (c/load-config! "github/staging.edn")
   (c/load-config! "bitbucket/staging.edn")

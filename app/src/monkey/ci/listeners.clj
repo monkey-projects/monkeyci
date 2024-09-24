@@ -8,7 +8,9 @@
              [jobs :as j]
              [runtime :as rt]
              [storage :as st]]
-            [monkey.ci.events.core :as ec]))
+            [monkey.ci.events.core :as ec]
+            [monkey.ci.spec :as spec]
+            [monkey.ci.spec.events :as se]))
 
 (defn- save-build
   "Saves the build in storage, then returns it"
@@ -16,7 +18,12 @@
   (st/save-build storage build)
   (assoc build :sid sid))
 
-(defn create-build [storage {:keys [sid build] :as evt}]
+(defn pending-build [storage {:keys [sid build] :as evt}]
+  (save-build storage
+              sid
+              (assoc build :status :pending)))
+
+(defn init-build [storage {:keys [sid build] :as evt}]
   (save-build storage
               sid
               (assoc build :status :initializing)))
@@ -81,7 +88,8 @@
                              (assoc :end-time time))))
 
 (def update-handlers
-  {:build/initializing  create-build
+  {:build/pending       pending-build
+   :build/initializing  init-build
    :build/start         start-build
    :build/end           end-build
    :script/initializing init-script
@@ -92,6 +100,7 @@
    :job/end             end-job})
 
 (defn handle-event [evt storage events]
+  (spec/valid? ::se/event evt)
   (when-let [h (get update-handlers (:type evt))]
     (log/debug "Handling:" evt)
     (try

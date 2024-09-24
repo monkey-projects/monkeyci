@@ -11,6 +11,7 @@
              [labels :as lbl]
              [runtime :as rt]
              [storage :as st]]
+            [monkey.ci.events.core :as ec]
             [reitit.ring :as ring]
             [reitit.ring.coercion :as rrc]
             [reitit.ring.middleware
@@ -226,9 +227,9 @@
                                                       :message (ex-message ex))))))]
     (md/future
       (try
-        (rt/post-events rt {:type :build/pending
-                            :build (b/build->evt build)
-                            :sid (b/sid build)})
+        (rt/post-events rt (ec/make-event :build/pending
+                                          :build (b/build->evt build)
+                                          :sid (b/sid build)))
         ;; Catch both the deferred error, or the direct exception, because both
         ;; can be thrown here.
         (-> (runner build rt)
