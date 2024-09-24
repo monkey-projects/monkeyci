@@ -119,10 +119,10 @@
                 (if (>= status 400)
                   (do
                     (log/warn "Got an error response, status" status "with message" (:message body))
-                    r)
+                    (md/error-deferred (ex-info "Failed to create container instance" r)))
                   (handler body))
                 ;; Some other invalid response
-                r)))
+                (md/error-deferred (ex-info "Invalid response" r)))))
           
           (create-instance []
             (log/debug "Creating instance...")
@@ -162,9 +162,8 @@
 
           (log-error [ex]
             (log/error "Error creating container instance" ex)
-            ;; Return the exception
-            {:status 500
-             :exception ex})]
+            ;; Rethrow
+            (md/error-deferred ex))]
     
     (-> (md/chain
          (create-instance)

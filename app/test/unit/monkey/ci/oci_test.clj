@@ -138,7 +138,8 @@
                :body
                {:message "test error"}}]
       (with-redefs [ci/create-container-instance (constantly res)]
-        (is (= res @(sut/run-instance {} {} {:exited? (md/error-deferred "should not be called")}))))))
+        (is (thrown? Exception
+                     @(sut/run-instance {} {} {:exited? (md/error-deferred "should not be called")}))))))
 
   (testing "includes container logs if not inactive"
     (let [cid (random-uuid)
@@ -228,7 +229,7 @@
                       (reset! deleted? true)
                       (md/success-deferred
                        {:status (if (= iid (:instance-id opts)) 200 400)}))]
-        (is (map? (deref (sut/run-instance {} {} {:delete? true}) 200 :timeout)))
+        (is (thrown? Exception (deref (sut/run-instance {} {} {:delete? true}) 200 :timeout)))
         (is (false? @deleted?))))))
 
 (deftest instance-config
