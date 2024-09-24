@@ -28,9 +28,14 @@
      {:href (r/path-for :page/repo-edit (get-in @c [:parameters :path]))}
      [:span.me-1 [co/icon :pencil-fill]] "Edit"]))
 
+(defn refresh-btn [& [opts]]
+  [:button.btn.btn-outline-primary.btn-icon.btn-sm
+   (merge opts {:on-click (u/link-evt-handler [:builds/reload])
+                :title "Refresh"})
+   [co/icon :arrow-clockwise]])
+
 (defn build-actions []
   [:<>
-   [co/reload-btn [:builds/reload]]
    [trigger-build-btn]
    [edit-repo-btn]])
 
@@ -93,7 +98,8 @@
       (rf/dispatch [:builds/load]))
     [:<>
      [:div.d-flex.gap-1.align-items-start
-      [:h4.me-auto "Builds"]
+      [:h4.me-2 "Builds"]
+      [refresh-btn {:class [:me-auto]}]
       [build-actions]]
      [trigger-form repo]
      [table/paged-table

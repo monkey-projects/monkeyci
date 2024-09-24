@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.layout
-  (:require [monkey.ci.gui.components :as co]
+  (:require [monkey.ci.gui.breadcrumb :as b]
+            [monkey.ci.gui.components :as co]
             [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.utils :as u]
             [reagent.core :as rc]
@@ -29,7 +30,7 @@
        [user-info]]]]]
    [:div.row.mt-1
     [:div.col
-     [co/path-breadcrumb]]]])
+     [b/path-breadcrumb]]]])
 
 (defn footer []
   (let [v (rf/subscribe [:version])]

@@ -10,6 +10,7 @@
             [monkey.ci.gui.home.views :as home]
             [monkey.ci.gui.params.views :as params]
             [monkey.ci.gui.repo.views :as repo]
+            [monkey.ci.gui.routing :as r]
             [re-frame.core :as rf]))
 
 (def pages
@@ -27,21 +28,18 @@
    :page/repo-edit repo/edit
    :page/job job/page})
 
-(def route-name (comp :name :data))
-(def public? #{:page/login :page/github-callback :page/bitbucket-callback})
-
 (defn render-page [route]
-  (log/debug "Rendering page for route:" (str (route-name route)))
-  (if-let [p (get pages (get-in route [:data :name]))]
+  (log/debug "Rendering page for route:" (str (r/route-name route)))
+  (if-let [p (get pages (r/route-name route))]
     [p route]
     [:div.alert.alert-warning
      [:h3 "Page not found"]
-     [:p "No page exists for route " [:b (str (get-in route [:data :name]))]]]))
+     [:p "No page exists for route " [:b (str (r/route-name route))]]]))
 
 (defn render []
   (let [r (rf/subscribe [:route/current])
         t (rf/subscribe [:login/token])]
     ;; If no token found, redirect to login
-    (if (or @t (public? (route-name @r)))
+    (if (or @t (r/public? (r/route-name @r)))
       [render-page @r]
       (rf/dispatch [:login/login-and-redirect]))))
