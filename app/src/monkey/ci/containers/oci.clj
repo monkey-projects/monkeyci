@@ -268,20 +268,16 @@
   (letfn [(container-started [evt]
             (log/debug "Detected container start:" job-id)
             (md/chain
-             (ec/post-events events [{:type :job/start
-                                      :sid sid
-                                      :job (-> (:job evt)
-                                               (assoc :start-time (t/now)))}])
+             (ec/post-events events [(j/job-start-evt job-id sid)])
              (constantly evt)))
           (sidecar-failed [evt]
             (let [now (t/now)]
               (log/warn "Detected sidecar failure for job" job-id)
               (md/chain
-               (ec/post-events events [{:type :job/end
-                                        :sid sid
-                                        :job (-> (:job evt)
-                                                 (assoc :start-time now
-                                                        :end-time now))}])
+               (ec/post-events events [(j/job-end-evt (:job evt)
+                                                      sid
+                                                      (-> (select-keys evt [:message :exception])
+                                                          (assoc :status :error)))])
                (constantly (md/error-deferred (ex-info "Sidecar failed to start" evt))))))]
     (log/debug "Waiting for container startup:" job-id)
     (-> (ec/wait-for-event events

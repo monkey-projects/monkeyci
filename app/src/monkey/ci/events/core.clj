@@ -4,7 +4,8 @@
             [monkey.ci
              [config :as c]
              [protocols :as p]
-             [runtime :as rt]]
+             [runtime :as rt]
+             [time :as t]]
             [monkey.ci.events
              [jms :as jms]
              [manifold :as manifold]
@@ -14,8 +15,15 @@
 (def add-listener p/add-listener)
 (def remove-listener p/remove-listener)
 
-(defn make-event [e]
-  (assoc e :timestamp (System/currentTimeMillis)))
+(defn make-event
+  "Creates a new event with required properties.  Additional properties are given as
+   map keyvals, or as a single map."
+  [type & props]
+  (-> (if (= 1 (count props))
+        (first props)
+        (apply hash-map props))
+      (assoc :type type
+             :time (t/now))))
 
 (defn invoke-listeners [filter-fn listeners events]
   ;; Find all listeners where the filter and event are matched by the filter-fn

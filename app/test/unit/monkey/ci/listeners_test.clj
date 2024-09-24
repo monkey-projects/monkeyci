@@ -30,11 +30,17 @@
                     (merge {:sid sid :time time} part-evt)
                     st events))]
       
-      (testing "`build/initializing` creates build"
+      (testing "`build/initializing` upserts build"
         (is (some? (handle {:type :build/initializing
                             :build build})))
         (is (= :initializing (-> (st/find-build st sid)
                                  :status))))
+
+      (testing "`build/pending` upserts build"
+        (is (some? (handle {:type :build/pending
+                            :build build})))
+        (is (= :pending (-> (st/find-build st sid)
+                            :status))))
 
       (testing "`build/start` sets start time and credit multiplier"
         (is (some? (handle {:type :build/start

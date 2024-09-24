@@ -107,6 +107,8 @@
 
 (defmethod make-runner :child [conf]
   (log/info "Using child process runner")
+  ;; FIXME When called directly from the API, the runtime is the wrong one.
+  ;; We need a separate runner type for this.
   (fn [build rt]
     (let [build (build/set-credit-multiplier build (get-in conf [:runner :credit-multiplier]))]
       (log/debug "Running build in child process:" build)

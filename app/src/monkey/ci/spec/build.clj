@@ -101,7 +101,7 @@
 
 (s/def ::build
   (-> (s/keys :req-un [:build/customer-id :build/repo-id :build/build-id :build/sid
-                       :build/source :build/status]
+                       :build/source]
               :opt-un [:build/git :build/cleanup? :build/webhook-id :build/script :build/checkout-dir
-                       :build/changes :build/workspace])
+                       :build/changes :build/workspace :build/status])
       (s/merge ::generic-entity)))

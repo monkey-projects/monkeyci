@@ -10,7 +10,8 @@
              [sid :as sid]
              [time :as t]
              [utils :as u]]
-            [monkey.ci.build.core :as bc]))
+            [monkey.ci.build.core :as bc]
+            [monkey.ci.events.core :as ec]))
 
 (def sid-props [:customer-id :repo-id :build-id])
 
@@ -156,8 +157,9 @@
   (partial build-related-dir (rt/from-config :ssh-keys-dir)))
 
 (defn exit-code->status [exit]
-  (when (number? exit)
-    (if (zero? exit) :success :error)))
+  (if (and (number? exit) (zero? exit))
+    :success
+    :error))
 
 (defn build->evt
   "Prepare build object so it can be added to an event"
@@ -165,30 +167,30 @@
   (mc/update-existing build :git dissoc :ssh-keys :ssh-keys-dir))
 
 (defn build-init-evt [build]
-  {:type :build/initializing
-   :sid (sid build)
-   :build (build->evt build)})
+  (ec/make-event :build/initializing
+                 :sid (sid build)
+                 :build (build->evt build)))
 
 (defn build-start-evt [build]
-  {:type :build/start
-   :sid (sid build)
-   :credit-multiplier (credit-multiplier build)
-   ;; TODO Remove this
-   :build (-> build
-              (build->evt)
-              (assoc :start-time (t/now)))})
+  (ec/make-event :build/start
+                 :sid (sid build)
+                 :credit-multiplier (credit-multiplier build)
+                 ;; TODO Remove this
+                 :build (-> build
+                            (build->evt)
+                            (assoc :start-time (t/now)))))
 
 (defn build-end-evt
   "Creates a `build/end` event"
   [build & [exit-code]]
-  {:type :build/end
-   :sid (sid build)
-   :status (exit-code->status exit-code)
-   ;; TODO Remove this
-   :build (-> build
-              (build->evt)
-              (assoc :end-time (u/now))
-              (mc/assoc-some :status (exit-code->status exit-code)))})
+  (ec/make-event :build/end
+                 :sid (sid build)
+                 :status (exit-code->status exit-code)
+                 ;; TODO Remove this
+                 :build (-> build
+                            (build->evt)
+                            (assoc :end-time (u/now))
+                            (mc/assoc-some :status (exit-code->status exit-code)))))
 
 (def ^:deprecated build-completed-evt build-end-evt)
 

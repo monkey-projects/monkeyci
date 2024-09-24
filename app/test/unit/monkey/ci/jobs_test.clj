@@ -1,12 +1,15 @@
 (ns monkey.ci.jobs-test
   (:require [clojure.test :refer [deftest testing is]]
+            [clojure.spec.alpha :as spec]
             [manifold.deferred :as md]
             [monkey.ci.build.core :as bc]
             [monkey.ci
              [artifacts :as art]
              [cache :as cache]
              [containers :as co]
+             [edn :as edn]
              [jobs :as sut]]
+            [monkey.ci.spec.events :as se]
             [monkey.ci.helpers :as h]))
 
 (defn dummy-job
@@ -234,19 +237,24 @@
 
   (let [job (bc/action-job "test-job" (constantly bc/success))
         events (h/fake-events)
-        ctx {:events events}]
+        ctx {:events events
+             :build {:sid (h/gen-build-sid)}}]
     (is (bc/success? @(sut/execute! job ctx)))
     
     (testing "fires `job/start` event"
       (let [evt (h/first-event-by-type :job/start (h/received-events events))]
         (is (some? evt))
-        (is (number? (get-in evt [:job :start-time])))))
+        (is (number? (get-in evt [:job :start-time])))
+        (is (spec/valid? ::se/event evt))
+        (is (= evt (edn/edn-> (edn/->edn evt))) "Event should be serializable to edn")))
 
     (testing "fires `job/end` event"
       (let [{:keys [job] :as evt} (h/first-event-by-type :job/end (h/received-events events))]
         (is (some? evt))
         (is (number? (:start-time job)))
-        (is (number? (:end-time job)))))))
+        (is (number? (:end-time job)))
+        (is (spec/valid? ::se/event evt))
+        (is (= evt (edn/edn-> (edn/->edn evt))) "Event should be serializable to edn")))))
 
 (deftest execute-jobs!
   (let [ctx {:events (h/fake-events)}]

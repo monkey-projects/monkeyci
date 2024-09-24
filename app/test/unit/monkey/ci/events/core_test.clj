@@ -7,9 +7,16 @@
 
 (deftest make-event
   (testing "adds timestamp to event"
-    (is (number? (-> {:type :test-event}
-                     (sut/make-event)
-                     :timestamp)))))
+    (is (number? (-> (sut/make-event :test-event :key "value")
+                     :time))))
+
+  (testing "adds properties from varargs"
+    (is (= {:key "value"} (-> (sut/make-event :test-event :key "value")
+                              (select-keys [:key])))))
+
+  (testing "adds properties from map"
+    (is (= {:key "value"} (-> (sut/make-event :test-event {:key "value"})
+                              (select-keys [:key]))))))
 
 (deftest sync-events
   (testing "can add listener"

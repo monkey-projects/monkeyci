@@ -60,8 +60,6 @@
   (-> (rt/rt->config rt)
       ;; TODO Move the config needed by the runner under the runner config itself
       (select-keys [:containers :logging :workspace :cache :artifacts :sidecar :promtail :api])
-      #_(dissoc :app-mode :git :github :http :args :jwk :checkout-base-dir :storage
-                :ssh-keys-dir :work-dir :oci :runner)
       (assoc :build (dissoc build :ssh-keys :cleanup? :status)
              ;; TODO Use aero tags in the config, instead of doing this manually here
              :events (-> (get-in rt [rt/config :events])

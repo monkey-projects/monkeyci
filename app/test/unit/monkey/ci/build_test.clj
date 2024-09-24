@@ -178,9 +178,9 @@
            (-> (sut/build-end-evt {} 1)
                (get-in [:build :status])))))
 
-  (testing "does not set status when no exit"
-    (is (nil? (-> (sut/build-end-evt {} nil)
-                  (get-in [:build :status]))))))
+  (testing "error status when no exit"
+    (is (= :error (-> (sut/build-end-evt {} nil)
+                      (get-in [:build :status]))))))
 
 (deftest calc-credits
   (testing "zero if no jobs"
