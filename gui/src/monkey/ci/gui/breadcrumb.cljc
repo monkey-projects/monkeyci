@@ -33,10 +33,16 @@
         {:url (r/path-for :page/customer-params (r/path-params (r/current db)))
          :name "Parameters"}))
 
+(defn- repo-edit-breadcrumb [db]
+  (conj (default-breadcrumb db)
+        {:url (r/path-for :page/repo-edit (r/path-params (r/current db)))
+         :name "Edit"}))
+
 (def routes
   "Breadcrumb configuration per route.  If no match is found, the default behaviour
    is applied."
-  {:page/customer-params params-breadcrumb})
+  {:page/customer-params params-breadcrumb
+   :page/repo-edit repo-edit-breadcrumb})
 
 (rf/reg-sub
  :breadcrumb/path

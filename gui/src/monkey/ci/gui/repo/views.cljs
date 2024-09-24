@@ -155,7 +155,7 @@
 
 (defn- save-btn []
   (let [s? (rf/subscribe [:repo/saving?])]
-    [:button.btn.btn-primary.me-2
+    [:button.btn.btn-primary
      (cond-> {:type :submit}
        @s? (assoc :disabled true))
      [:span.me-2 [co/icon :floppy]] "Save"]))
@@ -195,13 +195,13 @@
           :disabled true}]
         [:div.form-text "The native Github Id, registered when watching this repo."]]]
       [:div.col
-       [:p "Labels:"]
+       [:h5 "Labels:"]
        [:p.text-body-secondary
         "Labels are used to expose parameters and ssh keys to builds, but also to group repositories. "
         "You can assign any labels you like.  Labels are case-sensitive."]
        [labels (:labels @e)]]
       [:div.row
-       [:div.col
+       [:div.d-flex.gap-2
         [save-btn]
         [co/cancel-btn [:route/goto :page/repo (-> route
                                                    (r/path-params)

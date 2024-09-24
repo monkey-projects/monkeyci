@@ -12,46 +12,64 @@
             [monkey.ci.gui.timer :as timer]
             [re-frame.core :as rf]))
 
+(defn build-status-icon [status]
+  (let [[cl icon] (get {:success      [:text-success :check-circle]
+                        :error        [:text-danger :x-circle]
+                        :running      [:text-info :play-circle]
+                        :pending      [:text-warning :pause-circle]
+                        :initializing [:text-warning :play-circle]}
+                       status
+                       [:text-default :question-circle])]
+    [:div (cond-> {:style {:font-size "8em"}
+                   :class cl}
+            status (assoc :title (name status)))
+     [co/icon icon]]))
+
+(defn build-status [{:keys [status]}]
+  (let [status-desc {:pending      "The build is waiting to be picked up by a runner."
+                     :initializing "Compute capacity is being provisioned."
+                     :running      "The build script is running."
+                     :success      "The build has completed succesfully."
+                     :error        "The build has failed."}]
+    [:div.d-flex.gap-4.align-items-center
+     [build-status-icon status]
+     [:div
+      [:h3 (cs/capitalize (name status))]
+      [:p (get status-desc status "Unknown")]]]))
+
 (defn build-details
   "Displays the build details by looking it up in the list of repo builds."
-  []
-  (let [d (rf/subscribe [:build/current])
-        {:keys [message]} @d]
-    (letfn [(item [k v]
-              [:<>
-               [:div.col-md-2 [:b k]]
-               [:div.col-md-2 v]])]
-      [:div.mb-3
+  [build]
+  (letfn [(item [k v]
+            [:<>
+             [:div.col-lg-3.col-sm-6 [:b k]]
+             [:div.col-lg-3.col-sm-6 v]])]
+    [:<>
+     [:div.row
+      (item "Start time" (t/reformat (:start-time build)))]
+     [:div.row
+      (item "End time" (t/reformat (:end-time build)))
+      (item "Git ref" (get-in build [:git :ref]))]
+     [:div.row
+      (item [:span {:title "Total time that has passed between build start and end"} "Elapsed"]
+            [co/build-elapsed build])
+      (item "Credits" (or (:credits build) 0))]
+     (when-let [msg (:message build)]
        [:div.row
-        (item "Result" [co/build-result (:status @d)])
-        (item "Start time" (t/reformat (:start-time @d)))]
-       [:div.row
-        (item "Git ref" (get-in @d [:git :ref]))
-        (item "End time" (t/reformat (:end-time @d)))]
-       [:div.row
-        (item "Credits" (or (:credits @d) 0))
-        (item [:span {:title "Total time that has passed between build start and end"} "Elapsed"]
-              [co/build-elapsed @d])]
-       (when message
-         [:div.row
-          [:div.col-md-2 [:b "Message"]]
-          [:div.col-md-10 message]])])))
+        [:div.col-md-3 [:b "Message"]]
+        [:div.col-md-9 msg]])]))
 
-(defn build-result []
-  (let [b (rf/subscribe [:build/current])]
-    ;; TODO Signal warnings or skipped jobs.
-    (case (:status @b)
-      :success
-      [:div.alert.alert-success
-       [co/icon :check-circle-fill]
-       [:span.ms-2 "Build successful!"]]
-      :error
-      [:div.alert.alert-danger
-       [co/icon :exclamation-triangle-fill]
-       [:b.ms-2.me-2 "This build failed."]
-       [:span "Check the job logs for details."]]
-      ;; Build still running: show nothing
-      nil)))
+(defn overview [build]
+  [:div.d-flex.align-items-center.gap-4
+   [build-status build]
+   [:div.flex-grow-1
+    [build-details build]]]
+  #_[:div.container
+     [:div.row
+      [:div.col-5
+       [build-status build]]
+      [:div.container.col-7.align-bottom
+       [build-details build]]]])
 
 (defn- build-path [route]
   (let [p (r/path-params route)
@@ -158,15 +176,15 @@
   (fn [route]
     (let [params (r/path-params route)
           repo (rf/subscribe [:repo/info (:repo-id params)])
-          reloading? (rf/subscribe [:build/reloading?])]
+          reloading? (rf/subscribe [:build/reloading?])
+          curr (rf/subscribe [:build/current])]
       [l/default
        [:<>
         [:div.d-flex.gap-2.align-items-start.mb-2
          [:h3.me-auto (:name @repo) " - " (:build-id params)]
-         [co/reload-btn [:build/reload] (when @reloading? {:disabled true})]]
+         [co/reload-btn-sm [:build/reload] (when @reloading? {:disabled true})]]
         [:div.card
          [:div.card-body
           [co/alerts [:build/alerts]]
-          [build-details]
-          [build-result]
+          [overview @curr]
           [build-jobs]]]]])))
