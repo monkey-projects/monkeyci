@@ -44,9 +44,10 @@
 (deftest artifact-download--success
   (let [art-id (str (random-uuid))]
     (testing "unmarks downloading"
-      (is (some? (reset! app-db (db/set-downloading {} art-id))))
-      (rf/dispatch-sync [:artifact/download--success art-id "test contents"])
-      (is (not (db/downloading? @app-db art-id))))
+      (let [e (h/catch-fx :download-link)]
+        (is (some? (reset! app-db (db/set-downloading {} art-id))))
+        (rf/dispatch-sync [:artifact/download--success art-id "test contents"])
+        (is (not (db/downloading? @app-db art-id)))))
 
     (testing "makes download link"
       (let [e (h/catch-fx :download-link)]
