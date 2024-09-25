@@ -989,7 +989,6 @@
     (testing "`GET /:id/download` retrieves artifact contents"
       (is (= 200 (-> (mock/request :get (format "%s/artifact/%s/download" base-path art-id))
                      (app)
-                     (deref)
                      :status))))
 
     (testing "`DELETE /:id` deletes artifact")))

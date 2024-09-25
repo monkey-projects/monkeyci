@@ -48,30 +48,6 @@
    {:on-click (u/link-evt-handler evt)}
    [:span.me-2 [icon :x-square]] "Cancel"])
 
-(defn breadcrumb [parts]
-  [:nav {:aria-label "breadcrumb"}
-   (->> (loop [p parts
-               r []]
-          (let [last? (empty? (rest p))
-                v (first p)
-                n (if last?
-                    [:li.breadcrumb-item.active {:aria-current "page"}
-                     (:name v)]
-                    [:li.breadcrumb-item 
-                     [:a {:href (:url v)} (:name v)]])
-                r+ (conj r n)]
-            (if last?
-              r+
-              (recur (rest p) r+))))
-        (into [:ol.breadcrumb]))])
-
-(defn path-breadcrumb
-  "Renders breadcrumb component according to path.  It uses the current route to
-   determine what to display."
-  []
-  (let [p (rf/subscribe [:breadcrumb/path])]
-    [breadcrumb @p]))
-
 (defn build-result [r]
   (let [r (or r "running")
         type (condp = (keyword r)
@@ -84,6 +60,19 @@
                :skipped :bg-warning
                :bg-secondary)]
     [:span {:class (str "badge " (name type))} r]))
+
+(defn status-icon [status size]
+  (let [[cl i] (get {:success      [:text-success :check-circle]
+                     :error        [:text-danger :x-circle]
+                     :running      [:text-info :play-circle]
+                     :pending      [:text-warning :pause-circle]
+                     :initializing [:text-warning :play-circle]}
+                    status
+                    [:text-default :question-circle])]
+    [:div (cond-> {:style {:font-size size}
+                   :class cl}
+            status (assoc :title (name status)))
+     [icon i]]))
 
 (defn- item-id [id idx]
   (str (name id) "-" idx))

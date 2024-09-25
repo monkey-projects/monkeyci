@@ -169,7 +169,7 @@
   [re]
   (md/chain
    (list-instances)
-   (partial filter (comp (partial = "INACTIVE") :lifecycle-state))
+   (partial filter (comp #{"INACTIVE" "ACTIVE"} :lifecycle-state))
    (partial filter (comp (partial re-matches re) :display-name))
    (fn [m]
      (println "Deleting" (count m) "container instances...")

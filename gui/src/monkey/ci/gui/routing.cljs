@@ -8,6 +8,10 @@
   "Retrieve current route from app db"
   :route/current)
 
+(def route-name
+  "Retrieves name of given route"
+  (comp :name :data))
+
 (defn set-current [db r]
   (assoc db current r))
 
@@ -63,6 +67,10 @@
     ["/c/:customer-id/r/:repo-id/b/:build-id/j/:job-id" :page/job]
     ["/github/callback" :page/github-callback]
     ["/bitbucket/callback" :page/bitbucket-callback]]))
+
+(def public?
+  "Route names that are publicly accessible"
+  #{:page/login :page/github-callback :page/bitbucket-callback})
 
 (defn on-route-change [match history]
   (log/debug "Route changed:" match)

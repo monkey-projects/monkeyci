@@ -4,10 +4,8 @@
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
-(u/db-sub :build/alerts db/alerts)
-(u/db-sub :build/current db/build)
-(u/db-sub :build/reloading? (comp some? db/reloading?))
-(u/db-sub :build/expanded-jobs db/expanded-jobs)
+(u/db-sub :build/alerts db/get-alerts)
+(u/db-sub :build/current db/get-build)
 
 (def split-log-path #(cs/split % #"/"))
 
@@ -30,3 +28,9 @@
  :<- [:build/current]
  (fn [b _]
    (-> b :script :jobs vals sort-by-deps)))
+
+(rf/reg-sub
+ :build/loading?
+ :<- [:loader/loading? db/id]
+ (fn [l? _]
+   l?))

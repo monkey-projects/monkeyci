@@ -12,46 +12,46 @@
             [monkey.ci.gui.timer :as timer]
             [re-frame.core :as rf]))
 
+(defn build-status-icon [status]
+  (co/status-icon status "8em"))
+
+(defn build-status [{:keys [status]}]
+  (let [status-desc {:pending      "The build is waiting to be picked up by a runner."
+                     :initializing "Compute capacity is being provisioned."
+                     :running      "The build script is running."
+                     :success      "The build has completed succesfully."
+                     :error        "The build has failed."}]
+    [:div.d-flex.gap-4.align-items-center
+     [build-status-icon status]
+     [:div
+      [:h3 (cs/capitalize (name status))]
+      [:p (get status-desc status "Unknown")]]]))
+
 (defn build-details
   "Displays the build details by looking it up in the list of repo builds."
-  []
-  (let [d (rf/subscribe [:build/current])
-        {:keys [message]} @d]
-    (letfn [(item [k v]
-              [:<>
-               [:div.col-md-2 [:b k]]
-               [:div.col-md-2 v]])]
-      [:div.mb-3
+  [{:keys [credits] :as build}]
+  (letfn [(item [k v]
+            [:div.row
+             [:div.col-5.offset-1 [:b k]]
+             [:div.col-6 v]])]
+    [:<>
+     (item "Start time" (t/reformat (:start-time build)))
+     (item [:span {:title "Total time that has passed between build start and end"} "Elapsed"]
+           [:span {:title (t/reformat (:end-time build))} [co/build-elapsed build]])
+     (item "Git ref" (get-in build [:git :ref]))
+     (when (number? credits)
+       (item [:span {:title "Consumed amount of credits"} "Credits"] credits))
+     (when-let [msg (:message build)]
        [:div.row
-        (item "Result" [co/build-result (:status @d)])
-        (item "Start time" (t/reformat (:start-time @d)))]
-       [:div.row
-        (item "Git ref" (get-in @d [:git :ref]))
-        (item "End time" (t/reformat (:end-time @d)))]
-       [:div.row
-        (item "Credits" (or (:credits @d) 0))
-        (item [:span {:title "Total time that has passed between build start and end"} "Elapsed"]
-              [co/build-elapsed @d])]
-       (when message
-         [:div.row
-          [:div.col-md-2 [:b "Message"]]
-          [:div.col-md-10 message]])])))
+        [:div.col-md-3 [:b "Message"]]
+        [:div.col-md-9 msg]])]))
 
-(defn build-result []
-  (let [b (rf/subscribe [:build/current])]
-    ;; TODO Signal warnings or skipped jobs.
-    (case (:status @b)
-      :success
-      [:div.alert.alert-success
-       [co/icon :check-circle-fill]
-       [:span.ms-2 "Build successful!"]]
-      :error
-      [:div.alert.alert-danger
-       [co/icon :exclamation-triangle-fill]
-       [:b.ms-2.me-2 "This build failed."]
-       [:span "Check the job logs for details."]]
-      ;; Build still running: show nothing
-      nil)))
+(defn overview [build]
+  (when build
+    [:div.d-flex.align-items-center.gap-4
+     [build-status build]
+     [:div.flex-grow-1
+      [build-details build]]]))
 
 (defn- build-path [route]
   (let [p (r/path-params route)
@@ -82,91 +82,59 @@
                             (r/path-params)
                             (assoc :job-id (:id job)))))
 
-(defn- logs-btn [job]
-  (let [r (rf/subscribe [:route/current])]
-    [:a.btn.btn-primary.me-2
-     {:href (job-path job @r)}
-     [co/icon :file-earmark-plus] [:span.ms-1 "View Logs"]]))
-
-(defn- hide-btn [job]
-  [:button.btn.btn-close
-   {:on-click #(rf/dispatch [:job/toggle job])
-    :aria-label "Close"}])
-
-(defn- job-details [{:keys [labels start-time end-time] deps :dependencies arts :save-artifacts :as job}]
-  (letfn [(format-labels [lbls]
-            (->> lbls
-                 (map (partial cs/join " = "))
-                 (cs/join ", ")))]
-    [:div.row
-     [:div.col-4
-      [:ul
-       (when start-time
-         [:li "Started at: " [co/date-time start-time]])
-       (when end-time
-         [:li "Ended at: " [co/date-time end-time]])
-       (when-not (empty? labels)
-         [:li "Labels: " (format-labels labels)])
-       (when-not (empty? deps)
-         [:li "Dependent on: " (cs/join ", " deps)])
-       (when-not (empty? arts)
-         ;; TODO Link to artifact
-         [:li "Artifacts: " (cs/join ", " (map :id arts))])]]
-     [:div.col-4
-      [logs-btn job]]
-     [:div.col-4
-      [:div.float-end
-       [hide-btn job]]]]))
-
-(defn- render-job [job]
-  (let [exp (rf/subscribe [:build/expanded-jobs])
-        expanded? (and exp (contains? @exp (:id job)))
-        r (rf/subscribe [:route/current])
-        cells [[:td [:a {:href (job-path job @r)}
+(defn- render-job [idx job]
+  (let [r (rf/subscribe [:route/current])
+        cells [[:td [:th {:scope :row} (inc idx)]]
+               [:td [:a {:href (job-path job @r)}
                      (:id job)]]
                [:td (->> (get-in job [:dependencies])
                          (cs/join ", "))]
                [:td [co/build-result (:status job)]]
                [:td (elapsed job)]]]
     [:<>
-     (into [:tr {:on-click #(rf/dispatch [:job/toggle job])}] cells)
-     (when expanded?
-       [:tr
-        [:td {:col-span (count cells)}
-         [job-details job]]])]))
+     (into [:tr {:on-click #(rf/dispatch [:route/goto-path (job-path job @r)])}] cells)]))
 
 (defn- jobs-table [jobs]
-  [:table.table
+  [:table.table.table-hover
    [:thead
     [:tr
+     [:th "#"]
      [:th "Job"]
      [:th "Dependencies"]
      [:th "Result"]
      [:th "Elapsed"]]]
    (->> jobs
-        (map render-job)
+        (map-indexed render-job)
         (into [:tbody]))])
 
 (defn- build-jobs []
   (let [jobs (rf/subscribe [:build/jobs])]
-    [:div.mb-2
-     [:p "This build contains " (count @jobs) " jobs"]
-     [jobs-table @jobs]]))
+    (if (empty? @jobs)
+      [:p "This build does not contain any jobs."]
+      [jobs-table @jobs])))
+
+(defn- current-overview []
+  (let [build (rf/subscribe [:build/current])]
+    [overview @build]))
 
 (defn page [route]
   (rf/dispatch [:build/init])
   (fn [route]
     (let [params (r/path-params route)
           repo (rf/subscribe [:repo/info (:repo-id params)])
-          reloading? (rf/subscribe [:build/reloading?])]
+          loading? (rf/subscribe [:build/loading?])]
       [l/default
        [:<>
         [:div.d-flex.gap-2.align-items-start.mb-2
          [:h3.me-auto (:name @repo) " - " (:build-id params)]
-         [co/reload-btn [:build/reload] (when @reloading? {:disabled true})]]
+         (if @loading?
+           [:button.btn.btn-primary.btn-sm
+            {:disabled true}
+            [:div.spinner-border]]
+           [co/reload-btn-sm [:build/reload]])]
         [:div.card
          [:div.card-body
           [co/alerts [:build/alerts]]
-          [build-details]
-          [build-result]
+          ;; TODO When loading, show placeholders
+          [current-overview]
           [build-jobs]]]]])))

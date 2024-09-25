@@ -310,3 +310,8 @@
  :secure-request
  (fn [{:keys [db]} [_ req args on-success on-failure]]
    {:dispatch (into [:martian.re-frame/request req (add-token db args) on-success [::error-handler on-failure]])}))
+
+(defn api-url
+  "Constructs a url to the api, using authorization token given"
+  [path]
+  (str url path))

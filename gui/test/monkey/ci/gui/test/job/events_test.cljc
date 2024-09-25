@@ -5,6 +5,7 @@
             [day8.re-frame.test :as rft]
             [monkey.ci.gui.job.db :as db]
             [monkey.ci.gui.job.events :as sut]
+            [monkey.ci.gui.login.db :as ldb]
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.test.fixtures :as tf]
             [monkey.ci.gui.test.helpers :as h]
@@ -138,3 +139,4 @@
       (is (= :danger (-> (db/path-alerts @app-db path)
                          first
                          :type))))))
+

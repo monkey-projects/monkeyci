@@ -73,33 +73,19 @@
          (rf/dispatch [:build/init])
          (is (empty? @c)))))))
 
+(defn- build-sid []
+  (repeatedly 3 (comp str random-uuid)))
+
+(defn- gen-build []
+  (zipmap [:customer-id :repo-id :build-id] (build-sid)))
+
 (deftest build-load
-  (testing "sets alert"
+  (testing "resets alerts"
+    (is (some? (reset! app-db (db/set-alerts {} [{:type :info :message "test alert"}]))))
     (rf/dispatch-sync [:build/load])
-    (is (= 1 (count (db/alerts @app-db)))))
+    (is (empty? (db/get-alerts @app-db))))
 
   (testing "fetches builds from backend"
-    (rft/run-test-sync
-     (let [c (h/catch-fx :martian.re-frame/request)]
-       (reset! app-db {:route/current
-                       {:parameters
-                        {:path 
-                         {:customer-id "test-cust"
-                          :repo-id "test-repo"
-                          :build-id "test-build"}}}})
-       (h/initialize-martian {:get-build {:body "test-build"
-                                          :error-code :no-error}})
-       (rf/dispatch [:build/load])
-       (is (= 1 (count @c)))
-       (is (= :get-build (-> @c first (nth 2)))))))
-
-  (testing "clears current build"
-    (is (map? (reset! app-db (db/set-build {} "test-build"))))
-    (rf/dispatch-sync [:build/load])
-    (is (nil? (db/build @app-db)))))
-
-(deftest build-maybe-load
-  (testing "loads build if not in db"
     (rft/run-test-sync
      (let [c (h/catch-fx :martian.re-frame/request)]
        (reset! app-db (r/set-current
@@ -111,60 +97,48 @@
                           :build-id "test-build"}}}))
        (h/initialize-martian {:get-build {:body "test-build"
                                           :error-code :no-error}})
-       (rf/dispatch [:build/maybe-load])
+       (rf/dispatch [:build/load])
        (is (= 1 (count @c)))
        (is (= :get-build (-> @c first (nth 2)))))))
 
-  (testing "does not load build if already in db"
-    (rft/run-test-sync
-     (let [c (h/catch-fx :martian.re-frame/request)]
-       (reset! app-db (-> {}
-                          (r/set-current
-                           {:parameters
-                            {:path 
-                             {:customer-id "test-cust"
-                              :repo-id "test-repo"
-                              :build-id "test-build"}}})
-                          (db/set-build {:id "test-build"})))
-       (h/initialize-martian {:get-build {:body "test-build"
-                                          :error-code :no-error}})
-       (rf/dispatch [:build/maybe-load])
-       (is (empty? @c)))))
+  (testing "does not clear build if it's the same path"
+    (let [build (gen-build)]
+      (is (some? (reset! app-db (-> {}
+                                    (r/set-current
+                                     {:parameters
+                                      {:path build}})
+                                    (db/set-build build)))))
+      (rf/dispatch-sync [:build/load])
+      (is (= build (db/get-build @app-db)))))
 
-  (testing "loads build if id in db differs from route id"
-    (rft/run-test-sync
-     (let [c (h/catch-fx :martian.re-frame/request)]
-       (reset! app-db (-> {}
-                          (r/set-current
-                           {:parameters
-                            {:path 
-                             {:customer-id "test-cust"
-                              :repo-id "test-repo"
-                              :build-id "test-build"}}})
-                          (db/set-build {:id "other-build"})))
-       (h/initialize-martian {:get-build {:body "test-build"
-                                          :error-code :no-error}})
-       (rf/dispatch [:build/maybe-load])
-       (is (= 1 (count @c)))))))
+  (testing "clears current build if path differs"
+    (is (some? (reset! app-db (-> {}
+                                  (r/set-current
+                                   {:parameters
+                                    {:path (gen-build)}})
+                                  (db/set-build (gen-build))))))
+    (rf/dispatch-sync [:build/load])
+    (is (nil? (db/get-build @app-db)))))
 
 (deftest build-load--success
-  (testing "clears alerts"
-    (is (map? (reset! app-db (db/set-alerts {} [{:type :info
-                                                 :message "test notification"}]))))
-    (rf/dispatch-sync [:build/load--success {:body {}}])
-    (is (nil? (db/alerts @app-db))))
-
-  (testing "clears build reload flag"
-    (is (map? (reset! app-db (db/set-reloading {} #{:build}))))
-    (rf/dispatch-sync [:build/load--success {:body {}}])
-    (is (not (db/reloading? @app-db))))
-
   (testing "converts build jobs to map"
     (rf/dispatch-sync [:build/load--success {:body {:script
                                                     {:jobs [{:id "test-job"}]}}}])
     (is (= {:script
             {:jobs {"test-job" {:id "test-job"}}}}
-           (db/build @app-db))))
+           (db/get-build @app-db))))
+
+  (testing "adds customer and repo id from route"
+    (let [[_ _ build-id :as sid] (build-sid)]
+      (is (some? (reset! app-db (r/set-current
+                                 {}
+                                 {:parameters
+                                  {:path (zipmap [:customer-id :repo-id :build-id] sid)}}))))
+      (rf/dispatch-sync [:build/load--success {:body {:build-id build-id}}])
+      (is (= sid
+             (-> (db/get-build @app-db)
+                 (select-keys [:customer-id :repo-id :build-id])
+                 (vals))))))
 
   (testing "starts event stream when build is running")
 
@@ -173,14 +147,14 @@
 (deftest build-load--failed
   (testing "sets error"
     (rf/dispatch-sync [:build/load--failed "test-error"])
-    (is (= :danger (-> (db/alerts @app-db)
+    (is (= :danger (-> (db/get-alerts @app-db)
                        (first)
                        :type))))
   
-  (testing "clears build reload flag"
-    (is (map? (reset! app-db (db/set-reloading {} #{:build}))))
+  (testing "clears build loading flag"
+    (is (map? (reset! app-db (lo/set-loading {} db/id))))
     (rf/dispatch-sync [:build/load--failed {:body {}}])
-    (is (not (db/reloading? @app-db)))))
+    (is (not (lo/loading? @app-db db/id)))))
 
 (deftest build-reload
   (testing "loads build from backend"
@@ -199,9 +173,9 @@
        (is (= 1 (count @c)))
        (is (= [:get-build] (->> @c (map #(nth % 2))))))))
 
-  (testing "marks reloading"
+  (testing "marks loading"
     (rf/dispatch-sync [:build/reload])
-    (is (some? (db/reloading? @app-db)))))
+    (is (some? (lo/loading? @app-db db/id)))))
 
 (defn- test-build []
   (->> (repeatedly 3 (comp str random-uuid))
@@ -227,7 +201,7 @@
                          (db/set-build build)
                          (set-build-path build)))
       (rf/dispatch-sync [:build/handle-event evt])
-      (is (= build (db/build @app-db)))))
+      (is (= build (db/get-build @app-db)))))
 
   (testing "updates build on `build/updated` event"
     (let [build (test-build)
@@ -238,16 +212,5 @@
                                     (db/set-build build)
                                     (set-build-path build)))))
       (rf/dispatch-sync [:build/handle-event evt])
-      (is (= (:build evt) (db/build @app-db))))))
+      (is (= (:build evt) (db/get-build @app-db))))))
 
-(deftest job-toggle
-  (testing "marks job as expanded in db by id"
-    (let [job {:id ::test-job}]
-      (rf/dispatch-sync [:job/toggle job])
-      (is (= #{::test-job} (db/expanded-jobs @app-db)))))
-
-  (testing "removes expanded job from list"
-    (let [job {:id ::test-job-2}]
-      (rf/dispatch-sync [:job/toggle job])
-      (rf/dispatch-sync [:job/toggle job])
-      (is (= #{::test-job} (db/expanded-jobs @app-db))))))

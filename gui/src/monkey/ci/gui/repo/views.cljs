@@ -28,9 +28,14 @@
      {:href (r/path-for :page/repo-edit (get-in @c [:parameters :path]))}
      [:span.me-1 [co/icon :pencil-fill]] "Edit"]))
 
+(defn refresh-btn [& [opts]]
+  [:button.btn.btn-outline-primary.btn-icon.btn-sm
+   (merge opts {:on-click (u/link-evt-handler [:builds/reload])
+                :title "Refresh"})
+   [co/icon :arrow-clockwise]])
+
 (defn build-actions []
   [:<>
-   [co/reload-btn [:builds/reload]]
    [trigger-build-btn]
    [edit-repo-btn]])
 
@@ -93,7 +98,8 @@
       (rf/dispatch [:builds/load]))
     [:<>
      [:div.d-flex.gap-1.align-items-start
-      [:h4.me-auto "Builds"]
+      [:h4.me-2 "Builds"]
+      [refresh-btn {:class [:me-auto]}]
       [build-actions]]
      [trigger-form repo]
      [table/paged-table
@@ -149,7 +155,7 @@
 
 (defn- save-btn []
   (let [s? (rf/subscribe [:repo/saving?])]
-    [:button.btn.btn-primary.me-2
+    [:button.btn.btn-primary
      (cond-> {:type :submit}
        @s? (assoc :disabled true))
      [:span.me-2 [co/icon :floppy]] "Save"]))
@@ -189,13 +195,13 @@
           :disabled true}]
         [:div.form-text "The native Github Id, registered when watching this repo."]]]
       [:div.col
-       [:p "Labels:"]
+       [:h5 "Labels:"]
        [:p.text-body-secondary
         "Labels are used to expose parameters and ssh keys to builds, but also to group repositories. "
         "You can assign any labels you like.  Labels are case-sensitive."]
        [labels (:labels @e)]]
       [:div.row
-       [:div.col
+       [:div.d-flex.gap-2
         [save-btn]
         [co/cancel-btn [:route/goto :page/repo (-> route
                                                    (r/path-params)

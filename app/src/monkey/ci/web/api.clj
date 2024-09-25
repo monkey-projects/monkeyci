@@ -210,9 +210,9 @@
                          (if (or (nil? res) (and (sequential? res) (empty? res)))
                            (rur/status 204)
                            (rur/response res)))]
-        (if (md/deferred? res)
-          (md/chain res ->response)
-          (->response res))))
+        (->response (if (md/deferred? res)
+                      @res ; Deref otherwise cors middleware fails
+                      res))))
     (rur/not-found nil)))
 
 (defn get-build-artifacts

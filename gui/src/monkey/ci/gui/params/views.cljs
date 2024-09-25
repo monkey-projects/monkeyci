@@ -177,11 +177,14 @@
       [:h3 "Build Parameters"]
       [:p
        "Parameters can be used by builds for " [:b "sensitive information"] ", or dynamically changing "
-       "data, like hostnames or file paths.  They are grouped in " [:b "parameter sets"] ". "
-       "Each set can be accessed by builds according to the configured " [:b "label filters"]
-       ".  Builds from repositories with matching labels can access those parameters.  A set "
-       "can be accessed by multiple repositories, and builds from a repository can potentially "
-       "access multiple sets.  When a parameter set has no label filters, all your builds can "
-       "read that set."]
+       "data, like hostnames or file paths. They obey the following rules:"]
+      [:ul
+       [:li "Parameters are grouped in " [:b "parameter sets"] "."]
+       [:li "Each set can be accessed by builds according to the configured " [:b "label filters"]]
+       [:li "Builds from repositories with matching labels can access those parameters."]
+       [:li "A set can be accessed by multiple repositories, and builds from a repository can potentially "
+        "access multiple sets."]
+       [:li "When a parameter set has " [:b "no label filters"] ", all your builds can read that set."]]
+      
       [co/alerts [:params/alerts]]
       [params-list]])))
