@@ -240,14 +240,3 @@
       (rf/dispatch-sync [:build/handle-event evt])
       (is (= (:build evt) (db/build @app-db))))))
 
-(deftest job-toggle
-  (testing "marks job as expanded in db by id"
-    (let [job {:id ::test-job}]
-      (rf/dispatch-sync [:job/toggle job])
-      (is (= #{::test-job} (db/expanded-jobs @app-db)))))
-
-  (testing "removes expanded job from list"
-    (let [job {:id ::test-job-2}]
-      (rf/dispatch-sync [:job/toggle job])
-      (rf/dispatch-sync [:job/toggle job])
-      (is (= #{::test-job} (db/expanded-jobs @app-db))))))

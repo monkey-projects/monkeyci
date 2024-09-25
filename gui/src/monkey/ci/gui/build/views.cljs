@@ -60,16 +60,11 @@
         [:div.col-md-9 msg]])]))
 
 (defn overview [build]
-  [:div.d-flex.align-items-center.gap-4
-   [build-status build]
-   [:div.flex-grow-1
-    [build-details build]]]
-  #_[:div.container
-     [:div.row
-      [:div.col-5
-       [build-status build]]
-      [:div.container.col-7.align-bottom
-       [build-details build]]]])
+  (when build
+    [:div.d-flex.align-items-center.gap-4
+     [build-status build]
+     [:div.flex-grow-1
+      [build-details build]]]))
 
 (defn- build-path [route]
   (let [p (r/path-params route)
@@ -100,46 +95,8 @@
                             (r/path-params)
                             (assoc :job-id (:id job)))))
 
-(defn- logs-btn [job]
-  (let [r (rf/subscribe [:route/current])]
-    [:a.btn.btn-primary.me-2
-     {:href (job-path job @r)}
-     [co/icon :file-earmark-plus] [:span.ms-1 "View Logs"]]))
-
-(defn- hide-btn [job]
-  [:button.btn.btn-close
-   {:on-click #(rf/dispatch [:job/toggle job])
-    :aria-label "Close"}])
-
-(defn- job-details [{:keys [labels start-time end-time] deps :dependencies arts :save-artifacts :as job}]
-  (letfn [(format-labels [lbls]
-            (->> lbls
-                 (map (partial cs/join " = "))
-                 (cs/join ", ")))]
-    [:div.row
-     [:div.col-4
-      [:ul
-       (when start-time
-         [:li "Started at: " [co/date-time start-time]])
-       (when end-time
-         [:li "Ended at: " [co/date-time end-time]])
-       (when-not (empty? labels)
-         [:li "Labels: " (format-labels labels)])
-       (when-not (empty? deps)
-         [:li "Dependent on: " (cs/join ", " deps)])
-       (when-not (empty? arts)
-         ;; TODO Link to artifact
-         [:li "Artifacts: " (cs/join ", " (map :id arts))])]]
-     [:div.col-4
-      [logs-btn job]]
-     [:div.col-4
-      [:div.float-end
-       [hide-btn job]]]]))
-
 (defn- render-job [job]
-  (let [exp (rf/subscribe [:build/expanded-jobs])
-        expanded? (and exp (contains? @exp (:id job)))
-        r (rf/subscribe [:route/current])
+  (let [r (rf/subscribe [:route/current])
         cells [[:td [:a {:href (job-path job @r)}
                      (:id job)]]
                [:td (->> (get-in job [:dependencies])
@@ -147,11 +104,7 @@
                [:td [co/build-result (:status job)]]
                [:td (elapsed job)]]]
     [:<>
-     (into [:tr {:on-click #(rf/dispatch [:job/toggle job])}] cells)
-     (when expanded?
-       [:tr
-        [:td {:col-span (count cells)}
-         [job-details job]]])]))
+     (into [:tr {:on-click #(rf/dispatch [:route/goto-path (job-path job @r)])}] cells)]))
 
 (defn- jobs-table [jobs]
   [:table.table
@@ -171,13 +124,16 @@
      [:p "This build contains " (count @jobs) " jobs"]
      [jobs-table @jobs]]))
 
+(defn- current-overview []
+  (let [build (rf/subscribe [:build/current])]
+    [overview @build]))
+
 (defn page [route]
   (rf/dispatch [:build/init])
   (fn [route]
     (let [params (r/path-params route)
           repo (rf/subscribe [:repo/info (:repo-id params)])
-          reloading? (rf/subscribe [:build/reloading?])
-          curr (rf/subscribe [:build/current])]
+          reloading? (rf/subscribe [:build/reloading?])]
       [l/default
        [:<>
         [:div.d-flex.gap-2.align-items-start.mb-2
@@ -186,5 +142,5 @@
         [:div.card
          [:div.card-body
           [co/alerts [:build/alerts]]
-          [overview @curr]
+          [current-overview]
           [build-jobs]]]]])))

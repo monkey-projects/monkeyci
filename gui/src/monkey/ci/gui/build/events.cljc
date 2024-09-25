@@ -96,7 +96,3 @@
    (when (for-build? db evt)
      (handle-event db evt))))
 
-(rf/reg-event-db
- :job/toggle
- (fn [db [_ job]]
-   (db/toggle-expanded-job db (:id job))))

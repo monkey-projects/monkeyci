@@ -7,7 +7,6 @@
 (u/db-sub :build/alerts db/alerts)
 (u/db-sub :build/current db/build)
 (u/db-sub :build/reloading? (comp some? db/reloading?))
-(u/db-sub :build/expanded-jobs db/expanded-jobs)
 
 (def split-log-path #(cs/split % #"/"))
 

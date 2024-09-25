@@ -61,14 +61,3 @@
 
 (defn set-auto-reload [db v]
   (assoc db auto-reload? v))
-
-(def expanded-jobs ::expanded-jobs)
-
-(defn set-expanded-jobs [db ids]
-  (assoc db expanded-jobs (set ids)))
-
-(defn toggle-expanded-job [db id]
-  (update db expanded-jobs (fnil (fn [ids]
-                                   (let [toggle (if (ids id) disj conj)]
-                                     (toggle ids id)))
-                                 #{})))
