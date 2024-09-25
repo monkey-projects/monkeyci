@@ -39,21 +39,18 @@
 
 (defn build-details
   "Displays the build details by looking it up in the list of repo builds."
-  [build]
+  [{:keys [credits] :as build}]
   (letfn [(item [k v]
-            [:<>
-             [:div.col-lg-3.col-sm-6 [:b k]]
-             [:div.col-lg-3.col-sm-6 v]])]
+            [:div.row
+             [:div.col-5.offset-1 [:b k]]
+             [:div.col-6 v]])]
     [:<>
-     [:div.row
-      (item "Start time" (t/reformat (:start-time build)))]
-     [:div.row
-      (item "End time" (t/reformat (:end-time build)))
-      (item "Git ref" (get-in build [:git :ref]))]
-     [:div.row
-      (item [:span {:title "Total time that has passed between build start and end"} "Elapsed"]
-            [co/build-elapsed build])
-      (item "Credits" (or (:credits build) 0))]
+     (item "Start time" (t/reformat (:start-time build)))
+     (item [:span {:title "Total time that has passed between build start and end"} "Elapsed"]
+           [:span {:title (t/reformat (:end-time build))} [co/build-elapsed build]])
+     (item "Git ref" (get-in build [:git :ref]))
+     (when (number? credits)
+       (item [:span {:title "Consumed amount of credits"} "Credits"] credits))
      (when-let [msg (:message build)]
        [:div.row
         [:div.col-md-3 [:b "Message"]]
@@ -95,9 +92,10 @@
                             (r/path-params)
                             (assoc :job-id (:id job)))))
 
-(defn- render-job [job]
+(defn- render-job [idx job]
   (let [r (rf/subscribe [:route/current])
-        cells [[:td [:a {:href (job-path job @r)}
+        cells [[:td [:th {:scope :row} (inc idx)]]
+               [:td [:a {:href (job-path job @r)}
                      (:id job)]]
                [:td (->> (get-in job [:dependencies])
                          (cs/join ", "))]
@@ -107,22 +105,23 @@
      (into [:tr {:on-click #(rf/dispatch [:route/goto-path (job-path job @r)])}] cells)]))
 
 (defn- jobs-table [jobs]
-  [:table.table
+  [:table.table.table-hover
    [:thead
     [:tr
+     [:th "#"]
      [:th "Job"]
      [:th "Dependencies"]
      [:th "Result"]
      [:th "Elapsed"]]]
    (->> jobs
-        (map render-job)
+        (map-indexed render-job)
         (into [:tbody]))])
 
 (defn- build-jobs []
   (let [jobs (rf/subscribe [:build/jobs])]
-    [:div.mb-2
-     [:p "This build contains " (count @jobs) " jobs"]
-     [jobs-table @jobs]]))
+    (if (empty? @jobs)
+      [:p "This build does not contain any jobs."]
+      [jobs-table @jobs])))
 
 (defn- current-overview []
   (let [build (rf/subscribe [:build/current])]
@@ -133,14 +132,19 @@
   (fn [route]
     (let [params (r/path-params route)
           repo (rf/subscribe [:repo/info (:repo-id params)])
-          reloading? (rf/subscribe [:build/reloading?])]
+          loading? (rf/subscribe [:build/loading?])]
       [l/default
        [:<>
         [:div.d-flex.gap-2.align-items-start.mb-2
          [:h3.me-auto (:name @repo) " - " (:build-id params)]
-         [co/reload-btn-sm [:build/reload] (when @reloading? {:disabled true})]]
+         (if @loading?
+           [:button.btn.btn-primary.btn-sm
+            {:disabled true}
+            [:div.spinner-border]]
+           [co/reload-btn-sm [:build/reload]])]
         [:div.card
          [:div.card-body
           [co/alerts [:build/alerts]]
+          ;; TODO When loading, show placeholders
           [current-overview]
           [build-jobs]]]]])))

@@ -2,47 +2,24 @@
   (:require [monkey.ci.gui.loader :as lo]))
 
 (def id ::build-id)
-(def alerts ::alerts)
+
+(defn get-alerts [db]
+  (lo/get-alerts db id))
 
 (defn set-alerts [db a]
-  (assoc db alerts a))
+  (lo/set-alerts db id a))
 
 (defn reset-alerts [db]
-  (dissoc db alerts))
+  (lo/reset-alerts db id))
 
-(def build ::build)
+(defn get-build [db]
+  (lo/get-value db id))
 
-(defn set-build [db l]
-  (assoc db build l))
+(defn set-build [db b]
+  (lo/set-value db id b))
 
 (defn update-build [db f & args]
-  (apply update db build f args))
-
-(def reloading ::reloading)
-
-(defn set-reloading
-  "Sets the set of reloading things"
-  ([db r]
-   (assoc db reloading r))
-  ([db]
-   (set-reloading db #{:build})))
-
-(defn clear-reloading [db r]
-  (update db reloading disj r))
-
-(defn clear-build-reloading [db]
-  (clear-reloading db :build))
-
-(defn reloading? [db]
-  (not-empty (reloading db)))
-
-(def downloading? ::downloading?)
-
-(defn mark-downloading [db]
-  (assoc db downloading? true))
-
-(defn reset-downloading [db]
-  (dissoc db downloading?))
+  (apply lo/update-value db id f args))
 
 (def log-path ::log-path)
 
@@ -56,8 +33,3 @@
 
 (defn reset-log-alerts [db]
   (dissoc db log-alerts))
-
-(def auto-reload? ::auto-reload)
-
-(defn set-auto-reload [db v]
-  (assoc db auto-reload? v))

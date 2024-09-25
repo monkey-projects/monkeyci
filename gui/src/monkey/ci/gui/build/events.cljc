@@ -27,22 +27,19 @@
    [:build/load--success]
    [:build/load--failed]])
 
+(defn- same-build?
+  "True if the build in db is the same as referred to by the current route"
+  [db]
+  (let [id (juxt :customer-id :repo-id :build-id)]
+    (= (id (r/path-params (r/current db)))
+       (id (db/get-build db)))))
+
 (rf/reg-event-fx
  :build/load
  (fn [{:keys [db]} _]
-   {:db (-> db
-            (db/set-alerts [{:type :info
-                             :message "Loading build details..."}])
-            (db/set-build nil))
+   {:db (cond-> (db/reset-alerts db)
+          (not (same-build? db)) (db/set-build nil))
     :dispatch (load-build-req db)}))
-
-(rf/reg-event-fx
- :build/maybe-load
- (fn [{:keys [db]} _]
-   (let [existing (db/build db)
-         id (-> (r/current db) r/path-params :build-id)]
-     (when-not (= (:id existing) id)
-       {:dispatch [:build/load id]}))))
 
 (defn- convert-build
   "Builds received from requests are slightly different from those received as events.
@@ -58,26 +55,22 @@
 
 (rf/reg-event-db
  :build/load--success
- (fn [db [_ {build :body}]]
+ (fn [db [_ {build :body :as resp}]]
    (-> db
-       (db/set-build (convert-build build))
-       (db/reset-alerts)
-       (db/clear-build-reloading))))
+       (lo/on-success db/id resp)
+       ;; Override build with conversion
+       (db/set-build (convert-build build)))))
 
 (rf/reg-event-db
  :build/load--failed
  (fn [db [_ err op]]
-   (-> db
-       (db/set-alerts [{:type :danger
-                        :message (str "Could not load build details: " (u/error-msg err))}])
-       (db/clear-build-reloading))))
+   (lo/on-failure db db/id "Could not load build details: " err)))
 
 (rf/reg-event-fx
  :build/reload
- [(rf/inject-cofx :time/now)]
  (fn [{:keys [db] :as cofx} _]
    {:dispatch (load-build-req db)
-    :db (db/set-reloading db)}))
+    :db (lo/set-loading db db/id)}))
 
 (defn- for-build? [db evt]
   (let [get-id (juxt :customer-id :repo-id :build-id)]
@@ -95,4 +88,3 @@
  (fn [db [_ evt]]
    (when (for-build? db evt)
      (handle-event db evt))))
-

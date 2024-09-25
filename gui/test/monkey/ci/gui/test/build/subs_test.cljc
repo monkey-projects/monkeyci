@@ -3,6 +3,7 @@
                :clj [clojure.test :refer [deftest testing is use-fixtures]])
             [monkey.ci.gui.build.db :as db]
             [monkey.ci.gui.build.subs :as sut]
+            [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.repo.db :as rdb]
             [monkey.ci.gui.test.fixtures :as f]
             [re-frame.core :as rf]
@@ -50,12 +51,12 @@
                 "dep-3"]
                (map :id @jobs)))))))
 
-(deftest reloading?
-  (let [r (rf/subscribe [:build/reloading?])]
+(deftest loading?
+  (let [r (rf/subscribe [:build/loading?])]
     (testing "exists"
       (is (some? r)))
 
     (testing "returns reloading status from db"
       (is (false? @r))
-      (is (map? (reset! app-db (db/set-reloading {}))))
+      (is (map? (reset! app-db (lo/set-loading {} db/id))))
       (is (true? @r)))))
