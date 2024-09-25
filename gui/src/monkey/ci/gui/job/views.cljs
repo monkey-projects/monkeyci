@@ -1,11 +1,14 @@
 (ns monkey.ci.gui.job.views
   (:require [clojure.string :as cs]
+            [monkey.ci.gui.artifact.events]
+            [monkey.ci.gui.artifact.subs]
             [monkey.ci.gui.charts :as charts]
             [monkey.ci.gui.components :as co]
             [monkey.ci.gui.job.events :as e]
             [monkey.ci.gui.job.subs]
             [monkey.ci.gui.layout :as l]
             [monkey.ci.gui.logging :as log]
+            [monkey.ci.gui.martian :as m]
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.tabs :as tabs]
             [monkey.ci.gui.test-results :as tr]
@@ -102,21 +105,31 @@
                                     (cs/split #"\n")
                                     (as-> x (interpose [:br] x)))]}))
 
+(defn- download-artifact-btn [{:keys [id]}]
+  (let [loading? (rf/subscribe [:artifact/downloading? id])]
+    (if @loading?
+      [:button.btn.btn-sm.btn-primary [:div.spinner-border.spinner-border-sm]]
+      [co/icon-btn-sm :download [:artifact/download id] {:title "Download artifact"}])))
+
 (defn- artifacts [job]
-  (letfn [(artifact-row [art]
-            [:tr
-             [:td (co/status-icon :loading "1.5em")]
-             [:td (:id art)]
-             [:td (:path art)]])]
-    [:<>
-     [:table.table
-      [:thead
-       [:tr
-        [:th "Status"]
-        [:th.w-25 "Id"]
-        [:th.w-75 "Path"]]]
-      (into [:tbody] (map artifact-row (:save-artifacts job)))
-      [:caption "Configured and actual job artifacts."]]]))
+  (let [route (rf/subscribe [:route/current])
+        token (rf/subscribe [:login/token])
+        {:keys [customer-id repo-id build-id]} (r/path-params @route)]
+    (letfn [(artifact-row [art]
+              [:tr
+               [:td [download-artifact-btn art]]
+               [:td (:id art)]
+               [:td (:path art)]])]
+      [:<>
+       [co/alerts [:artifact/alerts]]
+       [:table.table
+        [:thead
+         [:tr
+          [:th ""]
+          [:th.w-25 "Id"]
+          [:th.w-75 "Path"]]]
+        (into [:tbody] (map artifact-row (:save-artifacts job)))
+        [:caption "Configured and actual job artifacts."]]])))
 
 (defn- artifacts-tab [job]
   (when (:save-artifacts job)

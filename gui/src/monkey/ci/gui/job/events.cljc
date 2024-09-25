@@ -1,7 +1,9 @@
 (ns monkey.ci.gui.job.events
   (:require [monkey.ci.gui.job.db :as db]
             [monkey.ci.gui.loader :as lo]
+            [monkey.ci.gui.login.db :as ldb]
             [monkey.ci.gui.loki :as loki]
+            [monkey.ci.gui.martian :as m]
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
@@ -91,3 +93,4 @@
                   path
                   [{:type :danger
                     :message (str "Failed to fetch logs: " (u/error-msg err))}])))
+
