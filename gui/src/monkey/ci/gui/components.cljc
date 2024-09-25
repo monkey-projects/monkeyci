@@ -61,6 +61,19 @@
                :bg-secondary)]
     [:span {:class (str "badge " (name type))} r]))
 
+(defn status-icon [status size]
+  (let [[cl i] (get {:success      [:text-success :check-circle]
+                     :error        [:text-danger :x-circle]
+                     :running      [:text-info :play-circle]
+                     :pending      [:text-warning :pause-circle]
+                     :initializing [:text-warning :play-circle]}
+                    status
+                    [:text-default :question-circle])]
+    [:div (cond-> {:style {:font-size size}
+                   :class cl}
+            status (assoc :title (name status)))
+     [icon i]]))
+
 (defn- item-id [id idx]
   (str (name id) "-" idx))
 

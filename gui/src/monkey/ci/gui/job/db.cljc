@@ -1,4 +1,5 @@
-(ns monkey.ci.gui.job.db)
+(ns monkey.ci.gui.job.db
+  (:require [monkey.ci.gui.loader :as lo]))
 
 (def alerts ::alerts)
 

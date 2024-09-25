@@ -12,13 +12,16 @@
             [monkey.ci.gui.time :as t]
             [re-frame.core :as rf]))
 
+(defn status-icon [status]
+  (co/status-icon status "6em"))
+
 (defn- info
   "Displays the given rows (consisting of 2 items) as an info grid."
   [& rows]
   (letfn [(info-row [[k v]]
             [:div.row
              [:div.col-2 k]
-             [:div.col-2 v]])]
+             [:div.col-10 v]])]
     (->> rows
          (remove nil?)
          (map info-row)
@@ -30,26 +33,28 @@
               [:li k ": " v]))
        (into [:ul])))
 
-(defn job-details  
-  ([details]
-   (when-let [{:keys [start-time end-time labels message] deps :dependencies :as job} details]
-     [:<>
-      [info
-       ["Status:" [co/build-result (:status job)]]
-       (when start-time
-         ["Started at:" [co/date-time start-time]])
-       (when end-time
-         ["Ended at:" [co/date-time end-time]])
-       (when (and start-time end-time)
-         ["Duration:" [t/format-seconds (int (/ (- end-time start-time) 1000))]])
-       (when-not (empty? labels)
-         ["Labels:" [job-labels labels]])
-       (when-not (empty? deps)
-         ["Dependent on:" (cs/join ", " deps)])]
-      (when-not (empty? message)
-        [:div.row
-         [:div.col-2 "Message: "]
-         [:div.col-10.text-truncate message]])]))
+(defn job-details
+  ([job]
+   (when-let [{:keys [start-time end-time labels message] deps :dependencies} job]
+     [:div.d-flex.gap-4.align-items-center
+      [status-icon (:status job)]
+      [:div.w-100
+       [info
+        ["Status:" [co/build-result (:status job)]]
+        (when start-time
+          ["Started at:" [co/date-time start-time]])
+        (when end-time
+          ["Ended at:" [co/date-time end-time]])
+        (when (and start-time end-time)
+          ["Duration:" [t/format-seconds (int (/ (- end-time start-time) 1000))]])
+        (when-not (empty? labels)
+          ["Labels:" [job-labels labels]])
+        (when-not (empty? deps)
+          ["Dependent on:" (cs/join ", " deps)])]
+       (when-not (empty? message)
+         [:div.row
+          [:div.col-2 "Message: "]
+          [:div.col-10.text-truncate message]])]]))
   ([]
    (job-details @(rf/subscribe [:job/current]))))
 
@@ -66,6 +71,19 @@
      [co/alerts [:job/path-alerts path]]
      (when (and @log (not-empty @log))
        [co/log-contents @log])]))
+
+(defn- job-output [output]
+  ;; TODO Handle ansi coloring
+  [co/log-contents (->> (cs/split output #"\n")
+                        (map cs/trim)
+                        (interpose [:br])
+                        (into [:pre])
+                        vector)])
+
+(defn output-tab [job]
+  (when-let [output (get-in job [:result :output])]
+    {:header "Output"
+     :contents [job-output output]}))
 
 (defn- test-results-details [tr]
   [:div
@@ -84,6 +102,27 @@
                                     (cs/split #"\n")
                                     (as-> x (interpose [:br] x)))]}))
 
+(defn- artifacts [job]
+  (letfn [(artifact-row [art]
+            [:tr
+             [:td (co/status-icon :loading "1.5em")]
+             [:td (:id art)]
+             [:td (:path art)]])]
+    [:<>
+     [:table.table
+      [:thead
+       [:tr
+        [:th "Status"]
+        [:th.w-25 "Id"]
+        [:th.w-75 "Path"]]]
+      (into [:tbody] (map artifact-row (:save-artifacts job)))
+      [:caption "Configured and actual job artifacts."]]]))
+
+(defn- artifacts-tab [job]
+  (when (:save-artifacts job)
+    {:header "Artifacts"
+     :contents [artifacts job]}))
+
 (defn- details-tabs
   "Renders tabs to display the job details.  These tabs include logs and test results."
   [job]
@@ -93,11 +132,15 @@
                         (map (fn [p]
                                {:header (path->file p)
                                 :contents [log-contents job p]}))))
-        [f :as tabs] (->> log-tabs
-                          (concat [(error-trace job) (test-results job)])
+        [f :as tabs] (->> log-tabs ; TODO Merge into one tab
+                          (concat [(output-tab job)
+                                   (error-trace job)
+                                   (test-results job)
+                                   (artifacts-tab job)])
                           (remove nil?))]
     (if (empty? tabs)
       [:p "No job details available.  You may want to try again later."]
+      ;; Make first tab the active one
       (conj [tabs/tabs e/details-tabs-id]
             (replace {f (assoc f :current? true)} tabs)))))
 
@@ -108,13 +151,21 @@
     (rf/dispatch [:job/load-log-files job])
     [details-tabs job]))
 
+(defn- return-link []
+  (let [route (rf/subscribe [:route/current])]
+    [:div.mt-2
+     [:a {:href (r/path-for :page/build (r/path-params @route))}
+      "Back to build"]]))
+
 (defn page [_]
   (rf/dispatch [:job/init])
   (let [job-id (rf/subscribe [:job/id])]
     [l/default
      [:<>
-      [:h2 "Job: " @job-id]
-      [:div.mb-2
-       [job-details]]
-      [co/alerts [:job/alerts]]
-      [load-details-tabs]]]))
+      [:h3 "Job: " @job-id]
+      [:div.card
+       [:div.card-body
+        [job-details]
+        [co/alerts [:job/alerts]]
+        [load-details-tabs]]]
+      [return-link]]]))

@@ -59,7 +59,10 @@
    (-> db
        (lo/on-success db/id resp)
        ;; Override build with conversion
-       (db/set-build (convert-build build)))))
+       (db/set-build (-> (convert-build build)
+                         ;; Also add customer and repo id because they don't come in the reply
+                         (merge (select-keys (r/path-params (r/current db))
+                                             [:customer-id :repo-id])))))))
 
 (rf/reg-event-db
  :build/load--failed

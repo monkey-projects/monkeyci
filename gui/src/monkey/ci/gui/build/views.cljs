@@ -13,17 +13,7 @@
             [re-frame.core :as rf]))
 
 (defn build-status-icon [status]
-  (let [[cl icon] (get {:success      [:text-success :check-circle]
-                        :error        [:text-danger :x-circle]
-                        :running      [:text-info :play-circle]
-                        :pending      [:text-warning :pause-circle]
-                        :initializing [:text-warning :play-circle]}
-                       status
-                       [:text-default :question-circle])]
-    [:div (cond-> {:style {:font-size "8em"}
-                   :class cl}
-            status (assoc :title (name status)))
-     [co/icon icon]]))
+  (co/status-icon status "8em"))
 
 (defn build-status [{:keys [status]}]
   (let [status-desc {:pending      "The build is waiting to be picked up by a runner."

@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.job.events
   (:require [monkey.ci.gui.job.db :as db]
+            [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.loki :as loki]
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.utils :as u]

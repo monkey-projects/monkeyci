@@ -128,6 +128,18 @@
             {:jobs {"test-job" {:id "test-job"}}}}
            (db/get-build @app-db))))
 
+  (testing "adds customer and repo id from route"
+    (let [[_ _ build-id :as sid] (build-sid)]
+      (is (some? (reset! app-db (r/set-current
+                                 {}
+                                 {:parameters
+                                  {:path (zipmap [:customer-id :repo-id :build-id] sid)}}))))
+      (rf/dispatch-sync [:build/load--success {:body {:build-id build-id}}])
+      (is (= sid
+             (-> (db/get-build @app-db)
+                 (select-keys [:customer-id :repo-id :build-id])
+                 (vals))))))
+
   (testing "starts event stream when build is running")
 
   (testing "does not start event stream when build has finished"))
