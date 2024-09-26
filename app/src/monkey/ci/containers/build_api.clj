@@ -46,15 +46,12 @@
            (fn [events]
              ;; TODO Refactor to an event listener, so we can use existing code
              (ms/consume (fn [{:keys [type job] :as evt}]
-                           (log/debug "Got event while waiting for container" job-id "to end:" evt)
+                           (log/debug "Got event while waiting for container" job-id "to be executed:" evt)
                            (let [result (:result job)]
-                             (if (and (= :job/end type)
-                                      (= job-id (j/job-id job)))
-                               (do
-                                 (log/debug "Container job" job-id "completed:" result)
-                                 (md/success! r result))
-                               (log/debug "No match: same types?" (= :container-job/end type)
-                                          ", same job id?" (= job-id (j/job-id job))))))
+                             (when (and (= :job/executed type)
+                                        (= job-id (j/job-id job)))
+                               (log/debug "Container job" job-id "completed:" result)
+                               (md/success! r result))))
                          events)))
           (md/catch (fn [ex]
                       (md/error! r ex))))

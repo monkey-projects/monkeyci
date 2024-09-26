@@ -46,14 +46,14 @@
                                                         (throw (ex-info "test error" {})))]
         (is (thrown? Exception (deref (p/run-container runner job) 1000 ::timeout)))))
 
-    (testing "reads events until `job/end` event has been received"
+    (testing "reads events until `job/executed` event has been received"
       (at/with-fake-http ["http://test-api/container"
                           (fn [req]
                             (swap! invocations conj req)
                             {:status 202})
                           "http://test-api/events"
                           {:status 200
-                           :body (-> (str "data: " (pr-str {:type :job/end
+                           :body (-> (str "data: " (pr-str {:type :job/executed
                                                             :job (-> (j/as-serializable job)
                                                                      (assoc :result ::test-result))
                                                             :sid ["some" "sid"]})

@@ -24,7 +24,7 @@
       (= :success status)))
 
 (defn failed? [{:keys [status]}]
-  (= :failure status))
+  (#{:failure :error} status))
 
 (defn skipped? [{:keys [status]}]
   (= :skipped status))

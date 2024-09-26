@@ -514,7 +514,7 @@
                    {:containers [{:display-name sut/sidecar-container-name}
                                  {:display-name sut/job-container-name}]}}
           res (sut/wait-for-results conf 100 (constantly details))
-          evt (ec/wait-for-event events {:types #{:job/start :job/end}})]
+          evt (ec/wait-for-event events {:types #{:job/start :job/executed}})]
       (is (some? (rt/post-events conf
                                  [{:type :sidecar/end
                                    :sid sid
@@ -523,7 +523,7 @@
       (is (some? res))
       (let [evt (deref evt 1000 :timeout)]
         (is (not= :timeout evt))
-        (is (= :job/end (:type evt)))))))
+        (is (= :job/executed (:type evt)))))))
 
 (deftest run-container
   (let [events (h/fake-events)
@@ -570,15 +570,13 @@
             (is (= sid (:sid evt)))
             (is (number? (:credit-multiplier evt)))))
 
-        (testing "fires `job/end` event"
-          (let [{:keys [job] :as evt} (->> (h/received-events events)
-                                           (h/first-event-by-type :job/end))]
+        (testing "fires `job/executed` event"
+          (let [evt (->> (h/received-events events)
+                         (h/first-event-by-type :job/executed))]
             (is (some? evt))
             (is (spec/valid? ::se/event evt)
                 (spec/explain-str ::se/event evt))
-            (is (= sid (:sid evt)))
-            (is (some? job))
-            (is (= {:exit 0} (:result job))))))
+            (is (= sid (:sid evt))))))
 
       (testing "fires event in case of oci error"
         (h/reset-events events)
@@ -587,9 +585,9 @@
                                                      :exception (ex-info "oci error" {})}))]
           (is (nil? @(p/run-container runner job)))
           (let [evt (->> (h/received-events events)
-                         (h/first-event-by-type :job/end))]
+                         (h/first-event-by-type :job/executed))]
             (is (some? evt))
-            (is (= "oci error" (get-in evt [:job :message]))))))
+            (is (= "oci error" (get-in evt [:result :message]))))))
       
       (testing "fires event in case of async exception"
         (h/reset-events events)
@@ -597,9 +595,9 @@
                                                     (ex-info "infra error" {})))]
           (is (nil? @(p/run-container runner job)))
           (let [evt (->> (h/received-events events)
-                         (h/first-event-by-type :job/end))]
+                         (h/first-event-by-type :job/executed))]
             (is (some? evt))
-            (is (= "infra error" (get-in evt [:job :message])))))))))
+            (is (= "infra error" (get-in evt [:result :message])))))))))
 
 (deftest normalize-key
   (testing "takes configured tag"

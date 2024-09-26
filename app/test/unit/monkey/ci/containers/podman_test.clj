@@ -118,14 +118,14 @@
           (is (some? evt))
           (is (spec/valid? ::se/event evt)))))
 
-    (testing "fires `job/end` event"
+    (testing "fires `job/executed` event"
       (h/with-tmp-dir dir
         (let [rt (test-rt dir)
               store (art/make-blob-repository (h/fake-blob-store) {})
               runner (sut/make-container-runner rt)
               r @(p/run-container runner (:job rt))
               evt (->> (h/received-events (:events rt))
-                       (h/first-event-by-type :job/end))]
+                       (h/first-event-by-type :job/executed))]
           (is (some? evt))
           (is (spec/valid? ::se/event evt)))))))
 

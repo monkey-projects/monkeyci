@@ -83,6 +83,9 @@
   (patch-job storage evt {:status :running
                           :start-time time}))
 
+(defn skip-job [storage {:keys [time] :as evt}]
+  (patch-job storage evt {:status :skipped}))
+
 (defn end-job [storage {:keys [time] :as evt}]
   (patch-job storage evt (-> evt
                              (select-keys [:status :result])
@@ -98,6 +101,7 @@
    :script/end          end-script
    :job/initializing    init-job
    :job/start           start-job
+   :job/skipped         skip-job
    :job/end             end-job})
 
 (defn handle-event [evt storage events]

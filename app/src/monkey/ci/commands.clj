@@ -140,17 +140,16 @@
 (defn- run-sidecar [{:keys [events job] :as rt}]
   (let [sid (b/get-sid rt)
         base-evt {:sid sid
-                  :job (jobs/job->event job)}
+                  :job-id (jobs/job-id job)}
         result (try
-                 (p/post-events events (assoc base-evt :type :sidecar/start))
+                 (p/post-events events (ec/make-event :sidecar/start base-evt))
                  (let [r @(sidecar/run rt)
                        e (:exit r)]
                    (ec/make-result (b/exit-code->status e) e (:message r)))
                  (catch Throwable t
                    (ec/exception-result t)))]
     (log/info "Sidecar terminated")
-    (p/post-events events (-> base-evt
-                              (assoc :type :sidecar/end)
+    (p/post-events events (-> (ec/make-event :sidecar/end base-evt)
                               (ec/set-result result)))
     (:exit result)))
 

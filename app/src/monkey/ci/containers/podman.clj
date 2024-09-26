@@ -102,19 +102,20 @@
     (log/info "Running build job " log-base "as podman container")
     (log/debug "Log base is:" log-base)
     (log/debug "Podman command:" cmd)
-    (ec/post-events events (j/job-start-evt job (b/sid build)))
+    (ec/post-events events (j/job-start-evt (j/job-id job) (b/sid build)))
     ;; Job is required by the blob wrappers in the config
     (try 
       (let [{:keys [exit] :as res} (wrapped-runner (assoc conf :job job))]
-        (ec/post-events events (j/job-end-evt job
-                                              (b/sid build)
-                                              (ec/make-result
-                                               (b/exit-code->status exit)
-                                               exit
-                                               nil)))
+        (ec/post-events events (j/job-executed-evt
+                                (j/job-id job)
+                                (b/sid build)
+                                (ec/make-result
+                                 (b/exit-code->status exit)
+                                 exit
+                                 nil)))
         res)
       (catch Exception ex
-        (ec/post-events events (j/job-end-evt job (b/sid build) (ec/exception-result ex)))))))
+        (ec/post-events events (j/job-end-evt (j/job-id job) (b/sid build) (ec/exception-result ex)))))))
 
 (defrecord PodmanContainerRunner [config credit-consumer]
   p/ContainerRunner

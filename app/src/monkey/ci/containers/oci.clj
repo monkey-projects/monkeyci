@@ -274,10 +274,10 @@
             (let [now (t/now)]
               (log/warn "Detected sidecar failure for job" job-id)
               (md/chain
-               (ec/post-events events [(j/job-end-evt (:job evt)
-                                                      sid
-                                                      (-> (select-keys evt [:message :exception])
-                                                          (assoc :status :error)))])
+               (ec/post-events events [(j/job-executed-evt (:job-id evt)
+                                                           sid
+                                                           (-> (select-keys evt [:message :exception])
+                                                               (assoc :status :error)))])
                (constantly (md/error-deferred (ex-info "Sidecar failed to start" evt))))))]
     (log/debug "Waiting for container startup:" job-id)
     (-> (ec/wait-for-event events
@@ -355,41 +355,28 @@
                          (get job :cpus oci/default-cpu-count)
                          (get job :memory oci/default-memory-gb)))
 
-(defn- base-event
-  "Creates a skeleton event with basic properties"
-  [type job build-sid]
-  {:type type
-   :src :script
-   :sid build-sid
-   :time (t/now)
-   :job (j/job->event job)})
-
 (defn- fire-job-initializing [job build-sid events]
-  (ec/post-events events [(j/job-initializing-evt job build-sid (credit-multiplier job))])
-  job)
+  (ec/post-events events [(j/job-initializing-evt (j/job-id job) build-sid (credit-multiplier job))]))
 
-(defn- fire-job-end [job build-sid result events]
+(defn- fire-job-executed [job-id build-sid result events]
   (let [result (-> result
                    (assoc :status (b/exit-code->status (:exit result))))]
-    (ec/post-events events [(j/job-end-evt job build-sid result)])))
+    (ec/post-events events [(j/job-executed-evt job-id build-sid result)])))
 
 (defn run-container [{:keys [events job build] :as conf}]
   (log/debug "Running job as OCI instance:" job)
   (log/debug "Build details:" build)
   (let [client (ci/make-context (:oci conf))
-        ic (instance-config conf)
-        job (fire-job-initializing job (b/sid build) events)]
+        ic (instance-config conf)]
+    (fire-job-initializing job (b/sid build) events)
     (-> (oci/run-instance client ic
                           {:delete? true
                            :exited? (fn [id]
                                       ;; TODO When a start event has not been received after
                                       ;; a sufficient period of time, start polling anyway.
                                       ;; For now, we add a max timeout.
-                                      (-> (wait-for-results conf j/max-job-timeout
-                                                            #(oci/get-full-instance-details client id))
-                                          ;; Just return the error data in case of error, which
-                                          ;; may contain http status
-                                          (md/catch ex-data)))})
+                                      (wait-for-results conf j/max-job-timeout
+                                                        #(oci/get-full-instance-details client id)))})
         (md/chain
          (fn [r]
            (letfn [(maybe-log-output [{:keys [exit-code display-name logs] :as c}]
@@ -413,11 +400,13 @@
                  (md/error-deferred r)))))
          (fn [r]
            (md/chain
-            (fire-job-end job (b/sid build) r events)
+            (fire-job-executed (j/job-id job) (b/sid build) r events)
             (constantly r))))
         (md/catch (fn [ex]
                     (log/error "Got error:" ex)
-                    (fire-job-end job (b/sid build) (j/ex->result ex) events)
+                    (fire-job-executed (j/job-id job)
+                                       (b/sid build)
+                                       (j/ex->result (or (:exception ex) ex)) events)
                     nil)))))
 
 (defmethod mcc/normalize-containers-config :oci [conf]
