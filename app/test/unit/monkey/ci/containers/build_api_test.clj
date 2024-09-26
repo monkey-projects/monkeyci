@@ -54,8 +54,8 @@
                           "http://test-api/events"
                           {:status 200
                            :body (-> (str "data: " (pr-str {:type :job/executed
-                                                            :job (-> (j/as-serializable job)
-                                                                     (assoc :result ::test-result))
+                                                            :job-id (:id job)
+                                                            :result ::test-result
                                                             :sid ["some" "sid"]})
                                           "\n\n")
                                      (.getBytes)

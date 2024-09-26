@@ -102,6 +102,7 @@
    :job/initializing    init-job
    :job/start           start-job
    :job/skipped         skip-job
+   ;; :job/executed is ignored, we wait for the actual end
    :job/end             end-job})
 
 (defn handle-event [evt storage events]

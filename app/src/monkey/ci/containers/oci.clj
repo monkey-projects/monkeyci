@@ -283,7 +283,7 @@
     (-> (ec/wait-for-event events
                            {:types #{:container/start :sidecar/end}
                             :sid sid}
-                           #(= job-id (get-in % [:job :id])))
+                           (comp (partial = job-id) :job-id))
         (md/timeout! container-start-timeout)
         (md/chain
          (fn [evt]
