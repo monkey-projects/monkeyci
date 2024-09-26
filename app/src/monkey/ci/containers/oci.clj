@@ -304,7 +304,7 @@
              (ec/wait-for-event events
                                 {:types #{t}
                                  :sid sid}
-                                #(= job-id (get-in % [:job :id])))
+                                (comp (partial = job-id) :job-id))
              max-timeout
              (ec/set-result
               {:type t}

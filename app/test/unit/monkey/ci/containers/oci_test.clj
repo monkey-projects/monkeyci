@@ -396,15 +396,15 @@
       (is (not (md/realized? d)) "should not be realized after start event")
       (is (some? (ec/post-events events [{:type :container/end
                                           :sid sid
-                                          :job {:id "this-job"}}])))
+                                          :job-id "this-job"}])))
       (is (not (md/realized? d)) "should not be realized after one event")
       (is (some? (ec/post-events events [{:type :sidecar/end
                                           :sid sid
-                                          :job {:id "other-job"}}])))
+                                          :job-id "other-job"}])))
       (is (not (md/realized? d)) "should not be realized after other job event")
       (is (some? (ec/post-events events [{:type :sidecar/end
                                           :sid sid
-                                          :job {:id "this-job"}}])))
+                                          :job-id "this-job"}])))
       (is (= [:container/end :sidecar/end]
              (->> (deref d 100 :timeout)
                   (map :type)))))))
@@ -423,19 +423,19 @@
           res (sut/wait-for-results conf 1000 (constantly details))]
       (is (some? (rt/post-events conf [{:type :container/start
                                         :sid sid
-                                        :job job}
+                                        :job-id (:id job)}
                                        {:type :sidecar/end
                                         :sid sid
-                                        :job job}
+                                        :job-id (:id job)}
                                        {:type :container/end
                                         :sid sid
-                                        :job job}])))
+                                        :job-id (:id job)}])))
       (is (sequential? (get-in @res [:body :containers])))))
 
   (testing "adds exit codes from events"
     (let [events (ec/make-events {:type :manifold})
           sid (random-build-sid)
-          job (h/gen-job)
+          {job-id :id :as job} (h/gen-job)
           conf {:events events
                 :job job
                 :build {:sid sid}}
@@ -446,21 +446,21 @@
       (is (some? (rt/post-events conf
                                  [{:type :container/start
                                    :sid sid
-                                   :job job}
+                                   :job-id job-id}
                                   {:type :sidecar/end
                                    :sid sid
-                                   :job job
+                                   :job-id job-id
                                    :result {:exit 1}}
                                   {:type :container/end
                                    :sid sid
-                                   :job job
+                                   :job-id job-id
                                    :result {:exit 2}}])))
       (is (= [1 2] (->> @res :body :containers (map ec/result-exit))))))
 
   (testing "marks timeout as failure"
     (let [events (ec/make-events {:type :manifold})
           sid (random-build-sid)
-          job (h/gen-job)
+          {job-id :id :as job} (h/gen-job)
           conf {:events events
                 :job job
                 :build {:sid sid}}
@@ -471,17 +471,17 @@
       (is (some? (rt/post-events conf
                                  [{:type :container/start
                                    :sid sid
-                                   :job job}
+                                   :job-id job-id}
                                   {:type :sidecar/end
                                    :sid sid
-                                   :job job
+                                   :job-id job-id
                                    :result {:exit 0}}])))
       (is (= 1 (->> @res :body :containers second ec/result-exit)))))
 
   (testing "dispatches `job/start` event on container start"
     (let [events (ec/make-events {:type :manifold})
           sid (random-build-sid)
-          job (h/gen-job)
+          {job-id :id :as job} (h/gen-job)
           conf {:events events
                 :job job
                 :build {:sid sid}}
@@ -493,10 +493,10 @@
       (is (some? (rt/post-events conf
                                  [{:type :container/start
                                    :sid sid
-                                   :job job}
+                                   :job-id job-id}
                                   {:type :sidecar/end
                                    :sid sid
-                                   :job job
+                                   :job-id job-id
                                    :result {:exit 0}}])))
       (is (some? res))
       (let [evt (deref evt 1000 :timeout)]
@@ -506,7 +506,7 @@
   (testing "fails when `sidecar/end` is received before `container/start`"
     (let [events (ec/make-events {:type :manifold})
           sid (random-build-sid)
-          job (h/gen-job)
+          {job-id :id :as job} (h/gen-job)
           conf {:events events
                 :job job
                 :build {:sid sid}}
@@ -518,7 +518,7 @@
       (is (some? (rt/post-events conf
                                  [{:type :sidecar/end
                                    :sid sid
-                                   :job job
+                                   :job-id job-id
                                    :result {:exit 1}}])))
       (is (some? res))
       (let [evt (deref evt 1000 :timeout)]
