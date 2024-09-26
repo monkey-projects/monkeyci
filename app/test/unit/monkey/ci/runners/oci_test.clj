@@ -164,8 +164,8 @@
 
             (testing "runner"
               (let [r (:runner parsed)]
-                (testing "enforces child runner"
-                  (is (= :child (:type r))))
+                (testing "enforces in-container runner"
+                  (is (= :in-container (:type r))))
 
                 (testing "adds calculated credit multiplier"
                   (is (number? (:credit-multiplier r))))))
