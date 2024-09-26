@@ -9,12 +9,15 @@
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [config.core :as cc]
-            [manifold.deferred :as md]
+            [manifold
+             [deferred :as md]
+             [executor :as me]]
             [medley.core :as mc]
             [monkey.ci
              [build :as b]
              [config :as config]
              [edn :as edn]
+             [errors :as err]
              [logging :as l]
              [runtime :as rt]
              [script :as script]
@@ -43,6 +46,24 @@
 (defn- load-config [{:keys [config-file]}]
   (config/load-config-file config-file))
 
+(defn- log-exec-stats [stats]
+  (log/debug "Execute pool stats:" stats))
+
+(defn- log-wait-stats [stats]
+  (log/debug "Wait pool stats:" stats))
+
+(defn- register-stats
+  "For debugging purposes, logs pool statistics"
+  []
+  (me/register-execute-pool-stats-callback log-exec-stats)
+  (me/register-wait-pool-stats-callback log-wait-stats))
+
+(defn- unregister-stats
+  "For debugging purposes, logs pool statistics"
+  []
+  (me/unregister-execute-pool-stats-callback log-exec-stats)
+  (me/unregister-wait-pool-stats-callback log-wait-stats))
+
 (defn run
   "Run function for when a build task is executed using clojure tools.  This function
    is run in a child process by the `execute!` function below.  This exits the VM
@@ -58,13 +79,16 @@
                    (fn [rt]
                      (log/debug "Executing script with config" (:config rt))
                      (log/debug "Script working directory:" (utils/cwd))
+                     (register-stats)
                      (script/exec-script! rt)))
                  (bc/failed?))
-         (exit! 1)))
-     (catch Exception ex
+         (exit! err/error-script-failure)))
+     (catch Throwable ex
        ;; This could happen if there is an error loading or initializing the child process
-       (log/error "Failed to run child process" ex)
-       (exit! 1))))
+       (log/error "Failed to run script process" ex)
+       (exit! err/error-process-failure))
+     (finally
+       (unregister-stats))))
 
   ([args]
    (run args cc/env)))
@@ -163,8 +187,10 @@
                          (log/debug "Process output:" (bs/to-string out)))
                        (when (and err (not= 0 exit))
                          (log/warn "Process error output:" (bs/to-string err)))
-                       (md/success! result {:process p
-                                            :exit exit})))})
+                       (md/success! result (cond-> {:process p
+                                                    :exit exit}
+                                             (= err/error-process-failure exit)
+                                             (assoc :message "Child process failed to initialize correctly")))))})
         ;; Depending on settings, some process streams need handling
         (l/handle-process-streams loggers))
     result))

@@ -11,7 +11,11 @@
              [manifold :as manifold]
              [zmq :as zmq]]))
 
-(def post-events p/post-events)
+(defn post-events [e evts]
+  (if e
+    (p/post-events e evts)
+    (log/warn "Unable to post, no events configured")))
+
 (def add-listener p/add-listener)
 (def remove-listener p/remove-listener)
 

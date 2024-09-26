@@ -27,7 +27,9 @@
              [oci]]
             [monkey.ci.events.core :as ec]
             [monkey.ci.reporting.print]
-            [monkey.ci.runners.oci]
+            [monkey.ci.runners
+             [oci]
+             [server]]
             [monkey.ci.storage
              [cached]
              [file]

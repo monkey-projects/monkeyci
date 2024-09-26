@@ -16,7 +16,8 @@
              [jobs :as j]
              [logging :as l]
              [protocols :as p]
-             [runtime :as rt]]))
+             [runtime :as rt]]
+            [monkey.ci.events.core :as ec]))
 
 (defn- make-script-cmd [script]
   [(cs/join " && " script)])
@@ -80,10 +81,9 @@
      ;; TODO Execute script job by job
      (make-script-cmd (:script job)))))
 
-(defn- run-container [job conf]
+(defn- run-container [job {:keys [build events] :as conf}]
   ;; TODO Fire events
   (let [log-maker (rt/log-maker conf)
-        build (:build conf)
         ;; Don't prefix the sid here, that's the responsability of the logger
         log-base (b/get-job-sid job build)
         [out-log err-log :as loggers] (->> ["out.txt" "err.txt"]
@@ -102,15 +102,19 @@
     (log/info "Running build job " log-base "as podman container")
     (log/debug "Log base is:" log-base)
     (log/debug "Podman command:" cmd)
+    (ec/post-events events (j/job-start-evt job (b/sid build)))
     ;; Job is required by the blob wrappers in the config
-    (wrapped-runner (assoc conf :job job))))
-
-(defn- rt->config [rt]
-  (-> rt
-      (select-keys [:artifacts :cache])
-      (assoc :dev-mode? (rt/dev-mode? rt)
-             :build (rt/build rt)
-             :log-maker (rt/log-maker rt))))
+    (try 
+      (let [{:keys [exit] :as res} (wrapped-runner (assoc conf :job job))]
+        (ec/post-events events (j/job-end-evt job
+                                              (b/sid build)
+                                              (ec/make-result
+                                               (b/exit-code->status exit)
+                                               exit
+                                               nil)))
+        res)
+      (catch Exception ex
+        (ec/post-events events (j/job-end-evt job (b/sid build) (ec/exception-result ex)))))))
 
 (defrecord PodmanContainerRunner [config credit-consumer]
   p/ContainerRunner

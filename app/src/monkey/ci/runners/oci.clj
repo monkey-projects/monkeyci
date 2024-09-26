@@ -33,8 +33,8 @@
 
 (defn- prepare-config-for-oci [config]
   (-> config
-      ;; Enforce child runner
-      (assoc :runner {:type :child
+      ;; Enforce container runner
+      (assoc :runner {:type :in-container
                       ;; Credit multiplier for action jobs
                       :credit-multiplier (oci/credit-multiplier
                                           oci/default-arch

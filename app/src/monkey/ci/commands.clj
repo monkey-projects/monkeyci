@@ -7,6 +7,7 @@
             [medley.core :as mc]
             [monkey.ci
              [build :as b]
+             [errors :as err]
              [jobs :as jobs]
              [protocols :as p]
              [runtime :as rt]
@@ -21,8 +22,6 @@
             [monkey.ci.spec.sidecar :as ss]
             [monkey.ci.web.handler :as h]))
 
-(def exit-error 1)
-
 (defn run-build
   "Performs a build, using the runner from the context.  Returns a deferred
    that will complete when the build finishes."
@@ -34,9 +33,9 @@
         (runner)
         (catch Exception ex
           (log/error "Unable to start build" ex)
-          (ec/post-events events (b/build-end-evt (assoc build :message (ex-message ex))
-                                                  exit-error))
-          exit-error)))))
+          (ec/post-events events (b/build-end-evt (assoc build :message (ex-message (or (ex-cause ex) ex)))
+                                                  err/error-process-failure))
+          err/error-process-failure)))))
 
 (defn run-build-local
   "Run a build locally, normally from local source but can also be from a git checkout."
@@ -50,7 +49,7 @@
   [rt]
   (letfn [(report [rep]
             (rt/report rt rep)
-            (if (= :verify/success (:type rep)) 0 exit-error))]
+            (if (= :verify/success (:type rep)) 0 err/error-script-failure))]
     (try
       ;; TODO Git branch and other options
       ;; TODO Use child process if there is a deps.edn

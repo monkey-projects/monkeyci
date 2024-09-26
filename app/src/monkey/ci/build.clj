@@ -186,6 +186,7 @@
   (ec/make-event :build/end
                  :sid (sid build)
                  :status (exit-code->status exit-code)
+                 :message (:message build)
                  ;; TODO Remove this
                  :build (-> build
                             (build->evt)
