@@ -127,6 +127,15 @@
             (testing "sets status to `running`"
               (is (= :running (:status upd))))))
 
+        (testing "`job/skipped`"
+          (is (some? (handle {:type :job/skipped
+                              :job-id job-id})))
+          (let [upd (-> (st/find-build st sid)
+                        (get-in [:script :jobs job-id]))]
+            
+            (testing "sets status to `skipped`"
+              (is (= :skipped (:status upd))))))
+
         (testing "`job/end`"
           (is (some? (handle {:type :job/end
                               :job-id job-id

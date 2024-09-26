@@ -10,6 +10,7 @@
              [build :as b]
              [cache :as cache]
              [config :as c]
+             [jobs :as j]
              [logging :as l]
              [runtime :as rt]
              [spec :as spec]
@@ -96,9 +97,11 @@
                           ;; TODO Start uploading logs as soon as the file is created instead
                           ;; of when the command has finished.
                           (upload-logs evt logger))
-                        (ec/post-events events (assoc evt
-                                                      :sid (b/sid build)
-                                                      :job job))))
+                        (ec/post-events events (ec/make-event
+                                                (:type evt)
+                                                (assoc evt
+                                                       :sid (b/sid build)
+                                                       :job-id (j/job-id job))))))
                 (if (:done? evt)
                   (set-exit 0)
                   (recur (read-next r)))))))

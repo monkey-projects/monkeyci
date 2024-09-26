@@ -10,7 +10,6 @@
              [jobs :as j]
              [protocols :as p]
              [spec :as s]
-             [time :as t]
              [utils :as u]]
             [monkey.ci.build.core :as bc]
             [monkey.ci.events.core :as ec]
@@ -33,10 +32,10 @@
 (defn- base-event
   "Creates a skeleton event with basic properties"
   [build type]
-  {:type type
+  (ec/make-event
+   type 
    :src :script
-   :sid (build/sid build)
-   :time (t/now)})
+   :sid (build/sid build)))
 
 ;; Wraps a job so it catches any exceptions.
 (defrecord ErrorCatchingJob [target]
@@ -83,7 +82,7 @@
     (log/debug "Found" (count pf) "matching jobs:" (map bc/job-id pf))
     (let [result @(j/execute-jobs! pf rt)]
       (log/debug "Jobs executed, result is:" result)
-      {:status (if (some (comp bc/failed? :result) (vals result)) :failure :success)
+      {:status (if (some (comp bc/failed? :result) (vals result)) :error :success)
        :jobs result})))
 
 ;;; Script loading
@@ -114,9 +113,20 @@
     (-> (base-event (:build rt) :script/start)
         (assoc :jobs (map (comp mark-pending j/job->event) jobs)))))
 
-(defn- script-end-evt [rt _ res]
-  (-> (base-event (:build rt) :script/end)
-      (assoc :status (:status res))))
+(defn- script-end-evts [rt _ res]
+  ;; In addition to the script end event, we should also generate a job/skipped event
+  ;; for each skipped job.
+  (let [skipped (->> res
+                     :jobs
+                     vals
+                     (filter (comp bc/skipped? :result))
+                     (map (comp j/job-id :job)))]
+    (->> [(-> (base-event (:build rt) :script/end)
+              (assoc :status (:status res)))]
+         (concat (mapv #(ec/make-event :job/skipped
+                                       :sid (build/sid (:build rt))
+                                       :job-id %)
+                       skipped)))))
 
 (defn script-init-evt [build script-dir]
   (-> (base-event build :script/initializing)
@@ -125,7 +135,7 @@
 (def run-all-jobs*
   (wrapped run-all-jobs
            script-start-evt
-           script-end-evt))
+           script-end-evts))
 
 (defn- assign-ids
   "Assigns an id to each job that does not have one already."

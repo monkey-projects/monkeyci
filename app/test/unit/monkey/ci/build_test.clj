@@ -148,20 +148,22 @@
 (deftest job-work-dir
   (testing "returns job work dir as absolute path"
     (is (= "/job/work/dir"
-           (sut/job-work-dir {:job {:work-dir "/job/work/dir"}}))))
+           (sut/job-work-dir {:work-dir "/job/work/dir"}
+                             {}))))
 
   (testing "returns checkout dir when no job dir given"
     (is (= "/checkout/dir"
-           (sut/job-work-dir {:build {:checkout-dir "/checkout/dir"}}))))
+           (sut/job-work-dir {}
+                             {:checkout-dir "/checkout/dir"}))))
 
   (testing "returns current working dir when no job or checkout dir given"
     (is (= (u/cwd)
-           (sut/job-work-dir {}))))
+           (sut/job-work-dir { }{}))))
 
   (testing "returns work dir as relative dir of checkout dir"
     (is (= "/checkout/job-dir"
-           (sut/job-work-dir {:job {:work-dir "job-dir"}
-                              :build {:checkout-dir "/checkout"}})))))
+           (sut/job-work-dir {:work-dir "job-dir"}
+                             {:checkout-dir "/checkout"})))))
 
 (deftest build-end-evt
   (testing "creates build/end event with status completed"

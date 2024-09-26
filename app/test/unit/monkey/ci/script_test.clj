@@ -168,6 +168,18 @@
          (fn [evt]
            (is (= :success (:status evt)))))))
 
+    (testing "posts `:job/skipped` event for all skipped jobs"
+      (let [failing (bc/action-job "failing-job"
+                                   (constantly bc/failure))
+            skipped (bc/action-job "skipped-job"
+                                   (fn [_] (throw (ex-info "Should not be invoked" {})))
+                                   {:dependencies ["failing-job"]})]
+        (verify-script-evt
+         :job/skipped
+         [failing skipped]
+         (fn [evt]
+           (is (= "skipped-job" (:job-id evt)))))))
+
     (testing "adds job labels to event"
       (verify-script-start-evt
        [(bc/action-job "test-job" (constantly bc/success) {:labels {:key "value"}})]

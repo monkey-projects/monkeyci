@@ -120,10 +120,10 @@
                     (is (= [:sidecar/start :sidecar/end]
                            (map :type (recv)))))
 
-                  (testing "events contain job details from config"
-                    (is (= job (-> (recv)
-                                   first
-                                   :job))))))]
+                  (testing "events contain job id from config"
+                    (is (= (:id job) (-> (recv)
+                                         first
+                                         :job-id))))))]
         
         (testing "from sidecar-specific config"
           (let [job {:id (str (random-uuid))}

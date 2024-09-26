@@ -68,7 +68,7 @@
         (is (true? (.delete f)))
         (is (= 0 (wait-for-exit c))))))
 
-  (testing "adds sid and job to events"
+  (testing "adds sid and job-id to events"
     (h/with-tmp-dir dir
       (let [f (io/file dir "events.edn")
             evt {:type :test/event
@@ -88,7 +88,7 @@
         (is (not= :timeout (h/wait-until #(not-empty @recv) 500)))
         (let [evt (first @recv)]
           (is (= sid (:sid evt)))
-          (is (= job (:job evt))))
+          (is (= (:id job) (:job-id evt))))
         (is (true? (.delete f)))
         (is (= 0 (wait-for-exit c))))))
 

@@ -57,15 +57,33 @@
        (s/merge ::build-event)))
 
 (defmethod event-type :job/initializing [_]
-  (->> (s/keys :req-un [:script/job ::credit-multiplier])
+  (->> (s/keys :req-un [::credit-multiplier])
        (s/merge ::job-event)))
 
 (defmethod event-type :job/start [_]
   ::job-event)
 
-(defmethod event-type :job/end [_]
+(defmethod event-type :job/skipped [_]
+  ::job-event)
+
+(s/def ::job-status-event
   (->> (s/keys :req-un [:job/status]
                :opt-un [::result])
        (s/merge ::job-event)))
+
+(defmethod event-type :job/executed [_]
+  ;; Indicates the job has been executed, but not yet ended.  Extensions may
+  ;; have to be applied yet.
+  ::job-status-event)
+
+(defmethod event-type :job/end [_]
+  ;; Indicates the job has been fully completed.
+  ::job-status-event)
+
+(defmethod event-type :sidecar/start [_]
+  ::job-event)
+
+(defmethod event-type :sidecar/end [_]
+  ::job-status-event)
 
 (s/def ::event (s/multi-spec event-type :type))

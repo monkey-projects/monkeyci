@@ -66,37 +66,35 @@
   "Converts job into something that can be put in an event"
   as-serializable)
 
-(defn base-event
+(defn- base-event
   "Creates a skeleton event with basic properties"
-  [type job-or-id build-sid]
-  (let [id? (string? job-or-id)]
-    (cond-> (ec/make-event 
-             type
-             :src :script
-             :sid build-sid
-             :job-id (cond-> job-or-id
-                       (not id?) (job-id)))
-      (not id?) (assoc :job (job->event job-or-id)))))
+  [type job-id build-sid]
+  (ec/make-event 
+   type
+   :src :script
+   :sid build-sid
+   :job-id job-id))
 
-(defn job-initializing-evt [job build-sid cm]
-  (-> (base-event :job/initializing job build-sid)
+(defn job-initializing-evt [job-id build-sid cm]
+  (-> (base-event :job/initializing job-id build-sid)
       (assoc :credit-multiplier cm)))
 
 (def job-start-evt (partial base-event :job/start))
 
-(defn job-end-evt [job build-sid {:keys [status message exception] :as r}]
+(defn- job-status-evt [type job-id build-sid {:keys [status message exception] :as r}]
   (let [r (dissoc r :status :exception)]
-    (-> (base-event :job/end job build-sid)
+    (-> (base-event type job-id build-sid)
         (assoc :status status
-               :result r)
-        ;; TODO Remove job from the event
-        (assoc :job (cond-> (job->event job)
-                      true (assoc :status status)
-                      ;; Add any extra information to the result key
-                      (not-empty r) (assoc :result r)
-                      ;; TODO Move this into the event
-                      (some? exception) (assoc :message (or message (ex-message exception))
-                                               :stack-trace (u/stack-trace exception)))))))
+               :result r))))
+
+(def job-executed-evt
+  "Creates an event that indicates the job has executed, but has not been completed yet.
+   Extensions may need to be applied first."
+  (partial job-status-evt :job/executed))
+
+(def job-end-evt
+  "Event that indicates the job has been fully completed.  The result should not change anymore."
+  (partial job-status-evt :job/end))
 
 (defn ex->result
   "Creates result structure from an exception"
@@ -129,7 +127,9 @@
                       (cond-> j
                         (nil? (bc/job-id j)) (assoc :id (bc/job-id job))))]
       (md/chain
-       (action (rt->context rt))        ; Only pass necessary info
+       ;; Ensure this executes async by wrapping it in a future
+       (md/future
+         (action (rt->context rt)))        ; Only pass necessary info
        (fn [r]
          (cond
            ;; Valid response
@@ -149,7 +149,7 @@
           job (assoc job
                      :start-time (t/now))]
       (ec/post-events (:events ctx)
-                      [(job-start-evt (assoc job :status :running) build-sid)])
+                      [(job-start-evt (job-id job) build-sid)])
       (-> ctx
           (make-job-dir-absolute)
           (a)
@@ -157,7 +157,7 @@
            #(or % bc/success)
            (fn [r]
              (md/chain
-              (ec/post-events (:events ctx) [(job-end-evt (assoc job :end-time (t/now)) build-sid r)])
+              (ec/post-events (:events ctx) [(job-executed-evt (job-id job) build-sid r)])
               (constantly r)))))))
 
   monkey.ci.build.core.ContainerJob
@@ -296,6 +296,15 @@
    the results of all executed jobs."
   [jobs rt]
   (let [grouped (group-by-id jobs)
+
+        post-end
+        (fn [job res]
+          (md/chain
+           (ec/post-events (:events rt)
+                           (job-end-evt (job-id job)
+                                        (build/sid (:build rt))
+                                        res))
+           (constantly res)))
         
         execute-all!
         (fn execute-all [jobs state]
@@ -304,10 +313,12 @@
           (reduce (fn [r j]
                     (assoc r
                            (job-id j)
-                           (md/chain
-                            ;; Ensure this executes async by wrapping it in a future
-                            (md/future (execute! j (assoc-in rt [:build :jobs] state)))
-                            (partial vector j))))
+                           ;; Note that this must execute async, otherwise jobs will not be
+                           ;; run concurrently.
+                           (-> (execute! j (assoc-in rt [:build :jobs] state))
+                               (md/chain
+                                (partial post-end j)
+                                (partial vector j)))))
                   {}
                   jobs))
 
