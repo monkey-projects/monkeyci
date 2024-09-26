@@ -34,3 +34,8 @@
     (make-error (:type data) (-> data
                                  (dissoc :type)
                                  (assoc :message (ex-message ex))))))
+
+;; Error codes
+(def error-script-failure 1)
+(def error-process-failure 2)
+(def error-no-script 3)

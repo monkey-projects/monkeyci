@@ -184,13 +184,14 @@
   "Creates a `build/end` event"
   [build & [exit-code]]
   (ec/make-event :build/end
-                 :sid (sid build)
-                 :status (exit-code->status exit-code)
-                 ;; TODO Remove this
-                 :build (-> build
-                            (build->evt)
-                            (assoc :end-time (u/now))
-                            (mc/assoc-some :status (exit-code->status exit-code)))))
+                 (-> {:sid (sid build)
+                      :status (exit-code->status exit-code)
+                      ;; TODO Remove this
+                      :build (-> build
+                                 (build->evt)
+                                 (assoc :end-time (u/now))
+                                 (mc/assoc-some :status (exit-code->status exit-code)))}
+                     (mc/assoc-some :message (:message build)))))
 
 (def ^:deprecated build-completed-evt build-end-evt)
 

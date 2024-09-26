@@ -8,6 +8,7 @@
             [monkey.ci
              [commands :as sut]
              [edn :as edn]
+             [errors :as err]
              [runners :as r]
              [sidecar :as sc]]
             [monkey.ci.config.sidecar :as cs]
@@ -45,11 +46,12 @@
 
     (testing "posts `build/end` event on exception"
       (let [recv (atom [])]
-        (is (= 1 (-> config
-                     (assoc :runner {:type ::failing}
-                            :events {:type :fake
-                                     :recv recv})
-                     (sut/run-build))))
+        (is (= err/error-process-failure
+               (-> config
+                   (assoc :runner {:type ::failing}
+                          :events {:type :fake
+                                   :recv recv})
+                   (sut/run-build))))
         (is (= 1 (count @recv)))
         (let [evt (first @recv)]
           (is (= :build/end (:type evt)))

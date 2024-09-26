@@ -9,6 +9,7 @@
              [blob :as b]
              [build :as build]
              [config :as config]
+             [errors :as err]
              [process :as p]
              [runtime :as rt]
              [script :as s]
@@ -21,7 +22,7 @@
 (defn- script-not-found [build]
   (let [msg (str "No build script found at " (build/script-dir build))]
     (log/warn msg)
-    {:exit 1
+    {:exit err/error-no-script
      :result :error
      :message msg}))
 
@@ -105,17 +106,23 @@
 ;; Creates a runner fn according to its type
 (defmulti make-runner (comp :type :runner))
 
-(defmethod make-runner :child [conf]
-  (log/info "Using child process runner")
-  ;; FIXME When called directly from the API, the runtime is the wrong one.
-  ;; We need a separate runner type for this.
-  (fn [build rt]
-    (let [build (build/set-credit-multiplier build (get-in conf [:runner :credit-multiplier]))]
-      (log/debug "Running build in child process:" build)
-      (-> build
-          (download-src rt)
-          (store-src rt)
-          (build-local rt)))))
+(defn- run-local [build rt]
+  (let [build (build/set-credit-multiplier build (get-in rt [:config :runner :credit-multiplier]))]
+    (log/debug "Running build in child process:" build)
+    (-> build
+        (download-src rt)
+        (store-src rt)
+        (build-local rt))))
+
+(defmethod make-runner :in-container [conf]
+  ;; Runner that is invoked when the build uses container instances.  The runtime is
+  ;; created by a cli function.
+  (log/info "Using in-container runner")
+  run-local)
+
+(defmethod make-runner :local [conf]
+  (log/info "Using local runner")
+  run-local)
 
 (defmethod make-runner :noop [_]
   ;; For testing

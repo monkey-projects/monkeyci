@@ -48,7 +48,7 @@
                          (assoc bc/failure
                                 :exception ex
                                 :message (.getMessage ex)))]
-      (log/debug "Executing event firing job:" (bc/job-id target))
+      (log/debug "Executing error catching job:" (bc/job-id target))
       (md/chain
        ;; Catch both sync and async errors
        (try 

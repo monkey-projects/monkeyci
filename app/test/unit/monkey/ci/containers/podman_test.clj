@@ -1,5 +1,6 @@
 (ns monkey.ci.containers.podman-test
   (:require [clojure.test :refer [deftest testing is]]
+            [clojure.spec.alpha :as spec]
             [babashka.process :as bp]
             [monkey.ci
              [artifacts :as art]
@@ -8,17 +9,20 @@
              [logging :as l]
              [protocols :as p]]
             [monkey.ci.containers.podman :as sut]
+            [monkey.ci.spec.events :as se]
             [monkey.ci.helpers :as h :refer [contains-subseq?]]
             [monkey.ci.test.runtime :as trt]))
 
 (defn test-rt [dir]
   {:containers {:type :podman}
-   :build {:build-id "test-build"}
+   :build {:build-id "test-build"
+           :sid (h/gen-build-sid)}
    :work-dir dir
    :logging {:maker (l/make-logger {})}
    :job {:id "test-job"
          :container/image "test-img"
-         :script ["first" "second"]}})
+         :script ["first" "second"]}
+   :events (h/fake-events)})
 
 (deftest container-runner
   (with-redefs [bp/process (fn [args]
@@ -101,7 +105,29 @@
               runner (sut/make-container-runner rt)
               r @(p/run-container runner (:job rt))]
           (is (some? r))
-          (is (not-empty @stored)))))))
+          (is (not-empty @stored)))))
+
+    (testing "fires `job/start` event"
+      (h/with-tmp-dir dir
+        (let [rt (test-rt dir)
+              store (art/make-blob-repository (h/fake-blob-store) {})
+              runner (sut/make-container-runner rt)
+              r @(p/run-container runner (:job rt))
+              evt (->> (h/received-events (:events rt))
+                       (h/first-event-by-type :job/start))]
+          (is (some? evt))
+          (is (spec/valid? ::se/event evt)))))
+
+    (testing "fires `job/end` event"
+      (h/with-tmp-dir dir
+        (let [rt (test-rt dir)
+              store (art/make-blob-repository (h/fake-blob-store) {})
+              runner (sut/make-container-runner rt)
+              r @(p/run-container runner (:job rt))
+              evt (->> (h/received-events (:events rt))
+                       (h/first-event-by-type :job/end))]
+          (is (some? evt))
+          (is (spec/valid? ::se/event evt)))))))
 
 (deftest build-cmd-args
   (let [job {:id "test-job"

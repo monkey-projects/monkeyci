@@ -47,11 +47,12 @@
                             :credit-multiplier credit-multiplier
                             :status :running}))
 
-(defn end-build [storage {:keys [sid time status]}]
+(defn end-build [storage {:keys [sid time status message]}]
   (patch-build storage sid (fn [build]
                              {:end-time time
                               :status status
-                              :credits (b/calc-credits build)})))
+                              :credits (b/calc-credits build)
+                              :message message})))
 
 (defn init-script [storage {:keys [sid script-dir]}]
   (patch-build storage sid #(assoc-in % [:script :script-dir] script-dir)))

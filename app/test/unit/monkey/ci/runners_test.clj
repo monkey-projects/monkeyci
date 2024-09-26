@@ -6,6 +6,7 @@
             [clojure.string :as cs]
             [manifold.deferred :as md]
             [monkey.ci
+             [errors :as err]
              [process :as p]
              [runners :as sut]
              [script :as script]
@@ -22,10 +23,11 @@
                                          {}))))
     
     (testing "when script not found"
-      (testing "returns exit code 1"
-        (is (= 1 (-> {:script {:script-dir "nonexisting"}}
-                     (sut/build-local {})
-                     (deref)))))
+      (testing "returns exit code"
+        (is (= err/error-no-script
+               (-> {:script {:script-dir "nonexisting"}}
+                   (sut/build-local {})
+                   (deref)))))
 
       (testing "fires `:build/end` event with error status"
         (let [e (h/fake-events)]
@@ -171,8 +173,13 @@
 
 (deftest make-runner
   (let [build {:build-id "test-build"}]
-    (testing "provides child type"
-      (is (fn? (sut/make-runner {:runner {:type :child}}))))
+    (testing "provides in-container type"
+      (is (fn? (sut/make-runner {:runner {:type :in-container}}))))
+
+    (testing "provides server type"
+      (with-redefs [p/execute! (constantly (md/success-deferred {:exit 0}))]
+        (let [r (sut/make-runner {:runner {:type :server}})]
+          (is (fn? r)))))
 
     (testing "provides noop type"
       (let [r (sut/make-runner {:runner {:type :noop}})]
