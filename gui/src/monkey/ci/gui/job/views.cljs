@@ -67,6 +67,7 @@
           last))
 
 (defn- log-contents [job path]
+  ;; FIXME Stretch to full available height
   (let [log (rf/subscribe [:job/logs path])]
     ;; Reload log file
     (rf/dispatch [:job/load-logs job path])

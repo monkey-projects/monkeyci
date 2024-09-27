@@ -66,7 +66,9 @@
                      :error        [:text-danger :x-circle]
                      :running      [:text-info :play-circle]
                      :pending      [:text-warning :pause-circle]
-                     :initializing [:text-warning :play-circle]}
+                     :initializing [:text-warning :play-circle]
+                     :canceled     [:text-warning :x-circle]
+}
                     status
                     [:text-default :question-circle])]
     [:div (cond-> {:style {:font-size size}
@@ -146,7 +148,8 @@
 (defn log-contents [raw]
   (->> raw
        (map ->html)
-       (into [:p.bg-dark.text-white.font-monospace.overflow-auto.text-nowrap.h-100.p-1])))
+       (into [:p.bg-dark.text-white.font-monospace.overflow-auto.text-nowrap.p-1
+              {:style {:min-height "20em"}}])))
 
 (defn build-elapsed [b]
   (let [e (u/build-elapsed b)]
