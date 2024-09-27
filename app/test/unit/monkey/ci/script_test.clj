@@ -84,7 +84,13 @@
           (is (bc/failed? r)))
 
         (testing "returns compiler error"
-          (is (= "Unable to resolve symbol: This in this context" (:message r))))))))
+          (is (= "Unable to resolve symbol: This in this context" (:message r))))))
+
+    (testing "executes many parallel jobs"
+      (is (bc/success? (exec-in-dir "many-parallel-jobs"))))
+
+    (testing "executes many sequential jobs"
+      (is (bc/success? (exec-in-dir "many-sequential-jobs"))))))
 
 (deftest run-all-jobs
   (let [rt {:events (h/fake-events)
