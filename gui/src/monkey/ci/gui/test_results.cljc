@@ -121,12 +121,12 @@
     [:div
      [:h4 "Test Timings"]
      [:form
-      [:div.row
-       [:label.form-label.col-2.col-form-label {:for suite-id} "Suite:"]
-       [:div.col-2
+      [:div.d-flex.gap-2
+       [:label.form-label.col-form-label {:for suite-id} "Suite:"]
+       [:div
         [suite-dropdown results id suite-id]]
-       [:label.form-label.col-2.col-form-label {:for count-id} "Show top:"]
-       [:div.col-2
+       [:label.form-label.col-form-label {:for count-id} "Show top:"]
+       [:div
         [test-count-dropdown id count-id]]]]
      (rf/dispatch [::timing-chart-init id results])
      #_[charts/chart-component id]

@@ -129,8 +129,6 @@
       event-handler-event
       (update :dispatch-n (fnil conj []) [:event-stream/start id (r/customer-id db) event-handler-event]))))
 
-;;(defn initializer-evt-handler [])
-
 (defn on-leave
   "Creates a context for an leave fx handler that clears the initialized flag
    and dispatches a stream stop event."

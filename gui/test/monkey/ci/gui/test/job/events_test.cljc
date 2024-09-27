@@ -35,6 +35,18 @@
        (rf/dispatch [:job/init])
        (is (= ::loaded (::build @app-db)))))))
 
+(deftest job-leave
+  (testing "clears all job info from db"
+    (let [uid (repeatedly 4 (comp str random-uuid))]
+      (is (some? (reset! app-db (-> {}
+                                    (r/set-current
+                                     {:parameters
+                                      {:path (zipmap [:customer-id :repo-id :build-id :job-id]
+                                                     uid)}})
+                                    (db/set-alerts [{:type :info :message "test alert"}])))))
+      (rf/dispatch-sync [:job/leave uid])
+      (is (nil? (db/get-alerts @app-db))))))
+
 (deftest job-load-log-files
   (is (some? (reset! app-db (r/set-current {}
                                            {:parameters
@@ -59,13 +71,7 @@
                         (nth 3))]
          (is (= "filename" (:label params)))
          (is (= 100 (:start params)))
-         (is (= 201 (:end params))))))
-
-   (testing "sets alert"
-     (rf/dispatch [:job/load-logs {:id "test-job" :start-time 100}])
-     (let [a (db/global-alerts @app-db)]
-       (is (= 1 (count a)))
-       (is (= :info (-> a first :type)))))))
+         (is (= 201 (:end params))))))))
 
 (deftest job-load-log-files--success
   (testing "clears alerts"
@@ -114,11 +120,8 @@
      (testing "sets customer id in request"
        (is (= "test-cust" (-> @e first (nth 3) :customer-id))))
 
-     (testing "sets alert"
-       (let [path "test/path"]
-         (let [a (db/path-alerts @app-db path)]
-           (is (= 1 (count a)))
-           (is (= :info (-> a first :type)))))))))
+     (testing "marks loading"
+       (is (db/logs-loading? @app-db "test/path"))))))
 
 (deftest job-load-logs--success
   (testing "clears alerts"
@@ -130,7 +133,7 @@
   (testing "sets log lines in db"
     (is (empty? (reset! app-db {})))
     (rf/dispatch-sync [:job/load-logs--success "test/path" {:body ::logs}])
-    (is (= ::logs (db/logs @app-db "test/path")))))
+    (is (= ::logs (db/get-logs @app-db "test/path")))))
 
 (deftest job-load-logs--failed
   (testing "sets error alert"
