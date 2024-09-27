@@ -76,9 +76,13 @@
   p/EventPoster
   (post-events [this events]
     (let [events (if (sequential? events) events [events])]
-      (doseq [evt events]
-        (producer evt))
-      this))
+      (log/debug "Posting" (count events) "events")
+      (try 
+        (doseq [evt events]
+          (producer evt))
+        this
+        (finally
+          (log/debug "Events posted")))))
   
   p/EventReceiver
   (add-listener [this ef l]

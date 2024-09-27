@@ -318,7 +318,11 @@
                            (-> (execute! j (assoc-in rt [:build :jobs] state))
                                (md/chain
                                 (partial post-end j)
-                                (partial vector j)))))
+                                (partial vector j))
+                               (md/finally
+                                 (fn []
+                                   (log/debug "Jobs completed and job/end events (probably) sent for"
+                                              (map job-id jobs)))))))
                   {}
                   jobs))
 
