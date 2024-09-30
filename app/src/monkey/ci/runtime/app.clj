@@ -47,9 +47,12 @@
 (defn- new-build-runner [config]
   (map->Runner {:runner (r/make-runner config)}))
 
-(defn- make-container-runner [{:keys [containers] :as config} events build api-config]
+(defn- make-container-runner [{:keys [containers] :as config} events build api-config logging]
   (case (:type containers)
-    :podman (ccp/make-container-runner containers)
+    :podman (ccp/make-container-runner
+             {:logging logging
+              :events events
+              :build build})
     :oci    (cco/make-container-runner
              (-> config
                  (select-keys [:promtail :sidecar :api])
@@ -58,10 +61,10 @@
                         :api (bas/srv->api-config api-config)))
              events)))
 
-(defrecord DelayedContainerRunner [config events build api-config]
+(defrecord DelayedContainerRunner [config events build api-config logging]
   co/Lifecycle
   (start [this]
-    (assoc this :target-runner (make-container-runner config events build api-config)))
+    (assoc this :target-runner (make-container-runner config events build api-config logging)))
   (stop [this]
     this)
   p/ContainerRunner
@@ -145,7 +148,7 @@
    :workspace  (new-workspace config)
    :containers (co/using
                 (new-container-runner config)
-                [:events :build :api-config])
+                [:events :build :api-config :logging])
    :logging    (new-logging config)
    :runner     (co/using
                 (new-build-runner config)

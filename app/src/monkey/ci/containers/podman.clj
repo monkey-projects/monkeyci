@@ -82,7 +82,6 @@
      (make-script-cmd (:script job)))))
 
 (defn- run-container [job {:keys [build events] :as conf}]
-  ;; TODO Fire events
   (let [log-maker (rt/log-maker conf)
         ;; Don't prefix the sid here, that's the responsability of the logger
         log-base (b/get-job-sid job build)
@@ -115,7 +114,7 @@
                                  nil)))
         res)
       (catch Exception ex
-        (ec/post-events events (j/job-end-evt (j/job-id job) (b/sid build) (ec/exception-result ex)))))))
+        (ec/post-events events (j/job-executed-evt (j/job-id job) (b/sid build) (ec/exception-result ex)))))))
 
 (defrecord PodmanContainerRunner [config credit-consumer]
   p/ContainerRunner

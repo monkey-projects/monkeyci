@@ -30,7 +30,9 @@
                            :request-method :post}
                           (fn [req]
                             (swap! invocations conj req)
-                            {:status 202})]
+                            {:status 202})
+                          "http://test-api/events"
+                          {:status 200}]
         (is (md/deferred? (p/run-container runner job)))
         (is (= 1 (count @invocations)))
         (let [ser (-> @invocations

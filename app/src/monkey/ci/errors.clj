@@ -1,7 +1,8 @@
 (ns monkey.ci.errors
   "Functions for working with errors and exceptions.  This provides a uniform way
    to handle exceptions and convert them into a usable format for internal 
-   propagation and to give useful feedback to the user.")
+   propagation and to give useful feedback to the user."
+  (:require [clj-commons.byte-streams :as bs]))
 
 (def exception? (partial instance? java.lang.Exception))
 
@@ -24,6 +25,15 @@
 
 (def error-msg (get-prop :message))
 (def error-cause (get-prop :cause))
+
+(defn unwrap-exception [ex]
+  (let [ex (or (ex-cause ex) ex)
+        data (ex-data ex)]
+    ;; If it's a http error, there may be a body that can be read
+    (if (some? (:body data))
+      (ex-info (bs/to-string (:body data))
+               data)
+      ex)))
 
 (defmulti ->error
   "Convert argument into an application error"

@@ -64,6 +64,7 @@
 (defn status-icon [status size]
   (let [[cl i] (get {:success      [:text-success :check-circle]
                      :error        [:text-danger :x-circle]
+                     :failure      [:text-danger :x-circle]
                      :running      [:text-info :play-circle]
                      :pending      [:text-warning :pause-circle]
                      :initializing [:text-warning :play-circle]}

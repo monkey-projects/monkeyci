@@ -237,9 +237,15 @@
         containers (req->containers req)]
     ;; Start the container, don't wait for the result.  It's up to the client
     ;; to monitor job end event.
-    (p/run-container containers job)
-    (-> (rur/response {:job job})
-        (rur/status 202))))
+    (try
+      (p/run-container containers job)
+      (-> (rur/response {:job job})
+          (rur/status 202))
+      (catch Exception ex
+        (log/error "Unable to start container job" ex)
+        (-> (rur/response {:job job
+                           :exception ex})
+            (rur/status 500))))))
 
 (def edn #{"application/edn"})
 

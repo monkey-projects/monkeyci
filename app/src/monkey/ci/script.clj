@@ -6,6 +6,7 @@
             [monkey.ci
              [build :as build]
              [credits :as cr]
+             [errors :as err]
              [extensions :as ext]
              [jobs :as j]
              [protocols :as p]
@@ -44,9 +45,10 @@
     (let [ctx-with-job (assoc ctx :job target)
           handle-error (fn [ex]
                          (log/error "Got job exception:" ex)
-                         (assoc bc/failure
-                                :exception ex
-                                :message (.getMessage ex)))]
+                         (let [u (err/unwrap-exception ex)]
+                           (assoc bc/failure
+                                  :exception u
+                                  :message (ex-message u))))]
       (log/debug "Executing error catching job:" (bc/job-id target))
       (md/chain
        ;; Catch both sync and async errors
