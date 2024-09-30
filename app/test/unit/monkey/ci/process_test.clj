@@ -1,6 +1,7 @@
 (ns monkey.ci.process-test
   (:require [aleph.http :as http]
             [babashka.process :as bp]
+            [clj-commons.byte-streams :as bs]
             [clojure.test :refer :all]
             [clojure.java.io :as io]
             [clojure.string :as cs]
@@ -20,7 +21,9 @@
              [events :as se]
              [script :as ss]]
             [monkey.ci.helpers :as h]
-            [monkey.ci.test.runtime :as trt]))
+            [monkey.ci.test
+             [aleph-test :as at]
+             [runtime :as trt]]))
 
 (def cwd (u/cwd))
 
@@ -28,24 +31,26 @@
   (.getAbsolutePath (io/file cwd "examples" subdir)))
 
 (deftest run
-  (let [build {:build-id "test-build"}
-        config (-> cos/empty-config
-                   (cos/set-build build)
-                   (cos/set-api {:url "http://test"
-                                 :token "test-token"}))]    
-    (with-redefs [sut/exit! (constantly nil)]
-      (testing "parses arg as config file"
-        (h/with-tmp-dir dir
-          (let [captured-args (atom nil)
-                config-file (io/file dir "config.edn")]
-            (with-redefs [script/exec-script! (fn [args]
-                                                (reset! captured-args args)
-                                                bc/success)]
-              (is (nil? (spit config-file (pr-str config))))
-              (is (nil? (sut/run {:config-file (.getAbsolutePath config-file)})))
-              (is (= build
-                     (-> @captured-args
-                         :build))))))))))
+  (at/with-fake-http ["http://test/events" {:status 200
+                                            :body (bs/to-input-stream "")}]
+    (let [build {:build-id "test-build"}
+          config (-> cos/empty-config
+                     (cos/set-build build)
+                     (cos/set-api {:url "http://test"
+                                   :token "test-token"}))]    
+      (with-redefs [sut/exit! (constantly nil)]
+        (testing "parses arg as config file"
+          (h/with-tmp-dir dir
+            (let [captured-args (atom nil)
+                  config-file (io/file dir "config.edn")]
+              (with-redefs [script/exec-script! (fn [args]
+                                                  (reset! captured-args args)
+                                                  bc/success)]
+                (is (nil? (spit config-file (pr-str config))))
+                (is (nil? (sut/run {:config-file (.getAbsolutePath config-file)})))
+                (is (= build
+                       (-> @captured-args
+                           :build)))))))))))
 
 (deftype FakeProcess [exitValue])
 
