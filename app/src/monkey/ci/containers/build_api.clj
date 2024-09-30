@@ -1,7 +1,8 @@
 (ns monkey.ci.containers.build-api
   "Container runner that invokes an endpoint on the build api.  This is meant to
    be used by child processes that do not have full infra permissions."
-  (:require [clj-commons.byte-streams :as bs]
+  (:require [aleph.http :as http]
+            [clj-commons.byte-streams :as bs]
             [clojure.tools.logging :as log]
             [manifold
              [deferred :as md]
@@ -13,6 +14,13 @@
              [protocols :as p]]
             [monkey.ci.events.http :as eh]))
 
+(defn check-http-error [msg job {:keys [status body] :as resp}]
+  (if (or (nil? status) (>= status 400))
+    (throw (ex-info msg
+                    {:job job
+                     :cause resp}))
+    body))
+
 (defn- wait-for-job-executed
   "Listens to events on the build api server that indicate the container job
    has executed.  Returns a deferred that yields the container result when 
@@ -23,15 +31,17 @@
         src (promise)
         job-id (j/job-id job)]
     (log/debug "Listening to events for container job to end for job" job-id)
+    ;; TODO Instead of sending an event request for each job, we should create a
+    ;; single event stream and tap those.  This would avoid the problem described below
+    ;; of the connection pool running out of connections because they are not given back
+    ;; when doing an SSE request.
     (-> (client {:request-method :get
-                 :path "/events"})
+                 :path "/events"
+                 ;; Use custom connection pool for events because connections aren't given back
+                 ;; to the pool, which results in requests blocking.
+                 :pool (http/connection-pool {:total-connections 10})})
         (md/chain
-         (fn [{:keys [status body] :as resp}]
-           (if (or (nil? status) (>= status 400))
-             (throw (ex-info "Failed to listen to build API events"
-                             {:job job
-                              :cause resp}))
-             body))
+         (partial check-http-error "Failed to listen to build API events" job)
          (fn [is]
            ;; Store it so we can close it later
            (deliver evt-stream is)
@@ -76,6 +86,8 @@
                       :path "/container"
                       :body (edn/->edn {:job (j/as-serializable job)})
                       :headers {"content-type" "application/edn"}})
+             (md/chain
+              (partial check-http-error "Request to start container job failed" job))
              (md/catch (fn [ex]
                          (throw (ex-info "Failed to run container job using build API"
                                          {:cause ex

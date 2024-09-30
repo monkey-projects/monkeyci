@@ -58,7 +58,7 @@
          (catch Exception ex
            (handle-error ex)))
        (fn [r]
-         (log/debug "Job ended with response:" r)
+         (log/debug "Job" (j/job-id job) "ended with response:" r)
          r)))))
 
 (defn- with-catch

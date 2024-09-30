@@ -8,6 +8,7 @@
             [cheshire.core :as json]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
+            [manifold.deferred :as md]
             [monkey.ci
              [artifacts :as art]
              [build :as b]
@@ -68,7 +69,7 @@
                           "-v" (str wd ":" cwd ":Z")
                           "-w" cwd]
                    ;; Do not delete container in dev mode
-                   (not (:dev-mode? conf)) (conj "--rm"))]
+                   (not (:dev-mode conf)) (conj "--rm"))]
     (concat
      ;; TODO Allow for more options to be passed in
      base-cmd
@@ -78,7 +79,7 @@
      (entrypoint job)
      [(mcc/image job)]
      (make-cmd job)
-     ;; TODO Execute script job by job
+     ;; TODO Execute script command per command
      (make-script-cmd (:script job)))))
 
 (defn- run-container [job {:keys [build events] :as conf}]
@@ -97,24 +98,30 @@
                                  (l/handle-process-streams loggers)
                                  (deref)))
                            (cache/wrap-caches)
-                           (art/wrap-artifacts))]
-    (log/info "Running build job " log-base "as podman container")
-    (log/debug "Log base is:" log-base)
+                           (art/wrap-artifacts))
+        handle-error (fn [ex]
+                       (ec/post-events
+                        events
+                        (j/job-executed-evt (j/job-id job) (b/sid build) (ec/exception-result ex))))]
+    (log/info "Running build job" log-base "as podman container")
     (log/debug "Podman command:" cmd)
     (ec/post-events events (j/job-start-evt (j/job-id job) (b/sid build)))
     ;; Job is required by the blob wrappers in the config
-    (try 
-      (let [{:keys [exit] :as res} (wrapped-runner (assoc conf :job job))]
-        (ec/post-events events (j/job-executed-evt
-                                (j/job-id job)
-                                (b/sid build)
-                                (ec/make-result
-                                 (b/exit-code->status exit)
-                                 exit
-                                 nil)))
-        res)
+    (try
+      (-> (wrapped-runner (assoc conf :job job))
+          (md/chain
+           (fn [{:keys [exit] :as res}]
+             (ec/post-events events (j/job-executed-evt
+                                     (j/job-id job)
+                                     (b/sid build)
+                                     (ec/make-result
+                                      (b/exit-code->status exit)
+                                      exit
+                                      nil)))
+             res))
+          (md/catch handle-error))
       (catch Exception ex
-        (ec/post-events events (j/job-executed-evt (j/job-id job) (b/sid build) (ec/exception-result ex)))))))
+        (handle-error ex)))))
 
 (defrecord PodmanContainerRunner [config credit-consumer]
   p/ContainerRunner

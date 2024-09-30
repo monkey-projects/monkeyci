@@ -50,9 +50,11 @@
 (defn- make-container-runner [{:keys [containers] :as config} events build api-config logging]
   (case (:type containers)
     :podman (ccp/make-container-runner
-             {:logging logging
-              :events events
-              :build build})
+             (-> config
+                 (select-keys [:dev-mode])
+                 (assoc :logging logging
+                        :events events
+                        :build build)))
     :oci    (cco/make-container-runner
              (-> config
                  (select-keys [:promtail :sidecar :api])

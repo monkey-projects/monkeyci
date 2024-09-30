@@ -25,12 +25,12 @@
   (blob/->DiskBlobStore (abs-wd dir)))
 
 (def default-config
-  {:events (ec/make-events {:type :manifold})
-   :workspace (blob "workspace")
-   :artifacts (blob "artifacts")
-   :cache (blob "cache")
-   :storage (st/make-memory-storage)
-   :build {:sid ["test-cust" "test-repo" "test-build"]}})
+  {:events {:type :manifold}
+   :workspace {:type :disk :dir (abs-wd "workspace")}
+   :artifacts {:type :disk :dir (abs-wd "artifacts")}
+   :cache {:type :disk :dir (abs-wd "caches")}
+   :build {:sid ["test-cust" "test-repo" "test-build"]}
+   :containers {:type :podman}})
 
 (defn start-system [conf]
   (-> (ra/make-runner-system conf)

@@ -238,6 +238,7 @@
     ;; Start the container, don't wait for the result.  It's up to the client
     ;; to monitor job end event.
     (try
+      (log/debug "Got request to start container job:" job)
       (p/run-container containers job)
       (-> (rur/response {:job job})
           (rur/status 202))

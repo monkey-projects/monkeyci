@@ -13,6 +13,6 @@
   (fn [build rt]
     (-> (rt/config rt)
         (assoc :build build
-               :runner {:type :local})
+               :runner (assoc (:runner conf) :type :local))
         (cmd/run-build))))
 
