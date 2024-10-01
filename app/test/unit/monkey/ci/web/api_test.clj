@@ -360,6 +360,15 @@
                :git
                :ref))))
 
+  (testing "adds tag to build"
+    (is (= "test-tag"
+           (-> (trt/test-runtime)
+               (h/->req)
+               (assoc-in [:parameters :query :tag] "test-tag")
+               (sut/make-build-ctx {})
+               :git
+               :tag))))
+
   (testing "adds configured ssh keys"
     (let [{st :storage :as rt} (trt/test-runtime)
           [cid rid] (repeatedly st/new-id)

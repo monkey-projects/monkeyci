@@ -266,7 +266,7 @@
                :build-id bid
                :idx idx
                :git (-> (:query p)
-                        (select-keys [:commit-id :branch])
+                        (select-keys [:commit-id :branch :tag])
                         (assoc :url (:url repo)
                                :ssh-keys-dir (rt/ssh-keys-dir rt bid))
                         (mc/assoc-some :ref (or (params->ref p)
