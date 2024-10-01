@@ -596,10 +596,10 @@
 
 (defn- with-repo [f & [rt]]
   (h/with-memory-store st
-    (let [events (atom [])
+    (let [events (h/fake-events)
           app (sut/make-app (mm/meta-merge
                              {:storage st
-                              :events {:poster (partial swap! events conj)}
+                              :events events
                               :config {:dev-mode true}
                               :runner (constantly nil)}
                              rt))

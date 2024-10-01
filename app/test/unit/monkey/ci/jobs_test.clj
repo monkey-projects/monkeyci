@@ -315,6 +315,17 @@
                             :result
                             ::extension-result))))))))
 
+(deftest execute-next
+  (testing "stops when canceled"
+    (let [state {"job-1" (bc/action-job "job-1" (constantly bc/success) {:status :success})
+                 "job-2" (bc/action-job "job-2" (constantly bc/success) {:status :pending})}
+          executing {}
+          results {}
+          rt {:canceled? (atom true)}
+          res (sut/execute-next state executing results rt)]
+      (is (map? res))
+      (is (= :skipped (get-in res ["job-2" :result :status]))))))
+
 (deftest container-job
   (testing "is a job"
     (is (sut/job? (bc/container-job ::test-job {:container/image "test-img"}))))

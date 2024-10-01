@@ -82,6 +82,7 @@
              pipeline (j/filter-jobs (j/label-filter (pipeline-filter pipeline)))
              true (map (comp with-catch with-extensions)))]
     (log/debug "Found" (count pf) "matching jobs:" (map bc/job-id pf))
+    ;; TODO Cancel when build/canceled event received
     (let [result @(j/execute-jobs! pf rt)]
       (log/debug "Jobs executed, result is:" result)
       {:status (if (some (comp bc/failed? :result) (vals result)) :error :success)
