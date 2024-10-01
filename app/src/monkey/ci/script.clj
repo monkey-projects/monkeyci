@@ -1,7 +1,10 @@
 (ns monkey.ci.script
   (:require [clojure.java.io :as io]
             [clojure.tools.logging :as log]
-            [manifold.deferred :as md]
+            [manifold
+             [bus :as mb]
+             [deferred :as md]
+             [stream :as ms]]
             [medley.core :as mc]
             [monkey.ci
              [build :as build]
@@ -74,19 +77,38 @@
   [[{:label "pipeline"
      :value pipeline}]])
 
+(defn canceled-evt
+  "Returns a deferred that will hold a `build/canceled` event, should it arrive.
+   When deferred is realized, we unsubscribe from the bus."
+  [bus]
+  (let [src (mb/subscribe bus :build/canceled)]
+    (-> (ms/take! src)
+        (md/finally
+          (fn []
+            (ms/close! src))))))
+
 (defn run-all-jobs
   "Executes all jobs in the set, in dependency order."
   [{:keys [pipeline events] :as rt} jobs]
   (let [pf (cond->> jobs
              ;; Filter jobs by pipeline, if given
              pipeline (j/filter-jobs (j/label-filter (pipeline-filter pipeline)))
-             true (map (comp with-catch with-extensions)))]
+             true (map (comp with-catch with-extensions)))
+        ;; Cancel when build/canceled event received
+        canceled? (atom false)
+        evt-def (-> (canceled-evt (get-in rt [:event-bus :bus]))
+                    (md/chain
+                     (fn [_] (reset! canceled? true))))]
     (log/debug "Found" (count pf) "matching jobs:" (map bc/job-id pf))
-    ;; TODO Cancel when build/canceled event received
-    (let [result @(j/execute-jobs! pf rt)]
-      (log/debug "Jobs executed, result is:" result)
-      {:status (if (some (comp bc/failed? :result) (vals result)) :error :success)
-       :jobs result})))
+    (try 
+      (let [result @(j/execute-jobs! pf (assoc rt :canceled? canceled?))]
+        (log/debug "Jobs executed, result is:" result)
+        {:status (if (some (comp bc/failed? :result) (vals result)) :error :success)
+         :jobs result})
+      (finally
+        ;; Realize the deferred so it cancels the subscription
+        (when-not (md/realized? evt-def)
+          (md/success! evt-def {}))))))
 
 ;;; Script loading
 
