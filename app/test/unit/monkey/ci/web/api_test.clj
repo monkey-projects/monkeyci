@@ -1,11 +1,13 @@
 (ns monkey.ci.web.api-test
   (:require [clojure.test :refer [deftest testing is]]
+            [clojure.spec.alpha :as spec]
             [clojure.string :as cs]
             [manifold.stream :as ms]
             [monkey.ci
              [storage :as st]
              [utils :as u]]
             [monkey.ci.events.core :as ec]
+            [monkey.ci.spec.events :as se]
             [monkey.ci.web.api :as sut]
             [monkey.ci.helpers :as h]
             [monkey.ci.test.runtime :as trt]))
@@ -610,3 +612,35 @@
                                             (assoc :build-id "non-existing"))})
                        (sut/retry-build)
                        :status)))))))
+
+(deftest cancel-build
+  (h/with-memory-store st
+    (let [build (h/gen-build)
+          events (h/fake-events)
+          make-req (fn [& [params]]
+                     (-> {:storage st
+                          :events events}
+                         (h/->req)
+                         (assoc :parameters
+                                (merge {:path (select-keys build [:customer-id :repo-id :build-id])}
+                                       params))))
+          sid (juxt :customer-id :repo-id :build-id)]
+      (is (some? (st/save-build st build)))
+      
+      (testing "dispatchs `build/canceled` event"
+        (is (= 202 (-> (make-req)
+                       (sut/cancel-build)
+                       :status)))
+        (let [evt (->> events
+                       (h/received-events)
+                       (h/first-event-by-type :build/canceled))]
+          (is (some? evt))
+          (is (spec/valid? ::se/event evt))
+          (is (= (sid build) (:sid evt)))))
+      
+      (testing "404 if build not found"
+        (h/reset-events events)
+        (is (= 404 (-> (make-req {:path {:build-id "non-existing"}})
+                       (sut/cancel-build)
+                       :status)))
+        (is (empty? (h/received-events events)))))))

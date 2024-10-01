@@ -230,6 +230,8 @@
        {:get {:handler api/get-build}}]
       ["/retry"
        {:post {:handler api/retry-build}}]
+      ["/cancel"
+       {:post {:handler api/cancel-build}}]
       log-routes
       artifact-routes]]]])
 

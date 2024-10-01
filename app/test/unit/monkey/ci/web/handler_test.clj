@@ -719,6 +719,11 @@
                          (app)
                          :status))))
 
+        (testing "`POST /cancel` cancels build"
+          (is (= 202 (-> (mock/request :post (str (build-path sid) "/cancel"))
+                         (app)
+                         :status))))
+
         (testing "/logs"
           (testing "`GET` retrieves list of available logs for build"
             (let [app (sut/make-app (test-rt {:logging {:retriever (->TestLogRetriever {})}}))

@@ -367,6 +367,7 @@
               executing {}
               results {}]
       (let [n (next-jobs* state)]
+        ;; TODO Do not proceed if build canceled
         (log/trace "Job state:" state)
         (log/debugf "There are %d pending jobs: %s" (count n) (keys n))
         (log/debugf "There are %d jobs currently executing: %s" (count executing) (keys executing))

@@ -12,7 +12,9 @@
              [runtime :as rt]
              [storage :as st]
              [time :as t]]
-            [monkey.ci.events.http :as eh]
+            [monkey.ci.events
+             [core :as ec]
+             [http :as eh]]
             [monkey.ci.web
              [auth :as auth]
              [common :as c]]
@@ -320,6 +322,15 @@
     (if build
       (save-and-run-build rt build)
       (rur/not-found {:message "Build not found"}))))
+
+(defn cancel-build
+  "Cancels running build"
+  [req]
+  (if-let [build (st/find-build (c/req->storage req) (c/build-sid req))]
+    (do
+      (ec/post-events (c/from-rt req :events) [(b/build-evt :build/canceled build)])
+      (rur/status 202))
+    (rur/not-found {:message "Build not found"})))
 
 (defn list-build-logs [req]
   (let [build-sid (st/ext-build-sid (get-in req [:parameters :path]))
