@@ -578,3 +578,35 @@
                                          :repo-id "also-nonexisting"}})
                        (sut/trigger-build)
                        :status)))))))
+
+(deftest retry-build
+  (h/with-memory-store st
+    (let [build (h/gen-build)
+          make-req (fn [runner params]
+                     (-> {:storage st
+                          :runner runner}
+                         (h/->req)
+                         (assoc :parameters params)))]
+      (is (some? (st/save-build st build)))
+
+      (let [r (-> (make-req (constantly "ok")
+                            {:path (select-keys build [:customer-id :repo-id :build-id])})
+                  (sut/retry-build))
+            bid (-> r :body :build-id)]
+        (testing "returns newly created build id"
+          (is (some? bid))
+          (is (not= (:build-id build) bid)))
+        
+        (testing "creates new build with same settings"
+          (let [new (st/find-build st [(:customer-id build) (:repo-id build) bid])]
+            (is (some? new))
+            (is (= :initializing (:status new)))
+            (is (= (:git build) (:git new))))))
+
+      (testing "returns 404 if build not found"
+        (is (= 404 (-> (make-req (constantly "ok")
+                                 {:path (-> build
+                                            (select-keys [:customer-id :repo-id])
+                                            (assoc :build-id "non-existing"))})
+                       (sut/retry-build)
+                       :status)))))))

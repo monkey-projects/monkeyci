@@ -11,7 +11,7 @@
              [logging :as l]
              [runtime :as rt]
              [storage :as st]
-             [utils :as u]]
+             [time :as t]]
             [monkey.ci.events.http :as eh]
             [monkey.ci.web
              [auth :as auth]
@@ -195,9 +195,7 @@
     (when-let [r (get-in p [:query k])]
       (format "refs/%s/%s" v r))))
 
-(def build-sid (comp (juxt :customer-id :repo-id :build-id)
-                     :path
-                     :parameters))
+(def build-sid c/build-sid)
 
 (defn- with-artifacts [req f]
   (if-let [b (st/find-build (c/req->storage req)
@@ -250,35 +248,52 @@
   (some-fn (as-ref :branch "heads")
            (as-ref :tag "tags")))
 
+(defn- assign-build-id [build req]
+  (let [idx (st/find-next-build-idx (c/req->storage req) (c/repo-sid req))
+        bid (str "build-" idx)
+        build (assoc build :build-id bid)]
+    (-> build
+        (assoc :idx idx
+               :sid (st/ext-build-sid build)))))
+
+(defn- initialize-build [build rt]
+  (assoc build
+         :source :api
+         :start-time (t/now)
+         :status :initializing
+         :cleanup? (not (rt/dev-mode? rt))))
+
 (defn make-build-ctx
   "Creates a build object from the request for the repo"
   [{p :parameters :as req} repo]
   (let [acc (:path p)
         st (c/req->storage req)
-        idx (st/find-next-build-idx st (c/repo-sid req))
-        bid (str "build-" idx)
         ssh-keys (->> (st/find-ssh-keys st (customer-id req))
                       (lbl/filter-by-label repo))
-        rt (c/req->rt req)]
-    (-> acc
-        (select-keys [:customer-id :repo-id])
-        (assoc :source :api
-               :build-id bid
-               :idx idx
-               :git (-> (:query p)
+        rt (c/req->rt req)
+        {bid :build-id :as build} (-> acc
+                                      (select-keys [:customer-id :repo-id])
+                                      (assign-build-id req))]
+    (-> build
+        (initialize-build rt)
+        (assoc :git (-> (:query p)
                         (select-keys [:commit-id :branch :tag])
                         (assoc :url (:url repo)
                                :ssh-keys-dir (rt/ssh-keys-dir rt bid))
                         (mc/assoc-some :ref (or (params->ref p)
                                                 (some->> (:main-branch repo) (str "refs/heads/")))
                                        :ssh-keys ssh-keys
-                                       :main-branch (:main-branch repo)))
-               :sid (-> acc
-                        (assoc :build-id bid)
-                        (st/ext-build-sid))
-               :start-time (u/now)
-               :status :running
-               :cleanup? (not (rt/dev-mode? rt))))))
+                                       :main-branch (:main-branch repo)))))))
+
+(defn- save-and-run-build [rt build]
+  (if (st/save-build (c/rt->storage rt) build)
+    (do
+      ;; Trigger the build but don't wait for the result
+      (c/run-build-async rt build)
+      (-> (rur/response (select-keys build [:build-id]))
+          (rur/status 202)))
+    (-> (rur/response {:message "Unable to create build"})
+        (rur/status 500))))
 
 (defn trigger-build [req]
   (let [{p :parameters} req]
@@ -290,15 +305,21 @@
           build (make-build-ctx req repo)]
       (log/debug "Triggering build for repo sid:" repo-sid)
       (if repo
-        (if (st/save-build st build)
-          (do
-            ;; Trigger the build but don't wait for the result
-            (c/run-build-async (c/req->rt req) build)
-            (-> (rur/response (select-keys build [:build-id]))
-                (rur/status 202)))
-          (-> (rur/response {:message "Unable to create build"})
-              (rur/status 500)))
+        (save-and-run-build (c/req->rt req) build)
         (rur/not-found {:message "Repository does not exist"})))))
+
+(defn retry-build
+  "Re-triggers existing build by id"
+  [req]
+  (let [st (c/req->storage req)
+        existing (st/find-build st (c/build-sid req))
+        rt (c/req->rt req)
+        build (some-> existing
+                      (assign-build-id req)
+                      (initialize-build rt))]
+    (if build
+      (save-and-run-build rt build)
+      (rur/not-found {:message "Build not found"}))))
 
 (defn list-build-logs [req]
   (let [build-sid (st/ext-build-sid (get-in req [:parameters :path]))

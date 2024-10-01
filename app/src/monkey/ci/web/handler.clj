@@ -228,6 +228,8 @@
      {:parameters {:path {:build-id Id}}}
      [[""
        {:get {:handler api/get-build}}]
+      ["/retry"
+       {:post {:handler api/retry-build}}]
       log-routes
       artifact-routes]]]])
 
