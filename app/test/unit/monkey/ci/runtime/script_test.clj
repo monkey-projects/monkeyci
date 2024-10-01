@@ -43,6 +43,11 @@
                                  test-config
                                  :containers))))
 
+    (testing "adds event bus"
+      (is (some? (sut/with-runtime
+                   test-config
+                   :event-bus))))
+
     (let [api-client (sut/with-runtime test-config (comp :client :api))]
       (testing "adds api client"
         (is (fn? api-client)))

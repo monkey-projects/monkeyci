@@ -318,7 +318,9 @@
         rt (c/req->rt req)
         build (some-> existing
                       (assign-build-id req)
-                      (initialize-build rt))]
+                      (initialize-build rt)
+                      (update :script dissoc :script-dir :start-time :end-time)
+                      (dissoc :start-time :end-time))]
     (if build
       (save-and-run-build rt build)
       (rur/not-found {:message "Build not found"}))))

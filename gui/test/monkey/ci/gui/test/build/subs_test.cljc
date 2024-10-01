@@ -58,5 +58,25 @@
 
     (testing "returns reloading status from db"
       (is (false? @r))
-      (is (map? (reset! app-db (lo/set-loading {} db/id))))
+      (is (map? (reset! app-db (lo/set-loading {} (db/get-id {})))))
+      (is (true? @r)))))
+
+(deftest canceling?
+  (let [r (rf/subscribe [:build/canceling?])]
+    (testing "exists"
+      (is (some? r)))
+
+    (testing "returns canceling status from db"
+      (is (false? @r))
+      (is (map? (reset! app-db (db/mark-canceling {}))))
+      (is (true? @r)))))
+
+(deftest retrying?
+  (let [r (rf/subscribe [:build/retrying?])]
+    (testing "exists"
+      (is (some? r)))
+
+    (testing "returns retrying status from db"
+      (is (false? @r))
+      (is (map? (reset! app-db (db/mark-retrying {}))))
       (is (true? @r)))))

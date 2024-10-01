@@ -197,6 +197,18 @@
      :path-schema build-schema})
 
    (api-route
+    {:route-name :retry-build
+     :method :post
+     :path-parts (conj build-path "/retry")
+     :path-schema build-schema})
+
+   (api-route
+    {:route-name :cancel-build
+     :method :post
+     :path-parts (conj build-path "/cancel")
+     :path-schema build-schema})
+
+   (api-route
     {:route-name :download-log
      :path-parts ["/logs/" :customer-id "/entries"]
      :path-schema customer-schema

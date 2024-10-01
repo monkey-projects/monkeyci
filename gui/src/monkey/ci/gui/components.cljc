@@ -39,7 +39,10 @@
 (defn reload-btn-sm
   "Small reload button, icon only"
   [evt & [opts]]
-  (icon-btn-sm :arrow-clockwise evt (assoc opts :title "Reload")))
+  [:button.btn.btn-outline-primary.btn-icon.btn-sm
+   {:on-click (u/link-evt-handler evt)
+    :title "Reload"}
+   [icon :arrow-clockwise]])
 
 (defn cancel-btn
   "Generic cancel button.  Posts given event when pressed."
@@ -67,7 +70,8 @@
                      :failure      [:text-danger :x-circle]
                      :running      [:text-info :play-circle]
                      :pending      [:text-warning :pause-circle]
-                     :initializing [:text-warning :play-circle]}
+                     :initializing [:text-warning :play-circle]
+                     :canceled     [:text-warning :x-circle]}
                     status
                     [:text-default :question-circle])]
     [:div (cond-> {:style {:font-size size}
