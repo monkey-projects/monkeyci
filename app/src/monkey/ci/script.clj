@@ -20,19 +20,6 @@
             [monkey.ci.runtime.script :as rs]
             [monkey.ci.spec.build :as sb]))
 
-(defn- wrapped
-  "Sets the event poster in the runtime."
-  [f before after]
-  (let [error (fn [& args]
-                ;; On error, add the exception to the result of the 'after' event
-                (let [ex (last args)]
-                  (log/error "Got error:" ex)
-                  (assoc (apply after (concat (butlast args) [{}]))
-                         :exception (.getMessage ex))))
-        w (ec/wrapped f before after error)]
-    (fn [rt & more]
-      (apply w rt more))))
-
 (defn- base-event
   "Creates a skeleton event with basic properties"
   [build type]
@@ -158,9 +145,15 @@
       (assoc :script-dir script-dir)))
 
 (def run-all-jobs*
-  (wrapped run-all-jobs
-           script-start-evt
-           script-end-evts))
+  (letfn [(error [rt _ ex]
+            (log/error "Got error:" ex)
+            (-> (base-event (:build rt) :script/end)
+                (assoc :status :error
+                       :exception (ex-message ex))))]
+    (ec/wrapped run-all-jobs
+                script-start-evt
+                script-end-evts
+                error)))
 
 (defn- assign-ids
   "Assigns an id to each job that does not have one already."

@@ -66,7 +66,8 @@
 (deftest exec-script!
   (letfn [(exec-in-dir [d]
             (-> {:build (b/set-script-dir {} (str "examples/" d))
-                 :events (h/fake-events)}
+                 :events (h/fake-events)
+                 :event-bus {:bus (mb/event-bus)}}
                 (sut/exec-script!)))]
     
     (testing "executes basic clj script from location"
@@ -158,6 +159,7 @@
   (letfn [(verify-script-evt [evt-type jobs verifier]
             (let [e (h/fake-events)
                   rt {:events e
+                      :event-bus {:bus (mb/event-bus)}
                       :build {:sid (h/gen-build-sid)}}]
               (is (some? (sut/run-all-jobs* rt jobs)))
               (let [l (->> (h/received-events e)
