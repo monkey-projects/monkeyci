@@ -55,5 +55,8 @@
 (defn set-log-expanded [db idx exp?]
   (assoc-in db [::expanded idx] exp?))
 
-(defn log-expanded? [db idx]
-  (true? (get-in db [::expanded idx])))
+(defn log-expanded?
+  ([db idx]
+   (true? (get-in db [::expanded idx])))
+  ([db]
+   (::expanded db)))

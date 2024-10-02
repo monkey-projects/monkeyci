@@ -77,9 +77,16 @@
      (when (and @log (not-empty @log))
        [co/log-contents @log])]))
 
-(defn- script-line [idx l]
-  [:a {:on-click (u/link-evt-handler [:job/toggle-logs idx])}
-   [:span.me-1 [co/icon :chevron-right]] (co/->html (str "\033[92m$ " (:cmd l) "\033[0m"))])
+(defn- script-line [idx {:keys [expanded?] :as l}]
+  [:<>
+   [:a {:on-click (u/link-evt-handler [:job/toggle-logs idx])}
+    [:span.me-1
+     [co/icon (if expanded? :chevron-down :chevron-right)]]
+    (co/->html (str "\033[92m$ " (:cmd l) "\033[0m"))]
+   (when expanded?
+     ;; TODO Subscribe to logs per type
+     ;; TODO Show each log
+     )])
 
 (defn- job-logs [job]
   (rf/dispatch [:job/load-log-files job])

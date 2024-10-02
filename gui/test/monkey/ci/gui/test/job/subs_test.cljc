@@ -165,4 +165,9 @@
                :err "/var/log/0_err.log"}
               {:cmd "script line 2"
                :out "/var/log/1_out.log"}]
-             @l)))))
+             @l)))
+
+    (testing "includes expanded state"
+      (is (some? (swap! app-db (fn [db]
+                                 (db/set-log-expanded db 1 true)))))
+      (is (true? (-> @l second :expanded?))))))

@@ -99,8 +99,10 @@
  :job/toggle-logs
  (fn [{:keys [db]} [_ idx]]
    (let [job-id (db/db->job-id db)
-         job (get-in (bdb/get-build db) [:script :jobs job-id])]
-     ;; TODO Only fetch logs if we know they exist
-     {:dispatch-n [[:job/load-logs job (str idx "_out.log")]
-                   [:job/load-logs job (str idx "_err.log")]]
-      :db (db/set-log-expanded db idx true)})))
+         job (get-in (bdb/get-build db) [:script :jobs job-id])
+         exp? (db/log-expanded? db idx)]
+     (cond-> {:db (db/set-log-expanded db idx (not exp?))}
+       (not exp?)
+       ;; TODO Only fetch logs if we know they exist
+       (assoc :dispatch-n [[:job/load-logs job (str idx "_out.log")]
+                           [:job/load-logs job (str idx "_err.log")]])))))

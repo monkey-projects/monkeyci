@@ -3,6 +3,7 @@
                :cljs [cljs.test :refer-macros [deftest testing is use-fixtures]])
             [clojure.string :as cs]
             [day8.re-frame.test :as rft]
+            [monkey.ci.gui.build.db :as bdb]
             [monkey.ci.gui.job.db :as db]
             [monkey.ci.gui.job.events :as sut]
             [monkey.ci.gui.login.db :as ldb]
@@ -144,12 +145,21 @@
                          :type))))))
 
 (deftest job-toggle-logs
-  (testing "when collapsed"
-    (rft/run-test-sync
-     (h/initialize-martian {:download-log {:error-code :no-error
-                                           :body {}}})
+  (rft/run-test-sync
+   (h/initialize-martian {:download-log {:error-code :no-error
+                                         :body {}}})
+   
+   (let [e (h/catch-fx :martian.re-frame/request)
+         job-id "test-job"
+         build {:script {:jobs {job-id {:status :running}}}}]
+     (is (some? (swap! app-db (fn [db]
+                                (-> db
+                                    (bdb/set-build build)
+                                    (r/set-current {:parameters
+                                                    {:path
+                                                     {:job-id job-id}}}))))))
      
-     (let [e (h/catch-fx :martian.re-frame/request)]
+     (testing "when collapsed"
        (is (nil? (rf/dispatch [:job/toggle-logs 0])))
 
        (testing "fetches out and err logs for given line from backend"
@@ -166,9 +176,24 @@
                  (cs/includes? "filename=\"0_err.log\""))))
 
        (testing "marks as expanded"
-         (is (db/log-expanded? @app-db 0)))))
+         (is (db/log-expanded? @app-db 0))))
 
-    (testing "does not re-fetch logs if job finished"))
+     (testing "when expanded"
+       (is (empty? (reset! e [])))
+       (is (nil? (rf/dispatch [:job/toggle-logs 0])))
 
-  (testing "when expanded"
-    (testing "marks as collapsed")))
+       (testing "does not re-fetch"
+         (is (empty? @e)))
+       
+       (testing "marks as collapsed"
+         (is (not (db/log-expanded? @app-db 0)))))
+
+     (testing "does not re-fetch logs if job finished"
+       (is (empty? (reset! e [])))
+       (is (some? (swap! app-db (fn [db]
+                                  (bdb/set-build
+                                   db
+                                   (assoc-in (bdb/get-build db)
+                                             [:script :jobs job-id :status] :success))))))
+       (is (nil? (rf/dispatch [:job/toggle-logs 0])))
+       (is (empty? @e))))))

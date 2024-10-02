@@ -7,6 +7,7 @@
 
 (u/db-sub :job/alerts db/global-alerts)
 (u/db-sub :job/log-files db/log-files)
+(u/db-sub :job/log-expanded? db/log-expanded?)
 
 (rf/reg-sub
  :job/path-alerts
@@ -65,7 +66,8 @@
  :job/script-with-logs
  :<- [:job/current]
  :<- [:job/log-files]
- (fn [[job files] _]
+ :<- [:job/log-expanded?]
+ (fn [[job files exp] _]
    (let [file-per-line (group-by path->line files)]
      (letfn [(as-types-map [paths]
                (->> paths
@@ -74,8 +76,8 @@
                     (into {})))
              (->out [idx line]
                (let [m (get file-per-line idx)]
-                 ;; TODO Also add expanded status
                  (cond-> {:cmd line}
-                   m (merge (as-types-map m)))))]
+                   m (merge (as-types-map m))
+                   (get exp idx) (assoc :expanded? true))))]
        (->> (:script job)
             (map-indexed ->out))))))
