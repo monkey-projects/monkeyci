@@ -143,3 +143,32 @@
                          first
                          :type))))))
 
+(deftest job-toggle-logs
+  (testing "when collapsed"
+    (rft/run-test-sync
+     (h/initialize-martian {:download-log {:error-code :no-error
+                                           :body {}}})
+     
+     (let [e (h/catch-fx :martian.re-frame/request)]
+       (is (nil? (rf/dispatch [:job/toggle-logs 0])))
+
+       (testing "fetches out and err logs for given line from backend"
+         (is (= 2 (count @e)))
+         (is (-> @e
+                 first
+                 (nth 3)
+                 :query
+                 (cs/includes? "filename=\"0_out.log\"")))
+         (is (-> @e
+                 second
+                 (nth 3)
+                 :query
+                 (cs/includes? "filename=\"0_err.log\""))))
+
+       (testing "marks as expanded"
+         (is (db/log-expanded? @app-db 0)))))
+
+    (testing "does not re-fetch logs if job finished"))
+
+  (testing "when expanded"
+    (testing "marks as collapsed")))

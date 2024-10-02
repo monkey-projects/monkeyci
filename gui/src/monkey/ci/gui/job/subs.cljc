@@ -74,6 +74,7 @@
                     (into {})))
              (->out [idx line]
                (let [m (get file-per-line idx)]
+                 ;; TODO Also add expanded status
                  (cond-> {:cmd line}
                    m (merge (as-types-map m)))))]
        (->> (:script job)

@@ -40,7 +40,7 @@
                 (-> (merge existing (if (fn? patch)
                                       (patch existing)
                                       patch))))
-    (log/warn "Unable to patch build" sid ", record not found in db (initialize event missed?)")))
+    (log/warn "Unable to patch build" sid ", record not found in db (initialize or pending event missed?)")))
 
 (defn start-build [storage {:keys [sid time credit-multiplier]}]
   (patch-build storage sid {:start-time time
@@ -51,6 +51,7 @@
   (patch-build storage sid (fn [build]
                              {:end-time time
                               :status status
+                              ;; TODO Calculate credits on each job update
                               :credits (b/calc-credits build)
                               :message message})))
 

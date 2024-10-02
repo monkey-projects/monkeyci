@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.job.events
-  (:require [monkey.ci.gui.job.db :as db]
+  (:require [monkey.ci.gui.build.db :as bdb]
+            [monkey.ci.gui.job.db :as db]
             [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.login.db :as ldb]
             [monkey.ci.gui.loki :as loki]
@@ -94,3 +95,12 @@
  (fn [db [_ path err]]
    (lo/on-failure db (db/get-path-id db path) "Failed to fetch logs: " err)))
 
+(rf/reg-event-fx
+ :job/toggle-logs
+ (fn [{:keys [db]} [_ idx]]
+   (let [job-id (db/db->job-id db)
+         job (get-in (bdb/get-build db) [:script :jobs job-id])]
+     ;; TODO Only fetch logs if we know they exist
+     {:dispatch-n [[:job/load-logs job (str idx "_out.log")]
+                   [:job/load-logs job (str idx "_err.log")]]
+      :db (db/set-log-expanded db idx true)})))

@@ -100,7 +100,7 @@
 ;;; Script loading
 
 (defn- load-script
-  "Loads the pipelines from the build script, by reading the script files 
+  "Loads the jobs from the build script, by reading the script files 
    dynamically.  If the build script does not define its own namespace,
    one will be randomly generated to avoid collisions."
   [dir build-id]
@@ -112,7 +112,7 @@
     (try
       (let [path (io/file dir "build.clj")]
         (log/debug "Loading script:" path)
-        ;; This should return pipelines to run
+        ;; This should return jobs to run
         (load-file (str path)))
       (finally
         ;; Return
