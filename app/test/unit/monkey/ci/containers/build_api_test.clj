@@ -3,6 +3,7 @@
             [clj-commons.byte-streams :as bs]
             [clojure.java.io :as io]
             [manifold
+             [bus :as bus]
              [deferred :as md]
              [stream :as ms]]
             [monkey.ci.build
@@ -19,7 +20,8 @@
 (deftest run-container
   (let [invocations (atom [])
         client (api/make-client "http://test-api" "test-token")
-        runner (sut/->BuildApiContainerRunner client)
+        bus (bus/event-bus)
+        runner (sut/->BuildApiContainerRunner client {:bus bus})
         job (bc/container-job "test-job"
                               {:image "test-img"
                                :script ["test-cmd"]
@@ -50,17 +52,14 @@
       (at/with-fake-http ["http://test-api/container"
                           (fn [req]
                             (swap! invocations conj req)
-                            {:status 202})
-                          "http://test-api/events"
-                          {:status 200
-                           :body (-> (str "data: " (pr-str {:type :job/executed
-                                                            :job-id (:id job)
-                                                            :result ::test-result
-                                                            :sid ["some" "sid"]})
-                                          "\n\n")
-                                     (.getBytes)
-                                     (io/input-stream))}]
+                            {:status 202})]
         (let [r (p/run-container runner job)]
           (is (md/deferred? r))
+          (is (some? (bus/publish! bus
+                                   :job/executed
+                                   {:type :job/executed
+                                    :job-id (:id job)
+                                    :result ::test-result
+                                    :sid ["some" "sid"]})))
           (is (= ::test-result (deref r 1000 ::timeout))))))))
 

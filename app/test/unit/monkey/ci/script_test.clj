@@ -1,7 +1,9 @@
 (ns monkey.ci.script-test
   (:require [clojure.test :refer :all]
             [clojure.spec.alpha :as spec]
-            [manifold.deferred :as md]
+            [manifold
+             [bus :as mb]
+             [deferred :as md]]
             [monkey.ci
              [build :as b]
              [jobs :as j]
@@ -9,6 +11,7 @@
              [script :as sut]
              [utils :as u]]
             [monkey.ci.build.core :as bc]
+            [monkey.ci.events.core :as ec]
             [monkey.ci.spec.events :as se]
             [monkey.ci.helpers :as h]
             [monkey.ci.test.aleph-test :as at]))
@@ -63,7 +66,8 @@
 (deftest exec-script!
   (letfn [(exec-in-dir [d]
             (-> {:build (b/set-script-dir {} (str "examples/" d))
-                 :events (h/fake-events)}
+                 :events (h/fake-events)
+                 :event-bus {:bus (mb/event-bus)}}
                 (sut/exec-script!)))]
     
     (testing "executes basic clj script from location"
@@ -94,6 +98,7 @@
 
 (deftest run-all-jobs
   (let [rt {:events (h/fake-events)
+            :event-bus {:bus (mb/event-bus)}
             :api {:client ::fake-api}}]
     (testing "success if no pipelines"
       (is (bc/success? (sut/run-all-jobs rt []))))
@@ -137,12 +142,30 @@
             result (->> [job]
                         (sut/run-all-jobs rt)
                         :jobs)]
-        (is (= bc/success (get-in result ["test-job" :result])))))))
+        (is (= bc/success (get-in result ["test-job" :result])))))
+
+    #_(testing "does not run jobs when canceled"
+      ;; FIXME The event is dropped because there are no listeners at this point
+      (is (true? @(mb/publish! (get-in rt [:event-bus :bus]) :build/canceled {:type :build/canceled})))
+      (let [job (bc/action-job "test-job" (constantly bc/success))
+            result (->> [job]
+                        (sut/run-all-jobs rt)
+                        :jobs)]
+        (is (= :skipped (-> result (get "test-job") :result :status)))))))
+
+(deftest canceled-evt
+  (testing "holds `build/canceled` event"
+    (let [bus (mb/event-bus)
+          c (sut/canceled-evt bus)]
+      (is (md/deferred? c))
+      (is (true? @(mb/publish! bus :build/canceled ::test-evt)))
+      (is (= ::test-evt (deref c 1000 ::timeout))))))
 
 (deftest run-all-jobs*
   (letfn [(verify-script-evt [evt-type jobs verifier]
             (let [e (h/fake-events)
                   rt {:events e
+                      :event-bus {:bus (mb/event-bus)}
                       :build {:sid (h/gen-build-sid)}}]
               (is (some? (sut/run-all-jobs* rt jobs)))
               (let [l (->> (h/received-events e)

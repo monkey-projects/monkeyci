@@ -78,8 +78,6 @@
            (partial assoc-in rt [:job :result])
            ;; Let any extensions work on it
            #(apply-extensions-after % registered-ext)
-           ;; FIXME job/end event has already been sent at this point.  We need some way to get the extension
-           ;; results in there.
            ;; Return the job result (possibly modified by extensions)
            (comp :result :job)))))
 

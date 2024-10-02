@@ -596,10 +596,10 @@
 
 (defn- with-repo [f & [rt]]
   (h/with-memory-store st
-    (let [events (atom [])
+    (let [events (h/fake-events)
           app (sut/make-app (mm/meta-merge
                              {:storage st
-                              :events {:poster (partial swap! events conj)}
+                              :events events
                               :config {:dev-mode true}
                               :runner (constantly nil)}
                              rt))
@@ -695,23 +695,34 @@
 
         (testing "404 when repo does not exist"))))
 
-  (testing "`GET /:build-id`"
+  (testing "`/:build-id`"
     (with-repo
       (fn [{:keys [app] [_ _ build-id :as sid] :sid}]
-        (testing "retrieves build with given id"
-          (let [l (-> (mock/request :get (build-path sid))
-                      (app))
-                b (some-> l :body slurp h/parse-json)]
-            (is (not-empty l))
-            (is (= 200 (:status l)))
-            (is (= build-id (:build-id b)))))
+        (testing "`GET`"
+          (testing "retrieves build with given id"
+            (let [l (-> (mock/request :get (build-path sid))
+                        (app))
+                  b (some-> l :body slurp h/parse-json)]
+              (is (not-empty l))
+              (is (= 200 (:status l)))
+              (is (= build-id (:build-id b)))))
 
-        (testing "404 when build does not exist"
-          (let [sid (generate-build-sid)
-                l (-> (mock/request :get (build-path sid))
-                      (app))]
-            (is (= 404 (:status l)))
-            (is (nil? (:body l)))))
+          (testing "404 when build does not exist"
+            (let [sid (generate-build-sid)
+                  l (-> (mock/request :get (build-path sid))
+                        (app))]
+              (is (= 404 (:status l)))
+              (is (nil? (:body l))))))
+
+        (testing "`POST /retry` re-triggers build"
+          (is (= 202 (-> (mock/request :post (str (build-path sid) "/retry"))
+                         (app)
+                         :status))))
+
+        (testing "`POST /cancel` cancels build"
+          (is (= 202 (-> (mock/request :post (str (build-path sid) "/cancel"))
+                         (app)
+                         :status))))
 
         (testing "/logs"
           (testing "`GET` retrieves list of available logs for build"

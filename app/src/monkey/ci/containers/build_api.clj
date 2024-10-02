@@ -1,69 +1,57 @@
 (ns monkey.ci.containers.build-api
   "Container runner that invokes an endpoint on the build api.  This is meant to
    be used by child processes that do not have full infra permissions."
-  (:require [clj-commons.byte-streams :as bs]
-            [clojure.tools.logging :as log]
+  (:require [clojure.tools.logging :as log]
             [manifold
+             [bus :as mb]
              [deferred :as md]
              [stream :as ms]]
             [monkey.ci
-             [containers :as mcc]
              [edn :as edn]
              [jobs :as j]
-             [protocols :as p]]
-            [monkey.ci.events.http :as eh]))
+             [protocols :as p]]))
 
-(defrecord BuildApiContainerRunner [client]
+(defn check-http-error [msg job {:keys [status body] :as resp}]
+  (if (or (nil? status) (>= status 400))
+    (throw (ex-info msg
+                    {:job job
+                     :cause resp}))
+    body))
+
+(defn- wait-for-job-executed
+  "Listens to events on the build api server that indicate the container job
+   has executed.  Returns a deferred that yields the container result when 
+   it has finished, or a timeout exception when the job takes too long to
+   complete."
+  [bus job-id]
+  (log/debug "Listening to events for container job to end for job" job-id)
+  (let [src (mb/subscribe bus :job/executed)]
+    (-> (->> src
+             (ms/filter (comp (partial = job-id) :job-id))
+             (ms/sliding-stream 10))
+        (ms/take!)
+        (md/timeout! j/max-job-timeout)
+        (md/chain :result)
+        (md/finally
+          (fn []
+            (log/debug "Unsubscribing from bus")
+            (ms/close! src))))))
+
+(defrecord BuildApiContainerRunner [client bus]
   p/ContainerRunner
   (run-container [this job]
-    (let [r (-> (md/deferred)
-                (md/timeout! j/max-job-timeout))
-          evt-stream (promise)
-          src (promise)
-          job-id (j/job-id job)]
-      (-> (client {:request-method :post
-                   :path "/container"
-                   :body (edn/->edn {:job (j/as-serializable job)})
-                   :headers {"content-type" "application/edn"}})
-          ;; Listen to events to realize deferred
-          (md/chain
-           (fn [_]
-             (log/debug "Listening to events for container job to end for job" (j/job-id job))
-             (client {:request-method :get
-                      :path "/events"}))
-           :body
-           (fn [is]
-             ;; Store it so we can close it later
-             (deliver evt-stream is)
-             is)
-           bs/to-line-seq
-           ms/->source
-           (fn [s]
-             (deliver src s)
-             s)
-           (partial ms/filter not-empty)
-           (partial ms/map eh/parse-event-line)
-           (fn [events]
-             ;; TODO Refactor to an event listener, so we can use existing code
-             (ms/consume (fn [{:keys [type result] :as evt}]
-                           (log/debug "Got event while waiting for container" job-id "to be executed:" evt)
-                           (when (and (= :job/executed type)
-                                      (= job-id (:job-id evt)))
-                             (log/debug "Container job" job-id "completed:" result)
-                             (md/success! r result)))
-                         events)))
-          (md/catch (fn [ex]
-                      (md/error! r ex))))
-      (md/finally
-        r
-        (fn []
-          (log/debug "Closing event stream on client side")
-          (if (realized? evt-stream)
-            (.close @evt-stream)
-            (log/warn "Unable to close event inputstream, not delivered yet."))
-          ;; We need to close the stream explicitly, because it is not automatically
-          ;; closed if the input stream is closed.
-          (if (realized? src)
-            (ms/close! @src)
-            (log/warn "Unable to close source stream, not delivered yet."))
-          (log/debug "Stream and sink closed"))))))
+    (log/info "Starting container job using build API:" (j/job-id job))
+    (-> (md/zip
+         (wait-for-job-executed (:bus bus) (j/job-id job))
+         (-> (client {:request-method :post
+                      :path "/container"
+                      :body (edn/->edn {:job (j/as-serializable job)})
+                      :headers {"content-type" "application/edn"}})
+             (md/chain
+              (partial check-http-error "Request to start container job failed" job))
+             (md/catch (fn [ex]
+                         (throw (ex-info "Failed to run container job using build API"
+                                         {:cause ex
+                                          :job job}))))))
+        ;; Just return the job result
+        (md/chain first))))

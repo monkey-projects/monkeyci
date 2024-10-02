@@ -305,6 +305,14 @@
           (is (sid/sid? (st/save-build s (assoc-in build [:script :jobs (:id job)] upd))))
           (is (= upd (get-in (st/find-build s build-sid) [:script :jobs (:id job)])))))
 
+      (testing "stores job message"
+        (let [job (assoc (h/gen-job)
+                         :status :failure
+                         :message "Test error message")
+              jobs {(:id job) job}]
+          (is (sid/sid? (st/save-build s (assoc-in build [:script :jobs] jobs))))
+          (is (= (:message job) (get-in (st/find-build s build-sid) [:script :jobs (:id job) :message])))))
+
       (testing "stores credit multiplier"
         (let [job (assoc (h/gen-job) :credit-multiplier 3)
               jobs {(:id job) job}]

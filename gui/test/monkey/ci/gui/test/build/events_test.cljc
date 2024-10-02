@@ -14,70 +14,85 @@
 
 (use-fixtures :each f/reset-db)
 
+(defn- build-sid []
+  (repeatedly 3 (comp str random-uuid)))
+
+(defn- gen-build []
+  (zipmap [:customer-id :repo-id :build-id] (build-sid)))
+
+(defn- build->params [build]
+  {:parameters
+   {:path (select-keys build [:customer-id :repo-id :build-id])}})
+
+(def build-keys [:customer-id :repo-id :build-id])
+(def sid (apply juxt build-keys))
+
+(defn- set-build-path
+  "Updates the db route to match the build"
+  [db build]
+  (r/set-current db (build->params build)))
+
 (deftest build-init
   (letfn [(mock-handlers []
             (rf/reg-event-db :build/load (constantly nil))
             (rf/reg-event-db :customer/maybe-load (constantly nil))
             (rf/reg-event-db :event-stream/start (constantly nil))
             (rf/reg-event-db :route/on-page-leave (constantly nil)))]
-    
-    (testing "when not initialized"
-      (testing "dispatches load event"
-        (rft/run-test-sync
-         (let [c (atom [])]
-           (mock-handlers)
-           (rf/reg-event-db :build/load (fn [_ evt] (swap! c conj evt)))
-           (rf/dispatch [:build/init])
-           (is (= 1 (count @c))))))
 
-      (testing "dispatches customer load event"
-        (rft/run-test-sync
-         (let [c (atom [])]
-           (mock-handlers)
-           (rf/reg-event-db :customer/maybe-load (fn [_ evt] (swap! c conj evt)))
-           (rf/dispatch [:build/init])
-           (is (= 1 (count @c))))))
+    (let [db (set-build-path {} (gen-build))]
+      (is (some? (reset! app-db db)))
       
-      (testing "dispatches page leave event"
-        (rft/run-test-sync
-         (let [c (atom [])]
-           (mock-handlers)
-           (rf/reg-event-db :route/on-page-leave (fn [_ evt] (swap! c conj evt)))
-           (rf/dispatch [:build/init])
-           (is (= 1 (count @c))))))
+      (testing "when not initialized"
+        (testing "dispatches load event"
+          (rft/run-test-sync
+           (let [c (atom [])]
+             (mock-handlers)
+             (rf/reg-event-db :build/load (fn [_ evt] (swap! c conj evt)))
+             (rf/dispatch [:build/init])
+             (is (= 1 (count @c))))))
 
-      (testing "dispatches event stream start"
-        (rft/run-test-sync
-         (let [c (atom [])]
-           (mock-handlers)
-           (rf/reg-event-db :event-stream/start (fn [_ evt] (swap! c conj evt)))
-           (rf/dispatch [:build/init])
-           (is (= 1 (count @c))))))
+        (testing "dispatches customer load event"
+          (rft/run-test-sync
+           (let [c (atom [])]
+             (mock-handlers)
+             (rf/reg-event-db :customer/maybe-load (fn [_ evt] (swap! c conj evt)))
+             (rf/dispatch [:build/init])
+             (is (= 1 (count @c))))))
+        
+        (testing "dispatches page leave event"
+          (rft/run-test-sync
+           (let [c (atom [])]
+             (mock-handlers)
+             (rf/reg-event-db :route/on-page-leave (fn [_ evt] (swap! c conj evt)))
+             (rf/dispatch [:build/init])
+             (is (= 1 (count @c))))))
 
-      (testing "marks initialized"
+        (testing "dispatches event stream start"
+          (rft/run-test-sync
+           (let [c (atom [])]
+             (mock-handlers)
+             (rf/reg-event-db :event-stream/start (fn [_ evt] (swap! c conj evt)))
+             (rf/dispatch [:build/init])
+             (is (= 1 (count @c))))))
+
+        (testing "marks initialized"
+          (rft/run-test-sync
+           (mock-handlers)
+           (reset! app-db {})
+           (rf/dispatch [:build/init])
+           (is (true? (lo/initialized? @app-db (db/get-id db)))))))
+
+      (testing "does nothing when initialized"
+        (reset! app-db (lo/set-initialized {} (db/get-id db)))
         (rft/run-test-sync
          (mock-handlers)
-         (reset! app-db {})
-         (rf/dispatch [:build/init])
-         (is (true? (lo/initialized? @app-db db/id))))))
-
-    (testing "does nothing when initialized"
-      (reset! app-db (lo/set-initialized {} db/id))
-      (rft/run-test-sync
-       (mock-handlers)
-       (let [c (atom [])
-             h (fn [_ evt] (swap! c conj evt))]
-         (rf/reg-event-db :build/load h)
-         (rf/reg-event-db :event-stream/start h)
-         (rf/reg-event-db :route/on-page-leave h)
-         (rf/dispatch [:build/init])
-         (is (empty? @c)))))))
-
-(defn- build-sid []
-  (repeatedly 3 (comp str random-uuid)))
-
-(defn- gen-build []
-  (zipmap [:customer-id :repo-id :build-id] (build-sid)))
+         (let [c (atom [])
+               h (fn [_ evt] (swap! c conj evt))]
+           (rf/reg-event-db :build/load h)
+           (rf/reg-event-db :event-stream/start h)
+           (rf/reg-event-db :route/on-page-leave h)
+           (rf/dispatch [:build/init])
+           (is (empty? @c))))))))
 
 (deftest build-load
   (testing "resets alerts"
@@ -145,27 +160,26 @@
   (testing "does not start event stream when build has finished"))
 
 (deftest build-load--failed
-  (testing "sets error"
-    (rf/dispatch-sync [:build/load--failed "test-error"])
-    (is (= :danger (-> (db/get-alerts @app-db)
-                       (first)
-                       :type))))
-  
-  (testing "clears build loading flag"
-    (is (map? (reset! app-db (lo/set-loading {} db/id))))
-    (rf/dispatch-sync [:build/load--failed {:body {}}])
-    (is (not (lo/loading? @app-db db/id)))))
+  (let [db (set-build-path {} (gen-build))]
+    (is (some? (reset! app-db db)))
+    
+    (testing "sets error"
+      (rf/dispatch-sync [:build/load--failed "test-error"])
+      (is (= :danger (-> (db/get-alerts @app-db)
+                         (first)
+                         :type))))
+    
+    (testing "clears build loading flag"
+      (is (map? (reset! app-db (lo/set-loading db (db/get-id db)))))
+      (rf/dispatch-sync [:build/load--failed {:body {}}])
+      (is (not (lo/loading? @app-db (db/get-id db)))))))
 
 (deftest build-reload
   (testing "loads build from backend"
     (rft/run-test-sync
-     (let [c (h/catch-fx :martian.re-frame/request)]
-       (reset! app-db {:route/current
-                       {:parameters
-                        {:path 
-                         {:customer-id "test-cust"
-                          :repo-id "test-repo"
-                          :build-id "test-build"}}}})
+     (let [c (h/catch-fx :martian.re-frame/request)
+           build (gen-build)]
+       (reset! app-db (set-build-path {} build))
        (h/initialize-martian {:get-build
                               {:body "test-build"
                                :error-code :no-error}})
@@ -180,15 +194,6 @@
 (defn- test-build []
   (->> (repeatedly 3 (comp str random-uuid))
        (zipmap [:customer-id :repo-id :build-id])))
-
-(def build-keys [:customer-id :repo-id :build-id])
-(def sid (apply juxt build-keys))
-
-(defn- set-build-path
-  "Updates the db route to match the build"
-  [db build]
-  (assoc-in db [:route/current :parameters :path]
-            (select-keys build build-keys)))
 
 (deftest handle-event
   (testing "ignores events for other builds"
@@ -214,3 +219,86 @@
       (rf/dispatch-sync [:build/handle-event evt])
       (is (= (:build evt) (db/get-build @app-db))))))
 
+(deftest build-cancel
+  (rft/run-test-sync
+   (let [c (h/catch-fx :martian.re-frame/request)
+         build (gen-build)]
+     (reset! app-db (set-build-path {} build))
+     (h/initialize-martian {:get-build {:body "test-build"
+                                        :error-code :no-error}})
+     (rf/dispatch [:build/cancel])
+
+     (testing "invokes cancel-build endpoint"
+       (is (= 1 (count @c)))
+       (is (= :cancel-build (-> @c first (nth 2)))))
+
+     (testing "marks build canceling"
+       (is (db/canceling? @app-db))))))
+
+(deftest build-cancel--success
+  (let [build (gen-build)]
+    (is (some? (reset! app-db (-> {}
+                                  (set-build-path build)
+                                  (db/mark-canceling)))))
+    (rf/dispatch-sync [:build/cancel--success])
+    
+    (testing "unmarks canceling"
+      (is (not (db/canceling? @app-db))))
+
+    (testing "sets alert"
+      (is (not-empty (db/get-alerts @app-db))))))
+
+(deftest build-cancel--failed
+  (let [build (gen-build)]
+    (is (some? (reset! app-db (-> {}
+                                  (set-build-path build)
+                                  (db/mark-canceling)))))
+    (rf/dispatch-sync [:build/cancel--failed "test error"])
+    
+    (testing "unmarks canceling"
+      (is (not (db/canceling? @app-db))))
+
+    (testing "sets alert"
+      (is (not-empty (db/get-alerts @app-db))))))
+
+(deftest build-retry
+  (rft/run-test-sync
+   (let [c (h/catch-fx :martian.re-frame/request)
+         build (gen-build)]
+     (reset! app-db (set-build-path {} build))
+     (h/initialize-martian {:get-build {:body "test-build"
+                                        :error-code :no-error}})
+     (rf/dispatch [:build/retry])
+
+     (testing "invokes retry-build endpoint"
+       (is (= 1 (count @c)))
+       (is (= :retry-build (-> @c first (nth 2)))))
+
+     (testing "marks build retrying"
+       (is (db/retrying? @app-db))))))
+
+(deftest build-retry--success
+  (let [build (gen-build)]
+    (is (some? (reset! app-db (-> {}
+                                  (set-build-path build)
+                                  (db/mark-retrying)))))
+    (rf/dispatch-sync [:build/retry--success])
+    
+    (testing "unmarks retrying"
+      (is (not (db/retrying? @app-db))))
+
+    (testing "sets alert"
+      (is (not-empty (db/get-alerts @app-db))))))
+
+(deftest build-retry--failed
+  (let [build (gen-build)]
+    (is (some? (reset! app-db (-> {}
+                                  (set-build-path build)
+                                  (db/mark-retrying)))))
+    (rf/dispatch-sync [:build/retry--failed "test error"])
+    
+    (testing "unmarks retrying"
+      (is (not (db/retrying? @app-db))))
+
+    (testing "sets alert"
+      (is (not-empty (db/get-alerts @app-db))))))

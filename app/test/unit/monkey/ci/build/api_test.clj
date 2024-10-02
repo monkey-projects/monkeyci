@@ -1,6 +1,10 @@
 (ns monkey.ci.build.api-test
   (:require [clojure.test :refer [deftest testing is]]
-            [manifold.deferred :as md]
+            [clojure.java.io :as io]
+            [manifold
+             [bus :as bus]
+             [deferred :as md]
+             [stream :as ms]]
             [martian.core :as mc]
             [monkey.ci.build
              [api :as sut]
@@ -8,7 +12,8 @@
             [monkey.ci.events.build-api :as events]
             [monkey.ci.helpers :as h]
             [monkey.ci.protocols :as p]
-            [monkey.ci.test.api-server :as tas]))
+            [monkey.ci.test.api-server :as tas])
+  (:import [java.io PipedInputStream PipedOutputStream PrintWriter]))
 
 (deftest api-client
   (let [config (tas/test-config)
@@ -57,3 +62,36 @@
               :build {:sid ["test-cust" "test-repo" "test-build"]}}]
       (is (= "test artifact contents"
              (sut/download-artifact rt "test-artifact"))))))
+
+(deftest event-bus
+  (let [input (PipedInputStream.)
+        output (PipedOutputStream. input)
+        client (fn [req]
+                 (md/success-deferred {:status 200
+                                       :body input}))
+        bus (sut/event-bus client)]
+    (with-open [w (io/writer output)
+                pw (PrintWriter. w)]
+      (letfn [(post-event [evt]
+                (.println pw (str "data: " (pr-str evt) "\n"))
+                (.flush pw))]
+        (testing "returns an event bus"
+          (is (some? (:bus bus))))
+
+        (testing "returns a close fn"
+          (is (fn? (:close bus))))
+
+        (testing "dispatches events"
+          (let [s (bus/subscribe (:bus bus) ::test-event)
+                evt {:type ::test-event :message "test event"}]
+            (is (ms/source? s))
+            (post-event evt)
+            (is (= evt (-> s (ms/take!) (deref 1000 :timeout))))
+            (is (nil? (ms/close! s)))))
+
+        (testing "dispatches events to multiple listeners"
+          (let [s (bus/subscribe (:bus bus) ::test-event)
+                evt {:type ::test-event :message "other event"}]
+            (post-event evt)
+            (is (= evt (-> s (ms/take!) (deref 1000 :timeout))))
+            (is (nil? (ms/close! s)))))))))

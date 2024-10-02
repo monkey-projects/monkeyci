@@ -8,11 +8,11 @@
 
 (defmethod r/make-runner :server [conf]
   ;; Runner that is invoked when the build is run by the server itself.  The runtime
-  ;; has to be modified so it container the correct properties.
+  ;; has to be modified so it contains the correct properties.
   (log/info "Using server build runner")
   (fn [build rt]
     (-> (rt/config rt)
         (assoc :build build
-               :runner {:type :local})
+               :runner (assoc (:runner conf) :type :local))
         (cmd/run-build))))
 

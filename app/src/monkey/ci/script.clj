@@ -1,11 +1,15 @@
 (ns monkey.ci.script
   (:require [clojure.java.io :as io]
             [clojure.tools.logging :as log]
-            [manifold.deferred :as md]
+            [manifold
+             [bus :as mb]
+             [deferred :as md]
+             [stream :as ms]]
             [medley.core :as mc]
             [monkey.ci
              [build :as build]
              [credits :as cr]
+             [errors :as err]
              [extensions :as ext]
              [jobs :as j]
              [protocols :as p]
@@ -15,19 +19,6 @@
             [monkey.ci.events.core :as ec]
             [monkey.ci.runtime.script :as rs]
             [monkey.ci.spec.build :as sb]))
-
-(defn- wrapped
-  "Sets the event poster in the runtime."
-  [f before after]
-  (let [error (fn [& args]
-                ;; On error, add the exception to the result of the 'after' event
-                (let [ex (last args)]
-                  (log/error "Got error:" ex)
-                  (assoc (apply after (concat (butlast args) [{}]))
-                         :exception (.getMessage ex))))
-        w (ec/wrapped f before after error)]
-    (fn [rt & more]
-      (apply w rt more))))
 
 (defn- base-event
   "Creates a skeleton event with basic properties"
@@ -44,9 +35,10 @@
     (let [ctx-with-job (assoc ctx :job target)
           handle-error (fn [ex]
                          (log/error "Got job exception:" ex)
-                         (assoc bc/failure
-                                :exception ex
-                                :message (.getMessage ex)))]
+                         (let [u (err/unwrap-exception ex)]
+                           (assoc bc/failure
+                                  :exception u
+                                  :message (ex-message u))))]
       (log/debug "Executing error catching job:" (bc/job-id target))
       (md/chain
        ;; Catch both sync and async errors
@@ -56,7 +48,7 @@
          (catch Exception ex
            (handle-error ex)))
        (fn [r]
-         (log/debug "Job ended with response:" r)
+         (log/debug "Job" (j/job-id job) "ended with response:" r)
          r)))))
 
 (defn- with-catch
@@ -72,18 +64,38 @@
   [[{:label "pipeline"
      :value pipeline}]])
 
+(defn canceled-evt
+  "Returns a deferred that will hold a `build/canceled` event, should it arrive.
+   When deferred is realized, we unsubscribe from the bus."
+  [bus]
+  (let [src (mb/subscribe bus :build/canceled)]
+    (-> (ms/take! src)
+        (md/finally
+          (fn []
+            (ms/close! src))))))
+
 (defn run-all-jobs
   "Executes all jobs in the set, in dependency order."
   [{:keys [pipeline events] :as rt} jobs]
   (let [pf (cond->> jobs
              ;; Filter jobs by pipeline, if given
              pipeline (j/filter-jobs (j/label-filter (pipeline-filter pipeline)))
-             true (map (comp with-catch with-extensions)))]
+             true (map (comp with-catch with-extensions)))
+        ;; Cancel when build/canceled event received
+        canceled? (atom false)
+        evt-def (-> (canceled-evt (get-in rt [:event-bus :bus]))
+                    (md/chain
+                     (fn [_] (reset! canceled? true))))]
     (log/debug "Found" (count pf) "matching jobs:" (map bc/job-id pf))
-    (let [result @(j/execute-jobs! pf rt)]
-      (log/debug "Jobs executed, result is:" result)
-      {:status (if (some (comp bc/failed? :result) (vals result)) :error :success)
-       :jobs result})))
+    (try 
+      (let [result @(j/execute-jobs! pf (assoc rt :canceled? canceled?))]
+        (log/debug "Jobs executed, result is:" result)
+        {:status (if (some (comp bc/failed? :result) (vals result)) :error :success)
+         :jobs result})
+      (finally
+        ;; Realize the deferred so it cancels the subscription
+        (when-not (md/realized? evt-def)
+          (md/success! evt-def {}))))))
 
 ;;; Script loading
 
@@ -133,9 +145,15 @@
       (assoc :script-dir script-dir)))
 
 (def run-all-jobs*
-  (wrapped run-all-jobs
-           script-start-evt
-           script-end-evts))
+  (letfn [(error [rt _ ex]
+            (log/error "Got error:" ex)
+            (-> (base-event (:build rt) :script/end)
+                (assoc :status :error
+                       :exception (ex-message ex))))]
+    (ec/wrapped run-all-jobs
+                script-start-evt
+                script-end-evts
+                error)))
 
 (defn- assign-ids
   "Assigns an id to each job that does not have one already."

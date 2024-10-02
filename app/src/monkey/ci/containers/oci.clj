@@ -363,51 +363,67 @@
                    (assoc :status (b/exit-code->status (:exit result))))]
     (ec/post-events events [(j/job-executed-evt job-id build-sid result)])))
 
+(defn- fire-job-error [{:keys [events job build]} ex]
+  (log/error "Got error:" ex)
+  (fire-job-executed (j/job-id job)
+                     (b/sid build)
+                     (j/ex->result (or (:exception ex) ex))
+                     events)
+  nil)
+
+(defn- validate-job! [{:keys [job] :as conf}]
+  ;; TODO Add more validations
+  (when (some nil? (-> job mcc/env vals))
+    (fire-job-error
+     conf
+     (ex-info "Invalid job configuration: environment variables must have a value"
+              {:job job})))
+  true)
+
 (defn run-container [{:keys [events job build] :as conf}]
   (log/debug "Running job as OCI instance:" job)
   (log/debug "Build details:" build)
   (let [client (ci/make-context (:oci conf))
-        ic (instance-config conf)]
+        ic     (instance-config conf)]
     (fire-job-initializing job (b/sid build) events)
-    (-> (oci/run-instance client ic
-                          {:delete? true
-                           :exited? (fn [id]
-                                      ;; TODO When a start event has not been received after
-                                      ;; a sufficient period of time, start polling anyway.
-                                      ;; For now, we add a max timeout.
-                                      (wait-for-results conf j/max-job-timeout
-                                                        #(oci/get-full-instance-details client id)))})
-        (md/chain
-         (fn [r]
-           (letfn [(maybe-log-output [{:keys [exit-code display-name logs] :as c}]
-                     (when (and (some? exit-code) (not= 0 exit-code))
-                       (log/warn "Container" display-name "returned a nonzero exit code:" exit-code)
-                       (log/warn "Captured output:" logs))
-                     c)]
-             (let [containers (->> (get-in r [:body :containers])
-                                   (mapv maybe-log-output))
-                   nonzero (->> containers
-                                (filter (comp (complement (fnil zero? 0)) ec/result-exit))
-                                (first))
-                   job-cont (->> containers
-                                 (filter (comp (partial = job-container-name) :display-name))
-                                 (first))]
-               (log/debug "Containers:" containers)
-               ;; Either return the first error result, or the result of the job container
-               (if-let [res (:result (or nonzero job-cont))]
-                 (md/success-deferred res)
-                 ;; Result does not contain container info, so error
-                 (md/error-deferred r)))))
-         (fn [r]
-           (md/chain
-            (fire-job-executed (j/job-id job) (b/sid build) r events)
-            (constantly r))))
-        (md/catch (fn [ex]
-                    (log/error "Got error:" ex)
-                    (fire-job-executed (j/job-id job)
-                                       (b/sid build)
-                                       (j/ex->result (or (:exception ex) ex)) events)
-                    nil)))))
+    (when (validate-job! conf)
+      (try 
+        (-> (oci/run-instance client ic
+                              {:delete? true
+                               :exited? (fn [id]
+                                          ;; TODO When a start event has not been received after
+                                          ;; a sufficient period of time, start polling anyway.
+                                          ;; For now, we add a max timeout.
+                                          (wait-for-results conf j/max-job-timeout
+                                                            #(oci/get-full-instance-details client id)))})
+            (md/chain
+             (fn [r]
+               (letfn [(maybe-log-output [{:keys [exit-code display-name logs] :as c}]
+                         (when (and (some? exit-code) (not= 0 exit-code))
+                           (log/warn "Container" display-name "returned a nonzero exit code:" exit-code)
+                           (log/warn "Captured output:" logs))
+                         c)]
+                 (let [containers (->> (get-in r [:body :containers])
+                                       (mapv maybe-log-output))
+                       nonzero    (->> containers
+                                       (filter (comp (complement (fnil zero? 0)) ec/result-exit))
+                                       (first))
+                       job-cont   (->> containers
+                                       (filter (comp (partial = job-container-name) :display-name))
+                                       (first))]
+                   (log/debug "Containers:" containers)
+                   ;; Either return the first error result, or the result of the job container
+                   (if-let [res (:result (or nonzero job-cont))]
+                     (md/success-deferred res)
+                     ;; Result does not contain container info, so error
+                     (md/error-deferred r)))))
+             (fn [r]
+               (md/chain
+                (fire-job-executed (j/job-id job) (b/sid build) r events)
+                (constantly r))))
+            (md/catch (partial fire-job-error conf)))
+        (catch Exception ex
+          (fire-job-error conf ex))))))
 
 (defmethod mcc/normalize-containers-config :oci [conf]
   ;; Take app version if no image version specified

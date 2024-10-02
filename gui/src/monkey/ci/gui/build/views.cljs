@@ -20,7 +20,8 @@
                      :initializing "Compute capacity is being provisioned."
                      :running      "The build script is running."
                      :success      "The build has completed succesfully."
-                     :error        "The build has failed."}]
+                     :error        "The build has failed."
+                     :canceled     "The buld has been canceled."}]
     [:div.d-flex.gap-4.align-items-center
      [build-status-icon status]
      [:div
@@ -117,6 +118,28 @@
   (let [build (rf/subscribe [:build/current])]
     [overview @build]))
 
+(defn- cancel-btn []
+  (let [build (rf/subscribe [:build/current])
+        c? (rf/subscribe [:build/canceling?])]
+    (when (= :running (:status @build))
+      [:button.btn.btn-icon.btn-danger.btn-sm
+       (cond-> {:on-click (u/link-evt-handler [:build/cancel])
+                :title "Cancel this build"}
+         @c? (assoc :disabled true))
+       [co/icon :x-circle]])))
+
+(def status-ended? #{:success :error :failure :canceled})
+
+(defn- retry-btn []
+  (let [build (rf/subscribe [:build/current])
+        r? (rf/subscribe [:build/retrying?])]
+    (when (status-ended? (:status @build))
+      [:button.btn.btn-icon.btn-primary.btn-sm
+       (cond-> {:on-click (u/link-evt-handler [:build/retry])
+                :title "Restart this build"}
+         @r? (assoc :disabled true))
+       [co/icon :arrow-repeat]])))
+
 (defn page [route]
   (rf/dispatch [:build/init])
   (fn [route]
@@ -127,11 +150,13 @@
        [:<>
         [:div.d-flex.gap-2.align-items-start.mb-2
          [:h3.me-auto (:name @repo) " - " (:build-id params)]
-         (if @loading?
+         (when @loading?
            [:button.btn.btn-primary.btn-sm
             {:disabled true}
-            [:div.spinner-border]]
-           [co/reload-btn-sm [:build/reload]])]
+            [:div.spinner-border]])
+         [retry-btn]
+         [cancel-btn]
+         [co/reload-btn-sm [:build/reload]]]
         [:div.card
          [:div.card-body
           [co/alerts [:build/alerts]]

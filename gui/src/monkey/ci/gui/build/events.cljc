@@ -9,7 +9,7 @@
  :build/init
  (fn [{:keys [db]} _]
    (lo/on-initialize
-    db db/id
+    db (db/get-id db)
     {:init-events         [[:build/load]
                            [:customer/maybe-load (r/customer-id db)]]
      :leave-event         [:build/leave]
@@ -18,7 +18,7 @@
 (rf/reg-event-fx
  :build/leave
  (fn [{:keys [db]} _]
-   (lo/on-leave db db/id)))
+   (lo/on-leave db (db/get-id db))))
 
 (defn load-build-req [db]
   [:secure-request
@@ -57,7 +57,7 @@
  :build/load--success
  (fn [db [_ {build :body :as resp}]]
    (-> db
-       (lo/on-success db/id resp)
+       (lo/on-success (db/get-id db) resp)
        ;; Override build with conversion
        (db/set-build (-> (convert-build build)
                          ;; Also add customer and repo id because they don't come in the reply
@@ -67,13 +67,13 @@
 (rf/reg-event-db
  :build/load--failed
  (fn [db [_ err op]]
-   (lo/on-failure db db/id "Could not load build details: " err)))
+   (lo/on-failure db (db/get-id db) "Could not load build details: " err)))
 
 (rf/reg-event-fx
  :build/reload
  (fn [{:keys [db] :as cofx} _]
    {:dispatch (load-build-req db)
-    :db (lo/set-loading db db/id)}))
+    :db (lo/set-loading db (db/get-id db))}))
 
 (defn- for-build? [db evt]
   (let [get-id (juxt :customer-id :repo-id :build-id)]
@@ -91,3 +91,66 @@
  (fn [db [_ evt]]
    (when (for-build? db evt)
      (handle-event db evt))))
+
+(rf/reg-event-fx
+ :build/cancel
+ (fn [{:keys [db]} _]
+   {:dispatch [:secure-request
+               :cancel-build
+               (r/path-params (:route/current db))
+               [:build/cancel--success]
+               [:build/cancel--failed]]
+    :db (db/mark-canceling db)}))
+
+(rf/reg-event-db
+ :build/cancel--success
+ (fn [db _]
+   (-> db
+       (db/reset-canceling)
+       (db/set-alerts
+        [{:type :warning
+          :message "The build is being canceled.  Some jobs may continue to run until they too are canceled."}]))))
+
+(rf/reg-event-db
+ :build/cancel--failed
+ (fn [db [_ err]]
+   (-> db
+       (db/reset-canceling)
+       (db/set-alerts
+        [{:type :danger
+          :message (str "Unable to cancel this build: " (u/error-msg err))}]))))
+
+(rf/reg-event-fx
+ :build/retry
+ (fn [{:keys [db]} _]
+   {:dispatch [:secure-request
+               :retry-build
+               (r/path-params (:route/current db))
+               [:build/retry--success]
+               [:build/retry--failed]]
+    :db (db/mark-retrying db)}))
+
+(rf/reg-event-db
+ :build/retry--success
+ (fn [db [_ resp]]
+   (let [build-id (get-in resp [:body :build-id])]
+     (-> db
+         (db/reset-retrying)
+         (db/set-alerts
+          [{:type :info
+            :message [:span "The build is being restarted as "
+                      [:a
+                       {:href (r/path-for :page/build (-> (r/current db)
+                                                          (r/path-params)
+                                                          (assoc :build-id build-id)))}
+                       [:b.text-white build-id]]
+                      "."]}])))))
+
+(rf/reg-event-db
+ :build/retry--failed
+ (fn [db [_ err]]
+   (-> db
+       (db/reset-retrying)
+       (db/set-alerts
+        [{:type :danger
+          :message (str "Unable to restart this build: " (u/error-msg err))}]))))

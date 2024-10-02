@@ -13,7 +13,7 @@
             [monkey.ci.runtime.common :as rc]
             [monkey.ci.spec.script :as ss]))
 
-(defrecord ScriptRuntime [events artifacts cache build containers api-client]
+(defrecord ScriptRuntime [events artifacts cache build containers api-client event-bus]
   co/Lifecycle
   (start [{:keys [config] :as this}]
     (assoc this
@@ -48,7 +48,19 @@
   (cache/make-build-api-repository nil))
 
 (defn- new-container-runner []
-  (cba/->BuildApiContainerRunner nil))
+  (cba/map->BuildApiContainerRunner {}))
+
+(defrecord EventBus [client]
+  co/Lifecycle
+  (start [this]
+    (merge this (api/event-bus client)))
+  (stop [this]
+    (when-let [s (:close this)]
+      (s))
+    (dissoc this :bus :close)))
+
+(defn- new-event-bus []
+  (->EventBus nil))
 
 (defn- using-api [obj]
   (co/using
@@ -64,12 +76,16 @@
   (co/system-map
    :runtime    (co/using
                 (new-runtime config)
-                [:events :artifacts :cache :containers :api-client])
+                [:events :artifacts :cache :containers :api-client :event-bus])
    :api-client (new-api-client config)
    :events     (using-api (new-events))
+   :event-bus  (using-api (new-event-bus))
    :artifacts  (using-api (new-artifacts))
    :cache      (using-api (new-cache))
-   :containers (using-api (new-container-runner))))
+   :containers (co/using
+                (new-container-runner)
+                {:client :api-client
+                 :bus :event-bus})))
 
 (defn with-runtime [config f]
   (rc/with-runtime (make-system config) f))

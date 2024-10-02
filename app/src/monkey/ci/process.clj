@@ -46,24 +46,6 @@
 (defn- load-config [{:keys [config-file]}]
   (config/load-config-file config-file))
 
-(defn- log-exec-stats [stats]
-  (log/debug "Execute pool stats:" stats))
-
-(defn- log-wait-stats [stats]
-  (log/debug "Wait pool stats:" stats))
-
-(defn- register-stats
-  "For debugging purposes, logs pool statistics"
-  []
-  (me/register-execute-pool-stats-callback log-exec-stats)
-  (me/register-wait-pool-stats-callback log-wait-stats))
-
-(defn- unregister-stats
-  "For debugging purposes, logs pool statistics"
-  []
-  (me/unregister-execute-pool-stats-callback log-exec-stats)
-  (me/unregister-wait-pool-stats-callback log-wait-stats))
-
 (defn run
   "Run function for when a build task is executed using clojure tools.  This function
    is run in a child process by the `execute!` function below.  This exits the VM
@@ -79,16 +61,13 @@
                    (fn [rt]
                      (log/debug "Executing script with config" (:config rt))
                      (log/debug "Script working directory:" (utils/cwd))
-                     (register-stats)
                      (script/exec-script! rt)))
                  (bc/failed?))
          (exit! err/error-script-failure)))
      (catch Throwable ex
        ;; This could happen if there is an error loading or initializing the child process
        (log/error "Failed to run script process" ex)
-       (exit! err/error-process-failure))
-     (finally
-       (unregister-stats))))
+       (exit! err/error-process-failure))))
 
   ([args]
    (run args cc/env)))
@@ -109,6 +88,8 @@
   ;; TODO Use some sort of templating engine to generate a custom log config to add
   ;; the build id as a label to the logs (e.g. moustache).  That would make it easier
   ;; to fetch logs for a specific build.
+  ;; FIXME When using aero tags, it could be that instead of a path, we have the file
+  ;; contents instead.  In that case we should write it to a tmp file.
   (->> [(io/file (get-in build [:script :script-dir]) "logback.xml")
         (some->> (get-in rt [:config :runner :log-config])
                  (utils/abs-path (rt/work-dir rt)))]

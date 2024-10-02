@@ -552,6 +552,15 @@
                        (deref)
                        :exit)))))
 
+    (testing "fails when `nil` env vars are specified"
+      (h/reset-events events)
+      (is (nil? (p/run-container runner (assoc job :container/env {"INVALID_ENV" nil}))))
+      (let [evt (->> (h/received-events events)
+                     (h/first-event-by-type :job/executed))]
+        (is (some? evt))
+        (is (= :error (:status evt)))
+        (is (re-matches #"Invalid job configuration.*" (get-in evt [:result :message])))))
+
     (testing "events"
       (h/reset-events events)
       (with-redefs [oci/run-instance (constantly (md/success-deferred

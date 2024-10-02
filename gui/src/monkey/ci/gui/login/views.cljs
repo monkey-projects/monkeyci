@@ -42,7 +42,7 @@
 
 (defn page [_]
   [:<>
-   [:div.bg-soft-primary-light
+   [:div.bg-soft-primary-light.flex-fill
     [:div.container.content-space-1.content-space-t-md-3
      [:div.row.justify-content-center.align-items-lg-center
       [:div.col-md-8.col-lg-6.mb-7.mb-lg-0

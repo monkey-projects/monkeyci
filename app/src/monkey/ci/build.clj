@@ -166,32 +166,34 @@
   [build]
   (mc/update-existing build :git dissoc :ssh-keys :ssh-keys-dir))
 
+(defn build-evt [type build & keyvals]
+  (apply ec/make-event type :sid (sid build) keyvals))
+
 (defn build-init-evt [build]
-  (ec/make-event :build/initializing
-                 :sid (sid build)
-                 :build (build->evt build)))
+  (build-evt :build/initializing
+             build
+             :build (build->evt build)))
 
 (defn build-start-evt [build]
-  (ec/make-event :build/start
-                 :sid (sid build)
-                 :credit-multiplier (credit-multiplier build)
-                 ;; TODO Remove this
-                 :build (-> build
-                            (build->evt)
-                            (assoc :start-time (t/now)))))
+  (build-evt :build/start
+             build
+             :credit-multiplier (credit-multiplier build)
+             ;; TODO Remove this
+             :build (-> build
+                        (build->evt)
+                        (assoc :start-time (t/now)))))
 
 (defn build-end-evt
   "Creates a `build/end` event"
   [build & [exit-code]]
-  (ec/make-event :build/end
-                 (-> {:sid (sid build)
-                      :status (exit-code->status exit-code)
-                      ;; TODO Remove this
-                      :build (-> build
-                                 (build->evt)
-                                 (assoc :end-time (u/now))
-                                 (mc/assoc-some :status (exit-code->status exit-code)))}
-                     (mc/assoc-some :message (:message build)))))
+  (-> (build-evt :build/end build)
+      (assoc :status (exit-code->status exit-code)
+             ;; TODO Remove this
+             :build (-> build
+                        (build->evt)
+                        (assoc :end-time (u/now))
+                        (mc/assoc-some :status (exit-code->status exit-code))))
+      (mc/assoc-some :message (:message build))))
 
 (defn job-work-dir
   "Given a runtime, determines the job working directory.  This is either the

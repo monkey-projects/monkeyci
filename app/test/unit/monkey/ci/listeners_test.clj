@@ -72,6 +72,11 @@
             (is (number? (-> (st/find-build st sid)
                              :credits))))))
 
+      (testing "`build/canceled` marks build as canceled"
+        (is (some? (handle {:type :build/canceled})))
+        (is (= :canceled (-> (st/find-build st sid)
+                             :status))))
+
       (testing "`script/initializing` sets script dir in build"
         (is (some? (handle {:type :script/initializing
                             :script-dir "test/dir"})))

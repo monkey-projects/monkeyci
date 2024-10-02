@@ -30,6 +30,10 @@
                     :path
                     :parameters))
 
+(def build-sid (comp (juxt :customer-id :repo-id :build-id)
+                     :path
+                     :parameters))
+
 (defn error-response
   ([error-msg status]
    (-> (rur/response {:error error-msg})
@@ -51,10 +55,12 @@
   [req f]
   (f (req->rt req)))
 
+(def rt->storage :storage)
+
 (defn req->storage
   "Retrieves storage object from the request context"
   [req]
-  (from-rt req :storage))
+  (from-rt req rt->storage))
 
 (defn id-getter [id-key]
   (comp id-key :path :parameters))

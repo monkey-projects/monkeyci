@@ -39,7 +39,7 @@
 
 (defn job-details
   ([job]
-   (when-let [{:keys [start-time end-time labels message] deps :dependencies} job]
+   (when-let [{:keys [start-time end-time labels] deps :dependencies} job]
      [:div.d-flex.gap-4.align-items-center
       [status-icon (:status job)]
       [:div.w-100
@@ -55,10 +55,11 @@
           ["Labels:" [job-labels labels]])
         (when-not (empty? deps)
           ["Dependent on:" (cs/join ", " deps)])]
-       (when-not (empty? message)
-         [:div.row
-          [:div.col-2 "Message: "]
-          [:div.col-10.text-truncate message]])]]))
+       (let [msg (or (:message job) (get-in job [:result :message]))]
+         (when-not (empty? msg)
+           [:div.row
+            [:div.col-2 "Message: "]
+            [:div.col-10.text-truncate msg]]))]]))
   ([]
    (job-details @(rf/subscribe [:job/current]))))
 

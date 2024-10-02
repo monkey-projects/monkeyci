@@ -44,6 +44,9 @@
   (->> (s/keys :req-un [:build/status])
        (s/merge ::build-event)))
 
+(defmethod event-type :build/canceled [_]
+  ::build-event)
+
 (defmethod event-type :script/initializing [_]
   (->> (s/keys :req-un [:script/script-dir])
        (s/merge ::build-event)))

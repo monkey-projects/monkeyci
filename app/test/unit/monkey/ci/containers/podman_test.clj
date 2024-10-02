@@ -26,13 +26,14 @@
 
 (deftest container-runner
   (with-redefs [bp/process (fn [args]
-                             (future args))]
+                             (future {:result args
+                                      :exit 0}))]
     
     (testing "starts podman process"   
       (h/with-tmp-dir dir
         (let [rt (test-rt dir)
               runner (sut/make-container-runner rt)
-              r @(p/run-container runner (:job rt))]
+              r (:result @(p/run-container runner (:job rt)))]
           (is (map? r))
           (is (= "/usr/bin/podman" (-> r :cmd first)))
           (is (contains? (set (:cmd r))
@@ -127,7 +128,8 @@
               evt (->> (h/received-events (:events rt))
                        (h/first-event-by-type :job/executed))]
           (is (some? evt))
-          (is (spec/valid? ::se/event evt)))))))
+          (is (spec/valid? ::se/event evt))
+          (is (= :success (:status evt))))))))
 
 (deftest build-cmd-args
   (let [job {:id "test-job"

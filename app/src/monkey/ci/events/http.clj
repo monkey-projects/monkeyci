@@ -1,7 +1,9 @@
 (ns monkey.ci.events.http
   "Functions for doing events over http"
   (:require [clojure.tools.logging :as log]
-            [manifold.stream :as ms]
+            [manifold
+             [deferred :as md]
+             [stream :as ms]]
             [monkey.ci.edn :as edn]
             [monkey.ci.events.core :as ec]
             [ring.util.response :as rur]))
@@ -29,9 +31,10 @@
     ;; be lower than the read timeout of the client, or any intermediate proxy server.
     ;; TODO Ideally we should not send a ping if another event has been sent more recently.
     ;; TODO Make the ping timeout configurable
-    (ms/connect (ms/periodically 30000 0 (constantly (make-reply {:type :ping})))
-                stream
-                {:upstream? true})
+    (-> (ms/periodically 30000 0 (constantly (make-reply {:type :ping})))
+        (ms/connect stream {:upstream? true})
+        (md/catch (fn [ex]
+                    (log/warn "Unable to send ping:" (ex-message ex)))))
     (-> (rur/response stream)
         (rur/header "content-type" "text/event-stream")
         (rur/header "access-control-allow-origin" "*")
@@ -39,7 +42,6 @@
         ;; See https://www.nginx.com/resources/wiki/start/topics/examples/x-accel/#x-accel-buffering
         (rur/header "x-accel-buffering" "no")
         (rur/header "cache-control" "no-cache"))))
-
 
 (defn parse-event-line [line]
   (when (and line (.startsWith line evt-prefix))

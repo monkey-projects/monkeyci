@@ -1,11 +1,13 @@
 (ns monkey.ci.web.api-test
   (:require [clojure.test :refer [deftest testing is]]
+            [clojure.spec.alpha :as spec]
             [clojure.string :as cs]
             [manifold.stream :as ms]
             [monkey.ci
              [storage :as st]
              [utils :as u]]
             [monkey.ci.events.core :as ec]
+            [monkey.ci.spec.events :as se]
             [monkey.ci.web.api :as sut]
             [monkey.ci.helpers :as h]
             [monkey.ci.test.runtime :as trt]))
@@ -360,6 +362,15 @@
                :git
                :ref))))
 
+  (testing "adds tag to build"
+    (is (= "test-tag"
+           (-> (trt/test-runtime)
+               (h/->req)
+               (assoc-in [:parameters :query :tag] "test-tag")
+               (sut/make-build-ctx {})
+               :git
+               :tag))))
+
   (testing "adds configured ssh keys"
     (let [{st :storage :as rt} (trt/test-runtime)
           [cid rid] (repeatedly st/new-id)
@@ -569,3 +580,67 @@
                                          :repo-id "also-nonexisting"}})
                        (sut/trigger-build)
                        :status)))))))
+
+(deftest retry-build
+  (h/with-memory-store st
+    (let [build (h/gen-build)
+          make-req (fn [runner params]
+                     (-> {:storage st
+                          :runner runner}
+                         (h/->req)
+                         (assoc :parameters params)))]
+      (is (some? (st/save-build st build)))
+
+      (let [r (-> (make-req (constantly "ok")
+                            {:path (select-keys build [:customer-id :repo-id :build-id])})
+                  (sut/retry-build))
+            bid (-> r :body :build-id)]
+        (testing "returns newly created build id"
+          (is (some? bid))
+          (is (not= (:build-id build) bid)))
+        
+        (testing "creates new build with same settings"
+          (let [new (st/find-build st [(:customer-id build) (:repo-id build) bid])]
+            (is (some? new))
+            (is (= :initializing (:status new)))
+            (is (= (:git build) (:git new))))))
+
+      (testing "returns 404 if build not found"
+        (is (= 404 (-> (make-req (constantly "ok")
+                                 {:path (-> build
+                                            (select-keys [:customer-id :repo-id])
+                                            (assoc :build-id "non-existing"))})
+                       (sut/retry-build)
+                       :status)))))))
+
+(deftest cancel-build
+  (h/with-memory-store st
+    (let [build (h/gen-build)
+          events (h/fake-events)
+          make-req (fn [& [params]]
+                     (-> {:storage st
+                          :events events}
+                         (h/->req)
+                         (assoc :parameters
+                                (merge {:path (select-keys build [:customer-id :repo-id :build-id])}
+                                       params))))
+          sid (juxt :customer-id :repo-id :build-id)]
+      (is (some? (st/save-build st build)))
+      
+      (testing "dispatchs `build/canceled` event"
+        (is (= 202 (-> (make-req)
+                       (sut/cancel-build)
+                       :status)))
+        (let [evt (->> events
+                       (h/received-events)
+                       (h/first-event-by-type :build/canceled))]
+          (is (some? evt))
+          (is (spec/valid? ::se/event evt))
+          (is (= (sid build) (:sid evt)))))
+      
+      (testing "404 if build not found"
+        (h/reset-events events)
+        (is (= 404 (-> (make-req {:path {:build-id "non-existing"}})
+                       (sut/cancel-build)
+                       :status)))
+        (is (empty? (h/received-events events)))))))

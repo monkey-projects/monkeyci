@@ -54,6 +54,11 @@
                               :credits (b/calc-credits build)
                               :message message})))
 
+(defn cancel-build [storage {:keys [sid] :as evt}]
+  (patch-build storage
+               sid
+               {:status :canceled}))
+
 (defn init-script [storage {:keys [sid script-dir]}]
   (patch-build storage sid #(assoc-in % [:script :script-dir] script-dir)))
 
@@ -96,6 +101,7 @@
    :build/initializing  init-build
    :build/start         start-build
    :build/end           end-build
+   :build/canceled      cancel-build
    :script/initializing init-script
    :script/start        start-script
    :script/end          end-script
