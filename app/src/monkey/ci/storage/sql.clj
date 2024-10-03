@@ -10,6 +10,7 @@
              [build :as eb]
              [core :as ec]
              [customer :as ecu]
+             [customer-credit :as ecc]
              [join-request :as jr]
              [migrations :as emig]
              [param :as eparam]
@@ -562,6 +563,35 @@
 (defn- delete-email-registration [conn cuid]
   (ec/delete-email-registrations conn (ec/by-cuid cuid)))
 
+(def customer-credit? (partial global-sid? st/customer-credits))
+
+(defn- customer-credit->db [cred]
+  (-> cred
+      (dissoc :id)
+      (assoc :cuid (:id cred))))
+
+(defn- db->customer-credit [cred]
+  (mc/filter-vals some? cred))
+
+(defn- insert-customer-credit [conn cred]
+  (let [cust (ec/select-customer conn (ec/by-cuid (:customer-id cred)))]
+    (ec/insert-customer-credit conn (-> cred
+                                        (customer-credit->db)
+                                        (assoc :customer-id (:id cust))))))
+
+(defn- update-customer-credit [conn cred]
+  (ec/update-customer-credit conn (select-keys cred [:amount :from-time])))
+
+(defn- upsert-customer-credit [conn cred]
+  (if-let [existing (ec/select-customer-credit conn (ec/by-cuid (:id cred)))]
+    (update-customer-credit conn cred existing)
+    (insert-customer-credit conn cred)))
+
+(defn- select-customer-credit [conn id]
+  (some->> (ecc/select-customer-credits conn (ecc/by-cuid id))
+           (first)
+           (db->customer-credit)))
+
 (defn- sid-pred [t sid]
   (t sid))
 
@@ -584,7 +614,9 @@
       join-request?
       (select-join-request conn (global-sid->cuid sid))
       email-registration?
-      (select-email-registration conn (global-sid->cuid sid))))
+      (select-email-registration conn (global-sid->cuid sid))
+      customer-credit?
+      (select-customer-credit conn (global-sid->cuid sid))))
   
   (write-obj [_ sid obj]
     (when (condp sid-pred sid
@@ -604,6 +636,8 @@
             (upsert-params conn (last sid) obj)
             email-registration?
             (insert-email-registration conn obj)
+            customer-credit?
+            (upsert-customer-credit conn obj)
             (log/warn "Unrecognized sid when writing:" sid))
       sid))
 

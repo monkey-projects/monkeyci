@@ -219,7 +219,15 @@
    (migration
     (mig-id 20 :email-reg-uniqueness)
     [(h/create-index [:unique :email-reg-idx] [:email-registrations :email])]
-    [(h/drop-index :email-reg-idx)])])
+    [(h/drop-index :email-reg-idx)])
+
+   (entity-table-migration
+    21 :customer-credits
+    [customer-col
+     [:amount [:decimal 10 2] [:not nil]]
+     [:from-time :timestamp]
+     fk-customer]
+    [(col-idx :customer-credits :customer-id)])])
 
 (defn- format-migration [sql-opts m]
   (letfn [(format-sql [stmt]

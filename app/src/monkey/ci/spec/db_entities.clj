@@ -111,3 +111,11 @@
 (s/def :db/email-registration
   (-> (s/keys :req-un [:db/email])
       (s/merge :db/common)))
+
+(s/def :db/from-time int?)
+(s/def :db/amount (s/int-in 0 1000000))
+
+(s/def :db/customer-credit
+  (-> (s/keys :req-un [:db/customer-id :db/amount]
+              :opt-un [:db/from-time])
+      (s/merge :db/common)))

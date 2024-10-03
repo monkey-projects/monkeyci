@@ -88,3 +88,6 @@
 
 (defn gen-email-registration []
   (gen-spec :db/email-registration))
+
+(defn gen-cust-credit []
+  (gen-spec :db/customer-credit))

@@ -284,6 +284,10 @@
 (defn gen-email-registration []
   (gen-entity :entity/email-registration))
 
+(defn gen-cust-credit []
+  (-> (gen-entity :entity/customer-credit)
+      (update :amount bigdec)))
+
 (defrecord FakeContainerRunner [credit-consumer runs result]
   p/ContainerRunner
   (run-container [this job]
@@ -292,15 +296,6 @@
 
 (defn fake-container-runner [& [result]]
   (->FakeContainerRunner (constantly 0) (atom []) (or result {:exit 0})))
-
-;; (defrecord FakeBuildContainerRunner [runs]
-;;   p/BuildContainerRunner
-;;   (run-build-container [this build job]
-;;     (swap! runs (fnil conj []) {:build build :job job})
-;;     (md/success-deferred {:exit 0})))
-
-;; (defn fake-build-container-runner []
-;;   (->FakeBuildContainerRunner (atom [])))
 
 (defn gen-build-sid []
   (repeatedly 3 cuid/random-cuid))

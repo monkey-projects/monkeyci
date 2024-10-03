@@ -437,6 +437,20 @@
         (is (true? (st/delete-email-registration s (:id er))))
         (is (empty? (st/list-email-registrations s)))))))
 
+(deftest ^:sql customer-credits
+  (with-storage conn s
+      (let [cust (h/gen-cust)
+            cred (-> (h/gen-cust-credit)
+                     (assoc :customer-id (:id cust)))]
+        (is (sid/sid? (st/save-customer s cust)))
+        
+        (testing "can create and retrieve"
+          (is (sid/sid? (st/save-customer-credit s cred)))
+          (is (= cred (st/find-customer-credit s (:id cred)))))
+        
+        (testing "can list for customer"
+          ))))
+
 (deftest make-storage
   (testing "creates sql storage object using connection settings"
     (let [s (st/make-storage {:storage {:type :sql

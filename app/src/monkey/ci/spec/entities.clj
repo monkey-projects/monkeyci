@@ -123,3 +123,11 @@
 (s/def :entity/email-registration
   (-> (s/keys :req-un [:entity/email])
       (s/merge :entity/common)))
+
+(s/def :entity/amount (s/int-in 0 1000000))
+(s/def :entity/from-time int?)
+
+(s/def :entity/customer-credit
+  (-> (s/keys :req-un [:entity/customer-id :entity/amount]
+              :opt-un [:entity/from-time])
+      (s/merge :entity/common)))

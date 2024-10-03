@@ -5,7 +5,8 @@
              [config :as c]
              [cuid :as cuid]
              [sid :as sid]
-             [storage :as sut]]
+             [storage :as sut]
+             [time :as t]]
             [monkey.ci.helpers :as h]))
 
 (deftest webhook-details
@@ -304,6 +305,18 @@
 
       (testing "can list for user"
         (is (= [req] (sut/list-user-join-requests st (:user-id req))))))))
+
+(deftest customer-credits
+  (h/with-memory-store st
+    (let [now (t/now)
+          cred (-> (h/gen-cust-credit)
+                   (assoc :from-time now))]
+      (testing "can save and find"
+        (is (sid/sid? (sut/save-customer-credit st cred)))
+        (is (= cred (sut/find-customer-credit st (:id cred)))))
+
+      (testing "can list for customer since date"
+        (is (= [cred] (sut/list-customer-credits-since st (:customer-id cred) (- now 100))))))))
 
 (deftest normalize-key
   (testing "normalizes string type"

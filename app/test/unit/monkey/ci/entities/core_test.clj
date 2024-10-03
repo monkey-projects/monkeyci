@@ -304,3 +304,16 @@
       (testing "can delete"
         (is (= 1 (sut/delete-email-registrations conn (sut/by-cuid (:cuid reg)))))
         (is (nil? (sut/select-email-registration conn (sut/by-cuid (:cuid reg)))))))))
+
+(deftest ^:sql customer-credits
+  (eh/with-prepared-db conn
+    (let [cust (sut/insert-customer conn (eh/gen-customer))
+          cred (-> (eh/gen-cust-credit)
+                   (assoc :customer-id (:id cust)))]
+      (testing "can insert"
+        (is (number? (:id (sut/insert-customer-credit conn cred)))))
+
+      (testing "can select by customer"
+        (is (= [(:cuid cred)]
+               (->> (sut/select-customer-credits conn (sut/by-customer (:id cust)))
+                    (map :cuid))))))))

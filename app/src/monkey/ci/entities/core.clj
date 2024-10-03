@@ -313,3 +313,16 @@
 
 (defentity join-request)
 (defentity email-registration)
+
+(def prepare-credit-conversions (partial int->time :from-time))
+(def convert-credit-conversions (partial copy-prop :from-time))
+(def convert-credit-conversions-select (partial time->int :from-time))
+
+(def cust-credit-conversions
+  {:before-insert prepare-credit-conversions
+   :after-insert  convert-credit-conversions
+   :before-update prepare-credit-conversions
+   :after-update  convert-credit-conversions
+   :after-select  convert-credit-conversions-select})
+
+(defentity customer-credit cust-credit-conversions)

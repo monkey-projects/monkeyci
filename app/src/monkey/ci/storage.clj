@@ -505,3 +505,23 @@
 
 (defn delete-email-registration [s id]
   (p/delete-obj s (email-registration-sid id)))
+
+(def customer-credits :customer-credits)
+(def customer-credit-sid (partial global-sid customer-credits))
+
+(defn save-customer-credit [s cred]
+  (p/write-obj s (customer-credit-sid (:id cred)) cred))
+
+(defn find-customer-credit [s id]
+  (p/read-obj s (customer-credit-sid id)))
+
+(def list-customer-credits-since
+  "Lists all customer credits for the customer since given timestamp.  
+   This includes those without a `from-time`."
+  (override-or
+   [:customer :list-credits-since]
+   (fn [s cust-id ts]
+     (->> (p/list-obj s (customer-credit-sid))
+          (map (partial find-customer-credit s))
+          (filter (every-pred (cp/prop-pred :customer-id cust-id)
+                              (comp (partial <= ts) :from-time)))))))
