@@ -13,6 +13,7 @@
             [monkey.ci.gui.tabs :as tabs]
             [monkey.ci.gui.test-results :as tr]
             [monkey.ci.gui.time :as t]
+            [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
 (defn status-icon [status]
@@ -67,14 +68,43 @@
           (cs/split #"/")
           last))
 
-(defn- log-contents [job path]
+(defn- log-contents [lbl path]
   (let [log (rf/subscribe [:job/logs path])]
-    ;; Reload log file
-    (rf/dispatch [:job/load-logs job path])
-    [:<>
-     [co/alerts [:job/path-alerts path]]
-     (when (and @log (not-empty @log))
-       [co/log-contents @log])]))
+    (->>
+     (concat
+      [(co/->html (co/colored (str lbl ":") 95))
+       [:br]]
+      (when (and @log (not-empty @log))
+        (mapv co/->html @log)))
+     (into [:<>]))))
+
+(def log-types
+  {:out "stdout"
+   :err "stderr"})
+
+(defn- script-line [idx {:keys [expanded?] :as l}]
+  [:<>
+   [:a {:on-click (u/link-evt-handler [:job/toggle-logs idx l])}
+    [:span.me-1
+     [co/icon (if expanded? :chevron-down :chevron-right)]]
+    (co/->html (co/colored (:cmd l) 92))]
+   [:br]
+   (when expanded?
+     (->> log-types
+          (map (fn [[t lbl]]
+                 (when-let [path (get l t)]
+                   [log-contents lbl path])))
+          (into [:<>])))])
+
+(defn- job-logs [job]
+  (rf/dispatch [:job/load-log-files job])
+  (let [script-logs (rf/subscribe [:job/script-with-logs])]
+    ;; Display combined logs for all script lines in the job
+    [co/log-viewer (map-indexed script-line @script-logs)]))
+
+(defn- log-tab [job]
+  {:header "Logs"
+   :contents [job-logs job]})
 
 (defn- job-output [output]
   ;; TODO Handle ansi coloring
@@ -84,7 +114,7 @@
                         (into [:pre])
                         vector)])
 
-(defn output-tab [job]
+(defn- output-tab [job]
   (when-let [output (get-in job [:result :output])]
     {:header "Output"
      :contents [job-output output]}))
@@ -140,17 +170,11 @@
 (defn- details-tabs
   "Renders tabs to display the job details.  These tabs include logs and test results."
   [job]
-  (let [files (rf/subscribe [:job/log-files])
-        log-tabs (when @files
-                   (->> @files
-                        (map (fn [p]
-                               {:header (path->file p)
-                                :contents [log-contents job p]}))))
-        [f :as tabs] (->> log-tabs ; TODO Merge into one tab
-                          (concat [(output-tab job)
-                                   (error-trace job)
-                                   (test-results job)
-                                   (artifacts-tab job)])
+  (let [[f :as tabs] (->> [(output-tab job)
+                           (error-trace job)
+                           (test-results job)
+                           (log-tab job)
+                           (artifacts-tab job)]
                           (remove nil?))]
     (if (empty? tabs)
       [:p "No job details available.  You may want to try again later."]
@@ -162,24 +186,27 @@
   "Loads any additional job details and renders the tabs to display them."
   []
   (when-let [job @(rf/subscribe [:job/current])]
-    (rf/dispatch [:job/load-log-files job])
     [details-tabs job]))
 
 (defn- return-link []
   (let [route (rf/subscribe [:route/current])]
     [:div.mt-2
      [:a {:href (r/path-for :page/build (r/path-params @route))}
-      "Back to build"]]))
+      [:span.me-1 [co/icon :chevron-left]] "Back to build"]]))
 
-(defn page [_]
-  (rf/dispatch [:job/init])
-  (let [job-id (rf/subscribe [:job/id])]
-    [l/default
-     [:<>
-      [:h3 "Job: " @job-id]
-      [:div.card
-       [:div.card-body
-        [job-details]
-        [co/alerts [:job/alerts]]
-        [load-details-tabs]]]
-      [return-link]]]))
+(def route->id (comp (juxt :customer-id :repo-id :build-id :job-id)
+                     r/path-params))
+
+(defn page [route]
+  (let [uid (e/route->id route)]
+    (rf/dispatch [:job/init uid])
+    (let [job-id (rf/subscribe [:job/id])]
+      [l/default
+       [:<>
+        [:h3 "Job: " @job-id]
+        [:div.card
+         [:div.card-body
+          [job-details]
+          [co/alerts [:job/alerts]]
+          [load-details-tabs]]]
+        [return-link]]])))

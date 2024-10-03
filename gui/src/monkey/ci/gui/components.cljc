@@ -148,10 +148,18 @@
      {:dangerouslySetInnerHTML {:__html (ansi->html l)}}]
     l))
 
+(defn colored [s color]
+  (str "\033[" color "m" s "\033[0m"))
+
+(defn log-viewer [contents]
+  (into [:p.bg-dark.text-white.font-monospace.overflow-auto.text-nowrap.p-1
+         {:style {:min-height "20em"}}]
+        contents))
+
 (defn log-contents [raw]
   (->> raw
        (map ->html)
-       (into [:p.bg-dark.text-white.font-monospace.overflow-auto.text-nowrap.h-100.p-1])))
+       (log-viewer)))
 
 (defn build-elapsed [b]
   (let [e (u/build-elapsed b)]

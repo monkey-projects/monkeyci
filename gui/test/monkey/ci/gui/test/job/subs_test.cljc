@@ -134,3 +134,40 @@
                 "failed"
                 "success"]
                (map :name @tc)))))))
+
+(deftest job-script-with-logs
+  (let [l (rf/subscribe [:job/script-with-logs])]
+    (testing "exists"
+      (is (some? l)))
+
+    (testing "returns script list with log paths"
+      (is (empty? @l))
+      (is (some? (reset! app-db
+                         (-> {}
+                             (db/set-log-files
+                              ["/var/log/0_out.log"
+                               "/var/log/0_err.log"
+                               "/var/log/1_out.log"])
+                             (r/set-current
+                              {:parameters
+                               {:path
+                                {:job-id "test-job"}}})
+                             (bdb/set-build
+                              {:id "test-build"
+                               :script
+                               {:jobs {"test-job"
+                                       {:id "test-job"
+                                        :script
+                                        ["script line 1"
+                                         "script line 2"]}}}})))))
+      (is (= [{:cmd "script line 1"
+               :out "/var/log/0_out.log"
+               :err "/var/log/0_err.log"}
+              {:cmd "script line 2"
+               :out "/var/log/1_out.log"}]
+             @l)))
+
+    (testing "includes expanded state"
+      (is (some? (swap! app-db (fn [db]
+                                 (db/set-log-expanded db 1 true)))))
+      (is (true? (-> @l second :expanded?))))))
