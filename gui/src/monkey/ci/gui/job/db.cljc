@@ -60,3 +60,6 @@
    (true? (get-in db [::expanded idx])))
   ([db]
    (::expanded db)))
+
+(defn clear-expanded [db]
+  (dissoc db ::expanded))

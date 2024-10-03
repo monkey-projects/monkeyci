@@ -37,8 +37,8 @@
        (is (= ::loaded (::build @app-db)))))))
 
 (deftest job-leave
-  (testing "clears all job info from db"
-    (let [uid (repeatedly 4 (comp str random-uuid))]
+  (let [uid (repeatedly 4 (comp str random-uuid))]
+    (testing "clears all job info from db"
       (is (some? (reset! app-db (-> {}
                                     (r/set-current
                                      {:parameters
@@ -46,7 +46,12 @@
                                                      uid)}})
                                     (db/set-alerts [{:type :info :message "test alert"}])))))
       (rf/dispatch-sync [:job/leave uid])
-      (is (nil? (db/get-alerts @app-db))))))
+      (is (nil? (db/get-alerts @app-db))))
+
+    (testing "clears log expansion states"
+      (is (some? (reset! app-db (db/set-log-expanded {} 0 true))))
+      (rf/dispatch-sync [:job/leave uid])
+      (is (not (db/log-expanded? @app-db 0))))))
 
 (deftest job-load-log-files
   (is (some? (reset! app-db (r/set-current {}
@@ -160,7 +165,8 @@
                                                      {:job-id job-id}}}))))))
      
      (testing "when collapsed"
-       (is (nil? (rf/dispatch [:job/toggle-logs 0])))
+       (is (nil? (rf/dispatch [:job/toggle-logs 0 {:out "/path/to/out"
+                                                   :err "/path/to/err"}])))
 
        (testing "fetches out and err logs for given line from backend"
          (is (= 2 (count @e)))
@@ -168,12 +174,12 @@
                  first
                  (nth 3)
                  :query
-                 (cs/includes? "filename=\"0_out.log\"")))
+                 (cs/includes? "filename=\"/path/to/out\"")))
          (is (-> @e
                  second
                  (nth 3)
                  :query
-                 (cs/includes? "filename=\"0_err.log\""))))
+                 (cs/includes? "filename=\"/path/to/err\""))))
 
        (testing "marks as expanded"
          (is (db/log-expanded? @app-db 0))))
@@ -195,5 +201,5 @@
                                    db
                                    (assoc-in (bdb/get-build db)
                                              [:script :jobs job-id :status] :success))))))
-       (is (nil? (rf/dispatch [:job/toggle-logs 0])))
+       (is (nil? (rf/dispatch [:job/toggle-logs 0 {:out "/path/to/out"}])))
        (is (empty? @e))))))

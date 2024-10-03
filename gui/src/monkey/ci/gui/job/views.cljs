@@ -68,30 +68,38 @@
           (cs/split #"/")
           last))
 
-(defn- log-contents [job path]
+(defn- log-contents [lbl path]
   (let [log (rf/subscribe [:job/logs path])]
-    ;; Reload log file
-    (rf/dispatch [:job/load-logs job path])
-    [:<>
-     [co/alerts [:job/path-alerts path]]
-     (when (and @log (not-empty @log))
-       [co/log-contents @log])]))
+    (->>
+     (concat
+      [(co/->html (co/colored (str lbl ":") 95))
+       [:br]]
+      (when (and @log (not-empty @log))
+        (mapv co/->html @log)))
+     (into [:<>]))))
+
+(def log-types
+  {:out "stdout"
+   :err "stderr"})
 
 (defn- script-line [idx {:keys [expanded?] :as l}]
   [:<>
-   [:a {:on-click (u/link-evt-handler [:job/toggle-logs idx])}
+   [:a {:on-click (u/link-evt-handler [:job/toggle-logs idx l])}
     [:span.me-1
      [co/icon (if expanded? :chevron-down :chevron-right)]]
-    (co/->html (str "\033[92m$ " (:cmd l) "\033[0m"))]
+    (co/->html (co/colored (:cmd l) 92))]
+   [:br]
    (when expanded?
-     ;; TODO Subscribe to logs per type
-     ;; TODO Show each log
-     )])
+     (->> log-types
+          (map (fn [[t lbl]]
+                 (when-let [path (get l t)]
+                   [log-contents lbl path])))
+          (into [:<>])))])
 
 (defn- job-logs [job]
   (rf/dispatch [:job/load-log-files job])
   (let [script-logs (rf/subscribe [:job/script-with-logs])]
-    ;; TODO Display combined logs for all script lines in the job
+    ;; Display combined logs for all script lines in the job
     [co/log-viewer (map-indexed script-line @script-logs)]))
 
 (defn- log-tab [job]
@@ -162,18 +170,11 @@
 (defn- details-tabs
   "Renders tabs to display the job details.  These tabs include logs and test results."
   [job]
-  (let [;;files (rf/subscribe [:job/log-files])
-        log-tabs [] #_(when @files
-                     (->> @files
-                          (map (fn [p]
-                                 {:header (path->file p)
-                                  :contents [log-contents job p]}))))
-        [f :as tabs] (->> log-tabs ; TODO Merge into one tab
-                          (concat [(output-tab job)
-                                   (error-trace job)
-                                   (test-results job)
-                                   (log-tab job)
-                                   (artifacts-tab job)])
+  (let [[f :as tabs] (->> [(output-tab job)
+                           (error-trace job)
+                           (test-results job)
+                           (log-tab job)
+                           (artifacts-tab job)]
                           (remove nil?))]
     (if (empty? tabs)
       [:p "No job details available.  You may want to try again later."]
@@ -185,7 +186,6 @@
   "Loads any additional job details and renders the tabs to display them."
   []
   (when-let [job @(rf/subscribe [:job/current])]
-    ;;(rf/dispatch [:job/load-log-files job])
     [details-tabs job]))
 
 (defn- return-link []

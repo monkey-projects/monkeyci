@@ -25,7 +25,9 @@
 (rf/reg-event-db
  :job/leave
  (fn [db [_ uid]]
-   (lo/clear-all db uid)))
+   (-> db
+       (lo/clear-all uid)
+       (db/clear-expanded))))
 
 (def route->id db/route->id)
 
@@ -96,13 +98,23 @@
    (lo/on-failure db (db/get-path-id db path) "Failed to fetch logs: " err)))
 
 (rf/reg-event-fx
+ :job/maybe-load-logs
+ (fn [{:keys [db]} [_ job path]]
+   ;; Only fetch if job is running or if this is the first time
+   (let [running? (= :running (:status job))]
+     (when (or running? (not (db/get-logs db path)))
+       {:dispatch [:job/load-logs job path]}))))
+
+(rf/reg-event-fx
  :job/toggle-logs
- (fn [{:keys [db]} [_ idx]]
-   (let [job-id (db/db->job-id db)
+ (fn [{:keys [db]} [_ idx {:keys [out err]}]]
+   (let [job-id (last (db/db->job-id db))
          job (get-in (bdb/get-build db) [:script :jobs job-id])
          exp? (db/log-expanded? db idx)]
      (cond-> {:db (db/set-log-expanded db idx (not exp?))}
        (not exp?)
-       ;; TODO Only fetch logs if we know they exist
-       (assoc :dispatch-n [[:job/load-logs job (str idx "_out.log")]
-                           [:job/load-logs job (str idx "_err.log")]])))))
+       ;; Only fetch logs if we know they exist
+       (assoc :dispatch-n
+              (->> [out err]
+                   (filter some?)
+                   (mapv (fn [p] [:job/maybe-load-logs job p]))))))))
