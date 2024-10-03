@@ -119,6 +119,7 @@
    will also start an event stream using the id."
   [db id {:keys [init-events leave-event event-handler-event]}]
   (when-not (initialized? db id)
+    (log/debug "Initializing:" (str id))
     (cond-> {:db (set-initialized db id)}
       init-events
       (assoc :dispatch-n init-events)

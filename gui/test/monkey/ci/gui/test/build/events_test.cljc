@@ -39,8 +39,10 @@
             (rf/reg-event-db :event-stream/start (constantly nil))
             (rf/reg-event-db :route/on-page-leave (constantly nil)))]
 
-    (let [db (set-build-path {} (gen-build))]
+    (let [build (gen-build)
+          db (set-build-path {} build)]
       (is (some? (reset! app-db db)))
+      (is (= (sid build) (last (db/get-id @app-db))) "loader id must contain build sid")
       
       (testing "when not initialized"
         (testing "dispatches load event"
@@ -78,12 +80,12 @@
         (testing "marks initialized"
           (rft/run-test-sync
            (mock-handlers)
-           (reset! app-db {})
+           (swap! app-db #(lo/reset-initialized % (db/get-id db)))
            (rf/dispatch [:build/init])
            (is (true? (lo/initialized? @app-db (db/get-id db)))))))
 
       (testing "does nothing when initialized"
-        (reset! app-db (lo/set-initialized {} (db/get-id db)))
+        (swap! app-db #(lo/set-initialized % (db/get-id db)))
         (rft/run-test-sync
          (mock-handlers)
          (let [c (atom [])
@@ -92,7 +94,12 @@
            (rf/reg-event-db :event-stream/start h)
            (rf/reg-event-db :route/on-page-leave h)
            (rf/dispatch [:build/init])
-           (is (empty? @c))))))))
+           (is (empty? @c)))))
+
+      (testing "not initialized when route changes to another build"
+        (is (some? (swap! app-db (fn [db]
+                                   (r/set-current db (r/path-for :page/build (gen-build)))))))
+        (is (not (lo/initialized? @app-db (db/get-id @app-db))))))))
 
 (deftest build-load
   (testing "resets alerts"
@@ -203,8 +210,8 @@
                :sid (sid other-build)
                :build other-build}]
       (reset! app-db (-> {}
-                         (db/set-build build)
-                         (set-build-path build)))
+                         (set-build-path build)
+                         (db/set-build build)))
       (rf/dispatch-sync [:build/handle-event evt])
       (is (= build (db/get-build @app-db)))))
 
@@ -214,8 +221,8 @@
                :sid (sid build)
                :build (assoc build :start-time 100)}]
       (is (some? (reset! app-db (-> {}
-                                    (db/set-build build)
-                                    (set-build-path build)))))
+                                    (set-build-path build)
+                                    (db/set-build build)))))
       (rf/dispatch-sync [:build/handle-event evt])
       (is (= (:build evt) (db/get-build @app-db))))))
 

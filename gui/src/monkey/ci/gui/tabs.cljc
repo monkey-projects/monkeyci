@@ -28,6 +28,10 @@
    (log/debug "Tab changed:" (str id) "to" (str changed))
    (assoc-in db [::tabs id :current] changed)))
 
+(defn- current-or-first [headers]
+  (or (->> headers (filter :current?) first)
+      (first headers)))
+
 (defn tabs
   "Controlled tabs component.  The headers are a list of tab configs that
    have a `:header` and `:contents`.  Current tab is indicated by `:current?`."
@@ -35,7 +39,7 @@
   (let [curr (rf/subscribe [:tab/current id])
         by-id (group-by header-id headers)]
     (when-not @curr
-      (rf/dispatch [:tab/tab-changed id (->> headers (filter :current?) first header-id)]))
+      (rf/dispatch [:tab/tab-changed id (header-id (current-or-first headers))]))
     [:<>
      (->> headers
           (map (partial tab-header id @curr))

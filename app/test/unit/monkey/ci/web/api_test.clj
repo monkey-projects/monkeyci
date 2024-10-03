@@ -603,7 +603,8 @@
           (let [new (st/find-build st [(:customer-id build) (:repo-id build) bid])]
             (is (some? new))
             (is (= :initializing (:status new)))
-            (is (= (:git build) (:git new))))))
+            (is (= (:git build) (:git new)))
+            (is (number? (:start-time build))))))
 
       (testing "returns 404 if build not found"
         (is (= 404 (-> (make-req (constantly "ok")

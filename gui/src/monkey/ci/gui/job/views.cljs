@@ -75,7 +75,8 @@
       [(co/->html (co/colored (str lbl ":") 95))
        [:br]]
       (when (and @log (not-empty @log))
-        (mapv co/->html @log)))
+        (mapv co/->html @log))
+      [[:br]])
      (into [:<>]))))
 
 (def log-types

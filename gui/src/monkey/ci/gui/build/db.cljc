@@ -6,7 +6,7 @@
 
 (def params->sid (juxt :customer-id :repo-id :build-id))
 
-(def r->sid (comp params->sid r/current))
+(def r->sid (comp params->sid r/path-params r/current))
 
 (def get-id
   "Construct a unique loader id for the build using route params"
