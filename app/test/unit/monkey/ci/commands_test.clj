@@ -83,11 +83,8 @@
 
 (deftest http-server
   (with-redefs [wh/on-server-close (constantly (md/success-deferred nil))]
-    (testing "returns a deferred"
-      (is (md/deferred? (sut/http-server {:http (constantly ::ok)}))))
-
-    (testing "starts the server using the runtime fn"
-      (let [r (sut/http-server {:http (constantly ::ok)})]
+    (testing "starts the server and waits for close"
+      (let [r (sut/http-server tc/base-config)]
         (is (nil? (deref r 100 :timeout)))))))
 
 (deftest watch
