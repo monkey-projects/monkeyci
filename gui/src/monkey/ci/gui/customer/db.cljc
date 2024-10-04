@@ -55,3 +55,11 @@
 (def recent-builds ::recent-builds)
 
 (def stats ::stats)
+
+(def group-by-lbl ::group-by-lbl)
+
+(defn get-group-by-lbl [db]
+  (get db group-by-lbl "project"))
+
+(defn set-group-by-lbl [db l]
+  (assoc db group-by-lbl l))

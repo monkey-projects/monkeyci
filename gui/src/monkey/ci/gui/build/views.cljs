@@ -33,8 +33,8 @@
   [{:keys [credits] :as build}]
   (letfn [(item [k v]
             [:div.row
-             [:div.col-5.offset-1 [:b k]]
-             [:div.col-6 v]])]
+             [:div.col-4.offset-1 [:b k]]
+             [:div.col-7 v]])]
     [:<>
      (item "Start time" (t/reformat (:start-time build)))
      (item [:span {:title "Total time that has passed between build start and end"} "Elapsed"]
@@ -44,8 +44,8 @@
        (item [:span {:title "Consumed amount of credits"} "Credits"] credits))
      (when-let [msg (:message build)]
        [:div.row
-        [:div.col-md-3 [:b "Message"]]
-        [:div.col-md-9 msg]])]))
+        [:div.col-md-4.offset-1 [:b "Message"]]
+        [:div.col-md-7 msg]])]))
 
 (defn overview [build]
   (when build

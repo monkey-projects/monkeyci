@@ -258,3 +258,8 @@
                       (sort-by :start-time)
                       (reverse))))]
        (lo/update-value db db/recent-builds update-build)))))
+
+(rf/reg-event-db
+ :customer/group-by-lbl-changed
+ (fn [db [_ val]]
+   (db/set-group-by-lbl db val)))

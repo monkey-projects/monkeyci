@@ -388,3 +388,9 @@
       (is (= [upd
               other-build]
              (lo/get-value @app-db db/recent-builds))))))
+
+(deftest group-by-lbl-changed
+  (testing "updates group-by-lbl in db"
+    (is (nil? (db/group-by-lbl @app-db)))
+    (rf/dispatch-sync [:customer/group-by-lbl-changed "new-label"])
+    (is (= "new-label" (db/group-by-lbl @app-db)))))

@@ -12,6 +12,7 @@
             [monkey.ci.gui.table :as t]
             [monkey.ci.gui.tabs :as tabs]
             [monkey.ci.gui.time :as time]
+            [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
 (defn customer-icon []
@@ -81,15 +82,18 @@
           [charts/chart-component :customer/credits]]]]])))
 
 (defn- show-repo [c p r]
-  [:div.repo.card-body
-   [:div.d-flex.flex-row.align-items-start
-    [:div.me-auto
-     [:h6 {:title (:id r)} [:span.me-2 co/repo-icon] (:name r)]
-     [:p "Url: " [:a {:href (:url r)} (:url r)]]]
-    [:a.btn.btn-primary
-     {:href (r/path-for :page/repo {:customer-id (:id c)
-                                    :repo-id (:id r)})}
-     [co/icon :three-dots-vertical] " Details"]]])
+  (let [repo-path (r/path-for :page/repo {:customer-id (:id c)
+                                          :repo-id (:id r)})]
+    [:div.repo.card-body
+     [:div.d-flex.flex-row.align-items-start
+      [:div.me-auto
+       [:h6 {:title (:id r)}
+        [:span.me-2 co/repo-icon]
+        [:a.link-dark {:href repo-path} (:name r)]]
+       [:p "Url: " [:a {:href (:url r)} (:url r)]]]
+      [:a.btn.btn-primary
+       {:href repo-path}
+       [co/icon :three-dots-vertical] " Details"]]]))
 
 (defn- show-project [cust [p repos]]
   (->> repos
@@ -98,13 +102,7 @@
        (into
         [:div.project.card.mb-3
          [:div.card-header
-          [:h5.card-title [:span.me-2 co/repo-group-icon] p]]])))
-
-(defn- project-lbl [r]
-  (->> (:labels r)
-       (filter (comp (partial = "project") :name))
-       (map :value)
-       (first)))
+          [:h5.card-title [:span.me-2 co/repo-group-icon] (or p "(No value)")]]])))
 
 (defn- add-repo-btn [id]
   [:a.btn.btn-outline-dark
@@ -129,6 +127,32 @@
      [:h3.me-auto [customer-icon] (:name @c)]
      [customer-actions (:id @c)]]))
 
+(defn- label-selector []
+  (let [l (rf/subscribe [:customer/labels])
+        sel (rf/subscribe [:customer/group-by-lbl])]
+    (->> @l
+         (map (fn [v]
+                [:option {:value v} v]))
+         (into [:select.form-select
+                {:id :group-by-label
+                 :aria-label "Label selector"
+                 :value @sel
+                 :on-change (u/form-evt-handler [:customer/group-by-lbl-changed])}]))))
+
+(defn- repos-list [cust]
+  (let [r (rf/subscribe [:customer/grouped-repos])]
+    (->> @r
+         (sort-by first)
+         (map (partial show-project cust))
+         (into [:<>
+                [:div.d-flex.flex-row.mb-2
+                 [:form.row.row-cols-lg-auto.g-2.align-items-center
+                  [:label.col-12 {:for :group-by-label} "Repository overview, grouped by"]
+                  [:div.col-12
+                   [label-selector]]]
+                 [:div.ms-auto
+                  [co/reload-btn-sm [:customer/load (:id cust)]]]]]))))
+
 (defn- customer-repos
   "Displays a list of customer repositories, grouped by project"
   []
@@ -136,15 +160,7 @@
     (if (empty? (:repos @c))
       [:p "No repositories configured for this customer.  You can start by"
        [:a.mx-1 {:href (r/path-for :page/add-repo {:customer-id (:id @c)})} "following one."]]
-      (->> (:repos @c)
-           ;; TODO Allow grouping by any custom label
-           (group-by project-lbl)
-           (sort-by first)
-           (map (partial show-project @c))
-           (into [:<>
-                  [:div.d-flex.mb-1
-                   [:p.me-auto "Repository overview, grouped by project."]
-                   [co/reload-btn-sm [:customer/load (:id @c)]]]])))))
+      [repos-list @c])))
 
 (defn- recent-builds [id]
   (rf/dispatch [:customer/load-recent-builds id])
