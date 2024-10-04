@@ -14,6 +14,9 @@
             [monkey.ci.gui.time :as time]
             [re-frame.core :as rf]))
 
+(defn customer-icon []
+  [:span.me-2 co/customer-icon])
+
 (defn- build-chart-config [{:keys [elapsed-seconds consumed-credits]}]
   (let [dates (->> (concat (map :date elapsed-seconds)
                            (map :date consumed-credits))
@@ -79,13 +82,14 @@
 
 (defn- show-repo [c p r]
   [:div.repo.card-body
-   [:div.float-start
-    [:b {:title (:id r)} (:name r)]
-    [:p "Url: " [:a {:href (:url r)} (:url r)]]]
-   [:a.btn.btn-primary.float-end
-    {:href (r/path-for :page/repo {:customer-id (:id c)
-                                   :repo-id (:id r)})}
-    [co/icon :three-dots-vertical] " Details"]])
+   [:div.d-flex.flex-row.align-items-start
+    [:div.me-auto
+     [:h6 {:title (:id r)} [:span.me-2 co/repo-icon] (:name r)]
+     [:p "Url: " [:a {:href (:url r)} (:url r)]]]
+    [:a.btn.btn-primary
+     {:href (r/path-for :page/repo {:customer-id (:id c)
+                                    :repo-id (:id r)})}
+     [co/icon :three-dots-vertical] " Details"]]])
 
 (defn- show-project [cust [p repos]]
   (->> repos
@@ -94,7 +98,7 @@
        (into
         [:div.project.card.mb-3
          [:div.card-header
-          [:h5.card-title p]]])))
+          [:h5.card-title [:span.me-2 co/repo-group-icon] p]]])))
 
 (defn- project-lbl [r]
   (->> (:labels r)
@@ -122,7 +126,7 @@
 (defn- customer-header []
   (let [c (rf/subscribe [:customer/info])]
     [:div.d-flex.gap-2
-     [:h3.me-auto (:name @c)]
+     [:h3.me-auto [customer-icon] (:name @c)]
      [customer-actions (:id @c)]]))
 
 (defn- customer-repos
@@ -168,11 +172,11 @@
   "Displays tab pages for various customer overview screens"
   [id]
   [tabs/tabs ::overview
-   [{:header "Overview"
+   [{:header [:span [:span.me-2 co/overview-icon] "Overview"]
      :contents [customer-stats id]}
-    {:header "Repositories"
+    {:header [:span [:span.me-2 co/repo-icon] "Repositories"]
      :contents [customer-repos]}
-    {:header "Recent Builds"
+    {:header [:span [:span.me-2 co/build-icon] "Recent Builds"]
      :contents [recent-builds id]
      :current? true}]])
 
@@ -237,7 +241,7 @@
   []
   (l/default
    [:<>
-    [:h3 "New Customer"]
+    [:h3 [customer-icon] "New Customer"]
     [:form.mb-3
      {:on-submit (f/submit-handler [:customer/create])}
      [:div.mb-3

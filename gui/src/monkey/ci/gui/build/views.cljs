@@ -149,7 +149,7 @@
       [l/default
        [:<>
         [:div.d-flex.gap-2.align-items-start.mb-2
-         [:h3.me-auto (:name @repo) " - " (:build-id params)]
+         [:h3.me-auto [:span.me-2 co/build-icon] (:name @repo) " - " (:build-id params)]
          (when @loading?
            [:button.btn.btn-primary.btn-sm
             {:disabled true}
