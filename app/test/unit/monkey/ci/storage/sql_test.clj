@@ -449,7 +449,20 @@
           (is (= cred (st/find-customer-credit s (:id cred)))))
         
         (testing "can list for customer"
-          ))))
+          (let [other-cust (h/gen-cust)
+                _ (st/save-customer s other-cust)
+                sids (->> [(assoc cred :from-time 1000)
+                           (-> (h/gen-cust-credit)
+                               (assoc :customer-id (:id cust)
+                                      :from-time 2000))
+                           (-> (h/gen-cust-credit)
+                               (assoc :customer-id (:id other-cust)
+                                      :from-time 1000))]
+                          (mapv (partial st/save-customer-credit s)))]
+            (is (some? sids))
+            (is (= [(-> sids first last)]
+                   (->> (st/list-customer-credits-since s (:id cust) 1100)
+                        (map :id)))))))))
 
 (deftest make-storage
   (testing "creates sql storage object using connection settings"

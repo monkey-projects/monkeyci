@@ -13,3 +13,8 @@
 
 (defn by-cuid [id]
   [:= :cc.cuid id])
+
+(defn by-customer-since [cust-id ts]
+  [:and
+   [:= :c.cuid cust-id]
+   [:<= :cc.from-time (ec/->ts ts)]])

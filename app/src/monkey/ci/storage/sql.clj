@@ -579,8 +579,8 @@
                                         (customer-credit->db)
                                         (assoc :customer-id (:id cust))))))
 
-(defn- update-customer-credit [conn cred]
-  (ec/update-customer-credit conn (select-keys cred [:amount :from-time])))
+(defn- update-customer-credit [conn cred existing]
+  (ec/update-customer-credit conn (merge existing (select-keys cred [:amount :from-time]))))
 
 (defn- upsert-customer-credit [conn cred]
   (if-let [existing (ec/select-customer-credit conn (ec/by-cuid (:id cred)))]
@@ -591,6 +591,10 @@
   (some->> (ecc/select-customer-credits conn (ecc/by-cuid id))
            (first)
            (db->customer-credit)))
+
+(defn- select-customer-credits-since [{:keys [conn]} cust-id since]
+  (->> (ecc/select-customer-credits conn (ecc/by-customer-since cust-id since))
+       (map db->customer-credit)))
 
 (defn- sid-pred [t sid]
   (t sid))
@@ -713,7 +717,8 @@
     :watch watch-github-repo
     :unwatch unwatch-github-repo}
    :customer
-   {:search select-customers}
+   {:search select-customers
+    :list-credits-since select-customer-credits-since}
    :repo
    {:list-display-ids select-repo-display-ids
     :find-next-build-idx (comp (fnil inc 0) select-max-build-idx)}
