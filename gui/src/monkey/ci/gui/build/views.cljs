@@ -141,8 +141,8 @@
        [co/icon :arrow-repeat]])))
 
 (defn page [route]
-  (rf/dispatch [:build/init])
   (fn [route]
+    (rf/dispatch [:build/init])
     (let [params (r/path-params route)
           repo (rf/subscribe [:repo/info (:repo-id params)])
           loading? (rf/subscribe [:build/loading?])]

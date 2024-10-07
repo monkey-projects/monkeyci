@@ -106,4 +106,7 @@
       (is (satisfies? p/Storage (get-in sys [:http :rt :storage]))))
 
     (testing "provides empty jwk if not configured"
-      (is (nil? (get-in sys [:http :rt :jwk]))))))
+      (is (nil? (get-in sys [:http :rt :jwk]))))
+
+    (testing "activates listeners"
+      (is (instance? monkey.ci.listeners.Listeners (:listeners sys))))))

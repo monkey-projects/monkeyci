@@ -136,7 +136,3 @@
       (catch Throwable t
         (mark-abort rt)
         (md/success-deferred (error-result t))))))
-
-(defn- add-from-args [conf k]
-  (update-in conf [:sidecar k] #(or (get-in conf [:args k]) %)))
-

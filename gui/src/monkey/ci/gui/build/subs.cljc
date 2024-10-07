@@ -39,8 +39,8 @@
          res
          (let [next-jobs (->> rem
                               (filter (comp (partial every? proc?) :dependencies)))]
-           ;; Safety, should not happen
            (if (empty? next-jobs)
+             ;; Safety, should not happen
              (concat res rem)
              (recur (remove (set next-jobs) rem)
                     (clojure.set/union proc? (set (map :id next-jobs)))

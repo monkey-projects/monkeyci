@@ -7,6 +7,7 @@
              [blob :as blob]
              [containers :as c]
              [git :as git]
+             [listeners :as li]
              [logging :as l]
              [protocols :as p]
              [reporting :as rep]
@@ -184,6 +185,9 @@
   ;; Wrapped in a map because component doesn't allow nils
   {:jwk (auth/config->keypair conf)})
 
+(defn- new-listeners []
+  (li/map->Listeners {}))
+
 (defrecord ServerRuntime [config]
   co/Lifecycle
   (start [this]
@@ -210,7 +214,10 @@
                (new-server-runtime config)
                [:artifacts :events :reporter :runner :storage :jwk])
    :storage   (new-storage config)
-   :jwk       (new-jwk config)))
+   :jwk       (new-jwk config)
+   :listeners (co/using
+               (new-listeners)
+               [:events :storage])))
 
 (defn with-server-system [config f]
   (rc/with-system (make-server-system config) f))
