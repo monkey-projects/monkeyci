@@ -8,7 +8,6 @@
             [monkey.ci
              [blob :as b]
              [build :as build]
-             [config :as config]
              [errors :as err]
              [process :as p]
              [runtime :as rt]
@@ -143,14 +142,6 @@
   (constantly 2))
 
 ;;; Configuration handling
-
-(defmulti normalize-runner-config (comp :type :runner))
-
-(defmethod normalize-runner-config :default [conf]
-  conf)
-
-(defmethod config/normalize-key :runner [k conf]
-  (config/normalize-typed k conf normalize-runner-config))
 
 (defmethod rt/setup-runtime :runner [conf _]
   (make-runner conf))

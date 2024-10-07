@@ -97,6 +97,3 @@
   (-> conf
       :storage
       (make-oci-storage)))
-
-(defmethod st/normalize-storage-config :oci [conf]
-  conf)

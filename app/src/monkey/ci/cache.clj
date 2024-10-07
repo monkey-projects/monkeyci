@@ -8,7 +8,6 @@
              [artifacts :as art]
              [blob :as blob]
              [build :as b]
-             [config :as config]
              [oci :as oci]
              [runtime :as rt]]))
 
@@ -56,9 +55,6 @@
   (art/->BuildApiArtifactRepository client "/cache/"))
 
 ;;; Config handling
-
-(defmethod config/normalize-key :cache [k conf]
-  (config/normalize-typed k conf (partial blob/normalize-blob-config k)))
 
 (defmethod rt/setup-runtime :cache [conf k]
   (when (k conf)

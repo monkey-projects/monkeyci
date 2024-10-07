@@ -7,7 +7,6 @@
             [medley.core :as mc]
             [monkey.ci
              [build :as b]
-             [config :as c]
              [jobs :as j]
              [runtime :as rt]
              [spec :as spec]]
@@ -77,5 +76,3 @@
                  (:job rt)
                  (rt/build rt))))
 
-(defmethod c/normalize-key :promtail [_ conf]
-  conf)

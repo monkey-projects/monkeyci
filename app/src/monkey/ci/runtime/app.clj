@@ -9,8 +9,9 @@
              [git :as git]
              [logging :as l]
              [protocols :as p]
+             [reporting :as rep]
              [runners :as r]
-             #_[storage :as s]
+             [storage :as s]
              [utils :as u]
              [workspace :as ws]]
             [monkey.ci.build.api-server :as bas]
@@ -18,7 +19,10 @@
              [podman :as ccp]
              [oci :as cco]]
             [monkey.ci.events.core :as ec]
-            [monkey.ci.runtime.common :as rc]))
+            [monkey.ci.runtime.common :as rc]
+            [monkey.ci.web
+             [auth :as auth]
+             [handler :as wh]]))
 
 (defrecord AppRuntime [config events artifacts cache containers workspace logging git build api-config])
 
@@ -39,13 +43,16 @@
 (defn- new-workspace [config]
   (blob/make-blob-store config :workspace))
 
-(defrecord Runner [runner runtime build]
+(defrecord BuildRunner [runner runtime build]
   clojure.lang.IFn
   (invoke [this]
     (runner build runtime)))
 
 (defn- new-build-runner [config]
-  (map->Runner {:runner (r/make-runner config)}))
+  (map->BuildRunner {:runner (r/make-runner config)}))
+
+(defn- new-server-runner [config]
+  (r/make-runner config))
 
 (defn- make-container-runner [{:keys [containers] :as config} events build api-config logging]
   (case (:type containers)
@@ -78,11 +85,6 @@
   ;; plain container runner.  Instead, we initialize a wrapper, that accepts the
   ;; build as an argument.
   (map->DelayedContainerRunner {:config conf}))
-
-#_(defn- new-storage [config]
-  (if (not-empty (:storage config))
-    (s/make-storage config)
-    (s/make-memory-storage)))
 
 (defn- new-logging [config]
   {:maker (l/make-logger config)})
@@ -166,3 +168,49 @@
 
 (defn with-runner-system [config f]
   (rc/with-system (make-runner-system config) f))
+
+(defn- new-storage [config]
+  (if (not-empty (:storage config))
+    (s/make-storage config)
+    (s/make-memory-storage)))
+
+(defn- new-http-server [_]
+  (wh/->HttpServer nil))
+
+(defn- new-reporter [conf]
+  (rep/make-reporter (:reporter conf)))
+
+(defn- new-jwk [conf]
+  ;; Wrapped in a map because component doesn't allow nils
+  {:jwk (auth/config->keypair conf)})
+
+(defrecord ServerRuntime [config]
+  co/Lifecycle
+  (start [this]
+    (assoc this :jwk (get-in this [:jwk :jwk])))
+
+  (stop [this]
+    this))
+
+(defn- new-server-runtime [conf]
+  (->ServerRuntime conf))
+
+(defn make-server-system
+  "Creates a component system that can be used to start an application server."
+  [config]
+  (co/system-map
+   :artifacts (new-artifacts config)
+   :events    (new-events config)
+   :http      (co/using
+               (new-http-server config)
+               {:rt :runtime})
+   :reporter  (new-reporter config)
+   :runner    (new-server-runner config)
+   :runtime   (co/using
+               (new-server-runtime config)
+               [:artifacts :events :reporter :runner :storage :jwk])
+   :storage   (new-storage config)
+   :jwk       (new-jwk config)))
+
+(defn with-server-system [config f]
+  (rc/with-system (make-server-system config) f))

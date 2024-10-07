@@ -474,9 +474,6 @@
     (log/info "Shutting down HTTP server...")
     (.close s)))
 
-(defmethod config/normalize-key :http [_ {:keys [args] :as conf}]
-  (update-in conf [:http :port] #(or (:port args) %)))
-
 (defrecord HttpServer [rt]
   co/Lifecycle
   (start [this]

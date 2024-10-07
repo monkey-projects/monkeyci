@@ -111,7 +111,6 @@
   (let [build-id (str "test-build-" (System/currentTimeMillis))
         pipeline "test-pipe"
         rt (-> @co/global-config
-               (config/normalize-config {} {})
                (assoc-in [:containers :image-tag] version)
                ;; Dummy api config
                (assoc :api {:url "http://test"
@@ -196,8 +195,7 @@
 (defn run-build
   "Runs a build given the specified GIT url and branch name, using the current config."
   [url branch]
-  (let [conf (-> @co/global-config
-                 (config/normalize-config {} {}))]
+  (let [conf @co/global-config]
     (rt/with-runtime conf :server rt
       (let [runner (:runner rt)
             build {:build-id (str "test-build-" (u/now))

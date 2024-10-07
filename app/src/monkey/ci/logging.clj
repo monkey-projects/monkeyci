@@ -8,7 +8,6 @@
             [manifold.deferred :as md]
             [monkey.ci
              [build :as b]
-             [config :as c]
              [oci :as oci]
              [runtime :as rt]
              [sid :as sid]
@@ -212,20 +211,6 @@
     (->OciBucketLogRetriever client oci-conf)))
 
 ;;; Configuration handling
-
-(defmulti normalize-logging-config (comp :type :logging))
-
-(defmethod normalize-logging-config :default [conf]
-  conf)
-
-(defmethod normalize-logging-config :file [conf]
-  (update-in conf [:logging :dir] #(or (u/abs-path %) (u/combine (c/abs-work-dir conf) "logs"))))
-
-(defmethod normalize-logging-config :oci [conf]
-  (update conf :logging select-keys [:type :credentials :ns :compartment-id :bucket-name :region]))
-
-(defmethod c/normalize-key :logging [k conf]
-  (c/normalize-typed k conf normalize-logging-config))
 
 (defmethod rt/setup-runtime :logging [conf _]
   {:maker (make-logger conf)

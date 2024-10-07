@@ -261,26 +261,3 @@
       (is (= :script/end (-> (deref d 100 :timeout)
                               :type))))))
 
-(deftest normalize-runner-config
-  (testing "uses configured image tag"
-    (is (= "test-image"
-           (-> {:runner {:type :oci
-                         :image-tag "test-image"}}
-               (r/normalize-runner-config)
-               :runner
-               :image-tag))))
-
-  (testing "uses app version if no image tag configured"
-    (is (= (v/version)
-           (-> {:runner {:type :oci}}
-               (r/normalize-runner-config)
-               :runner
-               :image-tag))))
-
-  (testing "formats using app version if format string specified"
-    (is (= (str "format-" (v/version))
-           (-> {:runner {:type :oci
-                         :image-tag "format-%s"}}
-               (r/normalize-runner-config)
-               :runner
-               :image-tag)))))

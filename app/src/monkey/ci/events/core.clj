@@ -81,11 +81,6 @@
     (f evt)
     nil))
 
-(defmethod c/normalize-key :events [k conf]
-  (update conf k (comp #(c/group-keys % :client)
-                       #(c/group-keys % :server)
-                       c/keywordize-type)))
-
 (defmulti make-events :type)
 
 (defmethod make-events :sync [_]

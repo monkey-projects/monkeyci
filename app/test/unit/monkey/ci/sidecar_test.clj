@@ -151,7 +151,7 @@
         (is (= rt (sut/mark-start rt)))
         (is (.exists start))))))
 
-(deftest normalize-key
+#_(deftest normalize-key
   (testing "adds events file from args"
     (is (= "test-file" (-> (c/normalize-key :sidecar {:sidecar {}
                                                       :args {:events-file "test-file"}})

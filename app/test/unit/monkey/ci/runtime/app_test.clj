@@ -88,3 +88,22 @@
       (is (some? (get-in sys [:api-server :server])))
       (is (= (get-in sys [:api-server :port])
              (get-in sys [:api-config :port]))))))
+
+(def server-config
+  (assoc tc/base-config
+         :http {:port 3001}))
+
+(deftest with-server-system
+  (let [sys (sut/with-server-system server-config identity)]
+    (testing "provides http server"
+      (is (some? (:http sys)))
+      (is (some? (get-in sys [:http :server]))))
+
+    (testing "http server has runtime"
+      (is (map? (get-in sys [:http :rt]))))
+
+    (testing "runtime has storage"
+      (is (satisfies? p/Storage (get-in sys [:http :rt :storage]))))
+
+    (testing "provides empty jwk if not configured"
+      (is (nil? (get-in sys [:http :rt :jwk]))))))

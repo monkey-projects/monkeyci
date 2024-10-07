@@ -219,6 +219,3 @@
         client (ci/make-context conf)]
     (partial oci-runner client conf)))
 
-(defmethod r/normalize-runner-config :oci [conf]
-  ;; TODO Use aero reader tags instead
-  (update-in conf [:runner :image-tag] #(format (or % "%s") (v/version))))

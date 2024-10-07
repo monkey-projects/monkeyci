@@ -9,7 +9,6 @@
              [artifacts :as art]
              [build :as b]
              [cache :as cache]
-             [config :as c]
              [jobs :as j]
              [logging :as l]
              [runtime :as rt]
@@ -141,10 +140,3 @@
 (defn- add-from-args [conf k]
   (update-in conf [:sidecar k] #(or (get-in conf [:args k]) %)))
 
-(defmethod c/normalize-key :sidecar [_ conf]
-  (-> conf
-      (mc/update-existing-in [:sidecar :log-config] u/try-slurp)
-      (add-from-args :events-file)
-      (add-from-args :start-file)
-      (add-from-args :abort-file)
-      (add-from-args :job-config)))
