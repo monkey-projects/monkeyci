@@ -7,7 +7,6 @@
             [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
-             [config :as config]
              [labels :as lbl]
              [runtime :as rt]
              [storage :as s]
@@ -242,5 +241,3 @@
   [req]
   (rur/response {:client-id (c/from-rt req (comp :client-id :github rt/config))}))
 
-(defmethod config/normalize-key :github [_ conf]
-  conf)

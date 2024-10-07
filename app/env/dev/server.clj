@@ -40,7 +40,6 @@
                          :http {:port 3000}
                          :work-dir (u/abs-path "tmp")}
                         @co/global-config)
-                 (config/normalize-config {} {})
                  (assoc :app-mode :server)
                  (validate-config))
         sys (-> (ra/make-server-system conf)

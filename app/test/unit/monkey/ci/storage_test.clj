@@ -2,7 +2,6 @@
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.string :as cs]
             [monkey.ci
-             [config :as c]
              [cuid :as cuid]
              [sid :as sid]
              [storage :as sut]]
@@ -304,9 +303,3 @@
 
       (testing "can list for user"
         (is (= [req] (sut/list-user-join-requests st (:user-id req))))))))
-
-(deftest normalize-key
-  (testing "normalizes string type"
-    (is (= :memory (-> (c/normalize-key :storage {:storage {:type "memory"}})
-                       :storage
-                       :type)))))

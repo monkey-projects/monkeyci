@@ -54,9 +54,7 @@
    (log/debug "Running with args:" args)
    (try
      (let [config (load-config args)]
-       (when (-> (config/normalize-config (merge default-script-config config)
-                                          (config/strip-env-prefix env)
-                                          nil)
+       (when (-> (merge default-script-config config)
                  (rs/with-runtime
                    (fn [rt]
                      (log/debug "Executing script with config" (:config rt))

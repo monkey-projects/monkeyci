@@ -1,6 +1,5 @@
 (ns monkey.ci.events.core-test
   (:require [clojure.test :refer [deftest testing is]]
-            [monkey.ci.config :as c]
             [monkey.ci.events
              [core :as sut]
              [async-tests :as ast]]))
@@ -129,17 +128,3 @@
                                   :exception
                                   (.getMessage)))))))
 
-(deftest normalize-key
-  (testing "groups client subkey"
-    (is (= {:type :zmq
-            :client {:addr "test-addr"}}
-           (-> (c/normalize-key :events {:events {:type "zmq"
-                                                  :client-addr "test-addr"}})
-               :events))))
-
-  (testing "groups server subkey"
-    (is (= {:type :zmq
-            :server {:addr "test-addr"}}
-           (-> (c/normalize-key :events {:events {:type "zmq"
-                                                  :server-addr "test-addr"}})
-               :events)))))

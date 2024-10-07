@@ -6,7 +6,6 @@
             [monkey.ci
              [blob :as b]
              [build :as build]
-             [config :as c]
              [protocols :as p]
              [runtime :as rt]]
             [monkey.ci.build.archive :as arch]))
@@ -68,9 +67,6 @@
 (def make-build-api-workspace ->BuildApiWorkspace)
 
 ;;; Configuration handling
-
-(defmethod c/normalize-key :workspace [k conf]
-  (c/normalize-typed k conf (partial b/normalize-blob-config k)))
 
 (defmethod rt/setup-runtime :workspace [conf k]
   (when (k conf)

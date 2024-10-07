@@ -2,9 +2,7 @@
   "Provides functions for reporting output.  This can be logging, or printing
    to stdout, or formatting as json, etc..."
   (:require [clojure.tools.logging :as log]
-            [monkey.ci
-             [config :as c]
-             [runtime :as rt]]))
+            [monkey.ci.runtime :as rt]))
 
 (defn log-reporter
   "Just logs the input object"
@@ -18,9 +16,6 @@
 
 (defmethod make-reporter :default [_]
   log-reporter)
-
-(defmethod c/normalize-key :reporter [_ conf]
-  (update conf :reporter c/keywordize-type))
 
 (defmethod rt/setup-runtime :reporter [conf _]
   (make-reporter (:reporter conf)))
