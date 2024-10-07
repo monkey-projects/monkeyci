@@ -49,7 +49,8 @@
         (is (= ["root"
                 "dep-1"
                 "dep-2"
-                "dep-3"]
+                "dep-3"
+                "dep-4"]
                (map :id @jobs)))))))
 
 (deftest loading?
