@@ -1,4 +1,4 @@
-(ns unit.monkey.ci.web.bitbucket-test
+(ns monkey.ci.web.bitbucket-test
   (:require [clojure.test :refer [deftest testing is]]
             [monkey.ci.web.bitbucket :as sut]
             [monkey.ci.test.aleph-test :as at]))
