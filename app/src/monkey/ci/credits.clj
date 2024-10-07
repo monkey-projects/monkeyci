@@ -31,4 +31,3 @@
   [rt]
   ;; TODO Use protocols instead
   (get-in rt [:containers :credit-consumer] default-consumer))
-

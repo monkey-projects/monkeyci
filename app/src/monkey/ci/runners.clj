@@ -60,6 +60,7 @@
    runs the build.  Returns a deferred that resolves when the child process has
    exited."
   [build rt]
+  (log/debug "Building locally:" build)
   (spec/valid? ::sb/build build)
   (let [script-dir (build/script-dir build)]
     (rt/post-events rt (build/build-start-evt build))

@@ -56,11 +56,11 @@
   (assoc-in conf [:api :token] (auth/generate-jwt-from-rt rt (auth/build-token (b/sid build)))))
 
 (defn- rt->config [build rt]
-  ;; TODO Also calculate credit multiplier for action jobs in this build
   (-> (rt/rt->config rt)
       ;; TODO Move the config needed by the runner under the runner config itself
       (select-keys [:containers :logging :workspace :cache :artifacts :sidecar :promtail :api])
-      (assoc :build (dissoc build :ssh-keys :cleanup? :status)
+      (assoc :checkout-base-dir oci/work-dir
+             :build (dissoc build :ssh-keys :cleanup? :status)
              ;; TODO Use aero tags in the config, instead of doing this manually here
              :events (-> (get-in rt [rt/config :events])
                          (dissoc :server) ; Child processes never start an event server
@@ -144,8 +144,8 @@
                 ;; to shield off any sensitive info, or use the general API server.  This
                 ;; could lead to performance bottlenecks and could lead to higher costs wrt.
                 ;; the API gateway.
-                :arguments (cond-> ["-w" oci/checkout-dir "build" "run"
-                                    "--sid" (format-sid (b/sid build))
+                :arguments (cond-> ["-w" oci/checkout-dir
+                                    "build" "run"
                                     "-u" url]
                              branch (concat ["-b" branch])
                              tag (concat ["-t" tag])

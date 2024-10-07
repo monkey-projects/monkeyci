@@ -139,7 +139,6 @@
         (testing "provides arguments as to monkeyci build"
           (is (= ["-w" "/opt/monkeyci/checkout"
                   "build" "run"
-                  "--sid" "a/b/test-build-id"
                   "-u" "http://git-url"
                   "-b" "main"
                   "--commit-id" "test-commit"]
@@ -184,7 +183,10 @@
                          :sub))))
 
             (testing "adds build sid"
-              (is (= (:sid build) (get-in parsed [:build :sid]))))))))
+              (is (= (:sid build) (get-in parsed [:build :sid]))))
+
+            (testing "containes checkout-base-dir"
+              (is (string? (:checkout-base-dir parsed))))))))
 
     (testing "ssh keys"
       (testing "adds as volume"

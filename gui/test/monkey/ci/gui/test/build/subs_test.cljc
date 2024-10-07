@@ -38,6 +38,7 @@
 
     (testing "sorts jobs in dependency order"
       (let [job-list [{:id "dep-1" :dependencies ["root"]}
+                      {:id "dep-4" :dependencies ["dep-3"]}
                       {:id "dep-3" :dependencies ["dep-1" "dep-2"]}
                       {:id "root"}
                       {:id "dep-2" :dependencies ["root"]}]]
