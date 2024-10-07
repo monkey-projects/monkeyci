@@ -20,7 +20,9 @@
              [oci :as cco]]
             [monkey.ci.events.core :as ec]
             [monkey.ci.runtime.common :as rc]
-            [monkey.ci.web.handler :as wh]))
+            [monkey.ci.web
+             [auth :as auth]
+             [handler :as wh]]))
 
 (defrecord AppRuntime [config events artifacts cache containers workspace logging git build api-config])
 
@@ -178,6 +180,21 @@
 (defn- new-reporter [conf]
   (rep/make-reporter (:reporter conf)))
 
+(defn- new-jwk [conf]
+  ;; Wrapped in a map because component doesn't allow nils
+  {:jwk (auth/config->keypair conf)})
+
+(defrecord ServerRuntime [config]
+  co/Lifecycle
+  (start [this]
+    (assoc this :jwk (get-in this [:jwk :jwk])))
+
+  (stop [this]
+    this))
+
+(defn- new-server-runtime [conf]
+  (->ServerRuntime conf))
+
 (defn make-server-system
   "Creates a component system that can be used to start an application server."
   [config]
@@ -190,9 +207,10 @@
    :reporter  (new-reporter config)
    :runner    (new-server-runner config)
    :runtime   (co/using
-               {:config config}
-               [:artifacts :events :reporter :runner :storage])
-   :storage   (new-storage config)))
+               (new-server-runtime config)
+               [:artifacts :events :reporter :runner :storage :jwk])
+   :storage   (new-storage config)
+   :jwk       (new-jwk config)))
 
 (defn with-server-system [config f]
   (rc/with-system (make-server-system config) f))

@@ -103,4 +103,7 @@
       (is (map? (get-in sys [:http :rt]))))
 
     (testing "runtime has storage"
-      (is (satisfies? p/Storage (get-in sys [:http :rt :storage]))))))
+      (is (satisfies? p/Storage (get-in sys [:http :rt :storage]))))
+
+    (testing "provides empty jwk if not configured"
+      (is (nil? (get-in sys [:http :rt :jwk]))))))
