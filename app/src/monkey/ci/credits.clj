@@ -32,6 +32,3 @@
   ;; TODO Use protocols instead
   (get-in rt [:containers :credit-consumer] default-consumer))
 
-(defn container-credit-multiplier [containers job]
-  (let [ccf (get containers :credit-consumer default-consumer)]
-    (ccf job)))
