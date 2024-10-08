@@ -8,6 +8,7 @@
 (u/db-sub ::github-repos db/github-repos)
 (u/db-sub :customer/create-alerts db/create-alerts)
 (u/db-sub :customer/creating? db/customer-creating?)
+(u/db-sub :customer/group-by-lbl db/get-group-by-lbl)
 
 (rf/reg-sub
  :customer/info
@@ -67,3 +68,28 @@
  :customer/stats
  :<- [:loader/value db/stats]
  identity)
+
+(rf/reg-sub
+ :customer/labels
+ :<- [:customer/info]
+ (fn [cust _]
+   (->> cust
+        :repos
+        (mapcat :labels)
+        (map :name)
+        (distinct)
+        (sort))))
+
+(defn- lbl-value [label]
+  (fn [{:keys [labels]}]
+    (->> labels
+         (filter (comp (partial = label) :name))
+         (first)
+         :value)))
+
+(rf/reg-sub
+ :customer/grouped-repos
+ :<- [:customer/repos]
+ :<- [:customer/group-by-lbl]
+ (fn [[repos lbl] _]
+   (group-by (lbl-value lbl) repos)))

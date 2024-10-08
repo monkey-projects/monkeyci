@@ -8,7 +8,6 @@
             [monkey.ci
              [blob :as b]
              [build :as build]
-             [config :as config]
              [errors :as err]
              [process :as p]
              [runtime :as rt]
@@ -61,6 +60,7 @@
    runs the build.  Returns a deferred that resolves when the child process has
    exited."
   [build rt]
+  (log/debug "Building locally:" build)
   (spec/valid? ::sb/build build)
   (let [script-dir (build/script-dir build)]
     (rt/post-events rt (build/build-start-evt build))
@@ -121,7 +121,7 @@
   run-local)
 
 (defmethod make-runner :local [conf]
-  (log/info "Using local runner")
+  (log/info "Using local runner with working directory" (:work-dir conf))
   run-local)
 
 (defmethod make-runner :noop [_]
@@ -143,14 +143,6 @@
   (constantly 2))
 
 ;;; Configuration handling
-
-(defmulti normalize-runner-config (comp :type :runner))
-
-(defmethod normalize-runner-config :default [conf]
-  conf)
-
-(defmethod config/normalize-key :runner [k conf]
-  (config/normalize-typed k conf normalize-runner-config))
 
 (defmethod rt/setup-runtime :runner [conf _]
   (make-runner conf))

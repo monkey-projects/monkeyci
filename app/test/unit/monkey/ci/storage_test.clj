@@ -2,7 +2,6 @@
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.string :as cs]
             [monkey.ci
-             [config :as c]
              [cuid :as cuid]
              [sid :as sid]
              [storage :as sut]
@@ -318,8 +317,3 @@
       (testing "can list for customer since date"
         (is (= [cred] (sut/list-customer-credits-since st (:customer-id cred) (- now 100))))))))
 
-(deftest normalize-key
-  (testing "normalizes string type"
-    (is (= :memory (-> (c/normalize-key :storage {:storage {:type "memory"}})
-                       :storage
-                       :type)))))

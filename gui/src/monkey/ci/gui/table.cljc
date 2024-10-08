@@ -112,8 +112,13 @@
           (into [:tr]))]))
 
 (defn- render-tbody [cols items {:keys [on-row-click]}]
-  (letfn [(render-cell [v]
-            [:td v])
+  (letfn [(td? [x]
+            (and (keyword? x) (re-matches #"^td\..*" (name x))))
+          (render-cell [v]
+            ;; Allow rendering functions to define their own td
+            (if (and (vector? v) (td? (first v)))
+              v
+              [:td v]))
           (render-item [it]
             (->> cols
                  (map (fn [{:keys [value]}]

@@ -180,6 +180,7 @@
     (if (empty? tabs)
       [:p "No job details available.  You may want to try again later."]
       ;; Make first tab the active one
+      ;; FIXME Doesn't work after refresh
       (conj [tabs/tabs e/details-tabs-id]
             (replace {f (assoc f :current? true)} tabs)))))
 

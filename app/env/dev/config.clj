@@ -32,7 +32,6 @@
    and converts it to an OCI config map."
   ([env type]
    (-> (load-config (format "oci/%s-config.edn" (name env)))
-       (config/normalize-config {} {})
        (get type)))
   ([type]
    (load-oci-config @c/env type)))
@@ -42,7 +41,6 @@
    it (type being `:logging`, `:runner`, `:container`, `:storage`)"
   [type]
   (-> @global-config
-      (config/normalize-config {} {})
       (get type)))
 
 (defn oci-runner-config []

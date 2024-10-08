@@ -5,7 +5,6 @@
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
             [monkey.ci
-             [config :as config]
              [runtime :as rt]
              [utils :as u]]
             [monkey.ci.web
@@ -55,5 +54,3 @@
   [req]  
   (rur/response {:client-id (c/from-rt req (comp :client-id :bitbucket rt/config))}))
 
-(defmethod config/normalize-key :bitbucket [_ conf]
-  conf)

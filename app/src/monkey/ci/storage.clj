@@ -6,7 +6,6 @@
             [clojure.tools.logging :as log]
             [medley.core :as mc]
             [monkey.ci
-             [config :as c]
              [cuid :as cuid]
              [protocols :as p]
              [runtime :as rt]
@@ -57,14 +56,6 @@
 (defmethod make-storage :memory [_]
   (log/info "Using memory storage (only for dev purposes!)")
   (make-memory-storage))
-
-(defmulti normalize-storage-config (comp :type :storage))
-
-(defmethod normalize-storage-config :default [conf]
-  conf)
-
-(defmethod c/normalize-key :storage [k conf]
-  (c/normalize-typed k conf normalize-storage-config))
 
 (defmethod rt/setup-runtime :storage [conf _]
   ;; Wrap in cache if so requested by storage object

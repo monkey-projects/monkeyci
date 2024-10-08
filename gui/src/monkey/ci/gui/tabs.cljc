@@ -1,7 +1,6 @@
 (ns monkey.ci.gui.tabs
   "Renders bootstrap tab pages"
-  (:require [monkey.ci.gui.logging :as log]
-            [monkey.ci.gui.utils :as u]
+  (:require [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
 (def header-id
@@ -25,7 +24,6 @@
 (rf/reg-event-db
  :tab/tab-changed
  (fn [db [_ id changed]]
-   (log/debug "Tab changed:" (str id) "to" (str changed))
    (assoc-in db [::tabs id :current] changed)))
 
 (defn- current-or-first [headers]
@@ -39,7 +37,7 @@
   (let [curr (rf/subscribe [:tab/current id])
         by-id (group-by header-id headers)]
     (when-not @curr
-      (rf/dispatch [:tab/tab-changed id (header-id (current-or-first headers))]))
+      (rf/dispatch-sync [:tab/tab-changed id (header-id (current-or-first headers))]))
     [:<>
      (->> headers
           (map (partial tab-header id @curr))

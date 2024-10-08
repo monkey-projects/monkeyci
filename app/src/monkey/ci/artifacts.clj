@@ -12,7 +12,6 @@
             [monkey.ci
              [blob :as blob]
              [build :as b]
-             [config :as config]
              [oci :as oci]
              [runtime :as rt]
              [utils :as u]]
@@ -193,9 +192,6 @@
   (->BuildApiArtifactRepository client "/artifact/"))
 
 ;;; Config handling
-
-(defmethod config/normalize-key :artifacts [k conf]
-  (config/normalize-typed k conf (partial blob/normalize-blob-config k)))
 
 (defmethod rt/setup-runtime :artifacts [conf k]
   (when (k conf)

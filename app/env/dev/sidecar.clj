@@ -16,11 +16,11 @@
                :workspace "test-ws"}
         job {:id "test-job"}]
     (rt/with-runtime-fn (-> @co/global-config
-                            (assoc :build build)
-                            (c/normalize-config {} {:events-file "/tmp/events.edn"
-                                                    :start-file "/tmp/start"
-                                                    :abort-file "/tmp/abort"
-                                                    :job-config {:job job}}))
+                            (assoc :build build
+                                   :sidecar {:events-file "/tmp/events.edn"
+                                             :start-file "/tmp/start"
+                                             :abort-file "/tmp/abort"
+                                             :job-config {:job job}}))
       :sidecar
       cmd/sidecar)))
 

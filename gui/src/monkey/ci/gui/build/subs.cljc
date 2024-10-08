@@ -30,7 +30,21 @@
  :build/jobs
  :<- [:build/current]
  (fn [b _]
-   (-> b :script :jobs vals sort-by-deps)))
+   (let [jobs (-> b :script :jobs vals)
+         no-deps? (comp empty? :dependencies)]
+     (loop [rem (->> jobs (remove no-deps?) (sort-by :id) vec)
+            proc? #{}
+            res (filterv no-deps? jobs)]
+       (if (empty? rem)
+         res
+         (let [next-jobs (->> rem
+                              (filter (comp (partial every? proc?) :dependencies)))]
+           (if (empty? next-jobs)
+             ;; Safety, should not happen
+             (concat res rem)
+             (recur (remove (set next-jobs) rem)
+                    (clojure.set/union proc? (set (map :id next-jobs)))
+                    (concat jobs next-jobs)))))))))
 
 (rf/reg-sub
  :build/loading?

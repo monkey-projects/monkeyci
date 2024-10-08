@@ -18,7 +18,7 @@
   ;; Mimic behaviour using OCI runner
   (let [conf (-> (config/load-config-file "dev-resources/test/config/oci-build-config.edn")
                  (assoc-in [:build :git :dir] (str "test-" (System/currentTimeMillis)))
-                 (config/normalize-config {} {:workdir "tmp"}))]
+                 (assoc :work-dir "tmp"))]
     (testing "config contains necessary info"
       (is (not-empty (:jwk conf)))
       (is (not-empty (:build conf)))

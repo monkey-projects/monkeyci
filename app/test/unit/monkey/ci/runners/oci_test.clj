@@ -139,7 +139,6 @@
         (testing "provides arguments as to monkeyci build"
           (is (= ["-w" "/opt/monkeyci/checkout"
                   "build" "run"
-                  "--sid" "a/b/test-build-id"
                   "-u" "http://git-url"
                   "-b" "main"
                   "--commit-id" "test-commit"]
@@ -184,7 +183,10 @@
                          :sub))))
 
             (testing "adds build sid"
-              (is (= (:sid build) (get-in parsed [:build :sid]))))))))
+              (is (= (:sid build) (get-in parsed [:build :sid]))))
+
+            (testing "containes checkout-base-dir"
+              (is (string? (:checkout-base-dir parsed))))))))
 
     (testing "ssh keys"
       (testing "adds as volume"
@@ -261,26 +263,3 @@
       (is (= :script/end (-> (deref d 100 :timeout)
                               :type))))))
 
-(deftest normalize-runner-config
-  (testing "uses configured image tag"
-    (is (= "test-image"
-           (-> {:runner {:type :oci
-                         :image-tag "test-image"}}
-               (r/normalize-runner-config)
-               :runner
-               :image-tag))))
-
-  (testing "uses app version if no image tag configured"
-    (is (= (v/version)
-           (-> {:runner {:type :oci}}
-               (r/normalize-runner-config)
-               :runner
-               :image-tag))))
-
-  (testing "formats using app version if format string specified"
-    (is (= (str "format-" (v/version))
-           (-> {:runner {:type :oci
-                         :image-tag "format-%s"}}
-               (r/normalize-runner-config)
-               :runner
-               :image-tag)))))

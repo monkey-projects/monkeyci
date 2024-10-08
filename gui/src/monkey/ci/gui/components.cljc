@@ -66,8 +66,8 @@
 
 (defn status-icon [status size]
   (let [[cl i] (get {:success      [:text-success :check-circle]
-                     :error        [:text-danger :x-circle]
-                     :failure      [:text-danger :x-circle]
+                     :error        [:text-danger :exclamation-circle]
+                     :failure      [:text-danger :exclamation-circle]
                      :running      [:text-info :play-circle]
                      :pending      [:text-warning :pause-circle]
                      :initializing [:text-warning :play-circle]
@@ -165,3 +165,18 @@
   (let [e (u/build-elapsed b)]
     (when (pos? e)
       (t/format-seconds (int (/ e 1000))))))
+
+(def overview-icon
+  [icon :house])
+
+(def customer-icon
+  [icon :people-fill])
+
+(def repo-icon
+  [icon :box-seam])
+
+(def repo-group-icon
+  [icon :boxes])
+
+(def build-icon
+  [icon :gear])

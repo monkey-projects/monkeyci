@@ -601,13 +601,14 @@
           (is (some? bid))
           (is (not= (:build-id build) bid)))
         
-        (testing "creates new build with same settings"
+        (testing "creates new build with same settings but without script details"
           (let [new (st/find-build st [(:customer-id build) (:repo-id build) bid])]
             (is (some? new))
             (is (= :initializing (:status new)))
             (is (= (:git build) (:git new)))
             (is (number? (:start-time new)))
-            (is (nil? (:end-time new))))))
+            (is (nil? (:end-time new)))
+            (is (empty? (get-in build [:script :jobs]))))))
 
       (testing "returns 404 if build not found"
         (is (= 404 (-> (make-req (constantly "ok")

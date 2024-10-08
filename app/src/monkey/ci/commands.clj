@@ -77,7 +77,7 @@
        (hash-map :type :build/list :builds)
        (rt/report rt)))
 
-(defn http-server
+#_(defn http-server
   "Starts the server by invoking the function in the runtime.  This function is supposed
    to return another function that can be invoked to stop the http server.  Returns a 
    deferred that resolves when the server is stopped."
@@ -88,6 +88,19 @@
                     (assoc :type :server/started)))
   ;; Start the server and wait for it to shut down
   (h/on-server-close (http rt)))
+
+(defn http-server
+  "Starts a system with an http server.  Dependency management will take care of
+   creating and starting the necessary modules."
+  [conf]
+  (ra/with-server-system conf
+    (fn [{rt :runtime :keys [http]}]
+      (rt/report rt (-> rt
+                        (rt/config)
+                        (select-keys [:http])
+                        (assoc :type :server/started)))
+      ;; Wait for server to stop
+      (h/on-server-close http))))
 
 (defn watch
   "Starts listening for events and prints the results.  The arguments determine

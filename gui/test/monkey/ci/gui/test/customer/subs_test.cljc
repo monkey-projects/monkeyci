@@ -5,6 +5,7 @@
             [monkey.ci.gui.customer.subs :as sut]
             [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.test.fixtures :as f]
+            [monkey.ci.gui.test.helpers :as h]
             [re-frame.core :as rf]
             [re-frame.db :refer [app-db]]))
 
@@ -147,3 +148,67 @@
       (is (nil? @s))
       (is (some? (reset! app-db (lo/set-value {} db/stats ::test-stats))))
       (is (= ::test-stats @s)))))
+
+(deftest customer-labels
+  (let [l (rf/subscribe [:customer/labels])]
+    (testing "exists"
+      (is (some? l)))
+
+    (testing "provides distinct labels for all customer repos, sorted"
+      (is (empty? @l))
+      (is (some? (reset! app-db (db/set-customer
+                                 {}
+                                 {:id "test-cust"
+                                  :name "Test customer"
+                                  :repos [{:id "repo-1"
+                                           :name "Test repo 1"
+                                           :labels
+                                           [{:name "label-1"
+                                             :value "value 1"}
+                                            {:name "label-2"
+                                             :value "value 2"}]}
+                                          {:id "repo-2"
+                                           :name "Test repo 2"
+                                           :labels
+                                           [{:name "label-1"
+                                             :value "value 3"}
+                                            {:name "label-3"
+                                             :value "value 4"}]}]}))))
+      (is (= ["label-1" "label-2" "label-3"]
+             @l)))))
+
+(deftest customer-group-by-lbl
+  (h/verify-sub
+   [:customer/group-by-lbl]
+   #(db/set-group-by-lbl % "test-lbl")
+   "test-lbl"
+   "project"))
+
+(deftest customer-grouped-repos
+  (let [r (rf/subscribe [:customer/grouped-repos])]
+    (testing "exists"
+      (is (some? r)))
+
+    (testing "returns repos, grouped by label from db"
+      (let [[repo-1 repo-2 repo-3 :as repos]
+            [{:id "repo-1"
+              :labels
+              [{:name "label-1"
+                :value "value 1"}
+               {:name "label-2"
+                :value "value 1"}]}
+             {:id "repo-2"
+              :labels
+              [{:name "label-2"
+                :value "value 1"}]}
+             {:id "repo-3"
+              :labels
+              [{:name "label-2"
+                :value "value 2"}]}]]
+        (is (some? (reset! app-db (-> {}
+                                      (db/set-group-by-lbl "label-2")
+                                      (db/set-customer
+                                       {:repos repos})))))
+        (is (= {"value 1" [repo-1 repo-2]
+                "value 2" [repo-3]}
+               @r))))))

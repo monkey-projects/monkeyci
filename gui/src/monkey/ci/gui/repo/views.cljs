@@ -89,8 +89,10 @@
     :value (fn [b] [:div.text-center [co/build-result (:status b)]])}
    {:label "Message"
     :value (fn [b]
-             [:span (or (get-in b [:git :message])
-                        (:message b))])}])
+             [:div.text-truncate
+              {:style {:max-width "240px"}}
+              (or (get-in b [:git :message])
+                  (:message b))])}])
 
 (defn- builds [repo]
   (let [loaded? (rf/subscribe [:builds/loaded?])]
@@ -98,7 +100,7 @@
       (rf/dispatch [:builds/load]))
     [:<>
      [:div.d-flex.gap-1.align-items-start
-      [:h4.me-2 "Builds"]
+      [:h4.me-2 [:span.me-2 co/build-icon] "Builds"]
       [refresh-btn {:class [:me-auto]}]
       [build-actions]]
      [trigger-form repo]
@@ -118,6 +120,7 @@
       [l/default
        [:<>
         [:h3
+         [:span.me-2 co/repo-icon] 
          "Repository: " (:name @r)
          [:span.fs-6.p-1
           [cl/clipboard-copy (u/->sid p :customer-id :repo-id) "Click to save the sid to clipboard"]]]
@@ -216,7 +219,7 @@
           repo (rf/subscribe [:repo/info (get-in @route [:parameters :path :repo-id])])]
       [l/default
        [:<>
-        [:h3 "Edit Repository: " (:name @repo)]
+        [:h3 [:span.me-2 co/repo-icon] "Edit Repository: " (:name @repo)]
         [:div.card
          [:div.card-body
           [co/alerts [:repo/edit-alerts]]

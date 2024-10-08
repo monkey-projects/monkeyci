@@ -7,6 +7,7 @@
              [artifacts :as art]
              [cache :as cache]
              [containers :as co]
+             [credits :as cr]
              [edn :as edn]
              [jobs :as sut]]
             [monkey.ci.spec.events :as se]
@@ -253,7 +254,12 @@
         (is (some? evt))
         (is (spec/valid? ::se/event evt))
         (is (= (sut/job-id job) (:job-id evt)))
-        (is (= evt (edn/edn-> (edn/->edn evt))) "Event should be serializable to edn")))))
+        (is (= evt (edn/edn-> (edn/->edn evt))) "Event should be serializable to edn"))))
+
+  (testing "uses runner credit consumer"
+    (let [cr (constantly 666)
+          job (bc/action-job "test-job" (constantly bc/success))]
+      (is (= 666 (cr/credit-multiplier job {:runner {:credit-consumer cr}}))))))
 
 (deftest execute-jobs!
   (let [ctx {:events (h/fake-events)}]
@@ -340,7 +346,12 @@
   (testing "adds status according to exit code"
     (is (bc/failed? (-> (bc/container-job ::test-job {})
                         (sut/execute! {:containers (h/fake-container-runner {:exit 1})})
-                        (deref))))))
+                        (deref)))))
+
+  (testing "uses containers credit consumer"
+    (let [cr (constantly 555)
+          job (bc/container-job ::cr-job {})]
+      (is (= 555 (cr/credit-multiplier job {:containers {:credit-consumer cr}}))))))
 
 (deftest filter-jobs
   (testing "applies filter to jobs"

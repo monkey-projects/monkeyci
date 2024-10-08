@@ -7,7 +7,6 @@
             [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
-             [config :as c]
              [containers :as mcc]
              [cuid :as cuid]
              [oci :as oci]
@@ -608,26 +607,3 @@
             (is (some? evt))
             (is (= "infra error" (get-in evt [:result :message])))))))))
 
-(deftest normalize-key
-  (testing "takes configured tag"
-    (is (= "test-version"
-           (->> {:containers {:type :oci
-                              :image-tag "test-version"}}
-                (c/normalize-key :containers)
-                :containers
-                :image-tag))))
-
-  (testing "takes app version if no tag specified"
-    (is (= (v/version)
-           (->> {:containers {:type :oci}}
-                (c/normalize-key :containers)
-                :containers
-                :image-tag))))
-
-  (testing "formats using app version when format string specified"
-    (is (= (str "test-format-" (v/version))
-           (->> {:containers {:type :oci
-                              :image-tag "test-format-%s"}}
-                (c/normalize-key :containers)
-                :containers
-                :image-tag)))))

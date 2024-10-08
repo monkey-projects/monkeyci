@@ -151,41 +151,6 @@
         (is (= rt (sut/mark-start rt)))
         (is (.exists start))))))
 
-(deftest normalize-key
-  (testing "adds events file from args"
-    (is (= "test-file" (-> (c/normalize-key :sidecar {:sidecar {}
-                                                      :args {:events-file "test-file"}})
-                           :sidecar
-                           :events-file))))
-
-  (testing "adds start file from args"
-    (is (= "test-file" (-> (c/normalize-key :sidecar {:sidecar {}
-                                                      :args {:start-file "test-file"}})
-                           :sidecar
-                           :start-file))))
-
-  (testing "adds abort file from args"
-    (is (= "test-file" (-> (c/normalize-key :sidecar {:sidecar {}
-                                                      :args {:abort-file "test-file"}})
-                           :sidecar
-                           :abort-file))))
-
-  (testing "adds job config from args"
-    (is (= {:key "value"}
-           (-> (c/normalize-key :sidecar {:sidecar {}
-                                          :args {:job-config {:key "value"}}})
-               :sidecar
-               :job-config))))
-
-  (testing "reads log config if specified"
-    (h/with-tmp-dir dir
-      (let [p (io/file dir "log-test.xml")
-            file-contents "test-config-xml"]
-        (is (nil? (spit p file-contents)))
-        (is (= file-contents (-> (c/normalize-key :sidecar {:sidecar {:log-config (.getCanonicalPath p)}})
-                                 :sidecar
-                                 :log-config)))))))
-
 (deftest upload-logs
   (testing "does nothing if no logger"
     (is (nil? (sut/upload-logs {} nil))))
