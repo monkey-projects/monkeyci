@@ -85,7 +85,7 @@
 
 (defn- render-job [idx job]
   (let [r (rf/subscribe [:route/current])
-        cells [[:td [:th {:scope :row} (inc idx)]]
+        cells [[:td [:b (inc idx)]]
                [:td [:a {:href (job-path job @r)}
                      (:id job)]]
                [:td (->> (get-in job [:dependencies])
@@ -110,6 +110,7 @@
 
 (defn- build-jobs []
   (let [jobs (rf/subscribe [:build/jobs])]
+    (println "Jobs:" (str @jobs))
     (if (empty? @jobs)
       [:p "This build does not contain any jobs."]
       [jobs-table @jobs])))
@@ -121,7 +122,7 @@
 (defn- cancel-btn []
   (let [build (rf/subscribe [:build/current])
         c? (rf/subscribe [:build/canceling?])]
-    (when (= :running (:status @build))
+    (when (#{:running :initializing} (:status @build))
       [:button.btn.btn-icon.btn-danger.btn-sm
        (cond-> {:on-click (u/link-evt-handler [:build/cancel])
                 :title "Cancel this build"}
@@ -140,26 +141,29 @@
          @r? (assoc :disabled true))
        [co/icon :arrow-repeat]])))
 
+(defn build-title []
+  (let [route (rf/subscribe [:route/current])
+        params (-> @route r/path-params)
+        repo (rf/subscribe [:repo/info (:repo-id params)])]
+    [:h3.me-auto [:span.me-2 co/build-icon] (:name @repo) " - " (:build-id params)]))
+
 (defn page [route]
-  (fn [route]
-    (rf/dispatch [:build/init])
-    (let [params (r/path-params route)
-          repo (rf/subscribe [:repo/info (:repo-id params)])
-          loading? (rf/subscribe [:build/loading?])]
-      [l/default
-       [:<>
-        [:div.d-flex.gap-2.align-items-start.mb-2
-         [:h3.me-auto [:span.me-2 co/build-icon] (:name @repo) " - " (:build-id params)]
-         (when @loading?
-           [:button.btn.btn-primary.btn-sm
-            {:disabled true}
-            [:div.spinner-border]])
-         [retry-btn]
-         [cancel-btn]
-         [co/reload-btn-sm [:build/reload]]]
-        [:div.card
-         [:div.card-body
-          [co/alerts [:build/alerts]]
-          ;; TODO When loading, show placeholders
-          [current-overview]
-          [build-jobs]]]]])))
+  (rf/dispatch [:build/init])
+  (let [loading? (rf/subscribe [:build/loading?])]
+    [l/default
+     [:<>
+      [:div.d-flex.gap-2.align-items-start.mb-2
+       [build-title]
+       (when @loading?
+         [:button.btn.btn-primary.btn-sm
+          {:disabled true}
+          [:div.spinner-border]])
+       [retry-btn]
+       [cancel-btn]
+       [co/reload-btn-sm [:build/reload]]]
+      [:div.card
+       [:div.card-body
+        [co/alerts [:build/alerts]]
+        ;; TODO When loading, show placeholders
+        [current-overview]
+        [build-jobs]]]]]))

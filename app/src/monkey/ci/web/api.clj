@@ -317,10 +317,9 @@
         existing (st/find-build st (c/build-sid req))
         rt (c/req->rt req)
         build (some-> existing
-                      (dissoc :start-time :end-time)
+                      (dissoc :start-time :end-time :script)
                       (assign-build-id req)
-                      (initialize-build rt)
-                      (update :script dissoc :script-dir :start-time :end-time))]
+                      (initialize-build rt))]
     (if build
       (save-and-run-build rt build)
       (rur/not-found {:message "Build not found"}))))
