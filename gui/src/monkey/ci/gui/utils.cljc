@@ -105,3 +105,8 @@
   "Updates an item in a sequential collection"
   [coll idx f & args]
   (mc/replace-nth idx (apply f (nth coll idx) args) coll))
+
+(defn truncate [x len]
+  (if (and (string? x) (> (count x) len))
+    (str (subs x 0 len) "...")
+    x))

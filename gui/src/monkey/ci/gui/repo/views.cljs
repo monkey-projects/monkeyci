@@ -89,8 +89,10 @@
     :value (fn [b] [:div.text-center [co/build-result (:status b)]])}
    {:label "Message"
     :value (fn [b]
-             [:span (or (get-in b [:git :message])
-                        (:message b))])}])
+             [:div.text-truncate
+              {:style {:max-width "240px"}}
+              (or (get-in b [:git :message])
+                  (:message b))])}])
 
 (defn- builds [repo]
   (let [loaded? (rf/subscribe [:builds/loaded?])]

@@ -121,7 +121,7 @@
   run-local)
 
 (defmethod make-runner :local [conf]
-  (log/info "Using local runner")
+  (log/info "Using local runner with working directory" (:work-dir conf))
   run-local)
 
 (defmethod make-runner :noop [_]

@@ -188,11 +188,14 @@
   "Displays tab pages for various customer overview screens"
   [id]
   [tabs/tabs ::overview
-   [{:header [:span [:span.me-2 co/overview-icon] "Overview"]
+   [{:id :overview
+     :header [:span [:span.me-2 co/overview-icon] "Overview"]
      :contents [customer-stats id]}
-    {:header [:span [:span.me-2 co/repo-icon] "Repositories"]
+    {:id :repos
+     :header [:span [:span.me-2 co/repo-icon] "Repositories"]
      :contents [customer-repos]}
-    {:header [:span [:span.me-2 co/build-icon] "Recent Builds"]
+    {:id :recent
+     :header [:span [:span.me-2 co/build-icon] "Recent Builds"]
      :contents [recent-builds id]
      :current? true}]])
 
