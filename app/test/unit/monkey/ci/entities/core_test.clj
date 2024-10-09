@@ -309,7 +309,8 @@
   (eh/with-prepared-db conn
     (let [cust (sut/insert-customer conn (eh/gen-customer))
           cred (-> (eh/gen-cust-credit)
-                   (assoc :customer-id (:id cust)))]
+                   (assoc :customer-id (:id cust))
+                   (dissoc :subscription-id :user-id))]
       (testing "can insert"
         (is (number? (:id (sut/insert-customer-credit conn cred)))))
 
