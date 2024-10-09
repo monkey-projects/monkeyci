@@ -9,6 +9,7 @@
             [monkey.ci.entities
              [build :as eb]
              [core :as ec]
+             [credit-subs :as ecsub]
              [customer :as ecu]
              [customer-credit :as ecc]
              [join-request :as jr]
@@ -563,6 +564,40 @@
 (defn- delete-email-registration [conn cuid]
   (ec/delete-email-registrations conn (ec/by-cuid cuid)))
 
+(def credit-subscription? (partial global-sid? st/credit-subscriptions))
+
+(defn- credit-sub->db [cs]
+  (-> cs
+      (assoc :cuid (:id cs))
+      (dissoc :id)))
+
+(defn- db->credit-sub [cs]
+  (mc/filter-vals some? cs))
+
+(defn- insert-credit-subscription [conn cs]
+  (let [cust (ec/select-customer conn (ec/by-cuid (:customer-id cs)))]
+    (ec/insert-credit-subscription conn (assoc (credit-sub->db cs)
+                                               :customer-id (:id cust)))))
+
+(defn- update-credit-subscription [conn cs existing]
+  (ec/update-credit-subscription conn (merge existing
+                                             (-> (credit-sub->db cs)
+                                                 (dissoc :customer-id)))))
+
+(defn- upsert-credit-subscription [conn cs]
+  (if-let [existing (ec/select-credit-subscription conn (ec/by-cuid (:id cs)))]
+    (update-credit-subscription conn cs existing)
+    (insert-credit-subscription conn cs)))
+
+(defn- select-credit-subscription [conn cuid]
+  (some->> (ecsub/select-credit-subs conn (ecsub/by-cuid cuid))
+           (first)
+           (db->credit-sub)))
+
+(defn- select-customer-credit-subs [{:keys [conn]} cust-id]
+  (->> (ecsub/select-credit-subs conn (ecsub/by-cust cust-id))
+       (map db->credit-sub)))
+
 (def customer-credit? (partial global-sid? st/customer-credits))
 
 (defn- customer-credit->db [cred]
@@ -622,6 +657,8 @@
       (select-join-request conn (global-sid->cuid sid))
       email-registration?
       (select-email-registration conn (global-sid->cuid sid))
+      credit-subscription?
+      (select-credit-subscription conn (global-sid->cuid sid))
       customer-credit?
       (select-customer-credit conn (global-sid->cuid sid))))
   
@@ -643,6 +680,8 @@
             (upsert-params conn (last sid) obj)
             email-registration?
             (insert-email-registration conn obj)
+            credit-subscription?
+            (upsert-credit-subscription conn obj)
             customer-credit?
             (upsert-customer-credit conn obj)
             (log/warn "Unrecognized sid when writing:" sid))
@@ -722,7 +761,8 @@
    :customer
    {:search select-customers
     :list-credits-since select-customer-credits-since
-    :get-available-credits select-avail-credits}
+    :get-available-credits select-avail-credits
+    :list-credit-subscriptions select-customer-credit-subs}
    :repo
    {:list-display-ids select-repo-display-ids
     :find-next-build-idx (comp (fnil inc 0) select-max-build-idx)}

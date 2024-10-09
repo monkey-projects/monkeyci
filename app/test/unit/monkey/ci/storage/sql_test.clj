@@ -437,6 +437,25 @@
         (is (true? (st/delete-email-registration s (:id er))))
         (is (empty? (st/list-email-registrations s)))))))
 
+(deftest ^:sql credit-subscriptions
+  (with-storage conn s
+    (let [cust (h/gen-cust)
+          cs (-> (h/gen-credit-subs)
+                 (assoc :customer-id (:id cust)))]
+      (is (sid/sid? (st/save-customer s cust)))
+
+      (testing "can create and retrieve"
+        (is (sid/sid? (st/save-credit-subscription s cs)))
+        (is (= cs (st/find-credit-subscription s (st/credit-sub-sid (:id cust) (:id cs))))))
+
+      (testing "can list for customer"
+        (is (= [cs] (st/list-customer-credit-subscriptions s (:id cust)))))
+
+      (testing "can update"
+        (is (sid/sid? (st/save-credit-subscription s (assoc cs :amount 200M))))
+        (is (= 200M (-> (st/find-credit-subscription s (st/credit-sub-sid (:id cust) (:id cs)))
+                        :amount)))))))
+
 (deftest ^:sql customer-credits
   (with-storage conn s
     (let [repo (h/gen-repo)

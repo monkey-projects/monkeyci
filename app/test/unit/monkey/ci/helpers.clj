@@ -284,15 +284,20 @@
 (defn gen-email-registration []
   (gen-entity :entity/email-registration))
 
+(defn- update-amount [x]
+  (update x :amount bigdec))
+
 (defn gen-cust-credit []
   (-> (gen-entity :entity/customer-credit)
-      (update :amount bigdec)))
+      (update-amount)))
 
 (defn gen-credit-subs []
-  (gen-entity :entity/credit-subscription))
+  (-> (gen-entity :entity/credit-subscription)
+      (update-amount)))
 
 (defn gen-credit-cons []
-  (gen-entity :entity/credit-consumption))
+  (-> (gen-entity :entity/credit-consumption)
+      (update-amount)))
 
 (defrecord FakeContainerRunner [credit-consumer runs result]
   p/ContainerRunner
