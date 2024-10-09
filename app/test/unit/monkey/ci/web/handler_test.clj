@@ -1010,3 +1010,17 @@
                             :creator st/save-email-registration
                             :can-update? false
                             :can-delete? true}))
+
+(deftest admin-routes
+  (testing "`/admin`"
+    (testing "`/issue-credits`"
+      (testing "POST `/:customer-id` issues new credits to specific customer"
+        (let [cust (h/gen-cust)]
+          (is (= 200 (-> (mock/request :post (str "/admin/issue-credits/" (:id cust)))
+                         (test-app)
+                         :status)))))
+
+      (testing "POST `/auto` issues new credits to all customers with subscriptions"
+        (is (= 200 (-> (mock/request :post "/admin/issue-credits/auto")
+                       (test-app)
+                       :status)))))))
