@@ -516,3 +516,26 @@
           (map (partial find-customer-credit s))
           (filter (every-pred (cp/prop-pred :customer-id cust-id)
                               (comp (partial <= ts) :from-time)))))))
+
+(def calc-available-credits
+  "Calculates the available credits for the customer.  Basically this is the
+   amount of provisioned credits, substracted by the consumed credits."
+  (override-or
+   [:customer :get-available-credits]
+   (fn [s cust-id]
+     ;; Naive implementation: sum up all provisioned credits and all
+     ;; credits from all builds
+     (let [avail (->> (p/list-obj s (customer-credit-sid))
+                      (map (partial find-customer-credit s))
+                      (filter (cp/prop-pred :customer-id cust-id))
+                      (map :amount)
+                      (reduce + 0M))
+           used (->> (find-customer s cust-id)
+                     :repos
+                     (keys)
+                     (map (partial vector cust-id))
+                     (mapcat (fn [sid]
+                               (->> (list-builds s sid)
+                                    (map :credits))))
+                     (reduce + 0M))]
+       (- avail used)))))

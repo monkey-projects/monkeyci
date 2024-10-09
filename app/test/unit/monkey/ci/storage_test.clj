@@ -309,11 +309,27 @@
   (h/with-memory-store st
     (let [now (t/now)
           cred (-> (h/gen-cust-credit)
-                   (assoc :from-time now))]
+                   (assoc :from-time now
+                          :amount 100M))
+          cid (:customer-id cred)
+          repo (h/gen-repo)
+          rid (:id repo)
+          cust {:id cid
+                :repos {(:id repo) repo}}]
+      (is (sid/sid? (sut/save-customer st cust)))
+
       (testing "can save and find"
         (is (sid/sid? (sut/save-customer-credit st cred)))
         (is (= cred (sut/find-customer-credit st (:id cred)))))
 
       (testing "can list for customer since date"
-        (is (= [cred] (sut/list-customer-credits-since st (:customer-id cred) (- now 100))))))))
+        (is (= [cred] (sut/list-customer-credits-since st cid (- now 100)))))
 
+      (testing "can calculate available credits"
+        (is (sid/sid? (sut/save-build
+                       st
+                       (-> (h/gen-build)
+                           (assoc :customer-id cid
+                                  :repo-id rid
+                                  :credits 20M)))))
+        (is (= 80M (sut/calc-available-credits st cid)))))))

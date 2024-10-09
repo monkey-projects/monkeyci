@@ -596,6 +596,9 @@
   (->> (ecc/select-customer-credits conn (ecc/by-customer-since cust-id since))
        (map db->customer-credit)))
 
+(defn- select-avail-credits [{:keys [conn]} cust-id]
+  (ecc/select-avail-credits conn cust-id))
+
 (defn- sid-pred [t sid]
   (t sid))
 
@@ -718,7 +721,8 @@
     :unwatch unwatch-github-repo}
    :customer
    {:search select-customers
-    :list-credits-since select-customer-credits-since}
+    :list-credits-since select-customer-credits-since
+    :get-available-credits select-avail-credits}
    :repo
    {:list-display-ids select-repo-display-ids
     :find-next-build-idx (comp (fnil inc 0) select-max-build-idx)}

@@ -439,9 +439,12 @@
 
 (deftest ^:sql customer-credits
   (with-storage conn s
-      (let [cust (h/gen-cust)
+      (let [repo (h/gen-repo)
+            cust (-> (h/gen-cust)
+                     (assoc :repos {(:id repo) repo}))
             cred (-> (h/gen-cust-credit)
-                     (assoc :customer-id (:id cust)))]
+                     (assoc :customer-id (:id cust)
+                            :amount 100M))]
         (is (sid/sid? (st/save-customer s cust)))
         
         (testing "can create and retrieve"
@@ -454,7 +457,8 @@
                 sids (->> [(assoc cred :from-time 1000)
                            (-> (h/gen-cust-credit)
                                (assoc :customer-id (:id cust)
-                                      :from-time 2000))
+                                      :from-time 2000
+                                      :amount 200M))
                            (-> (h/gen-cust-credit)
                                (assoc :customer-id (:id other-cust)
                                       :from-time 1000))]
@@ -462,7 +466,15 @@
             (is (some? sids))
             (is (= [(-> sids first last)]
                    (->> (st/list-customer-credits-since s (:id cust) 1100)
-                        (map :id)))))))))
+                        (map :id))))))
+
+        (testing "calculates available credits"
+          (let [build (-> (h/gen-build)
+                          (assoc :customer-id (:id cust)
+                                 :repo-id (:id repo)
+                                 :credits 25M))]
+            (is (sid/sid? (st/save-build s build)))
+            (is (= 275M (st/calc-available-credits s (:id cust)))))))))
 
 (deftest make-storage
   (testing "creates sql storage object using connection settings"
