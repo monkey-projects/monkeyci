@@ -439,42 +439,45 @@
 
 (deftest ^:sql customer-credits
   (with-storage conn s
-      (let [repo (h/gen-repo)
-            cust (-> (h/gen-cust)
-                     (assoc :repos {(:id repo) repo}))
-            cred (-> (h/gen-cust-credit)
-                     (assoc :customer-id (:id cust)
-                            :amount 100M))]
-        (is (sid/sid? (st/save-customer s cust)))
+    (let [repo (h/gen-repo)
+          cust (-> (h/gen-cust)
+                   (assoc :repos {(:id repo) repo}))
+          cred (-> (h/gen-cust-credit)
+                   (assoc :customer-id (:id cust)
+                          :amount 100M)
+                   (dissoc :user-id :subscription-id))]
+      (is (sid/sid? (st/save-customer s cust)))
         
-        (testing "can create and retrieve"
-          (is (sid/sid? (st/save-customer-credit s cred)))
-          (is (= cred (st/find-customer-credit s (:id cred)))))
+      (testing "can create and retrieve"
+        (is (sid/sid? (st/save-customer-credit s cred)))
+        (is (= cred (st/find-customer-credit s (:id cred)))))
         
-        (testing "can list for customer"
-          (let [other-cust (h/gen-cust)
-                _ (st/save-customer s other-cust)
-                sids (->> [(assoc cred :from-time 1000)
-                           (-> (h/gen-cust-credit)
-                               (assoc :customer-id (:id cust)
-                                      :from-time 2000
-                                      :amount 200M))
-                           (-> (h/gen-cust-credit)
-                               (assoc :customer-id (:id other-cust)
-                                      :from-time 1000))]
-                          (mapv (partial st/save-customer-credit s)))]
-            (is (some? sids))
-            (is (= [(-> sids first last)]
-                   (->> (st/list-customer-credits-since s (:id cust) 1100)
-                        (map :id))))))
+      (testing "can list for customer"
+        (let [other-cust (h/gen-cust)
+              _ (st/save-customer s other-cust)
+              sids (->> [(assoc cred :from-time 1000)
+                         (-> (h/gen-cust-credit)
+                             (assoc :customer-id (:id cust)
+                                    :from-time 2000
+                                    :amount 200M)
+                             (dissoc :user-id :subscription-id))
+                         (-> (h/gen-cust-credit)
+                             (assoc :customer-id (:id other-cust)
+                                    :from-time 1000)
+                             (dissoc :user-id :subscription-id))]
+                        (mapv (partial st/save-customer-credit s)))]
+          (is (some? sids))
+          (is (= [(-> sids first last)]
+                 (->> (st/list-customer-credits-since s (:id cust) 1100)
+                      (map :id))))))
 
-        (testing "calculates available credits"
-          (let [build (-> (h/gen-build)
-                          (assoc :customer-id (:id cust)
-                                 :repo-id (:id repo)
-                                 :credits 25M))]
-            (is (sid/sid? (st/save-build s build)))
-            (is (= 275M (st/calc-available-credits s (:id cust)))))))))
+      (testing "calculates available credits"
+        (let [build (-> (h/gen-build)
+                        (assoc :customer-id (:id cust)
+                               :repo-id (:id repo)
+                               :credits 25M))]
+          (is (sid/sid? (st/save-build s build)))
+          (is (= 275M (st/calc-available-credits s (:id cust)))))))))
 
 (deftest make-storage
   (testing "creates sql storage object using connection settings"

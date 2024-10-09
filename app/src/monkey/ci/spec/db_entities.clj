@@ -127,7 +127,6 @@
 
 (s/def :db/subscription-id int?)
 (s/def :db/reason string?)
-(s/def :credit/type #{:subscription :user})
 
 (s/def :db/customer-credit
   (-> (s/keys :req-un [:db/customer-id :db/amount :credit/type]

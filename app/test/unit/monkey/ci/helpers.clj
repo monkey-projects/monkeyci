@@ -288,6 +288,12 @@
   (-> (gen-entity :entity/customer-credit)
       (update :amount bigdec)))
 
+(defn gen-credit-subs []
+  (gen-entity :entity/credit-subscription))
+
+(defn gen-credit-cons []
+  (gen-entity :entity/credit-consumption))
+
 (defrecord FakeContainerRunner [credit-consumer runs result]
   p/ContainerRunner
   (run-container [this job]

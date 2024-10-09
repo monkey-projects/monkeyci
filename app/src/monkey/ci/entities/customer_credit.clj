@@ -9,12 +9,12 @@
 
 (defn select-customer-credits [conn f]
   (->> (assoc base-query
-              :select [:cc.amount :cc.from-time
+              :select [:cc.amount :cc.from-time :cc.type :cc.reason
                        [:cc.cuid :id]
                        [:c.cuid :customer-id]]
               :where f)
        (ec/select conn)
-       (map ec/convert-credit-conversions-select)))
+       (map ec/convert-credit-select)))
 
 (defn select-avail-credits [conn cust-id]
   (let [avail (-> (ec/select

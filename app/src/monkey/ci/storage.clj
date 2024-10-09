@@ -539,3 +539,41 @@
                                     (map :credits))))
                      (reduce + 0M))]
        (- avail used)))))
+
+(def credit-subscriptions :credit-subscriptions)
+(defn credit-sub-sid [cust-id & others]
+  (into [global (name credit-subscriptions)] others))
+
+(defn save-credit-subscription [s cs]
+  (p/write-obj s (credit-sub-sid (:customer-id cs) (:id cs)) cs))
+
+(defn find-credit-subscription [s sid]
+  (p/read-obj s sid))
+
+(def list-customer-credit-subscriptions
+  (override-or
+   [:customer :list-credit-subscriptions]
+   (fn [st cust-id]
+     (let [sid (credit-sub-sid [cust-id])]
+       (->> (p/list-obj st sid)
+            (map (partial conj sid))
+            (map (partial find-credit-subscription st)))))))
+
+(def credit-consumptions :credit-consumptions)
+(defn credit-cons-sid [cust-id & others]
+  (into [global (name credit-consumptions)] others))
+
+(defn save-credit-consumption [s cs]
+  (p/write-obj s (credit-cons-sid (:customer-id cs) (:id cs)) cs))
+
+(defn find-credit-consumption [s sid]
+  (p/read-obj s sid))
+
+(def list-customer-credit-consumptions
+  (override-or
+   [:customer :list-credit-consumptions]
+   (fn [st cust-id]
+     (let [sid (credit-cons-sid [cust-id])]
+       (->> (p/list-obj st sid)
+            (map (partial conj sid))
+            (map (partial find-credit-consumption st)))))))
