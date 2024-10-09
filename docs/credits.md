@@ -18,16 +18,17 @@ The entities are related to each other like this:
 ```mermaid
 flowchart TD
     CS[CreditSubscription] --> C[Customer]
-    CI[CreditIssuance] -->|subscription-id| CS
     CC[CustomerCredit] --> C
-    CC --> CI
-    CI -->|user-id| U[User]
-    AC[AvailableCredits] --> C
+    CC -->|subscription-id| CS
+    CC -->|user-id| U[User]
+    CCO[CreditConsumption] --> CC
+    CCO --> B[Build]
+    AC[AvailableCredit] --> C
 ```
 
 ### Issuing
 
-A `CreditIssuance` has a `type` property, that indicates whether the issuance is
+A `CustomerCredit` has a `type` property, that indicates whether the issuance is
 the result of a subscription, or of an arbitrary action by a user (ad-hoc).  In case
 of a subscription, the `subscription-id` points to the `CreditSubscription`.
 
@@ -42,11 +43,6 @@ It's also possible a user with the right privileges (e.g. a salesperson or admin
 wants to issue credits to a customer just once, in which case the `user-id`
 property on the issuance will point to the user in question.  A `reason` can also
 be given in this case.
-
-The `CustomerCredit` record that is the result of the issuance will the point to
-the `CreditIssuance`.  The reason these two entities are not merged into a single
-entity is because the issuance information is irrelevant most of the time for
-credit calculation.
 
 ### Credit Calculation
 

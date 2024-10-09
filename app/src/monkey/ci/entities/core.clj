@@ -314,15 +314,57 @@
 (defentity join-request)
 (defentity email-registration)
 
-(def prepare-credit-conversions (partial int->time :from-time))
-(def convert-credit-conversions (partial copy-prop :from-time))
-(def convert-credit-conversions-select (partial time->int :from-time))
+(def prepare-credit-sub
+  (comp (partial int->time :valid-from)
+        (partial int->time :valid-until)))
+
+(def convert-credit-sub
+  (comp (partial copy-prop :valid-from)
+        (partial copy-prop :valid-until)))
+
+(def convert-credit-sub-select
+  (comp (partial time->int :valid-from)
+        (partial time->int :valid-until)))
+
+(def credit-sub-conversions
+  {:before-insert prepare-credit-sub
+   :after-insert  convert-credit-sub
+   :before-update prepare-credit-sub
+   :after-update  convert-credit-sub
+   :after-select  convert-credit-sub-select})
+
+(defentity credit-subscription credit-sub-conversions)
+
+(def prepare-credit
+  (comp (partial int->time :from-time)
+        (partial keyword->str :type)))
+
+(def convert-credit
+  (comp (partial copy-prop :from-time)
+        (partial copy-prop :type)))
+
+(def convert-credit-select
+  (comp (partial time->int :from-time)
+        (partial str->keyword :type)))
 
 (def cust-credit-conversions
-  {:before-insert prepare-credit-conversions
-   :after-insert  convert-credit-conversions
-   :before-update prepare-credit-conversions
-   :after-update  convert-credit-conversions
-   :after-select  convert-credit-conversions-select})
+  {:before-insert prepare-credit
+   :after-insert  convert-credit
+   :before-update prepare-credit
+   :after-update  convert-credit
+   :after-select  convert-credit-select})
 
 (defentity customer-credit cust-credit-conversions)
+
+(def prepare-credit-cons (partial int->time :consumed-at))
+(def convert-credit-cons (partial copy-prop :consumed-at))
+(def convert-credit-cons-select (partial time->int :consumed-at))
+
+(def credit-cons-conversions
+  {:before-insert prepare-credit-cons
+   :after-insert  convert-credit-cons
+   :before-update prepare-credit-cons
+   :after-update  convert-credit-cons
+   :after-select  convert-credit-cons-select})
+
+(defentity credit-consumption credit-cons-conversions)

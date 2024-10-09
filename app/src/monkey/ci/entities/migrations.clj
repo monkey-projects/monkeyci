@@ -17,6 +17,7 @@
 (def cuid-col [:cuid [:char 24] [:not nil]])
 (def description-col [:description [:varchar 300]])
 (def label-filters-col [:label-filters :text])
+(def amount-col [:amount [:decimal 10 2] [:not nil]])
 
 (defn cuid-idx
   "Generates a unique index on the `cuid` column for given table."
@@ -222,12 +223,47 @@
     [(h/drop-index :email-reg-idx)])
 
    (entity-table-migration
-    21 :customer-credits
+    21 :credit-subscriptions
     [customer-col
-     [:amount [:decimal 10 2] [:not nil]]
-     [:from-time :timestamp]
+     amount-col
+     [:valid-from :timestamp]
+     [:valid-until :timestamp]
      fk-customer]
-    [(col-idx :customer-credits :customer-id)])])
+    [(col-idx :credit-subscriptions :customer-id)])
+
+   (entity-table-migration
+    22 :customer-credits
+    [customer-col
+     amount-col
+     [:from-time :timestamp]
+     [:type [:varchar 20]]
+     [:user-id :integer] ; can be nil
+     [:subscription-id :integer]
+     [:reason [:varchar 300]]
+     fk-customer
+     fk-user
+     (fk :subscription-id :credit-subscriptions :id)]
+    [(col-idx :customer-credits :customer-id)
+     (col-idx :customer-credits :user-id)
+     (col-idx :customer-credits :subscription-id)])
+
+   (entity-table-migration
+    23 :credit-consumptions
+    [amount-col
+     [:consumed-at :timestamp]
+     [:credit-id :integer [:not nil]]
+     [:build-id :integer [:not nil]]
+     (fk :credit-id :customer-credits :id)
+     (fk :build-id :builds :id)]
+    [(col-idx :credit-consumptions :credit-id)
+     (col-idx :credit-consumptions :build-id)])
+
+   (entity-table-migration
+    24 :available-credits
+    [customer-col
+     amount-col
+     fk-customer]
+    [(col-idx :available-credits :customer-id)])])
 
 (defn- format-migration [sql-opts m]
   (letfn [(format-sql [stmt]

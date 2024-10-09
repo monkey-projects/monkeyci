@@ -91,3 +91,9 @@
 
 (defn gen-cust-credit []
   (gen-spec :db/customer-credit))
+
+(defn gen-credit-subscription []
+  (gen-spec :db/credit-subscription))
+
+(defn gen-credit-consumption []
+  (gen-spec :db/credit-consumption))
