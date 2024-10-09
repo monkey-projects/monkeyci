@@ -9,6 +9,7 @@
              [git :as git]
              [listeners :as li]
              [logging :as l]
+             [metrics :as m]
              [protocols :as p]
              [reporting :as rep]
              [runners :as r]
@@ -199,6 +200,9 @@
 (defn- new-server-runtime [conf]
   (->ServerRuntime conf))
 
+(defn- new-metrics []
+  (m/make-registry))
+
 (defn make-server-system
   "Creates a component system that can be used to start an application server."
   [config]
@@ -212,12 +216,15 @@
    :runner    (new-server-runner config)
    :runtime   (co/using
                (new-server-runtime config)
-               [:artifacts :events :reporter :runner :storage :jwk])
+               [:artifacts :events :metrics :reporter :runner :storage :jwk])
    :storage   (new-storage config)
    :jwk       (new-jwk config)
    :listeners (co/using
                (new-listeners)
-               [:events :storage])))
+               [:events :storage])
+   :metrics   (co/using
+               (new-metrics)
+               [:events])))
 
 (defn with-server-system [config f]
   (rc/with-system (make-server-system config) f))
