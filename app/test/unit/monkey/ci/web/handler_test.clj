@@ -14,7 +14,6 @@
              [artifacts :as a]
              [logging :as l]
              [metrics :as m]
-             [runtime :as rt]
              [storage :as st]
              [utils :as u]
              [version :as v]]
@@ -937,30 +936,6 @@
                      (test-app)
                      :status))))))
 
-(deftest setup-runtime
-  (testing "returns fn that starts http server"
-    (let [conf {:http {:port 1234}}
-          h (rt/setup-runtime conf :http)
-          rt {:http h
-              :config conf}
-          inv (atom nil)]
-      (is (fn? h))
-      (with-redefs [aleph/start-server (fn [handler args]
-                                         (reset! inv {:handler handler
-                                                      :opts args}))]
-        (is (some? (h rt)))
-        (is (= {:port 1234} (-> (:opts @inv)
-                                (select-keys [:port])))))))
-
-  (testing "start fn returns another fn that stops the server"
-    (let [stopped? (atom false)]
-      (with-redefs [aleph/start-server (constantly (h/->FakeServer stopped?))]
-        (let [h (rt/setup-runtime {:http {}} :http)
-              s (h {})]
-          (is (ifn? s))
-          (is (some? (s)))
-          (is (true? @stopped?)))))))
-
 (deftest on-server-close
   (testing "waits until netty server closes"
     (with-redefs [netty/wait-for-close (fn [s]
@@ -1010,3 +985,17 @@
                             :creator st/save-email-registration
                             :can-update? false
                             :can-delete? true}))
+
+(deftest admin-routes
+  (testing "`/admin`"
+    (testing "`/issue-credits`"
+      (testing "POST `/:customer-id` issues new credits to specific customer"
+        (let [cust (h/gen-cust)]
+          (is (= 200 (-> (mock/request :post (str "/admin/issue-credits/" (:id cust)))
+                         (test-app)
+                         :status)))))
+
+      (testing "POST `/auto` issues new credits to all customers with subscriptions"
+        (is (= 200 (-> (mock/request :post "/admin/issue-credits/auto")
+                       (test-app)
+                       :status)))))))

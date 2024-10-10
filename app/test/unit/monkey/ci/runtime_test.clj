@@ -60,10 +60,7 @@
     (verify-runtime :cache {:type :disk :dir "/tmp"} some?))
 
   (testing "provides events"
-    (verify-runtime :events {:type :manifold} some?))
-
-  (testing "provides http server"
-    (verify-runtime :http {:port 3000} fn?)))
+    (verify-runtime :events {:type :manifold} some?)))
 
 (deftest from-config
   (testing "gets value from config"

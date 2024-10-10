@@ -496,3 +496,84 @@
 
 (defn delete-email-registration [s id]
   (p/delete-obj s (email-registration-sid id)))
+
+(def customer-credits :customer-credits)
+(def customer-credit-sid (partial global-sid customer-credits))
+
+(defn save-customer-credit [s cred]
+  (p/write-obj s (customer-credit-sid (:id cred)) cred))
+
+(defn find-customer-credit [s id]
+  (p/read-obj s (customer-credit-sid id)))
+
+(def list-customer-credits-since
+  "Lists all customer credits for the customer since given timestamp.  
+   This includes those without a `from-time`."
+  (override-or
+   [:customer :list-credits-since]
+   (fn [s cust-id ts]
+     (->> (p/list-obj s (customer-credit-sid))
+          (map (partial find-customer-credit s))
+          (filter (every-pred (cp/prop-pred :customer-id cust-id)
+                              (comp (partial <= ts) :from-time)))))))
+
+(def calc-available-credits
+  "Calculates the available credits for the customer.  Basically this is the
+   amount of provisioned credits, substracted by the consumed credits."
+  (override-or
+   [:customer :get-available-credits]
+   (fn [s cust-id]
+     ;; Naive implementation: sum up all provisioned credits and all
+     ;; credits from all builds
+     (let [avail (->> (p/list-obj s (customer-credit-sid))
+                      (map (partial find-customer-credit s))
+                      (filter (cp/prop-pred :customer-id cust-id))
+                      (map :amount)
+                      (reduce + 0M))
+           used (->> (find-customer s cust-id)
+                     :repos
+                     (keys)
+                     (map (partial vector cust-id))
+                     (mapcat (fn [sid]
+                               (->> (list-builds s sid)
+                                    (map :credits))))
+                     (reduce + 0M))]
+       (- avail used)))))
+
+(def credit-subscriptions :credit-subscriptions)
+(defn credit-sub-sid [cust-id & others]
+  (into [global (name credit-subscriptions)] others))
+
+(defn save-credit-subscription [s cs]
+  (p/write-obj s (credit-sub-sid (:customer-id cs) (:id cs)) cs))
+
+(defn find-credit-subscription [s sid]
+  (p/read-obj s sid))
+
+(def list-customer-credit-subscriptions
+  (override-or
+   [:customer :list-credit-subscriptions]
+   (fn [st cust-id]
+     (let [sid (credit-sub-sid [cust-id])]
+       (->> (p/list-obj st sid)
+            (map (partial conj sid))
+            (map (partial find-credit-subscription st)))))))
+
+(def credit-consumptions :credit-consumptions)
+(defn credit-cons-sid [cust-id & others]
+  (into [global (name credit-consumptions)] others))
+
+(defn save-credit-consumption [s cs]
+  (p/write-obj s (credit-cons-sid (:customer-id cs) (:id cs)) cs))
+
+(defn find-credit-consumption [s sid]
+  (p/read-obj s sid))
+
+(def list-customer-credit-consumptions
+  (override-or
+   [:customer :list-credit-consumptions]
+   (fn [st cust-id]
+     (let [sid (credit-cons-sid [cust-id])]
+       (->> (p/list-obj st sid)
+            (map (partial conj sid))
+            (map (partial find-credit-consumption st)))))))

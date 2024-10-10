@@ -14,6 +14,7 @@
              [runtime :as rt]
              [version :as v]]
             [monkey.ci.web
+             [admin :as admin]
              [api :as api]
              [auth :as auth]
              [bitbucket :as bitbucket]
@@ -384,7 +385,8 @@
    bitbucket-routes
    auth-routes
    user-routes
-   email-registration-routes])
+   email-registration-routes
+   ["/admin" admin/admin-routes]])
 
 (defn- stringify-body
   "Since the raw body could be read more than once (security, content negotiation...),
@@ -420,6 +422,12 @@
   (fn [req]
     (h req)))
 
+(defn- non-dev [rt mw]
+  (if (rt/dev-mode? rt)
+    ;; Disable security in dev mode
+    [passthrough-middleware]
+    mw))
+
 (defn make-router
   ([rt routes]
    (ring/router
@@ -440,19 +448,11 @@
      ;;:compile rc/compile-request-coercers
      :reitit.middleware/registry
      {:github-security
-      (if (rt/dev-mode? rt)
-        ;; Disable security in dev mode
-        [passthrough-middleware]
-        [github/validate-security])
+      (non-dev rt [github/validate-security])
       :github-app-security
-      (if (rt/dev-mode? rt)
-        ;; Disable security in dev mode
-        [passthrough-middleware]
-        [github/validate-security (constantly (get-in (rt/config rt) [:github :webhook-secret]))])
+      (non-dev rt [github/validate-security (constantly (get-in (rt/config rt) [:github :webhook-secret]))])
       :customer-check
-      (if (rt/dev-mode? rt)
-        [passthrough-middleware]
-        [auth/customer-authorization])}}))
+      (non-dev rt [auth/customer-authorization])}}))
   ([rt]
    (make-router rt routes)))
 
@@ -486,13 +486,6 @@
   clojure.lang.IFn
   (invoke [this]
     (co/stop this)))
-
-(defmethod rt/setup-runtime :http [conf _]
-  ;; Return a function that when invoked, returns another function to shut down the server
-  (fn [rt]
-    (log/debug "Starting http server with config:" (:config rt))
-    (-> (->HttpServer rt)
-        (co/start))))
 
 (defn on-server-close
   "Returns a deferred that resolves when the server shuts down."

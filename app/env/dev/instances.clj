@@ -174,12 +174,19 @@
      (println "Deleting" (count m) "container instances...")
      (let [conf (co/oci-container-config)
            client (ci/make-context conf)]
-       (md/loop [td m]
-         (when (not-empty td)
-           (md/chain
-            (ci/delete-container-instance client {:instance-id (:id (first td))})
-            (fn [_]
-              (md/recur (rest td))))))))))
+       (doseq [ci m]
+         (let [id (:id ci)]
+           (println "Deleting" id)
+           @(ci/delete-container-instance client {:instance-id id})))
+       ;; Results in 429
+       #_(md/loop [td m
+                   res []]
+           (if (not-empty td)
+             (md/chain
+              (ci/delete-container-instance client {:instance-id (:id (first td))})
+              (fn [r]
+                (md/recur (rest td) (conj res r))))
+             (apply md/zip res)))))))
 
 (defn print-job-logs
   "Prints the logs of the (active) job container in the given instance"

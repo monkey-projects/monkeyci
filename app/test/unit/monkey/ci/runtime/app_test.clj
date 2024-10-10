@@ -8,7 +8,8 @@
             [monkey.ci.runtime.app :as sut]
             [monkey.ci.spec.runner :as sr]
             [monkey.ci.test.config :as tc]
-            [monkey.ci.helpers :as h]))
+            [monkey.ci.helpers :as h])
+  (:import monkey.ci.listeners.Listeners))
 
 (def runner-config
   (assoc tc/base-config
@@ -109,4 +110,8 @@
       (is (nil? (get-in sys [:http :rt :jwk]))))
 
     (testing "activates listeners"
-      (is (instance? monkey.ci.listeners.Listeners (:listeners sys))))))
+      (is (instance? monkey.ci.listeners.Listeners (:listeners sys))))
+
+    (testing "provides metrics"
+      (is (some? (get sys :metrics)))
+      (is (some? (get-in sys [:http :rt :metrics]))))))

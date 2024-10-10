@@ -583,7 +583,9 @@
 
 (deftest retry-build
   (h/with-memory-store st
-    (let [build (h/gen-build)
+    (let [build (-> (h/gen-build)
+                    (assoc :start-time 100
+                           :end-time 200))
           make-req (fn [runner params]
                      (-> {:storage st
                           :runner runner}
@@ -605,7 +607,8 @@
             (is (= :initializing (:status new)))
             (is (= (:git build) (:git new)))
             (is (number? (:start-time new)))
-            (is (empty? (get-in build [:script :jobs]))))))
+            (is (nil? (:end-time new)))
+            (is (nil? (:script new))))))
 
       (testing "returns 404 if build not found"
         (is (= 404 (-> (make-req (constantly "ok")
