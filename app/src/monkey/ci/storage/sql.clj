@@ -39,6 +39,16 @@
 (defn- db->labels [labels]
   (map #(select-keys % [:name :value]) labels))
 
+(defn- id->cuid [x]
+  (-> x
+      (assoc :cuid (:id x))
+      (dissoc :id)))
+
+(defn- cuid->id [x]
+  (-> x
+      (assoc :id (:cuid x))
+      (dissoc :cuid)))
+
 (defn- repo->db
   "Converts the repository into an entity that can be sent to the database."
   [r cust-id]
@@ -112,8 +122,8 @@
 
 (defn- cust->db [cust]
   (-> cust
-      (select-keys [:name])
-      (assoc :cuid (:id cust))))
+      (id->cuid)
+      (select-keys [:cuid :name])))
 
 (defn- db->cust [c]
   (letfn [(entities->repos [repos]
@@ -122,8 +132,7 @@
                        {}
                        repos))]
     (-> c
-        (dissoc :cuid)
-        (assoc :id (str (:cuid c)))
+        (cuid->id)
         (mc/update-existing :repos entities->repos))))
 
 (defn- insert-customer [conn cust]
@@ -210,8 +219,8 @@
 
 (defn- ssh-key->db [k]
   (-> k
-      (dissoc :id :customer-id)
-      (assoc :cuid (:id k))))
+      (id->cuid)
+      (dissoc :customer-id)))
 
 (defn- insert-ssh-key [conn ssh-key cust-id]
   (log/debug "Inserting ssh key:" ssh-key)
@@ -260,9 +269,9 @@
 
 (defn- param->db [param cust-id]
   (-> param
-      (select-keys [:description :label-filters])
-      (assoc :customer-id cust-id
-             :cuid (:id param))))
+      (id->cuid)
+      (select-keys [:cuid :description :label-filters])
+      (assoc :customer-id cust-id)))
 
 (defn- insert-param [conn param cust-id]
   (let [{:keys [id]} (ec/insert-customer-param conn (param->db param cust-id))]
@@ -310,15 +319,17 @@
        (= [st/global "users"] (take 2 sid))))
 
 (defn- user->db [user]
-  (-> (select-keys user [:type :type-id :email])
-      (assoc :cuid (:id user))
+  (-> user
+      (id->cuid)
+      (select-keys [:cuid :type :type-id :email])
       (mc/update-existing :type name)
       (mc/update-existing :type-id str)))
 
 (defn- db->user [user]
-  (-> (select-keys user [:type :type-id :email])
-      (mc/update-existing :type keyword)
-      (assoc :id (:cuid user))))
+  (-> user
+      (cuid->id)
+      (select-keys [:id :type :type-id :email])
+      (mc/update-existing :type keyword)))
 
 (defn- insert-user [conn user]
   (let [{:keys [id] :as ins} (ec/insert-user conn (user->db user))
@@ -509,10 +520,11 @@
 (defn- insert-join-request [conn jr]
   (let [user (ec/select-user conn (ec/by-cuid (:user-id jr)))
         cust (ec/select-customer conn (ec/by-cuid (:customer-id jr)))
-        e (-> (select-keys jr [:status :request-msg :response-msg])
+        e (-> jr
+              (id->cuid)
+              (select-keys [:cuid :status :request-msg :response-msg])
               (update :status name)
-              (assoc :cuid (:id jr)
-                     :customer-id (:id cust)
+              (assoc :customer-id (:id cust)
                      :user-id (:id user)))]
     (ec/insert-join-request conn e)))
 
@@ -539,9 +551,7 @@
 (def email-registration? (partial global-sid? st/email-registrations))
 
 (defn- db->email-registration [reg]
-  (-> reg
-      (dissoc :cuid)
-      (assoc :id (:cuid reg))))
+  (cuid->id reg))
 
 (defn- select-email-registration [conn cuid]
   (some-> (ec/select-email-registration conn (ec/by-cuid cuid))
@@ -567,9 +577,7 @@
 (def credit-subscription? (partial global-sid? st/credit-subscriptions))
 
 (defn- credit-sub->db [cs]
-  (-> cs
-      (assoc :cuid (:id cs))
-      (dissoc :id)))
+  (id->cuid cs))
 
 (defn- db->credit-sub [cs]
   (mc/filter-vals some? cs))
@@ -601,9 +609,7 @@
 (def customer-credit? (partial global-sid? st/customer-credits))
 
 (defn- customer-credit->db [cred]
-  (-> cred
-      (dissoc :id)
-      (assoc :cuid (:id cred))))
+  (id->cuid cred))
 
 (defn- db->customer-credit [cred]
   (mc/filter-vals some? cred))
