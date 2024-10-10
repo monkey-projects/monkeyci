@@ -104,13 +104,15 @@
       [refresh-btn {:class [:me-auto]}]
       [build-actions]]
      [trigger-form repo]
-     [table/paged-table
-      {:id ::builds
-       :items-sub [:repo/builds]
-       :columns table-columns
-       :loading {:sub [:builds/init-loading?]}
-       :class [:table-hover]
-       :on-row-click #(rf/dispatch [:route/goto :page/build %])}]]))
+     (if (empty? @(rf/subscribe [:repo/builds]))
+       [:p "This repository has no builds yet."]
+       [table/paged-table
+        {:id ::builds
+         :items-sub [:repo/builds]
+         :columns table-columns
+         :loading {:sub [:builds/init-loading?]}
+         :class [:table-hover]
+         :on-row-click #(rf/dispatch [:route/goto :page/build %])}])]))
 
 (defn page [route]
   (rf/dispatch [:repo/init])

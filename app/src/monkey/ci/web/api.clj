@@ -1,6 +1,5 @@
 (ns monkey.ci.web.api
-  (:require [camel-snake-kebab.core :as csk]
-            [clojure.tools.logging :as log]
+  (:require [clojure.tools.logging :as log]
             [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
@@ -22,26 +21,7 @@
 
 (def body c/body)
 
-(defn- gen-display-id
-  "Generates id from the object name.  It lists existing repository display ids
-   and generates an id from the name.  If the display id is already taken, it adds
-   an index."
-  [st obj]
-  (let [existing? (-> (:customer-id obj)
-                      (as-> cid (st/list-repo-display-ids st cid))
-                      (set))
-        ;; TODO Check what happens with special chars
-        new-id (csk/->kebab-case (:name obj))]
-    (loop [id new-id
-           idx 2]
-      ;; Try a new id until we find one that does not exist yet.
-      ;; Alternatively we could parse the ids to extract the max index (but yagni)
-      (if (existing? id)
-        (recur (str new-id "-" idx)
-               (inc idx))
-        id))))
-
-(def repo-id gen-display-id)
+(def repo-id c/gen-repo-display-id)
 
 (defn- repo->out [r]
   (dissoc r :customer-id))

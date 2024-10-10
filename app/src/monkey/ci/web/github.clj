@@ -184,7 +184,7 @@
                    (s/find-repo st [(:customer-id repo) id]))
         with-id (if existing
                   (merge existing repo)
-                  (assoc repo :id (s/new-id)))]
+                  (assoc repo :id (c/gen-repo-display-id st repo)))]
     (if (s/watch-github-repo st with-id)
       (rur/response with-id)
       (rur/status 500))))
@@ -192,6 +192,7 @@
 (defn unwatch-repo [req]
   (let [st (c/req->storage req)
         sid (req->repo-sid req)]
+    (log/debug "Unwatching repo:" sid)
     (if (s/unwatch-github-repo st sid)
       (rur/response (s/find-repo st sid))
       (rur/status 404))))
