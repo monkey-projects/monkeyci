@@ -498,6 +498,38 @@
           (is (sid/sid? (st/save-build s build)))
           (is (= 275M (st/calc-available-credits s (:id cust)))))))))
 
+(deftest ^:sql credit-consumptions
+  (with-storage conn s
+    (let [repo (h/gen-repo)
+          cust (-> (h/gen-cust)
+                   (assoc :repos {(:id repo) repo}))
+          build (-> (h/gen-build)
+                    (assoc :repo-id (:id repo)
+                           :customer-id (:id cust)))
+          credit (-> (h/gen-cust-credit)
+                     (assoc :customer-id (:id cust))
+                     (dissoc :user-id :subscription-id))
+          cc (-> (h/gen-credit-cons)
+                 (assoc :build-id (:build-id build)
+                        :repo-id (:id repo)
+                        :customer-id (:id cust)
+                        :credit-id (:id credit)))]
+      (is (sid/sid? (st/save-customer s cust)))
+      (is (sid/sid? (st/save-customer-credit s credit)))
+      (is (sid/sid? (st/save-build s build)))
+
+      (testing "can create and retrieve"
+        (is (sid/sid? (st/save-credit-consumption s cc)))
+        (is (= cc (st/find-credit-consumption s (st/credit-cons-sid (:id cust) (:id cc))))))
+
+      (testing "can list for customer"
+        (is (= [cc] (st/list-customer-credit-consumptions s (:id cust)))))
+
+      (testing "can update"
+        (is (sid/sid? (st/save-credit-consumption s (assoc cc :amount 200M))))
+        (is (= 200M (-> (st/find-credit-consumption s (st/credit-cons-sid (:id cust) (:id cc)))
+                        :amount)))))))
+
 (deftest make-storage
   (testing "creates sql storage object using connection settings"
     (let [s (st/make-storage {:storage {:type :sql

@@ -148,6 +148,7 @@
 (s/def :entity/consumed-at ts?)
 
 (s/def :entity/credit-consumption
-  (-> (s/keys :req-un [:entity/credit-id :entity/build-id :entity/amount :entity/consumed-at])
+  (-> (s/keys :req-un [:entity/credit-id :entity/customer-id :entity/repo-id :entity/build-id
+                       :entity/amount :entity/consumed-at])
       (s/merge :entity/common)))
 

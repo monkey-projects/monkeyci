@@ -9,6 +9,7 @@
             [monkey.ci.entities
              [build :as eb]
              [core :as ec]
+             [credit-cons :as eccon]
              [credit-subs :as ecsub]
              [customer :as ecu]
              [customer-credit :as ecc]
@@ -640,6 +641,47 @@
 (defn- select-avail-credits [{:keys [conn]} cust-id]
   (ecc/select-avail-credits conn cust-id))
 
+(def credit-consumption? (partial global-sid? st/credit-consumptions))
+
+(defn- credit-cons->db [cc]
+  (-> (id->cuid cc)
+      (dissoc :customer-id :repo-id)))
+
+(defn- db->credit-cons [cc]
+  (mc/filter-vals some? cc))
+
+(def build-sid (juxt :customer-id :repo-id :build-id))
+
+(defn- insert-credit-consumption [conn cc]
+  (let [build (apply eb/select-build-by-sid conn (build-sid cc))
+        credit (ec/select-customer-credit conn (ec/by-cuid (:credit-id cc)))]
+    (when-not build
+      (throw (ex-info "Build not found" cc)))
+    (when-not credit
+      (throw (ex-info "Customer credit not found" cc)))
+    (ec/insert-credit-consumption conn (assoc (credit-cons->db cc)
+                                              :build-id (:id build)
+                                              :credit-id (:id credit)))))
+
+(defn- update-credit-consumption [conn cc existing]
+  (ec/update-credit-consumption conn (merge existing
+                                            (-> (credit-cons->db cc)
+                                                (dissoc :build-id :credit-id)))))
+
+(defn- upsert-credit-consumption [conn cc]
+  (if-let [existing (ec/select-credit-consumption conn (ec/by-cuid (:id cc)))]
+    (update-credit-consumption conn cc existing)
+    (insert-credit-consumption conn cc)))
+
+(defn- select-credit-consumption [conn cuid]
+  (some->> (eccon/select-credit-cons conn (eccon/by-cuid cuid))
+           (first)
+           (db->credit-cons)))
+
+(defn- select-customer-credit-cons [{:keys [conn]} cust-id]
+  (->> (eccon/select-credit-cons conn (ecsub/by-cust cust-id))
+       (map db->credit-cons)))
+
 (defn- sid-pred [t sid]
   (t sid))
 
@@ -665,6 +707,8 @@
       (select-email-registration conn (global-sid->cuid sid))
       credit-subscription?
       (select-credit-subscription conn (global-sid->cuid sid))
+      credit-consumption?
+      (select-credit-consumption conn (global-sid->cuid sid))
       customer-credit?
       (select-customer-credit conn (global-sid->cuid sid))))
   
@@ -688,6 +732,8 @@
             (insert-email-registration conn obj)
             credit-subscription?
             (upsert-credit-subscription conn obj)
+            credit-consumption?
+            (upsert-credit-consumption conn obj)
             customer-credit?
             (upsert-customer-credit conn obj)
             (log/warn "Unrecognized sid when writing:" sid))
@@ -768,7 +814,8 @@
    {:search select-customers
     :list-credits-since select-customer-credits-since
     :get-available-credits select-avail-credits
-    :list-credit-subscriptions select-customer-credit-subs}
+    :list-credit-subscriptions select-customer-credit-subs
+    :list-credit-consumptions select-customer-credit-cons}
    :repo
    {:list-display-ids select-repo-display-ids
     :find-next-build-idx (comp (fnil inc 0) select-max-build-idx)}
