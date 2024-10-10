@@ -615,11 +615,19 @@
 (defn- db->customer-credit [cred]
   (mc/filter-vals some? cred))
 
-(defn- insert-customer-credit [conn cred]
-  (let [cust (ec/select-customer conn (ec/by-cuid (:customer-id cred)))]
+(defn- insert-customer-credit [conn {:keys [subscription-id user-id] :as cred}]
+  (let [cust (ec/select-customer conn (ec/by-cuid (:customer-id cred)))
+        cs   (when subscription-id
+               (or (ec/select-credit-subscription conn (ec/by-cuid subscription-id))
+                   (throw (ex-info "Subscription not found" cred))))
+        user (when user-id
+               (or (ec/select-user conn (ec/by-cuid user-id))
+                   (throw (ex-info "User not found" cred))))]
     (ec/insert-customer-credit conn (-> cred
                                         (customer-credit->db)
-                                        (assoc :customer-id (:id cust))))))
+                                        (assoc :customer-id (:id cust)
+                                               :subscription-id (:id cs)
+                                               :user-id (:id user))))))
 
 (defn- update-customer-credit [conn cred existing]
   (ec/update-customer-credit conn (merge existing (select-keys cred [:amount :from-time]))))
@@ -652,7 +660,7 @@
 
 (def build-sid (juxt :customer-id :repo-id :build-id))
 
-(defn- insert-credit-consumption [conn cc]
+(defn- insert-credit-consumption [conn {:keys [subscription-id] :as cc}]
   (let [build (apply eb/select-build-by-sid conn (build-sid cc))
         credit (ec/select-customer-credit conn (ec/by-cuid (:credit-id cc)))]
     (when-not build
@@ -679,7 +687,7 @@
            (db->credit-cons)))
 
 (defn- select-customer-credit-cons [{:keys [conn]} cust-id]
-  (->> (eccon/select-credit-cons conn (ecsub/by-cust cust-id))
+  (->> (eccon/select-credit-cons conn (eccon/by-cust cust-id))
        (map db->credit-cons)))
 
 (defn- sid-pred [t sid]

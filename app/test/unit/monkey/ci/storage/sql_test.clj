@@ -528,7 +528,34 @@
       (testing "can update"
         (is (sid/sid? (st/save-credit-consumption s (assoc cc :amount 200M))))
         (is (= 200M (-> (st/find-credit-consumption s (st/credit-cons-sid (:id cust) (:id cc)))
-                        :amount)))))))
+                        :amount))))
+
+      (testing "can create for user"
+        (let [user (h/gen-user)
+              cred (-> (h/gen-cust-credit)
+                       (assoc :type :user
+                              :user-id (:id user)
+                              :reason "testing"
+                              :customer-id (:id cust)
+                              :amount 1000M)
+                       (dissoc :subscription-id))]
+          (is (sid/sid? (st/save-user s user)))
+          (is (sid/sid? (st/save-customer-credit s cred)))
+          (is (= cred (st/find-customer-credit s (:id cred))))))
+
+      (testing "can create for subscription"
+        (let [cs (-> (h/gen-credit-subs)
+                     (assoc :customer-id (:id cust)
+                            :amount 1000M))
+              cred (-> (h/gen-cust-credit)
+                       (assoc :type :subscription
+                              :subscription-id (:id cs)
+                              :customer-id (:id cust)
+                              :amount 1000M)
+                       (dissoc :user-id))]
+          (is (sid/sid? (st/save-credit-subscription s cs)))
+          (is (sid/sid? (st/save-customer-credit s cred)))
+          (is (= cred (st/find-customer-credit s (:id cred)))))))))
 
 (deftest make-storage
   (testing "creates sql storage object using connection settings"

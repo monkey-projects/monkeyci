@@ -991,7 +991,10 @@
     (testing "`/issue-credits`"
       (testing "POST `/:customer-id` issues new credits to specific customer"
         (let [cust (h/gen-cust)]
-          (is (= 200 (-> (mock/request :post (str "/admin/issue-credits/" (:id cust)))
+          (is (= 200 (-> (h/json-request :post
+                                         (str "/admin/issue-credits/" (:id cust))
+                                         {:amount 100
+                                          :reason "test issue"})
                          (test-app)
                          :status)))))
 

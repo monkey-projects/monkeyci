@@ -109,6 +109,7 @@
     (rur/status (if (deleter (req->storage req) (get-id req))
                   204
                   404))))
+
 (defn default-id [_ _]
   (st/new-id))
 

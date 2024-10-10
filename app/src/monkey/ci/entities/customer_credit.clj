@@ -5,13 +5,17 @@
 
 (def base-query
   {:from [[:customer-credits :cc]]
-   :join [[:customers :c] [:= :c.id :cc.customer-id]]})
+   :join [[:customers :c] [:= :c.id :cc.customer-id]]
+   :left-join [[:credit-subscriptions :cs] [:= :cs.id :cc.subscription-id]
+               [:users :u] [:= :u.id :cc.user-id]]})
 
 (defn select-customer-credits [conn f]
   (->> (assoc base-query
               :select [:cc.amount :cc.from-time :cc.type :cc.reason
                        [:cc.cuid :id]
-                       [:c.cuid :customer-id]]
+                       [:c.cuid :customer-id]
+                       [:cs.cuid :subscription-id]
+                       [:u.cuid :user-id]]
               :where f)
        (ec/select conn)
        (map ec/convert-credit-select)))
