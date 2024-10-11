@@ -215,6 +215,7 @@
                                    :body "Unauthenticated"}))})))
 
 (def default-middleware
+  ;; TODO Transactions for sql storage
   [rrmp/parameters-middleware
    rrmm/format-middleware
    exception-middleware

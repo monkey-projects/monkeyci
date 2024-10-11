@@ -251,6 +251,33 @@
         (is (some? (sut/update-repo st [cid rid] assoc :url "updated-url")))
         (is (= "updated-url" (:url (sut/find-repo st [cid rid]))))))))
 
+(deftest delete-repo
+  (h/with-memory-store st
+    (let [repo (h/gen-repo)
+          cust (-> (h/gen-cust)
+                   (assoc-in [:repos (:id repo)] repo))
+          build (-> (h/gen-build)
+                    (assoc :customer-id (:id cust)
+                           :repo-id (:id repo)))
+          wh (-> (h/gen-webhook)
+                 (assoc :customer-id (:id cust)
+                        :repo-id (:id repo)))
+          repo-sid [(:id cust) (:id repo)]]
+      (is (sid/sid? (sut/save-customer st cust)))
+      (is (sid/sid? (sut/save-build st build)))
+      (is (sid/sid? (sut/save-webhook st wh)))
+      
+      (testing "removes repo from customer"
+        (is (true? (sut/delete-repo st repo-sid)))
+        (is (empty? (-> (sut/find-customer st (:id cust))
+                        :repos))))
+
+      (testing "removes all builds for repo"
+        (is (empty? (sut/list-build-ids st repo-sid))))
+
+      (testing "removes webhooks for repo"
+        (is (empty? (sut/find-webhook st (:id wh))))))))
+
 (deftest watch-github-repo
   (h/with-memory-store st
     (let [[cid rid gid] (repeatedly sut/new-id)

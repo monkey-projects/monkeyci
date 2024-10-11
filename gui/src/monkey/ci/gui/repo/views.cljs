@@ -89,10 +89,14 @@
     :value (fn [b] [:div.text-center [co/build-result (:status b)]])}
    {:label "Message"
     :value (fn [b]
-             [:div.text-truncate
-              {:style {:max-width "240px"}}
-              (or (get-in b [:git :message])
-                  (:message b))])}])
+             ;; Can't use css truncation in a table without forcing column widths,
+             ;; but this in turn could make tables overflow their container.  So we
+             ;; just truncate the text.
+             [:span
+              (u/truncate
+               (or (get-in b [:git :message])
+                   (:message b))
+               30)])}])
 
 (defn- builds [repo]
   (let [loaded? (rf/subscribe [:builds/loaded?])]
