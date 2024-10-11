@@ -115,23 +115,10 @@
       (is (= ::test-edit-alerts @a)))))
 
 (deftest saving?
-  (let [a (rf/subscribe [:repo/saving?])]
-    (testing "exists"
-      (is (some? a)))
-
-    (testing "holds saving state from db"
-      (is (map? (reset! app-db (db/set-saving {} true))))
-      (is (true? @a)))))
+  (h/verify-sub [:repo/saving?] #(db/set-saving % true) true false))
 
 (deftest builds-loaded?
-  (let [l (rf/subscribe [:builds/loaded?])]
-    (testing "exists"
-      (is (some? l)))
-
-    (testing "holds loaded state for builds"
-      (is (false? @l))
-      (is (some? (reset! app-db (lo/set-loaded {} db/id))))
-      (is (true? @l)))))
+  (h/verify-sub [:builds/loaded?] #(lo/set-loaded % db/id) true false))
 
 (deftest deleting?
   (h/verify-sub [:repo/deleting?] db/mark-deleting true false))

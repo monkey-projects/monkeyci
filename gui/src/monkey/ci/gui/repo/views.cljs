@@ -169,14 +169,40 @@
        @s? (assoc :disabled true))
      [:span.me-2 [co/icon :floppy]] "Save"]))
 
+(def delete-modal-id ::delete-repo-confirm)
+
+(defn confirm-delete-modal
+  ([repo]
+   [co/modal
+    delete-modal-id
+    [:h4 "Confirmation"]
+    [:div
+     [:p "Are you sure you want to delete repository " [:b (:name repo)] "? "
+      "This will also delete any builds and artifacts associated with it."]
+     [:p "This operation cannot be undone."]]
+    [:div.d-flex.gap-2
+     [:button.btn.btn-danger
+      {:title "Confirm delete"
+       :on-click (u/link-evt-handler [:repo/delete])}
+      [:span.me-2 co/delete-icon] "Yes, Delete!"]
+     [co/modal-dismiss-btn
+      [:span [:span.me-2 co/cancel-icon] "Oops, No"]]]])
+  ([]
+   (let [repo (rf/subscribe [:repo/info])]
+     (confirm-delete-modal @repo))))
+
 (defn- delete-btn []
   (let [d? (rf/subscribe [:repo/deleting?])]
-    ;; TODO Ask for confirmation first
-    [:button.btn.btn-danger
-     (cond-> {:title "Delete this repository"
-              :on-click (u/link-evt-handler [:repo/delete])}
-       @d? (assoc :disabled true))
-     [:span.me-2 co/delete-icon] "Delete"]))
+    ;; Ask for confirmation first
+    [:div
+     [confirm-delete-modal]
+     [:button.btn.btn-danger
+      (cond-> {:title "Delete this repository"
+               :data-bs-toggle :modal
+               :data-bs-target (u/->dom-id delete-modal-id)
+               :on-click u/noop-handler}
+        @d? (assoc :disabled true))
+      [:span.me-2 co/delete-icon] "Delete"]]))
 
 (defn- edit-form [route]
   (let [e (rf/subscribe [:repo/editing])]

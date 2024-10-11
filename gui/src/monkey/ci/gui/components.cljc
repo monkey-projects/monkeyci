@@ -33,6 +33,27 @@
   [:button.btn.btn-primary.btn-icon.btn-sm
    (merge {:on-click (u/link-evt-handler evt)} opts) [icon i]])
 
+(def overview-icon
+  [icon :house])
+
+(def customer-icon
+  [icon :people-fill])
+
+(def repo-icon
+  [icon :box-seam])
+
+(def repo-group-icon
+  [icon :boxes])
+
+(def build-icon
+  [icon :gear])
+
+(def delete-icon
+  [icon :trash])
+
+(def cancel-icon
+  [icon :x-square])
+
 (defn reload-btn [evt & [opts]]
   (icon-btn :arrow-clockwise "Reload" evt opts))
 
@@ -49,7 +70,7 @@
   [evt & [lbl]]
   [:button.btn.btn-outline-danger
    {:on-click (u/link-evt-handler evt)}
-   [:span.me-2 [icon :x-square]] (or lbl "Cancel")])
+   [:span.me-2 cancel-icon] (or lbl "Cancel")])
 
 (defn close-btn
   "Generic close button.  Posts given event when pressed."
@@ -111,7 +132,14 @@
   (->> (map-indexed (partial accordion-item id) items)
        (into [:div.accordion {:id id}])))
 
-(defn modal [id title contents]
+(defn modal-dismiss-btn [lbl]
+  [:button.btn.btn-secondary {:type :button
+                              :data-bs-dismiss "modal"}
+   lbl])
+
+(defn modal
+  "Renders a modal box with a close button by default"
+  [id title contents & [footer]]
   [:div.modal.fade.modal-lg
    {:id id
     :tab-index -1}
@@ -125,9 +153,8 @@
      [:div.modal-body
       contents]
      [:div.modal-footer
-      [:button.btn.btn-secondary {:type :button
-                                  :data-bs-dismiss "modal"}
-       "Close"]]]]])
+      (or footer
+          [modal-dismiss-btn "Close"])]]]])
 
 (defn date-time
   "Reformats given object as a date-time"
@@ -170,21 +197,3 @@
   (let [e (u/build-elapsed b)]
     (when (pos? e)
       (t/format-seconds (int (/ e 1000))))))
-
-(def overview-icon
-  [icon :house])
-
-(def customer-icon
-  [icon :people-fill])
-
-(def repo-icon
-  [icon :box-seam])
-
-(def repo-group-icon
-  [icon :boxes])
-
-(def build-icon
-  [icon :gear])
-
-(def delete-icon
-  [icon :trash])
