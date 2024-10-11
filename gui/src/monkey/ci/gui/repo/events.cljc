@@ -224,3 +224,39 @@
        (db/set-edit-alerts [{:type :danger
                              :message (str "Failed to save changes: " (u/error-msg err))}])
        (db/unmark-saving))))
+
+(rf/reg-event-fx
+ :repo/delete
+ (fn [{:keys [db]} _]
+   {:dispatch [:secure-request
+               :delete-repo
+               (r/path-params (r/current db))
+               [:repo/delete--success]
+               [:repo/delete--failed]]
+    :db (db/mark-deleting db)}))
+
+(defn- remove-repo [cust repo-id]
+  (update cust :repos (partial remove (comp (partial = repo-id) :id))))
+
+(rf/reg-event-fx
+ :repo/delete--success
+ (fn [{:keys [db]} _]
+   (let [params (-> (r/current db) (r/path-params))
+         repo-id (:repo-id params)
+         repo (u/find-by-id repo-id (:repos (cdb/get-customer db)))]
+     {:db (-> db
+              (db/unmark-deleting)
+              (cdb/update-customer remove-repo repo-id)
+              (cdb/set-alerts
+               [{:type :info
+                 :message (str "Repository " (:name repo) " has been deleted.")}]))
+      :dispatch [:route/goto :page/customer (select-keys params [:customer-id])]})))
+
+(rf/reg-event-db
+ :repo/delete--failed
+ (fn [db [_ err]]
+   (-> db
+       (db/unmark-deleting)
+       (db/set-edit-alerts
+        [{:type :danger
+          :message (str "Unable to delete repository: " (u/error-msg err))}]))))

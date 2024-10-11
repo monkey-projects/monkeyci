@@ -6,6 +6,7 @@
             [monkey.ci.gui.repo.db :as db]
             [monkey.ci.gui.repo.subs :as sut]
             [monkey.ci.gui.test.fixtures :as f]
+            [monkey.ci.gui.test.helpers :as h]
             [re-frame.core :as rf]
             [re-frame.db :refer [app-db]]))
 
@@ -131,3 +132,6 @@
       (is (false? @l))
       (is (some? (reset! app-db (lo/set-loaded {} db/id))))
       (is (true? @l)))))
+
+(deftest deleting?
+  (h/verify-sub [:repo/deleting?] db/mark-deleting true false))

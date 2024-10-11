@@ -9,6 +9,12 @@
 (defn get-customer [db]
   (lo/get-value db customer))
 
+(defn get-alerts [db]
+  (lo/get-alerts db customer))
+
+(defn set-alerts [db a]
+  (lo/set-alerts db customer a))
+
 (defn update-customer [db f & args]
   (apply lo/update-value db customer f args))
 

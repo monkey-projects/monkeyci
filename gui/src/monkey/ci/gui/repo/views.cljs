@@ -169,6 +169,15 @@
        @s? (assoc :disabled true))
      [:span.me-2 [co/icon :floppy]] "Save"]))
 
+(defn- delete-btn []
+  (let [d? (rf/subscribe [:repo/deleting?])]
+    ;; TODO Ask for confirmation first
+    [:button.btn.btn-danger
+     (cond-> {:title "Delete this repository"
+              :on-click (u/link-evt-handler [:repo/delete])}
+       @d? (assoc :disabled true))
+     [:span.me-2 co/delete-icon] "Delete"]))
+
 (defn- edit-form [route]
   (let [e (rf/subscribe [:repo/editing])]
     [:form
@@ -212,9 +221,10 @@
       [:div.row
        [:div.d-flex.gap-2
         [save-btn]
-        [co/cancel-btn [:route/goto :page/repo (-> route
-                                                   (r/path-params)
-                                                   (select-keys [:repo-id :customer-id]))]]]]]]))
+        [co/close-btn [:route/goto :page/repo (-> route
+                                                  (r/path-params)
+                                                  (select-keys [:repo-id :customer-id]))]]
+        [:span.ms-auto [delete-btn]]]]]]))
 
 (defn edit
   "Displays repo editing page"

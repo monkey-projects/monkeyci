@@ -46,10 +46,15 @@
 
 (defn cancel-btn
   "Generic cancel button.  Posts given event when pressed."
-  [evt]
+  [evt & [lbl]]
   [:button.btn.btn-outline-danger
    {:on-click (u/link-evt-handler evt)}
-   [:span.me-2 [icon :x-square]] "Cancel"])
+   [:span.me-2 [icon :x-square]] (or lbl "Cancel")])
+
+(defn close-btn
+  "Generic close button.  Posts given event when pressed."
+  [evt]
+  [cancel-btn evt "Close"])
 
 (defn build-result [r]
   (let [r (or r "running")
@@ -180,3 +185,6 @@
 
 (def build-icon
   [icon :gear])
+
+(def delete-icon
+  [icon :trash])

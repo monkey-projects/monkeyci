@@ -178,6 +178,12 @@
      :body-schema {:repo UpdateRepo}})
 
    (api-route
+    {:route-name :delete-repo
+     :method :delete
+     :path-parts repo-path
+     :path-schema repo-schema})
+
+   (api-route
     {:route-name :get-builds
      :path-parts (into repo-path ["/builds"])
      :path-schema repo-schema})
