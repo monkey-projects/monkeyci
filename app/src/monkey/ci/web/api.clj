@@ -59,6 +59,7 @@
                          {:get-id (c/id-getter (juxt :customer-id :repo-id))
                           :getter st/find-repo
                           :saver st/save-repo
+                          :deleter st/delete-repo
                           :new-id repo-id})
 
 (c/make-entity-endpoints "webhook"
