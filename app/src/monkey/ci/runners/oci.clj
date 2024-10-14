@@ -216,6 +216,7 @@
 
 (defmethod r/make-runner :oci [rt]
   (let [conf (:runner rt)
-        client (ci/make-context conf)]
+        client (-> (ci/make-context conf)
+                   (oci/add-inv-interceptor :runners))]
     (partial oci-runner client conf)))
 

@@ -32,6 +32,27 @@
     :credits 2}})
 (def default-arch arch-arm)
 
+(defn invocation-interceptor
+  "A Martian interceptor that dispatches telemere events for each invocation.  Useful
+   for metrics to know how many api calls were done."
+  [kind]
+  {:name ::invocation-interceptor
+   :enter (fn [ctx]
+            ;; TODO More properties
+            (t/event! :oci/invocation
+                      {:data {:kind kind}
+                       :level :info})
+            ctx)})
+
+(defn add-interceptor
+  "Adds the given interceptor before all other inceptors of the Martian context"
+  [ctx i]
+  (let [id (-> ctx :interceptors first :name)]
+    (update ctx :interceptors mi/inject i :before id)))
+
+(defn add-inv-interceptor [ctx kind]
+  (add-interceptor ctx (invocation-interceptor kind)))
+
 (defn stream-to-bucket
   "Pipes an input stream to a bucket object using multipart uploads.
    Returns a deferred that will resolve when the upload completes.
@@ -41,6 +62,7 @@
   (log/trace "Piping stream to bucket using config" conf)
   (-> conf
       (os/make-context)
+      (add-inv-interceptor :stream)
       (s/input-stream->multipart (assoc conf :input-stream in))))
 
 (def terminated? #{"INACTIVE" "DELETED" "FAILED"})
@@ -254,24 +276,3 @@
   (+ (* cpus
         (get-in arch-shapes [arch :credits] 1))
      mem))
-
-(defn invocation-interceptor
-  "A Martian interceptor that dispatches telemere events for each invocation.  Useful
-   for metrics to know how many api calls were done."
-  [kind]
-  {:name ::invocation-interceptor
-   :enter (fn [ctx]
-            ;; TODO More properties
-            (t/event! :oci/invocation
-                      {:data {:kind kind}
-                       :level :info})
-            ctx)})
-
-(defn add-interceptor
-  "Adds the given interceptor before all other inceptors of the Martian context"
-  [ctx i]
-  (let [id (-> ctx :interceptors first :name)]
-    (update ctx :interceptors mi/inject i :before id)))
-
-(defn add-inv-interceptor [ctx kind]
-  (add-interceptor ctx (invocation-interceptor kind)))
