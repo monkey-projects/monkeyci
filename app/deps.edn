@@ -32,6 +32,7 @@
                                 ;; slower however, so maybe later we can change this.
                                 :exclusions [org.zeromq/jzmq]}
         com.stuartsierra/component {:mvn/version "1.1.0"}
+        com.taoensso/telemere {:mvn/version "1.0.0-beta25"}
         commons-io/commons-io {:mvn/version "2.16.1"}
         io.micrometer/micrometer-registry-prometheus {:mvn/version "1.12.8"}
         io.micrometer/micrometer-core {:mvn/version "1.12.8"}

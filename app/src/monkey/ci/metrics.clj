@@ -3,7 +3,7 @@
             [com.stuartsierra.component :as co]
             [io.resonant.micrometer :as mm]
             [manifold.stream :as ms]
-            [monkey.ci.runtime :as rt]))
+            [taoensso.telemere :as t]))
 
 (defn make-registry []
   (mm/meter-registry {:type :prometheus}))
@@ -13,7 +13,9 @@
   [r]
   (some-> r :registry (.scrape)))
 
-(defn- count-listeners [state]
+(defn- count-listeners
+  "Counts event state listeners for metrics"
+  [state]
   (->> state
        :listeners
        vals
@@ -43,6 +45,19 @@
     (.close this)
     this))
 
-(defmethod rt/setup-runtime :metrics [conf _]
-  (cond-> (make-registry)
-    (some? (:events conf)) (co/using [:events])))
+(defn signal->counter
+  "Registers a signal handler that creates a counter in the registry that counts 
+   how many times the given signal was received.  If `tags` is a function, it 
+   will be invoked with the received signal in order to get the tags for the
+   counter."
+  [signal-id reg counter-id & [tags opts]]
+  (letfn [(get-tags [s]
+            (if (fn? tags)
+              (tags s)
+              tags))]
+    (t/add-handler!
+     signal-id
+     (fn
+       ([signal]
+        (mm/add-counter reg counter-id (get-tags signal) opts 1))
+       ([])))))

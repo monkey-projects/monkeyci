@@ -5,6 +5,7 @@
             [manifold
              [deferred :as md]
              [time :as mt]]
+            [martian.interceptors :as mi]
             [medley.core :as mc]
             [monkey.ci
              [build :as b]
@@ -13,7 +14,8 @@
             [monkey.oci.container-instance.core :as ci]
             [monkey.oci.os
              [martian :as os]
-             [stream :as s]]))
+             [stream :as s]]
+            [taoensso.telemere :as t]))
 
 ;; Cpu architectures
 (def arch-arm :arm)
@@ -252,3 +254,24 @@
   (+ (* cpus
         (get-in arch-shapes [arch :credits] 1))
      mem))
+
+(defn invocation-interceptor
+  "A Martian interceptor that dispatches telemere events for each invocation.  Useful
+   for metrics to know how many api calls were done."
+  [kind]
+  {:name ::invocation-interceptor
+   :enter (fn [ctx]
+            ;; TODO More properties
+            (t/event! :oci/invocation
+                      {:data {:kind kind}
+                       :level :info})
+            ctx)})
+
+(defn add-interceptor
+  "Adds the given interceptor before all other inceptors of the Martian context"
+  [ctx i]
+  (let [id (-> ctx :interceptors first :name)]
+    (update ctx :interceptors mi/inject i :before id)))
+
+(defn add-inv-interceptor [ctx kind]
+  (add-interceptor ctx (invocation-interceptor kind)))
