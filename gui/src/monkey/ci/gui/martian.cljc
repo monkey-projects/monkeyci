@@ -243,7 +243,7 @@
    (api-route
     {:route-name :unwatch-github-repo
      :method :post
-     :path-parts (conj repo-path "github/unwatch")
+     :path-parts (conj repo-path "/github/unwatch")
      :path-schema repo-schema})
 
    (public-route

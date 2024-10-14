@@ -38,9 +38,12 @@
  (fn [[cr gr] _]
    (letfn [(watched-repo [r]
              (->> cr
-                  (filter (some-fn (comp (partial = (:id r)) :github-id)
-                                   (comp (partial = (:ssh-url r)) :url)
-                                   (comp (partial = (:clone-url r)) :url)))
+                  ;; This falsely triggers positive when unwatching a repo
+                  ;; TODO Add a separate flag for repos that have a registered webhook
+                  #_(filter (some-fn (comp (partial = (:id r)) :github-id)
+                                     (comp (partial = (:ssh-url r)) :url)
+                                     (comp (partial = (:clone-url r)) :url)))
+                  (filter (comp (partial = (:id r)) :github-id))
                   first))]
      (map (fn [r]
             (let [w (watched-repo r)]

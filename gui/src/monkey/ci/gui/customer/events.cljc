@@ -152,7 +152,7 @@
  (fn [{:keys [db]} [_ repo]]
    {:dispatch [:secure-request
                :unwatch-github-repo
-               {:repo-id (get-in repo [:monkeyci/repo :id])
+               {:repo-id (:id repo)
                 :customer-id (r/customer-id db)}
                [:repo/unwatch--success]
                [:repo/unwatch--failed]]}))
@@ -160,6 +160,7 @@
 (rf/reg-event-db
  :repo/unwatch--success
  (fn [db [_ {:keys [body]}]]
+   (log/debug "Repo unwatched:" (str body))
    (db/replace-repo db body)))
 
 (rf/reg-event-db

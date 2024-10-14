@@ -74,13 +74,13 @@
         (is (map? (swap! app-db db/set-customer {:repos [{:github-id "github-repo-id"}]})))
         (is (true? (-> @r first :monkeyci/watched?))))
       
-      (testing "by clone url"
+      (testing "not by clone url"
         (is (map? (swap! app-db db/set-customer {:repos [{:url "https://clone-url"}]})))
-        (is (true? (-> @r first :monkeyci/watched?))))
+        (is (not (-> @r first :monkeyci/watched?))))
       
-      (testing "by ssh url"
+      (testing "not by ssh url"
         (is (map? (swap! app-db db/set-customer {:repos [{:url "ssh@ssh-url"}]})))
-        (is (true? (-> @r first :monkeyci/watched?)))))
+        (is (not (-> @r first :monkeyci/watched?)))))
 
     (testing "contains repo info"
       (is (map? (reset! app-db (-> {}
@@ -88,7 +88,8 @@
                                                           :ssh-url "ssh@ssh-url"
                                                           :clone-url "https://clone-url"}])
                                    (db/set-customer {:repos [{:url "ssh@ssh-url"
-                                                              :id "test-repo"}]})))))
+                                                              :id "test-repo"
+                                                              :github-id "github-repo-id"}]})))))
       (is (= "test-repo" (-> @r first :monkeyci/repo :id))))))
 
 (deftest create-alerts

@@ -11,7 +11,9 @@
              [common :as wc]
              [github :as sut]]
             [monkey.ci.helpers :as h]
-            [monkey.ci.test.aleph-test :as af]
+            [monkey.ci.test
+             [aleph-test :as af]
+             [runtime :as trt]]
             [ring.mock.request :as mock]))
 
 (deftest valid-security?
@@ -365,7 +367,7 @@
     (with-github-user
       (fn [_]
         (let [kp (auth/generate-keypair)
-              req (-> (h/test-rt)
+              req (-> (trt/test-runtime)
                       (assoc :jwk {:priv (.getPrivate kp)})
                       (h/->req)
                       (assoc :parameters
@@ -381,7 +383,7 @@
   (testing "finds existing github user in storage"
     (with-github-user
       (fn [u]
-        (let [{st :storage :as rt} (h/test-rt)
+        (let [{st :storage :as rt} (trt/test-runtime)
               _ (st/save-user st {:type "github"
                                   :type-id (:id u)
                                   :customers ["test-cust"]})
@@ -399,7 +401,7 @@
   (testing "creates user when none found in storage"
     (with-github-user
       (fn [u]
-        (let [{st :storage :as rt} (h/test-rt)
+        (let [{st :storage :as rt} (trt/test-runtime)
               req (-> rt
                       (h/->req)
                       (assoc :parameters
@@ -416,7 +418,7 @@
   (testing "sets user id in token"
     (with-github-user
       (fn [u]
-        (let [{st :storage :as rt} (h/test-rt)
+        (let [{st :storage :as rt} (trt/test-runtime)
               pubkey (auth/rt->pub-key rt)
               req (-> rt
                       (h/->req)
@@ -439,7 +441,7 @@
   (testing "adds github token to response"
     (with-github-user
       (fn [u]
-        (let [{st :storage :as rt} (h/test-rt)
+        (let [{st :storage :as rt} (trt/test-runtime)
               req (-> rt
                       (h/->req)
                       (assoc :parameters
@@ -455,7 +457,7 @@
 
 (deftest watch-repo
   (let [cust-id (st/new-id)
-        {st :storage :as rt} (h/test-rt)
+        {st :storage :as rt} (trt/test-runtime)
         _ (st/save-customer st {:id cust-id :name "test customer"})
         repo {:name "test repo"
               :customer-id cust-id
@@ -473,11 +475,14 @@
 
     (testing "creates new repo"
       (is (= (:body r)
-             (st/find-repo st [cust-id (get-in r [:body :id])]))))))
+             (st/find-repo st [cust-id (get-in r [:body :id])]))))
+
+    (testing "generates display id based on github repo name"
+      (is (= "test-repo" (get-in r [:body :id]))))))
 
 (deftest unwatch-repo
   (testing "404 when repo not found"
-    (is (= 404 (-> (h/test-rt)
+    (is (= 404 (-> (trt/test-runtime)
                    (h/->req)
                    (assoc :parameters {:path {:customer-id "test-cust"
                                               :repo-id "test-repo"}})
@@ -485,7 +490,7 @@
                    :status))))
 
   (testing "unwatches in db"
-    (let [{st :storage :as rt} (h/test-rt)
+    (let [{st :storage :as rt} (trt/test-runtime)
           [cust-id repo-id github-id :as sid] (repeatedly 3 st/new-id)
           _ (st/watch-github-repo st (zipmap [:customer-id :id :github-id] sid))
           req (-> rt

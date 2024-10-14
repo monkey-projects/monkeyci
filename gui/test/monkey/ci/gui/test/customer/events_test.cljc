@@ -211,9 +211,7 @@
        (h/initialize-martian {:unwatch-github-repo {:status 200
                                                     :error-code :no-error}})
        (is (some? (:martian.re-frame/martian @app-db)))
-       (rf/dispatch [:repo/unwatch {:monkeyci/repo
-                                    {:id "test-repo"}
-                                    :id 12432}])
+       (rf/dispatch [:repo/unwatch {:id "test-repo"}])
        (is (= 1 (count @c)))
        (is (= :unwatch-github-repo (-> @c first (nth 2)))
            "invokes correct endpoint")
