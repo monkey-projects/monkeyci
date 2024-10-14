@@ -849,7 +849,7 @@
                     :overrides overrides}))
 
 (defmethod st/make-storage :sql [{conf :storage}]
-  (log/info "Using SQL storage with configuration:" conf)
+  (log/debug "Using SQL storage with configuration:" (dissoc conf :password))
   (let [conn {:ds (conn/->pool HikariDataSource (-> conf
                                                     (dissoc :url :type)
                                                     (assoc :jdbcUrl (:url conf))))
