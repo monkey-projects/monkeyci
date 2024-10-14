@@ -89,10 +89,14 @@
     :value (fn [b] [:div.text-center [co/build-result (:status b)]])}
    {:label "Message"
     :value (fn [b]
-             [:div.text-truncate
-              {:style {:max-width "240px"}}
-              (or (get-in b [:git :message])
-                  (:message b))])}])
+             ;; Can't use css truncation in a table without forcing column widths,
+             ;; but this in turn could make tables overflow their container.  So we
+             ;; just truncate the text.
+             [:span
+              (u/truncate
+               (or (get-in b [:git :message])
+                   (:message b))
+               30)])}])
 
 (defn- builds [repo]
   (let [loaded? (rf/subscribe [:builds/loaded?])]
@@ -165,6 +169,41 @@
        @s? (assoc :disabled true))
      [:span.me-2 [co/icon :floppy]] "Save"]))
 
+(def delete-modal-id ::delete-repo-confirm)
+
+(defn confirm-delete-modal
+  ([repo]
+   [co/modal
+    delete-modal-id
+    [:h4 "Confirmation"]
+    [:div
+     [:p "Are you sure you want to delete repository " [:b (:name repo)] "? "
+      "This will also delete any builds and artifacts associated with it."]
+     [:p "This operation cannot be undone."]]
+    [:div.d-flex.gap-2
+     [:button.btn.btn-danger
+      {:title "Confirm delete"
+       :on-click (u/link-evt-handler [:repo/delete])}
+      [:span.me-2 co/delete-icon] "Yes, Delete!"]
+     [co/modal-dismiss-btn
+      [:span [:span.me-2 co/cancel-icon] "Oops, No"]]]])
+  ([]
+   (let [repo (rf/subscribe [:repo/info])]
+     (confirm-delete-modal @repo))))
+
+(defn- delete-btn []
+  (let [d? (rf/subscribe [:repo/deleting?])]
+    ;; Ask for confirmation first
+    [:div
+     [confirm-delete-modal]
+     [:button.btn.btn-danger
+      (cond-> {:title "Delete this repository"
+               :data-bs-toggle :modal
+               :data-bs-target (u/->dom-id delete-modal-id)
+               :on-click u/noop-handler}
+        @d? (assoc :disabled true))
+      [:span.me-2 co/delete-icon] "Delete"]]))
+
 (defn- edit-form [route]
   (let [e (rf/subscribe [:repo/editing])]
     [:form
@@ -208,9 +247,10 @@
       [:div.row
        [:div.d-flex.gap-2
         [save-btn]
-        [co/cancel-btn [:route/goto :page/repo (-> route
-                                                   (r/path-params)
-                                                   (select-keys [:repo-id :customer-id]))]]]]]]))
+        [co/close-btn [:route/goto :page/repo (-> route
+                                                  (r/path-params)
+                                                  (select-keys [:repo-id :customer-id]))]]
+        [:span.ms-auto [delete-btn]]]]]]))
 
 (defn edit
   "Displays repo editing page"

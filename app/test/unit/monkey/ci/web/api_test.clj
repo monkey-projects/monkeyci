@@ -605,7 +605,7 @@
             (is (= :initializing (:status new)))
             (is (= (:git build) (:git new)))
             (is (number? (:start-time new)))
-            (is (empty? (get-in build [:script :jobs]))))))
+            (is (empty? (get-in new [:script :jobs]))))))
 
       (testing "returns 404 if build not found"
         (is (= 404 (-> (make-req (constantly "ok")

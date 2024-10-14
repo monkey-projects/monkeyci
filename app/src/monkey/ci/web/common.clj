@@ -109,6 +109,7 @@
     (rur/status (if (deleter (req->storage req) (get-id req))
                   204
                   404))))
+
 (defn default-id [_ _]
   (st/new-id))
 
@@ -215,6 +216,7 @@
                                    :body "Unauthenticated"}))})))
 
 (def default-middleware
+  ;; TODO Transactions for sql storage
   [rrmp/parameters-middleware
    rrmm/format-middleware
    exception-middleware

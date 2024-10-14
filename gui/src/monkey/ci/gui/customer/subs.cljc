@@ -23,7 +23,7 @@
 (rf/reg-sub
  :customer/alerts
  (fn [db _]
-   (lo/get-alerts db db/customer)))
+   (db/get-alerts db)))
 
 (rf/reg-sub
  :customer/repos

@@ -387,7 +387,8 @@
                                             :url "http://test-repo"
                                             :labels [{:name "app" :value "test-app"}]}
                               :updated-entity {:name "updated repo"}
-                              :creator st/save-repo})
+                              :creator st/save-repo
+                              :can-delete? true})
     
     (testing "`/customer/:id/github`"
       (testing "`/watch` starts watching repo"

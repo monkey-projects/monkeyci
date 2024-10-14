@@ -1,5 +1,8 @@
 (ns monkey.ci.storage
-  "Data storage functionality"
+  "Data storage functionality.  Next to basic storage implementations, this ns also contains
+   a lot of functions for working with storage entities.  Many of these are overridden by
+   implementation-specific functions, and so implementations here don't focus on efficiency.
+   They are merely used in tests."
   (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
             [clojure.string :as cs]
@@ -140,6 +143,30 @@
    (fn [s [cust-id repo-id] f & args]
      (apply update-obj s (customer-sid cust-id) update-in [:repos repo-id] f args))))
 
+(declare list-build-ids)
+(declare builds)
+(declare webhook-sid)
+(declare find-webhook)
+
+(def delete-repo
+  "Deletes repository with given sid, including all builds"
+  (override-or
+   [:repo :delete]
+   (fn [s [cust-id repo-id :as sid]]
+     (when (some? (update-obj s (customer-sid cust-id) update :repos dissoc repo-id))
+       ;; Delete all builds
+       (->> (list-build-ids s sid)
+            (map (comp sid/->sid (partial concat [builds] sid) vector))
+            (map (partial p/delete-obj s))
+            (doall))
+       ;; Delete webhooks
+       (->> (p/list-obj s (webhook-sid))
+            (map (partial find-webhook s))
+            (filter (comp (partial = sid) (juxt :customer-id :repo-id)))
+            (map (comp (partial p/delete-obj s) webhook-sid :id))
+            (doall))
+       true))))
+
 (def list-repo-display-ids
   "Lists all display ids for the repos for given customer"
   (override-or
@@ -178,7 +205,8 @@
    [:watched-github-repos :unwatch]
    (fn [s sid]
      (when-let [repo (find-repo s sid)]
-       (when-let [gid (:github-id repo)]
+       (when-let [gid (some-> (find-repo s sid)
+                              :github-id)]
          ;; Remove it from the list of watched repos for the stored github id
          (update-obj s (watched-sid gid) (comp vec (partial remove (partial = sid))))
          ;; Clear github id

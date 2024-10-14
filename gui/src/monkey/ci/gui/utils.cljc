@@ -26,6 +26,9 @@
     #?(:cljs (.preventDefault e true))
     (rf/dispatch evt)))
 
+(defn noop-handler[e]
+  #?(:cljs (.preventDefault e true)))
+
 (defn evt->value [e]
   #?(:cljs (-> e .-target .-value)
      :clj (:value e)))

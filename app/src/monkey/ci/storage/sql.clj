@@ -91,6 +91,9 @@
       (ec/update-repo conn re)
       (sync-repo-labels conn (:labels repo) re))))
 
+(defn- select-repo-id-by-sid [conn [cust-id repo-id]]
+  (er/repo-for-build-sid conn cust-id repo-id))
+
 (defn- upsert-repo [conn repo cust-id]
   (spec/valid? :entity/repo repo)
   (let [re (repo->db repo cust-id)]
@@ -104,6 +107,11 @@
 (defn- upsert-repos [conn {:keys [repos]} cust-id]
   (doseq [[_ r] repos]
     (upsert-repo conn r cust-id)))
+
+(defn- delete-repo [{:keys [conn]} sid]
+  (when-let [repo-id (select-repo-id-by-sid conn sid)]
+    ;; Other records are deleted by cascading
+    (pos? (ec/delete-repos conn (ec/by-id repo-id)))))
 
 (defn- select-repo-display-ids [{:keys [conn]} cust-id]
   (er/repo-display-ids conn cust-id))
@@ -175,16 +183,12 @@
   (nth sid 2))
 
 (defn- insert-webhook [conn wh]
-  (if-let [cust (ec/select-customer conn (ec/by-cuid (:customer-id wh)))]
-    (if-let [repo (ec/select-repo conn [:and
-                                        (ec/by-display-id (:repo-id wh))
-                                        (ec/by-customer (:id cust))])]
-      (let [we {:cuid (:id wh)
-                :repo-id (:id repo)
-                :secret (:secret-key wh)}]
-        (ec/insert-webhook conn we))
-      (throw (ex-info "Repository does not exist" wh)))
-    (throw (ex-info "Customer does not exist" wh))))
+  (if-let [repo-id (select-repo-id-by-sid conn [(:customer-id wh) (:repo-id wh)])]
+    (let [we {:cuid (:id wh)
+              :repo-id repo-id
+              :secret (:secret-key wh)}]
+      (ec/insert-webhook conn we))
+    (throw (ex-info "Repository does not exist" wh))))
 
 (defn- update-webhook [conn wh existing])
 
@@ -682,7 +686,8 @@
    {:search select-customers}
    :repo
    {:list-display-ids select-repo-display-ids
-    :find-next-build-idx (comp (fnil inc 0) select-max-build-idx)}
+    :find-next-build-idx (comp (fnil inc 0) select-max-build-idx)
+    :delete delete-repo}
    :user
    {:find select-user
     :customers select-user-customers}

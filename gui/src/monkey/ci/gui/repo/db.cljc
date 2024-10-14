@@ -82,3 +82,15 @@
 
 (defn unmark-saving [db]
   (dissoc db saving?))
+
+(def deleting? ::deleting?)
+
+(defn set-deleting [db s]
+  (assoc db deleting? s))
+
+(defn mark-deleting [db]
+  (set-deleting db true))
+
+(defn unmark-deleting [db]
+  (dissoc db deleting?))
+
