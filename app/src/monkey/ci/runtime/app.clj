@@ -192,7 +192,9 @@
 (defrecord ServerRuntime [config]
   co/Lifecycle
   (start [this]
-    (assoc this :jwk (get-in this [:jwk :jwk])))
+    (assoc this
+           :jwk (get-in this [:jwk :jwk])
+           :metrics (get-in this [:metrics :registry])))
 
   (stop [this]
     this))
@@ -201,7 +203,7 @@
   (->ServerRuntime conf))
 
 (defn- new-metrics []
-  (m/make-registry))
+  {:registry (m/make-registry)})
 
 (defn make-server-system
   "Creates a component system that can be used to start an application server."
