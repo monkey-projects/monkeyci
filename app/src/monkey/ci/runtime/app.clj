@@ -203,7 +203,7 @@
   (->ServerRuntime conf))
 
 (defn- new-metrics []
-  {:registry (m/make-registry)})
+  (m/make-metrics))
 
 (defn make-server-system
   "Creates a component system that can be used to start an application server."

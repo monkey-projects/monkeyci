@@ -1,6 +1,5 @@
 (ns monkey.ci.metrics
-  (:require [clojure.tools.logging :as log]
-            [com.stuartsierra.component :as co]
+  (:require [com.stuartsierra.component :as co]
             [manifold.stream :as ms]
             [medley.core :as mc]
             [monkey.ci.prometheus :as prom]
@@ -14,40 +13,31 @@
   [r]
   (prom/scrape r))
 
-(defn- count-listeners
-  "Counts event state listeners for metrics"
-  [state]
-  (->> state
-       :listeners
-       vals
-       (mapcat vals)
-       (distinct)
-       (count)))
+;; (defn- count-listeners
+;;   "Counts event state listeners for metrics"
+;;   [state]
+;;   (->> state
+;;        :listeners
+;;        vals
+;;        (mapcat vals)
+;;        (distinct)
+;;        (count)))
 
-;; TODO Reactivate
-
-#_(defn add-events-metrics [r events]
-    (when-let [ss (get-in events [:server :state-stream])]
-      (let [state (atom nil)]
-        ;; Constantly store the latest state, so it can be used by the gauges
-        (ms/consume (partial reset! state) ss)
-        (mm/get-gauge r "monkey_event_filters" {}
-                      {:description "Number of different registered event filters"}
-                      #(count (keys (:listeners @state))))
-        (mm/get-gauge r "monkey_event_clients" {}
-                      {:description "Total number of registered clients"}
-                      #(count-listeners @state))))
-    r)
-
-;; TODO Instrument prometheus registry
-#_(extend-type io.resonant.micrometer.Registry
-    co/Lifecycle
-    (start [this]
-      (add-events-metrics this (:events this)))
-
-    (stop [this]
-      (.close this)
-      this))
+;; (defn add-events-metrics
+;;   "When the events object exposes a state stream, registers some metrics with the given
+;;    registry.  Returns the updated registry."
+;;   [r events]
+;;     (when-let [ss (get-in events [:server :state-stream])]
+;;       (let [state (atom nil)]
+;;         ;; Constantly store the latest state, so it can be used by the gauges
+;;         (ms/consume (partial reset! state) ss)
+;;         (mm/get-gauge r "monkey_event_filters" {}
+;;                       {:description "Number of different registered event filters"}
+;;                       #(count (keys (:listeners @state))))
+;;         (mm/get-gauge r "monkey_event_clients" {}
+;;                       {:description "Total number of registered clients"}
+;;                       #(count-listeners @state))))
+;;     r)
 
 (defn signal->counter
   "Registers a signal handler that creates a counter in the registry that counts 
@@ -78,3 +68,12 @@
          ([])))
       counter)))
 
+(defrecord Metrics []
+  co/Lifecycle
+  (start [this]
+    (assoc this :registry (make-registry)))
+
+  (stop [this]
+    this))
+
+(def make-metrics ->Metrics)

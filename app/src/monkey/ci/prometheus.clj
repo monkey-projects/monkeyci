@@ -4,17 +4,22 @@
    versions of the Prometheus libs.  Since we're fixed on Prometheus (for now), it's not
    necessary to maintain all the other formats, so the micrometer layer was essentially
    ballast.  This namespace accesses the Prometheus code directly."
-  (:import [io.prometheus.metrics.core.metrics Counter Gauge]
+  (:require [medley.core :as mc])
+  (:import [io.prometheus.metrics.core.metrics Counter CounterWithCallback Gauge GaugeWithCallback]
            [io.prometheus.metrics.model.registry PrometheusRegistry]
            [io.prometheus.metrics.exporter.pushgateway PushGateway]
            [io.prometheus.metrics.expositionformats PrometheusTextFormatWriter]
+           [io.prometheus.metrics.instrumentation.jvm JvmMetrics]
            [java.io ByteArrayOutputStream]
            [java.nio.charset StandardCharsets]))
 
 (defn make-registry
   "Creates a new prometheus registry"
   []
-  (PrometheusRegistry.))
+  (let [r (PrometheusRegistry.)]
+    ;; Add JVM metrics
+    (.. (JvmMetrics/builder) (register r))
+    r))
 
 (defn ^String scrape
   "Returns metrics formatted to Prometheus scrape format as a string."
@@ -28,14 +33,41 @@
 (defn- ->arr [strs]
   (into-array String strs))
 
-(defn- build-datapoint [dp name reg {:keys [description labels]}]
+(defn- build-datapoint [dp name reg {:keys [description labels builder]}]
   (cond-> (.name dp name)
     description (.help description)
     labels (.labelNames (->arr labels))
+    builder (builder)
     true (.register reg)))
 
+(defn- as-callback
+  "Creates a lambda that can be used as a callback.  It invokes `f`, and if it
+   returns a sequence, the first value is assumed to be the data, and the remainder
+   the label values."
+  [f]
+  (reify java.util.function.Consumer
+    (accept [this cb]
+      (let [r (f)]
+        ;; TODO Support multiple values (invokes `call` multiple times)
+        (if (sequential? r)
+          (.call cb (double (first r)) (->arr (rest r)))
+          (.call cb (double r) (make-array String 0)))))))
+
+(defn- prepare-opts [{:keys [callback] :as opts}]
+  (-> opts
+      (dissoc :callback)
+      (mc/assoc-some :builder
+                     (when callback
+                       (fn [builder]
+                         (.callback builder (as-callback callback)))))))
+
 (defn make-gauge [name reg & [opts]]
-  (build-datapoint (Gauge/builder) name reg opts))
+  (build-datapoint (if (:callback opts)
+                     (GaugeWithCallback/builder)
+                     (Gauge/builder))
+                   name
+                   reg
+                   (prepare-opts opts)))
 
 (defn gauge-set [g v]
   (.set g (double v))
@@ -53,7 +85,13 @@
   (.get g))
 
 (defn make-counter [name reg & [opts]]
-  (build-datapoint (Counter/builder) name reg opts))
+  (build-datapoint
+   (if (:callback opts)
+     (CounterWithCallback/builder)
+     (Counter/builder))
+   name
+   reg
+   (prepare-opts opts)))
 
 (defn counter-inc [c v & [label-vals]]
   (if label-vals

@@ -19,7 +19,20 @@
     (let [reg (sut/make-registry)
           c (sut/make-counter "test_counter" reg {:labels ["test" "labels"]})]
       (is (= c (sut/counter-inc c 10 ["val-1" "val-2"])))
-      (is (= 10.0 (sut/counter-get c ["val-1" "val-2"]))))))
+      (is (= 10.0 (sut/counter-get c ["val-1" "val-2"])))))
+
+  (testing "invokes callback if provided"
+    (let [reg (sut/make-registry)
+          c (sut/make-counter "lazy_counter" reg {:callback (constantly 7)})]
+      (is (= 7.0 (.. c (collect) (getDataPoints) (get 0) (getValue))))))
+
+  (testing "invokes callback with labels"
+    (let [reg (sut/make-registry)
+          c (sut/make-counter "lazy_counter" reg {:callback (constantly [7 "test-domain"])
+                                                  :labels ["domain"]})]
+      (is (= "test-domain" (.. c
+                               (collect) (getDataPoints) (get 0)
+                               (getLabels) (getValue 0)))))))
 
 (deftest push-gw
   (testing "creates push gateway"

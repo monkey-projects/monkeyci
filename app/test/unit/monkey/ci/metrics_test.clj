@@ -64,3 +64,12 @@
         (is (= 1.0 (get-val))))
       (finally
         (t/remove-handler! ::lbl-handler)))))
+
+(deftest metrics-component
+  (testing "creates registry at start"
+    (let [co (-> (sut/make-metrics)
+                 (co/start))]
+      (is (some? (:registry co)))))
+
+  (testing "adds event metrics when events state stream exists"
+    ))
