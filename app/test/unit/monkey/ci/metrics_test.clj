@@ -69,7 +69,4 @@
   (testing "creates registry at start"
     (let [co (-> (sut/make-metrics)
                  (co/start))]
-      (is (some? (:registry co)))))
-
-  (testing "adds event metrics when events state stream exists"
-    ))
+      (is (some? (:registry co))))))

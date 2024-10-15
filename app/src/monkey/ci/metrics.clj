@@ -68,10 +68,23 @@
          ([])))
       counter)))
 
+(defn- add-oci-metrics [reg]
+  (letfn [(tags
+            ([]
+             [:kind])
+            ([signal]
+             (name (get-in signal [:data :kind]))))]
+    (signal->counter ::oci-calls reg "monkey_oci_calls"
+                     {:description "Number of calls to OCI API endpoints"
+                      :tags tags
+                      :tx (filter (comp (partial = :oci/invocation) :id))})
+    reg))
+
 (defrecord Metrics []
   co/Lifecycle
   (start [this]
-    (assoc this :registry (make-registry)))
+    (assoc this :registry (-> (make-registry)
+                              (add-oci-metrics))))
 
   (stop [this]
     this))
