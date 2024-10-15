@@ -1,5 +1,6 @@
 (ns monkey.ci.metrics-test
   (:require [clojure.test :refer [deftest testing is]]
+            [clojure.string :as cs]
             [com.stuartsierra.component :as co]
             [monkey.ci
              [metrics :as sut]
@@ -66,10 +67,19 @@
         (t/remove-handler! ::lbl-handler)))))
 
 (deftest metrics-component
-  (testing "creates registry at start"
-    (let [co (-> (sut/make-metrics)
-                 (co/start))]
-      (try
-        (is (some? (:registry co)))
-        (finally
-          (co/stop co))))))
+  (let [co (-> (sut/make-metrics)
+               (co/start))]
+    (try
+      (testing "creates registry at start"
+        (is (some? (:registry co))))
+
+      (testing "handles oci invocation metrics"
+        (is (some?
+             (t/with-signal
+               (t/event! :oci/invocation
+                         {:data {:kind :test-event}
+                          :level :info}))))
+        (is (cs/includes? (sut/scrape (:registry co)) "monkey_oci_calls")))
+      
+      (finally
+        (co/stop co)))))
