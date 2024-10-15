@@ -69,4 +69,7 @@
   (testing "creates registry at start"
     (let [co (-> (sut/make-metrics)
                  (co/start))]
-      (is (some? (:registry co))))))
+      (try
+        (is (some? (:registry co)))
+        (finally
+          (co/stop co))))))

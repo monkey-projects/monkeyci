@@ -4,7 +4,8 @@
    versions of the Prometheus libs.  Since we're fixed on Prometheus (for now), it's not
    necessary to maintain all the other formats, so the micrometer layer was essentially
    ballast.  This namespace accesses the Prometheus code directly."
-  (:require [medley.core :as mc])
+  (:require [clojure.tools.logging :as log]
+            [medley.core :as mc])
   (:import [io.prometheus.metrics.core.metrics Counter CounterWithCallback Gauge GaugeWithCallback]
            [io.prometheus.metrics.model.registry PrometheusRegistry]
            [io.prometheus.metrics.exporter.pushgateway PushGateway]
@@ -115,4 +116,5 @@
 (defn push
   "Pushes all registered datapoints to the push gateway"
   [gw]
+  (log/debug "Pushing metrics to push gateway")
   (.push gw))

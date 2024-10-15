@@ -80,6 +80,9 @@
                       :tx (filter (comp (partial = :oci/invocation) :id))})
     reg))
 
+(defn- remove-signal-handlers []
+  (t/remove-handler! ::oci-calls))
+
 (defrecord Metrics []
   co/Lifecycle
   (start [this]
@@ -87,6 +90,7 @@
                               (add-oci-metrics))))
 
   (stop [this]
+    (remove-signal-handlers)
     this))
 
 (def make-metrics ->Metrics)
