@@ -86,6 +86,7 @@
 (defrecord Metrics []
   co/Lifecycle
   (start [this]
+    ;; TODO Add build labels if present
     (assoc this :registry (-> (make-registry)
                               (add-oci-metrics))))
 

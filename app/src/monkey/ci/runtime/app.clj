@@ -147,7 +147,7 @@
       (not-empty config) (assoc :gw (prom/push-gw (:host config)
                                                   (:port config)
                                                   (:registry metrics)
-                                                  "test_job"))))
+                                                  "monkeyci_build"))))
 
   (stop [this]
     (when-let [gw (:gw this)]
