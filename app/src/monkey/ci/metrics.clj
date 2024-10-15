@@ -47,17 +47,20 @@
 
 (defn signal->counter
   "Registers a signal handler that creates a counter in the registry that counts 
-   how many times the given signal was received.  If `tags` is a function, it 
-   will be invoked with the received signal in order to get the tags for the
-   counter."
-  [signal-id reg counter-id & [tags opts]]
+   how many times a signal was received.  If `tags` is a function, it  will be 
+   invoked with the received signal in order to get the tags for the counter."
+  [handler-id reg counter-id {:keys [opts tags tx]}]
   (letfn [(get-tags [s]
             (if (fn? tags)
               (tags s)
               tags))]
     (t/add-handler!
-     signal-id
+     handler-id
      (fn
        ([signal]
-        (mm/add-counter reg counter-id (get-tags signal) opts 1))
+        (when-let [r (if tx
+                       (some-> (eduction tx [signal]) first)
+                       signal)]
+          (mm/add-counter reg counter-id (get-tags r) opts 1)))
        ([])))))
+
