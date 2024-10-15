@@ -58,7 +58,7 @@
 (defn- rt->config [build rt]
   (-> (rt/rt->config rt)
       ;; TODO Move the config needed by the runner under the runner config itself
-      (select-keys [:containers :logging :workspace :cache :artifacts :sidecar :promtail :api])
+      (select-keys [:containers :logging :workspace :cache :artifacts :sidecar :promtail :api :push-gw])
       (assoc :checkout-base-dir oci/work-dir
              :build (dissoc build :ssh-keys :cleanup? :status)
              ;; TODO Use aero tags in the config, instead of doing this manually here
@@ -216,6 +216,7 @@
 
 (defmethod r/make-runner :oci [rt]
   (let [conf (:runner rt)
-        client (ci/make-context conf)]
+        client (-> (ci/make-context conf)
+                   (oci/add-inv-interceptor :runners))]
     (partial oci-runner client conf)))
 

@@ -213,7 +213,8 @@
 
 (defmethod make-blob-store :oci [conf k]
   (let [oci-conf (get conf k)
-        client (os/make-client oci-conf)]
+        client (-> (os/make-client oci-conf)
+                   (oci/add-inv-interceptor :blob))]
     (->OciBlobStore client oci-conf)))
 
 ;;; Configuration functionality

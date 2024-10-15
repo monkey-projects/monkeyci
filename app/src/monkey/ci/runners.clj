@@ -26,6 +26,7 @@
      :message msg}))
 
 (defn- post-build-end [rt build {:keys [exit message] :as res}]
+  (log/debug "Posting :build/end event for exit code" exit)
   (md/chain
    (rt/post-events rt (build/build-end-evt
                        (cond-> build

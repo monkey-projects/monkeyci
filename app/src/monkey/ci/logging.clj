@@ -207,7 +207,8 @@
 
 (defmethod make-log-retriever :oci [conf]
   (let [oci-conf (:logging conf)
-        client (os/make-client oci-conf)]
+        client (-> (os/make-client oci-conf)
+                   (oci/add-inv-interceptor :logging))]
     (->OciBucketLogRetriever client oci-conf)))
 
 ;;; Configuration handling

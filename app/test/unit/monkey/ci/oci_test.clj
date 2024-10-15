@@ -6,7 +6,8 @@
             [monkey.ci.oci :as sut]
             [monkey.ci.helpers :as h]
             [monkey.oci.container-instance.core :as ci]
-            [monkey.oci.os.stream :as os])
+            [monkey.oci.os.stream :as os]
+            [taoensso.telemere :as t])
   (:import java.io.ByteArrayInputStream))
 
 (deftest stream-to-bucket
@@ -293,3 +294,12 @@
                     :is-read-only false
                     :volume-name "checkout"}
                    (first (get vol-mounts "checkout"))))))))))
+
+(deftest invocation-interceptor
+  (testing "dispatches invocation event for given kind"
+    (let [i (sut/invocation-interceptor ::test-module)
+          s (t/with-signal
+              (is (= ::test-ctx ((:enter i) ::test-ctx))))]
+      (is (= :event (:kind s)))
+      (is (= :oci/invocation (:id s)))
+      (is (= ::test-module (get-in s [:data :kind]))))))
