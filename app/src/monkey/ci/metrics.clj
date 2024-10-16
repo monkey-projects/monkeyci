@@ -1,5 +1,6 @@
 (ns monkey.ci.metrics
-  (:require [com.stuartsierra.component :as co]
+  (:require [clojure.tools.logging :as log]
+            [com.stuartsierra.component :as co]
             [manifold.stream :as ms]
             [medley.core :as mc]
             [monkey.ci.prometheus :as prom]
@@ -64,7 +65,8 @@
           (when-let [r (if tx
                          (some-> (eduction tx [signal]) first)
                          signal)]
-            (prom/counter-inc counter 1 (lbl-vals signal))))
+            (log/debug "Increasing counter for signal:" r)
+            (prom/counter-inc counter 1 (lbl-vals r))))
          ([])))
       counter)))
 
