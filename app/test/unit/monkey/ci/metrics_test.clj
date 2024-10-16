@@ -74,12 +74,14 @@
         (is (some? (:registry co))))
 
       (testing "handles oci invocation metrics"
-        (is (some?
-             (t/with-signal
-               (t/event! :oci/invocation
-                         {:data {:kind :test-event}
-                          :level :info}))))
-        (is (cs/includes? (sut/scrape (:registry co)) "monkey_oci_calls")))
+        (is (= :oci/invocation
+               (-> (t/with-signal
+                     (t/event! :oci/invocation
+                               {:data {:kind :test-event}
+                                :level :info}))
+                   :id)))
+        (is (not= :timeout (h/wait-until #(cs/includes? (sut/scrape (:registry co)) "monkey_oci_calls")
+                                         1000))))
       
       (finally
         (co/stop co)))))
