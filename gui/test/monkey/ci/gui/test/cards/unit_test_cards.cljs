@@ -6,6 +6,8 @@
             [re-frame.core :as rf]
             [re-frame.db :as rdb]))
 
+(rf/clear-subscription-cache!)
+
 (defcard-rg single-suite
   "Unit tests for single suite"
   [sut/test-results
@@ -46,3 +48,19 @@
      :test-cases
      (->> (range 200)
           (map (comp gen-test-case inc)))}]])
+
+(rf/reg-sub
+ ::tests-with-failure
+ (fn [_ _]
+   [{:test-case "successful test"
+     :time 0.1}
+    {:test-case "failing test"
+     :time 0.2
+     :failures
+     [{:type "assertion failure: cs/includes?"
+       :message "A description of the test"
+       :description "A more detailed description\nCan be multiple lines"}]}]))
+
+(defcard-rg test-results-with-failure
+  "Test results table with failure"
+  [sut/test-results ::tests-with-failure [::tests-with-failure]])

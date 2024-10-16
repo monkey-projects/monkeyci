@@ -938,30 +938,6 @@
                      (test-app)
                      :status))))))
 
-(deftest setup-runtime
-  (testing "returns fn that starts http server"
-    (let [conf {:http {:port 1234}}
-          h (rt/setup-runtime conf :http)
-          rt {:http h
-              :config conf}
-          inv (atom nil)]
-      (is (fn? h))
-      (with-redefs [aleph/start-server (fn [handler args]
-                                         (reset! inv {:handler handler
-                                                      :opts args}))]
-        (is (some? (h rt)))
-        (is (= {:port 1234} (-> (:opts @inv)
-                                (select-keys [:port])))))))
-
-  (testing "start fn returns another fn that stops the server"
-    (let [stopped? (atom false)]
-      (with-redefs [aleph/start-server (constantly (h/->FakeServer stopped?))]
-        (let [h (rt/setup-runtime {:http {}} :http)
-              s (h {})]
-          (is (ifn? s))
-          (is (some? (s)))
-          (is (true? @stopped?)))))))
-
 (deftest on-server-close
   (testing "waits until netty server closes"
     (with-redefs [netty/wait-for-close (fn [s]

@@ -1,6 +1,7 @@
 (ns monkey.ci.gui.test-results
   "Displays test results"
   (:require #_[monkey.ci.gui.charts :as charts]
+            [clojure.string :as cs]
             [monkey.ci.gui.colors :as colors]
             [monkey.ci.gui.components :as co]
             [monkey.ci.gui.logging :as log]
@@ -19,20 +20,49 @@
 (defn- suite-rows [suite]
   (map test-row (:test-cases suite)))
 
+(rf/reg-sub
+ :test/selected
+ (fn [db _]
+   (::selected-test db)))
+
+(rf/reg-event-db
+ :test/select
+ (fn [db [_ tc]]
+   (assoc db ::selected-test tc)))
+
+(defn test-details-modal []
+  (let [tc (rf/subscribe [:test/selected])]
+    [co/modal
+     ::test-details
+     [:h3 (:test-case @tc)]
+     [co/log-contents (->> (concat (:failures @tc) (:errors @tc))
+                           (mapcat (fn [err]
+                                     (some-> (or (:description err) (:message err))
+                                             (cs/split #"\n"))))
+                           (interpose [:br]))]]))
+
 (defn test-results
   "Renders a paged table with given id that retrieves test result info from 
    the specified sub."
   [id tr-sub]
   (letfn [(result-val [tc]
-            (co/build-result (if (success? tc) "success" "failure")) )]
-    [t/paged-table {:id id
-                    :items-sub tr-sub
-                    :columns [{:label "Test case"
-                               :value :test-case}
-                              {:label "Result"
-                               :value result-val}
-                              {:label "Elapsed"
-                               :value #(str (:time %) "s")}]}]))
+            (co/build-result (if (success? tc) "success" "failure")))
+          (show-test-details [tc]
+            (when-not (success? tc)
+              (rf/dispatch [:test/select tc])
+              #?(:cljs (-> (js/bootstrap.Modal. (u/->dom-id ::test-details))
+                           (.show)))))]
+    [:<>
+     [test-details-modal]
+     [t/paged-table {:id id
+                     :items-sub tr-sub
+                     :columns [{:label "Test case"
+                                :value :test-case}
+                               {:label "Result"
+                                :value result-val}
+                               {:label "Elapsed"
+                                :value #(str (:time %) "s")}]
+                     :on-row-click show-test-details}]]))
 
 (def all-suites "$all$")
 

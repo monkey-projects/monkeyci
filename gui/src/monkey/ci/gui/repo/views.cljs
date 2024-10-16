@@ -183,6 +183,7 @@
     [:div.d-flex.gap-2
      [:button.btn.btn-danger
       {:title "Confirm delete"
+       :data-bs-dismiss "modal"
        :on-click (u/link-evt-handler [:repo/delete])}
       [:span.me-2 co/delete-icon] "Yes, Delete!"]
      [co/modal-dismiss-btn

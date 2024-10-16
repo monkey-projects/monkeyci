@@ -488,13 +488,6 @@
   (invoke [this]
     (co/stop this)))
 
-(defmethod rt/setup-runtime :http [conf _]
-  ;; Return a function that when invoked, returns another function to shut down the server
-  (fn [rt]
-    (log/debug "Starting http server with config:" (:config rt))
-    (-> (->HttpServer rt)
-        (co/start))))
-
 (defn on-server-close
   "Returns a deferred that resolves when the server shuts down."
   [server]
