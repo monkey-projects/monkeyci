@@ -36,4 +36,6 @@
 
 (deftest push-gw
   (testing "creates push gateway"
-    (is (some? (sut/push-gw "test-host" 9091 (sut/make-registry) "test_job")))))
+    (is (instance? io.prometheus.metrics.exporter.pushgateway.PushGateway
+                   (sut/push-gw "test-host" 9091 (sut/make-registry) "test_job")))))
+

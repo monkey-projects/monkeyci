@@ -111,7 +111,8 @@
   (.. (PushGateway/builder)
       (address (str host ":" port))
       (registry reg)
-      (job job)))
+      (job job)
+      (build)))
 
 (defn push
   "Pushes all registered datapoints to the push gateway"
