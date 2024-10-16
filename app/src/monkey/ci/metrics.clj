@@ -77,7 +77,7 @@
     (signal->counter ::oci-calls reg "monkey_oci_calls"
                      {:description "Number of calls to OCI API endpoints"
                       :tags tags
-                      :tx (map identity) #_(filter (comp (partial = :oci/invocation) :id))})
+                      :tx (filter (comp (partial = :oci/invocation) :id))})
     reg))
 
 (defn- remove-signal-handlers []
