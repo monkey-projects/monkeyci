@@ -1,5 +1,6 @@
 (ns monkey.ci.runtime.app-test
   (:require [clojure.test :refer [deftest testing is]]
+            [aleph.http :as aleph]
             [clojure.spec.alpha :as spec]
             [com.stuartsierra.component :as co]
             [monkey.ci
@@ -122,24 +123,29 @@
   (assoc tc/base-config
          :http {:port 3001}))
 
+(defn fake-server []
+  (reify java.lang.AutoCloseable
+    (close [this])))
+
 (deftest with-server-system
-  (let [sys (sut/with-server-system server-config identity)]
-    (testing "provides http server"
-      (is (some? (:http sys)))
-      (is (some? (get-in sys [:http :server]))))
+  (with-redefs [aleph/start-server (constantly (fake-server))]
+    (let [sys (sut/with-server-system server-config identity)]
+      (testing "provides http server"
+        (is (some? (:http sys)))
+        (is (some? (get-in sys [:http :server]))))
 
-    (testing "http server has runtime"
-      (is (map? (get-in sys [:http :rt]))))
+      (testing "http server has runtime"
+        (is (map? (get-in sys [:http :rt]))))
 
-    (testing "runtime has storage"
-      (is (satisfies? p/Storage (get-in sys [:http :rt :storage]))))
+      (testing "runtime has storage"
+        (is (satisfies? p/Storage (get-in sys [:http :rt :storage]))))
 
-    (testing "provides empty jwk if not configured"
-      (is (nil? (get-in sys [:http :rt :jwk]))))
+      (testing "provides empty jwk if not configured"
+        (is (nil? (get-in sys [:http :rt :jwk]))))
 
-    (testing "activates listeners"
-      (is (instance? monkey.ci.listeners.Listeners (:listeners sys))))
+      (testing "activates listeners"
+        (is (instance? monkey.ci.listeners.Listeners (:listeners sys))))
 
-    (testing "provides metrics"
-      (is (some? (get sys :metrics)))
-      (is (some? (get-in sys [:http :rt :metrics]))))))
+      (testing "provides metrics"
+        (is (some? (get sys :metrics)))
+        (is (some? (get-in sys [:http :rt :metrics])))))))
