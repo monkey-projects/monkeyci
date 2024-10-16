@@ -145,8 +145,8 @@
         
         (is (fs/exists? arch))
         (is (pos? (fs/size arch)))
-        (with-redefs [os/head-object (constantly true)
-                      os/get-object (constantly (md/success-deferred (fs/read-all-bytes arch)))]
+        (with-redefs [sut/head-object (constantly true)
+                      sut/get-object (constantly (md/success-deferred (fs/read-all-bytes arch)))]
           (let [res @(sut/restore blob "remote/path" r)]
             
             (testing "unzips and unarchives to destination"
@@ -161,9 +161,9 @@
             #_(testing "deletes tmp files"
               (is (empty? (fs/list-dir tmp-dir))))))
 
-        (with-redefs [os/head-object (constantly false)
-                      os/get-object (fn [& args]
-                                      (throw (ex-info "This should not be invoked" {:args args})))]
+        (with-redefs [sut/head-object (constantly false)
+                      sut/get-object (fn [& args]
+                                       (throw (ex-info "This should not be invoked" {:args args})))]
           (let [res @(sut/restore blob "remote/path" r)]
             
             (testing "returns `nil` if src does not exist"
@@ -176,12 +176,12 @@
           path "/test/path"]
 
       (testing "returns raw stream"
-        (with-redefs [os/head-object (constantly true)
-                      os/get-object (constantly (md/success-deferred (.getBytes "this is a test")))]
+        (with-redefs [sut/head-object (constantly true)
+                      sut/get-object (constantly (md/success-deferred (.getBytes "this is a test")))]
           (is (instance? java.io.InputStream @(sut/input-stream blob path)))))
 
       (testing "`nil` if blob does not exist"
-        (with-redefs [os/head-object (constantly false)]
+        (with-redefs [sut/head-object (constantly false)]
           (is (nil? @(sut/input-stream blob path)))))
 
       (testing "can upload raw stream"

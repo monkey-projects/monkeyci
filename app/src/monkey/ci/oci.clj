@@ -9,6 +9,7 @@
             [medley.core :as mc]
             [monkey.ci
              [build :as b]
+             [retry :as retry]
              [utils :as u]]
             [monkey.ci.common.preds :as cp]
             [monkey.oci.container-instance.core :as ci]
@@ -52,6 +53,20 @@
 
 (defn add-inv-interceptor [ctx kind]
   (add-interceptor ctx (invocation-interceptor kind)))
+
+(defn too-many-requests? [r]
+  (= 429 (:status r)))
+
+(defn with-retry
+  "Invokes `f` with async retry"
+  [f]
+  (retry/async-retry f {:max-retries 10
+                        :retry-if too-many-requests?
+                        :backoff (retry/with-max (retry/exponential-delay 1000) 60000)}))
+
+(defn retry-fn [f]
+  (fn [& args]
+    (with-retry #(apply f args))))
 
 (defn stream-to-bucket
   "Pipes an input stream to a bucket object using multipart uploads.
@@ -99,7 +114,7 @@
   [client id]
   (log/trace "Retrieving container instance details for" id)
   (md/chain
-   (ci/get-container-instance client {:instance-id id})
+   (with-retry #(ci/get-container-instance client {:instance-id id}))
    ;; TODO Handle error responses
    (fn [{:keys [status body] :as r}]
      (if (>= status 400)
@@ -150,9 +165,10 @@
           
           (create-instance []
             (log/debug "Creating instance...")
-            (ci/create-container-instance
-             client
-             {:container-instance instance-config}))
+            (with-retry
+              #(ci/create-container-instance
+                client
+                {:container-instance instance-config})))
 
           (wait-for-exit [{:keys [id]}]
             (if exited?
@@ -171,7 +187,7 @@
                  (->> (:containers body)
                       (map (fn [c]
                              (md/chain
-                              (ci/retrieve-logs client (select-keys c [:container-id]))
+                              (with-retry #(ci/retrieve-logs client (select-keys c [:container-id])))
                               #(mc/assoc-some c :logs (:body %)))))
                       (apply md/zip))
                  (partial assoc-in r [:body :containers])))
@@ -180,7 +196,7 @@
           (maybe-delete-instance [{{:keys [id]} :body :as c}]
             (if (and delete? id)
               (md/chain
-               (ci/delete-container-instance client {:instance-id id})
+               (with-retry #(ci/delete-container-instance client {:instance-id id}))
                (constantly c))
               (md/success-deferred c)))
 
