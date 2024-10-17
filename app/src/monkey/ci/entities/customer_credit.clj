@@ -1,7 +1,7 @@
 (ns monkey.ci.entities.customer-credit
   (:require [monkey.ci.entities
-             [build :as eb]
-             [core :as ec]]))
+             [core :as ec]
+             [credit-cons :as ecc]]))
 
 (def base-query
   {:from [[:customer-credits :cc]]
@@ -20,7 +20,7 @@
        (ec/select conn)
        (map ec/convert-credit-select)))
 
-(defn select-avail-credits [conn cust-id]
+(defn select-avail-credits-amount [conn cust-id]
   (let [avail (-> (ec/select
                    conn
                    (assoc base-query
@@ -29,20 +29,43 @@
                   (first)
                   :avail
                   (or 0M))
-        ;; FIXME Use credit consumptions instead
         used  (-> (ec/select
                    conn
-                   (assoc eb/basic-query
-                          :select [[[:sum :b.credits] :used]]
-                          :where [:= :c.cuid cust-id]))
+                   (-> ecc/basic-query
+                       (assoc :select [[[:sum :cc.amount] :used]]
+                              :where (ecc/by-cust cust-id))))
                   (first)
                   :used)]
     (- avail used)))
 
+(defn select-avail-credits [conn cust-id]
+  (->> (ec/select
+        conn
+        {:select [:cc.amount :cc.from-time :cc.type :cc.reason
+                  [:cc.cuid :id]
+                  [:c.cuid :customer-id]
+                  [:cs.cuid :subscription-id]
+                  [:u.cuid :user-id]
+                  [:cco.amount :used]]
+         :from [[:credit-consumptions :cco]]
+         :join [[:customers :c] [:= :c.id :cc.customer-id]]
+         :left-join [[:customer-credits :cc] [:= :cc.id :cco.credit-id]
+                     [:credit-subscriptions :cs] [:= :cs.id :cc.subscription-id]
+                     [:users :u] [:= :u.id :cc.user-id]]
+         :where [:= :c.cuid cust-id]
+         :group-by [:cc.id]
+         :having [:> [:- :cc.amount :used] 0]})
+       (map #(dissoc % :used))
+       (map ec/convert-credit-select)))
+
 (defn by-cuid [id]
   [:= :cc.cuid id])
 
-(defn by-customer-since [cust-id ts]
+(defn by-cust [cust-id]
+  [:= :c.cuid cust-id])
+
+(defn by-cust-since [cust-id ts]
   [:and
-   [:= :c.cuid cust-id]
+   (by-cust cust-id)
    [:<= :cc.from-time (ec/->ts ts)]])
+

@@ -27,21 +27,24 @@
 
 (deftest issue-auto-credits
   (h/with-memory-store st
-    (let [now (t/now)
-          cust (h/gen-cust)
-          sub (-> (h/gen-credit-subs)
-                  (assoc :customer-id (:id cust)
-                         :amount 200M
-                         :valid-from (- now 1000))
-                  (dissoc :valid-until))]
+    (let [now      (t/now)
+          until    (+ now 1000)
+          cust     (h/gen-cust)
+          sub      (-> (h/gen-credit-subs)
+                       (assoc :customer-id (:id cust)
+                              :amount 200M
+                              :valid-from (- now 1000)
+                              :valid-until until))
+          issue-at (fn [at]
+                     (-> {:storage st}
+                         (h/->req)
+                         (assoc-in [:parameters :body :from-time] at)
+                         (sut/issue-auto-credits)))]
       (is (st/save-customer st cust))
       (is (st/save-credit-subscription st sub))
       (is (not-empty (st/list-active-credit-subscriptions st now)))
 
-      (let [resp (-> {:storage st}
-                     (h/->req)
-                     (assoc-in [:parameters :body :from-time] now)
-                     (sut/issue-auto-credits))]
+      (let [resp (issue-at now)]
         (is (= 200 (:status resp)))
         (is (not-empty (get-in resp [:body :credits]))))
       
@@ -51,11 +54,11 @@
           (is (= [200M] (map :amount cc)))))
 
       (testing "does not create credit if a future one already exists"
-        (is (empty? (-> {:storage st}
-                        (h/->req)
-                        (assoc-in [:parameters :body :from-time] now)
-                        (sut/issue-auto-credits)
+        (is (empty? (-> (issue-at now)
                         :body
                         :credits))))
 
-      (testing "skips expired subscriptions"))))
+      (testing "skips expired subscriptions"
+        (is (empty? (-> (issue-at (+ until 1000))
+                        :body
+                        :credits)))))))

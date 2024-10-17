@@ -19,3 +19,11 @@
 
 (defn by-cust [id]
   [:= :c.cuid id])
+
+(defn active-at [at]
+  (let [ts (ec/->ts at)]
+    [:and
+     [:<= :cs.valid-from ts]
+     [:or
+      [:is :cs.valid-until nil]
+      [:<= ts :cs.valid-until]]]))

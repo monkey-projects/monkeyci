@@ -607,9 +607,15 @@
            (first)
            (db->credit-sub)))
 
-(defn- select-customer-credit-subs [{:keys [conn]} cust-id]
-  (->> (ecsub/select-credit-subs conn (ecsub/by-cust cust-id))
+(defn- select-credit-subs [conn f]
+  (->> (ecsub/select-credit-subs conn f)
        (map db->credit-sub)))
+
+(defn- select-customer-credit-subs [{:keys [conn]} cust-id]
+  (select-credit-subs conn (ecsub/by-cust cust-id)))
+
+(defn- select-active-credit-subs [{:keys [conn]} at]
+  (select-credit-subs conn (ecsub/active-at at)))
 
 (def customer-credit? (partial global-sid? st/customer-credits))
 
@@ -647,11 +653,15 @@
            (db->customer-credit)))
 
 (defn- select-customer-credits-since [{:keys [conn]} cust-id since]
-  (->> (ecc/select-customer-credits conn (ecc/by-customer-since cust-id since))
+  (->> (ecc/select-customer-credits conn (ecc/by-cust-since cust-id since))
        (map db->customer-credit)))
 
+(defn- select-avail-credits-amount [{:keys [conn]} cust-id]
+  (ecc/select-avail-credits-amount conn cust-id))
+
 (defn- select-avail-credits [{:keys [conn]} cust-id]
-  (ecc/select-avail-credits conn cust-id))
+  (->> (ecc/select-avail-credits conn cust-id)
+       (map db->customer-credit)))
 
 (def credit-consumption? (partial global-sid? st/credit-consumptions))
 
@@ -664,7 +674,7 @@
 
 (def build-sid (juxt :customer-id :repo-id :build-id))
 
-(defn- insert-credit-consumption [conn {:keys [subscription-id] :as cc}]
+(defn- insert-credit-consumption [conn cc]
   (let [build (apply eb/select-build-by-sid conn (build-sid cc))
         credit (ec/select-customer-credit conn (ec/by-cuid (:credit-id cc)))]
     (when-not build
@@ -718,7 +728,7 @@
       email-registration?
       (select-email-registration conn (global-sid->cuid sid))
       credit-subscription?
-      (select-credit-subscription conn (global-sid->cuid sid))
+      (select-credit-subscription conn (last sid))
       credit-consumption?
       (select-credit-consumption conn (global-sid->cuid sid))
       customer-credit?
@@ -825,7 +835,8 @@
    :customer
    {:search select-customers
     :list-credits-since select-customer-credits-since
-    :get-available-credits select-avail-credits
+    :get-available-credits select-avail-credits-amount
+    :list-available-credits select-avail-credits
     :list-credit-subscriptions select-customer-credit-subs
     :list-credit-consumptions select-customer-credit-cons}
    :repo
@@ -847,7 +858,9 @@
    :param
    {:save upsert-customer-param
     :find select-customer-param
-    :delete delete-customer-param}})
+    :delete delete-customer-param}
+   :credit
+   {:list-active-subscriptions select-active-credit-subs}})
 
 (defn make-storage [conn]
   (map->SqlStorage {:conn conn
