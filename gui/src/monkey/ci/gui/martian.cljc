@@ -147,6 +147,12 @@
      :method :get})
 
    (api-route
+    {:route-name :get-customer-credits
+     :path-parts (into customer-path ["/credits"])
+     :path-schema customer-schema
+     :method :get})
+
+   (api-route
     {:route-name :get-user-customers
      :path-parts (into user-path ["/customers"])
      :path-schema user-schema})

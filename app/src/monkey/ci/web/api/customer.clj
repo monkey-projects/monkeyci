@@ -93,3 +93,11 @@
     (catch java.time.DateTimeException ex
       ;; Most likely invalid zone offset
       (c/error-response (ex-message ex) 400))))
+
+(defn credits
+  "Returns details of customer credits"
+  [req]
+  (let [s (c/req->storage req)
+        cust-id (c/customer-id req)
+        avail (st/calc-available-credits s cust-id)]
+    (rur/response {:available avail})))

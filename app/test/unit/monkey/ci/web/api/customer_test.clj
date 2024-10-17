@@ -146,3 +146,26 @@
                      (->> stats
                           :stats
                           :consumed-credits))))))))))
+
+(deftest credits
+  (h/with-memory-store s
+    (let [cust (-> (h/gen-cust)
+                   (dissoc :repos))
+          user (h/gen-user)]
+      (is (some? (st/save-customer s cust)))
+      (is (some? (st/save-user s user)))
+      (is (some? (st/save-customer-credit s {:customer-id (:id cust)
+                                             :amount 100M
+                                             :type :user
+                                             :user-id (:id user)
+                                             :reason "Testing"})))
+      
+      (testing "provides available credits"
+        (is (= 100M (-> {:storage s}
+                        (h/->req)
+                        (assoc-in [:parameters :path :customer-id] (:id cust))
+                        (sut/credits)
+                        :body
+                        :available))))
+
+      (testing "contains last credit provision"))))

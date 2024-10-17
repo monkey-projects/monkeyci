@@ -244,6 +244,27 @@
  (fn [db [_ err]]
    (lo/on-failure db db/stats "Failed to load statistics: " err)))
 
+(rf/reg-event-fx
+ :customer/load-credits
+ (lo/loader-evt-handler
+  db/credits
+  (fn [_ ctx [_ cust-id days]]
+    [:secure-request
+     :get-customer-credits
+     {:customer-id cust-id}
+     [:customer/load-credits--success]
+     [:customer/load-credits--failed]])))
+
+(rf/reg-event-db
+ :customer/load-credits--success
+ (fn [db [_ resp]]
+   (lo/on-success db db/credits resp)))
+
+(rf/reg-event-db
+ :customer/load-credits--failed
+ (fn [db [_ err]]
+   (lo/on-failure db db/credits "Failed to load credit information: " err)))
+
 (rf/reg-event-db
  :customer/handle-event
  (fn [db [_ {:keys [build] :as evt}]]

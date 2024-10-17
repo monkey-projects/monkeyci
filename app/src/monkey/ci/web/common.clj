@@ -18,7 +18,12 @@
              [exception :as rrme]
              [muuntaja :as rrmm]
              [parameters :as rrmp]]
-            [ring.util.response :as rur]))
+            [ring.util.response :as rur]
+            [schema.core :as s]))
+
+(def not-empty-str (s/constrained s/Str not-empty))
+(def Id not-empty-str)
+(def Name not-empty-str)
 
 (def body
   "Retrieves request body"

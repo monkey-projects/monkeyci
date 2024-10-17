@@ -3,6 +3,7 @@
    in the general api and are meant to be used by system administrators or
    system processes only."
   (:require [monkey.ci.web.api.admin :as api]
+            [monkey.ci.web.common :as c]
             [schema.core :as s]))
 
 (s/defschema UserCredits
@@ -16,4 +17,5 @@
       {:post api/issue-auto-credits}]
      ["/:customer-id"
       {:post api/issue-credits
-       :parameters {:body UserCredits}}]]]])
+       :parameters {:path {:customer-id c/Id}
+                    :body UserCredits}}]]]])

@@ -29,6 +29,7 @@
                   (first)
                   :avail
                   (or 0M))
+        ;; FIXME Use credit consumptions instead
         used  (-> (ec/select
                    conn
                    (assoc eb/basic-query

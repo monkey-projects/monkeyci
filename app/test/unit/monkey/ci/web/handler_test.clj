@@ -331,7 +331,13 @@
         (testing "`GET /stats` retrieves customer statistics"
           (is (= 200 (-> (mock/request :get (str "/customer/" (:id cust) "/stats"))
                          (app)
-                         :status)))))))
+                         :status))))
+
+        (testing "`/credits`"
+          (testing "`GET` retrieves customer credit details"
+            (is (= 200 (-> (mock/request :get (str "/customer/" (:id cust) "/credits"))
+                           (app)
+                           :status))))))))
 
   (h/with-memory-store st
     (let [kp (auth/generate-keypair)
