@@ -3,7 +3,6 @@
             [com.stuartsierra.component :as co]
             [monkey.ci
              [listeners :as sut]
-             [runtime :as rt]
              [storage :as st]
              [time :as t]]
             [monkey.ci.helpers :as h]))
@@ -61,7 +60,7 @@
                  (-> (st/find-build st sid)
                      (select-keys [:end-time :status])))))
         
-        (testing "`build/end` calculates consumed credits"
+        (testing "calculates consumed credits"
           (let [build (-> build
                           (assoc-in [:script :jobs] {:job-1 {:id "job-1"
                                                              :start-time 100
@@ -70,7 +69,13 @@
             (is (some? (st/save-build st build)))
             (is (some? (handle {:type :build/end})))
             (is (number? (-> (st/find-build st sid)
-                             :credits))))))
+                             :credits)))))
+
+        (testing "creates credit consumption"
+          (let [[m :as cc] (st/list-customer-credit-consumptions st (:customer-id build))]
+            (is (= 1 (count cc)))
+            (is (pos? (:amount m)))
+            (is (some? (:credit-id m))))))
 
       (testing "`build/canceled` marks build as canceled"
         (is (some? (handle {:type :build/canceled})))
@@ -201,27 +206,6 @@
           (is (not= :timeout (h/wait-until #(= 4 @handled) 1000)))
           (doseq [[k r] @inv]
             (is (= [:started :completed] r) (str "for id " k))))))))
-
-(deftest setup-runtime
-  (testing "`nil` if no events configured"
-    (is (nil? (rt/setup-runtime {:app-mode :server
-                                 :storage ::test-storage} :listeners))))
-
-  (testing "`nil` if no storage configured"
-    (is (nil? (rt/setup-runtime {:app-mode :server
-                                 :events ::test-events} :listeners))))
-
-  (testing "returns component if storage and events configured"
-    (is (some? (rt/setup-runtime {:app-mode :server
-                                  :storage ::test-storage
-                                  :events ::test-events}
-                                 :listeners))))
-
-  (testing "`nil` if not in server mode"
-    (is (nil? (rt/setup-runtime {:app-mode :script
-                                 :storage ::test-storage
-                                 :events ::test-events}
-                                :listeners)))))
 
 (deftest listeners-component
   (testing "adds listeners on start"

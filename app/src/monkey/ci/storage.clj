@@ -545,29 +545,6 @@
           (filter (every-pred (cp/prop-pred :customer-id cust-id)
                               (comp (partial <= ts) :from-time)))))))
 
-(def calc-available-credits
-  "Calculates the available credits for the customer.  Basically this is the
-   amount of provisioned credits, substracted by the consumed credits."
-  (override-or
-   [:customer :get-available-credits]
-   (fn [s cust-id]
-     ;; Naive implementation: sum up all provisioned credits and all
-     ;; credits from all builds
-     (let [avail (->> (p/list-obj s (customer-credit-sid))
-                      (map (partial find-customer-credit s))
-                      (filter (cp/prop-pred :customer-id cust-id))
-                      (map :amount)
-                      (reduce + 0M))
-           used (->> (find-customer s cust-id)
-                     :repos
-                     (keys)
-                     (map (partial vector cust-id))
-                     (mapcat (fn [sid]
-                               (->> (list-builds s sid)
-                                    (map :credits))))
-                     (reduce + 0M))]
-       (- avail used)))))
-
 (def credit-subscriptions :credit-subscriptions)
 (defn credit-sub-sid [cust-id & others]
   (into [global (name credit-subscriptions)] others))
@@ -605,3 +582,44 @@
        (->> (p/list-obj st sid)
             (map (partial conj sid))
             (map (partial find-credit-consumption st)))))))
+
+(defn- list-customer-credits [s cust-id]
+  (->> (p/list-obj s (customer-credit-sid))
+       (map (partial find-customer-credit s))
+       (filter (cp/prop-pred :customer-id cust-id))))
+
+(defn- sum-amount [e]
+  (->> e
+       (map :amount)
+       (reduce + 0M)))
+
+(def list-available-credits
+  "Lists all available customer credits.  These are the credits that have not been fully
+   consumed, i.e. the difference between the amount and the sum of all consumptions linked
+   to the credit is positive."
+  (override-or
+   [:customer :list-available-credits]
+   (fn [s cust-id]
+     (let [consm (->> (list-customer-credit-consumptions s cust-id)
+                      (group-by :credit-id))
+           avail? (fn [{:keys [id amount]}]
+                    (->> (get consm id)
+                         (sum-amount)
+                         (- amount)
+                         pos?))]
+       (->> (list-customer-credits s cust-id)
+            (filter avail?))))))
+
+(def calc-available-credits
+  "Calculates the available credits for the customer.  Basically this is the
+   amount of provisioned credits, substracted by the consumed credits."
+  (override-or
+   [:customer :get-available-credits]
+   (fn [s cust-id]
+     ;; Naive implementation: sum up all provisioned credits and all
+     ;; credits from all builds
+     (let [avail (->> (list-customer-credits s cust-id)
+                      (sum-amount))
+           used  (->> (list-customer-credit-consumptions s cust-id)
+                      (sum-amount))]
+       (- avail used)))))

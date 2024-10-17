@@ -372,11 +372,32 @@
       (testing "can list for customer since date"
         (is (= [cred] (sut/list-customer-credits-since st cid (- now 100)))))
 
-      (testing "can calculate available credits"
-        (is (sid/sid? (sut/save-build
+      (testing "available credits"
+        (is (sid/sid? (sut/save-credit-consumption
                        st
-                       (-> (h/gen-build)
-                           (assoc :customer-id cid
-                                  :repo-id rid
-                                  :credits 20M)))))
-        (is (= 80M (sut/calc-available-credits st cid)))))))
+                       {:id (cuid/random-cuid)
+                        :customer-id cid
+                        :repo-id rid
+                        :credit-id (:id cred)
+                        :amount 20M})))
+        
+        (testing "can calculate total"
+          (is (= 80M (sut/calc-available-credits st cid))))
+
+        (testing "can list credit entities"
+          (let [avail (sut/list-available-credits st cid)]
+            (is (= 1 (count avail)))
+            (is (= cred (first avail))))
+          
+          (is (empty? (sut/list-available-credits st (cuid/random-cuid)))
+              "empty if no matching records")
+
+          (is (sid/sid? (sut/save-credit-consumption
+                         st
+                         {:id (cuid/random-cuid)
+                          :customer-id cid
+                          :repo-id rid
+                          :credit-id (:id cred)
+                          :amount 80M})))
+          (is (empty? (sut/list-available-credits st cid))
+              "empty if all is consumed"))))))

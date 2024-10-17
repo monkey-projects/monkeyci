@@ -6,8 +6,8 @@
             [monkey.ci
              [build :as b]
              [jobs :as j]
-             [runtime :as rt]
-             [storage :as st]]
+             [storage :as st]
+             [time :as t]]
             [monkey.ci.events.core :as ec]
             [monkey.ci.spec :as spec]
             [monkey.ci.spec.events :as se]))
@@ -48,12 +48,21 @@
                             :status :running}))
 
 (defn end-build [storage {:keys [sid time status message]}]
-  (patch-build storage sid (fn [build]
-                             {:end-time time
-                              :status status
-                              ;; TODO Calculate credits on each job update
-                              :credits (b/calc-credits build)
-                              :message message})))
+  (let [{:keys [credits] :as build} (patch-build
+                                     storage sid
+                                     (fn [build]
+                                       {:end-time time
+                                        :status status
+                                        ;; TODO Calculate credits on each job update
+                                        :credits (b/calc-credits build)
+                                        :message message}))]
+    (when (and (some? credits) (pos? credits))
+      (st/save-credit-consumption storage
+                                  (-> (select-keys build [:customer-id :repo-id :build-id])
+                                      ;; TODO Find available credit
+                                      (assoc :amount credits
+                                             :consumed-at (t/now)))))
+    build))
 
 (defn cancel-build [storage {:keys [sid] :as evt}]
   (patch-build storage
@@ -154,10 +163,3 @@
   (stop [{:keys [event-filter handler] :as this}]
     (ec/remove-listener events event-filter handler)
     (dissoc this :event-filter :handler)))
-
-(defmethod rt/setup-runtime :listeners [conf _]
-  (when (and (= :server (:app-mode conf))
-             (every? conf [:events :storage]))
-    (log/debug "Setting up storage event listeners")
-    (-> (map->Listeners {})
-        (co/using [:events :storage]))))
