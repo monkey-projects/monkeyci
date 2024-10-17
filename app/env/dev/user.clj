@@ -3,7 +3,7 @@
             [logging :as l]
             [server :as server]
             [storage :as s]
-            [clojure.tools.namespace.repl :refer [refresh]]))
+            [clojure.tools.namespace.repl :as nr]))
 
 (defn global-config []
   @c/global-config)
@@ -22,3 +22,7 @@
   (c/load-config! "github/staging.edn")
   (c/load-config! "bitbucket/staging.edn")
   (server/start-server))
+
+(defn refresh []
+  (server/stop-server)
+  (nr/refresh))

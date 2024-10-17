@@ -383,7 +383,8 @@
 (defn run-container [{:keys [events job build] :as conf}]
   (log/debug "Running job as OCI instance:" job)
   (log/debug "Build details:" build)
-  (let [client (ci/make-context (:oci conf))
+  (let [client (-> (ci/make-context (:oci conf))
+                   (oci/add-inv-interceptor :containers))
         ic     (instance-config conf)]
     (fire-job-initializing job (b/sid build) events)
     (when (validate-job! conf)

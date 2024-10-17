@@ -251,6 +251,7 @@
         {:creator api/create-repo
          :updater api/update-repo
          :getter  api/get-repo
+         :deleter api/delete-repo
          :new-schema NewRepo
          :update-schema UpdateRepo
          :id-key :repo-id

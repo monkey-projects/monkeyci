@@ -10,6 +10,7 @@
              [listeners :as li]
              [logging :as l]
              [metrics :as m]
+             [prometheus :as prom]
              [protocols :as p]
              [reporting :as rep]
              [runners :as r]
@@ -136,6 +137,26 @@
    :port (or (get-in config [:runner :api-port])
              (random-port))})
 
+(defn- new-metrics []
+  (m/make-metrics))
+
+(defrecord PushGateway [config metrics]
+  co/Lifecycle
+  (start [this]
+    (cond-> this
+      (not-empty config) (assoc :gw (prom/push-gw (:host config)
+                                                  (:port config)
+                                                  (:registry metrics)
+                                                  "monkeyci_build"))))
+
+  (stop [this]
+    (when-let [gw (:gw this)]
+      (prom/push gw))
+    (dissoc this :gw)))
+
+(defn new-push-gw [config]
+  (map->PushGateway {:config (:push-gw config)}))
+
 (defn make-runner-system
   "Given a runner configuration object, creates component system.  When started,
    it contains a fully configured `runtime` component that can be used by the
@@ -166,7 +187,11 @@
                 [:events :artifacts :cache :containers :workspace :build :params :api-config])
    :params     (co/using
                 (new-params config)
-                [:build])))
+                [:build])
+   :metrics    (new-metrics)
+   :push-gw    (co/using
+                (new-push-gw config)
+                [:metrics])))
 
 (defn with-runner-system [config f]
   (rc/with-system (make-runner-system config) f))
@@ -192,16 +217,15 @@
 (defrecord ServerRuntime [config]
   co/Lifecycle
   (start [this]
-    (assoc this :jwk (get-in this [:jwk :jwk])))
+    (assoc this
+           :jwk (get-in this [:jwk :jwk])
+           :metrics (get-in this [:metrics :registry])))
 
   (stop [this]
     this))
 
 (defn- new-server-runtime [conf]
   (->ServerRuntime conf))
-
-(defn- new-metrics []
-  (m/make-registry))
 
 (defn make-server-system
   "Creates a component system that can be used to start an application server."

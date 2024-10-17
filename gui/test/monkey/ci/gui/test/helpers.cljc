@@ -29,7 +29,7 @@
       (testing "exists"
         (is (some? s)))
 
-      (when default-val
+      (when (some? default-val)
         (testing "has default value"
           (is (= default-val @s))))
 

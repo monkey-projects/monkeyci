@@ -12,6 +12,16 @@
 
 (use-fixtures :each f/reset-db)
 
+(deftest selected-test
+  (let [s (rf/subscribe [:test/selected])]
+    (testing "sub exists"
+      (is (some? s)))
+    
+    (testing "sets current test"
+      (is (nil? @s))
+      (rf/dispatch-sync [:test/select ::current])
+      (is (= ::current @s)))))
+
 (deftest timing-chart-form-sub
   (let [s (rf/subscribe [::sut/timing-chart-form ::test])]
     (testing "exists"

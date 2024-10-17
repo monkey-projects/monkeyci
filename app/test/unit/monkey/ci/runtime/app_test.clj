@@ -1,8 +1,12 @@
 (ns monkey.ci.runtime.app-test
   (:require [clojure.test :refer [deftest testing is]]
+            [aleph.http :as aleph]
             [clojure.spec.alpha :as spec]
+            [com.stuartsierra.component :as co]
             [monkey.ci
+             [metrics :as m]
              [runtime :as rt]
+             [prometheus :as prom]
              [protocols :as p]]
             [monkey.ci.containers.oci :as cco]
             [monkey.ci.runtime.app :as sut]
@@ -88,30 +92,60 @@
     (testing "starts api server at configured pod"
       (is (some? (get-in sys [:api-server :server])))
       (is (= (get-in sys [:api-server :port])
-             (get-in sys [:api-config :port]))))))
+             (get-in sys [:api-config :port]))))
+
+    (testing "system has metrics"
+      (is (some? (:metrics sys))))
+
+    (testing "has push gateway"
+      (is (some? (:push-gw sys))))))
+
+(deftest push-gw
+  (let [conf {:push-gw
+              {:host "test-host"
+               :port 9091}}
+        sys (-> (co/system-map
+                 :push-gw (co/using (sut/new-push-gw conf) [:metrics])
+                 :metrics (m/make-metrics))
+                (co/start))
+        p (:push-gw sys)
+        pushed? (atom false)]
+    (with-redefs [prom/push (fn [_] (reset! pushed? true))]
+      (try
+        (testing "creates push gw on start"
+          (is (some? (:gw p))))
+        (finally (co/stop sys))))
+
+    (testing "pushes metrics on system stop"
+      (is (true? @pushed?)))))
 
 (def server-config
   (assoc tc/base-config
          :http {:port 3001}))
 
+(defn fake-server []
+  (reify java.lang.AutoCloseable
+    (close [this])))
+
 (deftest with-server-system
-  (let [sys (sut/with-server-system server-config identity)]
-    (testing "provides http server"
-      (is (some? (:http sys)))
-      (is (some? (get-in sys [:http :server]))))
+  (with-redefs [aleph/start-server (constantly (fake-server))]
+    (let [sys (sut/with-server-system server-config identity)]
+      (testing "provides http server"
+        (is (some? (:http sys)))
+        (is (some? (get-in sys [:http :server]))))
 
-    (testing "http server has runtime"
-      (is (map? (get-in sys [:http :rt]))))
+      (testing "http server has runtime"
+        (is (map? (get-in sys [:http :rt]))))
 
-    (testing "runtime has storage"
-      (is (satisfies? p/Storage (get-in sys [:http :rt :storage]))))
+      (testing "runtime has storage"
+        (is (satisfies? p/Storage (get-in sys [:http :rt :storage]))))
 
-    (testing "provides empty jwk if not configured"
-      (is (nil? (get-in sys [:http :rt :jwk]))))
+      (testing "provides empty jwk if not configured"
+        (is (nil? (get-in sys [:http :rt :jwk]))))
 
-    (testing "activates listeners"
-      (is (instance? monkey.ci.listeners.Listeners (:listeners sys))))
+      (testing "activates listeners"
+        (is (instance? monkey.ci.listeners.Listeners (:listeners sys))))
 
-    (testing "provides metrics"
-      (is (some? (get sys :metrics)))
-      (is (some? (get-in sys [:http :rt :metrics]))))))
+      (testing "provides metrics"
+        (is (some? (get sys :metrics)))
+        (is (some? (get-in sys [:http :rt :metrics])))))))

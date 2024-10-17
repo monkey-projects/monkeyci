@@ -131,6 +131,9 @@
   ;; Increase buffer size to 16MB
   {:buf-size 0x1000000})
 
+(def head-object (oci/retry-fn os/head-object))
+(def get-object  (oci/retry-fn os/get-object))
+
 (deftype OciBlobStore [client conf]
   p/BlobStore
   (save-blob [_ src dest]
@@ -144,6 +147,7 @@
         (log/debugf "Uploading archive %s to %s (%d bytes)" arch obj-name (fs/size arch))
         (let [is (io/input-stream arch)]
           (u/log-deferred-elapsed
+           ;; TODO Add retry on this
            (-> (oss/input-stream->multipart client
                                             (-> conf
                                                 (select-keys [:ns :bucket-name])
@@ -167,10 +171,10 @@
       (log/debug "Restoring blob from" src "to" dest)
       (u/log-deferred-elapsed
        (md/chain
-        (os/head-object client params)
+        (head-object client params)
         (fn [exists?]
           (if exists?
-            (-> (os/get-object client params)
+            (-> (get-object client params)
                 (md/chain
                  bs/to-input-stream
                  ;; Unzip and unpack in one go
@@ -188,11 +192,11 @@
                      (assoc :object-name obj-name))]
       (u/log-deferred-elapsed
        (md/chain
-        (os/head-object client params)
+        (head-object client params)
         (fn [exists?]
           (when exists?
             (md/chain
-             (os/get-object client params)
+             (get-object client params)
              bs/to-input-stream))))
        (str "Downloaded blob stream from bucket: " src))))
 
@@ -213,7 +217,8 @@
 
 (defmethod make-blob-store :oci [conf k]
   (let [oci-conf (get conf k)
-        client (os/make-client oci-conf)]
+        client (-> (os/make-client oci-conf)
+                   (oci/add-inv-interceptor :blob))]
     (->OciBlobStore client oci-conf)))
 
 ;;; Configuration functionality

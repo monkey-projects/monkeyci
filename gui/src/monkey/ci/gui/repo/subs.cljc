@@ -32,6 +32,7 @@
 (u/db-sub :repo/edit-alerts db/edit-alerts)
 (u/db-sub :repo/editing db/editing)
 (u/db-sub :repo/saving? (comp true? db/saving?))
+(u/db-sub :repo/deleting? (comp true? db/deleting?))
 
 (rf/reg-sub
  :builds/init-loading?

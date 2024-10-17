@@ -122,7 +122,16 @@
             (is (= labels (:labels repo))))))
 
       (testing "lists display ids"
-        (is (= ["test-repo" "new-repo"] (st/list-repo-display-ids s (:id cust))))))))
+        (is (= ["test-repo" "new-repo"] (st/list-repo-display-ids s (:id cust)))))
+
+      (testing "delete repo"
+        (is (true? (st/delete-repo s sid)))
+        
+        (testing "removes repo from customer"
+          (is (nil? (st/find-repo s sid)))
+          (is (not (contains? (-> (st/find-customer s (:id cust))
+                                  :repos)
+                              (:id repo)))))))))
 
 (deftest ^:sql watched-github-repos
   (with-storage conn s

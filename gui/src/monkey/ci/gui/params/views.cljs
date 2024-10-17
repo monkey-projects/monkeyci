@@ -138,7 +138,7 @@
     {:title "Adds a new empty parameter set"
      :on-click (u/link-evt-handler [:params/new-set])}
     [:span.me-2 [co/icon :plus-square]] "Add Set"]
-   [:button.btn.btn-outline-secondary
+   [:button.btn.btn-outline-danger
     {:title "Close this screen"
      :on-click (u/link-evt-handler [:params/cancel-all])}
     [:span.me-2 [co/icon :x-square]] "Close"]])
