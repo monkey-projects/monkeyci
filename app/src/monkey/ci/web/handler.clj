@@ -14,6 +14,7 @@
              [runtime :as rt]
              [version :as v]]
             [monkey.ci.web
+             [admin :as admin]
              [api :as api]
              [auth :as auth]
              [bitbucket :as bitbucket]
@@ -45,16 +46,15 @@
     (text-response (metrics/scrape m))
     (rur/status 204)))
 
-(def not-empty-str (s/constrained s/Str not-empty))
-(def Id not-empty-str)
-(def Name not-empty-str)
+(def Id c/Id)
+(def Name c/Name)
 
 (defn- assoc-id [s]
   (assoc s (s/optional-key :id) Id))
 
 (s/defschema Label
   {:name Name
-   :value not-empty-str})
+   :value c/not-empty-str})
 
 (s/defschema NewCustomer
   {:name Name})
@@ -293,6 +293,9 @@
                    :parameters (assoc since-params
                                       (s/optional-key :zone-offset) s/Str)}}])
 
+(def credit-routes
+  ["/credits" {:get {:handler cust-api/credits}}])
+
 (def customer-routes
   ["/customer"
    {:middleware [:customer-check]}
@@ -311,7 +314,8 @@
                     customer-join-request-routes
                     event-stream-routes
                     customer-build-routes
-                    stats-routes]})])
+                    stats-routes
+                    credit-routes]})])
 
 (def github-routes
   ["/github" [["/login" {:post
@@ -385,7 +389,8 @@
    bitbucket-routes
    auth-routes
    user-routes
-   email-registration-routes])
+   email-registration-routes
+   ["/admin" admin/admin-routes]])
 
 (defn- stringify-body
   "Since the raw body could be read more than once (security, content negotiation...),
@@ -421,6 +426,12 @@
   (fn [req]
     (h req)))
 
+(defn- non-dev [rt mw]
+  (if (rt/dev-mode? rt)
+    ;; Disable security in dev mode
+    [passthrough-middleware]
+    mw))
+
 (defn make-router
   ([rt routes]
    (ring/router
@@ -441,19 +452,11 @@
      ;;:compile rc/compile-request-coercers
      :reitit.middleware/registry
      {:github-security
-      (if (rt/dev-mode? rt)
-        ;; Disable security in dev mode
-        [passthrough-middleware]
-        [github/validate-security])
+      (non-dev rt [github/validate-security])
       :github-app-security
-      (if (rt/dev-mode? rt)
-        ;; Disable security in dev mode
-        [passthrough-middleware]
-        [github/validate-security (constantly (get-in (rt/config rt) [:github :webhook-secret]))])
+      (non-dev rt [github/validate-security (constantly (get-in (rt/config rt) [:github :webhook-secret]))])
       :customer-check
-      (if (rt/dev-mode? rt)
-        [passthrough-middleware]
-        [auth/customer-authorization])}}))
+      (non-dev rt [auth/customer-authorization])}}))
   ([rt]
    (make-router rt routes)))
 

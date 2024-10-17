@@ -142,8 +142,10 @@
   [id title contents & [footer]]
   [:div.modal.fade.modal-lg
    {:id id
+    :role :dialog
     :tab-index -1}
    [:div.modal-dialog
+    {:role :document}
     [:div.modal-content
      [:div.modal-header
       [:div.modal-title title]

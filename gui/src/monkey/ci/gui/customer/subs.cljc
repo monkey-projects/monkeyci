@@ -73,6 +73,22 @@
  identity)
 
 (rf/reg-sub
+ :customer/credits
+ :<- [:loader/value db/credits]
+ identity)
+
+(rf/reg-sub
+ :customer/credit-stats
+ :<- [:customer/stats]
+ :<- [:customer/credits]
+ (fn [[stats creds] _]
+   (when (and stats creds)
+     {:available (:available creds)
+      :consumed (->> (get-in stats [:stats :consumed-credits])
+                     (map :credits)
+                     (reduce + 0))})))
+
+(rf/reg-sub
  :customer/labels
  :<- [:customer/info]
  (fn [cust _]

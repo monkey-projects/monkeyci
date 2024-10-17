@@ -579,11 +579,15 @@
                                  {:path {:customer-id "nonexisting"
                                          :repo-id "also-nonexisting"}})
                        (sut/trigger-build)
-                       :status)))))))
+                       :status))))
+
+      (testing "fails if no available credit"))))
 
 (deftest retry-build
   (h/with-memory-store st
-    (let [build (h/gen-build)
+    (let [build (-> (h/gen-build)
+                    (assoc :start-time 100
+                           :end-time 200))
           make-req (fn [runner params]
                      (-> {:storage st
                           :runner runner}
@@ -605,6 +609,8 @@
             (is (= :initializing (:status new)))
             (is (= (:git build) (:git new)))
             (is (number? (:start-time new)))
+            (is (nil? (:end-time new)))
+            (is (nil? (:script new)))
             (is (empty? (get-in new [:script :jobs]))))))
 
       (testing "returns 404 if build not found"

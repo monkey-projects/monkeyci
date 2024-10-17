@@ -141,14 +141,23 @@
       (is (= "test repo name" (-> @l first :repo :name))))))
 
 (deftest customer-stats
-  (let [s (rf/subscribe [:customer/stats])]
-    (testing "exists"
-      (is (some? s)))
+  (h/verify-sub [:customer/stats] #(lo/set-value % db/stats ::test-stats) ::test-stats nil))
 
-    (testing "returns customer stats from db"
-      (is (nil? @s))
-      (is (some? (reset! app-db (lo/set-value {} db/stats ::test-stats))))
-      (is (= ::test-stats @s)))))
+(deftest customer-credits
+  (h/verify-sub [:customer/credits] #(lo/set-value % db/credits ::test-creds) ::test-creds nil))
+
+(deftest credit-stats
+  (h/verify-sub [:customer/credit-stats]
+                (fn [db]
+                  (-> db
+                      (lo/set-value db/credits {:available 100})
+                      (lo/set-value db/stats {:stats
+                                              {:consumed-credits
+                                               [{:credits 10}
+                                                {:credits 5}]}})))
+                {:available 100
+                 :consumed 15}
+                nil))
 
 (deftest customer-labels
   (let [l (rf/subscribe [:customer/labels])]

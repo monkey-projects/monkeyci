@@ -350,6 +350,30 @@
     (is (= [:danger] (->> (lo/get-alerts @app-db db/stats)
                           (map :type))))))
 
+(deftest customer-load-credits
+  (testing "sends request to backend"
+    (rf-test/run-test-sync
+     (let [c (h/catch-fx :martian.re-frame/request)]
+       (h/initialize-martian {:get-customer-credits
+                              {:status 200
+                               :body {:available 100}
+                               :error-code :no-error}})
+       (is (some? (:martian.re-frame/martian @app-db)))
+       (rf/dispatch [:customer/load-credits "test-customer"])
+       (is (= 1 (count @c)))
+       (is (= :get-customer-credits (-> @c first (nth 2))))))))
+
+(deftest customer-load-credits--success
+  (testing "sets credit info in db"
+    (rf/dispatch-sync [:customer/load-credits--success {:body {:available 100}}])
+    (is (= {:available 100} (db/get-credits @app-db)))))
+
+(deftest customer-load-credits--failed
+  (testing "sets error in db"
+    (rf/dispatch-sync [:customer/load-credits--failed "test error"])
+    (is (= [:danger] (->> (lo/get-alerts @app-db db/credits)
+                          (map :type))))))
+
 (deftest customer-event
   (testing "does nothing when recent builds not loaded"
     (rf/dispatch-sync [:customer/handle-event {:type :build/updated

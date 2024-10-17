@@ -61,6 +61,10 @@
 (def recent-builds ::recent-builds)
 
 (def stats ::stats)
+(def credits ::credits)
+
+(defn get-credits [db]
+  (lo/get-value db credits))
 
 (def group-by-lbl ::group-by-lbl)
 

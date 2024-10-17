@@ -28,8 +28,8 @@
   "Finds build for customer, repo and display id"
   [conn cust-cuid repo-id build-id]
   (some-> (ec/select conn
-                 (-> (build-query cust-cuid repo-id)
-                     (update :where conj [:= :b.display-id build-id])))
+                     (-> (build-query cust-cuid repo-id)
+                         (update :where conj [:= :b.display-id build-id])))
           (first)
           (ec/convert-build-select)))
 

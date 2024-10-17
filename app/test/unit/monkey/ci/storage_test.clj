@@ -4,7 +4,8 @@
             [monkey.ci
              [cuid :as cuid]
              [sid :as sid]
-             [storage :as sut]]
+             [storage :as sut]
+             [time :as t]]
             [monkey.ci.helpers :as h]))
 
 (deftest webhook-details
@@ -330,3 +331,84 @@
 
       (testing "can list for user"
         (is (= [req] (sut/list-user-join-requests st (:user-id req))))))))
+
+(deftest credit-subscriptions
+  (h/with-memory-store st
+    (let [cs    (-> (h/gen-credit-subs)
+                    (assoc :valid-from 1000
+                           :valid-until 2000))
+          other (-> (h/gen-credit-subs)
+                    (assoc :valid-from 1000)
+                    (dissoc :valid-until))]
+      (testing "can save and find"
+        (is (sid/sid? (sut/save-credit-subscription st cs)))
+        (is (= cs (sut/find-credit-subscription st (sut/credit-sub-sid (:customer-id cs) (:id cs))))))
+
+      (testing "can list for customer"
+        (is (= [cs] (sut/list-customer-credit-subscriptions st (:customer-id cs)))))
+
+      (is (sid/sid? (sut/save-credit-subscription st other)))              
+
+      (testing "can list active"
+        (is (= [cs other] (sut/list-active-credit-subscriptions st 1500)))
+        (is (empty (sut/list-active-credit-subscriptions st 3000)))))))
+
+(deftest credit-consumptions
+  (h/with-memory-store st
+    (let [cs (h/gen-credit-cons)]
+      (testing "can save and find"
+        (is (sid/sid? (sut/save-credit-consumption st cs)))
+        (is (= cs (sut/find-credit-consumption st (sut/credit-cons-sid (:customer-id cs) (:id cs))))))
+
+      (testing "can list for customer"
+        (is (= [cs] (sut/list-customer-credit-consumptions st (:customer-id cs))))))))
+
+(deftest customer-credits
+  (h/with-memory-store st
+    (let [now (t/now)
+          cred (-> (h/gen-cust-credit)
+                   (assoc :from-time now
+                          :amount 100M))
+          cid (:customer-id cred)
+          repo (h/gen-repo)
+          rid (:id repo)
+          cust {:id cid
+                :repos {(:id repo) repo}}]
+      (is (sid/sid? (sut/save-customer st cust)))
+
+      (testing "can save and find"
+        (is (sid/sid? (sut/save-customer-credit st cred)))
+        (is (= cred (sut/find-customer-credit st (:id cred)))))
+
+      (testing "can list for customer since date"
+        (is (= [cred] (sut/list-customer-credits-since st cid (- now 100)))))
+
+      (testing "available credits"
+        (is (sid/sid? (sut/save-credit-consumption
+                       st
+                       {:id (cuid/random-cuid)
+                        :customer-id cid
+                        :repo-id rid
+                        :credit-id (:id cred)
+                        :amount 20M})))
+        
+        (testing "can calculate total"
+          (is (= 80M (sut/calc-available-credits st cid))))
+
+        (testing "can list credit entities"
+          (let [avail (sut/list-available-credits st cid)]
+            (is (= 1 (count avail)))
+            (is (= cred (first avail))))
+          
+          (is (empty? (sut/list-available-credits st (cuid/random-cuid)))
+              "empty if no matching records")
+
+          (is (sid/sid? (sut/save-credit-consumption
+                         st
+                         {:id (cuid/random-cuid)
+                          :customer-id cid
+                          :repo-id rid
+                          :credit-id (:id cred)
+                          :amount 80M})))
+          (is (empty? (sut/list-available-credits st cid))
+              "empty if all is consumed"))))))

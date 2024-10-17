@@ -82,6 +82,7 @@
           dates (->> (t/date-seq (jt/offset-date-time since zone))
                      (take-while (partial jt/after? (jt/offset-date-time until zone))))
           cid (c/customer-id req)
+          ;; FIXME Use credit consumptions instead
           builds (st/list-builds-since st cid since)
           by-date (group-by-date dates zone builds)
           by-date-vals (juxt elapsed-seconds consumed-credits)]
@@ -93,3 +94,11 @@
     (catch java.time.DateTimeException ex
       ;; Most likely invalid zone offset
       (c/error-response (ex-message ex) 400))))
+
+(defn credits
+  "Returns details of customer credits"
+  [req]
+  (let [s (c/req->storage req)
+        cust-id (c/customer-id req)
+        avail (st/calc-available-credits s cust-id)]
+    (rur/response {:available avail})))

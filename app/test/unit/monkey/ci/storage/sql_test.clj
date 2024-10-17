@@ -8,7 +8,8 @@
              [cuid :as cuid]
              [protocols :as p]
              [sid :as sid]
-             [storage :as st]]
+             [storage :as st]
+             [time :as t]]
             [monkey.ci.entities.core :as ec]
             [monkey.ci.helpers :as h]
             [monkey.ci.spec.entities :as se]
@@ -445,6 +446,144 @@
       (testing "can delete"
         (is (true? (st/delete-email-registration s (:id er))))
         (is (empty? (st/list-email-registrations s)))))))
+
+(deftest ^:sql credit-subscriptions
+  (with-storage conn s
+    (let [cust (h/gen-cust)
+          now (t/now)
+          cs (-> (h/gen-credit-subs)
+                 (assoc :customer-id (:id cust)
+                        :valid-from (- now 1000)
+                        :valid-until (+ now 1000)))]
+      (is (sid/sid? (st/save-customer s cust)))
+
+      (testing "can create and retrieve"
+        (is (sid/sid? (st/save-credit-subscription s cs)))
+        (is (= cs (st/find-credit-subscription s (st/credit-sub-sid (:id cust) (:id cs))))))
+
+      (testing "can list for customer"
+        (is (= [cs] (st/list-customer-credit-subscriptions s (:id cust)))))
+
+      (testing "can list active"
+        (is (= [cs] (st/list-active-credit-subscriptions s now)))
+        (is (empty? (st/list-active-credit-subscriptions s (+ now 2000)))))
+
+      (testing "can update"
+        (is (sid/sid? (st/save-credit-subscription s (assoc cs :amount 200M))))
+        (is (= 200M (-> (st/find-credit-subscription s (st/credit-sub-sid (:id cust) (:id cs)))
+                        :amount)))))))
+
+(deftest ^:sql customer-credits
+  (with-storage conn s
+    (let [repo (h/gen-repo)
+          cust (-> (h/gen-cust)
+                   (assoc :repos {(:id repo) repo}))
+          cred (-> (h/gen-cust-credit)
+                   (assoc :customer-id (:id cust)
+                          :amount 100M)
+                   (dissoc :user-id :subscription-id))]
+      (is (sid/sid? (st/save-customer s cust)))
+        
+      (testing "can create and retrieve"
+        (is (sid/sid? (st/save-customer-credit s cred)))
+        (is (= cred (st/find-customer-credit s (:id cred)))))
+        
+      (testing "can list for customer"
+        (let [other-cust (h/gen-cust)
+              _ (st/save-customer s other-cust)
+              sids (->> [(assoc cred :from-time 1000)
+                         (-> (h/gen-cust-credit)
+                             (assoc :customer-id (:id cust)
+                                    :from-time 2000
+                                    :amount 200M)
+                             (dissoc :user-id :subscription-id))
+                         (-> (h/gen-cust-credit)
+                             (assoc :customer-id (:id other-cust)
+                                    :from-time 1000)
+                             (dissoc :user-id :subscription-id))]
+                        (mapv (partial st/save-customer-credit s)))]
+          (is (some? sids))
+          (is (= [(-> sids first last)]
+                 (->> (st/list-customer-credits-since s (:id cust) 1100)
+                      (map :id))))))
+
+      (testing "calculates available credits using credit consumptions"
+        (let [build (-> (h/gen-build)
+                        (assoc :customer-id (:id cust)
+                               :repo-id (:id repo)
+                               :credits 25M))
+              ccons {:customer-id (:id cust)
+                     :repo-id (:id repo)
+                     :build-id (:build-id build)
+                     :credit-id (:id cred)
+                     :amount 30M}]
+          (is (sid/sid? (st/save-build s build)))
+          (is (sid/sid? (st/save-credit-consumption s ccons)))
+          (is (= 270M (st/calc-available-credits s (:id cust))))))
+
+      (testing "lists available credits"
+        (is (= [(:id cred)]
+               (->> (st/list-available-credits s (:id cust))
+                    (map :id))))))))
+
+(deftest ^:sql credit-consumptions
+  (with-storage conn s
+    (let [repo (h/gen-repo)
+          cust (-> (h/gen-cust)
+                   (assoc :repos {(:id repo) repo}))
+          build (-> (h/gen-build)
+                    (assoc :repo-id (:id repo)
+                           :customer-id (:id cust)))
+          credit (-> (h/gen-cust-credit)
+                     (assoc :customer-id (:id cust))
+                     (dissoc :user-id :subscription-id))
+          cc (-> (h/gen-credit-cons)
+                 (assoc :build-id (:build-id build)
+                        :repo-id (:id repo)
+                        :customer-id (:id cust)
+                        :credit-id (:id credit)))]
+      (is (sid/sid? (st/save-customer s cust)))
+      (is (sid/sid? (st/save-customer-credit s credit)))
+      (is (sid/sid? (st/save-build s build)))
+
+      (testing "can create and retrieve"
+        (is (sid/sid? (st/save-credit-consumption s cc)))
+        (is (= cc (st/find-credit-consumption s (st/credit-cons-sid (:id cust) (:id cc))))))
+
+      (testing "can list for customer"
+        (is (= [cc] (st/list-customer-credit-consumptions s (:id cust)))))
+      
+      (testing "can update"
+        (is (sid/sid? (st/save-credit-consumption s (assoc cc :amount 200M))))
+        (is (= 200M (-> (st/find-credit-consumption s (st/credit-cons-sid (:id cust) (:id cc)))
+                        :amount))))
+
+      (testing "can create for user"
+        (let [user (h/gen-user)
+              cred (-> (h/gen-cust-credit)
+                       (assoc :type :user
+                              :user-id (:id user)
+                              :reason "testing"
+                              :customer-id (:id cust)
+                              :amount 1000M)
+                       (dissoc :subscription-id))]
+          (is (sid/sid? (st/save-user s user)))
+          (is (sid/sid? (st/save-customer-credit s cred)))
+          (is (= cred (st/find-customer-credit s (:id cred))))))
+
+      (testing "can create for subscription"
+        (let [cs (-> (h/gen-credit-subs)
+                     (assoc :customer-id (:id cust)
+                            :amount 1000M))
+              cred (-> (h/gen-cust-credit)
+                       (assoc :type :subscription
+                              :subscription-id (:id cs)
+                              :customer-id (:id cust)
+                              :amount 1000M)
+                       (dissoc :user-id))]
+          (is (sid/sid? (st/save-credit-subscription s cs)))
+          (is (sid/sid? (st/save-customer-credit s cred)))
+          (is (= cred (st/find-customer-credit s (:id cred)))))))))
 
 (deftest make-storage
   (testing "creates sql storage object using connection settings"

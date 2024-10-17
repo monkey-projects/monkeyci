@@ -146,3 +146,7 @@ Interfacing with the app should be possible with a CLI, HTTP API and a user inte
 Ideally, these are all event-driven.  Well, only the API needs to be, the other parts
 could talk to the API in turn.  It could also have a [Terraform](https://terraform.io)
 integration.  A Slack app would also be nice.
+
+## Credits
+
+For more on how credits are issued and used in *MonkeyCI*, see [the credits section](credits.md).
