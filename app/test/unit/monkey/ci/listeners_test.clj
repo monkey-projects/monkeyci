@@ -60,22 +60,28 @@
                  (-> (st/find-build st sid)
                      (select-keys [:end-time :status])))))
         
-        (testing "calculates consumed credits"
-          (let [build (-> build
-                          (assoc-in [:script :jobs] {:job-1 {:id "job-1"
-                                                             :start-time 100
-                                                             :end-time 200
-                                                             :credit-multiplier 1}}))]
-            (is (some? (st/save-build st build)))
-            (is (some? (handle {:type :build/end})))
+        (let [build (-> build
+                        (assoc-in [:script :jobs] {:job-1 {:id "job-1"
+                                                           :start-time 100
+                                                           :end-time 200
+                                                           :credit-multiplier 1}}))
+              cred (-> (h/gen-cust-credit)
+                       (assoc :customer-id (:customer-id build)
+                              :type :user
+                              :amount 100))]
+          (is (some? (st/save-build st build)))
+          (is (some? (st/save-customer-credit st cred)))
+          (is (some? (handle {:type :build/end})))
+          
+          (testing "calculates consumed credits"
             (is (number? (-> (st/find-build st sid)
-                             :credits)))))
+                             :credits))))
 
-        (testing "creates credit consumption"
-          (let [[m :as cc] (st/list-customer-credit-consumptions st (:customer-id build))]
-            (is (= 1 (count cc)))
-            (is (pos? (:amount m)))
-            (is (some? (:credit-id m))))))
+          (testing "creates credit consumption"
+            (let [[m :as cc] (st/list-customer-credit-consumptions st (:customer-id build))]
+              (is (= 1 (count cc)))
+              (is (pos? (:amount m)))
+              (is (= (:id cred) (:credit-id m)))))))
 
       (testing "`build/canceled` marks build as canceled"
         (is (some? (handle {:type :build/canceled})))

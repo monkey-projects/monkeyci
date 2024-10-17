@@ -47,22 +47,31 @@
                             :credit-multiplier credit-multiplier
                             :status :running}))
 
+(defn- create-credit-consumption [{:keys [credits customer-id] :as build} storage]
+  (when (and (some? credits) (pos? credits))
+    (let [avail (st/list-available-credits storage customer-id)]
+      ;; TODO To avoid problems when there are no available credits at this point, we should
+      ;; consider "reserving" one at the start of the build.  We have to do a check at that
+      ;; point anyway.
+      (if (empty? avail)
+        (log/warn "No available customer credits for build" (:sid build))
+        (st/save-credit-consumption storage
+                                    (-> (select-keys build [:customer-id :repo-id :build-id])
+                                        (assoc :amount credits
+                                               :consumed-at (t/now)
+                                               :credit-id (-> avail first :id)))))))
+  build)
+
 (defn end-build [storage {:keys [sid time status message]}]
-  (let [{:keys [credits] :as build} (patch-build
-                                     storage sid
-                                     (fn [build]
-                                       {:end-time time
-                                        :status status
-                                        ;; TODO Calculate credits on each job update
-                                        :credits (b/calc-credits build)
-                                        :message message}))]
-    (when (and (some? credits) (pos? credits))
-      (st/save-credit-consumption storage
-                                  (-> (select-keys build [:customer-id :repo-id :build-id])
-                                      ;; TODO Find available credit
-                                      (assoc :amount credits
-                                             :consumed-at (t/now)))))
-    build))
+  (-> (patch-build
+       storage sid
+       (fn [build]
+         {:end-time time
+          :status status
+          ;; TODO Calculate credits on each job update
+          :credits (b/calc-credits build)
+          :message message}))
+      (create-credit-consumption storage)))
 
 (defn cancel-build [storage {:keys [sid] :as evt}]
   (patch-build storage
