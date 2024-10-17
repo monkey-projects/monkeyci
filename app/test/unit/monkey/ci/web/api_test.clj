@@ -579,7 +579,9 @@
                                  {:path {:customer-id "nonexisting"
                                          :repo-id "also-nonexisting"}})
                        (sut/trigger-build)
-                       :status)))))))
+                       :status))))
+
+      (testing "fails if no available credit"))))
 
 (deftest retry-build
   (h/with-memory-store st

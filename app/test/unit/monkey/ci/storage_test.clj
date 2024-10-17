@@ -334,13 +334,24 @@
 
 (deftest credit-subscriptions
   (h/with-memory-store st
-    (let [cs (h/gen-credit-subs)]
+    (let [cs    (-> (h/gen-credit-subs)
+                    (assoc :valid-from 1000
+                           :valid-until 2000))
+          other (-> (h/gen-credit-subs)
+                    (assoc :valid-from 1000)
+                    (dissoc :valid-until))]
       (testing "can save and find"
         (is (sid/sid? (sut/save-credit-subscription st cs)))
         (is (= cs (sut/find-credit-subscription st (sut/credit-sub-sid (:customer-id cs) (:id cs))))))
 
       (testing "can list for customer"
-        (is (= [cs] (sut/list-customer-credit-subscriptions st (:customer-id cs))))))))
+        (is (= [cs] (sut/list-customer-credit-subscriptions st (:customer-id cs)))))
+
+      (is (sid/sid? (sut/save-credit-subscription st other)))              
+
+      (testing "can list active"
+        (is (= [cs other] (sut/list-active-credit-subscriptions st 1500)))
+        (is (empty (sut/list-active-credit-subscriptions st 3000)))))))
 
 (deftest credit-consumptions
   (h/with-memory-store st

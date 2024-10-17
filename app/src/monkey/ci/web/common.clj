@@ -257,6 +257,7 @@
                                            (-> build
                                                (assoc :status :error
                                                       :message (ex-message ex))))))]
+    ;; TODO Check customer available credits
     (md/future
       (try
         (rt/post-events rt (ec/make-event :build/pending

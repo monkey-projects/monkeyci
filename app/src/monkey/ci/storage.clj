@@ -543,11 +543,11 @@
      (->> (p/list-obj s (customer-credit-sid))
           (map (partial find-customer-credit s))
           (filter (every-pred (cp/prop-pred :customer-id cust-id)
-                              (comp (partial <= ts) :from-time)))))))
+                              (comp (some-fn nil? (partial <= ts)) :from-time)))))))
 
 (def credit-subscriptions :credit-subscriptions)
-(defn credit-sub-sid [cust-id & others]
-  (into [global (name credit-subscriptions)] others))
+(defn credit-sub-sid [& parts]
+  (into [global (name credit-subscriptions)] parts))
 
 (defn save-credit-subscription [s cs]
   (p/write-obj s (credit-sub-sid (:customer-id cs) (:id cs)) cs))
@@ -559,10 +559,23 @@
   (override-or
    [:customer :list-credit-subscriptions]
    (fn [st cust-id]
-     (let [sid (credit-sub-sid [cust-id])]
+     (let [sid (credit-sub-sid cust-id)]
        (->> (p/list-obj st sid)
             (map (partial conj sid))
             (map (partial find-credit-subscription st)))))))
+
+(def list-active-credit-subscriptions
+  "Lists all active credit subscriptions at given timestamp"
+  (override-or
+   [:credit :list-active-subscriptions]
+   (fn [s at]
+     (letfn [(active? [{:keys [valid-from valid-until]}]
+               (and 
+                (<= valid-from at)
+                (or (nil? valid-until) (< at valid-until))))]
+       (->> (p/list-obj s (credit-sub-sid))
+            (mapcat (partial list-customer-credit-subscriptions s))
+            (filter active?))))))
 
 (def credit-consumptions :credit-consumptions)
 (defn credit-cons-sid [cust-id & others]

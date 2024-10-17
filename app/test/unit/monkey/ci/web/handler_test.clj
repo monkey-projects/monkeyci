@@ -15,6 +15,7 @@
              [logging :as l]
              [metrics :as m]
              [storage :as st]
+             [time :as t]
              [utils :as u]
              [version :as v]]
             [monkey.ci.web
@@ -1006,6 +1007,7 @@
                          :status)))))
 
       (testing "POST `/auto` issues new credits to all customers with subscriptions"
-        (is (= 200 (-> (mock/request :post "/admin/issue-credits/auto")
+        (is (= 200 (-> (h/json-request :post "/admin/issue-credits/auto"
+                                       {:from-time (t/now)})
                        (test-app)
                        :status)))))))

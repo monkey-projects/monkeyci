@@ -10,11 +10,15 @@
   {:amount s/Int
    (s/optional-key :reason) s/Str})
 
+(s/defschema AutoCredits
+  {:from-time s/Int})
+
 (def admin-routes
   [["/issue-credits"
     {:conflicting true}
     [["/auto"
-      {:post api/issue-auto-credits}]
+      {:post api/issue-auto-credits
+       :parameters {:body AutoCredits}}]
      ["/:customer-id"
       {:post api/issue-credits
        :parameters {:path {:customer-id c/Id}

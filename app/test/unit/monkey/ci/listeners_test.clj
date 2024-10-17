@@ -77,11 +77,13 @@
             (is (number? (-> (st/find-build st sid)
                              :credits))))
 
-          (testing "creates credit consumption"
+          (testing "creates credit consumption for available credit"
             (let [[m :as cc] (st/list-customer-credit-consumptions st (:customer-id build))]
               (is (= 1 (count cc)))
               (is (pos? (:amount m)))
-              (is (= (:id cred) (:credit-id m)))))))
+              (is (= (:id cred) (:credit-id m)))))
+
+          (testing "when no available credit, assigns consumption to most recent credit")))
 
       (testing "`build/canceled` marks build as canceled"
         (is (some? (handle {:type :build/canceled})))

@@ -82,6 +82,7 @@
           dates (->> (t/date-seq (jt/offset-date-time since zone))
                      (take-while (partial jt/after? (jt/offset-date-time until zone))))
           cid (c/customer-id req)
+          ;; FIXME Use credit consumptions instead
           builds (st/list-builds-since st cid since)
           by-date (group-by-date dates zone builds)
           by-date-vals (juxt elapsed-seconds consumed-credits)]
