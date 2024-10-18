@@ -2,6 +2,7 @@
   (:require [clojure.string :as cs]
             [monkey.ci.gui.build.db :as db]
             [monkey.ci.gui.loader :as lo]
+            [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
@@ -17,24 +18,15 @@
       (assoc :path (:name l))
       (update :name (comp last split-log-path))))
 
-(def sorted-deps
-  (comp vec sort :dependencies))
-
-(defn sort-by-deps
-  "Sorts jobs by dependencies: jobs that are dependent on another job will occur after it"
-  [jobs]
-  ;; Just sort dependencies and compare those.  This is not really 100% correct but it's a start.
-  (sort-by sorted-deps jobs))
-
 (rf/reg-sub
  :build/jobs
  :<- [:build/current]
  (fn [b _]
-   (let [jobs (-> b :script :jobs vals)
-         no-deps? (comp empty? :dependencies)]
-     (loop [rem (->> jobs (remove no-deps?) (sort-by :id) vec)
+   ;; Sort the jobs in the build by dependency order
+   (let [jobs (-> b :script :jobs vals)]
+     (loop [rem (->> jobs (sort-by :id) vec)
             proc? #{}
-            res (filterv no-deps? jobs)]
+            res []]
        (if (empty? rem)
          res
          (let [next-jobs (->> rem
@@ -44,7 +36,7 @@
              (concat res rem)
              (recur (remove (set next-jobs) rem)
                     (clojure.set/union proc? (set (map :id next-jobs)))
-                    (concat jobs next-jobs)))))))))
+                    (concat res next-jobs)))))))))
 
 (rf/reg-sub
  :build/loading?
