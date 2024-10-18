@@ -253,8 +253,11 @@
      [:<>
       [:h3 "Add Repository to Watch"]
       [co/alerts [:customer/repo-alerts]]
-      [repo-table]
-      [:a {:href (r/path-for :page/customer (r/path-params @route))} "Back to customer"]])))
+      [:div.card.mb-2
+       [:div.card-body
+        [repo-table]]]
+      [:a {:href (r/path-for :page/customer (r/path-params @route))}
+       [:span.me-1 [co/icon :chevron-left]] "Back to customer"]])))
 
 (defn page-new
   "New customer page"
