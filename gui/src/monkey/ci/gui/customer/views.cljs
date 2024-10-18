@@ -51,18 +51,19 @@
         {:drawOnChartArea false}}}}}))
 
 (defn- credits-chart-config []
-  (let [consumed 850
-        avail (- 1000 consumed)]
-    {:type :doughnut
-     :data {:labels [(str consumed " consumed") (str avail " available")]
-            :datasets
-            [{:label "Credits"
-              :data [consumed avail]}]}}))
+  (let [stats (rf/subscribe [:customer/credit-stats])]
+    (when-let [{:keys [consumed available]} @stats]
+      {:type :doughnut
+       :data {:labels [(str consumed " consumed") (str available " available")]
+              :datasets
+              [{:label "Credits"
+                :data [consumed available]}]}})))
 
 (def stats-period-days 30)
 
 (defn customer-stats [cust-id]
   (rf/dispatch [:customer/load-stats cust-id stats-period-days])
+  (rf/dispatch [:customer/load-credits cust-id])
   (fn [cust-id]
     (let [stats (rf/subscribe [:customer/stats])]
       (rf/dispatch [:chart/update :customer/builds (build-chart-config (:stats @stats))])
@@ -252,8 +253,11 @@
      [:<>
       [:h3 "Add Repository to Watch"]
       [co/alerts [:customer/repo-alerts]]
-      [repo-table]
-      [:a {:href (r/path-for :page/customer (r/path-params @route))} "Back to customer"]])))
+      [:div.card.mb-2
+       [:div.card-body
+        [repo-table]]]
+      [:a {:href (r/path-for :page/customer (r/path-params @route))}
+       [:span.me-1 [co/icon :chevron-left]] "Back to customer"]])))
 
 (defn page-new
   "New customer page"

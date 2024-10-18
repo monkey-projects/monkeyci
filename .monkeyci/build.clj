@@ -11,7 +11,8 @@
             [monkey.ci.plugin
              [github :as gh]
              [infra :as infra]
-             [kaniko :as kaniko]]))
+             [kaniko :as kaniko]
+             [pushover :as po]]))
 
 ;; Version assigned when building main branch
 ;; TODO Determine automatically
@@ -246,6 +247,12 @@
                             (when (publish-gui? ctx) "publish-gui-img")]
                            (remove nil?))}))))
 
+(defn notify [ctx]
+  (when (release? ctx)
+    (po/pushover-msg
+     {:message (str "MonkeyCI version " (tag-version ctx) " has been released.")
+      :dependencies ["app-img-manifest" "publish-gui-img"]})))
+
 ;; TODO Add jobs that auto-deploy to staging after running some sanity checks
 ;; We could do a git push with updated kustomization file.
 ;; But running sanity checks requires a running app.  Either we could rely on
@@ -264,4 +271,5 @@
  build-gui-release
  build-app-image
  build-gui-image
- deploy]
+ deploy
+ notify]

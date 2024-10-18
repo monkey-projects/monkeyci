@@ -2,6 +2,7 @@
   (:require [clojure.test :refer [deftest testing is]]
             [java-time.api :as jt]
             [monkey.ci
+             [cuid :as cuid]
              [helpers :as h]
              [storage :as st]
              [utils :as u]]
@@ -102,7 +103,7 @@
                        (sut/stats)
                        :status))))
 
-      (testing "with builds"
+      (testing "with builds and credit consumptions"
         (letfn [(gen-build [start end creds]
                   (-> (h/gen-build)
                       (assoc :repo-id (:id repo)
@@ -113,36 +114,74 @@
                 (ts [& args]
                   (-> (apply jt/offset-date-time args)
                       (jt/with-offset (jt/zone-offset "Z"))
-                      (jt/to-millis-from-epoch)))]
-          (is (->> [(gen-build (ts 2024 9 17 10) (ts 2024 9 17 10 5)  10)
-                    (gen-build (ts 2024 9 17 11) (ts 2024 9 17 11 20) 20)
-                    (gen-build (ts 2024 9 19 15) (ts 2024 9 19 15 30) 30)]
-                   (map (partial st/save-build st))
-                   (every? some?)))
+                      (jt/to-millis-from-epoch)))
+                (insert-cc [cred build]
+                  (st/save-credit-consumption st (-> (select-keys build [:build-id :repo-id :customer-id])
+                                                     (assoc :id (cuid/random-cuid)
+                                                            :consumed-at (:end-time build)
+                                                            :amount (:credits build)
+                                                            :credit-id (:id cred)))))]
+          (let [cred (-> (h/gen-cust-credit)
+                         (assoc :customer-id (:id cust)
+                                :type :user
+                                :amount 1000))
+                builds [(gen-build (ts 2024 9 17 10) (ts 2024 9 17 10 5)  10)
+                        (gen-build (ts 2024 9 17 11) (ts 2024 9 17 11 20) 20)
+                        (gen-build (ts 2024 9 19 15) (ts 2024 9 19 15 30) 30)]]
+            (is (some? (st/save-customer-credit st cred)))
+            (is (->> builds
+                     (map (partial st/save-build st))
+                     (every? some?)))
+            (is (->> builds
+                     (map (partial insert-cc cred))
+                     (every? some?)))
 
-          (let [stats (-> req
-                          (assoc-in [:parameters :query] {:since (ts 2024 9 17)
-                                                          :until (ts 2024 9 20)})
-                          (sut/stats)
-                          :body)]
-            (testing "contains elapsed seconds per day"
-              (is (= [{:date    (ts 2024 9 17)
-                       :seconds (* 60 25)}
-                      {:date    (ts 2024 9 18)
-                       :seconds 0}
-                      {:date    (ts 2024 9 19)
-                       :seconds (* 60 30)}]
-                     (->> stats
-                          :stats
-                          :elapsed-seconds))))
-            
-            (testing "contains consumed credits per day"
-              (is (= [{:date    (ts 2024 9 17)
-                       :credits 30}
-                      {:date    (ts 2024 9 18)
-                       :credits 0}
-                      {:date    (ts 2024 9 19)
-                       :credits 30}]
-                     (->> stats
-                          :stats
-                          :consumed-credits))))))))))
+            (let [stats (-> req
+                            (assoc-in [:parameters :query] {:since (ts 2024 9 17)
+                                                            :until (ts 2024 9 20)})
+                            (sut/stats)
+                            :body)]
+              (testing "contains elapsed seconds per day"
+                (is (= [{:date    (ts 2024 9 17)
+                         :seconds (* 60 25)}
+                        {:date    (ts 2024 9 18)
+                         :seconds 0}
+                        {:date    (ts 2024 9 19)
+                         :seconds (* 60 30)}]
+                       (->> stats
+                            :stats
+                            :elapsed-seconds))))
+              
+              (testing "contains consumed credits per day"
+                (is (= [{:date    (ts 2024 9 17)
+                         :credits 30}
+                        {:date    (ts 2024 9 18)
+                         :credits 0}
+                        {:date    (ts 2024 9 19)
+                         :credits 30}]
+                       (->> stats
+                            :stats
+                            :consumed-credits)))))))))))
+
+(deftest credits
+  (h/with-memory-store s
+    (let [cust (-> (h/gen-cust)
+                   (dissoc :repos))
+          user (h/gen-user)]
+      (is (some? (st/save-customer s cust)))
+      (is (some? (st/save-user s user)))
+      (is (some? (st/save-customer-credit s {:customer-id (:id cust)
+                                             :amount 100M
+                                             :type :user
+                                             :user-id (:id user)
+                                             :reason "Testing"})))
+      
+      (testing "provides available credits"
+        (is (= 100M (-> {:storage s}
+                        (h/->req)
+                        (assoc-in [:parameters :path :customer-id] (:id cust))
+                        (sut/credits)
+                        :body
+                        :available))))
+
+      (testing "contains last credit provision"))))

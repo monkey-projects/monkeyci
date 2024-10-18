@@ -524,3 +524,122 @@
 
 (defn delete-email-registration [s id]
   (p/delete-obj s (email-registration-sid id)))
+
+(def customer-credits :customer-credits)
+(def customer-credit-sid (partial global-sid customer-credits))
+
+(defn save-customer-credit [s cred]
+  (p/write-obj s (customer-credit-sid (:id cred)) cred))
+
+(defn find-customer-credit [s id]
+  (p/read-obj s (customer-credit-sid id)))
+
+(def list-customer-credits-since
+  "Lists all customer credits for the customer since given timestamp.  
+   This includes those without a `from-time`."
+  (override-or
+   [:customer :list-credits-since]
+   (fn [s cust-id ts]
+     (->> (p/list-obj s (customer-credit-sid))
+          (map (partial find-customer-credit s))
+          (filter (every-pred (cp/prop-pred :customer-id cust-id)
+                              (comp (some-fn nil? (partial <= ts)) :from-time)))))))
+
+(def credit-subscriptions :credit-subscriptions)
+(defn credit-sub-sid [& parts]
+  (into [global (name credit-subscriptions)] parts))
+
+(defn save-credit-subscription [s cs]
+  (p/write-obj s (credit-sub-sid (:customer-id cs) (:id cs)) cs))
+
+(defn find-credit-subscription [s sid]
+  (p/read-obj s sid))
+
+(def list-customer-credit-subscriptions
+  (override-or
+   [:customer :list-credit-subscriptions]
+   (fn [st cust-id]
+     (let [sid (credit-sub-sid cust-id)]
+       (->> (p/list-obj st sid)
+            (map (partial conj sid))
+            (map (partial find-credit-subscription st)))))))
+
+(def list-active-credit-subscriptions
+  "Lists all active credit subscriptions at given timestamp"
+  (override-or
+   [:credit :list-active-subscriptions]
+   (fn [s at]
+     (letfn [(active? [{:keys [valid-from valid-until]}]
+               (and 
+                (<= valid-from at)
+                (or (nil? valid-until) (< at valid-until))))]
+       (->> (p/list-obj s (credit-sub-sid))
+            (mapcat (partial list-customer-credit-subscriptions s))
+            (filter active?))))))
+
+(def credit-consumptions :credit-consumptions)
+(defn credit-cons-sid [cust-id & others]
+  (into [global (name credit-consumptions)] others))
+
+(defn save-credit-consumption [s cs]
+  (p/write-obj s (credit-cons-sid (:customer-id cs) (:id cs)) cs))
+
+(defn find-credit-consumption [s sid]
+  (p/read-obj s sid))
+
+(def list-customer-credit-consumptions
+  (override-or
+   [:customer :list-credit-consumptions]
+   (fn [st cust-id]
+     (let [sid (credit-cons-sid [cust-id])]
+       (->> (p/list-obj st sid)
+            (map (partial conj sid))
+            (map (partial find-credit-consumption st)))))))
+
+(def list-customer-credit-consumptions-since
+  (override-or
+   [:customer :list-credit-consumptions-since]
+   (fn [st cust-id since]
+     (->> (list-customer-credit-consumptions st cust-id)
+          (filter (comp (partial <= since) :consumed-at))))))
+
+(defn- list-customer-credits [s cust-id]
+  (->> (p/list-obj s (customer-credit-sid))
+       (map (partial find-customer-credit s))
+       (filter (cp/prop-pred :customer-id cust-id))))
+
+(defn- sum-amount [e]
+  (->> e
+       (map :amount)
+       (reduce + 0M)))
+
+(def list-available-credits
+  "Lists all available customer credits.  These are the credits that have not been fully
+   consumed, i.e. the difference between the amount and the sum of all consumptions linked
+   to the credit is positive."
+  (override-or
+   [:customer :list-available-credits]
+   (fn [s cust-id]
+     (let [consm (->> (list-customer-credit-consumptions s cust-id)
+                      (group-by :credit-id))
+           avail? (fn [{:keys [id amount]}]
+                    (->> (get consm id)
+                         (sum-amount)
+                         (- amount)
+                         pos?))]
+       (->> (list-customer-credits s cust-id)
+            (filter avail?))))))
+
+(def calc-available-credits
+  "Calculates the available credits for the customer.  Basically this is the
+   amount of provisioned credits, substracted by the consumed credits."
+  (override-or
+   [:customer :get-available-credits]
+   (fn [s cust-id]
+     ;; Naive implementation: sum up all provisioned credits and all
+     ;; credits from all builds
+     (let [avail (->> (list-customer-credits s cust-id)
+                      (sum-amount))
+           used  (->> (list-customer-credit-consumptions s cust-id)
+                      (sum-amount))]
+       (- avail used)))))

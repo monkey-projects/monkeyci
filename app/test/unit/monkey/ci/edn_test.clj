@@ -1,7 +1,11 @@
 (ns monkey.ci.edn-test
   (:require [clojure.test :refer [deftest testing is]]
-            [monkey.ci.edn :as sut]
-            [monkey.ci.helpers :as h]))
+            [aero.core :as ac]
+            [monkey.ci
+             [edn :as sut]
+             [version :as v]]
+            [monkey.ci.helpers :as h])
+  (:import java.io.StringReader))
 
 (deftest edn-conversion
   (testing "can convert objects to edn and back"
@@ -16,3 +20,8 @@
       (doseq [o objs]
         (is (= o (sut/edn-> (sut/->edn o)))
             (str "Could not convert:" o))))))
+
+(deftest version
+  (testing "replaces `#version` with app version"
+    (is (= (str "test-" (v/version))
+           (ac/read-config (StringReader. "#join [ \"test-\" #version [] ]"))))))

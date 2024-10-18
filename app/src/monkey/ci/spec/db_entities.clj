@@ -9,6 +9,7 @@
              [common :as c]]))
 
 (def id? int?)
+(def ts? int?)
 
 (s/def :db/id id?)
 (s/def :db/cuid ::c/cuid)
@@ -22,8 +23,8 @@
           :opt-un [:db/id]))
 
 ;; Maybe we should use instants instead?
-(s/def :db/start-time int?)
-(s/def :db/end-time int?)
+(s/def :db/start-time ts?)
+(s/def :db/end-time ts?)
 
 (s/def :db/timed
   (-> (s/keys :opt-un [:db/start-time :db/end-time])
@@ -110,4 +111,31 @@
 
 (s/def :db/email-registration
   (-> (s/keys :req-un [:db/email])
+      (s/merge :db/common)))
+
+;;; Credits
+
+(s/def :db/from-time ts?)
+(s/def :db/valid-from ts?)
+(s/def :db/valid-until ts?)
+(s/def :db/amount (s/int-in 0 1000000))
+
+(s/def :db/credit-subscription
+  (-> (s/keys :req-un [:db/customer-id :db/amount :db/valid-from]
+              :opt-un [:db/valid-until])
+      (s/merge :db/common)))
+
+(s/def :db/subscription-id int?)
+(s/def :db/reason string?)
+
+(s/def :db/customer-credit
+  (-> (s/keys :req-un [:db/customer-id :db/amount :credit/type]
+              :opt-un [:db/from-time :db/user-id :db/subscription-id :db/reason])
+      (s/merge :db/common)))
+
+(s/def :db/credit-id int?)
+(s/def :db/consumed-at ts?)
+
+(s/def :db/credit-consumption
+  (-> (s/keys :req-un [:db/credit-id :db/build-id :db/consumed-at :db/amount])
       (s/merge :db/common)))

@@ -9,7 +9,10 @@
             [monkey.ci.entities
              [build :as eb]
              [core :as ec]
+             [credit-cons :as eccon]
+             [credit-subs :as ecsub]
              [customer :as ecu]
+             [customer-credit :as ecc]
              [join-request :as jr]
              [migrations :as emig]
              [param :as eparam]
@@ -36,6 +39,16 @@
 
 (defn- db->labels [labels]
   (map #(select-keys % [:name :value]) labels))
+
+(defn- id->cuid [x]
+  (-> x
+      (assoc :cuid (:id x))
+      (dissoc :id)))
+
+(defn- cuid->id [x]
+  (-> x
+      (assoc :id (:cuid x))
+      (dissoc :cuid)))
 
 (defn- repo->db
   "Converts the repository into an entity that can be sent to the database."
@@ -118,8 +131,8 @@
 
 (defn- cust->db [cust]
   (-> cust
-      (select-keys [:name])
-      (assoc :cuid (:id cust))))
+      (id->cuid)
+      (select-keys [:cuid :name])))
 
 (defn- db->cust [c]
   (letfn [(entities->repos [repos]
@@ -128,8 +141,7 @@
                        {}
                        repos))]
     (-> c
-        (dissoc :cuid)
-        (assoc :id (str (:cuid c)))
+        (cuid->id)
         (mc/update-existing :repos entities->repos))))
 
 (defn- insert-customer [conn cust]
@@ -212,8 +224,8 @@
 
 (defn- ssh-key->db [k]
   (-> k
-      (dissoc :id :customer-id)
-      (assoc :cuid (:id k))))
+      (id->cuid)
+      (dissoc :customer-id)))
 
 (defn- insert-ssh-key [conn ssh-key cust-id]
   (log/debug "Inserting ssh key:" ssh-key)
@@ -262,9 +274,9 @@
 
 (defn- param->db [param cust-id]
   (-> param
-      (select-keys [:description :label-filters])
-      (assoc :customer-id cust-id
-             :cuid (:id param))))
+      (id->cuid)
+      (select-keys [:cuid :description :label-filters])
+      (assoc :customer-id cust-id)))
 
 (defn- insert-param [conn param cust-id]
   (let [{:keys [id]} (ec/insert-customer-param conn (param->db param cust-id))]
@@ -312,15 +324,17 @@
        (= [st/global "users"] (take 2 sid))))
 
 (defn- user->db [user]
-  (-> (select-keys user [:type :type-id :email])
-      (assoc :cuid (:id user))
+  (-> user
+      (id->cuid)
+      (select-keys [:cuid :type :type-id :email])
       (mc/update-existing :type name)
       (mc/update-existing :type-id str)))
 
 (defn- db->user [user]
-  (-> (select-keys user [:type :type-id :email])
-      (mc/update-existing :type keyword)
-      (assoc :id (:cuid user))))
+  (-> user
+      (cuid->id)
+      (select-keys [:id :type :type-id :email])
+      (mc/update-existing :type keyword)))
 
 (defn- insert-user [conn user]
   (let [{:keys [id] :as ins} (ec/insert-user conn (user->db user))
@@ -511,10 +525,11 @@
 (defn- insert-join-request [conn jr]
   (let [user (ec/select-user conn (ec/by-cuid (:user-id jr)))
         cust (ec/select-customer conn (ec/by-cuid (:customer-id jr)))
-        e (-> (select-keys jr [:status :request-msg :response-msg])
+        e (-> jr
+              (id->cuid)
+              (select-keys [:cuid :status :request-msg :response-msg])
               (update :status name)
-              (assoc :cuid (:id jr)
-                     :customer-id (:id cust)
+              (assoc :customer-id (:id cust)
                      :user-id (:id user)))]
     (ec/insert-join-request conn e)))
 
@@ -541,9 +556,7 @@
 (def email-registration? (partial global-sid? st/email-registrations))
 
 (defn- db->email-registration [reg]
-  (-> reg
-      (dissoc :cuid)
-      (assoc :id (:cuid reg))))
+  (cuid->id reg))
 
 (defn- select-email-registration [conn cuid]
   (some-> (ec/select-email-registration conn (ec/by-cuid cuid))
@@ -565,6 +578,133 @@
 
 (defn- delete-email-registration [conn cuid]
   (ec/delete-email-registrations conn (ec/by-cuid cuid)))
+
+(def credit-subscription? (partial global-sid? st/credit-subscriptions))
+
+(defn- credit-sub->db [cs]
+  (id->cuid cs))
+
+(defn- db->credit-sub [cs]
+  (mc/filter-vals some? cs))
+
+(defn- insert-credit-subscription [conn cs]
+  (let [cust (ec/select-customer conn (ec/by-cuid (:customer-id cs)))]
+    (ec/insert-credit-subscription conn (assoc (credit-sub->db cs)
+                                               :customer-id (:id cust)))))
+
+(defn- update-credit-subscription [conn cs existing]
+  (ec/update-credit-subscription conn (merge existing
+                                             (-> (credit-sub->db cs)
+                                                 (dissoc :customer-id)))))
+
+(defn- upsert-credit-subscription [conn cs]
+  (if-let [existing (ec/select-credit-subscription conn (ec/by-cuid (:id cs)))]
+    (update-credit-subscription conn cs existing)
+    (insert-credit-subscription conn cs)))
+
+(defn- select-credit-subscription [conn cuid]
+  (some->> (ecsub/select-credit-subs conn (ecsub/by-cuid cuid))
+           (first)
+           (db->credit-sub)))
+
+(defn- select-credit-subs [conn f]
+  (->> (ecsub/select-credit-subs conn f)
+       (map db->credit-sub)))
+
+(defn- select-customer-credit-subs [{:keys [conn]} cust-id]
+  (select-credit-subs conn (ecsub/by-cust cust-id)))
+
+(defn- select-active-credit-subs [{:keys [conn]} at]
+  (select-credit-subs conn (ecsub/active-at at)))
+
+(def customer-credit? (partial global-sid? st/customer-credits))
+
+(defn- customer-credit->db [cred]
+  (id->cuid cred))
+
+(defn- db->customer-credit [cred]
+  (mc/filter-vals some? cred))
+
+(defn- insert-customer-credit [conn {:keys [subscription-id user-id] :as cred}]
+  (let [cust (ec/select-customer conn (ec/by-cuid (:customer-id cred)))
+        cs   (when subscription-id
+               (or (ec/select-credit-subscription conn (ec/by-cuid subscription-id))
+                   (throw (ex-info "Subscription not found" cred))))
+        user (when user-id
+               (or (ec/select-user conn (ec/by-cuid user-id))
+                   (throw (ex-info "User not found" cred))))]
+    (ec/insert-customer-credit conn (-> cred
+                                        (customer-credit->db)
+                                        (assoc :customer-id (:id cust)
+                                               :subscription-id (:id cs)
+                                               :user-id (:id user))))))
+
+(defn- update-customer-credit [conn cred existing]
+  (ec/update-customer-credit conn (merge existing (select-keys cred [:amount :from-time]))))
+
+(defn- upsert-customer-credit [conn cred]
+  (if-let [existing (ec/select-customer-credit conn (ec/by-cuid (:id cred)))]
+    (update-customer-credit conn cred existing)
+    (insert-customer-credit conn cred)))
+
+(defn- select-customer-credit [conn id]
+  (some->> (ecc/select-customer-credits conn (ecc/by-cuid id))
+           (first)
+           (db->customer-credit)))
+
+(defn- select-customer-credits-since [{:keys [conn]} cust-id since]
+  (->> (ecc/select-customer-credits conn (ecc/by-cust-since cust-id since))
+       (map db->customer-credit)))
+
+(defn- select-avail-credits-amount [{:keys [conn]} cust-id]
+  ;; TODO Use the available-credits table for faster lookup
+  (ecc/select-avail-credits-amount conn cust-id))
+
+(defn- select-avail-credits [{:keys [conn]} cust-id]
+  (->> (ecc/select-avail-credits conn cust-id)
+       (map db->customer-credit)))
+
+(def credit-consumption? (partial global-sid? st/credit-consumptions))
+
+(defn- credit-cons->db [cc]
+  (-> (id->cuid cc)
+      (dissoc :customer-id :repo-id)))
+
+(defn- db->credit-cons [cc]
+  (mc/filter-vals some? cc))
+
+(def build-sid (juxt :customer-id :repo-id :build-id))
+
+(defn- insert-credit-consumption [conn cc]
+  (let [build (apply eb/select-build-by-sid conn (build-sid cc))
+        credit (ec/select-customer-credit conn (ec/by-cuid (:credit-id cc)))]
+    (when-not build
+      (throw (ex-info "Build not found" cc)))
+    (when-not credit
+      (throw (ex-info "Customer credit not found" cc)))
+    (ec/insert-credit-consumption conn (assoc (credit-cons->db cc)
+                                              :build-id (:id build)
+                                              :credit-id (:id credit)))))
+
+(defn- update-credit-consumption [conn cc existing]
+  (ec/update-credit-consumption conn (merge existing
+                                            (-> (credit-cons->db cc)
+                                                (dissoc :build-id :credit-id)))))
+
+(defn- upsert-credit-consumption [conn cc]
+  ;; TODO Update available-credits table
+  (if-let [existing (ec/select-credit-consumption conn (ec/by-cuid (:id cc)))]
+    (update-credit-consumption conn cc existing)
+    (insert-credit-consumption conn cc)))
+
+(defn- select-credit-consumption [conn cuid]
+  (some->> (eccon/select-credit-cons conn (eccon/by-cuid cuid))
+           (first)
+           (db->credit-cons)))
+
+(defn- select-customer-credit-cons [{:keys [conn]} cust-id]
+  (->> (eccon/select-credit-cons conn (eccon/by-cust cust-id))
+       (map db->credit-cons)))
 
 (defn- sid-pred [t sid]
   (t sid))
@@ -588,7 +728,13 @@
       join-request?
       (select-join-request conn (global-sid->cuid sid))
       email-registration?
-      (select-email-registration conn (global-sid->cuid sid))))
+      (select-email-registration conn (global-sid->cuid sid))
+      credit-subscription?
+      (select-credit-subscription conn (last sid))
+      credit-consumption?
+      (select-credit-consumption conn (global-sid->cuid sid))
+      customer-credit?
+      (select-customer-credit conn (global-sid->cuid sid))))
   
   (write-obj [_ sid obj]
     (when (condp sid-pred sid
@@ -608,6 +754,12 @@
             (upsert-params conn (last sid) obj)
             email-registration?
             (insert-email-registration conn obj)
+            credit-subscription?
+            (upsert-credit-subscription conn obj)
+            credit-consumption?
+            (upsert-credit-consumption conn obj)
+            customer-credit?
+            (upsert-customer-credit conn obj)
             (log/warn "Unrecognized sid when writing:" sid))
       sid))
 
@@ -683,7 +835,12 @@
     :watch watch-github-repo
     :unwatch unwatch-github-repo}
    :customer
-   {:search select-customers}
+   {:search select-customers
+    :list-credits-since select-customer-credits-since
+    :get-available-credits select-avail-credits-amount
+    :list-available-credits select-avail-credits
+    :list-credit-subscriptions select-customer-credit-subs
+    :list-credit-consumptions select-customer-credit-cons}
    :repo
    {:list-display-ids select-repo-display-ids
     :find-next-build-idx (comp (fnil inc 0) select-max-build-idx)
@@ -703,14 +860,16 @@
    :param
    {:save upsert-customer-param
     :find select-customer-param
-    :delete delete-customer-param}})
+    :delete delete-customer-param}
+   :credit
+   {:list-active-subscriptions select-active-credit-subs}})
 
 (defn make-storage [conn]
   (map->SqlStorage {:conn conn
                     :overrides overrides}))
 
 (defmethod st/make-storage :sql [{conf :storage}]
-  (log/info "Using SQL storage with configuration:" conf)
+  (log/debug "Using SQL storage with configuration:" (dissoc conf :password))
   (let [conn {:ds (conn/->pool HikariDataSource (-> conf
                                                     (dissoc :url :type)
                                                     (assoc :jdbcUrl (:url conf))))

@@ -14,8 +14,8 @@
              [artifacts :as a]
              [logging :as l]
              [metrics :as m]
-             [runtime :as rt]
              [storage :as st]
+             [time :as t]
              [utils :as u]
              [version :as v]]
             [monkey.ci.web
@@ -332,7 +332,13 @@
         (testing "`GET /stats` retrieves customer statistics"
           (is (= 200 (-> (mock/request :get (str "/customer/" (:id cust) "/stats"))
                          (app)
-                         :status)))))))
+                         :status))))
+
+        (testing "`/credits`"
+          (testing "`GET` retrieves customer credit details"
+            (is (= 200 (-> (mock/request :get (str "/customer/" (:id cust) "/credits"))
+                           (app)
+                           :status))))))))
 
   (h/with-memory-store st
     (let [kp (auth/generate-keypair)
@@ -987,3 +993,21 @@
                             :creator st/save-email-registration
                             :can-update? false
                             :can-delete? true}))
+
+(deftest admin-routes
+  (testing "`/admin`"
+    (testing "`/issue-credits`"
+      (testing "POST `/:customer-id` issues new credits to specific customer"
+        (let [cust (h/gen-cust)]
+          (is (= 201 (-> (h/json-request :post
+                                         (str "/admin/issue-credits/" (:id cust))
+                                         {:amount 100
+                                          :reason "test issue"})
+                         (test-app)
+                         :status)))))
+
+      (testing "POST `/auto` issues new credits to all customers with subscriptions"
+        (is (= 200 (-> (h/json-request :post "/admin/issue-credits/auto"
+                                       {:from-time (t/now)})
+                       (test-app)
+                       :status)))))))
