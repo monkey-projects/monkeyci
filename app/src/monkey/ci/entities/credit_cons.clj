@@ -31,3 +31,9 @@
 
 (defn by-cust [id]
   [:= :c.cuid id])
+
+(defn since [ts]
+  [:>= :cc.consumed-at (ec/->ts ts)])
+
+(defn by-cust-since [id ts]
+  [:and (by-cust id) (since ts)])

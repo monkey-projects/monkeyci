@@ -36,7 +36,7 @@
                               :where (ecc/by-cust cust-id))))
                   (first)
                   :used)]
-    (- avail used)))
+    (- (or avail 0) (or used 0))))
 
 (defn select-avail-credits [conn cust-id]
   (->> (ec/select
@@ -48,12 +48,13 @@
                   [:u.cuid :user-id]
                   [:cco.amount :used]]
          :from [[:credit-consumptions :cco]]
-         :join [[:customers :c] [:= :c.id :cc.customer-id]]
          :left-join [[:customer-credits :cc] [:= :cc.id :cco.credit-id]
                      [:credit-subscriptions :cs] [:= :cs.id :cc.subscription-id]
-                     [:users :u] [:= :u.id :cc.user-id]]
+                     [:users :u] [:= :u.id :cc.user-id]
+                     [:customers :c] [:= :c.id :cc.customer-id]]
          :where [:= :c.cuid cust-id]
-         :group-by [:cc.id]
+         ;; Group by amount required by mysql
+         :group-by [:cc.id :cco.amount]
          :having [:> [:- :cc.amount :used] 0]})
        (map #(dissoc % :used))
        (map ec/convert-credit-select)))

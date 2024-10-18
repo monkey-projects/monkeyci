@@ -706,6 +706,10 @@
   (->> (eccon/select-credit-cons conn (eccon/by-cust cust-id))
        (map db->credit-cons)))
 
+(defn- select-customer-credit-cons-since [{:keys [conn]} cust-id since]
+  (->> (eccon/select-credit-cons conn (eccon/by-cust-since cust-id since))
+       (map db->credit-cons)))
+
 (defn- sid-pred [t sid]
   (t sid))
 
@@ -840,7 +844,8 @@
     :get-available-credits select-avail-credits-amount
     :list-available-credits select-avail-credits
     :list-credit-subscriptions select-customer-credit-subs
-    :list-credit-consumptions select-customer-credit-cons}
+    :list-credit-consumptions select-customer-credit-cons
+    :list-credit-consumptions-since select-customer-credit-cons-since}
    :repo
    {:list-display-ids select-repo-display-ids
     :find-next-build-idx (comp (fnil inc 0) select-max-build-idx)

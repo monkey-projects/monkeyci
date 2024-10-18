@@ -528,7 +528,8 @@
 
 (deftest ^:sql credit-consumptions
   (with-storage conn s
-    (let [repo (h/gen-repo)
+    (let [now (t/now)
+          repo (h/gen-repo)
           cust (-> (h/gen-cust)
                    (assoc :repos {(:id repo) repo}))
           build (-> (h/gen-build)
@@ -541,7 +542,8 @@
                  (assoc :build-id (:build-id build)
                         :repo-id (:id repo)
                         :customer-id (:id cust)
-                        :credit-id (:id credit)))]
+                        :credit-id (:id credit)
+                        :consumed-at now))]
       (is (sid/sid? (st/save-customer s cust)))
       (is (sid/sid? (st/save-customer-credit s credit)))
       (is (sid/sid? (st/save-build s build)))
@@ -552,7 +554,11 @@
 
       (testing "can list for customer"
         (is (= [cc] (st/list-customer-credit-consumptions s (:id cust)))))
-      
+
+      (testing "can list for customer since timestamp"
+        (is (= [cc] (st/list-customer-credit-consumptions-since s (:id cust) (- now 100))))
+        (is (empty? (st/list-customer-credit-consumptions-since s (:id cust) (+ now 100)))))
+
       (testing "can update"
         (is (sid/sid? (st/save-credit-consumption s (assoc cc :amount 200M))))
         (is (= 200M (-> (st/find-credit-consumption s (st/credit-cons-sid (:id cust) (:id cc)))

@@ -1,6 +1,7 @@
 (ns monkey.ci.entities.core
   "Core functionality for database entities.  Allows to store/retrieve basic entities."
-  (:require [honey.sql :as h]
+  (:require [clojure.tools.logging :as log]
+            [honey.sql :as h]
             [honey.sql.helpers :as hh]
             [medley.core :as mc]
             [monkey.ci
@@ -73,7 +74,9 @@
 (defn select
   "Formats and executes the given query"
   [{:keys [ds sql-opts]} query]
-  (jdbc/execute! ds (h/format query sql-opts) select-opts))
+  (let [sql (h/format query sql-opts)]
+    (log/trace "Executing query:" sql)
+    (jdbc/execute! ds sql select-opts)))
 
 (defn select-entities
   "Selects entity from table using filter"
