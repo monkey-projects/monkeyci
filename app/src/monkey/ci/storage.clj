@@ -596,6 +596,13 @@
             (map (partial conj sid))
             (map (partial find-credit-consumption st)))))))
 
+(def list-customer-credit-consumptions-since
+  (override-or
+   [:customer :list-credit-consumptions-since]
+   (fn [st cust-id since]
+     (->> (list-customer-credit-consumptions st cust-id)
+          (filter (comp (partial <= since) :consumed-at))))))
+
 (defn- list-customer-credits [s cust-id]
   (->> (p/list-obj s (customer-credit-sid))
        (map (partial find-customer-credit s))

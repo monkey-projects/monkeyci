@@ -259,6 +259,7 @@
      (col-idx :credit-consumptions :build-id)])
 
    (entity-table-migration
+    ;; Caching table that holds the current available credits value for each customer
     24 :available-credits
     [customer-col
      amount-col

@@ -657,6 +657,7 @@
        (map db->customer-credit)))
 
 (defn- select-avail-credits-amount [{:keys [conn]} cust-id]
+  ;; TODO Use the available-credits table for faster lookup
   (ecc/select-avail-credits-amount conn cust-id))
 
 (defn- select-avail-credits [{:keys [conn]} cust-id]
@@ -691,6 +692,7 @@
                                                 (dissoc :build-id :credit-id)))))
 
 (defn- upsert-credit-consumption [conn cc]
+  ;; TODO Update available-credits table
   (if-let [existing (ec/select-credit-consumption conn (ec/by-cuid (:id cc)))]
     (update-credit-consumption conn cc existing)
     (insert-credit-consumption conn cc)))
