@@ -277,7 +277,9 @@
           build (-> (h/gen-build)
                     (assoc :customer-id (:id cust)
                            :repo-id (:id repo)
-                           :script {:script-dir "test-dir"})
+                           :script {:script-dir "test-dir"}
+                           :start-time (t/now)
+                           :end-time (t/now))
                     (mc/update-existing :git dissoc :ssh-keys-dir :ssh-keys))
           build-sid (st/ext-build-sid build)]
       (is (sid/sid? (st/save-customer s cust)))
