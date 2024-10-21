@@ -5,6 +5,7 @@
             [medley.core :as mc]
             [monkey.ci
              [blob :as blob]
+             [build :as b]
              [containers :as c]
              [git :as git]
              [listeners :as li]
@@ -252,3 +253,18 @@
 
 (defn with-server-system [config f]
   (rc/with-system (make-server-system config) f))
+
+(defn- new-cli-build [conf]
+  (b/make-build-ctx conf))
+
+(defn make-cli-system
+  "Creates a component system that can be used by CLI commands"
+  [config]
+  (co/system-map
+   :runtime (co/using
+             {:config config}
+             [:build])
+   :build (new-cli-build config)))
+
+(defn with-cli-runtime [config f]
+  (rc/with-runtime (make-cli-system config) f))

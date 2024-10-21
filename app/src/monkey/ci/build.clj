@@ -57,14 +57,12 @@
 (defn- maybe-set-git-opts
   "If a git url is specified, updates the build with git information, taken from
    the arguments and from runtime."
-  [build rt]
-  (let [{:keys [git-url branch tag commit-id dir]} (rt/args rt)
-        existing (get-in rt [:build :git])]
+  [build args]
+  (let [{:keys [git-url branch tag commit-id dir]} args]
     (cond-> build
-      git-url (-> (assoc :git (-> existing
-                                  (assoc :url git-url
-                                         :branch (or branch "main")
-                                         :id commit-id)
+      git-url (-> (assoc :git (-> {:url git-url
+                                   :branch (or branch "main")
+                                   :id commit-id}
                                   (mc/assoc-some :tag tag)))
                   ;; Overwrite script dir cause it will be calculated by the git checkout
                   (assoc-in [:script :script-dir] dir)))))
@@ -78,27 +76,27 @@
 (defn make-build-ctx
   "Creates a build context that can be added to the runtime.  This is used when
    running a build from cli."
-  [rt]
-  (let [work-dir (rt/work-dir rt)
-        orig-sid (or (some->> (:sid (rt/args rt))
+  [{:keys [args] :as config}]
+  (let [work-dir (:work-dir config)
+        orig-sid (or (some->> (:sid args)
                               (sid/parse-sid)
                               (take build-sid-length))
-                     (get-sid rt))
+                     (->> (account->sid config)
+                          (remove nil?)))
         ;; Either generate a new build id, or use the one given
         sid (sid/->sid (if (or (empty? orig-sid) (includes-build-id? orig-sid))
                          orig-sid
                          (concat orig-sid [(local-build-id)])))
         id (or (last sid) (local-build-id))]
     (maybe-set-git-opts
-     (merge (get-in rt [rt/config :build])
-            {:customer-id (first sid)
-             :repo-id (second sid)
-             :build-id id
-             :checkout-dir work-dir
-             :script {:script-dir (u/abs-path work-dir (rt/get-arg rt :dir))}
-             :pipeline (rt/get-arg rt :pipeline)
-             :sid sid})
-     rt)))
+     {:customer-id (first sid)
+      :repo-id (second sid)
+      :build-id id
+      :checkout-dir work-dir
+      :script {:script-dir (u/abs-path work-dir (:dir args))}
+      :pipeline (:pipeline args)
+      :sid sid}
+     args)))
 
 (def script "Gets script from the build"
   :script)

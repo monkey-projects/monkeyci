@@ -42,7 +42,7 @@
   ;; TODO
   [config])
 
-(defn verify-build
+(defn- verify-in-proc
   "Verifies the build in the current directory by loading the script files in-process
    and resolving the jobs.  This is useful when checking if there are any compilation
    errors in the script."
@@ -52,9 +52,8 @@
             (if (= :verify/success (:type rep)) 0 err/error-script-failure))]
     (try
       ;; TODO Git branch and other options
-      ;; TODO Use child process if there is a deps.edn
       ;; TODO Build parameters
-      (let [jobs (script/load-jobs (b/make-build-ctx rt) rt)]
+      (let [jobs (script/load-jobs (:build rt) rt)]
         (report
          (if (not-empty jobs)
            {:type :verify/success
@@ -66,6 +65,12 @@
         (report {:type :verify/failed
                  :message (ex-message ex)})))))
 
+(defn verify-build [conf]
+  ;; TODO Use child process if there is a deps.edn
+  (ra/with-cli-runtime conf
+    verify-in-proc))
+
+
 (defn list-builds [rt]
   (->> (http/get (apply format "%s/customer/%s/repo/%s/builds"
                         ((juxt :url :customer-id :repo-id) (rt/account rt)))
@@ -76,18 +81,6 @@
        (u/parse-edn)
        (hash-map :type :build/list :builds)
        (rt/report rt)))
-
-#_(defn http-server
-  "Starts the server by invoking the function in the runtime.  This function is supposed
-   to return another function that can be invoked to stop the http server.  Returns a 
-   deferred that resolves when the server is stopped."
-  [{:keys [http] :as rt}]
-  (rt/report rt (-> rt
-                    (rt/config)
-                    (select-keys [:http])
-                    (assoc :type :server/started)))
-  ;; Start the server and wait for it to shut down
-  (h/on-server-close (http rt)))
 
 (defn http-server
   "Starts a system with an http server.  Dependency management will take care of
