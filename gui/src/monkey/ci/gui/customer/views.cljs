@@ -53,11 +53,13 @@
 (defn- credits-chart-config []
   (let [stats (rf/subscribe [:customer/credit-stats])]
     (when-let [{:keys [consumed available]} @stats]
+      ;; TODO Colors
       {:type :doughnut
-       :data {:labels [(str consumed " consumed") (str available " available")]
+       :data {:labels [(str available " available")
+                       (str consumed " consumed")]
               :datasets
               [{:label "Credits"
-                :data [consumed available]}]}})))
+                :data [available consumed]}]}})))
 
 (def stats-period-days 30)
 

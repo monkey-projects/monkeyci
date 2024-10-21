@@ -68,16 +68,19 @@
           (cs/split #"/")
           last))
 
+(defn- show-log [lbl contents]
+  (->>
+   (concat
+    [(co/->html (co/colored (str lbl ":") 95))
+     [:br]]
+    (when (and contents (not-empty contents))
+      (mapv co/->html contents))
+    [[:br]])
+   (into [:<>])))
+
 (defn- log-contents [lbl path]
   (let [log (rf/subscribe [:job/logs path])]
-    (->>
-     (concat
-      [(co/->html (co/colored (str lbl ":") 95))
-       [:br]]
-      (when (and @log (not-empty @log))
-        (mapv co/->html @log))
-      [[:br]])
-     (into [:<>]))))
+    (show-log lbl @log)))
 
 (def log-types
   {:out "stdout"
@@ -107,18 +110,17 @@
   {:header "Logs"
    :contents [job-logs job]})
 
-(defn- job-output [output]
-  ;; TODO Handle ansi coloring
-  [co/log-contents (->> (cs/split output #"\n")
-                        (map cs/trim)
-                        (interpose [:br])
-                        (into [:pre])
-                        vector)])
+(defn- job-output [{:keys [output error]}]
+  [co/log-viewer
+   (->> [["stdout" output] ["stderr" error]]
+        (filter (comp not-empty second))
+        (map (partial apply show-log)))])
 
 (defn- output-tab [job]
-  (when-let [output (get-in job [:result :output])]
-    {:header "Output"
-     :contents [job-output output]}))
+  (let [result (select-keys (:result job) [:output :error])]
+    (when (not-empty result)
+      {:header "Output"
+       :contents [job-output result]})))
 
 (defn- test-results-details [tr]
   [:div

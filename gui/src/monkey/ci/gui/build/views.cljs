@@ -42,7 +42,7 @@
      (item "Git ref" (get-in build [:git :ref]))
      (when (number? credits)
        (item [:span {:title "Consumed amount of credits"} "Credits"] credits))
-     (when-let [msg (:message build)]
+     (when-let [msg (or (:message build) (get-in build [:script :message]))]
        [:div.row
         [:div.col-md-4.offset-1 [:b "Message"]]
         [:div.col-md-7 msg]])]))
