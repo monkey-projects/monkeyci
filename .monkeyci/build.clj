@@ -250,7 +250,7 @@
 (defn notify [ctx]
   (when (release? ctx)
     (po/pushover-msg
-     {:message (str "MonkeyCI version " (tag-version ctx) " has been released.")
+     {:msg (str "MonkeyCI version " (tag-version ctx) " has been released.")
       :dependencies ["app-img-manifest" "publish-gui-img"]})))
 
 ;; TODO Add jobs that auto-deploy to staging after running some sanity checks
