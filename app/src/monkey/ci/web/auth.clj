@@ -142,7 +142,7 @@
                               (st/find-build storage))]
       (assoc build :customers #{(:customer-id build)}))))
 
-(defmethod resolve-token :default [rt token]
+(defmethod resolve-token :default [_ _]
   ;; Fallback, for backwards compatibility
   nil)
 

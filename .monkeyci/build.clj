@@ -1,12 +1,9 @@
 ;; Build script for Monkey-ci itself
-(ns monkeyci.build.script
-  (:require [babashka.fs :as fs]
-            [clojure.java.io :as io]
-            [clojure.string :as cs]
+(ns build
+  (:require [clojure.string :as cs]
             [monkey.ci.build
              [api :as api]
-             [core :as core]
-             [shell :as shell]]
+             [core :as core]]
             [monkey.ci.ext.junit]
             [monkey.ci.plugin
              [github :as gh]
@@ -84,11 +81,12 @@
   (or (tag-version ctx)
       snapshot-version))
 
-(defn clj-container [id dir & args]
+(defn clj-container 
   "Executes script in clojure container"
+  [id dir & args]
   (core/container-job
    id
-   {;; Alpine based images don't exist for arm, so use debian
+   { ;; Alpine based images don't exist for arm, so use debian
     :image "docker.io/clojure:temurin-21-tools-deps-bookworm-slim"
     :script [(str "cd " dir
                   " && "
@@ -170,8 +168,9 @@
        :dependencies ["release-gui"]}}
      ctx)))
 
-(defn publish [ctx id dir & [version]]
+(defn publish 
   "Executes script in clojure container that has clojars publish env vars"
+  [ctx id dir & [version]]
   (let [env (-> (api/build-params ctx)
                 (select-keys ["CLOJARS_USERNAME" "CLOJARS_PASSWORD"])
                 (assoc "MONKEYCI_VERSION" (or version (lib-version ctx))))]

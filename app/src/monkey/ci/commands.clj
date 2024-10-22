@@ -1,7 +1,9 @@
 (ns monkey.ci.commands
   "Event handlers for commands"
   (:require [aleph.http :as http]
+            [babashka.fs :as fs]
             [clj-commons.byte-streams :as bs]
+            [clj-kondo.core :as clj-kondo]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
             [medley.core :as mc]
@@ -42,29 +44,49 @@
   ;; TODO
   [config])
 
+;; (defn- deps-exists? [rt]
+;;   (fs/exists? (fs/path (get-in rt [:build :script :script-dir]) "deps.edn")))
+
+;; (defn- verify-child-proc
+;;   "Starts a child process to perform verification.  This is necessary if a `deps.edn`
+;;    exists with custom dependencies."
+;;   [rt]
+;;   ;; TODO Need to get back reported info.  Using a UDS?
+;;   1)
+
+;; (defn- verify-in-proc
+;;   "Verifies the build in the current directory by loading the script files in-process
+;;    and resolving the jobs.  This is useful when checking if there are any compilation
+;;    errors in the script."
+;;   [rt]
+;;   (letfn [(report [rep]
+;;             (rt/report rt rep)
+;;             (if (= :verify/success (:type rep)) 0 err/error-script-failure))]
+;;     (try
+;;       ;; TODO Git branch and other options
+;;       ;; TODO Build parameters
+;;       (let [jobs (script/load-jobs (:build rt) rt)]
+;;         (report
+;;          (if (not-empty jobs)
+;;            {:type :verify/success
+;;             :jobs jobs}
+;;            {:type :verify/failed
+;;             :message "No jobs found in build script for the active configuration"})))
+;;       (catch Exception ex
+;;         (log/error "Error verifying build" ex)
+;;         (report {:type :verify/failed
+;;                  :message (ex-message ex)})))))
+
 (defn verify-build
-  "Verifies the build in the current directory by loading the script files in-process
-   and resolving the jobs.  This is useful when checking if there are any compilation
-   errors in the script."
-  [rt]
-  (letfn [(report [rep]
-            (rt/report rt rep)
-            (if (= :verify/success (:type rep)) 0 err/error-script-failure))]
-    (try
-      ;; TODO Git branch and other options
-      ;; TODO Use child process if there is a deps.edn
-      ;; TODO Build parameters
-      (let [jobs (script/load-jobs (b/make-build-ctx rt) rt)]
-        (report
-         (if (not-empty jobs)
-           {:type :verify/success
-            :jobs jobs}
-           {:type :verify/failed
-            :message "No jobs found in build script for the active configuration"})))
-      (catch Exception ex
-        (log/error "Error verifying build" ex)
-        (report {:type :verify/failed
-                 :message (ex-message ex)})))))
+  "Runs a linter agains the build script to catch any grammatical errors."
+  [conf]
+  (ra/with-cli-runtime conf
+    (fn [rt]
+      (let [res (clj-kondo/run! {:lint [(get-in rt [:build :script :script-dir])]})]
+        (rt/report rt {:type :verify/result :result res})
+        (-> res
+            :summary
+            :error)))))
 
 (defn list-builds [rt]
   (->> (http/get (apply format "%s/customer/%s/repo/%s/builds"
@@ -76,18 +98,6 @@
        (u/parse-edn)
        (hash-map :type :build/list :builds)
        (rt/report rt)))
-
-#_(defn http-server
-  "Starts the server by invoking the function in the runtime.  This function is supposed
-   to return another function that can be invoked to stop the http server.  Returns a 
-   deferred that resolves when the server is stopped."
-  [{:keys [http] :as rt}]
-  (rt/report rt (-> rt
-                    (rt/config)
-                    (select-keys [:http])
-                    (assoc :type :server/started)))
-  ;; Start the server and wait for it to shut down
-  (h/on-server-close (http rt)))
 
 (defn http-server
   "Starts a system with an http server.  Dependency management will take care of

@@ -1,8 +1,7 @@
 (ns monkey.ci.web.api.admin
   (:require [monkey.ci
              [cuid :as cuid]
-             [storage :as s]
-             [time :as t]]
+             [storage :as s]]
             [monkey.ci.web
              [auth :as auth]
              [common :as c]]

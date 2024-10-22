@@ -59,10 +59,9 @@
 
 (deftest verify-build
   (testing "zero when successful"
-    (is (zero? (sut/verify-build {:config
-                                  {:work-dir "examples"
-                                   :args {:dir "basic-clj"}}}))))
-
+    (is (zero? (sut/verify-build {:work-dir "examples"
+                                  :args {:dir "basic-clj"}}))))
+  
   (testing "nonzero exit on failure"
     (is (not= 0 (sut/verify-build {})))))
 

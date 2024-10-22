@@ -47,7 +47,8 @@
    :description "Verifies local build script"
    :opts [script-location-opt]
    :runs {:command cmd/verify-build
-          :app-mode :cli}})
+          :app-mode :cli
+          :runtime? false}})
 
 (def list-build-cmd
   {:command "list"

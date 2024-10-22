@@ -9,7 +9,6 @@
             [manifold.deferred :as md]
             [medley.core :refer [update-existing] :as mc]
             [monkey.ci
-             [config :as config]
              [metrics :as metrics]
              [runtime :as rt]
              [version :as v]]

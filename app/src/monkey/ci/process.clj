@@ -70,15 +70,6 @@
   ([args]
    (run args cc/env)))
 
-(defn verify
-  "Run function that verifies the build by attempting to load the build script using
-   some given configuration."
-  ([args env]
-   ;; TODO
-   )
-  ([args]
-   (verify args cc/env)))
-
 (defn- find-log-config
   "Finds logback configuration file, either configured on the runner, or present 
    in the script dir"
