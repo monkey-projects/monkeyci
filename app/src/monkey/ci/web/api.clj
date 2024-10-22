@@ -183,17 +183,16 @@
 (defn- with-artifacts [req f]
   (if-let [b (st/find-build (c/req->storage req)
                             (build-sid req))]
-    (do 
-      (let [res (->> (b/all-jobs b)
-                     (mapcat :save-artifacts)
-                     (f))
-            ->response (fn [res]
-                         (if (or (nil? res) (and (sequential? res) (empty? res)))
-                           (rur/status 204)
-                           (rur/response res)))]
-        (->response (if (md/deferred? res)
-                      @res ; Deref otherwise cors middleware fails
-                      res))))
+    (let [res (->> (b/all-jobs b)
+                   (mapcat :save-artifacts)
+                   (f))
+          ->response (fn [res]
+                       (if (or (nil? res) (and (sequential? res) (empty? res)))
+                         (rur/status 204)
+                         (rur/response res)))]
+      (->response (if (md/deferred? res)
+                    @res ; Deref otherwise cors middleware fails
+                    res)))
     (rur/not-found nil)))
 
 (defn get-build-artifacts
@@ -279,17 +278,15 @@
         (rur/status 500))))
 
 (defn trigger-build [req]
-  (let [{p :parameters} req]
-    (let [acc (:path p)
-          st (c/req->storage req)
-          runner (c/from-rt req :runner)
-          repo-sid (c/repo-sid req)
-          repo (st/find-repo st repo-sid)
-          build (make-build-ctx req repo)]
-      (log/debug "Triggering build for repo sid:" repo-sid)
-      (if repo
-        (save-and-run-build (c/req->rt req) build)
-        (rur/not-found {:message "Repository does not exist"})))))
+  (let [{p :parameters} req
+        st (c/req->storage req)
+        repo-sid (c/repo-sid req)
+        repo (st/find-repo st repo-sid)
+        build (make-build-ctx req repo)]
+    (log/debug "Triggering build for repo sid:" repo-sid)
+    (if repo
+      (save-and-run-build (c/req->rt req) build)
+      (rur/not-found {:message "Repository does not exist"}))))
 
 (defn retry-build
   "Re-triggers existing build by id"

@@ -479,7 +479,7 @@
        (map (fn [j] [(:id j) j]))
        (into {})))
 
-(defn- select-build [conn [cust-id repo-id build-id :as sid]]
+(defn- select-build [conn [cust-id repo-id :as sid]]
   (when-let [build (apply eb/select-build-by-sid conn sid)]
     (let [jobs (select-jobs conn (:id build))]
       (cond-> (-> (db->build build)

@@ -4,9 +4,7 @@
             [clj-commons.byte-streams :as bs]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
-            [monkey.ci
-             [runtime :as rt]
-             [utils :as u]]
+            [monkey.ci.runtime :as rt]
             [monkey.ci.web
              [common :as c]
              [oauth2 :as oauth2]]
@@ -32,7 +30,7 @@
          (md/chain c/parse-body)
          (md/catch handle-error))))
 
-(defn- ->oauth-user [{:keys [uuid email] :as u}]
+(defn- ->oauth-user [{:keys [uuid] :as u}]
   (log/debug "Converting Bitbucket user:" u)
   {:sid [:bitbucket uuid]})
 

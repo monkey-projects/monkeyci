@@ -19,7 +19,7 @@
 (defn recent-builds [req]
   (let [st (c/req->storage req)
         cid (c/customer-id req)]
-    (if-let [cust (st/find-customer st cid)]
+    (if (st/find-customer st cid)
       (rur/response (st/list-builds-since st cid (or (query->since req)
                                                      (hours-ago 24))))
       (rur/not-found {:message "Customer not found"}))))
