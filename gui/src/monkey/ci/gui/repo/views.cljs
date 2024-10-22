@@ -121,7 +121,7 @@
 (defn page [route]
   (rf/dispatch [:repo/init])
   (fn [route]
-    (let [{:keys [customer-id repo-id] :as p} (get-in route [:parameters :path])
+    (let [{:keys [repo-id] :as p} (get-in route [:parameters :path])
           r (rf/subscribe [:repo/info repo-id])]
       [l/default
        [:<>

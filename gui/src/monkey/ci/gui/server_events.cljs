@@ -1,8 +1,6 @@
 (ns monkey.ci.gui.server-events
   "Read server-sent events from the API and dispatch events"
-  (:require-macros [cljs.core.async.macros :refer [go]])
-  (:require [cljs.core.async :refer [<!]]
-            [clojure.tools.reader.edn :as edn]
+  (:require [clojure.tools.reader.edn :as edn]
             [monkey.ci.gui.martian :as m]
             [monkey.ci.gui.logging :as log]
             [re-frame.core :as rf]))

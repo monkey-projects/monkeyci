@@ -13,7 +13,6 @@
              [blob :as blob]
              [build :as b]
              [oci :as oci]
-             [runtime :as rt]
              [utils :as u]]
             [monkey.ci.build
              [api :as api]
@@ -190,9 +189,3 @@
 
 (defn make-build-api-repository [client]
   (->BuildApiArtifactRepository client "/artifact/"))
-
-;;; Config handling
-
-(defmethod rt/setup-runtime :artifacts [conf k]
-  (when (k conf)
-    (blob/make-blob-store conf k)))

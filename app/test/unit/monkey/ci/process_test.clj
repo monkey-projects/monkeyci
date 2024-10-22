@@ -102,7 +102,14 @@
                        (h/received-events)
                        (h/first-event-by-type :script/initializing))]
           (is (some? evt))
-          (is (s/valid? ::se/event evt)))))))
+          (is (s/valid? ::se/event evt))))
+
+      (testing "restores and saves build cache"
+        (let [stored (atom {sut/m2-cache-dir ::cache})
+              cache-rt (assoc test-rt :build-cache (h/fake-blob-store stored))
+              [cust-id repo-id] (:sid test-build)]
+          (is (some? @(sut/execute! test-build cache-rt)))
+          (is (= {sut/m2-cache-dir (str cust-id "/" repo-id ".tgz")} @stored)))))))
 
 (deftest generate-deps
   (testing "adds log config file, relative to work dir if configured"
@@ -152,7 +159,10 @@
   (testing "adds script dir as paths"
     (is (= ["test-dir"] (-> {:script {:script-dir "test-dir"}}
                             (sut/generate-deps {})
-                            :paths)))))
+                            :paths))))
+
+  (testing "specifies m2 cache location"
+    (is (some? (:mvn/local-repo (sut/generate-deps {} {}))))))
 
 (deftest child-config
   (testing "satisfies spec"

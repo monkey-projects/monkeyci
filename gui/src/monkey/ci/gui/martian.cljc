@@ -323,7 +323,7 @@
 
 (rf/reg-event-fx
  ::error-handler
- (fn [{:keys [db]} [_ target-evt err]]
+ (fn [_ [_ target-evt err]]
    (log/debug "Got error:" (clj->js err))
    {:dispatch (if (= 401 (:status err))
                 [:route/goto :page/login]

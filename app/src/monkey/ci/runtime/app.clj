@@ -44,6 +44,12 @@
 (defn- new-cache [config]
   (blob/make-blob-store config :cache))
 
+(defn- new-build-cache [config]
+  ;; The build cache is separate from the customer cache, because the build cache
+  ;; is (mostly) out of control of the user, where the customer cache is fully
+  ;; determined by the user's cache configurations.
+  (blob/make-blob-store config :build-cache))
+
 (defn- new-workspace [config]
   (blob/make-blob-store config :workspace))
 
@@ -168,11 +174,12 @@
   (co/system-map
    :runtime    (co/using
                 (new-runtime config)
-                [:events :artifacts :cache :containers :workspace :logging :git :build :api-config])
+                [:events :artifacts :cache :containers :workspace :logging :git :build :api-config :build-cache])
    :build      (prepare-build config)
    :events     (new-events config)
    :artifacts  (new-artifacts config)
    :cache      (new-cache config)
+   :build-cache (new-build-cache config)
    :workspace  (new-workspace config)
    :containers (co/using
                 (new-container-runner config)

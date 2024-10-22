@@ -1,7 +1,6 @@
 (ns ^:dev/always monkey.ci.gui.pages
   "Links route names to actual components to be rendered"
-  (:require [monkey.ci.gui.layout :as l]
-            [monkey.ci.gui.logging :as log]
+  (:require [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.login.views :as login]
             [monkey.ci.gui.login.subs]
             [monkey.ci.gui.build.views :as build]

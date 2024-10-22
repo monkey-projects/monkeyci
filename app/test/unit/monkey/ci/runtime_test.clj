@@ -53,12 +53,6 @@
   (testing "provides workspace"
     (verify-runtime :workspace {:type :disk :dir "/tmp"} some?))
 
-  (testing "provides artifacts"
-    (verify-runtime :artifacts {:type :disk :dir "/tmp"} some?))
-
-  (testing "provides cache"
-    (verify-runtime :cache {:type :disk :dir "/tmp"} some?))
-
   (testing "provides events"
     (verify-runtime :events {:type :manifold} some?)))
 

@@ -55,6 +55,9 @@
     (testing "provides cache"
       (is (some? (:cache rt))))
 
+    (testing "provides build cache"
+      (is (some? (:build-cache rt))))
+
     (testing "provides containers"
       (is (some? (:containers rt))))
 
