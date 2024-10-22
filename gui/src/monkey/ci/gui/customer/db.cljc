@@ -73,3 +73,11 @@
 
 (defn set-group-by-lbl [db l]
   (assoc db group-by-lbl l))
+
+(def repo-filter ::repo-filter)
+
+(defn get-repo-filter [db]
+  (get db repo-filter))
+
+(defn set-repo-filter [db f]
+  (assoc db repo-filter f))

@@ -87,25 +87,25 @@
 (defn- show-repo [c p r]
   (let [repo-path (r/path-for :page/repo {:customer-id (:id c)
                                           :repo-id (:id r)})]
-    [:div.repo.card-body
+    [:div.card-body.border-top
      [:div.d-flex.flex-row.align-items-start
       [:div.me-auto
        [:h6 {:title (:id r)}
         [:span.me-2 co/repo-icon]
         [:a.link-dark {:href repo-path} (:name r)]]
-       [:p "Url: " [:a {:href (:url r)} (:url r)]]]
+       [:p "Url: " [:a {:href (:url r) :target :_blank} (:url r)]]]
       [:a.btn.btn-primary
        {:href repo-path}
        [co/icon :three-dots-vertical] " Details"]]]))
 
-(defn- show-project [cust [p repos]]
+(defn- show-repo-group [cust [p repos]]
   (->> repos
        (sort-by :name)
        (map (partial show-repo cust p))
        (into
-        [:div.project.card.mb-3
+        [:div.card.mb-3
          [:div.card-header
-          [:h5.card-title [:span.me-2 co/repo-group-icon] (or p "(No value)")]]])))
+          [:h5.card-header-title [:span.me-2 co/repo-group-icon] (or p "(No value)")]]])))
 
 (defn- add-repo-btn [id]
   [:a.btn.btn-outline-dark
@@ -142,22 +142,36 @@
                  :value @sel
                  :on-change (u/form-evt-handler [:customer/group-by-lbl-changed])}]))))
 
+(defn- repo-name-filter []
+  (let [f (rf/subscribe [:customer/repo-filter])]
+    [:input.form-control
+     {:id :repo-name-filter
+      :on-change (u/form-evt-handler [:customer/repo-filter-changed])
+      :value @f}]))
+
+(defn- repos-action-bar
+  "Display a small form on top of the repositories overview to group and filter repos."
+  [cust]
+  [:div.d-flex.flex-row.mb-2
+   [:form.row.row-cols-lg-auto.g-2.align-items-center
+    [:label.col {:for :group-by-label} "Repository overview, grouped by"]
+    [:div.col
+     [label-selector]]
+    [:label.col {:for :repo-name-filter} "Filter by name"]
+    [:div.col
+     [repo-name-filter]]]
+   [:div.ms-auto
+    [co/reload-btn-sm [:customer/load (:id cust)]]]])
+
 (defn- repos-list [cust]
   (let [r (rf/subscribe [:customer/grouped-repos])]
     (->> @r
          (sort-by first)
-         (map (partial show-project cust))
-         (into [:<>
-                [:div.d-flex.flex-row.mb-2
-                 [:form.row.row-cols-lg-auto.g-2.align-items-center
-                  [:label.col-12 {:for :group-by-label} "Repository overview, grouped by"]
-                  [:div.col-12
-                   [label-selector]]]
-                 [:div.ms-auto
-                  [co/reload-btn-sm [:customer/load (:id cust)]]]]]))))
+         (map (partial show-repo-group cust))
+         (into [:<> [repos-action-bar cust]]))))
 
 (defn- customer-repos
-  "Displays a list of customer repositories, grouped by project"
+  "Displays a list of customer repositories, grouped by selected label"
   []
   (let [c (rf/subscribe [:customer/info])]
     (if (empty? (:repos @c))

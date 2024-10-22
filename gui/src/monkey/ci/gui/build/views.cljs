@@ -45,6 +45,10 @@
      (when-let [msg (or (:message build) (get-in build [:script :message]))]
        [:div.row
         [:div.col-md-4.offset-1 [:b "Message"]]
+        [:div.col-md-7 msg]])
+     (when-let [msg (get-in build [:git :message])]
+       [:div.row
+        [:div.col-md-4.offset-1 [:b "Commit message"]]
         [:div.col-md-7 msg]])]))
 
 (defn overview [build]

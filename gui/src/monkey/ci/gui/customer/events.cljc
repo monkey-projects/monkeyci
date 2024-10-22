@@ -285,3 +285,8 @@
  :customer/group-by-lbl-changed
  (fn [db [_ val]]
    (db/set-group-by-lbl db val)))
+
+(rf/reg-event-db
+ :customer/repo-filter-changed
+ (fn [db [_ val]]
+   (db/set-repo-filter db val)))

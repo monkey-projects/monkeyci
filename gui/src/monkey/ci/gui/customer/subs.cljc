@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.customer.subs
-  (:require [monkey.ci.gui.customer.db :as db]
+  (:require [clojure.string :as cs]
+            [monkey.ci.gui.customer.db :as db]
             [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
@@ -9,6 +10,7 @@
 (u/db-sub :customer/create-alerts db/create-alerts)
 (u/db-sub :customer/creating? db/customer-creating?)
 (u/db-sub :customer/group-by-lbl db/get-group-by-lbl)
+(u/db-sub :customer/repo-filter db/get-repo-filter)
 
 (rf/reg-sub
  :customer/info
@@ -110,5 +112,12 @@
  :customer/grouped-repos
  :<- [:customer/repos]
  :<- [:customer/group-by-lbl]
- (fn [[repos lbl] _]
-   (group-by (lbl-value lbl) repos)))
+ :<- [:customer/repo-filter]
+ (fn [[repos lbl rf] _]
+   (letfn [(matches-filter? [{:keys [name]}]
+             (or (empty? rf)
+                 (empty? name)
+                 (cs/includes? (cs/lower-case name) (cs/lower-case rf))))]
+     (->> repos
+          (filter matches-filter?)
+          (group-by (lbl-value lbl))))))

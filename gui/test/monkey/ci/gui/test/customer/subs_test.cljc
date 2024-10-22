@@ -199,26 +199,40 @@
     (testing "exists"
       (is (some? r)))
 
-    (testing "returns repos, grouped by label from db"
-      (let [[repo-1 repo-2 repo-3 :as repos]
-            [{:id "repo-1"
-              :labels
-              [{:name "label-1"
-                :value "value 1"}
-               {:name "label-2"
-                :value "value 1"}]}
-             {:id "repo-2"
-              :labels
-              [{:name "label-2"
-                :value "value 1"}]}
-             {:id "repo-3"
-              :labels
-              [{:name "label-2"
-                :value "value 2"}]}]]
+    (let [[repo-1 repo-2 repo-3 :as repos]
+          [{:id "repo-1"
+            :name "test repo 1"
+            :labels
+            [{:name "label-1"
+              :value "value 1"}
+             {:name "label-2"
+              :value "value 1"}]}
+           {:id "repo-2"
+            :name "test repo 2"
+            :labels
+            [{:name "label-2"
+              :value "value 1"}]}
+           {:id "repo-3"
+            :name "test repo 3"
+            :labels
+            [{:name "label-2"
+              :value "value 2"}]}]]
+      (testing "returns repos, grouped by label from db"
         (is (some? (reset! app-db (-> {}
                                       (db/set-group-by-lbl "label-2")
                                       (db/set-customer
                                        {:repos repos})))))
         (is (= {"value 1" [repo-1 repo-2]
                 "value 2" [repo-3]}
-               @r))))))
+               @r)))
+
+      (testing "filters by repo name when repo filter specified"
+        (is (some? (swap! app-db db/set-repo-filter "2")))
+        (is (= {"value 1" [repo-2]} @r))))))
+
+(deftest customer-repo-filter
+  (h/verify-sub
+   [:customer/repo-filter]
+   #(db/set-repo-filter % "test-filter")
+   "test-filter"
+   nil))

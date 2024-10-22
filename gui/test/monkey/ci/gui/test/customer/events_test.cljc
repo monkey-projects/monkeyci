@@ -416,3 +416,9 @@
     (is (nil? (db/group-by-lbl @app-db)))
     (rf/dispatch-sync [:customer/group-by-lbl-changed "new-label"])
     (is (= "new-label" (db/group-by-lbl @app-db)))))
+
+(deftest repo-filter-changed
+  (testing "updates repo filter in db"
+    (is (nil? (db/get-repo-filter @app-db)))
+    (rf/dispatch-sync [:customer/repo-filter-changed "test-filter"])
+    (is (= "test-filter" (db/get-repo-filter @app-db)))))
