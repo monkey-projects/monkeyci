@@ -220,16 +220,3 @@
         client (-> (os/make-client oci-conf)
                    (oci/add-inv-interceptor :blob))]
     (->OciBlobStore client oci-conf)))
-
-;;; Configuration functionality
-
-(defmulti normalize-blob-config (fn [t conf] (get-in conf [t :type])))
-
-(defmethod normalize-blob-config :default [_ config]
-  config)
-
-(defmethod normalize-blob-config :disk [t config]
-  (update-in config [t :dir] (partial u/abs-path (co/abs-work-dir config))))
-
-(defmethod normalize-blob-config :oci [t config]
-  config)

@@ -8,8 +8,7 @@
              [artifacts :as art]
              [blob :as blob]
              [build :as b]
-             [oci :as oci]
-             [runtime :as rt]]))
+             [oci :as oci]]))
 
 (defn cache-archive-path [build id]
   ;; The cache archive path is the repo sid with the cache id added.
@@ -53,9 +52,3 @@
   "Creates an `ArtifactRepository` that can be used to upload/download caches"
   [client]
   (art/->BuildApiArtifactRepository client "/cache/"))
-
-;;; Config handling
-
-(defmethod rt/setup-runtime :cache [conf k]
-  (when (k conf)
-    (blob/make-blob-store conf k)))
