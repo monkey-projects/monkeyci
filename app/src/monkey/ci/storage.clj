@@ -3,9 +3,7 @@
    a lot of functions for working with storage entities.  Many of these are overridden by
    implementation-specific functions, and so implementations here don't focus on efficiency.
    They are merely used in tests."
-  (:require [clojure.edn :as edn]
-            [clojure.java.io :as io]
-            [clojure.string :as cs]
+  (:require [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [medley.core :as mc]
             [monkey.ci

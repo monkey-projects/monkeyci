@@ -1,12 +1,9 @@
 (ns monkey.ci.storage.oci
-  (:require [clj-commons.byte-streams :as bs]
-            [clojure
-             [string :as cs]]
+  (:require [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
             [monkey.ci
              [edn :as edn]
-             [oci :as oci]
              [protocols :as p]
              [sid :as sid]
              [storage :as st]

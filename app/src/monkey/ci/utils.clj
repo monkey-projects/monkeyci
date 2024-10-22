@@ -1,9 +1,7 @@
 (ns monkey.ci.utils
   (:require [babashka.fs :as fs]
             [buddy.core.keys.pem :as pem]
-            [clojure
-             [string :as cs]
-             [walk :as cw]]
+            [clojure.walk :as cw]
             [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [clojure

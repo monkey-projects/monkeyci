@@ -25,8 +25,7 @@
              [protocols :as p]
              [sid :as sid]
              [spec :as spec]
-             [storage :as st]
-             [utils :as u]]
+             [storage :as st]]
             [monkey.ci.spec.db-entities]
             [monkey.ci.spec.entities]
             [next.jdbc.connection :as conn])

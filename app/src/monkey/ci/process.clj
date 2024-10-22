@@ -146,6 +146,7 @@
     (rt/post-events rt [(script/script-init-evt build script-dir)])
     ;; TODO Run as another unprivileged user for security (we'd need `su -c` for that)
     ;; TODO Restore and save m2 cache using deps.edn hash as key
+    ;; TODO Validate script before spawning the child process?
     (-> (bp/process
          {:dir script-dir
           :out (l/log-output out)
