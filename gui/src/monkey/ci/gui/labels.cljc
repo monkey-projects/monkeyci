@@ -2,7 +2,6 @@
   "Label editing components"
   (:require [medley.core :as mc]
             [monkey.ci.gui.components :as co]
-            [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 

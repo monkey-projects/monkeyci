@@ -72,7 +72,7 @@
   "Route names that are publicly accessible"
   #{:page/login :page/github-callback :page/bitbucket-callback})
 
-(defn on-route-change [match history]
+(defn on-route-change [match _]
   (log/debug "Route changed:" match)
   (rf/dispatch [:route/changed match]))
 

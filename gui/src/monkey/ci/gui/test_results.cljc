@@ -1,10 +1,8 @@
 (ns monkey.ci.gui.test-results
   "Displays test results"
-  (:require #_[monkey.ci.gui.charts :as charts]
-            [clojure.string :as cs]
+  (:require [clojure.string :as cs]
             [monkey.ci.gui.colors :as colors]
             [monkey.ci.gui.components :as co]
-            [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.table :as t]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
@@ -146,8 +144,7 @@
    all suites, the top 100, but the user can configure this."
   [id results]
   (let [suite-id (str (name id) "-suite-dropdown")
-        count-id (str (name id) "-count-dropdown")
-        form (rf/subscribe [::timing-chart-form id])]
+        count-id (str (name id) "-count-dropdown")]
     [:div
      [:h4 "Test Timings"]
      [:form
@@ -159,5 +156,4 @@
        [:div
         [test-count-dropdown id count-id]]]]
      (rf/dispatch [::timing-chart-init id results])
-     #_[charts/chart-component id]
      [:canvas {:id id :height "100px"}]]))

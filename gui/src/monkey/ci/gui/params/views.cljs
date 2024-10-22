@@ -11,7 +11,7 @@
             [re-frame.core :as rf]))
 
 (defn- param-form [set-id param-idx]
-  (let [{:keys [name value] :as p} @(rf/subscribe [:customer/param set-id param-idx])]
+  (let [{:keys [name value]} @(rf/subscribe [:customer/param set-id param-idx])]
     [:div.row.mb-2
      [:div.col-md-3
       [:input.form-control
@@ -64,7 +64,7 @@
        :on-click (u/link-evt-handler [:params/delete-set id])}
       [:span.me-2 [co/icon :trash]] "Delete"])])
 
-(defn- edit-params-card [{:keys [id label-filters] :as p}]
+(defn- edit-params-card [{:keys [id] :as p}]
   (let [param (rf/subscribe [:params/editing id])]
     [:div.card.mb-4
      [:div.card-body
