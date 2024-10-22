@@ -14,6 +14,7 @@
                                         org.bouncycastle/bcprov-jdk15on
                                         org.bouncycastle/bcpkix-jdk15on
                                         org.bouncycastle/bcutil-jdk15on]}
+        clj-kondo/clj-kondo {:mvn/version "2024.09.27"}
         clojure.java-time/clojure.java-time {:mvn/version "1.4.2"}
         com.github.loki4j/loki-logback-appender {:mvn/version "1.6.0-m1"}
         com.github.seancorfield/honeysql {:mvn/version "2.6.1147"}
@@ -58,7 +59,8 @@
  
  :aliases
  {:dev
-  {:extra-deps {org.clojure/test.check {:mvn/version "1.1.1"}}
+  {:extra-deps {org.clojure/test.check {:mvn/version "1.1.1"}
+                org.clojure/tools.namespace {:mvn/version "1.5.0"}}
    :extra-paths ["dev-resources" "env/dev"]}
 
   :test-paths ["test/unit" "test/integration"]

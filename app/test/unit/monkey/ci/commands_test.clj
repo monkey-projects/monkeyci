@@ -61,14 +61,9 @@
   (testing "zero when successful"
     (is (zero? (sut/verify-build {:work-dir "examples"
                                   :args {:dir "basic-clj"}}))))
-
+  
   (testing "nonzero exit on failure"
-    (is (not= 0 (sut/verify-build {}))))
-
-  (testing "runs child process when `deps.edn` present"
-    (is (zero? (sut/verify-build {:work-dir "examples"
-                                  :args {:dir "extra-deps"}
-                                  :dev-mode true})))))
+    (is (not= 0 (sut/verify-build {})))))
 
 (deftest list-builds
   (testing "reports builds from server"

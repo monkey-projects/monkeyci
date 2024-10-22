@@ -263,7 +263,8 @@
   (co/system-map
    :runtime (co/using
              {:config config}
-             [:build])
+             [:build :reporter])
+   :reporter (new-reporter config)
    :build (new-cli-build config)))
 
 (defn with-cli-runtime [config f]

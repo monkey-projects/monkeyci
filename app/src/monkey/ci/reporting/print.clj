@@ -137,6 +137,14 @@
 (defmethod printer :verify/failed [{:keys [message]}]
   (println (error "Error:") "Exception while verifying:" message))
 
+(defmethod printer :verify/result [{:keys [result]}]
+  (let [{:keys [error warning]} (:summary result)]
+    (cond
+      (pos? error)
+      (println (error (str "Got " error " errors")))
+      :else
+      (println (success "Build script is valid!")))))
+
 (defmethod printer :default [msg]
   (println (cl/style "Warning:" :bright :cyan) "unknown message type" (accent (str (:type msg)))))
 
