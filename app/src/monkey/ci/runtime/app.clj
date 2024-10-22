@@ -45,6 +45,9 @@
   (blob/make-blob-store config :cache))
 
 (defn- new-build-cache [config]
+  ;; The build cache is separate from the customer cache, because the build cache
+  ;; is (mostly) out of control of the user, where the customer cache is fully
+  ;; determined by the user's cache configurations.
   (blob/make-blob-store config :build-cache))
 
 (defn- new-workspace [config]
