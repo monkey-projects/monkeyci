@@ -171,12 +171,11 @@
         (add-log-config-volume rt)
         (add-config-volume build rt))))
 
-(defn wait-for-script-end-event
+(defn wait-for-build-end-event
   "Returns a deferred that realizes when the script/end event has been received."
   [events sid]
   (ec/wait-for-event events
-                     ;; Also capture build/end, in case of initialization error
-                     {:types #{:script/end :build/end}
+                     {:types #{:build/end}
                       :sid sid}))
 
 (def max-script-timeout
@@ -195,12 +194,12 @@
                          :exited? (fn [id]
                                     (md/chain
                                      (md/timeout!
-                                      (wait-for-script-end-event (:events rt) (b/sid build))
+                                      (wait-for-build-end-event (:events rt) (b/sid build))
                                       max-script-timeout ::timeout)
                                      (fn [r]
                                        (when (= r ::timeout)
                                          (log/warn "Build script timed out after" max-script-timeout "msecs"))
-                                       (if (= :script/end (:type r))
+                                       (if (= :build/end (:type r))
                                          (log/debug "Script end event received, fetching full instance details")
                                          (log/warn "Script failed to initialize"))
                                        (oci/get-full-instance-details client id))))})

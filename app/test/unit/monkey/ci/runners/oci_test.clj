@@ -255,18 +255,18 @@
           (is (= "test-user" (get-in conf [:events :client :username])))
           (is (= :jms (get-in conf [:events :type]))))))))
  
-(deftest wait-for-script-end-event
+(deftest wait-for-build-end-event
   (testing "returns a deferred that holds the script end event"
     (let [events (ec/make-events {:type :manifold})
           sid (repeatedly 3 random-uuid)
-          d (sut/wait-for-script-end-event events sid)]
+          d (sut/wait-for-build-end-event events sid)]
       (is (md/deferred? d))
       (is (not (md/realized? d)) "should not be realized initially")
       (is (some? (ec/post-events events [{:type :script/start
                                           :sid sid}])))
       (is (not (md/realized? d)) "should not be realized after start event")
-      (is (some? (ec/post-events events [{:type :script/end
+      (is (some? (ec/post-events events [{:type :build/end
                                           :sid sid}])))
-      (is (= :script/end (-> (deref d 100 :timeout)
-                              :type))))))
+      (is (= :build/end (-> (deref d 100 :timeout)
+                            :type))))))
 

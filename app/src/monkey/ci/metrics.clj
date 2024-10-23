@@ -65,7 +65,7 @@
           (when-let [r (if tx
                          (some-> (eduction tx [signal]) first)
                          signal)]
-            (log/debug "Increasing counter for signal:" r)
+            (log/trace "Increasing counter for signal:" r)
             (prom/counter-inc counter 1 (lbl-vals r))))
          ([])))
       counter)))
