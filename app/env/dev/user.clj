@@ -1,5 +1,6 @@
 (ns user
   (:require [config :as c]
+            [instances :as i]
             [logging :as l]
             [server :as server]
             [storage :as s]
@@ -26,3 +27,7 @@
 (defn refresh []
   (server/stop-server)
   (nr/refresh))
+
+(defn list-staging []
+  (->> @(i/list-active)
+       (map (juxt :id :display-name :time-created))))

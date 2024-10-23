@@ -4,7 +4,7 @@
   <packaging>jar</packaging>
   <groupId>com.monkeyci</groupId>
   <artifactId>app</artifactId>
-  <version>0.7.5-SNAPSHOT</version>
+  <version>0.9.1-SNAPSHOT</version>
   <name>app</name>
   <repositories>
     <repository>
@@ -25,12 +25,7 @@
     <dependency>
       <groupId>metosin</groupId>
       <artifactId>reitit-middleware</artifactId>
-      <version>0.7.1</version>
-    </dependency>
-    <dependency>
-      <groupId>io.resonant</groupId>
-      <artifactId>micrometer-clj</artifactId>
-      <version>0.0.4</version>
+      <version>0.7.2</version>
     </dependency>
     <dependency>
       <groupId>buddy</groupId>
@@ -40,12 +35,12 @@
     <dependency>
       <groupId>org.clojure</groupId>
       <artifactId>clojure</artifactId>
-      <version>1.11.4</version>
+      <version>1.12.0</version>
     </dependency>
     <dependency>
       <groupId>com.zaxxer</groupId>
       <artifactId>HikariCP</artifactId>
-      <version>5.1.0</version>
+      <version>6.0.0</version>
     </dependency>
     <dependency>
       <groupId>org.clojure</groupId>
@@ -68,19 +63,14 @@
       <version>1.6.0-m1</version>
     </dependency>
     <dependency>
-      <groupId>org.clojars.lispyclouds</groupId>
-      <artifactId>contajners</artifactId>
-      <version>1.0.5</version>
-    </dependency>
-    <dependency>
-      <groupId>io.micrometer</groupId>
-      <artifactId>micrometer-registry-prometheus</artifactId>
-      <version>1.12.8</version>
-    </dependency>
-    <dependency>
       <groupId>clansi</groupId>
       <artifactId>clansi</artifactId>
       <version>1.0.0</version>
+    </dependency>
+    <dependency>
+      <groupId>io.prometheus</groupId>
+      <artifactId>prometheus-metrics-core</artifactId>
+      <version>1.3.2</version>
     </dependency>
     <dependency>
       <groupId>ring-cors</groupId>
@@ -95,22 +85,22 @@
     <dependency>
       <groupId>commons-io</groupId>
       <artifactId>commons-io</artifactId>
-      <version>2.16.1</version>
+      <version>2.17.0</version>
     </dependency>
     <dependency>
       <groupId>com.github.seancorfield</groupId>
       <artifactId>honeysql</artifactId>
-      <version>2.6.1147</version>
+      <version>2.6.1196</version>
     </dependency>
     <dependency>
       <groupId>org.apache.activemq</groupId>
       <artifactId>artemis-server</artifactId>
-      <version>2.36.0</version>
+      <version>2.37.0</version>
     </dependency>
     <dependency>
       <groupId>metosin</groupId>
       <artifactId>reitit-swagger</artifactId>
-      <version>0.7.1</version>
+      <version>0.7.2</version>
     </dependency>
     <dependency>
       <groupId>aleph</groupId>
@@ -120,12 +110,17 @@
     <dependency>
       <groupId>org.apache.activemq</groupId>
       <artifactId>artemis-amqp-protocol</artifactId>
-      <version>2.36.0</version>
+      <version>2.37.0</version>
     </dependency>
     <dependency>
       <groupId>metosin</groupId>
       <artifactId>reitit-ring</artifactId>
-      <version>0.7.1</version>
+      <version>0.7.2</version>
+    </dependency>
+    <dependency>
+      <groupId>io.prometheus</groupId>
+      <artifactId>prometheus-metrics-tracer-initializer</artifactId>
+      <version>1.3.2</version>
     </dependency>
     <dependency>
       <groupId>dev.weavejester</groupId>
@@ -133,9 +128,19 @@
       <version>0.9.4</version>
     </dependency>
     <dependency>
+      <groupId>clj-kondo</groupId>
+      <artifactId>clj-kondo</artifactId>
+      <version>2024.09.27</version>
+    </dependency>
+    <dependency>
       <groupId>com.monkeyprojects</groupId>
       <artifactId>oci-container-instance</artifactId>
       <version>0.1.0</version>
+    </dependency>
+    <dependency>
+      <groupId>io.prometheus</groupId>
+      <artifactId>prometheus-metrics-instrumentation-jvm</artifactId>
+      <version>1.3.2</version>
     </dependency>
     <dependency>
       <groupId>com.monkeyprojects</groupId>
@@ -150,12 +155,7 @@
     <dependency>
       <groupId>metosin</groupId>
       <artifactId>reitit-schema</artifactId>
-      <version>0.7.1</version>
-    </dependency>
-    <dependency>
-      <groupId>io.micrometer</groupId>
-      <artifactId>micrometer-core</artifactId>
-      <version>1.12.8</version>
+      <version>0.7.2</version>
     </dependency>
     <dependency>
       <groupId>com.monkeyprojects</groupId>
@@ -175,7 +175,7 @@
     <dependency>
       <groupId>clj-commons</groupId>
       <artifactId>clj-yaml</artifactId>
-      <version>1.0.27</version>
+      <version>1.0.28</version>
     </dependency>
     <dependency>
       <groupId>prismatic</groupId>
@@ -185,12 +185,12 @@
     <dependency>
       <groupId>com.mysql</groupId>
       <artifactId>mysql-connector-j</artifactId>
-      <version>9.0.0</version>
+      <version>9.1.0</version>
     </dependency>
     <dependency>
       <groupId>yogthos</groupId>
       <artifactId>config</artifactId>
-      <version>1.2.0</version>
+      <version>1.2.1</version>
     </dependency>
     <dependency>
       <groupId>com.monkeyprojects</groupId>
@@ -201,6 +201,11 @@
       <groupId>babashka</groupId>
       <artifactId>process</artifactId>
       <version>0.5.22</version>
+    </dependency>
+    <dependency>
+      <groupId>io.prometheus</groupId>
+      <artifactId>prometheus-metrics-exporter-pushgateway</artifactId>
+      <version>1.3.2</version>
     </dependency>
     <dependency>
       <groupId>buddy</groupId>
@@ -244,7 +249,7 @@
     <dependency>
       <groupId>ch.qos.logback</groupId>
       <artifactId>logback-classic</artifactId>
-      <version>1.5.6</version>
+      <version>1.5.11</version>
     </dependency>
     <dependency>
       <groupId>camel-snake-kebab</groupId>
@@ -265,6 +270,11 @@
       <groupId>org.clojure</groupId>
       <artifactId>core.async</artifactId>
       <version>1.6.681</version>
+    </dependency>
+    <dependency>
+      <groupId>com.taoensso</groupId>
+      <artifactId>telemere</artifactId>
+      <version>1.0.0-beta25</version>
     </dependency>
   </dependencies>
   <build>

@@ -261,6 +261,16 @@
                 {:label "Actions"
                  :value actions}]}]))
 
+(defn github-repo-filter []
+  (let [v (rf/subscribe [:customer/github-repo-filter])]
+    [:form.row.row-cols-lg-auto.g-2.align-items-center.mb-2
+     [:label.col {:for :github-repo-name} "Filter by name:"]
+     [:div.col
+      [:input.form-control
+       {:id :github-repo-name
+        :value @v
+        :on-change (u/form-evt-handler [:customer/github-repo-filter-changed])}]]]))
+
 (defn add-repo-page
   []
   (let [route (rf/subscribe [:route/current])]
@@ -269,6 +279,7 @@
      [:<>
       [:h3 "Add Repository to Watch"]
       [co/alerts [:customer/repo-alerts]]
+      [github-repo-filter]
       [:div.card.mb-2
        [:div.card-body
         [repo-table]]]

@@ -81,3 +81,11 @@
 
 (defn set-repo-filter [db f]
   (assoc db repo-filter f))
+
+(def github-repo-filter ::repo-filter)
+
+(defn get-github-repo-filter [db]
+  (get db github-repo-filter))
+
+(defn set-github-repo-filter [db f]
+  (assoc db github-repo-filter f))

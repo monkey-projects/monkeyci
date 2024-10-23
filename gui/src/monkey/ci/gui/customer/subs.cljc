@@ -11,6 +11,7 @@
 (u/db-sub :customer/creating? db/customer-creating?)
 (u/db-sub :customer/group-by-lbl db/get-group-by-lbl)
 (u/db-sub :customer/repo-filter db/get-repo-filter)
+(u/db-sub :customer/github-repo-filter db/get-github-repo-filter)
 
 (rf/reg-sub
  :customer/info
@@ -37,7 +38,8 @@
  :customer/github-repos
  :<- [:customer/repos]
  :<- [::github-repos]
- (fn [[cr gr] _]
+ :<- [:customer/github-repo-filter]
+ (fn [[cr gr f] _]
    (letfn [(watched-repo [r]
              (->> cr
                   ;; This falsely triggers positive when unwatching a repo
@@ -46,13 +48,17 @@
                                      (comp (partial = (:ssh-url r)) :url)
                                      (comp (partial = (:clone-url r)) :url)))
                   (filter (comp (partial = (:id r)) :github-id))
-                  first))]
-     (map (fn [r]
-            (let [w (watched-repo r)]
-              (assoc r
-                     :monkeyci/watched? (some? w)
-                     :monkeyci/repo w)))
-          gr))))
+                  first))
+           (matches-filter? [{:keys [name]}]
+             (or (nil? f) (cs/includes? (cs/lower-case name) (cs/lower-case f))))]
+     (->> gr
+          (map (fn [r]
+                 (let [w (watched-repo r)]
+                   (assoc r
+                          :monkeyci/watched? (some? w)
+                          :monkeyci/repo w))))
+          (filter matches-filter?)
+          (sort-by :name)))))
 
 (rf/reg-sub
  :customer/recent-builds

@@ -77,7 +77,7 @@
     (when (and contents (not-empty contents))
       (mapv co/->html contents))
     [[:br]])
-   (into [:<>])))
+   (into [:pre])))
 
 (defn- log-contents [lbl path]
   (let [log (rf/subscribe [:job/logs path])]

@@ -21,6 +21,7 @@
              [edn :as edn]
              [errors :as err]
              [logging :as l]
+             [retry :as retry]
              [runtime :as rt]
              [script :as script]
              [sidecar]
@@ -152,7 +153,17 @@
   [build {:keys [build-cache]}]
   (when build-cache
     (log/debug "Saving build cache for build" (b/sid build))
-    @(blob/save build-cache m2-cache-dir (repo-cache-location build))))
+    (try
+      (retry/async-retry
+       #(-> (blob/save build-cache m2-cache-dir (repo-cache-location build))
+            (md/catch (fn [ex]
+                        (log/error "Failed to save cache" ex)
+                        nil)))
+       {:max-retries 5
+        :retry-if nil?
+        :backoff (retry/constant-delay 3000)})
+      (catch Exception ex
+        (log/error "Failed to save build cache" ex)))))
 
 (defn execute!
   "Executes the build script located in given directory.  This actually runs the

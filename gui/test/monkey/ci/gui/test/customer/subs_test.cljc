@@ -85,12 +85,19 @@
     (testing "contains repo info"
       (is (map? (reset! app-db (-> {}
                                    (db/set-github-repos [{:id "github-repo-id"
+                                                          :name "test repo"
                                                           :ssh-url "ssh@ssh-url"
                                                           :clone-url "https://clone-url"}])
                                    (db/set-customer {:repos [{:url "ssh@ssh-url"
                                                               :id "test-repo"
                                                               :github-id "github-repo-id"}]})))))
-      (is (= "test-repo" (-> @r first :monkeyci/repo :id))))))
+      (is (= "test-repo" (-> @r first :monkeyci/repo :id))))
+
+    (testing "applies filter"
+      (is (some? (swap! app-db db/set-github-repo-filter "test")))
+      (is (= 1 (count @r)))
+      (is (some? (swap! app-db db/set-github-repo-filter "other")))
+      (is (empty? @r)))))
 
 (deftest create-alerts
   (let [s (rf/subscribe [:customer/create-alerts])]
@@ -234,5 +241,12 @@
   (h/verify-sub
    [:customer/repo-filter]
    #(db/set-repo-filter % "test-filter")
+   "test-filter"
+   nil))
+
+(deftest customer-github-repo-filter
+  (h/verify-sub
+   [:customer/github-repo-filter]
+   #(db/set-github-repo-filter % "test-filter")
    "test-filter"
    nil))
