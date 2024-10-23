@@ -152,7 +152,7 @@
   [build {:keys [build-cache]}]
   (when build-cache
     (log/debug "Saving build cache for build" (b/sid build))
-    @(blob/save build-cache (repo-cache-location build) m2-cache-dir)))
+    @(blob/save build-cache m2-cache-dir (repo-cache-location build))))
 
 (defn execute!
   "Executes the build script located in given directory.  This actually runs the
