@@ -84,7 +84,7 @@
   (with-redefs [wh/on-server-close (constantly (md/success-deferred nil))]
     (testing "starts the server and waits for close"
       (let [r (sut/http-server tc/base-config)]
-        (is (nil? (deref r 100 :timeout)))))))
+        (is (nil? r))))))
 
 (deftest watch
   (testing "sends request and returns deferred"

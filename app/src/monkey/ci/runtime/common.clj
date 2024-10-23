@@ -3,6 +3,10 @@
             [com.stuartsierra.component :as co]
             [manifold.deferred :as md]))
 
+(defn- maybe-deref [x]
+  (cond-> x
+    (md/deferred? x) deref))
+
 (defn with-system
   "Starts the system passes it to `f` and then shuts it down afterwards."
   [sys f]
@@ -11,14 +15,10 @@
                (log/debug "Stopping system")
                (co/stop sys))]
     (try
-      (let [r (f sys)]
-        ;; If `f` returns a deferred, only stop the system on realization
-        (if (md/deferred? r)
-          (md/finally r stop)
-          (do 
-            ;; Otherwise stop now
-            (stop)
-            r)))
+      ;; If `f` returns a deferred, deref it first
+      (let [r (maybe-deref (f sys))]
+        (stop)
+        r)
       (catch Exception ex
         (co/stop sys)
         (throw ex)))))
