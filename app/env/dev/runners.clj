@@ -28,7 +28,7 @@
   [build]
   (let [dir (str (fs/create-temp-dir))
         conf (-> @co/global-config
-                 (assoc-in [:runner :type] :child)
+                 (assoc-in [:runner :type] :local)
                  (assoc :build build
                         :dev-mode true
                         :checkout-base-dir dir)
@@ -42,3 +42,12 @@
       (assoc :sid sid
              :git {:url git-url
                    :branch branch})))
+
+(defn run-example-local
+  "Runs an example build locally"
+  [example]
+  (let [build (-> ["example-cust" "example-repo" (str "build-") (System/currentTimeMillis)]
+                  (make-build nil nil)
+                  (dissoc :git)
+                  (assoc-in [:script :script-dir] (str "examples/" example)))]
+    (run-build-local build)))

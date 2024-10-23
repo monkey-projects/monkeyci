@@ -4,6 +4,7 @@
             [manifold.deferred :as md]))
 
 (defn- maybe-deref [x]
+  (log/debug "Checking if we need to deref:" x)
   (cond-> x
     (md/deferred? x) deref))
 
@@ -17,6 +18,9 @@
     (try
       ;; If `f` returns a deferred, deref it first
       (maybe-deref (f sys))
+      (catch Exception ex
+        (log/error "Got exception in system:" ex)
+        (throw ex))
       (finally
         (stop)))))
 

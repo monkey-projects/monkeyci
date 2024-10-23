@@ -1,5 +1,6 @@
 (ns monkey.ci.retry
-  (:require [manifold
+  (:require [clojure.tools.logging :as log]
+            [manifold
              [deferred :as md]
              [time :as mt]]))
 
@@ -10,6 +11,7 @@
   [f {:keys [max-retries retry-if backoff]}]
   (md/loop [retries max-retries
             r nil]
+    (log/debug "Invoking retryable function," retries "attempts left")
     (if (zero? retries)
       r
       (md/chain
