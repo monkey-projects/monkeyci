@@ -16,12 +16,9 @@
                (co/stop sys))]
     (try
       ;; If `f` returns a deferred, deref it first
-      (let [r (maybe-deref (f sys))]
-        (stop)
-        r)
-      (catch Exception ex
-        (co/stop sys)
-        (throw ex)))))
+      (maybe-deref (f sys))
+      (finally
+        (stop)))))
 
 (defn with-runtime
   "Starts the given component system and then passes the `runtime` 

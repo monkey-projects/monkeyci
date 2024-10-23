@@ -11,7 +11,7 @@
 (s/def :display/id string?)
 
 (s/def :github/secret string?)
-(s/def :entity/name string?)
+(s/def :entity/name (s/and string? not-empty))
 (s/def :entity/description string?)
 
 (s/def :entity/common

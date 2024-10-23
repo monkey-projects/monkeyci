@@ -15,7 +15,7 @@
 (s/def :db/cuid ::c/cuid)
 
 (s/def :github/secret string?)
-(s/def :db/name string?)
+(s/def :db/name (s/and string? not-empty))
 (s/def :db/description string?)
 
 (s/def :db/common
