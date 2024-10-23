@@ -74,9 +74,13 @@
       (create-credit-consumption storage)))
 
 (defn cancel-build [storage {:keys [sid] :as evt}]
-  (patch-build storage
-               sid
-               {:status :canceled}))
+  (-> (patch-build storage
+                   sid
+                   (fn [build]
+                     {:status :canceled
+                      :credits (b/calc-credits build)}))
+      ;; Register consumed credits also in case of cancellation, for all jobs that have already run
+      (create-credit-consumption storage)))
 
 (defn init-script [storage {:keys [sid script-dir]}]
   (patch-build storage sid #(assoc-in % [:script :script-dir] script-dir)))

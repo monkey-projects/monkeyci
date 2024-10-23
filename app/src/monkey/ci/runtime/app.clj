@@ -220,6 +220,7 @@
   {:jwk (auth/config->keypair conf)})
 
 (defn- new-listeners []
+  ;; TODO Listen to events on a queue so we don't process them multiple times
   (li/map->Listeners {}))
 
 (defrecord ServerRuntime [config]

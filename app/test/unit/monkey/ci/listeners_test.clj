@@ -2,6 +2,8 @@
   (:require [clojure.test :refer [deftest testing is]]
             [com.stuartsierra.component :as co]
             [monkey.ci
+             [build :as b]
+             [cuid :as cuid]
              [listeners :as sut]
              [storage :as st]
              [time :as t]]
@@ -81,14 +83,37 @@
             (let [[m :as cc] (st/list-customer-credit-consumptions st (:customer-id build))]
               (is (= 1 (count cc)))
               (is (pos? (:amount m)))
-              (is (= (:id cred) (:credit-id m)))))
+              (is (= (:id cred) (:credit-id m)))
+              (is (= (:build-id build) (:build-id m)))))
 
           (testing "when no available credit, assigns consumption to most recent credit")))
 
-      (testing "`build/canceled` marks build as canceled"
-        (is (some? (handle {:type :build/canceled})))
-        (is (= :canceled (-> (st/find-build st sid)
-                             :status))))
+      (testing "`build/canceled`"
+        (let [build (-> (test-build (concat (take 2 sid) [(cuid/random-cuid)]))
+                        (assoc-in [:script :jobs "job-2"] {:id "job-2"
+                                                           :start-time 100
+                                                           :end-time 200
+                                                           :credit-multiplier 1}))
+              sid (b/sid build)]
+          (is (some? (st/save-build st build)))
+          (is (some? (handle {:type :build/canceled
+                              :sid sid})))
+          
+          (testing "marks build as canceled"
+            (is (= :canceled (-> (st/find-build st sid)
+                                 :status))))
+
+          (testing "calculates consumed credits"
+            (is (number? (-> (st/find-build st sid)
+                             :credits))))
+
+          (testing "creates credit consumption for available credit"
+            (let [cc (st/list-customer-credit-consumptions st (:customer-id build))
+                  m (->> cc
+                         (filter (comp (partial = (:build-id build)) :build-id))
+                         (first))]
+              (is (some? m))
+              (is (pos? (:amount m)))))))
 
       (testing "`script/initializing` sets script dir in build"
         (is (some? (handle {:type :script/initializing
