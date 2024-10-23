@@ -105,11 +105,12 @@
           (is (s/valid? ::se/event evt))))
 
       (testing "restores and saves build cache"
-        (let [stored (atom {sut/m2-cache-dir ::cache})
-              cache-rt (assoc test-rt :build-cache (h/fake-blob-store stored))
-              [cust-id repo-id] (:sid test-build)]
+        (let [[cust-id repo-id] (:sid test-build)
+              loc (str cust-id "/" repo-id ".tgz")
+              stored (atom {loc sut/m2-cache-dir})
+              cache-rt (assoc test-rt :build-cache (h/fake-blob-store stored))]
           (is (some? @(sut/execute! test-build cache-rt)))
-          (is (= {(str cust-id "/" repo-id ".tgz") sut/m2-cache-dir} @stored)))))))
+          (is (= {loc sut/m2-cache-dir} @stored)))))))
 
 (deftest generate-deps
   (testing "adds log config file, relative to work dir if configured"
