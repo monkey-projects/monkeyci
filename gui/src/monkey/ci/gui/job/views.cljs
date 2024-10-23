@@ -69,6 +69,7 @@
           last))
 
 (defn- show-log [lbl contents]
+  (println "Showing log:" contents)
   (->>
    (concat
     [(co/->html (co/colored (str lbl ":") 95))
@@ -114,6 +115,10 @@
   [co/log-viewer
    (->> [["stdout" output] ["stderr" error]]
         (filter (comp not-empty second))
+        ;; FIXME Multiple spaces are not displayed correctly
+        (map (fn [[lbl v]]
+               [lbl (->> (cs/split v #"\n")
+                         (interpose [:br]))]))
         (map (partial apply show-log)))])
 
 (defn- output-tab [job]
