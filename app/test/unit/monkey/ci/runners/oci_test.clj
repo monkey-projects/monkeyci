@@ -81,7 +81,11 @@
                      :ssh-keys [{:private-key "test-privkey"
                                  :public-key "test-pubkey"}]}}
         rt (-> (trt/test-runtime)
-               (assoc-in [:config :api :url] "http://test-api"))
+               (trt/set-config
+                {:api {:url "http://test-api"}
+                 :artifacts {:type :disk}
+                 :cache {:type :disk}
+                 :build-cache {:type :disk}}))
         conf {:availability-domain "test-ad"
               :compartment-id "test-compartment"
               :image-pull-secrets "test-secrets"
@@ -186,7 +190,10 @@
               (is (= (:sid build) (get-in parsed [:build :sid]))))
 
             (testing "containes checkout-base-dir"
-              (is (string? (:checkout-base-dir parsed))))))))
+              (is (string? (:checkout-base-dir parsed))))
+
+            (testing "contains `build-cache` configuration"
+              (is (some? (:build-cache parsed))))))))
 
     (testing "ssh keys"
       (testing "adds as volume"
