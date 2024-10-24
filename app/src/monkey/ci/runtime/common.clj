@@ -4,7 +4,6 @@
             [manifold.deferred :as md]))
 
 (defn- maybe-deref [x]
-  (log/debug "Checking if we need to deref:" x)
   (cond-> x
     (md/deferred? x) deref))
 

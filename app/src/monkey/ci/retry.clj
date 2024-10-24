@@ -1,6 +1,5 @@
 (ns monkey.ci.retry
-  (:require [clojure.tools.logging :as log]
-            [manifold
+  (:require [manifold
              [deferred :as md]
              [time :as mt]]))
 

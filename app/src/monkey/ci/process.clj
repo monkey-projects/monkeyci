@@ -9,12 +9,8 @@
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [config.core :as cc]
-            [manifold
-             [deferred :as md]
-             [executor :as me]]
-            [medley.core :as mc]
+            [manifold.deferred :as md]
             [monkey.ci
-             [artifacts :as art]
              [blob :as blob]
              [build :as b]
              [config :as config]
@@ -53,7 +49,7 @@
   "Run function for when a build task is executed using clojure tools.  This function
    is run in a child process by the `execute!` function below.  This exits the VM
    with a nonzero value on failure."
-  ([args env]
+  ([args _]
    (log/debug "Running with args:" args)
    (try
      (let [config (load-config args)]
@@ -155,17 +151,19 @@
   (when build-cache
     (log/debug "Saving build cache for build" (b/sid build))
     (try
-      (retry/retry
+      @(blob/save build-cache m2-cache-dir (repo-cache-location build))
+      ;; This results in class not found error?
+      #_(retry/retry
        #(try
-          (log/debug "Trying to save build cache...")
           @(blob/save build-cache m2-cache-dir (repo-cache-location build))
+          true
           (catch Exception ex
             (log/error "Unable to save cache" ex)
             nil))
        {:max-retries 5
         :retry-if nil?
         :backoff (retry/constant-delay 3000)})
-      (catch Exception ex
+      (catch Throwable ex
         (log/error "Failed to save build cache" ex)))))
 
 (defn execute!

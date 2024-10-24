@@ -576,8 +576,8 @@
             (filter active?))))))
 
 (def credit-consumptions :credit-consumptions)
-(defn credit-cons-sid [cust-id & others]
-  (into [global (name credit-consumptions)] others))
+(defn credit-cons-sid [& parts]
+  (into [global (name credit-consumptions)] parts))
 
 (defn save-credit-consumption [s cs]
   (p/write-obj s (credit-cons-sid (:customer-id cs) (:id cs)) cs))
@@ -589,7 +589,7 @@
   (override-or
    [:customer :list-credit-consumptions]
    (fn [st cust-id]
-     (let [sid (credit-cons-sid [cust-id])]
+     (let [sid (credit-cons-sid cust-id)]
        (->> (p/list-obj st sid)
             (map (partial conj sid))
             (map (partial find-credit-consumption st)))))))
