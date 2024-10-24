@@ -18,7 +18,7 @@
     (try
       ;; If `f` returns a deferred, deref it first
       (maybe-deref (f sys))
-      (catch Exception ex
+      (catch Throwable ex
         (log/error "Got exception in system:" ex)
         (throw ex))
       (finally

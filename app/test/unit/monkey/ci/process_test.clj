@@ -11,6 +11,7 @@
              [logging :as l]
              [containers]
              [process :as sut]
+             [protocols :as p]
              [script :as script]
              [sid :as sid]
              [utils :as u]]
@@ -53,6 +54,21 @@
                            :build)))))))))))
 
 (deftype FakeProcess [exitValue])
+
+(defrecord FakeBuildBlobStore [saved restorable]
+  p/BlobStore
+  (save-blob [_ src dest]
+    (md/success-deferred (swap! saved assoc src dest)))
+
+  (restore-blob [_ src dest]
+    (if (= dest (get restorable src))
+      (md/success-deferred {:src src
+                            :dest dest
+                            :entries []})
+      (md/error-deferred (ex-info "Unable to restore: unexpected"
+                                  {:src src
+                                   :dest dest
+                                   :restorable restorable})))))
 
 (deftest execute!
   (let [server-args (atom nil)
@@ -107,10 +123,11 @@
       (testing "restores and saves build cache"
         (let [[cust-id repo-id] (:sid test-build)
               loc (str cust-id "/" repo-id ".tgz")
-              stored (atom {loc sut/m2-cache-dir})
-              cache-rt (assoc test-rt :build-cache (h/fake-blob-store stored))]
+              stored (atom {})
+              restorable {loc "/tmp"}
+              cache-rt (assoc test-rt :build-cache (->FakeBuildBlobStore stored restorable))]
           (is (some? @(sut/execute! test-build cache-rt)))
-          (is (= {loc sut/m2-cache-dir} @stored)))))))
+          (is (= {sut/m2-cache-dir loc} @stored)))))))
 
 (deftest generate-deps
   (testing "adds log config file, relative to work dir if configured"

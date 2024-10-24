@@ -32,7 +32,9 @@
     (fn [{:keys [runner events build]}]
       (try
         (log/debug "Starting runner for build" build)
-        (runner)
+        (let [v (runner)]
+          (log/debug "Runner exited")
+          v)
         (catch Exception ex
           (log/error "Unable to start build" ex)
           (ec/post-events events (b/build-end-evt (assoc build :message (ex-message (or (ex-cause ex) ex)))

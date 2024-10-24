@@ -44,10 +44,10 @@
                    :branch branch})))
 
 (defn run-example-local
-  "Runs an example build locally"
+  "Runs an example build locally by starting the build process"
   [example]
   (let [build (-> ["example-cust" "example-repo" (str "build-") (System/currentTimeMillis)]
                   (make-build nil nil)
                   (dissoc :git)
-                  (assoc-in [:script :script-dir] (str "examples/" example)))]
+                  (assoc-in [:script :script-dir] (str (fs/absolutize (fs/path "examples/" example)))))]
     (run-build-local build)))
