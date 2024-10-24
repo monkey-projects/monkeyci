@@ -26,6 +26,30 @@
                                       :retry-if (constantly true)
                                       :backoff (sut/constant-delay 100)})))))
 
+(deftest retry
+  (testing "invokes target fn"
+    (is (= ::result (sut/retry (constantly ::result)
+                               {:max-retries 1
+                                :retry-if (constantly false)}))))
+
+  (testing "retries invocation if condition matches"
+    (let [inv (atom 0)]
+      (is (= 2 (sut/retry (fn []
+                            (swap! inv inc))
+                          {:max-retries 10
+                           :retry-if #(= 1 %)
+                           :backoff (sut/constant-delay 100)})))
+      (is (= 2 @inv))))
+
+  (testing "returns last result if max retries reached"
+    (let [inv (atom 0)]
+      (is (= 2 (sut/retry (fn []
+                            (swap! inv inc))
+                          {:max-retries 2
+                           :retry-if (constantly true)
+                           :backoff (sut/constant-delay 100)})))
+      (is (= 2 @inv)))))
+
 (deftest constant-delay
   (testing "always returns same timeout"
     (is (every? (partial = 1000) (repeatedly 10 (sut/constant-delay 1000))))))

@@ -154,16 +154,16 @@
   (when build-cache
     (log/debug "Saving build cache for build" (b/sid build))
     (try
-      @(retry/async-retry
-        #(try
-           (log/debug "Trying to save build cache...")
-           @(blob/save build-cache m2-cache-dir (repo-cache-location build))
-           (catch Exception ex
-             (log/error "Unable to save cache" ex)
-             nil))
-        {:max-retries 5
-         :retry-if nil?
-         :backoff (retry/constant-delay 3000)})
+      (retry/retry
+       #(try
+          (log/debug "Trying to save build cache...")
+          @(blob/save build-cache m2-cache-dir (repo-cache-location build))
+          (catch Exception ex
+            (log/error "Unable to save cache" ex)
+            nil))
+       {:max-retries 5
+        :retry-if nil?
+        :backoff (retry/constant-delay 3000)})
       (catch Exception ex
         (log/error "Failed to save build cache" ex)))))
 

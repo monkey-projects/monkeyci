@@ -11,7 +11,6 @@
   [f {:keys [max-retries retry-if backoff]}]
   (md/loop [retries max-retries
             r nil]
-    (log/debug "Invoking retryable function," retries "attempts left")
     (if (zero? retries)
       r
       (md/chain
@@ -22,6 +21,20 @@
             (mt/in (backoff)
                    #(md/recur (dec retries) r)))
            r))))))
+
+(defn retry
+  "Similar to `async-retry`, but for regular functions."
+  [f {:keys [max-retries retry-if backoff]}]
+  (loop [retries max-retries
+         r nil]
+    (if (zero? retries)
+      r
+      (let [r (f)]
+        (if (retry-if r)
+          (do
+            (Thread/sleep (backoff))
+            (recur (dec retries) r))
+          r)))))
 
 (defn constant-delay
   "Backoff fn that always returns the same interval"
