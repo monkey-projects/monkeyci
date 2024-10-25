@@ -735,7 +735,7 @@
       credit-subscription?
       (select-credit-subscription conn (last sid))
       credit-consumption?
-      (select-credit-consumption conn (global-sid->cuid sid))
+      (select-credit-consumption conn (last sid))
       customer-credit?
       (select-customer-credit conn (global-sid->cuid sid))))
   
