@@ -47,7 +47,7 @@
   (let [c (rf/subscribe [:user/customers])]
     (when @c
       [:<>
-       [:h3 "Your Linked Customers"]
+       [:h3 [:span.me-2 co/overview-icon] "Your Linked Customers"]
        [:p "This screen shows all customers linked to your user account."]
        (if (empty? @c)
          [:<>
