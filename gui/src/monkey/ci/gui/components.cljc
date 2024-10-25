@@ -140,7 +140,7 @@
 (defn modal
   "Renders a modal box with a close button by default"
   [id title contents & [footer]]
-  [:div.modal.fade.modal-lg
+  [:div.modal.fade
    {:id id
     :role :dialog
     :tab-index -1}
