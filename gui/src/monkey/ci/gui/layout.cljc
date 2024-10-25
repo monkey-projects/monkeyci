@@ -45,7 +45,8 @@
 (defn- social-link [icon url]
   [:li.list-inline-item
    [:a.btn.btn-icon.btn-sm.btn-soft-light.rounded-circle
-    {:href url}
+    {:href url
+     :target :_blank}
     [co/icon icon]]])
 
 (defn footer []

@@ -54,6 +54,9 @@
 (def cancel-icon
   [icon :x-square])
 
+(def search-icon
+  [icon :search])
+
 (defn reload-btn [evt & [opts]]
   (icon-btn :arrow-clockwise "Reload" evt opts))
 
@@ -199,3 +202,8 @@
   (let [e (u/build-elapsed b)]
     (when (pos? e)
       (t/format-seconds (int (/ e 1000))))))
+
+(defn filter-input [opts]
+  [:div.input-group.input-group-merge
+   [:span.input-group-prepend.input-group-text search-icon]
+   [:input.form-control opts]])

@@ -135,18 +135,20 @@
         sel (rf/subscribe [:customer/group-by-lbl])]
     (->> @l
          (map (fn [v]
-                [:option {:value v} v]))
+                [:option {:value v} (str "Group by " v)]))
          (into [:select.form-select
                 {:id :group-by-label
                  :aria-label "Label selector"
                  :value @sel
-                 :on-change (u/form-evt-handler [:customer/group-by-lbl-changed])}]))))
+                 :on-change (u/form-evt-handler [:customer/group-by-lbl-changed])}
+                [:option {:value nil} "Ungrouped"]]))))
 
 (defn- repo-name-filter []
   (let [f (rf/subscribe [:customer/repo-filter])]
-    [:input.form-control
+    [co/filter-input
      {:id :repo-name-filter
       :on-change (u/form-evt-handler [:customer/repo-filter-changed])
+      :placeholder "Repository name"
       :value @f}]))
 
 (defn- repos-action-bar
@@ -154,10 +156,9 @@
   [cust]
   [:div.d-flex.flex-row.mb-2
    [:form.row.row-cols-lg-auto.g-2.align-items-center
-    [:label.col {:for :group-by-label} "Repository overview, grouped by"]
+    [:label.col {:for :group-by-label} "Repository overview"]
     [:div.col
      [label-selector]]
-    [:label.col {:for :repo-name-filter} "Filter by name"]
     [:div.col
      [repo-name-filter]]]
    [:div.ms-auto
@@ -264,10 +265,10 @@
 (defn github-repo-filter []
   (let [v (rf/subscribe [:customer/github-repo-filter])]
     [:form.row.row-cols-lg-auto.g-2.align-items-center.mb-2
-     [:label.col {:for :github-repo-name} "Filter by name:"]
      [:div.col
-      [:input.form-control
+      [co/filter-input
        {:id :github-repo-name
+        :placeholder "Repository name"
         :value @v
         :on-change (u/form-evt-handler [:customer/github-repo-filter-changed])}]]]))
 
