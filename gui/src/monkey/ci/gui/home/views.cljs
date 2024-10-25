@@ -20,25 +20,35 @@
    [:span.me-2 [co/icon :arrow-right-square]] "Join Customer"])
 
 (defn- cust-item [{:keys [id name owner?]}]
-  [:li
-   [:a {:href (r/path-for :page/customer {:customer-id id})}
-    name
-    (when owner?
-      [:span.badge.text-bg-success.ms-2 "owner"])]])
+  [:div.card
+   {:style {:width "20em"}
+    :on-click #(rf/dispatch [:route/goto :page/customer {:customer-id id}])}
+   [:div.card-header {:style {:font-size "5em"}}
+    co/customer-icon]
+   [:div.card-body
+    [:div.card-title
+     [:h5
+      [:a {:href (r/path-for :page/customer {:customer-id id})}
+       name
+       (when owner?
+         [:span.badge.text-bg-success.ms-2 "owner"])]]]]])
 
 (defn- linked-customers [cust]
   [:div
    (->> (map cust-item cust)
-        (into [:ul]))
+        (into [:div.d-flex.gap-3.mb-3]))
+   [:p "You can join any number of customers, as long as a customer administrator approves your request."]
    [join-cust-btn]])
 
-(def free-credits 1000)
+;; TODO Configure centrally somewhere
+(def free-credits 5000)
 
 (defn customers []
   (let [c (rf/subscribe [:user/customers])]
     (when @c
       [:<>
        [:h3 "Your Linked Customers"]
+       [:p "This screen shows all customers linked to your user account."]
        (if (empty? @c)
          [:<>
           [:p "No customers have been linked to your account.  You could either "
@@ -56,7 +66,7 @@
          [linked-customers @c])])))
 
 (defn user-home [u]
-  (rf/dispatch [:user/load-customers])
+  (rf/dispatch [:home/initialize])
   [:<>
    [co/alerts [:user/alerts]]
    [customers]])

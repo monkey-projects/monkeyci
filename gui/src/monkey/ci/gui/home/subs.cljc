@@ -4,8 +4,8 @@
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
-(u/db-sub :user/customers db/customers)
-(u/db-sub :user/alerts db/alerts)
+(u/db-sub :user/customers db/get-customers)
+(u/db-sub :user/alerts db/get-alerts)
 (u/db-sub :customer/join-alerts db/join-alerts)
 (u/db-sub :customer/searching? (comp true? db/customer-searching?))
 (u/db-sub :customer/search-results db/search-results)

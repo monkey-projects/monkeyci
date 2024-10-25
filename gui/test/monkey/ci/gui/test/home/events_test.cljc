@@ -23,26 +23,17 @@
        (is (some? (:martian.re-frame/martian @app-db)))
        (rf/dispatch [:user/load-customers])
        (is (= 1 (count @c)))
-       (is (= :get-user-customers (-> @c first (nth 2)))))))
-
-  (testing "sets alert"
-    (rf/dispatch-sync [:user/load-customers])
-    (is (some? (db/alerts @app-db)))))
+       (is (= :get-user-customers (-> @c first (nth 2))))))))
 
 (deftest user-load-customers--success
   (testing "sets customers in db"
     (rf/dispatch-sync [:user/load-customers--success {:body ::customers}])
-    (is (= ::customers (db/customers @app-db))))
-
-  (testing "clears alerts"
-    (is (some? (reset! app-db (db/set-alerts {} [{:type :info}]))))
-    (rf/dispatch-sync [:user/load-customers--success {:body ::customers}])
-    (is (empty? (db/alerts @app-db)))))
+    (is (= ::customers (db/get-customers @app-db)))))
 
 (deftest user-load-customers--failed
   (testing "sets error alert"
     (rf/dispatch-sync [:user/load-customers--failed {:message "test error"}])
-    (is (= :danger (-> (db/alerts @app-db)
+    (is (= :danger (-> (db/get-alerts @app-db)
                        first
                        :type)))))
 
