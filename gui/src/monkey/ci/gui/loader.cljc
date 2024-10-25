@@ -109,9 +109,11 @@
   [db id msg err]
   (-> db
       (reset-loading id)
-      (set-alerts id [{:type :danger
-                       ;; TODO Replace this with a UI component (for future multilanguage)
-                       :message (str msg (u/error-msg err))}])))
+      (set-alerts id [(if (fn? msg)
+                        (msg err)
+                        ;; Provided for backwards compatibility
+                        {:type :danger
+                         :message (str msg (u/error-msg err))})])))
 
 (defn on-initialize
   "Creates an fx context when initializing a screen that prepares the db, and

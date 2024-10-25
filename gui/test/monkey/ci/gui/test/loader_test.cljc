@@ -2,6 +2,7 @@
   (:require #?(:cljs [cljs.test :refer-macros [deftest testing is use-fixtures]]
                :clj [clojure.test :refer [deftest testing is use-fixtures]])
             [monkey.ci.gui.test.fixtures :as f]
+            [monkey.ci.gui.alerts :as a]
             [monkey.ci.gui.loader :as sut]
             [monkey.ci.gui.routing :as r] 
             [re-frame.core :as rf]
@@ -78,7 +79,15 @@
              (-> {}
                  (sut/on-failure id "test error" ::test-error)
                  (sut/get-alerts id)
-                 (as-> a (map :type a))))))))
+                 (as-> a (map :type a))))))
+
+    (testing "sets alert using fn"
+      (is (= "test message: test error"
+             (-> {}
+                 (sut/on-failure id (a/error-msg "test message") "test error")
+                 (sut/get-alerts id)
+                 (first)
+                 :message))))))
 
 (deftest on-initialize
   (let [id ::init-id]

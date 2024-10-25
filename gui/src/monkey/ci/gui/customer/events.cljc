@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.customer.events
   (:require [medley.core :as mc]
+            [monkey.ci.gui.alerts :as a]
             [monkey.ci.gui.apis.github :as github]
             [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.martian]
@@ -53,15 +54,14 @@
 (rf/reg-event-db
  :customer/load--failed
  (fn [db [_ id err]]
-   (lo/on-failure db db/customer (str "Could not load details for customer " id ": ") err)))
+   (lo/on-failure db db/customer (a/cust-details-failed id) err)))
 
 (rf/reg-event-fx
  :customer/load-github-repos
  (fn [{:keys [db]} _]
    {:db (-> db
             (db/set-github-repos nil)
-            (db/set-repo-alerts [{:type :info
-                                  :message "Fetching repositories from Github..."}]))
+            (db/set-repo-alerts [(a/cust-fetch-github-repos)]))
     :dispatch-n [[::load-user-repos]
                  [::load-orgs]]}))
 
@@ -106,20 +106,17 @@
  (u/req-error-handler-db
   (fn [db [_ err]]
     (db/set-repo-alerts db
-                        [{:type :danger
-                          :message (str "Unable to fetch user orgs from Github: " (u/error-msg err))}]))))
+                        [(a/cust-user-orgs-failed err)]))))
 
 (rf/reg-event-db
  :customer/load-github-repos--success
  (fn [db [_ new-repos]]
-   (log/debug "Got github repos:" new-repos)
    (let [orig (db/github-repos db)
          all (vec (concat orig new-repos))]
      (-> db
          ;; Add to existing repos since we're doing multiple calls
          (db/set-github-repos all)
-         (db/set-repo-alerts [{:type :success
-                               :message (str "Found " (count all) " repositories in Github.")}])))))
+         (db/set-repo-alerts [(a/cust-github-repos-success (count all))])))))
 
 (rf/reg-event-fx
  :repo/watch
@@ -144,8 +141,7 @@
 (rf/reg-event-db
  :repo/watch--failed
  (fn [db [_ err]]
-   (db/set-repo-alerts db [{:type :danger
-                            :message (str "Failed to watch repo: " (u/error-msg err))}])))
+   (db/set-repo-alerts db [(a/repo-watch-failed err)])))
 
 (rf/reg-event-fx
  :repo/unwatch
@@ -160,14 +156,12 @@
 (rf/reg-event-db
  :repo/unwatch--success
  (fn [db [_ {:keys [body]}]]
-   (log/debug "Repo unwatched:" (str body))
    (db/replace-repo db body)))
 
 (rf/reg-event-db
  :repo/unwatch--failed
  (fn [db [_ err]]
-   (db/set-repo-alerts db [{:type :danger
-                            :message (str "Failed to unwatch repo: " (u/error-msg err))}])))
+   (db/set-repo-alerts db [(a/repo-unwatch-failed err)])))
 
 (rf/reg-event-fx
  :customer/create
@@ -188,23 +182,20 @@
             (db/unmark-customer-creating)
             (db/set-customer body)
             (lo/set-alerts db/customer
-                           [{:type :success
-                             :message [:span "Customer " [:b (:name body)] " has been created."]}]))
+                           [(a/cust-create-success body)]))
     ;; Redirect to customer page
     :dispatch [:route/goto :page/customer {:customer-id (:id body)}]}))
 
 (rf/reg-event-db
  :customer/create--failed
  (fn [db [_ err]]
-   (db/set-create-alerts db [{:type :danger
-                              :message (str "Failed to create customer: " (u/error-msg err))}])))
+   (db/set-create-alerts db [(a/cust-create-failed err)])))
 
 (rf/reg-event-fx
  :customer/load-recent-builds
  (lo/loader-evt-handler
   db/recent-builds
   (fn [_ _ [_ cust-id]]
-    (log/debug "Loading recent builds for" cust-id)
     [:secure-request
      :get-recent-builds
      {:customer-id cust-id}
@@ -219,7 +210,7 @@
 (rf/reg-event-db
  :customer/load-recent-builds--failed
  (fn [db [_ err]]
-   (lo/on-failure db db/recent-builds "Failed to load recent builds: " err)))
+   (lo/on-failure db db/recent-builds a/cust-recent-builds-failed err)))
 
 (rf/reg-event-fx
  :customer/load-stats
@@ -242,7 +233,7 @@
 (rf/reg-event-db
  :customer/load-stats--failed
  (fn [db [_ err]]
-   (lo/on-failure db db/stats "Failed to load statistics: " err)))
+   (lo/on-failure db db/stats a/cust-stats-failed err)))
 
 (rf/reg-event-fx
  :customer/load-credits
@@ -263,7 +254,7 @@
 (rf/reg-event-db
  :customer/load-credits--failed
  (fn [db [_ err]]
-   (lo/on-failure db db/credits "Failed to load credit information: " err)))
+   (lo/on-failure db db/credits a/cust-credits-failed err)))
 
 (rf/reg-event-db
  :customer/handle-event

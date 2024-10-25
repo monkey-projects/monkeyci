@@ -84,7 +84,7 @@
           [:p "Credit consumption for this month."]
           [charts/chart-component :customer/credits]]]]])))
 
-(defn- show-repo [c p r]
+(defn- show-repo [c r]
   (let [repo-path (r/path-for :page/repo {:customer-id (:id c)
                                           :repo-id (:id r)})]
     [:div.card-body.border-top
@@ -98,17 +98,21 @@
        {:href repo-path}
        [co/icon :three-dots-vertical] " Details"]]]))
 
-(defn- show-repo-group [cust [p repos]]
+(defn- repo-group-card [cust title repos]
   (->> repos
        (sort-by :name)
-       (map (partial show-repo cust p))
+       (map (partial show-repo cust))
        (into
         [:div.card.mb-3
          [:div.card-header
-          [:h5.card-header-title [:span.me-2 co/repo-group-icon] (or p "(No value)")]]])))
+          (when title
+            [:h5.card-header-title [:span.me-2 co/repo-group-icon] title])]])))
+
+(defn- show-repo-group [cust [p repos]]
+  (repo-group-card cust (or p "(No value)") repos))
 
 (defn- add-repo-btn [id]
-  [:a.btn.btn-outline-dark
+  [:a.btn.btn-outline-dark.bg-light.link-dark
    {:href (r/path-for :page/add-repo {:customer-id id})
     :title "Link an existing GitHub repository"}
    [:span.me-1 [co/icon :github]] "Follow Repository"])
@@ -166,10 +170,12 @@
 
 (defn- repos-list [cust]
   (let [r (rf/subscribe [:customer/grouped-repos])]
-    (->> @r
-         (sort-by first)
-         (map (partial show-repo-group cust))
-         (into [:<> [repos-action-bar cust]]))))
+    (into [:<> [repos-action-bar cust]]
+          (if (= 1 (count @r))
+            [(repo-group-card cust "All Repositories" (first (vals  @r)))]
+            (->> @r
+                 (sort-by first)
+                 (map (partial show-repo-group cust)))))))
 
 (defn- customer-repos
   "Displays a list of customer repositories, grouped by selected label"
