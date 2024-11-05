@@ -25,6 +25,12 @@
 (def cust-github-repos-failed
   (error-msg "Unable to fetch repositories from Github"))
 
+(def bitbucket-ws-failed
+  (error-msg "Unable to fetch Bitbucket workspaces"))
+
+(def bitbucket-repos-failed
+  (error-msg "Unable to fetch repositories for Bitbucket workspace"))
+
 (def repo-watch-failed
   (error-msg "Failed to watch repo"))
 

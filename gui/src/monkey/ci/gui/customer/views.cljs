@@ -6,7 +6,8 @@
             [monkey.ci.gui.customer.events]
             [monkey.ci.gui.customer.subs]
             [monkey.ci.gui.forms :as f]
-            [monkey.ci.gui.apis.github :as github]
+            [monkey.ci.gui.apis.bitbucket]
+            [monkey.ci.gui.apis.github]
             [monkey.ci.gui.layout :as l]
             [monkey.ci.gui.repo.views :as rv]
             [monkey.ci.gui.routing :as r]
@@ -115,9 +116,17 @@
 (defn- add-github-repo-btn [id]
   (when @(rf/subscribe [:login/github-user?])
     [:a.btn.btn-outline-dark.bg-light.link-dark
-     {:href (r/path-for :page/add-repo {:customer-id id})
+     {:href (r/path-for :page/add-github-repo {:customer-id id})
       :title "Link an existing GitHub repository"}
      [:span.me-1 [co/icon :github]] "Watch Repository"]))
+
+(defn- add-bitbucket-repo-btn [id]
+  (when @(rf/subscribe [:login/bitbucket-user?])
+    [:a.btn.btn-outline-dark.bg-light.link-dark
+     {:href (r/path-for :page/add-bitbucket-repo {:customer-id id})
+      :title "Link an existing Bitbucket repository"}
+     [:img.me-2 {:src "/img/mark-gradient-blue-bitbucket.svg" :height "25px"}]
+     "Watch Repository"]))
 
 (defn- params-btn [id]
   [:a.btn.btn-soft-primary
@@ -128,6 +137,7 @@
 (defn- customer-actions [id]
   [:<>
    [add-github-repo-btn id]
+   [add-bitbucket-repo-btn id]
    [params-btn id]])
 
 (defn- customer-header []
@@ -185,7 +195,7 @@
   (let [c (rf/subscribe [:customer/info])]
     (if (empty? (:repos @c))
       [:p "No repositories configured for this customer.  You can start by"
-       [:a.mx-1 {:href (r/path-for :page/add-repo {:customer-id (:id @c)})} "watching one."]]
+       [:a.mx-1 {:href (r/path-for :page/add-github-repo {:customer-id (:id @c)})} "watching one."]]
       [repos-list @c])))
 
 (defn- recent-builds [id]
@@ -240,22 +250,23 @@
       [co/alerts [:customer/alerts]]
       [customer-details id]])))
 
-(defn- repo-table []
+(defn- ext-repo-actions [{:keys [:monkeyci/watched?] :as repo}]
+  (if watched?
+    [:button.btn.btn-sm.btn-danger
+     {:on-click #(rf/dispatch [:repo/unwatch (:monkeyci/repo repo)])}
+     [:span.me-1.text-nowrap [co/icon :stop-circle-fill]] "Unwatch"]
+    [:button.btn.btn-sm.btn-primary
+     {:on-click #(rf/dispatch [:repo/watch repo])}
+     [:span.me-1.text-nowrap [co/icon :binoculars-fill]] "Watch"]))
+
+(defn- github-repo-table []
   (letfn [(name+url [{:keys [name html-url]}]
             [:a {:href html-url :target "_blank"} name])
           (visibility [{:keys [visibility]}]
             [:span.badge {:class (if (= "public" visibility)
-                                   :text-bg-success
-                                   :text-bg-warning)}
-             visibility])
-          (actions [{:keys [:monkeyci/watched?] :as repo}]
-            (if watched?
-              [:button.btn.btn-sm.btn-danger
-               {:on-click #(rf/dispatch [:repo/unwatch (:monkeyci/repo repo)])}
-               [:span.me-1.text-nowrap [co/icon :stop-circle-fill]] "Unwatch"]
-              [:button.btn.btn-sm.btn-primary
-               {:on-click #(rf/dispatch [:repo/watch repo])}
-               [:span.me-1.text-nowrap [co/icon :binoculars-fill]] "Watch"]))]
+                                   :bg-success
+                                   :bg-warning)}
+             visibility])]
     [t/paged-table
      {:id ::repos
       :items-sub [:customer/github-repos]
@@ -268,32 +279,61 @@
                 {:label "Visibility"
                  :value visibility}
                 {:label "Actions"
-                 :value actions}]}]))
+                 :value ext-repo-actions}]}]))
 
-(defn github-repo-filter []
-  (let [v (rf/subscribe [:customer/github-repo-filter])]
+(defn- bitbucket-repo-table []
+  (letfn [(name+url [{:keys [name links]}]
+            [:a {:href (:html links) :target "_blank"} name])
+          (visibility [{:keys [is-private]}]
+            [:span.badge {:class (if is-private
+                                   :bg-warning
+                                   :bg-success)}
+             (if is-private "private" "public")])]
+    [t/paged-table
+     {:id ::repos
+      :items-sub [:customer/bitbucket-repos]
+      :columns [{:label "Name"
+                 :value name+url}
+                {:label "Workspace"
+                 :value (comp :name :workspace)}
+                {:label "Description"
+                 :value :description}
+                {:label "Visibility"
+                 :value visibility}
+                {:label "Actions"
+                 :value ext-repo-actions}]}]))
+
+(defn ext-repo-filter []
+  (let [v (rf/subscribe [:customer/ext-repo-filter])]
     [:form.row.row-cols-lg-auto.g-2.align-items-center.mb-2
      [:div.col
       [co/filter-input
        {:id :github-repo-name
         :placeholder "Repository name"
         :value @v
-        :on-change (u/form-evt-handler [:customer/github-repo-filter-changed])}]]]))
+        :on-change (u/form-evt-handler [:customer/ext-repo-filter-changed])}]]]))
 
 (defn add-repo-page
-  []
+  [table]
   (let [route (rf/subscribe [:route/current])]
-    (rf/dispatch [:github/load-repos])
     (l/default
      [:<>
       [:h3 "Add Repository to Watch"]
       [co/alerts [:customer/repo-alerts]]
-      [github-repo-filter]
+      [ext-repo-filter]
       [:div.card.mb-2
        [:div.card-body
-        [repo-table]]]
+        [table]]]
       [:a {:href (r/path-for :page/customer (r/path-params @route))}
        [:span.me-1 [co/icon :chevron-left]] "Back to customer"]])))
+
+(defn add-github-repo-page []
+  (rf/dispatch [:github/load-repos])
+  [add-repo-page github-repo-table])
+
+(defn add-bitbucket-repo-page []
+  (rf/dispatch [:bitbucket/load-repos])
+  [add-repo-page bitbucket-repo-table])
 
 (defn page-new
   "New customer page"

@@ -222,6 +222,6 @@
    (db/set-repo-filter db val)))
 
 (rf/reg-event-db
- :customer/github-repo-filter-changed
+ :customer/ext-repo-filter-changed
  (fn [db [_ val]]
-   (db/set-github-repo-filter db val)))
+   (db/set-ext-repo-filter db val)))

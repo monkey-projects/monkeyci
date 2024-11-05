@@ -22,7 +22,8 @@
    :page/customer-new customer/page-new
    :page/customer-join home/page-join
    :page/customer-params params/page
-   :page/add-repo customer/add-repo-page
+   :page/add-github-repo customer/add-github-repo-page
+   :page/add-bitbucket-repo customer/add-bitbucket-repo-page
    :page/repo repo/page
    :page/repo-edit repo/edit
    :page/job job/page})

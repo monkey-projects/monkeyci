@@ -1,6 +1,7 @@
 (ns monkey.ci.gui.test.customer.subs-test
   (:require #?(:cljs [cljs.test :refer-macros [deftest testing is use-fixtures]]
                :clj [clojure.test :refer [deftest testing is use-fixtures]])
+            [monkey.ci.gui.apis.bitbucket :as bb]
             [monkey.ci.gui.apis.github :as github]
             [monkey.ci.gui.customer.db :as db]
             [monkey.ci.gui.customer.subs :as sut]
@@ -84,9 +85,36 @@
       (is (= "test-repo" (-> @r first :monkeyci/repo :id))))
 
     (testing "applies filter"
-      (is (some? (swap! app-db db/set-github-repo-filter "test")))
+      (is (some? (swap! app-db db/set-ext-repo-filter "test")))
       (is (= 1 (count @r)))
-      (is (some? (swap! app-db db/set-github-repo-filter "other")))
+      (is (some? (swap! app-db db/set-ext-repo-filter "other")))
+      (is (empty? @r)))))
+
+(deftest bitbucket-repos
+  (let [r (rf/subscribe [:customer/bitbucket-repos])]
+    (testing "exists"
+      (is (some? r)))
+
+    (testing "returns repos from db"
+      (let [l [{:uuid "test-repo"
+                :name "test repo"}]]
+        (is (map? (reset! app-db (bb/set-repos {} l))))
+        (is (= ["test-repo"] (map :uuid @r)))))
+
+    #_(testing "contains repo info"
+      (is (map? (reset! app-db (-> {}
+                                   (bb/set-repos [{:uuid "bb-repo-id"
+                                                   :name "test repo"
+                                                   :links {:html "http://test-url"}}])
+                                   (db/set-customer {:repos [{:url "ssh@ssh-url"
+                                                              :id "test-repo"
+                                                              :github-id "github-repo-id"}]})))))
+      (is (= "test-repo" (-> @r first :monkeyci/repo :id))))
+
+    (testing "applies filter"
+      (is (some? (swap! app-db db/set-ext-repo-filter "test")))
+      (is (= 1 (count @r)))
+      (is (some? (swap! app-db db/set-ext-repo-filter "other")))
       (is (empty? @r)))))
 
 (deftest repo-alerts
@@ -250,9 +278,9 @@
    "test-filter"
    nil))
 
-(deftest customer-github-repo-filter
+(deftest customer-ext-repo-filter
   (h/verify-sub
-   [:customer/github-repo-filter]
-   #(db/set-github-repo-filter % "test-filter")
+   [:customer/ext-repo-filter]
+   #(db/set-ext-repo-filter % "test-filter")
    "test-filter"
    nil))

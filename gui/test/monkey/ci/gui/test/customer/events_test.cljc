@@ -373,8 +373,8 @@
     (rf/dispatch-sync [:customer/repo-filter-changed "test-filter"])
     (is (= "test-filter" (db/get-repo-filter @app-db)))))
 
-(deftest github-repo-filter-changed
-  (testing "updates github repo filter in db"
-    (is (nil? (db/get-github-repo-filter @app-db)))
-    (rf/dispatch-sync [:customer/github-repo-filter-changed "test-filter"])
-    (is (= "test-filter" (db/get-github-repo-filter @app-db)))))
+(deftest ext-repo-filter-changed
+  (testing "updates ext repo filter in db"
+    (is (nil? (db/get-ext-repo-filter @app-db)))
+    (rf/dispatch-sync [:customer/ext-repo-filter-changed "test-filter"])
+    (is (= "test-filter" (db/get-ext-repo-filter @app-db)))))

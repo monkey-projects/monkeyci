@@ -59,7 +59,8 @@
                :name :page/customer-new}]
     ["/c/:customer-id" {:conflicting true
                         :name :page/customer}]
-    ["/c/:customer-id/add-repo" :page/add-repo]
+    ["/c/:customer-id/add-repo/github" :page/add-github-repo]
+    ["/c/:customer-id/add-repo/bitbucket" :page/add-bitbucket-repo]
     ["/c/:customer-id/params" :page/customer-params]
     ["/c/:customer-id/r/:repo-id" :page/repo]
     ["/c/:customer-id/r/:repo-id/edit" :page/repo-edit]

@@ -77,10 +77,10 @@
 (defn set-repo-filter [db f]
   (assoc db repo-filter f))
 
-(def github-repo-filter ::repo-filter)
+(def ext-repo-filter ::repo-filter)
 
-(defn get-github-repo-filter [db]
-  (get db github-repo-filter))
+(defn get-ext-repo-filter [db]
+  (get db ext-repo-filter))
 
-(defn set-github-repo-filter [db f]
-  (assoc db github-repo-filter f))
+(defn set-ext-repo-filter [db f]
+  (assoc db ext-repo-filter f))
