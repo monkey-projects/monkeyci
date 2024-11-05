@@ -2,6 +2,7 @@
   (:require [medley.core :as mc]
             [monkey.ci.gui.alerts :as a]
             [monkey.ci.gui.apis.github :as github]
+            [monkey.ci.gui.home.db :as hdb]
             [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.martian]
             [monkey.ci.gui.customer.db :as db]
@@ -188,6 +189,7 @@
    {:db (-> db
             (db/unmark-customer-creating)
             (db/set-customer body)
+            (hdb/set-customers (conj (vec (hdb/get-customers db)) body))
             (lo/set-alerts db/customer
                            [(a/cust-create-success body)]))
     ;; Redirect to customer page

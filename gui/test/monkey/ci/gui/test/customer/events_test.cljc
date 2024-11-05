@@ -4,6 +4,7 @@
             [day8.re-frame.test :as rf-test]
             [monkey.ci.gui.customer.db :as db]
             [monkey.ci.gui.customer.events :as sut]
+            [monkey.ci.gui.home.db :as hdb]
             [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.login.db :as ldb]
             [monkey.ci.gui.login.events]
@@ -274,10 +275,15 @@
     (rf/dispatch-sync [:customer/create--success {:body {:id "test-cust"}}])
     (is (not (db/customer-creating? @app-db))))
 
-  (testing "sets customer in db"
-    (let [cust {:id "test-cust"}]
-      (rf/dispatch-sync [:customer/create--success {:body cust}])
-      (is (= cust (lo/get-value @app-db db/customer)))))
+  (let [cust {:id "test-cust"}]
+    (is (empty? (reset! app-db {})))
+    (rf/dispatch-sync [:customer/create--success {:body cust}])
+
+    (testing "sets customer in db"
+      (is (= cust (lo/get-value @app-db db/customer))))
+
+    (testing "adds to user customers"
+      (is (= [cust] (hdb/get-customers @app-db)))))
 
   (testing "redirects to customer page"
     (rf-test/run-test-sync
