@@ -4,7 +4,7 @@
   <packaging>jar</packaging>
   <groupId>com.monkeyci</groupId>
   <artifactId>app</artifactId>
-  <version>0.9.2-SNAPSHOT</version>
+  <version>0.9.3-SNAPSHOT</version>
   <name>app</name>
   <repositories>
     <repository>
@@ -170,7 +170,7 @@
     <dependency>
       <groupId>com.monkeyprojects</groupId>
       <artifactId>clompress</artifactId>
-      <version>0.1.1</version>
+      <version>0.1.2-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>clj-commons</groupId>

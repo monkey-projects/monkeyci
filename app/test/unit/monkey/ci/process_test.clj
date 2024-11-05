@@ -14,7 +14,8 @@
              [protocols :as p]
              [script :as script]
              [sid :as sid]
-             [utils :as u]]
+             [utils :as u]
+             [version :as v]]
             [monkey.ci.build.core :as bc]
             [monkey.ci.config.script :as cos]
             [monkey.ci.spec
@@ -180,7 +181,26 @@
                             :paths))))
 
   (testing "specifies m2 cache location"
-    (is (some? (:mvn/local-repo (sut/generate-deps {} {}))))))
+    (is (some? (:mvn/local-repo (sut/generate-deps {} {})))))
+
+  (testing "uses default version"
+    (is (= (v/version)
+           (-> (sut/generate-deps {} {})
+               :aliases
+               :monkeyci/build
+               :extra-deps
+               (get 'com.monkeyci/app)
+               :mvn/version))))
+
+  (testing "uses binding version if specified"
+    (v/with-version "test-version"
+      (is (= "test-version"
+             (-> (sut/generate-deps {} {})
+                 :aliases
+                 :monkeyci/build
+                 :extra-deps
+                 (get 'com.monkeyci/app)
+                 :mvn/version))))))
 
 (deftest child-config
   (testing "satisfies spec"

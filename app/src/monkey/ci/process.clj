@@ -96,7 +96,7 @@
   (let [version-or (fn [f]
                      (if (rt/dev-mode? rt)
                        {:local/root (f)}
-                       {:mvn/version (v/version)}))
+                       {:mvn/version (or v/*version* (v/version))}))
         log-config (find-log-config build rt)]
     (log/debug "Child process log config:" log-config)
     {:paths [(b/script-dir build)]
@@ -136,10 +136,19 @@
   [build]
   (str (cs/join "/" (take 2 (b/sid build))) blob/extension))
 
+(defn- check! []
+  (try
+    (log/debug "Performing check")
+    (when (Class/forName "org.apache.commons.io.IOUtils")
+      (log/debug "Check succeeded"))
+    (catch Throwable t
+      (log/warn "Check failed" t))))
+
 (defn- restore-cache!
   "Restores the m2 cache for the specified repo.  This speeds up the child process, because
    it reduces the number of dependencies it needs to download (likely to zero)."
   [build {:keys [build-cache]}]
+  (check!)
   (when build-cache
     (log/debug "Restoring build cache for build" (b/sid build))
     ;; Restore to parent because the dir is in the archive
@@ -151,18 +160,12 @@
   (when build-cache
     (log/debug "Saving build cache for build" (b/sid build))
     (try
+      ;; This check, which looks up the IOUtils class, works.
+      (check!)
+      ;; FIXME Gives class not found on IOUtils while trying to copy the first file into the archive
+      ;; Works fine locally, it only fails when running in an OCI container instance.  Cause as yet
+      ;; unknown.
       @(blob/save build-cache m2-cache-dir (repo-cache-location build))
-      ;; This results in class not found error?
-      #_(retry/retry
-       #(try
-          @(blob/save build-cache m2-cache-dir (repo-cache-location build))
-          true
-          (catch Exception ex
-            (log/error "Unable to save cache" ex)
-            nil))
-       {:max-retries 5
-        :retry-if nil?
-        :backoff (retry/constant-delay 3000)})
       (catch Throwable ex
         (log/error "Failed to save build cache" ex)))))
 

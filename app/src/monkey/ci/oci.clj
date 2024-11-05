@@ -31,7 +31,7 @@
    arch-amd
    {:shape "CI.Standard.E4.Flex"
     :credits 2}})
-(def default-arch arch-arm)
+(def default-arch arch-arm)  ; Use ARM shape, it's cheaper
 
 (defn invocation-interceptor
   "A Martian interceptor that dispatches telemere events for each invocation.  Useful
@@ -152,7 +152,6 @@
    errors from OCI."
   [client instance-config & [{:keys [delete? exited?] :as opts}]]
   (log/debug "Running OCI instance with config:" instance-config)
-  ;; TODO Add auto-retry on 429 errors ("too many requests")
   (letfn [(check-error [handler]
             (fn [{:keys [body status] :as r}]
               (if status
@@ -238,7 +237,7 @@
   (-> conf
       (select-keys [:compartment-id :image-pull-secrets :vnics :freeform-tags])
       (assoc :container-restart-policy "NEVER"
-             :shape (get-in arch-shapes [default-arch :shape]) ; Use ARM shape, it's cheaper
+             :shape (get-in arch-shapes [default-arch :shape])
              :shape-config {:ocpus default-cpu-count
                             :memory-in-g-bs default-memory-gb}
              :availability-domain (pick-ad conf)

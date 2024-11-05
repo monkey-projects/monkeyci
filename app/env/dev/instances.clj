@@ -13,6 +13,7 @@
              [utils :as u]]
             [monkey.ci.containers.oci :as oci-cont]
             [monkey.ci.runners.oci :as ro]
+            [monkey.ci.runtime.app :as ra]
             [monkey.oci.container-instance.core :as ci]
             [manifold
              [deferred :as md]
@@ -202,11 +203,16 @@
 (defn run-build
   "Runs a build given the specified GIT url and branch name, using the current config."
   [url branch]
-  (let [conf @co/global-config]
-    (rt/with-runtime conf :server rt
-      (let [runner (:runner rt)
-            build {:build-id (str "test-build-" (u/now))
-                   :git {:url url
-                         :branch branch
-                         :sid (co/account->sid)}}]
-        (runner (assoc rt :build build))))))
+  (let [[cust-id repo-id :as sid] (co/account->sid)]
+    (md/future
+      (-> @co/global-config
+          (assoc :build {:build-id (str "test-build-" (u/now))
+                         :repo-id repo-id
+                         :customer-id cust-id
+                         :sid sid
+                         :git {:url url
+                               :branch branch}})
+          (ra/with-runner-system
+            (fn [{:keys [runner build]}]
+              (log/info "Running test build:" build)
+              (runner)))))))
