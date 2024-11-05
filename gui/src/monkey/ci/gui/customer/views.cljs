@@ -6,6 +6,7 @@
             [monkey.ci.gui.customer.events]
             [monkey.ci.gui.customer.subs]
             [monkey.ci.gui.forms :as f]
+            [monkey.ci.gui.apis.github :as github]
             [monkey.ci.gui.layout :as l]
             [monkey.ci.gui.repo.views :as rv]
             [monkey.ci.gui.routing :as r]
@@ -282,7 +283,7 @@
 (defn add-repo-page
   []
   (let [route (rf/subscribe [:route/current])]
-    (rf/dispatch [:customer/load-github-repos])
+    (rf/dispatch [:github/load-repos])
     (l/default
      [:<>
       [:h3 "Add Repository to Watch"]

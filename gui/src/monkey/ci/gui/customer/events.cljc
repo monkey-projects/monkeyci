@@ -1,7 +1,6 @@
 (ns monkey.ci.gui.customer.events
   (:require [medley.core :as mc]
             [monkey.ci.gui.alerts :as a]
-            [monkey.ci.gui.apis.github :as github]
             [monkey.ci.gui.home.db :as hdb]
             [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.martian]
@@ -56,75 +55,6 @@
  :customer/load--failed
  (fn [db [_ id err]]
    (lo/on-failure db db/customer (a/cust-details-failed id) err)))
-
-(rf/reg-event-fx
- :customer/load-github-repos
- (fn [{:keys [db]} _]
-   {:db (-> db
-            (db/set-github-repos nil)
-            (db/set-repo-alerts [(a/cust-fetch-github-repos)]))
-    :dispatch-n [[::load-user-repos]
-                 [::load-orgs]]}))
-
-(rf/reg-event-fx
- ::load-user-repos
- (fn [_ _]
-   ;; Turns out that this url gives different results than the one in :repos-url
-   {:dispatch [::load-repos (github/api-url "/user/repos")]}))
-
-(rf/reg-event-fx
- ::load-repos
- (fn [{:keys [db]} [_ url]]
-   {:http-xhrio (github/api-request
-                 db
-                 {:method :get
-                  :uri url
-                  :params {:type "all"
-                           :per_page 50}
-                  :on-success [:customer/load-github-repos--success]
-                  :on-failure [:customer/load-github-repos--failed]})}))
-
-(rf/reg-event-fx
- ::load-orgs
- (fn [{:keys [db]} _]
-   (let [u (ldb/github-user db)]
-     {:http-xhrio (github/api-request
-                   db
-                   {:method :get
-                    :uri (:organizations-url u)
-                    :on-success [::load-orgs--success]
-                    :on-failure [::load-orgs--failed]})})))
-
-(rf/reg-event-fx
- ::load-orgs--success
- (fn [{:keys [db]} [_ orgs]]
-   {:dispatch-n (map (comp (partial conj [::load-repos])
-                           :repos-url)
-                     orgs)}))
-
-(rf/reg-event-fx
- ::load-orgs--failed
- (u/req-error-handler-db
-  (fn [db [_ err]]
-    (db/set-repo-alerts db
-                        [(a/cust-user-orgs-failed err)]))))
-
-(rf/reg-event-db
- :customer/load-github-repos--success
- (fn [db [_ new-repos]]
-   (let [orig (db/github-repos db)
-         all (vec (concat orig new-repos))]
-     (-> db
-         ;; Add to existing repos since we're doing multiple calls
-         (db/set-github-repos all)
-         (db/set-repo-alerts [(a/cust-github-repos-success (count all))])))))
-
-(rf/reg-event-fx
- :customer/load-github-repos--failed
- (u/req-error-handler-db
-  (fn [db [_ err]]
-    (db/set-repo-alerts db
-                        [(a/cust-github-repos-failed err)]))))
 
 (rf/reg-event-fx
  :repo/watch

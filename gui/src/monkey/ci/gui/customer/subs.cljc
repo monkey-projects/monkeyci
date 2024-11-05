@@ -1,12 +1,11 @@
 (ns monkey.ci.gui.customer.subs
   (:require [clojure.string :as cs]
+            [monkey.ci.gui.apis.github]
             [monkey.ci.gui.customer.db :as db]
             [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
-(u/db-sub :customer/repo-alerts db/repo-alerts)
-(u/db-sub ::github-repos db/github-repos)
 (u/db-sub :customer/create-alerts db/create-alerts)
 (u/db-sub :customer/creating? db/customer-creating?)
 (u/db-sub :customer/group-by-lbl db/get-group-by-lbl)
@@ -37,7 +36,7 @@
 (rf/reg-sub
  :customer/github-repos
  :<- [:customer/repos]
- :<- [::github-repos]
+ :<- [:github/repos]
  :<- [:customer/github-repo-filter]
  (fn [[cr gr f] _]
    (letfn [(watched-repo [r]
@@ -127,3 +126,12 @@
      (->> repos
           (filter matches-filter?)
           (group-by (lbl-value lbl))))))
+
+(u/db-sub ::repo-alerts db/repo-alerts)
+
+(rf/reg-sub
+ :customer/repo-alerts
+ :<- [::repo-alerts]
+ :<- [:github/alerts]
+ (fn [[ra ga] _]
+   (concat ra ga)))

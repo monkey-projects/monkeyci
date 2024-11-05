@@ -37,11 +37,6 @@
 (defn reset-repo-alerts [db]
   (dissoc db repo-alerts))
 
-(def github-repos ::github-repos)
-
-(defn set-github-repos [db r]
-  (assoc db github-repos r))
-
 (def customer-creating? ::customer-creating)
 
 (defn mark-customer-creating [db]

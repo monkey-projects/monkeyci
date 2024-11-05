@@ -1,6 +1,7 @@
 (ns monkey.ci.gui.test.customer.subs-test
   (:require #?(:cljs [cljs.test :refer-macros [deftest testing is use-fixtures]]
                :clj [clojure.test :refer [deftest testing is use-fixtures]])
+            [monkey.ci.gui.apis.github :as github]
             [monkey.ci.gui.customer.db :as db]
             [monkey.ci.gui.customer.subs :as sut]
             [monkey.ci.gui.loader :as lo]
@@ -44,17 +45,6 @@
       (is (map? (reset! app-db (lo/set-loading {} db/customer))))
       (is (true? @l)))))
 
-(deftest repo-alerts
-  (let [s (rf/subscribe [:customer/repo-alerts])]
-    (testing "exists"
-      (is (some? s)))
-
-    (testing "returns alerts from db"
-      (let [a [{:type :info
-                :message "Test alert"}]]
-        (is (map? (reset! app-db (db/set-repo-alerts {} a))))
-        (is (= a @s))))))
-
 (deftest github-repos
   (let [r (rf/subscribe [:customer/github-repos])]
     (testing "exists"
@@ -62,13 +52,13 @@
 
     (testing "returns repos from db"
       (let [l [{:id "test-repo"}]]
-        (is (map? (reset! app-db (db/set-github-repos {} l))))
+        (is (map? (reset! app-db (github/set-repos {} l))))
         (is (= ["test-repo"] (map :id @r)))))
 
     (testing "marks watched repo"
-      (is (map? (reset! app-db (db/set-github-repos {} [{:id "github-repo-id"
-                                                         :ssh-url "ssh@ssh-url"
-                                                         :clone-url "https://clone-url"}]))))
+      (is (map? (reset! app-db (github/set-repos {} [{:id "github-repo-id"
+                                                      :ssh-url "ssh@ssh-url"
+                                                      :clone-url "https://clone-url"}]))))
 
       (testing "by github id"
         (is (map? (swap! app-db db/set-customer {:repos [{:github-id "github-repo-id"}]})))
@@ -84,10 +74,10 @@
 
     (testing "contains repo info"
       (is (map? (reset! app-db (-> {}
-                                   (db/set-github-repos [{:id "github-repo-id"
-                                                          :name "test repo"
-                                                          :ssh-url "ssh@ssh-url"
-                                                          :clone-url "https://clone-url"}])
+                                   (github/set-repos [{:id "github-repo-id"
+                                                       :name "test repo"
+                                                       :ssh-url "ssh@ssh-url"
+                                                       :clone-url "https://clone-url"}])
                                    (db/set-customer {:repos [{:url "ssh@ssh-url"
                                                               :id "test-repo"
                                                               :github-id "github-repo-id"}]})))))
@@ -98,6 +88,22 @@
       (is (= 1 (count @r)))
       (is (some? (swap! app-db db/set-github-repo-filter "other")))
       (is (empty? @r)))))
+
+(deftest repo-alerts
+  (let [a (rf/subscribe [:customer/repo-alerts])]
+    (testing "exists"
+      (is (some? a)))
+
+    (let [alert {:type :info :message "test alert"}]
+      (testing "returns db alerts"
+        (is (empty? @a))
+        (is (some? (reset! app-db (db/set-repo-alerts {} [alert]))))
+        (is (= [alert] @a)))
+
+      (testing "contains github repo alerts"
+        (let [gh-alert {:type :danger :message "test error"}]
+          (is (some? (swap! app-db github/set-alerts [gh-alert])))
+          (is (= [alert gh-alert] @a)))))))
 
 (deftest create-alerts
   (let [s (rf/subscribe [:customer/create-alerts])]
