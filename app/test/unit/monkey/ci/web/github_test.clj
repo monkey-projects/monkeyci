@@ -378,7 +378,9 @@
                         :body
                         :token)]
           (is (string? token))
-          (is (map? (jwt/unsign token (.getPublic kp) {:alg :rs256})))))))
+          (let [u (jwt/unsign token (.getPublic kp) {:alg :rs256})]
+            (is (map? u))
+            (is (re-matches #"^github/.*" (:sub u))))))))
 
   (testing "finds existing github user in storage"
     (with-github-user

@@ -17,10 +17,13 @@
   (alert-msg :info (constantly "Fetching repositories from Github...")))
 
 (def cust-user-orgs-failed
-  (error-msg "Unable to fetch user orgs from Github"))
+  (error-msg "Unable to fetch user organizations from Github"))
 
 (def cust-github-repos-success
   (alert-msg :success #(str "Found " % " repositories in Github.")))
+
+(def cust-github-repos-failed
+  (error-msg "Unable to fetch repositories from Github"))
 
 (def repo-watch-failed
   (error-msg "Failed to watch repo"))

@@ -148,6 +148,13 @@
         (is (= 1 (count a)))
         (is (= :success (-> a first :type))))))
 
+(deftest customer-load-github-repos--failed
+  (testing "sets error alert"
+    (rf/dispatch-sync [:customer/load-github-repos--failed {:message "test error"}])
+      (let [a (db/repo-alerts @app-db)]
+        (is (= 1 (count a)))
+        (is (= :danger (-> a first :type))))))
+
 (deftest load-orgs
   (testing "invokes orgs url from github user"
     (let [e (h/catch-fx :http-xhrio)]

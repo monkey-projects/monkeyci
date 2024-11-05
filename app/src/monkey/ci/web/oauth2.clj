@@ -9,7 +9,7 @@
 (defn- generate-jwt [req user]
   ;; Perhaps we should use the internal user id instead?
   ;; TODO Add user permissions
-  (auth/generate-jwt req (auth/user-token ["github" (:type-id user)])))
+  (auth/generate-jwt req (auth/user-token [(name (:type user)) (:type-id user)])))
 
 (defn- add-jwt [user req]
   (assoc user :token (generate-jwt req user)))

@@ -111,11 +111,12 @@
 (defn- show-repo-group [cust [p repos]]
   (repo-group-card cust (or p "(No value)") repos))
 
-(defn- add-repo-btn [id]
-  [:a.btn.btn-outline-dark.bg-light.link-dark
-   {:href (r/path-for :page/add-repo {:customer-id id})
-    :title "Link an existing GitHub repository"}
-   [:span.me-1 [co/icon :github]] "Follow Repository"])
+(defn- add-github-repo-btn [id]
+  (when @(rf/subscribe [:login/github-user?])
+    [:a.btn.btn-outline-dark.bg-light.link-dark
+     {:href (r/path-for :page/add-repo {:customer-id id})
+      :title "Link an existing GitHub repository"}
+     [:span.me-1 [co/icon :github]] "Watch Repository"]))
 
 (defn- params-btn [id]
   [:a.btn.btn-soft-primary
@@ -125,7 +126,7 @@
 
 (defn- customer-actions [id]
   [:<>
-   [add-repo-btn id]
+   [add-github-repo-btn id]
    [params-btn id]])
 
 (defn- customer-header []
@@ -183,7 +184,7 @@
   (let [c (rf/subscribe [:customer/info])]
     (if (empty? (:repos @c))
       [:p "No repositories configured for this customer.  You can start by"
-       [:a.mx-1 {:href (r/path-for :page/add-repo {:customer-id (:id @c)})} "following one."]]
+       [:a.mx-1 {:href (r/path-for :page/add-repo {:customer-id (:id @c)})} "watching one."]]
       [repos-list @c])))
 
 (defn- recent-builds [id]

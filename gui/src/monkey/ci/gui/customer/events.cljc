@@ -119,6 +119,13 @@
          (db/set-repo-alerts [(a/cust-github-repos-success (count all))])))))
 
 (rf/reg-event-fx
+ :customer/load-github-repos--failed
+ (u/req-error-handler-db
+  (fn [db [_ err]]
+    (db/set-repo-alerts db
+                        [(a/cust-github-repos-failed err)]))))
+
+(rf/reg-event-fx
  :repo/watch
  (fn [{:keys [db]} [_ repo]]
    (log/debug "Watching repo:" repo)

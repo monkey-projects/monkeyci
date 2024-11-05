@@ -28,3 +28,15 @@
    (-> (db/user db)
        (add-github-user db)
        (add-bitbucket-user db))))
+
+(rf/reg-sub
+ :login/github-user?
+ :<- [:login/user]
+ (fn [u _]
+   (some? (:github u))))
+
+(rf/reg-sub
+ :login/bitbucket-user?
+ :<- [:login/user]
+ (fn [u _]
+   (some? (:bitbucket u))))
