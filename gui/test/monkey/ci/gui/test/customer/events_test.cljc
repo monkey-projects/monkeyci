@@ -4,6 +4,7 @@
             [day8.re-frame.test :as rf-test]
             [monkey.ci.gui.customer.db :as db]
             [monkey.ci.gui.customer.events :as sut]
+            [monkey.ci.gui.home.db :as hdb]
             [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.login.db :as ldb]
             [monkey.ci.gui.login.events]
@@ -118,62 +119,6 @@
     (rf/dispatch-sync [:customer/load--failed "test-id" "test-customer"])
     (is (not (lo/loading? @app-db db/customer)))))
 
-(deftest customer-load-github-repos
-  (testing "invokes repos and orgs url from github user"
-    (let [e (h/catch-fx :http-xhrio)]
-      (rf-test/run-test-sync
-       (is (some? (reset! app-db (ldb/set-github-user {} {:organizations-url "http://test-orgs"}))))
-       (rf/dispatch [:customer/load-github-repos])
-       (is (= 2 (count @e)))
-       (is (= #{"https://api.github.com/user/repos" "http://test-orgs"}
-              (set (map :uri @e)))))))
-
-  (testing "sets info alert"
-    (let [_ (h/catch-fx :http-xhrio)]
-      (rf-test/run-test-sync
-       (is (some? (reset! app-db (ldb/set-github-user {} {:repos-url "http://test-repos"}))))
-       (rf/dispatch [:customer/load-github-repos])
-       (let [a (db/repo-alerts @app-db)]
-         (is (= 1 (count a)))
-         (is (= :info (-> a first :type))))))))
-
-(deftest customer-load-github-repos--success
-  (testing "sets repos in db"
-    (rf/dispatch-sync [:customer/load-github-repos--success [{:id "test-repo"}]])
-    (is (= 1 (count (db/github-repos @app-db)))))
-
-  (testing "sets success alert"
-    (rf/dispatch-sync [:customer/load-github-repos--success [{:id "test-repo"}]])
-      (let [a (db/repo-alerts @app-db)]
-        (is (= 1 (count a)))
-        (is (= :success (-> a first :type))))))
-
-(deftest load-orgs
-  (testing "invokes orgs url from github user"
-    (let [e (h/catch-fx :http-xhrio)]
-      (is (some? (reset! app-db (ldb/set-github-user {} {:organizations-url "http://test-orgs"}))))
-      (rf/dispatch-sync [::sut/load-orgs])
-      (is (= 1 (count @e)))
-      (is (= "http://test-orgs" (-> @e first :uri))))))
-
-(deftest load-orgs--success
-  (testing "fetches repos for each org"
-    (let [e (h/catch-fx :http-xhrio)]
-      (rf-test/run-test-sync
-       (rf/dispatch [::sut/load-orgs--success [{:repos-url "http://test-repos/org-1"}
-                                               {:repos-url "http://test-repos/org-2"}]])
-       (is (= 2 (count @e)))
-       (is (= ["http://test-repos/org-1"
-               "http://test-repos/org-2"]
-              (map :uri @e)))))))
-
-(deftest load-orgs--failed
-  (testing "redirect to login on 401 error"
-    (rf-test/run-test-sync
-     (let [e (h/catch-fx :route/goto)]
-       (rf/dispatch [::sut/load-orgs--failed {:status 401}])
-       (is (= ["/login"] @e))))))
-
 (deftest repo-watch
   (testing "invokes repo github watch endpoint"
     (rf-test/run-test-sync
@@ -267,10 +212,15 @@
     (rf/dispatch-sync [:customer/create--success {:body {:id "test-cust"}}])
     (is (not (db/customer-creating? @app-db))))
 
-  (testing "sets customer in db"
-    (let [cust {:id "test-cust"}]
-      (rf/dispatch-sync [:customer/create--success {:body cust}])
-      (is (= cust (lo/get-value @app-db db/customer)))))
+  (let [cust {:id "test-cust"}]
+    (is (empty? (reset! app-db {})))
+    (rf/dispatch-sync [:customer/create--success {:body cust}])
+
+    (testing "sets customer in db"
+      (is (= cust (lo/get-value @app-db db/customer))))
+
+    (testing "adds to user customers"
+      (is (= [cust] (hdb/get-customers @app-db)))))
 
   (testing "redirects to customer page"
     (rf-test/run-test-sync
@@ -423,8 +373,8 @@
     (rf/dispatch-sync [:customer/repo-filter-changed "test-filter"])
     (is (= "test-filter" (db/get-repo-filter @app-db)))))
 
-(deftest github-repo-filter-changed
-  (testing "updates github repo filter in db"
-    (is (nil? (db/get-github-repo-filter @app-db)))
-    (rf/dispatch-sync [:customer/github-repo-filter-changed "test-filter"])
-    (is (= "test-filter" (db/get-github-repo-filter @app-db)))))
+(deftest ext-repo-filter-changed
+  (testing "updates ext repo filter in db"
+    (is (nil? (db/get-ext-repo-filter @app-db)))
+    (rf/dispatch-sync [:customer/ext-repo-filter-changed "test-filter"])
+    (is (= "test-filter" (db/get-ext-repo-filter @app-db)))))

@@ -1,17 +1,17 @@
 (ns monkey.ci.gui.customer.subs
   (:require [clojure.string :as cs]
+            [monkey.ci.gui.apis.bitbucket]
+            [monkey.ci.gui.apis.github]
             [monkey.ci.gui.customer.db :as db]
             [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
-(u/db-sub :customer/repo-alerts db/repo-alerts)
-(u/db-sub ::github-repos db/github-repos)
 (u/db-sub :customer/create-alerts db/create-alerts)
 (u/db-sub :customer/creating? db/customer-creating?)
 (u/db-sub :customer/group-by-lbl db/get-group-by-lbl)
 (u/db-sub :customer/repo-filter db/get-repo-filter)
-(u/db-sub :customer/github-repo-filter db/get-github-repo-filter)
+(u/db-sub :customer/ext-repo-filter db/get-ext-repo-filter)
 
 (rf/reg-sub
  :customer/info
@@ -37,8 +37,8 @@
 (rf/reg-sub
  :customer/github-repos
  :<- [:customer/repos]
- :<- [::github-repos]
- :<- [:customer/github-repo-filter]
+ :<- [:github/repos]
+ :<- [:customer/ext-repo-filter]
  (fn [[cr gr f] _]
    (letfn [(watched-repo [r]
              (->> cr
@@ -57,6 +57,18 @@
                    (assoc r
                           :monkeyci/watched? (some? w)
                           :monkeyci/repo w))))
+          (filter matches-filter?)
+          (sort-by :name)))))
+
+(rf/reg-sub
+ :customer/bitbucket-repos
+ :<- [:bitbucket/repos]
+ :<- [:customer/ext-repo-filter]
+ (fn [[r ef] _]
+   (letfn [(matches-filter? [{:keys [name]}]
+             (or (nil? ef) (cs/includes? (cs/lower-case name) (cs/lower-case ef))))]
+     ;; TODO Watching
+     (->> r
           (filter matches-filter?)
           (sort-by :name)))))
 
@@ -127,3 +139,12 @@
      (->> repos
           (filter matches-filter?)
           (group-by (lbl-value lbl))))))
+
+(u/db-sub ::repo-alerts db/repo-alerts)
+
+(rf/reg-sub
+ :customer/repo-alerts
+ :<- [::repo-alerts]
+ :<- [:github/alerts]
+ (fn [[ra ga] _]
+   (concat ra ga)))

@@ -23,37 +23,6 @@
 
 (def repo-id c/gen-repo-display-id)
 
-(defn- repo->out [r]
-  (dissoc r :customer-id))
-
-(defn- repos->out
-  "Converts the project repos into output format"
-  [p]
-  (some-> p
-          (mc/update-existing :repos (comp (partial map repo->out) vals))))
-
-(c/make-entity-endpoints "customer"
-                         {:get-id (c/id-getter :customer-id)
-                          :getter (comp repos->out st/find-customer)
-                          :saver st/save-customer})
-
-(defn create-customer [req]
-  (let [creator (c/entity-creator st/save-customer c/default-id)
-        user? (every-pred :type)]
-    (when-let [reply (creator req)]
-      (let [user (:identity req)]
-        ;; When a user is creating the customer, link them up
-        (when (user? user)
-          (st/save-user (c/req->storage req) (update user :customers conj (get-in reply [:body :id]))))
-        reply))))
-
-(defn search-customers [req]
-  (let [f (get-in req [:parameters :query])]
-    (if (empty? f)
-      (-> (rur/response {:message "Query must be specified"})
-          (rur/status 400))
-      (rur/response (st/search-customers (c/req->storage req) f)))))
-
 (c/make-entity-endpoints "repo"
                          ;; The repo is part of the customer, so combine the ids
                          {:get-id (c/id-getter (juxt :customer-id :repo-id))

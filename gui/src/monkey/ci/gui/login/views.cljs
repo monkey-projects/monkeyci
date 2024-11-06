@@ -71,7 +71,7 @@
       [l/default
        [c/render-alert {:type :danger
                         :message [:<>
-                                  [:h4 "Unable to Authenticate"]
+                                  [:h4.text-white "Unable to Authenticate"]
                                   [:p (or (:error_description q) q)]]}]])))
 
 (defn github-callback [req]

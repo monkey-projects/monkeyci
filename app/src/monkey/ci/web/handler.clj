@@ -299,10 +299,10 @@
   ["/customer"
    {:middleware [:customer-check]}
    (generic-routes
-    {:creator api/create-customer
-     :updater api/update-customer
-     :getter  api/get-customer
-     :searcher api/search-customers
+    {:creator cust-api/create-customer
+     :updater cust-api/update-customer
+     :getter  cust-api/get-customer
+     :searcher cust-api/search-customers
      :new-schema NewCustomer
      :update-schema UpdateCustomer
      :search-schema SearchCustomer

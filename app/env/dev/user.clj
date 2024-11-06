@@ -21,7 +21,7 @@
   (c/reset-config!)
   (c/load-config! "local.edn")
   (c/load-config! "github/staging.edn")
-  (c/load-config! "bitbucket/staging.edn")
+  (c/load-config! "bitbucket/dev.edn")
   (server/start-server))
 
 (defn refresh []

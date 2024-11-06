@@ -6,7 +6,9 @@
             [config :as co]
             [medley.core :as mc]
             [monkey.ci.logging :as l]
-            [monkey.oci.os.core :as os]))
+            [monkey.oci.os.core :as os])
+  (:import ch.qos.logback.classic.joran.JoranConfigurator
+           org.slf4j.LoggerFactory))
 
 (defn test-stream-to-bucket []
   (let [c (co/load-config "oci-config.edn")
@@ -41,3 +43,12 @@
 (defn move-log [from to]
   @(call-os os/rename-object {:rename {:source-name from
                                        :new-name to}}))
+
+(defn use-logback-config
+  "Reconfigures logback to use config from given file"
+  [f]
+  (let [ctx (LoggerFactory/getILoggerFactory)
+        conf (JoranConfigurator.)]
+    (.setContext conf ctx)
+    (.reset ctx)
+    (.doConfigure conf f)))

@@ -37,7 +37,7 @@
   (letfn [(footer-link [[lbl url]]
             [:li [:a.link-sm.link-light {:href url} lbl]])]
     [:div.col-sm.mb-7.mb-sm-0
-     [:span.text-cap.text-primary-light "Resources"]
+     [:span.text-cap.text-primary-light header]
      (->> links
           (map footer-link)
           (into [:ul.list-unstyled.list-py-1.mb-0]))]))

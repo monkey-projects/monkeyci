@@ -48,21 +48,24 @@
     (when @c
       [:<>
        [:h3 [:span.me-2 co/overview-icon] "Your Linked Customers"]
-       [:p "This screen shows all customers linked to your user account."]
+       [:p "Welcome! This screen shows all customers linked to your user account."]
        (if (empty? @c)
          [:<>
-          [:p "No customers have been linked to your account.  You could either "
+          [:p "No customers have been linked to your account yet.  You could either "
            [:a {:href (r/path-for :page/customer-new)} "create a new one"]
            " or "
            [:a {:href (r/path-for :page/customer-join)} "request to join an existing one"] "."]
-          [:div
+          [:div.mb-2
            [:span.me-2 [create-cust-btn]]
            [join-cust-btn]]
           [:p
-           "You can create one customer per user account.  Creating a customer is free, a "
-           "credit card is not required.  Each customer gets " free-credits " free credits per month. "
+           "You can create one customer per user account." [:b.mx-1 "Creating a customer is free,"]
+           "a credit card is not required.  Each customer gets" [:b.mx-1 free-credits " free credits"]
+           "per month. "
            "One credit can be spent on one cpu minute, or one memory GB per minute. "
-           "You can join an unlimited number of customers."]]
+           "You can join an unlimited number of customers.  See more details in "
+           ;; TODO Make docs url configurable per env
+           [:a {:href "https://docs.monkeyci.com" :target :_blank} "the documentation."]]]
          [linked-customers @c])])))
 
 (defn user-home [u]

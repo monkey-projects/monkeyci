@@ -6,7 +6,120 @@
              [helpers :as h]
              [storage :as st]
              [utils :as u]]
-            [monkey.ci.web.api.customer :as sut]))
+            [monkey.ci.web.api.customer :as sut]
+            [monkey.ci.test.runtime :as trt]))
+
+(deftest get-customer
+  (testing "returns customer in body"
+    (let [cust {:id "test-customer"
+                :name "Test customer"}
+          {st :storage :as rt} (trt/test-runtime)
+          req (-> rt
+                  (h/->req)
+                  (h/with-path-param :customer-id (:id cust)))]
+      (is (st/sid? (st/save-customer st cust)))
+      (is (= cust (:body (sut/get-customer req))))))
+
+  (testing "404 not found when no match"
+    (is (= 404 (-> (trt/test-runtime)
+                   (h/->req)
+                   (h/with-path-param :customer-id "nonexisting")
+                   (sut/get-customer)
+                   :status))))
+
+  (testing "converts repo map into list"
+    (let [cust {:id (st/new-id)
+                :name "Customer with projects"}
+          repo {:id "test-repo"
+                :name "Test repository"
+                :customer-id (:id cust)}
+          {st :storage :as rt} (trt/test-runtime)]
+      (is (st/sid? (st/save-customer st cust)))
+      (is (st/sid? (st/save-repo st repo)))
+      (let [r (-> rt
+                  (h/->req)
+                  (h/with-path-param :customer-id (:id cust))
+                  (sut/get-customer)
+                  :body)
+            repos (-> r :repos)]
+        (is (some? repos))
+        (is (not (map? repos)))
+        (is (= (select-keys repo [:id :name])
+               (first repos)))))))
+
+(deftest create-customer
+  (testing "returns created customer with id"
+    (let [r (-> (trt/test-runtime)
+                (h/->req)
+                (h/with-body {:name "new customer"})
+                (sut/create-customer)
+                :body)]
+      (is (= "new customer" (:name r)))
+      (is (string? (:id r)))))
+
+  (testing "links current user to customer"
+    (let [user (-> (h/gen-user)
+                   (dissoc :customers))
+          {st :storage :as rt} (trt/test-runtime)
+          r (-> rt
+                (h/->req)
+                (h/with-body {:name "another customer"})
+                (h/with-identity user)
+                (sut/create-customer)
+                :body)]
+      (is (some? r))
+      (is (= [(:id r)] (-> (st/find-user st (:id user))
+                           :customers)))
+      (is (= [r] (st/list-user-customers st (:id user)))))))
+
+(deftest update-customer
+  (testing "returns customer in body"
+    (let [cust {:id "test-customer"
+                :name "Test customer"}
+          {st :storage :as rt} (trt/test-runtime)
+          req (-> rt
+                  (h/->req)
+                  (h/with-path-param :customer-id (:id cust))
+                  (h/with-body {:name "updated"}))]
+      (is (st/sid? (st/save-customer st cust)))
+      (is (= {:id (:id cust)
+              :name "updated"}
+             (:body (sut/update-customer req))))))
+
+  (testing "404 not found when no match"
+    (is (= 404 (-> (trt/test-runtime)
+                   (h/->req)
+                   (h/with-path-param :customer-id "nonexisting")
+                   (sut/update-customer)
+                   :status)))))
+
+(deftest search-customers
+  (let [{st :storage :as rt} (trt/test-runtime)
+        cust {:id (st/new-id)
+              :name "Test customer"}
+        sid (st/save-customer st cust)]
+    (testing "retrieves customer by id"
+      (is (= [cust]
+             (-> rt
+                 (h/->req)
+                 (h/with-query-param :id (:id cust))
+                 (sut/search-customers)
+                 :body))))
+    
+    (testing "searches customers by name"
+      (is (= [cust]
+             (-> rt
+                 (h/->req)
+                 (h/with-query-param :name "Test")
+                 (sut/search-customers)
+                 :body))))
+    
+    (testing "fails if no query params given"
+      (is (= 400
+             (-> rt
+                 (h/->req)
+                 (sut/search-customers)
+                 :status))))))
 
 (deftest recent-builds
   (h/with-memory-store st
