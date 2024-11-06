@@ -283,7 +283,7 @@
 
 (defn- bitbucket-repo-table []
   (letfn [(name+url [{:keys [name links]}]
-            [:a {:href (:html links) :target "_blank"} name])
+            [:a {:href (get-in links [:html :href]) :target "_blank"} name])
           (visibility [{:keys [is-private]}]
             [:span.badge {:class (if is-private
                                    :bg-warning

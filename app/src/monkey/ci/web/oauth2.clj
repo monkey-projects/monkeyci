@@ -39,7 +39,8 @@
         ;; Request user info, generate JWT
         (let [token (get-in token-reply [:body :access-token])]
           (-> (request-user-info token)
-              ;; Return token to frontend, we'll need it when doing github requests.
+              ;; Return token to frontend, we'll need it when doing requests to external api.
+              ;; TODO Keep track of any refresh tokens, so we can request a new token when it expires.
               (assoc :token token)
               (fetch-or-create-user req)
               (add-jwt req)
