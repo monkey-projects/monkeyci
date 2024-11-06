@@ -1,6 +1,7 @@
 (ns monkey.ci.web.oauth2
   "OAuth2 flow support handlers"
-  (:require [monkey.ci.storage :as s]
+  (:require [medley.core :as mc]
+            [monkey.ci.storage :as s]
             [monkey.ci.web
              [auth :as auth]
              [common :as c]]
@@ -40,9 +41,10 @@
         (let [token (get-in token-reply [:body :access-token])]
           (-> (request-user-info token)
               ;; Return token to frontend, we'll need it when doing requests to external api.
-              ;; TODO Keep track of any refresh tokens, so we can request a new token when it expires.
               (assoc :token token)
               (fetch-or-create-user req)
+              ;; Return any refresh tokens, so we can request a new token when it expires.
+              (mc/assoc-some :refresh-token (get-in token-reply [:body :refresh-token]))
               (add-jwt req)
               (rur/response)))
         ;; Failure
