@@ -89,6 +89,12 @@
       (assoc-id)
       (assoc :github-id s/Int)))
 
+(s/defschema WatchBitBucketRepo
+  (-> NewRepo
+      (assoc-id)
+      (assoc :workspace s/Str
+             :repo-slug s/Str)))
+
 (s/defschema ParameterValue
   {:name s/Str
    :value s/Str})
@@ -234,14 +240,19 @@
       log-routes
       artifact-routes]]]])
 
-(def github-watch-route
-  ["/github"
-   [["/watch" {:post {:handler github/watch-repo
-                      :parameters {:body WatchGithubRepo}}}]]])
+(def watch-routes
+  ["" [["/github"
+        [["/watch" {:post {:handler github/watch-repo
+                           :parameters {:body WatchGithubRepo}}}]]]
+       ["/bitbucket"
+        [["/watch" {:post {:handler bitbucket/watch-repo
+                           :parameters {:body WatchBitBucketRepo}}}]]]]])
 
-(def github-unwatch-route
-  ["/github"
-   [["/unwatch" {:post {:handler github/unwatch-repo}}]]])
+(def unwatch-routes
+  ["" [["/github"
+        [["/unwatch" {:post {:handler github/unwatch-repo}}]]]
+       ["/bitbucket"
+        [["/unwatch" {:post {:handler bitbucket/unwatch-repo}}]]]]])
 
 (def repo-routes
   ["/repo"
@@ -256,8 +267,8 @@
          :child-routes [repo-parameter-routes
                         repo-ssh-keys-routes
                         build-routes
-                        github-unwatch-route]})
-       (conj github-watch-route))])
+                        unwatch-routes]})
+       (conj watch-routes))])
 
 (s/defschema JoinRequestSchema
   {:customer-id Id

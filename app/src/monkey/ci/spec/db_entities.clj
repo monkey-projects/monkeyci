@@ -139,3 +139,10 @@
 (s/def :db/credit-consumption
   (-> (s/keys :req-un [:db/credit-id :db/build-id :db/consumed-at :db/amount])
       (s/merge :db/common)))
+
+(s/def :db/webhook-id int?)
+(s/def :db/bitbucket-id string?)
+
+(s/def :db/bb-webhook
+  (-> (s/keys :req-un [:db/bitbucket-id :db/webhook-id :bb/workspace :bb/repo-slug])
+      (s/merge :db/common)))

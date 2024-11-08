@@ -13,7 +13,8 @@
             [monkey.ci.entities.core :as ec]
             [monkey.ci.helpers :as h]
             [monkey.ci.spec.entities :as se]
-            [monkey.ci.storage.sql :as sut]))
+            [monkey.ci.storage.sql :as sut]
+            [monkey.ci.web.auth :as auth]))
 
 (defmacro with-storage [conn s & body]
   `(eh/with-prepared-db ~conn
@@ -189,7 +190,8 @@
                      (assoc :customer-id (:id cust)))
             wh (-> (h/gen-webhook)
                    (assoc :customer-id (:id cust)
-                          :repo-id (:id repo)))]
+                          :repo-id (:id repo)
+                          :secret-key (auth/generate-secret-key)))]
         (is (some? (st/save-customer s (assoc-in cust [:repos (:id repo)] repo))))
         
         (testing "can create and retrieve"
