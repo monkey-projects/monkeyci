@@ -93,7 +93,8 @@
   (-> NewRepo
       (assoc-id)
       (assoc :workspace s/Str
-             :repo-slug s/Str)))
+             :repo-slug s/Str
+             :token s/Str)))
 
 (s/defschema ParameterValue
   {:name s/Str

@@ -59,10 +59,13 @@
                                         ws slug)
                            :method :post}
                           (fn [req]
-                            (swap! bb-requests conj (h/parse-json (:body req)))
-                            {:status 201
-                             :headers {"Content-Type" "application/json"}
-                             :body (h/to-json {:uuid bb-uuid})})]
+                            (if (some? (get-in req [:headers "Authorization"]))
+                              (do
+                                (swap! bb-requests conj (h/parse-json (:body req)))
+                                {:status 201
+                                 :headers {"Content-Type" "application/json"}
+                                 :body (h/to-json {:uuid bb-uuid})})
+                              {:status 401}))]
         (is (some? (st/save-customer st cust)))
         (let [r (-> {:storage st}
                     (h/->req)
@@ -77,7 +80,8 @@
                              :workspace ws
                              :repo-slug slug
                              :url "http://bitbucket.org/test-repo"
-                             :name "test repo"}})
+                             :name "test repo"
+                             :token "test-bb-token"}})
                     (sut/watch-repo))]
           (is (= 201 (:status r)))
           

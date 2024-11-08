@@ -74,15 +74,16 @@
         url (ext-webhook-url req wh)
         body (c/body req)
         ;; Create bitbucket webhook using external url
-        bb-resp @(-> (api-req {:path (format "/repositories/%s/%s/hooks" (:workspace body) (:repo-slug body))
-                               :method :post
-                               :headers {"Content-Type" "application/json"}
-                               :body (json/generate-string
-                                      {:url url
-                                       :active true
-                                       :secret (:secret-key wh)
-                                       :events ["repo:push"]
-                                       :description "MonkeyCI generated webhook"})})
+        bb-resp @(-> (auth-req {:path (format "/repositories/%s/%s/hooks" (:workspace body) (:repo-slug body))
+                                :method :post
+                                :headers {"Content-Type" "application/json"}
+                                :body (json/generate-string
+                                       {:url url
+                                        :active true
+                                        :secret (:secret-key wh)
+                                        :events ["repo:push"]
+                                        :description "MonkeyCI generated webhook"})}
+                               (:token body))
                      (md/chain c/parse-body))]
     (if (= 201 (:status bb-resp))
       (st/save-bb-webhook s {:id (cuid/random-cuid)
