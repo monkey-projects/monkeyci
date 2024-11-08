@@ -57,7 +57,7 @@
           bb-requests (atom [])]
       (at/with-fake-http [{:url (format "https://api.bitbucket.org/2.0/repositories/%s/%s/hooks"
                                         ws slug)
-                           :method :post}
+                           :request-method :post}
                           (fn [req]
                             (if (some? (get-in req [:headers "Authorization"]))
                               (do

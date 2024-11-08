@@ -50,7 +50,7 @@
 (defn- request-user-info [token]
   (when token 
     (-> @(auth-req {:path "/user"
-                    :method :get
+                    :request-method :get
                     :headers {"Accept" "application/json"}}
                    token)
         (c/parse-body)
@@ -70,12 +70,14 @@
   (str (c/req->ext-uri req "/customer") "/webhook/bitbucket/" (:id wh)))
 
 (defn- create-bb-webhook [req wh]
+  (log/debug "Creating Bitbucket webhook for internal webhook" (:id wh))
   (let [s (c/req->storage req)
         url (ext-webhook-url req wh)
         body (c/body req)
         ;; Create bitbucket webhook using external url
+        ;; TODO Reactivate existing webhook
         bb-resp @(-> (auth-req {:path (format "/repositories/%s/%s/hooks" (:workspace body) (:repo-slug body))
-                                :method :post
+                                :request-method :post
                                 :headers {"Content-Type" "application/json"}
                                 :body (json/generate-string
                                        {:url url
@@ -121,7 +123,7 @@
 (defn unwatch-repo
   "Unwatches Bitbucket repo by deactivating any existing webhook."
   [req]
-  ;; TODO
+  ;; TODO Deactivate the BB webhook
   (rur/response "todo"))
 
 (defn webhook

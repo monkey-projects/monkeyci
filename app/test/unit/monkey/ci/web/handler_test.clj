@@ -420,31 +420,36 @@
                            :status))))))
 
       (testing "`/bitbucket`"
-        (testing "`/watch` starts watching bitbucket repo"
-          (is (= 200 (-> (h/json-request :post
-                                         (str "/customer/" cust-id "/repo/bitbucket/watch")
-                                         {:bitbucket-id (str (random-uuid))
-                                          :customer-id cust-id
-                                          :name "test-repo"
-                                          :url "http://test"})
-                         (test-app)
-                         :status))))
+        (at/with-fake-http [(constantly true) {:status 201
+                                               :headers {"Content-Type" "application/json"}
+                                               :body "{}"}]
+          (testing "`/watch` starts watching bitbucket repo"
+            (is (= 201 (-> (h/json-request :post
+                                           (str "/customer/" cust-id "/repo/bitbucket/watch")
+                                           {:customer-id cust-id
+                                            :name "test-repo"
+                                            :url "http://test"
+                                            :workspace "test-ws"
+                                            :repo-slug "test-repo"
+                                            :token "test-token"})
+                           (test-app)
+                           :status))))
 
-        (testing "`/unwatch` stops watching repo"
-          (let [st (st/make-memory-storage)
-                app (make-test-app st)
-                repo-id (st/new-id)
-                wh-id (st/new-id)
-                _ (st/save-webhook st {:customer-id cust-id
-                                       :repo-id repo-id
-                                       :id wh-id
-                                       :secret (str (random-uuid))})
-                _ (st/save-bb-webhook st {:webhook-id wh-id
-                                          :bitbucket-id (str (random-uuid))})]
-            (is (= 200 (-> (mock/request :post
-                                         (format "/customer/%s/repo/%s/bitbucket/unwatch" cust-id repo-id))
-                           (app)
-                           :status)))))))))
+          (testing "`/unwatch` stops watching repo"
+            (let [st (st/make-memory-storage)
+                  app (make-test-app st)
+                  repo-id (st/new-id)
+                  wh-id (st/new-id)
+                  _ (st/save-webhook st {:customer-id cust-id
+                                         :repo-id repo-id
+                                         :id wh-id
+                                         :secret (str (random-uuid))})
+                  _ (st/save-bb-webhook st {:webhook-id wh-id
+                                            :bitbucket-id (str (random-uuid))})]
+              (is (= 200 (-> (mock/request :post
+                                           (format "/customer/%s/repo/%s/bitbucket/unwatch" cust-id repo-id))
+                             (app)
+                             :status))))))))))
 
 (deftest webhook-endpoints
   (verify-entity-endpoints {:name "webhook"
