@@ -173,7 +173,12 @@
                 {:post {:handler github/webhook
                         :parameters {:path {:id Id}
                                      :body s/Any}}
-                 :middleware [:github-security]}]]]))])
+                 :middleware [:github-security]}]]]
+             ["/bitbucket/:id"
+              {:post {:handler bitbucket/webhook
+                      :parameters {:path {:id Id}
+                                   :body s/Any}}
+               :middleware [:bitbucket-security]}]))])
 
 (def customer-parameter-routes
   ["/param"
@@ -466,6 +471,8 @@
       (non-dev rt [github/validate-security])
       :github-app-security
       (non-dev rt [github/validate-security (constantly (get-in (rt/config rt) [:github :webhook-secret]))])
+      :bitbucket-security
+      (non-dev rt [bitbucket/validate-security])
       :customer-check
       (non-dev rt [auth/customer-authorization])}}))
   ([rt]

@@ -171,6 +171,43 @@
                        (app)
                        :status)))))))
 
+(deftest webhook-bitbucket-routes
+  (testing "`POST /webhook/bitbucket/:id`"
+    (testing "accepts with valid security header"
+      (let [bitbucket-secret "bitbucket-secret"
+            payload (h/to-json {:head-commit {:message "test"}})
+            signature (-> (mac/hash payload {:key bitbucket-secret
+                                             :alg :hmac+sha256})
+                          (codecs/bytes->hex))
+            hook-id (st/new-id)
+            st (st/make-memory-storage)
+            app (sut/make-app (test-rt {:storage st
+                                        :runner (constantly nil)
+                                        :config {:dev-mode false}}))]
+        (is (st/sid? (st/save-webhook st {:id hook-id
+                                          :secret-key bitbucket-secret})))
+        (is (= 202 (-> (mock/request :post (str "/webhook/bitbucket/" hook-id))
+                       (mock/body payload)
+                       (mock/header :x-hub-signature (str "sha256=" signature))
+                       (mock/header :x-bitbucket-event "push")
+                       (mock/content-type "application/json")
+                       (mock/content-length (count payload))
+                       (app)
+                       :status)))))
+
+    (testing "returns 401 if invalid security"
+      (let [app (sut/make-app (test-rt {:config {:dev-mode false}}))]
+        (is (= 401 (-> (mock/request :post "/webhook/bitbucket/test-hook")
+                       (app)
+                       :status)))))
+
+    (testing "disables security check when in dev mode"
+      (let [dev-app (sut/make-app {:config {:dev-mode true}
+                                   :runner (constantly nil)})]
+        (is (= 202 (-> (mock/request :post "/webhook/bitbucket/test-hook")
+                       (dev-app)
+                       :status)))))))
+
 (defn- verify-entity-endpoints [{:keys [path base-entity updated-entity name creator can-update? can-delete?]
                                  :or {can-update? true can-delete? false}}]
   (let [st (st/make-memory-storage)

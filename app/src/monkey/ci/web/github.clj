@@ -1,9 +1,6 @@
 (ns monkey.ci.web.github
   "Functionality specific for Github"
-  (:require [buddy.core
-             [codecs :as codecs]
-             [mac :as mac]]
-            [clojure.tools.logging :as log]
+  (:require [clojure.tools.logging :as log]
             [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
@@ -13,45 +10,19 @@
              [utils :as u]
              [version :as v]]
             [monkey.ci.web
+             [auth :as auth]
              [common :as c]
              [oauth2 :as oauth2]]
             [aleph.http :as http]
             [ring.util.response :as rur]))
 
-(defn extract-signature [s]
-  (when s
-    (let [[k v :as parts] (seq (.split s "="))]
-      (when (and (= 2 (count parts)) (= "sha256" k))
-        v))))
-
-(defn valid-security?
-  "Validates security header"
-  [{:keys [secret payload x-hub-signature]}]
-  (when-let [sign (extract-signature x-hub-signature)]
-    (mac/verify payload
-              (codecs/hex->bytes sign)
-              {:key secret :alg :hmac+sha256})))
-
-(def req->webhook-id (comp :id :path :parameters))
 (def req->repo-sid (comp (juxt :customer-id :repo-id) :path :parameters))
 
 (defn validate-security
   "Middleware that validates the github security header using a fn that retrieves
    the secret for the request."
-  ([h get-secret]
-   (fn [req]
-     (if (valid-security? {:secret (get-secret req)
-                           :payload (:body req)
-                           :x-hub-signature (get-in req [:headers "x-hub-signature-256"])})
-       (h req)
-       (-> (rur/response "Invalid signature header")
-           (rur/status 401)))))
-  ([h]
-   (validate-security h (fn [req]
-                          ;; Find the secret key by looking up the webhook from storage
-                          (some-> (c/req->storage req)
-                                  (s/find-webhook (req->webhook-id req))
-                                  :secret-key)))))
+  [h & [get-secret]]
+  (auth/validate-hmac-security h {:get-secret get-secret}))
 
 (defn github-event [req]
   (get-in req [:headers "x-github-event"]))

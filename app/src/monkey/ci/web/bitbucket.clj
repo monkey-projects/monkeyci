@@ -129,5 +129,12 @@
 (defn webhook
   "Handles incoming calls from Bitbucket through installed webhooks."
   [req]
-  ;; TODO
-  (rur/response "todo"))
+  ;; TODO Trigger build
+  (log/debug "Got incoming bitbucket request:" (pr-str (:body req)))
+  (-> (rur/response "todo")
+      (rur/status 202)))
+
+(defn validate-security
+  "Validates bitbucket hmac signature header"
+  [h]
+  (auth/validate-hmac-security h {:header "x-hub-signature"}))
