@@ -57,7 +57,7 @@
    (lo/on-failure db db/customer (a/cust-details-failed id) err)))
 
 (rf/reg-event-fx
- :repo/watch
+ :repo/watch-github
  (fn [{:keys [db]} [_ repo]]
    (log/debug "Watching repo:" repo)
    (let [cust-id (r/customer-id db)]
@@ -67,6 +67,24 @@
                          :url (:clone-url repo)
                          :customer-id cust-id
                          :github-id (:id repo)}
+                  :customer-id cust-id}
+                 [:repo/watch--success]
+                 [:repo/watch--failed]]})))
+
+(rf/reg-event-fx
+ :repo/watch-bitbucket
+ (fn [{:keys [db]} [_ repo]]
+   (log/debug "Watching repo:" (str repo))
+   (let [cust-id (r/customer-id db)
+         token (ldb/bitbucket-token db)]
+     {:dispatch [:secure-request
+                 :watch-bitbucket-repo
+                 {:repo {:name (:name repo)
+                         :url (get-in repo [:links :html :href])
+                         :customer-id cust-id
+                         :workspace (get-in repo [:workspace :slug])
+                         :repo-slug (:slug repo)
+                         :token token}
                   :customer-id cust-id}
                  [:repo/watch--success]
                  [:repo/watch--failed]]})))

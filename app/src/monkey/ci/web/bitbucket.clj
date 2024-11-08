@@ -88,9 +88,11 @@
                                (:token body))
                      (md/chain c/parse-body))]
     (if (= 201 (:status bb-resp))
-      (st/save-bb-webhook s {:id (cuid/random-cuid)
-                             :webhook-id (:id wh)
-                             :bitbucket-id (get-in bb-resp [:body :uuid])})
+      (st/save-bb-webhook s (-> body
+                                (select-keys [:repo-slug :workspace])
+                                (assoc :id (cuid/random-cuid)
+                                       :webhook-id (:id wh)
+                                       :bitbucket-id (get-in bb-resp [:body :uuid]))))
       (throw (ex-info "Unable to create bitbucket webhook" bb-resp)))))
 
 (defn watch-repo
@@ -124,7 +126,7 @@
 (defn unwatch-repo
   "Unwatches Bitbucket repo by deactivating any existing webhook."
   [req]
-  ;; TODO Deactivate the BB webhook
+  ;; TODO Deactivate the BB webhook and delete associated record
   (rur/response "todo"))
 
 (defn webhook

@@ -250,13 +250,13 @@
       [co/alerts [:customer/alerts]]
       [customer-details id]])))
 
-(defn- ext-repo-actions [{:keys [:monkeyci/watched?] :as repo}]
+(defn- ext-repo-actions [watch-evt {:keys [:monkeyci/watched?] :as repo}]
   (if watched?
     [:button.btn.btn-sm.btn-danger
      {:on-click #(rf/dispatch [:repo/unwatch (:monkeyci/repo repo)])}
      [:span.me-1.text-nowrap [co/icon :stop-circle-fill]] "Unwatch"]
     [:button.btn.btn-sm.btn-primary
-     {:on-click #(rf/dispatch [:repo/watch repo])}
+     {:on-click #(rf/dispatch [watch-evt repo])}
      [:span.me-1.text-nowrap [co/icon :binoculars-fill]] "Watch"]))
 
 (defn- github-repo-table []
@@ -279,7 +279,7 @@
                 {:label "Visibility"
                  :value visibility}
                 {:label "Actions"
-                 :value ext-repo-actions}]}]))
+                 :value (partial ext-repo-actions :repo/watch-github)}]}]))
 
 (defn- bitbucket-repo-table []
   (letfn [(name+url [{:keys [name links]}]
@@ -301,7 +301,7 @@
                 {:label "Visibility"
                  :value visibility}
                 {:label "Actions"
-                 :value ext-repo-actions}]}]))
+                 :value (partial ext-repo-actions :repo/watch-bitbucket)}]}]))
 
 (defn ext-repo-filter []
   (let [v (rf/subscribe [:customer/ext-repo-filter])]

@@ -109,7 +109,9 @@
                 (is (= bb-uuid (:bitbucket-id bb-wh)))
                 (is (= 1 (count @bb-requests)))
                 (is (= (str "http://localhost/webhook/bitbucket/" (:id wh))
-                       (:url (first @bb-requests))))))))))
+                       (:url (first @bb-requests))))
+                (is (= slug (:repo-slug bb-wh)))
+                (is (= ws (:workspace bb-wh)))))))))
 
     (testing "404 if customer not found"
       (is (= 404 (-> {:storage st}
