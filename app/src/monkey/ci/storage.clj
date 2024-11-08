@@ -223,7 +223,8 @@
 
 (def ^:deprecated find-details-for-webhook find-webhook)
 
-(def bb-webhook-sid (partial global-sid :bb-webhooks))
+(def bb-webhooks :bb-webhooks)
+(def bb-webhook-sid (partial global-sid bb-webhooks))
 
 (defn save-bb-webhook
   "Stores bitbucket webhook information.  This links a Bitbucket native webhook uuid

@@ -97,3 +97,9 @@
 
 (defn gen-credit-consumption []
   (gen-spec :db/credit-consumption))
+
+(defn gen-webhook []
+  (gen-spec :db/webhook))
+
+(defn gen-bb-webhook []
+  (gen-spec :db/bb-webhook))

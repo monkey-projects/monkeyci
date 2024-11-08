@@ -105,11 +105,12 @@
     (if cust
       (let [repo (-> body
                      (select-keys [:customer-id :name :url :main-branch])
-                     (assoc :id (cuid/random-cuid)))
+                     (assoc :id (c/gen-repo-display-id s body)))
             wh {:customer-id cust-id
                 :repo-id (:id repo)
                 :id (cuid/random-cuid)
                 :secret-key (auth/generate-secret-key)}]
+        ;; TODO Only create if it does not exist already
         (if (st/save-repo s repo)
           (if (st/save-webhook s wh)
             (if (create-bb-webhook req wh)
