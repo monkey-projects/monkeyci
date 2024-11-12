@@ -134,16 +134,17 @@
   (let [st (c/req->storage req)
         idx (st/find-next-build-idx st [customer-id repo-id])
         sid [customer-id repo-id (c/new-build-id idx)]
-        body (get-in req [:parameters :body])]
+        body (get-in req [:parameters :body])
+        repo (st/find-repo st [customer-id repo-id])]
     (-> (zipmap [:customer-id :repo-id :build-id] sid)
         (assoc :sid sid
                :source :bitbucket-webhook
                :start-time (t/now)
-               :status :initializing
+               :status :pending
                :idx idx
                :cleanup? true
                ;; TODO
-               :git {}))))
+               :git {:url (:url repo)}))))
 
 (defn- handle-push [req]
   (let [st (c/req->storage req)

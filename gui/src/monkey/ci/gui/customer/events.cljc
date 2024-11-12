@@ -71,6 +71,13 @@
                  [:repo/watch--success]
                  [:repo/watch--failed]]})))
 
+(defn- clone-url [{:keys [is-private] :as repo}]
+  (->> (get-in repo [:links :clone])
+       ;; Use ssh url for private repos
+       (filter (comp (partial = (if is-private "ssh" "https")) :name))
+       (first)
+       :href))
+
 (rf/reg-event-fx
  :repo/watch-bitbucket
  (fn [{:keys [db]} [_ repo]]
@@ -80,7 +87,7 @@
      {:dispatch [:secure-request
                  :watch-bitbucket-repo
                  {:repo {:name (:name repo)
-                         :url (get-in repo [:links :html :href])
+                         :url (clone-url repo)
                          :customer-id cust-id
                          :workspace (get-in repo [:workspace :slug])
                          :repo-slug (:slug repo)

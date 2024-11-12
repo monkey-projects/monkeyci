@@ -145,9 +145,11 @@
        (rf/dispatch [:repo/watch-bitbucket {:id "github-id"
                                             :private false
                                             :name "test-repo"
-                                            :clone-url "http://test-url"}])
+                                            :links {:clone [{:name "https"
+                                                             :href "https://test-url"}]}}])
        (is (= 1 (count @c)))
-       (is (= :watch-bitbucket-repo (-> @c first (nth 2))))))))
+       (is (= :watch-bitbucket-repo (-> @c first (nth 2))))
+       (is (= "https://test-url" (-> @c first (nth 3) :repo :url)))))))
 
 (deftest repo-watch--success
   (testing "adds repo to customer"

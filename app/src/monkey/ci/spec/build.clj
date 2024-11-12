@@ -53,7 +53,7 @@
 
 ;;; Script: contains info about a build script, most notably the jobs
 
-(def build-states #{:pending :running :error :success :canceled})
+(def build-states #{:pending :initializing :running :error :success :canceled})
 
 (s/def :script/script-dir path?)
 (s/def :script/status build-states)
@@ -87,8 +87,8 @@
 (s/def :git/message string?)
 
 (s/def :build/git
-  (s/keys :req-un [:git/url :git/dir]
-          :opt-un [:git/ref :git/commit-id :git/main-branch :git/ssh-keys-dir :git/message]))
+  (s/keys :req-un [:git/url]
+          :opt-un [:git/ref :git/commit-id :git/main-branch :git/ssh-keys-dir :git/message :git/dir]))
 
 ;;; Changes: which files have changed for the build
 

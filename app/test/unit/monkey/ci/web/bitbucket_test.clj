@@ -133,8 +133,14 @@
             rt (-> rt
                    (trt/set-runner (fn [build _]
                                      (swap! runs conj build))))
-            wh (->> (repeatedly cuid/random-cuid)
-                    (zipmap [:customer-id :repo-id :id]))
+            repo (-> (h/gen-repo)
+                     (assoc :url "http://test-url"))
+            cust (-> (h/gen-cust)
+                     (assoc :repos {(:id repo) repo}))
+            _ (st/save-customer (:storage rt) cust)
+            wh {:id (cuid/random-cuid)
+                :repo-id (:id repo)
+                :customer-id (:id cust)}
             _ (st/save-webhook (:storage rt) wh)
             resp (-> rt
                      (h/->req)

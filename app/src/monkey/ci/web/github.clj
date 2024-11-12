@@ -71,7 +71,7 @@
                          ;; Do not use the commit timestamp, because when triggered from a tag
                          ;; this is still the time of the last commit, not of the tag creation.
                          :start-time (u/now)
-                         :status :initializing
+                         :status :pending
                          :build-id build-id
                          :idx idx
                          :cleanup? true

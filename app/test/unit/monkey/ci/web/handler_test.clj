@@ -186,7 +186,7 @@
                                         :config {:dev-mode false}}))]
         (is (st/sid? (st/save-webhook st {:id hook-id
                                           :secret-key bitbucket-secret})))
-        (is (= 202 (-> (mock/request :post (str "/webhook/bitbucket/" hook-id))
+        (is (= 200 (-> (mock/request :post (str "/webhook/bitbucket/" hook-id))
                        (mock/body payload)
                        (mock/header :x-hub-signature (str "sha256=" signature))
                        (mock/header :x-bitbucket-event "push")
@@ -204,7 +204,7 @@
     (testing "disables security check when in dev mode"
       (let [dev-app (sut/make-app {:config {:dev-mode true}
                                    :runner (constantly nil)})]
-        (is (= 202 (-> (mock/request :post "/webhook/bitbucket/test-hook")
+        (is (= 200 (-> (mock/request :post "/webhook/bitbucket/test-hook")
                        (dev-app)
                        :status)))))))
 
