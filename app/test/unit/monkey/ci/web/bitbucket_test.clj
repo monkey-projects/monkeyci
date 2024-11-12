@@ -127,36 +127,58 @@
                      :status))))))
 
 (deftest webhook
-  (let [rt (trt/test-runtime)]
+  (let [rt (-> (trt/test-runtime)
+               (assoc :config {:ssh-keys-dir "/tmp"}))
+        s (:storage rt)
+        runs (atom [])
+        rt (-> rt
+               (trt/set-runner (fn [build _]
+                                 (swap! runs conj build))))
+        repo (-> (h/gen-repo)
+                 (assoc :url "http://test-url"))
+        cust (-> (h/gen-cust)
+                 (assoc :repos {(:id repo) repo}))
+        _ (st/save-customer s cust)
+        wh {:id (cuid/random-cuid)
+            :repo-id (:id repo)
+            :customer-id (:id cust)}
+        _ (st/save-webhook s wh)
+        req (-> rt
+                (h/->req)
+                (assoc :headers {"x-event-key" "repo:push"}
+                       :parameters
+                       {:path
+                        {:id (:id wh)}
+                        :body
+                        {:push
+                         {:new
+                          {:type "branch"
+                           :name "main"}}}}))]
+    
     (testing "triggers build for webhook"
-      (let [runs (atom [])
-            rt (-> rt
-                   (trt/set-runner (fn [build _]
-                                     (swap! runs conj build))))
-            repo (-> (h/gen-repo)
-                     (assoc :url "http://test-url"))
-            cust (-> (h/gen-cust)
-                     (assoc :repos {(:id repo) repo}))
-            _ (st/save-customer (:storage rt) cust)
-            wh {:id (cuid/random-cuid)
-                :repo-id (:id repo)
-                :customer-id (:id cust)}
-            _ (st/save-webhook (:storage rt) wh)
-            resp (-> rt
-                     (h/->req)
-                     (assoc :headers {"x-event-key" "repo:push"}
-                            :parameters
-                            {:path
-                             {:id (:id wh)}})
-                     (sut/webhook))]
+      (let [resp (sut/webhook req)]
         (is (= 202 (:status resp)))
         (is (re-matches #"^build-\d+$" (get-in resp [:body :build-id])))
         (is (not= :timeout (h/wait-until #(not-empty @runs) 500)))
-        (let [build (first @runs)]
+        (let [{:keys [git] :as build} (first @runs)]
           (is (spec/valid? ::sb/build build)
               (spec/explain-str ::sb/build build))
-          (is (some? (:git build)) "contains git info"))))
+          (is (some? git) "contains git info")
+          (is (= "http://test-url" (:url git)))
+          (is (= "refs/heads/main" (:ref git))))))
 
+    (testing "adds configured ssh key matching repo labels"
+      (reset! runs [])
+      (let [ssh-key {:id "test-key"
+                     :private-key "test-ssh-key"}]
+        (is (st/sid? (st/save-repo s (assoc repo :labels [{:name "ssh-lbl"
+                                                           :value "lbl-val"}]))))
+        (is (st/sid? (st/save-ssh-keys s (:id cust) [ssh-key])))
+        (is (some? (sut/webhook req)))
+        (is (not= :timeout (h/wait-until #(not-empty @runs) 500)))
+        (is (= [ssh-key]
+               (-> @runs first (get-in [:git :ssh-keys]))))))
+  
     (testing "404 if webhook does not exist"
       (is (= 404 (-> rt
                      (h/->req)

@@ -7,6 +7,7 @@
             [manifold.deferred :as md]
             [monkey.ci
              [cuid :as cuid]
+             [labels :as lbl]
              [runtime :as rt]
              [storage :as st]
              [time :as t]]
@@ -104,7 +105,7 @@
   (let [s (c/req->storage req)
         body (c/body req)
         cust-id (c/customer-id req)
-        cust (st/find-customer s (:customer-id body))]
+        cust (st/find-customer s cust-id)]
     (if cust
       (let [repo (-> body
                      (select-keys [:customer-id :name :url :main-branch])
@@ -130,12 +131,21 @@
   ;; TODO Deactivate the BB webhook and delete associated record
   (rur/response "todo"))
 
+(defn- git-ref [payload]
+  (let [{:keys [name type]} (get-in payload [:push :new])]
+    (condp = type
+      "branch" (str "refs/heads/" name)
+      "tag" (str "refs/tags/" name))))
+
 (defn- make-build [req {:keys [customer-id repo-id] :as wh}]
   (let [st (c/req->storage req)
         idx (st/find-next-build-idx st [customer-id repo-id])
-        sid [customer-id repo-id (c/new-build-id idx)]
+        build-id (c/new-build-id idx)
+        sid [customer-id repo-id build-id]
         body (get-in req [:parameters :body])
-        repo (st/find-repo st [customer-id repo-id])]
+        repo (st/find-repo st [customer-id repo-id])
+        ssh-keys (->> (st/find-ssh-keys st customer-id)
+                      (lbl/filter-by-label repo))]
     (-> (zipmap [:customer-id :repo-id :build-id] sid)
         (assoc :sid sid
                :source :bitbucket-webhook
@@ -143,8 +153,10 @@
                :status :pending
                :idx idx
                :cleanup? true
-               ;; TODO
-               :git {:url (:url repo)}))))
+               :git (cond-> {:url (:url repo)
+                             :ref (git-ref body)
+                             :ssh-keys-dir (rt/ssh-keys-dir (c/req->rt req) build-id)}
+                      (not-empty ssh-keys) (assoc :ssh-keys ssh-keys))))))
 
 (defn- handle-push [req]
   (let [st (c/req->storage req)
