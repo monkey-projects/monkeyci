@@ -119,7 +119,7 @@
     (rf/dispatch-sync [:customer/load--failed "test-id" "test-customer"])
     (is (not (lo/loading? @app-db db/customer)))))
 
-(deftest repo-watch
+(deftest repo-watch-github
   (testing "invokes repo github watch endpoint"
     (rf-test/run-test-sync
      (let [c (h/catch-fx :martian.re-frame/request)]
@@ -127,12 +127,29 @@
                                                   :body {:id "test-repo"}
                                                   :error-code :no-error}})
        (is (some? (:martian.re-frame/martian @app-db)))
-       (rf/dispatch [:repo/watch {:id "github-id"
-                                  :private false
-                                  :name "test-repo"
-                                  :clone-url "http://test-url"}])
+       (rf/dispatch [:repo/watch-github {:id "github-id"
+                                         :private false
+                                         :name "test-repo"
+                                         :clone-url "http://test-url"}])
        (is (= 1 (count @c)))
        (is (= :watch-github-repo (-> @c first (nth 2))))))))
+
+(deftest repo-watch-bitbucket
+  (testing "invokes repo bitbucket watch endpoint"
+    (rf-test/run-test-sync
+     (let [c (h/catch-fx :martian.re-frame/request)]
+       (h/initialize-martian {:watch-bitbucket-repo {:status 204
+                                                     :body {:id "test-repo"}
+                                                     :error-code :no-error}})
+       (is (some? (:martian.re-frame/martian @app-db)))
+       (rf/dispatch [:repo/watch-bitbucket {:id "github-id"
+                                            :private false
+                                            :name "test-repo"
+                                            :links {:clone [{:name "https"
+                                                             :href "https://test-url"}]}}])
+       (is (= 1 (count @c)))
+       (is (= :watch-bitbucket-repo (-> @c first (nth 2))))
+       (is (= "https://test-url" (-> @c first (nth 3) :repo :url)))))))
 
 (deftest repo-watch--success
   (testing "adds repo to customer"

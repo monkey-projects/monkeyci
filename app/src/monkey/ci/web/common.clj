@@ -1,6 +1,7 @@
 (ns monkey.ci.web.common
   (:require [buddy.auth :as ba]
             [camel-snake-kebab.core :as csk]
+            [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
             [muuntaja.core :as mc]
@@ -64,6 +65,12 @@
   "Retrieves storage object from the request context"
   [req]
   (from-rt req rt->storage))
+
+(defn req->ext-uri
+  "Determines external host address using request properties"
+  [req base]
+  (let [idx (cs/index-of (:uri req) base)]
+    (format "%s://%s%s" (name (:scheme req)) (get-in req [:headers "host"]) (subs (:uri req) 0 idx))))
 
 (defn id-getter [id-key]
   (comp id-key :path :parameters))
@@ -244,6 +251,9 @@
    the content type is not supported."
   [resp]
   (assoc resp :body (mc/decode-response-body m-decoder resp)))
+
+(defn new-build-id [idx]
+  (str "build-" idx))
 
 (defn run-build-async
   "Starts the build in a new thread"

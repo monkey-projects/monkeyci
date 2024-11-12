@@ -13,7 +13,8 @@
             [monkey.ci.entities.core :as ec]
             [monkey.ci.helpers :as h]
             [monkey.ci.spec.entities :as se]
-            [monkey.ci.storage.sql :as sut]))
+            [monkey.ci.storage.sql :as sut]
+            [monkey.ci.web.auth :as auth]))
 
 (defmacro with-storage [conn s & body]
   `(eh/with-prepared-db ~conn
@@ -189,7 +190,8 @@
                      (assoc :customer-id (:id cust)))
             wh (-> (h/gen-webhook)
                    (assoc :customer-id (:id cust)
-                          :repo-id (:id repo)))]
+                          :repo-id (:id repo)
+                          :secret-key (auth/generate-secret-key)))]
         (is (some? (st/save-customer s (assoc-in cust [:repos (:id repo)] repo))))
         
         (testing "can create and retrieve"
@@ -592,6 +594,25 @@
           (is (sid/sid? (st/save-credit-subscription s cs)))
           (is (sid/sid? (st/save-customer-credit s cred)))
           (is (= cred (st/find-customer-credit s (:id cred)))))))))
+
+(deftest ^:sql bb-webhooks
+  (with-storage conn st
+    (let [repo (h/gen-repo)
+          cust (-> (h/gen-cust)
+                   (assoc :repos {(:id repo) repo}))
+          wh (-> (h/gen-webhook)
+                 (assoc :customer-id (:id cust)
+                        :repo-id (:id repo)))
+          bb-wh (-> (h/gen-bb-webhook)
+                    (assoc :webhook-id (:id wh)))]
+      (testing "can save and find"
+        (is (sid/sid? (st/save-customer st cust)))
+        (is (sid/sid? (st/save-webhook st wh)))
+        (is (sid/sid? (st/save-bb-webhook st bb-wh)))
+        (is (= bb-wh (st/find-bb-webhook st (:id bb-wh)))))
+
+      (testing "can find by webhook id"
+        (is (= bb-wh (st/find-bb-webhook-for-webhook st (:id wh))))))))
 
 (deftest make-storage
   (testing "creates sql storage object using connection settings"

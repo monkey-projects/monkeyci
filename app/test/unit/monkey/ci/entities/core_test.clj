@@ -354,3 +354,24 @@
         (is (= [(:cuid ccons)]
                (->> (sut/select-credit-consumptions conn (sut/by-build (:id build)))
                     (map :cuid))))))))
+
+(deftest ^:sql bb-webhook
+  (eh/with-prepared-db conn
+    (let [cust (sut/insert-customer conn (eh/gen-customer))
+          repo (sut/insert-repo conn (assoc (eh/gen-repo)
+                                            :customer-id (:id cust)))
+          wh (sut/insert-webhook conn (-> (eh/gen-webhook)
+                                          (assoc :repo-id (:id repo))))
+          bb-wh (-> (eh/gen-bb-webhook)
+                    (assoc :webhook-id (:id wh)))]
+      
+      (testing "can insert"
+        (is (some? (sut/insert-bb-webhook conn bb-wh))))
+      
+      (testing "can select by cuid"
+        (is (= bb-wh (-> (sut/select-bb-webhook conn (sut/by-cuid (:cuid bb-wh)))
+                         (dissoc :id)))))
+      
+      (testing "can select by webhook id"
+        (is (= bb-wh (-> (sut/select-bb-webhook conn [:= :webhook-id (:id wh)])
+                         (dissoc :id))))))))

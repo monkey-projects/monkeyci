@@ -34,3 +34,7 @@
 (s/def ::params (partial satisfies? p/BuildParams))
 
 (s/def :credit/type #{:subscription :user})
+
+;; Bitbucket specific
+(s/def :bb/workspace string?)
+(s/def :bb/repo-slug string?)

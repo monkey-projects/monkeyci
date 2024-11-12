@@ -7,6 +7,7 @@
             [com.stuartsierra.component :as co]
             [medley.core :as mc]
             [monkey.ci.entities
+             [bb-webhook :as ebbwh]
              [build :as eb]
              [core :as ec]
              [credit-cons :as eccon]
@@ -709,6 +710,23 @@
   (->> (eccon/select-credit-cons conn (eccon/by-cust-since cust-id since))
        (map db->credit-cons)))
 
+(def bb-webhook? (partial global-sid? st/bb-webhooks))
+
+(defn- upsert-bb-webhook [conn bb-wh]
+  (let [wh (ec/select-webhook conn (ec/by-cuid (:webhook-id bb-wh)))]
+    ;; TODO Update?
+    (ec/insert-bb-webhook conn (-> bb-wh
+                                   (id->cuid)
+                                   (assoc :webhook-id (:id wh))))))
+
+(defn- select-bb-webhook [conn cuid]
+  (some-> (ebbwh/select-bb-webhook conn (ebbwh/by-cuid cuid))
+          (cuid->id)))
+
+(defn- select-bb-webhook-for-webhook [{:keys [conn]} cuid]
+  (some-> (ebbwh/select-bb-webhook conn (ebbwh/by-wh-cuid cuid))
+          (cuid->id)))
+
 (defn- sid-pred [t sid]
   (t sid))
 
@@ -737,7 +755,9 @@
       credit-consumption?
       (select-credit-consumption conn (last sid))
       customer-credit?
-      (select-customer-credit conn (global-sid->cuid sid))))
+      (select-customer-credit conn (global-sid->cuid sid))
+      bb-webhook?
+      (select-bb-webhook conn (last sid))))
   
   (write-obj [_ sid obj]
     (when (condp sid-pred sid
@@ -763,6 +783,8 @@
             (upsert-credit-consumption conn obj)
             customer-credit?
             (upsert-customer-credit conn obj)
+            bb-webhook?
+            (upsert-bb-webhook conn obj)
             (log/warn "Unrecognized sid when writing:" sid))
       sid))
 
@@ -866,7 +888,9 @@
     :find select-customer-param
     :delete delete-customer-param}
    :credit
-   {:list-active-subscriptions select-active-credit-subs}})
+   {:list-active-subscriptions select-active-credit-subs}
+   :bitbucket
+   {:find-for-webhook select-bb-webhook-for-webhook}})
 
 (defn make-storage [conn]
   (map->SqlStorage {:conn conn

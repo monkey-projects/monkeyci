@@ -253,6 +253,19 @@
      :consumes ["application/edn"]})
 
    (api-route
+    {:route-name :watch-bitbucket-repo
+     :method :post
+     :path-parts (conj customer-path "/repo/bitbucket/watch")
+     :path-schema customer-schema
+     :body-schema {:repo {:name s/Str
+                          :url s/Str
+                          :customer-id s/Str
+                          :workspace s/Str
+                          :repo-slug s/Str
+                          :token s/Str}}
+     :consumes ["application/edn"]})
+
+   (api-route
     {:route-name :unwatch-github-repo
      :method :post
      :path-parts (conj repo-path "/github/unwatch")

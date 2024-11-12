@@ -89,6 +89,13 @@
       (assoc-id)
       (assoc :github-id s/Int)))
 
+(s/defschema WatchBitBucketRepo
+  (-> NewRepo
+      (assoc-id)
+      (assoc :workspace s/Str
+             :repo-slug s/Str
+             :token s/Str)))
+
 (s/defschema ParameterValue
   {:name s/Str
    :value s/Str})
@@ -166,7 +173,12 @@
                 {:post {:handler github/webhook
                         :parameters {:path {:id Id}
                                      :body s/Any}}
-                 :middleware [:github-security]}]]]))])
+                 :middleware [:github-security]}]]]
+             ["/bitbucket/:id"
+              {:post {:handler bitbucket/webhook
+                      :parameters {:path {:id Id}
+                                   :body s/Any}}
+               :middleware [:bitbucket-security]}]))])
 
 (def customer-parameter-routes
   ["/param"
@@ -234,14 +246,19 @@
       log-routes
       artifact-routes]]]])
 
-(def github-watch-route
-  ["/github"
-   [["/watch" {:post {:handler github/watch-repo
-                      :parameters {:body WatchGithubRepo}}}]]])
+(def watch-routes
+  ["" [["/github"
+        [["/watch" {:post {:handler github/watch-repo
+                           :parameters {:body WatchGithubRepo}}}]]]
+       ["/bitbucket"
+        [["/watch" {:post {:handler bitbucket/watch-repo
+                           :parameters {:body WatchBitBucketRepo}}}]]]]])
 
-(def github-unwatch-route
-  ["/github"
-   [["/unwatch" {:post {:handler github/unwatch-repo}}]]])
+(def unwatch-routes
+  ["" [["/github"
+        [["/unwatch" {:post {:handler github/unwatch-repo}}]]]
+       ["/bitbucket"
+        [["/unwatch" {:post {:handler bitbucket/unwatch-repo}}]]]]])
 
 (def repo-routes
   ["/repo"
@@ -256,8 +273,8 @@
          :child-routes [repo-parameter-routes
                         repo-ssh-keys-routes
                         build-routes
-                        github-unwatch-route]})
-       (conj github-watch-route))])
+                        unwatch-routes]})
+       (conj watch-routes))])
 
 (s/defschema JoinRequestSchema
   {:customer-id Id
@@ -454,6 +471,8 @@
       (non-dev rt [github/validate-security])
       :github-app-security
       (non-dev rt [github/validate-security (constantly (get-in (rt/config rt) [:github :webhook-secret]))])
+      :bitbucket-security
+      (non-dev rt [bitbucket/validate-security])
       :customer-check
       (non-dev rt [auth/customer-authorization])}}))
   ([rt]

@@ -152,3 +152,9 @@
                        :entity/amount :entity/consumed-at])
       (s/merge :entity/common)))
 
+(s/def :entity/webhook-id ::c/cuid)
+(s/def :entity/bitbucket-id string?)
+
+(s/def :entity/bb-webhook
+  (-> (s/keys :req-un [:entity/bitbucket-id :entity/webhook-id :bb/workspace :bb/repo-slug])
+      (s/merge :entity/common)))

@@ -371,3 +371,4 @@
    :after-select  convert-credit-cons-select})
 
 (defentity credit-consumption credit-cons-conversions)
+(defentity bb-webhook)

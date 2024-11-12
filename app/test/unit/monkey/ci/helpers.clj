@@ -299,6 +299,9 @@
   (-> (gen-entity :entity/credit-consumption)
       (update-amount)))
 
+(defn gen-bb-webhook []
+  (gen-entity :entity/bb-webhook))
+
 (defrecord FakeContainerRunner [credit-consumer runs result]
   p/ContainerRunner
   (run-container [this job]

@@ -223,6 +223,29 @@
 
 (def ^:deprecated find-details-for-webhook find-webhook)
 
+(def bb-webhooks :bb-webhooks)
+(def bb-webhook-sid (partial global-sid bb-webhooks))
+
+(defn save-bb-webhook
+  "Stores bitbucket webhook information.  This links a Bitbucket native webhook uuid
+   to a MonkeyCI webhook."
+  [s wh]
+  (p/write-obj s (bb-webhook-sid (:id wh)) wh))
+
+(defn find-bb-webhook
+  [s id]
+  (p/read-obj s (bb-webhook-sid id)))
+
+(def find-bb-webhook-for-webhook
+  "Retrieves bitbucket webhook given an internal webhook id"
+  (override-or
+   [:bitbucket :find-for-webhook]
+   (fn [s wh-id]
+     (->> (p/list-obj s (bb-webhook-sid))
+          (map (partial find-bb-webhook s))
+          (filter (cp/prop-pred :webhook-id wh-id))
+          (first)))))
+
 (def builds "builds")
 (def build-sid-keys [:customer-id :repo-id :build-id])
 ;; Build sid, for external representation

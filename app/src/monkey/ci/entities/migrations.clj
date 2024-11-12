@@ -264,7 +264,16 @@
     [customer-col
      amount-col
      fk-customer]
-    [(col-idx :available-credits :customer-id)])])
+    [(col-idx :available-credits :customer-id)])
+
+   (entity-table-migration
+    25 :bb-webhooks
+    [[:webhook-id :integer [:not nil]]
+     [:bitbucket-id [:varchar 100] [:not nil]]
+     [:workspace [:varchar 300] [:not nil]]
+     [:repo-slug [:varchar 100] [:not nil]]
+     (fk :webhook-id :webhooks :id)]
+    [(col-idx :bb-webhooks :webhook-id)])])
 
 (defn- format-migration [sql-opts m]
   (letfn [(format-sql [stmt]

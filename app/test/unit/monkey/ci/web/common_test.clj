@@ -50,3 +50,12 @@
                 :headers {"Content-Type" "application/json"}}
                (sut/parse-body)
                :body)))))
+
+(deftest req->ext-uri
+  (testing "determines external uri using host, scheme and path"
+    (is (= "http://test:1234/v1"
+           (sut/req->ext-uri
+            {:scheme :http
+             :uri "/v1/customer/test-cust"
+             :headers {"host" "test:1234"}}
+            "/customer")))))

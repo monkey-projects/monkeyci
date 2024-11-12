@@ -412,3 +412,13 @@
                           :amount 80M})))
           (is (empty? (sut/list-available-credits st cid))
               "empty if all is consumed"))))))
+
+(deftest bitbucket-webhooks
+  (h/with-memory-store st
+    (let [wh (h/gen-bb-webhook)]
+      (testing "can save and find"
+        (is (sid/sid? (sut/save-bb-webhook st wh)))
+        (is (= wh (sut/find-bb-webhook st (:id wh)))))
+
+      (testing "can find for webhook id"
+        (is (= wh (sut/find-bb-webhook-for-webhook st (:webhook-id wh))))))))
