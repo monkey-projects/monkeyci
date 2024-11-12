@@ -1,6 +1,7 @@
 (ns monkey.ci.test.runtime
   "Helper functions for working with runtime in tests"
-  (:require [monkey.ci.helpers :as h]
+  (:require [manifold.deferred :as md]
+            [monkey.ci.helpers :as h]
             [monkey.ci.storage :as s]
             [monkey.ci.web.auth :as auth]))
 
@@ -30,6 +31,9 @@
 (defn set-containers [rt c]
   (assoc rt :containers c))
 
+(defn set-runner [rt r]
+  (assoc rt :runner r))
+
 (defn test-runtime []
   (-> empty-runtime
       (set-artifacts (h/fake-blob-store))
@@ -38,4 +42,5 @@
       (set-events (h/fake-events))
       (set-storage (s/make-memory-storage))
       (set-jwk (auth/keypair->rt (auth/generate-keypair)))
-      (set-containers (h/fake-container-runner))))
+      (set-containers (h/fake-container-runner))
+      (set-runner (constantly (md/success-deferred 0)))))

@@ -252,6 +252,9 @@
   [resp]
   (assoc resp :body (mc/decode-response-body m-decoder resp)))
 
+(defn new-build-id [idx]
+  (str "build-" idx))
+
 (defn run-build-async
   "Starts the build in a new thread"
   [rt build]

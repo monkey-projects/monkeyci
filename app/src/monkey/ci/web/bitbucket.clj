@@ -8,7 +8,8 @@
             [monkey.ci
              [cuid :as cuid]
              [runtime :as rt]
-             [storage :as st]]
+             [storage :as st]
+             [time :as t]]
             [monkey.ci.web
              [auth :as auth]
              [common :as c]
@@ -129,13 +130,44 @@
   ;; TODO Deactivate the BB webhook and delete associated record
   (rur/response "todo"))
 
+(defn- make-build [req {:keys [customer-id repo-id] :as wh}]
+  (let [st (c/req->storage req)
+        idx (st/find-next-build-idx st [customer-id repo-id])
+        sid [customer-id repo-id (c/new-build-id idx)]
+        body (get-in req [:parameters :body])]
+    (-> (zipmap [:customer-id :repo-id :build-id] sid)
+        (assoc :sid sid
+               :source :bitbucket-webhook
+               :start-time (t/now)
+               :status :initializing
+               :idx idx
+               :cleanup? true
+               ;; TODO
+               :git {}))))
+
+(defn- handle-push [req]
+  (let [st (c/req->storage req)
+        webhook-id (get-in req [:parameters :path :id])
+        wh (st/find-webhook st webhook-id)]
+    (if wh
+      (let [build (make-build req wh)]
+        (c/run-build-async (c/req->rt req) build)
+        (-> (rur/response (select-keys build [:build-id]))
+            (rur/status 202)))
+      (c/error-response "Webhook not found" 404))))
+
+(defn- handle-unsupported [type]
+  (log/debug "Ignoring unsupported Bitbucket webhook request:" type)
+  (rur/status 200))
+
 (defn webhook
   "Handles incoming calls from Bitbucket through installed webhooks."
   [req]
-  ;; TODO Trigger build
   (log/debug "Got incoming bitbucket request:" (pr-str (:body req)))
-  (-> (rur/response "todo")
-      (rur/status 202)))
+  (let [type (get-in req [:headers "x-event-key"])]
+    (condp = type
+      "repo:push" (handle-push req)
+      (handle-unsupported type))))
 
 (defn validate-security
   "Validates bitbucket hmac signature header"

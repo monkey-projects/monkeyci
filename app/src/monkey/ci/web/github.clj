@@ -55,7 +55,7 @@
   (let [{:keys [master-branch clone-url ssh-url private]} (:repository payload)
         ;; TODO Ensure idx uniqueness over repo
         idx (s/find-next-build-idx st [customer-id repo-id])
-        build-id (str "build-" idx)
+        build-id (c/new-build-id idx)
         commit-id (get-in payload [:head-commit :id])
         ssh-keys (find-ssh-keys st customer-id repo-id)
         build (-> init-build
@@ -71,7 +71,7 @@
                          ;; Do not use the commit timestamp, because when triggered from a tag
                          ;; this is still the time of the last commit, not of the tag creation.
                          :start-time (u/now)
-                         :status :running
+                         :status :initializing
                          :build-id build-id
                          :idx idx
                          :cleanup? true
@@ -212,4 +212,3 @@
   "Lists public github configuration to use"
   [req]
   (rur/response {:client-id (c/from-rt req (comp :client-id :github rt/config))}))
-

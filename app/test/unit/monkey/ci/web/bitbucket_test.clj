@@ -1,9 +1,12 @@
 (ns monkey.ci.web.bitbucket-test
   (:require [clojure.test :refer [deftest testing is]]
+            [clojure.spec.alpha :as spec]
             [buddy.sign.jwt :as jwt]
             [monkey.ci
+             [cuid :as cuid]
              [protocols :as p]
              [storage :as st]]
+            [monkey.ci.spec.build :as sb]
             [monkey.ci.web
              [auth :as auth]
              [bitbucket :as sut]]
@@ -121,4 +124,46 @@
                             :headers {"host" "localhost"}
                             :uri "/customer")
                      (sut/watch-repo)
+                     :status))))))
+
+(deftest webhook
+  (let [rt (trt/test-runtime)]
+    (testing "triggers build for webhook"
+      (let [runs (atom [])
+            rt (-> rt
+                   (trt/set-runner (fn [build _]
+                                     (swap! runs conj build))))
+            wh (->> (repeatedly cuid/random-cuid)
+                    (zipmap [:customer-id :repo-id :id]))
+            _ (st/save-webhook (:storage rt) wh)
+            resp (-> rt
+                     (h/->req)
+                     (assoc :headers {"x-event-key" "repo:push"}
+                            :parameters
+                            {:path
+                             {:id (:id wh)}})
+                     (sut/webhook))]
+        (is (= 202 (:status resp)))
+        (is (re-matches #"^build-\d+$" (get-in resp [:body :build-id])))
+        (is (not= :timeout (h/wait-until #(not-empty @runs) 500)))
+        (let [build (first @runs)]
+          (is (spec/valid? ::sb/build build)
+              (spec/explain-str ::sb/build build))
+          (is (some? (:git build)) "contains git info"))))
+
+    (testing "404 if webhook does not exist"
+      (is (= 404 (-> rt
+                     (h/->req)
+                     (assoc :headers {"x-event-key" "repo:push"}
+                            :parameters
+                            {:path
+                             {:id (cuid/random-cuid)}})
+                     (sut/webhook)
+                     :status))))
+
+    (testing "ignoring non-push events"
+      (is (= 200 (-> rt
+                     (h/->req)
+                     (assoc :headers {"x-event-key" "some:other"})
+                     (sut/webhook)
                      :status))))))
