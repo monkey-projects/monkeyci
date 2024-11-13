@@ -126,6 +126,56 @@
                      (sut/watch-repo)
                      :status))))))
 
+(deftest unwatch-repo
+  (h/with-memory-store st
+    (let [ws "test-workspace"
+          repo-slug "test-repo"
+          wh-uuid (str (random-uuid))
+          repo (h/gen-repo)
+          cust (-> (h/gen-cust)
+                   (assoc :repos {(:id repo) repo}))
+          wh {:customer-id (:id cust)
+              :repo-id (:id repo)
+              :id (cuid/random-cuid)}
+          bb-wh {:id (cuid/random-cuid)
+                 :webhook-id (:id wh)
+                 :bitbucket-id wh-uuid
+                 :workspace ws
+                 :repo-slug repo-slug}
+          inv (atom [])]
+      
+      (is (some? (st/save-customer st cust)))
+      (is (some? (st/save-webhook st wh)))
+      (is (some? (st/save-bb-webhook st bb-wh)))
+
+      (at/with-fake-http [{:url (format "https://api.bitbucket.org/2.0/repositories/%s/%s/hooks/%s"
+                                        ws repo-slug wh-uuid)
+                           :request-method :delete}
+                          (fn [req]
+                            (swap! inv conj req)
+                            {:status 204
+                             :headers {"Content-Type" "application/json"}})]
+        (is (= 204 (-> {:storage st}
+                       (h/->req)
+                       (assoc :parameters
+                              {:path
+                               {:customer-id (:id cust)
+                                :repo-id (:id repo)}})
+                       (sut/unwatch-repo)
+                       :status)))
+        
+        (testing "deletes webhook records from database"
+          (is (nil? (st/find-webhook st (:id wh)))))
+        
+        (testing "deletes webhook in bitbucket"
+          (is (= 1 (count @inv)))))
+
+      (testing "404 when repo not found"
+        (is (= 404 (-> {:storage st}
+                       (h/->req)
+                       (sut/unwatch-repo)
+                       :status)))))))
+
 (deftest webhook
   (let [rt (-> (trt/test-runtime)
                (assoc :config {:ssh-keys-dir "/tmp"}))

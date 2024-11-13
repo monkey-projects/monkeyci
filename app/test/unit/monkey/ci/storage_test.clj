@@ -8,7 +8,7 @@
              [time :as t]]
             [monkey.ci.helpers :as h]))
 
-(deftest webhook-details
+(deftest webhooks
   (testing "webhook-sid is a sid"
     (is (sid/sid? (sut/webhook-sid "test-id"))))
   
@@ -17,7 +17,18 @@
       (let [id (cuid/random-cuid)
             d {:id id}]
         (is (sid/sid? (sut/save-webhook st d)))
-        (is (= d (sut/find-webhook st id)))))))
+        (is (= d (sut/find-webhook st id))))))
+
+  (h/with-memory-store st
+    (let [wh (h/gen-webhook)]
+      (is (sid/sid? (sut/save-webhook st wh)))
+      
+      (testing "can find for repo"
+        (is (= [wh] (sut/find-webhooks-for-repo st [(:customer-id wh) (:repo-id wh)]))))
+
+      (testing "can delete"
+        (is (true? (sut/delete-webhook st (:id wh))))
+        (is (nil? (sut/find-webhook st (:id wh))))))))
 
 (deftest build-metadata
   (testing "can create and find"

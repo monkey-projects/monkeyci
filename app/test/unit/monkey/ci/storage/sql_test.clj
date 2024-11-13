@@ -196,7 +196,14 @@
         
         (testing "can create and retrieve"
           (is (sid/sid? (st/save-webhook s wh)))
-          (is (= wh (st/find-webhook s (:id wh)))))))))
+          (is (= wh (st/find-webhook s (:id wh)))))
+
+        (testing "can find by repo"
+          (is (= [wh] (st/find-webhooks-for-repo s [(:id cust) (:id repo)]))))
+
+        (testing "can delete"
+          (is (true? (st/delete-webhook s (:id wh))))
+          (is (nil? (st/find-webhook s (:id wh)))))))))
 
 (deftest ^:sql customer-params
   (with-storage conn s

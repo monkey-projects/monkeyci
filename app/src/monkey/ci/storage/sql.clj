@@ -211,10 +211,14 @@
     (insert-webhook conn wh)))
 
 (defn- select-webhook [conn cuid]
-  (-> (ewh/select-webhook-as-entity conn cuid)
-      (first)
-      (update :id str)
-      (update :customer-id str)))
+  (-> (ewh/select-webhooks-as-entity conn (ewh/by-cuid cuid))
+      (first)))
+
+(defn- select-repo-webhooks [{:keys [conn]} [cust-id repo-id]]
+  (ewh/select-webhooks-as-entity conn (ewh/by-repo cust-id repo-id)))
+
+(defn- delete-webhook [conn cuid]
+  (ec/delete-webhooks conn (ec/by-cuid cuid)))
 
 (defn- top-sid? [type sid]
   (and (= 2 (count sid))
@@ -804,6 +808,8 @@
        (delete-customer conn (global-sid->cuid sid))
        email-registration?
        (delete-email-registration conn (global-sid->cuid sid))
+       webhook?
+       (delete-webhook conn (last sid))
        (log/warn "Deleting entity" sid "is not supported"))))
 
   (list-obj [_ sid]
@@ -870,6 +876,7 @@
    :repo
    {:list-display-ids select-repo-display-ids
     :find-next-build-idx (comp (fnil inc 0) select-max-build-idx)
+    :find-webhooks select-repo-webhooks
     :delete delete-repo}
    :user
    {:find select-user

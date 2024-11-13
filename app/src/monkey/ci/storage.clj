@@ -223,6 +223,19 @@
 
 (def ^:deprecated find-details-for-webhook find-webhook)
 
+(defn delete-webhook [s id]
+  (p/delete-obj s (webhook-sid id)))
+
+(def find-webhooks-for-repo
+  (override-or
+   [:repo :find-webhooks]
+   (fn [s sid]
+     (->> (p/list-obj s (webhook-sid))
+          (map (partial find-webhook s))
+          (filter (comp (partial = sid) (juxt :customer-id :repo-id)))
+          (map (comp (partial find-webhook s) :id))
+          (doall)))))
+
 (def bb-webhooks :bb-webhooks)
 (def bb-webhook-sid (partial global-sid bb-webhooks))
 

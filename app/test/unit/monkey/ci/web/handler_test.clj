@@ -477,13 +477,15 @@
                   app (make-test-app st)
                   repo-id (st/new-id)
                   wh-id (st/new-id)
+                  _ (st/save-customer st {:id cust-id
+                                          :repos {repo-id {:id repo-id}}})
                   _ (st/save-webhook st {:customer-id cust-id
                                          :repo-id repo-id
                                          :id wh-id
                                          :secret (str (random-uuid))})
                   _ (st/save-bb-webhook st {:webhook-id wh-id
                                             :bitbucket-id (str (random-uuid))})]
-              (is (= 200 (-> (mock/request :post
+              (is (= 204 (-> (mock/request :post
                                            (format "/customer/%s/repo/%s/bitbucket/unwatch" cust-id repo-id))
                              (app)
                              :status))))))))))

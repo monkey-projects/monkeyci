@@ -97,6 +97,15 @@
                                        :bitbucket-id (get-in bb-resp [:body :uuid]))))
       (throw (ex-info "Unable to create bitbucket webhook" bb-resp)))))
 
+(defn- delete-bb-webhook
+  "Deletes the webhook with given uuid from the workspace/repo in Bitbucket"
+  [req wh]
+  @(-> (auth-req {:path (format "/repositories/%s/%s/hooks/%s"
+                                (:workspace wh) (:repo-slug wh) (:bitbucket-id wh))
+                  :request-method :delete}
+                 (:token (c/body req)))
+       (md/chain c/parse-body)))
+
 (defn watch-repo
   "Starts watching a Bitbucket repo.  This installs a webhook in the repository,
    or reactivates it if it already exists.  We keep track of the returned webhook 
@@ -128,8 +137,21 @@
 (defn unwatch-repo
   "Unwatches Bitbucket repo by deactivating any existing webhook."
   [req]
-  ;; TODO Deactivate the BB webhook and delete associated record
-  (rur/response "todo"))
+  (let [s (c/req->storage req)
+        cust-and-repo (comp (juxt :customer-id :repo-id) :path :parameters)
+        repo-sid (cust-and-repo req)
+        repo (st/find-repo s repo-sid)]
+    (if repo
+      (if-let [wh (st/find-webhooks-for-repo s repo-sid)]
+        (do
+          (doseq [w wh]
+            (when-let [bb (st/find-bb-webhook-for-webhook s (:id w))]
+              (delete-bb-webhook req bb))
+            (st/delete-webhook s (:id w)))
+          (rur/status 204))
+        ;; Webhook not found, do nothing
+        (rur/status 200))
+      (c/error-response "Repo not found" 404))))
 
 (defn- git-ref [payload]
   (let [{:keys [name type]} (get-in payload [:push :new])]
