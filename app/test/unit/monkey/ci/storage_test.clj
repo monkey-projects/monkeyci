@@ -8,7 +8,7 @@
              [time :as t]]
             [monkey.ci.helpers :as h]))
 
-(deftest webhook-details
+(deftest webhooks
   (testing "webhook-sid is a sid"
     (is (sid/sid? (sut/webhook-sid "test-id"))))
   
@@ -17,7 +17,18 @@
       (let [id (cuid/random-cuid)
             d {:id id}]
         (is (sid/sid? (sut/save-webhook st d)))
-        (is (= d (sut/find-webhook st id)))))))
+        (is (= d (sut/find-webhook st id))))))
+
+  (h/with-memory-store st
+    (let [wh (h/gen-webhook)]
+      (is (sid/sid? (sut/save-webhook st wh)))
+      
+      (testing "can find for repo"
+        (is (= [wh] (sut/find-webhooks-for-repo st [(:customer-id wh) (:repo-id wh)]))))
+
+      (testing "can delete"
+        (is (true? (sut/delete-webhook st (:id wh))))
+        (is (nil? (sut/find-webhook st (:id wh))))))))
 
 (deftest build-metadata
   (testing "can create and find"
@@ -415,10 +426,23 @@
 
 (deftest bitbucket-webhooks
   (h/with-memory-store st
-    (let [wh (h/gen-bb-webhook)]
+    (let [wh (h/gen-webhook)
+          bb (-> (h/gen-bb-webhook)
+                 (assoc :webhook-id (:id wh)))]
+      (is (sid/sid? (sut/save-webhook st wh)))
+      
       (testing "can save and find"
-        (is (sid/sid? (sut/save-bb-webhook st wh)))
-        (is (= wh (sut/find-bb-webhook st (:id wh)))))
+        (is (sid/sid? (sut/save-bb-webhook st bb)))
+        (is (= bb (sut/find-bb-webhook st (:id bb)))))
 
       (testing "can find for webhook id"
-        (is (= wh (sut/find-bb-webhook-for-webhook st (:webhook-id wh))))))))
+        (is (= bb (sut/find-bb-webhook-for-webhook st (:webhook-id bb)))))
+
+      (testing "can search using filter"
+        (is (= [(merge bb (select-keys wh [:customer-id :repo-id]))]
+               (sut/search-bb-webhooks st (select-keys bb [:webhook-id])))
+            "search by webhook id")
+        (is (= [(:id bb)] (->> (sut/search-bb-webhooks st (select-keys wh [:customer-id]))
+                               (map :id)))
+            "search by customer id")
+        (is (empty? (sut/search-bb-webhooks st {:customer-id "nonexisting"})))))))

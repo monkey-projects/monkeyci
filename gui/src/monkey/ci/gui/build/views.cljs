@@ -19,9 +19,9 @@
   (let [status-desc {:pending      "The build is waiting to be picked up by a runner."
                      :initializing "Compute capacity is being provisioned."
                      :running      "The build script is running."
-                     :success      "The build has completed succesfully."
+                     :success      "The build has completed successfully."
                      :error        "The build has failed."
-                     :canceled     "The buld has been canceled."}]
+                     :canceled     "The build has been canceled."}]
     [:div.d-flex.gap-4.align-items-center
      [build-status-icon status]
      [:div

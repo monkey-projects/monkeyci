@@ -69,6 +69,7 @@
   (rur/response {:client-id (c/from-rt req (comp :client-id :bitbucket rt/config))}))
 
 (defn- ext-webhook-url [req wh]
+  (log/debug "Determining external webhook url using request with headers:" (:headers req))
   (str (c/req->ext-uri req "/customer") "/webhook/bitbucket/" (:id wh)))
 
 (defn- create-bb-webhook [req wh]
@@ -96,6 +97,16 @@
                                        :webhook-id (:id wh)
                                        :bitbucket-id (get-in bb-resp [:body :uuid]))))
       (throw (ex-info "Unable to create bitbucket webhook" bb-resp)))))
+
+(defn- delete-bb-webhook
+  "Deletes the webhook with given uuid from the workspace/repo in Bitbucket"
+  [req wh]
+  (log/debug "Deleting Bitbucket webhook:" wh)
+  @(-> (auth-req {:path (format "/repositories/%s/%s/hooks/%s"
+                                (:workspace wh) (:repo-slug wh) (:bitbucket-id wh))
+                  :request-method :delete}
+                 (:token (c/body req)))
+       (md/chain c/parse-body)))
 
 (defn watch-repo
   "Starts watching a Bitbucket repo.  This installs a webhook in the repository,
@@ -128,8 +139,20 @@
 (defn unwatch-repo
   "Unwatches Bitbucket repo by deactivating any existing webhook."
   [req]
-  ;; TODO Deactivate the BB webhook and delete associated record
-  (rur/response "todo"))
+  (let [s (c/req->storage req)
+        cust-and-repo (comp (juxt :customer-id :repo-id) :path :parameters)
+        repo-sid (cust-and-repo req)
+        repo (st/find-repo s repo-sid)]
+    (if repo
+      (do
+        ;; When webhook not found, do nothing, but return ok
+        (when-let [wh (st/find-webhooks-for-repo s repo-sid)]
+          (doseq [w wh]
+            (when-let [bb (st/find-bb-webhook-for-webhook s (:id w))]
+              (delete-bb-webhook req bb))
+            (st/delete-webhook s (:id w))))
+        (rur/status 200))
+      (c/error-response "Repo not found" 404))))
 
 (defn- git-ref [payload]
   (let [{:keys [name type]} (get-in payload [:push :new])]
@@ -181,6 +204,15 @@
     (condp = type
       "repo:push" (handle-push req)
       (handle-unsupported type))))
+
+(defn list-webhooks
+  "Lists all bitbucket webhooks for customer, possibly filtered by repo"
+  [req]
+  (let [cust-id (c/customer-id req)
+        st (c/req->storage req)
+        params (:parameters req)
+        matches (st/search-bb-webhooks st (merge (:path params) (:query params)))]
+    (rur/response matches)))
 
 (defn validate-security
   "Validates bitbucket hmac signature header"

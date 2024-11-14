@@ -84,3 +84,8 @@
 
 (defn set-ext-repo-filter [db f]
   (assoc db ext-repo-filter f))
+
+(def bb-webhooks ::bb-webhooks)
+
+(defn set-bb-webhooks [db wh]
+  (assoc db bb-webhooks wh))

@@ -12,6 +12,7 @@
 (u/db-sub :customer/group-by-lbl db/get-group-by-lbl)
 (u/db-sub :customer/repo-filter db/get-repo-filter)
 (u/db-sub :customer/ext-repo-filter db/get-ext-repo-filter)
+(u/db-sub :customer/bb-webhooks db/bb-webhooks)
 
 (rf/reg-sub
  :customer/info
@@ -64,13 +65,24 @@
  :customer/bitbucket-repos
  :<- [:bitbucket/repos]
  :<- [:customer/ext-repo-filter]
- (fn [[r ef] _]
-   (letfn [(matches-filter? [{:keys [name]}]
-             (or (nil? ef) (cs/includes? (cs/lower-case name) (cs/lower-case ef))))]
-     ;; TODO Watching
-     (->> r
-          (filter matches-filter?)
-          (sort-by :name)))))
+ :<- [:customer/bb-webhooks]
+ (fn [[r ef wh] _]
+   (let [wh-by-id (group-by (juxt :workspace :repo-slug) wh)
+         watched? (->> (keys wh-by-id)
+                       (set))]
+     (letfn [(matches-filter? [{:keys [name]}]
+               (or (nil? ef) (cs/includes? (cs/lower-case name) (cs/lower-case ef))))
+             (mark-watched [r]
+               (let [id [(get-in r [:workspace :slug]) (:slug r)]]
+                 (cond-> r
+                   (watched? id)
+                   (assoc :monkeyci/watched? true
+                          :monkeyci/webhook (->> (get wh-by-id id)
+                                                 (first))))))]
+       (->> r
+            (filter matches-filter?)
+            (map mark-watched)
+            (sort-by :name))))))
 
 (rf/reg-sub
  :customer/recent-builds

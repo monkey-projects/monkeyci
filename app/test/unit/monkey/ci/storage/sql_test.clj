@@ -196,7 +196,14 @@
         
         (testing "can create and retrieve"
           (is (sid/sid? (st/save-webhook s wh)))
-          (is (= wh (st/find-webhook s (:id wh)))))))))
+          (is (= wh (st/find-webhook s (:id wh)))))
+
+        (testing "can find by repo"
+          (is (= [wh] (st/find-webhooks-for-repo s [(:id cust) (:id repo)]))))
+
+        (testing "can delete"
+          (is (true? (st/delete-webhook s (:id wh))))
+          (is (nil? (st/find-webhook s (:id wh)))))))))
 
 (deftest ^:sql customer-params
   (with-storage conn s
@@ -612,7 +619,15 @@
         (is (= bb-wh (st/find-bb-webhook st (:id bb-wh)))))
 
       (testing "can find by webhook id"
-        (is (= bb-wh (st/find-bb-webhook-for-webhook st (:id wh))))))))
+        (is (= bb-wh (st/find-bb-webhook-for-webhook st (:id wh)))))
+
+      (testing "can search by filter"
+        (is (= [(merge bb-wh (select-keys wh [:customer-id :repo-id]))]
+               (st/search-bb-webhooks st {:customer-id (:id cust)})))
+        (is (= [(:id bb-wh)]
+               (->> (st/search-bb-webhooks st {:webhook-id (:id wh)})
+                    (map :id))))
+        (is (empty? (st/search-bb-webhooks st {:customer-id "nonexisting"})))))))
 
 (deftest make-storage
   (testing "creates sql storage object using connection settings"

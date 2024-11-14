@@ -12,6 +12,7 @@
             [meta-merge.core :as mm]
             [monkey.ci
              [artifacts :as a]
+             [cuid :as cuid]
              [logging :as l]
              [metrics :as m]
              [storage :as st]
@@ -374,7 +375,43 @@
           (testing "`GET` retrieves customer credit details"
             (is (= 200 (-> (mock/request :get (str "/customer/" (:id cust) "/credits"))
                            (app)
-                           :status))))))))
+                           :status)))))
+
+        (testing "`/webhook/bitbucket`"
+          (let [repo (h/gen-repo)
+                cust (assoc cust :repos {(:id repo) repo})
+                wh {:id (cuid/random-cuid)
+                    :customer-id (:id cust)
+                    :repo-id (:id repo)
+                    :secret "test secret"}
+                bb {:webhook-id (:id wh)
+                    :workspace "test-ws"
+                    :repo-slug "test-repo"
+                    :bitbucket-id (str (random-uuid))}
+                search (fn [path]
+                         (-> (mock/request :get (str (format "/customer/%s/webhook/bitbucket" (:id cust)) path))
+                             (app)
+                             :body
+                             slurp
+                             (h/parse-json)))
+                select-props #(select-keys % (keys bb))]
+            (is (some? (st/save-customer st cust)))
+            (is (some? (st/save-webhook st wh)))
+            (is (some? (st/save-bb-webhook st bb)))
+            
+            (testing "`GET` lists bitbucket webhooks for customer"
+              (is (= [bb] (->> (search "")
+                               (map select-props)))))
+
+            (testing "contains customer and repo id"
+              (let [r (-> (search "") first)]
+                (is (= (:id cust) (:customer-id r)))
+                (is (= (:id repo) (:repo-id r)))))
+            
+            (testing "allows filtering by query params"
+              (is (= [bb] (->> (search "?workspace=test-ws")
+                               (map select-props))))
+              (is (empty? (search "?repo-id=nonexisting")))))))))
 
   (h/with-memory-store st
     (let [kp (auth/generate-keypair)
@@ -477,14 +514,17 @@
                   app (make-test-app st)
                   repo-id (st/new-id)
                   wh-id (st/new-id)
+                  _ (st/save-customer st {:id cust-id
+                                          :repos {repo-id {:id repo-id}}})
                   _ (st/save-webhook st {:customer-id cust-id
                                          :repo-id repo-id
                                          :id wh-id
                                          :secret (str (random-uuid))})
                   _ (st/save-bb-webhook st {:webhook-id wh-id
                                             :bitbucket-id (str (random-uuid))})]
-              (is (= 200 (-> (mock/request :post
-                                           (format "/customer/%s/repo/%s/bitbucket/unwatch" cust-id repo-id))
+              (is (= 200 (-> (h/json-request :post
+                                             (format "/customer/%s/repo/%s/bitbucket/unwatch" cust-id repo-id)
+                                             {:token "test-token"})
                              (app)
                              :status))))))))))
 

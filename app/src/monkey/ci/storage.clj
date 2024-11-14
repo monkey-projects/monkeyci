@@ -223,6 +223,19 @@
 
 (def ^:deprecated find-details-for-webhook find-webhook)
 
+(defn delete-webhook [s id]
+  (p/delete-obj s (webhook-sid id)))
+
+(def find-webhooks-for-repo
+  (override-or
+   [:repo :find-webhooks]
+   (fn [s sid]
+     (->> (p/list-obj s (webhook-sid))
+          (map (partial find-webhook s))
+          (filter (comp (partial = sid) (juxt :customer-id :repo-id)))
+          (map (comp (partial find-webhook s) :id))
+          (doall)))))
+
 (def bb-webhooks :bb-webhooks)
 (def bb-webhook-sid (partial global-sid bb-webhooks))
 
@@ -236,15 +249,30 @@
   [s id]
   (p/read-obj s (bb-webhook-sid id)))
 
+(def search-bb-webhooks
+  "Retrieves bitbucket webhook that match given filter, and adds customer and repo ids."
+  (let [wh-props #{:customer-id :repo-id}]
+    (override-or
+     [:bitbucket :search-webhooks]
+     (fn [s f]
+       (letfn [(add-webhook [bb-wh]
+                 (merge bb-wh (-> (find-webhook s (:webhook-id bb-wh))
+                                  (select-keys [:customer-id :repo-id]))))
+               (matches-filter? [bb-wh]
+                 (= f (select-keys bb-wh (keys f))))]
+         (->> (p/list-obj s (bb-webhook-sid))
+              (map (partial find-bb-webhook s))
+              (map add-webhook)
+              (filter matches-filter?)))))))
+
 (def find-bb-webhook-for-webhook
   "Retrieves bitbucket webhook given an internal webhook id"
   (override-or
    [:bitbucket :find-for-webhook]
    (fn [s wh-id]
-     (->> (p/list-obj s (bb-webhook-sid))
-          (map (partial find-bb-webhook s))
-          (filter (cp/prop-pred :webhook-id wh-id))
-          (first)))))
+     (some-> (search-bb-webhooks s {:webhook-id wh-id})
+             (first)
+             (dissoc :customer-id :repo-id)))))
 
 (def builds "builds")
 (def build-sid-keys [:customer-id :repo-id :build-id])

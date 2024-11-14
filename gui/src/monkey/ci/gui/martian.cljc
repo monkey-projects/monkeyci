@@ -271,6 +271,22 @@
      :path-parts (conj repo-path "/github/unwatch")
      :path-schema repo-schema})
 
+   (api-route
+    {:route-name :unwatch-bitbucket-repo
+     :method :post
+     :path-parts (conj repo-path "/bitbucket/unwatch")
+     :path-schema repo-schema
+     :body-schema {:repo {:token s/Str}}})
+
+   (api-route
+    {:route-name :search-bitbucket-webhooks
+     :path-parts (conj customer-path "/webhook/bitbucket")
+     :path-schema customer-schema
+     :query-schema {(s/optional-key :repo-id) s/Str
+                    (s/optional-key :workspace) s/Str
+                    (s/optional-key :repo-slug) s/Str
+                    (s/optional-key :bitbucket-id) s/Str}})
+
    (public-route
     {:route-name :get-version
      :method :get

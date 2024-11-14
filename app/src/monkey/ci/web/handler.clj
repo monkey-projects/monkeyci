@@ -258,7 +258,9 @@
   ["" [["/github"
         [["/unwatch" {:post {:handler github/unwatch-repo}}]]]
        ["/bitbucket"
-        [["/unwatch" {:post {:handler bitbucket/unwatch-repo}}]]]]])
+        [["/unwatch" {:post {:handler bitbucket/unwatch-repo
+                             :parameters
+                             {:body {:token s/Str}}}}]]]]])
 
 (def repo-routes
   ["/repo"
@@ -312,6 +314,15 @@
 (def credit-routes
   ["/credits" {:get {:handler cust-api/credits}}])
 
+(def cust-webhook-routes
+  ["/webhook"
+   [["/bitbucket" {:get {:handler bitbucket/list-webhooks
+                         :parameters
+                         {:query {(s/optional-key :repo-id) s/Str
+                                  (s/optional-key :workspace) s/Str
+                                  (s/optional-key :repo-slug) s/Str
+                                  (s/optional-key :bitbucket-id) s/Str}}}}]]])
+
 (def customer-routes
   ["/customer"
    {:middleware [:customer-check]}
@@ -331,7 +342,8 @@
                     event-stream-routes
                     customer-build-routes
                     stats-routes
-                    credit-routes]})])
+                    credit-routes
+                    cust-webhook-routes]})])
 
 (def github-routes
   ["/github" [["/login" {:post
