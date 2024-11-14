@@ -22,7 +22,11 @@
   "Selects bitbucket webhook including customers and repos"
   [conn f]
   (->> (-> base-query
-           (assoc :where f)
+           (assoc :select [:bb.*
+                           [:wh.cuid :wh-cuid]
+                           [:c.cuid :customer-id]
+                           [:r.display-id :repo-id]]
+                  :where f)
            (update :join concat [[:repos :r] [:= :r.id :wh.repo-id]
                                  [:customers :c] [:= :c.id :r.customer-id]]))
        (ec/select conn)

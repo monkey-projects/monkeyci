@@ -439,8 +439,10 @@
         (is (= bb (sut/find-bb-webhook-for-webhook st (:webhook-id bb)))))
 
       (testing "can search using filter"
-        (is (= [bb] (sut/search-bb-webhooks st (select-keys bb [:webhook-id])))
+        (is (= [(merge bb (select-keys wh [:customer-id :repo-id]))]
+               (sut/search-bb-webhooks st (select-keys bb [:webhook-id])))
             "search by webhook id")
-        (is (= [bb] (sut/search-bb-webhooks st (select-keys wh [:customer-id])))
+        (is (= [(:id bb)] (->> (sut/search-bb-webhooks st (select-keys wh [:customer-id]))
+                               (map :id)))
             "search by customer id")
         (is (empty? (sut/search-bb-webhooks st {:customer-id "nonexisting"})))))))

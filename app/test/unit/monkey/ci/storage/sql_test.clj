@@ -622,8 +622,11 @@
         (is (= bb-wh (st/find-bb-webhook-for-webhook st (:id wh)))))
 
       (testing "can search by filter"
-        (is (= [bb-wh] (st/search-bb-webhooks st {:customer-id (:id cust)})))
-        (is (= [bb-wh] (st/search-bb-webhooks st {:webhook-id (:id wh)})))
+        (is (= [(merge bb-wh (select-keys wh [:customer-id :repo-id]))]
+               (st/search-bb-webhooks st {:customer-id (:id cust)})))
+        (is (= [(:id bb-wh)]
+               (->> (st/search-bb-webhooks st {:webhook-id (:id wh)})
+                    (map :id))))
         (is (empty? (st/search-bb-webhooks st {:customer-id "nonexisting"})))))))
 
 (deftest make-storage

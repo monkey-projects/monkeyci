@@ -65,13 +65,20 @@
  :customer/bitbucket-repos
  :<- [:bitbucket/repos]
  :<- [:customer/ext-repo-filter]
- (fn [[r ef] _]
-   (letfn [(matches-filter? [{:keys [name]}]
-             (or (nil? ef) (cs/includes? (cs/lower-case name) (cs/lower-case ef))))]
-     ;; TODO Watching
-     (->> r
-          (filter matches-filter?)
-          (sort-by :name)))))
+ :<- [:customer/bb-webhooks]
+ (fn [[r ef wh] _]
+   (let [watched? (->> wh
+                       (map (juxt :workspace :repo-slug))
+                       (set))]
+     (letfn [(matches-filter? [{:keys [name]}]
+               (or (nil? ef) (cs/includes? (cs/lower-case name) (cs/lower-case ef))))
+             (mark-watched [r]
+               (cond-> r
+                 (watched? [(get-in r [:workspace :slug]) (:slug r)]) (assoc :monkeyci/watched? true)))]
+       (->> r
+            (filter matches-filter?)
+            (map mark-watched)
+            (sort-by :name))))))
 
 (rf/reg-sub
  :customer/recent-builds

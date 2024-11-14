@@ -393,16 +393,24 @@
                              (app)
                              :body
                              slurp
-                             (h/parse-json)))]
+                             (h/parse-json)))
+                select-props #(select-keys % (keys bb))]
             (is (some? (st/save-customer st cust)))
             (is (some? (st/save-webhook st wh)))
             (is (some? (st/save-bb-webhook st bb)))
             
             (testing "`GET` lists bitbucket webhooks for customer"
-              (is (= [bb] (search ""))))
+              (is (= [bb] (->> (search "")
+                               (map select-props)))))
+
+            (testing "contains customer and repo id"
+              (let [r (-> (search "") first)]
+                (is (= (:id cust) (:customer-id r)))
+                (is (= (:id repo) (:repo-id r)))))
             
             (testing "allows filtering by query params"
-              (is (= [bb] (search "?workspace=test-ws")))
+              (is (= [bb] (->> (search "?workspace=test-ws")
+                               (map select-props))))
               (is (empty? (search "?repo-id=nonexisting")))))))))
 
   (h/with-memory-store st

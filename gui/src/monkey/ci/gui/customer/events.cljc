@@ -62,9 +62,9 @@
    (let [cust (db/get-customer db)]
      {:dispatch [:secure-request
                  :search-bitbucket-webhooks
-                 {:customer-id (:id cust)
-                  [:customer/load-bb-webhooks--success]
-                  [:customer/load-bb-webhooks--failed]}]})))
+                 {:customer-id (:id cust)}
+                 [:customer/load-bb-webhooks--success]
+                 [:customer/load-bb-webhooks--failed]]})))
 
 (rf/reg-event-db
  :customer/load-bb-webhooks--success

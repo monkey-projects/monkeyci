@@ -97,7 +97,9 @@
 
     (testing "returns repos from db"
       (let [l [{:uuid "test-repo"
-                :name "test repo"}]]
+                :name "test repo"
+                :slug "test-repo"
+                :workspace {:slug "test-ws"}}]]
         (is (map? (reset! app-db (bb/set-repos {} l))))
         (is (= ["test-repo"] (map :uuid @r)))))
 
@@ -111,14 +113,19 @@
                                                               :github-id "github-repo-id"}]})))))
       (is (= "test-repo" (-> @r first :monkeyci/repo :id))))
 
+    (testing "marks watched repos"
+      (is (some? (swap! app-db db/set-bb-webhooks [{:id "test-bb-webhook"
+                                                    :webhook-id "test-webhook-id"
+                                                    :workspace "test-ws"
+                                                    :repo-slug "test-repo"
+                                                    :bitbucket-id "test-bb-id"}])))
+      (is (true? (:monkeyci/watched? (first @r)))))
+
     (testing "applies filter"
       (is (some? (swap! app-db db/set-ext-repo-filter "test")))
       (is (= 1 (count @r)))
       (is (some? (swap! app-db db/set-ext-repo-filter "other")))
-      (is (empty? @r)))
-
-    (testing "marks watched repos"
-      )))
+      (is (empty? @r)))))
 
 (deftest repo-alerts
   (let [a (rf/subscribe [:customer/repo-alerts])]
