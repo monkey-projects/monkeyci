@@ -12,6 +12,7 @@
             [meta-merge.core :as mm]
             [monkey.ci
              [artifacts :as a]
+             [cuid :as cuid]
              [logging :as l]
              [metrics :as m]
              [storage :as st]
@@ -374,7 +375,35 @@
           (testing "`GET` retrieves customer credit details"
             (is (= 200 (-> (mock/request :get (str "/customer/" (:id cust) "/credits"))
                            (app)
-                           :status))))))))
+                           :status)))))
+
+        (testing "`/webhook/bitbucket`"
+          (let [repo (h/gen-repo)
+                cust (assoc cust :repos {(:id repo) repo})
+                wh {:id (cuid/random-cuid)
+                    :customer-id (:id cust)
+                    :repo-id (:id repo)
+                    :secret "test secret"}
+                bb {:webhook-id (:id wh)
+                    :workspace "test-ws"
+                    :repo-slug "test-repo"
+                    :bitbucket-id (str (random-uuid))}
+                search (fn [path]
+                         (-> (mock/request :get (str (format "/customer/%s/webhook/bitbucket" (:id cust)) path))
+                             (app)
+                             :body
+                             slurp
+                             (h/parse-json)))]
+            (is (some? (st/save-customer st cust)))
+            (is (some? (st/save-webhook st wh)))
+            (is (some? (st/save-bb-webhook st bb)))
+            
+            (testing "`GET` lists bitbucket webhooks for customer"
+              (is (= [bb] (search ""))))
+            
+            (testing "allows filtering by query params"
+              (is (= [bb] (search "?workspace=test-ws")))
+              (is (empty? (search "?repo-id=nonexisting")))))))))
 
   (h/with-memory-store st
     (let [kp (auth/generate-keypair)

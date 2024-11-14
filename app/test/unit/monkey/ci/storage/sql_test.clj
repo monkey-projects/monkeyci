@@ -619,7 +619,12 @@
         (is (= bb-wh (st/find-bb-webhook st (:id bb-wh)))))
 
       (testing "can find by webhook id"
-        (is (= bb-wh (st/find-bb-webhook-for-webhook st (:id wh))))))))
+        (is (= bb-wh (st/find-bb-webhook-for-webhook st (:id wh)))))
+
+      (testing "can search by filter"
+        (is (= [bb-wh] (st/search-bb-webhooks st {:customer-id (:id cust)})))
+        (is (= [bb-wh] (st/search-bb-webhooks st {:webhook-id (:id wh)})))
+        (is (empty? (st/search-bb-webhooks st {:customer-id "nonexisting"})))))))
 
 (deftest make-storage
   (testing "creates sql storage object using connection settings"

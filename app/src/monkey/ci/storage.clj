@@ -249,14 +249,32 @@
   [s id]
   (p/read-obj s (bb-webhook-sid id)))
 
+(def search-bb-webhooks
+  "Retrieves bitbucket webhook that match given filter"
+  (let [wh-props #{:customer-id :repo-id}]
+    (override-or
+     [:bitbucket :search-webhooks]
+     (fn [s f]
+       (let [wh-f (select-keys f wh-props)
+             bb-f (apply dissoc f (keys wh-f))]
+         (letfn [(matches-filter? [bb-wh]
+                   (let [wh (when (not-empty wh-f)
+                              (find-webhook s (:webhook-id bb-wh)))]
+                     (and
+                      (or (nil? wh)
+                          (= wh-f (select-keys wh (keys wh-f))))
+                      (or (empty? bb-f)
+                          (= bb-f (select-keys bb-wh (keys bb-f)))))))]
+           (->> (p/list-obj s (bb-webhook-sid))
+                (map (partial find-bb-webhook s))
+                (filter matches-filter?))))))))
+
 (def find-bb-webhook-for-webhook
   "Retrieves bitbucket webhook given an internal webhook id"
   (override-or
    [:bitbucket :find-for-webhook]
    (fn [s wh-id]
-     (->> (p/list-obj s (bb-webhook-sid))
-          (map (partial find-bb-webhook s))
-          (filter (cp/prop-pred :webhook-id wh-id))
+     (->> (search-bb-webhooks s {:webhook-id wh-id})
           (first)))))
 
 (def builds "builds")

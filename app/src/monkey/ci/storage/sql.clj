@@ -728,8 +728,13 @@
           (cuid->id)))
 
 (defn- select-bb-webhook-for-webhook [{:keys [conn]} cuid]
-  (some-> (ebbwh/select-bb-webhook conn (ebbwh/by-wh-cuid cuid))
+  (some-> (ebbwh/select-bb-webhooks conn (ebbwh/by-wh-cuid cuid))
+          (first)
           (cuid->id)))
+
+(defn- select-bb-webhooks-by-filter [{:keys [conn]} f]
+  (->> (ebbwh/select-bb-webhooks-with-repos conn (ebbwh/by-filter f))
+       (map cuid->id)))
 
 (defn- sid-pred [t sid]
   (t sid))
@@ -897,7 +902,8 @@
    :credit
    {:list-active-subscriptions select-active-credit-subs}
    :bitbucket
-   {:find-for-webhook select-bb-webhook-for-webhook}})
+   {:find-for-webhook select-bb-webhook-for-webhook
+    :search-webhooks select-bb-webhooks-by-filter}})
 
 (defn make-storage [conn]
   (map->SqlStorage {:conn conn

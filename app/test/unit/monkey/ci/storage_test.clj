@@ -426,10 +426,21 @@
 
 (deftest bitbucket-webhooks
   (h/with-memory-store st
-    (let [wh (h/gen-bb-webhook)]
+    (let [wh (h/gen-webhook)
+          bb (-> (h/gen-bb-webhook)
+                 (assoc :webhook-id (:id wh)))]
+      (is (sid/sid? (sut/save-webhook st wh)))
+      
       (testing "can save and find"
-        (is (sid/sid? (sut/save-bb-webhook st wh)))
-        (is (= wh (sut/find-bb-webhook st (:id wh)))))
+        (is (sid/sid? (sut/save-bb-webhook st bb)))
+        (is (= bb (sut/find-bb-webhook st (:id bb)))))
 
       (testing "can find for webhook id"
-        (is (= wh (sut/find-bb-webhook-for-webhook st (:webhook-id wh))))))))
+        (is (= bb (sut/find-bb-webhook-for-webhook st (:webhook-id bb)))))
+
+      (testing "can search using filter"
+        (is (= [bb] (sut/search-bb-webhooks st (select-keys bb [:webhook-id])))
+            "search by webhook id")
+        (is (= [bb] (sut/search-bb-webhooks st (select-keys wh [:customer-id])))
+            "search by customer id")
+        (is (empty? (sut/search-bb-webhooks st {:customer-id "nonexisting"})))))))
