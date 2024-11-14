@@ -333,6 +333,7 @@
 
 (defn add-bitbucket-repo-page []
   (rf/dispatch [:bitbucket/load-repos])
+  (rf/dispatch [:customer/load-bb-webhooks])
   [add-repo-page bitbucket-repo-table])
 
 (defn page-new

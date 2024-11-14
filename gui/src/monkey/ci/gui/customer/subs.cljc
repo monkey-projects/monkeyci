@@ -12,6 +12,7 @@
 (u/db-sub :customer/group-by-lbl db/get-group-by-lbl)
 (u/db-sub :customer/repo-filter db/get-repo-filter)
 (u/db-sub :customer/ext-repo-filter db/get-ext-repo-filter)
+(u/db-sub :customer/bb-webhooks db/bb-webhooks)
 
 (rf/reg-sub
  :customer/info

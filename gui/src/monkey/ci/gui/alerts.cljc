@@ -31,6 +31,9 @@
 (def bitbucket-repos-failed
   (error-msg "Unable to fetch repositories for Bitbucket workspace"))
 
+(def bitbucket-webhooks-failed
+  (error-msg "Unable to load Bitbucket webhooks"))
+
 (def repo-watch-failed
   (error-msg "Failed to watch repo"))
 

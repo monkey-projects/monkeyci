@@ -115,7 +115,10 @@
       (is (some? (swap! app-db db/set-ext-repo-filter "test")))
       (is (= 1 (count @r)))
       (is (some? (swap! app-db db/set-ext-repo-filter "other")))
-      (is (empty? @r)))))
+      (is (empty? @r)))
+
+    (testing "marks watched repos"
+      )))
 
 (deftest repo-alerts
   (let [a (rf/subscribe [:customer/repo-alerts])]
@@ -283,4 +286,11 @@
    [:customer/ext-repo-filter]
    #(db/set-ext-repo-filter % "test-filter")
    "test-filter"
+   nil))
+
+(deftest bb-webhooks
+  (h/verify-sub
+   [:customer/bb-webhooks]
+   #(db/set-bb-webhooks % ::test-webhooks)
+   ::test-webhooks
    nil))

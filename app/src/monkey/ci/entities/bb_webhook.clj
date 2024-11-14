@@ -55,6 +55,7 @@
         bb-f (apply dissoc f wh-props)]
     (cond-> []
       (not-empty bb-f) (concat (->where bb-f :bb))
-      (some? (:webhook-id f)) (concat [:= :wh.cuid (:webhook-id f)])
-      (some? (:customer-id f)) (concat [:= :c.cuid (:customer-id f)])
-      (some? (:repo-id f)) (concat [:= :r.display-id (:repo-id f)]))))
+      (some? (:webhook-id f)) (conj [:= :wh.cuid (:webhook-id f)])
+      (some? (:customer-id f)) (conj [:= :c.cuid (:customer-id f)])
+      (some? (:repo-id f)) (conj [:= :r.display-id (:repo-id f)])
+      true (prefix-and))))

@@ -57,6 +57,26 @@
    (lo/on-failure db db/customer (a/cust-details-failed id) err)))
 
 (rf/reg-event-fx
+ :customer/load-bb-webhooks
+ (fn [{:keys [db]} _]
+   (let [cust (db/get-customer db)]
+     {:dispatch [:secure-request
+                 :search-bitbucket-webhooks
+                 {:customer-id (:id cust)
+                  [:customer/load-bb-webhooks--success]
+                  [:customer/load-bb-webhooks--failed]}]})))
+
+(rf/reg-event-db
+ :customer/load-bb-webhooks--success
+ (fn [db [_ {:keys [body]}]]
+   (db/set-bb-webhooks db body)))
+
+(rf/reg-event-db
+ :customer/load-bb-webhooks--failed
+ (fn [db [_ err]]
+   (db/set-repo-alerts db [(a/bitbucket-webhooks-failed err)])))
+
+(rf/reg-event-fx
  :repo/watch-github
  (fn [{:keys [db]} [_ repo]]
    (log/debug "Watching repo:" repo)
