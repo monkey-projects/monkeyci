@@ -717,14 +717,16 @@
 (def bb-webhook? (partial global-sid? st/bb-webhooks))
 
 (defn- upsert-bb-webhook [conn bb-wh]
-  (let [wh (ec/select-webhook conn (ec/by-cuid (:webhook-id bb-wh)))]
+  (let [wh (-> (ec/select-webhooks conn (ec/by-cuid (:webhook-id bb-wh)))
+               first)]
     ;; TODO Update?
     (ec/insert-bb-webhook conn (-> bb-wh
                                    (id->cuid)
                                    (assoc :webhook-id (:id wh))))))
 
 (defn- select-bb-webhook [conn cuid]
-  (some-> (ebbwh/select-bb-webhook conn (ebbwh/by-cuid cuid))
+  (some-> (ebbwh/select-bb-webhooks conn (ebbwh/by-cuid cuid))
+          first
           (cuid->id)))
 
 (defn- select-bb-webhook-for-webhook [{:keys [conn]} cuid]
