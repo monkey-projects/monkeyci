@@ -191,17 +191,36 @@
       (is (= 1 (count a)))
       (is (= :danger (:type (first a)))))))
 
-(deftest repo-unwatch
-  (testing "invokes unwatch endpoint"  
+(deftest repo-unwatch-github
+  (testing "invokes github unwatch endpoint"  
     (rf-test/run-test-sync
      (let [c (h/catch-fx :martian.re-frame/request)]
        (is (some? (reset! app-db (r/set-current {} {:parameters {:path {:customer-id "test-cust"}}}))))
        (h/initialize-martian {:unwatch-github-repo {:status 200
                                                     :error-code :no-error}})
        (is (some? (:martian.re-frame/martian @app-db)))
-       (rf/dispatch [:repo/unwatch {:id "test-repo"}])
+       (rf/dispatch [:repo/unwatch-github {:monkeyci/repo {:id "test-repo"}}])
        (is (= 1 (count @c)))
        (is (= :unwatch-github-repo (-> @c first (nth 2)))
+           "invokes correct endpoint")
+       (is (= "test-repo" (-> @c first (nth 3) :repo-id))
+           "passes repo id")
+       (is (= "test-cust" (-> @c first (nth 3) :customer-id))
+           "passes customer id")))))
+
+(deftest repo-unwatch-bitbucket
+  (testing "invokes bitbucket unwatch endpoint"  
+    (rf-test/run-test-sync
+     (let [c (h/catch-fx :martian.re-frame/request)]
+       (is (some? (reset! app-db (r/set-current {} {:parameters {:path {:customer-id "test-cust"}}}))))
+       (h/initialize-martian {:unwatch-bitbucket-repo {:status 200
+                                                       :error-code :no-error}})
+       (is (some? (:martian.re-frame/martian @app-db)))
+       (rf/dispatch [:repo/unwatch-bitbucket {:monkeyci/webhook
+                                              {:customer-id "test-cust"
+                                               :repo-id "test-repo"}}])
+       (is (= 1 (count @c)))
+       (is (= :unwatch-bitbucket-repo (-> @c first (nth 2)))
            "invokes correct endpoint")
        (is (= "test-repo" (-> @c first (nth 3) :repo-id))
            "passes repo id")

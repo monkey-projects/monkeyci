@@ -155,7 +155,7 @@
                             (swap! inv conj req)
                             {:status 204
                              :headers {"Content-Type" "application/json"}})]
-        (is (= 204 (-> {:storage st}
+        (is (= 200 (-> {:storage st}
                        (h/->req)
                        (assoc :parameters
                               {:path

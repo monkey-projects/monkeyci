@@ -101,6 +101,7 @@
 (defn- delete-bb-webhook
   "Deletes the webhook with given uuid from the workspace/repo in Bitbucket"
   [req wh]
+  (log/debug "Deleting Bitbucket webhook:" wh)
   @(-> (auth-req {:path (format "/repositories/%s/%s/hooks/%s"
                                 (:workspace wh) (:repo-slug wh) (:bitbucket-id wh))
                   :request-method :delete}
@@ -143,14 +144,13 @@
         repo-sid (cust-and-repo req)
         repo (st/find-repo s repo-sid)]
     (if repo
-      (if-let [wh (st/find-webhooks-for-repo s repo-sid)]
-        (do
+      (do
+        ;; When webhook not found, do nothing, but return ok
+        (when-let [wh (st/find-webhooks-for-repo s repo-sid)]
           (doseq [w wh]
             (when-let [bb (st/find-bb-webhook-for-webhook s (:id w))]
               (delete-bb-webhook req bb))
-            (st/delete-webhook s (:id w)))
-          (rur/status 204))
-        ;; Webhook not found, do nothing
+            (st/delete-webhook s (:id w))))
         (rur/status 200))
       (c/error-response "Repo not found" 404))))
 

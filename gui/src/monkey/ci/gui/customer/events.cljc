@@ -86,7 +86,8 @@
                  {:repo {:name (:name repo)
                          :url (:clone-url repo)
                          :customer-id cust-id
-                         :github-id (:id repo)}
+                         :github-id (:id repo)
+                         :token (ldb/bitbucket-token db)}
                   :customer-id cust-id}
                  [:repo/watch--success]
                  [:repo/watch--failed]]})))
@@ -127,14 +128,25 @@
    (db/set-repo-alerts db [(a/repo-watch-failed err)])))
 
 (rf/reg-event-fx
- :repo/unwatch
- (fn [{:keys [db]} [_ repo]]
+ :repo/unwatch-github
+ (fn [{:keys [db]} [_ {:keys [:monkeyci/repo]}]]
    {:dispatch [:secure-request
                :unwatch-github-repo
                {:repo-id (:id repo)
                 :customer-id (r/customer-id db)}
                [:repo/unwatch--success]
                [:repo/unwatch--failed]]}))
+
+(rf/reg-event-fx
+ :repo/unwatch-bitbucket
+ (fn [{:keys [db]} [_ repo]]
+   (let [wh (:monkeyci/webhook repo)]
+     {:dispatch [:secure-request
+                 :unwatch-bitbucket-repo
+                 (-> (select-keys wh [:customer-id :repo-id])
+                     (assoc-in [:repo :token] (ldb/bitbucket-token db)))
+                 [:repo/unwatch--success]
+                 [:repo/unwatch--failed]]})))
 
 (rf/reg-event-db
  :repo/unwatch--success

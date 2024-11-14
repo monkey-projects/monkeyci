@@ -9,8 +9,8 @@
             [:w.cuid :id]
             [:w.secret :secret-key]]
    :from [[:webhooks :w]]
-   :join [[:customers :c] [:= :c.id :r.customer-id]
-          [:repos :r] [:= :r.id :w.repo-id]]})
+   :join [[:repos :r] [:= :r.id :w.repo-id]
+          [:customers :c] [:= :c.id :r.customer-id]]})
 
 (defn select-webhooks-as-entity
   "Select the necessary properties for a webhook to return it as an entity."

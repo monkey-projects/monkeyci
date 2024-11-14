@@ -272,6 +272,13 @@
      :path-schema repo-schema})
 
    (api-route
+    {:route-name :unwatch-bitbucket-repo
+     :method :post
+     :path-parts (conj repo-path "/bitbucket/unwatch")
+     :path-schema repo-schema
+     :body-schema {:repo {:token s/Str}}})
+
+   (api-route
     {:route-name :search-bitbucket-webhooks
      :path-parts (conj customer-path "/webhook/bitbucket")
      :path-schema customer-schema

@@ -258,7 +258,9 @@
   ["" [["/github"
         [["/unwatch" {:post {:handler github/unwatch-repo}}]]]
        ["/bitbucket"
-        [["/unwatch" {:post {:handler bitbucket/unwatch-repo}}]]]]])
+        [["/unwatch" {:post {:handler bitbucket/unwatch-repo
+                             :parameters
+                             {:body {:token s/Str}}}}]]]]])
 
 (def repo-routes
   ["/repo"

@@ -67,14 +67,18 @@
  :<- [:customer/ext-repo-filter]
  :<- [:customer/bb-webhooks]
  (fn [[r ef wh] _]
-   (let [watched? (->> wh
-                       (map (juxt :workspace :repo-slug))
+   (let [wh-by-id (group-by (juxt :workspace :repo-slug) wh)
+         watched? (->> (keys wh-by-id)
                        (set))]
      (letfn [(matches-filter? [{:keys [name]}]
                (or (nil? ef) (cs/includes? (cs/lower-case name) (cs/lower-case ef))))
              (mark-watched [r]
-               (cond-> r
-                 (watched? [(get-in r [:workspace :slug]) (:slug r)]) (assoc :monkeyci/watched? true)))]
+               (let [id [(get-in r [:workspace :slug]) (:slug r)]]
+                 (cond-> r
+                   (watched? id)
+                   (assoc :monkeyci/watched? true
+                          :monkeyci/webhook (->> (get wh-by-id id)
+                                                 (first))))))]
        (->> r
             (filter matches-filter?)
             (map mark-watched)

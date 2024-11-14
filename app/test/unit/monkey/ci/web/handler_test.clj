@@ -522,8 +522,9 @@
                                          :secret (str (random-uuid))})
                   _ (st/save-bb-webhook st {:webhook-id wh-id
                                             :bitbucket-id (str (random-uuid))})]
-              (is (= 204 (-> (mock/request :post
-                                           (format "/customer/%s/repo/%s/bitbucket/unwatch" cust-id repo-id))
+              (is (= 200 (-> (h/json-request :post
+                                             (format "/customer/%s/repo/%s/bitbucket/unwatch" cust-id repo-id)
+                                             {:token "test-token"})
                              (app)
                              :status))))))))))
 
