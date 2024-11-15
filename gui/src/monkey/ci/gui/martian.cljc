@@ -154,8 +154,8 @@
     {:route-name :update-customer-ssh-keys
      :path-parts (into customer-path ["/ssh-keys"])
      :path-schema customer-schema
-     :method :post
-     :body-schema {:params [SshKey]}})
+     :method :put
+     :body-schema {:ssh-keys [SshKey]}})
 
    (api-route
     {:route-name :get-customer-stats

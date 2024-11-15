@@ -8,6 +8,7 @@
 
 (def set-alerts #(lo/set-alerts %1 id %2))
 (def get-alerts #(lo/get-alerts % id))
+(def reset-alerts #(lo/reset-alerts % id))
 
 (def set-value #(lo/set-value %1 id %2))
 (def get-value #(lo/get-value % id))
@@ -16,13 +17,17 @@
 
 (def get-editing-keys editing-keys)
 
+(def set-id (some-fn :temp-id :id))
+(def new-set? (comp some? :temp-id))
+
 (defn set-editing-keys [db k]
   (assoc db editing-keys k))
 
 (defn update-editing-keys [db f & args]
   (apply update db editing-keys f args))
 
-(def set-id (some-fn :temp-id :id))
+(defn get-new-keys [db]
+  (filter new-set? (get-editing-keys db)))
 
 (defn same-id? [id]
   (comp (partial = id) set-id))

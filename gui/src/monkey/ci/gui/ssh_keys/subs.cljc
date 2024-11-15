@@ -25,7 +25,6 @@
  :<- [:ssh-keys/editing-keys]
  (fn [[orig ed] _]
    (let [by-id (group-by :id ed)
-         new? (comp some? :temp-id)
          mark-editing #(assoc % :editing? true)]
      (-> (map (fn [k]
                 (or (some-> (get by-id (:id k))
@@ -33,5 +32,5 @@
                             (mark-editing))
                     k))
               orig)
-         (concat (->> (filter new? ed)
+         (concat (->> (filter db/new-set? ed)
                       (map mark-editing)))))))

@@ -119,7 +119,7 @@
            (map :name)
            (map (partial into [:li]))
            (into [:ul]))
-      [label-filters-desc label-filters]]
+      [lbl/label-filters-desc label-filters]]
      [:div.col
       [:div.float-end
        [view-set-actions p]]]]

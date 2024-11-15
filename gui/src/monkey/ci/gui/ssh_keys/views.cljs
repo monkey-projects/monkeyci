@@ -8,11 +8,34 @@
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
-(defn- show-key [{desc :description :as k}]
+(defn- delete-set-btn [k]
+  [:button.btn.btn-outline-danger
+   {:title "Deletes this ssh key set"
+    :on-click (u/link-evt-handler [:ssh-keys/delete-set k])}
+   [:span.me-2 [co/icon :trash]] "Delete"])
+
+(defn- view-set-actions [ks]
+  [:div.d-flex.gap-2
+   [:button.btn.btn-outline-success
+    {:title "Edits this parameter set"
+     :on-click (u/link-evt-handler [:ssh-keys/edit-set ks])}
+    [:span.me-2 [co/icon :pencil-square]] "Edit"]
+   [delete-set-btn ks]])
+
+(defn- show-key [{desc :description pk :private-key :as k}]
   [:div.card
    [:div.card-body
     (when desc
-      [:h4.card-title desc])]])
+      [:h4.card-title desc])
+    [:div.row
+     [:div.col-2 [:b "Public key:"]]
+     [:div.col-10 (:public-key k)]]
+    [:div.row.mb-2
+     [:div.col-2 [:b "Private key:"]]
+     [:div.col-10 (str "..." (subs pk (- (count pk) 4)))]]
+    [lbl/label-filters-desc (:label-filters k)]
+    [:div.mt-2
+     [view-set-actions k]]]])
 
 (defn- key-set-actions [k]
   [:div.d-flex.gap-2
@@ -24,10 +47,7 @@
      :on-click (u/link-evt-handler [:ssh-keys/cancel-set k])}
     [:span.me-2 [co/icon :x-square]] "Cancel"]
    (when-not (e/new-set? k)
-     [:button.btn.btn-outline-danger
-      {:title "Deletes this ssh key set"
-       :on-click (u/link-evt-handler [:ssh-keys/delete-set k])}
-      [:span.me-2 [co/icon :trash]] "Delete"])])
+     [delete-set-btn k])])
 
 (defn- input-props [k id & [desc]]
   {:id id
@@ -101,7 +121,7 @@
        "SSH key pairs consist of a" [:b.mx-1 "private and public key"] "and can take an optional "
        "description, which can be useful for your users.  Similar to"
        [:a.ms-1 {:href (r/path-for :page/customer-params (r/path-params route))} "parameters"]
-       ", they can have any labels set on them which allow them to be access by builds for "
+       ", they can have any labels set on them which allow them to be accessed by builds for "
        "repositories with the same labels."]
       [co/alerts [:ssh-keys/alerts]]
       [ssh-keys-loader]
