@@ -40,20 +40,23 @@
       [ssh-keys])))
 
 (defn page [route]
-  (rf/dispatch [:ssh-keys/initialize])
-  (l/default
-   [:<>
-    [:h3 "SSH Keys"]
-    [:p
-     "SSH keys are used to access private repositories.  When a build is triggered from a "
-     "private repo, any SSH keys that are" [:b.mx-1 "configured on the customer with matching labels"]
-     "are exposed to the build script."]
-    [:p
-     "SSH key pairs consist of a" [:b.mx-1 "private and public key"] "and can take an optional "
-     "description, which can be useful for your users.  Similar to"
-     [:a.ms-1 {:href (r/path-for :page/customer-params (r/path-params route))} "parameters"]
-     ", they can have any labels set on them which allow them to be access by builds for "
-     "repositories with the same labels."]
-    [co/alerts [:ssh-keys/alerts]]
-    [ssh-keys-loader]
-    [global-actions]]))
+  (let [cust-id (:customer-id (r/path-params route))]
+    (rf/dispatch [:ssh-keys/initialize cust-id])
+    (l/default
+     [:<>
+      [:div.d-flex
+       [:h3 "SSH Keys"]
+       [co/reload-btn-sm [:ssh-keys/load cust-id] {:class :ms-auto}]]
+      [:p
+       "SSH keys are used to access private repositories.  When a build is triggered from a "
+       "private repo, any SSH keys that are" [:b.mx-1 "configured on the customer with matching labels"]
+       "are exposed to the build script."]
+      [:p
+       "SSH key pairs consist of a" [:b.mx-1 "private and public key"] "and can take an optional "
+       "description, which can be useful for your users.  Similar to"
+       [:a.ms-1 {:href (r/path-for :page/customer-params (r/path-params route))} "parameters"]
+       ", they can have any labels set on them which allow them to be access by builds for "
+       "repositories with the same labels."]
+      [co/alerts [:ssh-keys/alerts]]
+      [ssh-keys-loader]
+      [global-actions]])))

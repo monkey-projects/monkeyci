@@ -54,3 +54,6 @@
 
 (def cust-credits-failed
   (error-msg "Failed to load credit information"))
+
+(def cust-ssh-keys-failed
+  (error-msg "Failed to load SSH keys"))

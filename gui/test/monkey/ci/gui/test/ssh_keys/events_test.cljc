@@ -2,6 +2,7 @@
   (:require #?(:cljs [cljs.test :refer-macros [deftest testing is use-fixtures async]]
                :clj [clojure.test :refer [deftest testing is use-fixtures]])
             [day8.re-frame.test :as rf-test]
+            [monkey.ci.gui.ssh-keys.db :as db]
             [monkey.ci.gui.ssh-keys.events :as sut]
             [monkey.ci.gui.test.fixtures :as f]
             [monkey.ci.gui.test.helpers :as h]
@@ -27,3 +28,14 @@
               (-> @c first (nth 2))))
        (is (= {:customer-id "test-customer"}
               (-> @c first (nth 3))))))))
+
+(deftest ssh-keys-load--success
+  (testing "sets ssh keys in db"
+    (let [keys [{:description "test ssh key"}]]
+      (rf/dispatch-sync [:ssh-keys/load--success {:body keys}])
+      (is (= keys (db/get-value @app-db))))))
+
+(deftest ssh-keys-load--failed
+  (testing "sets alert"
+    (rf/dispatch-sync [:ssh-keys/load--failed "test error"])
+    (is (= 1 (count (db/get-alerts @app-db))))))
