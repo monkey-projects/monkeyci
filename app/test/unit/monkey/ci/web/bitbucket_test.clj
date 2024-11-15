@@ -204,7 +204,9 @@
                          {:changes
                           [{:new
                             {:type "branch"
-                             :name "main"}}]}}}))]
+                             :name "main"}
+                            :target
+                            {:message "Test commit"}}]}}}))]
     
     (testing "triggers build for webhook"
       (let [resp (sut/webhook req)]
