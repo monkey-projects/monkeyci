@@ -201,9 +201,12 @@
                         {:id (:id wh)}
                         :body
                         {:push
-                         {:new
-                          {:type "branch"
-                           :name "main"}}}}))]
+                         {:changes
+                          [{:new
+                            {:type "branch"
+                             :name "main"}
+                            :target
+                            {:message "Test commit"}}]}}}))]
     
     (testing "triggers build for webhook"
       (let [resp (sut/webhook req)]
