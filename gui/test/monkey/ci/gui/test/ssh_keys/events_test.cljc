@@ -39,3 +39,34 @@
   (testing "sets alert"
     (rf/dispatch-sync [:ssh-keys/load--failed "test error"])
     (is (= 1 (count (db/get-alerts @app-db))))))
+
+(deftest ssh-keys-new
+  (testing "adds new empty key set to list of editing keys"
+    (is (empty? (db/get-editing-keys @app-db)))
+    (rf/dispatch-sync [:ssh-keys/new])
+    (let [k (db/get-editing-keys @app-db)]
+      (is (= 1 (count k)))
+      (is (some? (:temp-id (first k)))
+          "new key set should have temp id"))))
+
+(deftest cancel-set
+  (testing "removes new set from editing list"
+    (let [new-set {:temp-id (random-uuid)}]
+      (is (some? (reset! app-db (db/set-editing-keys {} [new-set]))))
+      (rf/dispatch-sync [:ssh-keys/cancel-set new-set])
+      (is (empty? (db/get-editing-keys @app-db)))))
+
+  (testing "removes existing set from editing list"
+    (let [ex-set {:id "existing-set"}]
+      (is (some? (reset! app-db (db/set-editing-keys {} [ex-set]))))
+      (rf/dispatch-sync [:ssh-keys/cancel-set ex-set])
+      (is (empty? (db/get-editing-keys @app-db))))))
+
+(deftest prop-changed
+  (testing "updates property in ssh key"
+    (let [key {:id "test-key"}]
+      (is (some? (reset! app-db (db/set-editing-keys {} [key]))))
+      (rf/dispatch-sync [:ssh-keys/prop-changed key :description "updated value"])
+      (is (= [{:id "test-key"
+               :description "updated value"}]
+             (db/get-editing-keys @app-db))))))
