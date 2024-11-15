@@ -693,7 +693,23 @@
      :public-key "public-test-key"
      :description "test ssh key"
      :label-filters []}]
-   :private-key))
+   :private-key)
+
+  ;; In case we would want to add endpoints for single ssh keys
+  #_(let [cust-id (st/new-id)
+          ssh-key {:private-key "test-private-key"
+                   :public-key "test-public-key"
+                   :description "original desc"
+                   :customer-id cust-id
+                   :label-filters []}]
+      (verify-entity-endpoints
+       {:name "customer ssh key"
+        :path (format "/customer/%s/ssh-keys" cust-id)
+        :base-entity ssh-key
+        :updated-entity {:description "updated description"}
+        :creator (fn [s p]
+                   (st/save-ssh-key s (assoc p :customer-id cust-id)))
+        :can-delete? true})))
 
 (defn- generate-build-sid []
   (->> (repeatedly st/new-id)

@@ -72,6 +72,13 @@
   (assoc NewParamSet
          :id s/Str))
 
+(s/defschema SshKey
+  {(s/optional-key :id) s/Str
+   (s/optional-key :description) s/Str
+   :private-key s/Str
+   :public-key s/Str
+   :label-filters [LabelFilterDisjunction]})
+
 (defn public-route [conf]
   (merge {:method :get
           :produces #{"application/edn"}
@@ -102,13 +109,13 @@
                     (s/optional-key :id) s/Str}})
 
    (api-route
-    {:route-name :get-customer-params
-     :path-parts (into customer-path ["/param"])
+    {:route-name :get-recent-builds
+     :path-parts (into customer-path ["/builds/recent"])
      :path-schema customer-schema})
 
    (api-route
-    {:route-name :get-recent-builds
-     :path-parts (into customer-path ["/builds/recent"])
+    {:route-name :get-customer-params
+     :path-parts (into customer-path ["/param"])
      :path-schema customer-schema})
 
    (api-route
@@ -137,6 +144,18 @@
      :path-parts param-path
      :path-schema param-schema
      :method :delete})
+
+   (api-route
+    {:route-name :get-customer-ssh-keys
+     :path-parts (into customer-path ["/ssh-keys"])
+     :path-schema customer-schema})
+
+   (api-route
+    {:route-name :update-customer-ssh-keys
+     :path-parts (into customer-path ["/ssh-keys"])
+     :path-schema customer-schema
+     :method :post
+     :body-schema {:params [SshKey]}})
 
    (api-route
     {:route-name :get-customer-stats

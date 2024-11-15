@@ -116,6 +116,7 @@
 
 (s/defschema SshKeys
   {(s/optional-key :id) Id
+   (s/optional-key :customer-id) Id
    :private-key s/Str
    :public-key s/Str ; TODO It may be possible to extract public key from private
    (s/optional-key :description) s/Str

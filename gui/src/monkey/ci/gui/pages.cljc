@@ -10,6 +10,7 @@
             [monkey.ci.gui.params.views :as params]
             [monkey.ci.gui.repo.views :as repo]
             [monkey.ci.gui.routing :as r]
+            [monkey.ci.gui.ssh-keys.views :as ssh-keys]
             [re-frame.core :as rf]))
 
 (def pages
@@ -22,6 +23,7 @@
    :page/customer-new customer/page-new
    :page/customer-join home/page-join
    :page/customer-params params/page
+   :page/customer-ssh-keys ssh-keys/page
    :page/add-github-repo customer/add-github-repo-page
    :page/add-bitbucket-repo customer/add-bitbucket-repo-page
    :page/repo repo/page
