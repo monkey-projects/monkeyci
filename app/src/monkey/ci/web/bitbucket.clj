@@ -5,6 +5,7 @@
             [clj-commons.byte-streams :as bs]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
+            [medley.core :as mc]
             [monkey.ci
              [cuid :as cuid]
              [labels :as lbl]
@@ -154,8 +155,13 @@
         (rur/status 200))
       (c/error-response "Repo not found" 404))))
 
+(defn- new-changes [payload]
+  (-> (get-in payload [:push :changes])
+      first
+      :new))
+
 (defn- git-ref [payload]
-  (let [{:keys [name type]} (get-in payload [:push :new])]
+  (let [{:keys [name type]} (new-changes payload)]
     (condp = type
       "branch" (str "refs/heads/" name)
       "tag" (str "refs/tags/" name))))
@@ -165,7 +171,7 @@
         idx (st/find-next-build-idx st [customer-id repo-id])
         build-id (c/new-build-id idx)
         sid [customer-id repo-id build-id]
-        body (get-in req [:parameters :body])
+        body (c/body req)
         repo (st/find-repo st [customer-id repo-id])
         ssh-keys (->> (st/find-ssh-keys st customer-id)
                       (lbl/filter-by-label repo))]
@@ -176,10 +182,14 @@
                :status :pending
                :idx idx
                :cleanup? true
+               ;; TODO Changed files
                :git (cond-> {:url (:url repo)
                              :ref (git-ref body)
                              :ssh-keys-dir (rt/ssh-keys-dir (c/req->rt req) build-id)}
-                      (not-empty ssh-keys) (assoc :ssh-keys ssh-keys))))))
+                      (not-empty ssh-keys) (assoc :ssh-keys ssh-keys)
+                      true (mc/assoc-some :message (some-> (new-changes body)
+                                                           :target
+                                                           :message)))))))
 
 (defn- handle-push [req]
   (let [st (c/req->storage req)
@@ -199,7 +209,7 @@
 (defn webhook
   "Handles incoming calls from Bitbucket through installed webhooks."
   [req]
-  (log/debug "Got incoming bitbucket request:" (pr-str (:body req)))
+  (log/debug "Got incoming bitbucket request:" (pr-str (c/body req)))
   (let [type (get-in req [:headers "x-event-key"])]
     (condp = type
       "repo:push" (handle-push req)

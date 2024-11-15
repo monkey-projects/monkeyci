@@ -201,9 +201,10 @@
                         {:id (:id wh)}
                         :body
                         {:push
-                         {:new
-                          {:type "branch"
-                           :name "main"}}}}))]
+                         {:changes
+                          [{:new
+                            {:type "branch"
+                             :name "main"}}]}}}))]
     
     (testing "triggers build for webhook"
       (let [resp (sut/webhook req)]
