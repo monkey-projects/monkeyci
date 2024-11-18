@@ -14,6 +14,7 @@
   (c/load-config! "staging.edn")
   (c/load-config! "oci/staging-config.edn")
   (c/load-config! "github/staging.edn")
+  (c/load-config! "bitbucket/dev.edn")
   (c/load-config! "storage/staging.edn")
   (server/start-server))
 

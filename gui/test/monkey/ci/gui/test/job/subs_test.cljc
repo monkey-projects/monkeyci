@@ -113,6 +113,25 @@
                {:name "case 2"}}
              (set @tc))))
 
+    (testing "returns test cases if no suites"
+      (is (some? (reset! app-db (-> {}
+                                    (r/set-current
+                                     {:parameters
+                                      {:path
+                                       {:job-id "test-job"}}})
+                                    (bdb/set-build
+                                     {:script
+                                      {:jobs
+                                       {"test-job"
+                                        {:id "test-job"
+                                         :result {:monkey.ci/tests
+                                                  {:test-cases [{:name "case 1"}
+                                                                {:name "case 2"}]}}}}}})))))
+      (is (= #{{:name "case 1"}
+               {:name "case 2"}}
+             (set @tc))))
+    
+
     (testing "sorts with failed tests first"
       (let [tests [{:name "unit tests"
                     :test-cases
