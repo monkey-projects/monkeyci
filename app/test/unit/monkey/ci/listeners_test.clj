@@ -61,6 +61,13 @@
                   :status :success}
                  (-> (st/find-build st sid)
                      (select-keys [:end-time :status])))))
+
+        (testing "does not overwrite message if none in event"
+          (is (some? (st/save-build st (assoc build :message "existing message"))))
+          (is (some? (handle {:type :build/end
+                              :status :success})))
+          (is (= "existing message" (-> (st/find-build st sid)
+                                        :message))))
         
         (let [build (-> build
                         (assoc-in [:script :jobs] {:job-1 {:id "job-1"
@@ -135,13 +142,21 @@
                        :script
                        :jobs)))))
 
-        (testing "`script/end` saves status"
-          (is (some? (handle {:type :script/end
-                              :status :success})))
-          (is (= :success
-                 (-> (st/find-build st sid)
-                     :script
-                     :status))))
+        (testing "`script/end`"
+          (testing "saves status"
+            (is (some? (handle {:type :script/end
+                                :status :success})))
+            (is (= :success
+                   (-> (st/find-build st sid)
+                       :script
+                       :status))))
+
+          (testing "sets build message if any"
+            (is (some? (handle {:type :script/end
+                                :status :failure
+                                :message "test error"})))
+            (is (= "test error" (-> (st/find-build st sid)
+                                    :message)))))
 
         (testing "`job/initializing`"
           (is (some? (handle {:type :job/initializing
