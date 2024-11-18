@@ -73,7 +73,7 @@
              (mc/assoc-some :message message))))
       (create-credit-consumption storage)))
 
-(defn cancel-build [storage {:keys [sid] :as evt}]
+(defn cancel-build [storage {:keys [sid]}]
   (-> (patch-build storage
                    sid
                    (fn [build]

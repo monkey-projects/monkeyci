@@ -22,4 +22,6 @@
      ["/:customer-id"
       {:post api/issue-credits
        :parameters {:path {:customer-id c/Id}
-                    :body UserCredits}}]]]])
+                    :body UserCredits}}]]]
+   ["/reaper"
+    {:post api/cancel-dangling-builds}]])

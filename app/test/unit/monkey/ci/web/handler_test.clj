@@ -1135,4 +1135,9 @@
         (is (= 200 (-> (h/json-request :post "/admin/issue-credits/auto"
                                        {:from-time (t/now)})
                        (test-app)
-                       :status)))))))
+                       :status)))))
+
+    (testing "`/reaper` kills dangling builds"
+      (is (= 200 (-> (mock/request :post "/admin/reaper")
+                     (test-app)
+                     :status))))))

@@ -34,6 +34,9 @@
 (defn set-runner [rt r]
   (assoc rt :runner r))
 
+(defn set-process-reaper [rt pr]
+  (assoc rt :process-reaper pr))
+
 (defn test-runtime []
   (-> empty-runtime
       (set-artifacts (h/fake-blob-store))
@@ -43,4 +46,5 @@
       (set-storage (s/make-memory-storage))
       (set-jwk (auth/keypair->rt (auth/generate-keypair)))
       (set-containers (h/fake-container-runner))
-      (set-runner (constantly (md/success-deferred 0)))))
+      (set-runner (constantly (md/success-deferred 0)))
+      (set-process-reaper (constantly []))))

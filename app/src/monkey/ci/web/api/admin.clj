@@ -1,7 +1,9 @@
 (ns monkey.ci.web.api.admin
   (:require [monkey.ci
+             [build :as b]
              [cuid :as cuid]
              [storage :as s]]
+            [monkey.ci.events.core :as ec]
             [monkey.ci.web
              [auth :as auth]
              [common :as c]]
@@ -47,8 +49,19 @@
            (rur/response)))))
 
 (defn cancel-dangling-builds
-  "Checks any OCI containers that have been running for too long, and kills them.
+  "Checks any processes that have been running for too long, and kills them.
    Any associated builds and jobs will be canceled."
   [req]
-  ;; TODO
-  (rur/status 202))
+  (let [rt (c/req->rt req)]
+    (letfn [(to-event [b]
+              (ec/make-event :build/canceled {:sid (b/sid b)
+                                              :src :reaper}))
+            (dispatch [evts]
+              (ec/post-events (:events rt) evts)
+              (map :sid evts))]
+      (if-let [pr (:process-reaper rt)]
+        (->> (pr)
+             (map to-event)
+             (dispatch)
+             (rur/response))
+        (rur/response {:message "No process reaper configured"})))))

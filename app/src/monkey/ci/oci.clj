@@ -213,6 +213,11 @@
          maybe-delete-instance)
         (md/catch log-error))))
 
+(defn list-active-instances
+  "Lists all active container instances for the given compartment id"
+  [client cid]
+  (ci/list-container-instances client {:compartment-id cid :lifecycle-state "ACTIVE"}))
+
 (def checkout-vol "checkout")
 (def checkout-dir "/opt/monkeyci/checkout")
 (def key-dir "/opt/monkeyci/keys")
