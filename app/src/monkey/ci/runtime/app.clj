@@ -11,6 +11,7 @@
              [listeners :as li]
              [logging :as l]
              [metrics :as m]
+             [oci :as oci]
              [prometheus :as prom]
              [protocols :as p]
              [reporting :as rep]
@@ -26,7 +27,8 @@
             [monkey.ci.runtime.common :as rc]
             [monkey.ci.web
              [auth :as auth]
-             [handler :as wh]]))
+             [handler :as wh]]
+            [monkey.oci.container-instance.core :as ci]))
 
 (defrecord AppRuntime [config events artifacts cache containers workspace logging git build api-config])
 
@@ -236,6 +238,17 @@
 (defn- new-server-runtime [conf]
   (->ServerRuntime conf))
 
+(defrecord ProcessReaper [config]
+  clojure.lang.IFn
+  (invoke [this]
+    (let [rc (:runner config)]
+      (if (= :oci (:type rc))
+        (oci/delete-stale-instances (ci/make-context rc) (:compartment-id rc))
+        []))))
+
+(defn- new-process-reaper [conf]
+  (->ProcessReaper conf))
+
 (defn make-server-system
   "Creates a component system that can be used to start an application server."
   [config]
@@ -249,7 +262,7 @@
    :runner    (new-server-runner config)
    :runtime   (co/using
                (new-server-runtime config)
-               [:artifacts :events :metrics :reporter :runner :storage :jwk])
+               [:artifacts :events :metrics :reporter :runner :storage :jwk :process-reaper])
    :storage   (new-storage config)
    :jwk       (new-jwk config)
    :listeners (co/using
@@ -257,7 +270,8 @@
                [:events :storage])
    :metrics   (co/using
                (new-metrics)
-               [:events])))
+               [:events])
+   :process-reaper (new-process-reaper config)))
 
 (defn with-server-system [config f]
   (rc/with-system (make-server-system config) f))

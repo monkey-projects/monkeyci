@@ -2,6 +2,7 @@
   "Oracle cloud specific functionality"
   (:require [babashka.fs :as fs]
             [clojure.tools.logging :as log]
+            [java-time.api :as jt]
             [manifold
              [deferred :as md]
              [time :as mt]]
@@ -9,14 +10,16 @@
             [medley.core :as mc]
             [monkey.ci
              [build :as b]
+             [config :as config]
              [retry :as retry]
+             [time :as t]
              [utils :as u]]
             [monkey.ci.common.preds :as cp]
             [monkey.oci.container-instance.core :as ci]
             [monkey.oci.os
              [martian :as os]
              [stream :as s]]
-            [taoensso.telemere :as t]))
+            [taoensso.telemere :as tt]))
 
 ;; Cpu architectures
 (def arch-arm :arm)
@@ -40,9 +43,9 @@
   {:name ::invocation-interceptor
    :enter (fn [ctx]
             ;; TODO More properties
-            (t/event! :oci/invocation
-                      {:data {:kind kind}
-                       :level :info})
+            (tt/event! :oci/invocation
+                       {:data {:kind kind}
+                        :level :info})
             ctx)})
 
 (defn add-interceptor
@@ -298,3 +301,21 @@
   (+ (* cpus
         (get-in arch-shapes [arch :credits] 1))
      mem))
+
+(defn delete-stale-instances [client cid]
+  ;; Timeout is the max time a script may run, with a margin of one minute
+  (let [timeout (jt/instant (- (t/now) config/max-script-timeout 60000))]
+    (letfn [(stale? [x]
+              (jt/before? (jt/instant (:time-created x)) timeout))
+            (->out [ci]
+              (-> (select-keys (:freeform-tags ci) [:customer-id :repo-id])
+                  (assoc :build-id (:display-name ci)
+                         :instance-id (:id ci))))]
+      ;; TODO Check for errors
+      (->> @(ci/list-container-instances client {:compartment-id cid
+                                                 :lifecycle-state "ACTIVE"})
+           :body
+           :items
+           (filter stale?)
+           ;; TODO Delete the container instances
+           (map ->out)))))

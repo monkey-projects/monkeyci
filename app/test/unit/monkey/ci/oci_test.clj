@@ -1,13 +1,17 @@
 (ns monkey.ci.oci-test
   (:require [clojure.test :refer [deftest testing is]]
+            [java-time.api :as jt]
             [manifold
              [deferred :as md]
              [stream :as ms]]
-            [monkey.ci.oci :as sut]
+            [monkey.ci
+             [config :as c]
+             [oci :as sut]
+             [time :as t]]
             [monkey.ci.helpers :as h]
             [monkey.oci.container-instance.core :as ci]
             [monkey.oci.os.stream :as os]
-            [taoensso.telemere :as t])
+            [taoensso.telemere :as tt])
   (:import java.io.ByteArrayInputStream))
 
 (deftest stream-to-bucket
@@ -298,8 +302,35 @@
 (deftest invocation-interceptor
   (testing "dispatches invocation event for given kind"
     (let [i (sut/invocation-interceptor ::test-module)
-          s (t/with-signal
+          s (tt/with-signal
               (is (= ::test-ctx ((:enter i) ::test-ctx))))]
       (is (= :event (:kind s)))
       (is (= :oci/invocation (:id s)))
       (is (= ::test-module (get-in s [:data :kind]))))))
+
+(deftest delete-stale-instances
+  (testing "lists active container instances"
+    (let [time (- (t/now) (* 2 c/max-script-timeout))]
+      (with-redefs [ci/list-container-instances (fn [_ opts]
+                                                  (if (= "ACTIVE" (:lifecycle-state opts))
+                                                    (md/success-deferred
+                                                     {:body
+                                                      {:items
+                                                       [{:id "test-instance"
+                                                         :display-name "build-1"
+                                                         :freeform-tags {:customer-id "test-cust"
+                                                                         :repo-id "test-repo"}
+                                                         :time-created (str (jt/instant time))}
+                                                        {:id "other-instance"
+                                                         :display-name "build-2"
+                                                         :freeform-tags {:customer-id "test-cust"
+                                                                         :repo-id "test-repo"}
+                                                         :time-created (str (jt/instant (t/now)))}]}})
+                                                    (md/error-deferred (ex-info "Invalid options" opts))))]
+        (is (= [{:customer-id "test-cust"
+                 :repo-id "test-repo"
+                 :build-id "build-1"
+                 :instance-id "test-instance"}]
+               (sut/delete-stale-instances ::test-client "test-compartment"))))))
+
+  (testing "deletes stale instances"))
