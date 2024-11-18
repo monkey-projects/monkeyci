@@ -62,6 +62,7 @@
     ["/c/:customer-id/add-repo/github" :page/add-github-repo]
     ["/c/:customer-id/add-repo/bitbucket" :page/add-bitbucket-repo]
     ["/c/:customer-id/params" :page/customer-params]
+    ["/c/:customer-id/ssh-keys" :page/customer-ssh-keys]
     ["/c/:customer-id/r/:repo-id" :page/repo]
     ["/c/:customer-id/r/:repo-id/edit" :page/repo-edit]
     ["/c/:customer-id/r/:repo-id/b/:build-id" :page/build]

@@ -134,11 +134,18 @@
     :title "Configure build parameters"}
    [:span.me-2 [co/icon :gear]] "Parameters"])
 
+(defn- ssh-keys-btn [id]
+  [:a.btn.btn-soft-primary
+   {:href (r/path-for :page/customer-ssh-keys {:customer-id id})
+    :title "Configure ssh keys to access private repositories"}
+   [:span.me-2 [co/icon :key]] "SSH Keys"])
+
 (defn- customer-actions [id]
   [:<>
    [add-github-repo-btn id]
    [add-bitbucket-repo-btn id]
-   [params-btn id]])
+   [params-btn id]
+   [ssh-keys-btn id]])
 
 (defn- customer-header []
   (let [c (rf/subscribe [:customer/info])]
@@ -227,13 +234,13 @@
    [{:id :overview
      :header [:span [:span.me-2 co/overview-icon] "Overview"]
      :contents [customer-stats id]}
-    {:id :repos
-     :header [:span [:span.me-2 co/repo-icon] "Repositories"]
-     :contents [customer-repos]}
     {:id :recent
      :header [:span [:span.me-2 co/build-icon] "Recent Builds"]
      :contents [recent-builds id]
-     :current? true}]])
+     :current? true}
+    {:id :repos
+     :header [:span [:span.me-2 co/repo-icon] "Repositories"]
+     :contents [customer-repos]}]])
 
 (defn- customer-details [id]
   [:<>

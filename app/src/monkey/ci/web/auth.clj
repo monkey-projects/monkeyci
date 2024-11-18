@@ -132,7 +132,7 @@
   (when (and (not (expired? token)) sub)
     (let [id (sid/parse-sid sub)]
       (when (= 2 (count id))
-        (log/debug "Looking up user with id" id)
+        (log/trace "Looking up user with id" id)
         (some-> (st/find-user-by-type storage id)
                 (update :customers set))))))
 

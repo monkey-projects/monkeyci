@@ -64,8 +64,9 @@
   "Small reload button, icon only"
   [evt & [opts]]
   [:button.btn.btn-outline-primary.btn-icon.btn-sm
-   {:on-click (u/link-evt-handler evt)
-    :title "Reload"}
+   (merge {:on-click (u/link-evt-handler evt)
+           :title "Reload"}
+          opts)
    [icon :arrow-clockwise]])
 
 (defn cancel-btn

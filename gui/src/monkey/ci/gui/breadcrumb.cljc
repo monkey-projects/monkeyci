@@ -33,6 +33,11 @@
         {:url (r/path-for :page/customer-params (r/path-params (r/current db)))
          :name "Parameters"}))
 
+(defn- ssh-keys-breadcrumb [db]
+  (conj (default-breadcrumb db)
+        {:url (r/path-for :page/customer-ssh-keys (r/path-params (r/current db)))
+         :name "SSH Keys"}))
+
 (defn- repo-edit-breadcrumb [db]
   (conj (default-breadcrumb db)
         {:url (r/path-for :page/repo-edit (r/path-params (r/current db)))
@@ -47,6 +52,7 @@
   "Breadcrumb configuration per route.  If no match is found, the default behaviour
    is applied."
   {:page/customer-params params-breadcrumb
+   :page/customer-ssh-keys ssh-keys-breadcrumb
    :page/repo-edit repo-edit-breadcrumb
    :page/add-repo cust-watch-repo})
 
