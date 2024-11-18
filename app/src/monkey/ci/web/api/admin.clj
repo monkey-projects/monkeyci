@@ -45,3 +45,10 @@
            (map last)
            (hash-map :credits)
            (rur/response)))))
+
+(defn cancel-dangling-builds
+  "Checks any OCI containers that have been running for too long, and kills them.
+   Any associated builds and jobs will be canceled."
+  [req]
+  ;; TODO
+  (rur/status 202))

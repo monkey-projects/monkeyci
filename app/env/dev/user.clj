@@ -29,5 +29,6 @@
   (nr/refresh))
 
 (defn list-staging []
+  (c/load-config! "oci/staging-config.edn")
   (->> @(i/list-active)
        (map (juxt :id :display-name :time-created))))
