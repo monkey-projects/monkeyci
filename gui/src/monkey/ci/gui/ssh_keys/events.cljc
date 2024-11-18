@@ -102,6 +102,12 @@
 
 (rf/reg-event-fx
  :ssh-keys/delete-set
- (fn [ctx [_ ks]]
-   ;; TODO
-   ))
+ (fn [{:keys [db]} [_ ks]]
+   (let [cust-id (r/customer-id db)
+         all (db/get-value db)]
+     {:dispatch [:secure-request
+                 :update-customer-ssh-keys
+                 {:customer-id cust-id
+                  :ssh-keys (remove (db/same-id? (set-id ks)) all)}
+                 [:ssh-keys/save-set--success ks]
+                 [:ssh-keys/save-set--failed ks]]})))

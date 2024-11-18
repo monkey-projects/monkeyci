@@ -23,7 +23,7 @@
    [delete-set-btn ks]])
 
 (defn- show-key [{desc :description pk :private-key :as k}]
-  [:div.card
+  [:div.card.my-2
    [:div.card-body
     (when desc
       [:h4.card-title desc])
@@ -57,7 +57,7 @@
 
 (defn- edit-key [k]
   (let [id (e/set-id k)]
-    [:div.card.mb-4
+    [:div.card.my-2
      [:div.card-body
       [:div.mb-3
        [:label.form-label {:for :description} "Description"]
@@ -87,7 +87,7 @@
                 [:p "Found " (count @v) " configured SSH keys."]]))))
 
 (defn- global-actions [cust-id]
-  [:div.d-flex.gap-2
+  [:div.d-flex.gap-2.mt-2
    [:button.btn.btn-outline-success
     {:title "Adds a new SSK key pair"
      :on-click (u/link-evt-handler [:ssh-keys/new])}
