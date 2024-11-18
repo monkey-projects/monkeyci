@@ -170,4 +170,21 @@
       (is (= [ks] (db/get-editing-keys @app-db))))))
 
 (deftest delete-set
-  (testing "saves ssh keys without deleted keyset"))
+  (testing "saves ssh keys without deleted keyset"
+    (let [[set-1 set-2 :as ksets] (->> (range 2)
+                                       (map (fn [idx] {:id (str "set-" (inc idx))})))
+          c (h/catch-fx :martian.re-frame/request)]
+      (rf-test/run-test-sync
+       (is (some? (reset! app-db (-> {}
+                                     (r/set-current {:parameters
+                                                     {:path
+                                                      {:customer-id "test-customer"}}})
+                                     (db/set-value ksets)
+                                     (db/set-editing-keys [set-2])))))
+       (h/initialize-martian {:update-customer-ssh-keys {:status 200
+                                                         :body []
+                                                         :error-code :no-error}})
+       (is (some? (:martian.re-frame/martian @app-db)))
+       (rf/dispatch [:ssh-keys/delete-set set-2])
+       (is (= :update-customer-ssh-keys (-> @c first (nth 2))))
+       (is (= [set-1] (-> @c first (nth 3) :ssh-keys)))))))
