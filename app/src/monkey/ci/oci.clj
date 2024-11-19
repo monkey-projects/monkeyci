@@ -307,12 +307,16 @@
   (let [timeout (jt/instant (- (t/now) config/max-script-timeout 60000))]
     (letfn [(stale? [x]
               (jt/before? (jt/instant (:time-created x)) timeout))
+            (build? [x]
+              (let [props ((juxt :customer-id :repo-id) (:freeform-tags x))]
+                (and (not-empty props) (every? some? props))))
             (check-errors [resp]
               (when (>= (:status resp) 400)
                 (throw (ex-info "Got error response from OCI" resp)))
               resp)
             (delete-instance [ci]
               (log/warn "Deleting stale container instance:" (:id ci))
+              ;; TODO Only delete actual build containers
               @(md/chain
                 (ci/delete-container-instance client {:instance-id (:id ci)})
                 check-errors
@@ -326,6 +330,6 @@
            (check-errors)
            :body
            :items
-           (filter stale?)
+           (filter (every-pred build? stale?))
            (map delete-instance)
            (mapv ->out)))))

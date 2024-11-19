@@ -328,7 +328,10 @@
                              :display-name "build-2"
                              :freeform-tags {:customer-id "test-cust"
                                              :repo-id "test-repo"}
-                             :time-created (str (jt/instant (t/now)))}]}})
+                             :time-created (str (jt/instant (t/now)))}
+                            {:id "non-build-instance"
+                             :display-name "something else"
+                             :time-created (str (jt/instant time))}]}})
                         (md/error-deferred (ex-info "Invalid options" opts))))
 
                     ci/delete-container-instance
