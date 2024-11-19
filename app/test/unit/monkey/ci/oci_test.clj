@@ -309,28 +309,46 @@
       (is (= ::test-module (get-in s [:data :kind]))))))
 
 (deftest delete-stale-instances
-  (testing "lists active container instances"
-    (let [time (- (t/now) (* 2 c/max-script-timeout))]
-      (with-redefs [ci/list-container-instances (fn [_ opts]
-                                                  (if (= "ACTIVE" (:lifecycle-state opts))
-                                                    (md/success-deferred
-                                                     {:body
-                                                      {:items
-                                                       [{:id "test-instance"
-                                                         :display-name "build-1"
-                                                         :freeform-tags {:customer-id "test-cust"
-                                                                         :repo-id "test-repo"}
-                                                         :time-created (str (jt/instant time))}
-                                                        {:id "other-instance"
-                                                         :display-name "build-2"
-                                                         :freeform-tags {:customer-id "test-cust"
-                                                                         :repo-id "test-repo"}
-                                                         :time-created (str (jt/instant (t/now)))}]}})
-                                                    (md/error-deferred (ex-info "Invalid options" opts))))]
+  (testing "lists and deletes active container instances that have timed out"
+    (let [time (- (t/now) (* 2 c/max-script-timeout))
+          deleted (atom [])]
+      (with-redefs [ci/list-container-instances
+                    (fn [_ opts]
+                      (if (= "ACTIVE" (:lifecycle-state opts))
+                        (md/success-deferred
+                         {:status 200
+                          :body
+                          {:items
+                           [{:id "test-instance"
+                             :display-name "build-1"
+                             :freeform-tags {:customer-id "test-cust"
+                                             :repo-id "test-repo"}
+                             :time-created (str (jt/instant time))}
+                            {:id "other-instance"
+                             :display-name "build-2"
+                             :freeform-tags {:customer-id "test-cust"
+                                             :repo-id "test-repo"}
+                             :time-created (str (jt/instant (t/now)))}]}})
+                        (md/error-deferred (ex-info "Invalid options" opts))))
+
+                    ci/delete-container-instance
+                    (fn [_ opts]
+                      (swap! deleted conj opts)
+                      (if (= "test-instance" (:instance-id opts))
+                        (md/success-deferred {:status 200})
+                        (md/error-deferred
+                         (ex-info "Wrong instance" opts))))]
+        
         (is (= [{:customer-id "test-cust"
                  :repo-id "test-repo"
                  :build-id "build-1"
                  :instance-id "test-instance"}]
-               (sut/delete-stale-instances ::test-client "test-compartment"))))))
+               (sut/delete-stale-instances ::test-client "test-compartment")))
+        (is (= [{:instance-id "test-instance"}]
+               @deleted)))))
 
-  (testing "deletes stale instances"))
+  (testing "fails on error response"
+    (with-redefs [ci/list-container-instances (constantly
+                                               (md/success-deferred
+                                                {:status 500}))]
+      (is (thrown? Exception (sut/delete-stale-instances ::test-client "test-compartment"))))))

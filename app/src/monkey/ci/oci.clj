@@ -307,15 +307,25 @@
   (let [timeout (jt/instant (- (t/now) config/max-script-timeout 60000))]
     (letfn [(stale? [x]
               (jt/before? (jt/instant (:time-created x)) timeout))
+            (check-errors [resp]
+              (when (>= (:status resp) 400)
+                (throw (ex-info "Got error response from OCI" resp)))
+              resp)
+            (delete-instance [ci]
+              (log/warn "Deleting stale container instance:" (:id ci))
+              @(md/chain
+                (ci/delete-container-instance client {:instance-id (:id ci)})
+                check-errors
+                (constantly ci)))
             (->out [ci]
               (-> (select-keys (:freeform-tags ci) [:customer-id :repo-id])
                   (assoc :build-id (:display-name ci)
                          :instance-id (:id ci))))]
-      ;; TODO Check for errors
       (->> @(ci/list-container-instances client {:compartment-id cid
                                                  :lifecycle-state "ACTIVE"})
+           (check-errors)
            :body
            :items
            (filter stale?)
-           ;; TODO Delete the container instances
-           (map ->out)))))
+           (map delete-instance)
+           (mapv ->out)))))
