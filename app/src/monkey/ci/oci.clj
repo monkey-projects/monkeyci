@@ -316,7 +316,6 @@
               resp)
             (delete-instance [ci]
               (log/warn "Deleting stale container instance:" (:id ci))
-              ;; TODO Only delete actual build containers
               @(md/chain
                 (ci/delete-container-instance client {:instance-id (:id ci)})
                 check-errors
