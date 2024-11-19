@@ -5,7 +5,8 @@
              [storage :as st]
              [time :as t]]
             [monkey.ci.web.api.admin :as sut]
-            [monkey.ci.helpers :as h]))
+            [monkey.ci.helpers :as h]
+            [monkey.ci.test.runtime :as trt]))
 
 (deftest issue-credits
   (h/with-memory-store st
@@ -62,3 +63,31 @@
         (is (empty? (-> (issue-at (+ until 1000))
                         :body
                         :credits)))))))
+
+(deftest cancel-dangling-builds
+  (testing "invokes process reaper"
+    (let [inv (atom 0)
+          rt (-> (trt/test-runtime)
+                 (trt/set-process-reaper (fn []
+                                           (swap! inv inc)
+                                           [])))]
+      (is (= 200 (-> rt
+                     (h/->req)
+                     (sut/cancel-dangling-builds)
+                     :status)))
+      (is (= 1 @inv))))
+
+  (testing "dispatches `build/canceled` event for each reaped build process"
+    (let [sid (repeatedly 3 cuid/random-cuid)
+          rt (-> (trt/test-runtime)
+                 (trt/set-process-reaper
+                  (constantly [(zipmap [:customer-id :repo-id :build-id] sid)])))
+          resp (-> rt
+                   (h/->req)
+                   (sut/cancel-dangling-builds))]
+      (is (= 200 (:status resp)))
+      (let [[f :as recv] (h/received-events (:events rt))]
+        (is (not-empty recv))
+        (is (= :build/canceled (:type f)))
+        (is (= sid (:sid f))))
+      (is (= [sid] (:body resp))))))

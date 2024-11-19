@@ -149,13 +149,16 @@
   ([f conf-fn]
    (instance-call f conf-fn identity)))
 
-(defn list-instances []
-  (instance-call ci/list-container-instances #(select-keys % [:compartment-id]) :items))
+(defn list-instances [& [opts]]
+  (instance-call ci/list-container-instances
+                 (fn [conf]
+                   (-> conf
+                       (select-keys [:compartment-id])
+                       (merge opts)))
+                 :items))
 
 (defn list-active []
-  (md/chain
-   (list-instances)
-   (partial filter (comp (partial = "ACTIVE") :lifecycle-state))))
+  (list-instances {:lifecycle-state "ACTIVE"}))
 
 (defn get-instance [id]
   (instance-call ci/get-container-instance (constantly {:instance-id id})))

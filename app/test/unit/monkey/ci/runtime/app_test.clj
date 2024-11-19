@@ -5,6 +5,7 @@
             [com.stuartsierra.component :as co]
             [monkey.ci
              [metrics :as m]
+             [oci :as oci]
              [runtime :as rt]
              [prometheus :as prom]
              [protocols :as p]]
@@ -151,4 +152,17 @@
 
       (testing "provides metrics"
         (is (some? (get sys :metrics)))
-        (is (some? (get-in sys [:http :rt :metrics])))))))
+        (is (some? (get-in sys [:http :rt :metrics]))))
+
+      (testing "provides process reaper in runtime"
+        (is (ifn? (get-in sys [:http :rt :process-reaper])))))))
+
+(deftest process-reaper
+  (testing "returns empty list when no oci runner"
+    (let [r (sut/->ProcessReaper {:runner {:type :local}})]
+      (is (empty? (r)))))
+
+  (testing "deletes oci stale instances"
+    (with-redefs [oci/delete-stale-instances (constantly ::ok)]
+      (let [r (sut/->ProcessReaper {:runner {:type :oci}})]
+        (is (= ::ok (r)))))))
