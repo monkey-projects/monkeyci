@@ -14,6 +14,7 @@
   (c/load-config! "staging.edn")
   (c/load-config! "oci/staging-config.edn")
   (c/load-config! "github/staging.edn")
+  (c/load-config! "bitbucket/dev.edn")
   (c/load-config! "storage/staging.edn")
   (server/start-server))
 
@@ -29,5 +30,6 @@
   (nr/refresh))
 
 (defn list-staging []
+  (c/load-config! "oci/staging-config.edn")
   (->> @(i/list-active)
-       (map (juxt :id :display-name :time-created))))
+       (map (juxt :id :display-name :time-created :lifecycle-state))))

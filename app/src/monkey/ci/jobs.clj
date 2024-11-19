@@ -81,7 +81,7 @@
 
 (def job-start-evt (partial base-event :job/start))
 
-(defn- job-status-evt [type job-id build-sid {:keys [status message exception] :as r}]
+(defn- job-status-evt [type job-id build-sid {:keys [status] :as r}]
   (let [r (dissoc r :status :exception)]
     (-> (base-event type job-id build-sid)
         (assoc :status status
@@ -167,9 +167,10 @@
      (fn [r]
        (log/debug "Container job finished with result:" r)
        ;; Don't add the full result otherwise it will be sent out as an event
-       (if (= 0 (:exit r))
-         bc/success
-         bc/failure)))))
+       (-> (if (= 0 (:exit r))
+             bc/success
+             bc/failure)
+           (merge (select-keys r [:exit :message])))))))
 
 (defn- find-dependents
   "Finds all jobs that are dependent on this job"

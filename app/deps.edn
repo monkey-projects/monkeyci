@@ -4,7 +4,7 @@
         buddy/buddy-auth {:mvn/version "3.0.323"}
         buddy/buddy-core {:mvn/version "1.12.0-430"}
         camel-snake-kebab/camel-snake-kebab {:mvn/version "0.4.3"}
-        ch.qos.logback/logback-classic {:mvn/version "1.5.11"}
+        ch.qos.logback/logback-classic {:mvn/version "1.5.12"}
         clansi/clansi {:mvn/version "1.0.0"}
         clj-commons/clj-yaml {:mvn/version "1.0.28"}
         cli-matic/cli-matic {:mvn/version "0.5.4"}
@@ -22,7 +22,7 @@
         com.monkeyprojects/aero-ext {:mvn/version "0.2.0"}
         com.monkeyprojects/clompress {:mvn/version "0.1.1"}
         com.monkeyprojects/monkey-jms {:mvn/version "0.2.0"}
-        com.monkeyprojects/oci-container-instance {:mvn/version "0.1.0"}
+        com.monkeyprojects/oci-container-instance {:mvn/version "0.2.0-SNAPSHOT"}
         com.monkeyprojects/oci-os {:mvn/version "0.3.2"}
         com.monkeyprojects/oci-sign {:mvn/version "0.1.3"}
         com.mysql/mysql-connector-j {:mvn/version "9.1.0"}

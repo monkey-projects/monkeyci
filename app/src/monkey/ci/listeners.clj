@@ -66,14 +66,14 @@
   (-> (patch-build
        storage sid
        (fn [build]
-         {:end-time time
-          :status status
-          ;; TODO Calculate credits on each job update
-          :credits (b/calc-credits build)
-          :message message}))
+         (-> {:end-time time
+              :status status
+              ;; TODO Calculate credits on each job update
+              :credits (b/calc-credits build)}
+             (mc/assoc-some :message message))))
       (create-credit-consumption storage)))
 
-(defn cancel-build [storage {:keys [sid] :as evt}]
+(defn cancel-build [storage {:keys [sid]}]
   (-> (patch-build storage
                    sid
                    (fn [build]
@@ -92,8 +92,11 @@
                                                       (map #(vector (j/job-id %) %))
                                                       (into {}))))))
 
-(defn end-script [storage {:keys [sid status]}]
-  (patch-build storage sid #(assoc-in % [:script :status] status)))
+(defn end-script [storage {:keys [sid status message]}]
+  (patch-build storage sid (fn [b]
+                             (-> b
+                                 (assoc-in [:script :status] status)
+                                 (mc/assoc-some :message message)))))
 
 (defn- patch-job [storage {:keys [sid job-id]} patch]
   (patch-build storage sid

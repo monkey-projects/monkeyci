@@ -81,6 +81,11 @@
     ;; Load using Aero
     (ac/read-config f)))
 
+(def max-script-timeout
+  "Max msecs a build script can run before we terminate it"
+  ;; One hour
+  (* 3600 1000))
+
 (def default-app-config
   "Default configuration for the application, without env vars or args applied."
   {:http

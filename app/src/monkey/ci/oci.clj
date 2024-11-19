@@ -2,6 +2,7 @@
   "Oracle cloud specific functionality"
   (:require [babashka.fs :as fs]
             [clojure.tools.logging :as log]
+            [java-time.api :as jt]
             [manifold
              [deferred :as md]
              [time :as mt]]
@@ -9,14 +10,16 @@
             [medley.core :as mc]
             [monkey.ci
              [build :as b]
+             [config :as config]
              [retry :as retry]
+             [time :as t]
              [utils :as u]]
             [monkey.ci.common.preds :as cp]
             [monkey.oci.container-instance.core :as ci]
             [monkey.oci.os
              [martian :as os]
              [stream :as s]]
-            [taoensso.telemere :as t]))
+            [taoensso.telemere :as tt]))
 
 ;; Cpu architectures
 (def arch-arm :arm)
@@ -40,9 +43,9 @@
   {:name ::invocation-interceptor
    :enter (fn [ctx]
             ;; TODO More properties
-            (t/event! :oci/invocation
-                      {:data {:kind kind}
-                       :level :info})
+            (tt/event! :oci/invocation
+                       {:data {:kind kind}
+                        :level :info})
             ctx)})
 
 (defn add-interceptor
@@ -213,6 +216,11 @@
          maybe-delete-instance)
         (md/catch log-error))))
 
+(defn list-active-instances
+  "Lists all active container instances for the given compartment id"
+  [client cid]
+  (ci/list-container-instances client {:compartment-id cid :lifecycle-state "ACTIVE"}))
+
 (def checkout-vol "checkout")
 (def checkout-dir "/opt/monkeyci/checkout")
 (def key-dir "/opt/monkeyci/keys")
@@ -293,3 +301,35 @@
   (+ (* cpus
         (get-in arch-shapes [arch :credits] 1))
      mem))
+
+(defn delete-stale-instances [client cid]
+  ;; Timeout is the max time a script may run, with a margin of one minute
+  (let [timeout (jt/instant (- (t/now) config/max-script-timeout 60000))]
+    (letfn [(stale? [x]
+              (jt/before? (jt/instant (:time-created x)) timeout))
+            (build? [x]
+              (let [props ((juxt :customer-id :repo-id) (:freeform-tags x))]
+                (and (not-empty props) (every? some? props))))
+            (check-errors [resp]
+              (when (>= (:status resp) 400)
+                (throw (ex-info "Got error response from OCI" resp)))
+              resp)
+            (delete-instance [ci]
+              (log/warn "Deleting stale container instance:" (:id ci))
+              ;; TODO Only delete actual build containers
+              @(md/chain
+                (ci/delete-container-instance client {:instance-id (:id ci)})
+                check-errors
+                (constantly ci)))
+            (->out [ci]
+              (-> (select-keys (:freeform-tags ci) [:customer-id :repo-id])
+                  (assoc :build-id (:display-name ci)
+                         :instance-id (:id ci))))]
+      (->> @(ci/list-container-instances client {:compartment-id cid
+                                                 :lifecycle-state "ACTIVE"})
+           (check-errors)
+           :body
+           :items
+           (filter (every-pred build? stale?))
+           (map delete-instance)
+           (mapv ->out)))))

@@ -44,12 +44,17 @@
 (defn- error-count [{:keys [errors failures]}]
   (+ (count errors) (count failures)))
 
+(defn- job->test-cases [job]
+  (let [tr (get-in job [:result :monkey.ci/tests])]
+    ;; Test results can either contain a single suite, or multiple suites with test cases.
+    (or (:test-cases tr)
+        (mapcat :test-cases tr))))
+
 (rf/reg-sub
  :job/test-cases
  :<- [:job/current]
  (fn [job _]
-   (->> (get-in job [:result :monkey.ci/tests])
-        (mapcat :test-cases)
+   (->> (job->test-cases job)
         (sort-by error-count)
         (reverse))))
 
