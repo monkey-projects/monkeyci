@@ -1,7 +1,16 @@
-(ns monkeyci.build.script-test
+(ns build-test
   (:require [clojure.test :refer [deftest testing is]]
-            [monkeyci.build.script :as sut]))
+            [build :as sut]))
 
 (deftest tag-version
-  (testing "returns something"
-    (is (string? (sut/tag-version {})))))
+  (testing "returns valid version"
+    (is (= "0.1.0"
+           (sut/tag-version {:build
+                             {:git
+                              {:ref "refs/tags/0.1.0"}}}))))
+
+  (testing "`nil` if not a version number"
+    (is (nil?
+         (sut/tag-version {:build
+                           {:git
+                            {:ref "refs/tags/other"}}})))))
