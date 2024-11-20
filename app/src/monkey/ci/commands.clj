@@ -11,6 +11,7 @@
              [build :as b]
              [errors :as err]
              [jobs :as jobs]
+             [process :as proc]
              [protocols :as p]
              [runtime :as rt]
              [script :as script]
@@ -87,6 +88,13 @@
         (-> res
             :summary
             :error)))))
+
+(defn run-tests
+  "Runs unit tests declared in the build"
+  [conf]
+  (ra/with-cli-runtime conf
+    (fn [rt]
+      (:exit @(proc/test! (:build rt) rt)))))
 
 (defn list-builds [rt]
   (->> (http/get (apply format "%s/customer/%s/repo/%s/builds"

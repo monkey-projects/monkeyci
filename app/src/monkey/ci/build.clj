@@ -13,6 +13,8 @@
             [monkey.ci.build.core :as bc]
             [monkey.ci.events.core :as ec]))
 
+(def default-script-dir ".monkeyci")
+
 (def sid-props [:customer-id :repo-id :build-id])
 
 (def account->sid (juxt :customer-id :repo-id))
@@ -93,7 +95,7 @@
       :repo-id (second sid)
       :build-id id
       :checkout-dir work-dir
-      :script {:script-dir (u/abs-path work-dir (:dir args))}
+      :script {:script-dir (u/abs-path work-dir (get args :dir default-script-dir))}
       :pipeline (:pipeline args)
       :sid sid}
      args)))
@@ -138,8 +140,6 @@
   (assoc b credit-multiplier cm))
 
 (def ^:deprecated rt->checkout-dir (comp checkout-dir rt/build))
-
-(def default-script-dir ".monkeyci")
 
 (defn calc-script-dir
   "Given an (absolute) working directory and scripting directory, determines

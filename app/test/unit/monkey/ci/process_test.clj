@@ -201,3 +201,13 @@
   (testing "adds api server token"
     (let [conf (sut/child-config {} {:token "test-token"})]
       (is (= "test-token" (:token (cos/api conf)))))))
+
+(deftest test!
+  (let [build {:build-id "test-build"}
+        rt (trt/test-runtime)]
+    
+    (testing "runs child process to execute unit tests"
+      (with-redefs [bp/process identity]
+        (is (= "clojure" (-> (sut/test! build rt)
+                             :cmd
+                             first)))))))

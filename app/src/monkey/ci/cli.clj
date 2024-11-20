@@ -62,6 +62,14 @@
    :runs {:command cmd/watch
           :app-mode :cli}})
 
+(def test-cmd
+  {:command "test"
+   :description "Runs build script unit tests"
+   :opts [script-location-opt]
+   :runs {:command cmd/run-tests
+          :app-mode :cli
+          :runtime? false}})
+
 (def build-cmd
   {:command "build"
    :description "Build commands"
@@ -81,8 +89,7 @@
                  verify-build-cmd
                  list-build-cmd
                  watch-cmd
-                 ;; TODO Run build tests
-                 ]})
+                 test-cmd]})
 
 (def server-cmd
   {:command "server"
