@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.layout
-  (:require [monkey.ci.gui.breadcrumb :as b]
+  (:require [clojure.string :as cs]
+            [monkey.ci.gui.breadcrumb :as b]
             [monkey.ci.gui.components :as co]
             [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.routing :as r]
@@ -35,7 +36,15 @@
 
 (defn- footer-col [header links]
   (letfn [(footer-link [[lbl url]]
-            [:li [:a.link-sm.link-light {:href url} lbl]])]
+            (let [e? (ext? url)]
+              [:li [:a.link-sm.link-light
+                    (cond-> {:href url}
+                      e? (assoc :target :_blank))
+                    lbl
+                    (when e?
+                      [:small.ms-1 [co/icon :box-arrow-up-right]])]]))
+          (ext? [url]
+            (and url (cs/starts-with? url "http")))]
     [:div.col-sm.mb-7.mb-sm-0
      [:span.text-cap.text-primary-light header]
      (->> links
