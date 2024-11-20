@@ -86,6 +86,11 @@
 
 (def m2-cache-dir "/tmp/m2")
 
+(defn- version-or [rt f]
+  (if (rt/dev-mode? rt)
+    {:local/root (f)}
+    {:mvn/version (v/version)}))
+
 (defn generate-deps
   "Generates a string that will be added as a commandline argument
    to the clojure process when running the script.  Any existing `deps.edn`
@@ -93,17 +98,13 @@
   [build rt]
   (when (rt/dev-mode? rt)
     (log/debug "Running in development mode, using local src instead of libs"))
-  (let [version-or (fn [f]
-                     (if (rt/dev-mode? rt)
-                       {:local/root (f)}
-                       {:mvn/version (v/version)}))
-        log-config (find-log-config build rt)]
+  (let [log-config (find-log-config build rt)]
     (log/debug "Child process log config:" log-config)
     {:paths [(b/script-dir build)]
      :aliases
      {:monkeyci/build
       (cond-> {:exec-fn 'monkey.ci.process/run
-               :extra-deps {'com.monkeyci/app (version-or utils/cwd)}}
+               :extra-deps {'com.monkeyci/app (version-or rt utils/cwd)}}
         log-config (assoc :jvm-opts
                           [(str "-Dlogback.configurationFile=" log-config)]))}
      :mvn/local-repo m2-cache-dir}))
@@ -151,18 +152,10 @@
   (when build-cache
     (log/debug "Saving build cache for build" (b/sid build))
     (try
-      @(blob/save build-cache m2-cache-dir (repo-cache-location build))
       ;; This results in class not found error?
-      #_(retry/retry
-       #(try
-          @(blob/save build-cache m2-cache-dir (repo-cache-location build))
-          true
-          (catch Exception ex
-            (log/error "Unable to save cache" ex)
-            nil))
-       {:max-retries 5
-        :retry-if nil?
-        :backoff (retry/constant-delay 3000)})
+      ;; Something with running a sub process in oci container instances?
+      ;; We could run the script in a second container instead, similar to oci container jobs.
+      @(blob/save build-cache m2-cache-dir (repo-cache-location build))
       (catch Throwable ex
         (log/error "Failed to save build cache" ex)))))
 
@@ -203,3 +196,26 @@
         ;; Depending on settings, some process streams need handling
         (l/handle-process-streams loggers))
     (md/finally result #(save-cache! build rt))))
+
+(defn generate-test-deps [rt watch?]
+  {:aliases
+   {:monkeyci/test
+    {:extra-deps {'com.monkeyci/app (version-or rt utils/cwd)}
+     :paths ["."]
+     :exec-fn 'kaocha.runner/exec-fn
+     :exec-args (cond-> {:tests [{:type :kaocha.type/clojure.test
+                                  :id :unit
+                                  :ns-patterns ["-test$"]
+                                  :source-paths ["."]
+                                  :test-paths ["."]}]}
+                  watch? (assoc :watch? true))}}})
+
+(defn test!
+  "Executes any unit tests that have been defined for the build"
+  [build rt]
+  (let [deps (generate-test-deps rt false)]
+    (bp/process
+     {:cmd ["clojure" "-Sdeps" (pr-str deps) "-X:monkeyci/test"]
+      :out :inherit
+      :err :inherit
+      :dir (b/script-dir build)})))

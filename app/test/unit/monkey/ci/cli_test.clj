@@ -98,7 +98,12 @@
         (testing "`verify` subcommand"
           (testing "runs `verify-build` subcommand"
             (let [lc (run-cli "build" "verify")]
-              (is (= cmd/verify-build (:cmd lc)))))))
+              (is (= cmd/verify-build (:cmd lc))))))
+
+        (testing "`test` subcommand"
+          (testing "runs `run-tests` subcommand"
+            (let [lc (run-cli "build" "test")]
+              (is (= cmd/run-tests (:cmd lc)))))))
 
       (testing "`server` command"
         (testing "runs `server` command"

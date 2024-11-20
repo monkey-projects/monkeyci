@@ -70,7 +70,10 @@
                                  :body (h/to-json {:uuid bb-uuid})})
                               {:status 401}))]
         (is (some? (st/save-customer st cust)))
-        (let [r (-> {:storage st}
+        (let [r (-> {:storage st
+                     :config
+                     {:api
+                      {:ext-url "http://api.monkeyci.test"}}}
                     (h/->req)
                     (assoc :uri "/customer/test-cust"
                            :scheme :http
@@ -111,7 +114,7 @@
                 (is (some? bb-wh))
                 (is (= bb-uuid (:bitbucket-id bb-wh)))
                 (is (= 1 (count @bb-requests)))
-                (is (= (str "http://localhost/webhook/bitbucket/" (:id wh))
+                (is (= (str "http://api.monkeyci.test/webhook/bitbucket/" (:id wh))
                        (:url (first @bb-requests))))
                 (is (= slug (:repo-slug bb-wh)))
                 (is (= ws (:workspace bb-wh)))))))))

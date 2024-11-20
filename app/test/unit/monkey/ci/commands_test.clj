@@ -9,6 +9,7 @@
              [commands :as sut]
              [edn :as edn]
              [errors :as err]
+             [process :as proc]
              [runners :as r]
              [sidecar :as sc]]
             [monkey.ci.config.sidecar :as cs]
@@ -64,6 +65,18 @@
   
   (testing "nonzero exit on failure"
     (is (not= 0 (sut/verify-build {})))))
+
+(deftest run-tests
+  (testing "runs test process with build"
+    (let [inv (atom nil)]
+      (with-redefs [proc/test! (fn [build _]
+                                 (reset! inv {:build build
+                                              :invoked? true})
+                                 (future {:exit 0}))]
+        (let [res (sut/run-tests {})]
+          (is (zero? res))
+          (is (some? (:build @inv)))
+          (is (true? (:invoked? @inv))))))))
 
 (deftest list-builds
   (testing "reports builds from server"

@@ -67,10 +67,11 @@
   (from-rt req rt->storage))
 
 (defn req->ext-uri
-  "Determines external host address using request properties"
+  "Determines external host address using configuration, or request properties"
   [req base]
-  (let [idx (cs/index-of (:uri req) base)]
-    (format "%s://%s%s" (name (:scheme req)) (get-in req [:headers "host"]) (subs (:uri req) 0 idx))))
+  (or (-> req (req->rt) :config :api :ext-url)
+      (let [idx (cs/index-of (:uri req) base)]
+        (format "%s://%s%s" (name (:scheme req)) (get-in req [:headers "host"]) (subs (:uri req) 0 idx)))))
 
 (defn id-getter [id-key]
   (comp id-key :path :parameters))

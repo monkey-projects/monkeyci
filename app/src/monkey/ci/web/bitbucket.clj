@@ -70,7 +70,6 @@
   (rur/response {:client-id (c/from-rt req (comp :client-id :bitbucket rt/config))}))
 
 (defn- ext-webhook-url [req wh]
-  (log/debug "Determining external webhook url using request with headers:" (:headers req))
   (str (c/req->ext-uri req "/customer") "/webhook/bitbucket/" (:id wh)))
 
 (defn- create-bb-webhook [req wh]
