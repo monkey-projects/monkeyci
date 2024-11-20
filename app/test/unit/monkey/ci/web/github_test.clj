@@ -11,36 +11,18 @@
              [common :as wc]
              [github :as sut]]
             [monkey.ci.helpers :as h]
-            [org.httpkit.fake :as hf]
+            [monkey.ci.test
+             [aleph-test :as af]
+             [runtime :as trt]]
             [ring.mock.request :as mock]))
-
-(deftest valid-security?
-  (testing "false if nil"
-    (is (not (true? (sut/valid-security? nil)))))
-
-  (testing "true if valid"
-    ;; Github provided values for testing
-    (is (true? (sut/valid-security?
-                {:secret "It's a Secret to Everybody"
-                 :payload "Hello, World!"
-                 :x-hub-signature "sha256=757107ea0eb2509fc211221cce984b8a37570b6d7586c22c46f4379c8b043e17"})))))
-
-(deftest extract-signature
-  (testing "nil if nil input"
-    (is (nil? (sut/extract-signature nil))))
-
-  (testing "returns value of the sha256 key"
-    (is (= "test-value" (sut/extract-signature "sha256=test-value"))))
-
-  (testing "nil if key is not sha256"
-    (is (nil? (sut/extract-signature "key=value")))))
 
 (deftest webhook
   (testing "invokes runner from runtime"
     (let [inv (atom nil)
           st (st/make-memory-storage)
           _ (st/save-webhook st {:id "test-hook"})
-          req (-> {:runner (partial swap! inv conj)
+          req (-> {:runner (fn [_ build]
+                             (swap! inv conj build))
                    :storage st}
                   (h/->req)
                   (assoc :headers {"x-github-event" "push"}
@@ -52,7 +34,8 @@
 
   (testing "ignores non-push events"
     (let [inv (atom nil)
-          req (-> {:runner (partial swap! inv conj)}
+          req (-> {:runner (fn [_ build]
+                             (swap! inv conj build))}
                   (h/->req)
                   (assoc :headers {"x-github-event" "ping"}
                          :parameters {:body 
@@ -64,7 +47,8 @@
     (let [inv (atom nil)
           st (st/make-memory-storage)
           _ (st/save-webhook st {:id "test-hook"})
-          req (-> {:runner (partial swap! inv conj)
+          req (-> {:runner (fn [_ build]
+                             (swap! inv conj build))
                    :storage st}
                   (h/->req)
                   (assoc :headers {"x-github-event" "push"}
@@ -79,7 +63,7 @@
     (let [st (st/make-memory-storage)
           _ (st/save-webhook st {:id "test-hook"})
           {:keys [recv] :as e} (h/fake-events)
-          req (-> {:runner (fn [rt]
+          req (-> {:runner (fn [rt _]
                              (throw (ex-info "Test error" {:runtime rt})))
                    :storage st
                    :events e}
@@ -103,7 +87,8 @@
                                          :github-id gid})
             runs (atom [])
             req (-> {:storage s
-                     :runner (partial swap! runs conj)}
+                     :runner (fn [_ build]
+                               (swap! runs conj build))}
                     (h/->req)
                     (assoc :headers {"x-github-event" "push"}
                            :parameters {:body
@@ -122,7 +107,8 @@
                                          :github-id gid})
             runs (atom [])
             req (-> {:storage s
-                     :runner (partial swap! runs conj)}
+                     :runner (fn [_ build]
+                               (swap! runs conj build))}
                     (h/->req)
                     (assoc :headers {"x-github-event" "other"}
                            :parameters {:body
@@ -137,7 +123,8 @@
       (let [gid "test-id"
             runs (atom [])
             req (-> {:storage s
-                     :runner (partial swap! runs conj)}
+                     :runner (fn [_ build]
+                               (swap! runs conj build))}
                     (h/->req)
                     (assoc :headers {"x-github-event" "push"}
                            :parameters {:body
@@ -327,12 +314,16 @@
 (defn- with-github-user
   "Sets up fake http communication with github to return the given user"
   ([u f]
-   (hf/with-fake-http ["https://github.com/login/oauth/access_token"
+   (af/with-fake-http [{:url "https://github.com/login/oauth/access_token"
+                        :request-method :post}
                        {:status 200
-                        :body (h/to-json {:access-token "test-token"})}
-                       "https://api.github.com/user"
+                        :body (h/to-json {:access-token "test-token"})
+                        :headers {"Content-Type" "application/json"}}
+                       {:url "https://api.github.com/user"
+                        :request-method :get}
                        {:status 200
-                        :body (h/to-json u)}]
+                        :body (h/to-json u)
+                        :headers {"Content-Type" "application/json"}}]
      (f u)))
   ([f]
    (with-github-user {:name "test user"
@@ -341,9 +332,10 @@
 
 (deftest login
   (testing "when exchange fails at github, returns body and 400 status code"
-    (hf/with-fake-http ["https://github.com/login/oauth/access_token"
+    (af/with-fake-http ["https://github.com/login/oauth/access_token"
                         {:status 401
-                         :body (h/to-json {:message "invalid access code"})}]
+                         :body (h/to-json {:message "invalid access code"})
+                         :headers {"Content-Type" "application/json"}}]
       (is (= 400 (-> {:parameters
                       {:query
                        {:code "test-code"}}}
@@ -354,7 +346,7 @@
     (with-github-user
       (fn [_]
         (let [kp (auth/generate-keypair)
-              req (-> (h/test-rt)
+              req (-> (trt/test-runtime)
                       (assoc :jwk {:priv (.getPrivate kp)})
                       (h/->req)
                       (assoc :parameters
@@ -365,12 +357,14 @@
                         :body
                         :token)]
           (is (string? token))
-          (is (map? (jwt/unsign token (.getPublic kp) {:alg :rs256})))))))
+          (let [u (jwt/unsign token (.getPublic kp) {:alg :rs256})]
+            (is (map? u))
+            (is (re-matches #"^github/.*" (:sub u))))))))
 
   (testing "finds existing github user in storage"
     (with-github-user
       (fn [u]
-        (let [{st :storage :as rt} (h/test-rt)
+        (let [{st :storage :as rt} (trt/test-runtime)
               _ (st/save-user st {:type "github"
                                   :type-id (:id u)
                                   :customers ["test-cust"]})
@@ -388,7 +382,7 @@
   (testing "creates user when none found in storage"
     (with-github-user
       (fn [u]
-        (let [{st :storage :as rt} (h/test-rt)
+        (let [{st :storage :as rt} (trt/test-runtime)
               req (-> rt
                       (h/->req)
                       (assoc :parameters
@@ -405,7 +399,7 @@
   (testing "sets user id in token"
     (with-github-user
       (fn [u]
-        (let [{st :storage :as rt} (h/test-rt)
+        (let [{st :storage :as rt} (trt/test-runtime)
               pubkey (auth/rt->pub-key rt)
               req (-> rt
                       (h/->req)
@@ -428,7 +422,7 @@
   (testing "adds github token to response"
     (with-github-user
       (fn [u]
-        (let [{st :storage :as rt} (h/test-rt)
+        (let [{st :storage :as rt} (trt/test-runtime)
               req (-> rt
                       (h/->req)
                       (assoc :parameters
@@ -444,7 +438,7 @@
 
 (deftest watch-repo
   (let [cust-id (st/new-id)
-        {st :storage :as rt} (h/test-rt)
+        {st :storage :as rt} (trt/test-runtime)
         _ (st/save-customer st {:id cust-id :name "test customer"})
         repo {:name "test repo"
               :customer-id cust-id
@@ -462,11 +456,14 @@
 
     (testing "creates new repo"
       (is (= (:body r)
-             (st/find-repo st [cust-id (get-in r [:body :id])]))))))
+             (st/find-repo st [cust-id (get-in r [:body :id])]))))
+
+    (testing "generates display id based on github repo name"
+      (is (= "test-repo" (get-in r [:body :id]))))))
 
 (deftest unwatch-repo
   (testing "404 when repo not found"
-    (is (= 404 (-> (h/test-rt)
+    (is (= 404 (-> (trt/test-runtime)
                    (h/->req)
                    (assoc :parameters {:path {:customer-id "test-cust"
                                               :repo-id "test-repo"}})
@@ -474,7 +471,7 @@
                    :status))))
 
   (testing "unwatches in db"
-    (let [{st :storage :as rt} (h/test-rt)
+    (let [{st :storage :as rt} (trt/test-runtime)
           [cust-id repo-id github-id :as sid] (repeatedly 3 st/new-id)
           _ (st/watch-github-repo st (zipmap [:customer-id :id :github-id] sid))
           req (-> rt

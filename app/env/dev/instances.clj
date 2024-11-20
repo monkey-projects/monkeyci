@@ -8,6 +8,7 @@
              [config :as config]
              [containers :as c]
              [oci :as oci]
+             [protocols :as p]
              [runtime :as rt]
              [utils :as u]]
             [monkey.ci.containers.oci :as oci-cont]
@@ -110,8 +111,11 @@
   (let [build-id (str "test-build-" (System/currentTimeMillis))
         pipeline "test-pipe"
         rt (-> @co/global-config
-               (config/normalize-config {} {})
                (assoc-in [:containers :image-tag] version)
+               ;; Dummy api config
+               (assoc :api {:url "http://test"
+                            :port 12243
+                            :token "dummy-token"})
                (rt/config->runtime)
                (assoc :job
                       {:id "test-job"
@@ -123,8 +127,15 @@
                       (cond-> {:build-id build-id
                                :sid ["test-customer" "test-repo" build-id]
                                :checkout-dir oci-cont/work-dir}
-                        ws (assoc :workspace ws))))]
-    (md/future (c/run-container rt))))
+                        ws (assoc :workspace ws))))
+        ;; FIXME Rewrite to use app specific runtime
+        runner (oci-cont/make-container-runner (get-in rt [:config :containers]) (:events rt))]
+    (p/run-container runner (:job rt))))
+
+(defn- throw-error! [{:keys [status] :as resp}]
+  (if (or (nil? status) (>= status 400))
+    (throw (ex-info "Got remote error" resp))
+    resp))
 
 (defn- instance-call
   ([f conf-fn res-fn]
@@ -132,18 +143,22 @@
          client (ci/make-context conf)]
      (md/chain
       (f client (conf-fn conf))
+      throw-error!
       :body
       res-fn)))
   ([f conf-fn]
    (instance-call f conf-fn identity)))
 
-(defn list-instances []
-  (instance-call ci/list-container-instances #(select-keys % [:compartment-id]) :items))
+(defn list-instances [& [opts]]
+  (instance-call ci/list-container-instances
+                 (fn [conf]
+                   (-> conf
+                       (select-keys [:compartment-id])
+                       (merge opts)))
+                 :items))
 
 (defn list-active []
-  (md/chain
-   (list-instances)
-   (partial filter (comp (partial = "ACTIVE") :lifecycle-state))))
+  (list-instances {:lifecycle-state "ACTIVE"}))
 
 (defn get-instance [id]
   (instance-call ci/get-container-instance (constantly {:instance-id id})))
@@ -156,18 +171,25 @@
   [re]
   (md/chain
    (list-instances)
-   (partial filter (comp (partial = "INACTIVE") :lifecycle-state))
+   (partial filter (comp #{"INACTIVE" "ACTIVE"} :lifecycle-state))
    (partial filter (comp (partial re-matches re) :display-name))
    (fn [m]
      (println "Deleting" (count m) "container instances...")
      (let [conf (co/oci-container-config)
            client (ci/make-context conf)]
-       (md/loop [td m]
-         (when (not-empty td)
-           (md/chain
-            (ci/delete-container-instance client {:instance-id (:id (first td))})
-            (fn [_]
-              (md/recur (rest td))))))))))
+       (doseq [ci m]
+         (let [id (:id ci)]
+           (println "Deleting" id)
+           @(ci/delete-container-instance client {:instance-id id})))
+       ;; Results in 429
+       #_(md/loop [td m
+                   res []]
+           (if (not-empty td)
+             (md/chain
+              (ci/delete-container-instance client {:instance-id (:id (first td))})
+              (fn [r]
+                (md/recur (rest td) (conj res r))))
+             (apply md/zip res)))))))
 
 (defn print-job-logs
   "Prints the logs of the (active) job container in the given instance"
@@ -183,8 +205,7 @@
 (defn run-build
   "Runs a build given the specified GIT url and branch name, using the current config."
   [url branch]
-  (let [conf (-> @co/global-config
-                 (config/normalize-config {} {}))]
+  (let [conf @co/global-config]
     (rt/with-runtime conf :server rt
       (let [runner (:runner rt)
             build {:build-id (str "test-build-" (u/now))

@@ -7,7 +7,8 @@
    themselves under a specific namespaced keyword.  If this key is found in
    job properties, the associated extension code is executed.  Extensions can
    be executed before or after a job (or both)."
-  (:require [manifold.deferred :as md]
+  (:require [clojure.tools.logging :as log]
+            [manifold.deferred :as md]
             [monkey.ci
              [build :as b]
              [credits :as cr]
@@ -34,13 +35,21 @@
   (when-let [m (get-method mm k)]
     #(m k %)))
 
+(defn- run-safe [f ctx]
+  (try
+    (f ctx)
+    (catch Exception ex
+      (log/error "Failed to apply extension" ex)
+      ;; Return context unchanged
+      ctx)))
+
 (defn- apply-extensions [{:keys [job] :as rt} registered rk mm]
   (->> (keys job)
        (reduce (fn [r k]
                  (let [b (or (get-in registered [k rk])
                              (find-mm k mm))]
-                   (cond-> r
-                     b (b))))
+                   (cond->> r
+                     b (run-safe b))))
                rt)))
 
 (defn apply-extensions-before
@@ -58,12 +67,7 @@
 (defrecord ExtensionWrappingJob [target registered-ext]
   j/Job
   (execute! [job rt]
-    (let [rt (assoc rt :job target)
-          post-update (fn [rt]
-                        (rt/post-events rt {:type :job/updated
-                                            :sid (b/get-sid rt)
-                                            :job (j/job->event (:job rt))})
-                        rt)]
+    (let [rt (assoc rt :job target)]
       ;; FIXME This is fairly dirty: jobs don't return the runtime, but extensions use it,
       ;; so maybe we need to think about reworking this.
       (-> rt
@@ -72,9 +76,6 @@
           (md/chain
            ;; Add the result to the job in runtime
            (partial assoc-in rt [:job :result])
-           ;; Dispatch an update event already.  Some extensions may require information
-           ;; from the api that has not been sent yet, so we do it here.
-           post-update
            ;; Let any extensions work on it
            #(apply-extensions-after % registered-ext)
            ;; Return the job result (possibly modified by extensions)
@@ -82,7 +83,7 @@
 
   cr/CreditConsumer
   (credit-multiplier [_ rt]
-    (cr/credit-multiplier target rt)))
+    (cr/calc-credit-multiplier target rt)))
 
 (defn wrap-job
   "Wraps job so that extensions are invoked before and after it."

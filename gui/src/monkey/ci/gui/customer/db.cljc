@@ -9,6 +9,12 @@
 (defn get-customer [db]
   (lo/get-value db customer))
 
+(defn get-alerts [db]
+  (lo/get-alerts db customer))
+
+(defn set-alerts [db a]
+  (lo/set-alerts db customer a))
+
 (defn update-customer [db f & args]
   (apply lo/update-value db customer f args))
 
@@ -31,11 +37,6 @@
 (defn reset-repo-alerts [db]
   (dissoc db repo-alerts))
 
-(def github-repos ::github-repos)
-
-(defn set-github-repos [db r]
-  (assoc db github-repos r))
-
 (def customer-creating? ::customer-creating)
 
 (defn mark-customer-creating [db]
@@ -53,3 +54,38 @@
   (dissoc db create-alerts))
 
 (def recent-builds ::recent-builds)
+
+(def stats ::stats)
+(def credits ::credits)
+
+(defn get-credits [db]
+  (lo/get-value db credits))
+
+(def group-by-lbl ::group-by-lbl)
+
+(defn get-group-by-lbl [db]
+  (get db group-by-lbl "project"))
+
+(defn set-group-by-lbl [db l]
+  (assoc db group-by-lbl l))
+
+(def repo-filter ::repo-filter)
+
+(defn get-repo-filter [db]
+  (get db repo-filter))
+
+(defn set-repo-filter [db f]
+  (assoc db repo-filter f))
+
+(def ext-repo-filter ::repo-filter)
+
+(defn get-ext-repo-filter [db]
+  (get db ext-repo-filter))
+
+(defn set-ext-repo-filter [db f]
+  (assoc db ext-repo-filter f))
+
+(def bb-webhooks ::bb-webhooks)
+
+(defn set-bb-webhooks [db wh]
+  (assoc db bb-webhooks wh))

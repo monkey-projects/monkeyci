@@ -1,12 +1,16 @@
 (ns monkey.ci.reporting.print
   "Reporter that prints to the console using coloring."
-  (:require [clansi :as cl]
+  (:require [babashka.fs :as fs]
+            [clansi :as cl]
             [clojure.string :as cs]
             [monkey.ci.reporting :as r]
             [monkey.ci.build.core :as bc]))
 
 (defn- error [s]
   (cl/style s :bright :red))
+
+(defn- warning [s]
+  (cl/style s :bright :yellow))
 
 (defn- success [s]
   (cl/style s :bright :green))
@@ -136,6 +140,24 @@
 
 (defmethod printer :verify/failed [{:keys [message]}]
   (println (error "Error:") "Exception while verifying:" message))
+
+(defn- print-finding [{:keys [row col message filename] :as f}]
+  (printf "%s - at %d:%d: %s%n" (fs/file-name filename) row col message))
+
+(defmethod printer :verify/result [{:keys [result]}]
+  (let [{e :error w :warning} (:summary result)
+        e? (and e (pos? e))
+        w? (and w (pos? w))]
+    (when e?
+      (println (error (str "Got " e " error(s)"))))
+    (when w?
+      (println (warning (str "Got " w " warning(s)"))))
+    (when (not (or e? w?))
+      (println (success "Build script is valid!")))
+    (doseq [f (:findings result)]
+      (print-finding f))
+    ;; Ensure printed stuff is actually sent to stdout
+    (flush)))
 
 (defmethod printer :default [msg]
   (println (cl/style "Warning:" :bright :cyan) "unknown message type" (accent (str (:type msg)))))

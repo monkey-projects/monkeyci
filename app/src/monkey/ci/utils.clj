@@ -1,13 +1,13 @@
 (ns monkey.ci.utils
   (:require [babashka.fs :as fs]
             [buddy.core.keys.pem :as pem]
-            [clojure
-             [string :as cs]
-             [walk :as cw]]
+            [clojure.walk :as cw]
             [clojure.java.io :as io]
+            [clojure.tools.logging :as log]
             [clojure
              [math :as math]
              [repl :as cr]]
+            [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
              [edn :as ce]
@@ -56,6 +56,13 @@
       (throw (ex-info "Unable to create directory" {:dir f}))))
   f)
 
+(defn ensure-dir-exists!
+  "If `f` is a file, ensures that the directory containing `f` exists."
+  [^java.io.File f]
+  (when f
+    (mkdirs! (.getParentFile f))
+    f))
+
 (defn add-shutdown-hook!
   "Executes `h` when the JVM shuts down.  Returns the thread that will
    execute the hook."
@@ -80,11 +87,6 @@
   "Deletes directory recursively"
   [dir]
   (FileUtils/deleteDirectory (io/file dir)))
-
-;; Use build index instead
-(defn ^:deprecated new-build-id []
-  ;; TODO Generate a more unique build id
-  (format "build-%d" (System/currentTimeMillis)))
 
 (defn load-privkey
   "Load private key from file or from string"
@@ -133,16 +135,6 @@
                   (map? x) (prune-map)))
               t))
 
-(defn deep-merge
-  "Recursively merges maps."
-  ;; Copied from https://dnaeon.github.io/recursively-merging-maps-in-clojure/
-  [& maps]
-  (letfn [(m [& xs]
-            (if (some #(and (map? %) (not (record? %))) xs)
-              (apply merge-with m xs)
-              (last xs)))]
-    (reduce m maps)))
-
 (defn ->base64 [s]
   (.. (java.util.Base64/getEncoder)
       (encodeToString (.getBytes s java.nio.charset.StandardCharsets/UTF_8))))
@@ -180,3 +172,11 @@
   (let [r (int (math/round x))]
     (cond-> r
       (< r x) inc)))
+
+(defn log-deferred-elapsed
+  "Given a deferred, keeps track of time elapsed and logs it"
+  [x msg]
+  (let [start (now)]
+    (md/finally x (fn []
+                    (let [elapsed (- (now) start)]
+                      (log/debugf "%s - Elapsed: %s ms, %.2f s" msg elapsed (float (/ elapsed 1000))))))))

@@ -1,12 +1,12 @@
-{:deps {org.clojure/clojure {:mvn/version "1.11.4"}
+{:deps {org.clojure/clojure {:mvn/version "1.12.0"}
         aleph/aleph {:mvn/version "0.8.1"} ; For http SSE receiving
         babashka/process {:mvn/version "0.5.22"}
         buddy/buddy-auth {:mvn/version "3.0.323"}
         buddy/buddy-core {:mvn/version "1.12.0-430"}
         camel-snake-kebab/camel-snake-kebab {:mvn/version "0.4.3"}
-        ch.qos.logback/logback-classic {:mvn/version "1.5.6"}
+        ch.qos.logback/logback-classic {:mvn/version "1.5.12"}
         clansi/clansi {:mvn/version "1.0.0"}
-        clj-commons/clj-yaml {:mvn/version "1.0.27"}
+        clj-commons/clj-yaml {:mvn/version "1.0.28"}
         cli-matic/cli-matic {:mvn/version "0.5.4"}
         clj-jgit/clj-jgit {:mvn/version "1.1.0"
                            ;; Exclude these because they conflict with buddy
@@ -14,52 +14,52 @@
                                         org.bouncycastle/bcprov-jdk15on
                                         org.bouncycastle/bcpkix-jdk15on
                                         org.bouncycastle/bcutil-jdk15on]}
+        clj-kondo/clj-kondo {:mvn/version "2024.09.27"}
         clojure.java-time/clojure.java-time {:mvn/version "1.4.2"}
         com.github.loki4j/loki-logback-appender {:mvn/version "1.6.0-m1"}
-        com.github.oliyh/martian-httpkit {:mvn/version "0.1.26"}
-        com.github.seancorfield/honeysql {:mvn/version "2.6.1147"}
+        com.github.seancorfield/honeysql {:mvn/version "2.6.1196"}
         com.github.seancorfield/next.jdbc {:mvn/version "1.3.939"}
-        ;; TODO Use this instead of external path
-        ;; com.monkeyci/common {:local/root "../common"}
+        com.monkeyprojects/aero-ext {:mvn/version "0.2.0"}
         com.monkeyprojects/clompress {:mvn/version "0.1.1"}
         com.monkeyprojects/monkey-jms {:mvn/version "0.2.0"}
-        com.monkeyprojects/oci-container-instance {:mvn/version "0.1.0"}
-        com.monkeyprojects/oci-os {:mvn/version "0.3.1"}
+        com.monkeyprojects/oci-container-instance {:mvn/version "0.2.0"}
+        com.monkeyprojects/oci-os {:mvn/version "0.3.2"}
         com.monkeyprojects/oci-sign {:mvn/version "0.1.3"}
-        com.monkeyprojects/socket-async {:mvn/version "0.1.0"}
-        com.mysql/mysql-connector-j {:mvn/version "9.0.0"}
-        com.zaxxer/HikariCP {:mvn/version "5.1.0"}
+        com.mysql/mysql-connector-j {:mvn/version "9.1.0"}
+        com.zaxxer/HikariCP {:mvn/version "6.0.0"}
         dev.weavejester/ragtime {:mvn/version "0.9.4"}
         com.monkeyprojects/zmq {:mvn/version "0.3.2"
                                 ;; Use jeromq, so we don't need native lib.  This is a bit
                                 ;; slower however, so maybe later we can change this.
                                 :exclusions [org.zeromq/jzmq]}
         com.stuartsierra/component {:mvn/version "1.1.0"}
-        commons-io/commons-io {:mvn/version "2.16.1"}
-        http-kit/http-kit {:mvn/version "2.8.0"}
-        io.micrometer/micrometer-registry-prometheus {:mvn/version "1.12.8"}
-        io.micrometer/micrometer-core {:mvn/version "1.12.8"}
-        io.resonant/micrometer-clj {:mvn/version "0.0.4"}
+        com.taoensso/telemere {:mvn/version "1.0.0-beta25"}
+        commons-io/commons-io {:mvn/version "2.17.0"}
+        io.prometheus/prometheus-metrics-core {:mvn/version "1.3.2"}
+        io.prometheus/prometheus-metrics-exporter-pushgateway {:mvn/version "1.3.2"}
+        io.prometheus/prometheus-metrics-instrumentation-jvm {:mvn/version "1.3.2"}
+        io.prometheus/prometheus-metrics-tracer-initializer {:mvn/version "1.3.2"}
         medley/medley {:mvn/version "1.4.0"}
-        metosin/reitit-middleware {:mvn/version "0.7.1"}
-        metosin/reitit-ring {:mvn/version "0.7.1"}
-        metosin/reitit-schema {:mvn/version "0.7.1"}
-        metosin/reitit-swagger {:mvn/version "0.7.1"}
-        org.apache.activemq/artemis-server {:mvn/version "2.36.0"}
-        org.apache.activemq/artemis-amqp-protocol {:mvn/version "2.36.0"}
-        org.clojars.lispyclouds/contajners {:mvn/version "1.0.5"}
+        metosin/reitit-middleware {:mvn/version "0.7.2"}
+        metosin/reitit-ring {:mvn/version "0.7.2"}
+        metosin/reitit-schema {:mvn/version "0.7.2"}
+        metosin/reitit-swagger {:mvn/version "0.7.2"}
+        org.apache.activemq/artemis-server {:mvn/version "2.37.0"}
+        org.apache.activemq/artemis-amqp-protocol {:mvn/version "2.37.0"}
         org.clojure/core.async {:mvn/version "1.6.681"}
         org.clojure/tools.logging {:mvn/version "1.3.0"}
         org.zeromq/jeromq {:mvn/version "0.6.0"} ; Java implementation of zeromq
+        prismatic/schema {:mvn/version "1.4.1"}
         ring-cors/ring-cors {:mvn/version "0.1.13"}
-        yogthos/config {:mvn/version "1.2.0"}}
+        yogthos/config {:mvn/version "1.2.1"}}
 
  ;; TODO Remove external path, replace with lib
- :paths ["src" "../common/src" "resources"]
+ :paths ["src" "resources"]
  
  :aliases
  {:dev
-  {:extra-deps {org.clojure/test.check {:mvn/version "1.1.1"}}
+  {:extra-deps {org.clojure/test.check {:mvn/version "1.1.1"}
+                org.clojure/tools.namespace {:mvn/version "1.5.0"}}
    :extra-paths ["dev-resources" "env/dev"]}
 
   :test-paths ["test/unit" "test/integration"]
@@ -67,14 +67,10 @@
   :test
   {:extra-paths [:test-paths]
    :extra-deps {com.monkeyprojects/build {:mvn/version "0.2.0"}
-                com.github.oliyh/martian-test {:mvn/version "0.1.26"}
-                com.h2database/h2 {:mvn/version "2.3.230"}
-                http-kit.fake/http-kit.fake {:mvn/version "0.2.2"}
+                com.h2database/h2 {:mvn/version "2.3.232"}
                 org.clojure/test.check {:mvn/version "1.1.1"}
                 ring/ring-mock {:mvn/version "0.4.0"}}
-   :exec-fn monkey.test/all
-   ;; Add this to avoid falling back to the default logger
-   :jvm-opts ["-Dlogback.configurationFile=resources/logback.xml"]}
+   :exec-fn monkey.test/all}
 
   :junit ; Use this in conjunction with :test
   {:extra-deps {lambdaisland/kaocha-junit-xml {:mvn/version "1.17.101"}}
@@ -92,7 +88,10 @@
   {:extra-deps {org.clojure/tools.namespace {:mvn/version "1.5.0"}}
    :exec-fn monkey.test/watch
    ;; Skip integration and slow tests
-   :exec-args {:kaocha.filter/skip-meta [:integration :slow]}}
+   :exec-args {:kaocha.filter/skip-meta [:integration :slow]
+               :kaocha/plugins [:kaocha.plugin/notifier]
+               ;; Send notifications to desktop
+               :kaocha.plugin.notifier/command "notify-send -a Kaocha %{title} %{message} -i %{icon} -u %{urgency}"}}
   
   :run
   {:main-opts ["-m" "monkey.ci.core"]}

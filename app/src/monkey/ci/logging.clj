@@ -8,7 +8,6 @@
             [manifold.deferred :as md]
             [monkey.ci
              [build :as b]
-             [config :as c]
              [oci :as oci]
              [runtime :as rt]
              [sid :as sid]
@@ -22,6 +21,9 @@
   (handle-stream [this in] "Does some async processing on a stream, if necessary"))
 
 (defmulti make-logger (comp :type :logging))
+
+(defn ->config [conf]
+  {:logging conf})
 
 ;; Note that inherit logger redirects output to the stdout of the parent,
 ;; which is not necessarily the same as the log output.  For example, logging
@@ -55,13 +57,12 @@
   (fn [& _]
     (->InheritLogger)))
 
-(deftype FileLogger [conf rt path]
+(deftype FileLogger [conf build path]
   LogCapturer
   (log-output [_]
-    ;; FIXME Refactor to separate build from rt
     (let [f (apply io/file
-                   (or (:dir conf) (io/file (:work-dir rt) "logs"))
-                   (concat (drop-last (b/get-sid rt)) path))]
+                   (:dir conf)
+                   (concat (remove nil? (drop-last (b/sid build))) path))]
       (.mkdirs (.getParentFile f))
       f))
 
@@ -89,34 +90,35 @@
                           (.removeShutdownHook (Runtime/getRuntime) t)
                           (catch Exception _
                             (log/warn "Unable to remove shutdown hook, process is probably already shutting down.")))))]
-    (when (md/deferred? d)
-      (.addShutdownHook (Runtime/getRuntime) t)
-      (md/on-realized d remove-hook remove-hook))
-    d))
+    (if (md/deferred? d)
+      (do
+        (.addShutdownHook (Runtime/getRuntime) t)
+        (md/finally d remove-hook))
+      d)))
 
 (defn sid->path [{:keys [prefix]} path sid]
   (->> (concat [prefix] sid path)
        (remove nil?)
        (cs/join "/")))
 
-(deftype OciBucketLogger [conf rt path]
+(deftype OciBucketLogger [conf build path]
   LogCapturer
   (log-output [_]
     :stream)
 
   (handle-stream [_ in]
-    (let [sid (b/get-sid rt)
+    (let [sid (b/sid build)
           ;; Since the configured path already includes the build id,
           ;; we only use repo id to build the path
-          on (sid->path conf path (u/sid->repo-sid sid))]
+          on (sid->path conf path (sid/sid->repo-sid sid))]
       (-> (oci/stream-to-bucket (assoc conf :object-name on) in)
           (ensure-cleanup)))))
 
 (defmethod make-logger :oci [conf]
-  (fn [rt path]
+  (fn [build path]
     (-> conf
         :logging
-        (->OciBucketLogger rt path))))
+        (->OciBucketLogger build path))))
 
 (defn handle-process-streams
   "Given a process return value (as from `babashka.process/process`) and two
@@ -204,28 +206,12 @@
       bs/to-input-stream)))
 
 (defmethod make-log-retriever :oci [conf]
-  (let [oci-conf (-> conf
-                     :logging
-                     (oci/->oci-config))
-        client (os/make-client oci-conf)]
+  (let [oci-conf (:logging conf)
+        client (-> (os/make-client oci-conf)
+                   (oci/add-inv-interceptor :logging))]
     (->OciBucketLogRetriever client oci-conf)))
 
 ;;; Configuration handling
-
-(defmulti normalize-logging-config (comp :type :logging))
-
-(defmethod normalize-logging-config :default [conf]
-  conf)
-
-(defmethod normalize-logging-config :file [conf]
-  (update-in conf [:logging :dir] #(or (u/abs-path %) (u/combine (c/abs-work-dir conf) "logs"))))
-
-(defmethod normalize-logging-config :oci [conf]
-  (-> (oci/normalize-config conf :logging)
-      (update :logging select-keys [:type :credentials :ns :compartment-id :bucket-name :region])))
-
-(defmethod c/normalize-key :logging [k conf]
-  (c/normalize-typed k conf normalize-logging-config))
 
 (defmethod rt/setup-runtime :logging [conf _]
   {:maker (make-logger conf)

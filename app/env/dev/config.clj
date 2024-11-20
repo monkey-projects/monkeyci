@@ -2,28 +2,24 @@
   (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
             [common :as c]
+            [meta-merge.core :as mm]
             [monkey.ci
              [config :as config]
              [oci :as oci]
-             [storage]
-             [utils :as u]]
+             [storage]]
             [monkey.ci.storage.oci])
   (:import java.io.PushbackReader))
 
 ;; Global config state
 (defonce global-config (atom {}))
 
-(defn load-edn [f]
-  (with-open [is (PushbackReader. (io/reader f))]
-    (edn/read is)))
-
 (defn load-config [f]
-  (load-edn (io/file "dev-resources" "config" f)))
+  (config/load-config-file (io/file "dev-resources" "config" f)))
 
 (defn load-config!
   "Loads config from `f` and adds it to the state"
   [f]
-  (swap! global-config u/deep-merge (load-config f)))
+  (swap! global-config mm/meta-merge (load-config f)))
 
 (defn reset-config! []
   (reset! global-config {}))
@@ -36,9 +32,7 @@
    and converts it to an OCI config map."
   ([env type]
    (-> (load-config (format "oci/%s-config.edn" (name env)))
-       (config/normalize-config {} {})
-       (get type)
-       (oci/->oci-config)))
+       (get type)))
   ([type]
    (load-oci-config @c/env type)))
 
@@ -47,9 +41,7 @@
    it (type being `:logging`, `:runner`, `:container`, `:storage`)"
   [type]
   (-> @global-config
-      (config/normalize-config {} {})
-      (get type)
-      (oci/->oci-config)))
+      (get type)))
 
 (defn oci-runner-config []
   (oci-config :runner))

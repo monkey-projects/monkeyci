@@ -57,6 +57,8 @@ How should scripts be run?  I would like to reuse the Clojure tools `deps.edn` a
 much as possible.  So essentially it would be no more than running that build in
 a separate container or process.
 
+For more on this, see the [builds section](build.md).
+
 ## Plugins ##
 
 The Clojure-as-script concept should also allow builders to easily create plugins that
@@ -144,3 +146,7 @@ Interfacing with the app should be possible with a CLI, HTTP API and a user inte
 Ideally, these are all event-driven.  Well, only the API needs to be, the other parts
 could talk to the API in turn.  It could also have a [Terraform](https://terraform.io)
 integration.  A Slack app would also be nice.
+
+## Credits
+
+For more on how credits are issued and used in *MonkeyCI*, see [the credits section](credits.md).

@@ -89,6 +89,19 @@
     (is (not-empty (capture-out {:type :verify/failed
                                  :message "test error"})))))
 
+(deftest print-verify
+  (testing "prints error on error"
+    (is (not-empty (capture-out {:type :verify/result
+                                 :result {:summary {:error 1}}}))))
+  
+  (testing "prints warnings"
+    (is (not-empty (capture-out {:type :verify/result
+                                 :result {:summary {:warning 1}}}))))
+
+  (testing "prints success when no errors"
+    (is (not-empty (capture-out {:type :verify/result
+                                 :result {:summary {:error 0}}})))))
+
 (deftest unknown-types
   (testing "prints warning"
     (is (string? (capture-out {:type :unkown/type})))))

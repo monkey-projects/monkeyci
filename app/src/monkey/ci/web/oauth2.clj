@@ -1,6 +1,7 @@
 (ns monkey.ci.web.oauth2
   "OAuth2 flow support handlers"
-  (:require [monkey.ci.storage :as s]
+  (:require [medley.core :as mc]
+            [monkey.ci.storage :as s]
             [monkey.ci.web
              [auth :as auth]
              [common :as c]]
@@ -9,7 +10,7 @@
 (defn- generate-jwt [req user]
   ;; Perhaps we should use the internal user id instead?
   ;; TODO Add user permissions
-  (auth/generate-jwt req (auth/user-token ["github" (:type-id user)])))
+  (auth/generate-jwt req (auth/user-token [(name (:type user)) (:type-id user)])))
 
 (defn- add-jwt [user req]
   (assoc user :token (generate-jwt req user)))
@@ -39,9 +40,11 @@
         ;; Request user info, generate JWT
         (let [token (get-in token-reply [:body :access-token])]
           (-> (request-user-info token)
-              ;; Return token to frontend, we'll need it when doing github requests.
+              ;; Return token to frontend, we'll need it when doing requests to external api.
               (assoc :token token)
               (fetch-or-create-user req)
+              ;; Return any refresh tokens, so we can request a new token when it expires.
+              (mc/assoc-some :refresh-token (get-in token-reply [:body :refresh-token]))
               (add-jwt req)
               (rur/response)))
         ;; Failure

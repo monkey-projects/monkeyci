@@ -7,6 +7,7 @@
             [buddy.core
              [codecs :as codecs]
              [keys :as bk]
+             [mac :as mac]
              [nonce :as nonce]]
             [buddy.sign.jwt :as jwt]
             [clojure.tools.logging :as log]
@@ -90,13 +91,13 @@
   "Loads private and public keys from the app config, returns a map that can be
    used in the context `:jwk`."
   [conf]
-  (let [m {:private-key bk/private-key
-           :public-key bk/public-key}
+  (log/debug "Configured JWK:" (:jwk conf))
+  (let [m {:private-key (comp bk/str->private-key u/try-slurp)
+           :public-key (comp bk/str->public-key u/try-slurp)}
         loaded-keys (mapv (fn [[k f]]
                             (when-let [v (get-in conf [:jwk k])]
                               (f v)))
                           m)]
-    (log/debug "Configured JWK:" (:jwk conf))
     (when (every? some? loaded-keys)
       (zipmap [:priv :pub] loaded-keys))))
 
@@ -131,7 +132,7 @@
   (when (and (not (expired? token)) sub)
     (let [id (sid/parse-sid sub)]
       (when (= 2 (count id))
-        (log/debug "Looking up user with id" id)
+        (log/trace "Looking up user with id" id)
         (some-> (st/find-user-by-type storage id)
                 (update :customers set))))))
 
@@ -142,7 +143,7 @@
                               (st/find-build storage))]
       (assoc build :customers #{(:customer-id build)}))))
 
-(defmethod resolve-token :default [rt token]
+(defmethod resolve-token :default [_ _]
   ;; Fallback, for backwards compatibility
   nil)
 
@@ -194,3 +195,42 @@
 
 (defmethod rt/setup-runtime :jwk [conf _]
   (config->keypair conf))
+
+(def req->webhook-id (comp :id :path :parameters))
+
+(defn- get-webhook-secret [req]
+  ;; Find the secret key by looking up the webhook from storage
+  (some-> (c/req->storage req)
+          (st/find-webhook (req->webhook-id req))
+          :secret-key))
+
+(defn parse-signature
+  "Parses HMAC signature header, returns the algorithm and the signature."
+  [s]
+  (when s
+    (let [[k v :as parts] (seq (.split s "="))]
+      (when (= 2 (count parts))
+        {:alg (keyword k)
+         :signature v}))))
+
+(defn valid-security?
+  "Validates security header"
+  [{:keys [secret payload x-hub-signature]}]
+  (when-let [{:keys [alg signature]} (parse-signature x-hub-signature)]
+    (mac/verify payload
+                (codecs/hex->bytes signature)
+                {:key secret :alg (keyword (str "hmac+" (name alg)))})))
+
+(defn validate-hmac-security
+  "Middleware that validates the HMAC security header using a fn that retrieves
+   the secret for the request."
+  [h {:keys [get-secret header]
+      :or {header "x-hub-signature-256"}}]
+  (let [get-secret (or get-secret get-webhook-secret)]
+    (fn [req]
+      (if (valid-security? {:secret (get-secret req)
+                            :payload (:body req)
+                            :x-hub-signature (get-in req [:headers header])})
+        (h req)
+        (-> (rur/response "Invalid signature header")
+            (rur/status 401))))))

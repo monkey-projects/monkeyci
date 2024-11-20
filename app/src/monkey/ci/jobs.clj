@@ -15,13 +15,18 @@
              [credits :as cr]
              [labels :as lbl]
              [protocols :as p]
-             [utils :as u]]))
+             [time :as t]
+             [utils :as u]]
+            [monkey.ci.events.core :as ec]))
 
 (def deps "Get job dependencies" :dependencies)
 (def status "Get job status" :status)
 (def labels "Get job labels" :labels)
 (def save-artifacts "Gets artifacts saved by job" :save-artifacts)
 (def job-id "Gets job id" :id)
+(def work-dir "Gets job work dir" :work-dir)
+
+(def max-job-timeout (* 20 60 1000))
 
 (defprotocol Job
   "Base job protocol that is able to execute it, taking the runtime as argument."
@@ -42,16 +47,75 @@
 (def failed?  (comp (partial = :failure) status))
 (def success? (comp (partial = :success) status))
 
+(defn as-serializable
+  "Converts job into something that can be converted to edn"
+  [job]
+  (letfn [(art->ser [a]
+            (select-keys a [:id :path]))]
+    (-> job
+        (select-keys (concat [:status :start-time :end-time deps labels :extensions :credit-multiplier :script
+                              :memory :cpus :arch :work-dir
+                              save-artifacts :restore-artifacts :caches]
+                             co/props))
+        (mc/update-existing :save-artifacts (partial map art->ser))
+        (mc/update-existing :restore-artifacts (partial map art->ser))
+        (mc/update-existing :caches (partial map art->ser))
+        (assoc :id (bc/job-id job)))))
+
+(def job->event
+  "Converts job into something that can be put in an event"
+  as-serializable)
+
+(defn- base-event
+  "Creates a skeleton event with basic properties"
+  [type job-id build-sid]
+  (ec/make-event 
+   type
+   :src :script
+   :sid build-sid
+   :job-id job-id))
+
+(defn job-initializing-evt [job-id build-sid cm]
+  (-> (base-event :job/initializing job-id build-sid)
+      (assoc :credit-multiplier cm)))
+
+(def job-start-evt (partial base-event :job/start))
+
+(defn- job-status-evt [type job-id build-sid {:keys [status] :as r}]
+  (let [r (dissoc r :status :exception)]
+    (-> (base-event type job-id build-sid)
+        (assoc :status status
+               :result r))))
+
+(def job-executed-evt
+  "Creates an event that indicates the job has executed, but has not been completed yet.
+   Extensions may need to be applied first."
+  (partial job-status-evt :job/executed))
+
+(def job-end-evt
+  "Event that indicates the job has been fully completed.  The result should not change anymore."
+  (partial job-status-evt :job/end))
+
+(defn ex->result
+  "Creates result structure from an exception"
+  [ex]
+  (if (instance? java.lang.Exception ex)
+    (ec/exception-result ex)
+    ex))
+
 (defn- make-job-dir-absolute
   "Rewrites the job dir in the context so it becomes an absolute path, calculated
    relative to the checkout dir."
-  [{:keys [job] :as rt}]
-  (let [checkout-dir (build/rt->checkout-dir rt)]
+  [{:keys [job build] :as rt}]
+  (let [checkout-dir (build/checkout-dir build)]
     (update-in rt [:job :work-dir]
                (fn [d]
                  (if d
                    (u/abs-path checkout-dir d)
                    checkout-dir)))))
+
+(defn rt->context [rt]
+  (dissoc rt :events :containers :artifacts :cache))
 
 (defn- recurse-action
   "An action may return another job definition, especially in legacy builds.
@@ -63,7 +127,9 @@
                       (cond-> j
                         (nil? (bc/job-id j)) (assoc :id (bc/job-id job))))]
       (md/chain
-       (action rt)
+       ;; Ensure this executes async by wrapping it in a future
+       (md/future
+         (action (rt->context rt)))        ; Only pass necessary info
        (fn [r]
          (cond
            ;; Valid response
@@ -75,25 +141,36 @@
 
 (extend-protocol Job
   monkey.ci.build.core.ActionJob
-  (execute! [job rt]
-    (let [a (-> (recurse-action job)
+  (execute! [job ctx]
+    (let [build-sid (-> ctx :build build/sid)
+          a (-> (recurse-action job)
                 (cache/wrap-caches)
-                (art/wrap-artifacts))]
-      (-> rt
+                (art/wrap-artifacts))
+          job (assoc job
+                     :start-time (t/now))]
+      (ec/post-events (:events ctx)
+                      [(job-start-evt (job-id job) build-sid)])
+      (-> ctx
           (make-job-dir-absolute)
           (a)
           (md/chain 
-           #(or % bc/success)))))
+           #(or % bc/success)
+           (fn [r]
+             (md/chain
+              (ec/post-events (:events ctx) [(job-executed-evt (job-id job) build-sid r)])
+              (constantly r)))))))
 
   monkey.ci.build.core.ContainerJob
-  (execute! [this rt]
+  (execute! [this ctx]
     (md/chain
-     (co/run-container (assoc rt :job this))
+     (p/run-container (:containers ctx) this)
      (fn [r]
+       (log/debug "Container job finished with result:" r)
        ;; Don't add the full result otherwise it will be sent out as an event
-       (if (= 0 (:exit r))
-         bc/success
-         bc/failure)))))
+       (-> (if (= 0 (:exit r))
+             bc/success
+             bc/failure)
+           (merge (select-keys r [:exit :message])))))))
 
 (defn- find-dependents
   "Finds all jobs that are dependent on this job"
@@ -215,89 +292,114 @@
 
 (def resolve-jobs p/resolve-jobs)
 
+(defn execute-next
+  "Performs the next iteration of job execution"
+  [state executing results rt]
+  (letfn [(add-to-results [global [job r]]
+            (assoc global
+                   (job-id job)
+                   {:job job
+                    :result r}))
+
+          (mark-pending-skipped [state res]
+            (let [pending (clojure.set/difference (set (keys state)) (set (keys res)))]
+              (reduce (fn [r id]
+                        (add-to-results r [(get state id) bc/skipped]))
+                      res
+                      pending)))
+
+          (update-job-state [state job s]
+            (assoc-in state [(job-id job) :status] s))
+          
+          (update-multiple-jobs [state jobs js]
+            (reduce (fn [res j]
+                      (update-job-state res j js))
+                    state
+                    jobs))
+
+          (post-end [job res]
+            (md/chain
+             (ec/post-events (:events rt)
+                             (job-end-evt (job-id job)
+                                          (build/sid (:build rt))
+                                          res))
+             (constantly res)))
+
+          (execute-all! [jobs state]
+            ;; Execute all jobs in parallel, return a map of job-ids and deferreds
+            (log/info "Starting" (count jobs) "pending jobs:" (map job-id jobs))
+            (reduce (fn [r j]
+                      (assoc r
+                             (job-id j)
+                             ;; Note that this must execute async, otherwise jobs will not be
+                             ;; run concurrently.
+                             (-> (execute! j (assoc-in rt [:build :jobs] state))
+                                 (md/chain
+                                  (partial post-end j)
+                                  (partial vector j))
+                                 (md/finally
+                                   (fn []
+                                     (log/debug "Jobs completed and job/end events (probably) sent for"
+                                                (map job-id jobs)))))))
+                    {}
+                    jobs))
+
+          (result->status [r]
+            (if (bc/success? r)
+              :success
+              :failure))
+
+          (canceled? []
+            (some-> rt :canceled? deref))]
+    
+    (let [c? (canceled?)
+          n (if c? {} (next-jobs* state))]
+      ;; TODO Do not start new jobs if build canceled
+      (log/trace "Job state:" state)
+      (log/debugf "There are %d pending jobs: %s" (count n) (keys n))
+      (log/debugf "There are %d jobs currently executing: %s" (count executing) (keys executing))
+      (if (and (empty? n) (empty? executing))
+        ;; Done, no more jobs to run and all running jobs have terminated.
+        ;; Mark any jobs that have not been executed as skipped.
+        (mark-pending-skipped state results)
+        ;; More jobs to run, or at least one job is still executing
+        (md/chain
+         (md/let-flow [to-execute (vals n)
+                       updated-state (update-multiple-jobs state to-execute :running)
+                       all-executing (if c?
+                                       ;; When canceled, just continue executing the running jobs
+                                       executing
+                                       (->> (execute-all! to-execute state)
+                                            (merge executing)))
+                       ;; Wait for next running job to terminate
+                       next-done (apply md/alt (vals all-executing))]
+           [updated-state next-done all-executing])
+         (fn [[state [job out :as d] all]]
+           (log/info "Job finished:" (job-id job))
+           [(update-job-state state job (result->status out))
+            (dissoc all (job-id job))
+            (add-to-results results d)]))))))
+
 (defn execute-jobs!
   "Executes all jobs in dependency order.  Returns a deferred that will hold
-   the results of all executed jobs."
+   the results of all executed jobs.  The runtime can contain an atom `canceled?` 
+   that should hold `true` if the jobs loop should stop executing."
   [jobs rt]
-  (let [grouped (group-by-id jobs)
-        
-        execute-all!
-        (fn execute-all [jobs state]
-          ;; Execute all jobs in parallel, return a map of job-ids and deferreds
-          (log/info "Starting" (count jobs) "pending jobs:" (map job-id jobs))
-          (reduce (fn [r j]
-                    (assoc r
-                           (job-id j)
-                           (md/chain
-                            ;; Ensure this executes async by wrapping it in a future
-                            (md/future (execute! j (assoc-in rt [:build :jobs] state)))
-                            (partial vector j))))
-                  {}
-                  jobs))
-
-        add-to-results
-        (fn [global [job r]]
-          (assoc global
-                 (job-id job)
-                 {:job job
-                  :result r}))
-
-        result->status
-        (fn [r]
-          (if (bc/success? r)
-            :success
-            :failure))
-
-        update-job-state
-        (fn [state job s]
-          (assoc-in state [(job-id job) :status] s))
-
-        update-multiple-jobs
-        (fn [state jobs js]
-          (reduce (fn [res j]
-                    (update-job-state res j js))
-                  state
-                  jobs))
-
-        mark-pending-skipped
-        (fn [state res]
-          (let [pending (clojure.set/difference (set (keys state)) (set (keys res)))]
-            (reduce (fn [r id]
-                      (add-to-results r [(get state id) bc/skipped]))
-                    res
-                    pending)))]
-    ;; Sets up a loop that checks if any jobs are pending for execution, and
-    ;; starts them in parallel.  Then adds them to any already executing jobs.
-    ;; It then waits for the first job to finish, and adds its result to the
-    ;; global result map.  Then performs the next iteration with any new pending
-    ;; jobs.  Stops when no more jobs are eligible for execution and all running
-    ;; jobs have finished.
-    (md/loop [state grouped
-              executing {}
-              results {}]
-      (let [n (next-jobs* state)]
-        (log/trace "Job state:" state)
-        (log/debugf "There are %d pending jobs: %s" (count n) (keys n))
-        (log/debugf "There are %d jobs currently executing: %s" (count executing) (keys executing))
-        (if (and (empty? n) (empty? executing))
-          ;; Done, no more jobs to run and all running jobs have terminated.
-          ;; Mark any jobs that have not been executed as skipped.
-          (mark-pending-skipped state results)
-          ;; More jobs to run, or at least one job is still executing
-          (md/chain
-           (md/let-flow [to-execute (vals n)
-                         updated-state (update-multiple-jobs state to-execute :running)
-                         all-executing (->> (execute-all! to-execute state)
-                                            (merge executing))
-                         ;; Wait for next running job to terminate
-                         next-done (apply md/alt (vals all-executing))]
-             [updated-state next-done all-executing])
-           (fn [[state [job out :as d] all]]
-             (log/info "Job finished:" (job-id job))
-             (md/recur
-              (update-job-state state job (result->status out))
-              (dissoc all (job-id job))
-              (add-to-results results d)))))))))
+  ;; Sets up a loop that checks if any jobs are pending for execution, and
+  ;; starts them in parallel.  Then adds them to any already executing jobs.
+  ;; It then waits for the first job to finish, and adds its result to the
+  ;; global result map.  Then performs the next iteration with any new pending
+  ;; jobs.  Stops when no more jobs are eligible for execution and all running
+  ;; jobs have finished.
+  (md/loop [state (group-by-id jobs)
+            executing {}
+            results {}]
+    (let [next (execute-next state executing results rt)]
+      (if (map? next)
+        ;; We're done
+        next
+        ;; Not done, do next iteration
+        (md/chain next (partial apply md/recur))))))
 
 (defn filter-jobs
   "Applies a filter to the given jobs, but includes all dependencies of jobs that
@@ -330,19 +432,6 @@
        (mapcat #(resolve-jobs % rt))
        (filter job?)))
 
-(defn- art->event [a]
-  (select-keys a [:id :path]))
-
-(defn job->event
-  "Converts job into something that can be put in an event"
-  [job]
-  (letfn [(art->event [a]
-            (select-keys a [:id :path]))]
-    (-> job
-        (select-keys [:status :start-time :end-time deps labels save-artifacts :extensions :credit-multiplier])
-        (mc/update-existing :save-artifacts (partial map art->event))
-        (assoc :id (bc/job-id job)))))
-
 (extend-protocol cr/CreditConsumer
   monkey.ci.build.core.ActionJob
   (credit-multiplier [job rt]
@@ -351,3 +440,6 @@
   monkey.ci.build.core.ContainerJob
   (credit-multiplier [job rt]
     ((cr/container-credit-consumer-fn rt) job)))
+
+(defn set-credit-multiplier [job cm]
+  (assoc job :credit-multiplier cm))

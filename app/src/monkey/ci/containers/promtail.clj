@@ -7,8 +7,10 @@
             [medley.core :as mc]
             [monkey.ci
              [build :as b]
-             [config :as c]
-             [runtime :as rt]]))
+             [jobs :as j]
+             [runtime :as rt]
+             [spec :as spec]]
+            [monkey.ci.spec.containers :as cspec]))
 
 ;; Default promtail settings
 (def promtail-image "docker.io/grafana/promtail")
@@ -18,6 +20,7 @@
   "Generates config structure that can be passed to promtail.  The structure should
    be converted to yaml in order to be usable by promtail."
   [conf]
+  (spec/valid? ::cspec/promtail-config conf)
   {:server
    {:disable true}
    :positions
@@ -58,18 +61,18 @@
   {:image-url (str (or image-url promtail-image) ":" (or image-tag promtail-version))
    :display-name "promtail"})
 
-(defn rt->config
+(defn make-config [pt-config job build]
+  (-> pt-config
+      (merge (b/sid->props build))
+      (assoc :job-id (j/job-id job))))
+
+(defn ^:deprecated rt->config
   "Extracts necessary values from the runtime to create a promtail config map, that
    can be passed to `promtail-config`."
   [rt]
-  (letfn [(build-props []
-            (zipmap [:customer-id :repo-id :build-id] (b/get-sid rt)))
-          (job-props []
-            {:job-id (b/rt->job-id rt)})]
-    (-> (select-keys (:promtail (rt/config rt)) [:image-url :image-tag :loki-url])
-        (merge (build-props)
-               (job-props))
-        (assoc :token (-> (rt/config rt) :api :token)))))
+  (let [pt-config (get-in rt [:config :promtail])]
+    (make-config (-> pt-config
+                     (mc/assoc-some :token (-> (rt/config rt) :api :token)))
+                 (:job rt)
+                 (rt/build rt))))
 
-(defmethod c/normalize-key :promtail [_ conf]
-  conf)

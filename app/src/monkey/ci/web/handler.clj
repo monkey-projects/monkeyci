@@ -9,10 +9,11 @@
             [manifold.deferred :as md]
             [medley.core :refer [update-existing] :as mc]
             [monkey.ci
-             [config :as config]
              [metrics :as metrics]
-             [runtime :as rt]]
+             [runtime :as rt]
+             [version :as v]]
             [monkey.ci.web
+             [admin :as admin]
              [api :as api]
              [auth :as auth]
              [bitbucket :as bitbucket]
@@ -37,23 +38,22 @@
   (text-response "ok"))
 
 (defn version [_]
-  (text-response (config/version)))
+  (text-response (v/version)))
 
 (defn metrics [req]
   (if-let [m (c/from-rt req :metrics)]
     (text-response (metrics/scrape m))
     (rur/status 204)))
 
-(def not-empty-str (s/constrained s/Str not-empty))
-(def Id not-empty-str)
-(def Name not-empty-str)
+(def Id c/Id)
+(def Name c/Name)
 
 (defn- assoc-id [s]
   (assoc s (s/optional-key :id) Id))
 
 (s/defschema Label
   {:name Name
-   :value not-empty-str})
+   :value c/not-empty-str})
 
 (s/defschema NewCustomer
   {:name Name})
@@ -89,6 +89,13 @@
       (assoc-id)
       (assoc :github-id s/Int)))
 
+(s/defschema WatchBitBucketRepo
+  (-> NewRepo
+      (assoc-id)
+      (assoc :workspace s/Str
+             :repo-slug s/Str
+             :token s/Str)))
+
 (s/defschema ParameterValue
   {:name s/Str
    :value s/Str})
@@ -109,6 +116,7 @@
 
 (s/defschema SshKeys
   {(s/optional-key :id) Id
+   (s/optional-key :customer-id) Id
    :private-key s/Str
    :public-key s/Str ; TODO It may be possible to extract public key from private
    (s/optional-key :description) s/Str
@@ -123,6 +131,10 @@
 
 (s/defschema EmailRegistration
   {:email s/Str})
+
+(def since-params
+  {:query {(s/optional-key :since) s/Int
+           (s/optional-key :until) s/Int}})
 
 (defn- generic-routes
   "Generates generic entity routes.  If child routes are given, they are added
@@ -162,7 +174,12 @@
                 {:post {:handler github/webhook
                         :parameters {:path {:id Id}
                                      :body s/Any}}
-                 :middleware [:github-security]}]]]))])
+                 :middleware [:github-security]}]]]
+             ["/bitbucket/:id"
+              {:post {:handler bitbucket/webhook
+                      :parameters {:path {:id Id}
+                                   :body s/Any}}
+               :middleware [:bitbucket-security]}]))])
 
 (def customer-parameter-routes
   ["/param"
@@ -215,6 +232,7 @@
      {:post {:handler api/trigger-build
              ;; TODO Read additional parameters from body instead
              :parameters {:query {(s/optional-key :branch) s/Str
+                                  (s/optional-key :tag) s/Str
                                   (s/optional-key :commit-id) s/Str}}}}]
     ["/latest"
      {:get {:handler api/get-latest-build}}]
@@ -222,17 +240,28 @@
      {:parameters {:path {:build-id Id}}}
      [[""
        {:get {:handler api/get-build}}]
+      ["/retry"
+       {:post {:handler api/retry-build}}]
+      ["/cancel"
+       {:post {:handler api/cancel-build}}]
       log-routes
       artifact-routes]]]])
 
-(def github-watch-route
-  ["/github"
-   [["/watch" {:post {:handler github/watch-repo
-                      :parameters {:body WatchGithubRepo}}}]]])
+(def watch-routes
+  ["" [["/github"
+        [["/watch" {:post {:handler github/watch-repo
+                           :parameters {:body WatchGithubRepo}}}]]]
+       ["/bitbucket"
+        [["/watch" {:post {:handler bitbucket/watch-repo
+                           :parameters {:body WatchBitBucketRepo}}}]]]]])
 
-(def github-unwatch-route
-  ["/github"
-   [["/unwatch" {:post {:handler github/unwatch-repo}}]]])
+(def unwatch-routes
+  ["" [["/github"
+        [["/unwatch" {:post {:handler github/unwatch-repo}}]]]
+       ["/bitbucket"
+        [["/unwatch" {:post {:handler bitbucket/unwatch-repo
+                             :parameters
+                             {:body {:token s/Str}}}}]]]]])
 
 (def repo-routes
   ["/repo"
@@ -240,14 +269,15 @@
         {:creator api/create-repo
          :updater api/update-repo
          :getter  api/get-repo
+         :deleter api/delete-repo
          :new-schema NewRepo
          :update-schema UpdateRepo
          :id-key :repo-id
          :child-routes [repo-parameter-routes
                         repo-ssh-keys-routes
                         build-routes
-                        github-unwatch-route]})
-       (conj github-watch-route))])
+                        unwatch-routes]})
+       (conj watch-routes))])
 
 (s/defschema JoinRequestSchema
   {:customer-id Id
@@ -274,16 +304,34 @@
 
 (def customer-build-routes
   ["/builds"
-   [["/recent" {:get {:handler cust-api/recent-builds}}]]])
+   [["/recent" {:get {:handler cust-api/recent-builds
+                      :parameters since-params}}]]])
+
+(def stats-routes
+  ["/stats" {:get {:handler cust-api/stats
+                   :parameters (assoc since-params
+                                      (s/optional-key :zone-offset) s/Str)}}])
+
+(def credit-routes
+  ["/credits" {:get {:handler cust-api/credits}}])
+
+(def cust-webhook-routes
+  ["/webhook"
+   [["/bitbucket" {:get {:handler bitbucket/list-webhooks
+                         :parameters
+                         {:query {(s/optional-key :repo-id) s/Str
+                                  (s/optional-key :workspace) s/Str
+                                  (s/optional-key :repo-slug) s/Str
+                                  (s/optional-key :bitbucket-id) s/Str}}}}]]])
 
 (def customer-routes
   ["/customer"
    {:middleware [:customer-check]}
    (generic-routes
-    {:creator api/create-customer
-     :updater api/update-customer
-     :getter  api/get-customer
-     :searcher api/search-customers
+    {:creator cust-api/create-customer
+     :updater cust-api/update-customer
+     :getter  cust-api/get-customer
+     :searcher cust-api/search-customers
      :new-schema NewCustomer
      :update-schema UpdateCustomer
      :search-schema SearchCustomer
@@ -293,7 +341,10 @@
                     customer-ssh-keys-routes
                     customer-join-request-routes
                     event-stream-routes
-                    customer-build-routes]})])
+                    customer-build-routes
+                    stats-routes
+                    credit-routes
+                    cust-webhook-routes]})])
 
 (def github-routes
   ["/github" [["/login" {:post
@@ -367,7 +418,8 @@
    bitbucket-routes
    auth-routes
    user-routes
-   email-registration-routes])
+   email-registration-routes
+   ["/admin" admin/admin-routes]])
 
 (defn- stringify-body
   "Since the raw body could be read more than once (security, content negotiation...),
@@ -403,6 +455,12 @@
   (fn [req]
     (h req)))
 
+(defn- non-dev [rt mw]
+  (if (rt/dev-mode? rt)
+    ;; Disable security in dev mode
+    [passthrough-middleware]
+    mw))
+
 (defn make-router
   ([rt routes]
    (ring/router
@@ -413,7 +471,6 @@
                                        :access-control-allow-methods [:get :put :post :delete]
                                        :access-control-allow-credentials true]]
                                      c/default-middleware
-                                     ;; TODO Authorization checks
                                      [kebab-case-query
                                       log-request]))
             :muuntaja (c/make-muuntaja)
@@ -424,19 +481,13 @@
      ;;:compile rc/compile-request-coercers
      :reitit.middleware/registry
      {:github-security
-      (if (rt/dev-mode? rt)
-        ;; Disable security in dev mode
-        [passthrough-middleware]
-        [github/validate-security])
+      (non-dev rt [github/validate-security])
       :github-app-security
-      (if (rt/dev-mode? rt)
-        ;; Disable security in dev mode
-        [passthrough-middleware]
-        [github/validate-security (constantly (get-in (rt/config rt) [:github :webhook-secret]))])
+      (non-dev rt [github/validate-security (constantly (get-in (rt/config rt) [:github :webhook-secret]))])
+      :bitbucket-security
+      (non-dev rt [bitbucket/validate-security])
       :customer-check
-      (if (rt/dev-mode? rt)
-        [passthrough-middleware]
-        [auth/customer-authorization])}}))
+      (non-dev rt [auth/customer-authorization])}}))
   ([rt]
    (make-router rt routes)))
 
@@ -458,9 +509,6 @@
     (log/info "Shutting down HTTP server...")
     (.close s)))
 
-(defmethod config/normalize-key :http [_ {:keys [args] :as conf}]
-  (update-in conf [:http :port] #(or (:port args) %)))
-
 (defrecord HttpServer [rt]
   co/Lifecycle
   (start [this]
@@ -473,13 +521,6 @@
   clojure.lang.IFn
   (invoke [this]
     (co/stop this)))
-
-(defmethod rt/setup-runtime :http [conf _]
-  ;; Return a function that when invoked, returns another function to shut down the server
-  (fn [rt]
-    (log/debug "Starting http server with config:" (:config rt))
-    (-> (->HttpServer rt)
-        (co/start))))
 
 (defn on-server-close
   "Returns a deferred that resolves when the server shuts down."

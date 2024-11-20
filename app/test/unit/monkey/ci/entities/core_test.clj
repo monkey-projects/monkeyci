@@ -304,3 +304,74 @@
       (testing "can delete"
         (is (= 1 (sut/delete-email-registrations conn (sut/by-cuid (:cuid reg)))))
         (is (nil? (sut/select-email-registration conn (sut/by-cuid (:cuid reg)))))))))
+
+(deftest ^:sql customer-credits
+  (eh/with-prepared-db conn
+    (let [cust (sut/insert-customer conn (eh/gen-customer))
+          cred (-> (eh/gen-cust-credit)
+                   (assoc :customer-id (:id cust))
+                   (dissoc :subscription-id :user-id))]
+      (testing "can insert"
+        (is (number? (:id (sut/insert-customer-credit conn cred)))))
+
+      (testing "can select by customer"
+        (is (= [(:cuid cred)]
+               (->> (sut/select-customer-credits conn (sut/by-customer (:id cust)))
+                    (map :cuid))))))))
+
+(deftest ^:sql credit-subscriptions
+  (eh/with-prepared-db conn
+    (let [cust (sut/insert-customer conn (eh/gen-customer))
+          cred (-> (eh/gen-credit-subscription)
+                   (assoc :customer-id (:id cust)))]
+      (testing "can insert"
+        (is (number? (:id (sut/insert-credit-subscription conn cred)))))
+
+      (testing "can select by customer"
+        (is (= [(:cuid cred)]
+               (->> (sut/select-credit-subscriptions conn (sut/by-customer (:id cust)))
+                    (map :cuid))))))))
+
+(deftest ^:sql credit-consumptions
+  (eh/with-prepared-db conn
+    (let [cust (sut/insert-customer conn (eh/gen-customer))
+          repo (sut/insert-repo conn (assoc (eh/gen-repo)
+                                            :customer-id (:id cust)))
+          build (sut/insert-build conn (assoc (eh/gen-build)
+                                              :repo-id (:id repo)))
+          cred (sut/insert-customer-credit
+                conn
+                (-> (eh/gen-cust-credit)
+                    (assoc :customer-id (:id cust))
+                    (dissoc :user-id :subscription-id)))
+          ccons (-> (eh/gen-credit-consumption)
+                    (assoc :build-id (:id build)
+                           :credit-id (:id cred)))]
+      (testing "can insert"
+        (is (number? (:id (sut/insert-credit-consumption conn ccons)))))
+
+      (testing "can select by build"
+        (is (= [(:cuid ccons)]
+               (->> (sut/select-credit-consumptions conn (sut/by-build (:id build)))
+                    (map :cuid))))))))
+
+(deftest ^:sql bb-webhook
+  (eh/with-prepared-db conn
+    (let [cust (sut/insert-customer conn (eh/gen-customer))
+          repo (sut/insert-repo conn (assoc (eh/gen-repo)
+                                            :customer-id (:id cust)))
+          wh (sut/insert-webhook conn (-> (eh/gen-webhook)
+                                          (assoc :repo-id (:id repo))))
+          bb-wh (-> (eh/gen-bb-webhook)
+                    (assoc :webhook-id (:id wh)))]
+      
+      (testing "can insert"
+        (is (some? (sut/insert-bb-webhook conn bb-wh))))
+      
+      (testing "can select by cuid"
+        (is (= bb-wh (-> (sut/select-bb-webhook conn (sut/by-cuid (:cuid bb-wh)))
+                         (dissoc :id)))))
+      
+      (testing "can select by webhook id"
+        (is (= bb-wh (-> (sut/select-bb-webhook conn [:= :webhook-id (:id wh)])
+                         (dissoc :id))))))))

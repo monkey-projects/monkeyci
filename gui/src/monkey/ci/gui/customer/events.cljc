@@ -1,6 +1,7 @@
 (ns monkey.ci.gui.customer.events
   (:require [medley.core :as mc]
-            [monkey.ci.gui.apis.github :as github]
+            [monkey.ci.gui.alerts :as a]
+            [monkey.ci.gui.home.db :as hdb]
             [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.martian]
             [monkey.ci.gui.customer.db :as db]
@@ -8,6 +9,7 @@
             [monkey.ci.gui.login.db :as ldb]
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.server-events]
+            [monkey.ci.gui.time :as t]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
@@ -52,76 +54,30 @@
 (rf/reg-event-db
  :customer/load--failed
  (fn [db [_ id err]]
-   (lo/on-failure db db/customer err (str "Could not load details for customer " id ": "))))
+   (lo/on-failure db db/customer (a/cust-details-failed id) err)))
 
 (rf/reg-event-fx
- :customer/load-github-repos
+ :customer/load-bb-webhooks
  (fn [{:keys [db]} _]
-   {:db (-> db
-            (db/set-github-repos nil)
-            (db/set-repo-alerts [{:type :info
-                                  :message "Fetching repositories from Github..."}]))
-    :dispatch-n [[::load-user-repos]
-                 [::load-orgs]]}))
-
-(rf/reg-event-fx
- ::load-user-repos
- (fn [_ _]
-   ;; Turns out that this url gives different results than the one in :repos-url
-   {:dispatch [::load-repos (github/api-url "/user/repos")]}))
-
-(rf/reg-event-fx
- ::load-repos
- (fn [{:keys [db]} [_ url]]
-   {:http-xhrio (github/api-request
-                 db
-                 {:method :get
-                  :uri url
-                  :params {:type "all"
-                           :per_page 50}
-                  :on-success [:customer/load-github-repos--success]
-                  :on-failure [:customer/load-github-repos--failed]})}))
-
-(rf/reg-event-fx
- ::load-orgs
- (fn [{:keys [db]} _]
-   (let [u (ldb/github-user db)]
-     {:http-xhrio (github/api-request
-                   db
-                   {:method :get
-                    :uri (:organizations-url u)
-                    :on-success [::load-orgs--success]
-                    :on-failure [::load-orgs--failed]})})))
-
-(rf/reg-event-fx
- ::load-orgs--success
- (fn [{:keys [db]} [_ orgs]]
-   {:dispatch-n (map (comp (partial conj [::load-repos])
-                           :repos-url)
-                     orgs)}))
-
-(rf/reg-event-fx
- ::load-orgs--failed
- (u/req-error-handler-db
-  (fn [db [_ err]]
-    (db/set-repo-alerts db
-                        [{:type :danger
-                          :message (str "Unable to fetch user orgs from Github: " (u/error-msg err))}]))))
+   (let [cust (db/get-customer db)]
+     {:dispatch [:secure-request
+                 :search-bitbucket-webhooks
+                 {:customer-id (:id cust)}
+                 [:customer/load-bb-webhooks--success]
+                 [:customer/load-bb-webhooks--failed]]})))
 
 (rf/reg-event-db
- :customer/load-github-repos--success
- (fn [db [_ new-repos]]
-   (log/debug "Got github repos:" new-repos)
-   (let [orig (db/github-repos db)
-         all (vec (concat orig new-repos))]
-     (-> db
-         ;; Add to existing repos since we're doing multiple calls
-         (db/set-github-repos all)
-         (db/set-repo-alerts [{:type :success
-                               :message (str "Found " (count all) " repositories in Github.")}])))))
+ :customer/load-bb-webhooks--success
+ (fn [db [_ {:keys [body]}]]
+   (db/set-bb-webhooks db body)))
+
+(rf/reg-event-db
+ :customer/load-bb-webhooks--failed
+ (fn [db [_ err]]
+   (db/set-repo-alerts db [(a/bitbucket-webhooks-failed err)])))
 
 (rf/reg-event-fx
- :repo/watch
+ :repo/watch-github
  (fn [{:keys [db]} [_ repo]]
    (log/debug "Watching repo:" repo)
    (let [cust-id (r/customer-id db)]
@@ -130,7 +86,33 @@
                  {:repo {:name (:name repo)
                          :url (:clone-url repo)
                          :customer-id cust-id
-                         :github-id (:id repo)}
+                         :github-id (:id repo)
+                         :token (ldb/bitbucket-token db)}
+                  :customer-id cust-id}
+                 [:repo/watch--success]
+                 [:repo/watch--failed]]})))
+
+(defn- clone-url [{:keys [is-private] :as repo}]
+  (->> (get-in repo [:links :clone])
+       ;; Use ssh url for private repos
+       (filter (comp (partial = (if is-private "ssh" "https")) :name))
+       (first)
+       :href))
+
+(rf/reg-event-fx
+ :repo/watch-bitbucket
+ (fn [{:keys [db]} [_ repo]]
+   (log/debug "Watching repo:" (str repo))
+   (let [cust-id (r/customer-id db)
+         token (ldb/bitbucket-token db)]
+     {:dispatch [:secure-request
+                 :watch-bitbucket-repo
+                 {:repo {:name (:name repo)
+                         :url (clone-url repo)
+                         :customer-id cust-id
+                         :workspace (get-in repo [:workspace :slug])
+                         :repo-slug (:slug repo)
+                         :token token}
                   :customer-id cust-id}
                  [:repo/watch--success]
                  [:repo/watch--failed]]})))
@@ -143,18 +125,28 @@
 (rf/reg-event-db
  :repo/watch--failed
  (fn [db [_ err]]
-   (db/set-repo-alerts db [{:type :danger
-                            :message (str "Failed to watch repo: " (u/error-msg err))}])))
+   (db/set-repo-alerts db [(a/repo-watch-failed err)])))
 
 (rf/reg-event-fx
- :repo/unwatch
- (fn [{:keys [db]} [_ repo]]
+ :repo/unwatch-github
+ (fn [{:keys [db]} [_ {:keys [:monkeyci/repo]}]]
    {:dispatch [:secure-request
                :unwatch-github-repo
-               {:repo-id (get-in repo [:monkeyci/repo :id])
+               {:repo-id (:id repo)
                 :customer-id (r/customer-id db)}
                [:repo/unwatch--success]
                [:repo/unwatch--failed]]}))
+
+(rf/reg-event-fx
+ :repo/unwatch-bitbucket
+ (fn [{:keys [db]} [_ repo]]
+   (let [wh (:monkeyci/webhook repo)]
+     {:dispatch [:secure-request
+                 :unwatch-bitbucket-repo
+                 (-> (select-keys wh [:customer-id :repo-id])
+                     (assoc-in [:repo :token] (ldb/bitbucket-token db)))
+                 [:repo/unwatch--success]
+                 [:repo/unwatch--failed]]})))
 
 (rf/reg-event-db
  :repo/unwatch--success
@@ -164,8 +156,7 @@
 (rf/reg-event-db
  :repo/unwatch--failed
  (fn [db [_ err]]
-   (db/set-repo-alerts db [{:type :danger
-                            :message (str "Failed to unwatch repo: " (u/error-msg err))}])))
+   (db/set-repo-alerts db [(a/repo-unwatch-failed err)])))
 
 (rf/reg-event-fx
  :customer/create
@@ -185,17 +176,16 @@
    {:db (-> db
             (db/unmark-customer-creating)
             (db/set-customer body)
+            (hdb/set-customers (conj (vec (hdb/get-customers db)) body))
             (lo/set-alerts db/customer
-                           [{:type :success
-                             :message [:span "Customer " [:b (:name body)] " has been created."]}]))
+                           [(a/cust-create-success body)]))
     ;; Redirect to customer page
     :dispatch [:route/goto :page/customer {:customer-id (:id body)}]}))
 
 (rf/reg-event-db
  :customer/create--failed
  (fn [db [_ err]]
-   (db/set-create-alerts db [{:type :danger
-                              :message (str "Failed to create customer: " (u/error-msg err))}])))
+   (db/set-create-alerts db [(a/cust-create-failed err)])))
 
 (rf/reg-event-fx
  :customer/load-recent-builds
@@ -216,7 +206,51 @@
 (rf/reg-event-db
  :customer/load-recent-builds--failed
  (fn [db [_ err]]
-   (lo/on-failure db db/recent-builds "Failed to load recent builds: " err)))
+   (lo/on-failure db db/recent-builds a/cust-recent-builds-failed err)))
+
+(rf/reg-event-fx
+ :customer/load-stats
+ [(rf/inject-cofx :time/now)]
+ (lo/loader-evt-handler
+  db/stats
+  (fn [_ ctx [_ cust-id days]]
+    [:secure-request
+     :get-customer-stats
+     (cond-> {:customer-id cust-id}
+       days (assoc :since (-> (:time/now ctx) (t/parse-epoch) (t/minus-days days) (t/to-epoch))))
+     [:customer/load-stats--success]
+     [:customer/load-stats--failed]])))
+
+(rf/reg-event-db
+ :customer/load-stats--success
+ (fn [db [_ resp]]
+   (lo/on-success db db/stats resp)))
+
+(rf/reg-event-db
+ :customer/load-stats--failed
+ (fn [db [_ err]]
+   (lo/on-failure db db/stats a/cust-stats-failed err)))
+
+(rf/reg-event-fx
+ :customer/load-credits
+ (lo/loader-evt-handler
+  db/credits
+  (fn [_ ctx [_ cust-id days]]
+    [:secure-request
+     :get-customer-credits
+     {:customer-id cust-id}
+     [:customer/load-credits--success]
+     [:customer/load-credits--failed]])))
+
+(rf/reg-event-db
+ :customer/load-credits--success
+ (fn [db [_ resp]]
+   (lo/on-success db db/credits resp)))
+
+(rf/reg-event-db
+ :customer/load-credits--failed
+ (fn [db [_ err]]
+   (lo/on-failure db db/credits a/cust-credits-failed err)))
 
 (rf/reg-event-db
  :customer/handle-event
@@ -224,11 +258,27 @@
    (when (and (= :build/updated (:type evt))
               (lo/loaded? db db/recent-builds))
      (letfn [(update-build [builds]
-               (->> (if-let [match (->> builds
-                                        (filter (comp (partial = (:sid build)) :sid))
-                                        (first))]
-                      (replace {match build} builds)
-                      (conj builds build))
-                    (sort-by :start-time)
-                    (reverse)))]
+               (let [sid (juxt :customer-id :repo-id :build-id)]
+                 (->> (if-let [match (->> builds
+                                          (filter (comp (partial = (sid build)) sid))
+                                          (first))]
+                        (replace {match build} builds)
+                        (conj builds build))
+                      (sort-by :start-time)
+                      (reverse))))]
        (lo/update-value db db/recent-builds update-build)))))
+
+(rf/reg-event-db
+ :customer/group-by-lbl-changed
+ (fn [db [_ val]]
+   (db/set-group-by-lbl db val)))
+
+(rf/reg-event-db
+ :customer/repo-filter-changed
+ (fn [db [_ val]]
+   (db/set-repo-filter db val)))
+
+(rf/reg-event-db
+ :customer/ext-repo-filter-changed
+ (fn [db [_ val]]
+   (db/set-ext-repo-filter db val)))

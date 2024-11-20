@@ -72,6 +72,13 @@
   (assoc NewParamSet
          :id s/Str))
 
+(s/defschema SshKey
+  {(s/optional-key :id) s/Str
+   (s/optional-key :description) s/Str
+   :private-key s/Str
+   :public-key s/Str
+   :label-filters [LabelFilterDisjunction]})
+
 (defn public-route [conf]
   (merge {:method :get
           :produces #{"application/edn"}
@@ -102,13 +109,13 @@
                     (s/optional-key :id) s/Str}})
 
    (api-route
-    {:route-name :get-customer-params
-     :path-parts (into customer-path ["/param"])
+    {:route-name :get-recent-builds
+     :path-parts (into customer-path ["/builds/recent"])
      :path-schema customer-schema})
 
    (api-route
-    {:route-name :get-recent-builds
-     :path-parts (into customer-path ["/builds/recent"])
+    {:route-name :get-customer-params
+     :path-parts (into customer-path ["/param"])
      :path-schema customer-schema})
 
    (api-route
@@ -137,6 +144,32 @@
      :path-parts param-path
      :path-schema param-schema
      :method :delete})
+
+   (api-route
+    {:route-name :get-customer-ssh-keys
+     :path-parts (into customer-path ["/ssh-keys"])
+     :path-schema customer-schema})
+
+   (api-route
+    {:route-name :update-customer-ssh-keys
+     :path-parts (into customer-path ["/ssh-keys"])
+     :path-schema customer-schema
+     :method :put
+     :body-schema {:ssh-keys [SshKey]}})
+
+   (api-route
+    {:route-name :get-customer-stats
+     :path-parts (into customer-path ["/stats"])
+     :path-schema customer-schema
+     :query-schema {(s/optional-key :since) s/Int
+                    (s/optional-key :until) s/Int}
+     :method :get})
+
+   (api-route
+    {:route-name :get-customer-credits
+     :path-parts (into customer-path ["/credits"])
+     :path-schema customer-schema
+     :method :get})
 
    (api-route
     {:route-name :get-user-customers
@@ -170,6 +203,12 @@
      :body-schema {:repo UpdateRepo}})
 
    (api-route
+    {:route-name :delete-repo
+     :method :delete
+     :path-parts repo-path
+     :path-schema repo-schema})
+
+   (api-route
     {:route-name :get-builds
      :path-parts (into repo-path ["/builds"])
      :path-schema repo-schema})
@@ -186,6 +225,18 @@
    (api-route
     {:route-name :get-build
      :path-parts build-path
+     :path-schema build-schema})
+
+   (api-route
+    {:route-name :retry-build
+     :method :post
+     :path-parts (conj build-path "/retry")
+     :path-schema build-schema})
+
+   (api-route
+    {:route-name :cancel-build
+     :method :post
+     :path-parts (conj build-path "/cancel")
      :path-schema build-schema})
 
    (api-route
@@ -221,10 +272,39 @@
      :consumes ["application/edn"]})
 
    (api-route
+    {:route-name :watch-bitbucket-repo
+     :method :post
+     :path-parts (conj customer-path "/repo/bitbucket/watch")
+     :path-schema customer-schema
+     :body-schema {:repo {:name s/Str
+                          :url s/Str
+                          :customer-id s/Str
+                          :workspace s/Str
+                          :repo-slug s/Str
+                          :token s/Str}}
+     :consumes ["application/edn"]})
+
+   (api-route
     {:route-name :unwatch-github-repo
      :method :post
-     :path-parts (conj repo-path "github/unwatch")
+     :path-parts (conj repo-path "/github/unwatch")
      :path-schema repo-schema})
+
+   (api-route
+    {:route-name :unwatch-bitbucket-repo
+     :method :post
+     :path-parts (conj repo-path "/bitbucket/unwatch")
+     :path-schema repo-schema
+     :body-schema {:repo {:token s/Str}}})
+
+   (api-route
+    {:route-name :search-bitbucket-webhooks
+     :path-parts (conj customer-path "/webhook/bitbucket")
+     :path-schema customer-schema
+     :query-schema {(s/optional-key :repo-id) s/Str
+                    (s/optional-key :workspace) s/Str
+                    (s/optional-key :repo-slug) s/Str
+                    (s/optional-key :bitbucket-id) s/Str}})
 
    (public-route
     {:route-name :get-version
@@ -291,7 +371,7 @@
 
 (rf/reg-event-fx
  ::error-handler
- (fn [{:keys [db]} [_ target-evt err]]
+ (fn [_ [_ target-evt err]]
    (log/debug "Got error:" (clj->js err))
    {:dispatch (if (= 401 (:status err))
                 [:route/goto :page/login]
@@ -302,3 +382,8 @@
  :secure-request
  (fn [{:keys [db]} [_ req args on-success on-failure]]
    {:dispatch (into [:martian.re-frame/request req (add-token db args) on-success [::error-handler on-failure]])}))
+
+(defn api-url
+  "Constructs a url to the api, using authorization token given"
+  [path]
+  (str url path))

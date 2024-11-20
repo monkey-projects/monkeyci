@@ -53,3 +53,8 @@
      (rf/reg-event-db ::on-failure #(assoc % ::invoked? true))
      (rf/dispatch [::sut/error-handler [::on-failure] {:status 500}])
      (is (true? (::invoked? @app-db))))))
+
+(deftest api-url
+  (testing "constructs url using api url"
+    (is (= "http://test:3000/test-path"
+           (sut/api-url "/test-path")))))

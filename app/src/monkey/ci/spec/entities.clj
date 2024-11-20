@@ -5,19 +5,21 @@
              [build]
              [common :as c]]))
 
+(def ts? int?)
+
 (s/def :entity/id ::c/cuid)
 (s/def :display/id string?)
 
 (s/def :github/secret string?)
-(s/def :entity/name string?)
+(s/def :entity/name (s/and string? not-empty))
 (s/def :entity/description string?)
 
 (s/def :entity/common
   (s/keys :req-un [:entity/id]))
 
 ;; Maybe we should use instants instead?
-(s/def :entity/start-time int?)
-(s/def :entity/end-time int?)
+(s/def :entity/start-time ts?)
+(s/def :entity/end-time ts?)
 
 (s/def :entity/timed
   (s/keys :opt-un [:entity/start-time :entity/end-time]))
@@ -98,7 +100,7 @@
 (s/def :entity/parameter-value
   (s/keys :req-un [:entity/name :label/value]))
 
-(s/def :user/type #{:github})
+(s/def :user/type #{:github :bitbucket})
 (s/def :user/type-id string?)
 (s/def :entity/email string?)
 (s/def :user/customers (s/coll-of :entity/id))
@@ -122,4 +124,37 @@
 ;; in order to receive mailing updates.
 (s/def :entity/email-registration
   (-> (s/keys :req-un [:entity/email])
+      (s/merge :entity/common)))
+
+(s/def :entity/amount (s/int-in 0 1000000))
+(s/def :entity/valid-from ts?)
+(s/def :entity/valid-until ts?)
+
+(s/def :entity/credit-subscription
+  (-> (s/keys :req-un [:entity/customer-id :entity/amount :entity/valid-from]
+              :opt-un [:entity/valid-until])
+      (s/merge :entity/common)))
+
+(s/def :entity/from-time ts?)
+(s/def :entity/reason string?)
+(s/def :entity/subscription-id ::c/cuid)
+
+(s/def :entity/customer-credit
+  (-> (s/keys :req-un [:entity/customer-id :entity/amount :credit/type]
+              :opt-un [:entity/from-time :entity/user-id :entity/subscription-id :entity/reason])
+      (s/merge :entity/common)))
+
+(s/def :entity/credit-id ::c/cuid)
+(s/def :entity/consumed-at ts?)
+
+(s/def :entity/credit-consumption
+  (-> (s/keys :req-un [:entity/credit-id :entity/customer-id :entity/repo-id :entity/build-id
+                       :entity/amount :entity/consumed-at])
+      (s/merge :entity/common)))
+
+(s/def :entity/webhook-id ::c/cuid)
+(s/def :entity/bitbucket-id string?)
+
+(s/def :entity/bb-webhook
+  (-> (s/keys :req-un [:entity/bitbucket-id :entity/webhook-id :bb/workspace :bb/repo-slug])
       (s/merge :entity/common)))

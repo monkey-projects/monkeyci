@@ -2,6 +2,7 @@
   (:require [clojure.test :refer [deftest testing is]]
             [babashka.fs :as fs]
             [clojure.java.io :as io]
+            [clojure.spec.alpha :as s]
             [clojure.tools.logging :as log]
             [manifold
              [deferred :as md]
@@ -9,12 +10,16 @@
             [monkey.ci
              [artifacts :as art]
              [blob :as b]
+             [cache :as ca]
              [config :as c]
              [logging :as l]
              [protocols :as p]
              [sidecar :as sut]
-             [spec :as spec]]
-            [monkey.ci.helpers :as h]))
+             [workspace :as ws]]
+            [monkey.ci.config.sidecar :as cs]
+            [monkey.ci.spec.sidecar :as ss]
+            [monkey.ci.helpers :as h]
+            [monkey.ci.test.runtime.sidecar :as trs]))
 
 (defrecord TestLogger [streams path]
   l/LogCapturer
@@ -31,9 +36,10 @@
             evt {:type :test/event
                  :message "This is a test event"}
             {:keys [recv] :as e} (h/fake-events)
-            rt {:events e
-                :config {:sidecar {:poll-interval 10
-                                   :events-file f}}}
+            rt (-> trs/test-rt
+                   (trs/set-events e)
+                   (trs/set-events-file f)
+                   (trs/set-poll-interval 10))
             _ (spit f (prn-str evt))
             c (sut/poll-events rt)]
         (is (md/deferred? c))
@@ -49,9 +55,10 @@
             evt {:type :test/event
                  :message "This is a test event"}
             {:keys [recv] :as e} (h/fake-events)
-            rt {:events e
-                :config {:sidecar {:events-file f
-                                   :poll-interval 10}}}
+            rt (-> trs/test-rt
+                   (trs/set-events e)
+                   (trs/set-events-file f)
+                   (trs/set-poll-interval 10))
             c (sut/poll-events rt)]
         ;; Post the event after sidecar has started
         (is (nil? (spit f (prn-str evt))))
@@ -61,7 +68,7 @@
         (is (true? (.delete f)))
         (is (= 0 (wait-for-exit c))))))
 
-  (testing "adds sid and job to events"
+  (testing "adds sid and job-id to events"
     (h/with-tmp-dir dir
       (let [f (io/file dir "events.edn")
             evt {:type :test/event
@@ -69,18 +76,19 @@
             {:keys [recv] :as e} (h/fake-events)
             sid (repeatedly 3 random-uuid)
             job {:id "test-job"}
-            rt {:events e
-                :job job
-                :build {:sid sid}
-                :config {:sidecar {:events-file f
-                                   :poll-interval 10}}}
+            rt (-> trs/test-rt
+                   (trs/set-events e)
+                   (trs/set-events-file f)
+                   (trs/set-poll-interval 10)
+                   (trs/set-job job)
+                   (trs/set-build {:sid sid}))
             c (sut/poll-events rt)]
         ;; Post the event after sidecar has started
         (is (nil? (spit f (prn-str evt))))
         (is (not= :timeout (h/wait-until #(not-empty @recv) 500)))
         (let [evt (first @recv)]
           (is (= sid (:sid evt)))
-          (is (= job (:job evt))))
+          (is (= (:id job) (:job-id evt))))
         (is (true? (.delete f)))
         (is (= 0 (wait-for-exit c))))))
 
@@ -91,9 +99,10 @@
                  :message "This is a test event"
                  :done? true}
             {:keys [recv] :as e} (h/fake-events)
-            rt {:events e
-                :config {:sidecar {:events-file f
-                                   :poll-interval 10}}}
+            rt (-> trs/test-rt
+                   (trs/set-events e)
+                   (trs/set-events-file f)
+                   (trs/set-poll-interval 10))
             c (sut/poll-events rt)]
         ;; Post the event after sidecar has started
         (is (nil? (spit f (prn-str evt))))
@@ -113,86 +122,34 @@
                  :exit 0
                  :done? true}
             streams (atom [])
-            rt {:events {:poster (constantly true)}
-                :config {:sidecar {:events-file f
-                                   :poll-interval 10}}
-                :build {:build-id "test-build"}
-                :job {:id "test-job"}
-                :logging {:maker (fn [_ path]
-                                   (->TestLogger streams path))}}
+            rt (-> trs/test-rt
+                   (trs/set-events (h/fake-events))
+                   (trs/set-events-file f)
+                   (trs/set-poll-interval 10)
+                   (trs/set-log-maker (fn [_ path]
+                                        (->TestLogger streams path)))
+                   (trs/set-build {:build-id "test-build"})
+                   (trs/set-job {:id "test-job"}))
             c (sut/poll-events rt)]
         (is (nil? (spit f (prn-str evt))))
         (is (not= :timeout (h/wait-until #(not-empty @streams) 500)))
         (is (= 0 (wait-for-exit c)))
         (is (= ["test-build" "test-job" "out.log"] (first @streams)))))))
 
-(deftest restore-src
-  (testing "nothing if no workspace in build"
-    (let [rt {}]
-      (is (= rt (sut/restore-src rt)))))
-
-  (testing "restores using the workspace path in build into checkout dir"
-    (let [stored (atom {"path/to/workspace" "local"})
-          store (h/strict-fake-blob-store stored)
-          rt {:build {:workspace "path/to/workspace"
-                      :checkout-dir "local/dir"}
-              :workspace store}]
-      (is (true? (-> (sut/restore-src rt)
-                     (deref)
-                     (get-in [:build :workspace/restored?]))))
-      (is (empty? @stored)))))
-
 (deftest mark-start
   (testing "creates start file"
     (h/with-tmp-dir dir
       (let [start (io/file dir "start")
-            rt {:config
-                {:sidecar {:start-file (.getCanonicalPath start)}}}]
+            rt {:paths {:start-file (.getCanonicalPath start)}}]
         (is (= rt (sut/mark-start rt)))
         (is (.exists start)))))
 
   (testing "creates start file directory"
     (h/with-tmp-dir dir
       (let [start (io/file dir "sub/start")
-            rt {:config
-                {:sidecar {:start-file (.getCanonicalPath start)}}}]
+            rt {:paths {:start-file (.getCanonicalPath start)}}]
         (is (= rt (sut/mark-start rt)))
         (is (.exists start))))))
-
-(deftest normalize-key
-  (testing "adds events file from args"
-    (is (= "test-file" (-> (c/normalize-key :sidecar {:sidecar {}
-                                                      :args {:events-file "test-file"}})
-                           :sidecar
-                           :events-file))))
-
-  (testing "adds start file from args"
-    (is (= "test-file" (-> (c/normalize-key :sidecar {:sidecar {}
-                                                      :args {:start-file "test-file"}})
-                           :sidecar
-                           :start-file))))
-
-  (testing "adds abort file from args"
-    (is (= "test-file" (-> (c/normalize-key :sidecar {:sidecar {}
-                                                      :args {:abort-file "test-file"}})
-                           :sidecar
-                           :abort-file))))
-
-  (testing "adds job config from args"
-    (is (= {:key "value"}
-           (-> (c/normalize-key :sidecar {:sidecar {}
-                                          :args {:job-config {:key "value"}}})
-               :sidecar
-               :job-config))))
-
-  (testing "reads log config if specified"
-    (h/with-tmp-dir dir
-      (let [p (io/file dir "log-test.xml")
-            file-contents "test-config-xml"]
-        (is (nil? (spit p file-contents)))
-        (is (= file-contents (-> (c/normalize-key :sidecar {:sidecar {:log-config (.getCanonicalPath p)}})
-                                 :sidecar
-                                 :log-config)))))))
 
 (deftest upload-logs
   (testing "does nothing if no logger"
@@ -234,50 +191,56 @@
                                   (md/success-deferred (assoc rt :exit-code 0)))]
     
     (testing "restores src from workspace"
-      (with-redefs [sut/restore-src (constantly {:stage ::restored})
+      (with-redefs [ws/restore (constantly {:stage ::restored})
                     sut/poll-events (fn [rt]
                                       (when (= ::restored (:stage rt))
                                         {:stage ::polling}))]
-        (is (= ::polling (:stage @(sut/run {}))))))
+        (is (= ::polling (:stage @(sut/run (trs/make-test-rt)))))))
 
     (testing "restores and saves caches if configured"
       (h/with-tmp-dir dir
         (let [stored (atom {})
               path "test-path"
               _ (fs/create-file (fs/path dir path))
-              cache (h/fake-blob-store stored)
+              build {:build-id "test-build"
+                     :checkout-dir dir
+                     :workspace "test-ws"}
+              cache (ca/make-blob-repository (h/fake-blob-store stored) build)
               r (sut/run
-                  {:containers {:type :podman}
-                   :build {:build-id "test-build"
-                           :checkout-dir dir}
-                   :job {:name "test-job"
-                         :container/image "test-img"
-                         :script ["first" "second"]
-                         :caches [{:id "test-cache"
-                                   :path path}]}
-                   :logging {:maker (l/make-logger {})}
-                   :cache cache})]
+                  (trs/make-test-rt
+                   {:build build
+                    :logging {:maker (l/make-logger {})}
+                    :cache cache
+                    :job 
+                    {:id "test-job"
+                     :container/image "test-img"
+                     :script ["first" "second"]
+                     :caches [{:id "test-cache"
+                               :path path}]}}))]
           (is (map? (deref r 500 :timeout)))
           (is (not-empty @stored)))))
     
-    
     (testing "restores artifacts if configured"
       (h/with-tmp-dir dir
-        (let [stored (atom {"test-cust/test-build/test-artifact.tgz" "/tmp/checkout"})
-              store (h/fake-blob-store stored)
-              r (sut/run
-                  {:containers {:type :podman}
-                   :build {:build-id "test-build"
-                           :sid ["test-cust" "test-build"]
-                           :checkout-dir "/tmp/checkout"}
-                   :work-dir dir
-                   :job {:name "test-job"
-                         :container/image "test-img"
-                         :script ["first" "second"]
-                         :restore-artifacts [{:id "test-artifact"
-                                              :path "test-path"}]}
-                   :logging {:maker (l/make-logger {})}
-                   :artifacts store})]
+        (let [stored (atom {"test-cust/test-repo/test-build/test-artifact.tgz" "/tmp/checkout"})
+              build {:build-id "test-build"
+                     :sid ["test-cust" "test-repo" "test-build"]
+                     :checkout-dir "/tmp/checkout"
+                     :workspace "test-ws"}
+              repo (art/make-blob-repository (h/fake-blob-store stored) build)
+              tr (sut/run
+                  (trs/make-test-rt
+                   {:containers {:type :podman}
+                    :build build
+                    :work-dir dir
+                    :logging {:maker (l/make-logger {})}
+                    :artifacts repo
+                    :job 
+                    {:id "test-job"
+                     :container/image "test-img"
+                     :script ["first" "second"]
+                     :restore-artifacts [{:id "test-artifact"
+                                          :path "test-path"}]}}))]
           (is (empty? @stored)))))
 
     (testing "saves artifacts if configured"
@@ -285,26 +248,32 @@
         (let [stored (atom {})
               path "test-artifact"
               _ (fs/create-file (fs/path dir path))
-              store (h/fake-blob-store stored)
+              build {:build-id "test-build"
+                     :sid ["test-cust" "test-repo" "test-build"]
+                     :checkout-dir dir
+                     :workspace "test-ws"}
+              repo (art/make-blob-repository (h/fake-blob-store stored) build)
               r (sut/run
-                  {:containers {:type :podman}
-                   :build {:build-id "test-build"
-                           :sid ["test-cust" "test-build"]
-                           :checkout-dir dir}
-                   :job {:name "test-job"
-                         :container/image "test-img"
-                         :script ["first" "second"]
-                         :save-artifacts [{:id "test-artifact"
-                                           :path path}]}
-                   :logging {:maker (l/make-logger {})}
-                   :artifacts store})]
+                  (trs/make-test-rt
+                   {:containers {:type :podman}
+                    :build build
+                    :logging {:maker (l/make-logger {})}
+                    :artifacts repo
+                    :job 
+                    {:id "test-job"
+                     :container/image "test-img"
+                     :script ["first" "second"]
+                     :save-artifacts [{:id "test-artifact"
+                                       :path path}]}}))]
           (is (not-empty @stored)))))
 
     (testing "waits until artifacts have been stored"
       ;; Set up blob saving so it takes a while
-      (is (= ::timeout (-> {:job {:save-artifacts [{:id "test-artifact"
-                                                    :path "test-path"}]}
-                            :artifacts (->SlowBlobStore 1000)}
+      (is (= ::timeout (-> {:artifacts (art/make-blob-repository (->SlowBlobStore 1000) {})
+                            :job {:id "test-job"
+                                  :save-artifacts [{:id "test-artifact"
+                                                    :path "test-path"}]}}
+                           (trs/make-test-rt)
                            (sut/run)
                            (deref 100 ::timeout)))
           "expected timeout while waiting for blobs to save"))
@@ -317,14 +286,16 @@
                             rt))]
         (with-redefs [sut/mark-start (mark-action ::started)
                       art/restore-artifacts (mark-action ::restore-artifacts)]
-          (is (some? (deref (sut/run {}))))
+          (is (some? (deref (sut/run (trs/make-test-rt)))))
           (is (= [::restore-artifacts ::started] @actions)))))
 
     (testing "blocks until caches have been stored"
       ;; Set up blob saving so it takes a while
-      (is (= ::timeout (-> {:job {:caches [{:id "test-artifact"
-                                            :path "test-path"}]}
-                            :cache (->SlowBlobStore 1000)}
+      (is (= ::timeout (-> {:cache (ca/make-blob-repository (->SlowBlobStore 1000) {})
+                            :job {:id "test-job"
+                                  :caches [{:id "test-artifact"
+                                            :path "test-path"}]}}
+                           (trs/make-test-rt)
                            (sut/run)
                            (deref 100 ::timeout)))))
 
@@ -332,18 +303,21 @@
       (with-redefs [sut/poll-events (constantly (md/error-deferred (ex-info "test error" {})))]
         (h/with-tmp-dir dir
           (let [abort-file (io/file dir "abort")]
-            (is (some? (-> (sut/run {:config
-                                     {:sidecar {:abort-file (str abort-file)}}})
+            (is (some? (-> (trs/make-test-rt)
+                           (trs/set-abort-file (str abort-file))
+                           (sut/run)
                            deref
                            :exception)))
             (is (fs/exists? abort-file))))))
 
     (testing "aborts on exception thrown"
-      (with-redefs [sut/restore-src (fn [_] (throw (ex-info "test error" {})))]
+      (with-redefs [ws/restore (fn [_] (throw (ex-info "test error" {})))]
         (h/with-tmp-dir dir
           (let [abort-file (io/file dir "abort")]
-            (is (some? (-> (sut/run {:config
-                                     {:sidecar {:abort-file (str abort-file)}}})
+            (is (some? (-> (trs/make-test-rt)
+                           (trs/set-abort-file (str abort-file))
+                           (sut/run)
                            deref
                            :exception)))
             (is (fs/exists? abort-file))))))))
+

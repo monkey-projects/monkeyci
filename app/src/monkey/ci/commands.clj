@@ -1,61 +1,92 @@
 (ns monkey.ci.commands
   "Event handlers for commands"
-  (:require [clojure.tools.logging :as log]
+  (:require [aleph.http :as http]
+            [babashka.fs :as fs]
+            [clj-commons.byte-streams :as bs]
+            [clj-kondo.core :as clj-kondo]
+            [clojure.tools.logging :as log]
+            [manifold.deferred :as md]
+            [medley.core :as mc]
             [monkey.ci
              [build :as b]
+             [errors :as err]
              [jobs :as jobs]
+             [protocols :as p]
              [runtime :as rt]
              [script :as script]
              [sidecar :as sidecar]
+             [spec :as spec]
              [utils :as u]]
             [monkey.ci.events.core :as ec]
-            [monkey.ci.web.handler :as h]
-            [aleph.http :as http]
-            [clj-commons.byte-streams :as bs]
-            [manifold.deferred :as md]))
-
-(def exit-error 1)
+            [monkey.ci.runtime
+             [app :as ra]
+             [sidecar :as rs]]
+            [monkey.ci.spec.sidecar :as ss]
+            [monkey.ci.web.handler :as h]))
 
 (defn run-build
   "Performs a build, using the runner from the context.  Returns a deferred
    that will complete when the build finishes."
-  [rt]
-  (let [r (:runner rt)]
-    (try
-      (-> rt
-          (b/make-build-ctx)
-          (r rt))
-      (catch Exception ex
-        (log/error "Unable to start build" ex)
-        (rt/post-events rt (b/build-end-evt (assoc (rt/build rt) :message (ex-message ex))
-                                            exit-error))
-        exit-error))))
+  [config]
+  (ra/with-runner-system config
+    (fn [{:keys [runner events build]}]
+      (try
+        (log/debug "Starting runner for build" build)
+        (runner)
+        (catch Exception ex
+          (log/error "Unable to start build" ex)
+          (ec/post-events events (b/build-end-evt (assoc build :message (ex-message (or (ex-cause ex) ex)))
+                                                  err/error-process-failure))
+          err/error-process-failure)))))
+
+(defn run-build-local
+  "Run a build locally, normally from local source but can also be from a git checkout."
+  ;; TODO
+  [config])
+
+;; (defn- deps-exists? [rt]
+;;   (fs/exists? (fs/path (get-in rt [:build :script :script-dir]) "deps.edn")))
+
+;; (defn- verify-child-proc
+;;   "Starts a child process to perform verification.  This is necessary if a `deps.edn`
+;;    exists with custom dependencies."
+;;   [rt]
+;;   ;; TODO Need to get back reported info.  Using a UDS?
+;;   1)
+
+;; (defn- verify-in-proc
+;;   "Verifies the build in the current directory by loading the script files in-process
+;;    and resolving the jobs.  This is useful when checking if there are any compilation
+;;    errors in the script."
+;;   [rt]
+;;   (letfn [(report [rep]
+;;             (rt/report rt rep)
+;;             (if (= :verify/success (:type rep)) 0 err/error-script-failure))]
+;;     (try
+;;       ;; TODO Git branch and other options
+;;       ;; TODO Build parameters
+;;       (let [jobs (script/load-jobs (:build rt) rt)]
+;;         (report
+;;          (if (not-empty jobs)
+;;            {:type :verify/success
+;;             :jobs jobs}
+;;            {:type :verify/failed
+;;             :message "No jobs found in build script for the active configuration"})))
+;;       (catch Exception ex
+;;         (log/error "Error verifying build" ex)
+;;         (report {:type :verify/failed
+;;                  :message (ex-message ex)})))))
 
 (defn verify-build
-  "Verifies the build in the current directory by loading the script files in-process
-   and resolving the jobs.  This is useful when checking if there are any compilation
-   errors in the script."
-  [rt]
-  (letfn [(report [rep]
-            (rt/report rt rep)
-            (if (= :verify/success (:type rep)) 0 exit-error))]
-    (try
-      ;; TODO Git branch and other options
-      ;; TODO Use child process if there is a deps.edn
-      ;; TODO Build parameters
-      (let [jobs (-> rt
-                     (assoc :build (b/make-build-ctx rt))
-                     (script/load-jobs))]
-        (report
-         (if (not-empty jobs)
-           {:type :verify/success
-            :jobs jobs}
-           {:type :verify/failed
-            :message "No jobs found in build script"})))
-      (catch Exception ex
-        (log/error "Error verifying build" ex)
-        (report {:type :verify/failed
-                 :message (ex-message ex)})))))
+  "Runs a linter agains the build script to catch any grammatical errors."
+  [conf]
+  (ra/with-cli-runtime conf
+    (fn [rt]
+      (let [res (clj-kondo/run! {:lint [(get-in rt [:build :script :script-dir])]})]
+        (rt/report rt {:type :verify/result :result res})
+        (-> res
+            :summary
+            :error)))))
 
 (defn list-builds [rt]
   (->> (http/get (apply format "%s/customer/%s/repo/%s/builds"
@@ -69,16 +100,17 @@
        (rt/report rt)))
 
 (defn http-server
-  "Starts the server by invoking the function in the runtime.  This function is supposed
-   to return another function that can be invoked to stop the http server.  Returns a 
-   deferred that resolves when the server is stopped."
-  [{:keys [http] :as rt}]
-  (rt/report rt (-> rt
-                    (rt/config)
-                    (select-keys [:http])
-                    (assoc :type :server/started)))
-  ;; Start the server and wait for it to shut down
-  (h/on-server-close (http rt)))
+  "Starts a system with an http server.  Dependency management will take care of
+   creating and starting the necessary modules."
+  [conf]
+  (ra/with-server-system conf
+    (fn [{rt :runtime :keys [http]}]
+      (rt/report rt (-> rt
+                        (rt/config)
+                        (select-keys [:http])
+                        (assoc :type :server/started)))
+      ;; Wait for server to stop
+      (h/on-server-close http))))
 
 (defn watch
   "Starts listening for events and prints the results.  The arguments determine
@@ -106,12 +138,43 @@
          (http/get (str url "/events"))
          :body
          bs/to-reader
-         #(java.io.PushbackReader. %))
-        (md/on-realized pipe-events
-                        (fn [err]
-                          (log/error "Unable to receive server events:" err))))
+         #(java.io.PushbackReader. %)
+         pipe-events)
+        (md/catch (fn [err]
+                    (log/error "Unable to receive server events:" err))))
     ;; Return a deferred that only resolves when the event stream stops
     d))
+
+(defn- sidecar-rt->job [rt]
+  (get-in rt [rt/config :args :job-config :job]))
+
+(defn- ^:deprecated ->sidecar-rt
+  "Creates a runtime for the sidecar from the generic runtime.  To be removed."
+  [rt]
+  (let [conf (get-in rt [rt/config :sidecar])
+        args (get-in rt [rt/config :args])]
+    (-> rt
+        (select-keys [:build :events :workspace :artifacts :cache])
+        (assoc :job (sidecar-rt->job rt)
+               :log-maker (rt/log-maker rt)
+               :paths (select-keys args [:events-file :start-file :abort-file]))
+        (mc/assoc-some :poll-interval (get-in rt [rt/config :sidecar :poll-interval])))))
+
+(defn- run-sidecar [{:keys [events job] :as rt}]
+  (let [sid (b/get-sid rt)
+        base-evt {:sid sid
+                  :job-id (jobs/job-id job)}
+        result (try
+                 (p/post-events events (ec/make-event :sidecar/start base-evt))
+                 (let [r @(sidecar/run rt)
+                       e (:exit r)]
+                   (ec/make-result (b/exit-code->status e) e (:message r)))
+                 (catch Throwable t
+                   (ec/exception-result t)))]
+    (log/info "Sidecar terminated")
+    (p/post-events events (-> (ec/make-event :sidecar/end base-evt)
+                              (ec/set-result result)))
+    (:exit result)))
 
 (defn sidecar
   "Runs the application as a sidecar, that is meant to capture events 
@@ -122,22 +185,7 @@
    which are then picked up by the sidecar to dispatch or store.  
 
    The sidecar loop will stop when the events file is deleted."
-  [rt]
-  (let [sid (b/get-sid rt)
-        ;; Add job info from the sidecar config
-        {:keys [job] :as rt} (merge rt (get-in rt [rt/config :sidecar :job-config]))]
-    (let [result (try
-                   (rt/post-events rt {:type :sidecar/start
-                                       :sid sid
-                                       :job (jobs/job->event job)})
-                   (let [r @(sidecar/run rt)
-                         e (:exit r)]
-                     (ec/make-result (b/exit-code->status e) e (:message r)))
-                   (catch Throwable t
-                     (ec/exception-result t)))]
-      (log/info "Sidecar terminated")
-      (rt/post-events rt (-> {:type :sidecar/end
-                              :sid sid
-                              :job (jobs/job->event job)}
-                             (ec/set-result result)))
-      (:exit result))))
+  [conf]
+  (spec/valid? ::ss/config conf)
+  (log/info "Running sidecar with config:" conf)
+  (rs/with-runtime conf run-sidecar))

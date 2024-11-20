@@ -1,8 +1,8 @@
 (ns monkey.ci.gui.test-results
   "Displays test results"
-  (:require [monkey.ci.gui.charts :as charts]
+  (:require [clojure.string :as cs]
+            [monkey.ci.gui.colors :as colors]
             [monkey.ci.gui.components :as co]
-            [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.table :as t]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
@@ -18,20 +18,49 @@
 (defn- suite-rows [suite]
   (map test-row (:test-cases suite)))
 
+(rf/reg-sub
+ :test/selected
+ (fn [db _]
+   (::selected-test db)))
+
+(rf/reg-event-db
+ :test/select
+ (fn [db [_ tc]]
+   (assoc db ::selected-test tc)))
+
+(defn test-details-modal []
+  (let [tc (rf/subscribe [:test/selected])]
+    [co/modal
+     ::test-details
+     [:h3 (:test-case @tc)]
+     [co/log-contents (->> (concat (:failures @tc) (:errors @tc))
+                           (mapcat (fn [err]
+                                     (some-> (or (:description err) (:message err))
+                                             (cs/split #"\n"))))
+                           (interpose [:br]))]]))
+
 (defn test-results
   "Renders a paged table with given id that retrieves test result info from 
    the specified sub."
   [id tr-sub]
   (letfn [(result-val [tc]
-            (co/build-result (if (success? tc) "success" "failure")) )]
-    [t/paged-table {:id id
-                    :items-sub tr-sub
-                    :columns [{:label "Test case"
-                               :value :test-case}
-                              {:label "Result"
-                               :value result-val}
-                              {:label "Elapsed"
-                               :value #(str (:time %) "s")}]}]))
+            (co/build-result (if (success? tc) "success" "failure")))
+          (show-test-details [tc]
+            (when-not (success? tc)
+              (rf/dispatch [:test/select tc])
+              #?(:cljs (-> (js/bootstrap.Modal. (u/->dom-id ::test-details))
+                           (.show)))))]
+    [:<>
+     [test-details-modal]
+     [t/paged-table {:id id
+                     :items-sub tr-sub
+                     :columns [{:label "Test case"
+                                :value :test-case}
+                               {:label "Result"
+                                :value result-val}
+                               {:label "Elapsed"
+                                :value #(str (:time %) "s")}]
+                     :on-row-click show-test-details}]]))
 
 (def all-suites "$all$")
 
@@ -51,7 +80,8 @@
     {:type "bar"
      :data {:labels (map :test-case cases)
             :datasets [{:label "Seconds Elapsed"
-                        :data (map :time cases)}]}}))
+                        :data (map :time cases)
+                        :backgroundColor colors/primary}]}}))
 
 (def default-chart-form {:count 5})
 
@@ -114,18 +144,16 @@
    all suites, the top 100, but the user can configure this."
   [id results]
   (let [suite-id (str (name id) "-suite-dropdown")
-        count-id (str (name id) "-count-dropdown")
-        form (rf/subscribe [::timing-chart-form id])]
+        count-id (str (name id) "-count-dropdown")]
     [:div
      [:h4 "Test Timings"]
      [:form
-      [:div.row
-       [:label.form-label.col-2.col-form-label {:for suite-id} "Suite:"]
-       [:div.col-2
+      [:div.d-flex.gap-2
+       [:label.form-label.col-form-label {:for suite-id} "Suite:"]
+       [:div
         [suite-dropdown results id suite-id]]
-       [:label.form-label.col-2.col-form-label {:for count-id} "Show top:"]
-       [:div.col-2
+       [:label.form-label.col-form-label {:for count-id} "Show top:"]
+       [:div
         [test-count-dropdown id count-id]]]]
      (rf/dispatch [::timing-chart-init id results])
-     #_[charts/chart-component id]
      [:canvas {:id id :height "100px"}]]))

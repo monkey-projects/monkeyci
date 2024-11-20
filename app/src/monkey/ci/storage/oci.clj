@@ -1,23 +1,19 @@
 (ns monkey.ci.storage.oci
-  (:require [clj-commons.byte-streams :as bs]
-            [clojure
-             [edn :as edn]
-             [string :as cs]]
+  (:require [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
             [monkey.ci
-             [oci :as oci]
+             [edn :as edn]
              [protocols :as p]
              [sid :as sid]
-             [storage :as st]]
+             [storage :as st]
+             [utils :as u]]
             [monkey.oci.os.core :as os]))
 
 (def get-ns (memoize (fn [client]
                        @(os/get-namespace client {}))))
 
 (def ext ".edn")
-(def ->edn pr-str)
-(def parse-edn edn/read-string)
 (def delim sid/delim)
 
 (defn make-path [sid]
@@ -31,15 +27,6 @@
 (defn- object-args [client conf sid]
   (assoc (basic-args client conf)
          :object-name (make-path sid)))
-
-(def stream? (partial instance? java.io.InputStream))
-
-(defn- to-edn [x]
-  (let [s (cond-> x
-            (stream? x) bs/to-string)]
-    (if (string? s) 
-      (parse-edn s)
-      x)))
 
 (defn- strip-ext [s]
   (cond-> s
@@ -58,14 +45,14 @@
         (fn [v]
           (when v
             (os/get-object client args)))
-        to-edn)))
+        (u/or-nil edn/edn->))))
   
   (write-obj [_ sid obj]
     @(md/chain
       (os/put-object
        client
        (-> (object-args client conf sid)
-           (assoc :contents (->edn obj)
+           (assoc :contents (edn/->edn obj)
                   :content-type "application/edn")))
       (constantly sid)))
   
@@ -106,8 +93,4 @@
   (log/debug "Creating oci storage with config:" (:storage conf))
   (-> conf
       :storage
-      (oci/->oci-config)
       (make-oci-storage)))
-
-(defmethod st/normalize-storage-config :oci [conf]
-  (oci/normalize-config conf :storage))

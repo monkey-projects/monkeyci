@@ -2,13 +2,13 @@
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.string :as cs]
             [monkey.ci
-             [config :as c]
              [cuid :as cuid]
              [sid :as sid]
-             [storage :as sut]]
+             [storage :as sut]
+             [time :as t]]
             [monkey.ci.helpers :as h]))
 
-(deftest webhook-details
+(deftest webhooks
   (testing "webhook-sid is a sid"
     (is (sid/sid? (sut/webhook-sid "test-id"))))
   
@@ -17,7 +17,18 @@
       (let [id (cuid/random-cuid)
             d {:id id}]
         (is (sid/sid? (sut/save-webhook st d)))
-        (is (= d (sut/find-webhook st id)))))))
+        (is (= d (sut/find-webhook st id))))))
+
+  (h/with-memory-store st
+    (let [wh (h/gen-webhook)]
+      (is (sid/sid? (sut/save-webhook st wh)))
+      
+      (testing "can find for repo"
+        (is (= [wh] (sut/find-webhooks-for-repo st [(:customer-id wh) (:repo-id wh)]))))
+
+      (testing "can delete"
+        (is (true? (sut/delete-webhook st (:id wh))))
+        (is (nil? (sut/find-webhook st (:id wh))))))))
 
 (deftest build-metadata
   (testing "can create and find"
@@ -164,13 +175,13 @@
   (testing "retrieves latest build by build id"
     (h/with-memory-store st
       (let [repo-sid ["test-customer" "test-repo"]
-            build-ids (->> (range)
-                           (map (partial format "build-%d"))
-                           (take 2))
-            builds (map (comp (partial zipmap [:customer-id :repo-id :build-id])
-                              (partial conj repo-sid))
-                        build-ids)]
-        (doseq [b builds]
+            build-idxs (range 2)
+            builds (->> build-idxs
+                        (map (fn [idx]
+                               (-> (zipmap [:customer-id :repo-id] repo-sid)
+                                   (assoc :build-id (format "build-%d" idx)
+                                          :idx idx)))))]
+         (doseq [b builds]
           (is (sid/sid? (sut/save-build st b))))
         (let [l (sut/find-latest-build st repo-sid)]
           (is (= (last builds) l)))))))
@@ -252,6 +263,33 @@
         (is (some? (sut/update-repo st [cid rid] assoc :url "updated-url")))
         (is (= "updated-url" (:url (sut/find-repo st [cid rid]))))))))
 
+(deftest delete-repo
+  (h/with-memory-store st
+    (let [repo (h/gen-repo)
+          cust (-> (h/gen-cust)
+                   (assoc-in [:repos (:id repo)] repo))
+          build (-> (h/gen-build)
+                    (assoc :customer-id (:id cust)
+                           :repo-id (:id repo)))
+          wh (-> (h/gen-webhook)
+                 (assoc :customer-id (:id cust)
+                        :repo-id (:id repo)))
+          repo-sid [(:id cust) (:id repo)]]
+      (is (sid/sid? (sut/save-customer st cust)))
+      (is (sid/sid? (sut/save-build st build)))
+      (is (sid/sid? (sut/save-webhook st wh)))
+      
+      (testing "removes repo from customer"
+        (is (true? (sut/delete-repo st repo-sid)))
+        (is (empty? (-> (sut/find-customer st (:id cust))
+                        :repos))))
+
+      (testing "removes all builds for repo"
+        (is (empty? (sut/list-build-ids st repo-sid))))
+
+      (testing "removes webhooks for repo"
+        (is (empty? (sut/find-webhook st (:id wh))))))))
+
 (deftest watch-github-repo
   (h/with-memory-store st
     (let [[cid rid gid] (repeatedly sut/new-id)
@@ -305,16 +343,106 @@
       (testing "can list for user"
         (is (= [req] (sut/list-user-join-requests st (:user-id req))))))))
 
-(deftest normalize-key
-  (testing "normalizes string type"
-    (is (= :memory (-> (c/normalize-key :storage {:storage {:type "memory"}})
-                       :storage
-                       :type))))
+(deftest credit-subscriptions
+  (h/with-memory-store st
+    (let [cs    (-> (h/gen-credit-subs)
+                    (assoc :valid-from 1000
+                           :valid-until 2000))
+          other (-> (h/gen-credit-subs)
+                    (assoc :valid-from 1000)
+                    (dissoc :valid-until))]
+      (testing "can save and find"
+        (is (sid/sid? (sut/save-credit-subscription st cs)))
+        (is (= cs (sut/find-credit-subscription st (sut/credit-sub-sid (:customer-id cs) (:id cs))))))
 
-  (testing "normalizes oci credentials"
-    (is (map? (-> (c/normalize-key :storage {:storage
-                                             {:type :oci}
-                                             :oci
-                                             {:credentials {:fingerprint "test-fingerprint"}}})
-                  :storage
-                  :credentials)))))
+      (testing "can list for customer"
+        (is (= [cs] (sut/list-customer-credit-subscriptions st (:customer-id cs)))))
+
+      (is (sid/sid? (sut/save-credit-subscription st other)))              
+
+      (testing "can list active"
+        (is (= [cs other] (sut/list-active-credit-subscriptions st 1500)))
+        (is (empty (sut/list-active-credit-subscriptions st 3000)))))))
+
+(deftest credit-consumptions
+  (h/with-memory-store st
+    (let [cs (h/gen-credit-cons)]
+      (testing "can save and find"
+        (is (sid/sid? (sut/save-credit-consumption st cs)))
+        (is (= cs (sut/find-credit-consumption st (sut/credit-cons-sid (:customer-id cs) (:id cs))))))
+
+      (testing "can list for customer"
+        (is (= [cs] (sut/list-customer-credit-consumptions st (:customer-id cs))))))))
+
+(deftest customer-credits
+  (h/with-memory-store st
+    (let [now (t/now)
+          cred (-> (h/gen-cust-credit)
+                   (assoc :from-time now
+                          :amount 100M))
+          cid (:customer-id cred)
+          repo (h/gen-repo)
+          rid (:id repo)
+          cust {:id cid
+                :repos {(:id repo) repo}}]
+      (is (sid/sid? (sut/save-customer st cust)))
+
+      (testing "can save and find"
+        (is (sid/sid? (sut/save-customer-credit st cred)))
+        (is (= cred (sut/find-customer-credit st (:id cred)))))
+
+      (testing "can list for customer since date"
+        (is (= [cred] (sut/list-customer-credits-since st cid (- now 100)))))
+
+      (testing "available credits"
+        (is (sid/sid? (sut/save-credit-consumption
+                       st
+                       {:id (cuid/random-cuid)
+                        :customer-id cid
+                        :repo-id rid
+                        :credit-id (:id cred)
+                        :amount 20M})))
+        
+        (testing "can calculate total"
+          (is (= 80M (sut/calc-available-credits st cid))))
+
+        (testing "can list credit entities"
+          (let [avail (sut/list-available-credits st cid)]
+            (is (= 1 (count avail)))
+            (is (= cred (first avail))))
+          
+          (is (empty? (sut/list-available-credits st (cuid/random-cuid)))
+              "empty if no matching records")
+
+          (is (sid/sid? (sut/save-credit-consumption
+                         st
+                         {:id (cuid/random-cuid)
+                          :customer-id cid
+                          :repo-id rid
+                          :credit-id (:id cred)
+                          :amount 80M})))
+          (is (empty? (sut/list-available-credits st cid))
+              "empty if all is consumed"))))))
+
+(deftest bitbucket-webhooks
+  (h/with-memory-store st
+    (let [wh (h/gen-webhook)
+          bb (-> (h/gen-bb-webhook)
+                 (assoc :webhook-id (:id wh)))]
+      (is (sid/sid? (sut/save-webhook st wh)))
+      
+      (testing "can save and find"
+        (is (sid/sid? (sut/save-bb-webhook st bb)))
+        (is (= bb (sut/find-bb-webhook st (:id bb)))))
+
+      (testing "can find for webhook id"
+        (is (= bb (sut/find-bb-webhook-for-webhook st (:webhook-id bb)))))
+
+      (testing "can search using filter"
+        (is (= [(merge bb (select-keys wh [:customer-id :repo-id]))]
+               (sut/search-bb-webhooks st (select-keys bb [:webhook-id])))
+            "search by webhook id")
+        (is (= [(:id bb)] (->> (sut/search-bb-webhooks st (select-keys wh [:customer-id]))
+                               (map :id)))
+            "search by customer id")
+        (is (empty? (sut/search-bb-webhooks st {:customer-id "nonexisting"})))))))

@@ -109,6 +109,84 @@
                                                     :test-cases [{:name "case 1"}]}
                                                    {:name "other suite"
                                                     :test-cases [{:name "case 2"}]}]}}}}})))))
-      (is (= [{:name "case 1"}
-              {:name "case 2"}]
-             @tc)))))
+      (is (= #{{:name "case 1"}
+               {:name "case 2"}}
+             (set @tc))))
+
+    (testing "returns test cases if no suites"
+      (is (some? (reset! app-db (-> {}
+                                    (r/set-current
+                                     {:parameters
+                                      {:path
+                                       {:job-id "test-job"}}})
+                                    (bdb/set-build
+                                     {:script
+                                      {:jobs
+                                       {"test-job"
+                                        {:id "test-job"
+                                         :result {:monkey.ci/tests
+                                                  {:test-cases [{:name "case 1"}
+                                                                {:name "case 2"}]}}}}}})))))
+      (is (= #{{:name "case 1"}
+               {:name "case 2"}}
+             (set @tc))))
+    
+
+    (testing "sorts with failed tests first"
+      (let [tests [{:name "unit tests"
+                    :test-cases
+                    [{:name "success"}
+                     {:name "failed"
+                      :failures [{:message "some failure"}]}
+                     {:name "errored"
+                      :errors [{:message "some error"}]}]}]
+            job-id "failed-job"]
+        (is (some? (reset! app-db (-> {}
+                                      (r/set-current {:parameters {:path {:job-id job-id}}})
+                                      (bdb/set-build
+                                       {:script
+                                        {:jobs
+                                         {job-id
+                                          {:id job-id
+                                           :result {:monkey.ci/tests tests}}}}})))))
+        (is (= ["errored"
+                "failed"
+                "success"]
+               (map :name @tc)))))))
+
+(deftest job-script-with-logs
+  (let [l (rf/subscribe [:job/script-with-logs])]
+    (testing "exists"
+      (is (some? l)))
+
+    (testing "returns script list with log paths"
+      (is (empty? @l))
+      (is (some? (reset! app-db
+                         (-> {}
+                             (db/set-log-files
+                              ["/var/log/0_out.log"
+                               "/var/log/0_err.log"
+                               "/var/log/1_out.log"])
+                             (r/set-current
+                              {:parameters
+                               {:path
+                                {:job-id "test-job"}}})
+                             (bdb/set-build
+                              {:id "test-build"
+                               :script
+                               {:jobs {"test-job"
+                                       {:id "test-job"
+                                        :script
+                                        ["script line 1"
+                                         "script line 2"]}}}})))))
+      (is (= [{:cmd "script line 1"
+               :out "/var/log/0_out.log"
+               :err "/var/log/0_err.log"}
+              {:cmd "script line 2"
+               :out "/var/log/1_out.log"}]
+             @l)))
+
+    (testing "includes expanded state"
+      (is (some? (swap! app-db (fn [db]
+                                 (db/set-log-expanded db 1 true)))))
+      (is (true? (-> @l second :expanded?))))))

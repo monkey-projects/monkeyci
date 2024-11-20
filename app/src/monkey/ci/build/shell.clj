@@ -3,10 +3,10 @@
              [fs :as fs]
              [process :as bp]]
             [clojure.tools.logging :as log]
+            [monkey.ci.build :as b]
             [monkey.ci.build
              [api :as api]
-             [core :as core]]
-            [monkey.ci.oci :as oc]))
+             [core :as core]]))
 
 (defn bash [& args]
   (core/as-job
@@ -53,6 +53,6 @@
     (str (fs/normalize (fs/path wd p)))))
 
 (def container-work-dir
-  "Returns the dir where the workspace would be mounted in a container."
-  ;; TODO Get this from runtime instead, because now this depends on driver type
-  oc/base-work-dir)
+  "Returns the dir where the workspace would be mounted in a container.  Note that this
+   may vary, depending on the context where this is invoked."
+  (comp b/checkout-dir :build))

@@ -4,6 +4,7 @@
             [day8.re-frame.test :as rf-test]
             [monkey.ci.gui.customer.db :as db]
             [monkey.ci.gui.customer.events :as sut]
+            [monkey.ci.gui.home.db :as hdb]
             [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.login.db :as ldb]
             [monkey.ci.gui.login.events]
@@ -118,63 +119,33 @@
     (rf/dispatch-sync [:customer/load--failed "test-id" "test-customer"])
     (is (not (lo/loading? @app-db db/customer)))))
 
-(deftest customer-load-github-repos
-  (testing "invokes repos and orgs url from github user"
-    (let [e (h/catch-fx :http-xhrio)]
-      (rf-test/run-test-sync
-       (is (some? (reset! app-db (ldb/set-github-user {} {:organizations-url "http://test-orgs"}))))
-       (rf/dispatch [:customer/load-github-repos])
-       (is (= 2 (count @e)))
-       (is (= #{"https://api.github.com/user/repos" "http://test-orgs"}
-              (set (map :uri @e)))))))
-
-  (testing "sets info alert"
-    (let [_ (h/catch-fx :http-xhrio)]
-      (rf-test/run-test-sync
-       (is (some? (reset! app-db (ldb/set-github-user {} {:repos-url "http://test-repos"}))))
-       (rf/dispatch [:customer/load-github-repos])
-       (let [a (db/repo-alerts @app-db)]
-         (is (= 1 (count a)))
-         (is (= :info (-> a first :type))))))))
-
-(deftest customer-load-github-repos--success
-  (testing "sets repos in db"
-    (rf/dispatch-sync [:customer/load-github-repos--success [{:id "test-repo"}]])
-    (is (= 1 (count (db/github-repos @app-db)))))
-
-  (testing "sets success alert"
-    (rf/dispatch-sync [:customer/load-github-repos--success [{:id "test-repo"}]])
-      (let [a (db/repo-alerts @app-db)]
-        (is (= 1 (count a)))
-        (is (= :success (-> a first :type))))))
-
-(deftest load-orgs
-  (testing "invokes orgs url from github user"
-    (let [e (h/catch-fx :http-xhrio)]
-      (is (some? (reset! app-db (ldb/set-github-user {} {:organizations-url "http://test-orgs"}))))
-      (rf/dispatch-sync [::sut/load-orgs])
-      (is (= 1 (count @e)))
-      (is (= "http://test-orgs" (-> @e first :uri))))))
-
-(deftest load-orgs--success
-  (testing "fetches repos for each org"
-    (let [e (h/catch-fx :http-xhrio)]
-      (rf-test/run-test-sync
-       (rf/dispatch [::sut/load-orgs--success [{:repos-url "http://test-repos/org-1"}
-                                               {:repos-url "http://test-repos/org-2"}]])
-       (is (= 2 (count @e)))
-       (is (= ["http://test-repos/org-1"
-               "http://test-repos/org-2"]
-              (map :uri @e)))))))
-
-(deftest load-orgs--failed
-  (testing "redirect to login on 401 error"
+(deftest customer-load-bb-webhooks
+  (testing "sends request to api"
     (rf-test/run-test-sync
-     (let [e (h/catch-fx :route/goto)]
-       (rf/dispatch [::sut/load-orgs--failed {:status 401}])
-       (is (= ["/login"] @e))))))
+     (let [cust {:name "test customer"
+                 :id "test-cust"}
+           c (h/catch-fx :martian.re-frame/request)]
+       (h/initialize-martian {:search-bitbucket-webhooks
+                              {:status 200
+                               :body cust
+                               :error-code :no-error}})
+       (is (some? (:martian.re-frame/martian @app-db)))
+       (rf/dispatch [:customer/load-bb-webhooks])
+       (is (= 1 (count @c)))
+       (is (= :search-bitbucket-webhooks (-> @c first (nth 2))))))))
 
-(deftest repo-watch
+(deftest customer-load-bb-webhooks--success
+  (testing "sets bitbucket webhooks in db"
+    (rf/dispatch-sync [:customer/load-bb-webhooks--success {:body [::test-wh]}])
+    (is (= [::test-wh] (db/bb-webhooks @app-db)))))
+
+(deftest customer-load-bb-webhooks--failed
+  (testing "sets repo alert error"
+    (rf/dispatch-sync [:customer/load-bb-webhooks--failed "test error"])
+    (is (= [:danger] (->> (db/repo-alerts @app-db)
+                          (map :type))))))
+
+(deftest repo-watch-github
   (testing "invokes repo github watch endpoint"
     (rf-test/run-test-sync
      (let [c (h/catch-fx :martian.re-frame/request)]
@@ -182,12 +153,29 @@
                                                   :body {:id "test-repo"}
                                                   :error-code :no-error}})
        (is (some? (:martian.re-frame/martian @app-db)))
-       (rf/dispatch [:repo/watch {:id "github-id"
-                                  :private false
-                                  :name "test-repo"
-                                  :clone-url "http://test-url"}])
+       (rf/dispatch [:repo/watch-github {:id "github-id"
+                                         :private false
+                                         :name "test-repo"
+                                         :clone-url "http://test-url"}])
        (is (= 1 (count @c)))
        (is (= :watch-github-repo (-> @c first (nth 2))))))))
+
+(deftest repo-watch-bitbucket
+  (testing "invokes repo bitbucket watch endpoint"
+    (rf-test/run-test-sync
+     (let [c (h/catch-fx :martian.re-frame/request)]
+       (h/initialize-martian {:watch-bitbucket-repo {:status 204
+                                                     :body {:id "test-repo"}
+                                                     :error-code :no-error}})
+       (is (some? (:martian.re-frame/martian @app-db)))
+       (rf/dispatch [:repo/watch-bitbucket {:id "github-id"
+                                            :private false
+                                            :name "test-repo"
+                                            :links {:clone [{:name "https"
+                                                             :href "https://test-url"}]}}])
+       (is (= 1 (count @c)))
+       (is (= :watch-bitbucket-repo (-> @c first (nth 2))))
+       (is (= "https://test-url" (-> @c first (nth 3) :repo :url)))))))
 
 (deftest repo-watch--success
   (testing "adds repo to customer"
@@ -203,19 +191,36 @@
       (is (= 1 (count a)))
       (is (= :danger (:type (first a)))))))
 
-(deftest repo-unwatch
-  (testing "invokes unwatch endpoint"  
+(deftest repo-unwatch-github
+  (testing "invokes github unwatch endpoint"  
     (rf-test/run-test-sync
      (let [c (h/catch-fx :martian.re-frame/request)]
        (is (some? (reset! app-db (r/set-current {} {:parameters {:path {:customer-id "test-cust"}}}))))
        (h/initialize-martian {:unwatch-github-repo {:status 200
                                                     :error-code :no-error}})
        (is (some? (:martian.re-frame/martian @app-db)))
-       (rf/dispatch [:repo/unwatch {:monkeyci/repo
-                                    {:id "test-repo"}
-                                    :id 12432}])
+       (rf/dispatch [:repo/unwatch-github {:monkeyci/repo {:id "test-repo"}}])
        (is (= 1 (count @c)))
        (is (= :unwatch-github-repo (-> @c first (nth 2)))
+           "invokes correct endpoint")
+       (is (= "test-repo" (-> @c first (nth 3) :repo-id))
+           "passes repo id")
+       (is (= "test-cust" (-> @c first (nth 3) :customer-id))
+           "passes customer id")))))
+
+(deftest repo-unwatch-bitbucket
+  (testing "invokes bitbucket unwatch endpoint"  
+    (rf-test/run-test-sync
+     (let [c (h/catch-fx :martian.re-frame/request)]
+       (is (some? (reset! app-db (r/set-current {} {:parameters {:path {:customer-id "test-cust"}}}))))
+       (h/initialize-martian {:unwatch-bitbucket-repo {:status 200
+                                                       :error-code :no-error}})
+       (is (some? (:martian.re-frame/martian @app-db)))
+       (rf/dispatch [:repo/unwatch-bitbucket {:monkeyci/webhook
+                                              {:customer-id "test-cust"
+                                               :repo-id "test-repo"}}])
+       (is (= 1 (count @c)))
+       (is (= :unwatch-bitbucket-repo (-> @c first (nth 2)))
            "invokes correct endpoint")
        (is (= "test-repo" (-> @c first (nth 3) :repo-id))
            "passes repo id")
@@ -269,10 +274,15 @@
     (rf/dispatch-sync [:customer/create--success {:body {:id "test-cust"}}])
     (is (not (db/customer-creating? @app-db))))
 
-  (testing "sets customer in db"
-    (let [cust {:id "test-cust"}]
-      (rf/dispatch-sync [:customer/create--success {:body cust}])
-      (is (= cust (lo/get-value @app-db db/customer)))))
+  (let [cust {:id "test-cust"}]
+    (is (empty? (reset! app-db {})))
+    (rf/dispatch-sync [:customer/create--success {:body cust}])
+
+    (testing "sets customer in db"
+      (is (= cust (lo/get-value @app-db db/customer))))
+
+    (testing "adds to user customers"
+      (is (= [cust] (hdb/get-customers @app-db)))))
 
   (testing "redirects to customer page"
     (rf-test/run-test-sync
@@ -297,10 +307,9 @@
 (deftest customer-load-recent-builds
   (testing "sends request to backend"
     (rf-test/run-test-sync
-     (let [builds []
-           c (h/catch-fx :martian.re-frame/request)]
+     (let [c (h/catch-fx :martian.re-frame/request)]
        (h/initialize-martian {:get-recent-builds {:status 200
-                                                  :body builds
+                                                  :body []
                                                   :error-code :no-error}})
        (is (some? (:martian.re-frame/martian @app-db)))
        (rf/dispatch [:customer/load-recent-builds "test-customer"])
@@ -319,6 +328,64 @@
     (is (= [:danger] (->> (lo/get-alerts @app-db db/recent-builds)
                           (map :type))))))
 
+(deftest customer-load-stats
+  (testing "sends request to backend"
+    (rf-test/run-test-sync
+     (let [c (h/catch-fx :martian.re-frame/request)]
+       (h/initialize-martian {:get-customer-stats {:status 200
+                                                   :body {:stats ::test}
+                                                   :error-code :no-error}})
+       (is (some? (:martian.re-frame/martian @app-db)))
+       (rf/dispatch [:customer/load-stats "test-customer"])
+       (is (= 1 (count @c)))
+       (is (= :get-customer-stats (-> @c first (nth 2)))))))
+
+  (testing "adds `since` query param if days given"
+    (rf-test/run-test-sync
+     (let [c (h/catch-fx :martian.re-frame/request)]
+       (h/initialize-martian {:get-customer-stats {:status 200
+                                                   :body {}
+                                                   :error-code :no-error}})
+       (is (some? (:martian.re-frame/martian @app-db)))
+       (rf/dispatch [:customer/load-stats "test-customer" 10])
+       (is (number? (-> @c first (nth 3) :since)))))))
+
+(deftest customer-load-stats--success
+  (testing "sets builds in db"
+    (let [stats [{:stats {:elapsed-seconds []}}]]
+      (rf/dispatch-sync [:customer/load-stats--success {:body stats}])
+      (is (= stats (lo/get-value @app-db db/stats))))))
+
+(deftest customer-load-stats--failed
+  (testing "sets error in db"
+    (rf/dispatch-sync [:customer/load-stats--failed "test error"])
+    (is (= [:danger] (->> (lo/get-alerts @app-db db/stats)
+                          (map :type))))))
+
+(deftest customer-load-credits
+  (testing "sends request to backend"
+    (rf-test/run-test-sync
+     (let [c (h/catch-fx :martian.re-frame/request)]
+       (h/initialize-martian {:get-customer-credits
+                              {:status 200
+                               :body {:available 100}
+                               :error-code :no-error}})
+       (is (some? (:martian.re-frame/martian @app-db)))
+       (rf/dispatch [:customer/load-credits "test-customer"])
+       (is (= 1 (count @c)))
+       (is (= :get-customer-credits (-> @c first (nth 2))))))))
+
+(deftest customer-load-credits--success
+  (testing "sets credit info in db"
+    (rf/dispatch-sync [:customer/load-credits--success {:body {:available 100}}])
+    (is (= {:available 100} (db/get-credits @app-db)))))
+
+(deftest customer-load-credits--failed
+  (testing "sets error in db"
+    (rf/dispatch-sync [:customer/load-credits--failed "test error"])
+    (is (= [:danger] (->> (lo/get-alerts @app-db db/credits)
+                          (map :type))))))
+
 (deftest customer-event
   (testing "does nothing when recent builds not loaded"
     (rf/dispatch-sync [:customer/handle-event {:type :build/updated
@@ -333,23 +400,43 @@
       (is (= [build] (lo/get-value @app-db db/recent-builds)))))
 
   (testing "updates build in recent builds"
-    (let [build {:id (random-uuid)
-                 :sid "test-build"
-                 :status :pending
-                 :start-time 200}
-          other-build {:id (random-uuid)
-                       :sid "other-build"
-                       :status :success
-                       :start-time 100}]
+    (let [make-build (fn [opts]
+                       (merge {:id (random-uuid)
+                               :customer-id "test-cust"
+                               :repo-id "test-repo"
+                               :build-id (random-uuid)}
+                              opts))
+          build       (make-build {:build-id "build-1"
+                                   :status :pending
+                                   :start-time 200})
+          other-build (make-build {:build-id "build-2"
+                                   :status :success
+                                   :start-time 100})
+          upd (assoc build :status :running)]
       (is (some? (reset! app-db (-> {}
                                     (lo/set-loaded db/recent-builds)
                                     (lo/set-value db/recent-builds [build
                                                                     other-build])))))
       (rf/dispatch-sync [:customer/handle-event {:type :build/updated
-                                                 :build (assoc build :status :running)}])
-      (is (= [{:sid "test-build"
-               :status :running
-               :start-time 200
-               :id (:id build)}
+                                                 :build upd}])
+      (is (= [upd
               other-build]
              (lo/get-value @app-db db/recent-builds))))))
+
+(deftest group-by-lbl-changed
+  (testing "updates group-by-lbl in db"
+    (is (nil? (db/group-by-lbl @app-db)))
+    (rf/dispatch-sync [:customer/group-by-lbl-changed "new-label"])
+    (is (= "new-label" (db/group-by-lbl @app-db)))))
+
+(deftest repo-filter-changed
+  (testing "updates repo filter in db"
+    (is (nil? (db/get-repo-filter @app-db)))
+    (rf/dispatch-sync [:customer/repo-filter-changed "test-filter"])
+    (is (= "test-filter" (db/get-repo-filter @app-db)))))
+
+(deftest ext-repo-filter-changed
+  (testing "updates ext repo filter in db"
+    (is (nil? (db/get-ext-repo-filter @app-db)))
+    (rf/dispatch-sync [:customer/ext-repo-filter-changed "test-filter"])
+    (is (= "test-filter" (db/get-ext-repo-filter @app-db)))))

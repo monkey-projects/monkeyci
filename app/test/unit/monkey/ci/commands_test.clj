@@ -3,56 +3,65 @@
             [aleph.http :as http]
             [clj-commons.byte-streams :as bs]
             [clojure.java.io :as io]
+            [clojure.spec.alpha :as spec]
             [manifold.deferred :as md]
             [monkey.ci
              [commands :as sut]
-             [sidecar :as sc]
-             [spec :as spec]]
+             [edn :as edn]
+             [errors :as err]
+             [runners :as r]
+             [sidecar :as sc]]
+            [monkey.ci.config.sidecar :as cs]
             [monkey.ci.helpers :as h]
-            [monkey.ci.web.handler :as wh]))
+            [monkey.ci.spec.sidecar :as ss]
+            [monkey.ci.web.handler :as wh]
+            [monkey.ci.test
+             [config :as tc]
+             [aleph-test :as at]]))
+
+(defmethod r/make-runner ::dummy [_]
+  (constantly :invoked))
+
+(defmethod r/make-runner ::build [_]
+  (fn [build _]
+    build))
+
+(defmethod r/make-runner ::failing [_]
+  (fn [& _]
+    (throw (ex-info "test error" {}))))
 
 (deftest run-build
-  (testing "invokes runner from context"
-    (let [ctx {:runner (constantly :invoked)}]
-      (is (= :invoked (sut/run-build ctx)))))
+  (let [config (assoc tc/base-config
+                      :build {:build-id "test-build"})]
+    (testing "invokes runner from context"
+      (is (= :invoked (sut/run-build (assoc config :runner {:type ::dummy})))))
 
-  (letfn [(test-runner [build _] build)]
     (testing "adds `build` to runtime"
-      (is (map? (-> {:config {:args {:git-url "test-url"
-                                     :branch "test-branch"
-                                     :commit-id "test-id"}}
-                     :runner test-runner}
+      (is (map? (-> config
+                    (assoc :args {:git-url "test-url"
+                                  :branch "test-branch"
+                                  :commit-id "test-id"}
+                           :runner {:type ::build})
                     (sut/run-build)))))
 
-    (testing "adds build sid to build config"
-      (let [{:keys [sid build-id]} (-> {:config {:args {:sid "a/b/c"}}
-                                        :runner test-runner}
-                                       (sut/run-build))]
-        (is (= build-id (last sid)))
-        (is (= ["a" "b" "c"] (take 3 sid)))))
-
-    (testing "constructs `sid` from account settings if not specified"
-      (let [{:keys [sid build-id]} (-> {:runner test-runner
-                                        :config {:account {:customer-id "a"
-                                                           :repo-id "b"}}}
-                                       (sut/run-build))]
-        (is (= build-id (last sid)))
-        (is (= ["a" "b"] (take 2 sid))))))
-
-  (testing "posts `build/end` event on exception"
-    (let [{:keys [recv] :as e} (h/fake-events)]
-      (is (= 1 (-> {:runner (fn [_] (throw (ex-info "test error" {})))
-                    :events e}
+    (testing "posts `build/end` event on exception"
+      (let [recv (atom [])]
+        (is (= err/error-process-failure
+               (-> config
+                   (assoc :runner {:type ::failing}
+                          :events {:type :fake
+                                   :recv recv})
                    (sut/run-build))))
-      (is (= 1 (count @recv)))      
-      (is (= :build/end (:type (first @recv)))))))
+        (is (= 1 (count @recv)))
+        (let [evt (first @recv)]
+          (is (= :build/end (:type evt)))
+          (is (some? (:build evt))))))))
 
 (deftest verify-build
   (testing "zero when successful"
-    (is (zero? (sut/verify-build {:config
-                                  {:work-dir "examples"
-                                   :args {:dir "basic-clj"}}}))))
-
+    (is (zero? (sut/verify-build {:work-dir "examples"
+                                  :args {:dir "basic-clj"}}))))
+  
   (testing "nonzero exit on failure"
     (is (not= 0 (sut/verify-build {})))))
 
@@ -71,47 +80,11 @@
           (is (= :build/list (:type r)))
           (is (= builds (:builds r))))))))
 
-#_(deftest result-accumulator
-  (testing "returns a map of type handlers"
-    (is (map? (:handlers (sut/result-accumulator {})))))
-
-  (testing "updates pipeline and step states"
-    (let [{:keys [handlers state]} (sut/result-accumulator {})
-          start-step (:step/start handlers)
-          end-step (:step/end handlers)]
-      (is (some? (start-step {:name "step-1"
-                              :index 0
-                              :pipeline {:index 0
-                                         :name "test-pipeline"}})))
-      (is (some? (end-step {:name "step-1"
-                            :index 0
-                            :pipeline {:index 0
-                                       :name "test-pipeline"}
-                            :status :success})))
-      (is (= :success (get-in @state [:pipelines "test-pipeline" :steps 0 :status])))))
-
-  (testing "has build completed handler"
-    (let [acc (sut/result-accumulator {})
-          c (get-in acc [:handlers :build/completed])]
-      (is (fn? c))
-      (is (some? (reset! (:state acc) {:pipelines
-                                       {"test-pipeline"
-                                        {:steps
-                                         {0
-                                          {:name "test-step"
-                                           :start-time 0
-                                           :end-time 100
-                                           :status :success}}}}})))
-      (is (nil? (c {}))))))
-
 (deftest http-server
   (with-redefs [wh/on-server-close (constantly (md/success-deferred nil))]
-    (testing "returns a deferred"
-      (is (md/deferred? (sut/http-server {:http (constantly ::ok)}))))
-
-    (testing "starts the server using the runtime fn"
-      (let [r (sut/http-server {:http (constantly ::ok)})]
-        (is (nil? (deref r 100 :timeout)))))))
+    (testing "starts the server and waits for close"
+      (let [r (sut/http-server tc/base-config)]
+        (is (nil? r))))))
 
 (deftest watch
   (testing "sends request and returns deferred"
@@ -127,21 +100,42 @@
         (is (not-empty @reported))))))
 
 (deftest sidecar
-  (with-redefs [sc/run (constantly (md/success-deferred {:exit ::test-exit}))]
-    (testing "runs sidecar poll loop, returns exit code"
-      (is (= ::test-exit (sut/sidecar {:config {:dev-mode true}}))))
+  (let [inv-args (atom nil)]
+    (with-redefs [sc/run (fn [args]
+                           (reset! inv-args args)
+                           (md/success-deferred {:exit ::test-exit}))]
+      (letfn [(validate-sidecar [config job recv]
+                (let [result (sut/sidecar config)]
+                  (testing "runs sidecar poll loop, returns exit code"
+                    (is (= ::test-exit result)))
 
-    (testing "posts start and end events"
-      (let [{:keys [recv] :as e} (h/fake-events)]
-        (is (some? (sut/sidecar {:events e
-                                 :config {:dev-mode true}})))
-        (is (= [:sidecar/start :sidecar/end]
-               (map :type @recv)))))
+                  (testing "passes file paths from args"
+                    (is (= "test-events" (get-in @inv-args [:paths :events-file]))))
 
-    (testing "events contain job details from config"
-      (let [{:keys [recv] :as e} (h/fake-events)
-            job {:id "test-job"}]
-        (is (some? (sut/sidecar {:events e
-                                 :config {:sidecar {:job-config {:job job}}
-                                          :dev-mode true}})))
-        (is (= job (-> @recv first :job)))))))
+                  (testing "posts start and end events"
+                    (is (= [:sidecar/start :sidecar/end]
+                           (map :type (recv)))))
+
+                  (testing "events contain job id from config"
+                    (is (= (:id job) (-> (recv)
+                                         first
+                                         :job-id))))))]
+        
+        (testing "from sidecar-specific config"
+          (let [job {:id (str (random-uuid))}
+                config (-> {}
+                           (cs/set-events-file "test-events")
+                           (cs/set-start-file "start")
+                           (cs/set-abort-file "abort")
+                           (cs/set-api {:url "http://test"
+                                        :token (str (random-uuid))})
+                           (cs/set-job job)
+                           (cs/set-build {:build-id "test-build"
+                                          :workspace "test-ws"}))
+                recv (atom [])]
+            (is (spec/valid? ::ss/config config)
+                (spec/explain-str ::ss/config config))
+            (at/with-fake-http ["http://test/events" (fn [req]
+                                                       (swap! recv concat (edn/edn-> (:body req)))
+                                                       (md/success-deferred {:status 200}))]
+              (validate-sidecar config job (fn [] @recv)))))))))

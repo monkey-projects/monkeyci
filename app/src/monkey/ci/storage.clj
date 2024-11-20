@@ -1,12 +1,12 @@
 (ns monkey.ci.storage
-  "Data storage functionality"
-  (:require [clojure.edn :as edn]
-            [clojure.java.io :as io]
-            [clojure.string :as cs]
+  "Data storage functionality.  Next to basic storage implementations, this ns also contains
+   a lot of functions for working with storage entities.  Many of these are overridden by
+   implementation-specific functions, and so implementations here don't focus on efficiency.
+   They are merely used in tests."
+  (:require [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [medley.core :as mc]
             [monkey.ci
-             [config :as c]
              [cuid :as cuid]
              [protocols :as p]
              [runtime :as rt]
@@ -51,17 +51,12 @@
 
 (defmulti make-storage (comp :type :storage))
 
+(defmethod make-storage :default [_]
+  nil)
+
 (defmethod make-storage :memory [_]
   (log/info "Using memory storage (only for dev purposes!)")
   (make-memory-storage))
-
-(defmulti normalize-storage-config (comp :type :storage))
-
-(defmethod normalize-storage-config :default [conf]
-  conf)
-
-(defmethod c/normalize-key :storage [k conf]
-  (c/normalize-typed k conf normalize-storage-config))
 
 (defmethod rt/setup-runtime :storage [conf _]
   ;; Wrap in cache if so requested by storage object
@@ -146,6 +141,30 @@
    (fn [s [cust-id repo-id] f & args]
      (apply update-obj s (customer-sid cust-id) update-in [:repos repo-id] f args))))
 
+(declare list-build-ids)
+(declare builds)
+(declare webhook-sid)
+(declare find-webhook)
+
+(def delete-repo
+  "Deletes repository with given sid, including all builds"
+  (override-or
+   [:repo :delete]
+   (fn [s [cust-id repo-id :as sid]]
+     (when (some? (update-obj s (customer-sid cust-id) update :repos dissoc repo-id))
+       ;; Delete all builds
+       (->> (list-build-ids s sid)
+            (map (comp sid/->sid (partial concat [builds] sid) vector))
+            (map (partial p/delete-obj s))
+            (doall))
+       ;; Delete webhooks
+       (->> (p/list-obj s (webhook-sid))
+            (map (partial find-webhook s))
+            (filter (comp (partial = sid) (juxt :customer-id :repo-id)))
+            (map (comp (partial p/delete-obj s) webhook-sid :id))
+            (doall))
+       true))))
+
 (def list-repo-display-ids
   "Lists all display ids for the repos for given customer"
   (override-or
@@ -184,7 +203,8 @@
    [:watched-github-repos :unwatch]
    (fn [s sid]
      (when-let [repo (find-repo s sid)]
-       (when-let [gid (:github-id repo)]
+       (when-let [gid (some-> (find-repo s sid)
+                              :github-id)]
          ;; Remove it from the list of watched repos for the stored github id
          (update-obj s (watched-sid gid) (comp vec (partial remove (partial = sid))))
          ;; Clear github id
@@ -202,6 +222,57 @@
   (p/read-obj s (webhook-sid id)))
 
 (def ^:deprecated find-details-for-webhook find-webhook)
+
+(defn delete-webhook [s id]
+  (p/delete-obj s (webhook-sid id)))
+
+(def find-webhooks-for-repo
+  (override-or
+   [:repo :find-webhooks]
+   (fn [s sid]
+     (->> (p/list-obj s (webhook-sid))
+          (map (partial find-webhook s))
+          (filter (comp (partial = sid) (juxt :customer-id :repo-id)))
+          (map (comp (partial find-webhook s) :id))
+          (doall)))))
+
+(def bb-webhooks :bb-webhooks)
+(def bb-webhook-sid (partial global-sid bb-webhooks))
+
+(defn save-bb-webhook
+  "Stores bitbucket webhook information.  This links a Bitbucket native webhook uuid
+   to a MonkeyCI webhook."
+  [s wh]
+  (p/write-obj s (bb-webhook-sid (:id wh)) wh))
+
+(defn find-bb-webhook
+  [s id]
+  (p/read-obj s (bb-webhook-sid id)))
+
+(def search-bb-webhooks
+  "Retrieves bitbucket webhook that match given filter, and adds customer and repo ids."
+  (let [wh-props #{:customer-id :repo-id}]
+    (override-or
+     [:bitbucket :search-webhooks]
+     (fn [s f]
+       (letfn [(add-webhook [bb-wh]
+                 (merge bb-wh (-> (find-webhook s (:webhook-id bb-wh))
+                                  (select-keys [:customer-id :repo-id]))))
+               (matches-filter? [bb-wh]
+                 (= f (select-keys bb-wh (keys f))))]
+         (->> (p/list-obj s (bb-webhook-sid))
+              (map (partial find-bb-webhook s))
+              (map add-webhook)
+              (filter matches-filter?)))))))
+
+(def find-bb-webhook-for-webhook
+  "Retrieves bitbucket webhook given an internal webhook id"
+  (override-or
+   [:bitbucket :find-for-webhook]
+   (fn [s wh-id]
+     (some-> (search-bb-webhooks s {:webhook-id wh-id})
+             (first)
+             (dissoc :customer-id :repo-id)))))
 
 (def builds "builds")
 (def build-sid-keys [:customer-id :repo-id :build-id])
@@ -502,3 +573,122 @@
 
 (defn delete-email-registration [s id]
   (p/delete-obj s (email-registration-sid id)))
+
+(def customer-credits :customer-credits)
+(def customer-credit-sid (partial global-sid customer-credits))
+
+(defn save-customer-credit [s cred]
+  (p/write-obj s (customer-credit-sid (:id cred)) cred))
+
+(defn find-customer-credit [s id]
+  (p/read-obj s (customer-credit-sid id)))
+
+(def list-customer-credits-since
+  "Lists all customer credits for the customer since given timestamp.  
+   This includes those without a `from-time`."
+  (override-or
+   [:customer :list-credits-since]
+   (fn [s cust-id ts]
+     (->> (p/list-obj s (customer-credit-sid))
+          (map (partial find-customer-credit s))
+          (filter (every-pred (cp/prop-pred :customer-id cust-id)
+                              (comp (some-fn nil? (partial <= ts)) :from-time)))))))
+
+(def credit-subscriptions :credit-subscriptions)
+(defn credit-sub-sid [& parts]
+  (into [global (name credit-subscriptions)] parts))
+
+(defn save-credit-subscription [s cs]
+  (p/write-obj s (credit-sub-sid (:customer-id cs) (:id cs)) cs))
+
+(defn find-credit-subscription [s sid]
+  (p/read-obj s sid))
+
+(def list-customer-credit-subscriptions
+  (override-or
+   [:customer :list-credit-subscriptions]
+   (fn [st cust-id]
+     (let [sid (credit-sub-sid cust-id)]
+       (->> (p/list-obj st sid)
+            (map (partial conj sid))
+            (map (partial find-credit-subscription st)))))))
+
+(def list-active-credit-subscriptions
+  "Lists all active credit subscriptions at given timestamp"
+  (override-or
+   [:credit :list-active-subscriptions]
+   (fn [s at]
+     (letfn [(active? [{:keys [valid-from valid-until]}]
+               (and 
+                (<= valid-from at)
+                (or (nil? valid-until) (< at valid-until))))]
+       (->> (p/list-obj s (credit-sub-sid))
+            (mapcat (partial list-customer-credit-subscriptions s))
+            (filter active?))))))
+
+(def credit-consumptions :credit-consumptions)
+(defn credit-cons-sid [& parts]
+  (into [global (name credit-consumptions)] parts))
+
+(defn save-credit-consumption [s cs]
+  (p/write-obj s (credit-cons-sid (:customer-id cs) (:id cs)) cs))
+
+(defn find-credit-consumption [s sid]
+  (p/read-obj s sid))
+
+(def list-customer-credit-consumptions
+  (override-or
+   [:customer :list-credit-consumptions]
+   (fn [st cust-id]
+     (let [sid (credit-cons-sid cust-id)]
+       (->> (p/list-obj st sid)
+            (map (partial conj sid))
+            (map (partial find-credit-consumption st)))))))
+
+(def list-customer-credit-consumptions-since
+  (override-or
+   [:customer :list-credit-consumptions-since]
+   (fn [st cust-id since]
+     (->> (list-customer-credit-consumptions st cust-id)
+          (filter (comp (partial <= since) :consumed-at))))))
+
+(defn- list-customer-credits [s cust-id]
+  (->> (p/list-obj s (customer-credit-sid))
+       (map (partial find-customer-credit s))
+       (filter (cp/prop-pred :customer-id cust-id))))
+
+(defn- sum-amount [e]
+  (->> e
+       (map :amount)
+       (reduce + 0M)))
+
+(def list-available-credits
+  "Lists all available customer credits.  These are the credits that have not been fully
+   consumed, i.e. the difference between the amount and the sum of all consumptions linked
+   to the credit is positive."
+  (override-or
+   [:customer :list-available-credits]
+   (fn [s cust-id]
+     (let [consm (->> (list-customer-credit-consumptions s cust-id)
+                      (group-by :credit-id))
+           avail? (fn [{:keys [id amount]}]
+                    (->> (get consm id)
+                         (sum-amount)
+                         (- amount)
+                         pos?))]
+       (->> (list-customer-credits s cust-id)
+            (filter avail?))))))
+
+(def calc-available-credits
+  "Calculates the available credits for the customer.  Basically this is the
+   amount of provisioned credits, substracted by the consumed credits."
+  (override-or
+   [:customer :get-available-credits]
+   (fn [s cust-id]
+     ;; Naive implementation: sum up all provisioned credits and all
+     ;; credits from all builds
+     (let [avail (->> (list-customer-credits s cust-id)
+                      (sum-amount))
+           used  (->> (list-customer-credit-consumptions s cust-id)
+                      (sum-amount))]
+       (- avail used)))))

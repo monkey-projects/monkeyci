@@ -2,13 +2,16 @@
   (:require [clojure.test :refer :all]
             [clojure.core.async :as ca]
             [clojure.java.io :as io]
+            [clojure.spec.alpha :as spec]
             [clojure.string :as cs]
             [manifold.deferred :as md]
             [monkey.ci
+             [errors :as err]
              [process :as p]
              [runners :as sut]
              [script :as script]
              [utils :as u]]
+            [monkey.ci.spec.events :as se]
             [monkey.ci.helpers :as h]))
 
 (deftest build-local
@@ -20,21 +23,22 @@
                                          {}))))
     
     (testing "when script not found"
-      (testing "returns exit code 1"
-        (is (= 1 (-> {:script {:script-dir "nonexisting"}}
-                     (sut/build-local {})
-                     (deref)))))
+      (testing "returns exit code"
+        (is (= err/error-no-script
+               (-> {:script {:script-dir "nonexisting"}}
+                   (sut/build-local {})
+                   (deref)))))
 
       (testing "fires `:build/end` event with error status"
-        (let [{:keys [recv] :as e} (h/fake-events)]
-          (is (some? (-> {:script {:script-dir "nonexisting"}}
+        (let [e (h/fake-events)]
+          (is (some? (-> {:script {:script-dir "nonexisting"}
+                          :sid (h/gen-build-sid)}
                          (sut/build-local {:events e} )
                          (deref))))
-          (is (not-empty @recv))
-          (let [m (->> @recv
-                       (filter (comp (partial = :build/end) :type))
-                       (first))]
+          (let [m (->> (h/received-events e)
+                       (h/first-event-by-type :build/end))]
             (is (some? m))
+            (is (spec/valid? ::se/event m))
             (is (= :error (get-in m [:build :status])))))))
 
     (testing "deletes checkout dir"
@@ -74,14 +78,15 @@
           (is (true? (.exists checkout-dir))))))
 
     (testing "fires `build/start` event with sid"
-      (let [{:keys [recv] :as e} (h/fake-events)
+      (let [e (h/fake-events)
             rt {:events e}
             build {:build-id "test-build"
-                   :sid ["test" "build"]}]
+                   :sid (h/gen-build-sid)
+                   :credit-multiplier 1}]
         (is (some? @(sut/build-local build rt)))
-        (is (not-empty @recv))
-        (let [evt (first @recv)]
-          (is (= :build/start (:type evt)))
+        (let [evt (->> (h/received-events e)
+                       (h/first-event-by-type :build/start))]
+          (is (spec/valid? ::se/event evt))
           (is (= (:sid build) (:sid evt))))))))
 
 (deftest download-src
@@ -90,15 +95,18 @@
       (is (= build (sut/download-src build {})))))
 
   (testing "gets src using git fn"
-    (is (= "test/dir" (-> {:git {:url "http://git.test"}}
-                          (sut/download-src {:git {:clone (constantly "test/dir")}})
+    (is (= "test/dir" (-> {:git {:url "http://git.test"}
+                           :build-id "test-build"}
+                          (sut/download-src {:git {:clone (constantly "test/dir")}
+                                             :config {:checkout-base-dir "/tmp"}})
                           :checkout-dir))))
 
   (testing "passes git config to git fn"
     (let [git-config {:url "http://test"
                       :branch "main"
                       :id "test-id"}]
-      (is (= "ok" (-> {:git git-config}
+      (is (= "ok" (-> {:git git-config
+                       :build-id "test-build"}
                       (sut/download-src
                        {:git {:clone (fn [c]
                                        (if (= (select-keys c (keys git-config)) git-config)
@@ -126,8 +134,10 @@
   (testing "calculates script dir"
     (is (re-matches #".*test/dir/test-script$"
                     (-> {:git {:url "http://git.test"}
-                         :script {:script-dir "test-script"}}
-                        (sut/download-src {:git {:clone (constantly "test/dir")}})
+                         :script {:script-dir "test-script"}
+                         :build-id "test-build"}
+                        (sut/download-src {:git {:clone (constantly "test/dir")}
+                                           :config {:checkout-base-dir "/tmp"}})
                         :script
                         :script-dir))))
 
@@ -152,7 +162,7 @@
           build {:checkout-dir "test-checkout"
                  :sid ["test-cust" "test-repo" "test-build"]}]
       (is (some? (sut/store-src build rt)))
-      (is (= {"test-checkout" "test-cust/test-repo/test-build.tgz"} @stored))))
+      (is (= {"test-cust/test-repo/test-build.tgz" "test-checkout"} @stored))))
 
   (testing "returns updated build"
     (let [rt {:workspace (h/fake-blob-store (atom {}))}
@@ -163,8 +173,13 @@
 
 (deftest make-runner
   (let [build {:build-id "test-build"}]
-    (testing "provides child type"
-      (is (fn? (sut/make-runner {:runner {:type :child}}))))
+    (testing "provides in-container type"
+      (is (fn? (sut/make-runner {:runner {:type :in-container}}))))
+
+    (testing "provides server type"
+      (with-redefs [p/execute! (constantly (md/success-deferred {:exit 0}))]
+        (let [r (sut/make-runner {:runner {:type :server}})]
+          (is (fn? r)))))
 
     (testing "provides noop type"
       (let [r (sut/make-runner {:runner {:type :noop}})]

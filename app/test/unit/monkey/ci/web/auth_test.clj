@@ -11,17 +11,29 @@
     (is (string? (sut/generate-secret-key)))))
 
 (deftest config->keypair
-  (testing "`nil` if no keys configured"
-    (is (nil? (sut/config->keypair {}))))
+  (let [test-priv "dev-resources/test/jwk/privkey.pem"
+        test-pub "dev-resources/test/jwk/pubkey.pem"]
+    
+    (testing "`nil` if no keys configured"
+      (is (nil? (sut/config->keypair {}))))
 
-  (testing "returns private and public keys as map"
-    (let [rt (-> {:jwk {:private-key "dev-resources/test/jwk/privkey.pem"
-                        :public-key "dev-resources/test/jwk/pubkey.pem"}}
-                  (sut/config->keypair))]
-      (is (map? rt))
-      (is (= 2 (count rt)))
-      (is (bk/private-key? (:priv rt)))
-      (is (bk/public-key? (:pub rt))))))
+    (testing "returns private and public keys as map"
+      (let [rt (-> {:jwk {:private-key test-priv
+                          :public-key test-pub}}
+                   (sut/config->keypair))]
+        (is (map? rt))
+        (is (= 2 (count rt)))
+        (is (bk/private-key? (:priv rt)))
+        (is (bk/public-key? (:pub rt)))))
+
+    (testing "reads private and public keys from string"
+      (let [rt (-> {:jwk {:private-key (slurp test-priv)
+                          :public-key (slurp test-pub)}}
+                   (sut/config->keypair))]
+        (is (map? rt))
+        (is (= 2 (count rt)))
+        (is (bk/private-key? (:priv rt)))
+        (is (bk/public-key? (:pub rt)))))))
 
 (deftest secure-ring-app
   (testing "verifies bearer token using public key and puts user in request `:identity`"
@@ -111,3 +123,23 @@
                        (auth {:parameters
                               {:path
                                {:customer-id "test-cust"}}})))))))
+
+(deftest valid-security?
+  (testing "false if nil"
+    (is (not (true? (sut/valid-security? nil)))))
+
+  (testing "true if valid"
+    ;; Github provided values for testing
+    (is (true? (sut/valid-security?
+                {:secret "It's a Secret to Everybody"
+                 :payload "Hello, World!"
+                 :x-hub-signature "sha256=757107ea0eb2509fc211221cce984b8a37570b6d7586c22c46f4379c8b043e17"})))))
+
+(deftest parse-signature
+  (testing "nil if nil input"
+    (is (nil? (sut/parse-signature nil))))
+
+  (testing "returns signature and algorithm"
+    (is (= {:alg :sha256
+            :signature "test-value"}
+           (sut/parse-signature "sha256=test-value")))))

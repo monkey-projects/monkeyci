@@ -1,9 +1,6 @@
 (ns monkey.ci.web.api
-  (:require [camel-snake-kebab.core :as csk]
-            [clojure.tools.logging :as log]
-            [manifold
-             [deferred :as md]
-             [stream :as ms]]
+  (:require [clojure.tools.logging :as log]
+            [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
              [artifacts :as a]
@@ -13,8 +10,10 @@
              [logging :as l]
              [runtime :as rt]
              [storage :as st]
-             [utils :as u]]
-            [monkey.ci.events.core :as ec]
+             [time :as t]]
+            [monkey.ci.events
+             [core :as ec]
+             [http :as eh]]
             [monkey.ci.web
              [auth :as auth]
              [common :as c]]
@@ -22,63 +21,14 @@
 
 (def body c/body)
 
-(defn- gen-display-id
-  "Generates id from the object name.  It lists existing repository display ids
-   and generates an id from the name.  If the display id is already taken, it adds
-   an index."
-  [st obj]
-  (let [existing? (-> (:customer-id obj)
-                      (as-> cid (st/list-repo-display-ids st cid))
-                      (set))
-        ;; TODO Check what happens with special chars
-        new-id (csk/->kebab-case (:name obj))]
-    (loop [id new-id
-           idx 2]
-      ;; Try a new id until we find one that does not exist yet.
-      ;; Alternatively we could parse the ids to extract the max index (but yagni)
-      (if (existing? id)
-        (recur (str new-id "-" idx)
-               (inc idx))
-        id))))
-
-(def repo-id gen-display-id)
-
-(defn- repo->out [r]
-  (dissoc r :customer-id))
-
-(defn- repos->out
-  "Converts the project repos into output format"
-  [p]
-  (some-> p
-          (mc/update-existing :repos (comp (partial map repo->out) vals))))
-
-(c/make-entity-endpoints "customer"
-                         {:get-id (c/id-getter :customer-id)
-                          :getter (comp repos->out st/find-customer)
-                          :saver st/save-customer})
-
-(defn create-customer [req]
-  (let [creator (c/entity-creator st/save-customer c/default-id)
-        user? (every-pred :type)]
-    (when-let [reply (creator req)]
-      (let [user (:identity req)]
-        ;; When a user is creating the customer, link them up
-        (when (user? user)
-          (st/save-user (c/req->storage req) (update user :customers conj (get-in reply [:body :id]))))
-        reply))))
-
-(defn search-customers [req]
-  (let [f (get-in req [:parameters :query])]
-    (if (empty? f)
-      (-> (rur/response {:message "Query must be specified"})
-          (rur/status 400))
-      (rur/response (st/search-customers (c/req->storage req) f)))))
+(def repo-id c/gen-repo-display-id)
 
 (c/make-entity-endpoints "repo"
                          ;; The repo is part of the customer, so combine the ids
                          {:get-id (c/id-getter (juxt :customer-id :repo-id))
                           :getter st/find-repo
                           :saver st/save-repo
+                          :deleter st/delete-repo
                           :new-id repo-id})
 
 (c/make-entity-endpoints "webhook"
@@ -197,24 +147,21 @@
     (when-let [r (get-in p [:query k])]
       (format "refs/%s/%s" v r))))
 
-(def build-sid (comp (juxt :customer-id :repo-id :build-id)
-                     :path
-                     :parameters))
+(def build-sid c/build-sid)
 
 (defn- with-artifacts [req f]
   (if-let [b (st/find-build (c/req->storage req)
                             (build-sid req))]
-    (do 
-      (let [res (->> (b/all-jobs b)
-                     (mapcat :save-artifacts)
-                     (f))
-            ->response (fn [res]
-                         (if (or (nil? res) (and (sequential? res) (empty? res)))
-                           (rur/status 204)
-                           (rur/response res)))]
-        (if (md/deferred? res)
-          (md/chain res ->response)
-          (->response res))))
+    (let [res (->> (b/all-jobs b)
+                   (mapcat :save-artifacts)
+                   (f))
+          ->response (fn [res]
+                       (if (or (nil? res) (and (sequential? res) (empty? res)))
+                         (rur/status 204)
+                         (rur/response res)))]
+      (->response (if (md/deferred? res)
+                    @res ; Deref otherwise cors middleware fails
+                    res)))
     (rur/not-found nil)))
 
 (defn get-build-artifacts
@@ -240,7 +187,7 @@
   [req]
   (letfn [(get-contents [{:keys [id]}]
             (when id
-              (let [store (a/artifact-store (c/req->rt req))
+              (let [store (rt/artifacts (c/req->rt req))
                     path (a/build-sid->artifact-path (build-sid req) id)]
                 (log/debug "Downloading artifact for id" id "from path" path)
                 (blob/input-stream store path))))]
@@ -252,53 +199,86 @@
   (some-fn (as-ref :branch "heads")
            (as-ref :tag "tags")))
 
+(defn- assign-build-id [build req]
+  (let [idx (st/find-next-build-idx (c/req->storage req) (c/repo-sid req))
+        bid (str "build-" idx)
+        build (assoc build :build-id bid)]
+    (-> build
+        (assoc :idx idx
+               :sid (st/ext-build-sid build)))))
+
+(defn- initialize-build [build rt]
+  (assoc build
+         :source :api
+         :start-time (t/now)
+         :status :initializing
+         :cleanup? (not (rt/dev-mode? rt))))
+
 (defn make-build-ctx
-  "Creates a build object from the request"
-  [{p :parameters :as req}]
+  "Creates a build object from the request for the repo"
+  [{p :parameters :as req} repo]
   (let [acc (:path p)
         st (c/req->storage req)
-        repo-sid (c/repo-sid req)
-        idx (st/find-next-build-idx st repo-sid)
-        bid (str "build-" idx)
-        repo (st/find-repo st repo-sid)
         ssh-keys (->> (st/find-ssh-keys st (customer-id req))
                       (lbl/filter-by-label repo))
-        rt (c/req->rt req)]
-    (-> acc
-        (select-keys [:customer-id :repo-id])
-        (assoc :source :api
-               :build-id bid
-               :idx idx
-               :git (-> (:query p)
-                        (select-keys [:commit-id :branch])
+        rt (c/req->rt req)
+        {bid :build-id :as build} (-> acc
+                                      (select-keys [:customer-id :repo-id])
+                                      (assign-build-id req))]
+    (-> build
+        (initialize-build rt)
+        (assoc :git (-> (:query p)
+                        (select-keys [:commit-id :branch :tag])
                         (assoc :url (:url repo)
                                :ssh-keys-dir (rt/ssh-keys-dir rt bid))
-                        (mc/assoc-some :ref (params->ref p)
+                        (mc/assoc-some :ref (or (params->ref p)
+                                                (some->> (:main-branch repo) (str "refs/heads/")))
                                        :ssh-keys ssh-keys
-                                       :main-branch (:main-branch repo)))
-               :sid (-> acc
-                        (assoc :build-id bid)
-                        (st/ext-build-sid))
-               :start-time (u/now)
-               :status :running
-               :cleanup? (not (rt/dev-mode? rt))))))
+                                       :main-branch (:main-branch repo)))))))
+
+(defn- save-and-run-build [rt build]
+  (if (st/save-build (c/rt->storage rt) build)
+    (do
+      ;; Trigger the build but don't wait for the result
+      (c/run-build-async rt build)
+      (-> (rur/response (select-keys build [:build-id]))
+          (rur/status 202)))
+    (-> (rur/response {:message "Unable to create build"})
+        (rur/status 500))))
 
 (defn trigger-build [req]
-  (let [{p :parameters} req]
-    ;; TODO If no branch is specified, use the default
-    (let [acc (:path p)
-          st (c/req->storage req)
-          runner (c/from-rt req :runner)
-          build (make-build-ctx req)]
-      (log/debug "Triggering build for repo sid:" (c/repo-sid req))
-      (if (st/save-build st build)
-        (do
-          ;; Trigger the build but don't wait for the result
-          (c/run-build-async (c/req->rt req) build)
-          (-> (rur/response (select-keys build [:build-id]))
-              (rur/status 202)))
-        (-> (rur/response {:message "Unable to create build"})
-            (rur/status 500))))))
+  (let [{p :parameters} req
+        st (c/req->storage req)
+        repo-sid (c/repo-sid req)
+        repo (st/find-repo st repo-sid)
+        build (make-build-ctx req repo)]
+    (log/debug "Triggering build for repo sid:" repo-sid)
+    (if repo
+      (save-and-run-build (c/req->rt req) build)
+      (rur/not-found {:message "Repository does not exist"}))))
+
+(defn retry-build
+  "Re-triggers existing build by id"
+  [req]
+  (let [st (c/req->storage req)
+        existing (st/find-build st (c/build-sid req))
+        rt (c/req->rt req)
+        build (some-> existing
+                      (dissoc :start-time :end-time :script)
+                      (assign-build-id req)
+                      (initialize-build rt))]
+    (if build
+      (save-and-run-build rt build)
+      (rur/not-found {:message "Build not found"}))))
+
+(defn cancel-build
+  "Cancels running build"
+  [req]
+  (if-let [build (st/find-build (c/req->storage req) (c/build-sid req))]
+    (do
+      (ec/post-events (c/from-rt req :events) [(b/build-evt :build/canceled build)])
+      (rur/status 202))
+    (rur/not-found {:message "Build not found"})))
 
 (defn list-build-logs [req]
   (let [build-sid (st/ext-build-sid (get-in req [:parameters :path]))
@@ -315,48 +295,24 @@
       (rur/not-found nil))))
 
 (def allowed-events
-  #{:build/start
+  #{:build/pending
+    :build/initializing
+    :build/start
     :build/end
     :build/updated
     :script/start
     :script/end
+    :job/initializing
     :job/start
+    :job/updated
     :job/end})
 
 (defn event-stream
   "Sets up an event stream for the specified filter."
   [req]
-  (let [cid (customer-id req)
-        recv (c/from-rt req rt/events-receiver)
-        stream (ms/stream 1)
-        make-reply (fn [evt]
-                     ;; Format according to sse specs, with double newline at the end
-                     (str "data: " (pr-str evt) "\n\n"))
-        listener (fn [evt]
-                   (ms/put! stream (make-reply evt)))
-        cid-filter {:types allowed-events
-                    :sid [cid]}]
-    (ms/on-drained stream
-                   (fn []
-                     (log/info "Closing event stream")
-                     (ec/remove-listener recv cid-filter listener)))
-    ;; Only send events for the customer specified in the url
-    (ec/add-listener recv cid-filter listener)
-    ;; Set up a keepalive, which pings the client periodically to keep the connection open.
-    ;; The initial ping will make the browser "open" the connection.  The timeout must always
-    ;; be lower than the read timeout of the client, or any intermediate proxy server.
-    ;; TODO Ideally we should not send a ping if another event has been sent more recently.
-    ;; TODO Make the ping timeout configurable
-    (ms/connect (ms/periodically 30000 0 (constantly (make-reply {:type :ping})))
-                stream
-                {:upstream? true})
-    (-> (rur/response stream)
-        (rur/header "content-type" "text/event-stream")
-        (rur/header "access-control-allow-origin" "*")
-        ;; For nginx, set buffering to no.  This will disable buffering on Nginx proxy side.
-        ;; See https://www.nginx.com/resources/wiki/start/topics/examples/x-accel/#x-accel-buffering
-        (rur/header "x-accel-buffering" "no")
-        (rur/header "cache-control" "no-cache"))))
+  (eh/event-stream (c/from-rt req rt/events-receiver)
+                   {:types allowed-events
+                    :sid [(customer-id req)]}))
 
 (c/make-entity-endpoints "email-registration"
                          {:get-id (c/id-getter :email-registration-id)

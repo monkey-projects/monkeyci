@@ -9,8 +9,7 @@
             [monkey.oci.os.core :as os]))
 
 (defn- storage-config []
-  (-> @c/global-config
-      (config/normalize-config {} {})))
+  @c/global-config)
 
 (defn make-storage
   ([conf]

@@ -1,61 +1,28 @@
 (ns monkey.ci.web.github
   "Functionality specific for Github"
-  (:require [buddy.core
-             [codecs :as codecs]
-             [mac :as mac]]
-            [clojure.core.async :refer [go <!! <!]]
-            [clojure.java.io :as io]
-            [clojure.tools.logging :as log]
+  (:require [clojure.tools.logging :as log]
             [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
-             [config :as config]
              [labels :as lbl]
              [runtime :as rt]
              [storage :as s]
-             [utils :as u]]
+             [utils :as u]
+             [version :as v]]
             [monkey.ci.web
              [auth :as auth]
              [common :as c]
              [oauth2 :as oauth2]]
-            ;; TODO Replace httpkit with aleph
-            [org.httpkit.client :as http]
+            [aleph.http :as http]
             [ring.util.response :as rur]))
 
-(defn extract-signature [s]
-  (when s
-    (let [[k v :as parts] (seq (.split s "="))]
-      (when (and (= 2 (count parts)) (= "sha256" k))
-        v))))
-
-(defn valid-security?
-  "Validates security header"
-  [{:keys [secret payload x-hub-signature]}]
-  (when-let [sign (extract-signature x-hub-signature)]
-    (mac/verify payload
-              (codecs/hex->bytes sign)
-              {:key secret :alg :hmac+sha256})))
-
-(def req->webhook-id (comp :id :path :parameters))
 (def req->repo-sid (comp (juxt :customer-id :repo-id) :path :parameters))
 
 (defn validate-security
   "Middleware that validates the github security header using a fn that retrieves
    the secret for the request."
-  ([h get-secret]
-   (fn [req]
-     (if (valid-security? {:secret (get-secret req)
-                           :payload (:body req)
-                           :x-hub-signature (get-in req [:headers "x-hub-signature-256"])})
-       (h req)
-       (-> (rur/response "Invalid signature header")
-           (rur/status 401)))))
-  ([h]
-   (validate-security h (fn [req]
-                          ;; Find the secret key by looking up the webhook from storage
-                          (some-> (c/req->storage req)
-                                  (s/find-webhook (req->webhook-id req))
-                                  :secret-key)))))
+  [h & [get-secret]]
+  (auth/validate-hmac-security h {:get-secret get-secret}))
 
 (defn github-event [req]
   (get-in req [:headers "x-github-event"]))
@@ -88,7 +55,7 @@
   (let [{:keys [master-branch clone-url ssh-url private]} (:repository payload)
         ;; TODO Ensure idx uniqueness over repo
         idx (s/find-next-build-idx st [customer-id repo-id])
-        build-id (str "build-" idx)
+        build-id (c/new-build-id idx)
         commit-id (get-in payload [:head-commit :id])
         ssh-keys (find-ssh-keys st customer-id repo-id)
         build (-> init-build
@@ -104,7 +71,7 @@
                          ;; Do not use the commit timestamp, because when triggered from a tag
                          ;; this is still the time of the last commit, not of the tag creation.
                          :start-time (u/now)
-                         :status :running
+                         :status :pending
                          :build-id build-id
                          :idx idx
                          :cleanup? true
@@ -188,7 +155,7 @@
                    (s/find-repo st [(:customer-id repo) id]))
         with-id (if existing
                   (merge existing repo)
-                  (assoc repo :id (s/new-id)))]
+                  (assoc repo :id (c/gen-repo-display-id st repo)))]
     (if (s/watch-github-repo st with-id)
       (rur/response with-id)
       (rur/status 500))))
@@ -196,40 +163,46 @@
 (defn unwatch-repo [req]
   (let [st (c/req->storage req)
         sid (req->repo-sid req)]
+    (log/debug "Unwatching repo:" sid)
     (if (s/unwatch-github-repo st sid)
       (rur/response (s/find-repo st sid))
       (rur/status 404))))
 
-(defn- process-reply [r]
-  (log/trace "Got github reply:" r)
-  (update r :body c/parse-json))
+(def user-agent (str "MonkeyCI:" (v/version)))
 
 (defn- request-access-token [req]
   (let [code (get-in req [:parameters :query :code])
         {:keys [client-secret client-id]} (c/from-rt req (comp :github rt/config))]
-    (-> @(http/post "https://github.com/login/oauth/access_token"
-                    {:query-params {:client_id client-id
-                                    :client_secret client-secret
-                                    :code code}
-                     :headers {"Accept" "application/json"}})
-        (process-reply))))
+    (-> (http/post "https://github.com/login/oauth/access_token"
+                   {:query-params {:client_id client-id
+                                   :client_secret client-secret
+                                   :code code}
+                    :headers {"Accept" "application/json"
+                              "User-Agent" user-agent}
+                    :throw-exceptions false})
+        (md/chain c/parse-body)
+        deref)))
 
 (defn- ->oauth-user [{:keys [id email]}]
   {:email email
    :sid [:github id]})
 
-(defn- request-user-info
+(defn request-user-info
   "Fetch github user details in order to get the id and email (although
    the latter is not strictly necessary).  We need the id in order to
    link the Github user to the MonkeyCI user."
   [token]
-  (-> @(http/get "https://api.github.com/user"
-                 {:headers {"Accept" "application/json"
-                            "Authorization" (str "Bearer " token)}})
-      (process-reply)
-      ;; TODO Check for failures
-      :body
-      (->oauth-user)))
+  (-> (http/get "https://api.github.com/user"
+                {:headers {"Accept" "application/json"
+                           "Authorization" (str "Bearer " token)
+                           ;; Required by github
+                           "User-Agent" user-agent}
+                 :throw-exceptions false})
+      (md/chain
+       c/parse-body
+       :body
+       ->oauth-user)
+      deref))
 
 (def login (oauth2/login-handler
             request-access-token
@@ -239,6 +212,3 @@
   "Lists public github configuration to use"
   [req]
   (rur/response {:client-id (c/from-rt req (comp :client-id :github rt/config))}))
-
-(defmethod config/normalize-key :github [_ conf]
-  conf)

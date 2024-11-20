@@ -1,33 +1,38 @@
 (ns monkey.ci.gui.home.events
   (:require [monkey.ci.gui.home.db :as db]
+            [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.login.db :as ldb]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
 (rf/reg-event-fx
- :user/load-customers
+ :home/initialize
  (fn [{:keys [db]} _]
-   {:dispatch [:secure-request
-               :get-user-customers
-               {:user-id (:id (ldb/user db))}
-               [:user/load-customers--success]
-               [:user/load-customers--failed]]
-    :db (db/set-alerts db
-                       [{:type :info
-                         :message "Retrieving linked customers..."}])}))
+   (lo/on-initialize
+    db
+    db/id
+    {:init-events [[:user/load-customers]]})))
+
+(rf/reg-event-fx
+ :user/load-customers
+ (lo/loader-evt-handler
+  db/id
+  (fn [id {:keys [db]} _]
+    [:secure-request
+     :get-user-customers
+     {:user-id (:id (ldb/user db))}
+     [:user/load-customers--success]
+     [:user/load-customers--failed]])))
 
 (rf/reg-event-db
  :user/load-customers--success
- (fn [db [_ {:keys [body]}]]
-   (-> db
-       (db/clear-alerts)
-       (db/set-customers body))))
+ (fn [db [_ resp]]
+   (lo/on-success db db/id resp)))
 
 (rf/reg-event-db
  :user/load-customers--failed
  (fn [db [_ err]]
-   (db/set-alerts db [{:type :danger
-                       :message (str "Could not retrieve linked customers: " (u/error-msg err))}])))
+   (lo/on-failure db db/id "Could not retrieve linked customers: " err)))
 
 (rf/reg-event-db
  :customer/join-init

@@ -8,23 +8,25 @@
             [monkey.ci
              [blob :as b]
              [build :as build]
-             [config :as config]
+             [errors :as err]
              [process :as p]
              [runtime :as rt]
              [script :as s]
              [spec :as spec]
-             [utils :as u]]
+             [utils :as u]
+             [workspace :as ws]]
             [monkey.ci.build.core :as bc]
             [monkey.ci.spec.build :as sb]))
 
 (defn- script-not-found [build]
   (let [msg (str "No build script found at " (build/script-dir build))]
     (log/warn msg)
-    {:exit 1
+    {:exit err/error-no-script
      :result :error
      :message msg}))
 
 (defn- post-build-end [rt build {:keys [exit message] :as res}]
+  (log/debug "Posting :build/end event for exit code" exit)
   (md/chain
    (rt/post-events rt (build/build-end-evt
                        (cond-> build
@@ -59,13 +61,10 @@
    runs the build.  Returns a deferred that resolves when the child process has
    exited."
   [build rt]
+  (log/debug "Building locally:" build)
   (spec/valid? ::sb/build build)
   (let [script-dir (build/script-dir build)]
-    (rt/post-events rt {:type :build/start
-                        :sid (build/sid build)
-                        :build (-> build
-                                   (build/build->evt)
-                                   (assoc :start-time (u/now)))})
+    (rt/post-events rt (build/build-start-evt build))
     (-> (md/chain
          (if (some-> (io/file script-dir) (.exists))
            (p/execute! build rt)
@@ -97,34 +96,34 @@
   (cond-> build
     (not-empty (:git build)) (download-git rt)))
 
-(defn create-workspace [{:keys [checkout-dir sid] :as build} rt]
-  (let [ws (:workspace rt)
-        dest (str (cs/join "/" sid) b/extension)]
-    (when checkout-dir
-      (log/info "Creating workspace using files from" checkout-dir)
-      @(md/chain
-        (b/save ws checkout-dir dest) ; TODO Check for errors
-        (constantly (assoc build :workspace dest))))))
-
 (defn store-src
   "If a workspace configuration is present, uses it to store the source in
    the workspace.  This can then be used by other processes to download the
    cached files as needed."
   [build rt]
   (cond-> build
-    (some? (:workspace rt)) (create-workspace rt)))
+    (some? (:workspace rt)) (ws/create-workspace rt)))
 
 ;; Creates a runner fn according to its type
 (defmulti make-runner (comp :type :runner))
 
-(defmethod make-runner :child [_]
-  (log/info "Using child process runner")
-  (fn [build rt]
+(defn- run-local [build rt]
+  (let [build (build/set-credit-multiplier build (get-in rt [:config :runner :credit-multiplier]))]
     (log/debug "Running build in child process:" build)
     (-> build
         (download-src rt)
         (store-src rt)
         (build-local rt))))
+
+(defmethod make-runner :in-container [conf]
+  ;; Runner that is invoked when the build uses container instances.  The runtime is
+  ;; created by a cli function.
+  (log/info "Using in-container runner")
+  run-local)
+
+(defmethod make-runner :local [conf]
+  (log/info "Using local runner with working directory" (:work-dir conf))
+  run-local)
 
 (defmethod make-runner :noop [_]
   ;; For testing
@@ -145,14 +144,6 @@
   (constantly 2))
 
 ;;; Configuration handling
-
-(defmulti normalize-runner-config (comp :type :runner))
-
-(defmethod normalize-runner-config :default [conf]
-  conf)
-
-(defmethod config/normalize-key :runner [k conf]
-  (config/normalize-typed k conf normalize-runner-config))
 
 (defmethod rt/setup-runtime :runner [conf _]
   (make-runner conf))

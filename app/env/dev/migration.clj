@@ -1,11 +1,11 @@
 (ns migration
   (:require [clojure.java.io :as io]
             [clojure.tools.logging :as log]
-            [config :refer [load-edn]]
             [storage :refer [make-storage]]
             [medley.core :as mc]
             [monkey.ci
              [cuid :as cuid]
+             [edn :as edn]
              [protocols :as p]
              [storage :as s]]
             [monkey.ci.entities
@@ -25,7 +25,7 @@
         (.isFile f)
         (do
           (log/info "Migrating:" f)
-          (p/write-obj st (make-sid f) (load-edn f)))
+          (p/write-obj st (make-sid f) (edn/edn-> f)))
         (.isDirectory f)
         (migrate-dir f (concat sid [(.getName f)]) st)))))
 
@@ -200,3 +200,43 @@
            (map update-build-idx)
            (doall)))
     (log/info "Done.")))
+
+(defn create-credit-consumptions
+  "For the given customer, creates credit consumptions matching all builds of that customer.
+   Automatically creates a customer credit, rounded to the nearest thousand."
+  [st cust-id]
+  (let [cust (s/find-customer st cust-id)
+        avail-creds (s/calc-available-credits st cust-id)
+        cred-amount 10000]
+    (log/info "Creating credit consumptions for customer" (:name cust))
+    (loop [repos (vals (:repos cust))
+           creds avail-creds
+           cred-id (->> (s/list-available-credits st cust-id)
+                        (first)
+                        :id)]
+      (when-let [r (first repos)]
+        (log/info "Repository:" (:name r))
+        (let [builds (s/list-builds st [cust-id (:id r)])
+              repo-creds (->> builds
+                              (map :credits)
+                              (remove nil?)
+                              (reduce + 0))
+              [rem cred-id] (if (neg? (- creds repo-creds))
+                              (let [cred {:customer-id cust-id
+                                          :id (cuid/random-cuid)
+                                          :amount cred-amount
+                                          :type :user}]
+                                (log/info "Provisioning credits")
+                                (s/save-customer-credit st cred)
+                                [(+ creds cred-amount) (:id cred)])
+                              [creds cred-id])]
+          (log/info "Creating credit consumptions for" (count builds) "builds, totaling" repo-creds "credits.")
+          (doseq [b (filter (comp (fnil pos? 0) :credits) builds)]
+            (s/save-credit-consumption st (-> (select-keys b [:build-id :repo-id :customer-id])
+                                              (assoc :credit-id cred-id
+                                                     :id (cuid/random-cuid)
+                                                     :amount (:credits b)
+                                                     :consumed-at (:end-time b)))))
+          (recur (rest repos)
+                 rem
+                 cred-id))))))

@@ -15,6 +15,14 @@
       (is (= ["http://url" :branch "master" :dir "tmp"]
              (sut/clone {:url "http://url"
                          :branch "master"
+                         :dir "tmp"})))))
+
+  (testing "can check out tags"
+    (with-redefs [git/git-clone (fn [& args]
+                                  args)]
+      (is (= ["http://url" :branch "test-tag" :dir "tmp"]
+             (sut/clone {:url "http://url"
+                         :tag "test-tag"
                          :dir "tmp"}))))))
 
 (deftest checkout

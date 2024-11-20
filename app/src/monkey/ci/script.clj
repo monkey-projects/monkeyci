@@ -1,109 +1,60 @@
 (ns monkey.ci.script
-  (:require [aleph.http :as http]
-            [clj-commons.byte-streams :as bs]
-            [clojure.java.io :as io]
+  (:require [clojure.java.io :as io]
             [clojure.tools.logging :as log]
-            [manifold.deferred :as md]
+            [manifold
+             [bus :as mb]
+             [deferred :as md]
+             [stream :as ms]]
             [medley.core :as mc]
-            [monkey.ci.build.core :as bc]
             [monkey.ci
-             [artifacts :as art]
              [build :as build]
-             [cache :as cache]
-             [containers :as c]
              [credits :as cr]
+             [errors :as err]
              [extensions :as ext]
              [jobs :as j]
-             [runtime :as rt]
+             [protocols :as p]
              [spec :as s]
              [utils :as u]]
-            [monkey.ci.containers
-             [docker]
-             [oci]
-             [podman]]
+            [monkey.ci.build.core :as bc]
             [monkey.ci.events.core :as ec]
-            [monkey.ci.spec.build :as sb]
-            [muuntaja.parse :as mp]))
-
-(defn- wrapped
-  "Sets the event poster in the runtime."
-  [f before after]
-  (let [error (fn [& args]
-                ;; On error, add the exception to the result of the 'after' event
-                (let [ex (last args)]
-                  (log/error "Got error:" ex)
-                  (assoc (apply after (concat (butlast args) [{}]))
-                         :exception (.getMessage ex))))
-        w (ec/wrapped f before after error)]
-    (fn [rt & more]
-      (apply w rt more))))
+            [monkey.ci.runtime.script :as rs]
+            [monkey.ci.spec.build :as sb]))
 
 (defn- base-event
-  "Creates an skeleton event with basic properties"
-  [rt type]
-  {:type type
+  "Creates a skeleton event with basic properties"
+  [build type]
+  (ec/make-event
+   type 
    :src :script
-   :sid (build/get-sid rt)
-   :time (u/now)})
+   :sid (build/sid build)))
 
-(defn- job-start-evt [{:keys [job] :as rt}]
-  (-> (base-event rt :job/start)
-      (assoc :job (j/job->event job)
-             :message "Job started")))
-
-(defn- job-end-evt [{:keys [job] :as rt} {:keys [status message exception] :as r}]
-  (let [r (dissoc r :status :exception)]
-    (-> (base-event rt :job/end)
-        (assoc :message "Job completed"
-               :job (cond-> (j/job->event job)
-                      true (assoc :status status)
-                      ;; Add any extra information to the result key
-                      (not-empty r) (assoc :result r)
-                      (some? exception) (assoc :message (or message (.getMessage exception))
-                                               :stack-trace (u/stack-trace exception)))))))
-
-;; Wraps a job so it fires an event before and after execution, and also
-;; catches any exceptions.
-(defrecord EventFiringJob [target]
+;; Wraps a job so it catches any exceptions.
+(defrecord ErrorCatchingJob [target]
   j/Job
-  (execute! [job rt]
-    (let [rt-with-job (assoc rt :job target)
+  (execute! [job ctx]
+    (let [ctx-with-job (assoc ctx :job target)
           handle-error (fn [ex]
                          (log/error "Got job exception:" ex)
-                         (assoc bc/failure
-                                :exception ex
-                                :message (.getMessage ex)))
-          st (u/now)]
-      (log/debug "Executing event firing job:" (bc/job-id target))
+                         (let [u (err/unwrap-exception ex)]
+                           (assoc bc/failure
+                                  :exception u
+                                  :message (ex-message u))))]
+      (log/debug "Executing error catching job:" (bc/job-id target))
       (md/chain
-       (rt/post-events rt (job-start-evt
-                           (-> rt-with-job
-                               (update :job
-                                       merge {:start-time st
-                                              :status :running
-                                              :credit-multiplier (cr/credit-multiplier target rt)}))))
-       (fn [_]
-         ;; Catch both sync and async errors
-         (try 
-           (-> (j/execute! target rt-with-job)
-               (md/catch handle-error))
-           (catch Exception ex
-             (handle-error ex))))
+       ;; Catch both sync and async errors
+       (try 
+         (-> (j/execute! target ctx-with-job)
+             (md/catch handle-error))
+         (catch Exception ex
+           (handle-error ex)))
        (fn [r]
-         (log/debug "Job ended with response:" r)
-         (md/chain
-          (rt/post-events rt (job-end-evt
-                              (update rt-with-job :job
-                                      merge {:start-time st
-                                             :end-time (u/now)})
-                              r))
-          (constantly r)))))))
+         (log/debug "Job" (j/job-id job) "ended with response:" r)
+         r)))))
 
-(defn- with-fire-events
-  "Wraps job so events are fired on start and end."
+(defn- with-catch
   [job]
-  (map->EventFiringJob (-> (j/job->event job)
-                           (assoc :target job))))
+  (map->ErrorCatchingJob (-> (j/job->event job)
+                             (assoc :target job))))
 
 (def with-extensions
   "Wraps the job so any registered extensions get executed."
@@ -113,61 +64,43 @@
   [[{:label "pipeline"
      :value pipeline}]])
 
+(defn canceled-evt
+  "Returns a deferred that will hold a `build/canceled` event, should it arrive.
+   When deferred is realized, we unsubscribe from the bus."
+  [bus]
+  (let [src (mb/subscribe bus :build/canceled)]
+    (-> (ms/take! src)
+        (md/finally
+          (fn []
+            (ms/close! src))))))
+
 (defn run-all-jobs
   "Executes all jobs in the set, in dependency order."
-  [{:keys [pipeline] :as rt} jobs]
+  [{:keys [pipeline events] :as rt} jobs]
   (let [pf (cond->> jobs
              ;; Filter jobs by pipeline, if given
              pipeline (j/filter-jobs (j/label-filter (pipeline-filter pipeline)))
-             true (map (comp with-fire-events with-extensions)))]
+             true (map (comp with-catch with-extensions)))
+        ;; Cancel when build/canceled event received
+        canceled? (atom false)
+        evt-def (-> (canceled-evt (get-in rt [:event-bus :bus]))
+                    (md/chain
+                     (fn [_] (reset! canceled? true))))]
     (log/debug "Found" (count pf) "matching jobs:" (map bc/job-id pf))
-    (let [result @(j/execute-jobs! pf rt)]
-      (log/debug "Jobs executed, result is:" result)
-      {:status (if (some (comp bc/failed? :result) (vals result)) :failure :success)
-       :jobs result})))
-
-;;; Script client functions
-
-(defn make-client
-  "Creates an API client function, that can be invoked by build scripts to 
-   perform certain operations, like retrieve build parameters.  The client
-   uses the token passed by the spawning process to gain access to those
-   resources."
-  [{{:keys [url token]} :api}]
-  (letfn [(throw-on-error [{:keys [status] :as r}]
-            (if (>= status 400)
-              (md/error-deferred (ex-info "Failed to invoke API call" r))
-              r))
-          (parse-body [{:keys [body headers]}]
-            (if (= "application/edn" (some-> (get headers "content-type")
-                                             (mp/parse-content-type)
-                                             first))
-              (with-open [r (bs/to-reader body)]
-                (u/parse-edn r))
-              ;; Return non-edn contents as input stream
-              (bs/to-input-stream body)))]
-    (log/debug "Connecting to API at" url)
-    (fn [req]
-      (-> req
-          (update :url (partial str url))
-          (assoc-in [:headers "authorization"] (str "Bearer " token))
-          (assoc-in [:headers "accept"] "application/edn")
-          (http/request)
-          (md/chain
-           throw-on-error
-           parse-body)))))
-
-(def valid-config? (every-pred :url :token))
-
-(defmethod rt/setup-runtime :api [conf _]
-  (when-let [c (:api conf)]
-    (when (valid-config? c)
-      {:client (make-client conf)})))
+    (try 
+      (let [result @(j/execute-jobs! pf (assoc rt :canceled? canceled?))]
+        (log/debug "Jobs executed, result is:" result)
+        {:status (if (some (comp bc/failed? :result) (vals result)) :error :success)
+         :jobs result})
+      (finally
+        ;; Realize the deferred so it cancels the subscription
+        (when-not (md/realized? evt-def)
+          (md/success! evt-def {}))))))
 
 ;;; Script loading
 
 (defn- load-script
-  "Loads the pipelines from the build script, by reading the script files 
+  "Loads the jobs from the build script, by reading the script files 
    dynamically.  If the build script does not define its own namespace,
    one will be randomly generated to avoid collisions."
   [dir build-id]
@@ -179,55 +112,48 @@
     (try
       (let [path (io/file dir "build.clj")]
         (log/debug "Loading script:" path)
-        ;; This should return pipelines to run
+        ;; This should return jobs to run
         (load-file (str path)))
       (finally
         ;; Return
         (in-ns 'monkey.ci.script)
         (remove-ns tmp-ns)))))
 
-(defn- with-script-evt
-  "Creates an skeleton event with the script and invokes `f` on it"
-  [rt f]
-  (-> rt
-      (base-event nil)
-      (assoc :script (-> rt rt/build build/script))
-      (f)))
-
-(defn- job->evt [job]
-  (select-keys job [j/job-id j/deps j/labels]))
-
 (defn- script-start-evt [rt jobs]
   (letfn [(mark-pending [job]
             (assoc job :status :pending))]
-    (with-script-evt rt
-      #(-> %
-           (assoc :type :script/start
-                  :message "Script started")
-           ;; Add all info we already have about jobs
-           (assoc-in [:script :jobs] (->> jobs
-                                          (map (fn [{:keys [id] :as job}]
-                                                 [id job]))
-                                          (into {})
-                                          (mc/map-vals (comp mark-pending job->evt))))))))
+    (-> (base-event (:build rt) :script/start)
+        (assoc :jobs (map (comp mark-pending j/job->event) jobs)))))
 
-(defn- script-end-evt [rt jobs res]
-  (with-script-evt rt
-    (fn [evt]
-      (-> evt 
-          (assoc :type :script/end
-                 :message "Script completed")
-          ;; FIXME Jobs don't contain all info here, as they should (like start and end time)
-          (assoc-in [:script :jobs]
-                    (mc/map-vals (fn [r]
-                                   (-> (select-keys (:result r) [:status :message])
-                                       (merge (job->evt (:job r)))))
-                                 (:jobs res)))))))
+(defn- script-end-evts [rt _ res]
+  ;; In addition to the script end event, we should also generate a job/skipped event
+  ;; for each skipped job.
+  (let [skipped (->> res
+                     :jobs
+                     vals
+                     (filter (comp bc/skipped? :result))
+                     (map (comp j/job-id :job)))]
+    (->> [(-> (base-event (:build rt) :script/end)
+              (assoc :status (:status res)))]
+         (concat (mapv #(ec/make-event :job/skipped
+                                       :sid (build/sid (:build rt))
+                                       :job-id %)
+                       skipped)))))
+
+(defn script-init-evt [build script-dir]
+  (-> (base-event build :script/initializing)
+      (assoc :script-dir script-dir)))
 
 (def run-all-jobs*
-  (wrapped run-all-jobs
-           script-start-evt
-           script-end-evt))
+  (letfn [(error [rt _ ex]
+            (log/error "Got error:" ex)
+            (-> (base-event (:build rt) :script/end)
+                (assoc :status :error
+                       :exception (ex-message ex))))]
+    (ec/wrapped run-all-jobs
+                script-start-evt
+                script-end-evts
+                error)))
 
 (defn- assign-ids
   "Assigns an id to each job that does not have one already."
@@ -251,24 +177,22 @@
 
 (defn load-jobs
   "Loads the script and resolves the jobs"
-  [rt]
-  (-> (load-script (build/rt->script-dir rt) (build/get-build-id rt))
+  [build rt]
+  (-> (load-script (build/script-dir build) (build/build-id build))
       (resolve-jobs rt)))
 
 (defn exec-script!
   "Loads a script from a directory and executes it.  The script is executed in 
    this same process."
-  [rt+build]
-  (let [build (rt/build rt+build)
-        rt rt+build ; TODO Remove build from runtime
+  [rt]
+  (let [build (rs/build rt)
         build-id (build/build-id build)
         script-dir (build/script-dir build)]
-    (s/valid? ::sb/build build)
-    ;; TODO Replace the runtime with a specific context when passing it to a job
+    #_(s/valid? ::sb/build build)
     (log/debug "Executing script for build" build-id "at:" script-dir)
     (log/debug "Build map:" build)
-    (try 
-      (let [jobs (load-jobs rt)]
+    (try
+      (let [jobs (load-jobs build (j/rt->context rt))]
         (log/trace "Jobs:" jobs)
         (log/debug "Loaded" (count jobs) "jobs:" (map bc/job-id jobs))
         (run-all-jobs* rt jobs))
@@ -276,9 +200,10 @@
         (log/error "Unable to load build script" ex)
         (let [msg ((some-fn (comp ex-message ex-cause)
                             ex-message) ex)]
-          (rt/post-events rt [(-> (base-event rt :script/end)
-                                  (assoc :script (build/script build)
-                                         :message msg))])
+          (ec/post-events (:events rt)
+                          [(-> (base-event build :script/end)
+                               (assoc :script (build/script build)
+                                      :message msg))])
           (assoc bc/failure
                  :message msg
                  :exception ex))))))

@@ -1,6 +1,7 @@
 (ns monkey.ci.entities.core
   "Core functionality for database entities.  Allows to store/retrieve basic entities."
-  (:require [honey.sql :as h]
+  (:require [clojure.tools.logging :as log]
+            [honey.sql :as h]
             [honey.sql.helpers :as hh]
             [medley.core :as mc]
             [monkey.ci
@@ -73,7 +74,9 @@
 (defn select
   "Formats and executes the given query"
   [{:keys [ds sql-opts]} query]
-  (jdbc/execute! ds (h/format query sql-opts) select-opts))
+  (let [sql (h/format query sql-opts)]
+    (log/trace "Executing query:" sql)
+    (jdbc/execute! ds sql select-opts)))
 
 (defn select-entities
   "Selects entity from table using filter"
@@ -313,3 +316,59 @@
 
 (defentity join-request)
 (defentity email-registration)
+
+(def prepare-credit-sub
+  (comp (partial int->time :valid-from)
+        (partial int->time :valid-until)))
+
+(def convert-credit-sub
+  (comp (partial copy-prop :valid-from)
+        (partial copy-prop :valid-until)))
+
+(def convert-credit-sub-select
+  (comp (partial time->int :valid-from)
+        (partial time->int :valid-until)))
+
+(def credit-sub-conversions
+  {:before-insert prepare-credit-sub
+   :after-insert  convert-credit-sub
+   :before-update prepare-credit-sub
+   :after-update  convert-credit-sub
+   :after-select  convert-credit-sub-select})
+
+(defentity credit-subscription credit-sub-conversions)
+
+(def prepare-credit
+  (comp (partial int->time :from-time)
+        (partial keyword->str :type)))
+
+(def convert-credit
+  (comp (partial copy-prop :from-time)
+        (partial copy-prop :type)))
+
+(def convert-credit-select
+  (comp (partial time->int :from-time)
+        (partial str->keyword :type)))
+
+(def cust-credit-conversions
+  {:before-insert prepare-credit
+   :after-insert  convert-credit
+   :before-update prepare-credit
+   :after-update  convert-credit
+   :after-select  convert-credit-select})
+
+(defentity customer-credit cust-credit-conversions)
+
+(def prepare-credit-cons (partial int->time :consumed-at))
+(def convert-credit-cons (partial copy-prop :consumed-at))
+(def convert-credit-cons-select (partial time->int :consumed-at))
+
+(def credit-cons-conversions
+  {:before-insert prepare-credit-cons
+   :after-insert  convert-credit-cons
+   :before-update prepare-credit-cons
+   :after-update  convert-credit-cons
+   :after-select  convert-credit-cons-select})
+
+(defentity credit-consumption credit-cons-conversions)
+(defentity bb-webhook)

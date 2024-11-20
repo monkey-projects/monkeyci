@@ -1,85 +1,18 @@
 (ns monkey.ci.oci-test
   (:require [clojure.test :refer [deftest testing is]]
+            [java-time.api :as jt]
             [manifold
              [deferred :as md]
              [stream :as ms]]
-            [monkey.ci.oci :as sut]
+            [monkey.ci
+             [config :as c]
+             [oci :as sut]
+             [time :as t]]
             [monkey.ci.helpers :as h]
             [monkey.oci.container-instance.core :as ci]
-            [monkey.oci.os.stream :as os])
+            [monkey.oci.os.stream :as os]
+            [taoensso.telemere :as tt])
   (:import java.io.ByteArrayInputStream))
-
-(deftest group-credentials
-  (testing "takes credentials from env"
-    (is (= {:credentials {:fingerprint "test"}}
-           (sut/group-credentials {:credentials-fingerprint "test"}))))
-
-  (testing "merges credentials from env"
-    (is (= {:credentials {:fingerprint "test"
-                          :other "orig"}}
-           (sut/group-credentials {:credentials-fingerprint "test"
-                                   :credentials {:other "orig"}}))))
-  
-  (testing "overwrites from env"
-    (is (= {:credentials {:fingerprint "new"}}
-           (sut/group-credentials {:credentials {:fingerprint "old"}
-                                   :credentials-fingerprint "new"}))))
-
-  (testing "keeps as-is when no env"
-    (is (= {:credentials {:fingerprint "test"}}
-           (sut/group-credentials {:credentials {:fingerprint "test"}})))))
-
-(deftest normalize-config
-  (testing "combines oci and specific config from conf"
-    (is (= {:region "eu-frankfurt-1"
-            :bucket-name "test-bucket"}
-           (-> (sut/normalize-config
-                {:oci {:region "eu-frankfurt-1"}
-                 :storage {:bucket-name "test-bucket"}}
-                :storage)
-               :storage
-               (select-keys [:region :bucket-name])))))
-
-  (testing "loads private key from file"
-    (is (instance? java.security.PrivateKey
-                   (-> (sut/normalize-config
-                        {:storage
-                         {:credentials
-                          {:private-key "dev-resources/test/test-key.pem"}}}
-                        :storage)
-                       :storage
-                       :credentials
-                       :private-key))))
-
-  (testing "parses vnics"
-    (let [vnics [{:subnet-id "test-subnet"}]]
-      (is (= vnics
-             (-> (sut/normalize-config
-                  {:oci
-                   {:vnics (pr-str vnics)}}
-                  :runner)
-                 :runner
-                 :vnics)))))
-
-  (testing "does not parse vnics when no string"
-    (let [vnics [{:subnet-id "test-subnet"}]]
-      (is (= vnics
-             (-> (sut/normalize-config
-                  {:oci
-                   {:vnics vnics}}
-                  :runner)
-                 :runner
-                 :vnics)))))
-
-  (testing "parses availability-domains"
-    (let [ads ["ad-1" "ad-2"]]
-      (is (= ads
-             (-> (sut/normalize-config
-                  {:oci
-                   {:availability-domains (pr-str ads)}}
-                  :runner)
-                 :runner
-                 :availability-domains))))))
 
 (deftest stream-to-bucket
   (testing "pipes input stream to multipart"
@@ -210,7 +143,8 @@
                :body
                {:message "test error"}}]
       (with-redefs [ci/create-container-instance (constantly res)]
-        (is (= res @(sut/run-instance {} {} {:exited? (md/error-deferred "should not be called")}))))))
+        (is (thrown? Exception
+                     @(sut/run-instance {} {} {:exited? (md/error-deferred "should not be called")}))))))
 
   (testing "includes container logs if not inactive"
     (let [cid (random-uuid)
@@ -300,7 +234,7 @@
                       (reset! deleted? true)
                       (md/success-deferred
                        {:status (if (= iid (:instance-id opts)) 200 400)}))]
-        (is (map? (deref (sut/run-instance {} {} {:delete? true}) 200 :timeout)))
+        (is (thrown? Exception (deref (sut/run-instance {} {} {:delete? true}) 200 :timeout)))
         (is (false? @deleted?))))))
 
 (deftest instance-config
@@ -364,3 +298,60 @@
                     :is-read-only false
                     :volume-name "checkout"}
                    (first (get vol-mounts "checkout"))))))))))
+
+(deftest invocation-interceptor
+  (testing "dispatches invocation event for given kind"
+    (let [i (sut/invocation-interceptor ::test-module)
+          s (tt/with-signal
+              (is (= ::test-ctx ((:enter i) ::test-ctx))))]
+      (is (= :event (:kind s)))
+      (is (= :oci/invocation (:id s)))
+      (is (= ::test-module (get-in s [:data :kind]))))))
+
+(deftest delete-stale-instances
+  (testing "lists and deletes active container instances that have timed out"
+    (let [time (- (t/now) (* 2 c/max-script-timeout))
+          deleted (atom [])]
+      (with-redefs [ci/list-container-instances
+                    (fn [_ opts]
+                      (if (= "ACTIVE" (:lifecycle-state opts))
+                        (md/success-deferred
+                         {:status 200
+                          :body
+                          {:items
+                           [{:id "test-instance"
+                             :display-name "build-1"
+                             :freeform-tags {:customer-id "test-cust"
+                                             :repo-id "test-repo"}
+                             :time-created (str (jt/instant time))}
+                            {:id "other-instance"
+                             :display-name "build-2"
+                             :freeform-tags {:customer-id "test-cust"
+                                             :repo-id "test-repo"}
+                             :time-created (str (jt/instant (t/now)))}
+                            {:id "non-build-instance"
+                             :display-name "something else"
+                             :time-created (str (jt/instant time))}]}})
+                        (md/error-deferred (ex-info "Invalid options" opts))))
+
+                    ci/delete-container-instance
+                    (fn [_ opts]
+                      (swap! deleted conj opts)
+                      (if (= "test-instance" (:instance-id opts))
+                        (md/success-deferred {:status 200})
+                        (md/error-deferred
+                         (ex-info "Wrong instance" opts))))]
+        
+        (is (= [{:customer-id "test-cust"
+                 :repo-id "test-repo"
+                 :build-id "build-1"
+                 :instance-id "test-instance"}]
+               (sut/delete-stale-instances ::test-client "test-compartment")))
+        (is (= [{:instance-id "test-instance"}]
+               @deleted)))))
+
+  (testing "fails on error response"
+    (with-redefs [ci/list-container-instances (constantly
+                                               (md/success-deferred
+                                                {:status 500}))]
+      (is (thrown? Exception (sut/delete-stale-instances ::test-client "test-compartment"))))))

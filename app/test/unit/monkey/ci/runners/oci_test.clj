@@ -2,18 +2,21 @@
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.core.async :as ca]
             [clojure.java.io :as io]
+            [clojure.spec.alpha :as spec]
             [clojure.string :as cs]
             [manifold.deferred :as md]
             [monkey.ci
-             [config :as mc]
              [oci :as oci]
              [runners :as r]
              [sid :as sid]
-             [utils :as u]]
+             [utils :as u]
+             [version :as v]]
             [monkey.ci.events.core :as ec]
             [monkey.ci.runners.oci :as sut]
+            [monkey.ci.spec.events :as se]
             [monkey.ci.helpers :as h]
-            [monkey.oci.container-instance.core :as ci]))
+            [monkey.oci.container-instance.core :as ci]
+            [monkey.ci.test.runtime :as trt]))
 
 (deftest make-runner
   (testing "provides for `:oci` type"
@@ -23,14 +26,42 @@
     (is (fn? (r/make-runner {:runner {:type :oci}})))))
 
 (deftest oci-runner
-  (let [build {:git {:url "test-url"
-                     :branch "main"}}]
+  (let [build {:sid ["test-cust" "test-repo" "test-build"]
+               :git {:url "test-url"
+                     :branch "main"}}
+        rt (trt/test-runtime)]
     (testing "runs container instance"
       (with-redefs [oci/run-instance (constantly (md/success-deferred
                                                   {:status 200
                                                    :body {:containers [{:exit-code 0}]}}))]
-        (is (= 0 (-> (sut/oci-runner {} {} build {})
-                     (deref))))))))
+        (is (= 0 (-> (sut/oci-runner {} {} build rt)
+                     (deref))))))
+
+    (testing "posts `build/initializing` event"
+      (with-redefs [oci/run-instance (constantly (md/success-deferred
+                                                  {:status 200
+                                                   :body {:containers [{:exit-code 0}]}}))]
+        (is (some? (-> (sut/oci-runner {} {} build rt)
+                       (deref))))
+        (let [evt (->> rt
+                       :events
+                       (h/received-events)
+                       (h/first-event-by-type :build/initializing))]
+          (is (spec/valid? ::se/event evt))
+          (is (= build (:build evt))))))
+
+    (testing "posts `build/end` event on error"
+      (with-redefs [oci/run-instance (constantly (md/error-deferred
+                                                  {:status 500
+                                                   :body {:message "test error"}}))]
+        (is (some? (-> (sut/oci-runner {} {} build rt)
+                       (deref))))
+        (let [evt (->> rt
+                       :events
+                       (h/received-events)
+                       (h/first-event-by-type :build/end))]
+          (is (spec/valid? ::se/event evt))
+          (is (= :error (:status evt))))))))
 
 (defn- parse-config-vol [ic]
   (-> (oci/find-volume ic sut/config-volume)
@@ -49,7 +80,12 @@
                      :commit-id "test-commit"
                      :ssh-keys [{:private-key "test-privkey"
                                  :public-key "test-pubkey"}]}}
-        rt (h/test-rt)
+        rt (-> (trt/test-runtime)
+               (trt/set-config
+                {:api {:url "http://test-api"}
+                 :artifacts {:type :disk}
+                 :cache {:type :disk}
+                 :build-cache {:type :disk}}))
         conf {:availability-domain "test-ad"
               :compartment-id "test-compartment"
               :image-pull-secrets "test-secrets"
@@ -77,10 +113,15 @@
     (testing "fails when no git url specified"
       (is (thrown? Exception (sut/instance-config conf (update build :git dissoc :url) rt))))
 
-    (testing "fails when no git branch or commit-id specified"
+    (testing "fails when no git branch, tag or commit-id specified"
       (is (thrown? Exception (sut/instance-config conf
                                                   (update build :git dissoc :branch :commit-id)
-                                                  rt))))
+                                                  rt)))
+      (is (some? (sut/instance-config conf
+                                      (-> build
+                                          (update :git dissoc :branch :commit-id)
+                                          (assoc-in [:git :tag] "test-tag"))
+                                      rt))))
 
     (testing "container"
       (let [c (first (:containers inst))]
@@ -102,7 +143,6 @@
         (testing "provides arguments as to monkeyci build"
           (is (= ["-w" "/opt/monkeyci/checkout"
                   "build" "run"
-                  "--sid" "a/b/test-build-id"
                   "-u" "http://git-url"
                   "-b" "main"
                   "--commit-id" "test-commit"]
@@ -125,11 +165,19 @@
               (is (= 1 (count (:configs vol))))
               (is (= "config.edn" (:file-name (first (:configs vol))))))
 
-            (testing "enforces child runner"
-              (is (= :child (get-in parsed [:runner :type]))))
+            (testing "runner"
+              (let [r (:runner parsed)]
+                (testing "enforces in-container runner"
+                  (is (= :in-container (:type r))))
+
+                (testing "adds calculated credit multiplier"
+                  (is (number? (:credit-multiplier r))))))
             
             (testing "adds api token"
               (is (not-empty (get-in parsed [:api :token]))))
+
+            (testing "copies configured api"
+              (is (some? (get-in parsed [:api :url]))))
 
             (testing "api token contains serialized build sid in sub"
               (is (= (sid/serialize-sid (:sid build))
@@ -139,7 +187,13 @@
                          :sub))))
 
             (testing "adds build sid"
-              (is (= (:sid build) (get-in parsed [:build :sid]))))))))
+              (is (= (:sid build) (get-in parsed [:build :sid]))))
+
+            (testing "containes checkout-base-dir"
+              (is (string? (:checkout-base-dir parsed))))
+
+            (testing "contains `build-cache` configuration"
+              (is (some? (:build-cache parsed))))))))
 
     (testing "ssh keys"
       (testing "adds as volume"
@@ -201,62 +255,18 @@
           (is (= "test-user" (get-in conf [:events :client :username])))
           (is (= :jms (get-in conf [:events :type]))))))))
  
-(deftest wait-for-script-end-event
+(deftest wait-for-build-end-event
   (testing "returns a deferred that holds the script end event"
-    (let [events (ec/make-events {:events {:type :manifold}})
+    (let [events (ec/make-events {:type :manifold})
           sid (repeatedly 3 random-uuid)
-          d (sut/wait-for-script-end-event events sid)]
+          d (sut/wait-for-build-end-event events sid)]
       (is (md/deferred? d))
       (is (not (md/realized? d)) "should not be realized initially")
       (is (some? (ec/post-events events [{:type :script/start
                                           :sid sid}])))
       (is (not (md/realized? d)) "should not be realized after start event")
-      (is (some? (ec/post-events events [{:type :script/end
+      (is (some? (ec/post-events events [{:type :build/end
                                           :sid sid}])))
-      (is (= :script/end (-> (deref d 100 :timeout)
-                              :type))))))
+      (is (= :build/end (-> (deref d 100 :timeout)
+                            :type))))))
 
-(deftest normalize-runner-config
-  (testing "uses configured image tag"
-    (is (= "test-image"
-           (-> {:runner {:type :oci
-                         :image-tag "test-image"}}
-               (r/normalize-runner-config)
-               :runner
-               :image-tag))))
-
-  (testing "uses app version if no image tag configured"
-    (is (= (mc/version)
-           (-> {:runner {:type :oci}}
-               (r/normalize-runner-config)
-               :runner
-               :image-tag))))
-
-  (testing "formats using app version if format string specified"
-    (is (= (str "format-" (mc/version))
-           (-> {:runner {:type :oci
-                         :image-tag "format-%s"}}
-               (r/normalize-runner-config)
-               :runner
-               :image-tag))))
-
-  (testing "groups events properties"
-    (is (= "test-url"
-           (-> (r/normalize-runner-config
-                {:runner
-                 {:type :oci
-                  :events-url "test-url"}})
-               :runner
-               :events
-               :url))))
-
-  (testing "groups event client properties"
-    (is (= "test-user"
-           (-> (r/normalize-runner-config
-                {:runner
-                 {:type :oci
-                  :events-client-username "test-user"}})
-               :runner
-               :events
-               :client
-               :username)))))

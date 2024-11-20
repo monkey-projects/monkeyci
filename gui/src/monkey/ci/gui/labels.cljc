@@ -2,7 +2,6 @@
   "Label editing components"
   (:require [medley.core :as mc]
             [monkey.ci.gui.components :as co]
-            [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
@@ -124,3 +123,22 @@
   [editor-id]
   (let [lbl (rf/subscribe [:labels/edit editor-id])]
     [render-filter-editor editor-id @lbl]))
+
+(defn label-filters-desc [lf]
+  (letfn [(disj-desc [idx items]
+            (into [:li
+                   (when (pos? idx)
+                     [:b.me-1 "OR"])]
+                  (map-indexed conj-desc items)))
+          (conj-desc [idx {:keys [label value]}]
+            [:span
+             (when (pos? idx)
+               [:b.mx-1 "AND"])
+             (str label " = " value)])]
+    (if (empty? lf)
+      [:i "Applies to all builds for this customer."]
+      [:<>
+       [:i "Applies to all builds where:"]
+       (->> lf
+            (map-indexed disj-desc)
+            (into [:ul]))])))

@@ -84,7 +84,11 @@ for the more dynamic parts (like job definitions and results).  However, since
 this data type is not standard and not supported by all database systems, it may
 be better to just use `edn` stored in `VARCHAR` fields.
 The biggest hurdle here is that we would need to rewrite most of the current entity
-code because it is now oriented towards working with files.
+code because it is now oriented towards working with files.  In order to avoid
+this, the current implementation uses the same `Protocol` as the other storage
+systems.  This does introduce an additional layer of complexity, but it also
+makes for easier unit testing and decouples the application layer from the
+database details.
 
 ## Artifacts
 

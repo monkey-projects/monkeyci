@@ -28,8 +28,8 @@
   "Finds build for customer, repo and display id"
   [conn cust-cuid repo-id build-id]
   (some-> (ec/select conn
-                 (-> (build-query cust-cuid repo-id)
-                     (update :where conj [:= :b.display-id build-id])))
+                     (-> (build-query cust-cuid repo-id)
+                         (update :where conj [:= :b.display-id build-id])))
           (first)
           (ec/convert-build-select)))
 
@@ -56,3 +56,10 @@
                                       [:= :c.cuid cust-cuid]
                                       [:>= :b.start-time (ec/->ts ts)]]))
        (map ec/convert-build-select)))
+
+(defn select-latest-build [conn cust-cuid repo-id]
+  (some-> (ec/select conn (-> (build-query cust-cuid repo-id)
+                              (assoc :order-by [[:idx :desc]]
+                                     :limit 1)))
+          (first)
+          (ec/convert-build-select)))

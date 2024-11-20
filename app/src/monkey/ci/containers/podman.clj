@@ -2,59 +2,66 @@
   "Functions for running containers using Podman.  We don't use the api here, because
    it requires a socket, which is not always available.  Instead, we invoke the podman
    command as a child process and communicate with it using the standard i/o streams."
-  (:require [babashka.process :as bp]
+  (:require [babashka
+             [fs :as fs]
+             [process :as bp]]
             [cheshire.core :as json]
-            [clojure.java.io :as io]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
+            [manifold.deferred :as md]
             [monkey.ci
              [artifacts :as art]
              [build :as b]
              [cache :as cache]
              [containers :as mcc]
+             [jobs :as j]
              [logging :as l]
-             [runtime :as rt]
-             [utils :as u]]
-            [monkey.ci.build.core :as bc]))
+             [protocols :as p]
+             [runtime :as rt]]
+            [monkey.ci.events.core :as ec]))
 
 (defn- make-script-cmd [script]
   [(cs/join " && " script)])
 
-(defn- make-cmd [conf]
-  (if-let [cmd (mcc/cmd conf)]
+(defn- make-cmd [job]
+  (if-let [cmd (mcc/cmd job)]
     cmd
     ;; When no command is given, use /bin/sh as entrypoint and fail on errors
     ["-ec"]))
 
-(defn- mounts [{:keys [:container/mounts]}]
+(defn- mounts [job]
   (mapcat (fn [[h c]]
             ;; TODO Mount options
             ["-v" (str h ":" c)])
-          mounts))
+          (mcc/mounts job)))
 
-(defn- env-vars [{:keys [:container/env]}]
+(defn- env-vars [job]
   (mapcat (fn [[k v]]
             ["-e" (str k "=" v)])
-          env))
+          (mcc/env job)))
 
-(defn- platform [rt]
-  (when-let [p (or (get-in rt [:job :container/platform])
-                   (get-in rt [:containers :platform]))]
+(defn- platform [job conf]
+  (when-let [p (or (mcc/platform job)
+                   (:platform conf))]
     ["--platform" p]))
 
-(defn- entrypoint [{ep :container/entrypoint cmd :container/cmd}]
-  (cond
-    ep
-    ["--entrypoint" (str "'" (json/generate-string ep) "'")]
-    (nil? cmd)
-    ["--entrypoint" "/bin/sh"]))
+(defn- entrypoint [job]
+  (let [ep (mcc/entrypoint job)]
+    (cond
+      ep
+      ["--entrypoint" (str "'" (json/generate-string ep) "'")]
+      (nil? (mcc/cmd job))
+      ["--entrypoint" "/bin/sh"])))
+
+(defn get-job-id [job build]
+  "Creates a string representation of the job sid"
+  (cs/join "-" (b/get-job-sid job build)))
 
 (defn build-cmd-args
   "Builds command line args for the podman executable"
-  [{:keys [job] :as rt}]
-  (let [conf (mcc/rt->container-config rt)
-        cn (b/get-job-id rt)
-        wd (b/job-work-dir rt)
+  [job {:keys [build] :as conf}]
+  (let [cn (get-job-id job build)
+        wd (b/job-work-dir job build)
         cwd "/home/monkeyci"
         base-cmd (cond-> ["/usr/bin/podman" "run"
                           "-t"
@@ -62,37 +69,64 @@
                           "-v" (str wd ":" cwd ":Z")
                           "-w" cwd]
                    ;; Do not delete container in dev mode
-                   (not (rt/dev-mode? rt)) (conj "--rm"))]
+                   (not (:dev-mode conf)) (conj "--rm"))]
     (concat
      ;; TODO Allow for more options to be passed in
      base-cmd
      (mounts job)
      (env-vars job)
-     (platform rt)
+     (platform job conf)
      (entrypoint job)
-     [(or (:image conf) (:image job))]
+     [(mcc/image job)]
      (make-cmd job)
-     ;; TODO Execute script job by job
+     ;; TODO Execute script command per command
      (make-script-cmd (:script job)))))
 
-(defmethod mcc/run-container :podman [{:keys [job] {:keys [build-id]} :build :as rt}]
-  (log/info "Running build job " build-id "/" (bc/job-id job) "as podman container")
-  (let [log-maker (rt/log-maker rt)
+(defn- run-container [job {:keys [build events] :as conf}]
+  (let [log-maker (rt/log-maker conf)
         ;; Don't prefix the sid here, that's the responsability of the logger
-        log-base (b/get-job-sid rt)
+        log-base (b/get-job-sid job build)
         [out-log err-log :as loggers] (->> ["out.txt" "err.txt"]
                                            (map (partial conj log-base))
-                                           (map (partial log-maker rt)))
-        cmd (build-cmd-args rt)]
-    (log/debug "Log base is:" log-base)
+                                           (map (partial log-maker build)))
+        cmd (build-cmd-args job conf)
+        wrapped-runner (-> (fn [conf]
+                             (-> (bp/process {:dir (b/job-work-dir job (:build conf))
+                                              :out (l/log-output out-log)
+                                              :err (l/log-output err-log)
+                                              :cmd cmd})
+                                 (l/handle-process-streams loggers)
+                                 (deref)))
+                           (cache/wrap-caches)
+                           (art/wrap-artifacts))
+        handle-error (fn [ex]
+                       (ec/post-events
+                        events
+                        (j/job-executed-evt (j/job-id job) (b/sid build) (ec/exception-result ex))))]
+    (log/info "Running build job" log-base "as podman container")
     (log/debug "Podman command:" cmd)
-    ((-> (fn [rt]
-           (-> (bp/process {:dir (b/job-work-dir rt)
-                            :out (l/log-output out-log)
-                            :err (l/log-output err-log)
-                            :cmd cmd})
-               (l/handle-process-streams loggers)
-               (deref)))
-         (cache/wrap-caches)
-         (art/wrap-artifacts))
-     rt)))
+    (ec/post-events events (j/job-start-evt (j/job-id job) (b/sid build)))
+    ;; Job is required by the blob wrappers in the config
+    (try
+      (-> (wrapped-runner (assoc conf :job job))
+          (md/chain
+           (fn [{:keys [exit] :as res}]
+             (ec/post-events events (j/job-executed-evt
+                                     (j/job-id job)
+                                     (b/sid build)
+                                     (ec/make-result
+                                      (b/exit-code->status exit)
+                                      exit
+                                      nil)))
+             res))
+          (md/catch handle-error))
+      (catch Exception ex
+        (handle-error ex)))))
+
+(defrecord PodmanContainerRunner [config credit-consumer]
+  p/ContainerRunner
+  (run-container [this job]
+    (run-container job config)))
+
+(defn make-container-runner [conf]
+  (->PodmanContainerRunner conf (constantly 0)))

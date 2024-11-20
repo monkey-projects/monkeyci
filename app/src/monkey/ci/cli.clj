@@ -3,7 +3,7 @@
             [monkey.ci
              [build :as b]
              [commands :as cmd]
-             [config :as config]]))
+             [version :as v]]))
 
 (def script-location-opt
   {:as "Script location"
@@ -28,6 +28,10 @@
            :option "branch"
            :short "b"
            :type :string}
+          {:as "Repository tag"
+           :option "tag"
+           :short "t"
+           :type :string}
           {:as "Commit id"
            :option "commit-id"
            :type :string}
@@ -35,14 +39,16 @@
            :option "sid"
            :type :string}]
    :runs {:command cmd/run-build
-          :app-mode :cli}})
+          :app-mode :cli
+          :runtime? false}})
 
 (def verify-build-cmd
   {:command "verify"
    :description "Verifies local build script"
    :opts [script-location-opt]
    :runs {:command cmd/verify-build
-          :app-mode :cli}})
+          :app-mode :cli
+          :runtime? false}})
 
 (def list-build-cmd
   {:command "list"
@@ -88,8 +94,9 @@
            :default 3000
            :env "PORT"}]
    :runs {:command cmd/http-server
-          :requires [:http]
-          :app-mode :server}})
+          ;;:requires [:http]
+          :app-mode :server
+          :runtime? false}})
 
 (def sidecar-cmd
   {:command "sidecar"
@@ -114,12 +121,13 @@
            :short "t"
            :type :ednfile}]
    :runs {:command cmd/sidecar
-          :app-mode :script}})
+          :app-mode :script
+          :runtime? false}})
 
 (def base-config
   {:name "monkey-ci"
    :description "MonkeyCI: Powerful build pipeline runner"
-   :version (config/version)
+   :version (v/version)
    :opts [{:as "Working directory"
            :option "workdir"
            :short "w"

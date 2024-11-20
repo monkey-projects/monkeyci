@@ -20,7 +20,7 @@
      (cond-> {:type :button
               :on-click #(rf/dispatch [:repo/show-trigger-build])}
        @show? (assoc :disabled true))
-     "Trigger Build"]))
+     [:span.me-1 [co/icon :boxes]] "Trigger Build"]))
 
 (defn- edit-repo-btn []
   (let [c (rf/subscribe [:route/current])]
@@ -28,12 +28,15 @@
      {:href (r/path-for :page/repo-edit (get-in @c [:parameters :path]))}
      [:span.me-1 [co/icon :pencil-fill]] "Edit"]))
 
+(defn refresh-btn [& [opts]]
+  [:button.btn.btn-outline-primary.btn-icon.btn-sm
+   (merge opts {:on-click (u/link-evt-handler [:builds/reload])
+                :title "Refresh"})
+   [co/icon :arrow-clockwise]])
+
 (defn build-actions []
   [:<>
-   [:span.me-1
-    [co/reload-btn [:builds/load]]]
-   [:span.me-1
-    [trigger-build-btn]]
+   [trigger-build-btn]
    [edit-repo-btn]])
 
 (defn- trigger-type []
@@ -86,42 +89,52 @@
     :value (fn [b] [:div.text-center [co/build-result (:status b)]])}
    {:label "Message"
     :value (fn [b]
-             [:span (or (get-in b [:git :message])
-                        (:message b))])}])
+             ;; Can't use css truncation in a table without forcing column widths,
+             ;; but this in turn could make tables overflow their container.  So we
+             ;; just truncate the text.
+             [:span
+              (u/truncate
+               (or (get-in b [:git :message])
+                   (:message b))
+               30)])}])
 
 (defn- builds [repo]
-  (let [b (rf/subscribe [:repo/builds])]
-    (if-not @b
-      (rf/dispatch [:builds/load])
-      [:<>
-       [:div.clearfix
-        [:h4.float-start "Builds"]
-        (when @b
-          [:span.badge.text-bg-secondary.ms-2 (count @b)])
-        [:div.float-end
-         [build-actions]]]
-       [trigger-form repo]
+  (let [loaded? (rf/subscribe [:builds/loaded?])]
+    (when-not @loaded?
+      (rf/dispatch [:builds/load]))
+    [:<>
+     [:div.d-flex.gap-1.align-items-start
+      [:h4.me-2 [:span.me-2 co/build-icon] "Builds"]
+      [refresh-btn {:class [:me-auto]}]
+      [build-actions]]
+     [trigger-form repo]
+     (if (empty? @(rf/subscribe [:repo/builds]))
+       [:p "This repository has no builds yet."]
        [table/paged-table
         {:id ::builds
          :items-sub [:repo/builds]
-         :columns table-columns}]])))
+         :columns table-columns
+         :loading {:sub [:builds/init-loading?]}
+         :class [:table-hover]
+         :on-row-click #(rf/dispatch [:route/goto :page/build %])}])]))
 
 (defn page [route]
   (rf/dispatch [:repo/init])
   (fn [route]
-    (let [{:keys [customer-id repo-id] :as p} (get-in route [:parameters :path])
+    (let [{:keys [repo-id] :as p} (get-in route [:parameters :path])
           r (rf/subscribe [:repo/info repo-id])]
       [l/default
        [:<>
         [:h3
+         [:span.me-2 co/repo-icon] 
          "Repository: " (:name @r)
          [:span.fs-6.p-1
           [cl/clipboard-copy (u/->sid p :customer-id :repo-id) "Click to save the sid to clipboard"]]]
         [:p "Repository url: " [:a {:href (:url @r)} (:url @r)]]
         [co/alerts [:repo/alerts]]
-        [builds r]
-        [:div
-         [:a {:href (r/path-for :page/customer {:customer-id customer-id})} "Back to customer"]]]])))
+        [:div.card
+         [:div.card-body
+          [builds r]]]]])))
 
 (defn labels
   "Component that allows the user to edit, add or remove repo labels."
@@ -151,10 +164,46 @@
 
 (defn- save-btn []
   (let [s? (rf/subscribe [:repo/saving?])]
-    [:button.btn.btn-primary.me-2
+    [:button.btn.btn-primary
      (cond-> {:type :submit}
        @s? (assoc :disabled true))
      [:span.me-2 [co/icon :floppy]] "Save"]))
+
+(def delete-modal-id ::delete-repo-confirm)
+
+(defn confirm-delete-modal
+  ([repo]
+   [co/modal
+    delete-modal-id
+    [:h4 "Confirmation"]
+    [:div
+     [:p "Are you sure you want to delete repository " [:b (:name repo)] "? "
+      "This will also delete any builds and artifacts associated with it."]
+     [:p "This operation cannot be undone."]]
+    [:div.d-flex.gap-2
+     [:button.btn.btn-danger
+      {:title "Confirm delete"
+       :data-bs-dismiss "modal"
+       :on-click (u/link-evt-handler [:repo/delete])}
+      [:span.me-2 co/delete-icon] "Yes, Delete!"]
+     [co/modal-dismiss-btn
+      [:span [:span.me-2 co/cancel-icon] "Oops, No"]]]])
+  ([]
+   (let [repo (rf/subscribe [:repo/info])]
+     (confirm-delete-modal @repo))))
+
+(defn- delete-btn []
+  (let [d? (rf/subscribe [:repo/deleting?])]
+    ;; Ask for confirmation first
+    [:div
+     [confirm-delete-modal]
+     [:button.btn.btn-danger
+      (cond-> {:title "Delete this repository"
+               :data-bs-toggle :modal
+               :data-bs-target (u/->dom-id delete-modal-id)
+               :on-click u/noop-handler}
+        @d? (assoc :disabled true))
+      [:span.me-2 co/delete-icon] "Delete"]]))
 
 (defn- edit-form [route]
   (let [e (rf/subscribe [:repo/editing])]
@@ -191,17 +240,18 @@
           :disabled true}]
         [:div.form-text "The native Github Id, registered when watching this repo."]]]
       [:div.col
-       [:p "Labels:"]
+       [:h5 "Labels:"]
        [:p.text-body-secondary
         "Labels are used to expose parameters and ssh keys to builds, but also to group repositories. "
         "You can assign any labels you like.  Labels are case-sensitive."]
        [labels (:labels @e)]]
       [:div.row
-       [:div.col
+       [:div.d-flex.gap-2
         [save-btn]
-        [co/cancel-btn [:route/goto :page/repo (-> route
-                                                   (r/path-params)
-                                                   (select-keys [:repo-id :customer-id]))]]]]]]))
+        [co/close-btn [:route/goto :page/repo (-> route
+                                                  (r/path-params)
+                                                  (select-keys [:repo-id :customer-id]))]]
+        [:span.ms-auto [delete-btn]]]]]]))
 
 (defn edit
   "Displays repo editing page"
@@ -212,6 +262,8 @@
           repo (rf/subscribe [:repo/info (get-in @route [:parameters :path :repo-id])])]
       [l/default
        [:<>
-        [:h3 "Edit Repository: " (:name @repo)]
-        [co/alerts [:repo/edit-alerts]]
-        [edit-form @route]]])))
+        [:h3 [:span.me-2 co/repo-icon] "Edit Repository: " (:name @repo)]
+        [:div.card
+         [:div.card-body
+          [co/alerts [:repo/edit-alerts]]
+          [edit-form @route]]]]])))

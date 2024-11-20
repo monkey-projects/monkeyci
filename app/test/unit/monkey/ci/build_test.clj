@@ -7,35 +7,34 @@
 
 (deftest make-build-ctx
   (testing "adds build id"
-    (is (re-matches #"build-\d+"
+    (is (re-matches #"local-build-\d+"
                     (-> (sut/make-build-ctx {})
                         :build-id))))
 
   (testing "defaults to `main` branch"
     (is (= "main"
-           (-> {:config {:args {:git-url "test-url"}}}
+           (-> {:args {:git-url "test-url"}}
                (sut/make-build-ctx)
                :git
                :branch))))
 
   (testing "takes global work dir as build checkout dir"
     (is (= "global-work-dir"
-           (-> {:config {:args {:dir ".monkeci"}
-                         :work-dir "global-work-dir"}}
+           (-> {:args {:dir ".monkeci"}
+                :work-dir "global-work-dir"}
                (sut/make-build-ctx)
                :checkout-dir))))
 
   (testing "adds pipeline from args"
     (is (= "test-pipeline"
-           (-> {:config
-                {:args {:pipeline "test-pipeline"}}}
+           (-> {:args {:pipeline "test-pipeline"}}
                (sut/make-build-ctx)
                :pipeline))))
 
   (testing "adds script dir from args, as relative to work dir"
     (is (= "work-dir/test-script"
-           (-> {:config {:args {:dir "test-script"}
-                         :work-dir "work-dir"}}
+           (-> {:args {:dir "test-script"}
+                :work-dir "work-dir"}
                (sut/make-build-ctx)
                sut/script
                :script-dir))))
@@ -45,73 +44,58 @@
       (is (= {:url "test-url"
               :branch "test-branch"
               :id "test-id"}
-             (-> {:config
-                  {:args {:git-url "test-url"
-                          :branch "test-branch"
-                          :commit-id "test-id"}}}
+             (-> {:args {:git-url "test-url"
+                         :branch "test-branch"
+                         :commit-id "test-id"}}
                  (sut/make-build-ctx)
                  :git))))
 
-    (testing "sets script dir to arg"
-      (is (= "test-script"
-             (-> {:config
-                  {:args {:git-url "test-url"
-                          :branch "test-branch"
-                          :commit-id "test-id"
-                          :dir "test-script"}
-                   :work-dir "work"}}
-                 (sut/make-build-ctx)
-                 sut/script
-                 :script-dir))))
-
-    (testing "merges with existing git opts from runtime"
-      (is (= "test-dir"
-             (-> {:config
-                  {:args {:git-url "test-url"
-                          :branch "test-branch"
-                          :commit-id "test-id"
-                          :dir "test-script"}
-                   :work-dir "work"}
-                  :build {:git {:ssh-keys-dir "test-dir"}}}
+    (testing "sets tag"
+      (is (= "test-tag"
+             (-> {:args {:git-url "test-url"
+                         :tag "test-tag"
+                         :commit-id "test-id"}}
                  (sut/make-build-ctx)
                  :git
-                 :ssh-keys-dir)))))
+                 :tag))))
+
+    (testing "sets script dir to arg"
+      (is (= "test-script"
+             (-> {:args {:git-url "test-url"
+                         :branch "test-branch"
+                         :commit-id "test-id"
+                         :dir "test-script"}
+                  :work-dir "work"}
+                 (sut/make-build-ctx)
+                 sut/script
+                 :script-dir)))))
 
   (testing "when sid specified"
     (testing "parses on delimiter"
       (is (= ["a" "b" "c"]
-             (->> {:config
-                   {:args {:sid "a/b/c"}}}
+             (->> {:args {:sid "a/b/c"}}
                   (sut/make-build-ctx)
                   :sid
                   (take 3)))))
     
     (testing "adds build id"
-      (is (string? (-> {:config
-                        {:args {:sid "a/b/c"}}}
+      (is (string? (-> {:args {:sid "a/b/c"}}
                        (sut/make-build-ctx)
                        :sid
                        last))))
 
     (testing "when sid includes build id, reuses it"
       (let [sid "a/b/c"
-            ctx (-> {:config
-                     {:args {:sid sid}}}
+            ctx (-> {:args {:sid sid}}
                     (sut/make-build-ctx))]
         (is (= "c" (:build-id ctx)))
         (is (= "c" (last (:sid ctx)))))))
 
   (testing "when no sid specified"
     (testing "leaves it unspecified"
-      (is (empty? (-> {:config {:args {}}}
+      (is (empty? (-> {:args {}}
                       (sut/make-build-ctx)
-                      :sid)))))
-
-  (testing "merges in build from config"
-    (is (= ::test-changes
-           (-> {:config {:build {:changes ::test-changes}}}
-               (sut/make-build-ctx)
-               :changes)))))
+                      :sid))))))
 
 (deftest calc-checkout-dir
   (testing "combines build id with checkout base dir from config"
@@ -135,30 +119,25 @@
     (is (nil? (sut/get-sid {:config {:account {:repo-id "r"}}})))
     (is (nil? (sut/get-sid {:config {:account {:customer-id "c"}}})))))
 
-(deftest get-job-id
-  (testing "combines build and job id"
-    (is (= "test-build-test-job"
-           (-> {:build {:build-id "test-build"}
-                :job {:id "test-job"}}
-               (sut/get-job-id))))))
-
 (deftest job-work-dir
   (testing "returns job work dir as absolute path"
     (is (= "/job/work/dir"
-           (sut/job-work-dir {:job {:work-dir "/job/work/dir"}}))))
+           (sut/job-work-dir {:work-dir "/job/work/dir"}
+                             {}))))
 
   (testing "returns checkout dir when no job dir given"
     (is (= "/checkout/dir"
-           (sut/job-work-dir {:build {:checkout-dir "/checkout/dir"}}))))
+           (sut/job-work-dir {}
+                             {:checkout-dir "/checkout/dir"}))))
 
   (testing "returns current working dir when no job or checkout dir given"
     (is (= (u/cwd)
-           (sut/job-work-dir {}))))
+           (sut/job-work-dir { }{}))))
 
   (testing "returns work dir as relative dir of checkout dir"
     (is (= "/checkout/job-dir"
-           (sut/job-work-dir {:job {:work-dir "job-dir"}
-                              :build {:checkout-dir "/checkout"}})))))
+           (sut/job-work-dir {:work-dir "job-dir"}
+                             {:checkout-dir "/checkout"})))))
 
 (deftest build-end-evt
   (testing "creates build/end event with status completed"
@@ -175,9 +154,9 @@
            (-> (sut/build-end-evt {} 1)
                (get-in [:build :status])))))
 
-  (testing "does not set status when no exit"
-    (is (nil? (-> (sut/build-end-evt {} nil)
-                  (get-in [:build :status]))))))
+  (testing "error status when no exit"
+    (is (= :error (-> (sut/build-end-evt {} nil)
+                      (get-in [:build :status]))))))
 
 (deftest calc-credits
   (testing "zero if no jobs"
@@ -208,3 +187,13 @@
                            :end-time 20000
                            :credit-multiplier 4}}}}]
       (is (= 2 (sut/calc-credits build))))))
+
+(deftest sid
+  (testing "returns `:sid` from build"
+    (is (= ::test-sid (sut/sid {:sid ::test-sid}))))
+
+  (testing "when no `sid`, returns customer, repo and build id"
+    (is (= [::test-cust ::test-repo ::test-build]
+           (sut/sid {:customer-id ::test-cust
+                     :repo-id ::test-repo
+                     :build-id ::test-build})))))

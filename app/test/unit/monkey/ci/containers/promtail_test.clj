@@ -55,6 +55,24 @@
                (sut/promtail-container)
                :image-url)))))
 
+(deftest make-config
+  (testing "builds promtail config input map"
+    (is (= {:image-url "promtail-img"
+            :image-tag "promtail-version"
+            :loki-url "http://loki"
+            :customer-id "test-cust"
+            :repo-id "test-repo"
+            :build-id "test-build"
+            :job-id "test-job"
+            :token "test-token"}
+           (sut/make-config
+            {:image-url "promtail-img"
+             :image-tag "promtail-version"
+             :loki-url "http://loki"
+             :token "test-token"}
+            {:id "test-job"}
+            {:sid ["test-cust" "test-repo" "test-build"]})))))
+
 (deftest rt->config
   (testing "builds promtail config input map"
     (is (= {:image-url "promtail-img"

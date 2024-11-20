@@ -21,7 +21,9 @@
 (rf/reg-event-fx
  :repo/leave
  (fn [{:keys [db]} _]
-   (lo/on-leave db db/id)))
+   (-> (lo/on-leave db db/id)
+       ;; Also clear loaded state
+       (update :db lo/clear-all db/id))))
 
 (rf/reg-event-fx
  :repo/load
@@ -33,30 +35,31 @@
 
 (rf/reg-event-fx
  :builds/load
+ (lo/loader-evt-handler
+  db/id
+  (fn [_ {:keys [db]} _]
+    (let [params (get-in db [:route/current :parameters :path])]
+      [:secure-request
+       :get-builds
+       (select-keys params [:customer-id :repo-id])
+       [:builds/load--success]
+       [:builds/load--failed]]))))
+
+(rf/reg-event-fx
+ :builds/reload
  (fn [{:keys [db]} _]
-   (let [params (get-in db [:route/current :parameters :path])]
-     {:db (-> db
-              (db/set-alerts [{:type :info
-                               :message "Loading builds for repository..."}])
-              (db/set-builds nil))
-      :dispatch [:secure-request
-                 :get-builds
-                 (select-keys params [:customer-id :repo-id])
-                 [:builds/load--success]
-                 [:builds/load--failed]]})))
+   {:dispatch [:builds/load]
+    :db (lo/reset-loaded db db/id)}))
 
 (rf/reg-event-db
  :builds/load--success
- (fn [db [_ {builds :body}]]
-   (-> db
-       (db/set-builds builds)
-       (db/reset-alerts))))
+ (fn [db [_ resp]]
+   (lo/on-success db db/id resp)))
 
 (rf/reg-event-db
  :builds/load--failed
- (fn [db [_ err op]]
-   (db/set-alerts db [{:type :danger
-                       :message (str "Could not load builds: " (u/error-msg err))}])))
+ (fn [db [_ err]]
+   (lo/on-failure db db/id "Could not load builds: " err)))
 
 (def should-handle-evt? #{:build/start :build/pending :build/updated})
 
@@ -221,3 +224,39 @@
        (db/set-edit-alerts [{:type :danger
                              :message (str "Failed to save changes: " (u/error-msg err))}])
        (db/unmark-saving))))
+
+(rf/reg-event-fx
+ :repo/delete
+ (fn [{:keys [db]} _]
+   {:dispatch [:secure-request
+               :delete-repo
+               (r/path-params (r/current db))
+               [:repo/delete--success]
+               [:repo/delete--failed]]
+    :db (db/mark-deleting db)}))
+
+(defn- remove-repo [cust repo-id]
+  (update cust :repos (partial remove (comp (partial = repo-id) :id))))
+
+(rf/reg-event-fx
+ :repo/delete--success
+ (fn [{:keys [db]} _]
+   (let [params (-> (r/current db) (r/path-params))
+         repo-id (:repo-id params)
+         repo (u/find-by-id repo-id (:repos (cdb/get-customer db)))]
+     {:db (-> db
+              (db/unmark-deleting)
+              (cdb/update-customer remove-repo repo-id)
+              (cdb/set-alerts
+               [{:type :info
+                 :message (str "Repository " (:name repo) " has been deleted.")}]))
+      :dispatch [:route/goto :page/customer (select-keys params [:customer-id])]})))
+
+(rf/reg-event-db
+ :repo/delete--failed
+ (fn [db [_ err]]
+   (-> db
+       (db/unmark-deleting)
+       (db/set-edit-alerts
+        [{:type :danger
+          :message (str "Unable to delete repository: " (u/error-msg err))}]))))

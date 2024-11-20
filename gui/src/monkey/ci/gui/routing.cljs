@@ -8,6 +8,10 @@
   "Retrieve current route from app db"
   :route/current)
 
+(def route-name
+  "Retrieves name of given route"
+  (comp :name :data))
+
 (defn set-current [db r]
   (assoc db current r))
 
@@ -55,8 +59,10 @@
                :name :page/customer-new}]
     ["/c/:customer-id" {:conflicting true
                         :name :page/customer}]
-    ["/c/:customer-id/add-repo" :page/add-repo]
+    ["/c/:customer-id/add-repo/github" :page/add-github-repo]
+    ["/c/:customer-id/add-repo/bitbucket" :page/add-bitbucket-repo]
     ["/c/:customer-id/params" :page/customer-params]
+    ["/c/:customer-id/ssh-keys" :page/customer-ssh-keys]
     ["/c/:customer-id/r/:repo-id" :page/repo]
     ["/c/:customer-id/r/:repo-id/edit" :page/repo-edit]
     ["/c/:customer-id/r/:repo-id/b/:build-id" :page/build]
@@ -64,7 +70,11 @@
     ["/github/callback" :page/github-callback]
     ["/bitbucket/callback" :page/bitbucket-callback]]))
 
-(defn on-route-change [match history]
+(def public?
+  "Route names that are publicly accessible"
+  #{:page/login :page/github-callback :page/bitbucket-callback})
+
+(defn on-route-change [match _]
   (log/debug "Route changed:" match)
   (rf/dispatch [:route/changed match]))
 

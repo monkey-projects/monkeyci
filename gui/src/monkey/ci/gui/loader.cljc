@@ -10,7 +10,8 @@
    in that case, don't load it again (optionally).
    
    This namespace provides functionality to support this pattern."
-  (:require [monkey.ci.gui.routing :as r]
+  (:require [monkey.ci.gui.logging :as log]
+            [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
@@ -108,8 +109,11 @@
   [db id msg err]
   (-> db
       (reset-loading id)
-      (set-alerts id [{:type :danger
-                       :message (str msg (u/error-msg err))}])))
+      (set-alerts id [(if (fn? msg)
+                        (msg err)
+                        ;; Provided for backwards compatibility
+                        {:type :danger
+                         :message (str msg (u/error-msg err))})])))
 
 (defn on-initialize
   "Creates an fx context when initializing a screen that prepares the db, and
@@ -117,6 +121,7 @@
    will also start an event stream using the id."
   [db id {:keys [init-events leave-event event-handler-event]}]
   (when-not (initialized? db id)
+    (log/debug "Initializing:" (str id))
     (cond-> {:db (set-initialized db id)}
       init-events
       (assoc :dispatch-n init-events)
@@ -126,8 +131,6 @@
 
       event-handler-event
       (update :dispatch-n (fnil conj []) [:event-stream/start id (r/customer-id db) event-handler-event]))))
-
-;;(defn initializer-evt-handler [])
 
 (defn on-leave
   "Creates a context for an leave fx handler that clears the initialized flag
@@ -141,4 +144,11 @@
 
 (u/db-sub :loader/alerts get-alerts)
 (u/db-sub :loader/loading? loading?)
+(u/db-sub :loader/loaded? loaded?)
 (u/db-sub :loader/value get-value)
+
+(rf/reg-sub
+ :loader/init-loading?
+ (fn [db [_ id]]
+   ;; True when loading for the first time
+   (and (not (loaded? db id)) (loading? db id))))

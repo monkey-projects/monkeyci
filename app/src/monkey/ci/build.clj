@@ -8,16 +8,30 @@
             [monkey.ci
              [runtime :as rt]
              [sid :as sid]
+             [time :as t]
              [utils :as u]]
-            [monkey.ci.build.core :as bc]))
+            [monkey.ci.build.core :as bc]
+            [monkey.ci.events.core :as ec]))
+
+(def sid-props [:customer-id :repo-id :build-id])
 
 (def account->sid (juxt :customer-id :repo-id))
+(def props->sid
+  "Constructs sid from build properties"
+  (apply juxt sid-props))
 
 (def build-sid-length 3)
 
 (def sid
   "Gets the sid from the build"
-  :sid)
+  (some-fn :sid props->sid))
+
+(defn sid->props
+  "Constructs map of `customer-id`, `repo-id` and `build-id` from the build or it's sid"
+  [b]
+  (if-let [{:keys [sid]} b]
+    (zipmap sid-props sid)
+    (select-keys b sid-props)))
 
 (def build-id (some-fn :build-id (constantly "unknown-build")))
 
@@ -25,70 +39,64 @@
   "Gets current build sid from the runtime.  This is either specified directly,
    or taken from account settings."
   [rt]
-  (or (get-in rt [:build sid])
+  (or (get-in rt [:build :sid])
       (let [sid (->> (account->sid (rt/account rt))
                      (take-while some?))]
         (when (= (dec build-sid-length) (count sid))
           sid))))
 
-(def get-build-id (comp build-id rt/build))
-
-(def get-job-sid
+(defn get-job-sid
   "Creates a job sid using the build id and job id.  Note that this does
    not include the customer and repo ids, so this is only unique within the repo."
-  (comp (partial mapv str)
-        (juxt get-build-id
-              (comp bc/job-id :job))))
-
-(def get-job-id
-  "Creates a string representation of the job sid"
-  (comp (partial cs/join "-") get-job-sid))
+  [job build]
+  (->> [(build-id build) (bc/job-id job)]
+       (mapv str)))
 
 (def rt->job-id (comp bc/job-id :job))
 
 (defn- maybe-set-git-opts
   "If a git url is specified, updates the build with git information, taken from
    the arguments and from runtime."
-  [build rt]
-  (let [{:keys [git-url branch commit-id dir]} (rt/args rt)
-        existing (get-in rt [:build :git])]
+  [build args]
+  (let [{:keys [git-url branch tag commit-id dir]} args]
     (cond-> build
-      git-url (-> (assoc :git (assoc existing
-                                     :url git-url
-                                     :branch (or branch "main")
-                                     :id commit-id))
+      git-url (-> (assoc :git (-> {:url git-url
+                                   :branch (or branch "main")
+                                   :id commit-id}
+                                  (mc/assoc-some :tag tag)))
                   ;; Overwrite script dir cause it will be calculated by the git checkout
                   (assoc-in [:script :script-dir] dir)))))
 
 (defn- includes-build-id? [sid]
   (= build-sid-length (count sid)))
 
+(defn local-build-id []
+  (str "local-build-" (System/currentTimeMillis)))
+
 (defn make-build-ctx
   "Creates a build context that can be added to the runtime.  This is used when
    running a build from cli."
-  [rt]
-  (let [work-dir (rt/work-dir rt)
-        orig-sid (or (some->> (:sid (rt/args rt))
+  [{:keys [args] :as config}]
+  (let [work-dir (:work-dir config)
+        orig-sid (or (some->> (:sid args)
                               (sid/parse-sid)
                               (take build-sid-length))
-                     (get-sid rt))
+                     (->> (account->sid config)
+                          (remove nil?)))
         ;; Either generate a new build id, or use the one given
-        ;; TODO Get rid of deprecated timestamp based build id and either
-        ;; assign a 'local' id, or ask the api to reserve a new index.
         sid (sid/->sid (if (or (empty? orig-sid) (includes-build-id? orig-sid))
                          orig-sid
-                         (concat orig-sid [(u/new-build-id)])))
-        id (or (last sid) (u/new-build-id))]
+                         (concat orig-sid [(local-build-id)])))
+        id (or (last sid) (local-build-id))]
     (maybe-set-git-opts
-     (merge (get-in rt [rt/config :build])
-            {:customer-id (first sid)
-             :repo-id (second sid)
-             :build-id id
-             :checkout-dir work-dir
-             :script {:script-dir (u/abs-path work-dir (rt/get-arg rt :dir))}
-             :pipeline (rt/get-arg rt :pipeline)
-             :sid sid})
-     rt)))
+     {:customer-id (first sid)
+      :repo-id (second sid)
+      :build-id id
+      :checkout-dir work-dir
+      :script {:script-dir (u/abs-path work-dir (:dir args))}
+      :pipeline (:pipeline args)
+      :sid sid}
+     args)))
 
 (def script "Gets script from the build"
   :script)
@@ -105,29 +113,29 @@
   (comp script-dir rt/build))
 
 (defn- build-related-dir
-  ([base-dir-key rt build-id]
-   (some-> rt
-           (base-dir-key)
-           (u/combine build-id)))
-  ([base-dir-key rt]
-   ;; DEPRECATED Use the 3-arg fn
-   (build-related-dir base-dir-key rt (get-in rt [:build :build-id]))))
+  [base-dir-key rt build-id]
+  (some-> rt
+          (base-dir-key)
+          (u/combine build-id)))
 
 (defn calc-checkout-dir
   "Calculates the checkout directory for the build, by combining the checkout
    base directory and the build id."
-  ([rt build]
-   (build-related-dir (rt/from-config :checkout-base-dir) rt (:build-id build)))
-  ([rt]
-   ;; DEPRECATED Use the 2 arg fun
-   (build-related-dir (rt/from-config :checkout-base-dir) rt (get-in rt [:build :build-id]))))
+  [rt build]
+  (some-> (get-in rt [rt/config :checkout-base-dir])
+          (u/combine (:build-id build))))
 
 (def checkout-dir
   "Gets the checkout dir as stored in the build structure"
   :checkout-dir)
 
 (defn set-checkout-dir [b d]
-  (assoc b :checkout-dir d))
+  (assoc b checkout-dir d))
+
+(def credit-multiplier :credit-multiplier)
+
+(defn set-credit-multiplier [b cm]
+  (assoc b credit-multiplier cm))
 
 (def ^:deprecated rt->checkout-dir (comp checkout-dir rt/build))
 
@@ -147,44 +155,62 @@
   (partial build-related-dir (rt/from-config :ssh-keys-dir)))
 
 (defn exit-code->status [exit]
-  (when (number? exit)
-    (if (zero? exit) :success :error)))
+  (if (and (number? exit) (zero? exit))
+    :success
+    :error))
 
 (defn build->evt
   "Prepare build object so it can be added to an event"
   [build]
   (mc/update-existing build :git dissoc :ssh-keys :ssh-keys-dir))
 
+(defn build-evt [type build & keyvals]
+  (apply ec/make-event type :sid (sid build) keyvals))
+
+(defn build-init-evt [build]
+  (build-evt :build/initializing
+             build
+             :build (build->evt build)))
+
+(defn build-start-evt [build]
+  (build-evt :build/start
+             build
+             :credit-multiplier (credit-multiplier build)
+             ;; TODO Remove this
+             :build (-> build
+                        (build->evt)
+                        (assoc :start-time (t/now)))))
+
 (defn build-end-evt
   "Creates a `build/end` event"
   [build & [exit-code]]
-  {:type :build/end
-   :sid (:sid build)
-   :build (-> build
-              (build->evt)
-              (assoc :end-time (u/now))
-              (mc/assoc-some :status (exit-code->status exit-code)))})
-
-(def ^:deprecated build-completed-evt build-end-evt)
+  (-> (build-evt :build/end build)
+      (assoc :status (exit-code->status exit-code)
+             ;; TODO Remove this
+             :build (-> build
+                        (build->evt)
+                        (assoc :end-time (u/now))
+                        (mc/assoc-some :status (exit-code->status exit-code))))
+      (mc/assoc-some :message (:message build))))
 
 (defn job-work-dir
   "Given a runtime, determines the job working directory.  This is either the
    work dir as configured on the job, or the context work dir, or the process dir."
-  [rt]
-  (-> (if-let [jwd (get-in rt [:job :work-dir])]
+  [job build]
+  (-> (if-let [jwd (:work-dir job)]
         (if (fs/absolute? jwd)
           jwd
-          (if-let [cd (rt->checkout-dir rt)]
+          (if-let [cd (checkout-dir build)]
             (fs/path cd jwd)
             jwd))
-        (or (rt->checkout-dir rt) (u/cwd)))
+        (or (checkout-dir build) (u/cwd)))
       (fs/canonicalize)
       (str)))
 
 (defn job-relative-dir
   "Calculates path `p` as relative to the work dir for the current job"
-  [rt p]
-  (u/abs-path (job-work-dir rt) p))
+  [job build p]
+  (u/abs-path (job-work-dir job build) p))
 
 (def all-jobs "Retrieves all jobs known to the build"
   (comp vals :jobs :script))

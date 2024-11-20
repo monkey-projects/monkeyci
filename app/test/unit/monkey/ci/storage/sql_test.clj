@@ -8,11 +8,13 @@
              [cuid :as cuid]
              [protocols :as p]
              [sid :as sid]
-             [storage :as st]]
+             [storage :as st]
+             [time :as t]]
             [monkey.ci.entities.core :as ec]
             [monkey.ci.helpers :as h]
             [monkey.ci.spec.entities :as se]
-            [monkey.ci.storage.sql :as sut]))
+            [monkey.ci.storage.sql :as sut]
+            [monkey.ci.web.auth :as auth]))
 
 (defmacro with-storage [conn s & body]
   `(eh/with-prepared-db ~conn
@@ -122,7 +124,16 @@
             (is (= labels (:labels repo))))))
 
       (testing "lists display ids"
-        (is (= ["test-repo" "new-repo"] (st/list-repo-display-ids s (:id cust))))))))
+        (is (= ["test-repo" "new-repo"] (st/list-repo-display-ids s (:id cust)))))
+
+      (testing "delete repo"
+        (is (true? (st/delete-repo s sid)))
+        
+        (testing "removes repo from customer"
+          (is (nil? (st/find-repo s sid)))
+          (is (not (contains? (-> (st/find-customer s (:id cust))
+                                  :repos)
+                              (:id repo)))))))))
 
 (deftest ^:sql watched-github-repos
   (with-storage conn s
@@ -179,12 +190,20 @@
                      (assoc :customer-id (:id cust)))
             wh (-> (h/gen-webhook)
                    (assoc :customer-id (:id cust)
-                          :repo-id (:id repo)))]
+                          :repo-id (:id repo)
+                          :secret-key (auth/generate-secret-key)))]
         (is (some? (st/save-customer s (assoc-in cust [:repos (:id repo)] repo))))
         
         (testing "can create and retrieve"
           (is (sid/sid? (st/save-webhook s wh)))
-          (is (= wh (st/find-webhook s (:id wh)))))))))
+          (is (= wh (st/find-webhook s (:id wh)))))
+
+        (testing "can find by repo"
+          (is (= [wh] (st/find-webhooks-for-repo s [(:id cust) (:id repo)]))))
+
+        (testing "can delete"
+          (is (true? (st/delete-webhook s (:id wh))))
+          (is (nil? (st/find-webhook s (:id wh)))))))))
 
 (deftest ^:sql customer-params
   (with-storage conn s
@@ -267,7 +286,9 @@
           build (-> (h/gen-build)
                     (assoc :customer-id (:id cust)
                            :repo-id (:id repo)
-                           :script {:script-dir "test-dir"})
+                           :script {:script-dir "test-dir"}
+                           :start-time (t/now)
+                           :end-time (t/now))
                     (mc/update-existing :git dissoc :ssh-keys-dir :ssh-keys))
           build-sid (st/ext-build-sid build)]
       (is (sid/sid? (st/save-customer s cust)))
@@ -304,6 +325,20 @@
           (is (sid/sid? (st/save-build s (assoc-in build [:script :jobs] jobs))))
           (is (sid/sid? (st/save-build s (assoc-in build [:script :jobs (:id job)] upd))))
           (is (= upd (get-in (st/find-build s build-sid) [:script :jobs (:id job)])))))
+
+      (testing "stores job message"
+        (let [job (assoc (h/gen-job)
+                         :status :failure
+                         :message "Test error message")
+              jobs {(:id job) job}]
+          (is (sid/sid? (st/save-build s (assoc-in build [:script :jobs] jobs))))
+          (is (= (:message job) (get-in (st/find-build s build-sid) [:script :jobs (:id job) :message])))))
+
+      (testing "stores credit multiplier"
+        (let [job (assoc (h/gen-job) :credit-multiplier 3)
+              jobs {(:id job) job}]
+          (is (sid/sid? (st/save-build s (assoc-in build [:script :jobs] jobs))))
+          (is (= 3 (get-in (st/find-build s build-sid) [:script :jobs (:id job) :credit-multiplier])))))
 
       (testing "can list"
         (is (= [(:build-id build)]
@@ -349,9 +384,33 @@
           (is (sid/sid? (st/save-build s old-build)))
           (is (sid/sid? (st/save-build s new-build)))
           (let [r (st/list-builds-since s (:id cust) 150)]
-            (is (= [(:id new-build)] (map :id r)))
+            (is (= [(:build-id new-build)] (map :build-id r)))
             (is (= (:id cust) (:customer-id (first r))))
-            (is (= (:id repo) (:repo-id (first r))))))))))
+            (is (= (:id repo) (:repo-id (first r)))))))
+
+      (testing "can find latest by build index"
+        (let [repo (h/gen-repo)
+              cust (-> (h/gen-cust)
+                       (assoc :repos {(:id repo) repo}))
+              old-build (-> (h/gen-build)
+                            (assoc :customer-id (:id cust)
+                                   :repo-id (:id repo)
+                                   :start-time 100
+                                   :idx 9
+                                   :build-id "build-9")
+                            (dissoc :script))
+              new-build (-> (h/gen-build)
+                            (assoc :customer-id (:id cust)
+                                   :repo-id (:id repo)
+                                   :start-time 200
+                                   :idx 10
+                                   :build-id "build-10")
+                            (dissoc :script))]
+          (is (sid/sid? (st/save-customer s cust)))
+          (is (sid/sid? (st/save-build s old-build)))
+          (is (sid/sid? (st/save-build s new-build)))
+          (let [r (st/find-latest-build s [(:id cust) (:id repo)])]
+            (is (= (:build-id new-build) (:build-id r)))))))))
 
 (deftest ^:sql join-requests
   (with-storage conn s
@@ -398,6 +457,177 @@
       (testing "can delete"
         (is (true? (st/delete-email-registration s (:id er))))
         (is (empty? (st/list-email-registrations s)))))))
+
+(deftest ^:sql credit-subscriptions
+  (with-storage conn s
+    (let [cust (h/gen-cust)
+          now (t/now)
+          cs (-> (h/gen-credit-subs)
+                 (assoc :customer-id (:id cust)
+                        :valid-from (- now 1000)
+                        :valid-until (+ now 1000)))]
+      (is (sid/sid? (st/save-customer s cust)))
+
+      (testing "can create and retrieve"
+        (is (sid/sid? (st/save-credit-subscription s cs)))
+        (is (= cs (st/find-credit-subscription s (st/credit-sub-sid (:id cust) (:id cs))))))
+
+      (testing "can list for customer"
+        (is (= [cs] (st/list-customer-credit-subscriptions s (:id cust)))))
+
+      (testing "can list active"
+        (is (= [cs] (st/list-active-credit-subscriptions s now)))
+        (is (empty? (st/list-active-credit-subscriptions s (+ now 2000)))))
+
+      (testing "can update"
+        (is (sid/sid? (st/save-credit-subscription s (assoc cs :amount 200M))))
+        (is (= 200M (-> (st/find-credit-subscription s (st/credit-sub-sid (:id cust) (:id cs)))
+                        :amount)))))))
+
+(deftest ^:sql customer-credits
+  (with-storage conn s
+    (let [repo (h/gen-repo)
+          cust (-> (h/gen-cust)
+                   (assoc :repos {(:id repo) repo}))
+          cred (-> (h/gen-cust-credit)
+                   (assoc :customer-id (:id cust)
+                          :amount 100M)
+                   (dissoc :user-id :subscription-id))]
+      (is (sid/sid? (st/save-customer s cust)))
+        
+      (testing "can create and retrieve"
+        (is (sid/sid? (st/save-customer-credit s cred)))
+        (is (= cred (st/find-customer-credit s (:id cred)))))
+        
+      (testing "can list for customer"
+        (let [other-cust (h/gen-cust)
+              _ (st/save-customer s other-cust)
+              sids (->> [(assoc cred :from-time 1000)
+                         (-> (h/gen-cust-credit)
+                             (assoc :customer-id (:id cust)
+                                    :from-time 2000
+                                    :amount 200M)
+                             (dissoc :user-id :subscription-id))
+                         (-> (h/gen-cust-credit)
+                             (assoc :customer-id (:id other-cust)
+                                    :from-time 1000)
+                             (dissoc :user-id :subscription-id))]
+                        (mapv (partial st/save-customer-credit s)))]
+          (is (some? sids))
+          (is (= [(-> sids first last)]
+                 (->> (st/list-customer-credits-since s (:id cust) 1100)
+                      (map :id))))))
+
+      (testing "calculates available credits using credit consumptions"
+        (let [build (-> (h/gen-build)
+                        (assoc :customer-id (:id cust)
+                               :repo-id (:id repo)
+                               :credits 25M))
+              ccons {:customer-id (:id cust)
+                     :repo-id (:id repo)
+                     :build-id (:build-id build)
+                     :credit-id (:id cred)
+                     :amount 30M}]
+          (is (sid/sid? (st/save-build s build)))
+          (is (sid/sid? (st/save-credit-consumption s ccons)))
+          (is (= 270M (st/calc-available-credits s (:id cust))))))
+
+      (testing "lists available credits"
+        (is (= [(:id cred)]
+               (->> (st/list-available-credits s (:id cust))
+                    (map :id))))))))
+
+(deftest ^:sql credit-consumptions
+  (with-storage conn s
+    (let [now (t/now)
+          repo (h/gen-repo)
+          cust (-> (h/gen-cust)
+                   (assoc :repos {(:id repo) repo}))
+          build (-> (h/gen-build)
+                    (assoc :repo-id (:id repo)
+                           :customer-id (:id cust)))
+          credit (-> (h/gen-cust-credit)
+                     (assoc :customer-id (:id cust))
+                     (dissoc :user-id :subscription-id))
+          cc (-> (h/gen-credit-cons)
+                 (assoc :build-id (:build-id build)
+                        :repo-id (:id repo)
+                        :customer-id (:id cust)
+                        :credit-id (:id credit)
+                        :consumed-at now))]
+      (is (sid/sid? (st/save-customer s cust)))
+      (is (sid/sid? (st/save-customer-credit s credit)))
+      (is (sid/sid? (st/save-build s build)))
+
+      (testing "can create and retrieve"
+        (is (sid/sid? (st/save-credit-consumption s cc)))
+        (is (= cc (st/find-credit-consumption s (st/credit-cons-sid (:id cust) (:id cc))))))
+
+      (testing "can list for customer"
+        (is (= [cc] (st/list-customer-credit-consumptions s (:id cust)))))
+
+      (testing "can list for customer since timestamp"
+        (is (= [cc] (st/list-customer-credit-consumptions-since s (:id cust) (- now 100))))
+        (is (empty? (st/list-customer-credit-consumptions-since s (:id cust) (+ now 100)))))
+
+      (testing "can update"
+        (is (sid/sid? (st/save-credit-consumption s (assoc cc :amount 200M))))
+        (is (= 200M (-> (st/find-credit-consumption s (st/credit-cons-sid (:id cust) (:id cc)))
+                        :amount))))
+
+      (testing "can create for user"
+        (let [user (h/gen-user)
+              cred (-> (h/gen-cust-credit)
+                       (assoc :type :user
+                              :user-id (:id user)
+                              :reason "testing"
+                              :customer-id (:id cust)
+                              :amount 1000M)
+                       (dissoc :subscription-id))]
+          (is (sid/sid? (st/save-user s user)))
+          (is (sid/sid? (st/save-customer-credit s cred)))
+          (is (= cred (st/find-customer-credit s (:id cred))))))
+
+      (testing "can create for subscription"
+        (let [cs (-> (h/gen-credit-subs)
+                     (assoc :customer-id (:id cust)
+                            :amount 1000M))
+              cred (-> (h/gen-cust-credit)
+                       (assoc :type :subscription
+                              :subscription-id (:id cs)
+                              :customer-id (:id cust)
+                              :amount 1000M)
+                       (dissoc :user-id))]
+          (is (sid/sid? (st/save-credit-subscription s cs)))
+          (is (sid/sid? (st/save-customer-credit s cred)))
+          (is (= cred (st/find-customer-credit s (:id cred)))))))))
+
+(deftest ^:sql bb-webhooks
+  (with-storage conn st
+    (let [repo (h/gen-repo)
+          cust (-> (h/gen-cust)
+                   (assoc :repos {(:id repo) repo}))
+          wh (-> (h/gen-webhook)
+                 (assoc :customer-id (:id cust)
+                        :repo-id (:id repo)))
+          bb-wh (-> (h/gen-bb-webhook)
+                    (assoc :webhook-id (:id wh)))]
+      (testing "can save and find"
+        (is (sid/sid? (st/save-customer st cust)))
+        (is (sid/sid? (st/save-webhook st wh)))
+        (is (sid/sid? (st/save-bb-webhook st bb-wh)))
+        (is (= bb-wh (st/find-bb-webhook st (:id bb-wh)))))
+
+      (testing "can find by webhook id"
+        (is (= bb-wh (st/find-bb-webhook-for-webhook st (:id wh)))))
+
+      (testing "can search by filter"
+        (is (= [(merge bb-wh (select-keys wh [:customer-id :repo-id]))]
+               (st/search-bb-webhooks st {:customer-id (:id cust)})))
+        (is (= [(:id bb-wh)]
+               (->> (st/search-bb-webhooks st {:webhook-id (:id wh)})
+                    (map :id))))
+        (is (empty? (st/search-bb-webhooks st {:customer-id "nonexisting"})))))))
 
 (deftest make-storage
   (testing "creates sql storage object using connection settings"

@@ -1,20 +1,19 @@
 ;; Build script for Monkey-ci itself
-(ns monkeyci.build.script
-  (:require [babashka.fs :as fs]
-            [clojure.java.io :as io]
-            [clojure.string :as cs]
+(ns build
+  (:require [clojure.string :as cs]
             [monkey.ci.build
              [api :as api]
-             [core :as core]
-             [shell :as shell]]
+             [core :as core]]
             [monkey.ci.ext.junit]
             [monkey.ci.plugin
              [github :as gh]
-             [infra :as infra]]))
+             [infra :as infra]
+             [kaniko :as kaniko]
+             [pushover :as po]]))
 
 ;; Version assigned when building main branch
 ;; TODO Determine automatically
-(def snapshot-version "0.7.1-SNAPSHOT")
+(def snapshot-version "0.10.1-SNAPSHOT")
 
 (def tag-regex #"^refs/tags/(\d+\.\d+\.\d+(\.\d+)?$)")
 
@@ -22,8 +21,6 @@
   "Returns a predicate that checks if the ref matches the given regex"
   [re]
   #(core/ref-regex % re))
-
-;; TODO Also run jobs if triggered from the api, in which case no files are touched
 
 (def release?
   (ref? tag-regex))
@@ -39,7 +36,7 @@
   "True if files have been touched for the given regex, or the 
    build was triggered from the api."
   [ctx re]
-  (or (core/touched? ctx re)
+  (or (core/touched? ctx re)      
       (api-trigger? ctx)))
 
 (defn app-changed? [ctx]
@@ -51,13 +48,16 @@
 (defn common-changed? [ctx]
   (dir-changed? ctx #"^common/.*"))
 
-(def build-app? (some-fn app-changed? release?))
+(def build-app? (some-fn app-changed? common-changed? release?))
 (def build-gui? (some-fn gui-changed? release?))
 (def build-common? (some-fn common-changed? release?))
 
-(def publish-app? (some-fn (every-pred app-changed? should-publish?) release?))
-(def publish-gui? (some-fn (every-pred gui-changed? should-publish?) release?))
-(def publish-common? (some-fn (every-pred common-changed? should-publish?) release?))
+(def publish-app? (some-fn (every-pred (some-fn app-changed? common-changed?)
+                                       should-publish?)
+                           release?))
+(def publish-gui? (some-fn (every-pred gui-changed? should-publish?)
+                           release?))
+#_(def publish-common? (some-fn (every-pred common-changed? should-publish?) release?))
 
 (defn tag-version
   "Extracts the version from the tag"
@@ -81,11 +81,12 @@
   (or (tag-version ctx)
       snapshot-version))
 
-(defn clj-container [id dir & args]
+(defn clj-container 
   "Executes script in clojure container"
+  [id dir & args]
   (core/container-job
    id
-   {;; Alpine based images don't exist for arm, so use debian
+   { ;; Alpine based images don't exist for arm, so use debian
     :image "docker.io/clojure:temurin-21-tools-deps-bookworm-slim"
     :script [(str "cd " dir
                   " && "
@@ -130,67 +131,24 @@
          :save-artifacts [uberjar-artifact])
         (core/depends-on ["test-app"]))))
 
-(def image-creds-artifact
-  {:id "image-creds"
-   ;; File must be called config.json for kaniko
-   :path ".docker/config.json"})
-
-;; Full path to the docker config file, used to push images
-(defn img-repo-auth [ctx]
-  (shell/in-work ctx (:path image-creds-artifact)))
-
-(defn create-image-creds
-  "Fetches credentials from the params and writes them to Docker `config.json`"
-  [ctx]
-  (let [auth-file (img-repo-auth ctx)]
-    (println "Writing docker credentials to" auth-file)
-    (when-not (fs/exists? auth-file)
-      (shell/param-to-file ctx "dockerhub-creds" auth-file))))
-
-(defn image-creds [ctx]
-  (when (should-publish? ctx)
-    (core/action-job
-     "image-creds"
-     create-image-creds
-     {:save-artifacts [image-creds-artifact]})))
-
 (def img-base "fra.ocir.io/frjdhmocn5qi")
 (def app-img (str img-base "/monkeyci"))
 (def gui-img (str img-base "/monkeyci-gui"))
 
-(defn- make-context [ctx dir]
-  (cond-> (:checkout-dir ctx)
-    (some? dir) (str "/" dir)))
-
-(defn kaniko-build-img
-  "Creates a step that builds and uploads an image using kaniko"
-  [{:keys [id dockerfile context image tag opts]}]
-  (fn [ctx]
-    (let [wd (shell/container-work-dir ctx)
-          ctx-dir (cond-> wd 
-                    context (str "/" context))]
-      (core/container-job
-       id
-       (merge
-        {:image "docker.io/monkeyci/kaniko:1.21.0"
-         :script [(format "/kaniko/executor --dockerfile %s --destination %s --context dir://%s"
-                          (str ctx-dir "/" (or dockerfile "Dockerfile"))
-                          (str image ":" (or tag (image-version ctx)))
-                          ctx-dir)]
-         ;; Set docker config credentials location
-         :container/env {"DOCKER_CONFIG" (str wd "/.docker")}
-         :restore-artifacts [image-creds-artifact]
-         :dependencies ["image-creds"]}
-        opts)))))
-
 (defn build-app-image [ctx]
   (when (publish-app? ctx)
-    (kaniko-build-img
-     {:id "publish-app-img"
-      :dockerfile "docker/Dockerfile"
-      :image app-img
-      :opts {:restore-artifacts [uberjar-artifact image-creds-artifact]
-             :dependencies ["image-creds" "app-uberjar"]}})))
+    (kaniko/multi-platform-image
+     {:dockerfile "docker/Dockerfile"
+      :archs [:arm :amd]
+      :target-img (str app-img ":" (image-version ctx))
+      :image
+      {:job-id "publish-app-img"
+       :container-opts
+       {:restore-artifacts [uberjar-artifact]
+        :dependencies ["app-uberjar"]}}
+      :manifest
+      {:job-id "app-img-manifest"}}
+     ctx)))
 
 (def gui-release-artifact
   {:id "gui-release"
@@ -198,35 +156,34 @@
 
 (defn build-gui-image [ctx]
   (when (publish-gui? ctx)
-    (kaniko-build-img
-     {:id "publish-gui-img"
-      :context "gui"
-      :image gui-img
-      :memory 3 ;GB
-      ;; Restore artifacts but modify the path because work dir is not the same
-      :opts {:restore-artifacts [(update gui-release-artifact :path (partial str "gui/"))
-                                 image-creds-artifact]
-             :dependencies ["image-creds" "release-gui"]}})))
+    (kaniko/image
+     {:job-id "publish-gui-img"
+      :subdir "gui"
+      :dockerfile "Dockerfile"
+      :target-img (str gui-img ":" (image-version ctx))
+      :container-opts
+      {:memory 3 ;GB
+       ;; Restore artifacts but modify the path because work dir is not the same
+       :restore-artifacts [(update gui-release-artifact :path (partial str "gui/"))]
+       :dependencies ["release-gui"]}}
+     ctx)))
 
-(defn publish [ctx id dir]
+(defn publish 
   "Executes script in clojure container that has clojars publish env vars"
-  (when (publish-app? ctx)
-    (let [env (-> (api/build-params ctx)
-                  (select-keys ["CLOJARS_USERNAME" "CLOJARS_PASSWORD"])
-                  (assoc "MONKEYCI_VERSION" (lib-version ctx)))]
-      (-> (clj-container id dir
-                         "-X:jar:deploy")
-          (assoc :container/env env)))))
+  [ctx id dir & [version]]
+  (let [env (-> (api/build-params ctx)
+                (select-keys ["CLOJARS_USERNAME" "CLOJARS_PASSWORD"])
+                (assoc "MONKEYCI_VERSION" (or version (lib-version ctx))))]
+    (-> (clj-container id dir
+                       "-X:jar:deploy")
+        (assoc :container/env env))))
 
 (defn publish-app [ctx]
-  ;; App is dependent on the common lib, so we should replace version here
-  ;; (format "-Sdeps '{:override-deps {:mvn/version \"%s\"}}'" (lib-version ctx))
-  (some-> (publish ctx "publish-app" "app")
-          (core/depends-on ["test-app"])))
-
-(defn publish-common [ctx]
-  (some-> (publish ctx "publish-common" "common")
-          (core/depends-on ["test-common"])))
+  (when (publish-app? ctx)
+    ;; App is dependent on the common lib, so we should replace version here
+    ;; (format "-Sdeps '{:override-deps {:mvn/version \"%s\"}}'" (lib-version ctx))
+    (some-> (publish ctx "publish-app" "app")
+            (core/depends-on ["test-app"]))))
 
 (def github-release
   "Creates a release in github"
@@ -235,7 +192,7 @@
 (defn- shadow-release [id build]
   (core/container-job
    id
-   {:image "docker.io/dormeur/clojure-node:1.11.1"
+   {:image "docker.io/monkeyci/clojure-node:1.11.4"
     :work-dir "gui"
     :script ["npm install"
              (str "clojure -Sdeps '{:mvn/local-repo \".m2\"}' -M:test -m shadow.cljs.devtools.cli release " build)]
@@ -285,9 +242,15 @@
              core/success
              (assoc core/failure :message "Unable to patch version in infra repo"))
            (assoc core/failure :message "No github token provided")))
-       {:dependencies (->> [(when (publish-app? ctx) "publish-app-img")
+       {:dependencies (->> [(when (publish-app? ctx) "app-img-manifest")
                             (when (publish-gui? ctx) "publish-gui-img")]
                            (remove nil?))}))))
+
+(defn notify [ctx]
+  (when (release? ctx)
+    (po/pushover-msg
+     {:msg (str "MonkeyCI version " (tag-version ctx) " has been released.")
+      :dependencies ["app-img-manifest" "publish-gui-img"]})))
 
 ;; TODO Add jobs that auto-deploy to staging after running some sanity checks
 ;; We could do a git push with updated kustomization file.
@@ -298,12 +261,14 @@
 
 ;; List of jobs
 [test-app
+ test-gui
+ 
  app-uberjar
  publish-app
  github-release
- test-gui
+ 
  build-gui-release
- image-creds
  build-app-image
  build-gui-image
- deploy]
+ deploy
+ notify]

@@ -1,17 +1,22 @@
-(ns monkey.ci.gui.home.db)
+(ns monkey.ci.gui.home.db
+  (:require [monkey.ci.gui.loader :as lo]))
 
-(def customers ::customers)
+(def id ::home)
+
+(defn get-customers [db]
+  (lo/get-value db id))
 
 (defn set-customers [db c]
-  (assoc db customers c))
+  (lo/set-value db id c))
 
-(def alerts ::alerts)
+(defn get-alerts [db]
+  (lo/get-alerts db id))
 
 (defn set-alerts [db a]
-  (assoc db alerts a))
+  (lo/set-alerts db id a))
 
 (defn clear-alerts [db]
-  (dissoc db alerts))
+  (lo/reset-alerts db id))
 
 (def customer-searching? ::customer-searching?)
 

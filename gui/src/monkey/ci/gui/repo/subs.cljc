@@ -20,7 +20,7 @@
    (let [params (get-in db [:route/current :parameters :path])
          parse-time (fn [b]
                       (update b :start-time (comp str t/parse)))]
-     (some->> (db/builds db)
+     (some->> (db/get-builds db)
               (map parse-time)
               (sort-by :start-time)
               (reverse)
@@ -32,3 +32,16 @@
 (u/db-sub :repo/edit-alerts db/edit-alerts)
 (u/db-sub :repo/editing db/editing)
 (u/db-sub :repo/saving? (comp true? db/saving?))
+(u/db-sub :repo/deleting? (comp true? db/deleting?))
+
+(rf/reg-sub
+ :builds/init-loading?
+ :<- [:loader/init-loading? db/id]
+ (fn [l _]
+   l))
+
+(rf/reg-sub
+ :builds/loaded?
+ :<- [:loader/loaded? db/id]
+ (fn [l _]
+   l))

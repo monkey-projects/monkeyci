@@ -1,6 +1,7 @@
 (ns monkey.ci.helpers
   "Helper functions for testing"
-  (:require [camel-snake-kebab.core :as csk]
+  (:require [aleph.netty :as an]
+            [camel-snake-kebab.core :as csk]
             [clojure.java.io :as io]
             [clojure.core.async :as ca]
             [clojure.spec.alpha :as spec]
@@ -11,9 +12,12 @@
             [medley.core :as mc]
             [monkey.ci
              [blob :as blob]
+             [containers :as containers]
+             [cuid :as cuid]
              [protocols :as p]
              [storage :as s]
              [utils :as u]]
+            [monkey.ci.events.core :as ec]
             [monkey.ci.web
              [common :as wc]
              [auth :as auth]]
@@ -103,9 +107,10 @@
           (recur (rest t)))))))
 
 (defrecord FakeBlobStore [stored strict?]
-  p/BlobStore
+  p/BlobStore  
   (save-blob [_ src dest]
-    (md/success-deferred (swap! stored assoc src dest)))
+    (md/success-deferred (swap! stored assoc dest src)))
+
   (restore-blob [_ src dest]
     (if (or (not strict?)
             (= dest (get @stored src)))
@@ -118,24 +123,34 @@
       (md/error-deferred (ex-info
                           (format "destination path was not as expected: %s, actual: %s" (get @stored src) dest)
                           @stored))))
+  
   (get-blob-stream [_ src]
     (md/success-deferred
      (when (contains? @stored src)
-       (io/input-stream (.getBytes "This is a test stream"))))))
+       (io/input-stream (.getBytes "This is a test stream")))))
 
-(defn fake-blob-store [stored]
-  (->FakeBlobStore stored false))
+  (put-blob-stream [this src dest]
+    (p/save-blob this src dest)))
+
+(defn fake-blob-store
+  ([stored]
+   (->FakeBlobStore stored false))
+  ([]
+   (fake-blob-store (atom {}))))
 
 (defn strict-fake-blob-store [stored]
   (->FakeBlobStore stored true))
+
+(defn ->match-data [obj]
+  {:reitit.core/match
+   {:data obj}})
 
 (defn ->req
   "Takes a runtime and creates a request object from it that can be passed to
    an api handler function."
   [rt]
-  {:reitit.core/match
-   {:data
-    {:monkey.ci.web.common/runtime (wc/->RuntimeWrapper rt)}}})
+  (->match-data
+   {:monkey.ci.web.common/runtime (wc/->RuntimeWrapper rt)}))
 
 (defn with-path-param [r k v]
   (assoc-in r [:parameters :path k] v))
@@ -152,7 +167,9 @@
 (defn with-identity [r id]
   (assoc r :identity id))
 
-(defn test-rt []
+(defn ^:deprecated test-rt
+  "Deprecated, use `runtime/test-runtime`"
+  []
   {:storage (s/make-memory-storage)
    :jwk (auth/keypair->rt (auth/generate-keypair))})
 
@@ -162,13 +179,33 @@
 (defrecord FakeEvents [recv]
   p/EventPoster
   (post-events [this evt]
-    (swap! recv (comp vec concat) (u/->seq evt))))
+    (swap! recv (comp vec concat) (u/->seq evt)))
+
+  p/EventReceiver
+  (add-listener [this ef h]
+    nil)
+  (remove-listener [this ef h]
+    nil))
 
 (defn fake-events
   "Set up fake events implementation.  It returns an event poster that can be
    queried for received events."
-  []
-  (->FakeEvents (atom [])))
+  [& [recv]]
+  (->FakeEvents (or recv (atom []))))
+
+(defn received-events [fake]
+  @(:recv fake))
+
+(defn reset-events [fake]
+  (reset! (:recv fake) []))
+
+(defn first-event-by-type [type events]
+  (->> events
+       (filter (comp (partial = type) :type))
+       (first)))
+
+(defmethod ec/make-events :fake [{:keys [recv]}]
+  (fake-events recv))
 
 (defrecord FakeEventReceiver [listeners]
   p/EventReceiver
@@ -180,6 +217,14 @@
 
 (defn fake-events-receiver []
   (->FakeEventReceiver (atom {})))
+
+(defrecord FakeServer [closed?]
+  java.lang.AutoCloseable
+  (close [_]
+    (reset! closed? true))
+  an/AlephServer
+  (port [_]
+    0))
 
 (defn base64->
   "Converts from base64"
@@ -238,3 +283,33 @@
 
 (defn gen-email-registration []
   (gen-entity :entity/email-registration))
+
+(defn- update-amount [x]
+  (update x :amount bigdec))
+
+(defn gen-cust-credit []
+  (-> (gen-entity :entity/customer-credit)
+      (update-amount)))
+
+(defn gen-credit-subs []
+  (-> (gen-entity :entity/credit-subscription)
+      (update-amount)))
+
+(defn gen-credit-cons []
+  (-> (gen-entity :entity/credit-consumption)
+      (update-amount)))
+
+(defn gen-bb-webhook []
+  (gen-entity :entity/bb-webhook))
+
+(defrecord FakeContainerRunner [credit-consumer runs result]
+  p/ContainerRunner
+  (run-container [this job]
+    (swap! runs (fnil conj []) job)
+    (md/success-deferred result)))
+
+(defn fake-container-runner [& [result]]
+  (->FakeContainerRunner (constantly 0) (atom []) (or result {:exit 0})))
+
+(defn gen-build-sid []
+  (repeatedly 3 cuid/random-cuid))

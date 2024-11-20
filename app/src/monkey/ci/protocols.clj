@@ -32,6 +32,28 @@
    to some blob store, possibly remote."
   (save-blob [store src dest] "Saves `src` file or directory to `dest` as a blob")
   (restore-blob [store src dest] "Restores `src` to local `dest`")
-  (get-blob-stream [store src] "Gets a blob file as an `InputStream`"))
+  (get-blob-stream [store src] "Gets a blob file as an `InputStream`")
+  (put-blob-stream [store src dest] "Saves a raw stream to the blob store"))
 
 (def blob-store? (partial satisfies? BlobStore))
+
+(defprotocol ContainerRunner
+  (run-container [this job]
+    "Runs the given container job.  Returns a deferred that will hold the result."))
+
+(def container-runner? (partial satisfies? ContainerRunner))
+
+;; (defprotocol BuildContainerRunner
+;;   (run-build-container [this build job]
+;;     "Runs the container job for the specific build.  Use this in the runner, where the build
+;;      is not fully known at startup time."))
+
+(defprotocol Workspace
+  (restore-workspace [this]
+    "Restores the workspace associated with the current build"))
+
+(def workspace? (partial satisfies? Workspace))
+
+(defprotocol BuildParams
+  (get-build-params [this]
+    "Retrieves build parameters for this build"))

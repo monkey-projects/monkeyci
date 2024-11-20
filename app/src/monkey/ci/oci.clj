@@ -2,59 +2,74 @@
   "Oracle cloud specific functionality"
   (:require [babashka.fs :as fs]
             [clojure.tools.logging :as log]
+            [java-time.api :as jt]
             [manifold
              [deferred :as md]
              [time :as mt]]
+            [martian.interceptors :as mi]
             [medley.core :as mc]
             [monkey.ci
              [build :as b]
-             [config :as c]
-             [pem :as pem]
+             [config :as config]
+             [retry :as retry]
+             [time :as t]
              [utils :as u]]
             [monkey.ci.common.preds :as cp]
             [monkey.oci.container-instance.core :as ci]
             [monkey.oci.os
              [martian :as os]
-             [stream :as s]]))
+             [stream :as s]]
+            [taoensso.telemere :as tt]))
 
-(defn group-credentials
-  "Assuming the conf is taken from env, groups all keys that start with `credentials-`
-   into the `:credentials` submap."
-  [conf]
-  (c/group-keys conf :credentials))
+;; Cpu architectures
+(def arch-arm :arm)
+(def arch-amd :amd)
+(def valid-architectures #{arch-arm arch-amd})
 
-(defn normalize-config
-  "Normalizes the given OCI config key, by grouping the credentials both in the given key
-   and in the `oci` key, and merging them."
-  [conf k]
-  (letfn [(load-key [c]
-            (mc/update-existing-in c [:credentials :private-key] u/load-privkey))
-          (maybe-parse [s]
-            (cond-> s
-              (string? s)
-              (u/parse-edn-str)))
-          (parse-edn-prop [c k]
-            (mc/update-existing c k maybe-parse))
-          (parse-vnics [c]
-            (parse-edn-prop c :vnics))
-          (parse-ads [c]
-            (parse-edn-prop c :availability-domains))]
-    (->> [(:oci (c/group-and-merge-from-env conf :oci)) (k conf)]
-         (map group-credentials)
-         (apply u/deep-merge)
-         (load-key)
-         (parse-vnics)
-         (parse-ads)
-         (assoc conf k))))
+(def arch-shapes
+  "Architectures mapped to OCI shapes"
+  {arch-arm
+   {:shape "CI.Standard.A1.Flex"
+    :credits 1}
+   arch-amd
+   {:shape "CI.Standard.E4.Flex"
+    :credits 2}})
+(def default-arch arch-arm)
 
-(defn ->oci-config
-  "Given a configuration map with credentials, turns it into a config map
-   that can be passed to OCI context creators."
-  [{:keys [credentials] :as conf}]
-  (-> conf
-      ;; TODO Remove this, it's already done when normalizing the config
-      (merge (mc/update-existing credentials :private-key u/load-privkey))
-      (dissoc :credentials)))
+(defn invocation-interceptor
+  "A Martian interceptor that dispatches telemere events for each invocation.  Useful
+   for metrics to know how many api calls were done."
+  [kind]
+  {:name ::invocation-interceptor
+   :enter (fn [ctx]
+            ;; TODO More properties
+            (tt/event! :oci/invocation
+                       {:data {:kind kind}
+                        :level :info})
+            ctx)})
+
+(defn add-interceptor
+  "Adds the given interceptor before all other inceptors of the Martian context"
+  [ctx i]
+  (let [id (-> ctx :interceptors first :name)]
+    (update ctx :interceptors mi/inject i :before id)))
+
+(defn add-inv-interceptor [ctx kind]
+  (add-interceptor ctx (invocation-interceptor kind)))
+
+(defn too-many-requests? [r]
+  (= 429 (:status r)))
+
+(defn with-retry
+  "Invokes `f` with async retry"
+  [f]
+  (retry/async-retry f {:max-retries 10
+                        :retry-if too-many-requests?
+                        :backoff (retry/with-max (retry/exponential-delay 1000) 60000)}))
+
+(defn retry-fn [f]
+  (fn [& args]
+    (with-retry #(apply f args))))
 
 (defn stream-to-bucket
   "Pipes an input stream to a bucket object using multipart uploads.
@@ -63,10 +78,10 @@
   [conf ^java.io.InputStream in]
   (log/debug "Piping stream to bucket" (:bucket-name conf) "at" (:object-name conf))
   (log/trace "Piping stream to bucket using config" conf)
-  (let [ctx (-> conf
-                (->oci-config)
-                (os/make-context))]
-    (s/input-stream->multipart ctx (assoc conf :input-stream in))))
+  (-> conf
+      (os/make-context)
+      (add-inv-interceptor :stream)
+      (s/input-stream->multipart (assoc conf :input-stream in))))
 
 (def terminated? #{"INACTIVE" "DELETED" "FAILED"})
 
@@ -102,7 +117,7 @@
   [client id]
   (log/trace "Retrieving container instance details for" id)
   (md/chain
-   (ci/get-container-instance client {:instance-id id})
+   (with-retry #(ci/get-container-instance client {:instance-id id}))
    ;; TODO Handle error responses
    (fn [{:keys [status body] :as r}]
      (if (>= status 400)
@@ -140,22 +155,24 @@
    errors from OCI."
   [client instance-config & [{:keys [delete? exited?] :as opts}]]
   (log/debug "Running OCI instance with config:" instance-config)
+  ;; TODO Add auto-retry on 429 errors ("too many requests")
   (letfn [(check-error [handler]
             (fn [{:keys [body status] :as r}]
               (if status
                 (if (>= status 400)
                   (do
                     (log/warn "Got an error response, status" status "with message" (:message body))
-                    r)
+                    (md/error-deferred (ex-info "Failed to create container instance" r)))
                   (handler body))
                 ;; Some other invalid response
-                r)))
+                (md/error-deferred (ex-info "Invalid response" r)))))
           
           (create-instance []
             (log/debug "Creating instance...")
-            (ci/create-container-instance
-             client
-             {:container-instance instance-config}))
+            (with-retry
+              #(ci/create-container-instance
+                client
+                {:container-instance instance-config})))
 
           (wait-for-exit [{:keys [id]}]
             (if exited?
@@ -174,7 +191,7 @@
                  (->> (:containers body)
                       (map (fn [c]
                              (md/chain
-                              (ci/retrieve-logs client (select-keys c [:container-id]))
+                              (with-retry #(ci/retrieve-logs client (select-keys c [:container-id])))
                               #(mc/assoc-some c :logs (:body %)))))
                       (apply md/zip))
                  (partial assoc-in r [:body :containers])))
@@ -183,15 +200,14 @@
           (maybe-delete-instance [{{:keys [id]} :body :as c}]
             (if (and delete? id)
               (md/chain
-               (ci/delete-container-instance client {:instance-id id})
+               (with-retry #(ci/delete-container-instance client {:instance-id id}))
                (constantly c))
               (md/success-deferred c)))
 
           (log-error [ex]
             (log/error "Error creating container instance" ex)
-            ;; Return the exception
-            {:status 500
-             :exception ex})]
+            ;; Rethrow
+            (md/error-deferred ex))]
     
     (-> (md/chain
          (create-instance)
@@ -199,6 +215,11 @@
          try-fetch-logs
          maybe-delete-instance)
         (md/catch log-error))))
+
+(defn list-active-instances
+  "Lists all active container instances for the given compartment id"
+  [client cid]
+  (ci/list-container-instances client {:compartment-id cid :lifecycle-state "ACTIVE"}))
 
 (def checkout-vol "checkout")
 (def checkout-dir "/opt/monkeyci/checkout")
@@ -225,7 +246,7 @@
   (-> conf
       (select-keys [:compartment-id :image-pull-secrets :vnics :freeform-tags])
       (assoc :container-restart-policy "NEVER"
-             :shape "CI.Standard.A1.Flex" ; Use ARM shape, it's cheaper
+             :shape (get-in arch-shapes [default-arch :shape]) ; Use ARM shape, it's cheaper
              :shape-config {:ocpus default-cpu-count
                             :memory-in-g-bs default-memory-gb}
              :availability-domain (pick-ad conf)
@@ -266,8 +287,48 @@
 
 (defn base-work-dir
   "Determines the base work dir to use inside the container"
-  [rt]
-  (some->> (b/rt->checkout-dir rt)
+  [build]
+  (some->> (b/checkout-dir build)
            (fs/file-name)
            (fs/path work-dir)
            (str)))
+
+(defn credit-multiplier
+  "Calculates the credit multiplier that needs to be applied for the container
+   instance.  This varies depending on the architecture, number of cpu's and 
+   amount of memory."
+  [arch cpus mem]
+  (+ (* cpus
+        (get-in arch-shapes [arch :credits] 1))
+     mem))
+
+(defn delete-stale-instances [client cid]
+  ;; Timeout is the max time a script may run, with a margin of one minute
+  (let [timeout (jt/instant (- (t/now) config/max-script-timeout 60000))]
+    (letfn [(stale? [x]
+              (jt/before? (jt/instant (:time-created x)) timeout))
+            (build? [x]
+              (let [props ((juxt :customer-id :repo-id) (:freeform-tags x))]
+                (and (not-empty props) (every? some? props))))
+            (check-errors [resp]
+              (when (>= (:status resp) 400)
+                (throw (ex-info "Got error response from OCI" resp)))
+              resp)
+            (delete-instance [ci]
+              (log/warn "Deleting stale container instance:" (:id ci))
+              @(md/chain
+                (ci/delete-container-instance client {:instance-id (:id ci)})
+                check-errors
+                (constantly ci)))
+            (->out [ci]
+              (-> (select-keys (:freeform-tags ci) [:customer-id :repo-id])
+                  (assoc :build-id (:display-name ci)
+                         :instance-id (:id ci))))]
+      (->> @(ci/list-container-instances client {:compartment-id cid
+                                                 :lifecycle-state "ACTIVE"})
+           (check-errors)
+           :body
+           :items
+           (filter (every-pred build? stale?))
+           (map delete-instance)
+           (mapv ->out)))))

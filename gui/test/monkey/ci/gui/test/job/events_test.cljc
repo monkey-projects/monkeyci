@@ -3,8 +3,10 @@
                :cljs [cljs.test :refer-macros [deftest testing is use-fixtures]])
             [clojure.string :as cs]
             [day8.re-frame.test :as rft]
+            [monkey.ci.gui.build.db :as bdb]
             [monkey.ci.gui.job.db :as db]
             [monkey.ci.gui.job.events :as sut]
+            [monkey.ci.gui.login.db :as ldb]
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.test.fixtures :as tf]
             [monkey.ci.gui.test.helpers :as h]
@@ -34,6 +36,23 @@
        (rf/dispatch [:job/init])
        (is (= ::loaded (::build @app-db)))))))
 
+(deftest job-leave
+  (let [uid (repeatedly 4 (comp str random-uuid))]
+    (testing "clears all job info from db"
+      (is (some? (reset! app-db (-> {}
+                                    (r/set-current
+                                     {:parameters
+                                      {:path (zipmap [:customer-id :repo-id :build-id :job-id]
+                                                     uid)}})
+                                    (db/set-alerts [{:type :info :message "test alert"}])))))
+      (rf/dispatch-sync [:job/leave uid])
+      (is (nil? (db/get-alerts @app-db))))
+
+    (testing "clears log expansion states"
+      (is (some? (reset! app-db (db/set-log-expanded {} 0 true))))
+      (rf/dispatch-sync [:job/leave uid])
+      (is (not (db/log-expanded? @app-db 0))))))
+
 (deftest job-load-log-files
   (is (some? (reset! app-db (r/set-current {}
                                            {:parameters
@@ -58,13 +77,7 @@
                         (nth 3))]
          (is (= "filename" (:label params)))
          (is (= 100 (:start params)))
-         (is (= 201 (:end params))))))
-
-   (testing "sets alert"
-     (rf/dispatch [:job/load-logs {:id "test-job" :start-time 100}])
-     (let [a (db/global-alerts @app-db)]
-       (is (= 1 (count a)))
-       (is (= :info (-> a first :type)))))))
+         (is (= 201 (:end params))))))))
 
 (deftest job-load-log-files--success
   (testing "clears alerts"
@@ -113,11 +126,8 @@
      (testing "sets customer id in request"
        (is (= "test-cust" (-> @e first (nth 3) :customer-id))))
 
-     (testing "sets alert"
-       (let [path "test/path"]
-         (let [a (db/path-alerts @app-db path)]
-           (is (= 1 (count a)))
-           (is (= :info (-> a first :type)))))))))
+     (testing "marks loading"
+       (is (db/logs-loading? @app-db "test/path"))))))
 
 (deftest job-load-logs--success
   (testing "clears alerts"
@@ -129,7 +139,7 @@
   (testing "sets log lines in db"
     (is (empty? (reset! app-db {})))
     (rf/dispatch-sync [:job/load-logs--success "test/path" {:body ::logs}])
-    (is (= ::logs (db/logs @app-db "test/path")))))
+    (is (= ::logs (db/get-logs @app-db "test/path")))))
 
 (deftest job-load-logs--failed
   (testing "sets error alert"
@@ -138,3 +148,58 @@
       (is (= :danger (-> (db/path-alerts @app-db path)
                          first
                          :type))))))
+
+(deftest job-toggle-logs
+  (rft/run-test-sync
+   (h/initialize-martian {:download-log {:error-code :no-error
+                                         :body {}}})
+   
+   (let [e (h/catch-fx :martian.re-frame/request)
+         job-id "test-job"
+         build {:script {:jobs {job-id {:status :running}}}}]
+     (is (some? (swap! app-db (fn [db]
+                                (-> db
+                                    (bdb/set-build build)
+                                    (r/set-current {:parameters
+                                                    {:path
+                                                     {:job-id job-id}}}))))))
+     
+     (testing "when collapsed"
+       (is (nil? (rf/dispatch [:job/toggle-logs 0 {:out "/path/to/out"
+                                                   :err "/path/to/err"}])))
+
+       (testing "fetches out and err logs for given line from backend"
+         (is (= 2 (count @e)))
+         (is (-> @e
+                 first
+                 (nth 3)
+                 :query
+                 (cs/includes? "filename=\"/path/to/out\"")))
+         (is (-> @e
+                 second
+                 (nth 3)
+                 :query
+                 (cs/includes? "filename=\"/path/to/err\""))))
+
+       (testing "marks as expanded"
+         (is (db/log-expanded? @app-db 0))))
+
+     (testing "when expanded"
+       (is (empty? (reset! e [])))
+       (is (nil? (rf/dispatch [:job/toggle-logs 0])))
+
+       (testing "does not re-fetch"
+         (is (empty? @e)))
+       
+       (testing "marks as collapsed"
+         (is (not (db/log-expanded? @app-db 0)))))
+
+     (testing "does not re-fetch logs if job finished"
+       (is (empty? (reset! e [])))
+       (is (some? (swap! app-db (fn [db]
+                                  (bdb/set-build
+                                   db
+                                   (assoc-in (bdb/get-build db)
+                                             [:script :jobs job-id :status] :success))))))
+       (is (nil? (rf/dispatch [:job/toggle-logs 0 {:out "/path/to/out"}])))
+       (is (empty? @e))))))

@@ -79,3 +79,19 @@
   (testing "`nil` if start or end is not provided"
     (is (nil? (sut/format-interval (sut/now) nil)))
     (is (nil? (sut/format-interval nil (sut/now))))))
+
+(deftest date-seq
+  (testing "lazy seq of dates starting from given date"
+    (let [s (sut/local-date 2024 9 13)
+          ds (sut/date-seq s)]
+      (is (sut/same? s (first ds)))
+      (is (sut/same? (sut/local-date 2024 9 14) (second ds)))
+      (is (sut/same? (sut/local-date 2024 9 15) (nth ds 2))))))
+
+(deftest reverse-date-seq
+  (testing "lazy seq of dates starting from given date, moving backwards"
+    (let [s (sut/local-date 2024 9 13)
+          ds (sut/reverse-date-seq s)]
+      (is (sut/same? s (first ds)))
+      (is (sut/same? (sut/local-date 2024 9 12) (second ds)))
+      (is (sut/same? (sut/local-date 2024 9 11) (nth ds 2))))))

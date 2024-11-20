@@ -1,101 +1,246 @@
 (ns monkey.ci.gui.customer.views
-  (:require [monkey.ci.gui.components :as co]
+  (:require [monkey.ci.gui.charts :as charts]
+            [monkey.ci.gui.colors :as colors]
+            [monkey.ci.gui.components :as co]
+            [monkey.ci.gui.customer.db :as db]
             [monkey.ci.gui.customer.events]
             [monkey.ci.gui.customer.subs]
             [monkey.ci.gui.forms :as f]
+            [monkey.ci.gui.apis.bitbucket]
+            [monkey.ci.gui.apis.github]
             [monkey.ci.gui.layout :as l]
             [monkey.ci.gui.repo.views :as rv]
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.table :as t]
             [monkey.ci.gui.tabs :as tabs]
+            [monkey.ci.gui.time :as time]
+            [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
-(defn- show-repo [c p r]
-  [:div.repo.card-body
-   [:div.float-start
-    [:b {:title (:id r)} (:name r)]
-    [:p "Url: " [:a {:href (:url r)} (:url r)]]]
-   [:a.btn.btn-primary.float-end
-    {:href (r/path-for :page/repo {:customer-id (:id c)
-                                   :repo-id (:id r)})}
-    [co/icon :three-dots-vertical] " Details"]])
+(defn customer-icon []
+  [:span.me-2 co/customer-icon])
 
-(defn- show-project [cust [p repos]]
+(defn- build-chart-config [{:keys [elapsed-seconds consumed-credits]}]
+  (let [dates (->> (concat (map :date elapsed-seconds)
+                           (map :date consumed-credits))
+                   (set)
+                   (sort))]
+    {:type :line
+     :data {:labels (->> dates
+                         (map (comp time/format-date time/parse-epoch)))
+            :datasets
+            [{:label "Elapsed seconds"
+              :data (map :seconds elapsed-seconds)
+              :cubicInterpolationMode "monotone"
+              :tension 0.4
+              :yAxisID "y"}
+             {:label "Consumed credits"
+              :data (map :credits consumed-credits)
+              :cubicInterpolationMode "monotone"
+              :tension 0.4
+              :yAxisID "y1"}]}
+     :options
+     {:scales
+      {"y"
+       {:type :linear
+        :display true
+        :position :left}
+       "y1"
+       {:type :linear
+        :display true
+        :position :right
+        :grid
+        {:drawOnChartArea false}}}}}))
+
+(defn- credits-chart-config []
+  (let [stats (rf/subscribe [:customer/credit-stats])]
+    (when-let [{:keys [consumed available]} @stats]
+      ;; TODO Colors
+      {:type :doughnut
+       :data {:labels [(str available " available")
+                       (str consumed " consumed")]
+              :datasets
+              [{:label "Credits"
+                :data [available consumed]}]}})))
+
+(def stats-period-days 30)
+
+(defn customer-stats [cust-id]
+  (rf/dispatch [:customer/load-stats cust-id stats-period-days])
+  (rf/dispatch [:customer/load-credits cust-id])
+  (fn [cust-id]
+    (let [stats (rf/subscribe [:customer/stats])]
+      (rf/dispatch [:chart/update :customer/builds (build-chart-config (:stats @stats))])
+      (rf/dispatch [:chart/update :customer/credits (credits-chart-config)])
+      [:div.row
+       [:div.col-8
+        [:div.card
+         [:div.card-body
+          [:h5 "Statistics"]
+          [:p (str "Build elapsed times and consumed credits over the past " stats-period-days " days.")]
+          [charts/chart-component :customer/builds]]]]
+       [:div.col-4
+        [:div.card
+         [:div.card-body
+          [:h5 "Credits"]
+          [:p "Credit consumption for this month."]
+          [charts/chart-component :customer/credits]]]]])))
+
+(defn- show-repo [c r]
+  (let [repo-path (r/path-for :page/repo {:customer-id (:id c)
+                                          :repo-id (:id r)})]
+    [:div.card-body.border-top
+     [:div.d-flex.flex-row.align-items-start
+      [:div.me-auto
+       [:h6 {:title (:id r)}
+        [:span.me-2 co/repo-icon]
+        [:a.link-dark {:href repo-path} (:name r)]]
+       [:p "Url: " [:a {:href (:url r) :target :_blank} (:url r)]]]
+      [:a.btn.btn-primary
+       {:href repo-path}
+       [co/icon :three-dots-vertical] " Details"]]]))
+
+(defn- repo-group-card [cust title repos]
   (->> repos
        (sort-by :name)
-       (map (partial show-repo cust p))
+       (map (partial show-repo cust))
        (into
-        [:div.project.card.mb-3
+        [:div.card.mb-3
          [:div.card-header
-          [:h5.card-title p]]])))
+          (when title
+            [:h5.card-header-title [:span.me-2 co/repo-group-icon] title])]])))
 
-(defn- project-lbl [r]
-  (->> (:labels r)
-       (filter (comp (partial = "project") :name))
-       (map :value)
-       (first)))
+(defn- show-repo-group [cust [p repos]]
+  (repo-group-card cust (or p "(No value)") repos))
 
-(defn- add-repo-btn [id]
-  [:a.btn.btn-outline-dark.me-2
-   {:href (r/path-for :page/add-repo {:customer-id id})
-    :title "Link an existing GitHub repository"}
-   [:span.me-1 [co/icon :github]] "Follow Repository"])
+(defn- add-github-repo-btn [id]
+  (when @(rf/subscribe [:login/github-user?])
+    [:a.btn.btn-outline-dark.bg-light.link-dark
+     {:href (r/path-for :page/add-github-repo {:customer-id id})
+      :title "Link an existing GitHub repository"}
+     [:span.me-1 [co/icon :github]] "Watch Repository"]))
+
+(defn- add-bitbucket-repo-btn [id]
+  (when @(rf/subscribe [:login/bitbucket-user?])
+    [:a.btn.btn-outline-dark.bg-light.link-dark
+     {:href (r/path-for :page/add-bitbucket-repo {:customer-id id})
+      :title "Link an existing Bitbucket repository"}
+     [:img.me-2 {:src "/img/mark-gradient-blue-bitbucket.svg" :height "25px"}]
+     "Watch Repository"]))
 
 (defn- params-btn [id]
-  [:a.btn.btn-outline-primary.me-2
+  [:a.btn.btn-soft-primary
    {:href (r/path-for :page/customer-params {:customer-id id})
     :title "Configure build parameters"}
    [:span.me-2 [co/icon :gear]] "Parameters"])
 
+(defn- ssh-keys-btn [id]
+  [:a.btn.btn-soft-primary
+   {:href (r/path-for :page/customer-ssh-keys {:customer-id id})
+    :title "Configure ssh keys to access private repositories"}
+   [:span.me-2 [co/icon :key]] "SSH Keys"])
+
 (defn- customer-actions [id]
   [:<>
-   [add-repo-btn id]
+   [add-github-repo-btn id]
+   [add-bitbucket-repo-btn id]
    [params-btn id]
-   [co/reload-btn [:customer/load id]]])
+   [ssh-keys-btn id]])
 
 (defn- customer-header []
   (let [c (rf/subscribe [:customer/info])]
-    [:div.clearfix.mb-3
-     [:h3.float-start (:name @c)]
-     [:span.float-end
-      [customer-actions (:id @c)]]]))
+    [:div.d-flex.gap-2
+     [:h3.me-auto [customer-icon] (:name @c)]
+     [customer-actions (:id @c)]]))
+
+(defn- label-selector []
+  (let [l (rf/subscribe [:customer/labels])
+        sel (rf/subscribe [:customer/group-by-lbl])]
+    (->> @l
+         (map (fn [v]
+                [:option {:value v} (str "Group by " v)]))
+         (into [:select.form-select
+                {:id :group-by-label
+                 :aria-label "Label selector"
+                 :value @sel
+                 :on-change (u/form-evt-handler [:customer/group-by-lbl-changed])}
+                [:option {:value nil} "Ungrouped"]]))))
+
+(defn- repo-name-filter []
+  (let [f (rf/subscribe [:customer/repo-filter])]
+    [co/filter-input
+     {:id :repo-name-filter
+      :on-change (u/form-evt-handler [:customer/repo-filter-changed])
+      :placeholder "Repository name"
+      :value @f}]))
+
+(defn- repos-action-bar
+  "Display a small form on top of the repositories overview to group and filter repos."
+  [cust]
+  [:div.d-flex.flex-row.mb-2
+   [:form.row.row-cols-lg-auto.g-2.align-items-center
+    [:label.col {:for :group-by-label} "Repository overview"]
+    [:div.col
+     [label-selector]]
+    [:div.col
+     [repo-name-filter]]]
+   [:div.ms-auto
+    [co/reload-btn-sm [:customer/load (:id cust)]]]])
+
+(defn- repos-list [cust]
+  (let [r (rf/subscribe [:customer/grouped-repos])]
+    (into [:<> [repos-action-bar cust]]
+          (if (= 1 (count @r))
+            [(repo-group-card cust "All Repositories" (first (vals  @r)))]
+            (->> @r
+                 (sort-by first)
+                 (map (partial show-repo-group cust)))))))
 
 (defn- customer-repos
-  "Displays a list of customer repositories, grouped by project"
+  "Displays a list of customer repositories, grouped by selected label"
   []
   (let [c (rf/subscribe [:customer/info])]
     (if (empty? (:repos @c))
       [:p "No repositories configured for this customer.  You can start by"
-       [:a.mx-1 {:href (r/path-for :page/add-repo {:customer-id (:id @c)})} "following one."]]
-      (->> (:repos @c)
-           ;; TODO Allow grouping by any custom label
-           (group-by project-lbl)
-           (sort-by first)
-           (map (partial show-project @c))
-           (into [:<>
-                  [:p "Repository overview, grouped by project."]])))))
+       [:a.mx-1 {:href (r/path-for :page/add-github-repo {:customer-id (:id @c)})} "watching one."]]
+      [repos-list @c])))
 
 (defn- recent-builds [id]
   (rf/dispatch [:customer/load-recent-builds id])
-  [:<>
-   [:p "Recent builds for all repositories."]
-   [t/paged-table
-    {:id ::recent-builds
-     :items-sub [:customer/recent-builds]
-     :columns (concat [{:label "Repository"
-                        :value (fn [b]
-                                 [:a {:href (r/path-for :page/repo b)} (get-in b [:repo :name])])}]
-                      rv/table-columns)}]])
+  (fn [id]
+    (let [loaded? (rf/subscribe [:loader/loaded? db/recent-builds])
+          recent (rf/subscribe [:customer/recent-builds])]
+      (if (and @loaded? (empty? @recent))
+        [:p "No recent builds found for this customer."]
+        [:<>
+         (if @loaded?
+           [:p "Recent builds for all repositories."]
+           [:p "Loading recent builds for all repositories..."])
+         [:div.card
+          [:div.card-body
+           [t/paged-table
+            {:id ::recent-builds
+             :items-sub [:customer/recent-builds]
+             :columns (concat [{:label "Repository"
+                                :value (fn [b]
+                                         [:a {:href (r/path-for :page/repo b)} (get-in b [:repo :name])])}]
+                              rv/table-columns)
+             :loading {:sub [:loader/init-loading? db/recent-builds]}}]]]]))))
 
 (defn- overview-tabs
   "Displays tab pages for various customer overview screens"
   [id]
   [tabs/tabs ::overview
-   [{:header "Repositories"
-     :contents [customer-repos]
+   [{:id :overview
+     :header [:span [:span.me-2 co/overview-icon] "Overview"]
+     :contents [customer-stats id]}
+    {:id :recent
+     :header [:span [:span.me-2 co/build-icon] "Recent Builds"]
+     :contents [recent-builds id]
      :current? true}
-    {:header "Recent Builds"
-     :contents [recent-builds id]}]])
+    {:id :repos
+     :header [:span [:span.me-2 co/repo-icon] "Repositories"]
+     :contents [customer-repos]}]])
 
 (defn- customer-details [id]
   [:<>
@@ -108,26 +253,27 @@
   (let [id (-> route (r/path-params) :customer-id)]
     (rf/dispatch [:customer/init id])
     (l/default
-     [:div
+     [:<>
       [co/alerts [:customer/alerts]]
       [customer-details id]])))
 
-(defn- repo-table []
+(defn- ext-repo-actions [watch-evt unwatch-evt {:keys [:monkeyci/watched?] :as repo}]
+  (if watched?
+    [:button.btn.btn-sm.btn-danger
+     {:on-click #(rf/dispatch [unwatch-evt repo])}
+     [:span.me-1.text-nowrap [co/icon :stop-circle-fill]] "Unwatch"]
+    [:button.btn.btn-sm.btn-primary
+     {:on-click #(rf/dispatch [watch-evt repo])}
+     [:span.me-1.text-nowrap [co/icon :binoculars-fill]] "Watch"]))
+
+(defn- github-repo-table []
   (letfn [(name+url [{:keys [name html-url]}]
             [:a {:href html-url :target "_blank"} name])
           (visibility [{:keys [visibility]}]
             [:span.badge {:class (if (= "public" visibility)
-                                   :text-bg-success
-                                   :text-bg-warning)}
-             visibility])
-          (actions [{:keys [:monkeyci/watched?] :as repo}]
-            (if watched?
-              [:button.btn.btn-sm.btn-danger
-               {:on-click #(rf/dispatch [:repo/unwatch (:monkeyci/repo repo)])}
-               [:span.me-1.text-nowrap [co/icon :stop-circle-fill]] "Unwatch"]
-              [:button.btn.btn-sm.btn-primary
-               {:on-click #(rf/dispatch [:repo/watch repo])}
-               [:span.me-1.text-nowrap [co/icon :binoculars-fill]] "Watch"]))]
+                                   :bg-success
+                                   :bg-warning)}
+             visibility])]
     [t/paged-table
      {:id ::repos
       :items-sub [:customer/github-repos]
@@ -140,25 +286,73 @@
                 {:label "Visibility"
                  :value visibility}
                 {:label "Actions"
-                 :value actions}]}]))
+                 :value (partial ext-repo-actions
+                                 :repo/watch-github
+                                 :repo/unwatch-github)}]}]))
+
+(defn- bitbucket-repo-table []
+  (letfn [(name+url [{:keys [name links]}]
+            [:a {:href (get-in links [:html :href]) :target "_blank"} name])
+          (visibility [{:keys [is-private]}]
+            [:span.badge {:class (if is-private
+                                   :bg-warning
+                                   :bg-success)}
+             (if is-private "private" "public")])]
+    [t/paged-table
+     {:id ::repos
+      :items-sub [:customer/bitbucket-repos]
+      :columns [{:label "Name"
+                 :value name+url}
+                {:label "Workspace"
+                 :value (comp :name :workspace)}
+                {:label "Description"
+                 :value :description}
+                {:label "Visibility"
+                 :value visibility}
+                {:label "Actions"
+                 :value (partial ext-repo-actions
+                                 :repo/watch-bitbucket
+                                 :repo/unwatch-bitbucket)}]}]))
+
+(defn ext-repo-filter []
+  (let [v (rf/subscribe [:customer/ext-repo-filter])]
+    [:form.row.row-cols-lg-auto.g-2.align-items-center.mb-2
+     [:div.col
+      [co/filter-input
+       {:id :github-repo-name
+        :placeholder "Repository name"
+        :value @v
+        :on-change (u/form-evt-handler [:customer/ext-repo-filter-changed])}]]]))
 
 (defn add-repo-page
-  []
+  [table]
   (let [route (rf/subscribe [:route/current])]
-    (rf/dispatch [:customer/load-github-repos])
     (l/default
      [:<>
       [:h3 "Add Repository to Watch"]
       [co/alerts [:customer/repo-alerts]]
-      [repo-table]
-      [:a {:href (r/path-for :page/customer (r/path-params @route))} "Back to customer"]])))
+      [ext-repo-filter]
+      [:div.card.mb-2
+       [:div.card-body
+        [table]]]
+      [:a {:href (r/path-for :page/customer (r/path-params @route))}
+       [:span.me-1 [co/icon :chevron-left]] "Back to customer"]])))
+
+(defn add-github-repo-page []
+  (rf/dispatch [:github/load-repos])
+  [add-repo-page github-repo-table])
+
+(defn add-bitbucket-repo-page []
+  (rf/dispatch [:bitbucket/load-repos])
+  (rf/dispatch [:customer/load-bb-webhooks])
+  [add-repo-page bitbucket-repo-table])
 
 (defn page-new
   "New customer page"
   []
   (l/default
    [:<>
-    [:h3 "New Customer"]
+    [:h3 [customer-icon] "New Customer"]
     [:form.mb-3
      {:on-submit (f/submit-handler [:customer/create])}
      [:div.mb-3

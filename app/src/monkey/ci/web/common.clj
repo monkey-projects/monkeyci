@@ -1,8 +1,7 @@
 (ns monkey.ci.web.common
   (:require [buddy.auth :as ba]
             [camel-snake-kebab.core :as csk]
-            [cheshire.core :as json]
-            [clojure.java.io :as io]
+            [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
             [muuntaja.core :as mc]
@@ -11,13 +10,19 @@
              [labels :as lbl]
              [runtime :as rt]
              [storage :as st]]
+            [monkey.ci.events.core :as ec]
             [reitit.ring :as ring]
             [reitit.ring.coercion :as rrc]
             [reitit.ring.middleware
              [exception :as rrme]
              [muuntaja :as rrmm]
              [parameters :as rrmp]]
-            [ring.util.response :as rur]))
+            [ring.util.response :as rur]
+            [schema.core :as s]))
+
+(def not-empty-str (s/constrained s/Str not-empty))
+(def Id not-empty-str)
+(def Name not-empty-str)
 
 (def body
   "Retrieves request body"
@@ -28,6 +33,17 @@
 (def repo-sid (comp (juxt :customer-id :repo-id)
                     :path
                     :parameters))
+
+(def build-sid (comp (juxt :customer-id :repo-id :build-id)
+                     :path
+                     :parameters))
+
+(defn error-response
+  ([error-msg status]
+   (-> (rur/response {:error error-msg})
+       (rur/status status)))
+  ([error-msg]
+   (error-response error-msg 400)))
 
 ;; Reitit rewrites records in the data to hashmaps, so wrap it in a type
 (deftype RuntimeWrapper [runtime])
@@ -43,10 +59,19 @@
   [req f]
   (f (req->rt req)))
 
+(def rt->storage :storage)
+
 (defn req->storage
   "Retrieves storage object from the request context"
   [req]
-  (from-rt req :storage))
+  (from-rt req rt->storage))
+
+(defn req->ext-uri
+  "Determines external host address using configuration, or request properties"
+  [req base]
+  (or (-> req (req->rt) :config :api :ext-url)
+      (let [idx (cs/index-of (:uri req) base)]
+        (format "%s://%s%s" (name (:scheme req)) (get-in req [:headers "host"]) (subs (:uri req) 0 idx)))))
 
 (defn id-getter [id-key]
   (comp id-key :path :parameters))
@@ -95,6 +120,7 @@
     (rur/status (if (deleter (req->storage req) (get-id req))
                   204
                   404))))
+
 (defn default-id [_ _]
   (st/new-id))
 
@@ -149,6 +175,25 @@
            (rur/response))
       (rur/not-found {:message (format "Repository %s does not exist" sid)}))))
 
+(defn gen-repo-display-id
+  "Generates id from the object name.  It lists existing repository display ids
+   and generates an id from the name.  If the display id is already taken, it adds
+   an index."
+  [st obj]
+  (let [existing? (-> (:customer-id obj)
+                      (as-> cid (st/list-repo-display-ids st cid))
+                      (set))
+        ;; TODO Check what happens with special chars
+        new-id (csk/->kebab-case (:name obj))]
+    (loop [id new-id
+           idx 2]
+      ;; Try a new id until we find one that does not exist yet.
+      ;; Alternatively we could parse the ids to extract the max index (but yagni)
+      (if (existing? id)
+        (recur (str new-id "-" idx)
+               (inc idx))
+        id))))
+
 (defn make-muuntaja
   "Creates muuntaja instance with custom settings"
   []
@@ -168,7 +213,7 @@
       (h req)
       (catch Exception ex
         ;; Log and rethrow
-        (log/error (str "Got error while handling request" (:uri req)) ex)
+        (log/error (str "Got error while handling request: " (:uri req)) ex)
         (throw ex)))))
 
 (def exception-middleware
@@ -182,6 +227,7 @@
                                    :body "Unauthenticated"}))})))
 
 (def default-middleware
+  ;; TODO Transactions for sql storage
   [rrmp/parameters-middleware
    rrmm/format-middleware
    exception-middleware
@@ -197,11 +243,18 @@
     (ring/redirect-trailing-slash-handler)
     (ring/create-default-handler))))
 
-(defn parse-json [s]
-  (if (string? s)
-    (json/parse-string s csk/->kebab-case-keyword)
-    (with-open [r (io/reader s)]
-      (json/parse-stream r csk/->kebab-case-keyword))))
+(def m-decoder
+  "Muuntaja decoder used to parse response bodies"
+  (make-muuntaja))
+
+(defn parse-body
+  "Parses response body according to content type.  Throws an exception if 
+   the content type is not supported."
+  [resp]
+  (assoc resp :body (mc/decode-response-body m-decoder resp)))
+
+(defn new-build-id [idx]
+  (str "build-" idx))
 
 (defn run-build-async
   "Starts the build in a new thread"
@@ -213,11 +266,12 @@
                                            (-> build
                                                (assoc :status :error
                                                       :message (ex-message ex))))))]
+    ;; TODO Check customer available credits
     (md/future
       (try
-        (rt/post-events rt {:type :build/pending
-                            :build (b/build->evt build)
-                            :sid (b/sid build)})
+        (rt/post-events rt (ec/make-event :build/pending
+                                          :build (b/build->evt build)
+                                          :sid (b/sid build)))
         ;; Catch both the deferred error, or the direct exception, because both
         ;; can be thrown here.
         (-> (runner build rt)

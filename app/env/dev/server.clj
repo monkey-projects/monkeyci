@@ -2,6 +2,7 @@
   (:require [aleph.http :as aleph]
             [clojure.spec.alpha :as s]
             [clojure.tools.logging :as log]
+            [com.stuartsierra.component :as component]
             [config :as co]
             [manifold.stream :as ms]
             [monkey.ci
@@ -10,17 +11,22 @@
              [runtime :as rt]
              [spec :as mcs]
              [utils :as u]]
+            [monkey.ci.runtime.app :as ra]
             [monkey.ci.web.auth :as auth]
             [org.httpkit.server :as http]))
 
 (defonce server (atom nil))
 
 (defn stop-server []
-  (swap! server (fn [{:keys [server rt]}]
+  #_(swap! server (fn [{:keys [server rt]}]
                   (when server
                     (server))
                   (when rt
                     (rt/stop rt))
+                  nil))
+  (swap! server (fn [sys]
+                  (when sys
+                    (component/stop sys))
                   nil)))
 
 (defn validate-config [c]
@@ -30,18 +36,15 @@
 
 (defn start-server []
   (stop-server)
-  (let [rt (-> (merge {:dev-mode true
-                       :http {:port 3000}
-                       :work-dir (u/abs-path "tmp")}
-                      @co/global-config)
-               (config/normalize-config {} {})
-               (assoc :app-mode :server)
-               (validate-config)
-               (rt/config->runtime)
-               (rt/start))
-        start-server (:http rt)]
-    (reset! server {:rt rt
-                    :server (start-server rt)}))
+  (let [conf (-> (merge {:dev-mode true
+                         :http {:port 3000}
+                         :work-dir (u/abs-path "tmp")}
+                        @co/global-config)
+                 (assoc :app-mode :server)
+                 (validate-config))
+        sys (-> (ra/make-server-system conf)
+                (component/start))]
+    (reset! server sys))
   nil)
 
 (defn get-server-port []

@@ -10,14 +10,16 @@
   (testing "saves path using blob store"
     (let [stored (atom {})
           bs (h/fake-blob-store stored)
-          ctx {:cache bs
-               :build {:sid ["test-cust" "test-build"]}
+          build {:sid ["test-cust" "test-build"]}
+          repo (sut/make-blob-repository bs build)
+          ctx {:cache repo
+               :build build
                :job {:work-dir "work"
                      :caches [{:id "test-cache"
                                :path "test-path"}]}}]
       (is (some? @(sut/save-caches ctx)))
       (is (= 1 (count @stored)))
-      (is (cs/ends-with? (-> @stored first second)
+      (is (cs/ends-with? (-> @stored ffirst)
                          "test-cust/test-cache.tgz"))))
 
   (testing "nothing if no cache store"
@@ -28,8 +30,10 @@
   (testing "restores path using blob store"
     (let [stored (atom {"test-cust/test-cache.tgz" ::dest})
           bs (h/fake-blob-store stored)
-          ctx {:cache bs
-               :build {:sid ["test-cust" "test-build"]}
+          build {:sid ["test-cust" "test-build"]}
+          repo (sut/make-blob-repository bs build)
+          ctx {:cache repo
+               :build build
                :job {:work-dir "work"
                      :caches [{:id "test-cache"
                                :path "test-path"}]}}]

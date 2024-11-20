@@ -4,36 +4,18 @@
             [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
-            [medley.core :as mc]
             [monkey.ci
              [artifacts :as art]
-             [blob :as blob]
              [build :as b]
              [cache :as cache]
-             [config :as c]
+             [jobs :as j]
              [logging :as l]
-             [runtime :as rt]
-             [utils :as u]]))
-
-(defn restore-src [{:keys [build] :as rt}]
-  (let [store (get rt :workspace)
-        ws (:workspace build)
-        ;; Check out to the parent because the archive contains the directory
-        checkout (some-> (:checkout-dir build)
-                         (fs/parent)
-                         str)
-        restore (fn [rt]
-                  (log/info "Restoring workspace" ws)
-                  (md/chain
-                   (blob/restore store ws checkout)
-                   (fn [_]
-                     (assoc-in rt [:build :workspace/restored?] true))))]
-    (cond-> rt
-      (and store ws checkout)
-      (restore))))
-
-(defn- get-config [rt k]
-  (-> rt rt/config :sidecar k))
+             [spec :as spec]
+             [utils :as u]
+             [workspace :as ws]]
+            [monkey.ci.config.sidecar :as cs]
+            [monkey.ci.events.core :as ec]
+            [monkey.ci.spec.sidecar :as ss]))
 
 (defn- create-file-with-dirs [f]
   (let [p (fs/parent f)]
@@ -42,12 +24,8 @@
       (fs/create-dirs p)))
   (fs/create-file f))
 
-#_(defn- make-rw [f]
-  ;; Grant read/write to the world, in case the job runs as another user
-  (fs/set-posix-file-permissions f "rw-rw-rw-"))
-
 (defn- touch-file [rt k]
-  (let [f (get-config rt k)]
+  (let [f (get-in rt [:paths k])]
     (when (not-empty f)
       (log/debug "Creating file:" f)
       (create-file-with-dirs f))
@@ -72,7 +50,7 @@
         (with-open [is (io/input-stream path)]
           (let [capt (logger [(fs/file-name path)])
                 d (l/handle-stream capt is)]
-            (when (md/deferred? d)
+            (when  (md/deferred? d)
               @d)))))))
 
 (defn upload-logs
@@ -83,21 +61,20 @@
       (upload-log logger l)
       (log/debug "File uploaded:" l))))
 
+(defn- get-logger [{:keys [build job log-maker]}]
+  (let [log-base (b/get-job-sid job build)]
+    (when log-maker (comp (partial log-maker build)
+                          (partial concat log-base)))))
+
 (defn poll-events
   "Reads events from the job container events file and posts them to the event service."
-  [{:keys [job] :as rt}]
-  (let [f (-> (get-config rt :events-file)
-              (maybe-create-file))
+  [{:keys [job build events] :as rt}]
+  (let [f (maybe-create-file (get-in rt [:paths :events-file]))
         read-next (fn [r]
                     (u/parse-edn r {:eof ::eof}))
-        interval (get-in rt [rt/config :sidecar :poll-interval] 1000)
-        ;; TODO Remove explicit log uploads, the promtail container takes care of this now.
-        log-maker (rt/log-maker rt)
-        log-base (b/get-job-sid rt)
-        logger (when log-maker (comp (partial log-maker rt)
-                                     (partial concat log-base)))
-        set-exit (fn [v] (assoc rt :exit v))
-        sid (b/get-sid rt)]
+        interval (get rt :poll-interval cs/default-poll-interval)
+        logger (get-logger rt)
+        set-exit (fn [v] (assoc rt :exit v))]
     (log/info "Polling events from" f)
     (md/future
       (try
@@ -117,9 +94,11 @@
                           ;; TODO Start uploading logs as soon as the file is created instead
                           ;; of when the command has finished.
                           (upload-logs evt logger))
-                        (rt/post-events rt (assoc evt
-                                                  :sid sid
-                                                  :job job))))
+                        (ec/post-events events (ec/make-event
+                                                (:type evt)
+                                                (assoc evt
+                                                       :sid (b/sid build)
+                                                       :job-id (j/job-id job))))))
                 (if (:done? evt)
                   (set-exit 0)
                   (recur (read-next r)))))))
@@ -132,9 +111,9 @@
 (defn run
   "Runs sidecar by restoring workspace, artifacts and caches, and then polling for events.
    After the event loop has terminated, saves artifacts and caches and returns a deferred
-   containing the runtime with an `:exit-code` added."
+   containing the runtime with an `:exit` added."
   [rt]
-  (log/info "Running sidecar with configuration:" (get-in rt [rt/config :sidecar]))
+  {:pre [(spec/valid? ::ss/runtime rt)]}
   ;; Restore caches and artifacts before starting the job
   (let [h (-> (comp poll-events mark-start)
               (art/wrap-artifacts)
@@ -145,7 +124,7 @@
                         :exception ex})]
     (try
       (-> rt
-          (restore-src)
+          (ws/restore)
           (md/chain h)
           (md/catch
               (fn [ex]
@@ -155,14 +134,3 @@
       (catch Throwable t
         (mark-abort rt)
         (md/success-deferred (error-result t))))))
-
-(defn- add-from-args [conf k]
-  (update-in conf [:sidecar k] #(or (get-in conf [:args k]) %)))
-
-(defmethod c/normalize-key :sidecar [_ conf]
-  (-> conf
-      (mc/update-existing-in [:sidecar :log-config] u/try-slurp)
-      (add-from-args :events-file)
-      (add-from-args :start-file)
-      (add-from-args :abort-file)
-      (add-from-args :job-config)))

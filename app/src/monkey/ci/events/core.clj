@@ -4,18 +4,30 @@
             [monkey.ci
              [config :as c]
              [protocols :as p]
-             [runtime :as rt]]
+             [runtime :as rt]
+             [time :as t]]
             [monkey.ci.events
              [jms :as jms]
              [manifold :as manifold]
              [zmq :as zmq]]))
 
-(def post-events p/post-events)
+(defn post-events [e evts]
+  (if e
+    (p/post-events e evts)
+    (log/warn "Unable to post, no events configured")))
+
 (def add-listener p/add-listener)
 (def remove-listener p/remove-listener)
 
-(defn make-event [e]
-  (assoc e :timestamp (System/currentTimeMillis)))
+(defn make-event
+  "Creates a new event with required properties.  Additional properties are given as
+   map keyvals, or as a single map."
+  [type & props]
+  (-> (if (= 1 (count props))
+        (first props)
+        (apply hash-map props))
+      (assoc :type type
+             :time (t/now))))
 
 (defn invoke-listeners [filter-fn listeners events]
   ;; Find all listeners where the filter and event are matched by the filter-fn
@@ -46,11 +58,11 @@
 (defn matches-event?
   "Matches events against event filters.  This checks event types and possible sid."
   [evt {:keys [types sid] :as ef}]
+  ;; TODO Allow for more generic filter fn
   (letfn [(matches-type? [evt]
             (or (nil? types) (contains? types (:type evt))))
           (matches-sid? [evt]
             (or (nil? sid) (= sid (take (count sid) (:sid evt)))))]
-    ;; TODO Add sid check
     (or (nil? ef)
         ((every-pred matches-type? matches-sid?) evt))))
 
@@ -69,28 +81,23 @@
     (f evt)
     nil))
 
-(defmethod c/normalize-key :events [k conf]
-  (update conf k (comp #(c/group-keys % :client)
-                       #(c/group-keys % :server)
-                       c/keywordize-type)))
-
-(defmulti make-events (comp :type :events))
+(defmulti make-events :type)
 
 (defmethod make-events :sync [_]
   (make-sync-events matches-event?))
 
 (defmethod make-events :jms [config]
-  (jms/make-jms-events (:events config) matches-event?))
+  (jms/make-jms-events config matches-event?))
 
 (defmethod make-events :manifold [_]
   (manifold/make-manifold-events matches-event?))
 
 (defmethod make-events :zmq [config]
-  (zmq/make-zeromq-events (:events config) matches-event?))
+  (zmq/make-zeromq-events config matches-event?))
 
 (defmethod rt/setup-runtime :events [conf _]
-  (when (:events conf)
-    (make-events conf)))
+  (when-let [ec (:events conf)]
+    (make-events ec)))
 
 (defn wrapped
   "Returns a new function that wraps `f` and posts an event before 
@@ -131,14 +138,13 @@
   (let [r (md/deferred)
         l (fn [evt]
             (when (or (nil? pred) (pred evt))
-              (log/debug "Matching event has arrived")
+              (log/debug "Matching event has arrived for filter" ef ":" evt)
               (md/success! r evt)))
-        unregister (fn [_]
+        unregister (fn []
                      (remove-listener events ef l))]
-    ;; Make sure to unregister the listener in any case
-    (md/on-realized r unregister unregister)
     (add-listener events ef l)
-    r))
+    ;; Make sure to unregister the listener in any case
+    (md/finally r unregister)))
 
 ;;; Utility functions for building events
 

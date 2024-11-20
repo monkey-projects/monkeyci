@@ -1,48 +1,34 @@
 (ns monkey.ci.gui.build.db
-  (:require [monkey.ci.gui.loader :as lo]))
+  (:require [monkey.ci.gui.loader :as lo]
+            [monkey.ci.gui.routing :as r]))
 
 (def id ::build-id)
-(def alerts ::alerts)
+
+(def params->sid (juxt :customer-id :repo-id :build-id))
+
+(def r->sid (comp params->sid r/path-params r/current))
+
+(def get-id
+  "Construct a unique loader id for the build using route params"
+  (comp (partial vector id) r->sid))
+
+(defn get-alerts [db]
+  (lo/get-alerts db (get-id db)))
 
 (defn set-alerts [db a]
-  (assoc db alerts a))
+  (lo/set-alerts db (get-id db) a))
 
 (defn reset-alerts [db]
-  (dissoc db alerts))
+  (lo/reset-alerts db (get-id db)))
 
-(def build ::build)
+(defn get-build [db]
+  (lo/get-value db (get-id db)))
 
-(defn set-build [db l]
-  (assoc db build l))
+(defn set-build [db b]
+  (lo/set-value db (get-id db) b))
 
 (defn update-build [db f & args]
-  (apply update db build f args))
-
-(def reloading ::reloading)
-
-(defn set-reloading
-  "Sets the set of reloading things"
-  ([db r]
-   (assoc db reloading r))
-  ([db]
-   (set-reloading db #{:build})))
-
-(defn clear-reloading [db r]
-  (update db reloading disj r))
-
-(defn clear-build-reloading [db]
-  (clear-reloading db :build))
-
-(defn reloading? [db]
-  (not-empty (reloading db)))
-
-(def downloading? ::downloading?)
-
-(defn mark-downloading [db]
-  (assoc db downloading? true))
-
-(defn reset-downloading [db]
-  (dissoc db downloading?))
+  (apply lo/update-value db (get-id db) f args))
 
 (def log-path ::log-path)
 
@@ -57,18 +43,20 @@
 (defn reset-log-alerts [db]
   (dissoc db log-alerts))
 
-(def auto-reload? ::auto-reload)
+(defn mark-canceling [db]
+  (assoc-in db [(get-id db) ::canceling] true))
 
-(defn set-auto-reload [db v]
-  (assoc db auto-reload? v))
+(defn reset-canceling [db]
+  (update db (get-id db) dissoc ::canceling))
 
-(def expanded-jobs ::expanded-jobs)
+(defn canceling? [db]
+  (true? (get-in db [(get-id db) ::canceling])))
 
-(defn set-expanded-jobs [db ids]
-  (assoc db expanded-jobs (set ids)))
+(defn mark-retrying [db]
+  (assoc-in db [(get-id db) ::retrying] true))
 
-(defn toggle-expanded-job [db id]
-  (update db expanded-jobs (fnil (fn [ids]
-                                   (let [toggle (if (ids id) disj conj)]
-                                     (toggle ids id)))
-                                 #{})))
+(defn reset-retrying [db]
+  (update db (get-id db) dissoc ::retrying))
+
+(defn retrying? [db]
+  (true? (get-in db [(get-id db) ::retrying])))

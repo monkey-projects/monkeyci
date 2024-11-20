@@ -1,15 +1,21 @@
 (ns monkey.ci.events.core-test
   (:require [clojure.test :refer [deftest testing is]]
-            [monkey.ci.config :as c]
             [monkey.ci.events
              [core :as sut]
              [async-tests :as ast]]))
 
 (deftest make-event
   (testing "adds timestamp to event"
-    (is (number? (-> {:type :test-event}
-                     (sut/make-event)
-                     :timestamp)))))
+    (is (number? (-> (sut/make-event :test-event :key "value")
+                     :time))))
+
+  (testing "adds properties from varargs"
+    (is (= {:key "value"} (-> (sut/make-event :test-event :key "value")
+                              (select-keys [:key])))))
+
+  (testing "adds properties from map"
+    (is (= {:key "value"} (-> (sut/make-event :test-event {:key "value"})
+                              (select-keys [:key]))))))
 
 (deftest sync-events
   (testing "can add listener"
@@ -39,15 +45,15 @@
 
 (deftest make-events
   (testing "can make sync events"
-    (is (some? (sut/make-events {:events {:type :sync}}))))
+    (is (some? (sut/make-events {:type :sync}))))
 
   (testing "can make manifold events"
-    (is (some? (sut/make-events {:events {:type :manifold}}))))
+    (is (some? (sut/make-events {:type :manifold}))))
   
   (testing "can make zeromq server events"
-    (is (some? (sut/make-events {:events {:type :zmq
-                                          :server
-                                          {:addresses ["tcp://0.0.0.0:3001"]}}})))))
+    (is (some? (sut/make-events {:type :zmq
+                                 :server
+                                 {:addresses ["tcp://0.0.0.0:3001"]}})))))
 
 (deftest matches-event?
   (testing "matches event that contains one of the specified types"
@@ -122,17 +128,3 @@
                                   :exception
                                   (.getMessage)))))))
 
-(deftest normalize-key
-  (testing "groups client subkey"
-    (is (= {:type :zmq
-            :client {:addr "test-addr"}}
-           (-> (c/normalize-key :events {:events {:type "zmq"
-                                                  :client-addr "test-addr"}})
-               :events))))
-
-  (testing "groups server subkey"
-    (is (= {:type :zmq
-            :server {:addr "test-addr"}}
-           (-> (c/normalize-key :events {:events {:type "zmq"
-                                                  :server-addr "test-addr"}})
-               :events)))))

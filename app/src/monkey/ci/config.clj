@@ -6,28 +6,26 @@
    do some actual work.  This allows us to change the behaviour of the application with
    configuration, but also makes it possible to inject dummy functions for testing 
    purposes."
-  (:require [camel-snake-kebab.core :as csk]
-            [cheshire.core :as json]
-            [clojure
-             [string :as cs]
-             [walk :as cw]]
-            [clojure.java.io :as io]
+  (:require [aero.core :as ac]
+            [babashka.fs :as fs]
+            [camel-snake-kebab.core :as csk]
             [clojure.tools.logging :as log]
             [medley.core :as mc]
+            [meta-merge.core :as mm]
+            [monkey.aero] ; Aero extensions
             [monkey.ci
+             [edn]
              [sid :as sid]
-             [utils :as u]]))
+             [utils :as u]
+             [version :as v]]))
 
 (def ^:dynamic *global-config-file* "/etc/monkeyci/config.edn")
 (def ^:dynamic *home-config-file* (-> (System/getProperty "user.home")
-                                      (io/file ".monkeyci" "config.edn")
-                                      (.getCanonicalPath)))
+                                      (fs/path ".monkeyci" "config.edn")
+                                      (fs/canonicalize)
+                                      str))
 
 (def env-prefix "monkeyci")
-
-;; Determine version at compile time
-(defmacro version []
-  (or (System/getenv (csk/->SCREAMING_SNAKE_CASE (str env-prefix "-version"))) "0.1.0-SNAPSHOT"))
 
 (defn- key-filter [prefix]
   (let [exp (str (name prefix) "-")]
@@ -75,37 +73,18 @@
     (mc/update-existing v :type keyword)
     v))
 
-(defn- parse-edn
-  "Parses the input file as `edn` and converts keys to kebab-case."
-  [p]
-  (with-open [r (io/reader p)]
-    (->> (u/parse-edn r)
-         (cw/prewalk (fn [x]
-                       (if (map-entry? x)
-                         (let [[k v] x]
-                           [(csk/->kebab-case-keyword (name k)) v])
-                         x))))))
-
-(defn- parse-json
-  "Parses the file as `json`, converting keys to kebab-case."
-  [p]
-  (with-open [r (io/reader p)]
-    (json/parse-stream r csk/->kebab-case-keyword)))
-
 (defn load-config-file
   "Loads configuration from given file.  This supports json and edn and converts
    keys always to kebab-case."
   [f]
-  (when-let [p (some-> f
-                       u/abs-path
-                       io/file)]
-    (when (.exists p)
-      (log/debug "Reading configuration file:" p)
-      (letfn [(has-ext? [ext s]
-                (cs/ends-with? s ext))]
-        (condp has-ext? f
-          ".edn" (parse-edn p)
-          ".json" (parse-json p))))))
+  (when (fs/exists? f)
+    ;; Load using Aero
+    (ac/read-config f)))
+
+(def max-script-timeout
+  "Max msecs a build script can run before we terminate it"
+  ;; One hour
+  (* 3600 1000))
 
 (def default-app-config
   "Default configuration for the application, without env vars or args applied."
@@ -114,7 +93,7 @@
    :events
    {:type :manifold}
    :runner
-   {:type :child}
+   {:type :local}
    :storage
    {:type :memory}
    :containers
@@ -131,7 +110,7 @@
    {:type :disk :dir "tmp/cache"}})
 
 (defn- merge-configs [configs]
-  (reduce u/deep-merge default-app-config configs))
+  (reduce mm/meta-merge default-app-config configs))
 
 (defn load-raw-config
   "Loads raw (not normalized) configuration from its various sources"
@@ -142,82 +121,34 @@
       (merge-configs)
       (u/prune-tree)))
 
-(defmulti normalize-key
-  "Normalizes the config as read from files and env, for the specific key.
-   The method receives the entire config, that also holds the env and args
-   and should return the updated config."
-  (fn [k _] k))
-
-(defmethod normalize-key :default [k c]
-  (mc/update-existing c k keywordize-type))
-
-(defmethod normalize-key :dev-mode [_ conf]
-  (let [r (mc/assoc-some conf :dev-mode (get-in conf [:args :dev-mode]))]
-    (cond-> r
-      (not (boolean? (:dev-mode r))) (dissoc :dev-mode))))
-
 (defn abs-work-dir [conf]
   (u/abs-path (or (get-in conf [:args :workdir])
                   (:work-dir conf)
                   (u/cwd))))
 
-(defmethod normalize-key :work-dir [_ conf]
-  (assoc conf :work-dir (abs-work-dir conf)))
-
-(defmethod normalize-key :account [_ {:keys [args] :as conf}]
-  (let [c (update conf :account merge (-> args
-                                          (select-keys [:customer-id :repo-id])
-                                          (mc/assoc-some :url (:server args))))]
-    (cond-> c
-      (empty? (:account c)) (dissoc :account))))
-
-(defn- dir-or-work-sub [conf k d]
-  (update conf k #(or (u/abs-path %) (u/combine (abs-work-dir conf) d))))
-
-(defmethod normalize-key :checkout-base-dir [k conf]
-  (dir-or-work-sub conf k "checkout"))
-
-(defmethod normalize-key :ssh-keys-dir [k conf]
-  (dir-or-work-sub conf k "ssh-keys"))
-
-(defmethod normalize-key :api [_ conf]
-  conf)
-
-(defmethod normalize-key :build [_ conf]
-  (update conf :build (fn [b]
-                        (-> b
-                            (group-keys :git)
-                            (group-keys :script)
-                            (mc/update-existing :sid sid/parse-sid)
-                            (mc/update-existing :git group-keys :author)))))
-
-(defn normalize-config
-  "Given a configuration map loaded from file, environment variables and command-line
-   args, applies all registered normalizers to it and returns the result.  Since the 
-   order of normalizers is undefined, they should not be dependent on each other."
-  [conf env args]
-  (letfn [(merge-if-map [d m]
-            (if (map? d)
-              (merge d m)
-              (or m d)))
-          (nil-if-empty [x]
-            (when (or (not (seqable? x))
-                      (and (seqable? x) (not-empty x)))
-              x))]
-    (-> (methods normalize-key)
-        (keys)
-        (as-> keys-to-normalize
-            (reduce (fn [r k]
-                      (->> (or (get env k)
-                               (filter-and-strip-keys k env))
-                           (nil-if-empty)
-                           (merge-if-map (get conf k))
-                           (mc/assoc-some r k)
-                           (u/prune-tree)
-                           (normalize-key k)))
-                    (assoc conf :env env :args args)
-                    keys-to-normalize))
-        (dissoc :default :env))))
+(defn- apply-args
+  "Applies any CLI arguments to the config.  These have the highest priority and overwrite
+   any existing config."
+  [config args]
+  (letfn [(http-port [x]
+            (update x :http mc/assoc-some :port (:port args)))
+          (dev-mode [x]
+            (mc/assoc-some x :dev-mode (:dev-mode args)))
+          (work-dir [x]
+            (update x :work-dir (comp u/abs-path #(or (:workdir args) % (u/cwd)))))
+          (account [x]
+            (let [acc (-> (select-keys args [:customer-id :repo-id])
+                          (mc/assoc-some :url (:server args)))]
+              (cond-> x
+                (not-empty acc) (assoc :account acc))))
+          (do-apply [conf f]
+            (f conf))]
+    (let [cli-args [http-port
+                    dev-mode
+                    work-dir
+                    account]]
+      (-> (assoc config :args args)
+          (as-> x (reduce do-apply x cli-args))))))
 
 (defn app-config
   "Combines app environment with command-line args into a unified 
@@ -225,23 +156,7 @@
    which in turn override config loaded from files and default values."
   [env args]
   (-> (load-raw-config (:config-file args))
-      (normalize-config (strip-env-prefix env) args)))
-
-(defn- flatten-nested
-  "Recursively flattens a map of maps.  Each key in the resulting map is a
-   combination of the path of the parent keys."
-  [path c]
-  (letfn [(make-key [k]
-            (->> (conj path k)
-                 (map name)
-                 (cs/join "-")
-                 (keyword)))]
-    (reduce-kv (fn [r k v]
-                 (if (map? v)
-                   (merge r (flatten-nested (conj path k) v))
-                   (assoc r (make-key k) v)))
-               {}
-               c)))
+      (apply-args args)))
 
 (defn normalize-typed
   "Convenience function that converts the `:type` of an entry into a keyword and

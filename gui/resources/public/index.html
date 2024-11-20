@@ -13,16 +13,23 @@
   <body>
     <main role="main">
       <div class="overflow-hidden"> 
-	<div id="root" class="container d-flex flex-column min-vh-100">
-	  <div>
-	    <div class="header">
+	<div id="root" class="d-flex flex-column min-vh-100">
+	  <div class="container">
+	    <header class="header">
 	      <h1>MonkeyCI</h1>
 	      <p class="lead">
 		Unleashing full power to build your code!
 	      </p>
-	    </div>
+	    </header>
+	    <content class="flex-fill">
+	      Loading...
+	    </content>
 	  </div>
-	  Loading...
+	  <footer class="footer mt-auto mb-2 container">
+	    <div class="border-top mt-2">
+	      <span>built by <a href="https://www.monkey-projects.be">Monkey Projects</a></span>
+	    </div>
+	  </footer>
 	</div>
       </div>
     </div>

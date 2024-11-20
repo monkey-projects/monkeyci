@@ -4,7 +4,8 @@
             [monkey.ci
              [extensions :as sut]
              [jobs :as j]]
-            [monkey.ci.helpers :as h]))
+            [monkey.ci.helpers :as h]
+            [monkey.ci.test.runtime :as trt]))
 
 (defmacro with-extensions [& body]
   `(let [ext# @sut/registered-extensions]
@@ -92,7 +93,7 @@
                                              {(:key ext) ::extension-config})
                               reg)
         events (h/fake-events)
-        rt (-> (h/test-rt)
+        rt (-> (trt/test-runtime)
                (assoc :job wrapped
                       :events events))]
     (testing "creates job"
@@ -103,15 +104,10 @@
 
     (testing "executes job without any extensions"
       (let [wrapped (sut/wrap-job (bc/action-job "regular-job" (constantly bc/success)))]
-        (is (= bc/success @(j/execute! wrapped {})))))
+        (is (= bc/success @(j/execute! wrapped rt)))))
     
     (testing "invokes `before` extension"
       (is (true? (::before? @(j/execute! wrapped rt)))))
     
     (testing "invokes `after` extension"
-      (is (true? (::after? @(j/execute! wrapped rt)))))
-
-    (testing "dispatches `job/updated` event before invoking extensions"
-      (let [evt @(:recv events)]
-        (is (pos? (count evt)))
-        (is (= :job/updated (-> evt first :type)))))))
+      (is (true? (::after? @(j/execute! wrapped rt)))))))

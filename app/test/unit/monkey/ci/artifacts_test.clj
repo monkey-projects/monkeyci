@@ -3,10 +3,16 @@
             [babashka.fs :as fs]
             [clojure.java.io :as io]
             [clojure.string :as cs]
+            [clojure.tools.logging :as log]
+            [manifold.deferred :as md]
             [monkey.ci
              [artifacts :as sut]
              [blob :as blob]]
-            [monkey.ci.helpers :as h]))
+            [monkey.ci.build
+             [api :as api]
+             [api-server :as bas]]
+            [monkey.ci.helpers :as h]
+            [monkey.ci.test.api-server :as ta]))
 
 (deftest save-artifacts
   (testing "saves path using blob store, relative to job work dir"
@@ -14,46 +20,95 @@
       (let [p (doto (fs/path dir "test-path")
                 (fs/create-file))
             stored (atom {})
+            build {:sid ["test-cust" "test-build"]}
             bs (h/fake-blob-store stored)
-            ctx {:artifacts bs
-                 :build {:sid ["test-cust" "test-build"]}
+            repo (sut/make-blob-repository bs build)
+            ctx {:artifacts repo
+                 :build build
                  :job {:work-dir dir
                        :save-artifacts [{:id "test-artifact"
                                          :path "test-path"}]}}]
         (is (some? @(sut/save-artifacts ctx)))
         (is (= 1 (count @stored)))
-        (let [[p dest] (first @stored)]
+        (let [[dest p] (first @stored)]
           (is (cs/ends-with? dest "test-cust/test-build/test-artifact.tgz"))
           (is (= (str dir "/test-path") p))))))
 
-  (testing "nothing if no cache store"
+  (testing "nothing if no artifact repo"
     (is (empty? @(sut/save-artifacts
                   {:job {:save-artifacts [{:id "test-artifact"
                                            :path "test-path"}]}})))))
 
 (deftest restore-artifacts
-  (testing "restores path using blob store"
-    (let [stored (atom {"test-cust/test-build/test-artifact.tgz" ::dest})
-          bs (h/fake-blob-store stored)
-          ctx {:artifacts bs
-               :build {:sid ["test-cust" "test-build"]}
-               :job {:work-dir "work"
-                     :restore-artifacts [{:id "test-artifact"
-                                          :path "test-path"}]}}]
-      (is (some? @(sut/restore-artifacts ctx)))
+  (testing "restores path using artifact repo"
+    (let [job {:work-dir "work"
+               :restore-artifacts [{:id "test-artifact"
+                                    :path "test-path"}]}
+          stored (atom {"test-cust/test-build/test-artifact.tgz" (str (fs/canonicalize (:work-dir job)))})
+          bs (h/strict-fake-blob-store stored)
+          build {:sid ["test-cust" "test-build"]}
+          ctx {:artifacts (sut/make-blob-repository bs build)
+               :build build
+               :job job}]
+      (is (not-empty @(sut/restore-artifacts ctx)))
       (is (empty? @stored) "expected entry to be restored"))))
 
 (deftest restore-blob
   (testing "returns paths as strings and entry count"
-    (let [src (io/file "src")
-          dest (io/file "dest")
+    (let [dest (io/file "dest")
+          art-id "test-artifact"
+          build {:sid ["test-sid"]}
+          src (io/file "test-sid" (str art-id ".tgz"))
           bs (h/fake-blob-store (atom {src dest}))
-          r @(sut/restore-blob {:store-key :test-store
-                                :build-path (constantly src)}
-                               {:test-store bs}
-                               {:id "test-cache"
+          art (sut/make-blob-repository bs build)
+          r @(sut/restore-blob {:repo art}
+                               {:id art-id
                                 :path "test-path"})]
       (is (map? r))
       (is (= (.getCanonicalPath src) (:src r)))
       (is (= (.getCanonicalPath (.getParentFile (.getAbsoluteFile dest))) (:dest r)))
       (is (number? (:entries r))))))
+
+(deftest blob-artifact-repository
+  (let [build {:sid (take 3 (repeatedly (comp str random-uuid)))}
+        store (h/fake-blob-store)
+        repo (sut/make-blob-repository store build)
+        src-art "test source artifact"
+        art-id (str (random-uuid))]
+
+    (testing "uploads artifact to blob store"
+      (is (some? @(sut/save-artifact repo art-id src-art)))
+      (is (= 1 (-> store :stored deref count))))
+    
+    (testing "downloads artifact via blob store"
+      (is (some? @(sut/restore-artifact repo art-id ::test-destination)))
+
+      (is (empty? (-> store :stored deref))))))
+
+(deftest build-api-artifact-repository
+  (h/with-tmp-dir dir
+    (let [store-dir (fs/path dir "store")
+          _ (fs/create-dir store-dir)
+          store (blob/->DiskBlobStore (str store-dir))
+          build {:sid (take 3 (repeatedly (comp str random-uuid)))}
+          server (-> (ta/test-config)
+                     (assoc :artifacts store
+                            :build build)
+                     (bas/start-server))
+          client (api/make-client (format "http://localhost:%d" (:port server)) (:token server))
+          art-id (str (random-uuid))
+          in-dir (fs/path dir "input")
+          out-dir (fs/path dir "output")
+          _ (fs/create-dir in-dir)
+          _ (spit (fs/file (fs/path in-dir "test.txt")) "This is a test file")
+          repo (sut/make-build-api-repository client)]
+      (with-open [s (:server server)]
+        (testing "uploads artifact using api"
+          (is (= art-id (:artifact-id @(sut/save-artifact repo art-id (str in-dir))))))
+        
+        (testing "downloads artifact using api"
+          (is (some? @(sut/restore-artifact repo art-id (str out-dir))))
+          (is (fs/exists? (fs/path out-dir "input" "test.txt"))))
+
+        (testing "does nothing if artifact does not exist"
+          (is (nil? @(sut/restore-artifact repo "nonexisting" (str out-dir)))))))))

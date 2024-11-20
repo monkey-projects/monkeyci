@@ -5,23 +5,25 @@
             [buddy.core
              [codecs :as codecs]
              [mac :as mac]]
+            [clj-commons.byte-streams :as bs]
             [clojure.test :refer [deftest testing is]]
             [clojure.core.async :as ca]
             [clojure.string :as cs]
+            [meta-merge.core :as mm]
             [monkey.ci
              [artifacts :as a]
-             [config :as config]
+             [cuid :as cuid]
              [logging :as l]
              [metrics :as m]
-             [runtime :as rt]
              [storage :as st]
-             [utils :as u]]
+             [time :as t]
+             [utils :as u]
+             [version :as v]]
             [monkey.ci.web
              [auth :as auth]
              [handler :as sut]]
             [monkey.ci.helpers :refer [try-take] :as h]
-            [monkey.ci.http-helpers :refer [with-fake-http]]
-            [org.httpkit.fake :as hf]
+            [monkey.ci.test.aleph-test :as at]
             [reitit
              [core :as rc]
              [ring :as ring]]
@@ -30,8 +32,6 @@
 (deftest make-app
   (testing "creates a fn"
     (is (fn? (sut/make-app {})))))
-
-(def github-secret "github-secret")
 
 (defn- test-rt [& [opts]]
   (-> (merge {:config {:dev-mode true}}
@@ -45,11 +45,6 @@
    (sut/make-app (test-rt))))
 
 (def test-app (make-test-app))
-
-(defrecord FakeServer [closed?]
-  java.lang.AutoCloseable
-  (close [_]
-    (reset! closed? true)))
 
 (deftest start-server
   (with-redefs [aleph/start-server (fn [h opts]
@@ -72,7 +67,7 @@
 (deftest stop-server
   (testing "stops the server"
     (let [stopped? (atom false)
-          s (->FakeServer stopped?)]
+          s (h/->FakeServer stopped?)]
       (is (nil? (sut/stop-server s)))
       (is (true? @stopped?))))
 
@@ -89,7 +84,7 @@
     (let [r (-> (mock/request :get "/version")
                    (test-app))]
       (is (= 200 (:status r)))
-      (is (= (config/version) (:body r)))))
+      (is (= (v/version) (:body r)))))
 
   (testing "handles `nil` bodies"
     (is (= 200 (-> (mock/request :get "/health")
@@ -104,7 +99,8 @@
 (deftest webhook-github-routes
   (testing "`POST /webhook/github/:id`"
     (testing "accepts with valid security header"
-      (let [payload (h/to-json {:head-commit {:message "test"}})
+      (let [github-secret "github-secret"
+            payload (h/to-json {:head-commit {:message "test"}})
             signature (-> (mac/hash payload {:key github-secret
                                              :alg :hmac+sha256})
                           (codecs/bytes->hex))
@@ -174,6 +170,43 @@
                        (mock/body payload)
                        (mock/content-type "application/json")
                        (app)
+                       :status)))))))
+
+(deftest webhook-bitbucket-routes
+  (testing "`POST /webhook/bitbucket/:id`"
+    (testing "accepts with valid security header"
+      (let [bitbucket-secret "bitbucket-secret"
+            payload (h/to-json {:head-commit {:message "test"}})
+            signature (-> (mac/hash payload {:key bitbucket-secret
+                                             :alg :hmac+sha256})
+                          (codecs/bytes->hex))
+            hook-id (st/new-id)
+            st (st/make-memory-storage)
+            app (sut/make-app (test-rt {:storage st
+                                        :runner (constantly nil)
+                                        :config {:dev-mode false}}))]
+        (is (st/sid? (st/save-webhook st {:id hook-id
+                                          :secret-key bitbucket-secret})))
+        (is (= 200 (-> (mock/request :post (str "/webhook/bitbucket/" hook-id))
+                       (mock/body payload)
+                       (mock/header :x-hub-signature (str "sha256=" signature))
+                       (mock/header :x-bitbucket-event "push")
+                       (mock/content-type "application/json")
+                       (mock/content-length (count payload))
+                       (app)
+                       :status)))))
+
+    (testing "returns 401 if invalid security"
+      (let [app (sut/make-app (test-rt {:config {:dev-mode false}}))]
+        (is (= 401 (-> (mock/request :post "/webhook/bitbucket/test-hook")
+                       (app)
+                       :status)))))
+
+    (testing "disables security check when in dev mode"
+      (let [dev-app (sut/make-app {:config {:dev-mode true}
+                                   :runner (constantly nil)})]
+        (is (= 200 (-> (mock/request :post "/webhook/bitbucket/test-hook")
+                       (dev-app)
                        :status)))))))
 
 (defn- verify-entity-endpoints [{:keys [path base-entity updated-entity name creator can-update? can-delete?]
@@ -322,16 +355,63 @@
                          (app)
                          :status))))))))
 
-    (testing "`/builds`"
-      (h/with-memory-store st
-        (let [app (make-test-app st)
-              cust (h/gen-cust)]
-          (is (some? (st/save-customer st cust)))
-          
+    (h/with-memory-store st
+      (let [app (make-test-app st)
+            cust (h/gen-cust)]
+        (is (some? (st/save-customer st cust)))
+        
+        (testing "`/builds`"
           (testing "`/recent` retrieves builds from latest 24h"
             (is (= 200 (-> (mock/request :get (str "/customer/" (:id cust) "/builds/recent"))
                            (app)
-                           :status))))))))
+                           :status)))))
+
+        (testing "`GET /stats` retrieves customer statistics"
+          (is (= 200 (-> (mock/request :get (str "/customer/" (:id cust) "/stats"))
+                         (app)
+                         :status))))
+
+        (testing "`/credits`"
+          (testing "`GET` retrieves customer credit details"
+            (is (= 200 (-> (mock/request :get (str "/customer/" (:id cust) "/credits"))
+                           (app)
+                           :status)))))
+
+        (testing "`/webhook/bitbucket`"
+          (let [repo (h/gen-repo)
+                cust (assoc cust :repos {(:id repo) repo})
+                wh {:id (cuid/random-cuid)
+                    :customer-id (:id cust)
+                    :repo-id (:id repo)
+                    :secret "test secret"}
+                bb {:webhook-id (:id wh)
+                    :workspace "test-ws"
+                    :repo-slug "test-repo"
+                    :bitbucket-id (str (random-uuid))}
+                search (fn [path]
+                         (-> (mock/request :get (str (format "/customer/%s/webhook/bitbucket" (:id cust)) path))
+                             (app)
+                             :body
+                             slurp
+                             (h/parse-json)))
+                select-props #(select-keys % (keys bb))]
+            (is (some? (st/save-customer st cust)))
+            (is (some? (st/save-webhook st wh)))
+            (is (some? (st/save-bb-webhook st bb)))
+            
+            (testing "`GET` lists bitbucket webhooks for customer"
+              (is (= [bb] (->> (search "")
+                               (map select-props)))))
+
+            (testing "contains customer and repo id"
+              (let [r (-> (search "") first)]
+                (is (= (:id cust) (:customer-id r)))
+                (is (= (:id repo) (:repo-id r)))))
+            
+            (testing "allows filtering by query params"
+              (is (= [bb] (->> (search "?workspace=test-ws")
+                               (map select-props))))
+              (is (empty? (search "?repo-id=nonexisting")))))))))
 
   (h/with-memory-store st
     (let [kp (auth/generate-keypair)
@@ -386,30 +466,67 @@
                                             :url "http://test-repo"
                                             :labels [{:name "app" :value "test-app"}]}
                               :updated-entity {:name "updated repo"}
-                              :creator st/save-repo})
+                              :creator st/save-repo
+                              :can-delete? true})
     
-    (testing "`/customer/:id/github`"
-      (testing "`/watch` starts watching repo"
-        (is (= 200 (-> (h/json-request :post
-                                       (str "/customer/" cust-id "/repo/github/watch")
-                                       {:github-id 12324
-                                        :customer-id cust-id
-                                        :name "test-repo"
-                                        :url "http://test"})
-                       (test-app)
-                       :status))))
+    (testing "`/customer/:id`"
+      (testing "`/github`"
+        (testing "`/watch` starts watching repo"
+          (is (= 200 (-> (h/json-request :post
+                                         (str "/customer/" cust-id "/repo/github/watch")
+                                         {:github-id 12324
+                                          :customer-id cust-id
+                                          :name "test-repo"
+                                          :url "http://test"})
+                         (test-app)
+                         :status))))
 
-      (testing "`/unwatch` stops watching repo"
-        (let [st (st/make-memory-storage)
-              app (make-test-app st)
-              repo-id (st/new-id)
-              _ (st/watch-github-repo st {:customer-id cust-id
-                                          :id repo-id
-                                          :github-id 1234})]
-          (is (= 200 (-> (mock/request :post
-                                       (format "/customer/%s/repo/%s/github/unwatch" cust-id repo-id))
-                         (app)
-                         :status))))))))
+        (testing "`/unwatch` stops watching repo"
+          (let [st (st/make-memory-storage)
+                app (make-test-app st)
+                repo-id (st/new-id)
+                _ (st/watch-github-repo st {:customer-id cust-id
+                                            :id repo-id
+                                            :github-id 1234})]
+            (is (= 200 (-> (mock/request :post
+                                         (format "/customer/%s/repo/%s/github/unwatch" cust-id repo-id))
+                           (app)
+                           :status))))))
+
+      (testing "`/bitbucket`"
+        (at/with-fake-http [(constantly true) {:status 201
+                                               :headers {"Content-Type" "application/json"}
+                                               :body "{}"}]
+          (testing "`/watch` starts watching bitbucket repo"
+            (is (= 201 (-> (h/json-request :post
+                                           (str "/customer/" cust-id "/repo/bitbucket/watch")
+                                           {:customer-id cust-id
+                                            :name "test-repo"
+                                            :url "http://test"
+                                            :workspace "test-ws"
+                                            :repo-slug "test-repo"
+                                            :token "test-token"})
+                           (test-app)
+                           :status))))
+
+          (testing "`/unwatch` stops watching repo"
+            (let [st (st/make-memory-storage)
+                  app (make-test-app st)
+                  repo-id (st/new-id)
+                  wh-id (st/new-id)
+                  _ (st/save-customer st {:id cust-id
+                                          :repos {repo-id {:id repo-id}}})
+                  _ (st/save-webhook st {:customer-id cust-id
+                                         :repo-id repo-id
+                                         :id wh-id
+                                         :secret (str (random-uuid))})
+                  _ (st/save-bb-webhook st {:webhook-id wh-id
+                                            :bitbucket-id (str (random-uuid))})]
+              (is (= 200 (-> (h/json-request :post
+                                             (format "/customer/%s/repo/%s/bitbucket/unwatch" cust-id repo-id)
+                                             {:token "test-token"})
+                             (app)
+                             :status))))))))))
 
 (deftest webhook-endpoints
   (verify-entity-endpoints {:name "webhook"
@@ -576,7 +693,23 @@
      :public-key "public-test-key"
      :description "test ssh key"
      :label-filters []}]
-   :private-key))
+   :private-key)
+
+  ;; In case we would want to add endpoints for single ssh keys
+  #_(let [cust-id (st/new-id)
+          ssh-key {:private-key "test-private-key"
+                   :public-key "test-public-key"
+                   :description "original desc"
+                   :customer-id cust-id
+                   :label-filters []}]
+      (verify-entity-endpoints
+       {:name "customer ssh key"
+        :path (format "/customer/%s/ssh-keys" cust-id)
+        :base-entity ssh-key
+        :updated-entity {:description "updated description"}
+        :creator (fn [s p]
+                   (st/save-ssh-key s (assoc p :customer-id cust-id)))
+        :can-delete? true})))
 
 (defn- generate-build-sid []
   (->> (repeatedly st/new-id)
@@ -595,19 +728,22 @@
 
 (defn- with-repo [f & [rt]]
   (h/with-memory-store st
-    (let [events (atom [])
-          app (sut/make-app (u/deep-merge
+    (let [events (h/fake-events)
+          app (sut/make-app (mm/meta-merge
                              {:storage st
-                              :events {:poster (partial swap! events conj)}
+                              :events events
                               :config {:dev-mode true}
                               :runner (constantly nil)}
                              rt))
-          sid (generate-build-sid)
+          [_ repo-id _ :as sid] (generate-build-sid)
           build (-> (zipmap [:customer-id :repo-id :build-id] sid)
                     (assoc :status :success
                            :message "test msg"
                            :git {:message "test meta"}))
           path (repo-path sid)]
+      (is (st/sid? (st/save-customer st {:id (first sid)
+                                         :repos {repo-id {:id repo-id
+                                                          :name "test repo"}}})))
       (is (st/sid? (st/save-build st build)))
       (f {:events events
           :storage st
@@ -634,12 +770,11 @@
                              (reset! runner-args build))]
                 (with-repo
                   (fn [{:keys [app path] :as ctx}]
-                    (let [props [:customer-id :repo-id]]
-                      (is (= 202 (-> (mock/request :post (str path p))
-                                     (app)
-                                     :status)))
-                      (h/wait-until #(some? @runner-args) 500)
-                      (f (assoc ctx :runner-args runner-args))))
+                    (is (= 202 (-> (mock/request :post (str path p))
+                                   (app)
+                                   :status)))
+                    (h/wait-until #(some? @runner-args) 500)
+                    (f (assoc ctx :runner-args runner-args)))
                   {:runner runner})))]
       
       (testing "starts new build for repo using runner"
@@ -647,25 +782,6 @@
          "/trigger"
          (fn [{:keys [runner-args]}]
            (is (some? @runner-args)))))
-      
-      (testing "looks up url in repo config"
-        (let [runner-args (atom nil)
-              runner (fn [build _]
-                       (reset! runner-args build))]
-          (with-repo
-            (fn [{:keys [app path] [customer-id repo-id] :sid st :storage}]
-              (is (some? (st/save-customer st {:id customer-id
-                                               :repos
-                                               {repo-id
-                                                {:id repo-id
-                                                 :url "http://test-url"}}})))
-              (is (= 202 (-> (mock/request :post (str path "/trigger"))
-                             (app)
-                             :status)))
-              (is (not= :timeout (h/wait-until #(not-empty @runner-args) 1000)))
-              (is (= "http://test-url"
-                     (-> @runner-args :git :url))))
-            {:runner runner})))
       
       (testing "adds commit id from query params"
         (verify-runner
@@ -686,56 +802,7 @@
          "/trigger?tag=test-tag"
          (fn [{:keys [runner-args]}]
            (is (= "refs/tags/test-tag"
-                  (-> @runner-args :git :ref))))))
-
-      (testing "adds `sid` to build props"
-        (verify-runner
-         "/trigger"
-         (fn [{:keys [sid runner-args]}]
-           (let [bsid (:sid @runner-args)]
-             (is (= 3 (count bsid)) "expected sid to contain repo path and build id")
-             (is (= (take 2 sid) (take 2 bsid)))
-             (is (= (:build-id @runner-args)
-                    (last bsid)))))))
-      
-      (testing "creates build in storage"
-        (verify-runner
-         "/trigger?branch=test-branch"
-         (fn [{:keys [runner-args] st :storage}]
-           (let [bsid (:sid @runner-args)
-                 build (st/find-build st bsid)]
-             (is (some? build))
-             (is (= :api (:source build)))
-             (is (= "refs/heads/test-branch" (get-in build [:git :ref])))))))
-
-      (testing "assigns index to build"
-        (verify-runner
-         "/trigger"
-         (fn [{:keys [runner-args] st :storage}]
-           (let [bsid (:sid @runner-args)
-                 build (st/find-build st bsid)]
-             (is (number? (:idx build)))))))
-
-      (testing "build id incorporates index"
-        (verify-runner
-         "/trigger"
-         (fn [{:keys [runner-args] st :storage}]
-           (let [bsid (:sid @runner-args)
-                 build (st/find-build st bsid)]
-             (is (= (str "build-" (:idx build))
-                    (:build-id build)))))))
-      
-      (testing "returns build id"
-        (with-repo
-          (fn [{:keys [app path] :as ctx}]
-            (let [props [:customer-id :repo-id]
-                  r (-> (mock/request :post (str path "/trigger"))
-                        (app))]
-              (is (string? (-> r (h/reply->json) :build-id)))))))
-
-      (testing "returns 404 (not found) when repo does not exist")
-
-      (testing "when no branch specified, uses default branch")))
+                  (-> @runner-args :git :ref))))))))
   
   (testing "`GET /latest`"
     (with-repo
@@ -760,23 +827,34 @@
 
         (testing "404 when repo does not exist"))))
 
-  (testing "`GET /:build-id`"
+  (testing "`/:build-id`"
     (with-repo
       (fn [{:keys [app] [_ _ build-id :as sid] :sid}]
-        (testing "retrieves build with given id"
-          (let [l (-> (mock/request :get (build-path sid))
-                      (app))
-                b (some-> l :body slurp h/parse-json)]
-            (is (not-empty l))
-            (is (= 200 (:status l)))
-            (is (= build-id (:build-id b)))))
+        (testing "`GET`"
+          (testing "retrieves build with given id"
+            (let [l (-> (mock/request :get (build-path sid))
+                        (app))
+                  b (some-> l :body slurp h/parse-json)]
+              (is (not-empty l))
+              (is (= 200 (:status l)))
+              (is (= build-id (:build-id b)))))
 
-        (testing "404 when build does not exist"
-          (let [sid (generate-build-sid)
-                l (-> (mock/request :get (build-path sid))
-                      (app))]
-            (is (= 404 (:status l)))
-            (is (nil? (:body l)))))
+          (testing "404 when build does not exist"
+            (let [sid (generate-build-sid)
+                  l (-> (mock/request :get (build-path sid))
+                        (app))]
+              (is (= 404 (:status l)))
+              (is (nil? (:body l))))))
+
+        (testing "`POST /retry` re-triggers build"
+          (is (= 202 (-> (mock/request :post (str (build-path sid) "/retry"))
+                         (app)
+                         :status))))
+
+        (testing "`POST /cancel` cancels build"
+          (is (= 202 (-> (mock/request :post (str (build-path sid) "/cancel"))
+                         (app)
+                         :status))))
 
         (testing "/logs"
           (testing "`GET` retrieves list of available logs for build"
@@ -816,27 +894,35 @@
 
 (deftest github-endpoints
   (testing "`POST /github/login` requests token from github and fetches user info"
-    (hf/with-fake-http [{:url "https://github.com/login/oauth/access_token"
-                         :method :post}
-                        (fn [_ req _]
+    (at/with-fake-http [{:url "https://github.com/login/oauth/access_token"
+                         :request-method :post}
+                        (fn [req]
                           (if (= {:client_id "test-client-id"
                                   :client_secret "test-secret"
                                   :code "1234"}
                                  (:query-params req))
-                            {:status 200 :body (h/to-raw-json {:access_token "test-token"})}
-                            {:status 400 :body (str "invalid query params:" (:query-params req))}))
+                            {:status 200
+                             :body (h/to-raw-json {:access_token "test-token"})
+                             :headers {"Content-Type" "application/json"}}
+                            {:status 400
+                             :body (str "invalid query params:" (:query-params req))
+                             :headers ["Content-Type" "text/plain"]}))
                         {:url "https://api.github.com/user"
-                         :method :get}
-                        (fn [_ req _]
+                         :request-method :get}
+                        (fn [req]
                           (let [auth (get-in req [:headers "Authorization"])]
                             (if (= "Bearer test-token" auth)
-                              {:status 200 :body (h/to-raw-json {:id 4567
-                                                                 :name "test-user"
-                                                                 :other-key "other-value"})}
-                              {:status 400 :body (str "invalid auth header: " auth)})))]
+                              {:status 200
+                               :body (h/to-raw-json {:id 4567
+                                                     :name "test-user"
+                                                     :other-key "other-value"})
+                               :headers {"Content-Type" "application/json"}}
+                              {:status 400
+                               :body (str "invalid auth header: " auth)
+                               :headers {"Content-Type" "text/plain"}})))]
       (let [app (-> (test-rt {:config {:github {:client-id "test-client-id"
                                                 :client-secret "test-secret"}}
-                               :jwk (auth/keypair->rt (auth/generate-keypair))})
+                              :jwk (auth/keypair->rt (auth/generate-keypair))})
                     (sut/make-app))
             r (-> (mock/request :post "/github/login?code=1234")
                   (app))]
@@ -860,30 +946,30 @@
 
 (deftest bitbucket-endpoints
   (testing "`POST /bitbucket/login` requests token from bitbucket and fetches user info"
-    (with-fake-http [[{:url "https://bitbucket.org/site/oauth2/access_token"
-                       :request-method :post}
-                      (fn [req]
-                        (cond
-                          (not= {:grant_type "authorization_code"
-                                 :code "1234"}
-                                (:form-params req))
-                          {:status 400 :body (str "Invalid form params: " (:form-params req))}
-                          (not (matches-basic-auth? req "test-client-id" "test-secret"))
-                          {:status 400 :body (str "Invalid auth code: " (:basic-auth req))}
-                          :else
-                          {:status 200
-                           :body (h/to-raw-json {:access_token "test-token"})
-                           :headers {"content-type" "application/json"}}))]
-                     [{:url "https://api.bitbucket.org/2.0/user"
-                       :request-method :get}
-                      (fn [req]
-                        (let [auth (get-in req [:headers "Authorization"])]
-                          (if (= "Bearer test-token" auth)
+    (at/with-fake-http [{:url "https://bitbucket.org/site/oauth2/access_token"
+                         :request-method :post}
+                        (fn [req]
+                          (cond
+                            (not= {:grant_type "authorization_code"
+                                   :code "1234"}
+                                  (:form-params req))
+                            {:status 400 :body (str "Invalid form params: " (:form-params req))}
+                            (not (matches-basic-auth? req "test-client-id" "test-secret"))
+                            {:status 400 :body (str "Invalid auth code: " (:basic-auth req))}
+                            :else
                             {:status 200
-                             :body (h/to-raw-json {:name "test-user"
-                                                   :other-key "other-value"})
-                             :headers {"content-type" "application/json"}}
-                            {:status 400 :body (str "invalid auth header: " auth)})))]]
+                             :body (h/to-raw-json {:access_token "test-token"})
+                             :headers {"Content-Type" "application/json"}}))
+                        {:url "https://api.bitbucket.org/2.0/user"
+                         :request-method :get}
+                        (fn [req]
+                          (let [auth (get-in req [:headers "Authorization"])]
+                            (if (= "Bearer test-token" auth)
+                              {:status 200
+                               :body (h/to-raw-json {:name "test-user"
+                                                     :other-key "other-value"})
+                               :headers {"Content-Type" "application/json"}}
+                              {:status 400 :body (str "invalid auth header: " auth)})))]
       
       (let [app (-> (test-rt {:config {:bitbucket {:client-id "test-client-id"
                                                    :client-secret "test-secret"}}
@@ -983,30 +1069,6 @@
                      (test-app)
                      :status))))))
 
-(deftest setup-runtime
-  (testing "returns fn that starts http server"
-    (let [conf {:http {:port 1234}}
-          h (rt/setup-runtime conf :http)
-          rt {:http h
-              :config conf}
-          inv (atom nil)]
-      (is (fn? h))
-      (with-redefs [aleph/start-server (fn [handler args]
-                                         (reset! inv {:handler handler
-                                                      :opts args}))]
-        (is (some? (h rt)))
-        (is (= {:port 1234} (-> (:opts @inv)
-                                (select-keys [:port])))))))
-
-  (testing "start fn returns another fn that stops the server"
-    (let [stopped? (atom false)]
-      (with-redefs [aleph/start-server (constantly (->FakeServer stopped?))]
-        (let [h (rt/setup-runtime {:http {}} :http)
-              s (h {})]
-          (is (ifn? s))
-          (is (some? (s)))
-          (is (true? @stopped?)))))))
-
 (deftest on-server-close
   (testing "waits until netty server closes"
     (with-redefs [netty/wait-for-close (fn [s]
@@ -1046,7 +1108,6 @@
     (testing "`GET /:id/download` retrieves artifact contents"
       (is (= 200 (-> (mock/request :get (format "%s/artifact/%s/download" base-path art-id))
                      (app)
-                     (deref)
                      :status))))
 
     (testing "`DELETE /:id` deletes artifact")))
@@ -1057,3 +1118,26 @@
                             :creator st/save-email-registration
                             :can-update? false
                             :can-delete? true}))
+
+(deftest admin-routes
+  (testing "`/admin`"
+    (testing "`/issue-credits`"
+      (testing "POST `/:customer-id` issues new credits to specific customer"
+        (let [cust (h/gen-cust)]
+          (is (= 201 (-> (h/json-request :post
+                                         (str "/admin/issue-credits/" (:id cust))
+                                         {:amount 100
+                                          :reason "test issue"})
+                         (test-app)
+                         :status)))))
+
+      (testing "POST `/auto` issues new credits to all customers with subscriptions"
+        (is (= 200 (-> (h/json-request :post "/admin/issue-credits/auto"
+                                       {:from-time (t/now)})
+                       (test-app)
+                       :status)))))
+
+    (testing "`/reaper` kills dangling builds"
+      (is (= 200 (-> (mock/request :post "/admin/reaper")
+                     (test-app)
+                     :status))))))

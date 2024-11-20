@@ -4,6 +4,7 @@
             [monkey.ci.gui.login.db :as db]
             [monkey.ci.gui.login.subs :as sut]
             [monkey.ci.gui.test.fixtures :as f]
+            [monkey.ci.gui.test.helpers :as h]
             [re-frame.core :as rf]
             [re-frame.db :refer [app-db]]))
 
@@ -100,3 +101,15 @@
       (is (nil? @s))
       (is (map? (reset! app-db (db/set-bitbucket-config {} {:client-id "test-bitbucket-client-id"}))))
       (is (= "test-bitbucket-client-id" @s)))))
+
+(deftest github-user?
+  (h/verify-sub [:login/github-user?]
+                #(db/set-user % {:github ::test-github-user})
+                true
+                false))
+
+(deftest bitbucket-user?
+  (h/verify-sub [:login/bitbucket-user?]
+                #(db/set-user % {:bitbucket ::test-bitbucket-user})
+                true
+                false))

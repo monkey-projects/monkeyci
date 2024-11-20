@@ -16,17 +16,19 @@
              [git]
              [listeners]
              [logging]
-             [metrics]
              [runtime :as rt]
              [runners]
              [sidecar]
              [utils :as u]
+             [version :as v]
              [workspace]]
             [monkey.ci.containers
              [oci]]
             [monkey.ci.events.core :as ec]
             [monkey.ci.reporting.print]
-            [monkey.ci.runners.oci]
+            [monkey.ci.runners
+             [oci]
+             [server]]
             [monkey.ci.storage
              [cached]
              [file]
@@ -34,18 +36,18 @@
              [sql]]))
 
 (defn system-invoker
-  "The event invoker starts a subsystem according to the command requirements,
-   and posts the `command/invoked` event.  This event should be picked up by a
-   handler in the system.  When the command is complete, it should post a
-   `command/completed` event for the same command.  By default it uses the base
-   system, but you can specify your own for testing purposes."
-  [{:keys [command app-mode] :as cmd} env]
+  "Creates a new runtime and invokes the command using the specified application 
+   mode.  By default it uses the base system, but you can specify your own for 
+   testing purposes."
+  [{:keys [command app-mode runtime?] :as cmd :or {runtime? true}} env]
   (fn [args]
     (log/debug "Invoking command with arguments:" args)
     (let [config (config/app-config env args)]
-      (rt/with-runtime config app-mode runtime
-        (log/info "Executing command:" command)
-        (command runtime)))))
+      (log/info "Executing command:" command)
+      (if runtime?
+        (rt/with-runtime config app-mode runtime
+          (command runtime))
+        (command config)))))
 
 (defn make-cli-config [{:keys [cmd-invoker env] :or {cmd-invoker system-invoker}}]
   (letfn [(invoker [cmd]
@@ -57,7 +59,7 @@
   "Main entry point for the application."
   [& args]
   (try
-    (log/info "Starting MonkeyCI version" (config/version))
+    (log/info "Starting MonkeyCI version" (v/version))
     (cli/run-cmd args (make-cli-config {:env env}))
     (catch Throwable ex
       (log/error "Failed to run application" ex)

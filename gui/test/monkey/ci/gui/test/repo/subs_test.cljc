@@ -2,9 +2,11 @@
   (:require #?(:cljs [cljs.test :refer-macros [deftest testing is use-fixtures]]
                :clj [clojure.test :refer [deftest testing is use-fixtures]])
             [monkey.ci.gui.customer.db :as cdb]
+            [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.repo.db :as db]
             [monkey.ci.gui.repo.subs :as sut]
             [monkey.ci.gui.test.fixtures :as f]
+            [monkey.ci.gui.test.helpers :as h]
             [re-frame.core :as rf]
             [re-frame.db :refer [app-db]]))
 
@@ -113,10 +115,10 @@
       (is (= ::test-edit-alerts @a)))))
 
 (deftest saving?
-  (let [a (rf/subscribe [:repo/saving?])]
-    (testing "exists"
-      (is (some? a)))
+  (h/verify-sub [:repo/saving?] #(db/set-saving % true) true false))
 
-    (testing "holds saving state from db"
-      (is (map? (reset! app-db (db/set-saving {} true))))
-      (is (true? @a)))))
+(deftest builds-loaded?
+  (h/verify-sub [:builds/loaded?] #(lo/set-loaded % db/id) true false))
+
+(deftest deleting?
+  (h/verify-sub [:repo/deleting?] db/mark-deleting true false))

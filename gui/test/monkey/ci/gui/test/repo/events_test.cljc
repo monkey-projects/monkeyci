@@ -14,12 +14,14 @@
 
 (use-fixtures :each f/reset-db)
 
+(defn- set-repo-path [db cust repo]
+  (r/set-current db {:parameters
+                     {:path 
+                      {:customer-id cust
+                       :repo-id repo}}}))
+
 (defn- set-repo-path! [cust repo]
-  (reset! app-db {:route/current
-                  {:parameters
-                   {:path 
-                    {:customer-id cust
-                     :repo-id repo}}}}))
+  (swap! app-db set-repo-path cust repo))
 
 (defn- test-repo-path!
   "Generate random ids for customer, repo and build, and sets the current
@@ -76,13 +78,15 @@
   (testing "clears builds"
     (is (some? (reset! app-db (db/set-builds {} ::test-builds))))
     (rf/dispatch-sync [:repo/load "other-customer-id"])
-    (is (nil? (db/builds @app-db)))))
+    (is (nil? (db/get-builds @app-db)))))
+
+(deftest repo-leave
+  (testing "clears builds from db"
+    (is (some? (reset! app-db (db/set-builds {} ::test-builds))))
+    (rf/dispatch-sync [:repo/leave])
+    (is (nil? (db/get-builds @app-db)))))
 
 (deftest builds-load
-  (testing "sets alert"
-    (rf/dispatch-sync [:builds/load])
-    (is (= 1 (count (db/alerts @app-db)))))
-
   (testing "fetches builds from backend"
     (rft/run-test-sync
      (let [c (h/catch-fx :martian.re-frame/request)]
@@ -93,17 +97,16 @@
        (is (= 1 (count @c)))
        (is (= :get-builds (-> @c first (nth 2)))))))
 
-  (testing "clears current builds"
+  (testing "does not clear current builds"
     (is (map? (reset! app-db (db/set-builds {} [{:id "initial-build"}]))))
     (rf/dispatch-sync [:builds/load])
-    (is (nil? (db/builds @app-db)))))
+    (is (some? (db/get-builds @app-db)))))
 
 (deftest build-load-success
-  (testing "clears alerts"
-    (is (map? (reset! app-db (db/set-alerts {} [{:type :info
-                                                 :message "test notification"}]))))
-    (rf/dispatch-sync [:builds/load--success {:body []}])
-    (is (nil? (db/alerts @app-db)))))
+  (testing "sets builds"
+    (let [builds [{:id ::test-build}]]
+      (rf/dispatch-sync [:builds/load--success {:body builds}])
+      (is (= builds (db/get-builds @app-db))))))
 
 (deftest handle-event
   (testing "ignores events for other repos"
@@ -113,11 +116,12 @@
                                                                :repo-id "other-repo"
                                                                :build-id "other-build"
                                                                :git {:ref "main"}}}])))
-      (is (empty? (db/builds @app-db)))))
+      (is (empty? (db/get-builds @app-db)))))
 
   (testing "updates build list when build is started"
+    (reset! app-db {})
     (let [[cust repo build] (test-repo-path!)]
-      (is (empty? (db/builds @app-db)))
+      (is (empty? (db/get-builds @app-db)))
       (is (nil? (rf/dispatch-sync [:repo/handle-event {:type :build/start
                                                        :build {:customer-id cust
                                                                :repo-id repo
@@ -127,11 +131,12 @@
                :repo-id repo
                :build-id build
                :git {:ref "main"}}]
-             (db/builds @app-db)))))
+             (db/get-builds @app-db)))))
 
   (testing "updates build list when build is pending"
+    (reset! app-db {})
     (let [[cust repo build] (test-repo-path!)]
-      (is (empty? (db/builds @app-db)))
+      (is (empty? (db/get-builds @app-db)))
       (is (nil? (rf/dispatch-sync [:repo/handle-event {:type :build/pending
                                                        :build {:customer-id cust
                                                                :repo-id repo
@@ -141,9 +146,10 @@
                :repo-id repo
                :build-id build
                :git {:ref "main"}}]
-             (db/builds @app-db)))))
+             (db/get-builds @app-db)))))
 
   (testing "updates build list when build has updated"
+    (reset! app-db {})
     (let [[cust repo build] (test-repo-path!)
           upd {:customer-id cust
                :repo-id repo
@@ -156,7 +162,7 @@
       (is (nil? (rf/dispatch-sync [:repo/handle-event {:type :build/updated
                                                        :build upd}])))
       (is (= [upd]
-             (db/builds @app-db))))))
+             (db/get-builds @app-db))))))
 
 (deftest show-trigger-build
   (testing "sets `show trigger form` flag in db"
@@ -372,3 +378,58 @@
     (reset! app-db (db/mark-saving {}))
     (rf/dispatch-sync [:repo/save--failed {}])
     (is (not (db/saving? @app-db)))))
+
+(deftest repo-delete
+  (rft/run-test-sync
+   (let [c (h/catch-fx :martian.re-frame/request)
+         [cust-id repo-id] (test-repo-path!)]
+     (swap! app-db #(db/set-editing % {:id "test-repo"}))
+     (h/initialize-martian {:delete-repo {:error-code :no-error}})
+
+     (rf/dispatch [:repo/delete])
+     
+     (testing "sends delete request to backend"
+       (is (not-empty @c))
+       (is (= :delete-repo (-> @c first (nth 2)))))
+
+     (testing "marks as deleting"
+       (is (db/deleting? @app-db))))))
+
+(deftest repo-delete--success
+  (rft/run-test-sync
+   (let [repo {:id "test-repo"}
+         cust {:id "test-cust"
+               :repos [repo]}
+         e (h/catch-fx :route/goto)]
+     (is (some? (reset! app-db (-> {}
+                                   (set-repo-path (:id cust) (:id repo))
+                                   (cdb/set-customer cust)
+                                   (db/mark-deleting)))))
+     (rf/dispatch [:repo/delete--success])
+     
+     (testing "removes repo from db"
+       (is (empty? (-> (cdb/get-customer @app-db) :repos))))
+
+     (testing "unmarks deleting"
+       (is (not (db/deleting? @app-db))))
+
+     (testing "sets customer alert"
+       (is (= :info (-> (cdb/get-alerts @app-db)
+                        first
+                        :type))))
+
+     (testing "redirects to customer page"
+       (is (= 1 (count @e)))))))
+
+(deftest repo-delete--failed
+  (is (some? (set-repo-path! "test-cust" "test-repo")))
+  (is (some? (swap! app-db db/mark-deleting)))
+  (rf/dispatch-sync [:repo/delete--failed])
+  
+  (testing "unmarks deleting"
+    (is (not (db/deleting? @app-db))))
+
+  (testing "sets repo edit alert"
+    (is (= :danger (-> (db/edit-alerts @app-db)
+                       first
+                       :type)))))

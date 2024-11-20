@@ -1,11 +1,13 @@
 (ns monkey.ci.blob-test
   (:require [clojure.test :refer [deftest testing is]]
             [babashka.fs :as fs]
+            [clj-commons.byte-streams :as bs]
             [clojure.java.io :as io]
             [clompress.archivers :as ca]
             [manifold.deferred :as md]
             [monkey.ci
              [blob :as sut]
+             [protocols :as p]
              [utils :as u]]
             [monkey.ci.helpers :as h]
             [monkey.oci.os
@@ -77,7 +79,18 @@
 
   (testing "`nil` stream if blob does not exist"
     (with-disk-blob dir blob
-      (is (nil? @(sut/input-stream blob "nonexisting"))))))
+      (is (nil? @(sut/input-stream blob "nonexisting")))))
+
+  (testing "can put raw blob stream"
+    (with-disk-blob dir blob
+      (let [data "this is test data"
+            id "test-id"]
+        (with-open [stream (bs/to-input-stream (.getBytes data))]
+          (let [res @(p/put-blob-stream blob stream id)]
+            (is (map? res))
+            (is (some? (:dest res)))
+            (is (fs/exists? (:dest res)))
+            (is (= data (slurp (:dest res))))))))))
 
 (deftest oci-blob
   (testing "created by `make-blob-store`"
@@ -132,8 +145,8 @@
         
         (is (fs/exists? arch))
         (is (pos? (fs/size arch)))
-        (with-redefs [os/head-object (constantly true)
-                      os/get-object (constantly (md/success-deferred (fs/read-all-bytes arch)))]
+        (with-redefs [sut/head-object (constantly true)
+                      sut/get-object (constantly (md/success-deferred (fs/read-all-bytes arch)))]
           (let [res @(sut/restore blob "remote/path" r)]
             
             (testing "unzips and unarchives to destination"
@@ -148,9 +161,9 @@
             #_(testing "deletes tmp files"
               (is (empty? (fs/list-dir tmp-dir))))))
 
-        (with-redefs [os/head-object (constantly false)
-                      os/get-object (fn [& args]
-                                      (throw (ex-info "This should not be invoked" {:args args})))]
+        (with-redefs [sut/head-object (constantly false)
+                      sut/get-object (fn [& args]
+                                       (throw (ex-info "This should not be invoked" {:args args})))]
           (let [res @(sut/restore blob "remote/path" r)]
             
             (testing "returns `nil` if src does not exist"
@@ -163,11 +176,17 @@
           path "/test/path"]
 
       (testing "returns raw stream"
-        (with-redefs [os/head-object (constantly true)
-                      os/get-object (constantly (md/success-deferred (.getBytes "this is a test")))]
+        (with-redefs [sut/head-object (constantly true)
+                      sut/get-object (constantly (md/success-deferred (.getBytes "this is a test")))]
           (is (instance? java.io.InputStream @(sut/input-stream blob path)))))
 
       (testing "`nil` if blob does not exist"
-        (with-redefs [os/head-object (constantly false)]
-          (is (nil? @(sut/input-stream blob path))))))))
+        (with-redefs [sut/head-object (constantly false)]
+          (is (nil? @(sut/input-stream blob path)))))
+
+      (testing "can upload raw stream"
+        (with-redefs [oss/input-stream->multipart (constantly (md/success-deferred nil))]
+          (is (= "prefix/test-dest" @(p/put-blob-stream blob
+                                                        (bs/to-input-stream (.getBytes "test stream"))
+                                                        "test-dest"))))))))
 

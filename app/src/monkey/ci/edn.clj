@@ -1,9 +1,12 @@
 (ns monkey.ci.edn
   "Functionality for serializing objects to edn and deserializing them back."
-  (:require [clojure.edn :as edn]
-            [clojure.java.io :as io]
+  (:require [aero.core :as ac]
+            [clj-commons.byte-streams :as bs]
+            [clojure.edn :as edn]
             [clojure.walk :as cw]
-            [monkey.ci.pem :as pem]))
+            [monkey.ci
+             [pem :as pem]
+             [version :as v]]))
 
 (def pk-sym 'com.monkeyci/PrivateKey)
 
@@ -22,7 +25,7 @@
 (defn- ->reader [x]
   (if (string? x)
     (java.io.StringReader. x)
-    (io/reader x)))
+    (bs/to-reader x)))
 
 (def default-opts {:readers {pk-sym read-pk}})
 
@@ -32,3 +35,12 @@
       (edn/read opts edn)
       (with-open [r (->reader edn)]
         (edn/read opts (java.io.PushbackReader. r))))))
+
+;; Also specify an Aero reader, so we can read private keys from config
+(defmethod ac/reader pk-sym
+  [_ _ value]
+  (read-pk value))
+
+(defmethod ac/reader 'version
+  [_ _ _]
+  (v/version))
