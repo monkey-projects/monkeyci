@@ -20,31 +20,28 @@
 (defn customer-icon []
   [:span.me-2 co/customer-icon])
 
-(defn- build-chart-config [{:keys [elapsed-seconds consumed-credits]}]
+(defn build-chart-config [{:keys [elapsed-seconds consumed-credits]}]
   (let [dates (->> (concat (map :date elapsed-seconds)
                            (map :date consumed-credits))
                    (set)
                    (sort))]
-    {:type :line
+    {:type :bar
      :data {:labels (->> dates
                          (map (comp time/format-date time/parse-epoch)))
             :datasets
-            [{:label "Elapsed seconds"
-              :data (map :seconds elapsed-seconds)
-              :cubicInterpolationMode "monotone"
-              :tension 0.4
-              :yAxisID "y"}
+            [{:label "Elapsed minutes"
+              :data (map (comp #(/ % 60) :seconds) elapsed-seconds)}
              {:label "Consumed credits"
-              :data (map :credits consumed-credits)
-              :cubicInterpolationMode "monotone"
-              :tension 0.4
-              :yAxisID "y1"}]}
+              :data (map (comp - :credits) consumed-credits)}]}
      :options
      {:scales
-      {"y"
+      {"x"
+       {:stacked true}
+       "y"
        {:type :linear
         :display true
-        :position :left}
+        :position :left
+        :stacked true}
        "y1"
        {:type :linear
         :display true
@@ -52,7 +49,7 @@
         :grid
         {:drawOnChartArea false}}}}}))
 
-(defn- credits-chart-config []
+(defn credits-chart-config []
   (let [stats (rf/subscribe [:customer/credit-stats])]
     (when-let [{:keys [consumed available]} @stats]
       ;; TODO Colors
