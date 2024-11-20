@@ -65,6 +65,7 @@
 (def test-cmd
   {:command "test"
    :description "Runs build script unit tests"
+   ;; TODO Allow "watch mode"
    :opts [script-location-opt]
    :runs {:command cmd/run-tests
           :app-mode :cli
