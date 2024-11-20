@@ -49,7 +49,8 @@
        [:img.img-fluid.rounded {:src "/img/monkeyci-bw-small.png" :title "Placeholder Logo"}]
        [:h1 "Welcome to MonkeyCI"]
        [:p.lead
-        "A CI/CD tool designed to give you full power when building your applications."]]
+        "A" [:span.text-primary.mx-1 "CI/CD tool"] "designed to give you"
+        [:span.text-primary.mx-1 "full power"] "when building your applications."]]
       [:div.col-md-8.col-lg-6
        [:div.ps-lg-5
         [:div.card.card-lg

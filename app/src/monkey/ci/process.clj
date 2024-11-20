@@ -151,18 +151,10 @@
   (when build-cache
     (log/debug "Saving build cache for build" (b/sid build))
     (try
-      @(blob/save build-cache m2-cache-dir (repo-cache-location build))
       ;; This results in class not found error?
-      #_(retry/retry
-       #(try
-          @(blob/save build-cache m2-cache-dir (repo-cache-location build))
-          true
-          (catch Exception ex
-            (log/error "Unable to save cache" ex)
-            nil))
-       {:max-retries 5
-        :retry-if nil?
-        :backoff (retry/constant-delay 3000)})
+      ;; Something with running a sub process in oci container instances?
+      ;; We could run the script in a second container instead, similar to oci container jobs.
+      @(blob/save build-cache m2-cache-dir (repo-cache-location build))
       (catch Throwable ex
         (log/error "Failed to save build cache" ex)))))
 
