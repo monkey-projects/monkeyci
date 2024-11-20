@@ -39,6 +39,7 @@
         io.prometheus/prometheus-metrics-exporter-pushgateway {:mvn/version "1.3.2"}
         io.prometheus/prometheus-metrics-instrumentation-jvm {:mvn/version "1.3.2"}
         io.prometheus/prometheus-metrics-tracer-initializer {:mvn/version "1.3.2"}
+        lambdaisland/kaocha {:mvn/version "1.91.1392"} ; Used for running build tests
         medley/medley {:mvn/version "1.4.0"}
         metosin/reitit-middleware {:mvn/version "0.7.2"}
         metosin/reitit-ring {:mvn/version "0.7.2"}
