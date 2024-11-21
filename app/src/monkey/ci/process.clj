@@ -198,17 +198,19 @@
     (md/finally result #(save-cache! build rt))))
 
 (defn generate-test-deps [rt watch?]
-  {:aliases
-   {:monkeyci/test
-    {:extra-deps {'com.monkeyci/app (version-or rt utils/cwd)}
-     :paths ["."]
-     :exec-fn 'kaocha.runner/exec-fn
-     :exec-args (cond-> {:tests [{:type :kaocha.type/clojure.test
-                                  :id :unit
-                                  :ns-patterns ["-test$"]
-                                  :source-paths ["."]
-                                  :test-paths ["."]}]}
-                  watch? (assoc :watch? true))}}})
+  (let [v (version-or rt utils/cwd)]
+    {:aliases
+     {:monkeyci/test
+      {:extra-deps {'com.monkeyci/app v
+                    'com.monkeyci/test v}
+       :paths ["."]
+       :exec-fn 'kaocha.runner/exec-fn
+       :exec-args (cond-> {:tests [{:type :kaocha.type/clojure.test
+                                    :id :unit
+                                    :ns-patterns ["-test$"]
+                                    :source-paths ["."]
+                                    :test-paths ["."]}]}
+                    watch? (assoc :watch? true))}}}))
 
 (defn test!
   "Executes any unit tests that have been defined for the build"

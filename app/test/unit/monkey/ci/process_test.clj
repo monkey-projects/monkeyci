@@ -211,3 +211,11 @@
         (is (= "clojure" (-> (sut/test! build rt)
                              :cmd
                              first)))))))
+
+(deftest generate-test-deps
+  (testing "includes monkeyci test lib"
+    (is (contains? (-> (sut/generate-test-deps {} false)
+                       :aliases
+                       :monkeyci/test
+                       :extra-deps)
+                   'com.monkeyci/test))))
