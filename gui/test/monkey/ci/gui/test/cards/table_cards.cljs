@@ -86,3 +86,36 @@
      :name "Second item"}]
    {:class [:table-hover]
     :on-row-click #(js/alert (str "Row clicked:" %))}])
+
+(defcard-rg sorted-table
+  "Table with sorted column"
+  [sut/render-table
+   [{:label "Index"
+     :value :idx
+     :sorting :asc}
+    {:label "Name"
+     :value :name}]
+   (->> (range 10)
+        (map (fn [idx]
+               {:idx (inc idx)
+                :name (str "Item " (inc idx))})))
+   {}])
+
+(rf/reg-sub
+ ::sortable-table-items
+ (fn [_ _]
+   (->> (range 10)
+        (map (fn [idx]
+               {:idx (inc idx)
+                :name (str "Item " (inc idx))})))))
+
+(defcard-rg sortable-table
+  "Table that allows the user to change sorting"
+  [sut/paged-table
+   {:id ::sortable-table
+    :items-sub [::sortable-table-items]
+    :columns [{:label "Index"
+               :value :idx
+               :sorter (sut/prop-sorter :idx)}
+              {:label "Name"
+               :value :name}]}])

@@ -74,19 +74,23 @@
 
 (def table-columns
   [{:label "Build"
-    :value (fn [b] [:a {:href (r/path-for :page/build b)} (:idx b)])}
+    :value (fn [b] [:a {:href (r/path-for :page/build b)} (:idx b)])
+    :sorter (table/prop-sorter :idx)}
    {:label "Time"
     :value (fn [b]
              [:span.text-nowrap (t/reformat (:start-time b))])}
    {:label "Elapsed"
-    :value elapsed}
+    :value elapsed
+    :sorter (table/sorter-fn (partial sort-by elapsed))}
    {:label "Trigger"
     :value :source}
    {:label "Ref"
     :value (fn [b]
-             [:span.text-nowrap (trim-ref (get-in b [:git :ref]))])}
+             [:span.text-nowrap (trim-ref (get-in b [:git :ref]))])
+    :sorter (table/sorter-fn (partial sort-by (comp :ref :git)))}
    {:label "Result"
-    :value (fn [b] [:div.text-center [co/build-result (:status b)]])}
+    :value (fn [b] [:div.text-center [co/build-result (:status b)]])
+    :sorter (table/prop-sorter :status)}
    {:label "Message"
     :value (fn [b]
              ;; Can't use css truncation in a table without forcing column widths,
@@ -113,7 +117,7 @@
        [table/paged-table
         {:id ::builds
          :items-sub [:repo/builds]
-         :columns table-columns
+         :columns (table/add-sorting table-columns 0 :desc)
          :loading {:sub [:builds/init-loading?]}
          :class [:table-hover]
          :on-row-click #(rf/dispatch [:route/goto :page/build %])}])]))

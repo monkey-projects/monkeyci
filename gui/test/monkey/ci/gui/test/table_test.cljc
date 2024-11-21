@@ -69,3 +69,79 @@
       (rf/dispatch-sync [:pagination/set id {:current 1 :count 3}])
       (rf/dispatch-sync [:pagination/goto id 4])
       (is (= 1 (:current (sut/get-pagination @app-db id)))))))
+
+(deftest table-sorting-sub
+  (let [id ::test-table
+        ts (rf/subscribe [:table/sorting id])]
+    (testing "exists"
+      (is (some? ts)))
+    
+    (testing "initially empty"
+      (is (empty? @ts)))
+
+    (testing "returns current table sorting for id"
+      (let [sorting {:col-idx 0
+                     :sorting :asc}]
+        (is (some? (reset! app-db (sut/set-sorting {} id sorting))))
+        (is (= sorting @ts))))))
+
+(deftest sorting-toggled-evt
+  (let [id ::test-table]
+    (testing "sets sorting to ascending on given column index"
+      (rf/dispatch-sync [:table/sorting-toggled id 1])
+      (is (= {:col-idx 1 :sorting :asc}
+             (sut/get-sorting @app-db id))))
+
+    (testing "changes sorting to descending on same column index"
+      (rf/dispatch-sync [:table/sorting-toggled id 1])
+      (is (= {:col-idx 1 :sorting :desc}
+             (sut/get-sorting @app-db id))))
+
+    (testing "sets sorting to ascending on other column index"
+      (rf/dispatch-sync [:table/sorting-toggled id 0])
+      (is (= {:col-idx 0 :sorting :asc}
+             (sut/get-sorting @app-db id))))))
+
+(deftest sorter-fn
+  (let [items [3 1 2]
+        s (sut/sorter-fn sort)]
+    
+    (testing "invokes sorter on `:asc`"
+      (is (= [1 2 3] (sut/invoke-sorter s :asc items))))
+
+    (testing "reverses items on `:desc`"
+      (is (= [3 2 1] (sut/invoke-sorter s :desc items))))))
+
+(deftest apply-sorting
+  (let [cols [{:label "Id"
+               :sorter (sut/prop-sorter :id)}
+              {:label "Name"
+               :sorter (sut/prop-sorter :name)}
+              {:label "Date"}]
+        [i1 i2 i3 :as items] [{:id 1
+                               :name "C"}
+                              {:id 3
+                               :name "A"}
+                              {:id 2
+                               :name "B"}]]
+    (testing "returns items as-is when no sorting"
+      (is (= items
+             (sut/apply-sorting {} cols items))))
+
+    (testing "uses column sorter ascending"
+      (is (= [i1 i3 i2]
+             (sut/apply-sorting {:col-idx 0
+                                 :sorting :asc}
+                                cols items))))
+
+    (testing "uses column sorter descending"
+      (is (= [i1 i3 i2]
+             (sut/apply-sorting {:col-idx 1
+                                 :sorting :desc}
+                                cols items))))
+
+    (testing "returns items as-is when no sorter"
+      (is (= items
+             (sut/apply-sorting {:col-idx 2
+                                 :sorting :desc}
+                                cols items))))))

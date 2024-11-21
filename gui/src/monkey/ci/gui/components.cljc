@@ -57,6 +57,12 @@
 (def search-icon
   [icon :search])
 
+(def sort-up-icon
+  [icon :caret-up-fill])
+
+(def sort-down-icon
+  [icon :caret-down-fill])
+
 (defn reload-btn [evt & [opts]]
   (icon-btn :arrow-clockwise "Reload" evt opts))
 
