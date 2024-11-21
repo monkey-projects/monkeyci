@@ -6,6 +6,12 @@
   <artifactId>test</artifactId>
   <version>0.10.1-SNAPSHOT</version>
   <name>monkeyci-test</name>
+  <licenses>
+    <license>
+      <name>GPL 3</name>
+      <url>https://www.gnu.org/licenses/gpl-3.0.en.html#license-text</url>
+    </license>
+  </licenses>
   <dependencies>
     <dependency>
       <groupId>org.clojure</groupId>
