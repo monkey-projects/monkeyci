@@ -41,13 +41,7 @@
        {:type :linear
         :display true
         :position :left
-        :stacked true}
-       "y1"
-       {:type :linear
-        :display true
-        :position :right
-        :grid
-        {:drawOnChartArea false}}}}}))
+        :stacked true}}}}))
 
 (defn credits-chart-config []
   (let [stats (rf/subscribe [:customer/credit-stats])]

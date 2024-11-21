@@ -102,6 +102,10 @@
     (is (not-empty (capture-out {:type :verify/result
                                  :result {:summary {:error 0}}})))))
 
+(deftest print-test-starting
+  (testing "prints message"
+    (is (not-empty (capture-out {:type :test/starting})))))
+
 (deftest unknown-types
   (testing "prints warning"
     (is (string? (capture-out {:type :unkown/type})))))

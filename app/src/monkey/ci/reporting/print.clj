@@ -4,6 +4,7 @@
             [clansi :as cl]
             [clojure.string :as cs]
             [monkey.ci.reporting :as r]
+            [monkey.ci.build :as b]
             [monkey.ci.build.core :as bc]))
 
 (defn- error [s]
@@ -159,8 +160,12 @@
     ;; Ensure printed stuff is actually sent to stdout
     (flush)))
 
+(defmethod printer :test/starting [{:keys [build]}]
+  (println (accent "Starting unit tests for build..."))
+  (println "Location:" (b/script-dir build)))
+
 (defmethod printer :default [msg]
-  (println (cl/style "Warning:" :bright :cyan) "unknown message type" (accent (str (:type msg)))))
+  (println (warning "Warning:") "unknown message type" (accent (str (:type msg)))))
 
 (defn print-reporter
   "Nicely prints to stdout, using coloring"

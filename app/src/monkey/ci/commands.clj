@@ -94,6 +94,8 @@
   [conf]
   (ra/with-cli-runtime conf
     (fn [rt]
+      (rt/report rt {:type :test/starting
+                     :build (:build rt)})
       (:exit @(proc/test! (:build rt) rt)))))
 
 (defn list-builds [rt]
