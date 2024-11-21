@@ -1,0 +1,31 @@
+{:deps {com.monkeyci/app {:mvn/version "0.10.0"}}
+ :paths ["src" "resources"]
+
+ :aliases
+ {:dev
+  {:override-deps {com.monkeyci/app {:local/root "../app"}}
+   :extra-paths ["test" "dev-resources" "env/dev"]}
+
+  :test
+  {:extra-deps {com.monkeyprojects/build {:mvn/version "0.2.0"}}
+   :extra-paths ["test" "dev-resources"]
+   :exec-fn monkey.test/all}
+
+  :junit
+  {:exec-fn monkey.test/junit}
+
+  :watch
+  {:exec-fn monkey.test/watch}
+
+  :jar
+  {:extra-deps {com.monkeyprojects/build {:mvn/version "0.2.0"}}
+   :exec-fn monkey.build/jar
+   :exec-args {:lib com.monkeyci/test
+               :version-env "MONKEYCI_VERSION"
+               :jar "target/monkeyci-test.jar"}}
+
+  :install
+  {:exec-fn monkey.build/jar+install}
+
+  :deploy
+  {:exec-fn monkey.build/jar+deploy}}}

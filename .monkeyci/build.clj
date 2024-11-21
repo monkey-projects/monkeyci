@@ -45,19 +45,18 @@
 (defn gui-changed? [ctx]
   (dir-changed? ctx #"^gui/.*"))
 
-(defn common-changed? [ctx]
-  (dir-changed? ctx #"^common/.*"))
+(defn test-lib-changed? [ctx]
+  (dir-changed? ctx #"^test-lib/.*"))
 
-(def build-app? (some-fn app-changed? common-changed? release?))
+(def build-app? (some-fn app-changed? release?))
 (def build-gui? (some-fn gui-changed? release?))
-(def build-common? (some-fn common-changed? release?))
+(def build-test-lib? (some-fn test-lib-changed? release?))
 
-(def publish-app? (some-fn (every-pred (some-fn app-changed? common-changed?)
-                                       should-publish?)
+(def publish-app? (some-fn (every-pred app-changed? should-publish?)
                            release?))
 (def publish-gui? (some-fn (every-pred gui-changed? should-publish?)
                            release?))
-#_(def publish-common? (some-fn (every-pred common-changed? should-publish?) release?))
+(def publish-test-lib? (some-fn (every-pred test-lib-changed? should-publish?) release?))
 
 (defn tag-version
   "Extracts the version from the tag"
@@ -111,10 +110,10 @@
                  :junit {:artifact-id (:id junit-artifact)
                          :path "junit.xml"})))))
 
-(defn test-common [ctx]
-  (let [junit-artifact (junit-artifact "common")]
-    (when (build-common? ctx)
-      (-> (clj-container "test-common" "common" "-X:test:junit")
+(defn test-test-lib [ctx]
+  (let [junit-artifact (junit-artifact "test-lib")]
+    (when (build-test-lib? ctx)
+      (-> (clj-container "test-test-lib" "test-lib" "-X:test:junit")
           (assoc :save-artifacts [junit-artifact]
                  :junit {:artifact-id (:id junit-artifact)
                          :path "junit.xml"})))))
@@ -180,10 +179,15 @@
 
 (defn publish-app [ctx]
   (when (publish-app? ctx)
-    ;; App is dependent on the common lib, so we should replace version here
-    ;; (format "-Sdeps '{:override-deps {:mvn/version \"%s\"}}'" (lib-version ctx))
     (some-> (publish ctx "publish-app" "app")
             (core/depends-on ["test-app"]))))
+
+(defn publish-test-lib [ctx]
+  (when (publish-test-lib? ctx)
+    ;; TODO Overwrite monkeyci version if necessary
+    ;; (format "-Sdeps '{:override-deps {:mvn/version \"%s\"}}'" (lib-version ctx))
+    (some-> (publish ctx "publish-test-lib" "test-lib")
+            (core/depends-on ["test-test-lib"]))))
 
 (def github-release
   "Creates a release in github"
@@ -262,9 +266,11 @@
 ;; List of jobs
 [test-app
  test-gui
+ test-test-lib
  
  app-uberjar
  publish-app
+ publish-test-lib
  github-release
  
  build-gui-release
