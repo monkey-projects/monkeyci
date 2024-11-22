@@ -161,6 +161,7 @@
                    (sut/with-server-system :listeners)
                    :listeners
                    :events
+                   :in
                    :config
                    ::kind))))
 

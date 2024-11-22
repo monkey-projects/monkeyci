@@ -23,7 +23,9 @@
             [monkey.ci.containers
              [podman :as ccp]
              [oci :as cco]]
-            [monkey.ci.events.core :as ec]
+            [monkey.ci.events
+             [core :as ec]
+             [split  :as es]]
             [monkey.ci.runtime.common :as rc]
             [monkey.ci.web
              [auth :as auth]
@@ -239,7 +241,7 @@
   (when-let [c (get-in config [:listeners :events])]
     (ec/make-events c)))
 
-(defrecord ListenersEvents [config ext-events]
+(defrecord ListenersEvents [config out-events]
   ;; Either uses own created events, or external (top level) events, depending
   ;; on configuration.
   co/Lifecycle
@@ -247,14 +249,14 @@
     (if-let [le (some-> (maybe-make-listeners-events config)
                         (co/start))]
       (assoc this
-             :events le
-             :stop? true)
-      (assoc this :events ext-events)))
+             :in-events le
+             ;; Split events input from output
+             :events (es/->SplitEvents le out-events))
+      (assoc this :events out-events)))
 
   (stop [this]
-    (when (:stop? this)
-      (when-let [le (:events this)]
-        (co/stop le)))))
+    (when-let [le (:in-events this)]
+      (co/stop le))))
 
 (defn- new-listeners-events [config]
   (->ListenersEvents config nil))
@@ -304,7 +306,7 @@
                [:listeners-events :storage])
    :listeners-events (co/using
                       (new-listeners-events config)
-                      {:ext-events :events})
+                      {:out-events :events})
    :metrics   (co/using
                (new-metrics)
                [:events])
