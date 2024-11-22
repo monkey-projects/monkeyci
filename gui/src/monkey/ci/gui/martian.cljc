@@ -374,6 +374,8 @@
  (fn [_ [_ target-evt err]]
    (log/debug "Got error:" (clj->js err))
    {:dispatch (if (= 401 (:status err))
+                ;; TODO Try refreshing the token instead.  Only when that fails too,
+                ;; we should re-login.
                 [:route/goto :page/login]
                 (conj target-evt err))}))
 

@@ -221,9 +221,43 @@
   ;; Wrapped in a map because component doesn't allow nils
   {:jwk (auth/config->keypair conf)})
 
+(defrecord ListenersWrapper [listeners-events storage]
+  co/Lifecycle
+  (start [this]
+    (log/debug "Creating listeners with events" (:events listeners-events))
+    (assoc this :listeners (-> (li/->Listeners (:events listeners-events)
+                                               storage)
+                               (co/start))))
+  (stop [this]
+    (when-let [l (:listeners this)]
+      (co/stop l))))
+
 (defn- new-listeners []
-  ;; TODO Listen to events on a queue so we don't process them multiple times
-  (li/map->Listeners {}))
+  (map->ListenersWrapper {}))
+
+(defn- maybe-make-listeners-events [config]
+  (when-let [c (get-in config [:listeners :events])]
+    (ec/make-events c)))
+
+(defrecord ListenersEvents [config ext-events]
+  ;; Either uses own created events, or external (top level) events, depending
+  ;; on configuration.
+  co/Lifecycle
+  (start [this]
+    (if-let [le (some-> (maybe-make-listeners-events config)
+                        (co/start))]
+      (assoc this
+             :events le
+             :stop? true)
+      (assoc this :events ext-events)))
+
+  (stop [this]
+    (when (:stop? this)
+      (when-let [le (:events this)]
+        (co/stop le)))))
+
+(defn- new-listeners-events [config]
+  (->ListenersEvents config nil))
 
 (defrecord ServerRuntime [config]
   co/Lifecycle
@@ -267,7 +301,10 @@
    :jwk       (new-jwk config)
    :listeners (co/using
                (new-listeners)
-               [:events :storage])
+               [:listeners-events :storage])
+   :listeners-events (co/using
+                      (new-listeners-events config)
+                      {:ext-events :events})
    :metrics   (co/using
                (new-metrics)
                [:events])
