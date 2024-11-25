@@ -11,13 +11,17 @@
 (defn bash [& args]
   (core/as-job
    (fn [rt]
-     (let [work-dir (or (get-in rt [:job :work-dir]) (:checkout-dir rt))]
+     (let [work-dir (or (get-in rt [:job :work-dir]) (:checkout-dir rt))
+           [opts args] (if (map? (first args))
+                         [(first args) (rest args)]
+                         [{} args])]
        (log/debug "Executing shell script with args" args "in work dir" work-dir)
        (try
          (let [opts (cond-> {:out :string
                              :err :string}
                       ;; Add work dir if specified in the context
-                      work-dir (assoc :dir work-dir))]
+                      work-dir (assoc :dir work-dir)
+                      (:env opts) (assoc :extra-env (:env opts)))]
            (assoc core/success
                   :output (:out (apply bp/shell opts args))))
          (catch Exception ex
