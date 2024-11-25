@@ -1,5 +1,8 @@
 (ns monkey.ci.gui.login.db)
 
+(def storage-redir-id "login-redir")
+(def storage-token-id "login-tokens")
+
 (defn submitting? [db]
   (true? (::submitting? db)))
 

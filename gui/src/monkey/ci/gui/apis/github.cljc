@@ -17,9 +17,9 @@
   "Builds an xhrio request map to send a request to Github api"
   [db {:keys [path] :as opts}]
   ;; TODO Handle pagination (see the `link` header)
-  (cond-> (c/api-request db (-> opts
-                                (update :token #(or % (get-token db)))
-                                (dissoc :path)))
+  (cond-> (c/api-request (-> opts
+                             (update :token #(or % (get-token db)))
+                             (dissoc :path)))
     true (assoc-in [:headers "X-GitHub-Api-Version"] api-version)
     path (assoc :uri (api-url path))))
 
