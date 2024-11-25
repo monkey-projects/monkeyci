@@ -175,7 +175,8 @@
 
         (testing "`job/start`"
           (is (some? (handle {:type :job/start
-                              :job-id job-id})))
+                              :job-id job-id
+                              :credit-multiplier 3})))
           (let [upd (-> (st/find-build st sid)
                         (get-in [:script :jobs job-id]))]
             
@@ -183,7 +184,10 @@
               (is (= time (:start-time upd))))
 
             (testing "sets status to `running`"
-              (is (= :running (:status upd))))))
+              (is (= :running (:status upd))))
+
+            (testing "sets `credit-multiplier` if specified"
+              (is (= 3 (:credit-multiplier upd))))))
 
         (testing "`job/skipped`"
           (is (some? (handle {:type :job/skipped

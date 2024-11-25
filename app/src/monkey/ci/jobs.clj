@@ -142,14 +142,18 @@
 (extend-protocol Job
   monkey.ci.build.core.ActionJob
   (execute! [job ctx]
-    (let [build-sid (-> ctx :build build/sid)
+    (let [build (:build ctx)
+          build-sid (build/sid build)
           a (-> (recurse-action job)
                 (cache/wrap-caches)
                 (art/wrap-artifacts))
           job (assoc job
                      :start-time (t/now))]
       (ec/post-events (:events ctx)
-                      [(job-start-evt (job-id job) build-sid)])
+                      [(-> (job-start-evt (job-id job) build-sid)
+                           ;; For action jobs, add the credit multiplier on job start since there is
+                           ;; no `initializing` event.
+                           (merge (select-keys build [:credit-multiplier])))])
       (-> ctx
           (make-job-dir-absolute)
           (a)

@@ -170,9 +170,14 @@
 
 (def user-agent (str "MonkeyCI:" (v/version)))
 
+(defn- github-config
+  "Fetches github configuration from the request"
+  [req]
+  (c/from-rt req (comp :github rt/config)))
+
 (defn- request-access-token [req]
   (let [code (get-in req [:parameters :query :code])
-        {:keys [client-secret client-id]} (c/from-rt req (comp :github rt/config))]
+        {:keys [client-secret client-id]} (github-config req)]
     (-> (http/post "https://github.com/login/oauth/access_token"
                    {:query-params {:client_id client-id
                                    :client_secret client-secret

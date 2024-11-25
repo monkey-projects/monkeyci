@@ -484,3 +484,11 @@
               :id repo-id}
              (:body resp)))
       (is (empty? (st/find-watched-github-repos st github-id))))))
+
+(deftest refresh-token
+  (testing "posts to github api with refresh token"
+    (af/with-fake-http [{:url "https://github.com/login/oauth/access_token"
+                         :request-method :post}
+                        (fn [req]
+                          ;; TODO
+                          )])))

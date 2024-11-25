@@ -213,7 +213,8 @@
                     watch? (assoc :watch? true))}}}))
 
 (defn test!
-  "Executes any unit tests that have been defined for the build"
+  "Executes any unit tests that have been defined for the build by starting a clojure process
+   with a custom alias for running tests using kaocha."
   [build rt]
   (let [deps (generate-test-deps rt false)]
     (bp/process

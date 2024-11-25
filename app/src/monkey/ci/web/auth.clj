@@ -53,8 +53,9 @@
 (def default-token-expiration (jt/days 1))
 
 (defn augment-payload [payload]
-  ;; TODO Make token expiration configurable
   (assoc payload
+         ;; TODO Make token expiration configurable, or copy expiration from
+         ;; the original auth token
          :exp (-> (jt/plus (jt/instant) default-token-expiration)
                   (jt/to-millis-from-epoch))
          ;; TODO Make issuer and audiences configurable

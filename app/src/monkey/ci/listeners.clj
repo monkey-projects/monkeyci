@@ -111,8 +111,9 @@
                           :credit-multiplier credit-multiplier}))
 
 (defn start-job [storage {:keys [time] :as evt}]
-  (patch-job storage evt {:status :running
-                          :start-time time}))
+  (patch-job storage evt (-> {:status :running
+                              :start-time time}
+                             (merge (select-keys evt [:credit-multiplier])))))
 
 (defn skip-job [storage {:keys [time] :as evt}]
   (patch-job storage evt {:status :skipped}))

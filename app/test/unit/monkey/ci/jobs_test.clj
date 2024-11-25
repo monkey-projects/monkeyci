@@ -239,7 +239,8 @@
   (let [job (bc/action-job "test-job" (constantly bc/success))
         events (h/fake-events)
         ctx {:events events
-             :build {:sid (h/gen-build-sid)}}]
+             :build {:sid (h/gen-build-sid)
+                     :credit-multiplier 10}}]
     (is (bc/success? @(sut/execute! job ctx)))
     
     (testing "fires `job/start` event"
@@ -247,7 +248,8 @@
         (is (some? evt))
         (is (= (sut/job-id job) (:job-id evt)))
         (is (spec/valid? ::se/event evt))
-        (is (= evt (edn/edn-> (edn/->edn evt))) "Event should be serializable to edn")))
+        (is (= evt (edn/edn-> (edn/->edn evt))) "Event should be serializable to edn")
+        (is (= 10 (:credit-multiplier evt)) "Adds credit multiplier from build")))
 
     (testing "fires `job/executed` event"
       (let [evt (h/first-event-by-type :job/executed (h/received-events events))]
