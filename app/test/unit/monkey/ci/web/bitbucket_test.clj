@@ -56,7 +56,7 @@
     (let [user-id (str (random-uuid))]
       (at/with-fake-http ["https://bitbucket.org/site/oauth2/access_token"
                           (fn [req]
-                            (if (= "old-refresh-token" (get-in req [:form-params :refresh_token]))
+                            (if (not= "old-refresh-token" (get-in req [:form-params :refresh_token]))
                               {:status 400
                                :body (h/to-json {:message "Expected refresh token"})
                                :headers {"Content-Type" "application/json"}}
