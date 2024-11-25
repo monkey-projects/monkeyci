@@ -347,18 +347,32 @@
                     cust-webhook-routes]})])
 
 (def github-routes
-  ["/github" [["/login" {:post
-                         {:handler github/login
-                          :parameters {:query {:code s/Str}}}}]
-              ["/config" {:get
-                          {:handler github/get-config}}]]])
+  ["/github"
+   [["/login"
+     {:post
+      {:handler github/login
+       :parameters {:query {:code s/Str}}}}]
+    ["/refresh"
+     {:post
+      {:handler github/refresh
+       :parameters {:body {:refresh-token s/Str}}}}]
+    ["/config"
+     {:get
+      {:handler github/get-config}}]]])
 
 (def bitbucket-routes
-  ["/bitbucket" [["/login" {:post
-                            {:handler bitbucket/login
-                             :parameters {:query {:code s/Str}}}}]
-                 ["/config" {:get
-                             {:handler bitbucket/get-config}}]]])
+  ["/bitbucket"
+   [["/login"
+     {:post
+      {:handler bitbucket/login
+       :parameters {:query {:code s/Str}}}}]
+    ["/refresh"
+     {:post
+      {:handler bitbucket/refresh
+       :parameters {:body {:refresh-token s/Str}}}}]
+    ["/config"
+     {:get
+      {:handler bitbucket/get-config}}]]])
 
 (def auth-routes
   ["/auth/jwks" {:get

@@ -485,10 +485,21 @@
              (:body resp)))
       (is (empty? (st/find-watched-github-repos st github-id))))))
 
-#_(deftest refresh-token
+(deftest refresh-token
   (testing "posts to github api with refresh token"
     (af/with-fake-http [{:url "https://github.com/login/oauth/access_token"
                          :request-method :post}
                         (fn [req]
-                          ;; TODO
-                          )])))
+                          {:status 200
+                           :headers {"Content-Type" "application/json"}
+                           :body (h/to-json {:access-token "new-token"
+                                             :refresh-token "new-refresh-token"})})]
+      (is (= {:access-token "new-token"
+              :refresh-token "new-refresh-token"}
+             (-> (trt/test-runtime)
+                 (assoc-in [:config :github] {:client-id "test-client-id"
+                                              :client-secret "test-client-secret"})
+                 (h/->req)
+                 (assoc-in [:parameters :body :refresh-token] "old-refresh-token")
+                 (sut/refresh-token)
+                 :body))))))

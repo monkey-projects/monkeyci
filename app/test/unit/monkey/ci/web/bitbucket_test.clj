@@ -51,6 +51,38 @@
             (is (map? u))
             (is (= (str "bitbucket/" user-id) (:sub u)))))))))
 
+(deftest refresh
+  (testing "refreshes token and returns it"
+    (let [user-id (str (random-uuid))]
+      (at/with-fake-http ["https://bitbucket.org/site/oauth2/access_token"
+                          (fn [req]
+                            (if (= "old-refresh-token" (get-in req [:form-params :refresh_token]))
+                              {:status 400
+                               :body (h/to-json {:message "Expected refresh token"})
+                               :headers {"Content-Type" "application/json"}}
+                              {:status 200
+                               :body (h/to-json {:access-token "test-token"})
+                               :headers {"Content-Type" "application/json"}}))
+                          "https://api.bitbucket.org/2.0/user"
+                          {:status 200
+                           :body (h/to-json {:uuid user-id})
+                           :headers {"Content-Type" "application/json"}}]
+        (let [kp (auth/generate-keypair)
+              req (-> (trt/test-runtime)
+                      (assoc :jwk {:priv (.getPrivate kp)})
+                      (h/->req)
+                      (assoc :parameters
+                             {:body
+                              {:refresh-token "old-refresh-token"}}))
+              token (-> req
+                        (sut/refresh)
+                        :body
+                        :token)]
+          (is (string? token))
+          (let [u (jwt/unsign token (.getPublic kp) {:alg :rs256})]
+            (is (map? u))
+            (is (= (str "bitbucket/" user-id) (:sub u)))))))))
+
 (deftest watch-repo
   (h/with-memory-store st
     (let [cust (h/gen-cust)
