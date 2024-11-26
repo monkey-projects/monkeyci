@@ -6,7 +6,9 @@
    The general intention is to provide functions for most purposes, without the user
    having to resort to using keywords and maps."
   
-  (:require [monkey.ci.build.core :as bc]
+  (:require [monkey.ci.build
+             [api :as api]
+             [core :as bc]]
             [monkey.ci
              [containers :as co]
              [jobs :as j]]))
@@ -128,3 +130,9 @@
 (def main-branch?
   "Checks if the build branch is the configured main branch."
   bc/main-branch)
+
+(def build-params
+  "Retrieves parameters this build has access to"
+  api/build-params)
+
+(def params build-params)
