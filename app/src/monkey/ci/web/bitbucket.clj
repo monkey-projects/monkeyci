@@ -27,16 +27,24 @@
             (log/error))
     d))
 
-(defn- request-access-token [req]
-  (let [code (get-in req [:parameters :query :code])
-        {:keys [client-secret client-id]} (c/from-rt req (comp :bitbucket rt/config))]
+(defn- send-access-token-req [req opts]
+  (let [{:keys [client-secret client-id]} (c/from-rt req (comp :bitbucket rt/config))]
     @(-> (http/post "https://bitbucket.org/site/oauth2/access_token"
-                    {:form-params {:grant_type "authorization_code"
-                                   :code code}
+                    {:form-params opts
                      :basic-auth [client-id client-secret]
                      :headers {"Accept" "application/json"}})
          (md/chain c/parse-body)
          (md/catch handle-error))))
+
+(defn- request-access-token [req]
+  (send-access-token-req req
+                         {:grant_type "authorization_code"
+                          :code (get-in req [:parameters :query :code])}))
+
+(defn- refresh-access-token [req]
+  (send-access-token-req req
+                         {:grant_type "refresh_token"
+                          :refresh_token (get-in req [:parameters :body :refresh-token])}))
 
 (defn- ->oauth-user [{:keys [uuid] :as u}]
   (log/debug "Converting Bitbucket user:" u)
@@ -63,6 +71,10 @@
 (def login (oauth2/login-handler
             request-access-token
             request-user-info))
+
+(def refresh (oauth2/login-handler
+              refresh-access-token
+              request-user-info))
 
 (defn get-config
   "Lists public bitbucket config, necessary for authentication."

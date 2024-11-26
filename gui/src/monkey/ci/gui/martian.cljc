@@ -4,6 +4,7 @@
             [martian.interceptors :as mi]
             [martian.re-frame :as mr]
             [monkey.ci.gui.logging :as log]
+            [monkey.ci.gui.login.db :as ldb]
             [re-frame.core :as rf]
             [schema.core :as s]))
 
@@ -318,6 +319,12 @@
      :query-schema {:code s/Str}})
 
    (public-route
+    {:route-name :github-refresh
+     :method :post
+     :path-parts ["/github/refresh"]
+     :body-schema {:refresh {:refresh-token s/Str}}})
+   
+   (public-route
     {:route-name :get-github-config
      :path-parts ["/github/config"]})
 
@@ -328,10 +335,10 @@
      :query-schema {:code s/Str}})
 
    (public-route
-    {:route-name :bitbucket-login
+    {:route-name :bitbucket-refresh
      :method :post
-     :path-parts ["/bitbucket/login"]
-     :query-schema {:code s/Str}})
+     :path-parts ["/bitbucket/refresh"]
+     :body-schema {:refresh {:refresh-token s/Str}}})
 
    (public-route
     {:route-name :get-bitbucket-config
@@ -371,19 +378,57 @@
 
 (rf/reg-event-fx
  ::error-handler
- (fn [_ [_ target-evt err]]
-   (log/debug "Got error:" (clj->js err))
-   {:dispatch (if (= 401 (:status err))
-                ;; TODO Try refreshing the token instead.  Only when that fails too,
-                ;; we should re-login.
-                [:route/goto :page/login]
-                (conj target-evt err))}))
+ [(rf/inject-cofx :local-storage ldb/storage-token-id)]
+ (fn [{:keys [db local-storage]} [_ orig-evt error-evt err]]
+   (let [{:keys [refresh-token]} local-storage]
+     (log/debug "Got error:" (clj->js err))
+     {:dispatch (if (and (= 401 (:status err)) refresh-token)
+                  ;; Try refreshing the token.  Only when that fails too,
+                  ;; we should re-login.
+                  [::refresh-token refresh-token orig-evt]
+                  (conj error-evt err))})))
+
+(rf/reg-event-fx
+ ::refresh-token
+ (fn [{:keys [db]} [_ refresh-token orig-evt]]
+   (let [req (case (ldb/provider db)
+               :github :github-refresh
+               :bitbucket :bitbucket-refresh)]
+     {:dispatch [:martian.re-frame/request
+                 req
+                 {:refresh {:refresh-token refresh-token}}
+                 [::refresh-token--success orig-evt]
+                 [::refresh-token--failed]]})))
+
+(rf/reg-event-fx
+ ::refresh-token--success
+ [(rf/inject-cofx :local-storage ldb/storage-token-id)]
+ (fn [{:keys [db local-storage]} [_ orig-evt {:keys [body]}]]
+   {:db (-> db
+            (ldb/set-token (:token body))
+            (ldb/set-provider-token (or (:github-token body) (:bitbucket-token body))))
+    :dispatch orig-evt
+    ;; Update local storage with new tokens
+    :local-storage [ldb/storage-token-id
+                    (merge local-storage
+                           (select-keys body [:token :refresh-token :github-token :bitbucket-token]))]}))
+
+(rf/reg-event-fx
+ ::refresh-token--failed
+ (fn [_ _]
+   ;; In any case, redirect to login page.  Even for non-401 errors, because what else
+   ;; can we do?
+   {:dispatch [:route/goto :page/login]}))
 
 ;; Takes the token from the db and adds it to the martian request
 (rf/reg-event-fx
  :secure-request
  (fn [{:keys [db]} [_ req args on-success on-failure]]
-   {:dispatch (into [:martian.re-frame/request req (add-token db args) on-success [::error-handler on-failure]])}))
+   (let [orig [:martian.re-frame/request
+               req
+               (add-token db args)
+               on-success]]
+     {:dispatch (conj orig [::error-handler (conj orig on-failure) on-failure])})))
 
 (defn api-url
   "Constructs a url to the api, using authorization token given"

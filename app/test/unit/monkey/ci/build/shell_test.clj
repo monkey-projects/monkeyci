@@ -43,7 +43,13 @@
     (with-redefs-fn {#'bp/shell (fn [opts & _]
                                   {:out (:dir opts)})}
       (let [b (sut/bash "test")]
-        #(is (= "test-dir" (:output (b {:checkout-dir "test-dir"}))))))))
+        #(is (= "test-dir" (:output (b {:checkout-dir "test-dir"})))))))
+
+  (testing "adds env vars as extra envs"
+    (with-redefs-fn {#'bp/shell (fn [opts & _]
+                                  {:out (:extra-env opts)})}
+      (let [b (sut/bash {:env {"key" "value"}} "test")]
+        #(is (= {"key" "value"} (:output (b {}))))))))
 
 (deftest home
   (testing "provides home directory"

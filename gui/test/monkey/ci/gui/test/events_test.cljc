@@ -3,6 +3,7 @@
                :cljs [cljs.test :refer-macros [deftest testing is use-fixtures]])
             [day8.re-frame.test :as rft]
             [monkey.ci.gui.events]
+            [monkey.ci.gui.login.db :as ldb]
             [monkey.ci.gui.test.fixtures :as f]
             [monkey.ci.gui.test.helpers :as h]
             [re-frame.core :as rf]
@@ -12,9 +13,40 @@
 
 (deftest initialize-db
   (testing "clears db"
-    (is (nil? (reset! app-db nil)))
+    (rf/reg-cofx :local-storage (fn [cofx id] cofx))
+    (is (some? (reset! app-db {::test-key ::test-value})))
     (rf/dispatch-sync [:initialize-db])
-    (is (some? @app-db))))
+    (is (nil? (::test-key @app-db))))
+
+  (testing "loads tokens from local storage"
+    (rf/reg-cofx :local-storage (fn [cofx id]
+                                  (cond-> cofx
+                                    (= ldb/storage-token-id id)
+                                    (assoc :local-storage {:token "test-app-token"}))))
+    (rf/dispatch-sync [:initialize-db])
+    (is (= "test-app-token" (ldb/token @app-db))))
+
+  (testing "loads github user details if token provided"
+    (rf/reg-cofx :local-storage (fn [cofx id]
+                                  (cond-> cofx
+                                    (= ldb/storage-token-id id)
+                                    (assoc :local-storage {:token "test-app-token"
+                                                           :github-token "test-github-token"}))))
+    (let [c (h/catch-fx :http-xhrio)]
+      (rf/dispatch-sync [:initialize-db])
+      (is (= 1 (count @c)))
+      (is (= "https://api.github.com/user" (:uri (first @c))))))
+
+  (testing "loads bitbucket user details if token provided"
+    (rf/reg-cofx :local-storage (fn [cofx id]
+                                  (cond-> cofx
+                                    (= ldb/storage-token-id id)
+                                    (assoc :local-storage {:token "test-app-token"
+                                                           :bitbucket-token "test-github-token"}))))
+    (let [c (h/catch-fx :http-xhrio)]
+      (rf/dispatch-sync [:initialize-db])
+      (is (= 1 (count @c)))
+      (is (= "https://api.bitbucket.org/2.0/user" (:uri (first @c)))))))
 
 (deftest load-version
   (testing "sends request to backend"

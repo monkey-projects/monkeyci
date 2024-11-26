@@ -82,7 +82,8 @@
 
   (testing "fetches github user details"
     (let [e (h/catch-fx :http-xhrio)]
-      (rf/dispatch-sync [:login/github-login--success {:body {:token "test-token"}}])
+      (rf/dispatch-sync [:login/github-login--success {:body {:token "test-token"
+                                                              :github-token "github-token"}}])
       (is (= 1 (count @e)))
       (is (= {:method :get
               :uri "https://api.github.com/user"}
@@ -221,7 +222,9 @@
 
   (testing "fetches bitbucket user details"
     (let [e (h/catch-fx :http-xhrio)]
-      (rf/dispatch-sync [:login/bitbucket-login--success {:body {:token "test-token"}}])
+      (rf/dispatch-sync [:login/bitbucket-login--success {:body
+                                                          {:token "test-token"
+                                                           :bitbucket-token "test-bb-token"}}])
       (is (= 1 (count @e)))
       (is (= {:method :get
               :uri "https://api.bitbucket.org/2.0/user"}

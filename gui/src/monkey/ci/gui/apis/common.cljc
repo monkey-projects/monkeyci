@@ -20,7 +20,7 @@
 
 (defn api-request
   "Builds an xhrio request map to access an external api."
-  [db {:keys [token] :as opts}]
+  [{:keys [token] :as opts}]
   (-> opts
       (assoc :response-format format
              ;; Route the response to convert map keys

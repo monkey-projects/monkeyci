@@ -12,9 +12,9 @@
   (str "https://api.bitbucket.org/" api-version path))
 
 (defn api-request [db {:keys [path] :as opts}]
-  (cond-> (c/api-request db (-> opts
-                                (update :token #(or % (ldb/bitbucket-token db)))
-                                (dissoc :path)))
+  (cond-> (c/api-request (-> opts
+                             (update :token #(or % (ldb/bitbucket-token db)))
+                             (dissoc :path)))
     path (assoc :uri (api-url path))))
 
 (def repos ::repos)

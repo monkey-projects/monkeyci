@@ -1,5 +1,8 @@
 (ns monkey.ci.gui.login.db)
 
+(def storage-redir-id "login-redir")
+(def storage-token-id "login-tokens")
+
 (defn submitting? [db]
   (true? (::submitting? db)))
 
@@ -27,10 +30,29 @@
 (defn set-token [db t]
   (assoc db token t))
 
-(def github-token :github/token)
+(def provider-auth ::provider-auth)
+
+(defn set-provider-auth [db pa]
+  (assoc db provider-auth pa))
+
+(def provider (comp :provider provider-auth))
+
+(def provider-token (comp :token provider-auth))
+
+(defn set-provider-token [db t]
+  (assoc-in db [provider-auth :token] t))
+
+(def github-token provider-token)
 
 (defn set-github-token [db t]
-  (assoc db github-token t))
+  (set-provider-auth db {:provider :github
+                         :token t}))
+
+(def bitbucket-token provider-token)
+
+(defn set-bitbucket-token [db t]
+  (set-provider-auth db {:provider :bitbucket
+                         :token t}))
 
 (def github-config :auth/github-config)
 
@@ -41,11 +63,6 @@
 
 (defn set-bitbucket-config [db c]
   (assoc db bitbucket-config c))
-
-(def bitbucket-token :bitbucket/token)
-
-(defn set-bitbucket-token [db t]
-  (assoc db bitbucket-token t))
 
 (def github-user ::github-user)
 

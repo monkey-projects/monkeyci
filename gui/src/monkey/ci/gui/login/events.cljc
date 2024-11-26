@@ -8,8 +8,8 @@
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
-(def storage-redir-id "login-redir")
-(def storage-token-id "login-tokens")
+(def storage-redir-id db/storage-redir-id)
+(def storage-token-id db/storage-token-id)
 
 (rf/reg-event-fx
  :login/login-and-redirect
@@ -42,22 +42,31 @@
             (db/clear-alerts)
             (db/set-user nil))}))
 
+(defn try-load-github-user
+  "Adds a request to the fx to load github user details, if a token is provided."
+  [{:keys [db] :as fx} github-token]
+  (cond-> fx
+    github-token (assoc :http-xhrio
+                        (github/api-request
+                         db
+                         {:method :get
+                          :path "/user"
+                          :token github-token
+                          :on-success [:github/load-user--success]
+                          :on-failure [:github/load-user--failed]}))))
+
 (rf/reg-event-fx
  :login/github-login--success
  (fn [{:keys [db local-storage]} [_ {{:keys [github-token] :as u} :body}]]
    (log/debug "Got user details:" (clj->js u))
-   {:db (-> db
-            (db/set-user (dissoc u :token :github-token))
-            (db/set-token (:token u))
-            (db/set-github-token github-token))
-    :http-xhrio (github/api-request
-                 db
-                 {:method :get
-                  :path "/user"
-                  :token github-token
-                  :on-success [:github/load-user--success]
-                  :on-failure [:github/load-user--failed]})
-    :local-storage [storage-token-id (select-keys u [:github-token :token])]}))
+   (-> {:db (-> db
+                (db/set-user (dissoc u :token :github-token))
+                (db/set-token (:token u))
+                (db/set-github-token github-token))
+        ;; Store full user details locally, so we can retrieve them on page reload without having
+        ;; to re-authenticate.
+        :local-storage [storage-token-id u]}
+       (try-load-github-user github-token))))
 
 (defn- redirect-evt
   "Constructs the event to dispatch to redirect to the desired destination after login."
@@ -80,8 +89,7 @@
  [(rf/inject-cofx :local-storage storage-redir-id)]
  (fn [{:keys [db local-storage]} [_ github-user]]
    (let [redir (:redirect-to local-storage)]
-     (log/debug "Github user details:" #?(:cljs (clj->js github-user)
-                                          :clj github-user))
+     (log/debug "Github user details:" (str github-user))
      {:db (db/set-github-user db github-user)
       :dispatch (redirect-evt (db/user db) local-storage)
       :local-storage [storage-redir-id (dissoc local-storage :redirect-to)]})))
@@ -152,21 +160,26 @@
             (db/clear-alerts)
             (db/set-user nil))}))
 
+(defn try-load-bitbucket-user [{:keys [db] :as fx} bitbucket-token]
+  (cond-> fx
+    bitbucket-token (assoc :http-xhrio
+                           (bitbucket/api-request
+                            db
+                            {:method :get
+                             :path "/user"
+                             :token bitbucket-token
+                             :on-success [:bitbucket/load-user--success]
+                             :on-failure [:bitbucket/load-user--failed]}))))
+
 (rf/reg-event-fx
  :login/bitbucket-login--success
  (fn [{:keys [db local-storage]} [_ {{:keys [bitbucket-token] :as u} :body}]]
-   {:db (-> db
-            (db/set-user (dissoc u :token :bitbucket-token))
-            (db/set-token (:token u))
-            (db/set-bitbucket-token bitbucket-token))
-    :http-xhrio (bitbucket/api-request
-                 db
-                 {:method :get
-                  :path "/user"
-                  :token bitbucket-token
-                  :on-success [:bitbucket/load-user--success]
-                  :on-failure [:bitbucket/load-user--failed]})
-    :local-storage [storage-token-id (select-keys u [:bitbucket-token :token])]}))
+   (-> {:db (-> db
+                (db/set-user (dissoc u :token :bitbucket-token))
+                (db/set-token (:token u))
+                (db/set-bitbucket-token bitbucket-token))
+        :local-storage [storage-token-id (select-keys u [:bitbucket-token :token])]}
+       (try-load-bitbucket-user bitbucket-token))))
 
 (rf/reg-event-fx
  :bitbucket/load-user--success
