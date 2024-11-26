@@ -522,6 +522,7 @@
 
 (defn- select-max-build-idx [{:keys [conn]} [cust-id repo-id]]
   ;; TODO Use repo-indices table instead
+  ;; TODO Lock table for update
   (eb/select-max-idx conn cust-id repo-id))
 
 (def join-request? (partial global-sid? st/join-requests))

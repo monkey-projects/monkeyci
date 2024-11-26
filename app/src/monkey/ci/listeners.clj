@@ -99,6 +99,8 @@
                                  (mc/assoc-some :message message)))))
 
 (defn- patch-job [storage {:keys [sid job-id]} patch]
+  ;; TODO Allow patching individual jobs to avoid multiple replicas writing back stale
+  ;; information.  This would also allow us to lock job records.
   (patch-build storage sid
                (fn [build]
                  (update-in build [:script :jobs job-id]
