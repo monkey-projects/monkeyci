@@ -1,5 +1,6 @@
-;; Basic Clojure build script
-(require '[monkey.ci.build.core :as core])
+(ns basic-clj
+  ;; Basic Clojure build script
+  (:require [monkey.ci.build.core :as core]))
 
 (def simple-step
   (core/action-job

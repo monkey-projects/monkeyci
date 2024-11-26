@@ -143,9 +143,10 @@
 (defn- random-port []
   (+ (rand-int 10000) 30000))
 
-(defn new-api-config [config]
-  {:token (bas/generate-token)
-   :port (or (get-in config [:runner :api-port])
+(defn new-api-config [{:keys [runner]}]
+  {:token (or (:api-token runner)
+              (bas/generate-token))
+   :port (or (:api-port runner)
              (random-port))})
 
 (defn- new-metrics []

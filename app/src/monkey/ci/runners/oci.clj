@@ -140,10 +140,9 @@
                 ;; Run the build as a child process.  This allows us to add dependencies
                 ;; in the build, but also isolates the untrusted build script.  Alternatively,
                 ;; we could try to run the clj process directly but then we'd have to set up
-                ;; and external build api server for the script to communicate with in order
+                ;; an external build api server for the script to communicate with in order
                 ;; to shield off any sensitive info, or use the general API server.  This
-                ;; could lead to performance bottlenecks and could lead to higher costs wrt.
-                ;; the API gateway.
+                ;; could lead to performance bottlenecks and higher costs wrt. the API gateway.
                 :arguments (cond-> ["-w" oci/checkout-dir
                                     "build" "run"
                                     "-u" url]

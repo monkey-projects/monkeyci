@@ -8,7 +8,6 @@
             [clojure.java.io :as io]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
-            [config.core :as cc]
             [manifold.deferred :as md]
             [monkey.ci
              [blob :as blob]
@@ -49,25 +48,22 @@
   "Run function for when a build task is executed using clojure tools.  This function
    is run in a child process by the `execute!` function below.  This exits the VM
    with a nonzero value on failure."
-  ([args _]
-   (log/debug "Running with args:" args)
-   (try
-     (let [config (load-config args)]
-       (when (-> (merge default-script-config config)
-                 (rs/with-runtime
-                   (fn [rt]
-                     (log/debug "Executing script with config" (:config rt))
-                     (log/debug "Script working directory:" (utils/cwd))
-                     (script/exec-script! rt)))
-                 (bc/failed?))
-         (exit! err/error-script-failure)))
-     (catch Throwable ex
-       ;; This could happen if there is an error loading or initializing the child process
-       (log/error "Failed to run script process" ex)
-       (exit! err/error-process-failure))))
-
-  ([args]
-   (run args cc/env)))
+  [args & _]
+  (log/debug "Running with args:" args)
+  (try
+    (let [config (load-config args)]
+      (when (-> (merge default-script-config config)
+                (rs/with-runtime
+                  (fn [rt]
+                    (log/debug "Executing script with config" (:config rt))
+                    (log/debug "Script working directory:" (utils/cwd))
+                    (script/exec-script! rt)))
+                (bc/failed?))
+        (exit! err/error-script-failure)))
+    (catch Throwable ex
+      ;; This could happen if there is an error loading or initializing the child process
+      (log/error "Failed to run script process" ex)
+      (exit! err/error-process-failure))))
 
 (defn- find-log-config
   "Finds logback configuration file, either configured on the runner, or present 
