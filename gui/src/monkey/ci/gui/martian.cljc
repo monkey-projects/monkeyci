@@ -431,6 +431,6 @@
      {:dispatch (conj orig [::error-handler (conj orig on-failure) on-failure])})))
 
 (defn api-url
-  "Constructs a url to the api, using authorization token given"
+  "Constructs a url to the api for given path"
   [path]
   (str url path))
