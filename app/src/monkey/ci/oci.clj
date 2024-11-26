@@ -221,6 +221,7 @@
   [client cid]
   (ci/list-container-instances client {:compartment-id cid :lifecycle-state "ACTIVE"}))
 
+(def home-dir "/home/monkeyci")
 (def checkout-vol "checkout")
 (def checkout-dir "/opt/monkeyci/checkout")
 (def key-dir "/opt/monkeyci/keys")
@@ -271,6 +272,11 @@
   [ci n]
   (mc/find-first (cp/prop-pred :name n)
                  (:volumes ci)))
+
+(defn make-config-vol [name configs]
+  {:name name
+   :volume-type "CONFIGFILE"
+   :configs configs})
 
 (defn config-entry
   "Creates an entry config for a volume, where the contents are base64 encoded."

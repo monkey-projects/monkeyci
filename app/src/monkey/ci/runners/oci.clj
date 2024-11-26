@@ -23,7 +23,7 @@
 (def ssh-keys-volume "ssh-keys")
 (def ssh-keys-dir oci/key-dir)
 (def log-config-volume "log-config")
-(def log-config-dir "/home/monkeyci/config")
+(def log-config-dir (str oci/home-dir "/config"))
 (def log-config-file "logback.xml")
 (def config-volume "config")
 
@@ -81,9 +81,8 @@
                  ((juxt :private-key :public-key) ssh-keys)
                  ["" ".pub"]))]
     (when-let [ssh-keys (build-ssh-keys build)]
-      {:name ssh-keys-volume
-       :volume-type "CONFIGFILE"
-       :configs (mapcat ->config-entries (range) ssh-keys)})))
+      (oci/make-config-vol ssh-keys-volume
+                           (mapcat ->config-entries (range) ssh-keys)))))
 
 (defn- add-ssh-keys-volume [conf build]
   (let [vc (ssh-keys-volume-config build)]
