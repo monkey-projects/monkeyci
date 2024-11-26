@@ -386,7 +386,6 @@
                   ;; Try refreshing the token.  Only when that fails too,
                   ;; we should re-login.
                   [::refresh-token refresh-token orig-evt]
-                  #_[:route/goto :page/login]
                   (conj error-evt err))})))
 
 (rf/reg-event-fx
@@ -403,13 +402,23 @@
 
 (rf/reg-event-fx
  ::refresh-token--success
- (fn [{:keys [db]} [_ orig-evt {:keys [body]}]]
+ [(rf/inject-cofx :local-storage ldb/storage-token-id)]
+ (fn [{:keys [db local-storage]} [_ orig-evt {:keys [body]}]]
    {:db (-> db
             (ldb/set-token (:token body))
             (ldb/set-provider-token (or (:github-token body) (:bitbucket-token body))))
     :dispatch orig-evt
-;;    :local-storage [ldb/storage-token-id]
-    }))
+    ;; Update local storage with new tokens
+    :local-storage [ldb/storage-token-id
+                    (merge local-storage
+                           (select-keys body [:token :refresh-token :github-token :bitbucket-token]))]}))
+
+(rf/reg-event-fx
+ ::refresh-token--failed
+ (fn [_ _]
+   ;; In any case, redirect to login page.  Even for non-401 errors, because what else
+   ;; can we do?
+   {:dispatch [:route/goto :page/login]}))
 
 ;; Takes the token from the db and adds it to the martian request
 (rf/reg-event-fx

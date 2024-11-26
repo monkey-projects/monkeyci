@@ -70,28 +70,45 @@
 
 (deftest refresh-token--success
   (rf-test/run-test-sync
-   (is (some? (reset! app-db (-> {}
-                                 (ldb/set-token "old-token")
-                                 (ldb/set-github-token "test-github-token")))))
-   (rf/reg-event-db ::orig-req #(assoc % ::orig-invoked? true))
-   (rf/dispatch [::sut/refresh-token--success
-                 [::orig-req]
-                 {:body
-                  {:token "new-token"}}])
-   
-   (testing "stores received tokens"
-     (is (= "new-token" (ldb/token @app-db))))
-   
-   (testing "re-invokes original request"
-     (is (true? (::orig-invoked? @app-db))))
+   (let [e (h/catch-fx :local-storage)]
+     (is (some? (reset! app-db (-> {}
+                                   (ldb/set-token "old-token")
+                                   (ldb/set-github-token "test-github-token")))))
+     (rf/reg-event-db ::orig-req #(assoc % ::orig-invoked? true))
+     (rf/reg-cofx :local-storage (fn [cofx id]
+                                   (assoc cofx :local-storage {:user-id "test-id"
+                                                               :token "old-token"})))
+     (rf/dispatch [::sut/refresh-token--success
+                   [::orig-req]
+                   {:body
+                    {:token "new-token"
+                     :github-token "new-github-token"}}])
+     
+     (testing "stores received tokens"
+       (is (= "new-token" (ldb/token @app-db))))
+     
+     (testing "re-invokes original request"
+       (is (true? (::orig-invoked? @app-db))))
 
-   (testing "stores new provider and refresh tokens in local storage")))
+     (testing "stores new provider and refresh tokens in local storage"
+       (is (= 1 (count @e)))
+       (is (= ldb/storage-token-id (ffirst @e)))
+       (let [v (-> @e first second)]
+         (is (= "new-token" (:token v)))
+         (is (= "new-github-token" (:github-token v)))
+         (is (= "test-id" (:user-id v)) "Keep original user fields"))))))
 
 (deftest refresh-token--failed
   (testing "redirects to login page on 401"
     (rf-test/run-test-sync
      (let [e (h/catch-fx :route/goto)]
        (rf/dispatch [::sut/refresh-token--failed [::on-failure] {:status 401}])
+       (is (= ["/login"] @e)))))
+
+  (testing "redirects to login page on other error"
+    (rf-test/run-test-sync
+     (let [e (h/catch-fx :route/goto)]
+       (rf/dispatch [::sut/refresh-token--failed [::on-failure] {:status 500}])
        (is (= ["/login"] @e))))))
 
 (deftest api-url
