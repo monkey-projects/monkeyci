@@ -3,11 +3,15 @@
    one running the controller process, that starts the build api, and the other that
    actually runs the build script.  This is more secure and less error-prone than
    starting a child process."
-  (:require [monkey.ci
+  (:require [clojure.java.io :as io]
+            [monkey.ci
              [build :as b]
              [edn :as edn]
              [oci :as oci]
+             [process :as proc]
              [version :as v]]
+            [monkey.ci.build.api-server :as bas]
+            [monkey.ci.config.script :as cos]
             [monkey.ci.runners.oci :as ro]))
 
 ;; Necessary to be able to write to the shared volume
@@ -23,6 +27,7 @@
 (def log-config-file ro/log-config-file)
 (def script-path oci/script-dir)
 (def script-vol "script")
+(def build-script "build.sh")
 
 (def config-mount
   {:mount-path config-path
@@ -48,12 +53,19 @@
            (log-config config)]
           (remove nil?)))))
 
+(defn- script-config [{:keys [runner] :as config}]
+  (-> cos/empty-config
+      (cos/set-build (:build config))
+      (cos/set-api {:url (format "http://localhost:%d" (:api-port runner))
+                    :token (:api-token runner)})))
+
 (defn- generate-deps [{:keys [build] :as config}]
-  {:paths [(b/script-dir build)]
+  {:paths [(b/calc-script-dir oci/work-dir (b/script-dir build))]
    :aliases
    {:monkeyci/build
     {:exec-fn 'monkey.ci.process/run
-     :extra-deps {'com.monkeyci/app (v/version)}}}
+     :extra-deps {'com.monkeyci/app (v/version)}
+     :exec-args {:config (script-config config)}}}
    ;;:mvn/local-repo m2-cache-dir
    })
 
@@ -62,8 +74,12 @@
   [config]
   (oci/make-config-vol
    script-vol
-   [(oci/config-entry "deps.edn" (-> (generate-deps config)
-                                     (pr-str)))]))
+   [(oci/config-entry "deps.edn"
+                      (-> (generate-deps config)
+                          (pr-str)))
+    (oci/config-entry build-script
+                      (-> (io/resource "build.sh")
+                          (slurp)))]))
 
 (defn controller-container [config]
   (-> default-container
@@ -75,10 +91,14 @@
   ;; TODO Use clojure base image instead of the one from monkeyci
   (-> default-container
       (assoc :display-name "build"
-             ;; TODO Run script that waits for run file to be created
-             :arguments ["bash" "-c"]
+             ;; Run script that waits for run file to be created
+             :arguments ["bash" "-c" (str script-path "/" build-script)]
              ;; Tell clojure cli where to find deps.edn
-             :environment-variables {"CLJ_CONFIG" script-path})
+             :environment-variables
+             {"CLJ_CONFIG" script-path
+              "MONKEYCI_WORK_DIR" oci/work-dir
+              "MONKEYCI_START_FILE" (:run-path config)
+              "MONKEYCI_ABORT_FILE" (:abort-path config)})
       (update :volume-mounts conj script-mount)))
 
 (defn- make-containers [[orig] config]
@@ -92,10 +112,17 @@
    itself.  The controller is responsible for preparing the workspace and 
    starting an API server, which the script will connect to."
   [config build]
-  (let [run-path (str oci/checkout-dir "/" (b/build-id) ".run")
+  (let [file-path (fn [ext]
+                    (str oci/checkout-dir "/" (b/build-id build) ext))
         ctx (assoc config
-                   :build (dissoc build :ssh-keys :cleanup? :status)
-                   :run-path run-path)]
+                   :build (-> build
+                              (dissoc :ssh-keys :cleanup? :status)
+                              (assoc-in [:git :dir] oci/work-dir))
+                   :runner {:type :noop
+                            :api-port 3000
+                            :api-token (bas/generate-token)}
+                   :run-path (file-path ".run")
+                   :abort-path (file-path ".abort"))]
     (-> (oci/instance-config config)      
         (assoc :display-name (b/build-id build))
         (update :containers make-containers ctx)

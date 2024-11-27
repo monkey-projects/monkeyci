@@ -4,6 +4,7 @@
             [monkey.ci
              [edn :as edn]
              [oci :as oci]]
+            [monkey.ci.config.script :as cs]
             [monkey.ci.runners.oci2 :as sut]
             [monkey.ci.helpers :as h]
             [monkey.ci.test
@@ -19,7 +20,9 @@
            (h/base64->)))
 
 (deftest instance-config
-  (let [ic (sut/instance-config {:log-config "test-log-config"} {:build-id "test-build"})
+  (let [build {:build-id "test-build"}
+        ic (sut/instance-config {:log-config "test-log-config"}
+                                build)
         co (:containers ic)]
     (testing "creates container instance configuration"
       (is (map? ic))
@@ -52,20 +55,32 @@
     (testing "build"
       (let [c (->> co
                    (filter (comp (partial = "build") :display-name))
-                   (first))]
+                   (first))
+            env (:environment-variables c)]
         (is (some? c))
 
         (testing "invokes script"
           (is (= "bash" (first (:arguments c)))))
 
-        (let [config-env (get-in c [:environment-variables "CLJ_CONFIG"])]
+        (let [config-env (get env "CLJ_CONFIG")]
           (testing "sets `CLJ_CONFIG` location"
             (is (some? config-env)))
 
           (testing "mounts script to `CLJ_CONFIG`"
             (let [vm (oci/find-mount c "script")]
               (is (some? vm))
-              (is (= config-env (:mount-path vm))))))))
+              (is (= config-env (:mount-path vm))))))
+
+        (testing "sets work dir"
+          (is (= oci/work-dir (get env "MONKEYCI_WORK_DIR"))))
+
+        (testing "sets run file"
+          (is (= (str oci/checkout-dir "/" (:build-id build) ".run")
+                 (get env "MONKEYCI_START_FILE"))))
+
+        (testing "sets abort file"
+          (is (= (str oci/checkout-dir "/" (:build-id build) ".abort")
+                 (get env "MONKEYCI_ABORT_FILE"))))))
 
     (testing "volumes"
       (testing "contains config"
@@ -77,8 +92,13 @@
                                (edn/edn->))]
               (is (some? conf)
                   "should contain config file")
-              (is (some? (:build conf))
-                  "config should contain build")))
+
+              (testing "with git checkout dir"
+                (is (some? (get-in conf [:build :git :dir]))))
+
+              (testing "with api token and port"
+                (is (number? (get-in conf [:runner :api-port])))
+                (is (string? (get-in conf [:runner :api-token]))))))
 
           (testing "contains `logback.xml`"
             (let [f (decode-vol-config vol "logback.xml")]
@@ -88,8 +108,23 @@
         (let [vol (oci/find-volume ic "script")]
           (is (some? vol))
 
-          (testing "contains `deps.edn`"
-            (let [deps (some-> (decode-vol-config vol "deps.edn")
-                               (edn/edn->))]
-              (is (some? deps)))))))))
+          (let [deps (some-> (decode-vol-config vol "deps.edn")
+                             (edn/edn->))]
+            (testing "contains `deps.edn`"
+              (is (some? deps)))
+
+            (let [sc (get-in deps [:aliases :monkeyci/build :exec-args :config])]
+              (testing "passes script config as exec arg"
+                (is (map? sc)))
+
+              (testing "contains build"
+                (is (= build (select-keys (cs/build sc) (keys build)))))
+
+              (testing "contains api url and token"
+                (let [api (cs/api sc)]
+                  (is (string? (:url api)))
+                  (is (string? (:token api)))))))
+
+          (testing "contains `build.sh`"
+            (is (some? (decode-vol-config vol "build.sh")))))))))
 

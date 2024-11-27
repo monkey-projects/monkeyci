@@ -51,7 +51,17 @@
                 (is (nil? (sut/run {:config-file (.getAbsolutePath config-file)})))
                 (is (= build
                        (-> @captured-args
-                           :build)))))))))))
+                           :build)))))))
+
+        (testing "parses arg as config"
+          (let [captured-args (atom nil)]
+            (with-redefs [script/exec-script! (fn [args]
+                                                (reset! captured-args args)
+                                                bc/success)]
+              (is (nil? (sut/run {:config config})))
+              (is (= build
+                     (-> @captured-args
+                         :build))))))))))
 
 (deftype FakeProcess [exitValue])
 

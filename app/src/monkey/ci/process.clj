@@ -41,8 +41,10 @@
 (defn exit! [exit-code]
   (System/exit exit-code))
 
-(defn- load-config [{:keys [config-file]}]
-  (config/load-config-file config-file))
+(defn- load-config
+  "Either loads config from a config file, or passed directly as an exec arg"
+  [{:keys [config config-file]}]
+  (or config (config/load-config-file config-file)))
 
 (defn run
   "Run function for when a build task is executed using clojure tools.  This function
