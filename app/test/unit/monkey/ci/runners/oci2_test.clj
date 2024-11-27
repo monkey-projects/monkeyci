@@ -69,22 +69,3 @@
           (is (some? (:build conf))
               "config should contain build"))))))
 
-(deftest run-controller
-  (h/with-tmp-dir dir
-    (let [run-path (str dir "/test.run")
-          rt (-> (trt/test-runtime)
-                 (assoc :run-path run-path))]
-      (testing "performs git clone")
-      (testing "restores build cache")
-      (testing "creates run file")
-      (testing "starts api server")
-      (testing "waits until run file has been deleted"))))
-
-(deftest controller-main
-  (testing "invokes `run-controller` with runtime created from config"
-    (h/with-tmp-dir dir
-      (let [config (str (fs/path dir "config.edn"))]
-        (is (nil? (spit config (pr-str tc/base-config))))
-        (with-redefs [sut/run-controller (fn [rt]
-                                           (when (some? rt) ::ok))]
-          (is (= ::ok (sut/-main config))))))))

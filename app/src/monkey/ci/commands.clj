@@ -19,6 +19,7 @@
              [spec :as spec]
              [utils :as u]]
             [monkey.ci.events.core :as ec]
+            [monkey.ci.runners.controller :as rc]
             [monkey.ci.runtime
              [app :as ra]
              [sidecar :as rs]]
@@ -199,3 +200,14 @@
   (spec/valid? ::ss/config conf)
   (log/info "Running sidecar with config:" conf)
   (rs/with-runtime conf run-sidecar))
+
+(defn controller
+  "Runs the application as a controller.  This is similar to a sidecar,
+   but for build processes (usually running in cloud containers).  The
+   controller is responsible for preparing the build workspace and running
+   an API server that is used by the build script, which then runs alongside
+   the controller."
+  [conf]
+  (ra/with-runner-system conf
+    (fn [sys]
+      (rc/run-controller (:runtime sys)))))

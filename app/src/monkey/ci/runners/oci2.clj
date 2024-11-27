@@ -3,13 +3,11 @@
    one running the controller process, that starts the build api, and the other that
    actually runs the build script.  This is more secure and less error-prone than
    starting a child process."
-  (:gen-class)
   (:require [monkey.ci
              [build :as b]
              [edn :as edn]
              [oci :as oci]]
-            #_[monkey.ci.runners.oci :as ro]
-            [monkey.ci.runtime.app :as ra]))
+            #_[monkey.ci.runners.oci :as ro]))
 
 ;; Necessary to be able to write to the shared volume
 (def root-user {:security-context-type "LINUX"
@@ -72,14 +70,3 @@
         (update :containers make-containers ctx)
         (update :volumes conj (config-volume ctx)))))
 
-(defn run-controller [rt]
-  ;; TODO
-  )
-
-(defn -main
-  "Main entry point for the oci2 controller process"
-  [& [config-file]]
-  (let [config (edn/edn-> (slurp (or config-file config-path)))]
-    (ra/with-runner-system config
-      (fn [sys]
-        (run-controller (:runtime sys))))))
