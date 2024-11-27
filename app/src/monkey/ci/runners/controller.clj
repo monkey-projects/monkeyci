@@ -1,8 +1,33 @@
 (ns monkey.ci.runners.controller
   "Functions for running the application as a controller."
-  (:require [monkey.ci.runners :as r]))
+  (:require [babashka.fs :as fs]
+            [monkey.ci.runners :as r]))
+
+(def run-path (comp :run-path :config))
+
+(defn- create-run-file [rt]
+  (some-> (run-path rt)
+          (fs/create-file))
+  rt)
+
+(defn- download-and-store-src [rt]
+  (assoc rt :build (-> (:build rt)
+                       (r/download-src rt)
+                       (r/store-src rt))))
+
+(defn- restore-build-cache [rt]
+  rt)
+
+(defn- save-build-cache [rt]
+  rt)
+
+(defn- wait-until-run-file-deleted [rt]
+  rt)
 
 (defn run-controller [rt]
-  (-> (:build rt)
-      (r/download-src rt)
-      (r/store-src rt)))
+  (-> rt
+      (download-and-store-src)
+      (restore-build-cache)
+      (create-run-file)
+      (wait-until-run-file-deleted)
+      (save-build-cache)))

@@ -34,10 +34,7 @@
 
         (testing "runs monkeyci controller main"
           (let [args (:arguments c)]
-            (is (= "java" (first args)))
-            (is (some? (->> args
-                            (filter (partial = "monkey.ci.runners.oci2"))
-                            (first))))))
+            (is (= "controller" (first args)))))
 
         (testing "has config volume mount"
           (let [vm (oci/find-mount c "config")]
@@ -50,8 +47,8 @@
                    (first))]
         (is (some? c))
 
-        (testing "invokes clojure process"
-          (is (= "clojure" (first (:arguments c)))))))
+        (testing "invokes script"
+          (is (= "bash" (first (:arguments c)))))))
 
     (testing "volumes"
       (testing "contains config"

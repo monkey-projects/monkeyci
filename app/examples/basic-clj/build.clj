@@ -1,4 +1,4 @@
-(ns basic-clj
+(ns build
   ;; Basic Clojure build script
   (:require [monkey.ci.build.core :as core]))
 

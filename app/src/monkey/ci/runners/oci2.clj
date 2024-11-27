@@ -31,16 +31,13 @@
                  (edn/->edn))]
     (oci/make-config-vol
      config-vol
+     ;; TODO Logback config
      [(oci/config-entry config-file conf)])))
 
 (defn controller-container [config]
   (-> default-container
       (assoc :display-name "controller"
-             :arguments ["java"
-                         "-Xmx1g"
-                         "-Dlogback.configurationFile=config/logback.xml"
-                         "-cp" "monkeyci.jar"
-                         "monkey.ci.runners.oci2"])
+             :arguments ["controller"])
       (update :volume-mounts conj config-mount)))
 
 (defn script-container [config]
@@ -48,7 +45,7 @@
   (-> default-container
       (assoc :display-name "build"
              ;; TODO Run script that waits for run file to be created
-             :arguments ["clojure"])))
+             :arguments ["bash" "-c"])))
 
 (defn- make-containers [[orig] config]
   ;; Use the original container but modify it where necessary
