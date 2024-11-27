@@ -6,8 +6,9 @@
   (:require [monkey.ci
              [build :as b]
              [edn :as edn]
-             [oci :as oci]]
-            #_[monkey.ci.runners.oci :as ro]))
+             [oci :as oci]
+             [version :as v]]
+            [monkey.ci.runners.oci :as ro]))
 
 ;; Necessary to be able to write to the shared volume
 (def root-user {:security-context-type "LINUX"
@@ -19,20 +20,50 @@
 (def config-vol "config")
 (def config-path (str oci/home-dir "/config"))
 (def config-file "config.edn")
+(def log-config-file ro/log-config-file)
+(def script-path oci/script-dir)
+(def script-vol "script")
 
 (def config-mount
   {:mount-path config-path
    :volume-name config-vol
    :is-read-only true})
 
+(def script-mount
+  {:mount-path script-path
+   :volume-name script-vol
+   :is-read-only true})
+
+(defn- log-config
+  "Generates config entry holding the log config, if provided."
+  [config]
+  (when-let [c (:log-config config)]
+    (oci/config-entry log-config-file c)))
+
 (defn- config-volume [config]
-  (let [conf (-> (:config config)
-                 (assoc :build (:build config))
-                 (edn/->edn))]
+  (let [conf (edn/->edn config)]
     (oci/make-config-vol
      config-vol
-     ;; TODO Logback config
-     [(oci/config-entry config-file conf)])))
+     (->> [(oci/config-entry config-file conf)
+           (log-config config)]
+          (remove nil?)))))
+
+(defn- generate-deps [{:keys [build] :as config}]
+  {:paths [(b/script-dir build)]
+   :aliases
+   {:monkeyci/build
+    {:exec-fn 'monkey.ci.process/run
+     :extra-deps {'com.monkeyci/app (v/version)}}}
+   ;;:mvn/local-repo m2-cache-dir
+   })
+
+(defn- script-volume
+  "Creates a volume that holds necessary files to run the build script"
+  [config]
+  (oci/make-config-vol
+   script-vol
+   [(oci/config-entry "deps.edn" (-> (generate-deps config)
+                                     (pr-str)))]))
 
 (defn controller-container [config]
   (-> default-container
@@ -45,7 +76,10 @@
   (-> default-container
       (assoc :display-name "build"
              ;; TODO Run script that waits for run file to be created
-             :arguments ["bash" "-c"])))
+             :arguments ["bash" "-c"]
+             ;; Tell clojure cli where to find deps.edn
+             :environment-variables {"CLJ_CONFIG" script-path})
+      (update :volume-mounts conj script-mount)))
 
 (defn- make-containers [[orig] config]
   ;; Use the original container but modify it where necessary
@@ -65,5 +99,6 @@
     (-> (oci/instance-config config)      
         (assoc :display-name (b/build-id build))
         (update :containers make-containers ctx)
-        (update :volumes conj (config-volume ctx)))))
+        (update :volumes concat [(config-volume ctx)
+                                 (script-volume ctx)]))))
 

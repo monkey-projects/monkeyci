@@ -10,8 +10,16 @@
              [config :as tc]
              [runtime :as trt]]))
 
+(defn- decode-vol-config [vol fn]
+  (some->> vol
+           :configs
+           (filter (comp (partial = fn) :file-name))
+           first
+           :data
+           (h/base64->)))
+
 (deftest instance-config
-  (let [ic (sut/instance-config {} {:build-id "test-build"})
+  (let [ic (sut/instance-config {:log-config "test-log-config"} {:build-id "test-build"})
         co (:containers ic)]
     (testing "creates container instance configuration"
       (is (map? ic))
@@ -48,21 +56,40 @@
         (is (some? c))
 
         (testing "invokes script"
-          (is (= "bash" (first (:arguments c)))))))
+          (is (= "bash" (first (:arguments c)))))
+
+        (let [config-env (get-in c [:environment-variables "CLJ_CONFIG"])]
+          (testing "sets `CLJ_CONFIG` location"
+            (is (some? config-env)))
+
+          (testing "mounts script to `CLJ_CONFIG`"
+            (let [vm (oci/find-mount c "script")]
+              (is (some? vm))
+              (is (= config-env (:mount-path vm))))))))
 
     (testing "volumes"
       (testing "contains config"
-        (let [vol (oci/find-volume ic "config")
-              conf (some->> vol
-                            :configs
-                            (filter (comp (partial = "config.edn") :file-name))
-                            first
-                            :data
-                            (h/base64->)
-                            (edn/edn->))]
+        (let [vol (oci/find-volume ic "config")]
           (is (some? vol))
-          (is (some? conf)
-              "should contain config file")
-          (is (some? (:build conf))
-              "config should contain build"))))))
+          
+          (testing "contains `config.edn`"
+            (let [conf (some-> (decode-vol-config vol "config.edn")
+                               (edn/edn->))]
+              (is (some? conf)
+                  "should contain config file")
+              (is (some? (:build conf))
+                  "config should contain build")))
+
+          (testing "contains `logback.xml`"
+            (let [f (decode-vol-config vol "logback.xml")]
+              (is (= "test-log-config" f))))))
+
+      (testing "contains script"
+        (let [vol (oci/find-volume ic "script")]
+          (is (some? vol))
+
+          (testing "contains `deps.edn`"
+            (let [deps (some-> (decode-vol-config vol "deps.edn")
+                               (edn/edn->))]
+              (is (some? deps)))))))))
 

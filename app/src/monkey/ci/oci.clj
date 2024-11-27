@@ -224,6 +224,7 @@
 (def home-dir "/home/monkeyci")
 (def checkout-vol "checkout")
 (def checkout-dir "/opt/monkeyci/checkout")
+(def script-dir "/opt/monkeyci/script")
 (def key-dir "/opt/monkeyci/keys")
 
 (defn- container-config [conf]

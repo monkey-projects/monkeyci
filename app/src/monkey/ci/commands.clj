@@ -208,6 +208,7 @@
    an API server that is used by the build script, which then runs alongside
    the controller."
   [conf]
+  (log/info "Running controller with config:" conf)
   (ra/with-runner-system conf
     (fn [sys]
       (rc/run-controller (:runtime sys)))))

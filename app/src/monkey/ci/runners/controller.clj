@@ -16,12 +16,17 @@
                        (r/store-src rt))))
 
 (defn- restore-build-cache [rt]
+  ;; TODO
   rt)
 
 (defn- save-build-cache [rt]
+  ;; TODO
   rt)
 
 (defn- wait-until-run-file-deleted [rt]
+  (let [rp (run-path rt)]
+    (while (fs/exists? rp)
+      (Thread/sleep 500)))
   rt)
 
 (defn run-controller [rt]
