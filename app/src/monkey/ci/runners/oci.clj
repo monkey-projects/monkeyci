@@ -180,10 +180,11 @@
   "Max msecs a build script can run before we terminate it"
   config/max-script-timeout)
 
-(defn run-oci-build [{:keys [client conf build rt find-container]}]
+(defn run-oci-build [ic {:keys [client conf build rt find-container]}]
   (s/valid? ::sb/build build)
   (rt/post-events rt (b/build-init-evt build))
-  (-> (oci/run-instance client (instance-config conf build rt)
+  (-> (oci/run-instance client
+                        ic
                         {:delete? true
                          :exited? (fn [id]
                                     (md/chain
@@ -211,7 +212,8 @@
   "Runs the build script as an OCI container instance.  Returns a deferred with
    the container exit code."
   [client conf build rt]
-  (run-oci-build {:client client
+  (run-oci-build (instance-config conf build rt)
+                 {:client client
                   :conf conf
                   :build build
                   :rt rt

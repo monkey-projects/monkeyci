@@ -63,12 +63,12 @@
       (cos/set-api {:url (format "http://localhost:%d" (:api-port runner))
                     :token (:api-token runner)})))
 
-(defn- generate-deps [{:keys [build] :as config}]
+(defn- generate-deps [{:keys [build lib-version] :as config}]
   {:paths [(b/calc-script-dir oci/work-dir (b/script-dir build))]
    :aliases
    {:monkeyci/build
     {:exec-fn 'monkey.ci.process/run
-     :extra-deps {'com.monkeyci/app (v/version)}
+     :extra-deps {'com.monkeyci/app (or lib-version (v/version))}
      :exec-args {:config (script-config config)}}}
    ;;:mvn/local-repo m2-cache-dir
    })
@@ -88,7 +88,7 @@
 (defn controller-container [config]
   (-> default-container
       (assoc :display-name "controller"
-             :arguments ["controller"])
+             :arguments ["-c" (str config-path "/" config-file) "controller"])
       (update :volume-mounts conj config-mount)))
 
 (defn script-container [config]
@@ -96,7 +96,7 @@
   (-> default-container
       (assoc :display-name build-container-name
              ;; Run script that waits for run file to be created
-             :arguments ["bash" "-c" (str script-path "/" build-script)]
+             :command ["bash" (str script-path "/" build-script)]
              ;; Tell clojure cli where to find deps.edn
              :environment-variables
              {"CLJ_CONFIG" script-path
@@ -134,12 +134,14 @@
                                  (script-volume ctx)]))))
 
 (defn- oci-runner [client conf build rt]
-  (ro/run-oci-build {:client client
-                     :build build
-                     :rt rt
-                     :conf conf
-                     :find-container (partial filter (comp (partial = build-container-name)
-                                                           :display-name))}))
+  (ro/run-oci-build
+   (instance-config conf build)
+   {:client client
+    :build build
+    :rt rt
+    :conf conf
+    :find-container (partial filter (comp (partial = build-container-name)
+                                          :display-name))}))
 
 (defmethod r/make-runner :oci2 [config]
   (let [runner-conf (:runner config)

@@ -46,7 +46,7 @@
 
         (testing "runs monkeyci controller main"
           (let [args (:arguments c)]
-            (is (= "controller" (first args)))))
+            (is (= "controller" (last args)))))
 
         (testing "has config volume mount"
           (let [vm (oci/find-mount c "config")]
@@ -61,7 +61,7 @@
         (is (some? c))
 
         (testing "invokes script"
-          (is (= "bash" (first (:arguments c)))))
+          (is (= "bash" (first (:command c)))))
 
         (let [config-env (get env "CLJ_CONFIG")]
           (testing "sets `CLJ_CONFIG` location"

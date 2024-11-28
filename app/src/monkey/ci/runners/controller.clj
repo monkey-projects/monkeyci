@@ -6,6 +6,7 @@
 (def run-path (comp :run-path :config))
 
 (defn- create-run-file [rt]
+  (log/debug "Creating run file at:" (run-path rt))
   (some-> (run-path rt)
           (fs/create-file))
   rt)
@@ -25,6 +26,7 @@
 
 (defn- wait-until-run-file-deleted [rt]
   (let [rp (run-path rt)]
+    (log/debug "Waiting until run file has been deleted at:" rp)
     (while (fs/exists? rp)
       (Thread/sleep 500)))
   rt)
