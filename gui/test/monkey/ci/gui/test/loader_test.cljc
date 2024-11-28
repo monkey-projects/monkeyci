@@ -47,6 +47,12 @@
               :db
               (sut/loading? ::test-id))))
 
+    (testing "clears alerts"
+      (is (empty? (-> (sut/set-alerts {} ::test-id [::test-alert])
+                      (loader {})
+                      :db
+                      (sut/get-alerts ::test-id)))))
+
     (testing "dispatches generated event"
       (is (= ::request (:dispatch (loader {} [])))))))
 
