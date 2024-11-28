@@ -34,7 +34,7 @@
 (def job-id bc/job-id)
 (def dependencies :dependencies)
 
-(defn- try-unwrap
+(defn try-unwrap
   "Applies `f` to the job.  If `job` is a function, returns a new function 
    that applies `f` to the result of the function."
   [job f & args]
