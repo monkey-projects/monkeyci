@@ -445,6 +445,7 @@
       ins)))
 
 (defn- update-build [conn build existing]
+  ;; TODO Lock records before updating
   (ec/update-build conn (merge existing (build->db build)))
   (let [jobs (get-in build [:script :jobs])
         ex-jobs (ec/select-jobs conn (ec/by-build (:id existing)))
@@ -483,15 +484,27 @@
        (map (fn [j] [(:id j) j]))
        (into {})))
 
+(defn- hydrate-build [conn [cust-id repo-id] build]
+  (let [jobs (select-jobs conn (:id build))]
+    (cond-> (-> (db->build build)
+                (assoc :customer-id cust-id
+                       :repo-id repo-id)
+                (update :script drop-nil)
+                (drop-nil))
+      (not-empty jobs) (assoc-in [:script :jobs] jobs))))
+
+(defn- update-build-atomically
+  "Updates build atomically by locking build and job records."
+  [{:keys [conn]} sid f & args]
+  (when-let [b (apply eb/select-build-by-sid-for-update conn sid)]
+    ;; TODO Lock jobs as well?
+    (let [h (hydrate-build conn sid b)]
+      (when (update-build conn (apply f h args) b)
+        sid))))
+
 (defn- select-build [conn [cust-id repo-id :as sid]]
   (when-let [build (apply eb/select-build-by-sid conn sid)]
-    (let [jobs (select-jobs conn (:id build))]
-      (cond-> (-> (db->build build)
-                  (assoc :customer-id cust-id
-                         :repo-id repo-id)
-                  (update :script drop-nil)
-                  (drop-nil))
-        (not-empty jobs) (assoc-in [:script :jobs] jobs)))))
+    (hydrate-build conn sid build)))
 
 (defn- select-repo-builds
   "Retrieves all builds and their details for given repository"
@@ -891,7 +904,8 @@
    :join-request
    {:list-user select-user-join-requests}
    :build
-   {:list select-repo-builds
+   {:update update-build-atomically
+    :list select-repo-builds
     :list-since select-customer-builds-since
     :find-latest select-latest-build}
    :email-registration

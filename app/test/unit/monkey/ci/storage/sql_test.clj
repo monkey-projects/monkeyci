@@ -5,6 +5,7 @@
             [medley.core :as mc]
             [monkey.ci.entities.helpers :as eh]
             [monkey.ci
+             [build :as b]
              [cuid :as cuid]
              [protocols :as p]
              [sid :as sid]
@@ -410,7 +411,18 @@
           (is (sid/sid? (st/save-build s old-build)))
           (is (sid/sid? (st/save-build s new-build)))
           (let [r (st/find-latest-build s [(:id cust) (:id repo)])]
-            (is (= (:build-id new-build) (:build-id r)))))))))
+            (is (= (:build-id new-build) (:build-id r))))))
+
+      (testing "can update atomically"
+        (let [build (-> (h/gen-build)
+                        (assoc :status :initializing
+                               :customer-id (:id cust)
+                               :repo-id (:id repo)))
+              sid (b/sid build)]
+          (is (sid/sid? (st/save-build s build)))
+          (is (sid/sid? (st/update-build s sid assoc :status :running)))
+          (is (= :running (-> (st/find-build s sid)
+                              :status))))))))
 
 (deftest ^:sql join-requests
   (with-storage conn s
