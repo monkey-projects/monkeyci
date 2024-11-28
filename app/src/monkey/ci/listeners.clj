@@ -148,12 +148,13 @@
   (when-let [h (get update-handlers (:type evt))]
     (log/debug "Handling:" evt)
     (try
-      (when-let [build (h storage evt)]
-        ;; Dispatch consolidated build updated event
-        (ec/post-events events
-                        {:type :build/updated
-                         :sid (:sid evt)
-                         :build build}))
+      (st/with-transaction storage tx
+        (when-let [build (h tx evt)]
+          ;; Dispatch consolidated build updated event
+          (ec/post-events events
+                          {:type :build/updated
+                           :sid (:sid evt)
+                           :build build})))
       (catch Exception ex
         ;; TODO Handle this better
         (log/error "Unable to handle event" ex)))))

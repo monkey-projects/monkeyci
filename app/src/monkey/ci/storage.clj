@@ -49,7 +49,7 @@
 (defn transact [st f]
   (if (satisfies? p/Transactable st)
     (p/transact st f)
-    (f nil)))
+    (f st)))
 
 (defmacro with-transaction [st conn & body]
   `(transact ~st (fn [tx#]
