@@ -51,7 +51,11 @@
     (p/transact st f)
     (f st)))
 
-(defmacro with-transaction [st conn & body]
+(defmacro with-transaction
+  "Runs body in transaction by binding a transactional storage object to `conn`.
+   If the storage implementation does not support transactions, this just invokes
+   the body while binding the original storage to `conn`."
+  [st conn & body]
   `(transact ~st (fn [tx#]
                    (let [~conn tx#]
                      ~@body))))
