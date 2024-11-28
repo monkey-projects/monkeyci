@@ -111,18 +111,25 @@
 
 (def added?
   "Checks if files have been added in this build using the given predicate, which can either be a
-   regex, a string or a matcher function."
+   regex, a string or a matcher function.  Accepts one or two arguments: when given one argument,
+   returns a function that accepts the context to check if the predicate matches.  When given two
+   arguments, accepts the context and the predicate."
   (file-test bc/added?))
 
 (def removed?
   "Checks if files have been removed in this build using the given predicate, which can either be a
-   regex, a string or a matcher function."
+   regex, a string or a matcher function.  Similar to `added?`."
   (file-test bc/removed?))
 
 (def modified?
   "Checks if files have been modified in this build using the given predicate, which can either be a
-   regex, a string or a matcher function."
+   regex, a string or a matcher function.  Similar to `added?`."
   (file-test bc/modified?))
+
+(def touched?
+  "Checks if files have been touched in this build using the given predicate, which can either be a
+   regex, a string or a matcher function.  Similar to `added?`."
+  (file-test (partial apply bc/touched?)))
 
 (def tag
   "Gets commit tag (if any) from the context."
@@ -138,7 +145,7 @@
 
 (def main-branch?
   "Checks if the build branch is the configured main branch."
-  bc/main-branch)
+  bc/main-branch?)
 
 (def build-params
   "Retrieves parameters this build has access to"

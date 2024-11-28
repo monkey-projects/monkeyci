@@ -220,7 +220,25 @@
         (is (true? (sut/modified? ctx "a")))
         (is (true? ((sut/modified? "a") ctx)))
         (is (false? (sut/modified? ctx #"c")))
-        (is (false? ((sut/modified? #"c") ctx)))))))
+        (is (false? ((sut/modified? #"c") ctx))))))
+
+  (testing "`touched?`"
+    (let [ctx {:build
+               {:changes
+                {:added ["a"]
+                 :removed ["b"]
+                 :modified ["c"]}}}]
+      (testing "checks if file has been added"
+        (is (true? (sut/touched? ctx "a")))
+        (is (true? ((sut/touched? "a") ctx))))
+
+      (testing "checks if file has been removed"
+        (is (true? (sut/touched? ctx "b"))))
+
+      (testing "checks if file has been modified"
+        (is (true? (sut/touched? ctx "c"))))
+
+      (is (false? (sut/touched? ctx "d"))))))
 
 (deftest bash
   (testing "creates action job that executes bash script"
