@@ -8,7 +8,8 @@
   
   (:require [monkey.ci.build
              [api :as api]
-             [core :as bc]]
+             [core :as bc]
+             [shell :as bs]]
             [monkey.ci
              [containers :as co]
              [jobs :as j]]))
@@ -30,6 +31,7 @@
   "Checks if argument is an container job"
   bc/container-job?)
 
+(def job-id bc/job-id)
 (def dependencies :dependencies)
 
 (defn- try-unwrap
@@ -52,6 +54,13 @@
    (co/image job))
   ([job img]
    (try-unwrap job assoc :container/image img)))
+
+(defn script
+  "Gets or sets container job script"
+  ([job]
+   (:script job))
+  ([job script]
+   (try-unwrap job assoc :script script)))
 
 (defn- set-env [job e]
   (cond
@@ -136,3 +145,10 @@
   api/build-params)
 
 (def params build-params)
+
+(defn bash
+  "Creates an action job that executes given command in a bash script"
+  [id & cmds]
+  (action-job id (apply bs/bash cmds)))
+
+(def shell "Same as `bash`" bash)

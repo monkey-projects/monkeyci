@@ -10,8 +10,8 @@
 
 (defn bash [& args]
   (core/as-job
-   (fn [rt]
-     (let [work-dir (or (get-in rt [:job :work-dir]) (:checkout-dir rt))
+   (fn [{:keys [job] :as rt}]
+     (let [work-dir (or (:work-dir job) (:checkout-dir rt))
            [opts args] (if (map? (first args))
                          [(first args) (rest args)]
                          [{} args])]
@@ -21,7 +21,8 @@
                              :err :string}
                       ;; Add work dir if specified in the context
                       work-dir (assoc :dir work-dir)
-                      (:env opts) (assoc :extra-env (:env opts)))]
+                      (:env opts) (assoc :extra-env (:env opts))
+                      (:env job) (update :extra-env merge (:env job)))]
            (assoc core/success
                   :output (:out (apply bp/shell opts args))))
          (catch Exception ex

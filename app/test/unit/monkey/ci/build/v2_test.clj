@@ -1,6 +1,8 @@
 (ns monkey.ci.build.v2-test
   (:require [clojure.test :refer [deftest testing is]]
-            [monkey.ci.build.v2 :as sut]))
+            [babashka.process :as bp]
+            [monkey.ci.build.v2 :as sut]
+            [monkey.ci.jobs :as j]))
 
 (def test-ctx {})
 
@@ -66,6 +68,13 @@
                   (sut/image "test-img"))]
       (is (= "test-img"
              (sut/image (job test-ctx)))))))
+
+(deftest script
+  (testing "sets and gets script from container job"
+    (is (= ["first" "second"]
+           (-> (sut/container-job "test-job")
+               (sut/script ["first" "second"])
+               (sut/script))))))
 
 (deftest env
   (testing "gets container job env"
@@ -212,3 +221,12 @@
         (is (true? ((sut/modified? "a") ctx)))
         (is (false? (sut/modified? ctx #"c")))
         (is (false? ((sut/modified? #"c") ctx)))))))
+
+(deftest bash
+  (testing "creates action job that executes bash script"
+    (let [job (sut/bash "test-job" "ls -l")]
+      (with-redefs [bp/shell (fn [& args]
+                               {:out args})]
+        (is (sut/action-job? job))
+        (is (= "test-job" (sut/job-id job)))
+        (is (= "ls -l" (last (:output @(j/execute! job {})))))))))
