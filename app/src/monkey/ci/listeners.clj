@@ -34,13 +34,18 @@
    Returns the updated build, or `nil` if the build was not found."
   [storage sid patch]
   (log/debug "Patching build:" sid)
-  (if-let [existing (st/find-build storage sid)]
-    (save-build storage
-                sid
-                (-> (merge existing (if (fn? patch)
-                                      (patch existing)
-                                      patch))))
-    (log/warn "Unable to patch build" sid ", record not found in db (initialize or pending event missed?)")))
+  ;; Read and update build in one operation to avoid concurrency issues.
+  ;; Use an atom to return the updated build without having to re-fetch it from db.
+  (let [upd (atom nil)]
+    (if (st/update-build
+         storage sid
+         (fn [existing]
+           (reset! upd
+                   (merge existing (if (fn? patch)
+                                     (patch existing)
+                                     patch)))))
+      @upd
+      (log/warn "Unable to patch build" sid ", record not found in db (initialize or pending event missed?)"))))
 
 (defn start-build [storage {:keys [sid time credit-multiplier]}]
   (patch-build storage sid {:start-time time
@@ -145,12 +150,13 @@
   (when-let [h (get update-handlers (:type evt))]
     (log/debug "Handling:" evt)
     (try
-      (when-let [build (h storage evt)]
-        ;; Dispatch consolidated build updated event
-        (ec/post-events events
-                        {:type :build/updated
-                         :sid (:sid evt)
-                         :build build}))
+      (st/with-transaction storage tx
+        (when-let [build (h tx evt)]
+          ;; Dispatch consolidated build updated event
+          (ec/post-events events
+                          {:type :build/updated
+                           :sid (:sid evt)
+                           :build build})))
       (catch Exception ex
         ;; TODO Handle this better
         (log/error "Unable to handle event" ex)))))

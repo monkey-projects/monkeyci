@@ -11,6 +11,10 @@
   (obj-exists? [this sid] "Checks if object at location exists")
   (list-obj [this sid] "Lists objects at given location"))
 
+(defprotocol Transactable
+  "Storage implementations that support transactions, should implement this"
+  (transact [this f] "Executes `f` within a transaction, which is passed to `f`"))
+
 (defprotocol JobResolvable
   "Able to resolve into jobs (zero or more)"
   (resolve-jobs [x rt]))
