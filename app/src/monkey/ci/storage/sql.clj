@@ -29,6 +29,7 @@
              [storage :as st]]
             [monkey.ci.spec.db-entities]
             [monkey.ci.spec.entities]
+            [next.jdbc :as jdbc]
             [next.jdbc.connection :as conn])
   (:import com.zaxxer.hikari.HikariDataSource))
 
@@ -837,6 +838,14 @@
       build-repo?
       (select-repo-build-ids conn (rest sid))
       (log/warn "Unable to list objects for sid" sid)))
+
+  p/Transactable
+  (transact [_ f]
+    (jdbc/transact
+     (:ds conn)
+     (fn [c]
+       ;; Recreate storage object, with the transacted connection
+       (f (->SqlStorage (assoc conn :ds c))))))
 
   co/Lifecycle
   (start [this]

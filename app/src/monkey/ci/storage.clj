@@ -46,6 +46,16 @@
   (list-obj [_ loc]
     (keys (get-in @store loc))))
 
+(defn transact [st f]
+  (if (satisfies? p/Transactable st)
+    (p/transact st f)
+    (f nil)))
+
+(defmacro with-transaction [st conn & body]
+  `(transact ~st (fn [tx#]
+                   (let [~conn tx#]
+                     ~@body))))
+
 (defn make-memory-storage []
   (->MemoryStorage (atom {})))
 

@@ -32,6 +32,14 @@
         (is (= (assoc cust :repos {})
                (st/find-customer s (:id cust))))))
 
+    (testing "can operatin within a transaction"
+      (st/with-transaction s tx
+        (let [cust (h/gen-cust)]
+          (is (sid/sid? (st/save-customer tx cust)))
+          (is (some? (ec/select-customer (:conn tx) (ec/by-cuid (:id cust)))))
+          (is (= (assoc cust :repos {})
+                 (st/find-customer tx (:id cust)))))))
+
     (testing "can write and read with repos"
       (let [cust (h/gen-cust)
             repo {:name "test repo"
@@ -330,7 +338,8 @@
       (testing "stores job message"
         (let [job (assoc (h/gen-job)
                          :status :failure
-                         :message "Test error message")
+                         :message "Test error message"
+                         :credit-multiplier 5)
               jobs {(:id job) job}]
           (is (sid/sid? (st/save-build s (assoc-in build [:script :jobs] jobs))))
           (is (= (:message job) (get-in (st/find-build s build-sid) [:script :jobs (:id job) :message])))))

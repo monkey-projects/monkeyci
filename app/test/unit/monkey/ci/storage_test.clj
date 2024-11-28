@@ -3,10 +3,15 @@
             [clojure.string :as cs]
             [monkey.ci
              [cuid :as cuid]
+             [protocols :as p]
              [sid :as sid]
              [storage :as sut]
              [time :as t]]
             [monkey.ci.helpers :as h]))
+
+(deftest transaction
+  (testing "executes target"
+    (is (= ::result (sut/transact (sut/make-memory-storage) (constantly ::result))))))
 
 (deftest webhooks
   (testing "webhook-sid is a sid"
