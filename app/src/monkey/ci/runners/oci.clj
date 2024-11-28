@@ -180,10 +180,7 @@
   "Max msecs a build script can run before we terminate it"
   config/max-script-timeout)
 
-(defn oci-runner
-  "Runs the build script as an OCI container instance.  Returns a deferred with
-   the container exit code."
-  [client conf build rt]
+(defn run-oci-build [{:keys [client conf build rt find-container]}]
   (s/valid? ::sb/build build)
   (rt/post-events rt (b/build-init-evt build))
   (-> (oci/run-instance client (instance-config conf build rt)
@@ -202,7 +199,7 @@
                                        (oci/get-full-instance-details client id))))})
       (md/chain
        (fn [r]
-         (or (-> r :body :containers first :exit-code) 1)))
+         (or (-> r :body :containers find-container :exit-code) 1)))
       ;; Do not launch build/end event, that is already done by the script container, except
       ;; when there is an error trying to start the instance.
       (md/catch
@@ -210,9 +207,18 @@
             (log/error "Got error from container instance:" ex)
             (rt/post-events rt (b/build-end-evt build 1))))))
 
+(defn oci-runner
+  "Runs the build script as an OCI container instance.  Returns a deferred with
+   the container exit code."
+  [client conf build rt]
+  (run-oci-build {:client client
+                  :conf conf
+                  :build build
+                  :rt rt
+                  :find-container first}))
+
 (defmethod r/make-runner :oci [rt]
   (let [conf (:runner rt)
         client (-> (ci/make-context conf)
                    (oci/add-inv-interceptor :runners))]
     (partial oci-runner client conf)))
-

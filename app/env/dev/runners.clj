@@ -8,7 +8,8 @@
              [commands :as cmd]
              [process :as proc]
              [runners]
-             [script :as s]]
+             [script :as s]
+             [time :as t]]
             [monkey.ci.build.api-server :as bas]
             [monkey.ci.runtime
              [app :as ra]
@@ -62,47 +63,47 @@
   [example]
   (run-build-local (example-build example)))
 
-(defn- run-controller [run-file rt]
-  ;; Prepare workspace
-  ;; Check out cache
-  ;; Create start file
-  ;; Wait for script to create stop file
-  ;; Upload new cache, if changed
-  (log/info "Running controller, creating run file")
-  (fs/create-file run-file)
-  (while (fs/exists? run-file)
-    (Thread/sleep 1000))
-  (log/info "Script finished"))
+;; (defn- run-controller [run-file rt]
+;;   ;; Prepare workspace
+;;   ;; Check out cache
+;;   ;; Create start file
+;;   ;; Wait for script to create stop file
+;;   ;; Upload new cache, if changed
+;;   (log/info "Running controller, creating run file")
+;;   (fs/create-file run-file)
+;;   (while (fs/exists? run-file)
+;;     (Thread/sleep 1000))
+;;   (log/info "Script finished"))
 
-(defn- run-script [run-file config]
-  (log/info "Running script with config:" config)
-  (while (not (fs/exists? run-file)) 
-    (Thread/sleep 1000))
-  (log/info "Run file created, starting script")
-  (rs/with-runtime config
-    (fn [rt]
-      (let [ns *ns*]
-        (try
-          (s/exec-script! rt)
-          (finally
-            (fs/delete run-file)
-            (in-ns (ns-name ns))))))))
+;; (defn- run-script [run-file config]
+;;   (log/info "Running script with config:" config)
+;;   (while (not (fs/exists? run-file)) 
+;;     (Thread/sleep 1000))
+;;   (log/info "Run file created, starting script")
+;;   (rs/with-runtime config
+;;     (fn [rt]
+;;       (let [ns *ns*]
+;;         (try
+;;           (s/exec-script! rt)
+;;           (finally
+;;             (fs/delete run-file)
+;;             (in-ns (ns-name ns))))))))
 
-(defn run-oci2-local
-  "Runs an oci 2 test by starting two threads: one for the controller
-   and another one for the build script."
-  [config example]
-  (let [build (example-build example)
-        api-config {:port 3002
-                    :token (bas/generate-token)}
-        run-path (fs/path (fs/temp-dir) (str (:build-id build) ".run"))]
-    (log/info "Using run file:" run-path)
-    (md/future
-      (ra/with-runner-system (assoc config
-                                    :build build
-                                    :runner {:type :noop
-                                             :api-port (:port api-config)
-                                             :api-token (:token api-config)})
-        (fn [rt]
-          (run-controller run-path rt))))
-    (run-script run-path (proc/child-config build api-config))))
+(defn run-build
+  "Runs a build using given or current config"
+  ([config sid url branch]
+   (let [build-id (str "build-" (t/now))
+         sid (conj sid build-id)
+         build (-> (zipmap b/sid-props sid)
+                   (assoc :sid sid
+                          :git {:url url
+                                :branch (or branch "main")}))]
+     (log/info "Running build at url" url)
+     (ra/with-runner-system (assoc config :build build)
+       (fn [sys]
+         (let [rt (:runtime sys)
+               r (get-in sys [:runner :runner])]
+           (r build rt))))))
+
+  ([sid url branch]
+   (run-build @co/global-config sid url branch)))

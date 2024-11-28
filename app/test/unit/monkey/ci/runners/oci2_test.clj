@@ -3,7 +3,8 @@
             [babashka.fs :as fs]
             [monkey.ci
              [edn :as edn]
-             [oci :as oci]]
+             [oci :as oci]
+             [runners :as r]]
             [monkey.ci.config.script :as cs]
             [monkey.ci.runners.oci2 :as sut]
             [monkey.ci.helpers :as h]
@@ -128,3 +129,7 @@
           (testing "contains `build.sh`"
             (is (some? (decode-vol-config vol "build.sh")))))))))
 
+(deftest make-runner
+  (testing "creates runner fn for type `oci2`"
+    (is (fn? (r/make-runner {:runner
+                             {:type :oci2}})))))

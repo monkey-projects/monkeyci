@@ -25,7 +25,10 @@
              [oci :as cco]]
             [monkey.ci.events
              [core :as ec]
-             [split  :as es]]
+             [split :as es]]
+            [monkey.ci.runners
+             [oci]
+             [oci2]]
             [monkey.ci.runtime.common :as rc]
             [monkey.ci.web
              [auth :as auth]

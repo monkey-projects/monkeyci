@@ -9,10 +9,12 @@
              [edn :as edn]
              [oci :as oci]
              [process :as proc]
+             [runners :as r]
              [version :as v]]
             [monkey.ci.build.api-server :as bas]
             [monkey.ci.config.script :as cos]
-            [monkey.ci.runners.oci :as ro]))
+            [monkey.ci.runners.oci :as ro]
+            [monkey.oci.container-instance.core :as ci]))
 
 ;; Necessary to be able to write to the shared volume
 (def root-user {:security-context-type "LINUX"
@@ -21,6 +23,7 @@
 (def default-container
   {:security-context root-user})
 
+(def build-container-name "build")
 (def config-vol "config")
 (def config-path (str oci/home-dir "/config"))
 (def config-file "config.edn")
@@ -46,6 +49,7 @@
     (oci/config-entry log-config-file c)))
 
 (defn- config-volume [config]
+  ;; TODO Ssh keys
   (let [conf (edn/->edn config)]
     (oci/make-config-vol
      config-vol
@@ -90,7 +94,7 @@
 (defn script-container [config]
   ;; TODO Use clojure base image instead of the one from monkeyci
   (-> default-container
-      (assoc :display-name "build"
+      (assoc :display-name build-container-name
              ;; Run script that waits for run file to be created
              :arguments ["bash" "-c" (str script-path "/" build-script)]
              ;; Tell clojure cli where to find deps.edn
@@ -129,3 +133,16 @@
         (update :volumes concat [(config-volume ctx)
                                  (script-volume ctx)]))))
 
+(defn- oci-runner [client conf build rt]
+  (ro/run-oci-build {:client client
+                     :build build
+                     :rt rt
+                     :conf conf
+                     :find-container (partial filter (comp (partial = build-container-name)
+                                                           :display-name))}))
+
+(defmethod r/make-runner :oci2 [config]
+  (let [runner-conf (:runner config)
+        client (-> (ci/make-context runner-conf)
+                   (oci/add-inv-interceptor :runners))]
+    (partial oci-runner client runner-conf)))
