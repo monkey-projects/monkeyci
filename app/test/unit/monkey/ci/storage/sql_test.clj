@@ -5,6 +5,7 @@
             [medley.core :as mc]
             [monkey.ci.entities.helpers :as eh]
             [monkey.ci
+             [build :as b]
              [cuid :as cuid]
              [protocols :as p]
              [sid :as sid]
@@ -30,6 +31,14 @@
         (is (some? (ec/select-customer conn (ec/by-cuid (:id cust)))))
         (is (= (assoc cust :repos {})
                (st/find-customer s (:id cust))))))
+
+    (testing "can operatin within a transaction"
+      (st/with-transaction s tx
+        (let [cust (h/gen-cust)]
+          (is (sid/sid? (st/save-customer tx cust)))
+          (is (some? (ec/select-customer (:conn tx) (ec/by-cuid (:id cust)))))
+          (is (= (assoc cust :repos {})
+                 (st/find-customer tx (:id cust)))))))
 
     (testing "can write and read with repos"
       (let [cust (h/gen-cust)
@@ -329,7 +338,8 @@
       (testing "stores job message"
         (let [job (assoc (h/gen-job)
                          :status :failure
-                         :message "Test error message")
+                         :message "Test error message"
+                         :credit-multiplier 5)
               jobs {(:id job) job}]
           (is (sid/sid? (st/save-build s (assoc-in build [:script :jobs] jobs))))
           (is (= (:message job) (get-in (st/find-build s build-sid) [:script :jobs (:id job) :message])))))
@@ -410,7 +420,18 @@
           (is (sid/sid? (st/save-build s old-build)))
           (is (sid/sid? (st/save-build s new-build)))
           (let [r (st/find-latest-build s [(:id cust) (:id repo)])]
-            (is (= (:build-id new-build) (:build-id r)))))))))
+            (is (= (:build-id new-build) (:build-id r))))))
+
+      (testing "can update atomically"
+        (let [build (-> (h/gen-build)
+                        (assoc :status :initializing
+                               :customer-id (:id cust)
+                               :repo-id (:id repo)))
+              sid (b/sid build)]
+          (is (sid/sid? (st/save-build s build)))
+          (is (sid/sid? (st/update-build s sid assoc :status :running)))
+          (is (= :running (-> (st/find-build s sid)
+                              :status))))))))
 
 (deftest ^:sql join-requests
   (with-storage conn s

@@ -46,6 +46,20 @@
   (list-obj [_ loc]
     (keys (get-in @store loc))))
 
+(defn transact [st f]
+  (if (satisfies? p/Transactable st)
+    (p/transact st f)
+    (f st)))
+
+(defmacro with-transaction
+  "Runs body in transaction by binding a transactional storage object to `conn`.
+   If the storage implementation does not support transactions, this just invokes
+   the body while binding the original storage to `conn`."
+  [st conn & body]
+  `(transact ~st (fn [tx#]
+                   (let [~conn tx#]
+                     ~@body))))
+
 (defn make-memory-storage []
   (->MemoryStorage (atom {})))
 
@@ -351,6 +365,14 @@
           (merge (find-build-results s sid))
           (assoc :legacy? true))
       (p/read-obj s (concat [builds] sid)))))
+
+(def update-build
+  "Atomically updates build by retrieving it, applying `f` to it, and then saving it back"
+  (override-or
+   [:build :update]
+   (fn [s sid f & args]
+     (when-let [b (find-build s sid)]
+       (save-build s (apply f b args))))))
 
 (defn list-build-ids
   "Lists the ids of the builds for given repo sid"

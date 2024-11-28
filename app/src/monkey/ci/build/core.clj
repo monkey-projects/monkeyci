@@ -179,7 +179,7 @@
 
 (def added?
   "Checks if any of the added files matches `p`.  If `p` is a function, it is used
-   as a predicate.  If it's a string, and exact match is performed.  If it's a regex,
+   as a predicate.  If it's a string, an exact match is performed.  If it's a regex,
    a regex match is done."
   (pred-matcher files-added))
 

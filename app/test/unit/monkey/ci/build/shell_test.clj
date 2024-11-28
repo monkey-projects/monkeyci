@@ -49,7 +49,15 @@
     (with-redefs-fn {#'bp/shell (fn [opts & _]
                                   {:out (:extra-env opts)})}
       (let [b (sut/bash {:env {"key" "value"}} "test")]
-        #(is (= {"key" "value"} (:output (b {}))))))))
+        #(is (= {"key" "value"} (:output (b {})))))))
+
+  (testing "uses env vars from job"
+    (with-redefs-fn {#'bp/shell (fn [opts & _]
+                                  {:out (:extra-env opts)})}
+      (let [b (core/action-job "test-job" (sut/bash "test") {:env {"key" "value"}})]
+        #(is (= {"key" "value"} (-> (j/execute! b {:job b})
+                                    (deref)
+                                    :output)))))))
 
 (deftest home
   (testing "provides home directory"

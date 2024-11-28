@@ -6,8 +6,13 @@
    The general intention is to provide functions for most purposes, without the user
    having to resort to using keywords and maps."
   
-  (:require [monkey.ci.build.core :as bc]
-            [monkey.ci.containers :as co]))
+  (:require [monkey.ci.build
+             [api :as api]
+             [core :as bc]
+             [shell :as bs]]
+            [monkey.ci
+             [containers :as co]
+             [jobs :as j]]))
 
 (def action-job
   "Declares an action job with id, action and options"
@@ -26,6 +31,7 @@
   "Checks if argument is an container job"
   bc/container-job?)
 
+(def job-id bc/job-id)
 (def dependencies :dependencies)
 
 (defn- try-unwrap
@@ -49,9 +55,100 @@
   ([job img]
    (try-unwrap job assoc :container/image img)))
 
+(defn script
+  "Gets or sets container job script"
+  ([job]
+   (:script job))
+  ([job script]
+   (try-unwrap job assoc :script script)))
+
+(defn- set-env [job e]
+  (cond
+    (action-job? job) (assoc job :env e)
+    (container-job? job) (assoc job co/env e)))
+
+(defn env
+  "Gets or sets environment vars for the job"
+  ([job]
+   (or (co/env job) (:env job)))
+  ([job e]
+   (try-unwrap job set-env e)))
+
+(defn work-dir
+  "Gets or sets work dir for the job"
+  ([job]
+   (:work-dir job))
+  ([job wd]
+   (try-unwrap job assoc :work-dir wd)))
+
 (defn artifact
   "Defines a new artifact with given id, located at given `path`.  This can be passed
    to `save-artifacts` or `restore-artifacts`."
   [id path]
   {:id id
    :path path})
+
+(defn save-artifacts [job & arts]
+  (try-unwrap job update :save-artifacts concat (flatten arts)))
+
+(defn restore-artifacts [job & arts]
+  (try-unwrap job update :restore-artifacts concat (flatten arts)))
+
+(def cache
+  "Defines a cache with given id an path, that can be passed to `caches`"
+  artifact)
+
+(defn caches [job & arts]
+  (try-unwrap job update :caches concat (flatten arts)))
+
+(defn- file-test [tester]
+  (fn test-fn
+    ([ctx pred]
+     (some? (tester [ctx pred])))
+    ([pred]
+     (fn [ctx]
+       (test-fn ctx pred)))))
+
+(def added?
+  "Checks if files have been added in this build using the given predicate, which can either be a
+   regex, a string or a matcher function."
+  (file-test bc/added?))
+
+(def removed?
+  "Checks if files have been removed in this build using the given predicate, which can either be a
+   regex, a string or a matcher function."
+  (file-test bc/removed?))
+
+(def modified?
+  "Checks if files have been modified in this build using the given predicate, which can either be a
+   regex, a string or a matcher function."
+  (file-test bc/modified?))
+
+(def tag
+  "Gets commit tag (if any) from the context."
+  bc/tag)
+
+(def branch
+  "Gets commit branch from the context."
+  bc/branch)
+
+(def main-branch
+  "Gets configured main branch from the build."
+  bc/main-branch)
+
+(def main-branch?
+  "Checks if the build branch is the configured main branch."
+  bc/main-branch)
+
+(def build-params
+  "Retrieves parameters this build has access to"
+  api/build-params)
+
+(def params build-params)
+
+(defn bash
+  "Creates an action job that executes given command in a bash script"
+  [id & cmds]
+  (action-job id (apply bs/bash cmds)))
+
+(def shell "Same as `bash`" bash)
