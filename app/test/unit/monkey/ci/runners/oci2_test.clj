@@ -22,8 +22,10 @@
 
 (deftest instance-config
   (let [build {:build-id "test-build"}
-        ic (sut/instance-config {:log-config "test-log-config"}
-                                build)
+        ic (sut/instance-config {:log-config "test-log-config"
+                                 :build-image-url "test-clojure-img"}
+                                build
+                                (trt/test-runtime))
         co (:containers ic)]
     (testing "creates container instance configuration"
       (is (map? ic))
@@ -63,6 +65,9 @@
             env (:environment-variables c)]
         (is (some? c))
 
+        (testing "uses configured image url"
+          (is (= "test-clojure-img" (:image-url c))))
+
         (testing "invokes script"
           (is (= "bash" (first (:command c)))))
 
@@ -75,8 +80,8 @@
               (is (some? vm))
               (is (= config-env (:mount-path vm))))))
 
-        (testing "sets work dir"
-          (is (= oci/work-dir (get env "MONKEYCI_WORK_DIR"))))
+        (testing "sets work dir to script dir"
+          (is (= (str oci/work-dir "/.monkeyci") (get env "MONKEYCI_WORK_DIR"))))
 
         (testing "sets run file"
           (is (= (str oci/checkout-dir "/" (:build-id build) ".run")
@@ -105,7 +110,10 @@
 
               (testing "with api token and port"
                 (is (number? (get-in conf [:runner :api-port])))
-                (is (string? (get-in conf [:runner :api-token]))))))
+                (is (string? (get-in conf [:runner :api-token]))))
+
+              (testing "with public api token"
+                (is (string? (get-in conf [:api :token]))))))
 
           (testing "contains `logback.xml`"
             (let [f (decode-vol-config vol "logback.xml")]
@@ -120,6 +128,9 @@
             (testing "contains `deps.edn`"
               (is (some? deps)))
 
+            (testing "provides monkeyci dependency"
+              (is (string? (get-in deps [:aliases :monkeyci/build :extra-deps 'com.monkeyci/app :mvn/version]))))
+
             (let [sc (get-in deps [:aliases :monkeyci/build :exec-args :config])]
               (testing "passes script config as exec arg"
                 (is (map? sc)))
@@ -130,10 +141,18 @@
               (testing "contains api url and token"
                 (let [api (cs/api sc)]
                   (is (string? (:url api)))
-                  (is (string? (:token api)))))))
+                  (is (string? (:token api))))))
+
+            (testing "points to logback config file"
+              (is (re-matches #"^-Dlogback\.configurationFile=.*$"
+                              (-> (get-in deps [:aliases :monkeyci/build :jvm-opts])
+                                  first)))))
 
           (testing "contains `build.sh`"
-            (is (some? (decode-vol-config vol "build.sh")))))))))
+            (is (some? (decode-vol-config vol "build.sh"))))))
+
+      (testing "contains log config"
+        (is (some? (oci/find-volume ic "log-config")))))))
 
 (deftest make-runner
   (testing "creates runner fn for type `oci2`"

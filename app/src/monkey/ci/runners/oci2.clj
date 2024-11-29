@@ -4,6 +4,7 @@
    actually runs the build script.  This is more secure and less error-prone than
    starting a child process."
   (:require [clojure.java.io :as io]
+            [medley.core :as mc]
             [meta-merge.core :as mm]
             [monkey.ci
              [build :as b]
@@ -29,6 +30,7 @@
 (def config-path (str oci/home-dir "/config"))
 (def config-file "config.edn")
 (def log-config-file ro/log-config-file)
+(def log-config-vol "log-config")
 (def script-path oci/script-dir)
 (def script-vol "script")
 (def build-script "build.sh")
@@ -43,20 +45,33 @@
    :volume-name script-vol
    :is-read-only true})
 
+(def log-config-mount
+  {:mount-path config-path
+   :volume-name log-config-vol
+   :is-read-only true})
+
 (defn- log-config
   "Generates config entry holding the log config, if provided."
   [config]
   (when-let [c (:log-config config)]
     (oci/config-entry log-config-file c)))
 
-(defn- config-volume [config]
+(defn- config-volume [config build rt]
   ;; TODO Ssh keys
-  (let [conf (edn/->edn config)]
+  (let [conf (-> config
+                 (ro/add-api-token build rt)
+                 (edn/->edn))]
     (oci/make-config-vol
      config-vol
      (->> [(oci/config-entry config-file conf)
            (log-config config)]
           (remove nil?)))))
+
+(defn- log-config-volume [config]
+  (when-let [lc (log-config config)]
+    (oci/make-config-vol
+     log-config-vol
+     [lc])))
 
 (defn- script-config [{:keys [runner] :as config}]
   (-> cos/empty-config
@@ -68,9 +83,11 @@
   {:paths [(b/calc-script-dir oci/work-dir (b/script-dir build))]
    :aliases
    {:monkeyci/build
-    {:exec-fn 'monkey.ci.process/run
-     :extra-deps {'com.monkeyci/app (or lib-version (v/version))}
-     :exec-args {:config (script-config config)}}}
+    (cond-> {:exec-fn 'monkey.ci.process/run
+             :extra-deps {'com.monkeyci/app {:mvn/version (or lib-version (v/version))}}
+             :exec-args {:config (script-config config)}}
+      (:log-config config) (assoc :jvm-opts
+                                  [(str "-Dlogback.configurationFile=" config-path "/" log-config-file)]))}
    ;;:mvn/local-repo m2-cache-dir
    })
 
@@ -95,16 +112,19 @@
 (defn script-container [config]
   ;; TODO Use clojure base image instead of the one from monkeyci, it's smaller
   (-> default-container
+      (mc/assoc-some :image-url (:build-image-url config))
       (assoc :display-name build-container-name
              ;; Run script that waits for run file to be created
              :command ["bash" (str script-path "/" build-script)]
              ;; Tell clojure cli where to find deps.edn
              :environment-variables
              {"CLJ_CONFIG" script-path
-              "MONKEYCI_WORK_DIR" oci/work-dir
+              "MONKEYCI_WORK_DIR" (b/calc-script-dir oci/work-dir nil)
               "MONKEYCI_START_FILE" (:run-path config)
-              "MONKEYCI_ABORT_FILE" (:abort-path config)}
-             :volume-mounts [script-mount])))
+              "MONKEYCI_ABORT_FILE" (:abort-path config)
+              "MONKEYCI_EXIT_FILE" (:exit-path config)}
+             :volume-mounts (cond-> [script-mount]
+                              (some? (:log-config config)) (conj log-config-mount)))))
 
 (defn- make-containers [[orig] config]
   ;; Use the original container but modify it where necessary
@@ -116,7 +136,7 @@
    containers, one for the controller process and another one for the script
    itself.  The controller is responsible for preparing the workspace and 
    starting an API server, which the script will connect to."
-  [config build]
+  [config build rt]
   (let [file-path (fn [ext]
                     (str oci/checkout-dir "/" (b/build-id build) ext))
         ctx (assoc config
@@ -127,16 +147,19 @@
                             :api-port 3000
                             :api-token (bas/generate-token)}
                    :run-path (file-path ".run")
-                   :abort-path (file-path ".abort"))]
+                   :abort-path (file-path ".abort")
+                   :exit-path (file-path ".exit"))]
     (-> (oci/instance-config config)      
         (assoc :display-name (b/build-id build))
         (update :containers make-containers ctx)
-        (update :volumes concat [(config-volume ctx)
-                                 (script-volume ctx)]))))
+        (update :volumes concat (->> [(config-volume ctx build rt)
+                                      (script-volume ctx)
+                                      (log-config-volume ctx)]
+                                     (remove nil?))))))
 
 (defn- oci-runner [client conf build rt]
   (ro/run-oci-build
-   (instance-config conf build)
+   (instance-config conf build rt)
    {:client client
     :build build
     :rt rt

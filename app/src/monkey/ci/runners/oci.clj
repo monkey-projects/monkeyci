@@ -48,7 +48,7 @@
   (cond-> conf
     (log-config rt) (assoc-in [:runner :log-config] (str log-config-dir "/" log-config-file))))
 
-(defn- add-api-token
+(defn add-api-token
   "Generates a new API token that can be used by the build runner to invoke
    certain API calls."
   [conf build rt]

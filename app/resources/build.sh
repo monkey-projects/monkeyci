@@ -19,6 +19,10 @@ if [ "$MONKEYCI_ABORT_FILE" = "" ]; then
     MONKEYCI_ABORT_FILE=${MONKEYCI_WORK_DIR}/abort
 fi
 
+if [ "$MONKEYCI_EXIT_FILE" = "" ]; then
+    MONKEYCI_EXIT_FILE=${MONKEYCI_WORK_DIR}/exit
+fi
+
 wait_for_start()
 {
     echo "Waiting for start conditions..."
@@ -57,5 +61,6 @@ clojure -X:monkeyci/build
 RESULT=$?
 echo "Script finished with exit code $RESULT, deleting run file."
 rm -f $MONKEYCI_START_FILE
+echo $RESULT > $MONKEYCI_EXIT_FILE
 echo "All done."
 exit $RESULT
