@@ -22,6 +22,8 @@ fi
 wait_for_start()
 {
     echo "Waiting for start conditions..."
+    echo "Start file: $MONKEYCI_START_FILE"
+    echo "Abort file: $MONKEYCI_ABORT_FILE"
     while true; do
 	sleep 1
 	if [ -f "$MONKEYCI_START_FILE" ]; then
@@ -38,11 +40,6 @@ wait_for_start()
     done
 }
 
-post_event()
-{
-    echo $1 >> $MONKEYCI_EVENT_FILE
-}
-
 echo "Starting build with working directory $MONKEYCI_WORK_DIR"
 # Create any directories
 mkdir -p `dirname $MONKEYCI_START_FILE`
@@ -57,4 +54,8 @@ fi
 cd $MONKEYCI_WORK_DIR
 # Run the build.  This assumes the necessary deps.edn is placed in $CLJ_CONFIG.
 clojure -X:monkeyci/build
+RESULT=$?
+echo "Script finished with exit code $RESULT, deleting run file."
+rm -f $MONKEYCI_START_FILE
 echo "All done."
+exit $RESULT

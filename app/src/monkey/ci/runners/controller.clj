@@ -1,6 +1,7 @@
 (ns monkey.ci.runners.controller
   "Functions for running the application as a controller."
   (:require [babashka.fs :as fs]
+            [clojure.tools.logging :as log]
             [monkey.ci.runners :as r]))
 
 (def run-path (comp :run-path :config))
@@ -32,9 +33,12 @@
   rt)
 
 (defn run-controller [rt]
-  (-> rt
-      (download-and-store-src)
-      (restore-build-cache)
-      (create-run-file)
-      (wait-until-run-file-deleted)
-      (save-build-cache)))
+  (try
+    (-> rt
+        (download-and-store-src)
+        (restore-build-cache)
+        (create-run-file)
+        (wait-until-run-file-deleted)
+        (save-build-cache))
+    (catch Throwable ex
+      (log/error "Failed to run controller" ex))))

@@ -51,7 +51,10 @@
         (testing "has config volume mount"
           (let [vm (oci/find-mount c "config")]
             (is (some? vm))
-            (is (= "/home/monkeyci/config" (:mount-path vm)))))))
+            (is (= "/home/monkeyci/config" (:mount-path vm)))))
+
+        (testing "has checkout volume mount"
+          (is (some? (oci/find-mount c oci/checkout-vol))))))
 
     (testing "build"
       (let [c (->> co
@@ -81,7 +84,10 @@
 
         (testing "sets abort file"
           (is (= (str oci/checkout-dir "/" (:build-id build) ".abort")
-                 (get env "MONKEYCI_ABORT_FILE"))))))
+                 (get env "MONKEYCI_ABORT_FILE"))))
+
+        (testing "has checkout volume mount"
+          (is (some? (oci/find-mount c oci/checkout-vol))))))
 
     (testing "volumes"
       (testing "contains config"

@@ -4,6 +4,7 @@
    actually runs the build script.  This is more secure and less error-prone than
    starting a child process."
   (:require [clojure.java.io :as io]
+            [meta-merge.core :as mm]
             [monkey.ci
              [build :as b]
              [edn :as edn]
@@ -88,11 +89,11 @@
 (defn controller-container [config]
   (-> default-container
       (assoc :display-name "controller"
-             :arguments ["-c" (str config-path "/" config-file) "controller"])
-      (update :volume-mounts conj config-mount)))
+             :arguments ["-c" (str config-path "/" config-file) "controller"]
+             :volume-mounts [config-mount])))
 
 (defn script-container [config]
-  ;; TODO Use clojure base image instead of the one from monkeyci
+  ;; TODO Use clojure base image instead of the one from monkeyci, it's smaller
   (-> default-container
       (assoc :display-name build-container-name
              ;; Run script that waits for run file to be created
@@ -102,13 +103,13 @@
              {"CLJ_CONFIG" script-path
               "MONKEYCI_WORK_DIR" oci/work-dir
               "MONKEYCI_START_FILE" (:run-path config)
-              "MONKEYCI_ABORT_FILE" (:abort-path config)})
-      (update :volume-mounts conj script-mount)))
+              "MONKEYCI_ABORT_FILE" (:abort-path config)}
+             :volume-mounts [script-mount])))
 
 (defn- make-containers [[orig] config]
   ;; Use the original container but modify it where necessary
-  [(merge orig (controller-container config))
-   (merge orig (script-container config))])
+  [(mm/meta-merge orig (controller-container config))
+   (mm/meta-merge orig (script-container config))])
 
 (defn instance-config
   "Prepares container instance configuration to run a build.  It contains two
