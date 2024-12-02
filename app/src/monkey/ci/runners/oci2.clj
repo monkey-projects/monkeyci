@@ -12,6 +12,7 @@
              [oci :as oci]
              [process :as proc]
              [runners :as r]
+             [utils :as u]
              [version :as v]]
             [monkey.ci.build.api-server :as bas]
             [monkey.ci.config.script :as cos]
@@ -119,6 +120,9 @@
              :volume-mounts [config-mount])
       (ro/add-ssh-keys-mount (:build config))))
 
+(defn- checkout-dir [build]
+  (u/combine oci/work-dir (b/build-id build)))
+
 (defn script-container [config]
   ;; TODO Use clojure base image instead of the one from monkeyci, it's smaller
   (-> default-container
@@ -129,7 +133,7 @@
              ;; Tell clojure cli where to find deps.edn
              :environment-variables
              {"CLJ_CONFIG" script-path
-              "MONKEYCI_WORK_DIR" (b/calc-script-dir oci/work-dir nil)
+              "MONKEYCI_WORK_DIR" (b/calc-script-dir (checkout-dir (:build config)) nil)
               "MONKEYCI_START_FILE" (:run-path config)
               "MONKEYCI_ABORT_FILE" (:abort-path config)
               "MONKEYCI_EXIT_FILE" (:exit-path config)}
@@ -147,13 +151,15 @@
    itself.  The controller is responsible for preparing the workspace and 
    starting an API server, which the script will connect to."
   [config build rt]
-  (let [file-path (fn [ext]
-                    (str oci/checkout-dir "/" (b/build-id build) ext))
+  (let [bid (b/build-id build)
+        file-path (fn [ext]
+                    (u/combine oci/checkout-dir (str bid ext)))
+        wd (checkout-dir build)
         ctx (assoc config
                    :build (-> build
                               (dissoc :ssh-keys :cleanup? :status)
-                              (assoc-in [:git :dir] oci/work-dir)
-                              (assoc :checkout-dir oci/work-dir))
+                              (assoc-in [:git :dir] wd)
+                              (assoc :checkout-dir wd))
                    :checkout-base-dir oci/work-dir
                    :runner {:type :noop
                             :api-port 3000
@@ -162,7 +168,7 @@
                    :abort-path (file-path ".abort")
                    :exit-path (file-path ".exit"))]
     (-> (oci/instance-config config)      
-        (assoc :display-name (b/build-id build))
+        (assoc :display-name bid)
         (update :containers make-containers ctx)
         (update :volumes concat (->> [(config-volume ctx build rt)
                                       (script-volume ctx)

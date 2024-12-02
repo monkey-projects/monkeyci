@@ -58,7 +58,8 @@
         (is (nil? (fs/delete run-path)))
         (is (not= :timeout (deref res 1000 :timeout))))
 
-      (testing "saves build cache afterwards")
+      (testing "saves build cache afterwards"
+        (is (not-empty (-> rt :cache :stored deref))))
 
       (testing "posts `build/end` event"
         (let [events (:events rt)]

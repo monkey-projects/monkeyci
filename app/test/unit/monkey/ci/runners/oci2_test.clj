@@ -87,7 +87,7 @@
               (is (= config-env (:mount-path vm))))))
 
         (testing "sets work dir to script dir"
-          (is (= (str oci/work-dir "/.monkeyci") (get env "MONKEYCI_WORK_DIR"))))
+          (is (= (str oci/work-dir "/" (:build-id build) "/.monkeyci") (get env "MONKEYCI_WORK_DIR"))))
 
         (testing "sets run file"
           (is (= (str oci/checkout-dir "/" (:build-id build) ".run")
@@ -112,7 +112,8 @@
                   "should contain config file")
 
               (testing "with git checkout dir"
-                (is (some? (get-in conf [:build :git :dir]))))
+                (is (= (str oci/work-dir "/" (:build-id build))
+                       (get-in conf [:build :git :dir]))))
 
               (testing "with build checkout dir"
                 (is (some? (get-in conf [:build :checkout-dir]))))
@@ -128,7 +129,7 @@
                 (is (string? (get-in conf [:api :token]))))
 
               (testing "with `checkout-base-dir`"
-                (is (string? (:checkout-base-dir conf))))))
+                (is (= oci/work-dir (:checkout-base-dir conf))))))
 
           (testing "contains `logback.xml`"
             (let [f (decode-vol-config vol "logback.xml")]
