@@ -40,6 +40,12 @@
         ;; which indicates it has started
         (is (not= :timeout (h/wait-until #(fs/exists? run-path) 1000))))
       
+      (testing "posts `build/start` event"
+        (let [events (:events rt)]
+          (is (some? events))
+          (is (some? (->> (h/received-events events)
+                          (h/first-event-by-type :build/start))))))
+      
       (testing "posts `script/initializing` event"
         (let [events (:events rt)]
           (is (some? events))

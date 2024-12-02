@@ -17,8 +17,12 @@
 (def exit-path (comp :exit-path :config))
 (def m2-cache-dir (comp :m2-cache-path :config))
 
-(defn- post-init-evt [{:keys [build] :as rt}]
-  (ec/post-events (:events rt) (script/script-init-evt build (b/script-dir build)))
+(defn- post-init-evt
+  "Post both build/start and script/initializing events.  Indicates the build has started,
+   but the script is not running yet."
+  [{:keys [build] :as rt}]
+  (ec/post-events (:events rt) [(b/build-start-evt build)
+                                (script/script-init-evt build (b/script-dir build))])
   rt)
 
 (defn- create-run-file [rt]
@@ -95,4 +99,3 @@
       (log/error "Failed to run controller" ex)
       (create-abort-file rt)
       err/error-process-failure)))
-
