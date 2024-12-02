@@ -34,6 +34,7 @@
 (def script-path oci/script-dir)
 (def script-vol "script")
 (def build-script "build.sh")
+(def m2-cache-dir (str oci/checkout-dir "/m2"))
 
 (def config-mount
   {:mount-path config-path
@@ -60,6 +61,7 @@
   ;; TODO Ssh keys
   (let [conf (-> config
                  (ro/add-api-token build rt)
+                 (assoc :m2-cache-path m2-cache-dir)
                  (edn/->edn))]
     (oci/make-config-vol
      config-vol
@@ -88,8 +90,7 @@
              :exec-args {:config (script-config config)}}
       (:log-config config) (assoc :jvm-opts
                                   [(str "-Dlogback.configurationFile=" config-path "/" log-config-file)]))}
-   ;;:mvn/local-repo m2-cache-dir
-   })
+   :mvn/local-repo m2-cache-dir})
 
 (defn- script-volume
   "Creates a volume that holds necessary files to run the build script"
@@ -142,7 +143,8 @@
         ctx (assoc config
                    :build (-> build
                               (dissoc :ssh-keys :cleanup? :status)
-                              (assoc-in [:git :dir] oci/work-dir))
+                              (assoc-in [:git :dir] oci/work-dir)
+                              (assoc :checkout-dir oci/work-dir))
                    :runner {:type :noop
                             :api-port 3000
                             :api-token (bas/generate-token)}
