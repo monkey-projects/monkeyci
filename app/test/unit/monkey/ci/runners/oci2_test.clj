@@ -125,7 +125,10 @@
                 (is (string? (get-in conf [:runner :api-token]))))
 
               (testing "with public api token"
-                (is (string? (get-in conf [:api :token]))))))
+                (is (string? (get-in conf [:api :token]))))
+
+              (testing "with `checkout-base-dir`"
+                (is (string? (:checkout-base-dir conf))))))
 
           (testing "contains `logback.xml`"
             (let [f (decode-vol-config vol "logback.xml")]

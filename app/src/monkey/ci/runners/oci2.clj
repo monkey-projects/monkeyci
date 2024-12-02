@@ -154,6 +154,7 @@
                               (dissoc :ssh-keys :cleanup? :status)
                               (assoc-in [:git :dir] oci/work-dir)
                               (assoc :checkout-dir oci/work-dir))
+                   :checkout-base-dir oci/work-dir
                    :runner {:type :noop
                             :api-port 3000
                             :api-token (bas/generate-token)}
