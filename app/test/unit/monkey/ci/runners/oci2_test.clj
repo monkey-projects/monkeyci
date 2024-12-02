@@ -1,6 +1,7 @@
 (ns monkey.ci.runners.oci2-test
   (:require [clojure.test :refer [deftest testing is]]
             [babashka.fs :as fs]
+            [medley.core :as mc]
             [monkey.ci
              [edn :as edn]
              [oci :as oci]
@@ -21,7 +22,9 @@
            (h/base64->)))
 
 (deftest instance-config
-  (let [build {:build-id "test-build"}
+  (let [build {:build-id "test-build"
+               :git {:ssh-keys [{:private-key "test-privkey"
+                                 :public-key "test-pubkey"}]}}
         ic (sut/instance-config {:log-config "test-log-config"
                                  :build-image-url "test-clojure-img"}
                                 build
@@ -56,7 +59,10 @@
             (is (= "/home/monkeyci/config" (:mount-path vm)))))
 
         (testing "has checkout volume mount"
-          (is (some? (oci/find-mount c oci/checkout-vol))))))
+          (is (some? (oci/find-mount c oci/checkout-vol))))
+
+        (testing "has ssh keys volume mount"
+          (is (some? (oci/find-mount c "ssh-keys"))))))
 
     (testing "build"
       (let [c (->> co
@@ -110,6 +116,9 @@
 
               (testing "with build checkout dir"
                 (is (some? (get-in conf [:build :checkout-dir]))))
+              
+              (testing "with ssh keys dir"
+                (is (some? (get-in conf [:build :git :ssh-keys-dir]))))
 
               (testing "with api token and port"
                 (is (number? (get-in conf [:runner :api-port])))
@@ -138,8 +147,10 @@
               (testing "passes script config as exec arg"
                 (is (map? sc)))
 
-              (testing "contains build"
-                (is (= build (select-keys (cs/build sc) (keys build)))))
+              (testing "contains build, without ssh keys"
+                (let [r (cs/build sc)]
+                  (is (= (:build-id build) (:build-id r)))
+                  (is (nil? (get-in r [:git :ssh-keys])))))
 
               (testing "contains api url and token"
                 (let [api (cs/api sc)]
@@ -158,7 +169,10 @@
             (is (some? (decode-vol-config vol "build.sh"))))))
 
       (testing "contains log config"
-        (is (some? (oci/find-volume ic "log-config")))))))
+        (is (some? (oci/find-volume ic "log-config"))))
+
+      (testing "contains ssh keys"
+        (is (some? (oci/find-volume ic "ssh-keys")))))))
 
 (deftest make-runner
   (testing "creates runner fn for type `oci2`"

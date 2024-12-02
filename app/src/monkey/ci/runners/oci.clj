@@ -40,7 +40,7 @@
                                           oci/default-cpu-count
                                           oci/default-memory-gb)})))
 
-(defn- add-ssh-keys-dir [conf build]
+(defn add-ssh-keys-dir [conf build]
   (cond-> conf
     (build-ssh-keys build) (assoc-in [:build :git :ssh-keys-dir] ssh-keys-dir)))
 
@@ -84,16 +84,19 @@
       (oci/make-config-vol ssh-keys-volume
                            (mapcat ->config-entries (range) ssh-keys)))))
 
-(defn- add-ssh-keys-volume [conf build]
+(defn add-ssh-keys-volume [conf build]
   (let [vc (ssh-keys-volume-config build)]
     (cond-> conf
       vc (update :volumes conj vc))))
 
-(defn- add-ssh-keys-mount [conf build]
+(def ssh-keys-mount
+  {:mount-path ssh-keys-dir
+   :is-read-only true
+   :volume-name ssh-keys-volume})
+
+(defn add-ssh-keys-mount [conf build]
   (cond-> conf
-    (build-ssh-keys build) (update :volume-mounts conj {:mount-path ssh-keys-dir
-                                                        :is-read-only true
-                                                        :volume-name ssh-keys-volume})))
+    (build-ssh-keys build) (update :volume-mounts conj ssh-keys-mount)))
 
 (defn- log-config-volume-config [rt]
   ;; TODO Allow for log config read by aero tags

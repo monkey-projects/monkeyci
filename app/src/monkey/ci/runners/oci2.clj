@@ -57,10 +57,17 @@
   (when-let [c (:log-config config)]
     (oci/config-entry log-config-file c)))
 
+(defn- build->out [build]
+  (-> build
+      (dissoc :status :cleanup?)
+      (update :git dissoc :ssh-keys)))
+
 (defn- config-volume [config build rt]
   ;; TODO Ssh keys
   (let [conf (-> config
                  (ro/add-api-token build rt)
+                 (update :build build->out)
+                 (ro/add-ssh-keys-dir (:build config))
                  (assoc :m2-cache-path m2-cache-dir)
                  (edn/->edn))]
     (oci/make-config-vol
@@ -77,7 +84,8 @@
 
 (defn- script-config [{:keys [runner] :as config}]
   (-> cos/empty-config
-      (cos/set-build (:build config))
+      (cos/set-build (-> (:build config)
+                         (build->out)))
       (cos/set-api {:url (format "http://localhost:%d" (:api-port runner))
                     :token (:api-token runner)})))
 
@@ -108,7 +116,8 @@
   (-> default-container
       (assoc :display-name "controller"
              :arguments ["-c" (str config-path "/" config-file) "controller"]
-             :volume-mounts [config-mount])))
+             :volume-mounts [config-mount])
+      (ro/add-ssh-keys-mount (:build config))))
 
 (defn script-container [config]
   ;; TODO Use clojure base image instead of the one from monkeyci, it's smaller
@@ -157,7 +166,8 @@
         (update :volumes concat (->> [(config-volume ctx build rt)
                                       (script-volume ctx)
                                       (log-config-volume ctx)]
-                                     (remove nil?))))))
+                                     (remove nil?)))
+        (ro/add-ssh-keys-volume build))))
 
 (defn- oci-runner [client conf build rt]
   (ro/run-oci-build
