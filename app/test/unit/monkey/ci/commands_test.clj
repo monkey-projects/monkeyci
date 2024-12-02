@@ -14,6 +14,7 @@
              [sidecar :as sc]]
             [monkey.ci.config.sidecar :as cs]
             [monkey.ci.helpers :as h]
+            [monkey.ci.runners.controller :as rc]
             [monkey.ci.spec.sidecar :as ss]
             [monkey.ci.web.handler :as wh]
             [monkey.ci.test
@@ -152,3 +153,9 @@
                                                        (swap! recv concat (edn/edn-> (:body req)))
                                                        (md/success-deferred {:status 200}))]
               (validate-sidecar config job (fn [] @recv)))))))))
+
+(deftest controller
+  (testing "invokes `run-controller` with runtime created from config"
+    (with-redefs [rc/run-controller (fn [rt]
+                                       (when (some? rt) ::ok))]
+      (is (= ::ok (sut/controller tc/base-config))))))

@@ -1,7 +1,7 @@
 <configuration scan="true" scanPeriod="5 seconds">
   <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
     <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-      <level>DEBUG</level>
+      <level>INFO</level>
     </filter>		
     <encoder>
       <pattern>[%blue(DEV)] %d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
@@ -26,7 +26,7 @@
   <logger name="io" level="WARN"/>
   <logger name="monkey.ci" level="DEBUG"/>
 
-  <root level="WARN">
+  <root level="DEBUG">
     <appender-ref ref="STDOUT" />
     <appender-ref ref="FILE" />
   </root>
