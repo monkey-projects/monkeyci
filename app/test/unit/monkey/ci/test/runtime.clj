@@ -13,6 +13,9 @@
 (defn set-cache [rt c]
   (assoc rt :cache c))
 
+(defn set-build-cache [rt c]
+  (assoc rt :build-cache c))
+
 (defn set-workspace [rt w]
   (assoc rt :workspace w))
 
@@ -41,6 +44,7 @@
   (-> empty-runtime
       (set-artifacts (h/fake-blob-store))
       (set-cache (h/fake-blob-store))
+      (set-build-cache (h/fake-blob-store))
       (set-workspace (h/fake-blob-store))
       (set-events (h/fake-events))
       (set-storage (s/make-memory-storage))

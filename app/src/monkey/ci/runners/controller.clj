@@ -1,10 +1,13 @@
 (ns monkey.ci.runners.controller
   "Functions for running the application as a controller."
   (:require [babashka.fs :as fs]
+            [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [monkey.ci
+             [blob :as blob]
              [build :as b]
              [errors :as err]
+             [process :as proc]
              [runners :as r]
              [script :as script]]
             [monkey.ci.events.core :as ec]))
@@ -35,12 +38,26 @@
                        (r/download-src rt)
                        (r/store-src rt))))
 
+(defn- repo-cache-location
+  "Returns the location to use in the repo cache for the given build."
+  [build]
+  (str (cs/join "/" (take 2 (b/sid build))) blob/extension))
+
 (defn- restore-build-cache [{:keys [build build-cache] :as rt}]
-  ;; TODO
+  (log/debug "Restoring build cache for build" (b/sid build))
+  ;; Restore to parent because the dir is in the archive
+  @(blob/restore build-cache (repo-cache-location build) (str (fs/parent (m2-cache-dir rt))))
   rt)
 
-(defn- save-build-cache [rt]
-  ;; TODO
+(defn- save-build-cache [{:keys [build build-cache] :as rt}]
+  (log/debug "Saving build cache for build" (b/sid build))
+  (try
+    ;; This results in class not found error?
+    ;; Something with running a sub process in oci container instances?
+    ;; We could run the script in a second container instead, similar to oci container jobs.
+    @(blob/save build-cache (m2-cache-dir rt) (repo-cache-location build))
+    (catch Throwable ex
+      (log/error "Failed to save build cache" ex)))
   rt)
 
 (defn- wait-until-run-file-deleted [rt]

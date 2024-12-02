@@ -22,7 +22,8 @@
           rt (-> (trt/test-runtime)
                  (update :config merge {:run-path run-path
                                         :abort-path abort-path
-                                        :exit-path exit-path})
+                                        :exit-path exit-path
+                                        :m2-cache-path (str dir "/m2")})
                  (assoc-in [:build :git] {:url "git://test-url"
                                           :branch "main"})
                  (assoc-in [:build :script :script-dir] (str checkout-dir "/.monkeyci"))
@@ -48,8 +49,6 @@
       (testing "performs git clone"
         (is (true? @cloned?)))
       
-      (testing "restores build cache")
-
       (testing "stores workspace"
         (is (not-empty @(:stored (:workspace rt)))))
       
@@ -59,7 +58,7 @@
         (is (not= :timeout (deref res 1000 :timeout))))
 
       (testing "saves build cache afterwards"
-        (is (not-empty (-> rt :cache :stored deref))))
+        (is (not-empty (-> rt :build-cache :stored deref))))
 
       (testing "posts `build/end` event"
         (let [events (:events rt)]
