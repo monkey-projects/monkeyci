@@ -12,6 +12,7 @@
 (def run-path (comp :run-path :config))
 (def abort-path (comp :abort-path :config))
 (def exit-path (comp :exit-path :config))
+(def m2-cache-dir (comp :m2-cache-path :config))
 
 (defn- post-init-evt [{:keys [build] :as rt}]
   (ec/post-events (:events rt) (script/script-init-evt build (b/script-dir build)))
@@ -34,7 +35,7 @@
                        (r/download-src rt)
                        (r/store-src rt))))
 
-(defn- restore-build-cache [rt]
+(defn- restore-build-cache [{:keys [build build-cache] :as rt}]
   ;; TODO
   rt)
 
@@ -76,4 +77,5 @@
     (catch Throwable ex
       (log/error "Failed to run controller" ex)
       (create-abort-file rt)
-      1)))
+      err/error-process-failure)))
+

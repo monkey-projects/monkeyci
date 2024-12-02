@@ -108,6 +108,9 @@
               (testing "with git checkout dir"
                 (is (some? (get-in conf [:build :git :dir]))))
 
+              (testing "with build checkout dir"
+                (is (some? (get-in conf [:build :checkout-dir]))))
+
               (testing "with api token and port"
                 (is (number? (get-in conf [:runner :api-port])))
                 (is (string? (get-in conf [:runner :api-token]))))
@@ -146,7 +149,10 @@
             (testing "points to logback config file"
               (is (re-matches #"^-Dlogback\.configurationFile=.*$"
                               (-> (get-in deps [:aliases :monkeyci/build :jvm-opts])
-                                  first)))))
+                                  first))))
+
+            (testing "sets m2 cache dir"
+              (is (string? (:mvn/local-repo deps)))))
 
           (testing "contains `build.sh`"
             (is (some? (decode-vol-config vol "build.sh"))))))
