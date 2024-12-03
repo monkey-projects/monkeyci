@@ -67,7 +67,7 @@
 
 (defrecord FakeBuildBlobStore [saved restorable]
   p/BlobStore
-  (save-blob [_ src dest]
+  (save-blob [_ src dest _]
     (md/success-deferred (swap! saved assoc src dest)))
 
   (restore-blob [_ src dest]

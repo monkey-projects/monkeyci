@@ -8,8 +8,10 @@
              [build :as b]
              [errors :as err]
              [process :as proc]
+             [protocols :as p]
              [runners :as r]
-             [script :as script]]
+             [script :as script]
+             [utils :as u]]
             [monkey.ci.events.core :as ec]))
 
 (def run-path (comp :run-path :config))
@@ -53,16 +55,28 @@
   @(blob/restore build-cache (repo-cache-location build) (str (fs/parent (m2-cache-dir rt))))
   rt)
 
+(defmacro app-hash
+  "Calculates the md5 hash for deps.edn at compile time."
+  []
+  (u/file-hash "deps.edn"))
+
 (defn- save-build-cache [{:keys [build build-cache] :as rt}]
-  (log/debug "Saving build cache for build" (b/sid build))
-  (try
-    ;; This results in class not found error?
-    ;; Something with running a sub process in oci container instances?
-    ;; We could run the script in a second container instead, similar to oci container jobs.
-    @(blob/save build-cache (m2-cache-dir rt) (repo-cache-location build))
-    (catch Throwable ex
-      (log/error "Failed to save build cache" ex)))
-  rt)
+  (let [loc (repo-cache-location build)
+        md (some-> (p/get-blob-info build-cache loc)
+                   (deref)
+                   :metadata)]
+    ;; Only perform save if the hash has changed
+    (when (not= (app-hash) (:app-hash md))
+      (log/debug "Saving build cache for build" (b/sid build))
+      (try
+        @(blob/save build-cache
+                    (m2-cache-dir rt)
+                    loc
+                    ;; TODO Include hash of the build deps.edn as well
+                    {:app-hash (app-hash)})
+        (catch Throwable ex
+          (log/error "Failed to save build cache" ex))))
+    rt))
 
 (defn- wait-until-run-file-deleted [rt]
   (let [rp (run-path rt)]

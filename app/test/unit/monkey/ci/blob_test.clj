@@ -12,6 +12,7 @@
             [monkey.ci.helpers :as h]
             [monkey.oci.os
              [core :as os]
+             [martian :as om]
              [stream :as oss]]))
 
 (defmacro with-disk-blob [dir blob & body]
@@ -90,7 +91,19 @@
             (is (map? res))
             (is (some? (:dest res)))
             (is (fs/exists? (:dest res)))
-            (is (= data (slurp (:dest res))))))))))
+            (is (= data (slurp (:dest res)))))))))
+
+  (with-disk-blob dir blob
+    (with-open [stream (bs/to-input-stream (.getBytes "test data"))]
+      (is (some? @(p/put-blob-stream blob stream "test-stream"))))
+    
+    (testing "can get details about existing blob"
+      (let [d @(p/get-blob-info blob "test-stream")]
+        (is (map? d))
+        (is (number? (:size d)))))
+
+    (testing "details about non-existing blob is `nil`"
+      (is (nil? @(p/get-blob-info blob "nonexisting-stream"))))))
 
 (deftest oci-blob
   (testing "created by `make-blob-store`"
@@ -115,7 +128,24 @@
               (is (empty? (fs/list-dir tmp-dir)))))))
 
       (testing "does not store nonexisting paths"
-        (is (nil? @(sut/save (sut/make-blob-store {:blob {:type :oci}} :blob) "nonexisting.txt" "/test/dest")))))
+        (is (nil? @(sut/save (sut/make-blob-store {:blob {:type :oci}} :blob) "nonexisting.txt" "/test/dest"))))
+
+      (testing "passes metadata with `opc-meta-` prefix"
+        (letfn [(valid-md? [[k _]]
+                  (.startsWith (name k) "opc-meta-"))]
+          (with-redefs [oss/input-stream->multipart
+                        (fn [_ {:keys [metadata]}]
+                          (if (and (not-empty metadata)
+                                   (every? valid-md? metadata))
+                            (md/success-deferred nil)
+                            (md/error-deferred (ex-info "Invalid metadata" metadata))))]
+            (h/with-tmp-dir dir
+              (let [src (io/file dir "test.txt")
+                    _ (spit src "test file")
+                    blob (sut/make-blob-store {:blob {:type :oci
+                                                      :tmp-dir (u/abs-path dir)}}
+                                              :blob)]
+                (is (some? @(p/save-blob blob src "test/path" {:key "value"})))))))))
 
   (testing "`restore`"
     (h/with-tmp-dir dir
@@ -188,5 +218,15 @@
         (with-redefs [oss/input-stream->multipart (constantly (md/success-deferred nil))]
           (is (= "prefix/test-dest" @(p/put-blob-stream blob
                                                         (bs/to-input-stream (.getBytes "test stream"))
-                                                        "test-dest"))))))))
+                                                        "test-dest")))))))
+
+  (testing "`get-blob-info` heads object"
+    (let [blob (sut/make-blob-store {:blob {:type :oci}} :blob)]
+      (with-redefs [om/head-object (constantly (md/success-deferred
+                                                {:status 200
+                                                 :headers {:content-length "1000"
+                                                           :opc-meta-key "value"}}))]
+        (is (= {:size 1000
+                :metadata {:key "value"}}
+               @(p/get-blob-info blob "test/file")))))))
 

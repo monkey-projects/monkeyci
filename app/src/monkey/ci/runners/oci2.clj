@@ -64,7 +64,6 @@
       (update :git dissoc :ssh-keys)))
 
 (defn- config-volume [config build rt]
-  ;; TODO Ssh keys
   (let [conf (-> config
                  (ro/add-api-token build rt)
                  (update :build build->out)
@@ -86,6 +85,11 @@
 (defn- script-config [{:keys [runner] :as config}]
   (-> cos/empty-config
       (cos/set-build (-> (:build config)
+                         ;; Credit multiplier for action jobs
+                         (assoc :credit-multiplier (oci/credit-multiplier
+                                                    oci/default-arch
+                                                    oci/default-cpu-count
+                                                    oci/default-memory-gb))
                          (build->out)))
       (cos/set-api {:url (format "http://localhost:%d" (:api-port runner))
                     :token (:api-token runner)})))

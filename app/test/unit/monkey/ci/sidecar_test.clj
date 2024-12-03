@@ -179,7 +179,7 @@
 
 (defrecord SlowBlobStore [delay]
   p/BlobStore
-  (save-blob [_ _ _]
+  (save-blob [_ _ _ _]
     (log/info "Simulating slow blob storage...")
     (mt/in delay (constantly {::blob :saved})))
   (restore-blob [_ _ _]
