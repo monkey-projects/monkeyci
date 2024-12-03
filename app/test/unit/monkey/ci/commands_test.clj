@@ -97,7 +97,7 @@
 (deftest http-server
   (with-redefs [wh/on-server-close (constantly (md/success-deferred nil))]
     (testing "starts the server and waits for close"
-      (let [r (sut/http-server tc/base-config)]
+      (let [r (sut/http-server tc/app-config)]
         (is (nil? r))))))
 
 (deftest watch
