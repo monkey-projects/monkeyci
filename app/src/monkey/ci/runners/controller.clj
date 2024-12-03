@@ -54,6 +54,7 @@
   rt)
 
 (defn- save-build-cache [{:keys [build build-cache] :as rt}]
+  ;; TODO Only do this if some hash value has changed
   (log/debug "Saving build cache for build" (b/sid build))
   (try
     ;; This results in class not found error?

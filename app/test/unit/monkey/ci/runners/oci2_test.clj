@@ -151,10 +151,15 @@
               (testing "passes script config as exec arg"
                 (is (map? sc)))
 
-              (testing "contains build, without ssh keys"
+              (testing "contains build"
                 (let [r (cs/build sc)]
                   (is (= (:build-id build) (:build-id r)))
-                  (is (nil? (get-in r [:git :ssh-keys])))))
+                  
+                  (testing "without ssh keys"
+                    (is (nil? (get-in r [:git :ssh-keys]))))
+
+                  (testing "with credit multiplier"
+                    (is (number? (:credit-multiplier r))))))
 
               (testing "contains api url and token"
                 (let [api (cs/api sc)]

@@ -180,8 +180,8 @@
                  ;; Unzip and unpack in one go
                  #(a/extract % dest)
                  #(assoc % :src src)))
-            ;; FIXME It may occur that a file is not yet available if it is read immediately after writing
-            ;; In that case we should retry.
+            ;; It may occur that a file is not yet available if it is read immediately after writing
+            ;; In that case we should retry.  Currently, this is left up to the higher level.
             (log/warn "Blob not found in bucket:" obj-name))))
        (str "Restored blob from bucket: " src))))
 
