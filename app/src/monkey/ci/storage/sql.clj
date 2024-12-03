@@ -841,12 +841,13 @@
       (log/warn "Unable to list objects for sid" sid)))
 
   p/Transactable
-  (transact [_ f]
+  (transact [this f]
     (jdbc/transact
      (:ds conn)
      (fn [c]
        ;; Recreate storage object, with the transacted connection
-       (f (->SqlStorage (assoc conn :ds c))))))
+       (f (map->SqlStorage {:conn (assoc conn :ds c)
+                            :overrides (:overrides this)})))))
 
   co/Lifecycle
   (start [this]
