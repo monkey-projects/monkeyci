@@ -261,10 +261,11 @@
        (om/head-object client params)
        (fn [{:keys [status headers]}]
          (when (= 200 status)
-           {:size (Integer/parseInt (:content-length headers))
-            :last-modified (some->> (:last-modified headers)
-                                    (jt/instant (jt/formatter :rfc-1123-date-time)))
-            :metadata (parse-meta headers)}))))))
+           (-> {:size (Integer/parseInt (:content-length headers))
+                :metadata (parse-meta headers)}
+               (mc/assoc-some
+                :last-modified (some->> (:last-modified headers)
+                                        (jt/instant (jt/formatter :rfc-1123-date-time)))))))))))
 
 (defmethod make-blob-store :oci [conf k]
   (let [oci-conf (get conf k)
