@@ -62,3 +62,7 @@
 (defprotocol BuildParams
   (get-build-params [this]
     "Retrieves build parameters for this build"))
+
+(defprotocol Vault
+  (encrypt [this txt] "Encrypts given text")
+  (decrypt [this obj] "Decrypts given data"))

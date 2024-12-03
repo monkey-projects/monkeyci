@@ -155,7 +155,8 @@
   "Prefixes metadata with `opc-meta-` as required by oci"
   [md]
   (letfn [(->meta [k]
-            (keyword (str meta-prefix (name k))))]
+            ;; Write as string otherwise we risk conversion
+            (str meta-prefix (name k)))]
     (some->> md
              (map (fn [[k v]]
                     [(->meta k) v]))
