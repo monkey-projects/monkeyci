@@ -8,6 +8,7 @@
              [build :as b]
              [errors :as err]
              [process :as proc]
+             [protocols :as p]
              [runners :as r]
              [script :as script]
              [utils :as u]]
@@ -60,17 +61,22 @@
   (u/file-hash "deps.edn"))
 
 (defn- save-build-cache [{:keys [build build-cache] :as rt}]
-  ;; TODO Only perform save if the hash has changed
-  (log/debug "Saving build cache for build" (b/sid build))
-  (try
-    @(blob/save build-cache
-                (m2-cache-dir rt)
-                (repo-cache-location build)
-                ;; TODO Include hash of the build deps.edn as well
-                {:app-hash (app-hash)})
-    (catch Throwable ex
-      (log/error "Failed to save build cache" ex)))
-  rt)
+  (let [loc (repo-cache-location build)
+        md (some-> (p/get-blob-info build-cache loc)
+                   (deref)
+                   :metadata)]
+    ;; Only perform save if the hash has changed
+    (when (not= (app-hash) (:app-hash md))
+      (log/debug "Saving build cache for build" (b/sid build))
+      (try
+        @(blob/save build-cache
+                    (m2-cache-dir rt)
+                    loc
+                    ;; TODO Include hash of the build deps.edn as well
+                    {:app-hash (app-hash)})
+        (catch Throwable ex
+          (log/error "Failed to save build cache" ex))))
+    rt))
 
 (defn- wait-until-run-file-deleted [rt]
   (let [rp (run-path rt)]
