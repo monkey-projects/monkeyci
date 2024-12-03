@@ -108,7 +108,7 @@
 
 (defrecord FakeBlobStore [stored strict?]
   p/BlobStore  
-  (save-blob [_ src dest]
+  (save-blob [_ src dest md]
     (md/success-deferred (swap! stored assoc dest src)))
 
   (restore-blob [_ src dest]
@@ -130,7 +130,7 @@
        (io/input-stream (.getBytes "This is a test stream")))))
 
   (put-blob-stream [this src dest]
-    (p/save-blob this src dest)))
+    (p/save-blob this src dest nil)))
 
 (defn fake-blob-store
   ([stored]

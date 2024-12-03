@@ -22,7 +22,11 @@
   (:import [java.io BufferedInputStream PipedInputStream PipedOutputStream]
            [org.apache.commons.compress.archivers ArchiveStreamFactory]))
 
-(def save p/save-blob)
+(defn save
+  "Saves blob from src to dest, with optional metadata"
+  [blob src dest & [md]]
+  (p/save-blob blob src dest md))
+
 (def restore p/restore-blob)
 (def input-stream p/get-blob-stream)
 
@@ -75,7 +79,7 @@
 
 (deftype DiskBlobStore [dir]
   p/BlobStore
-  (save-blob [_ src dest]
+  (save-blob [_ src dest _]
     (md/success-deferred 
      (if (fs/exists? src)
        (let [f (io/file dir dest)]
@@ -136,7 +140,7 @@
 
 (deftype OciBlobStore [client conf]
   p/BlobStore
-  (save-blob [_ src dest]
+  (save-blob [_ src dest md]
     (if (fs/exists? src)
       (let [arch (tmp-archive conf)
             obj-name (archive-obj-name conf dest)]
