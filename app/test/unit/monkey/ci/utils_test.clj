@@ -65,3 +65,7 @@
 
   (testing "rounds to next integer"
     (is (= 5 (sut/round-up 4.3M)))))
+
+(deftest file-hash
+  (testing "calculates hash string for file"
+    (is (string? (sut/file-hash "deps.edn")))))

@@ -130,7 +130,10 @@
        (io/input-stream (.getBytes "This is a test stream")))))
 
   (put-blob-stream [this src dest]
-    (p/save-blob this src dest nil)))
+    (p/save-blob this src dest nil))
+
+  (get-blob-info [_ _]
+    nil))
 
 (defn fake-blob-store
   ([stored]

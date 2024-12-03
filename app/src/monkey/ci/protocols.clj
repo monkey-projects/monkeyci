@@ -37,7 +37,8 @@
   (save-blob [store src dest md] "Saves `src` file or directory to `dest` as a blob")
   (restore-blob [store src dest] "Restores `src` to local `dest`")
   (get-blob-stream [store src] "Gets a blob file as an `InputStream`")
-  (put-blob-stream [store src dest] "Saves a raw stream to the blob store"))
+  (put-blob-stream [store src dest] "Saves a raw stream to the blob store")
+  (get-blob-info [store src] "Gets details about a stored blob"))
 
 (def blob-store? (partial satisfies? BlobStore))
 

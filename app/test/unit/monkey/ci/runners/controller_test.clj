@@ -2,7 +2,9 @@
   (:require [clojure.test :refer [deftest testing is]]
             [babashka.fs :as fs]
             [manifold.deferred :as md]
-            [monkey.ci.protocols :as p]
+            [monkey.ci
+             [protocols :as p]
+             [utils :as u]]
             [monkey.ci.build.api-server :as bas]
             [monkey.ci.runners.controller :as sut]
             [monkey.ci.helpers :as h]
@@ -81,3 +83,8 @@
                       (assoc :events (->FailingEventsPoster)) ; force error
                       (sut/run-controller))))
         (is (fs/exists? abort-path))))))
+
+(deftest app-hash
+  (testing "returns hash string for `deps.edn`"
+    (is (= (u/file-hash "deps.edn")
+           (sut/app-hash)))))
