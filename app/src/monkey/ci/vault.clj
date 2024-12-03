@@ -18,6 +18,7 @@
         :ciphertext))
 
   (decrypt [_ obj]
+    ;; TODO May become slow for lots of values
     (-> (vault/decrypt client (assoc config :ciphertext obj))
         (deref)
         check-error!
@@ -29,3 +30,8 @@
 (defn make-oci-vault [config]
   (->OciVault (vault/make-crypto-client config)
               (select-keys config [:key-id :key-version-id])))
+
+(defmulti make-vault :type)
+
+(defmethod make-vault :oci [config]
+  (make-oci-vault config))

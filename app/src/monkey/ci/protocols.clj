@@ -48,11 +48,6 @@
 
 (def container-runner? (partial satisfies? ContainerRunner))
 
-;; (defprotocol BuildContainerRunner
-;;   (run-build-container [this build job]
-;;     "Runs the container job for the specific build.  Use this in the runner, where the build
-;;      is not fully known at startup time."))
-
 (defprotocol Workspace
   (restore-workspace [this]
     "Restores the workspace associated with the current build"))
@@ -66,3 +61,5 @@
 (defprotocol Vault
   (encrypt [this txt] "Encrypts given text")
   (decrypt [this obj] "Decrypts given data"))
+
+(def vault? (partial satisfies? Vault))

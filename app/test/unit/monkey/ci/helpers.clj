@@ -16,7 +16,8 @@
              [cuid :as cuid]
              [protocols :as p]
              [storage :as s]
-             [utils :as u]]
+             [utils :as u]
+             [vault :as v]]
             [monkey.ci.events.core :as ec]
             [monkey.ci.web
              [common :as wc]
@@ -317,3 +318,19 @@
 
 (defn gen-build-sid []
   (repeatedly 3 cuid/random-cuid))
+
+(defrecord DummyVault []
+  p/Vault
+  (encrypt [_ v]
+    v)
+
+  (decrypt [_ v]
+    v))
+
+(defn dummy-vault []
+  (->DummyVault))
+
+(def fake-vault dummy-vault)
+
+(defmethod v/make-vault :noop [_]
+  (fake-vault))

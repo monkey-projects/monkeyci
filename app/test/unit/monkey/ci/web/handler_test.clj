@@ -35,7 +35,8 @@
     (is (fn? (sut/make-app {})))))
 
 (defn- test-rt [& [opts]]
-  (-> (merge {:config {:dev-mode true}}
+  (-> (merge {:config {:dev-mode true}
+              :vault (h/dummy-vault)}
              opts)
       (update :storage #(or % (st/make-memory-storage)))))
 

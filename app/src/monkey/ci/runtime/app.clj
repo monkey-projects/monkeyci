@@ -18,6 +18,7 @@
              [runners :as r]
              [storage :as s]
              [utils :as u]
+             [vault :as v]
              [workspace :as ws]]
             [monkey.ci.build.api-server :as bas]
             [monkey.ci.containers
@@ -265,6 +266,9 @@
 (defn- new-listeners-events [config]
   (->ListenersEvents config nil))
 
+(defn- new-vault [config]
+  (v/make-vault (:vault config)))
+
 (defrecord ServerRuntime [config]
   co/Lifecycle
   (start [this]
@@ -302,7 +306,7 @@
    :runner    (new-server-runner config)
    :runtime   (co/using
                (new-server-runtime config)
-               [:artifacts :events :metrics :reporter :runner :storage :jwk :process-reaper])
+               [:artifacts :events :metrics :reporter :runner :storage :jwk :process-reaper :vault])
    :storage   (new-storage config)
    :jwk       (new-jwk config)
    :listeners (co/using
@@ -314,7 +318,8 @@
    :metrics   (co/using
                (new-metrics)
                [:events])
-   :process-reaper (new-process-reaper config)))
+   :process-reaper (new-process-reaper config)
+   :vault     (new-vault config)))
 
 (defn with-server-system [config f]
   (rc/with-system (make-server-system config) f))
