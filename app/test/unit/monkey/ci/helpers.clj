@@ -321,10 +321,10 @@
 
 (defrecord DummyVault []
   p/Vault
-  (encrypt [_ v]
+  (encrypt [_ _ v]
     v)
 
-  (decrypt [_ v]
+  (decrypt [_ _ v]
     v))
 
 (defn dummy-vault []

@@ -9,9 +9,9 @@
 
 (defrecord TestVault []
   p/Vault
-  (encrypt [_ _]
+  (encrypt [_ _ _]
     "encrypted")
-  (decrypt [_ _]
+  (decrypt [_ _ _]
     "decrypted"))
 
 (def test-vault (->TestVault))

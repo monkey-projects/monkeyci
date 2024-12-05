@@ -10,7 +10,7 @@
   [req params]
   (let [v (c/req->vault req)]
     (letfn [(decrypt-vals [p]
-              (mapv #(update % :value (partial p/decrypt v)) p))]
+              (mapv #(update % :value (partial p/decrypt v nil)) p))]
       (->> params
            (map #(update % :parameters decrypt-vals))))))
 
@@ -35,13 +35,15 @@
 (defn- encrypt-one [req]
   (let [v (c/req->vault req)]
     (letfn [(encrypt-vals [p]
-              (map #(update % :value (partial p/encrypt v)) p))]
+              ;; TODO USe customer iv
+              (map #(update % :value (partial p/encrypt v nil)) p))]
       (update-in req [:parameters :body :parameters] encrypt-vals))))
 
 (defn- encrypt-all [req]
   (let [v (c/req->vault req)]
     (letfn [(encrypt-vals [p]
-              (map #(update % :value (partial p/encrypt v)) p))
+              ;; TODO USe customer iv
+              (map #(update % :value (partial p/encrypt v nil)) p))
             (encrypt-params [b]
               (map #(update % :parameters encrypt-vals) b))]
       (update-in req [:parameters :body] encrypt-params))))
