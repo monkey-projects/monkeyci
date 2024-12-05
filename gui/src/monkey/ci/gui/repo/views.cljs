@@ -134,7 +134,7 @@
          "Repository: " (:name @r)
          [:span.fs-6.p-1
           [cl/clipboard-copy (u/->sid p :customer-id :repo-id) "Click to save the sid to clipboard"]]]
-        [:p "Repository url: " [:a {:href (:url @r)} (:url @r)]]
+        [:p "Repository url: " [:a {:href (:url @r) :target :_blank} (:url @r)]]
         [co/alerts [:repo/alerts]]
         [:div.card
          [:div.card-body

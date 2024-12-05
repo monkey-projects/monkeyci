@@ -59,7 +59,7 @@
     "Retrieves build parameters for this build"))
 
 (defprotocol Vault
-  (encrypt [this txt] "Encrypts given text")
-  (decrypt [this obj] "Decrypts given data"))
+  (encrypt [this iv txt] "Encrypts given text using initialization vector, returns base64 string")
+  (decrypt [this iv obj] "Decrypts given data using initialization vector"))
 
 (def vault? (partial satisfies? Vault))
