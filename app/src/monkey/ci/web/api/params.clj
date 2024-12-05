@@ -38,6 +38,14 @@
               (map #(update % :value (partial p/encrypt v)) p))]
       (update-in req [:parameters :body :parameters] encrypt-vals))))
 
+(defn- encrypt-all [req]
+  (let [v (c/req->vault req)]
+    (letfn [(encrypt-vals [p]
+              (map #(update % :value (partial p/encrypt v)) p))
+            (encrypt-params [b]
+              (map #(update % :parameters encrypt-vals) b))]
+      (update-in req [:parameters :body] encrypt-params))))
+
 (def create-param 
   (comp (c/entity-creator st/save-param c/default-id)
         assign-customer-id
@@ -50,5 +58,5 @@
   (partial c/get-for-repo-by-label st/find-params (mapcat :parameters)))
 
 (def update-params
-  ;; TODO Encrypt
-  (partial c/update-for-customer st/save-params))
+  (comp (partial c/update-for-customer st/save-params)
+        encrypt-all))

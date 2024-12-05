@@ -121,4 +121,22 @@
                  first
                  :value))))))
 
-
+(deftest update-params
+  (testing "encrypts values"
+    (let [{st :storage :as rt} (-> (trt/test-runtime)
+                                   (trt/set-vault test-vault))
+          req (-> rt
+                  (h/->req)
+                  (assoc :parameters
+                         {:path
+                          {:customer-id "test-cust"}
+                          :body
+                          [{:parameters [{:name "test-param"
+                                          :value "test-val"}]}]}))]
+      (is (some? (sut/update-params req)))
+      (is (= "encrypted"
+             (-> (st/find-params st "test-cust")
+                 first
+                 :parameters
+                 first
+                 :value))))))
