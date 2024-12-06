@@ -13,7 +13,9 @@
              [time :as t]]
             [monkey.ci.entities.core :as ec]
             [monkey.ci.helpers :as h]
-            [monkey.ci.spec.entities :as se]
+            [monkey.ci.spec
+             [entities :as se]
+             [gen :as sg]]
             [monkey.ci.storage.sql :as sut]
             [monkey.ci.web.auth :as auth]))
 
@@ -653,6 +655,23 @@
                (->> (st/search-bb-webhooks st {:webhook-id (:id wh)})
                     (map :id))))
         (is (empty? (st/search-bb-webhooks st {:customer-id "nonexisting"})))))))
+
+(deftest crypto
+  (with-storage conn st
+    (let [cust (h/gen-cust)
+          crypto (-> (h/gen-crypto)
+                     (assoc :customer-id (:id cust)))]
+      (testing "can save and find by customer id"
+        (is (sid/sid? (st/save-customer st cust)))
+        (is (sid/sid? (st/save-crypto st crypto)))
+        (let [m (st/find-crypto st (:id cust))]
+          (is (= (:customer-id crypto) (:customer-id m)))
+          (is (java.util.Arrays/equals (:iv crypto) (:iv m)))))
+
+      (testing "can update"
+        (let [upd (assoc crypto :iv (gen/generate (sg/fixed-byte-array 16)))]
+          (is (sid/sid? (st/save-crypto st upd)))
+          (is (java.util.Arrays/equals (:iv upd) (:iv (st/find-crypto st (:id cust))))))))))
 
 (deftest make-storage
   (testing "creates sql storage object using connection settings"

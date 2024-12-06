@@ -273,7 +273,15 @@
      [:workspace [:varchar 300] [:not nil]]
      [:repo-slug [:varchar 100] [:not nil]]
      (fk :webhook-id :webhooks :id)]
-    [(col-idx :bb-webhooks :webhook-id)])])
+    [(col-idx :bb-webhooks :webhook-id)])
+
+   (table-migration
+    26 :cryptos
+    ;; Only one record per customer, so make customer id the pk
+    [[:customer-id :integer [:not nil] [:primary-key]]
+     [:iv [:binary 16]]
+     fk-customer]
+    [])])
 
 (defn- format-migration [sql-opts m]
   (letfn [(format-sql [stmt]

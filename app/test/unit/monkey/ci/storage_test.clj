@@ -451,3 +451,10 @@
                                (map :id)))
             "search by customer id")
         (is (empty? (sut/search-bb-webhooks st {:customer-id "nonexisting"})))))))
+
+(deftest crypto
+  (h/with-memory-store st
+    (let [crypto (h/gen-crypto)]
+      (testing "can save and find"
+        (is (sid/sid? (sut/save-crypto st crypto)))
+        (is (= crypto (sut/find-crypto st (:customer-id crypto))))))))

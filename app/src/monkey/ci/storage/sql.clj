@@ -753,6 +753,25 @@
   (->> (ebbwh/select-bb-webhooks-with-repos conn (ebbwh/by-filter f))
        (map cuid->id)))
 
+(def crypto? (partial global-sid? st/crypto))
+
+(defn- insert-crypto [conn crypto cust-id]
+  (ec/insert-crypto conn (-> crypto
+                             (assoc :customer-id cust-id))))
+
+(defn- update-crypto [conn crypto existing]
+  (ec/update-crypto conn (merge crypto (select-keys existing [:customer-id]))))
+
+(defn- upsert-crypto [conn crypto]
+  (let [cust (ec/select-customer conn (ec/by-cuid (:customer-id crypto)))
+        existing (ec/select-crypto conn (ec/by-customer (:id cust)))]
+    (if existing
+      (update-crypto conn crypto existing)
+      (insert-crypto conn crypto (:id cust)))))
+
+(defn- select-crypto [conn cust-cuid]
+  (ecu/crypto-by-cust-cuid conn cust-cuid))
+
 (defn- sid-pred [t sid]
   (t sid))
 
@@ -783,7 +802,9 @@
       customer-credit?
       (select-customer-credit conn (global-sid->cuid sid))
       bb-webhook?
-      (select-bb-webhook conn (last sid))))
+      (select-bb-webhook conn (last sid))
+      crypto?
+      (select-crypto conn (last sid))))
   
   (write-obj [_ sid obj]
     (when (condp sid-pred sid
@@ -811,6 +832,8 @@
             (upsert-customer-credit conn obj)
             bb-webhook?
             (upsert-bb-webhook conn obj)
+            crypto?
+            (upsert-crypto conn obj)
             (log/warn "Unrecognized sid when writing:" sid))
       sid))
 

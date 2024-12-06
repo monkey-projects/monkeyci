@@ -714,3 +714,13 @@
            used  (->> (list-customer-credit-consumptions s cust-id)
                       (sum-amount))]
        (- avail used)))))
+
+(def crypto :crypto)
+(defn crypto-sid [& parts]
+  (into [global (name crypto)] parts))
+
+(defn save-crypto [st crypto]
+  (p/write-obj st (crypto-sid (:customer-id crypto)) crypto))
+
+(defn find-crypto [st cust-id]
+  (p/read-obj st (crypto-sid cust-id)))

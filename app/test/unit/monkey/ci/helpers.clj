@@ -307,6 +307,9 @@
 (defn gen-bb-webhook []
   (gen-entity :entity/bb-webhook))
 
+(defn gen-crypto []
+  (gen-entity :entity/crypto))
+
 (defrecord FakeContainerRunner [credit-consumer runs result]
   p/ContainerRunner
   (run-container [this job]
