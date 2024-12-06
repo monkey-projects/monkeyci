@@ -1,6 +1,7 @@
 (ns monkey.ci.edn
   "Functionality for serializing objects to edn and deserializing them back."
   (:require [aero.core :as ac]
+            [buddy.core.codecs :as codecs]
             [clj-commons.byte-streams :as bs]
             [clojure.edn :as edn]
             [clojure.walk :as cw]
@@ -44,3 +45,7 @@
 (defmethod ac/reader 'version
   [_ _ _]
   (v/version))
+
+(defmethod ac/reader 'aes-key
+  [_ _ value]
+  (codecs/b64->bytes value))

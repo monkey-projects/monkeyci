@@ -1,10 +1,13 @@
 (ns monkey.ci.entities.migrations
   (:require [clojure.tools.logging :as log]
             [honey.sql :as sql]
-            [honey.sql.helpers :as h]
+            [honey.sql.helpers :as h]            
+            [monkey.ci.entities.core :as ec]
+            [monkey.ci.vault :as vault]
             [ragtime
              [core :as rt]
-             [next-jdbc :as rj]]))
+             [next-jdbc :as rj]
+             [protocols :as rp]]))
 
 (defn migration
   "Creates a new migration, with given id and up/down statements.  The statements
@@ -63,6 +66,29 @@
   (table-migration idx table
                    (concat [id-col cuid-col] extra-cols)
                    (concat [(cuid-idx table)] extra-indices)))
+
+(defn customer-ivs [idx]
+  (reify rp/Migration
+    (id [_] (str idx "-create-customer-ivs"))
+
+    (run-up! [_ db]
+      (let [conn (:datasource db)]
+        ;; FIXME We need also sql opts here to format statements
+        (log/info "Running migration with arg:" conn)
+        (let [cust (ec/select conn {:from [:customers :c]
+                                    :left-join [[:cryptos :cr] [:= :cr.customer-id :c.id]]
+                                    :where [nil? :cr.id]})]
+          (log/debug "Creating crypto records for" (count cust) "customers")
+          (doseq [c cust]
+            (ec/insert-crypto conn {:customer-id (:id c)
+                                    :iv (vault/generate-iv)})))))
+    
+    (run-down! [_ conn]
+      ;; Nothing
+      )))
+
+#_(def encrypt-params
+  (reify ))
 
 (def migrations
   [(entity-table-migration
@@ -237,7 +263,7 @@
      amount-col
      [:from-time :timestamp]
      [:type [:varchar 20]]
-     [:user-id :integer] ; can be nil
+     [:user-id :integer]                ; can be nil
      [:subscription-id :integer]
      [:reason [:varchar 300]]
      fk-customer
@@ -281,7 +307,9 @@
     [[:customer-id :integer [:not nil] [:primary-key]]
      [:iv [:binary 16]]
      fk-customer]
-    [])])
+    [])
+
+   #_(customer-ivs 27)])
 
 (defn- format-migration [sql-opts m]
   (letfn [(format-sql [stmt]
@@ -290,10 +318,16 @@
         (update :up (partial mapcat format-sql))
         (update :down (partial mapcat format-sql)))))
 
+(defn- ->sql-migration [sql-opts obj]
+  (if (map? obj)
+    (-> (format-migration sql-opts obj)
+        (rj/sql-migration))
+    obj)) 
+
 (defn format-migrations
   "Formats all migrations to sql, creates a ragtime migration object from it."
   ([migrations sql-opts]
-   (map (comp rj/sql-migration (partial format-migration sql-opts)) migrations))
+   (map (partial ->sql-migration sql-opts) migrations))
   ([sql-opts]
    (format-migrations migrations sql-opts)))
 

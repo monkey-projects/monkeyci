@@ -78,6 +78,10 @@
         assign-customer-id
         encrypt-one))
 
+(def update-param 
+  (comp (c/entity-updater get-param-id st/find-param st/save-param)
+        encrypt-one))
+
 (defn get-repo-params
   "Retrieves the parameters that are available for the given repository.  This depends
    on the parameter label filters and the repository labels."
