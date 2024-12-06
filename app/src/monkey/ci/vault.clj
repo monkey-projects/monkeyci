@@ -12,6 +12,9 @@
 
 (def key-shape {:algorithm "AES"
                 :length 32})
+;; Key size determines algorithm and iv length
+(def algo {:algo :aes-256-gcm})
+(def iv-size 16)
 
 (defn- load-enc-key
   "Loads encryption key from the configured vault secret"
@@ -45,23 +48,27 @@
         (generate-new-key v)
         (throw ex)))))
 
-(def algo {:algo :aes-256-gcm})
+(defn- encrypt [enc-key iv txt]
+  (-> (bcc/encrypt (codecs/str->bytes txt)
+                   enc-key
+                   iv
+                   algo)
+      (codecs/bytes->b64-str)))
+
+(defn- decrypt [enc-key iv enc]
+  (-> (bcc/decrypt (codecs/b64->bytes enc)
+                   enc-key
+                   iv
+                   algo)
+      (codecs/bytes->str)))
 
 (defrecord OciVault [client config]
   p/Vault
   (encrypt [this iv txt]
-    (-> (bcc/encrypt (codecs/str->bytes txt)
-                     (:encryption-key this)
-                     iv
-                     algo)
-        (codecs/bytes->b64-str)))
+    (encrypt (:encryption-key this) iv txt))
 
   (decrypt [this iv enc]
-    (-> (bcc/decrypt (codecs/b64->bytes enc)
-                     (:encryption-key this)
-                     iv
-                     algo)
-        (codecs/bytes->str)))
+    (decrypt (:encryption-key this) iv enc))
 
   co/Lifecycle
   (start [this]
@@ -74,12 +81,32 @@
   (->OciVault (vault/make-client config)
               (select-keys config [:compartment-id :vault-id :key-id :secret-name])))
 
+;; Fixed key vault, that uses a preconfigured key.  Useful for testing or developing.
+(defrecord FixedKeyVault [encryption-key]
+  p/Vault
+  (encrypt [_ iv txt]
+    (encrypt encryption-key iv txt))
+  
+  (decrypt [_ iv enc]
+    (decrypt encryption-key iv enc)))
+
+(defn generate-key
+  "Generates random encryption key"
+  []
+  (bcn/random-nonce 32))
+
+(defn make-fixed-key-vault [config]
+  (->FixedKeyVault (or (:encryption-key config) (generate-key))))
+
 (defmulti make-vault :type)
 
 (defmethod make-vault :oci [config]
   (make-oci-vault config))
 
+(defmethod make-vault :fixed [config]
+  (make-fixed-key-vault config))
+
 (defn generate-iv
   "Generates a random initialization vector for AES encryption"
   []
-  (bcn/random-nonce 16))
+  (bcn/random-nonce iv-size))
