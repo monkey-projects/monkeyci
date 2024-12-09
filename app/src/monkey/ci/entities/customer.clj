@@ -23,3 +23,12 @@
                      :from [[:customers :c]]
                      :where [:in :c.cuid cuids]})
          (map :id))))
+
+(defn crypto-by-cust-cuid [conn cuid]
+  (some-> (ec/select conn
+                     {:select [:cr.*]
+                      :from [[:cryptos :cr]]
+                      :join [[:customers :c] [:= :c.id :cr.customer-id]]
+                      :where [:= :c.cuid cuid]})
+          (first)
+          (assoc :customer-id cuid)))

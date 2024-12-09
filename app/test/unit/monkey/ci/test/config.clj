@@ -14,3 +14,6 @@
    :containers  {:type :podman}
    :storage     {:type :memory}
    :runner      {:type :child}})
+
+(def app-config
+  (assoc base-config :vault {:type :noop}))

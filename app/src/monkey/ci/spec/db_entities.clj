@@ -6,7 +6,8 @@
             [clojure.spec.gen.alpha :as gen]
             [monkey.ci.spec
              [build]
-             [common :as c]]))
+             [common :as c]
+             [gen :as sg]]))
 
 (def id? int?)
 (def ts? int?)
@@ -146,3 +147,11 @@
 (s/def :db/bb-webhook
   (-> (s/keys :req-un [:db/bitbucket-id :db/webhook-id :bb/workspace :bb/repo-slug])
       (s/merge :db/common)))
+
+(s/def :db/iv (s/with-gen
+                (s/and (partial instance? (class (byte-array 0)))
+                       (comp (partial = 16) count))
+                #(sg/fixed-byte-array 16)))
+
+(s/def :db/crypto
+  (s/keys :req-un [:db/customer-id :db/iv]))
