@@ -125,9 +125,9 @@
 
 (defn- select-params-with-iv [conn]
   (->> {:select [:pv.id :pv.value :c.iv]
-           :from [[:customer-param-values :pv]]
-           :join [[:customer-params :cp] [:= :cp.id :pv.params-id] 
-                  [:cryptos :c] [:= :c.customer-id :cp.customer-id]]}
+        :from [[:customer-param-values :pv]]
+        :join [[:customer-params :cp] [:= :cp.id :pv.params-id] 
+               [:cryptos :c] [:= :c.customer-id :cp.customer-id]]}
        (ec/select conn)))
 
 (defn- update-single-param [conn updater pv]
@@ -152,6 +152,35 @@
      ;; Decrypt all customer parameter values
      (->> (select-params-with-iv conn)
           (map (partial decrypt-single-param conn))
+          (doall)))))
+
+(defn- select-ssh-keys-with-iv [conn]
+  (->> {:select [:k.id :k.private-key :c.iv]
+        :from [[:ssh-keys :k]]
+        :join [[:cryptos :c] [:= :c.customer-id :k.customer-id]]}
+       (ec/select conn)))
+
+(defn- update-single-ssh-key [conn updater k]
+  (ec/update-ssh-key conn {:id (:id k)
+                           :private-key (updater (:iv k) (:private-key k))}))
+
+(defn- encrypt-single-ssh-key [{:keys [vault] :as conn} k]
+  (update-single-ssh-key conn (partial mp/encrypt vault) k))
+
+(defn- decrypt-single-ssh-key [{:keys [vault] :as conn} k]
+  (update-single-ssh-key conn (partial mp/decrypt vault) k))
+
+(defn encrypt-ssh-keys [idx]
+  (->FunctionMigration
+   (str idx "-encrypt-ssh-keys")
+   (fn [conn]
+     ;; Encrypt all private ssh keys
+     (->> (select-ssh-keys-with-iv conn)
+          (map (partial encrypt-single-ssh-key conn))
+          (doall)))
+   (fn [conn]
+     (->> (select-ssh-keys-with-iv conn)
+          (map (partial decrypt-single-ssh-key conn))
           (doall)))))
 
 (def migrations
@@ -374,7 +403,8 @@
     [])
 
    (customer-ivs 27)
-   (encrypt-params 28)])
+   (encrypt-params 28)
+   (encrypt-ssh-keys 29)])
 
 (defn prepare-migrations
   "Prepares all migrations by formatting to sql, creates a ragtime migration object from it."

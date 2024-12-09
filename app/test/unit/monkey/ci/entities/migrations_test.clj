@@ -65,3 +65,33 @@
         (is (= "decrypted" (-> (ec/select-customer-param-values conn [:= :params-id (:id param)])
                                first
                                :value)))))))
+
+(deftest encrypt-ssh-keys
+  (eh/with-prepared-db conn
+    (let [mig (sut/encrypt-ssh-keys 1)
+          vault (h/dummy-vault (constantly "encrypted")
+                               (constantly "decrypted"))
+          conn (assoc conn :vault vault)
+          cust (eh/gen-customer)
+          cust-id (:id (ec/insert-customer conn cust))
+          ssh-key {:private-key "test-pk"
+                   :public-key "test-pubkey"}]
+      (is (some? (ec/insert-ssh-key
+                  conn
+                  (assoc ssh-key :customer-id cust-id))))
+      (is (some? (ec/insert-crypto
+                  conn
+                  {:customer-id cust-id
+                   :iv (v/generate-iv)})))
+      
+      (testing "`up` encrypts all customer parameter values"
+        (is (some? ((:up mig) conn)))
+        (is (= "encrypted" (-> (ec/select-ssh-keys conn [:= :customer-id cust-id])
+                               first
+                               :private-key))))
+
+      (testing "`down` decrypts all customer parameter values"
+        (is (some? ((:down mig) conn)))
+        (is (= "decrypted" (-> (ec/select-ssh-keys conn [:= :customer-id cust-id])
+                               first
+                               :private-key)))))))
