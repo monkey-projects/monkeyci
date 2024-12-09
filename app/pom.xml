@@ -4,7 +4,7 @@
   <packaging>jar</packaging>
   <groupId>com.monkeyci</groupId>
   <artifactId>app</artifactId>
-  <version>0.10.2-SNAPSHOT</version>
+  <version>0.11.1-SNAPSHOT</version>
   <name>app</name>
   <repositories>
     <repository>
@@ -71,6 +71,11 @@
       <groupId>clansi</groupId>
       <artifactId>clansi</artifactId>
       <version>1.0.0</version>
+    </dependency>
+    <dependency>
+      <groupId>com.monkeyprojects</groupId>
+      <artifactId>oci-vault</artifactId>
+      <version>0.2.0-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>io.prometheus</groupId>
@@ -150,7 +155,7 @@
     <dependency>
       <groupId>com.monkeyprojects</groupId>
       <artifactId>oci-os</artifactId>
-      <version>0.3.2</version>
+      <version>0.4.0-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>clojure.java-time</groupId>
