@@ -35,7 +35,8 @@
     (let [c (h/catch-fx :http-xhrio)]
       (rf/dispatch-sync [:initialize-db])
       (is (= 1 (count @c)))
-      (is (= "https://api.github.com/user" (:uri (first @c))))))
+      (is (= "https://api.github.com/user" (:uri (first @c))))
+      (is (= :github (ldb/provider @app-db)))))
 
   (testing "loads bitbucket user details if token provided"
     (rf/reg-cofx :local-storage (fn [cofx id]
@@ -46,7 +47,8 @@
     (let [c (h/catch-fx :http-xhrio)]
       (rf/dispatch-sync [:initialize-db])
       (is (= 1 (count @c)))
-      (is (= "https://api.bitbucket.org/2.0/user" (:uri (first @c)))))))
+      (is (= "https://api.bitbucket.org/2.0/user" (:uri (first @c))))
+      (is (= :bitbucket (ldb/provider @app-db))))))
 
 (deftest load-version
   (testing "sends request to backend"

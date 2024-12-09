@@ -167,7 +167,23 @@
     (rf/dispatch-sync [:github/load-user--failed {:response "test error"}])
     (let [a (db/alerts @app-db)]
       (is (= :danger (-> a first :type)))
-      (is (string? (-> a first :message))))))
+      (is (string? (-> a first :message)))))
+
+  (testing "on 401 error, refreshes token and retries"
+    (rf-test/run-test-sync
+     (rf/reg-cofx
+      :local-storage
+      (fn [cofx]
+        (assoc cofx :local-storage {:refresh-token "test-refresh-token"})))
+     (let [c (h/catch-fx :martian.re-frame/request)]
+       (h/initialize-martian {:github-refresh {:status 200
+                                               :body {:github-token "github-token"}
+                                               :error-code :no-error}})
+       (is (some? (swap! app-db db/set-provider-auth {:provider :github})))
+       (rf/dispatch [:github/load-user--failed {:status 401}])
+       (is (= 1 (count @c)) "expected refresh token request")
+       (is (= :github-refresh (-> @c first (nth 2))))
+       (is (= [:github/load-user] (-> @c first (nth 4) second)))))))
 
 (deftest load-bitbucket-config
   (testing "sends request to backend to fetch config"
