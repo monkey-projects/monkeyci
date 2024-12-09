@@ -775,7 +775,7 @@
 (defn- sid-pred [t sid]
   (t sid))
 
-(defrecord SqlStorage [conn]
+(defrecord SqlStorage [conn vault]
   p/Storage
   (read-obj [_ sid]
     (condp sid-pred sid
@@ -872,10 +872,12 @@
        (f (map->SqlStorage {:conn (assoc conn :ds c)
                             :overrides (:overrides this)})))))
 
+  ;; It would be cleaner to remove migrations from storage, and put
+  ;; it in a separate component
   co/Lifecycle
   (start [this]
     (log/debug "Starting DB connection")
-    (emig/run-migrations! conn)
+    (emig/run-migrations! (assoc conn :vault vault))
     this)
 
   (stop [this]

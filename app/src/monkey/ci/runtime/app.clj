@@ -307,7 +307,9 @@
    :runtime   (co/using
                (new-server-runtime config)
                [:artifacts :events :metrics :reporter :runner :storage :jwk :process-reaper :vault])
-   :storage   (new-storage config)
+   :storage   (co/using
+               (new-storage config)
+               [:vault])
    :jwk       (new-jwk config)
    :listeners (co/using
                (new-listeners)

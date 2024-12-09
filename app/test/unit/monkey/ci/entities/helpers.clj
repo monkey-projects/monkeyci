@@ -4,6 +4,7 @@
             [clojure.spec.gen.alpha :as gen]
             [config.core :as cc]
             [monkey.ci.entities.migrations :as m]
+            [monkey.ci.helpers :as h]
             [monkey.ci.spec.entities]
             [next.jdbc :as jdbc]
             [next.jdbc.connection :as conn])
@@ -46,7 +47,8 @@
 (defn with-prepared-db* [f]
   (with-test-db*
     (fn [conn]
-      (m/with-migrations conn
+      ;; Vault is needed by migrations
+      (m/with-migrations (assoc conn :vault (h/dummy-vault))
         #(f conn)))))
 
 (defmacro with-prepared-db [conn & body]

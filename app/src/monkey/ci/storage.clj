@@ -23,8 +23,7 @@
   cuid/random-cuid)
 
 ;; In-memory implementation, provider for testing/development purposes.
-;; Must be a type, not a record otherwise reitit sees it as a map.
-(deftype MemoryStorage [store]
+(defrecord MemoryStorage [store]
   p/Storage
   (read-obj [_ loc]
     (get-in @store loc))

@@ -322,16 +322,19 @@
 (defn gen-build-sid []
   (repeatedly 3 cuid/random-cuid))
 
-(defrecord DummyVault []
+(defrecord DummyVault [enc-fn dec-fn]
   p/Vault
   (encrypt [_ _ v]
-    v)
+    (enc-fn v))
 
   (decrypt [_ _ v]
-    v))
+    (dec-fn v)))
 
-(defn dummy-vault []
-  (->DummyVault))
+(defn dummy-vault
+  ([]
+   (->DummyVault identity identity))
+  ([enc-fn dec-fn]
+   (->DummyVault enc-fn dec-fn)))
 
 (def fake-vault dummy-vault)
 

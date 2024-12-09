@@ -3,17 +3,57 @@
             [honey.sql :as sql]
             [honey.sql.helpers :as h]            
             [monkey.ci.entities.core :as ec]
-            [monkey.ci.vault :as vault]
+            [monkey.ci
+             [protocols :as mp]
+             [vault :as vault]]
             [ragtime
              [core :as rt]
              [next-jdbc :as rj]
              [protocols :as rp]]))
 
+(defprotocol Migratable
+  (->migration [obj sql-opts] "Convert the object into a migration, using sql opts"))
+
+(defn- format-migration [sql-opts m]
+  (letfn [(format-sql [stmt]
+            (sql/format stmt sql-opts))]
+    (-> m
+        (update :up (partial mapcat format-sql))
+        (update :down (partial mapcat format-sql)))))
+
+(defrecord SqlMigration [id up down]
+  Migratable
+  (->migration [m opts]
+    (-> (format-migration (:sql-opts opts) m)
+        (rj/sql-migration))))
+
+(defn- as-conn
+  "Adds the datasource to the migration so it can be used as a database connection.
+   This is necessary because the ragtime functions assume the argument is a jdbc
+   connection, but most migrations need more than that (like sql formatting settings)"
+  [mig {:keys [datasource]}]
+  (assoc mig :ds datasource))
+
+(defrecord FunctionMigration [id up down]
+  rp/Migration
+  (id [_]
+    id)
+
+  (run-up! [this db]
+    (up (as-conn this db)))
+
+  (run-down! [this db]
+    (down (as-conn this db)))
+
+  Migratable
+  (->migration [m opts]
+    (merge m opts)))
+
 (defn migration
   "Creates a new migration, with given id and up/down statements.  The statements
    can either be raw strings, or honeysql statements which are then converted to sql."
   [id up down]
-  (rj/sql-migration {:id id :up up :down down}))
+  (->SqlMigration id up down))
 
 ;;; Common column definitions
 (def id-col [:id :integer [:not nil] :auto-increment [:primary-key]])
@@ -68,27 +108,51 @@
                    (concat [(cuid-idx table)] extra-indices)))
 
 (defn customer-ivs [idx]
-  (reify rp/Migration
-    (id [_] (str idx "-create-customer-ivs"))
+  (->FunctionMigration
+   (str idx "-create-customer-ivs")
+   
+   (fn [conn]
+     (let [cust (ec/select conn {:select [:c.id]
+                                 :from [[:customers :c]]
+                                 :left-join [[:cryptos :cr] [:= :cr.customer-id :c.id]]
+                                 :where [:is :cr.customer-id nil]})]
+       (log/debug "Creating crypto records for" (count cust) "customers")
+       (doseq [c cust]
+         (ec/insert-crypto conn {:customer-id (:id c)
+                                 :iv (vault/generate-iv)}))))
+   ;; No rollback
+   (constantly nil)))
 
-    (run-up! [_ db]
-      (let [conn (:datasource db)]
-        ;; FIXME We need also sql opts here to format statements
-        (log/info "Running migration with arg:" conn)
-        (let [cust (ec/select conn {:from [:customers :c]
-                                    :left-join [[:cryptos :cr] [:= :cr.customer-id :c.id]]
-                                    :where [nil? :cr.id]})]
-          (log/debug "Creating crypto records for" (count cust) "customers")
-          (doseq [c cust]
-            (ec/insert-crypto conn {:customer-id (:id c)
-                                    :iv (vault/generate-iv)})))))
-    
-    (run-down! [_ conn]
-      ;; Nothing
-      )))
+(defn- select-params-with-iv [conn]
+  (->> {:select [:pv.id :pv.value :c.iv]
+           :from [[:customer-param-values :pv]]
+           :join [[:customer-params :cp] [:= :cp.id :pv.params-id] 
+                  [:cryptos :c] [:= :c.customer-id :cp.customer-id]]}
+       (ec/select conn)))
 
-#_(def encrypt-params
-  (reify ))
+(defn- update-single-param [conn updater pv]
+  (ec/update-customer-param-value conn {:id (:id pv)
+                                        :value (updater (:iv pv) (:value pv))}))
+
+(defn- encrypt-single-param [{:keys [vault] :as conn} pv]
+  (update-single-param conn (partial mp/encrypt vault) pv))
+
+(defn- decrypt-single-param [{:keys [vault] :as conn} pv]
+  (update-single-param conn (partial mp/decrypt vault) pv))
+
+(defn encrypt-params [idx]
+  (->FunctionMigration
+   (str idx "-encrypt-params")
+   (fn [conn]
+     ;; Encrypt all customer parameter values
+     (->> (select-params-with-iv conn)
+          (map (partial encrypt-single-param conn))
+          (doall)))
+   (fn [conn]
+     ;; Decrypt all customer parameter values
+     (->> (select-params-with-iv conn)
+          (map (partial decrypt-single-param conn))
+          (doall)))))
 
 (def migrations
   [(entity-table-migration
@@ -309,31 +373,19 @@
      fk-customer]
     [])
 
-   #_(customer-ivs 27)])
+   (customer-ivs 27)
+   (encrypt-params 28)])
 
-(defn- format-migration [sql-opts m]
-  (letfn [(format-sql [stmt]
-            (sql/format stmt sql-opts))]
-    (-> m
-        (update :up (partial mapcat format-sql))
-        (update :down (partial mapcat format-sql)))))
+(defn prepare-migrations
+  "Prepares all migrations by formatting to sql, creates a ragtime migration object from it."
+  ([migrations opts]
+   (map #(->migration % opts) migrations))
+  ([opts]
+   (prepare-migrations migrations opts)))
 
-(defn- ->sql-migration [sql-opts obj]
-  (if (map? obj)
-    (-> (format-migration sql-opts obj)
-        (rj/sql-migration))
-    obj)) 
-
-(defn format-migrations
-  "Formats all migrations to sql, creates a ragtime migration object from it."
-  ([migrations sql-opts]
-   (map (partial ->sql-migration sql-opts) migrations))
-  ([sql-opts]
-   (format-migrations migrations sql-opts)))
-
-(defn- load-migrations [{:keys [ds sql-opts]}]
+(defn- load-migrations [{:keys [ds] :as opts}]
   (let [db (rj/sql-database ds)
-        mig (format-migrations sql-opts)
+        mig (prepare-migrations (dissoc opts :ds))
         idx (rt/into-index mig)]
     [db mig idx]))
 
