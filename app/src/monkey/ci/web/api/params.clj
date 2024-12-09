@@ -3,34 +3,19 @@
   (:require [clojure.tools.logging :as log]
             [monkey.ci
              [protocols :as p]
-             [storage :as st]
-             [vault :as v]]
+             [storage :as st]]
             [monkey.ci.web.common :as c]))
-
-(defn- crypto-iv
-  "Looks up crypto initialization vector for the customer associated with the
-   request.  If no crypto record is found, one is generated."
-  [req]
-  (let [cust-id (c/customer-id req)
-        st (c/req->storage req)]
-    (if-let [crypto (st/find-crypto st cust-id)]
-      (:iv crypto)
-      (let [iv (v/generate-iv)]
-        (log/debug "No crypto record found for customer" cust-id ", generating a new one")
-        (when (st/save-crypto st {:customer-id cust-id
-                                  :iv iv})
-          iv)))))
 
 (defn- encrypt-one [req]
   (let [v (c/req->vault req)
-        iv (crypto-iv req)]
+        iv (c/crypto-iv req)]
     (letfn [(encrypt-vals [p]
               (map #(update % :value (partial p/encrypt v iv)) p))]
       (update-in req [:parameters :body :parameters] encrypt-vals))))
 
 (defn- encrypt-all [req]
   (let [v (c/req->vault req)
-        iv (crypto-iv req)]
+        iv (c/crypto-iv req)]
     (letfn [(encrypt-vals [p]
               (map #(update % :value (partial p/encrypt v iv)) p))
             (encrypt-params [b]
@@ -41,7 +26,7 @@
   "Decryps all parameter values using the vault from the request"
   [req params]
   (let [v (c/req->vault req)
-        iv (crypto-iv req)]
+        iv (c/crypto-iv req)]
     (letfn [(decrypt-vals [p]
               (mapv #(update % :value (partial p/decrypt v iv)) p))]
       (->> params
