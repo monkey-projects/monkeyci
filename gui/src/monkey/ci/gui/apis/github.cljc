@@ -11,7 +11,7 @@
 (defn api-url [path]
   (str "https://api.github.com" path))
 
-(def get-token :github/token)
+(def get-token ldb/github-token)
 
 (defn api-request
   "Builds an xhrio request map to send a request to Github api"

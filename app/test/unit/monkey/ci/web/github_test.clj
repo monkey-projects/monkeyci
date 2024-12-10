@@ -5,7 +5,8 @@
             [monkey.ci
              [cuid :as cuid]
              [protocols :as p]
-             [storage :as st]]
+             [storage :as st]
+             [vault :as v]]
             [monkey.ci.web
              [auth :as auth]
              [common :as wc]
@@ -262,24 +263,30 @@
           (is (= "test-commit-id"
                  (get-in r [:git :commit-id])))))))
 
-  (testing "adds configured ssh key matching repo labels"
+  (testing "adds configured and decrypted ssh key matching repo labels"
     (h/with-memory-store s
-      (let [wh (test-webhook)
+      (let [vault (v/make-fixed-key-vault {})
+            iv (v/generate-iv)
+            wh (test-webhook)
             cid (:customer-id wh)
             rid (:repo-id wh)
             ssh-key {:id "test-key"
-                     :private-key "test-ssh-key"}]
+                     :private-key (p/encrypt vault iv "test-ssh-key")}]
         (is (st/sid? (st/save-webhook s wh)))
-        (is (st/sid? (st/save-repo s {:customer cid
+        (is (st/sid? (st/save-repo s {:customer-id cid
                                       :id rid
                                       :labels [{:name "ssh-lbl"
                                                 :value "lbl-val"}]})))
         (is (st/sid? (st/save-ssh-keys s cid [ssh-key])))
-        (let [r (sut/create-webhook-build {:storage s}
+        (is (st/sid? (st/save-crypto s {:customer-id cid
+                                        :iv iv})))
+        (let [r (sut/create-webhook-build {:storage s
+                                           :vault vault}
                                           (:id wh)
                                           {:ref "test-ref"
                                            :repository {:master-branch "test-main"}})]
-          (is (= [ssh-key]
+          (is (= [{:id (:id ssh-key)
+                   :private-key "test-ssh-key"}]
                  (get-in r [:git :ssh-keys])))))))
 
   (testing "sets cleanup flag"

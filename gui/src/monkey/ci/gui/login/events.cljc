@@ -85,20 +85,30 @@
       [:route/goto :page/root])))
 
 (rf/reg-event-fx
+ :github/load-user
+ (fn [{:keys [db] :as ctx} _]
+   (when-let [token (db/provider-token db)]
+     (try-load-github-user ctx token))))
+
+(rf/reg-event-fx
  :github/load-user--success
  [(rf/inject-cofx :local-storage storage-redir-id)]
  (fn [{:keys [db local-storage]} [_ github-user]]
    (let [redir (:redirect-to local-storage)]
-     (log/debug "Github user details:" (str github-user))
      {:db (db/set-github-user db github-user)
       :dispatch (redirect-evt (db/user db) local-storage)
       :local-storage [storage-redir-id (dissoc local-storage :redirect-to)]})))
 
-(rf/reg-event-db
+(rf/reg-event-fx
  :github/load-user--failed
- (fn [db [_ err]]
-   (db/set-alerts db [{:type :danger
-                       :message (str "Unable to retrieve user details from Github: " (u/error-msg err))}])))
+ [(rf/inject-cofx :local-storage storage-token-id)]
+ (fn [{:keys [db] :as ctx} [_ err]]
+   (log/warn "Unable to load github user:" (str err))
+   (let [rt (get-in ctx [:local-storage :refresh-token])]
+     (if (and (= 401 (:status err)) rt)
+       {:dispatch [:monkey.ci.gui.martian/refresh-token rt [:github/load-user]]}
+       {:db (db/set-alerts db [{:type :danger
+                                :message (str "Unable to retrieve user details from Github: " (u/error-msg err))}])}))))
 
 (rf/reg-event-db
  :login/github-login--failed

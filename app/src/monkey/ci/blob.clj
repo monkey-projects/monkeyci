@@ -9,7 +9,9 @@
             [clompress
              [archivers :as ca]
              [compression :as cc]]
+            [java-time.api :as jt]
             [manifold.deferred :as md]
+            [medley.core :as mc]
             [monkey.ci
              [config :as co]
              [oci :as oci]
@@ -18,11 +20,16 @@
             [monkey.ci.build.archive :as a]
             [monkey.oci.os
              [core :as os]
+             [martian :as om]
              [stream :as oss]])
   (:import [java.io BufferedInputStream PipedInputStream PipedOutputStream]
            [org.apache.commons.compress.archivers ArchiveStreamFactory]))
 
-(def save p/save-blob)
+(defn save
+  "Saves blob from src to dest, with optional metadata"
+  [blob src dest & [md]]
+  (p/save-blob blob src dest md))
+
 (def restore p/restore-blob)
 (def input-stream p/get-blob-stream)
 
@@ -75,7 +82,8 @@
 
 (deftype DiskBlobStore [dir]
   p/BlobStore
-  (save-blob [_ src dest]
+  (save-blob [_ src dest _]
+    ;; Metadata not supported
     (md/success-deferred 
      (if (fs/exists? src)
        (let [f (io/file dir dest)]
@@ -108,7 +116,14 @@
       (io/copy src f)
       (md/success-deferred
        {:src src
-        :dest f}))))
+        :dest f})))
+
+  (get-blob-info [_ src]
+    (let [f (fs/path dir src)]
+      (md/success-deferred
+       (when (fs/exists? f)
+         {:src src
+          :size (fs/size f)})))))
 
 (defmethod make-blob-store :disk [conf k]
   ;; Make storage dir relative to the work dir
@@ -134,9 +149,31 @@
 (def head-object (oci/retry-fn os/head-object))
 (def get-object  (oci/retry-fn os/get-object))
 
+(def meta-prefix "opc-meta-")
+
+(defn- convert-meta
+  "Prefixes metadata with `opc-meta-` as required by oci"
+  [md]
+  (letfn [(->meta [k]
+            ;; Write as string otherwise we risk conversion
+            (str meta-prefix (name k)))]
+    (some->> md
+             (map (fn [[k v]]
+                    [(->meta k) v]))
+             (into {}))))
+
+(defn- parse-meta
+  "Extracts metadata from the headers, i.e. those that start with `opc-meta-`."
+  [headers]
+  (reduce-kv (fn [r k v]
+               (cond-> r
+                 (.startsWith (name k) meta-prefix) (assoc (keyword (subs (name k) (count meta-prefix))) v)))
+             {}
+             headers))
+
 (deftype OciBlobStore [client conf]
   p/BlobStore
-  (save-blob [_ src dest]
+  (save-blob [_ src dest md]
     (if (fs/exists? src)
       (let [arch (tmp-archive conf)
             obj-name (archive-obj-name conf dest)]
@@ -154,7 +191,8 @@
                                                 (merge default-oci-put-params)
                                                 (assoc :object-name obj-name
                                                        :input-stream is
-                                                       :close? true)))
+                                                       :close? true)
+                                                (mc/assoc-some :metadata (convert-meta md))))
                (md/chain (constantly obj-name))
                (md/finally #(fs/delete arch)))
            (str "Saving blob to bucket: " dest))))
@@ -180,8 +218,8 @@
                  ;; Unzip and unpack in one go
                  #(a/extract % dest)
                  #(assoc % :src src)))
-            ;; FIXME It may occur that a file is not yet available if it is read immediately after writing
-            ;; In that case we should retry.
+            ;; It may occur that a file is not yet available if it is read immediately after writing
+            ;; In that case we should retry.  Currently, this is left up to the higher level.
             (log/warn "Blob not found in bucket:" obj-name))))
        (str "Restored blob from bucket: " src))))
 
@@ -213,10 +251,25 @@
                                                 :input-stream src
                                                 :close? true)))
         (constantly obj-name))
-       (str "Uploaded blob stream to bucket: " dest)))))
+       (str "Uploaded blob stream to bucket: " dest))))
+
+  (get-blob-info [_ src]
+    (let [obj-name (archive-obj-name conf src)
+          params (-> conf
+                     (select-keys [:ns :bucket-name])
+                     (assoc :object-name obj-name))]
+      (md/chain
+       (om/head-object client params)
+       (fn [{:keys [status headers]}]
+         (when (= 200 status)
+           (-> {:size (Integer/parseInt (:content-length headers))
+                :metadata (parse-meta headers)}
+               (mc/assoc-some
+                :last-modified (some->> (:last-modified headers)
+                                        (jt/instant (jt/formatter :rfc-1123-date-time)))))))))))
 
 (defmethod make-blob-store :oci [conf k]
   (let [oci-conf (get conf k)
         client (-> (os/make-client oci-conf)
                    (oci/add-inv-interceptor :blob))]
-    (->OciBlobStore client oci-conf)))
+    (->OciBlobStore client oci-conf )))

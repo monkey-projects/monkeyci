@@ -22,7 +22,8 @@
             [monkey.ci.web.api
              [customer :as cust-api]
              [join-request :as jr-api]
-             [params :as param-api]]
+             [params :as param-api]
+             [ssh-keys :as ssh-api]]
             [reitit.coercion.schema]
             [reitit.ring :as ring]
             [ring.middleware.cors :as cors]
@@ -199,12 +200,12 @@
   ["/param" {:get {:handler param-api/get-repo-params}}])
 
 (def customer-ssh-keys-routes
-  ["/ssh-keys" {:get {:handler api/get-customer-ssh-keys}
-                :put {:handler api/update-ssh-keys
+  ["/ssh-keys" {:get {:handler ssh-api/get-customer-ssh-keys}
+                :put {:handler ssh-api/update-ssh-keys
                       :parameters {:body [SshKeys]}}}])
 
 (def repo-ssh-keys-routes
-  ["/ssh-keys" {:get {:handler api/get-repo-ssh-keys}}])
+  ["/ssh-keys" {:get {:handler ssh-api/get-repo-ssh-keys}}])
 
 (def log-routes
   ["/logs" ; Deprecated, use loki instead

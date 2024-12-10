@@ -101,20 +101,6 @@
          edn/edn->)
         (md/catch handle-error))))
 
-#_(defn- params-from-storage
-  "Fetches parameters from storage, using the current build configuration.
-   Returns a deferred, or `nil` if there is no storage configuration in the
-   context."
-  [req]
-  (when-let [st (req->storage req)]
-    (let [build (req->build req)
-          params (st/find-params st (:customer-id build))
-          repo (st/find-repo st (repo-id req))]
-      (->> params
-           (lbl/filter-by-label repo)
-           (mapcat :parameters)
-           (rur/response)))))
-
 (defn get-params-from-api [api build]
   (api-request api {:path (format "/customer/%s/repo/%s/param" (:customer-id build) (:repo-id build))
                     :method :get}))

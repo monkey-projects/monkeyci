@@ -5,7 +5,9 @@
             [manifold.stream :as ms]
             [monkey.ci
              [storage :as st]
-             [utils :as u]]
+             [protocols :as p]
+             [utils :as u]
+             [vault :as v]]
             [monkey.ci.events.core :as ec]
             [monkey.ci.spec.events :as se]
             [monkey.ci.web.api :as sut]
@@ -259,17 +261,26 @@
                :git
                :tag))))
 
-  (testing "adds configured ssh keys"
-    (let [{st :storage :as rt} (trt/test-runtime)
+  (testing "adds decrypted configured ssh keys"
+    (let [vault (v/make-fixed-key-vault {})
+          iv (v/generate-iv)
+          {st :storage :as rt} (-> (trt/test-runtime)
+                                   (trt/set-vault vault))
           [cid rid] (repeatedly st/new-id)
+          repo {:id rid
+                :customer-id cid}
           ssh-key {:private-key "private-key"
                    :public-key "public-key"}]
-      (is (st/sid? (st/save-ssh-keys st cid [ssh-key])))
+      (is (st/sid? (st/save-customer st {:id cid
+                                         :repos {rid repo}})))
+      (is (st/sid? (st/save-ssh-keys st cid [(update ssh-key :private-key (partial p/encrypt vault iv))])))
+      (is (st/sid? (st/save-crypto st {:customer-id cid
+                                       :iv iv})))
       (is (= [ssh-key]
              (-> (h/->req rt)
                  (assoc-in [:parameters :path] {:customer-id cid
                                                 :repo-id rid})
-                 (sut/make-build-ctx {})
+                 (sut/make-build-ctx repo)
                  :git
                  :ssh-keys)))))
 

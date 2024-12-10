@@ -11,7 +11,6 @@
                    (merge opts)))))
 
 (defn list-caches
-  "Downloads logs for a given build from log bucket"
   [sid]
   (let [conf (co/oci-config :cache)
         path (l/sid->path conf nil sid)]

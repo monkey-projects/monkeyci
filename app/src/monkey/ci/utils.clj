@@ -1,5 +1,8 @@
 (ns monkey.ci.utils
   (:require [babashka.fs :as fs]
+            [buddy.core
+             [hash :as bch]
+             [codecs :as bcc]]
             [buddy.core.keys.pem :as pem]
             [clojure.walk :as cw]
             [clojure.java.io :as io]
@@ -180,3 +183,10 @@
     (md/finally x (fn []
                     (let [elapsed (- (now) start)]
                       (log/debugf "%s - Elapsed: %s ms, %.2f s" msg elapsed (float (/ elapsed 1000))))))))
+
+(defn file-hash
+  "Calculates md5 hash for given file"
+  [path]
+  (with-open [in (io/input-stream path)]
+    (-> (bch/md5 in)
+        (bcc/bytes->hex))))

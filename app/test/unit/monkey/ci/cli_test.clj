@@ -155,7 +155,11 @@
               (is (= {:key "value"}
                      (-> (run-cli "sidecar" "-e" "events" "-s" "start" "-t" p)
                          :args
-                         :job-config))))))))))
+                         :job-config)))))))
+
+      (testing "`controller` command"
+        (testing "runs `controller` command"
+          (is (= cmd/controller (:cmd (run-cli "controller")))))))))
 
 (deftest set-invoker
   (testing "applies invoker to `runs` in commands"

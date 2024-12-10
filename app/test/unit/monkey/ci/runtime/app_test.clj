@@ -125,7 +125,8 @@
 
 (def server-config
   (assoc tc/base-config
-         :http {:port 3001}))
+         :http {:port 3001}
+         :vault {:type :noop}))
 
 (defn fake-server []
   (reify java.lang.AutoCloseable
@@ -170,7 +171,10 @@
         (is (some? (get-in sys [:http :rt :metrics]))))
 
       (testing "provides process reaper in runtime"
-        (is (ifn? (get-in sys [:http :rt :process-reaper])))))))
+        (is (ifn? (get-in sys [:http :rt :process-reaper]))))
+
+      (testing "provides vault in runtime"
+        (is (p/vault? (get-in sys [:http :rt :vault])))))))
 
 (deftest process-reaper
   (testing "returns empty list when no oci runner"
@@ -179,5 +183,14 @@
 
   (testing "deletes oci stale instances"
     (with-redefs [oci/delete-stale-instances (constantly ::ok)]
-      (let [r (sut/->ProcessReaper {:runner {:type :oci}})]
-        (is (= ::ok (r)))))))
+      (testing "for `:oci` runners"
+        (let [r (sut/->ProcessReaper {:runner {:type :oci}})]
+          (is (= ::ok (r)))))
+
+      (testing "for `:oci2` runners"
+        (let [r (sut/->ProcessReaper {:runner {:type :oci2}})]
+          (is (= ::ok (r)))))
+
+      (testing "not for other runners"
+        (let [r (sut/->ProcessReaper {:runner {:type :some-other}})]
+          (is (empty? (r))))))))

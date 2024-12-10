@@ -30,7 +30,7 @@
 (def max-pod-cpus "Max number of cpu's to assign to a pod" 16)
 
 (def work-dir oci/work-dir)
-(def script-dir "/opt/monkeyci/script")
+(def script-dir oci/script-dir)
 (def log-dir (oci/checkout-subdir "log"))
 (def events-dir (oci/checkout-subdir "events"))
 (def start-file (str events-dir "/start"))

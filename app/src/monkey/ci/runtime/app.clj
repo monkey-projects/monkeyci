@@ -18,6 +18,7 @@
              [runners :as r]
              [storage :as s]
              [utils :as u]
+             [vault :as v]
              [workspace :as ws]]
             [monkey.ci.build.api-server :as bas]
             [monkey.ci.containers
@@ -25,7 +26,10 @@
              [oci :as cco]]
             [monkey.ci.events
              [core :as ec]
-             [split  :as es]]
+             [split :as es]]
+            [monkey.ci.runners
+             [oci]
+             [oci2]]
             [monkey.ci.runtime.common :as rc]
             [monkey.ci.web
              [auth :as auth]
@@ -143,9 +147,10 @@
 (defn- random-port []
   (+ (rand-int 10000) 30000))
 
-(defn new-api-config [config]
-  {:token (bas/generate-token)
-   :port (or (get-in config [:runner :api-port])
+(defn new-api-config [{:keys [runner]}]
+  {:token (or (:api-token runner)
+              (bas/generate-token))
+   :port (or (:api-port runner)
              (random-port))})
 
 (defn- new-metrics []
@@ -261,6 +266,9 @@
 (defn- new-listeners-events [config]
   (->ListenersEvents config nil))
 
+(defn- new-vault [config]
+  (v/make-vault (:vault config)))
+
 (defrecord ServerRuntime [config]
   co/Lifecycle
   (start [this]
@@ -278,7 +286,7 @@
   clojure.lang.IFn
   (invoke [this]
     (let [rc (:runner config)]
-      (if (= :oci (:type rc))
+      (if (#{:oci :oci2} (:type rc))
         (oci/delete-stale-instances (ci/make-context rc) (:compartment-id rc))
         []))))
 
@@ -298,8 +306,10 @@
    :runner    (new-server-runner config)
    :runtime   (co/using
                (new-server-runtime config)
-               [:artifacts :events :metrics :reporter :runner :storage :jwk :process-reaper])
-   :storage   (new-storage config)
+               [:artifacts :events :metrics :reporter :runner :storage :jwk :process-reaper :vault])
+   :storage   (co/using
+               (new-storage config)
+               [:vault])
    :jwk       (new-jwk config)
    :listeners (co/using
                (new-listeners)
@@ -310,7 +320,8 @@
    :metrics   (co/using
                (new-metrics)
                [:events])
-   :process-reaper (new-process-reaper config)))
+   :process-reaper (new-process-reaper config)
+   :vault     (new-vault config)))
 
 (defn with-server-system [config f]
   (rc/with-system (make-server-system config) f))

@@ -1,9 +1,11 @@
 (ns monkey.ci.spec.entities
   "Spec for application entities."
   (:require [clojure.spec.alpha :as s]
+            [clojure.spec.gen.alpha :as gen]
             [monkey.ci.spec
              [build]
-             [common :as c]]))
+             [common :as c]
+             [gen :as sg]]))
 
 (def ts? int?)
 
@@ -158,3 +160,11 @@
 (s/def :entity/bb-webhook
   (-> (s/keys :req-un [:entity/bitbucket-id :entity/webhook-id :bb/workspace :bb/repo-slug])
       (s/merge :entity/common)))
+
+(s/def :entity/iv (s/with-gen
+                    (s/and (partial instance? (class (byte-array 0)))
+                           (comp (partial = 16) count))
+                    #(sg/fixed-byte-array 16)))
+
+(s/def :entity/crypto
+  (s/keys :req-un [:entity/customer-id :entity/iv]))

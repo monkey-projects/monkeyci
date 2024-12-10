@@ -23,8 +23,7 @@
   cuid/random-cuid)
 
 ;; In-memory implementation, provider for testing/development purposes.
-;; Must be a type, not a record otherwise reitit sees it as a map.
-(deftype MemoryStorage [store]
+(defrecord MemoryStorage [store]
   p/Storage
   (read-obj [_ loc]
     (get-in @store loc))
@@ -51,7 +50,11 @@
     (p/transact st f)
     (f st)))
 
-(defmacro with-transaction [st conn & body]
+(defmacro with-transaction
+  "Runs body in transaction by binding a transactional storage object to `conn`.
+   If the storage implementation does not support transactions, this just invokes
+   the body while binding the original storage to `conn`."
+  [st conn & body]
   `(transact ~st (fn [tx#]
                    (let [~conn tx#]
                      ~@body))))
@@ -710,3 +713,13 @@
            used  (->> (list-customer-credit-consumptions s cust-id)
                       (sum-amount))]
        (- avail used)))))
+
+(def crypto :crypto)
+(defn crypto-sid [& parts]
+  (into [global (name crypto)] parts))
+
+(defn save-crypto [st crypto]
+  (p/write-obj st (crypto-sid (:customer-id crypto)) crypto))
+
+(defn find-crypto [st cust-id]
+  (p/read-obj st (crypto-sid cust-id)))

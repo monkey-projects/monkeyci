@@ -108,7 +108,7 @@
 
 (def sidecar-cmd
   {:command "sidecar"
-   :description "Run as sidecar"
+   :description "Run as sidecar (for internal use)"
    :opts [{:as "Events file"
            :option "events-file"
            :short "e"
@@ -132,6 +132,13 @@
           :app-mode :script
           :runtime? false}})
 
+(def controller-cmd
+  {:command "controller"
+   :description "Runs as controller (for internal use)"
+   :runs {:command cmd/controller
+          :app-mode :script
+          :runtime? false}})
+
 (def base-config
   {:name "monkey-ci"
    :description "MonkeyCI: Powerful build pipeline runner"
@@ -151,7 +158,8 @@
            :multiple true}]
    :subcommands [build-cmd
                  server-cmd
-                 sidecar-cmd]})
+                 sidecar-cmd
+                 controller-cmd]})
 
 (defn set-invoker
   "Updates the cli config to replace the `runs` config with the given invoker."

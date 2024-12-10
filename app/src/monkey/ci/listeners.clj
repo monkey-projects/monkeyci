@@ -44,7 +44,7 @@
                    (merge existing (if (fn? patch)
                                      (patch existing)
                                      patch)))))
-      @upd
+      (assoc @upd :sid sid)
       (log/warn "Unable to patch build" sid ", record not found in db (initialize or pending event missed?)"))))
 
 (defn start-build [storage {:keys [sid time credit-multiplier]}]

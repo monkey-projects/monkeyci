@@ -16,7 +16,8 @@
              [cuid :as cuid]
              [protocols :as p]
              [storage :as s]
-             [utils :as u]]
+             [utils :as u]
+             [vault :as v]]
             [monkey.ci.events.core :as ec]
             [monkey.ci.web
              [common :as wc]
@@ -108,7 +109,7 @@
 
 (defrecord FakeBlobStore [stored strict?]
   p/BlobStore  
-  (save-blob [_ src dest]
+  (save-blob [_ src dest md]
     (md/success-deferred (swap! stored assoc dest src)))
 
   (restore-blob [_ src dest]
@@ -130,7 +131,10 @@
        (io/input-stream (.getBytes "This is a test stream")))))
 
   (put-blob-stream [this src dest]
-    (p/save-blob this src dest)))
+    (p/save-blob this src dest nil))
+
+  (get-blob-info [_ _]
+    nil))
 
 (defn fake-blob-store
   ([stored]
@@ -303,6 +307,9 @@
 (defn gen-bb-webhook []
   (gen-entity :entity/bb-webhook))
 
+(defn gen-crypto []
+  (gen-entity :entity/crypto))
+
 (defrecord FakeContainerRunner [credit-consumer runs result]
   p/ContainerRunner
   (run-container [this job]
@@ -314,3 +321,22 @@
 
 (defn gen-build-sid []
   (repeatedly 3 cuid/random-cuid))
+
+(defrecord DummyVault [enc-fn dec-fn]
+  p/Vault
+  (encrypt [_ _ v]
+    (enc-fn v))
+
+  (decrypt [_ _ v]
+    (dec-fn v)))
+
+(defn dummy-vault
+  ([]
+   (->DummyVault identity identity))
+  ([enc-fn dec-fn]
+   (->DummyVault enc-fn dec-fn)))
+
+(def fake-vault dummy-vault)
+
+(defmethod v/make-vault :noop [_]
+  (fake-vault))

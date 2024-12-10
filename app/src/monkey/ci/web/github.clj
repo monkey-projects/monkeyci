@@ -32,10 +32,9 @@
    send other types of requests."
   (comp (partial = "push") github-event))
 
-(defn- find-ssh-keys [st customer-id repo-id]
-  (let [repo (s/find-repo st [customer-id repo-id])
-        ssh-keys (s/find-ssh-keys st customer-id)]
-    (lbl/filter-by-label repo ssh-keys)))
+(defn- find-ssh-keys [{st :storage :keys [vault]} customer-id repo-id]
+  (let [repo (s/find-repo st [customer-id repo-id])]
+    (c/find-ssh-keys st vault repo)))
 
 (defn- file-changes
   "Determines file changes according to the payload commits."
@@ -57,7 +56,7 @@
         idx (s/find-next-build-idx st [customer-id repo-id])
         build-id (c/new-build-id idx)
         commit-id (get-in payload [:head-commit :id])
-        ssh-keys (find-ssh-keys st customer-id repo-id)
+        ssh-keys (find-ssh-keys rt customer-id repo-id)
         build (-> init-build
                   (assoc :git (-> payload
                                   :head-commit

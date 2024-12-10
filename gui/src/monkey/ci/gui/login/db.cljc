@@ -45,14 +45,16 @@
 (def github-token provider-token)
 
 (defn set-github-token [db t]
-  (set-provider-auth db {:provider :github
-                         :token t}))
+  (cond-> db
+    t (set-provider-auth {:provider :github
+                          :token t})))
 
 (def bitbucket-token provider-token)
 
 (defn set-bitbucket-token [db t]
-  (set-provider-auth db {:provider :bitbucket
-                         :token t}))
+  (cond-> db
+    t (set-provider-auth {:provider :bitbucket
+                          :token t})))
 
 (def github-config :auth/github-config)
 

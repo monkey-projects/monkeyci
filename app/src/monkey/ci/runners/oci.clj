@@ -23,7 +23,7 @@
 (def ssh-keys-volume "ssh-keys")
 (def ssh-keys-dir oci/key-dir)
 (def log-config-volume "log-config")
-(def log-config-dir "/home/monkeyci/config")
+(def log-config-dir (str oci/home-dir "/config"))
 (def log-config-file "logback.xml")
 (def config-volume "config")
 
@@ -40,7 +40,7 @@
                                           oci/default-cpu-count
                                           oci/default-memory-gb)})))
 
-(defn- add-ssh-keys-dir [conf build]
+(defn add-ssh-keys-dir [conf build]
   (cond-> conf
     (build-ssh-keys build) (assoc-in [:build :git :ssh-keys-dir] ssh-keys-dir)))
 
@@ -48,7 +48,7 @@
   (cond-> conf
     (log-config rt) (assoc-in [:runner :log-config] (str log-config-dir "/" log-config-file))))
 
-(defn- add-api-token
+(defn add-api-token
   "Generates a new API token that can be used by the build runner to invoke
    certain API calls."
   [conf build rt]
@@ -81,20 +81,22 @@
                  ((juxt :private-key :public-key) ssh-keys)
                  ["" ".pub"]))]
     (when-let [ssh-keys (build-ssh-keys build)]
-      {:name ssh-keys-volume
-       :volume-type "CONFIGFILE"
-       :configs (mapcat ->config-entries (range) ssh-keys)})))
+      (oci/make-config-vol ssh-keys-volume
+                           (mapcat ->config-entries (range) ssh-keys)))))
 
-(defn- add-ssh-keys-volume [conf build]
+(defn add-ssh-keys-volume [conf build]
   (let [vc (ssh-keys-volume-config build)]
     (cond-> conf
       vc (update :volumes conj vc))))
 
-(defn- add-ssh-keys-mount [conf build]
+(def ssh-keys-mount
+  {:mount-path ssh-keys-dir
+   :is-read-only true
+   :volume-name ssh-keys-volume})
+
+(defn add-ssh-keys-mount [conf build]
   (cond-> conf
-    (build-ssh-keys build) (update :volume-mounts conj {:mount-path ssh-keys-dir
-                                                        :is-read-only true
-                                                        :volume-name ssh-keys-volume})))
+    (build-ssh-keys build) (update :volume-mounts conj ssh-keys-mount)))
 
 (defn- log-config-volume-config [rt]
   ;; TODO Allow for log config read by aero tags
@@ -140,10 +142,9 @@
                 ;; Run the build as a child process.  This allows us to add dependencies
                 ;; in the build, but also isolates the untrusted build script.  Alternatively,
                 ;; we could try to run the clj process directly but then we'd have to set up
-                ;; and external build api server for the script to communicate with in order
+                ;; an external build api server for the script to communicate with in order
                 ;; to shield off any sensitive info, or use the general API server.  This
-                ;; could lead to performance bottlenecks and could lead to higher costs wrt.
-                ;; the API gateway.
+                ;; could lead to performance bottlenecks and higher costs wrt. the API gateway.
                 :arguments (cond-> ["-w" oci/checkout-dir
                                     "build" "run"
                                     "-u" url]
@@ -182,13 +183,11 @@
   "Max msecs a build script can run before we terminate it"
   config/max-script-timeout)
 
-(defn oci-runner
-  "Runs the build script as an OCI container instance.  Returns a deferred with
-   the container exit code."
-  [client conf build rt]
+(defn run-oci-build [ic {:keys [client conf build rt find-container]}]
   (s/valid? ::sb/build build)
   (rt/post-events rt (b/build-init-evt build))
-  (-> (oci/run-instance client (instance-config conf build rt)
+  (-> (oci/run-instance client
+                        ic
                         {:delete? true
                          :exited? (fn [id]
                                     (md/chain
@@ -204,7 +203,7 @@
                                        (oci/get-full-instance-details client id))))})
       (md/chain
        (fn [r]
-         (or (-> r :body :containers first :exit-code) 1)))
+         (or (-> r :body :containers find-container :exit-code) 1)))
       ;; Do not launch build/end event, that is already done by the script container, except
       ;; when there is an error trying to start the instance.
       (md/catch
@@ -212,9 +211,19 @@
             (log/error "Got error from container instance:" ex)
             (rt/post-events rt (b/build-end-evt build 1))))))
 
+(defn oci-runner
+  "Runs the build script as an OCI container instance.  Returns a deferred with
+   the container exit code."
+  [client conf build rt]
+  (run-oci-build (instance-config conf build rt)
+                 {:client client
+                  :conf conf
+                  :build build
+                  :rt rt
+                  :find-container first}))
+
 (defmethod r/make-runner :oci [rt]
   (let [conf (:runner rt)
         client (-> (ci/make-context conf)
                    (oci/add-inv-interceptor :runners))]
     (partial oci-runner client conf)))
-

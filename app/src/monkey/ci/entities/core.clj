@@ -372,3 +372,10 @@
 
 (defentity credit-consumption credit-cons-conversions)
 (defentity bb-webhook)
+
+(defaggregate crypto)
+
+(defn update-crypto [conn crypto]
+  (execute-update conn {:update :cryptos
+                        :set crypto
+                        :where [:= :customer-id (:customer-id crypto)]}))

@@ -34,10 +34,11 @@
 (defprotocol BlobStore
   "Protocol for blob store abstraction, used to save and compress files or directories
    to some blob store, possibly remote."
-  (save-blob [store src dest] "Saves `src` file or directory to `dest` as a blob")
+  (save-blob [store src dest md] "Saves `src` file or directory to `dest` as a blob")
   (restore-blob [store src dest] "Restores `src` to local `dest`")
   (get-blob-stream [store src] "Gets a blob file as an `InputStream`")
-  (put-blob-stream [store src dest] "Saves a raw stream to the blob store"))
+  (put-blob-stream [store src dest] "Saves a raw stream to the blob store")
+  (get-blob-info [store src] "Gets details about a stored blob"))
 
 (def blob-store? (partial satisfies? BlobStore))
 
@@ -46,11 +47,6 @@
     "Runs the given container job.  Returns a deferred that will hold the result."))
 
 (def container-runner? (partial satisfies? ContainerRunner))
-
-;; (defprotocol BuildContainerRunner
-;;   (run-build-container [this build job]
-;;     "Runs the container job for the specific build.  Use this in the runner, where the build
-;;      is not fully known at startup time."))
 
 (defprotocol Workspace
   (restore-workspace [this]
@@ -61,3 +57,9 @@
 (defprotocol BuildParams
   (get-build-params [this]
     "Retrieves build parameters for this build"))
+
+(defprotocol Vault
+  (encrypt [this iv txt] "Encrypts given text using initialization vector, returns base64 string")
+  (decrypt [this iv obj] "Decrypts given data using initialization vector"))
+
+(def vault? (partial satisfies? Vault))
