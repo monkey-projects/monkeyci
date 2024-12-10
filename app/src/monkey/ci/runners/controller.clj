@@ -3,6 +3,7 @@
   (:require [babashka.fs :as fs]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
+            [medley.core :as mc]
             [monkey.ci
              [blob :as blob]
              [build :as b]
@@ -90,9 +91,11 @@
   (ec/post-events (:events rt) (b/build-end-evt build (get rt :exit-code err/error-process-failure)))
   rt)
 
-(defn- post-failure-evt [{:keys [build] :as rt}]
+(defn- post-failure-evt [{:keys [build] :as rt} msg]
   (try
-    (ec/post-events (:events rt) (b/build-end-evt build err/error-process-failure))
+    (ec/post-events (:events rt) (-> build
+                                     (mc/assoc-some :message msg)
+                                     (b/build-end-evt build err/error-process-failure)))
     (catch Exception ex
       (log/warn "Failed to post :build/end event" ex))))
 
@@ -118,5 +121,5 @@
     (catch Throwable ex
       (log/error "Failed to run controller" ex)
       (create-abort-file rt)
-      (post-failure-evt rt)
+      (post-failure-evt rt (ex-message ex))
       err/error-process-failure)))

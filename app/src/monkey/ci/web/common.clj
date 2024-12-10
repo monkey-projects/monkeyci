@@ -303,7 +303,7 @@
   "Finds and decrypts ssh keys for the given repo"
   [st vault repo]
   (let [cust-id (:customer-id repo)
-        iv (crypto-iv st cust-id)
-        ssh-keys (st/find-ssh-keys st cust-id)]
-    (->> (lbl/filter-by-label repo ssh-keys)
+        iv (crypto-iv st cust-id)]
+    (->> (st/find-ssh-keys st cust-id)
+         (lbl/filter-by-label repo)
          (map #(update % :private-key (partial p/decrypt vault iv))))))

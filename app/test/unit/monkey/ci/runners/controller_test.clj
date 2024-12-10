@@ -99,13 +99,14 @@
           (h/reset-events (:events rt))
           (is (not= 0
                     (-> rt
-                        (assoc :git (fn [& _] (throw (ex-info "test error" {})))) ; force error
+                        (assoc :git {:clone (fn [& _] (throw (ex-info "test error" {})))}) ; force error
                         (run!)
                         (deref))))
           (let [evt (->> (h/received-events (:events rt))
                          (h/first-event-by-type :build/end))]
             (is (some? evt))
-            (is (= :error (:status evt))))))
+            (is (= :error (:status evt)))
+            (is (= "test error" (:message evt))))))
 
       (testing "does not save build cache if hash has not changed"
         (let [cache-dir "/tmp/test-cache"

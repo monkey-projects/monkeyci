@@ -218,10 +218,9 @@
   "Creates a build object from the request for the repo"
   [{p :parameters :as req} repo]
   (let [acc (:path p)
-        st (c/req->storage req)
-        ssh-keys (->> (st/find-ssh-keys st (customer-id req))
-                      (lbl/filter-by-label repo))
-        rt (c/req->rt req)
+        {st :storage :keys [vault] :as rt} (c/req->rt req)
+        ;;st (c/req->storage req)
+        ssh-keys (c/find-ssh-keys st vault repo)
         {bid :build-id :as build} (-> acc
                                       (select-keys [:customer-id :repo-id])
                                       (assign-build-id req))]
