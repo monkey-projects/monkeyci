@@ -85,14 +85,27 @@
 
       (testing "returns exit code read from exit file"
         (is (= exit-code (deref res 100 :timeout))))
-      
-      (testing "creates abort file on error"
-        (is (not= 0
-                  (-> rt
-                      (assoc :events (->FailingEventsPoster)) ; force error
-                      (run!)
-                      (deref))))
-        (is (fs/exists? abort-path)))
+
+      (testing "on error"
+        (testing "creates abort file"
+          (is (not= 0
+                    (-> rt
+                        (assoc :events (->FailingEventsPoster)) ; force error
+                        (run!)
+                        (deref))))
+          (is (fs/exists? abort-path)))
+
+        (testing "posts build failure event"
+          (h/reset-events (:events rt))
+          (is (not= 0
+                    (-> rt
+                        (assoc :git (fn [& _] (throw (ex-info "test error" {})))) ; force error
+                        (run!)
+                        (deref))))
+          (let [evt (->> (h/received-events (:events rt))
+                         (h/first-event-by-type :build/end))]
+            (is (some? evt))
+            (is (= :error (:status evt))))))
 
       (testing "does not save build cache if hash has not changed"
         (let [cache-dir "/tmp/test-cache"

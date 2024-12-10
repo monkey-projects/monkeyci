@@ -90,6 +90,12 @@
   (ec/post-events (:events rt) (b/build-end-evt build (get rt :exit-code err/error-process-failure)))
   rt)
 
+(defn- post-failure-evt [{:keys [build] :as rt}]
+  (try
+    (ec/post-events (:events rt) (b/build-end-evt build err/error-process-failure))
+    (catch Exception ex
+      (log/warn "Failed to post :build/end event" ex))))
+
 (defn- read-exit-code [rt]
   (let [p (exit-path rt)
         exit-code (when (fs/exists? p)
@@ -112,4 +118,5 @@
     (catch Throwable ex
       (log/error "Failed to run controller" ex)
       (create-abort-file rt)
+      (post-failure-evt rt)
       err/error-process-failure)))
