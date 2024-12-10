@@ -136,6 +136,7 @@
              :command ["bash" (str script-path "/" build-script)]
              ;; Tell clojure cli where to find deps.edn
              :environment-variables
+             ;; TODO Replace CLJ_CONFIG with command-line argument to avoid messing up clj invocations in the script
              {"CLJ_CONFIG" script-path
               "MONKEYCI_WORK_DIR" (b/calc-script-dir (checkout-dir (:build config)) nil)
               "MONKEYCI_START_FILE" (:run-path config)
