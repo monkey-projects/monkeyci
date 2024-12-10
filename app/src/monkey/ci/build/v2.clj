@@ -124,6 +124,8 @@
    regex, a string or a matcher function."
   (file-test bc/modified?))
 
+;; TODO touched?
+
 (def tag
   "Gets commit tag (if any) from the context."
   bc/tag)
