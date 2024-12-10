@@ -184,8 +184,7 @@
         sid [customer-id repo-id build-id]
         body (c/body req)
         repo (st/find-repo st [customer-id repo-id])
-        ssh-keys (->> (st/find-ssh-keys st customer-id)
-                      (lbl/filter-by-label repo))]
+        ssh-keys (c/find-ssh-keys st (c/req->vault req) repo)]
     (-> (zipmap [:customer-id :repo-id :build-id] sid)
         (assoc :sid sid
                :source :bitbucket-webhook

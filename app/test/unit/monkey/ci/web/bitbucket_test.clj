@@ -5,7 +5,8 @@
             [monkey.ci
              [cuid :as cuid]
              [protocols :as p]
-             [storage :as st]]
+             [storage :as st]
+             [vault :as v]]
             [monkey.ci.spec.build :as sb]
             [monkey.ci.web
              [auth :as auth]
@@ -216,9 +217,11 @@
                (assoc :config {:ssh-keys-dir "/tmp"}))
         s (:storage rt)
         runs (atom [])
+        vault (v/make-fixed-key-vault {})
         rt (-> rt
                (trt/set-runner (fn [build _]
-                                 (swap! runs conj build))))
+                                 (swap! runs conj build)))
+               (trt/set-vault vault))
         repo (-> (h/gen-repo)
                  (assoc :url "http://test-url"))
         cust (-> (h/gen-cust)
@@ -255,16 +258,20 @@
           (is (= "http://test-url" (:url git)))
           (is (= "refs/heads/main" (:ref git))))))
 
-    (testing "adds configured ssh key matching repo labels"
+    (testing "adds configured and decrypted ssh key matching repo labels"
       (reset! runs [])
-      (let [ssh-key {:id "test-key"
-                     :private-key "test-ssh-key"}]
+      (let [iv (v/generate-iv)
+            ssh-key {:id "test-key"
+                     :private-key (p/encrypt vault iv "test-ssh-key")}]
         (is (st/sid? (st/save-repo s (assoc repo :labels [{:name "ssh-lbl"
                                                            :value "lbl-val"}]))))
         (is (st/sid? (st/save-ssh-keys s (:id cust) [ssh-key])))
+        (is (st/sid? (st/save-crypto s {:customer-id (:id cust)
+                                        :iv iv})))
         (is (some? (sut/webhook req)))
         (is (not= :timeout (h/wait-until #(not-empty @runs) 500)))
-        (is (= [ssh-key]
+        (is (= [{:id (:id ssh-key)
+                 :private-key "test-ssh-key"}]
                (-> @runs first (get-in [:git :ssh-keys]))))))
   
     (testing "404 if webhook does not exist"

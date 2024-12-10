@@ -286,7 +286,7 @@
   clojure.lang.IFn
   (invoke [this]
     (let [rc (:runner config)]
-      (if (= :oci (:type rc))
+      (if (#{:oci :oci2} (:type rc))
         (oci/delete-stale-instances (ci/make-context rc) (:compartment-id rc))
         []))))
 

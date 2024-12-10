@@ -8,6 +8,7 @@
             [monkey.ci
              [build :as b]
              [labels :as lbl]
+             [protocols :as p]
              [runtime :as rt]
              [storage :as st]
              [vault :as v]]
@@ -285,13 +286,24 @@
 (defn crypto-iv
   "Looks up crypto initialization vector for the customer associated with the
    request.  If no crypto record is found, one is generated."
-  [req]
-  (let [cust-id (customer-id req)
-        st (req->storage req)]
-    (if-let [crypto (st/find-crypto st cust-id)]
-      (:iv crypto)
-      (let [iv (v/generate-iv)]
-        (log/debug "No crypto record found for customer" cust-id ", generating a new one")
-        (when (st/save-crypto st {:customer-id cust-id
-                                  :iv iv})
-          iv)))))
+  ([st cust-id]
+     (if-let [crypto (st/find-crypto st cust-id)]
+       (:iv crypto)
+       (let [iv (v/generate-iv)]
+         (log/debug "No crypto record found for customer" cust-id ", generating a new one")
+         (when (st/save-crypto st {:customer-id cust-id
+                                   :iv iv})
+           iv))))
+  ([req]
+   (let [cust-id (customer-id req)
+         st (req->storage req)]
+     (crypto-iv st cust-id))))
+
+(defn find-ssh-keys
+  "Finds and decrypts ssh keys for the given repo"
+  [st vault repo]
+  (let [cust-id (:customer-id repo)
+        iv (crypto-iv st cust-id)
+        ssh-keys (st/find-ssh-keys st cust-id)]
+    (->> (lbl/filter-by-label repo ssh-keys)
+         (map #(update % :private-key (partial p/decrypt vault iv))))))
