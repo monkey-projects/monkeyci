@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.layout
   (:require [clojure.string :as cs]
+            #_[monkey.ci.template.components :as tc]
             [monkey.ci.gui.breadcrumb :as b]
             [monkey.ci.gui.components :as co]
             [monkey.ci.gui.logging :as log]

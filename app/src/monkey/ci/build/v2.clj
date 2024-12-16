@@ -159,3 +159,7 @@
   (action-job id (apply bs/bash cmds)))
 
 (def shell "Same as `bash`" bash)
+
+(def build-id
+  "Returns current build id"
+  (comp :build-id :build))

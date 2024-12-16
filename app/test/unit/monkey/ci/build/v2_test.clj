@@ -248,3 +248,23 @@
         (is (sut/action-job? job))
         (is (= "test-job" (sut/job-id job)))
         (is (= "ls -l" (last (:output @(j/execute! job {})))))))))
+
+(deftest main-branch?
+  (testing "true if main branch"
+    (is (true? (sut/main-branch? {:build
+                                  {:git
+                                   {:main-branch "main"
+                                    :ref "refs/heads/main"}}}))))
+
+  (testing "false if not main branch"
+    (is (false? (sut/main-branch? {:build
+                                   {:git
+                                    {:main-branch "main"
+                                     :ref "refs/heads/other"}}})))))
+
+(deftest build-id
+  (testing "returns current build id"
+    (is (= "test-build"
+           (sut/build-id
+            {:build
+             {:build-id "test-build"}})))))

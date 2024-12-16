@@ -1,5 +1,6 @@
 {:deps {day8.re-frame/http-fx {:mvn/version "0.2.4"}
         com.github.oliyh/martian-re-frame {:mvn/version "0.1.30"}
+        com.monkeyci/site-template {:mvn/version "0.1.0-SNAPSHOT"}
         medley/medley {:mvn/version "1.4.0"}
         metosin/reitit-frontend {:mvn/version "0.7.2"}
         org.clojure/core.async {:mvn/version "1.6.681"}
