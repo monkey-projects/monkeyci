@@ -3,7 +3,8 @@
 
 (def config
   "Template configuration, can be passed to template functions."
-  #?(:cljs {:base-url js/hostBase}))
+  #?(:cljs (when (exists? js/hostBase)
+             {:base-url js/hostBase})))
 
 (defn logo
   ([config]
