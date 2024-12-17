@@ -222,7 +222,7 @@
     (-> (shadow-release "release-gui" :frontend)
         (core/depends-on ["test-gui"])
         ;; Also generate index.html
-        (update :script (partial concat ["clojure -X:gen-idx"]))
+        (update :script (partial concat [(format "clojure -X%s:gen-idx" (if (release? ctx) "" ":staging"))]))
         (assoc :save-artifacts [gui-release-artifact]))))
 
 (defn deploy
