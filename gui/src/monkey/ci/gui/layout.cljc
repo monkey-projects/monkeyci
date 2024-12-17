@@ -49,13 +49,9 @@
      :target :_blank}
     [co/icon icon]]])
 
-(def host-base
-  #?(:cljs js/hostBase))
-
 (defn footer []
   (let [v (rf/subscribe [:version])]
-    (tc/footer {:version @v
-                :base-url (or host-base "monkeyci.com")})))
+    (tc/footer (assoc t/config :version @v))))
 
 (defn error-boundary [target]
   #?(:cljs
