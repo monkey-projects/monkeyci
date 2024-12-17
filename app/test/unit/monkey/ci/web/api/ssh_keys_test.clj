@@ -37,7 +37,8 @@
                    (assoc :repos {(:id repo) repo}))
           cust-id (:id cust)
           _ (st/save-customer st cust)
-          ssh-key (h/gen-ssh-key)
+          ssh-key (-> (h/gen-ssh-key)
+                      (dissoc :label-filters))
           _ (st/save-ssh-keys st cust-id [ssh-key])
           res (-> rt
                   (h/->req)
