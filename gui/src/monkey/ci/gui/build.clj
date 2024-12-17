@@ -4,9 +4,13 @@
             [monkey.ci.gui.template :as t]
             [monkey.ci.template.components :as cc]))
 
+(defn head [config]
+  (conj (cc/head config)
+        (cc/script "/conf/config.js")))
+
 (defn- base-page [config]
   [:html
-   (cc/head config)
+   (head config)
    [:body
     [:main {:role :main}
      [:div.overflow-hidden
