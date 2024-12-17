@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.components
-  (:require [monkey.ci.gui.time :as t]
+  (:require [monkey.ci.gui.template :as templ]
+            [monkey.ci.gui.time :as t]
             [monkey.ci.gui.subs]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]
@@ -7,7 +8,7 @@
                 :cljs [["ansi_up" :refer [AnsiUp]]])))
 
 (defn logo []
-  [:img.img-fluid.rounded {:src "/img/monkeyci-bw-small.png" :title "Placeholder Logo"}])
+  (templ/logo))
 
 (defn render-alert [{:keys [type message]}]
   [:div {:class (str "alert alert-" (name type))} message])

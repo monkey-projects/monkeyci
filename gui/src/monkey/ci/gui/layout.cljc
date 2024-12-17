@@ -1,12 +1,12 @@
 (ns monkey.ci.gui.layout
   (:require [clojure.string :as cs]
-            #_[monkey.ci.template.components :as tc]
+            [monkey.ci.template.components :as tc]
             [monkey.ci.gui.breadcrumb :as b]
             [monkey.ci.gui.components :as co]
-            [monkey.ci.gui.logging :as log]
-            [monkey.ci.gui.routing :as r]
+            [monkey.ci.gui.template :as t]
+            #?(:cljs [monkey.ci.gui.logging :as log])
             [monkey.ci.gui.utils :as u]
-            [reagent.core :as rc]
+            #?(:cljs [reagent.core :as rc])
             [re-frame.core :as rf]))
 
 (defn user-info []
@@ -20,20 +20,10 @@
          "sign off"]]])))
 
 (defn header []
-  [:header.header.container
-   [:div.row.border-bottom
-    [:div.col-2
-     [:div.mt-2 [:a {:href "/"} [co/logo]]]]
-    [:div.col-10
-     [:div.row
-      [:div.col-9
-       [:h1.display-4 "MonkeyCI"]
-       [:p.lead "Unleashing full power to build your code!"]]
-      [:div.col-3.text-end
-       [user-info]]]]]
-   [:div.row.mt-1
-    [:div.col
-     [b/path-breadcrumb]]]])
+  (conj (t/generic-header t/config [user-info])
+        [:div.row.mt-1
+         [:div.col
+          [b/path-breadcrumb]]]))
 
 (defn- footer-col [header links]
   (letfn [(footer-link [[lbl url]]
@@ -59,34 +49,13 @@
      :target :_blank}
     [co/icon icon]]])
 
+(def host-base
+  #?(:cljs js/hostBase))
+
 (defn footer []
   (let [v (rf/subscribe [:version])]
-    [:footer.footer.bg-primary-dark.border-top.border-white-10
-     [:div.container
-      [:div.row.content-space-1
-       [:div.col-lg-3.mb-5.mb-lg-0
-        [:div.mb-5
-         [:img {:src "/img/monkeyci-white.png" :width "100px"}]
-         [:span.h5.text-light "MonkeyCI"]]]
-       [footer-col "Resources"
-        [["Blog" "https://www.monkey-projects.be/blog"]
-         ["Documentation" "https://docs.monkeyci.com"]]]
-       [footer-col "Company"
-        [["About us" (r/path-for :home/about)]
-         ["Contact" (r/path-for :home/contact)]]]
-       [footer-col "Legal"
-        [["Terms of use" "todo"]
-         ["Privacy policy" "todo"]]]]
-      [:div.border-top.border-white-10]
-      [:div.row.align-items-md-end.py-5
-       [:div.col-md.mb-3.mb-md-0
-        [:p.text-white.mb-0
-         "Built by " [:a.link-light {:href "https://www.monkey-projects.be"} "Monkey Projects"]]]
-       [:div.col-md.d-md-flex.justify-content-md-end
-        [:p.text-primary-light.mb-0.small.me-2.pt-2 "version " @v]
-        [:ul.list-inline.mb-0
-         [social-link :github "https://github.com/monkey-projects/monkeyci"]
-         [social-link :slack "https://monkeyci.slack.com"]]]]]]))
+    (tc/footer {:version @v
+                :base-url (or host-base "monkeyci.com")})))
 
 (defn error-boundary [target]
   #?(:cljs

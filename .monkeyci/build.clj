@@ -151,7 +151,7 @@
 
 (def gui-release-artifact
   {:id "gui-release"
-   :path "resources/public/js"})
+   :path "target"})
 
 (defn build-gui-image [ctx]
   (when (publish-gui? ctx)
@@ -221,6 +221,8 @@
   (when (publish-gui? ctx)
     (-> (shadow-release "release-gui" :frontend)
         (core/depends-on ["test-gui"])
+        ;; Also generate index.html
+        (update :script (partial concat ["clojure -X:gen-idx"]))
         (assoc :save-artifacts [gui-release-artifact]))))
 
 (defn deploy

@@ -1,13 +1,13 @@
 ;; shadow-cljs configuration
 {:deps {:aliases [:dev :test]}
- :dev-http {8080 "resources/public"
-            8002 ["dev-resources/devcards" "resources/public"]}
+ :dev-http {8080 ["target/js/frontend" "resources/public"]
+            8002 ["dev-resources/devcards" "target/js/frontend" "resources/public"]}
 
  :builds
  {:frontend
   {:target :browser
    :modules {:main {:init-fn monkey.ci.gui.core/init}}
-   :output-dir "resources/public/js"}
+   :output-dir "target/js/frontend/js"}
 
   :test/browser
   {:target :browser-test
