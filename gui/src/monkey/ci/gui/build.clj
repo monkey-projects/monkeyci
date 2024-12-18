@@ -11,26 +11,36 @@
 (defn- base-page [config]
   [:html
    (head config)
-   [:body
-    [:main {:role :main}
-     [:div.overflow-hidden
-      [:div#root.d-flex.flex-column.min-vh-100
-       [:div.container
-        (t/generic-header config)
-        [:content.flex-fill "Loading..."]]
-       [:div.mt-auto
-        (cc/footer config)]]]]
-    (cc/script (cc/script-url config "vendor.min.js"))
-    (cc/script (cc/script-url config "theme.min.js"))
-    (cc/script "/js/main.js")]])
+   (into
+    [:body
+     [:main {:role :main}
+      [:div.overflow-hidden
+       [:div#root.d-flex.flex-column.min-vh-100
+        [:div.container
+         (t/generic-header config)
+         [:content.flex-fill "Loading..."]]
+        [:div.mt-auto
+         (cc/footer config)]]]]
+     (cc/script (cc/script-url config "vendor.min.js"))
+     (cc/script (cc/script-url config "theme.min.js"))]
+    (map #(cc/script (format "/js/%s.js" (name %1)))
+         (:modules config)))])
 
-(defn gen-idx
-  "Generates the index.html file that will be included in the resulting website.
-   If no output file is specified, prints to stdout."
-  [{:keys [output] :as conf}]
+(defn gen-idx [{:keys [output] :as conf}]
   (let [html (str (h/html (base-page conf)))]
     (if output
       (do
         (.mkdirs (.getParentFile (io/file output)))
         (spit output html))
       (println html))))
+
+(defn gen-main
+  "Generates the index.html file for the main website.
+   If no output file is specified, prints to stdout."
+  [conf]
+  (gen-idx (assoc conf :modules ["common" "main"])))
+
+(defn gen-admin
+  "Generates the index.html file for the admin page."
+  [conf]
+  (gen-idx (assoc conf :modules ["common" "admin"])))

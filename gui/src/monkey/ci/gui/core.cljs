@@ -3,9 +3,7 @@
             [monkey.ci.gui.download]
             [monkey.ci.gui.events]
             [monkey.ci.gui.login.views :as lv]
-            [monkey.ci.gui.martian :as m]
             [monkey.ci.gui.pages :as p]
-            [monkey.ci.gui.routing :as routing]
             [monkey.ci.gui.server-events]
             [monkey.ci.gui.utils :as u]
             [reagent.core :as rc]
@@ -26,10 +24,3 @@
   (let [root (get-app-root!)]
     (rf/clear-subscription-cache!)
     (rd/render root [p/render])))
-
-(defn init []
-  (routing/start!)
-  (rf/dispatch-sync [:initialize-db])
-  (m/init)
-  (rf/dispatch [:core/load-version])
-  (reload))
