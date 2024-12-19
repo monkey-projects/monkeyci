@@ -17,10 +17,10 @@
   (swap! app-root (fn [r]
                     (or r (rd/create-root (.getElementById js/document "root"))))))
 
-(defn ^:dev/after-load reload []
+(defn reload [root-comp]
   ;; Creating the root multiple times gives a react warning on reload.  However, if we
   ;; keep track of the existing root instead, re-frame subs give problems, that's why
   ;; the pages ns is on "always reload".
   (let [root (get-app-root!)]
     (rf/clear-subscription-cache!)
-    (rd/render root [p/render])))
+    (rd/render root root-comp)))

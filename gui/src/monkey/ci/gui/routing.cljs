@@ -70,6 +70,10 @@
     ["/github/callback" :page/github-callback]
     ["/bitbucket/callback" :page/bitbucket-callback]]))
 
+(defonce admin-router
+  (f/router
+   [["/" :admin/root]]))
+
 (def public?
   "Route names that are publicly accessible"
   #{:page/login :page/github-callback :page/bitbucket-callback})
@@ -80,6 +84,9 @@
 
 (defn start! []
   (rfe/start! router on-route-change {:use-fragment false}))
+
+(defn start-admin! []
+  (rfe/start! admin-router on-route-change {:use-fragment false}))
 
 (defn path-for [id & [params]]
   (some-> (f/match-by-name router id params)
