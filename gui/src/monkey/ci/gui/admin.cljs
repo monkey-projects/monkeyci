@@ -2,7 +2,9 @@
   (:require [monkey.ci.gui.components :as co]
             [monkey.ci.gui.core :as c]
             [monkey.ci.gui.layout :as l]
-            [monkey.ci.gui.routing :as r]))
+            [monkey.ci.gui.routing :as r]
+            [monkey.ci.gui.admin.credits.views :as credits]
+            [re-frame.core :as rf]))
 
 (defn action-card [icon title desc link url]
   [:div.col-sm-6.col-lg-4.mb-3.mb-lg-5
@@ -18,7 +20,7 @@
       link
       [:i.ms-1.bi-chevron-right.small]]]]])
 
-(defn render-admin []
+(defn admin-root []
   [l/default
    [:div.container.content-space-1
     [:div.w-lg-65.text-center.mx-lg-auto.mb-7
@@ -56,6 +58,26 @@
       "Overview of created invoices, or create manual invoices or credit notes."
       "Go to Invoicing"
       (r/path-for :admin/invoicing)]]]])
+
+(defn not-implemented []
+  [l/default
+   [:<>
+    [:h3 "Not Implemented"]
+    [:p "Oops!  Looks like this page has not been implemented yet."]]])
+
+(def pages
+  {:admin/root admin-root
+   :admin/credits credits/overview})
+
+(defn render-page [route]
+  (let [p (get pages (r/route-name route) not-implemented)]
+    [p route]))
+
+(defn render-admin []
+  (let [r (rf/subscribe [:route/current])]
+    (if @r
+      (render-page @r)
+      (admin-root))))
 
 (defn ^:dev/after-load reload []
   (c/reload [render-admin]))

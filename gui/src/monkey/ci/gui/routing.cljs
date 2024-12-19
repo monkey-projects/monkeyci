@@ -72,7 +72,11 @@
 
 (defonce admin-router
   (f/router
-   [["/" :admin/root]]))
+   [["/" :admin/root]
+    ["/credits" :admin/credits]
+    ["/builds/clean" :admin/clean-builds]
+    ["/forget" :admin/forget-users]
+    ["/invoicing" :admin/invoicing]]))
 
 (def public?
   "Route names that are publicly accessible"
@@ -89,8 +93,9 @@
   (rfe/start! admin-router on-route-change {:use-fragment false}))
 
 (defn path-for [id & [params]]
-  (some-> (f/match-by-name router id params)
-          :path))
+  #_(some-> (f/match-by-name router id params)
+          :path)
+  (rfe/href id params))
 
 (def path-params (comp :path :parameters))
 
@@ -119,6 +124,7 @@
   ;; There is a bug in reitit where parameters are not filled in (no coercion)
   ;; when calling `match-by-name` so we do a second lookup using the path,
   ;; which seems to coerce correctly.
+  ;; FIXME This only works for the main router, we need to find a solution for admin router
   (->> (f/match-by-name router r params)
        :path
        (f/match-by-path router)))
