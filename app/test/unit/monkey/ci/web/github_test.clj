@@ -20,8 +20,12 @@
 (deftest webhook
   (testing "invokes runner from runtime"
     (let [inv (atom nil)
+          cid (cuid/random-cuid)
           st (st/make-memory-storage)
-          _ (st/save-webhook st {:id "test-hook"})
+          _ (st/save-webhook st {:id "test-hook"
+                                 :customer-id cid})
+          _ (st/save-customer-credit st {:customer-id cid
+                                         :amount 1000})
           req (-> {:runner (fn [_ build]
                              (swap! inv conj build))
                    :storage st}
@@ -83,9 +87,12 @@
   (testing "triggers build on push for watched repo"
     (h/with-memory-store s
       (let [gid "test-id"
-            sid (st/watch-github-repo s {:customer-id "test-cust"
+            cid "test-cust"
+            sid (st/watch-github-repo s {:customer-id cid
                                          :id "test-repo"
                                          :github-id gid})
+            _ (st/save-customer-credit s {:customer-id cid
+                                          :amount 1000})
             runs (atom [])
             req (-> {:storage s
                      :runner (fn [_ build]
