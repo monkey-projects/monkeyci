@@ -45,7 +45,7 @@
                         (dissoc on-page-leave))}
          (not-empty handlers) (assoc :dispatch-n handlers))))))
 
-(defonce router
+(defonce main-router
   ;; Instead of pointing to the views directly, we refer to a keyword, which
   ;; is linked in another namespace (pages) to the actual view.  This allows
   ;; us to refer to the routing namespace from views, e.g. to resolve paths
@@ -70,6 +70,16 @@
     ["/github/callback" :page/github-callback]
     ["/bitbucket/callback" :page/bitbucket-callback]]))
 
+(defonce admin-router
+  (f/router
+   [["/" :admin/root]
+    ["/credits" :admin/credits]
+    ["/builds/clean" :admin/clean-builds]
+    ["/forget" :admin/forget-users]
+    ["/invoicing" :admin/invoicing]]))
+
+(defonce router (atom main-router))
+
 (def public?
   "Route names that are publicly accessible"
   #{:page/login :page/github-callback :page/bitbucket-callback})
@@ -78,12 +88,22 @@
   (log/debug "Route changed:" match)
   (rf/dispatch [:route/changed match]))
 
+(defn- start-router []
+  (rfe/start! @router on-route-change {:use-fragment false}))
+
 (defn start! []
-  (rfe/start! router on-route-change {:use-fragment false}))
+  (reset! router main-router)
+  (start-router))
+
+(defn start-admin! []
+  (reset! router admin-router)
+  (start-router))
 
 (defn path-for [id & [params]]
-  (some-> (f/match-by-name router id params)
-          :path))
+  (some-> (f/match-by-name @router id params)
+          :path)
+  ;; Only works after start!
+  #_(rfe/href id params))
 
 (def path-params (comp :path :parameters))
 
@@ -112,9 +132,9 @@
   ;; There is a bug in reitit where parameters are not filled in (no coercion)
   ;; when calling `match-by-name` so we do a second lookup using the path,
   ;; which seems to coerce correctly.
-  (->> (f/match-by-name router r params)
+  (->> (f/match-by-name @router r params)
        :path
-       (f/match-by-path router)))
+       (f/match-by-path @router)))
 
 (rf/reg-event-fx
  :route/goto
@@ -126,7 +146,7 @@
 (rf/reg-event-fx
  :route/goto-path
  (fn [_ [_ path]]
-   (when-let [m (f/match-by-path router path)]
+   (when-let [m (f/match-by-path @router path)]
      {:route/goto path
       :dispatch [:route/changed m]})))
 

@@ -217,12 +217,16 @@
                  :junit {:artifact-id art-id
                          :path junit})))))
 
+(defn- gen-idx [ctx type]
+  (format "clojure -X%s:gen-%s" (if (release? ctx) "" ":staging") (name type)))
+
 (defn build-gui-release [ctx]
   (when (publish-gui? ctx)
     (-> (shadow-release "release-gui" :frontend)
         (core/depends-on ["test-gui"])
-        ;; Also generate index.html
-        (update :script (partial concat [(format "clojure -X%s:gen-idx" (if (release? ctx) "" ":staging"))]))
+        ;; Also generate index pages for app and admin sites
+        (update :script (partial concat [(gen-idx ctx :main)
+                                         (gen-idx ctx :admin)]))
         (assoc :save-artifacts [gui-release-artifact]))))
 
 (defn deploy

@@ -260,6 +260,12 @@
 (defn new-build-id [idx]
   (str "build-" idx))
 
+(defn- check-avail-credits! [{st :storage} build]
+  (let [avail (st/calc-available-credits st (:customer-id build))]
+    (when (or (nil? avail) (<= avail 0))
+      (throw (ex-info "Customer does not have available credits"
+                      {:build build})))))
+
 (defn run-build-async
   "Starts the build in a new thread"
   [rt build]
@@ -270,9 +276,9 @@
                                            (-> build
                                                (assoc :status :error
                                                       :message (ex-message ex))))))]
-    ;; TODO Check customer available credits
     (md/future
       (try
+        (check-avail-credits! rt build)
         (rt/post-events rt (ec/make-event :build/pending
                                           :build (b/build->evt build)
                                           :sid (b/sid build)))

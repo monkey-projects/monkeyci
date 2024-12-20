@@ -347,8 +347,11 @@
                     repo (-> (h/gen-repo)
                              (assoc :customer-id cust-id))
                     cust (-> (h/gen-cust)
-                             (assoc :repos {(:id repo) repo}))]
+                             (assoc :id cust-id
+                                    :repos {(:id repo) repo}))]
                 (st/save-customer st cust)
+                (st/save-customer-credit st {:customer-id cust-id
+                                             :amount 1000})
                 (f cust repo)))
 
             (make-rt []

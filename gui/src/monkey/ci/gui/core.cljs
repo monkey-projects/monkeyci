@@ -3,9 +3,7 @@
             [monkey.ci.gui.download]
             [monkey.ci.gui.events]
             [monkey.ci.gui.login.views :as lv]
-            [monkey.ci.gui.martian :as m]
             [monkey.ci.gui.pages :as p]
-            [monkey.ci.gui.routing :as routing]
             [monkey.ci.gui.server-events]
             [monkey.ci.gui.utils :as u]
             [reagent.core :as rc]
@@ -19,17 +17,10 @@
   (swap! app-root (fn [r]
                     (or r (rd/create-root (.getElementById js/document "root"))))))
 
-(defn ^:dev/after-load reload []
+(defn reload [root-comp]
   ;; Creating the root multiple times gives a react warning on reload.  However, if we
   ;; keep track of the existing root instead, re-frame subs give problems, that's why
   ;; the pages ns is on "always reload".
   (let [root (get-app-root!)]
     (rf/clear-subscription-cache!)
-    (rd/render root [p/render])))
-
-(defn init []
-  (routing/start!)
-  (rf/dispatch-sync [:initialize-db])
-  (m/init)
-  (rf/dispatch [:core/load-version])
-  (reload))
+    (rd/render root root-comp)))

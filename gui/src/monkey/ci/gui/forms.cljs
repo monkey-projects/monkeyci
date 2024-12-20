@@ -16,7 +16,9 @@
 (defn submit-handler
   "Form submission handler that dispatches the given event instead of 
    the default behaviour.  The form values are added to the event."
-  [evt]
+  [evt & [form-id]]
   (fn [e]
     (.preventDefault e)
-    (rf/dispatch (conj evt (get-form-data (.. e -target))))))
+    (rf/dispatch (conj evt (get-form-data (if form-id
+                                            (.getElementById js/document (name form-id))
+                                            (.. e -target)))))))
