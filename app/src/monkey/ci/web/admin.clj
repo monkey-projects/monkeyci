@@ -18,17 +18,21 @@
   {:from-time s/Int})
 
 (def admin-routes
-  [["/login"
-    {:post api/login
-     :parameters {:body UserCredentials}}]
-   ["/issue-credits"
+  [[""
     {:conflicting true}
-    [["/auto"
-      {:post api/issue-auto-credits
-       :parameters {:body AutoCredits}}]
-     ["/:customer-id"
-      {:post api/issue-credits
-       :parameters {:path {:customer-id c/Id}
-                    :body UserCredits}}]]]
-   ["/reaper"
-    {:post api/cancel-dangling-builds}]])
+    ["/login"
+     {:post api/login
+      :parameters {:body UserCredentials}}]
+    [""
+     {:middleware [:sysadmin-check]}
+     ["/issue-credits"
+      {:conflicting true}
+      [["/auto"
+        {:post api/issue-auto-credits
+         :parameters {:body AutoCredits}}]
+       ["/:customer-id"
+        {:post api/issue-credits
+         :parameters {:path {:customer-id c/Id}
+                      :body UserCredits}}]]]
+     ["/reaper"
+      {:post api/cancel-dangling-builds}]]]])

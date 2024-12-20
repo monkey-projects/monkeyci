@@ -14,7 +14,6 @@
             [clojure.tools.logging :as log]
             [java-time.api :as jt]
             [monkey.ci
-             [runtime :as rt]
              [sid :as sid]
              [storage :as st]
              [utils :as u]]
@@ -188,7 +187,7 @@
         (query-auth-to-bearer)
         (rmp/wrap-params))))
 
-(defn- check-authorization!
+(defn- check-cust-authorization!
   "Checks if the request identity grants access to the customer specified in 
    the parameters path."
   [req]
@@ -204,11 +203,16 @@
    access to the given customer."
   [h]
   (fn [req]
-    (check-authorization! req)
+    (check-cust-authorization! req)
     (h req)))
 
-(defmethod rt/setup-runtime :jwk [conf _]
-  (config->keypair conf))
+(defn sysadmin-authorization
+  [h]
+  (fn [req]
+    (when (not= :sysadmin (-> req :identity :type keyword))
+      (throw (ex-info "Only system administrators have access to this area"
+                      {:type :auth/unauthorized})))
+    (h req)))
 
 (def req->webhook-id (comp :id :path :parameters))
 

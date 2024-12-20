@@ -95,34 +95,52 @@
             "bearer token provided")))))
 
 (deftest customer-authorization
-    (let [h (constantly ::ok)
-          auth (sut/customer-authorization h)]
-      (testing "invokes target"
-        (testing "if no customer id in request path"
-          (is (= ::ok (auth {}))))
+  (let [h (constantly ::ok)
+        auth (sut/customer-authorization h)]
+    (testing "invokes target"
+      (testing "if no customer id in request path"
+        (is (= ::ok (auth {}))))
 
-        (testing "if identity allows access to customer id"
-          (is (= ::ok (auth {:parameters
-                             {:path
-                              {:customer-id "test-cust"}}
-                             :identity
-                             {:customers
-                              #{"test-cust"}}})))))
+      (testing "if identity allows access to customer id"
+        (is (= ::ok (auth {:parameters
+                           {:path
+                            {:customer-id "test-cust"}}
+                           :identity
+                           {:customers
+                            #{"test-cust"}}})))))
 
-      (testing "throws authorization error"
-        (testing "if customer id is not in identity"
-          (is (thrown? Exception
-                       (auth {:parameters
-                              {:path
-                               {:customer-id "test-cust"}}
-                              :identity
-                              {:customers #{"other-cust"}}}))))
+    (testing "throws authorization error"
+      (testing "if customer id is not in identity"
+        (is (thrown? Exception
+                     (auth {:parameters
+                            {:path
+                             {:customer-id "test-cust"}}
+                            :identity
+                            {:customers #{"other-cust"}}}))))
 
-        (testing "if not authenticated"
-          (is (thrown? Exception
-                       (auth {:parameters
-                              {:path
-                               {:customer-id "test-cust"}}})))))))
+      (testing "if not authenticated"
+        (is (thrown? Exception
+                     (auth {:parameters
+                            {:path
+                             {:customer-id "test-cust"}}})))))))
+
+(deftest sysadmin-authorization
+  (let [h (constantly ::ok)
+        auth (sut/sysadmin-authorization h)]
+    (testing "invokes target"
+      (testing "if identity is sysadmin"
+        (is (= ::ok (auth {:identity
+                           {:type :sysadmin}})))))
+
+    (testing "throws authorization error"
+      (testing "if user is not a sysadmin"
+        (is (thrown? Exception
+                     (auth {:identity
+                            {:type :github}}))))
+
+      (testing "if not authenticated"
+        (is (thrown? Exception
+                     (auth {})))))))
 
 (deftest valid-security?
   (testing "false if nil"

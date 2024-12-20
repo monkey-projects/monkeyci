@@ -1213,9 +1213,25 @@
                      (test-app)
                      :status))))
 
+    (testing "fails if no sysadmin token"
+      (let [secure-app (-> (test-rt {:config
+                                     {:dev-mode false}})
+                           (sut/make-app))]
+        (is (= 401 (-> (mock/request :post "/admin/reaper")
+                       (secure-app)
+                       :status)))))
+
     (testing "`/login` authenticates admin user"
-      (is (= 200 (-> (h/json-request :post "/admin/login"
-                                     {:username "test-admin"
-                                      :password "test-pass"})
-                     (test-app)
-                     :status))))))
+      (let [{st :storage :as rt} (test-rt)
+            app (sut/make-app rt)
+            uid (cuid/random-cuid)]
+        (is (some? (st/save-user st {:id uid
+                                     :type "sysadmin"
+                                     :type-id "test-admin"})))
+        (is (some? (st/save-sysadmin st {:user-id uid
+                                         :password (auth/hash-pw "test-pass")})))
+        (is (= 200 (-> (h/json-request :post "/admin/login"
+                                       {:username "test-admin"
+                                        :password "test-pass"})
+                       (app)
+                       :status)))))))
