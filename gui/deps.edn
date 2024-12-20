@@ -34,7 +34,7 @@
   :gen-admin
   {:extra-deps {hiccup/hiccup {:mvn/version "2.0.0-RC3"}}
    :exec-fn monkey.ci.gui.build/gen-admin
-   :exec-args {:output "target/index.html"}}
+   :exec-args {:output "target/admin/index.html"}}
 
   :staging
   {:exec-args {:base-url "staging.monkeyci.com"}}}}
