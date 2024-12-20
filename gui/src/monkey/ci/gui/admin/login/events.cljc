@@ -6,27 +6,28 @@
             [re-frame.core :as rf]))
 
 (rf/reg-event-fx
- :login/submit
+ ::submit
  (fn [{:keys [db]} [_ {:keys [username password]}]]
    {:dispatch [:secure-request
                :admin-login
                {:creds {:username (first username)
                         :password (first password)}}
-               [:login/submit--success]
-               [:login/submit--failed]]
+               [::submit--success]
+               [::submit--failed]]
     :db (-> db
             (db/mark-submitting)
             (ldb/clear-alerts))}))
 
 (rf/reg-event-fx
- :login/submit--success
+ ::submit--success
  (fn [{:keys [db]} [_ {user :body}]]
-   ;; TODO Redirect to admin root
    {:db (-> db
             (ldb/set-user (dissoc user :token))
-            (ldb/set-token (:token user)))}))
+            (ldb/set-token (:token user)))
+    ;; Redirect to admin root page
+    :dispatch [:route/goto :admin/root]}))
 
 (rf/reg-event-db
- :login/submit--failed
+ ::submit--failed
  (fn [db [_ err]]
    (ldb/set-alerts db [(a/admin-login-failed err)])))

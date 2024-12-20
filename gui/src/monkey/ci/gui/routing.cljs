@@ -73,6 +73,7 @@
 (defonce admin-router
   (f/router
    [["/" :admin/root]
+    ["/login" :admin/login]
     ["/credits" :admin/credits]
     ["/builds/clean" :admin/clean-builds]
     ["/forget" :admin/forget-users]

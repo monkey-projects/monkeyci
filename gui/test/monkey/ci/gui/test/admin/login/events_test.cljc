@@ -20,34 +20,41 @@
        (h/initialize-martian {:admin-login {:status 200
                                             :body "ok"
                                             :error-code :no-error}})
-       (rf/dispatch [:login/submit {:username "test-user"
-                                    :password "test-pass"}])
+       (rf/dispatch [::sut/submit {:username "test-user"
+                                   :password "test-pass"}])
        (is (= 1 (count @c))))))
 
   (testing "marks submitting"
-    (rf/dispatch-sync [:login/submit])
+    (rf/dispatch-sync [::sut/submit])
     (is (db/submitting? @app-db)))
 
   (testing "clears alerts"
     (is (some? (reset! app-db (ldb/set-alerts {} [{:type :info :message "test message"}]))))
-    (rf/dispatch-sync [:login/submit])
+    (rf/dispatch-sync [::sut/submit])
     (is (empty? (ldb/alerts @app-db)))))
 
 (deftest login-submit--success
-  (rf/dispatch-sync [:login/submit--success {:body {:type-id "test-user"
-                                                    :token "test-token"}}])
-  (testing "sets user"
-    (is (= "test-user"
-           (-> (ldb/user @app-db)
-               :type-id))))
+  (rf-test/run-test-sync
+   (let [c (h/catch-fx :route/goto)]
+     (rf/dispatch [::sut/submit--success {:body {:type-id "test-user"
+                                                 :token "test-token"}}])
 
-  (testing "sets token"
-    (is (= "test-token"
-           (ldb/token @app-db)))))
+     (testing "sets user"
+       (is (= "test-user"
+              (-> (ldb/user @app-db)
+                  :type-id))))
+
+     (testing "sets token"
+       (is (= "test-token"
+              (ldb/token @app-db))))
+
+     (testing "redirects to root page"
+       (is (= 1 (count @c)))
+       (is (nil? (first @c)))))))
 
 (deftest login-submit--failed
   (testing "sets error alert"
-    (rf/dispatch-sync [:login/submit--failed "test error"])
+    (rf/dispatch-sync [::sut/submit--failed "test error"])
     (is (= [:danger]
            (->> (ldb/alerts @app-db)
                 (map :type))))))

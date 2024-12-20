@@ -1,5 +1,5 @@
 (ns monkey.ci.gui.admin.login.views
-  (:require [monkey.ci.gui.admin.login.events]
+  (:require [monkey.ci.gui.admin.login.events :as e]
             [monkey.ci.gui.components :as co]
             [monkey.ci.gui.forms :as f]
             [monkey.ci.gui.layout :as l]
@@ -7,7 +7,7 @@
 
 (defn login-form []
   [:form
-   {:on-submit (f/submit-handler [:login/submit])}
+   {:on-submit (f/submit-handler [::e/submit])}
    [:div.mb-4
     [:label.form-label
      {:for :username}
