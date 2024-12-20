@@ -9,6 +9,21 @@
              [common :as c]]
             [ring.util.response :as rur]))
 
+(defn login
+  "Authenticates admin user"
+  [req]
+  (let [{:keys [username password]} (c/body req)
+        st (c/req->storage req)
+        sid ["sysadmin" username]
+        u (s/find-user-by-type st sid)
+        sa (when u
+             (s/find-sysadmin st (:id u)))]
+    (if sa
+      (if (= (:password sa) (auth/hash-pw password))
+        (rur/response {:token (->> (auth/sysadmin-token sid)
+                                   (auth/generate-jwt-from-rt (c/req->rt req)))}))
+      (rur/response {:message "todo"}))))
+
 (defn issue-credits
   "Issues ad-hoc credits to a customer."
   [req]

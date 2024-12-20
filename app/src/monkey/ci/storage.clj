@@ -723,3 +723,13 @@
 
 (defn find-crypto [st cust-id]
   (p/read-obj st (crypto-sid cust-id)))
+
+(def sysadmin :sysadmin)
+(defn sysadmin-sid [& parts]
+  (into [global (name sysadmin)] parts))
+
+(defn save-sysadmin [st sysadmin]
+  (p/write-obj st (sysadmin-sid (:user-id sysadmin)) sysadmin))
+
+(defn find-sysadmin [st user-id]
+  (p/read-obj st (sysadmin-sid user-id)))

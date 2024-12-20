@@ -1211,4 +1211,11 @@
     (testing "`/reaper` kills dangling builds"
       (is (= 200 (-> (mock/request :post "/admin/reaper")
                      (test-app)
+                     :status))))
+
+    (testing "`/login` authenticates admin user"
+      (is (= 200 (-> (h/json-request :post "/admin/login"
+                                     {:username "test-admin"
+                                      :password "test-pass"})
+                     (test-app)
                      :status))))))

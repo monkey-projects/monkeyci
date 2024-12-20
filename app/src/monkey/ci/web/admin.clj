@@ -6,6 +6,10 @@
             [monkey.ci.web.common :as c]
             [schema.core :as s]))
 
+(s/defschema UserCredentials
+  {:username s/Str
+   :password s/Str})
+
 (s/defschema UserCredits
   {:amount s/Int
    (s/optional-key :reason) s/Str})
@@ -14,7 +18,10 @@
   {:from-time s/Int})
 
 (def admin-routes
-  [["/issue-credits"
+  [["/login"
+    {:post api/login
+     :parameters {:body UserCredentials}}]
+   ["/issue-credits"
     {:conflicting true}
     [["/auto"
       {:post api/issue-auto-credits

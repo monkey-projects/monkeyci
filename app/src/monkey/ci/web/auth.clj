@@ -6,6 +6,7 @@
              [middleware :as bmw]]
             [buddy.core
              [codecs :as codecs]
+             [hash :as hash]
              [keys :as bk]
              [mac :as mac]
              [nonce :as nonce]]
@@ -24,6 +25,7 @@
 (def kid "master")
 (def role-user "user")
 (def role-build "build")
+(def role-sysadmin "sysadmin")
 
 (def user-id
   "Retrieves current user id from request"
@@ -40,6 +42,10 @@
 (def build-token
   "Creates token contents for a build, to be used by a build script."
   (partial make-token role-build))
+
+(def sysadmin-token
+  "Creates token contents for a system admin, a user that has special privileges."
+  (partial make-token role-sysadmin))
 
 (defn generate-secret-key
   "Generates a random secret key object"
@@ -235,3 +241,9 @@
         (h req)
         (-> (rur/response "Invalid signature header")
             (rur/status 401))))))
+
+(defn hash-pw
+  "Creates SHA256 hash of password, returns hex encoded string"
+  [pw]
+  (-> (hash/sha256 pw)
+      (codecs/bytes->hex)))

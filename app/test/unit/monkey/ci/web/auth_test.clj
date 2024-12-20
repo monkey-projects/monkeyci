@@ -143,3 +143,7 @@
     (is (= {:alg :sha256
             :signature "test-value"}
            (sut/parse-signature "sha256=test-value")))))
+
+(deftest sysadmin-token
+  (testing "has `sysadmin` role"
+    (is (= "sysadmin" (:role (sut/sysadmin-token ["test-admin-user"]))))))

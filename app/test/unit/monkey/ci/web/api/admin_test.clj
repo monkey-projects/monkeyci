@@ -2,11 +2,36 @@
   (:require [clojure.test :refer [deftest testing is]]
             [monkey.ci
              [cuid :as cuid]
+             [sid :as sid]
              [storage :as st]
              [time :as t]]
             [monkey.ci.web.api.admin :as sut]
+            [monkey.ci.web.auth :as auth]
             [monkey.ci.helpers :as h]
             [monkey.ci.test.runtime :as trt]))
+
+(deftest login
+  (let [{st :storage :as rt} (trt/test-runtime)
+        u (-> (h/gen-user)
+              (assoc :type "sysadmin"))
+        s {:user-id (:id u)
+           :password (auth/hash-pw "test-pass")}]
+    (is (sid/sid? (st/save-user st u)))
+    (is (sid/sid? (st/save-sysadmin st s)))
+    
+    (testing "returns token for valid credentials"
+      (let [r (-> rt
+                  (h/->req)
+                  (assoc-in [:parameters :body]
+                            {:username (:type-id u)
+                             :password "test-pass"})
+                  (sut/login))]
+        (is (= 200 (:status r)))
+        (is (string? (get-in r [:body :token])))))
+
+    (testing "403 if user does not exist")
+
+    (testing "403 if invalid password")))
 
 (deftest issue-credits
   (h/with-memory-store st
