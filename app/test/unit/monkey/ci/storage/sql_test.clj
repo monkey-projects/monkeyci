@@ -673,6 +673,17 @@
           (is (sid/sid? (st/save-crypto st upd)))
           (is (java.util.Arrays/equals (:iv upd) (:iv (st/find-crypto st (:id cust))))))))))
 
+(deftest sysadmin
+  (with-storage conn st
+    (let [user (h/gen-user)
+          sysadmin {:user-id (:id user)
+                    :password "test-password"}]
+      (testing "can save and find by user id"
+        (is (sid/sid? (st/save-user st user)))
+        (is (sid/sid? (st/save-sysadmin st sysadmin)))
+        (let [m (st/find-sysadmin st (:id user))]
+          (is (= sysadmin m)))))))
+
 (deftest make-storage
   (testing "creates sql storage object using connection settings"
     (let [s (st/make-storage {:storage {:type :sql

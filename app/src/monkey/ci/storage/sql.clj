@@ -772,6 +772,27 @@
 (defn- select-crypto [conn cust-cuid]
   (ecu/crypto-by-cust-cuid conn cust-cuid))
 
+(def sysadmin? (partial global-sid? st/sysadmin))
+
+(defn- insert-sysadmin [conn sysadmin user-id]
+  (ec/insert-sysadmin conn (-> sysadmin
+                               (assoc :user-id user-id)))
+  user-id)
+
+(defn- update-sysadmin [conn sysadmin existing]
+  (ec/update-sysadmin conn (merge sysadmin (select-keys existing [:user-id]))))
+
+(defn- upsert-sysadmin [conn sysadmin]
+  (let [user (ec/select-user conn (ec/by-cuid (:user-id sysadmin)))
+        existing (ec/select-sysadmin conn (ec/by-user (:id user)))]
+    (if existing
+      (update-sysadmin conn sysadmin existing)
+      (insert-sysadmin conn sysadmin (:id user)))))
+
+(defn- select-sysadmin [conn user-cuid]
+  (some-> (eu/select-sysadmin-by-user-cuid conn user-cuid)
+          (assoc :user-id user-cuid)))
+
 (defn- sid-pred [t sid]
   (t sid))
 
@@ -804,7 +825,9 @@
       bb-webhook?
       (select-bb-webhook conn (last sid))
       crypto?
-      (select-crypto conn (last sid))))
+      (select-crypto conn (last sid))
+      sysadmin?
+      (select-sysadmin conn (last sid))))
   
   (write-obj [_ sid obj]
     (when (condp sid-pred sid
@@ -834,6 +857,8 @@
             (upsert-bb-webhook conn obj)
             crypto?
             (upsert-crypto conn obj)
+            sysadmin?
+            (upsert-sysadmin conn obj)
             (log/warn "Unrecognized sid when writing:" sid))
       sid))
 
