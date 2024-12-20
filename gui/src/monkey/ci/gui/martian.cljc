@@ -342,7 +342,14 @@
 
    (public-route
     {:route-name :get-bitbucket-config
-     :path-parts ["/bitbucket/config"]})])
+     :path-parts ["/bitbucket/config"]})
+
+   (public-route
+    {:route-name :admin-login
+     :method :post
+     :path-parts ["/admin/login"]
+     :body-schema {:creds {:username s/Str
+                           :password s/Str}}})])
 
 ;; The api url.  This should be configured in a `config.js`.
 (def url #?(:clj "http://localhost:3000"

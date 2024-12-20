@@ -2,7 +2,9 @@
   (:require [monkey.ci.gui.components :as co]
             [monkey.ci.gui.core :as c]
             [monkey.ci.gui.layout :as l]
+            [monkey.ci.gui.login.subs]
             [monkey.ci.gui.routing :as r]
+            [monkey.ci.gui.admin.login.views :as login]
             [monkey.ci.gui.admin.credits.views :as credits]
             [re-frame.core :as rf]))
 
@@ -74,10 +76,13 @@
     [p route]))
 
 (defn render-admin []
-  (let [r (rf/subscribe [:route/current])]
-    (if @r
-      (render-page @r)
-      (admin-root))))
+  (let [r (rf/subscribe [:route/current])
+        u (rf/subscribe [:login/user])]
+    (if @u
+      (if @r
+        (render-page @r)
+        (admin-root))
+      [login/page])))
 
 (defn ^:dev/after-load reload []
   (c/reload [render-admin]))

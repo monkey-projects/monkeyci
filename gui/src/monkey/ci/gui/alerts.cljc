@@ -72,3 +72,6 @@
 
 (def cust-save-ssh-keys-failed
   (error-msg "Failed to save SSH keys"))
+
+(def admin-login-failed
+  (error-msg "Failed to authenticate"))
