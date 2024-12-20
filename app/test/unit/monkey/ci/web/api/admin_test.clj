@@ -27,11 +27,24 @@
                              :password "test-pass"})
                   (sut/login))]
         (is (= 200 (:status r)))
-        (is (string? (get-in r [:body :token])))))
+        (is (string? (get-in r [:body :token])))
+        (is (= (:id u) (get-in r [:body :id])))))
 
-    (testing "403 if user does not exist")
+    (testing "403 if user does not exist"
+      (is (= 403 (-> rt
+                     (h/->req)
+                     (assoc-in [:parameters :body :username] "nonexisting")
+                     (sut/login)
+                     :status))))
 
-    (testing "403 if invalid password")))
+    (testing "403 if invalid password"
+      (is (= 403 (-> rt
+                     (h/->req)
+                     (assoc-in [:parameters :body]
+                               {:username (:type-id u)
+                                :password "wrong-pass"})
+                     (sut/login)
+                     :status))))))
 
 (deftest issue-credits
   (h/with-memory-store st

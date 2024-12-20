@@ -10,19 +10,21 @@
             [ring.util.response :as rur]))
 
 (defn login
-  "Authenticates admin user"
+  "Authenticates admin user by looking up the user of type `sysadmin` with given
+   username that matches given password."
   [req]
   (let [{:keys [username password]} (c/body req)
         st (c/req->storage req)
-        sid ["sysadmin" username]
+        sid [auth/role-sysadmin username]
         u (s/find-user-by-type st sid)
         sa (when u
              (s/find-sysadmin st (:id u)))]
-    (if sa
-      (if (= (:password sa) (auth/hash-pw password))
-        (rur/response {:token (->> (auth/sysadmin-token sid)
-                                   (auth/generate-jwt-from-rt (c/req->rt req)))}))
-      (rur/response {:message "todo"}))))
+    (if (and sa
+             (= (:password sa) (auth/hash-pw password)))
+      (rur/response (assoc u :token (->> (auth/sysadmin-token sid)
+                                         (auth/generate-jwt-from-rt (c/req->rt req)))))
+      ;; Invalid credentials
+      (rur/status 403))))
 
 (defn issue-credits
   "Issues ad-hoc credits to a customer."
