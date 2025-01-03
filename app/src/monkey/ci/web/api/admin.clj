@@ -1,5 +1,6 @@
 (ns monkey.ci.web.api.admin
-  (:require [monkey.ci
+  (:require [java-time.api :as jt]
+            [monkey.ci
              [build :as b]
              [cuid :as cuid]
              [storage :as s]]
@@ -25,6 +26,17 @@
                                          (auth/generate-jwt-from-rt (c/req->rt req)))))
       ;; Invalid credentials
       (rur/status 403))))
+
+(defn list-customer-credits
+  "Returns overview of the issued credits to a customer"
+  [req]
+  (let [since (-> (jt/offset-date-time)
+                  (jt/minus (jt/years 5))
+                  (jt/instant)
+                  (jt/to-millis-from-epoch))
+        cust-id (c/customer-id req)
+        creds (s/list-customer-credits-since (c/req->storage req) cust-id since)]
+    (rur/response creds)))
 
 (defn issue-credits
   "Issues ad-hoc credits to a customer."

@@ -1192,18 +1192,24 @@
 
 (deftest admin-routes
   (testing "`/admin`"
-    (testing "`/issue-credits`"
-      (testing "POST `/:customer-id` issues new credits to specific customer"
+    (testing "`/credits`"
+      (testing "`/:customer-id`"
         (let [cust (h/gen-cust)]
-          (is (= 201 (-> (h/json-request :post
-                                         (str "/admin/issue-credits/" (:id cust))
-                                         {:amount 100
-                                          :reason "test issue"})
-                         (test-app)
-                         :status)))))
+          (testing "GET `/` returns credit overview"
+            (is (= 200 (-> (mock/request :get (str "/admin/credits/" (:id cust)))
+                           (test-app)
+                           :status))))
+          
+          (testing "POST `/issue` issues new credits to specific customer"
+            (is (= 201 (-> (h/json-request :post
+                                           (str "/admin/credits/" (:id cust) "/issue")
+                                           {:amount 100
+                                            :reason "test issue"})
+                           (test-app)
+                           :status))))))
 
-      (testing "POST `/auto` issues new credits to all customers with subscriptions"
-        (is (= 200 (-> (h/json-request :post "/admin/issue-credits/auto"
+      (testing "POST `/issue` issues new credits to all customers with subscriptions"
+        (is (= 200 (-> (h/json-request :post "/admin/credits/issue"
                                        {:from-time (t/now)})
                        (test-app)
                        :status)))))

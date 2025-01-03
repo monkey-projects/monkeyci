@@ -46,6 +46,22 @@
                      (sut/login)
                      :status))))))
 
+(deftest list-customer-credits
+  (let [{st :storage :as rt} (trt/test-runtime)
+        cust (h/gen-cust)
+        cred (-> (h/gen-cust-credit)
+                 (assoc :customer-id (:id cust)))]
+    (is (sid/sid? (st/save-customer st cust)))
+    (is (sid/sid? (st/save-customer-credit st cred)))
+    
+    (testing "returns list of issued credits for customer"
+      (let [resp (-> rt
+                     (h/->req)
+                     (assoc-in [:parameters :path :customer-id] (:id cust))
+                     (sut/list-customer-credits))]
+        (is (= 200 (:status resp)))
+        (is (not-empty (:body resp)))))))
+
 (deftest issue-credits
   (h/with-memory-store st
     (let [cust (h/gen-cust)]

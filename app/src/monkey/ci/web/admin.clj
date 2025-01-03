@@ -17,22 +17,27 @@
 (s/defschema AutoCredits
   {:from-time s/Int})
 
+(def credits-routes
+  ["/credits"
+   {:conflicting true}
+   [["/issue"
+     {:post api/issue-auto-credits
+      :parameters {:body AutoCredits}}]
+    ["/:customer-id"
+     {:parameters {:path {:customer-id c/Id}}}
+     [[""
+       {:get api/list-customer-credits}]
+      ["/issue"
+       {:post api/issue-credits
+        :parameters {:body UserCredits}}]]]]])
+
 (def admin-routes
   [[""
-    {:conflicting true}
     ["/login"
      {:post api/login
       :parameters {:body UserCredentials}}]
     [""
      {:middleware [:sysadmin-check]}
-     ["/issue-credits"
-      {:conflicting true}
-      [["/auto"
-        {:post api/issue-auto-credits
-         :parameters {:body AutoCredits}}]
-       ["/:customer-id"
-        {:post api/issue-credits
-         :parameters {:path {:customer-id c/Id}
-                      :body UserCredits}}]]]
+     credits-routes
      ["/reaper"
       {:post api/cancel-dangling-builds}]]]])
