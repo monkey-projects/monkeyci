@@ -102,3 +102,9 @@
    (-> db
        (db/set-credit-alerts [(a/credit-save-failed resp)])
        (db/reset-saving))))
+
+(rf/reg-event-db
+ :credits/cancel
+ (fn [db _]
+   ;; TODO Reset form
+   ))
