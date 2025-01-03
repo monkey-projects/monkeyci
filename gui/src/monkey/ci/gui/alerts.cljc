@@ -52,6 +52,9 @@
 (def repo-unwatch-failed
   (error-msg "Failed to unwatch repo"))
 
+(def cust-search-failed
+  (error-msg "Failed to search for customers"))
+
 (def cust-create-success
   (alert-msg :success (fn [body] [:span "Customer " [:b (:name body)] " has been created."])))
 

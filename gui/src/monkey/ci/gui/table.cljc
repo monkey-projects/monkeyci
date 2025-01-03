@@ -231,7 +231,6 @@
     :as opts}]
   ;; TODO Add support for paginated requests (i.e. dispatch an event
   ;; when navigating to another page)
-  ;; TODO Allow the user to sort, if defined on the column
   (let [loading? (or (some-> loading :sub rf/subscribe deref)
                      false)
         sorting (rf/subscribe [:table/sorting id])]
