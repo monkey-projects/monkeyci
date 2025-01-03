@@ -23,7 +23,9 @@
  ::submit--success
  (fn [{:keys [db]} [_ {user :body}]]
    {:db (-> db
-            (ldb/set-user (dissoc user :token))
+            (ldb/set-user (-> user
+                              (select-keys [:id])
+                              (assoc :name (:type-id user))))
             (ldb/set-token (:token user)))
     ;; Redirect to admin root page
     :dispatch [:route/goto :admin/root]}))

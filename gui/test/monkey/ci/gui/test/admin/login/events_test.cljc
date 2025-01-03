@@ -42,7 +42,7 @@
      (testing "sets user"
        (is (= "test-user"
               (-> (ldb/user @app-db)
-                  :type-id))))
+                  :name))))
 
      (testing "sets token"
        (is (= "test-token"
