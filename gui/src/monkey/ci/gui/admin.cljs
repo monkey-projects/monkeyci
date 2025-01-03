@@ -71,7 +71,8 @@
 (def pages
   {:admin/root admin-root
    :admin/login login/page
-   :admin/credits credits/overview})
+   :admin/credits credits/overview
+   :admin/cust-credits credits/customer-credits})
 
 (defn render-page [route]
   (let [p (get pages (r/route-name route) not-implemented)]

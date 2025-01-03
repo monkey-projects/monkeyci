@@ -1,4 +1,4 @@
-(ns monkey.ci.gui.layout
+(ns ^:dev/always monkey.ci.gui.layout
   (:require [clojure.string :as cs]
             [monkey.ci.template.components :as tc]
             [monkey.ci.gui.breadcrumb :as b]
@@ -9,7 +9,7 @@
             #?(:cljs [reagent.core :as rc])
             [re-frame.core :as rf]))
 
-(defn user-info []
+(defn user-info []  
   (let [u (rf/subscribe [:login/user])]
     (when @u
       [:div

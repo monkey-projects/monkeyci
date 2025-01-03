@@ -75,6 +75,7 @@
    [["/" :admin/root]
     ["/login" :admin/login]
     ["/credits" :admin/credits]
+    ["/credits/:customer-id" :admin/cust-credits]
     ["/builds/clean" :admin/clean-builds]
     ["/forget" :admin/forget-users]
     ["/invoicing" :admin/invoicing]]))

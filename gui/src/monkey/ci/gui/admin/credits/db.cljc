@@ -3,6 +3,7 @@
 
 (def cust-by-name ::cust-by-name)
 (def cust-by-id ::cust-by-id)
+(def credits ::credits)
 
 (defn get-customers-by-name [db]
   (lo/get-value db cust-by-name))

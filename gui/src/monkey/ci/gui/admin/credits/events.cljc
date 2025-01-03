@@ -48,3 +48,9 @@
  :credits/customer-search--failed
  (fn [db [_ id resp]]
    (lo/on-failure db id a/cust-search-failed resp)))
+
+(rf/reg-event-fx
+ :credits/load
+ (fn [{:keys [db]} [_ cust-id]]
+   ;; Load credit details for customer
+   ))
