@@ -12,7 +12,8 @@
 
 (s/defschema UserCredits
   {:amount s/Int
-   (s/optional-key :reason) s/Str})
+   (s/optional-key :reason) s/Str
+   (s/optional-key :from-time) s/Int})
 
 (s/defschema AutoCredits
   {:from-time s/Int})

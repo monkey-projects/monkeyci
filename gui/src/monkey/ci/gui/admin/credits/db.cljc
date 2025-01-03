@@ -27,3 +27,29 @@
 (defn customers-loaded? [db]
   (or (lo/loaded? db cust-by-name)
       (lo/loaded? db cust-by-id)))
+
+(defn get-credits [db]
+  (lo/get-value db credits))
+
+(defn update-credits [db f & args]
+  (apply lo/update-value db credits f args))
+
+(defn get-credit-alerts [db]
+  (lo/get-alerts db credits))
+
+(defn set-credit-alerts [db a]
+  (lo/set-alerts db credits a))
+
+(defn reset-credit-alerts [db]
+  (lo/reset-alerts db credits))
+
+(defn credits-loading? [db]
+  (lo/loading? db credits))
+
+(def saving? ::saving?)
+
+(defn set-saving [db]
+  (assoc db saving? true))
+
+(defn reset-saving [db]
+  (dissoc db saving?))

@@ -43,3 +43,76 @@
   (testing "sets alert for id"
     (rf/dispatch-sync [:credits/customer-search--failed db/cust-by-name "test error"])
     (is (= 1 (count (lo/get-alerts @app-db db/cust-by-name))))))
+
+(deftest credits-load
+  (testing "fetches customer credit overview from backend"
+    (rf-test/run-test-sync
+     (let [c (h/catch-fx :martian.re-frame/request)]
+       (h/initialize-martian {:get-customer-credit-overview
+                              {:status 200
+                               :body []
+                               :error-code :no-error}})
+       (rf/dispatch [:credits/load {:customer-id "test-cust"}])
+       (is (= 1 (count @c)))))))
+
+(deftest credits-load--success
+  (testing "stores credits in db"
+    (rf/dispatch-sync [:credits/load--success {:body [::test-credits]}])
+    (is (= [::test-credits] (db/get-credits @app-db)))))
+
+(deftest credits-load--failed
+  (testing "sets alert"
+    (rf/dispatch-sync [:credits/load--failed "test error"])
+    (is (= 1 (count (db/get-credit-alerts @app-db))))))
+
+(deftest credits-save
+  (rf-test/run-test-sync
+   (let [c (h/catch-fx :martian.re-frame/request)]
+     (is (some? (reset! app-db (r/set-current {} {:parameters
+                                                  {:path
+                                                   {:customer-id "test-cust"}}}))))
+     (h/initialize-martian {:issue-credits
+                            {:status 200
+                             :body {}
+                             :error-code :no-error}})
+     (rf/dispatch [:credits/save {:amount [1000]
+                                  :reason ["test reason"]
+                                  :from-time ["2025-01-01"]}])
+     (testing "saves to backend"
+       (is (= 1 (count @c)))
+       (is (= :issue-credits (-> @c first (nth 2)))))
+
+     (testing "passes form params as body"
+       (is (= {:amount 1000
+               :reason "test reason"
+               :from-time 1735686000000}
+              (-> @c first (nth 3) :credits))))
+
+     (testing "adds customer id"
+       (is (= "test-cust"
+              (-> @c first (nth 3) :customer-id))))
+
+     (testing "marks saving"
+       (is (db/saving? @app-db))))))
+
+(deftest credits-save--success
+  (let [cred {:id "test-cred"
+              :amount 1000}]
+    (is (some? (reset! app-db (db/set-saving {}))))
+    (rf/dispatch-sync [:credits/save--success {:body cred}])
+    
+    (testing "adds credits to db"
+      (is (= [cred] (db/get-credits @app-db))))
+
+    (testing "unmarks saving"
+      (is (not (db/saving? @app-db))))))
+
+(deftest credits-save--failed
+  (is (some? (reset! app-db (db/set-saving {}))))
+  
+  (testing "sets alert"
+    (rf/dispatch-sync [:credits/save--failed "test error"])
+    (is (= 1 (count (db/get-credit-alerts @app-db)))))
+
+  (testing "unmarks saving"
+    (is (not (db/saving? @app-db)))))

@@ -78,3 +78,9 @@
 
 (def admin-login-failed
   (error-msg "Failed to authenticate"))
+
+(def credit-overview-failed
+  (error-msg "Failed to retrieve credit overview"))
+
+(def credit-save-failed
+  (error-msg "Failed to issue credits"))

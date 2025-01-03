@@ -51,3 +51,31 @@
    #(lo/set-loaded % db/cust-by-id)
    true
    false))
+
+(deftest credits
+  (h/verify-sub
+   [:credits/credits]
+   #(lo/set-value % db/credits [::test-credits])
+   [::test-credits]
+   nil))
+
+(deftest credits-loading?
+  (h/verify-sub
+   [:credits/credits-loading?]
+   #(lo/set-loading % db/credits)
+   true
+   false))
+
+(deftest credit-alerts
+  (h/verify-sub
+   [:credits/credit-alerts]
+   #(db/set-credit-alerts % ::test-alerts)
+   ::test-alerts
+   nil))
+
+(deftest saving?
+  (h/verify-sub
+   [:credits/saving?]
+   db/set-saving
+   true
+   false))

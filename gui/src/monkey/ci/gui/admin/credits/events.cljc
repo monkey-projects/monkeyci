@@ -1,8 +1,11 @@
 (ns monkey.ci.gui.admin.credits.events
-  (:require [monkey.ci.gui.admin.credits.db :as db]
+  (:require [medley.core :as mc]
+            [monkey.ci.gui.admin.credits.db :as db]
             [monkey.ci.gui.alerts :as a]
             [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.martian]
+            [monkey.ci.gui.routing :as r]
+            [monkey.ci.gui.time :as t]
             [re-frame.core :as rf]))
 
 (rf/reg-event-fx
@@ -51,6 +54,51 @@
 
 (rf/reg-event-fx
  :credits/load
- (fn [{:keys [db]} [_ cust-id]]
-   ;; Load credit details for customer
-   ))
+ (lo/loader-evt-handler
+  db/credits
+  (fn [_ _ [_ cust-id]]
+    [:secure-request
+     :get-customer-credit-overview
+     {:customer-id cust-id}
+     [:credits/load--success]
+     [:credits/load--failed]])))
+
+(rf/reg-event-db
+ :credits/load--success
+ (fn [db [_ resp]]
+   (lo/on-success db db/credits resp)))
+
+(rf/reg-event-db
+ :credits/load--failed
+ (fn [db [_ resp]]
+   (lo/on-failure db db/credits a/credit-overview-failed resp)))
+
+(rf/reg-event-fx
+ :credits/save
+ (fn [{:keys [db]} [_ params]]
+   {:dispatch [:secure-request
+               :issue-credits
+               {:credits
+                (-> (select-keys params [:reason :amount :from-time])
+                    (as-> t (mc/map-vals first t))
+                    (mc/update-existing :from-time (comp t/to-epoch t/parse-iso)))
+                :customer-id (r/customer-id db)}
+               [:credits/save--success]
+               [:credits/save--failed]]
+    :db (-> db
+            (db/set-saving)
+            (db/reset-credit-alerts))}))
+
+(rf/reg-event-db
+ :credits/save--success
+ (fn [db [_ {resp :body}]]
+   (-> db
+       (db/reset-saving)
+       (db/update-credits conj resp))))
+
+(rf/reg-event-db
+ :credits/save--failed
+ (fn [db [_ resp]]
+   (-> db
+       (db/set-credit-alerts [(a/credit-save-failed resp)])
+       (db/reset-saving))))

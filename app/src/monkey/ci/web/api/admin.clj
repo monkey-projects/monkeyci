@@ -35,6 +35,7 @@
                   (jt/instant)
                   (jt/to-millis-from-epoch))
         cust-id (c/customer-id req)
+        ;; FIXME Return all of them
         creds (s/list-customer-credits-since (c/req->storage req) cust-id since)]
     (rur/response creds)))
 
