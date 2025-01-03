@@ -675,6 +675,10 @@
   (->> (ecc/select-customer-credits conn (ecc/by-cust-since cust-id since))
        (map db->customer-credit)))
 
+(defn- select-customer-credits [{:keys [conn]} cust-id]
+  (->> (ecc/select-customer-credits conn (ecc/by-cust cust-id))
+       (map db->customer-credit)))
+
 (defn- select-avail-credits-amount [{:keys [conn]} cust-id]
   ;; TODO Use the available-credits table for faster lookup
   (ecc/select-avail-credits-amount conn cust-id))
@@ -949,6 +953,7 @@
    :customer
    {:search select-customers
     :list-credits-since select-customer-credits-since
+    :list-credits select-customer-credits
     :get-available-credits select-avail-credits-amount
     :list-available-credits select-avail-credits
     :list-credit-subscriptions select-customer-credit-subs

@@ -604,14 +604,21 @@
 (defn find-customer-credit [s id]
   (p/read-obj s (customer-credit-sid id)))
 
+(def list-customer-credits
+  (override-or
+   [:customer :list-credits]
+   (fn [s cust-id]
+     (->> (p/list-obj s (customer-credit-sid))
+          (map (partial find-customer-credit s))
+          (filter (cp/prop-pred :customer-id cust-id))))))
+
 (def list-customer-credits-since
   "Lists all customer credits for the customer since given timestamp.  
    This includes those without a `from-time`."
   (override-or
    [:customer :list-credits-since]
    (fn [s cust-id ts]
-     (->> (p/list-obj s (customer-credit-sid))
-          (map (partial find-customer-credit s))
+     (->> (list-customer-credits s cust-id)
           (filter (every-pred (cp/prop-pred :customer-id cust-id)
                               (comp (some-fn nil? (partial <= ts)) :from-time)))))))
 
@@ -672,11 +679,6 @@
    (fn [st cust-id since]
      (->> (list-customer-credit-consumptions st cust-id)
           (filter (comp (partial <= since) :consumed-at))))))
-
-(defn- list-customer-credits [s cust-id]
-  (->> (p/list-obj s (customer-credit-sid))
-       (map (partial find-customer-credit s))
-       (filter (cp/prop-pred :customer-id cust-id))))
 
 (defn- sum-amount [e]
   (->> e

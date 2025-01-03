@@ -526,7 +526,7 @@
         (is (sid/sid? (st/save-customer-credit s cred)))
         (is (= cred (st/find-customer-credit s (:id cred)))))
         
-      (testing "can list for customer"
+      (testing "for customer"
         (let [other-cust (h/gen-cust)
               _ (st/save-customer s other-cust)
               sids (->> [(assoc cred :from-time 1000)
@@ -541,9 +541,16 @@
                              (dissoc :user-id :subscription-id))]
                         (mapv (partial st/save-customer-credit s)))]
           (is (some? sids))
-          (is (= [(-> sids first last)]
-                 (->> (st/list-customer-credits-since s (:id cust) 1100)
-                      (map :id))))))
+
+          (testing "can list since"
+            (is (= [(-> sids first last)]
+                   (->> (st/list-customer-credits-since s (:id cust) 1100)
+                        (map :id)))))
+
+          (testing "can list"
+            (is (= (map last (take 2 sids))
+                   (->> (st/list-customer-credits s (:id cust))
+                        (map :id)))))))
 
       (testing "calculates available credits using credit consumptions"
         (let [build (-> (h/gen-build)

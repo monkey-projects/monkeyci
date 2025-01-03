@@ -73,7 +73,9 @@
             [:span "€" amount])
           (from-time [{:keys [from-time]}]
             (when from-time
-              (time/parse-epoch from-time)))]
+              (-> from-time
+                  (time/parse-epoch)
+                  (time/format-date))))]
     [t/paged-table
      {:id ::credits
       :items-sub [:credits/credits]

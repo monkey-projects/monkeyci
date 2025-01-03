@@ -30,13 +30,8 @@
 (defn list-customer-credits
   "Returns overview of the issued credits to a customer"
   [req]
-  (let [since (-> (jt/offset-date-time)
-                  (jt/minus (jt/years 5))
-                  (jt/instant)
-                  (jt/to-millis-from-epoch))
-        cust-id (c/customer-id req)
-        ;; FIXME Return all of them
-        creds (s/list-customer-credits-since (c/req->storage req) cust-id since)]
+  (let [cust-id (c/customer-id req)
+        creds (s/list-customer-credits (c/req->storage req) cust-id)]
     (rur/response creds)))
 
 (defn issue-credits
