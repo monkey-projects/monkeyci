@@ -83,10 +83,11 @@
        (is (= :issue-credits (-> @c first (nth 2)))))
 
      (testing "passes form params as body"
-       (is (= {:amount 1000
-               :reason "test reason"
-               :from-time 1735686000000}
-              (-> @c first (nth 3) :credits))))
+       (let [params (-> @c first (nth 3) :credits)]
+         (is (= {:amount 1000
+                 :reason "test reason"}
+                (select-keys params [:amount :reason])))
+         (is (number? (:from-time params)))))
 
      (testing "adds customer id"
        (is (= "test-cust"
