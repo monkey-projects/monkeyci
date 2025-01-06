@@ -94,9 +94,7 @@
   [id request-builder]
   (fn [{:keys [db] :as ctx} evt]
     {:dispatch (request-builder id ctx evt)
-     :db (-> db
-             (reset-alerts id)
-             (before-request id))}))
+     :db (before-request db id)}))
 
 (defn on-success
   "Handles the success response for given id"

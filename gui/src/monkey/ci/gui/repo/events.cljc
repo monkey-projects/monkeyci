@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.repo.events
-  (:require [monkey.ci.gui.customer.db :as cdb]
+  (:require [monkey.ci.gui.alerts :as a]
+            [monkey.ci.gui.customer.db :as cdb]
             [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.repo.db :as db]
             [monkey.ci.gui.routing :as r]
@@ -22,11 +23,12 @@
  :repo/leave
  (fn [{:keys [db]} _]
    (-> (lo/on-leave db db/id)
-       ;; Also clear loaded state
+       ;; Also clear loaded state to avoid builds showing up in the wrong repo
        (update :db lo/clear-all db/id))))
 
 (rf/reg-event-fx
  :repo/load
+ ;; Since repos are part of the customer, this actually loads the customer.
  (fn [{:keys [db]} [_ cust-id]]
    (let [existing (cdb/customer db)]
      (cond-> {:db (db/set-builds db nil)}
@@ -59,7 +61,7 @@
 (rf/reg-event-db
  :builds/load--failed
  (fn [db [_ err]]
-   (lo/on-failure db db/id "Could not load builds: " err)))
+   (lo/on-failure db db/id a/builds-load-failed err)))
 
 (def should-handle-evt? #{:build/start :build/pending :build/updated})
 

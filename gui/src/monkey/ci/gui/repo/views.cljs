@@ -112,7 +112,8 @@
       [refresh-btn {:class [:me-auto]}]
       [build-actions]]
      [trigger-form repo]
-     (if (empty? @(rf/subscribe [:repo/builds]))
+     (if (and (empty? @(rf/subscribe [:repo/builds]))
+              @loaded?)
        [:p "This repository has no builds yet."]
        [table/paged-table
         {:id ::builds

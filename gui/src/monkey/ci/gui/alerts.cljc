@@ -52,6 +52,9 @@
 (def repo-unwatch-failed
   (error-msg "Failed to unwatch repo"))
 
+(def builds-load-failed
+  (error-msg "Failed to load builds"))
+
 (def cust-search-failed
   (error-msg "Failed to search for customers"))
 
