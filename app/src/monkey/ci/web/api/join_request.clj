@@ -70,16 +70,24 @@
     (when (and jr (= customer-id (:customer-id jr)))
       jr)))
 
-(defn- respond-to-join-request [new-status req]
+(defn- add-user-customer [st jr]
+  (when-let [u (st/find-user st (:user-id jr))]
+    (->> (update u :customers (comp distinct conj) (:customer-id jr))
+         (st/save-user st))))
+
+(defn- respond-to-join-request [new-status action req]
   (let [st (c/req->storage req)]
     (if-let [jr (find-join-request req)]
       (let [upd (assoc jr
                        :status new-status
                        :response-msg (:message (c/body req)))]
-        (st/save-join-request st upd)
-        (rur/response upd))
+        (if (action st upd)
+          (do
+            (st/save-join-request st upd)
+            (rur/response upd))
+          (rur/status 400)))
       (rur/status 404))))
 
-(def approve-join-request (partial respond-to-join-request :approved))
-(def reject-join-request (partial respond-to-join-request :rejected))
+(def approve-join-request (partial respond-to-join-request :approved add-user-customer))
+(def reject-join-request (partial respond-to-join-request :rejected (constantly true)))
 
