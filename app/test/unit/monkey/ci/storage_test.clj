@@ -188,19 +188,28 @@
           (is (= builds (map :build-id l))))))))
 
 (deftest find-latest-build
-  (testing "retrieves latest build by build id"
-    (h/with-memory-store st
-      (let [repo-sid ["test-customer" "test-repo"]
-            build-idxs (range 2)
-            builds (->> build-idxs
-                        (map (fn [idx]
-                               (-> (zipmap [:customer-id :repo-id] repo-sid)
-                                   (assoc :build-id (format "build-%d" idx)
-                                          :idx idx)))))]
-         (doseq [b builds]
-          (is (sid/sid? (sut/save-build st b))))
+  (h/with-memory-store st
+    (let [repo (h/gen-repo)
+          cust (-> (h/gen-cust)
+                   (assoc :repos {(:id repo) repo}))
+          repo-sid [(:id cust) (:id repo)]
+          build-idxs (range 2)
+          builds (->> build-idxs
+                      (map (fn [idx]
+                             (-> (zipmap [:customer-id :repo-id] repo-sid)
+                                 (assoc :build-id (format "build-%d" idx)
+                                        :idx idx)))))]
+      (is (sid/sid? (sut/save-customer st cust)))
+      (doseq [b builds]
+        (is (sid/sid? (sut/save-build st b))))
+      
+      (testing "retrieves latest build by build id"
         (let [l (sut/find-latest-build st repo-sid)]
-          (is (= (last builds) l)))))))
+          (is (= (last builds) l))))
+
+      (testing "can fetch for customer"
+        (is (= [(last builds)]
+               (sut/find-latest-builds st (first repo-sid))))))))
 
 (deftest list-builds-since
   (testing "retrieves builds since given timestamp"

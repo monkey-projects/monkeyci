@@ -86,10 +86,13 @@
 (def fk-repo (fk :repo-id :repos :id))
 (def fk-user (fk :user-id :users :id))
 
+(defn- idx-name [table col]
+  (keyword (str (name table) "-" (name col) "-idx")))
+
 (defn col-idx
   "Defines an index for a single column"
   [table col]
-  (h/create-index (keyword (str (name table) "-" (name col) "-idx"))
+  (h/create-index (idx-name table col)
                   [table col]))
 
 (defn- mig-id [idx desc]
@@ -411,7 +414,12 @@
     [user-col
      [:password [:varchar 100] [:not nil]]
      fk-user]
-    [(col-idx :sysadmins :user-id)])])
+    [(col-idx :sysadmins :user-id)])
+
+   (migration
+    (mig-id 31 :build-idx-idx)
+    [(col-idx :builds :idx)]
+    [(h/drop-index (idx-name :builds :idx))])])
 
 (defn prepare-migrations
   "Prepares all migrations by formatting to sql, creates a ragtime migration object from it."

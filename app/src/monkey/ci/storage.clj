@@ -408,6 +408,18 @@
           (conj (->sid sid))
           (find-build s)))))
 
+(def find-latest-builds
+  "Retrieves all latest builds for all repos for the customer"
+  (override-or
+   [:customer :find-latest-builds]
+   (fn [s cust-id]
+     (let [cust (find-customer s cust-id)]
+       (->> cust
+            :repos
+            vals
+            (map (comp (partial vector cust-id) :id))
+            (map (partial find-latest-build s)))))))
+
 (def list-builds-since
   "Retrieves all builds for customer since the given timestamp"
   (override-or

@@ -540,6 +540,10 @@
   (some-> (eb/select-latest-build conn cust-id repo-id)
           (db->build)))
 
+(defn- select-latest-customer-builds [{:keys [conn]} cust-id]
+  (->> (eb/select-latest-builds conn cust-id)
+       (map db->build)))
+
 (defn- select-max-build-idx [{:keys [conn]} [cust-id repo-id]]
   ;; TODO Use repo-indices table instead
   ;; TODO Lock table for update
@@ -965,7 +969,8 @@
     :list-available-credits select-avail-credits
     :list-credit-subscriptions select-customer-credit-subs
     :list-credit-consumptions select-customer-credit-cons
-    :list-credit-consumptions-since select-customer-credit-cons-since}
+    :list-credit-consumptions-since select-customer-credit-cons-since
+    :find-latest-builds select-latest-customer-builds}
    :repo
    {:list-display-ids select-repo-display-ids
     :find-next-build-idx (comp (fnil inc 0) select-max-build-idx)

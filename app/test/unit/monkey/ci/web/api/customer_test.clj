@@ -4,6 +4,7 @@
             [monkey.ci
              [cuid :as cuid]
              [helpers :as h]
+             [sid :as sid]
              [storage :as st]
              [utils :as u]]
             [monkey.ci.web.api.customer :as sut]
@@ -17,7 +18,7 @@
           req (-> rt
                   (h/->req)
                   (h/with-path-param :customer-id (:id cust)))]
-      (is (st/sid? (st/save-customer st cust)))
+      (is (sid/sid? (st/save-customer st cust)))
       (is (= cust (:body (sut/get-customer req))))))
 
   (testing "404 not found when no match"
@@ -34,8 +35,8 @@
                 :name "Test repository"
                 :customer-id (:id cust)}
           {st :storage :as rt} (trt/test-runtime)]
-      (is (st/sid? (st/save-customer st cust)))
-      (is (st/sid? (st/save-repo st repo)))
+      (is (sid/sid? (st/save-customer st cust)))
+      (is (sid/sid? (st/save-repo st repo)))
       (let [r (-> rt
                   (h/->req)
                   (h/with-path-param :customer-id (:id cust))
@@ -81,7 +82,7 @@
                   (h/->req)
                   (h/with-path-param :customer-id (:id cust))
                   (h/with-body {:name "updated"}))]
-      (is (st/sid? (st/save-customer st cust)))
+      (is (sid/sid? (st/save-customer st cust)))
       (is (= {:id (:id cust)
               :name "updated"}
              (:body (sut/update-customer req))))))
@@ -178,16 +179,47 @@
                      (sut/recent-builds)
                      :body))))))))
 
+(deftest latest-builds
+  (testing "returns latest build for each customer repo"
+    (h/with-memory-store st
+      (let [repos (repeatedly 2 h/gen-repo)
+            cust (-> (h/gen-cust)
+                     (assoc :repos (->> repos
+                                        (map (fn [r]
+                                               [(:id r) r]))
+                                        (into {}))))
+            builds (->> repos
+                        (map (fn [r]
+                               (-> (h/gen-build)
+                                   (assoc :customer-id (:id cust)
+                                          :repo-id (:id r))))))]
+        (is (sid/sid? (st/save-customer st cust)))
+        (doseq [b builds]
+          (is (sid/sid? (st/save-build st b))))
+        (let [res (-> {:storage st}
+                      (h/->req)
+                      (assoc-in [:parameters :path :customer-id] (:id cust))
+                      (sut/latest-builds))]
+          (is (= 200 (:status res)))
+          (is (= 2 (count (:body res))))
+          (is (= (->> builds
+                      (map :build-id)
+                      (set))
+                 (->> res
+                      :body
+                      (map :build-id)
+                      (set)))))))))
+
 (deftest stats
   (h/with-memory-store st
     (let [repo (h/gen-repo)
           cust (-> (h/gen-cust)
                    (assoc :repos {(:id repo) repo}))
           req  (-> {:storage st}
-                  (h/->req)
-                  (assoc :parameters
-                         {:path
-                          {:customer-id (:id cust)}}))]
+                   (h/->req)
+                   (assoc :parameters
+                          {:path
+                           {:customer-id (:id cust)}}))]
       
       (is (some? (st/save-customer st cust)))
       

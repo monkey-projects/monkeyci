@@ -366,6 +366,11 @@
           (testing "`/recent` retrieves builds from latest 24h"
             (is (= 200 (-> (mock/request :get (str "/customer/" (:id cust) "/builds/recent"))
                            (app)
+                           :status))))
+
+          (testing "`/latest` retrieves latest builds for each repo"
+            (is (= 200 (-> (mock/request :get (str "/customer/" (:id cust) "/builds/latest"))
+                           (app)
                            :status)))))
 
         (testing "`GET /stats` retrieves customer statistics"

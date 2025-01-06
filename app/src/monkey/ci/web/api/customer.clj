@@ -50,13 +50,23 @@
 (defn- hours-ago [h]
   (- (t/now) (t/hours->millis h)))
 
-(defn recent-builds [req]
+(defn recent-builds
+  "Fetches all builds for the customer that were executed in the past 24 hours, or since
+   a given query parameter."
+  [req]
   (let [st (c/req->storage req)
         cid (c/customer-id req)]
     (if (st/find-customer st cid)
       (rur/response (st/list-builds-since st cid (or (query->since req)
                                                      (hours-ago 24))))
       (rur/not-found {:message "Customer not found"}))))
+
+(defn latest-builds
+  "Fetches the latest build for each repo for the customer"
+  [req]
+  (-> (st/find-latest-builds (c/req->storage req)
+                             (c/customer-id req))
+      (rur/response)))
 
 (def default-tz "Z")
 

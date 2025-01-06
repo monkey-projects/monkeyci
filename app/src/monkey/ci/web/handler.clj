@@ -305,8 +305,11 @@
 
 (def customer-build-routes
   ["/builds"
-   [["/recent" {:get {:handler cust-api/recent-builds
-                      :parameters since-params}}]]])
+   [["/recent"
+     {:get {:handler cust-api/recent-builds
+            :parameters since-params}}]
+    ["/latest"
+     {:get {:handler cust-api/latest-builds}}]]])
 
 (def stats-routes
   ["/stats" {:get {:handler cust-api/stats

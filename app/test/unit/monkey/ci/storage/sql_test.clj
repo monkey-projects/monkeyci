@@ -441,6 +441,34 @@
           (let [r (st/find-latest-build s [(:id cust) (:id repo)])]
             (is (= (:build-id new-build) (:build-id r))))))
 
+      (testing "can find all latest for customer"
+        (let [repos (repeatedly 2 h/gen-repo)
+              cust (-> (h/gen-cust)
+                       (assoc :repos (->> repos
+                                          (map (fn [r] [(:id r) r]))
+                                          (into {}))))
+              builds (->> [{:idx 1
+                            :build-id "build-1"
+                            :repo-id (:id (first repos))}
+                           {:idx 2
+                            :build-id "build-2"
+                            :repo-id (:id (first repos))}
+                           {:idx 3
+                            :build-id "build-3"
+                            :repo-id (:id (second repos))}
+                           {:idx 4
+                            :build-id "build-4"
+                            :repo-id (:id (second repos))}]
+                          (map #(assoc % :customer-id (:id cust))))]
+          (is (sid/sid? (st/save-customer s cust)))
+          (doseq [b builds]
+            (is (sid/sid? (st/save-build s b))))
+          (let [latest (st/find-latest-builds s (:id cust))]
+            (is (= #{"build-2" "build-4"}
+                   (->> latest
+                        (map :build-id)
+                        (set)))))))
+
       (testing "can update atomically"
         (let [build (-> (h/gen-build)
                         (assoc :status :initializing
