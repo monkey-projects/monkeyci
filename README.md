@@ -85,8 +85,9 @@ or maybe [Artemis](https://activemq.apache.org/components/artemis/)).
 
 ### How do I get set up? ###
 
-The code consists of several modules.  `lib` contains the library included in the scripts,
-and `app` contains the code for the application itself.
+The code consists of several modules.  `gui` contains the frontend code, `app`
+contains the code for the application itself (the backend) and `test-lib` is a
+library that can be included in build script unit tests.
 
 * Install [Clojure tools](https://clojure.org/guides/deps_and_cli)
 * Running tests once: `clojure -X:test`

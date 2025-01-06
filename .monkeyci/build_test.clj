@@ -23,7 +23,7 @@
   (testing "generates index page for release"
     (let [ctx (-> mt/test-ctx
                   (mt/with-git-ref "refs/tags/0.1.0"))]
-      (is (= "clojure -X:gen-idx"
+      (is (= "clojure -X:gen-main"
              (-> (sut/build-gui-release ctx)
                  :script
                  first)))))
@@ -32,7 +32,15 @@
     (let [ctx (-> mt/test-ctx
                   (mt/with-git-ref "refs/heads/main")
                   (mt/with-changes (mt/modified ["gui/deps.edn"])))]
-      (is (= "clojure -X:staging:gen-idx"
+      (is (= "clojure -X:staging:gen-main"
              (-> (sut/build-gui-release ctx)
                  :script
-                 first))))))
+                 first)))))
+
+  (testing "generates admin page for release"
+    (let [ctx (-> mt/test-ctx
+                  (mt/with-git-ref "refs/tags/0.1.0"))]
+      (is (= "clojure -X:gen-admin"
+             (-> (sut/build-gui-release ctx)
+                 :script
+                 second))))))

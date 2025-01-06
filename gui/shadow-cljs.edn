@@ -6,7 +6,15 @@
  :builds
  {:frontend
   {:target :browser
-   :modules {:main {:init-fn monkey.ci.gui.core/init}}
+   :modules
+   {:common
+    {}
+    :main
+    {:init-fn monkey.ci.gui.main/init
+     :depends-on #{:common}}
+    :admin
+    {:init-fn monkey.ci.gui.admin/init
+     :depends-on #{:common}}}
    :output-dir "target/js/frontend/js"}
 
   :test/browser

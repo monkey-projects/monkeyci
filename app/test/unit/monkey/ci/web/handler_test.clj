@@ -747,6 +747,8 @@
                                          :repos {repo-id {:id repo-id
                                                           :name "test repo"}}})))
       (is (st/sid? (st/save-build st build)))
+      (is (st/sid? (st/save-customer-credit st {:customer-id (first sid)
+                                                :amount 1000})))
       (f {:events events
           :storage st
           :sid sid

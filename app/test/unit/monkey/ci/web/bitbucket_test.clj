@@ -231,6 +231,8 @@
             :repo-id (:id repo)
             :customer-id (:id cust)}
         _ (st/save-webhook s wh)
+        _ (st/save-customer-credit s {:customer-id (:id cust)
+                                      :amount 1000})
         req (-> rt
                 (h/->req)
                 (assoc :headers {"x-event-key" "repo:push"}

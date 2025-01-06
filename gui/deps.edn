@@ -26,10 +26,15 @@
   {:extra-deps {com.monkeyprojects/build {:mvn/version "0.2.0"}}
    :exec-fn monkey.test/all}
 
-  :gen-idx
+  :gen-main
   {:extra-deps {hiccup/hiccup {:mvn/version "2.0.0-RC3"}}
-   :exec-fn monkey.ci.gui.build/gen-idx
+   :exec-fn monkey.ci.gui.build/gen-main
    :exec-args {:output "target/index.html"}}
+  
+  :gen-admin
+  {:extra-deps {hiccup/hiccup {:mvn/version "2.0.0-RC3"}}
+   :exec-fn monkey.ci.gui.build/gen-admin
+   :exec-args {:output "target/admin/index.html"}}
 
   :staging
   {:exec-args {:base-url "staging.monkeyci.com"}}}}
