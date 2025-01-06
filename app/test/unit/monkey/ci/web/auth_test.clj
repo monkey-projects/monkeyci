@@ -1,9 +1,12 @@
 (ns monkey.ci.web.auth-test
   (:require [clojure.test :refer [deftest testing is]]
             [buddy.core.keys :as bk]
-            [monkey.ci.storage :as st]
+            [monkey.ci
+             [cuid :as cuid]
+             [storage :as st]]
             [monkey.ci.helpers :as h]
             [monkey.ci.web.auth :as sut]
+            [monkey.ci.test.runtime :as trt]
             [ring.mock.request :as mock]))
 
 (deftest generate-secret-key
@@ -36,51 +39,33 @@
         (is (bk/public-key? (:pub rt)))))))
 
 (deftest secure-ring-app
-  (testing "verifies bearer token using public key and puts user in request `:identity`"
-    (h/with-memory-store st
-      (let [app :identity
-            kp (sut/generate-keypair)
-            rt {:storage st
-                :jwk (sut/keypair->rt kp)}
-            sec (sut/secure-ring-app app rt)
-            req (h/->req rt)]
-        (is (st/sid? (st/save-user st {:type "github"
-                                       :type-id 456})))
-        (is (nil? (sec {}))
-            "no identity provided")
+  (let [app :identity
+        {st :storage :as rt} (trt/test-runtime)
+        sec (sut/secure-ring-app app rt)
+        req (h/->req rt)]
+
+    (testing "with user token"
+      (is (st/sid? (st/save-user st {:type "github"
+                                     :type-id 456})))
+      (is (nil? (sec {}))
+          "no identity provided")
+      
+      (testing "verifies bearer token using public key and puts user in request `:identity`"
         (is (some? (sec (-> req
                             (assoc :headers
                                    {"authorization"
                                     (str "Bearer " (sut/generate-jwt req {:role sut/role-user
                                                                           :sub "github/456"}))}))))
-            "bearer token provided"))))
+            "bearer token provided"))
 
-  (testing "verifies token query param using public key and puts user in request `:identity`"
-    (h/with-memory-store st
-      (let [app :identity
-            kp (sut/generate-keypair)
-            rt {:storage st
-                :jwk (sut/keypair->rt kp)}
-            sec (sut/secure-ring-app app rt)
-            req (h/->req rt)]
-        (is (st/sid? (st/save-user st {:type "github"
-                                       :type-id 456})))
-        (is (nil? (sec {}))
-            "no identity provided")
+      (testing "verifies token query param using public key and puts user in request `:identity`"
         (is (some? (sec (-> req
                             (assoc-in [:query-params "authorization"]
                                       (sut/generate-jwt req (sut/user-token ["github" "456"]))))))
-            "bearer token provided"))))
+            "bearer token provided")))
 
-  (testing "when build token, puts build customer and repo in identity"
-    (h/with-memory-store st
-      (let [app :identity
-            kp (sut/generate-keypair)
-            rt {:storage st
-                :jwk (sut/keypair->rt kp)}
-            sec (sut/secure-ring-app app rt)
-            req (h/->req rt)
-            [cid rid bid :as sid] (repeatedly 3 (comp str random-uuid))]
+    (testing "with build token, puts build customer and repo in identity"
+      (let [[cid rid bid :as sid] (repeatedly 3 cuid/random-cuid)]
         (is (st/sid? (st/save-customer st {:id cid
                                            :name "test customer"
                                            :repos [{:id rid
@@ -88,41 +73,74 @@
         (is (st/sid? (st/save-build st {:customer-id cid
                                         :repo-id rid
                                         :build-id bid})))
-        (is (some? (sec (-> req
+        (is (some? (-> req
+                       (assoc :headers
+                              {"authorization"
+                               (str "Bearer " (sut/generate-jwt req (sut/build-token sid)))})
+                       (sec)))
+            "bearer token provided")))
+
+    (testing "accepts sysadmin token"
+      (let [[_ username :as sid] ["sysadmin" "test-admin"]]
+        (is (st/sid? (st/save-user st
+                                   {:id (cuid/random-cuid)
+                                    :type-id username
+                                    :type "sysadmin"})))
+        (is (= username (-> req
                             (assoc :headers
                                    {"authorization"
-                                    (str "Bearer " (sut/generate-jwt req (sut/build-token sid)))}))))
+                                    (str "Bearer " (sut/generate-jwt req (sut/sysadmin-token sid)))})
+                            (sec)
+                            :type-id))
             "bearer token provided")))))
 
 (deftest customer-authorization
-    (let [h (constantly ::ok)
-          auth (sut/customer-authorization h)]
-      (testing "invokes target"
-        (testing "if no customer id in request path"
-          (is (= ::ok (auth {}))))
+  (let [h (constantly ::ok)
+        auth (sut/customer-authorization h)]
+    (testing "invokes target"
+      (testing "if no customer id in request path"
+        (is (= ::ok (auth {}))))
 
-        (testing "if identity allows access to customer id"
-          (is (= ::ok (auth {:parameters
-                             {:path
-                              {:customer-id "test-cust"}}
-                             :identity
-                             {:customers
-                              #{"test-cust"}}})))))
+      (testing "if identity allows access to customer id"
+        (is (= ::ok (auth {:parameters
+                           {:path
+                            {:customer-id "test-cust"}}
+                           :identity
+                           {:customers
+                            #{"test-cust"}}})))))
 
-      (testing "throws authorization error"
-        (testing "if customer id is not in identity"
-          (is (thrown? Exception
-                       (auth {:parameters
-                              {:path
-                               {:customer-id "test-cust"}}
-                              :identity
-                              {:customers #{"other-cust"}}}))))
+    (testing "throws authorization error"
+      (testing "if customer id is not in identity"
+        (is (thrown? Exception
+                     (auth {:parameters
+                            {:path
+                             {:customer-id "test-cust"}}
+                            :identity
+                            {:customers #{"other-cust"}}}))))
 
-        (testing "if not authenticated"
-          (is (thrown? Exception
-                       (auth {:parameters
-                              {:path
-                               {:customer-id "test-cust"}}})))))))
+      (testing "if not authenticated"
+        (is (thrown? Exception
+                     (auth {:parameters
+                            {:path
+                             {:customer-id "test-cust"}}})))))))
+
+(deftest sysadmin-authorization
+  (let [h (constantly ::ok)
+        auth (sut/sysadmin-authorization h)]
+    (testing "invokes target"
+      (testing "if identity is sysadmin"
+        (is (= ::ok (auth {:identity
+                           {:type :sysadmin}})))))
+
+    (testing "throws authorization error"
+      (testing "if user is not a sysadmin"
+        (is (thrown? Exception
+                     (auth {:identity
+                            {:type :github}}))))
+
+      (testing "if not authenticated"
+        (is (thrown? Exception
+                     (auth {})))))))
 
 (deftest valid-security?
   (testing "false if nil"
@@ -143,3 +161,7 @@
     (is (= {:alg :sha256
             :signature "test-value"}
            (sut/parse-signature "sha256=test-value")))))
+
+(deftest sysadmin-token
+  (testing "has `sysadmin` role"
+    (is (= "sysadmin" (:role (sut/sysadmin-token ["test-admin-user"]))))))

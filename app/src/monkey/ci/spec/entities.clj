@@ -168,3 +168,8 @@
 
 (s/def :entity/crypto
   (s/keys :req-un [:entity/customer-id :entity/iv]))
+
+(s/def :entity/password string?)
+
+(s/def :entity/sysadmin
+  (s/keys :req-un [:entity/user-id :entity/password]))

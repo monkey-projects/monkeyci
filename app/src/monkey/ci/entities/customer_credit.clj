@@ -68,5 +68,7 @@
 (defn by-cust-since [cust-id ts]
   [:and
    (by-cust cust-id)
-   [:<= :cc.from-time (ec/->ts ts)]])
+   [:or
+    [:is :cc.from-time nil]
+    [:<= :cc.from-time (ec/->ts ts)]]])
 

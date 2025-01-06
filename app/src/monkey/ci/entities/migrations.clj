@@ -404,7 +404,14 @@
 
    (customer-ivs 27)
    (encrypt-params 28)
-   (encrypt-ssh-keys 29)])
+   (encrypt-ssh-keys 29)
+
+   (table-migration
+    30 :sysadmins
+    [user-col
+     [:password [:varchar 100] [:not nil]]
+     fk-user]
+    [(col-idx :sysadmins :user-id)])])
 
 (defn prepare-migrations
   "Prepares all migrations by formatting to sql, creates a ragtime migration object from it."

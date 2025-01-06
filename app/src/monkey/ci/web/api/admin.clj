@@ -1,5 +1,6 @@
 (ns monkey.ci.web.api.admin
-  (:require [monkey.ci
+  (:require [java-time.api :as jt]
+            [monkey.ci
              [build :as b]
              [cuid :as cuid]
              [storage :as s]]
@@ -8,6 +9,30 @@
              [auth :as auth]
              [common :as c]]
             [ring.util.response :as rur]))
+
+(defn login
+  "Authenticates admin user by looking up the user of type `sysadmin` with given
+   username that matches given password."
+  [req]
+  (let [{:keys [username password]} (c/body req)
+        st (c/req->storage req)
+        sid [auth/role-sysadmin username]
+        u (s/find-user-by-type st sid)
+        sa (when u
+             (s/find-sysadmin st (:id u)))]
+    (if (and sa
+             (= (:password sa) (auth/hash-pw password)))
+      (rur/response (assoc u :token (->> (auth/sysadmin-token sid)
+                                         (auth/generate-jwt-from-rt (c/req->rt req)))))
+      ;; Invalid credentials
+      (rur/status 403))))
+
+(defn list-customer-credits
+  "Returns overview of the issued credits to a customer"
+  [req]
+  (let [cust-id (c/customer-id req)
+        creds (s/list-customer-credits (c/req->storage req) cust-id)]
+    (rur/response creds)))
 
 (defn issue-credits
   "Issues ad-hoc credits to a customer."

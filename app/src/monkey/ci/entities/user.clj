@@ -21,3 +21,11 @@
               :join [[:user-customers :uc] [:= :uc.customer-id :c.id]
                      [:users :u] [:= :u.id :uc.user-id]]
               :where [:= :u.cuid user-cuid]}))
+
+(defn select-sysadmin-by-user-cuid [conn cuid]
+  (->> (ec/select conn
+                  {:select [:s.*]
+                   :from [[:sysadmins :s]]
+                   :join [[:users :u] [:= :u.id :s.user-id]]
+                   :where [:= :u.cuid cuid]})
+       (first)))
