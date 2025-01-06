@@ -89,3 +89,9 @@
 
 (defn set-bb-webhooks [db wh]
   (assoc db bb-webhooks wh))
+
+(def latest-builds ::latest-builds)
+(def get-latest-builds latest-builds)
+
+(defn set-latest-builds [db l]
+  (assoc db latest-builds l))

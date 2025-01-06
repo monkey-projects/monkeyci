@@ -67,6 +67,9 @@
 (def cust-recent-builds-failed
   (error-msg "Failed to load recent builds"))
 
+(def cust-latest-builds-failed
+  (error-msg "Failed to load latest builds"))
+
 (def cust-stats-failed
   (error-msg "Failed to load statistics"))
 

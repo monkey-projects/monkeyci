@@ -77,6 +77,13 @@
           [:p "Credit consumption for this month."]
           [charts/chart-component :customer/credits]]]]])))
 
+(defn- latest-build [r]
+  (let [build (rf/subscribe [:customer/latest-build (:id r)])]
+    (when @build
+      [:a {:title (str "Latest build: " (:build-id @build))
+           :href (r/path-for :page/build @build)}
+       [co/build-result (:status @build)]])))
+
 (defn- show-repo [c r]
   (let [repo-path (r/path-for :page/repo {:customer-id (:id c)
                                           :repo-id (:id r)})]
@@ -85,7 +92,8 @@
       [:div.me-auto
        [:h6 {:title (:id r)}
         [:span.me-2 co/repo-icon]
-        [:a.link-dark {:href repo-path} (:name r)]]
+        [:a.link-dark.me-3 {:href repo-path} (:name r)]
+        [latest-build r]]
        [:p "Url: " [:a {:href (:url r) :target :_blank} (:url r)]]]
       [:a.btn.btn-primary
        {:href repo-path}
@@ -190,6 +198,7 @@
 (defn- customer-repos
   "Displays a list of customer repositories, grouped by selected label"
   []
+  (rf/dispatch [:customer/load-latest-builds])
   (let [c (rf/subscribe [:customer/info])]
     (if (empty? (:repos @c))
       [:p "No repositories configured for this customer.  You can start by"

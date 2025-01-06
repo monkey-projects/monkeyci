@@ -301,3 +301,18 @@
    #(db/set-bb-webhooks % ::test-webhooks)
    ::test-webhooks
    nil))
+
+(deftest latest-build
+  (let [repo-id "test-repo"
+        build ::test-build
+        l (rf/subscribe [:customer/latest-build repo-id])]
+    (testing "exists"
+      (is (some? l)))
+
+    (testing "initially `nil`"
+      (is (nil? @l)))
+
+    (testing "returns latest build for repo"
+      (is (some? (reset! app-db (db/set-latest-builds {}
+                                                      {repo-id build}))))
+      (is (= build @l)))))

@@ -119,6 +119,39 @@
     (rf/dispatch-sync [:customer/load--failed "test-id" "test-customer"])
     (is (not (lo/loading? @app-db db/customer)))))
 
+(deftest customer-load-latest-builds
+  (testing "requests from backend"
+    (rf-test/run-test-sync
+     (let [cust {:id "test-cust"
+                 :name "Test customer"}
+           c (h/catch-fx :martian.re-frame/request)]
+       (reset! app-db (r/set-current {} {:path "/c/test-cust"
+                                         :parameters {:path {:customer-id "test-cust"}}}))
+       (h/initialize-martian {:get-customer-latest-builds {:status 200
+                                                           :body []
+                                                           :error-code :no-error}})
+       (rf/dispatch [:customer/load-latest-builds])
+       (is (= 1 (count @c)))))))
+
+(deftest customer-load-latest-builds--success
+  (testing "sets latest builds in db by repo"
+    (rf/dispatch-sync [:customer/load-latest-builds--success
+                       {:body [{:repo-id "repo-1"
+                                :build-id "build-1"}
+                               {:repo-id "repo-2"
+                                :build-id "build-2"}]}])
+    (is (= {"repo-1" {:repo-id "repo-1"
+                      :build-id "build-1"}
+            "repo-2" {:repo-id "repo-2"
+                      :build-id "build-2"}}
+           (db/get-latest-builds @app-db)))))
+
+(deftest customer-load-latest-builds--failed
+  (testing "sets error alert"
+    (rf/dispatch-sync [:customer/load-latest-builds--failed "test error"])
+    (let [[err] (lo/get-alerts @app-db db/customer)]
+      (is (= :danger (:type err))))))
+
 (deftest customer-load-bb-webhooks
   (testing "sends request to api"
     (rf-test/run-test-sync

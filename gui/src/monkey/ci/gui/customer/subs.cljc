@@ -160,3 +160,8 @@
  :<- [:github/alerts]
  (fn [[ra ga] _]
    (concat ra ga)))
+
+(rf/reg-sub
+ :customer/latest-build
+ (fn [db [_ repo-id]]
+   (get (db/get-latest-builds db) repo-id)))

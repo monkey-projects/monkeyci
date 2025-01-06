@@ -57,6 +57,27 @@
    (lo/on-failure db db/customer (a/cust-details-failed id) err)))
 
 (rf/reg-event-fx
+ :customer/load-latest-builds
+ (fn [{:keys [db]} _]
+   {:dispatch [:secure-request
+               :get-customer-latest-builds
+               {:customer-id (r/customer-id db)}
+               [:customer/load-latest-builds--success]
+               [:customer/load-latest-builds--failed]]}))
+
+(rf/reg-event-db
+ :customer/load-latest-builds--success
+ (fn [db [_ {:keys [body]}]]
+   (db/set-latest-builds db (->> body
+                                 (group-by :repo-id)
+                                 (mc/map-vals first)))))
+
+(rf/reg-event-db
+ :customer/load-latest-builds--failed
+ (fn [db [_ err]]
+   (db/set-alerts db [(a/cust-latest-builds-failed err)])))
+
+(rf/reg-event-fx
  :customer/load-bb-webhooks
  (fn [{:keys [db]} _]
    (let [cust (db/get-customer db)]
