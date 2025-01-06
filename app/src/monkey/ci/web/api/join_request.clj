@@ -1,6 +1,7 @@
 (ns monkey.ci.web.api.join-request
   "API functions for customer join requests"
   (:require [clojure.tools.logging :as log]
+            [medley.core :as mc]
             [monkey.ci.storage :as st]
             [monkey.ci.web.common :as c]
             [ring.util.response :as rur]))
@@ -27,6 +28,14 @@
   (c/entity-getter (c/id-getter :join-request-id)
                    st/find-join-request))
 
+(defn- add-customers [st jrs]
+  (let [custs (->> (st/find-customers st (map :customer-id jrs))
+                   (group-by :id)
+                   (mc/map-vals first))]
+    (->> jrs
+         (map (fn [jr]
+                (assoc jr :customer (get custs (:customer-id jr))))))))
+
 (defn search-join-requests
   "Retrieves join requests for the user or customer, depending on parameters"
   [req]
@@ -34,7 +43,9 @@
         st (c/req->storage req)]
     (log/debug "User id:" user-id)
     (-> (cond
-          user-id (st/list-user-join-requests st user-id)
+          user-id (->> (st/list-user-join-requests st user-id)
+                       (add-customers st))
+          ;; TODO Implement for customer
           :else [])
         (rur/response))))
 
@@ -43,6 +54,7 @@
 
 (defn list-customer-join-requests [req]
   ;; TODO Allow filtering by status
+  ;; TODO Add user details
   (rur/response (st/list-customer-join-requests
                  (c/req->storage req)
                  (get-in req [:parameters :path :customer-id]))))

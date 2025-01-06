@@ -135,14 +135,16 @@
       (id->cuid)
       (select-keys [:cuid :name])))
 
-(defn- db->cust [c]
+(def db->cust cuid->id)
+
+(defn- db->cust-with-repos [c]
   (letfn [(entities->repos [repos]
             (reduce-kv (fn [r _ v]
                          (assoc r (:display-id v) (db->repo v)))
                        {}
                        repos))]
     (-> c
-        (cuid->id)
+        (db->cust)
         (mc/update-existing :repos entities->repos))))
 
 (defn- insert-customer [conn cust]
@@ -167,7 +169,7 @@
 (defn- select-customer [conn cuid]
   (when cuid
     (some-> (ecu/customer-with-repos conn (ec/by-cuid cuid))
-            (db->cust))))
+            (db->cust-with-repos))))
 
 (defn- customer-exists? [conn cuid]
   (some? (ec/select-customer conn (ec/by-cuid cuid))))
@@ -184,7 +186,11 @@
                 ;; By default, this will use case insensitive search (depends on collation)
                 name [:like :name (str "%" name "%")])]
     (->> (ec/select-customers conn query)
-         (map db->cust))))
+         (map db->cust-with-repos))))
+
+(defn- select-customers-by-id [{:keys [conn]} ids]
+  (->> (ec/select-customers conn [:in :cuid (distinct ids)])
+       (map db->cust)))
 
 (defn- global-sid? [type sid]
   (= [st/global (name type)] (take 2 sid)))
@@ -381,7 +387,7 @@
 
 (defn- select-user-customers [{:keys [conn]} id]
   (->> (eu/select-user-customers conn id)
-       (map db->cust)))
+       (map db->cust-with-repos)))
 
 (defn build? [sid]
   (and (= "builds" (first sid))
@@ -952,6 +958,7 @@
     :unwatch unwatch-github-repo}
    :customer
    {:search select-customers
+    :find-multiple select-customers-by-id
     :list-credits-since select-customer-credits-since
     :list-credits select-customer-credits
     :get-available-credits select-avail-credits-amount

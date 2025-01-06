@@ -109,6 +109,15 @@
 (defn find-customer [s id]
   (p/read-obj s (customer-sid id)))
 
+(def find-customers
+  "Fetches multiple customers, without repos"
+  (override-or
+   [:customer :find-multiple]
+   (fn [s ids]
+     (->> ids
+          (distinct)
+          (map (partial find-customer s))))))
+
 (def search-customers
   "Searches customers using given filter"
   (override-or

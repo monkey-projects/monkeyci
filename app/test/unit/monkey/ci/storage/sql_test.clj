@@ -80,7 +80,20 @@
           (is (= [cust] (st/search-customers s {:name "test"}))))
 
         (testing "by id"
-          (is (= [cust] (st/search-customers s {:id (:id cust)}))))))))
+          (is (= [cust] (st/search-customers s {:id (:id cust)}))))))
+
+    (testing "can find multiple by id"
+      (let [custs (repeatedly 3 h/gen-cust)]
+        (doseq [c custs]
+          (st/save-customer s c))
+        (let [r (st/find-customers s (->> custs
+                                          (take 2)
+                                          (map :id)))]
+          (is (= (->> (take 2 custs)
+                      (map :id)
+                      (set))
+                 (->> (map :id r)
+                      (set)))))))))
 
 (deftest ^:sql repos
   (with-storage conn s
@@ -461,8 +474,8 @@
                              :status))))
 
       (testing "can list for user"
-        (is (= [(:id jr)] (->> (st/list-user-join-requests s (:id user))
-                               (map :id))))))))
+        (let [r (st/list-user-join-requests s (:id user))]
+          (is (= [(:id jr)] (map :id r))))))))
 
 (deftest ^:sql email-registrations
   (with-storage conn s

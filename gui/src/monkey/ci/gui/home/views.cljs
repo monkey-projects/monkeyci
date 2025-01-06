@@ -97,7 +97,7 @@
   [:form
    {:on-submit (f/submit-handler [:customer/search])}
    [:div.row
-    [:div.col-lg-6
+    [:div.col
      [:label.form-label {:for :customer-search} "Search customer"]
      [:input.form-control.mb-3
       {:id :customer-search
@@ -151,10 +151,10 @@
 
 (defn- request-status [{:keys [status]}]
   (let [cl (condp = status
-             :pending  :text-bg-warning
-             :approved :text-bg-success
-             :rejected :text-bg-danger
-             :text-bg-warning)]
+             :pending  :bg-warning
+             :approved :bg-success
+             :rejected :bg-danger
+             :bg-warning)]
     [:span {:class (str "badge " (name cl))} (some-> status (name))]))
 
 (defn- join-requests-table []
@@ -166,9 +166,7 @@
      {:id :user/join-requests
       :items-sub [:user/join-requests]
       :columns [{:label "Customer"
-                 ;; TODO Find a way to get customer names here.  Either we need a special request
-                 ;; to the backend, or launch a request per record (to be avoided).
-                 :value :customer-id}
+                 :value (comp :name :customer)}
                 {:label "Status"
                  :value request-status}
                 {:label "Actions"
@@ -192,14 +190,18 @@
   (fn []
     [l/default
      [:div.row
-      [:div.col-lg-8
-       [:h3 "Join Existing Customer"]
-       [:p
-        "On this page you can search for a customer and request to join it.  A user "
-        "with administrator permissions for that customer can approve your request."]
-       [co/alerts [:customer/join-alerts]]
-       [search-customer]
-       [:div.mt-2
-        [search-results]]]
-      [:div.col-lg-4
-       [join-requests]]]]))
+      [:div.col-lg-6
+       [:div.card
+        [:div.card-body
+         [:h3.card-title "Join Existing Customer"]
+         [:p
+          "On this page you can search for a customer and request to join it.  A user "
+          "with administrator permissions for that customer can approve your request."]
+         [co/alerts [:customer/join-alerts]]
+         [search-customer]
+         [:div.mt-2
+          [search-results]]]]]
+      [:div.col-lg-6
+       [:div.card
+        [:div.card-body
+         [join-requests]]]]]]))

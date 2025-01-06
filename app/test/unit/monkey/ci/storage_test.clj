@@ -13,6 +13,17 @@
   (testing "executes target"
     (is (= ::result (sut/transact (sut/make-memory-storage) (constantly ::result))))))
 
+(deftest customers
+  (h/with-memory-store st
+    (testing "can find multiple"
+      (let [custs (repeatedly 3 h/gen-cust)]
+        (doseq [c custs]
+          (sut/save-customer st c))
+        (let [r (sut/find-customers st (->> custs
+                                            (take 2)
+                                            (map :id)))]
+          (is (= (take 2 custs) r)))))))
+
 (deftest webhooks
   (testing "webhook-sid is a sid"
     (is (sid/sid? (sut/webhook-sid "test-id"))))
@@ -346,7 +357,12 @@
         (is (= req (sut/find-join-request st (:id req)))))
 
       (testing "can list for user"
-        (is (= [req] (sut/list-user-join-requests st (:user-id req))))))))
+        (is (= req (-> (sut/list-user-join-requests st (:user-id req))
+                       first
+                       (select-keys (keys req))))))
+
+      (testing "can list for customer"
+        (is (= [req] (sut/list-customer-join-requests st (:customer-id req))))))))
 
 (deftest credit-subscriptions
   (h/with-memory-store st
