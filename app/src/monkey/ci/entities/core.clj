@@ -379,3 +379,5 @@
   (execute-update conn {:update :cryptos
                         :set crypto
                         :where [:= :customer-id (:customer-id crypto)]}))
+
+(defaggregate sysadmin)

@@ -502,7 +502,9 @@
       :bitbucket-security
       (non-dev rt [bitbucket/validate-security])
       :customer-check
-      (non-dev rt [auth/customer-authorization])}}))
+      (non-dev rt [auth/customer-authorization])
+      :sysadmin-check
+      (non-dev rt [auth/sysadmin-authorization])}}))
   ([rt]
    (make-router rt routes)))
 

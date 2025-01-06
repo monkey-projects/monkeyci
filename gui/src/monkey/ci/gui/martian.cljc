@@ -80,6 +80,11 @@
    :public-key s/Str
    :label-filters [LabelFilterDisjunction]})
 
+(s/defschema UserCredits
+  {:amount s/Int
+   (s/optional-key :reason) s/Str
+   :from-time s/Int})
+
 (defn public-route [conf]
   (merge {:method :get
           :produces #{"application/edn"}
@@ -171,6 +176,19 @@
      :path-parts (into customer-path ["/credits"])
      :path-schema customer-schema
      :method :get})
+
+   (api-route
+    {:route-name :get-customer-credit-overview
+     :path-parts ["/admin/credits/" :customer-id]
+     :path-schema customer-schema
+     :method :get})
+
+   (api-route
+    {:route-name :issue-credits
+     :path-parts ["/admin/credits/" :customer-id "/issue"]
+     :path-schema customer-schema
+     :body-schema {:credits UserCredits}
+     :method :post})
 
    (api-route
     {:route-name :get-user-customers
@@ -342,7 +360,14 @@
 
    (public-route
     {:route-name :get-bitbucket-config
-     :path-parts ["/bitbucket/config"]})])
+     :path-parts ["/bitbucket/config"]})
+
+   (public-route
+    {:route-name :admin-login
+     :method :post
+     :path-parts ["/admin/login"]
+     :body-schema {:creds {:username s/Str
+                           :password s/Str}}})])
 
 ;; The api url.  This should be configured in a `config.js`.
 (def url #?(:clj "http://localhost:3000"

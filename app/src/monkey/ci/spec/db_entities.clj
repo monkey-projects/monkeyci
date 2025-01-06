@@ -155,3 +155,8 @@
 
 (s/def :db/crypto
   (s/keys :req-un [:db/customer-id :db/iv]))
+
+(s/def :db/password string?)
+
+(s/def :db/sysadmin
+  (s/keys :req-un [:db/user-id :db/password]))

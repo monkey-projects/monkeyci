@@ -52,6 +52,9 @@
 (def repo-unwatch-failed
   (error-msg "Failed to unwatch repo"))
 
+(def cust-search-failed
+  (error-msg "Failed to search for customers"))
+
 (def cust-create-success
   (alert-msg :success (fn [body] [:span "Customer " [:b (:name body)] " has been created."])))
 
@@ -72,3 +75,12 @@
 
 (def cust-save-ssh-keys-failed
   (error-msg "Failed to save SSH keys"))
+
+(def admin-login-failed
+  (error-msg "Failed to authenticate"))
+
+(def credit-overview-failed
+  (error-msg "Failed to retrieve credit overview"))
+
+(def credit-save-failed
+  (error-msg "Failed to issue credits"))

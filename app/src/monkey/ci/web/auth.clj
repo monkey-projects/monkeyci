@@ -6,6 +6,7 @@
              [middleware :as bmw]]
             [buddy.core
              [codecs :as codecs]
+             [hash :as hash]
              [keys :as bk]
              [mac :as mac]
              [nonce :as nonce]]
@@ -13,7 +14,6 @@
             [clojure.tools.logging :as log]
             [java-time.api :as jt]
             [monkey.ci
-             [runtime :as rt]
              [sid :as sid]
              [storage :as st]
              [utils :as u]]
@@ -24,6 +24,7 @@
 (def kid "master")
 (def role-user "user")
 (def role-build "build")
+(def role-sysadmin "sysadmin")
 
 (def user-id
   "Retrieves current user id from request"
@@ -40,6 +41,10 @@
 (def build-token
   "Creates token contents for a build, to be used by a build script."
   (partial make-token role-build))
+
+(def sysadmin-token
+  "Creates token contents for a system admin, a user that has special privileges."
+  (partial make-token role-sysadmin))
 
 (defn generate-secret-key
   "Generates a random secret key object"
@@ -144,6 +149,13 @@
                               (st/find-build storage))]
       (assoc build :customers #{(:customer-id build)}))))
 
+(defmethod resolve-token role-sysadmin [{:keys [storage]} {:keys [sub] :as token}]
+  (when (and (not (expired? token)) sub)
+    (let [id (sid/parse-sid sub)]
+      (when (and (= 2 (count id)) (= role-sysadmin (first id)))
+        (log/trace "Looking up user with id" id)
+        (st/find-user-by-type storage id)))))
+
 (defmethod resolve-token :default [_ _]
   ;; Fallback, for backwards compatibility
   nil)
@@ -175,7 +187,7 @@
         (query-auth-to-bearer)
         (rmp/wrap-params))))
 
-(defn- check-authorization!
+(defn- check-cust-authorization!
   "Checks if the request identity grants access to the customer specified in 
    the parameters path."
   [req]
@@ -191,11 +203,16 @@
    access to the given customer."
   [h]
   (fn [req]
-    (check-authorization! req)
+    (check-cust-authorization! req)
     (h req)))
 
-(defmethod rt/setup-runtime :jwk [conf _]
-  (config->keypair conf))
+(defn sysadmin-authorization
+  [h]
+  (fn [req]
+    (when (not= :sysadmin (-> req :identity :type keyword))
+      (throw (ex-info "Only system administrators have access to this area"
+                      {:type :auth/unauthorized})))
+    (h req)))
 
 (def req->webhook-id (comp :id :path :parameters))
 
@@ -235,3 +252,9 @@
         (h req)
         (-> (rur/response "Invalid signature header")
             (rur/status 401))))))
+
+(defn hash-pw
+  "Creates SHA256 hash of password, returns hex encoded string"
+  [pw]
+  (-> (hash/sha256 pw)
+      (codecs/bytes->hex)))

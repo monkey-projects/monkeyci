@@ -1,14 +1,17 @@
 (ns monkey.ci.gui.breadcrumb
-  (:require [monkey.ci.gui.customer.db :as cdb]
+  (:require [medley.core :as mc]
+            [monkey.ci.gui.customer.db :as cdb]
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
+(def home {:url "/"
+           :name "Home"})
+
 (defn default-breadcrumb [db]
   (let [{:keys [customer-id repo-id build-id job-id] :as p} (r/path-params (r/current db))
         ci (cdb/get-customer db)]
-    (cond-> [{:url "/"
-              :name "Home"}]
+    (cond-> [home]
       customer-id
       (conj {:url (r/path-for :page/customer (select-keys p [:customer-id]))
              :name (:name ci)})
@@ -48,13 +51,27 @@
         {:url (r/path-for :page/add-repo (r/path-params (r/current db)))
          :name "Watch Repo"}))
 
+(defn- credits-breadcrumb [db]
+  (conj (default-breadcrumb db)
+        {:url (r/path-for :admin/credits)
+         :name "Credits"}))
+
+(defn- cust-credits-breadcrumb [db]
+  (mc/insert-nth
+   1
+   {:url (r/path-for :admin/credits)
+    :name "Credits"}
+   (default-breadcrumb db)))
+
 (def routes
   "Breadcrumb configuration per route.  If no match is found, the default behaviour
    is applied."
   {:page/customer-params params-breadcrumb
    :page/customer-ssh-keys ssh-keys-breadcrumb
    :page/repo-edit repo-edit-breadcrumb
-   :page/add-repo cust-watch-repo})
+   :page/add-repo cust-watch-repo
+   :admin/credits credits-breadcrumb
+   :admin/cust-credits cust-credits-breadcrumb})
 
 (rf/reg-sub
  :breadcrumb/path

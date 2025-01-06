@@ -458,3 +458,11 @@
       (testing "can save and find"
         (is (sid/sid? (sut/save-crypto st crypto)))
         (is (= crypto (sut/find-crypto st (:customer-id crypto))))))))
+
+(deftest sysadmin
+  (h/with-memory-store st
+    (let [sysadmin {:user-id (cuid/random-cuid)
+                    :password "test-sysadmin"}]
+      (testing "can save and find"
+        (is (sid/sid? (sut/save-sysadmin st sysadmin)))
+        (is (= sysadmin (sut/find-sysadmin st (:user-id sysadmin))))))))
