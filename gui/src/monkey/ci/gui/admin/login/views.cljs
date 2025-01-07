@@ -6,7 +6,7 @@
             [monkey.ci.gui.login.subs]))
 
 (defn login-form []
-  [:form
+  [:form#admin-login
    {:on-submit (f/submit-handler [::e/submit])}
    [:div.mb-4
     [:label.form-label

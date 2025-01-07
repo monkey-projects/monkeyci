@@ -4,6 +4,7 @@
             [monkey.ci.gui.layout :as l]
             [monkey.ci.gui.login.subs]
             [monkey.ci.gui.logging :as log]
+            [monkey.ci.gui.martian :as m]
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.admin.login.views :as login]
             [monkey.ci.gui.admin.credits.views :as credits]
@@ -94,4 +95,5 @@
 
 (defn init []
   (r/start-admin!)
+  (m/init)
   (reload))
