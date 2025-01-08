@@ -43,8 +43,12 @@
 (defn generic-routes
   "Generates generic entity routes.  If child routes are given, they are added
    as additional routes after the full path."
-  [{:keys [getter creator updater id-key new-schema update-schema child-routes
-           searcher search-schema deleter]}]
+  [{:keys [getter id-key
+           creator new-schema
+           updater update-schema
+           searcher search-schema
+           deleter delete-schema
+           child-routes]}]
   [["" (cond-> {:post {:handler creator
                        :parameters {:body new-schema}}}
          searcher (assoc :get {:handler searcher
@@ -56,7 +60,8 @@
                                   {:handler updater
                                    :parameters {:body update-schema}})
                    deleter (assoc :delete
-                                  {:handler deleter}))]]
+                                  (cond-> {:handler deleter}
+                                    delete-schema (assoc-in [:parameters :body] delete-schema))))]]
       child-routes (concat child-routes))]])
 
 (defn error-response

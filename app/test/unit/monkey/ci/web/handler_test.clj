@@ -1243,11 +1243,14 @@
                                :status))))
 
               (testing "`DELETE /:subscription-id` disables subscription"
-                (is (= 200 (-> (mock/request
-                                :delete
-                                (make-path (str "/subscription/" (:id created))))
-                               (test-app)
-                               :status))))))))
+                (let [reply (-> (h/json-request
+                                 :delete
+                                 (make-path (str "/subscription/" (:id created)))
+                                 {})
+                                (test-app))]
+                  (is (= 200 (:status reply)))
+                  (is (= (:id created)
+                         (:id (h/reply->json reply))))))))))
 
       (testing "POST `/issue` issues new credits to all customers with subscriptions"
         (is (= 200 (-> (h/json-request :post "/admin/credits/issue"

@@ -116,9 +116,10 @@
 (defn disable-credit-subscription
   "Disables a credit subscription by setting the `valid-until` timestamp"
   [req]
-  (let [st (c/req->storage req)]
+  (let [st (c/req->storage req)
+        until (or (get-in req [:parameters :body :valid-until]) (t/now))]
     (if-let [match (s/find-credit-subscription st (req->subscription-sid req))]
-      ;; TODO Allow to specify until time
-      (-> (s/save-credit-subscription st (assoc match :valid-until (t/now)))
-          (rur/response))
+      (let [upd (assoc match :valid-until until)]
+        (s/save-credit-subscription st upd)
+        (rur/response upd))
       (rur/status 404))))

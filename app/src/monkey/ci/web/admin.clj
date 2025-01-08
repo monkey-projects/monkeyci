@@ -24,6 +24,9 @@
    :valid-from s/Int
    (s/optional-key :valid-until) s/Int})
 
+(s/defschema DisableCreditSubscription
+  {(s/optional-key :valid-until) s/Int})
+
 (def credits-routes
   ["/credits"
    {:conflicting true}
@@ -44,7 +47,8 @@
          :deleter api/disable-credit-subscription
          :searcher api/list-credit-subscriptions
          :id-key :subscription-id
-         :new-schema CreditSubscription})]]]]])
+         :new-schema CreditSubscription
+         :delete-schema DisableCreditSubscription})]]]]])
 
 (def admin-routes
   [[""
