@@ -215,3 +215,6 @@
   [:div.input-group.input-group-merge
    [:span.input-group-prepend.input-group-text search-icon]
    [:input.form-control opts]])
+
+(defn tab-header [i lbl]
+  [:span [:span.me-2 [icon i]] lbl])

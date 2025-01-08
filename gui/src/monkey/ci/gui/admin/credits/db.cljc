@@ -3,7 +3,8 @@
 
 (def cust-by-name ::cust-by-name)
 (def cust-by-id ::cust-by-id)
-(def credits ::credits)
+(def issues ::issues)
+(def subscriptions ::subs)
 
 (defn get-customers-by-name [db]
   (lo/get-value db cust-by-name))
@@ -28,28 +29,70 @@
   (or (lo/loaded? db cust-by-name)
       (lo/loaded? db cust-by-id)))
 
-(defn get-credits [db]
-  (lo/get-value db credits))
+(defn get-issues [db]
+  (lo/get-value db issues))
 
-(defn update-credits [db f & args]
-  (apply lo/update-value db credits f args))
+(defn update-issues [db f & args]
+  (apply lo/update-value db issues f args))
 
-(defn get-credit-alerts [db]
-  (lo/get-alerts db credits))
+(defn get-issue-alerts [db]
+  (lo/get-alerts db issues))
 
-(defn set-credit-alerts [db a]
-  (lo/set-alerts db credits a))
+(defn set-issue-alerts [db a]
+  (lo/set-alerts db issues a))
 
-(defn reset-credit-alerts [db]
-  (lo/reset-alerts db credits))
+(defn reset-issue-alerts [db]
+  (lo/reset-alerts db issues))
 
-(defn credits-loading? [db]
-  (lo/loading? db credits))
+(defn issues-loading? [db]
+  (lo/loading? db issues))
 
-(def saving? ::saving?)
+(def issue-saving? ::issue-saving?)
 
-(defn set-saving [db]
-  (assoc db saving? true))
+(defn set-issue-saving [db]
+  (assoc db issue-saving? true))
 
-(defn reset-saving [db]
-  (dissoc db saving?))
+(defn reset-issue-saving [db]
+  (dissoc db issue-saving?))
+
+(def show-issue-form? ::show-issue-form?)
+
+(defn show-issue-form [db]
+  (assoc db show-issue-form? true))
+
+(defn hide-issue-form [db]
+  (dissoc db show-issue-form?))
+
+(defn get-subs [db]
+  (lo/get-value db subscriptions))
+
+(defn update-subs [db f & args]
+  (apply lo/update-value db subscriptions f args))
+
+(defn get-sub-alerts [db]
+  (lo/get-alerts db subscriptions))
+
+(defn set-sub-alerts [db a]
+  (lo/set-alerts db subscriptions a))
+
+(defn reset-sub-alerts [db]
+  (lo/reset-alerts db subscriptions))
+
+(defn subs-loading? [db]
+  (lo/loading? db subscriptions))
+
+(def sub-saving? ::sub-saving?)
+
+(defn set-sub-saving [db]
+  (assoc db sub-saving? true))
+
+(defn reset-sub-saving [db]
+  (dissoc db sub-saving?))
+
+(def show-sub-form? ::show-sub-form?)
+
+(defn show-sub-form [db]
+  (assoc db show-sub-form? true))
+
+(defn hide-sub-form [db]
+  (dissoc db show-sub-form?))

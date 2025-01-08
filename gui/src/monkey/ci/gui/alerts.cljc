@@ -85,8 +85,22 @@
 (def admin-login-failed
   (error-msg "Failed to authenticate"))
 
-(def credit-overview-failed
-  (error-msg "Failed to retrieve credit overview"))
+(def credit-issues-failed
+  (error-msg "Failed to retrieve credit issuances"))
 
-(def credit-save-failed
+(def credit-issue-save-success
+  {:type :success
+   :message "New credits have been issued."})
+
+(def credit-issue-save-failed
   (error-msg "Failed to issue credits"))
+
+(def credit-subs-failed
+  (error-msg "Failed to retrieve credit subscriptions"))
+
+(def sub-save-success
+  {:type :success
+   :message "New credit subscription has been created."})
+
+(def sub-save-failed
+  (error-msg "Failed to create credit subscription"))

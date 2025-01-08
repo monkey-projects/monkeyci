@@ -2,7 +2,8 @@
   "API Route definitions for administrative purposes.  These are not available
    in the general api and are meant to be used by system administrators or
    system processes only."
-  (:require [monkey.ci.web.api.admin :as api]
+  (:require [monkey.ci.entities.core :as ec]
+            [monkey.ci.web.api.admin :as api]
             [monkey.ci.web.common :as c]
             [schema.core :as s]))
 
@@ -18,6 +19,14 @@
 (s/defschema AutoCredits
   {:from-time s/Int})
 
+(s/defschema CreditSubscription
+  {:amount s/Int
+   :valid-from s/Int
+   (s/optional-key :valid-until) s/Int})
+
+(s/defschema DisableCreditSubscription
+  {(s/optional-key :valid-until) s/Int})
+
 (def credits-routes
   ["/credits"
    {:conflicting true}
@@ -27,16 +36,32 @@
     ["/:customer-id"
      {:parameters {:path {:customer-id c/Id}}}
      [[""
+       ;; TODO Move this under issuances
        {:get api/list-customer-credits}]
       ["/issue"
        {:post api/issue-credits
-        :parameters {:body UserCredits}}]]]]])
+        :parameters {:body UserCredits}}]
+      ["/subscription"
+       (c/generic-routes
+        {:getter api/get-credit-subscription
+         :creator api/create-credit-subscription
+         :deleter api/disable-credit-subscription
+         :searcher api/list-credit-subscriptions
+         :id-key :subscription-id
+         :new-schema CreditSubscription
+         :delete-schema DisableCreditSubscription})]]]]])
 
 (def admin-routes
   [[""
     ["/login"
      {:post api/login
       :parameters {:body UserCredentials}}]
+    ;; TODO Create/delete sysadmin users
+    #_["/sysadmin"
+     {:post
+      {:handler api/create-sysadmin}
+      :delete
+      {:handler api/delete-sysadmin}}]
     [""
      {:middleware [:sysadmin-check]}
      credits-routes

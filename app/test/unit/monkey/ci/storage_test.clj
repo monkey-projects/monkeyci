@@ -383,7 +383,7 @@
                     (dissoc :valid-until))]
       (testing "can save and find"
         (is (sid/sid? (sut/save-credit-subscription st cs)))
-        (is (= cs (sut/find-credit-subscription st (sut/credit-sub-sid (:customer-id cs) (:id cs))))))
+        (is (= cs (sut/find-credit-subscription st [(:customer-id cs) (:id cs)]))))
 
       (testing "can list for customer"
         (is (= [cs] (sut/list-customer-credit-subscriptions st (:customer-id cs)))))
