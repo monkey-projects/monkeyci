@@ -36,6 +36,7 @@
     ["/:customer-id"
      {:parameters {:path {:customer-id c/Id}}}
      [[""
+       ;; TODO Move this under issuances
        {:get api/list-customer-credits}]
       ["/issue"
        {:post api/issue-credits

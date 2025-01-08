@@ -44,48 +44,55 @@
     (rf/dispatch-sync [:credits/customer-search--failed db/cust-by-name "test error"])
     (is (= 1 (count (lo/get-alerts @app-db db/cust-by-name))))))
 
-(deftest credits-load
-  (testing "fetches customer credit overview from backend"
+(deftest credits-load-issues
+  (testing "fetches customer credit issues from backend"
     (rf-test/run-test-sync
      (let [c (h/catch-fx :martian.re-frame/request)]
-       (h/initialize-martian {:get-customer-credit-overview
+       (h/initialize-martian {:get-credit-issues
                               {:status 200
                                :body []
                                :error-code :no-error}})
-       (rf/dispatch [:credits/load {:customer-id "test-cust"}])
+       (rf/dispatch [:credits/load-issues {:customer-id "test-cust"}])
        (is (= 1 (count @c)))))))
 
-(deftest credits-load--success
+(deftest credits-load-issues--success
   (testing "stores credits in db"
-    (rf/dispatch-sync [:credits/load--success {:body [::test-credits]}])
-    (is (= [::test-credits] (db/get-credits @app-db)))))
+    (rf/dispatch-sync [:credits/load-issues--success {:body [::test-credits]}])
+    (is (= [::test-credits] (db/get-issues @app-db)))))
 
-(deftest credits-load--failed
+(deftest credits-load-issues--failed
   (testing "sets alert"
-    (rf/dispatch-sync [:credits/load--failed "test error"])
-    (is (= 1 (count (db/get-credit-alerts @app-db))))))
+    (rf/dispatch-sync [:credits/load-issues--failed "test error"])
+    (is (= 1 (count (db/get-issue-alerts @app-db))))))
 
-(deftest credits-new
+(deftest credits-new-issue
   (testing "displays form"
-    (rf/dispatch-sync [:credits/new])
-    (is (true? (db/show-credits-form? @app-db)))))
+    (rf/dispatch-sync [:credits/new-issue])
+    (is (true? (db/show-issue-form? @app-db)))))
 
-(deftest credits-save
+(deftest credits-cancel-issue
+  (testing "hides credits form"
+    (is (some? (reset! app-db (db/show-issue-form {}))))
+    (rf/dispatch-sync [:credits/cancel-issue])
+    (is (not (db/show-issue-form? @app-db)))))
+
+(deftest credits-save-issue
   (rf-test/run-test-sync
    (let [c (h/catch-fx :martian.re-frame/request)]
      (is (some? (reset! app-db (r/set-current {} {:parameters
                                                   {:path
                                                    {:customer-id "test-cust"}}}))))
-     (h/initialize-martian {:issue-credits
+     (h/initialize-martian {:create-credit-issue
                             {:status 200
                              :body {}
                              :error-code :no-error}})
-     (rf/dispatch [:credits/save {:amount [1000]
-                                  :reason ["test reason"]
-                                  :from-time ["2025-01-01"]}])
+     (rf/dispatch [:credits/save-issue
+                   {:amount [1000]
+                    :reason ["test reason"]
+                    :from-time ["2025-01-01"]}])
      (testing "saves to backend"
        (is (= 1 (count @c)))
-       (is (= :issue-credits (-> @c first (nth 2)))))
+       (is (= :create-credit-issue (-> @c first (nth 2)))))
 
      (testing "passes form params as body"
        (let [params (-> @c first (nth 3) :credits)]
@@ -99,34 +106,134 @@
               (-> @c first (nth 3) :customer-id))))
 
      (testing "marks saving"
-       (is (db/saving? @app-db))))))
+       (is (db/issue-saving? @app-db))))))
 
-(deftest credits-save--success
+(deftest credits-save-issue--success
   (let [cred {:id "test-cred"
               :amount 1000}]
-    (is (some? (reset! app-db (db/set-saving {}))))
-    (rf/dispatch-sync [:credits/save--success {:body cred}])
+    (is (some? (reset! app-db (-> {}
+                                  (db/set-issue-saving)
+                                  (db/show-issue-form)))))
+    (rf/dispatch-sync [:credits/save-issue--success {:body cred}])
     
     (testing "adds credits to db"
-      (is (= [cred] (db/get-credits @app-db))))
+      (is (= [cred] (db/get-issues @app-db))))
 
     (testing "unmarks saving"
-      (is (not (db/saving? @app-db))))
+      (is (not (db/issue-saving? @app-db))))
 
-    (testing "sets success alert")))
+    (testing "sets success alert"
+      (is (= [:success]
+             (->> (db/get-issue-alerts @app-db)
+                  (map :type)))))
 
-(deftest credits-save--failed
-  (is (some? (reset! app-db (db/set-saving {}))))
+    (testing "hides form"
+      (is (not (db/show-issue-form? @app-db))))))
+
+(deftest credits-save-issue--failed
+  (is (some? (reset! app-db (db/set-issue-saving {}))))
   
   (testing "sets alert"
-    (rf/dispatch-sync [:credits/save--failed "test error"])
-    (is (= 1 (count (db/get-credit-alerts @app-db)))))
+    (rf/dispatch-sync [:credits/save-issue--failed "test error"])
+    (is (= 1 (count (db/get-issue-alerts @app-db)))))
 
   (testing "unmarks saving"
-    (is (not (db/saving? @app-db)))))
+    (is (not (db/issue-saving? @app-db)))))
 
-(deftest credits-cancel
+(deftest credits-load-subs
+  (testing "fetches customer credit subs from backend"
+    (rf-test/run-test-sync
+     (let [c (h/catch-fx :martian.re-frame/request)]
+       (h/initialize-martian {:get-credit-subs
+                              {:status 200
+                               :body []
+                               :error-code :no-error}})
+       (rf/dispatch [:credits/load-subs {:customer-id "test-cust"}])
+       (is (= 1 (count @c)))))))
+
+(deftest credits-load-subs--success
+  (testing "stores credits in db"
+    (rf/dispatch-sync [:credits/load-subs--success {:body [::test-credits]}])
+    (is (= [::test-credits] (db/get-subs @app-db)))))
+
+(deftest credits-load-subs--failed
+  (testing "sets alert"
+    (rf/dispatch-sync [:credits/load-subs--failed "test error"])
+    (is (= 1 (count (db/get-sub-alerts @app-db))))))
+
+(deftest credits-new-sub
+  (testing "displays form"
+    (rf/dispatch-sync [:credits/new-sub])
+    (is (true? (db/show-sub-form? @app-db)))))
+
+(deftest credits-cancel-sub
   (testing "hides credits form"
-    (is (some? (reset! app-db (db/show-credits-form {}))))
-    (rf/dispatch-sync [:credits/cancel])
-    (is (not (db/show-credits-form? @app-db)))))
+    (is (some? (reset! app-db (db/show-sub-form {}))))
+    (rf/dispatch-sync [:credits/cancel-sub])
+    (is (not (db/show-sub-form? @app-db)))))
+
+(deftest credits-save-sub
+  (rf-test/run-test-sync
+   (let [c (h/catch-fx :martian.re-frame/request)]
+     (is (some? (reset! app-db (r/set-current {} {:parameters
+                                                  {:path
+                                                   {:customer-id "test-cust"}}}))))
+     (h/initialize-martian {:create-credit-sub
+                            {:status 200
+                             :body {}
+                             :error-code :no-error}})
+     (rf/dispatch [:credits/save-sub
+                   {:amount [1000]
+                    :valid-from ["2025-01-01"]
+                    :valid-until [""]}])
+     (testing "saves to backend"
+       (is (= 1 (count @c)))
+       (is (= :create-credit-sub (-> @c first (nth 2)))))
+
+     (let [params (-> @c first (nth 3) :sub)]
+       (testing "passes form params as body"
+         (is (= 1000
+                (:amount params)))
+         (is (number? (:valid-from params))))
+
+       (testing "does not pass empty `valid-until` date"
+         (is (not (contains? params :valid-until)))))
+
+     (testing "adds customer id"
+       (is (= "test-cust"
+              (-> @c first (nth 3) :customer-id))))
+
+     (testing "marks saving"
+       (is (db/sub-saving? @app-db))))))
+
+(deftest credits-save-sub--success
+  (let [cred {:id "test-cred"
+              :amount 1000}]
+    (is (some? (reset! app-db (-> {}
+                                  (db/set-sub-saving)
+                                  (db/show-sub-form)))))
+    (rf/dispatch-sync [:credits/save-sub--success {:body cred}])
+    
+    (testing "adds subscription to db"
+      (is (= [cred] (db/get-subs @app-db))))
+
+    (testing "unmarks saving"
+      (is (not (db/sub-saving? @app-db))))
+
+    (testing "sets success alert"
+      (is (= [:success]
+             (->> (db/get-sub-alerts @app-db)
+                  (map :type)))))
+
+    (testing "hides form"
+      (is (not (db/show-sub-form? @app-db))))))
+
+(deftest credits-save-sub--failed
+  (is (some? (reset! app-db (db/set-sub-saving {}))))
+  
+  (testing "sets alert"
+    (rf/dispatch-sync [:credits/save-sub--failed "test error"])
+    (is (= 1 (count (db/get-sub-alerts @app-db)))))
+
+  (testing "unmarks saving"
+    (is (not (db/sub-saving? @app-db)))))

@@ -53,62 +53,131 @@
    (lo/on-failure db id a/cust-search-failed resp)))
 
 (rf/reg-event-fx
- :credits/load
+ :credits/load-issues
  (lo/loader-evt-handler
-  db/credits
+  db/issues
   (fn [_ _ [_ cust-id]]
     [:secure-request
-     :get-customer-credit-overview
+     :get-credit-issues
      {:customer-id cust-id}
-     [:credits/load--success]
-     [:credits/load--failed]])))
+     [:credits/load-issues--success]
+     [:credits/load-issues--failed]])))
 
 (rf/reg-event-db
- :credits/load--success
+ :credits/load-issues--success
  (fn [db [_ resp]]
-   (lo/on-success db db/credits resp)))
+   (lo/on-success db db/issues resp)))
 
 (rf/reg-event-db
- :credits/load--failed
+ :credits/load-issues--failed
  (fn [db [_ resp]]
-   (lo/on-failure db db/credits a/credit-overview-failed resp)))
+   (lo/on-failure db db/issues a/credit-issues-failed resp)))
 
 (rf/reg-event-db
- :credits/new
+ :credits/new-issue
  (fn [db _]
-   (db/show-credits-form db)))
+   (db/show-issue-form db)))
+
+(rf/reg-event-db
+ :credits/cancel-issue
+ (fn [db _]
+   (db/hide-issue-form db)))
+
+(def date->epoch (comp t/to-epoch t/parse-iso))
 
 (rf/reg-event-fx
- :credits/save
+ :credits/save-issue
  (fn [{:keys [db]} [_ params]]
    {:dispatch [:secure-request
-               :issue-credits
+               :create-credit-issue
                {:credits
                 (-> (select-keys params [:reason :amount :from-time])
                     (as-> t (mc/map-vals first t))
-                    (mc/update-existing :from-time (comp t/to-epoch t/parse-iso)))
+                    (mc/update-existing :from-time date->epoch))
                 :customer-id (r/customer-id db)}
-               [:credits/save--success]
-               [:credits/save--failed]]
+               [:credits/save-issue--success]
+               [:credits/save-issue--failed]]
     :db (-> db
-            (db/set-saving)
-            (db/reset-credit-alerts))}))
+            (db/set-issue-saving)
+            (db/reset-issue-alerts))}))
 
 (rf/reg-event-db
- :credits/save--success
+ :credits/save-issue--success
  (fn [db [_ {resp :body}]]
    (-> db
-       (db/reset-saving)
-       (db/update-credits conj resp))))
+       (db/reset-issue-saving)
+       (db/hide-issue-form)
+       (db/update-issues conj resp)
+       (db/set-issue-alerts [a/credit-issue-save-success]))))
 
 (rf/reg-event-db
- :credits/save--failed
+ :credits/save-issue--failed
  (fn [db [_ resp]]
    (-> db
-       (db/set-credit-alerts [(a/credit-save-failed resp)])
-       (db/reset-saving))))
+       (db/reset-issue-saving)
+       (db/set-issue-alerts [(a/credit-issue-save-failed resp)]))))
+
+(rf/reg-event-fx
+ :credits/load-subs
+ (lo/loader-evt-handler
+  db/subscriptions
+  (fn [_ _ [_ cust-id]]
+    [:secure-request
+     :get-credit-subs
+     {:customer-id cust-id}
+     [:credits/load-subs--success]
+     [:credits/load-subs--failed]])))
 
 (rf/reg-event-db
- :credits/cancel
+ :credits/load-subs--success
+ (fn [db [_ resp]]
+   (lo/on-success db db/subscriptions resp)))
+
+(rf/reg-event-db
+ :credits/load-subs--failed
+ (fn [db [_ resp]]
+   (lo/on-failure db db/subscriptions a/credit-subs-failed resp)))
+
+(rf/reg-event-db
+ :credits/new-sub
  (fn [db _]
-   (db/hide-credits-form db)))
+   (db/show-sub-form db)))
+
+(rf/reg-event-db
+ :credits/cancel-sub
+ (fn [db _]
+   (db/hide-sub-form db)))
+
+(rf/reg-event-fx
+ :credits/save-sub
+ (fn [{:keys [db]} [_ params]]
+   {:dispatch [:secure-request
+               :create-credit-sub
+               {:sub
+                (-> (select-keys params [:reason :amount :valid-from :valid-until])
+                    (as-> t (mc/map-vals first t))
+                    (mc/update-existing :valid-from date->epoch)
+                    (mc/update-existing :valid-until date->epoch)
+                    (as-> t (mc/filter-vals some? t)))
+                :customer-id (r/customer-id db)}
+               [:credits/save-sub--success]
+               [:credits/save-sub--failed]]
+    :db (-> db
+            (db/set-sub-saving)
+            (db/reset-sub-alerts))}))
+
+(rf/reg-event-db
+ :credits/save-sub--success
+ (fn [db [_ {resp :body}]]
+   (-> db
+       (db/reset-sub-saving)
+       (db/hide-sub-form)
+       (db/update-subs conj resp)
+       (db/set-sub-alerts [a/sub-save-success]))))
+
+(rf/reg-event-db
+ :credits/save-sub--failed
+ (fn [db [_ resp]]
+   (-> db
+       (db/reset-sub-saving)
+       (db/set-sub-alerts [(a/sub-save-failed resp)]))))

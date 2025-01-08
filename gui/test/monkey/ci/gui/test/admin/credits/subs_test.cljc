@@ -52,37 +52,72 @@
    true
    false))
 
-(deftest credits
+(deftest issues
   (h/verify-sub
-   [:credits/credits]
-   #(lo/set-value % db/credits [::test-credits])
+   [:credits/issues]
+   #(lo/set-value % db/issues [::test-credits])
    [::test-credits]
    nil))
 
-(deftest credits-loading?
+(deftest issues-loading?
   (h/verify-sub
-   [:credits/credits-loading?]
-   #(lo/set-loading % db/credits)
+   [:credits/issues-loading?]
+   #(lo/set-loading % db/issues)
    true
    false))
 
-(deftest credit-alerts
+(deftest issue-alerts
   (h/verify-sub
-   [:credits/credit-alerts]
-   #(db/set-credit-alerts % ::test-alerts)
+   [:credits/issue-alerts]
+   #(db/set-issue-alerts % ::test-alerts)
    ::test-alerts
    nil))
 
-(deftest saving?
+(deftest issue-saving?
   (h/verify-sub
-   [:credits/saving?]
-   db/set-saving
+   [:credits/issue-saving?]
+   db/set-issue-saving
    true
    false))
 
-(deftest show-form?
+(deftest show-issue-form?
   (h/verify-sub
-   [:credits/show-form?]
-   db/show-credits-form
+   [:credits/show-issue-form?]
+   db/show-issue-form
+   true
+   false))
+
+(deftest credit-subs
+  (h/verify-sub
+   [:credits/subs]
+   #(lo/set-value % db/subscriptions [::test-credits])
+   [::test-credits]
+   nil))
+
+(deftest subs-loading?
+  (h/verify-sub
+   [:credits/subs-loading?]
+   #(lo/set-loading % db/subscriptions)
+   true
+   false))
+
+(deftest sub-alerts
+  (h/verify-sub
+   [:credits/sub-alerts]
+   #(db/set-sub-alerts % ::test-alerts)
+   ::test-alerts
+   nil))
+
+(deftest sub-saving?
+  (h/verify-sub
+   [:credits/sub-saving?]
+   db/set-sub-saving
+   true
+   false))
+
+(deftest show-sub-form?
+  (h/verify-sub
+   [:credits/show-sub-form?]
+   db/show-sub-form
    true
    false))
