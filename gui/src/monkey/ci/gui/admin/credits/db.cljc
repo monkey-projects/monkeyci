@@ -53,3 +53,11 @@
 
 (defn reset-saving [db]
   (dissoc db saving?))
+
+(def show-credits-form? ::show-credits-form?)
+
+(defn show-credits-form [db]
+  (assoc db show-credits-form? true))
+
+(defn hide-credits-form [db]
+  (dissoc db show-credits-form?))

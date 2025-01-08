@@ -65,6 +65,11 @@
     (rf/dispatch-sync [:credits/load--failed "test error"])
     (is (= 1 (count (db/get-credit-alerts @app-db))))))
 
+(deftest credits-new
+  (testing "displays form"
+    (rf/dispatch-sync [:credits/new])
+    (is (true? (db/show-credits-form? @app-db)))))
+
 (deftest credits-save
   (rf-test/run-test-sync
    (let [c (h/catch-fx :martian.re-frame/request)]
@@ -106,7 +111,9 @@
       (is (= [cred] (db/get-credits @app-db))))
 
     (testing "unmarks saving"
-      (is (not (db/saving? @app-db))))))
+      (is (not (db/saving? @app-db))))
+
+    (testing "sets success alert")))
 
 (deftest credits-save--failed
   (is (some? (reset! app-db (db/set-saving {}))))
@@ -117,3 +124,9 @@
 
   (testing "unmarks saving"
     (is (not (db/saving? @app-db)))))
+
+(deftest credits-cancel
+  (testing "hides credits form"
+    (is (some? (reset! app-db (db/show-credits-form {}))))
+    (rf/dispatch-sync [:credits/cancel])
+    (is (not (db/show-credits-form? @app-db)))))

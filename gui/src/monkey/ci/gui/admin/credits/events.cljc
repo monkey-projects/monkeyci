@@ -73,6 +73,11 @@
  (fn [db [_ resp]]
    (lo/on-failure db db/credits a/credit-overview-failed resp)))
 
+(rf/reg-event-db
+ :credits/new
+ (fn [db _]
+   (db/show-credits-form db)))
+
 (rf/reg-event-fx
  :credits/save
  (fn [{:keys [db]} [_ params]]
@@ -106,5 +111,4 @@
 (rf/reg-event-db
  :credits/cancel
  (fn [db _]
-   ;; TODO Reset form
-   ))
+   (db/hide-credits-form db)))

@@ -10,3 +10,4 @@
 (u/db-sub :credits/credits-loading? db/credits-loading?)
 (u/db-sub :credits/credit-alerts db/get-credit-alerts)
 (u/db-sub :credits/saving? (comp true? db/saving?))
+(u/db-sub :credits/show-form? (comp true? db/show-credits-form?))

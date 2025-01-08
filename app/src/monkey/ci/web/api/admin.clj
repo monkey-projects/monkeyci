@@ -122,4 +122,5 @@
       (let [upd (assoc match :valid-until until)]
         (s/save-credit-subscription st upd)
         (rur/response upd))
+      ;; Subscription or customer not found
       (rur/status 404))))

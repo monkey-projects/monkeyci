@@ -79,3 +79,10 @@
    db/set-saving
    true
    false))
+
+(deftest show-form?
+  (h/verify-sub
+   [:credits/show-form?]
+   db/show-credits-form
+   true
+   false))

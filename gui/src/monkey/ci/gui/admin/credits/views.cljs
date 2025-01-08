@@ -5,6 +5,7 @@
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.table :as t]
             [monkey.ci.gui.time :as time]
+            [monkey.ci.gui.utils :as u]
             [monkey.ci.gui.admin.credits.events]
             [monkey.ci.gui.admin.credits.subs]
             [monkey.ci.gui.customer.events]
@@ -69,9 +70,7 @@
     [search-results]]])
 
 (defn- credit-overview-table []
-  (letfn [(amount [{:keys [amount]}]
-            [:span "€" amount])
-          (from-time [{:keys [from-time]}]
+  (letfn [(from-time [{:keys [from-time]}]
             (when from-time
               (-> from-time
                   (time/parse-epoch)
@@ -84,7 +83,7 @@
                      :value from-time
                      :sorter (t/prop-sorter :from-time)}
                     {:label "Amount"
-                     :value amount
+                     :value :amount
                      :sorter (t/prop-sorter :amount)}
                     {:label "Type"
                      :value :type
@@ -113,14 +112,40 @@
      [:span.me-2 [co/icon :save]] "Save"]))
 
 (defn- new-credit-form []
-  [:form
-   {:on-submit (f/submit-handler [:credits/save])}
-   [form-input :amount "Amount" :number]
-   [form-input :reason "Reason" :text "Optional informational message for the customer."]
-   [form-input :from-time "Available from" :date "The date the credits become available for use."]
-   [:div.d-flex.gap-2
-    [save-btn]
-    [co/cancel-btn [:credits/cancel]]]])
+  (let [show? (rf/subscribe [:credits/show-form?])]
+    (when @show?
+      [:div.card
+       [:div.card-body
+        [:h5 "Issue Credits"]
+        [:form
+         {:on-submit (f/submit-handler [:credits/save])}
+         [form-input :amount "Amount" :number]
+         [form-input :reason "Reason" :text "Optional informational message for the customer."]
+         [form-input :from-time "Available from" :date "The date the credits become available for use."]
+         [:div.d-flex.gap-2
+          [save-btn]
+          [co/cancel-btn [:credits/cancel]]]]]])))
+
+(defn- issue-credits-btn []
+  (let [shown? (rf/subscribe [:credits/show-form?])]
+    [co/icon-btn
+     :plus-square
+     "Issue Credits"
+     [:credits/new]
+     (when @shown? {:disabled true})]))
+
+(defn- credit-sub-btn []
+  (let [shown? (rf/subscribe [:credits/show-form?])]
+    [co/icon-btn
+     :repeat
+     "New Subscription"
+     [:credits/new-sub]
+     (when @shown? {:disabled true})]))
+
+(defn- actions []
+  [:div.d-flex.gap-2
+   [issue-credits-btn]
+   [credit-sub-btn]])
 
 (defn customer-credits
   "Displays credit overview for a single customer"
@@ -128,14 +153,14 @@
   (let [cust-id (:customer-id (r/path-params route))]
     (rf/dispatch [:customer/maybe-load cust-id])
     (rf/dispatch [:credits/load cust-id])
-    (let [cust (rf/subscribe [:customer/info])]
-      [l/default
-       [:<>
-        [:h3 (:name @cust) ": Credit Overview"]
-        [:div.card
-         [:div.card-body
-          [credit-overview-table]
-          [co/alerts [:credits/credit-alerts]]
-          [:div.mt-5
-           [:h5 "Issue Credits"]
-           [new-credit-form]]]]]])))
+    (fn [route]
+      (let [cust (rf/subscribe [:customer/info])]
+        [l/default
+         [:<>
+          [:h3 (:name @cust) ": Credit Overview"]
+          [:div.card.mb-3
+           [:div.card-body
+            [credit-overview-table]
+            [co/alerts [:credits/credit-alerts]]
+            [actions]]]
+          [new-credit-form]]]))))
