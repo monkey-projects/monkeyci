@@ -3,7 +3,8 @@
             [monkey.ci
              [build :as b]
              [cuid :as cuid]
-             [storage :as s]]
+             [storage :as s]
+             [time :as t]]
             [monkey.ci.events.core :as ec]
             [monkey.ci.web
              [auth :as auth]
@@ -90,3 +91,34 @@
              (dispatch)
              (rur/response))
         (rur/response {:message "No process reaper configured"})))))
+
+(defn- req->subscription-sid [req]
+  [(c/customer-id req)
+   (get-in req [:parameters :path :subscription-id])])
+
+(c/make-entity-endpoints
+ "credit-subscription"
+ {:get-id req->subscription-sid
+  :getter s/find-credit-subscription})
+
+(defn create-credit-subscription [req]
+  (let [creator (c/entity-creator s/save-credit-subscription c/default-id)]
+    (-> req
+        (update-in [:parameters :body] assoc :customer-id (c/customer-id req))
+        (creator))))
+
+(defn list-credit-subscriptions [req]
+  (-> req
+      (c/req->storage)
+      (s/list-customer-credit-subscriptions (c/customer-id req))
+      (rur/response)))
+
+(defn disable-credit-subscription
+  "Disables a credit subscription by setting the `valid-until` timestamp"
+  [req]
+  (let [st (c/req->storage req)]
+    (if-let [match (s/find-credit-subscription st (req->subscription-sid req))]
+      ;; TODO Allow to specify until time
+      (-> (s/save-credit-subscription st (assoc match :valid-until (t/now)))
+          (rur/response))
+      (rur/status 404))))

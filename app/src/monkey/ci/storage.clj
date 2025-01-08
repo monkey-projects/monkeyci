@@ -651,7 +651,7 @@
   (p/write-obj s (credit-sub-sid (:customer-id cs) (:id cs)) cs))
 
 (defn find-credit-subscription [s sid]
-  (p/read-obj s sid))
+  (p/read-obj s (apply credit-sub-sid sid)))
 
 (def list-customer-credit-subscriptions
   (override-or
@@ -659,7 +659,7 @@
    (fn [st cust-id]
      (let [sid (credit-sub-sid cust-id)]
        (->> (p/list-obj st sid)
-            (map (partial conj sid))
+            (map (partial vector cust-id))
             (map (partial find-credit-subscription st)))))))
 
 (def list-active-credit-subscriptions

@@ -1199,19 +1199,55 @@
   (testing "`/admin`"
     (testing "`/credits`"
       (testing "`/:customer-id`"
-        (let [cust (h/gen-cust)]
+        (let [cust (h/gen-cust)
+              make-path (fn [& [path]]
+                          (cond-> (str "/admin/credits/" (:id cust))
+                            (some? path) (str path)))]
           (testing "GET `/` returns credit overview"
-            (is (= 200 (-> (mock/request :get (str "/admin/credits/" (:id cust)))
+            (is (= 200 (-> (mock/request :get (make-path))
                            (test-app)
                            :status))))
           
           (testing "POST `/issue` issues new credits to specific customer"
             (is (= 201 (-> (h/json-request :post
-                                           (str "/admin/credits/" (:id cust) "/issue")
+                                           (make-path "/issue")
                                            {:amount 100
                                             :reason "test issue"})
                            (test-app)
-                           :status))))))
+                           :status))))
+
+          (testing "`/subscription`"
+            (let [reply (-> (h/json-request :post
+                                            (make-path "/subscription")
+                                            {:amount 100
+                                             :valid-from (t/now)
+                                             :valid-until (+ (t/now) 1000)})
+                            (test-app))
+                  created (h/reply->json reply)]
+              (testing "`POST /` creates new credit subscription"
+                (is (= 201 (:status reply)))
+                (is (not-empty created))
+                (is (cuid/cuid? (:id created))))
+              
+              (testing "`GET /` lists subscriptions"
+                (let [reply (-> (mock/request :get (make-path "/subscription"))
+                                (test-app))]
+                  (is (= 200 (:status reply)))
+                  (is (= [created] (h/reply->json reply)))))
+              
+              (testing "`GET /:subscription-id` retrieves subscription by id"
+                (is (= 200 (-> (mock/request
+                                :get
+                                (make-path (str "/subscription/" (:id created))))
+                               (test-app)
+                               :status))))
+
+              (testing "`DELETE /:subscription-id` disables subscription"
+                (is (= 200 (-> (mock/request
+                                :delete
+                                (make-path (str "/subscription/" (:id created))))
+                               (test-app)
+                               :status))))))))
 
       (testing "POST `/issue` issues new credits to all customers with subscriptions"
         (is (= 200 (-> (h/json-request :post "/admin/credits/issue"
