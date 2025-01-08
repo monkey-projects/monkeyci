@@ -45,7 +45,7 @@
        (c/generic-routes
         {:getter api/get-credit-subscription
          :creator api/create-credit-subscription
-         :deleter api/disable-credit-subscription
+         :deleter api/cancel-credit-subscription
          :searcher api/list-credit-subscriptions
          :id-key :subscription-id
          :new-schema CreditSubscription

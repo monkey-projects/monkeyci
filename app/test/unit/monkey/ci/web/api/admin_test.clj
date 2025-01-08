@@ -145,3 +145,22 @@
         (is (= :build/canceled (:type f)))
         (is (= sid (:sid f))))
       (is (= [sid] (:body resp))))))
+
+(deftest cancel-credit-subscription
+  (testing "deletes when `valid-from` time is in the future"
+    (let [{st :storage :as rt} (trt/test-runtime)
+          cust (h/gen-cust)
+          cs {:id (cuid/random-cuid)
+              :customer-id (:id cust)
+              :valid-from (+ (t/now) 1000)
+              :amount 1000}]
+      (is (sid/sid? (st/save-customer st cust)))
+      (is (sid/sid? (st/save-credit-subscription st cs)))
+      (is (= 204 (-> (h/->req rt)
+                     (assoc :parameters
+                            {:path
+                             {:customer-id (:id cust)
+                              :subscription-id (:id cs)}})
+                     (sut/cancel-credit-subscription)
+                     :status)))
+      (is (nil? (st/find-credit-subscription st [(:id cust) (:id cs)]))))))

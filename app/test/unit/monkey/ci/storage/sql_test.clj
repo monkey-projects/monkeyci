@@ -533,12 +533,13 @@
           cs (-> (h/gen-credit-subs)
                  (assoc :customer-id (:id cust)
                         :valid-from (- now 1000)
-                        :valid-until (+ now 1000)))]
+                        :valid-until (+ now 1000)))
+          sid (st/credit-sub-sid (:id cust) (:id cs))]
       (is (sid/sid? (st/save-customer s cust)))
 
       (testing "can create and retrieve"
         (is (sid/sid? (st/save-credit-subscription s cs)))
-        (is (= cs (st/find-credit-subscription s (st/credit-sub-sid (:id cust) (:id cs))))))
+        (is (= cs (st/find-credit-subscription s sid))))
 
       (testing "can list for customer"
         (is (= [cs] (st/list-customer-credit-subscriptions s (:id cust)))))
@@ -549,8 +550,12 @@
 
       (testing "can update"
         (is (sid/sid? (st/save-credit-subscription s (assoc cs :amount 200M))))
-        (is (= 200M (-> (st/find-credit-subscription s (st/credit-sub-sid (:id cust) (:id cs)))
-                        :amount)))))))
+        (is (= 200M (-> (st/find-credit-subscription s sid)
+                        :amount))))
+
+      (testing "can delete"
+        (is (true? (st/delete-credit-subscription s sid)))
+        (is (nil? (st/find-credit-subscription s sid)))))))
 
 (deftest ^:sql customer-credits
   (with-storage conn s

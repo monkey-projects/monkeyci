@@ -28,11 +28,11 @@
   [l/default
    [:div.container.content-space-1
     [:div.w-lg-65.text-center.mx-lg-auto.mb-7
-     [:h3 "Administration Area"]
+     [:h2 "Administration Area"]
      [:p
       "Welcome to the administration site. "
       [:br]
-      "With great power comes great responsibility, so " [:b.text-primary "please be careful."]]]
+      "Remember, with great power comes great responsibility, so " [:b.text-primary "please be careful."]]]
     ;; Admin actions
     [:div.row.mb-5.mb-sm-5
      [action-card
@@ -50,18 +50,18 @@
       (r/path-for :admin/clean-builds)]
 
      [action-card
-      :trash
-      "Forget Users"
-      "Delete any information still referring to users that have requested to be forgotten."
-      "Forget users"
-      (r/path-for :admin/forget-users)]
-
-     [action-card
       :currency-euro
       "Invoicing"
       "Overview of created invoices, or create manual invoices or credit notes."
       "Go to Invoicing"
-      (r/path-for :admin/invoicing)]]]])
+      (r/path-for :admin/invoicing)]
+
+     [action-card
+      :trash
+      "Forget Users"
+      "Delete any information still referring to users that have requested to be forgotten."
+      "Forget users"
+      (r/path-for :admin/forget-users)]]]])
 
 (defn not-implemented []
   [l/default

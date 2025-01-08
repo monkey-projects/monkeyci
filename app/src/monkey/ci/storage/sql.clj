@@ -631,6 +631,9 @@
     (update-credit-subscription conn cs existing)
     (insert-credit-subscription conn cs)))
 
+(defn- delete-credit-subscription [conn cuid]
+  (ec/delete-credit-subscriptions conn (ec/by-cuid cuid)))
+
 (defn- select-credit-subscription [conn cuid]
   (some->> (ecsub/select-credit-subs conn (ecsub/by-cuid cuid))
            (first)
@@ -886,7 +889,6 @@
 
   (delete-obj [_ sid]
     (deleted?
-     ;; TODO Allow deleting other entities
      (condp sid-pred sid
        customer?
        (delete-customer conn (global-sid->cuid sid))
@@ -894,6 +896,8 @@
        (delete-email-registration conn (global-sid->cuid sid))
        webhook?
        (delete-webhook conn (last sid))
+       credit-subscription?
+       (delete-credit-subscription conn (last sid))
        (log/warn "Deleting entity" sid "is not supported"))))
 
   (list-obj [_ sid]

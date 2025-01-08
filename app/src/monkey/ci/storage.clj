@@ -653,6 +653,9 @@
 (defn find-credit-subscription [s sid]
   (p/read-obj s (apply credit-sub-sid sid)))
 
+(defn delete-credit-subscription [s sid]
+  (p/delete-obj s (apply credit-sub-sid sid)))
+
 (def list-customer-credit-subscriptions
   (override-or
    [:customer :list-credit-subscriptions]

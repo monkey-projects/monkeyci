@@ -113,14 +113,20 @@
       (s/list-customer-credit-subscriptions (c/customer-id req))
       (rur/response)))
 
-(defn disable-credit-subscription
-  "Disables a credit subscription by setting the `valid-until` timestamp"
+(defn cancel-credit-subscription
+  "Disables a credit subscription by setting the `valid-until` timestamp.  If a subscription
+   is not active yet (i.e. the `valid-from` time is in the future), it is deleted instead."
   [req]
   (let [st (c/req->storage req)
+        sid (req->subscription-sid req)
         until (or (get-in req [:parameters :body :valid-until]) (t/now))]
-    (if-let [match (s/find-credit-subscription st (req->subscription-sid req))]
-      (let [upd (assoc match :valid-until until)]
-        (s/save-credit-subscription st upd)
-        (rur/response upd))
+    (if-let [match (s/find-credit-subscription st sid)]
+      (if (< until (:valid-from match))
+        (do
+          (s/delete-credit-subscription st sid)
+          (rur/status 204))
+        (let [upd (assoc match :valid-until until)]
+          (s/save-credit-subscription st upd)
+          (rur/response upd)))
       ;; Subscription or customer not found
       (rur/status 404))))
