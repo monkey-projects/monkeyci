@@ -137,28 +137,9 @@
   {:query {(s/optional-key :since) s/Int
            (s/optional-key :until) s/Int}})
 
-(defn- generic-routes
-  "Generates generic entity routes.  If child routes are given, they are added
-   as additional routes after the full path."
-  [{:keys [getter creator updater id-key new-schema update-schema child-routes
-           searcher search-schema deleter]}]
-  [["" (cond-> {:post {:handler creator
-                       :parameters {:body new-schema}}}
-         searcher (assoc :get {:handler searcher
-                               :parameters {:query search-schema}}))]
-   [(str "/" id-key)
-    {:parameters {:path {id-key Id}}}
-    (cond-> [["" (cond-> {:get {:handler getter}}
-                   updater (assoc :put
-                                  {:handler updater
-                                   :parameters {:body update-schema}})
-                   deleter (assoc :delete
-                                  {:handler deleter}))]]
-      child-routes (concat child-routes))]])
-
 (def webhook-routes
   ["/webhook"
-   (-> (generic-routes
+   (-> (c/generic-routes
         {:creator api/create-webhook
          :updater api/update-webhook
          :getter  api/get-webhook
@@ -266,7 +247,7 @@
 
 (def repo-routes
   ["/repo"
-   (-> (generic-routes
+   (-> (c/generic-routes
         {:creator api/create-repo
          :updater api/update-repo
          :getter  api/get-repo
@@ -331,7 +312,7 @@
 (def customer-routes
   ["/customer"
    {:middleware [:customer-check]}
-   (generic-routes
+   (c/generic-routes
     {:creator cust-api/create-customer
      :updater cust-api/update-customer
      :getter  cust-api/get-customer
@@ -385,7 +366,7 @@
 
 (def user-join-request-routes
   ["/join-request"
-   (generic-routes
+   (c/generic-routes
     {:creator jr-api/create-join-request
      :getter jr-api/get-join-request
      :searcher jr-api/search-join-requests
@@ -420,11 +401,11 @@
 
 (def email-registration-routes
   ["/email-registration"
-   (generic-routes {:getter api/get-email-registration
-                    :creator api/create-email-registration
-                    :deleter api/delete-email-registration
-                    :id-key :email-registration-id
-                    :new-schema EmailRegistration})])
+   (c/generic-routes {:getter api/get-email-registration
+                      :creator api/create-email-registration
+                      :deleter api/delete-email-registration
+                      :id-key :email-registration-id
+                      :new-schema EmailRegistration})])
 
 (def routes
   [["/health" {:get health}]

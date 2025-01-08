@@ -85,6 +85,11 @@
    (s/optional-key :reason) s/Str
    :from-time s/Int})
 
+(s/defschema CreditSubscription
+  {:amount s/Int
+   :valid-from s/Int
+   (s/optional-key :valid-until) s/Int})
+
 (defn public-route [conf]
   (merge {:method :get
           :produces #{"application/edn"}
@@ -183,16 +188,29 @@
      :method :get})
 
    (api-route
-    {:route-name :get-customer-credit-overview
+    {:route-name :get-credit-issues
      :path-parts ["/admin/credits/" :customer-id]
      :path-schema customer-schema
      :method :get})
 
    (api-route
-    {:route-name :issue-credits
+    {:route-name :create-credit-issue
      :path-parts ["/admin/credits/" :customer-id "/issue"]
      :path-schema customer-schema
      :body-schema {:credits UserCredits}
+     :method :post})
+
+   (api-route
+    {:route-name :get-credit-subs
+     :path-parts ["/admin/credits/" :customer-id "/subscription"]
+     :path-schema customer-schema
+     :method :get})
+
+   (api-route
+    {:route-name :create-credit-sub
+     :path-parts ["/admin/credits/" :customer-id "/subscription"]
+     :path-schema customer-schema
+     :body-schema {:sub CreditSubscription}
      :method :post})
 
    (api-route

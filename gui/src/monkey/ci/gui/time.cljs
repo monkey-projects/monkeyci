@@ -24,15 +24,18 @@
 (defn parse-iso
   "Parses ISO datetime string"
   [s]
-  (.fromISO DateTime s))
+  (when (not-empty s)
+    (.fromISO DateTime s)))
 
 (defn parse-epoch
   "Parses epoch milliseconds to datetime"
   [m]
-  (.fromMillis DateTime m))
+  (when m
+    (.fromMillis DateTime m)))
 
 (defn to-epoch [^DateTime d]
-  (.toMillis d))
+  (when d
+    (.toMillis d)))
 
 (defn same?
   "Compares to dates"

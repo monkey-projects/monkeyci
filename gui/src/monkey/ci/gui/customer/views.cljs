@@ -205,16 +205,21 @@
        [:a.mx-1 {:href (r/path-for :page/add-github-repo {:customer-id (:id @c)})} "watching one."]]
       [repos-list @c])))
 
+(defn- with-recent-reload [id msg]
+  [:div.d-flex
+   [:p msg]
+   [:div.ms-auto [co/reload-btn-sm [:customer/load-recent-builds id]]]])
+
 (defn- recent-builds [id]
   (rf/dispatch [:customer/load-recent-builds id])
   (fn [id]
     (let [loaded? (rf/subscribe [:loader/loaded? db/recent-builds])
           recent (rf/subscribe [:customer/recent-builds])]
       (if (and @loaded? (empty? @recent))
-        [:p "No recent builds found for this customer."]
+        [with-recent-reload id "No recent builds found for this customer."]
         [:<>
          (if @loaded?
-           [:p "Recent builds for all repositories."]
+           [with-recent-reload id "Recent builds for all repositories."]
            [:p "Loading recent builds for all repositories..."])
          [:div.card
           [:div.card-body
