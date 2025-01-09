@@ -1,6 +1,7 @@
 (ns monkey.ci.gui.charts
   "Chart.js wrapper component"
   (:require [monkey.ci.gui.logging :as log]
+            [oops.core :as oc]
             [re-frame.core :as rf]
             [reagent.core :as rc]
             ["chart.js" :refer [BarController BarElement
@@ -56,6 +57,9 @@
   [id]
   [:canvas {:id id}])
 
+(defn ^Object get-data [chart]
+  (oc/oget chart "data"))
+
 (defn update-chart-data!
   "In order to ensure smooth animation transition when changing chart data, we can't
    just replace the entire data structure, we need to replace all modified data values
@@ -78,13 +82,13 @@
                 ;; Add values
                 (while (< (count old) nc)
                   (.push old (get new (count old)))))))]
-    (let [old-ds (-> old (.-data) (.-datasets))
+    (let [old-ds (oc/oget old "data.datasets")
           new-ds (get-in new [:data :datasets])]
       (doseq [i (range (count old-ds))]
         (let [upd (get new-ds i)]
-          (update-arr (.-data (aget old-ds i))
+          (update-arr (get-data (aget old-ds i))
                       (:data upd))))
-      (update-arr (-> old (.-data) (.-labels)) (vec (get-in new [:data :labels])))
+      (update-arr (oc/oget old "data.?labels") (vec (get-in new [:data :labels])))
       old)))
 
 (defn chart-component-2 [id config]
