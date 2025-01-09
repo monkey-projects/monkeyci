@@ -19,21 +19,36 @@
           (is (= 2 (aget d 1)))
           (is (= 4 (aget d 2))))))
 
-    (testing "replaces modified data in multiple datasets"
+  (testing "keeps dataset labels"
       (let [old (clj->js
                  {:data
                   {:datasets
-                   [{:data [1 2 3]}
-                    {:data [4 5 6]}]}})
+                   [{:label "test data"
+                     :data [1 2 3]}]}})
             new {:data
                  {:datasets
-                  [{:data [1 2 4]}
-                   {:data [4 5 7]}]}}]
-        (is (= old (sut/update-chart-data! old new)))
-        (let [ds (oc/oget old "data.datasets")]
-          (is (some? ds))
-          (is (= 4 (-> ds (aget 0) (sut/get-data) (aget 2))))
-          (is (= 7 (-> ds (aget 1) (sut/get-data) (aget 2)))))))
+                  [{:label "test data"
+                    :data [2 2 4]}]}}
+            res (sut/update-chart-data! old new)]
+        (is (= old res))
+        (let [d (-> old (oc/oget "data.datasets") (aget 0))]
+          (is (= "test data" (oc/oget d "label"))))))
+
+  (testing "replaces modified data in multiple datasets"
+    (let [old (clj->js
+               {:data
+                {:datasets
+                 [{:data [1 2 3]}
+                  {:data [4 5 6]}]}})
+          new {:data
+               {:datasets
+                [{:data [1 2 4]}
+                 {:data [4 5 7]}]}}]
+      (is (= old (sut/update-chart-data! old new)))
+      (let [ds (oc/oget old "data.datasets")]
+        (is (some? ds))
+        (is (= 4 (-> ds (aget 0) (sut/get-data) (aget 2))))
+        (is (= 7 (-> ds (aget 1) (sut/get-data) (aget 2)))))))
 
     (testing "removes value from data"
       (let [old (clj->js

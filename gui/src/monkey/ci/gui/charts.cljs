@@ -4,11 +4,12 @@
             [oops.core :as oc]
             [re-frame.core :as rf]
             [reagent.core :as rc]
+            #_["chart.js/auto"]
             ["chart.js" :refer [BarController BarElement
                                 DoughnutController ArcElement
                                 LineController PointElement LineElement
                                 CategoryScale LinearScale
-                                Colors
+                                Colors Legend
                                 Chart]]))
 
 ;; Necessary otherwise chartjs won't be able to use these
@@ -16,7 +17,7 @@
                            DoughnutController ArcElement
                            LineController PointElement LineElement
                            CategoryScale LinearScale
-                           Colors]))
+                           Colors Legend]))
 
 (defn- set-chart-config [db id conf]
   (assoc-in db [::chart-config id] conf))
