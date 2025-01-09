@@ -52,7 +52,10 @@
                        (str consumed " consumed")]
               :datasets
               [{:label "Credits"
-                :data [available consumed]}]}})))
+                :data [available consumed]}]}
+       ;; TODO Either disable animations, or make transition work
+       #_:options
+       #_{:animation false}})))
 
 (def stats-period-days 30)
 

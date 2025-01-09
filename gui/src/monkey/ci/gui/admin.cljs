@@ -15,7 +15,7 @@
    [:div.card.h-100.p-2
     [:div.card-img.text-center.text-primary.pt-2
      {:style {:font-size "6em"}}
-     [co/icon icon]]
+     [:a {:href url} [co/icon icon]]]
     [:div.card-body
      [:h5.card-title title]
      [:p.card-text desc]

@@ -17,10 +17,12 @@
   ;; regular system of "prepare the data and set it in the hiccup structure".
   (letfn [(make-chart [conf]
             (Chart. (.getElementById js/document id) (clj->js conf)))
-          (remake-chart [chart conf]
-            (log/debug "Destroying chart")
-            (.-destroy chart)           ; Has no effect?
-            (make-chart conf))]
+          (update-chart [chart conf]
+            ;; Replace the data in the chart, leave other values untouched
+            (log/debug "Updating chart data")
+            (sut/update-chart-data! chart conf)
+            (.update chart #_"none")
+            chart)]
     (let [state (rc/atom nil)]
       (rc/create-class
        {:display-name "chart-component"
@@ -34,7 +36,7 @@
         (fn [this argv]
           (let [conf @(nth argv 2)]
             (log/debug "Component updated:" (str conf))
-            (swap! state remake-chart conf)))
+            (swap! state update-chart conf)))
         :component-did-mount
         (fn [this]
           (log/debug "Component mounted")
@@ -69,7 +71,6 @@
                        (reset! config (create-config)))]
     [l/error-boundary
      [:div
-      [:h2 "Bar chart 2"]
       [chart-component-2 id config]
       [:button.btn.btn-primary {:on-click #(reset-config)} "Reset"]]]))
 

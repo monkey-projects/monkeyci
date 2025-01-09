@@ -13,6 +13,7 @@
 
 (defn- configure-chart! [id chart config]
   ;; FIXME No matter what, the chart always re-renders, so the change check doesn't work.
+  ;; TODO Find a way to change existing chart data instead of recreating it.
   (when (or (nil? chart)
             ;; Only update when the chart data has changed
             (not= (js->clj (.-data chart)) (:data config)))
@@ -42,3 +43,35 @@
    actually initialize and render the chart."
   [id]
   [:canvas {:id id}])
+
+(defn update-chart-data!
+  "In order to ensure smooth animation transition when changing chart data, we can't
+   just replace the entire data structure, we need to replace all modified data values
+   instead.  This function takes a new dataset and applies the differences to the old
+   (js) datastructure."
+  [old new]
+  (letfn [(update-arr [old new]
+            (println "Comparing:" old "and" (str new))
+            (when (and old new)
+              (let [new (vec new)
+                    oc (count old)
+                    nc (count new)]
+                ;; Update values
+                (doseq [i (range (min oc nc))]
+                  (let [v (get new i)]
+                    (when (not= (aget old i) v)
+                      (aset old i v))))
+                ;; Remove values
+                (when (> oc nc)
+                  (.splice old nc (- oc nc)))
+                ;; Add values
+                (while (< (count old) nc)
+                  (.push old (get new (count old)))))))]
+    (let [old-ds (-> old (.-data) (.-datasets))
+          new-ds (get-in new [:data :datasets])]
+      (doseq [i (range (count old-ds))]
+        (let [upd (get new-ds i)]
+          (update-arr (.-data (aget old-ds i))
+                      (:data upd))))
+      (update-arr (-> old (.-data) (.-labels)) (vec (get-in new [:data :labels])))
+      old)))
