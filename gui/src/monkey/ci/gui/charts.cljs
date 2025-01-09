@@ -2,8 +2,20 @@
   "Chart.js wrapper component"
   (:require [monkey.ci.gui.logging :as log]
             [re-frame.core :as rf]
-            ;; TODO Finetune loaded modules
-            ["chart.js/auto" :refer [Chart]]))
+            [reagent.core :as rc]
+            ["chart.js" :refer [BarController BarElement
+                                DoughnutController ArcElement
+                                LineController PointElement LineElement
+                                CategoryScale LinearScale
+                                Colors
+                                Chart]]))
+
+;; Necessary otherwise chartjs won't be able to use these
+(.register Chart (clj->js [BarController BarElement
+                           DoughnutController ArcElement
+                           LineController PointElement LineElement
+                           CategoryScale LinearScale
+                           Colors]))
 
 (defn- set-chart-config [db id conf]
   (assoc-in db [::chart-config id] conf))
@@ -51,7 +63,6 @@
    (js) datastructure."
   [old new]
   (letfn [(update-arr [old new]
-            (println "Comparing:" old "and" (str new))
             (when (and old new)
               (let [new (vec new)
                     oc (count old)
@@ -75,3 +86,40 @@
                       (:data upd))))
       (update-arr (-> old (.-data) (.-labels)) (vec (get-in new [:data :labels])))
       old)))
+
+(defn chart-component-2 [id config]
+  ;; The main issue with the chart component is that it requires an existing
+  ;; DOM object before it can render the chart.  So we can't really use the
+  ;; regular system of "prepare the data and set it in the hiccup structure".
+  (letfn [(make-chart [conf]
+            ;;(log/debug "Creating new chart with config:" (str conf))
+            (Chart. (.getElementById js/document (str id)) (clj->js conf)))
+          (update-chart [chart conf]
+            ;; Replace the data in the chart, leave other values untouched
+            ;;(log/debug "Updating chart data")
+            (update-chart-data! chart conf)
+            (.update chart)
+            chart)]
+    (let [state (rc/atom nil)]
+      (rc/create-class
+       {:display-name "chart-component"
+        :reagent-render
+        (fn [id config]
+          ;;(log/debug "Rendering component with config" (str config))
+          ;; Put the config in the state, we'll need it after mount
+          (swap! state assoc :config config)
+          ;; Render the component, chart js will fill it up after mount
+          [:canvas {:id (str id)}])
+        :component-did-update
+        (fn [this argv]
+          ;; Don't use argv, it contains the original values
+          ;;(log/debug "Component updated")
+          ;; Update the chart configuration
+          (swap! state (fn [{:keys [config] :as r}]
+                         (update r :chart update-chart config))))
+        :component-did-mount
+        (fn [this]
+          ;;(log/debug "Component mounted")
+          ;; Create the chart object using the config stored when rendering
+          (swap! state (fn [{:keys [config] :as r}]
+                         (assoc r :chart (make-chart config)))))}))))

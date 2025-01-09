@@ -5,42 +5,7 @@
             [monkey.ci.gui.logging :as log]
             [reagent.core :as rc]
             [re-frame.core :as rf]
-            [re-frame.db :as rdb]
-            ;; TODO Finetune loaded modules
-            ["chart.js/auto" :refer [Chart]]
-            #_["chart.js" :refer [BarController BarElement CategoryScale LinearScale
-                                  Chart]]))
-
-(defn chart-component-2 [id config]
-  ;; The main issue with the chart component is that it requires an existing
-  ;; DOM object before it can render the chart.  So we can't really use the
-  ;; regular system of "prepare the data and set it in the hiccup structure".
-  (letfn [(make-chart [conf]
-            (Chart. (.getElementById js/document id) (clj->js conf)))
-          (update-chart [chart conf]
-            ;; Replace the data in the chart, leave other values untouched
-            (log/debug "Updating chart data")
-            (sut/update-chart-data! chart conf)
-            (.update chart #_"none")
-            chart)]
-    (let [state (rc/atom nil)]
-      (rc/create-class
-       {:display-name "chart-component"
-        :reagent-render
-        (fn [id config]
-          ;; Render the component, chart js will fill it up after mount
-          (log/debug "Rendering component")
-          @config ; Dereference the config so reagent will re-render on changes
-          [:canvas {:id id}])
-        :component-did-update
-        (fn [this argv]
-          (let [conf @(nth argv 2)]
-            (log/debug "Component updated:" (str conf))
-            (swap! state update-chart conf)))
-        :component-did-mount
-        (fn [this]
-          (log/debug "Component mounted")
-          (reset! state (make-chart @config)))}))))
+            [re-frame.db :as rdb]))
 
 (defcard-rg bar-chart
   "Simple bar chart"
@@ -57,21 +22,37 @@
       [:h2 "Bar chart"]
       [sut/chart-component id]]]))
 
+(rf/reg-event-db
+ ::bar-chart-2--update
+ (fn [db [_ config]]
+   (println "Updating chart configuration in re-frame db")
+   (assoc db ::bar-chart-2 config)))
+
+(rf/reg-sub
+ ::bar-chart-2
+ (fn [db _]
+   (::bar-chart-2 db)))
+
+(defn bar-chart-2 [id]
+  (let [conf (rf/subscribe [::bar-chart-2])]
+    [sut/chart-component-2 id @conf]))
+
 (defcard-rg bar-chart-2
   "Simple bar chart with react class"
-  (let [id "bar-chart-2"
+  (let [id :bar-chart-2
         create-config (fn []
                         {:type "bar"
                          :data {:labels (range 10)
                                 :datasets [{:label "Values"
                                             :data (repeatedly 10 (comp inc #(rand-int 10)))}]}})
-        config (rc/atom (create-config))
         reset-config (fn []
                        (println "Resetting config")
-                       (reset! config (create-config)))]
+                       #_(reset! config (create-config))
+                       (rf/dispatch [::bar-chart-2--update (create-config)]))]
+    (rf/dispatch-sync [::bar-chart-2--update (create-config)])
     [l/error-boundary
      [:div
-      [chart-component-2 id config]
+      [bar-chart-2 id]
       [:button.btn.btn-primary {:on-click #(reset-config)} "Reset"]]]))
 
 (defcard-rg line-chart

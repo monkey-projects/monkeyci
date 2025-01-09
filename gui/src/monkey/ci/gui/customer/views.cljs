@@ -43,19 +43,26 @@
         :position :left
         :stacked true}}}}))
 
-(defn credits-chart-config []
+(defn history-chart []
+  (let [stats (rf/subscribe [:customer/stats])]
+    [charts/chart-component-2 :customer/builds (build-chart-config (:stats @stats))]))
+
+(defn credits-chart-config [stats]
+  (when-let [{:keys [consumed available]} stats]
+    ;; TODO Colors
+    {:type :doughnut
+     :data {:labels [(str available " available")
+                     (str consumed " consumed")]
+            :datasets
+            [{:label "Credits"
+              :data [available consumed]}]}
+     ;; TODO Either disable animations, or make transition work
+     #_:options
+     #_{:animation false}}))
+
+(defn credits-chart []
   (let [stats (rf/subscribe [:customer/credit-stats])]
-    (when-let [{:keys [consumed available]} @stats]
-      ;; TODO Colors
-      {:type :doughnut
-       :data {:labels [(str available " available")
-                       (str consumed " consumed")]
-              :datasets
-              [{:label "Credits"
-                :data [available consumed]}]}
-       ;; TODO Either disable animations, or make transition work
-       #_:options
-       #_{:animation false}})))
+    [charts/chart-component-2 :customer/credits (credits-chart-config @stats)]))
 
 (def stats-period-days 30)
 
@@ -63,22 +70,19 @@
   (rf/dispatch [:customer/load-stats cust-id stats-period-days])
   (rf/dispatch [:customer/load-credits cust-id])
   (fn [cust-id]
-    (let [stats (rf/subscribe [:customer/stats])]
-      (rf/dispatch [:chart/update :customer/builds (build-chart-config (:stats @stats))])
-      (rf/dispatch [:chart/update :customer/credits (credits-chart-config)])
-      [:div.row
-       [:div.col-8
-        [:div.card
-         [:div.card-body
-          [:h5 "History"]
-          [:p (str "Build elapsed times and consumed credits over the past " stats-period-days " days.")]
-          [charts/chart-component :customer/builds]]]]
-       [:div.col-4
-        [:div.card
-         [:div.card-body
-          [:h5 "Credits"]
-          [:p "Credit consumption for this month."]
-          [charts/chart-component :customer/credits]]]]])))
+    [:div.row
+     [:div.col-8
+      [:div.card
+       [:div.card-body
+        [:h5 "History"]
+        [:p (str "Build elapsed times and consumed credits over the past " stats-period-days " days.")]
+        [history-chart]]]]
+     [:div.col-4
+      [:div.card
+       [:div.card-body
+        [:h5 "Credits"]
+        [:p "Credit consumption for this month."]
+        [credits-chart]]]]]))
 
 (defn- latest-build [r]
   (let [build (rf/subscribe [:customer/latest-build (:id r)])]
