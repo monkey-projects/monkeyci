@@ -310,6 +310,9 @@
 (defn gen-crypto []
   (gen-entity :entity/crypto))
 
+(defn gen-invoice []
+  (gen-entity :entity/invoice))
+
 (defrecord FakeContainerRunner [credit-consumer runs result]
   p/ContainerRunner
   (run-container [this job]

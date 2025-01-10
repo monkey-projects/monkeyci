@@ -419,7 +419,19 @@
    (migration
     (mig-id 31 :build-idx-idx)
     [(col-idx :builds :idx)]
-    [(h/drop-index (idx-name :builds :idx))])])
+    [(h/drop-index (idx-name :builds :idx))])
+
+   (entity-table-migration
+    32 :invoices
+    [customer-col
+     [:kind [:varchar 30] [:not nil]]
+     [:invoice-nr [:varchar 50] [:not nil]]
+     [:net-amount [:decimal 10 2] [:not nil]]
+     [:vat-perc [:decimal 5 2] [:not nil]]
+     [:currency [:varchar 30] [:not nil]]
+     [:details :text]
+     fk-customer]
+    [(col-idx :invoices :customer-id)])])
 
 (defn prepare-migrations
   "Prepares all migrations by formatting to sql, creates a ragtime migration object from it."

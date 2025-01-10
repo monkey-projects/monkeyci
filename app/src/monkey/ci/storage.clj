@@ -759,3 +759,21 @@
 
 (defn find-sysadmin [st user-id]
   (p/read-obj st (sysadmin-sid user-id)))
+
+(def invoice :invoice)
+(defn invoice-sid [& parts]
+  (into [global (name invoice)] parts))
+
+(defn save-invoice [st invoice]
+  (p/write-obj st (invoice-sid (:customer-id invoice) (:id invoice)) invoice))
+
+(defn find-invoice [st sid]
+  (p/read-obj st (apply invoice-sid sid)))
+
+(def list-invoices-for-customer
+  (override-or
+   [:invoice :list-for-customer]
+   (fn [st cust-id]
+     (->> (p/list-obj st (invoice-sid cust-id))
+          (map (partial vector cust-id))
+          (map (partial find-invoice st))))))

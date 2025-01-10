@@ -149,5 +149,5 @@
        [:label.form-label.col-form-label {:for count-id} "Show top:"]
        [:div
         [test-count-dropdown id count-id]]]]
-     [:div {:height "100px"}
+     [:div {:style {:height "25em"}}
       [charts/chart-component id (timings->chart results @conf)]]]))

@@ -375,3 +375,25 @@
       (testing "can select by webhook id"
         (is (= bb-wh (-> (sut/select-bb-webhook conn [:= :webhook-id (:id wh)])
                          (dissoc :id))))))))
+
+(deftest ^:sql invoice
+  (eh/with-prepared-db conn
+    (let [cust (sut/insert-customer conn (eh/gen-customer))
+          inv (-> (eh/gen-invoice)
+                  (assoc :customer-id (:id cust)
+                         :net-amount 100M
+                         :vat-perc 21M
+                         :details [{:net-amount 100M
+                                    :vat-perc 21M
+                                    :description "Test invoice detail"}]))]
+      
+      (testing "can insert"
+        (is (number? (:id (sut/insert-invoice conn inv)))))
+
+      (testing "can select by cuid"
+        (is (= inv (-> (sut/select-invoice conn (sut/by-cuid (:cuid inv)))
+                       (dissoc :id)))))
+
+      (testing "can select by customer id"
+        (is (= inv (-> (sut/select-invoice conn (sut/by-customer (:id cust)))
+                       (dissoc :id))))))))

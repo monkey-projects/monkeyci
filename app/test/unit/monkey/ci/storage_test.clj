@@ -491,3 +491,15 @@
       (testing "can save and find"
         (is (sid/sid? (sut/save-sysadmin st sysadmin)))
         (is (= sysadmin (sut/find-sysadmin st (:user-id sysadmin))))))))
+
+(deftest invoices
+  (h/with-memory-store st
+    (let [cust (h/gen-cust)
+          inv (-> (h/gen-invoice)
+                  (assoc :customer-id (:id cust)))]
+      (testing "can save and find by id"
+        (is (sid/sid? (sut/save-invoice st inv)))
+        (is (= inv (sut/find-invoice st [(:id cust) (:id inv)]))))
+
+      (testing "can list for customer"
+        (is (= [inv] (sut/list-invoices-for-customer st (:id cust))))))))

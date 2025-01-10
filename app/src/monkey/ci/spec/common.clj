@@ -38,3 +38,9 @@
 ;; Bitbucket specific
 (s/def :bb/workspace string?)
 (s/def :bb/repo-slug string?)
+
+(s/def :invoice/invoice-nr string?)
+(s/def :invoice/net-amount (s/and decimal? pos?))
+(s/def :invoice/vat-perc (s/and decimal? pos?))
+(s/def :invoice/currency string?)
+(s/def :invoice/kind #{:invoice :creditnote})

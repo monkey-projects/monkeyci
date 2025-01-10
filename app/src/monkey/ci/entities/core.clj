@@ -381,3 +381,17 @@
                         :where [:= :customer-id (:customer-id crypto)]}))
 
 (defaggregate sysadmin)
+
+(def prepare-inv (comp (partial prop->edn :details)
+                       (partial keyword->str :kind)))
+(def convert-inv (comp (partial copy-prop :details)
+                       (partial str->keyword :kind)))
+(def convert-inv-select (comp (partial edn->prop :details)
+                              (partial str->keyword :kind)))
+
+(defentity invoice
+  {:before-insert prepare-inv
+   :after-insert  convert-inv
+   :before-update prepare-inv
+   :after-update  convert-inv
+   :after-select  convert-inv-select})

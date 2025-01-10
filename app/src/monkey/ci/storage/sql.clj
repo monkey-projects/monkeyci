@@ -14,6 +14,7 @@
              [credit-subs :as ecsub]
              [customer :as ecu]
              [customer-credit :as ecc]
+             [invoice :as ei]
              [join-request :as jr]
              [migrations :as emig]
              [param :as eparam]
@@ -810,6 +811,38 @@
   (some-> (eu/select-sysadmin-by-user-cuid conn user-cuid)
           (assoc :user-id user-cuid)))
 
+(def invoice? (partial global-sid? st/invoice))
+
+(defn- db->invoice [inv]
+  (-> inv
+      (cuid->id)
+      (assoc :customer-id (:customer-cuid inv))
+      (dissoc :customer-cuid)))
+
+(defn- select-invoice [conn cuid]
+  (some-> (ei/select-invoice-with-customer conn cuid)
+          db->invoice))
+
+(defn- select-invoices-for-customer [{:keys [conn]} cust-cuid]
+  (->> (ei/select-invoices-for-customer conn cust-cuid)
+       (map db->invoice)))
+
+(defn- insert-invoice [conn inv]
+  (when-let [cust (ec/select-customer conn (ec/by-cuid (:customer-id inv)))]
+    (ec/insert-invoice conn (-> inv
+                                (id->cuid)
+                                (assoc :customer-id (:id cust))))))
+
+(defn- update-invoice [conn inv existing]
+  (ec/update-invoice conn (merge existing
+                                 (-> inv
+                                     (dissoc :id :customer-id)))))
+
+(defn- upsert-invoice [conn inv]
+  (if-let [existing (ec/select-invoice conn (ec/by-cuid (:id inv)))]
+    (update-invoice conn inv existing)
+    (insert-invoice conn inv)))
+
 (defn- sid-pred [t sid]
   (t sid))
 
@@ -844,7 +877,9 @@
       crypto?
       (select-crypto conn (last sid))
       sysadmin?
-      (select-sysadmin conn (last sid))))
+      (select-sysadmin conn (last sid))
+      invoice?
+      (select-invoice conn (last sid))))
   
   (write-obj [_ sid obj]
     (when (condp sid-pred sid
@@ -876,6 +911,8 @@
             (upsert-crypto conn obj)
             sysadmin?
             (upsert-sysadmin conn obj)
+            invoice?
+            (upsert-invoice conn obj)
             (log/warn "Unrecognized sid when writing:" sid))
       sid))
 
@@ -1001,7 +1038,9 @@
    {:list-active-subscriptions select-active-credit-subs}
    :bitbucket
    {:find-for-webhook select-bb-webhook-for-webhook
-    :search-webhooks select-bb-webhooks-by-filter}})
+    :search-webhooks select-bb-webhooks-by-filter}
+   :invoice
+   {:list-for-customer select-invoices-for-customer}})
 
 (defn make-storage [conn]
   (map->SqlStorage {:conn conn

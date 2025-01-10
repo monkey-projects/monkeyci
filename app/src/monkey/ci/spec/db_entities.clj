@@ -160,3 +160,15 @@
 
 (s/def :db/sysadmin
   (s/keys :req-un [:db/user-id :db/password]))
+
+(s/def :db/invoice
+  (-> (s/keys :req-un [:db/customer-id :invoice/kind :invoice/invoice-nr
+                       :invoice/currency :invoice/net-amount :invoice/vat-perc
+                       :db-invoice/details])
+      (s/merge :db/common)))
+
+(s/def :db-invoice/details
+  (s/coll-of :db-invoice/detail))
+
+(s/def :db-invoice/detail
+  (s/keys :req-un [:invoice/net-amount :invoice/vat-perc :db/description]))
