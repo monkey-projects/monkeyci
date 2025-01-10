@@ -1,6 +1,7 @@
 (ns monkey.ci.gui.test-results
   "Displays test results"
   (:require [clojure.string :as cs]
+            [monkey.ci.gui.charts :as charts]
             [monkey.ci.gui.colors :as colors]
             [monkey.ci.gui.components :as co]
             [monkey.ci.gui.table :as t]
@@ -103,18 +104,10 @@
    (prop (timing-chart-form db id))))
 
 (rf/reg-event-fx
- ::timing-chart-init
- (fn [{:keys [db]} [_ id results]]
-   {:db (assoc-in db [::timing-chart-results id] results)
-    :dispatch [:chart/update id (timings->chart results (timing-chart-form db id))]}))
-
-(rf/reg-event-fx
  ::timing-chart-changed
  (fn [{:keys [db]} [_ id prop v]]
-   (let [results (timing-chart-results db id)
-         db (assoc-in db [::timing-chart id prop] v)]
-     {:db db
-      :dispatch [:chart/update id (timings->chart results (timing-chart-form db id))]})))
+   (let [results (timing-chart-results db id)]
+     {:db (assoc-in db [::timing-chart id prop] v)})))
 
 (defn suite-dropdown [suites id name]
   (let [v (rf/subscribe [::timing-chart-val id :suite])]
@@ -144,7 +137,8 @@
    all suites, the top 100, but the user can configure this."
   [id results]
   (let [suite-id (str (name id) "-suite-dropdown")
-        count-id (str (name id) "-count-dropdown")]
+        count-id (str (name id) "-count-dropdown")
+        conf (rf/subscribe [::timing-chart-form id])]
     [:div
      [:h4 "Test Timings"]
      [:form
@@ -155,5 +149,5 @@
        [:label.form-label.col-form-label {:for count-id} "Show top:"]
        [:div
         [test-count-dropdown id count-id]]]]
-     (rf/dispatch [::timing-chart-init id results])
-     [:canvas {:id id :height "100px"}]]))
+     [:div {:height "100px"}
+      [charts/chart-component id (timings->chart results @conf)]]]))

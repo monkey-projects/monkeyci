@@ -35,7 +35,7 @@
 
 (defn bar-chart-2 [id]
   (let [conf (rf/subscribe [::bar-chart-2])]
-    [sut/chart-component-2 id @conf]))
+    [sut/chart-component id @conf]))
 
 (defcard-rg bar-chart-2
   "Simple bar chart with react class"

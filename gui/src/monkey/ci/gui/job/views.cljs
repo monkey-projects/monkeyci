@@ -2,7 +2,6 @@
   (:require [clojure.string :as cs]
             [monkey.ci.gui.artifact.events]
             [monkey.ci.gui.artifact.subs]
-            [monkey.ci.gui.charts :as charts]
             [monkey.ci.gui.components :as co]
             [monkey.ci.gui.job.events :as e]
             [monkey.ci.gui.job.subs]
@@ -40,7 +39,7 @@
 (defn job-details
   ([job]
    (when-let [{:keys [start-time end-time labels] deps :dependencies} job]
-     [:div.d-flex.gap-4.align-items-center
+     [:div.d-flex.gap-4.align-items-center.mb-3
       [status-icon (:status job)]
       [:div.w-100
        [info

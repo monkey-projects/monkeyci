@@ -8,24 +8,28 @@
 
 (rf/clear-subscription-cache!)
 
+(rf/reg-sub
+ ::single-suite
+ (fn [db _]
+   [{:test-case "monkey.ci.test/some-test"
+     :class-name "monkey.ci.test"
+     :time 0.1735}
+    {:test-case "monkey.ci.test/other-test"
+     :class-name "monkey.ci.test"
+     :time 0.0414}
+    {:test-case "monkey.ci.test/failing"
+     :class-name "monkey.ci.test"
+     :time 0.069343
+     :failures
+     [{:message "Test error"
+       :type "assertion error: true?"
+       :description "This is a longer description of the error"}]}]))
+
 (defcard-rg single-suite
   "Unit tests for single suite"
   [sut/test-results
-   [{:name "unit"
-     :test-cases
-     [{:test-case "monkey.ci.test/some-test"
-       :class-name "monkey.ci.test"
-       :time 0.1735}
-      {:test-case "monkey.ci.test/other-test"
-       :class-name "monkey.ci.test"
-       :time 0.0414}
-      {:test-case "monkey.ci.test/failing"
-       :class-name "monkey.ci.test"
-       :time 0.069343
-       :failures
-       [{:message "Test error"
-         :type "assertion error: true?"
-         :description "This is a longer description of the error"}]}]}]])
+   ::single-suite
+   [::single-suite]])
 
 (defn- gen-test-case [n]
   {:test-case (str "test-" n)

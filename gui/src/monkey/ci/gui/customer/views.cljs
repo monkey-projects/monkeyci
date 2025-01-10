@@ -45,7 +45,7 @@
 
 (defn history-chart []
   (let [stats (rf/subscribe [:customer/stats])]
-    [charts/chart-component-2 :customer/builds (build-chart-config (:stats @stats))]))
+    [charts/chart-component :customer/builds (build-chart-config (:stats @stats))]))
 
 (defn credits-chart-config [stats]
   (when-let [{:keys [consumed available]} stats]
@@ -55,14 +55,11 @@
                      (str consumed " consumed")]
             :datasets
             [{:label "Credits"
-              :data [available consumed]}]}
-     ;; TODO Either disable animations, or make transition work
-     #_:options
-     #_{:animation false}}))
+              :data [available consumed]}]}}))
 
 (defn credits-chart []
   (let [stats (rf/subscribe [:customer/credit-stats])]
-    [charts/chart-component-2 :customer/credits (credits-chart-config @stats)]))
+    [charts/chart-component :customer/credits (credits-chart-config @stats)]))
 
 (def stats-period-days 30)
 
