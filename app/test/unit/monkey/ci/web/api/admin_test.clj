@@ -108,10 +108,24 @@
           (is (= 1 (count cc)))
           (is (= [200M] (map :amount cc)))))
 
-      (testing "does not create credit if a future one already exists"
+      (testing "does not create credit if a future one already exists for that subscription"
         (is (empty? (-> (issue-at now)
                         :body
                         :credits))))
+
+      (testing "ignores ad-hoc credit issuances"
+        (is (st/save-customer-credit st {:customer-id (:id cust)
+                                         :type :user
+                                         :amount 1000M
+                                         :valid-from (+ now 2000)}))
+        (is (st/save-credit-subscription st (-> (h/gen-credit-subs)
+                                                (assoc :customer-id (:id cust)
+                                                       :amount 300M
+                                                       :valid-from (+ now 2000)
+                                                       :valid-until (+ now 5000)))))
+        (is (not-empty (->> (issue-at (+ now 3000))
+                            :body
+                            :credits))))
 
       (testing "skips expired subscriptions"
         (is (empty? (-> (issue-at (+ until 1000))
