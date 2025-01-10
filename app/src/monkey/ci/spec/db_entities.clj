@@ -162,7 +162,7 @@
   (s/keys :req-un [:db/user-id :db/password]))
 
 (s/def :db/invoice
-  (-> (s/keys :req-un [:db/customer-id :invoice/kind :invoice/invoice-nr
+  (-> (s/keys :req-un [:db/customer-id :invoice/kind :invoice/invoice-nr :invoice/date
                        :invoice/currency :invoice/net-amount :invoice/vat-perc
                        :db-invoice/details])
       (s/merge :db/common)))

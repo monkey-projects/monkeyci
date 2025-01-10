@@ -175,7 +175,7 @@
   (s/keys :req-un [:entity/user-id :entity/password]))
 
 (s/def :entity/invoice
-  (-> (s/keys :req-un [:entity/customer-id :invoice/kind :invoice/invoice-nr
+  (-> (s/keys :req-un [:entity/customer-id :invoice/kind :invoice/invoice-nr :invoice/date
                        :invoice/net-amount :invoice/vat-perc :invoice/currency
                        :invoice/details])
       (s/merge :entity/common)))

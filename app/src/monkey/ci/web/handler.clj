@@ -21,6 +21,7 @@
              [github :as github]]
             [monkey.ci.web.api
              [customer :as cust-api]
+             [invoice :as inv-api]
              [join-request :as jr-api]
              [params :as param-api]
              [ssh-keys :as ssh-api]]
@@ -309,6 +310,22 @@
                                   (s/optional-key :repo-slug) s/Str
                                   (s/optional-key :bitbucket-id) s/Str}}}}]]])
 
+(s/defschema InvoiceSearchFilter
+  {(s/optional-key :from-date) s/Str
+   (s/optional-key :until-date) s/Str
+   (s/optional-key :invoice-nr) s/Str})
+
+(def invoice-routes
+  ["/invoice"
+   [[""
+     {:get {:handler inv-api/search-invoices
+            :parameters
+            {:query InvoiceSearchFilter}}}]
+    ["/:invoice-id"
+     {:get {:handler inv-api/get-invoice
+            :parameters
+            {:path {:invoice-id Id}}}}]]])
+
 (def customer-routes
   ["/customer"
    {:middleware [:customer-check]}
@@ -329,7 +346,8 @@
                     customer-build-routes
                     stats-routes
                     credit-routes
-                    cust-webhook-routes]})])
+                    cust-webhook-routes
+                    invoice-routes]})])
 
 (def github-routes
   ["/github"

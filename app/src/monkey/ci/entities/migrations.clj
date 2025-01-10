@@ -426,6 +426,7 @@
     [customer-col
      [:kind [:varchar 30] [:not nil]]
      [:invoice-nr [:varchar 50] [:not nil]]
+     [:date :date [:not nil]]
      [:net-amount [:decimal 10 2] [:not nil]]
      [:vat-perc [:decimal 5 2] [:not nil]]
      [:currency [:varchar 30] [:not nil]]
