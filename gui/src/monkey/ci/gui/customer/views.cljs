@@ -9,6 +9,7 @@
             [monkey.ci.gui.apis.bitbucket]
             [monkey.ci.gui.apis.github]
             [monkey.ci.gui.layout :as l]
+            [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.repo.views :as rv]
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.table :as t]
@@ -59,7 +60,8 @@
 
 (defn credits-chart []
   (let [stats (rf/subscribe [:customer/credit-stats])]
-    [charts/chart-component :customer/credits (credits-chart-config @stats)]))
+    (when @stats
+      [charts/chart-component :customer/credits (credits-chart-config @stats)])))
 
 (def stats-period-days 30)
 
