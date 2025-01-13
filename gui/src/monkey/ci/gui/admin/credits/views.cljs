@@ -20,7 +20,7 @@
     [:h3 "Credit Management"]
     [:div.mt-3
      [as/search-customers
-      {:goto-path #(r/path-for :admin/cust-credits {:customer-id %})
+      {:get-route #(vector :admin/cust-credits {:customer-id %})
        :init-view [:p.card-text "Search for a customer to manage their credits."]}]]]])
 
 (defn- formatted-time [prop]

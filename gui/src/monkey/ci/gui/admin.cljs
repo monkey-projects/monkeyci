@@ -75,7 +75,8 @@
    :admin/login login/page
    :admin/credits credits/overview
    :admin/cust-credits credits/customer-credits
-   :admin/invoicing inv/page})
+   :admin/invoicing inv/page
+   :admin/cust-invoices inv/customer-invoices})
 
 (defn render-page [route]
   (let [p (get pages (r/route-name route) not-implemented)]

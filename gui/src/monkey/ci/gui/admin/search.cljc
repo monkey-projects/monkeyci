@@ -2,6 +2,7 @@
   (:require [monkey.ci.gui.alerts :as a]
             [monkey.ci.gui.forms :as f]
             [monkey.ci.gui.loader :as lo]
+            [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.table :as t]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
@@ -105,9 +106,9 @@
                               :aria-label "Search for customer"}]]
        [cust-search-btn]]]]]])
 
-(defn- customers-table [goto-path]
+(defn- customers-table [get-route]
   (letfn [(render-id [{:keys [id]}]
-            [:a {:href (goto-path id)} id])]
+            [:a {:href (apply r/path-for (get-route id))} id])]
     [t/paged-table
      {:id ::customers
       :items-sub [:admin/customers]
@@ -119,14 +120,14 @@
                      :sorter (t/prop-sorter :name)}]
                    (t/add-sorting 1 :asc))
       :loading {:sub [:admin/customers-loading?]}
-      :on-row-click #(rf/dispatch [:route/goto :admin/cust-credits {:customer-id (:id %)}])}]))
+      :on-row-click #(rf/dispatch (into [:route/goto] (get-route %)))}]))
 
 (defn search-results [opts]
   (let [loaded? (rf/subscribe [:admin/customers-loaded?])]
     [:div.card
      [:div.card-body
       (if @loaded?
-        [customers-table (:goto-path opts)]
+        [customers-table (:get-route opts)]
         (or
          (:init-view opts)
          [:p.card-text "Search for a customer."]))]]))
