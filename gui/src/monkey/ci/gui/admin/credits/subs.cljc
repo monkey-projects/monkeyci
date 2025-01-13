@@ -3,10 +3,6 @@
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
-(u/db-sub :credits/customers-loading? db/customers-loading?)
-(u/db-sub :credits/customers-loaded? db/customers-loaded?)
-(u/db-sub :credits/customers db/get-customers)
-
 (u/db-sub :credits/issues db/get-issues)
 (u/db-sub :credits/issues-loading? db/issues-loading?)
 (u/db-sub :credits/issue-alerts db/get-issue-alerts)
