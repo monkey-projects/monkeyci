@@ -189,6 +189,9 @@
   java.sql.Timestamp
   (->epoch [ts]
     (.getTime ts))
+  java.sql.Date
+  (->epoch [ts]
+    (.getTime ts))
   java.time.Instant
   (->epoch [i]
     (.toEpochMilli i))
@@ -381,3 +384,20 @@
                         :where [:= :customer-id (:customer-id crypto)]}))
 
 (defaggregate sysadmin)
+
+(def prepare-inv (comp (partial prop->edn :details)
+                       (partial keyword->str :kind)
+                       (partial int->time :date)))
+(def convert-inv (comp (partial copy-prop :details)
+                       (partial str->keyword :kind)
+                       (partial time->int :date)))
+(def convert-inv-select (comp (partial edn->prop :details)
+                              (partial str->keyword :kind)
+                              (partial time->int :date)))
+
+(defentity invoice
+  {:before-insert prepare-inv
+   :after-insert  convert-inv
+   :before-update prepare-inv
+   :after-update  convert-inv
+   :after-select  convert-inv-select})

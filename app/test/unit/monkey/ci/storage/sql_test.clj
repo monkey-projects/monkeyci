@@ -709,7 +709,7 @@
                     (map :id))))
         (is (empty? (st/search-bb-webhooks st {:customer-id "nonexisting"})))))))
 
-(deftest crypto
+(deftest ^:sql crypto
   (with-storage conn st
     (let [cust (h/gen-cust)
           crypto (-> (h/gen-crypto)
@@ -726,7 +726,7 @@
           (is (sid/sid? (st/save-crypto st upd)))
           (is (java.util.Arrays/equals (:iv upd) (:iv (st/find-crypto st (:id cust))))))))))
 
-(deftest sysadmin
+(deftest ^:sql sysadmin
   (with-storage conn st
     (let [user (h/gen-user)
           sysadmin {:user-id (:id user)
@@ -736,6 +736,38 @@
         (is (sid/sid? (st/save-sysadmin st sysadmin)))
         (let [m (st/find-sysadmin st (:id user))]
           (is (= sysadmin m)))))))
+
+(deftest ^:sql invoices
+  (with-storage conn st
+    (let [cust (h/gen-cust)
+          inv (-> (h/gen-invoice)
+                  (assoc :customer-id (:id cust)
+                         :kind :invoice
+                         :currency "EUR"
+                         :net-amount 100M
+                         :vat-perc 21M
+                         :details
+                         [{:net-amount 20M
+                           :vat-perc 21M
+                           :description "first"}
+                          {:net-amount 80M
+                           :vat-perc 21M
+                           :description "second"}]))]
+      (testing "can save"
+        (is (sid/sid? (st/save-customer st cust)))
+        (is (sid/sid? (st/save-invoice st inv))))
+
+      (testing "can find by id"
+        (is (= inv (st/find-invoice st [(:id cust) (:id inv)]))))
+
+      (testing "can find by customer id"
+        (let [m (st/list-invoices-for-customer st (:id cust))]
+          (is (= [inv] m))))
+      
+      (testing "can update"
+        (let [upd (assoc inv :currency "USD")]
+          (is (some? (st/save-invoice st upd)))
+          (is (= upd (st/find-invoice st [(:id cust) (:id inv)]))))))))
 
 (deftest make-storage
   (testing "creates sql storage object using connection settings"

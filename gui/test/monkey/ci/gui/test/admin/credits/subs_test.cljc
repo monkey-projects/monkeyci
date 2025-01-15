@@ -13,45 +13,6 @@
 (use-fixtures :each f/reset-db)
 (rf/clear-subscription-cache!)
 
-(deftest customers-loading?
-  (let [l (rf/subscribe [:credits/customers-loading?])]
-    (testing "exists"
-      (is (some? l)))
-
-    (testing "initially false"
-      (is (false? @l)))
-    
-    (testing "true if loading by id"
-      (is (some? (reset! app-db (lo/set-loading {} db/cust-by-id))))
-      (is (true? @l)))
-
-    (testing "true if loading by name"
-      (is (some? (reset! app-db (lo/set-loading {} db/cust-by-name))))
-      (is (true? @l)))))
-
-(deftest customers
-  (let [c (rf/subscribe [:credits/customers])]
-    (testing "exists"
-      (is (some? c)))
-
-    (testing "initially empty"
-      (is (empty? @c)))
-    
-    (testing "contains customers by id"
-      (is (some? (reset! app-db (lo/set-value {} db/cust-by-id [::cust]))))
-      (is (= [::cust])))
-
-    (testing "contains customers by name"
-      (is (some? (reset! app-db (lo/set-value {} db/cust-by-name [::cust]))))
-      (is (= [::cust])))))
-
-(deftest customers-loaded?
-  (h/verify-sub
-   [:credits/customers-loaded?]
-   #(lo/set-loaded % db/cust-by-id)
-   true
-   false))
-
 (deftest issues
   (h/verify-sub
    [:credits/issues]

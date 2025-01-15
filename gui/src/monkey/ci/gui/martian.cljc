@@ -3,6 +3,7 @@
             [martian.cljs-http :as mh]
             [martian.interceptors :as mi]
             [martian.re-frame :as mr]
+            [monkey.ci.gui.local-storage]
             [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.login.db :as ldb]
             [re-frame.core :as rf]
@@ -429,12 +430,13 @@
  [(rf/inject-cofx :local-storage ldb/storage-token-id)]
  (fn [{:keys [db local-storage]} [_ orig-evt error-evt err]]
    (let [{:keys [refresh-token]} local-storage]
-     (log/debug "Got error:" (clj->js err))
      {:dispatch (if (and (= 401 (:status err)) refresh-token)
                   ;; Try refreshing the token.  Only when that fails too,
                   ;; we should re-login.
                   [::refresh-token refresh-token orig-evt]
-                  (conj error-evt err))})))
+                  (do
+                    (log/debug "Got error:" (clj->js err))
+                    (conj error-evt err)))})))
 
 (rf/reg-event-fx
  ::refresh-token
@@ -442,6 +444,7 @@
    (let [req (case (ldb/provider db)
                :github :github-refresh
                :bitbucket :bitbucket-refresh)]
+     (log/debug "Attempting to refresh using token" refresh-token)
      {:dispatch [:martian.re-frame/request
                  req
                  {:refresh {:refresh-token refresh-token}}

@@ -105,3 +105,6 @@
 
 (defn gen-bb-webhook []
   (gen-spec :db/bb-webhook))
+
+(defn gen-invoice []
+  (gen-spec :db/invoice))

@@ -5,6 +5,7 @@
             [monkey.ci.gui.login.events]
             [monkey.ci.gui.login.subs]
             [monkey.ci.gui.routing :as r]
+            [monkey.ci.gui.template :as t]
             [re-frame.core :as rf]))
 
 (defn- login-btn [url contents disabled?]
@@ -46,7 +47,7 @@
     [:div.container.content-space-1.content-space-t-md-3
      [:div.row.justify-content-center.align-items-lg-center
       [:div.col-md-8.col-lg-6.mb-7.mb-lg-0
-       [:img.img-fluid.rounded {:src "/img/monkeyci-bw-small.png" :title "Placeholder Logo"}]
+       [t/logo]
        [:h1 "Welcome to MonkeyCI"]
        [:p.lead
         "A" [:span.text-primary.mx-1 "CI/CD tool"] "designed to give you"

@@ -418,7 +418,22 @@
             (testing "allows filtering by query params"
               (is (= [bb] (->> (search "?workspace=test-ws")
                                (map select-props))))
-              (is (empty? (search "?repo-id=nonexisting")))))))))
+              (is (empty? (search "?repo-id=nonexisting"))))))
+
+        (testing "`/invoice`"
+          (let [inv (-> (h/gen-invoice)
+                        (assoc :customer-id (:id cust)))]
+            (is (some? (st/save-invoice st inv)))
+            
+            (testing "`GET` searches invoices"
+              (is (= 200 (-> (mock/request :get (str "/customer/" (:id cust) "/invoice"))
+                             (app)
+                             :status))))
+
+            (testing "`GET /:id` retrieves by id"
+              (is (= 200 (-> (mock/request :get (str "/customer/" (:id cust) "/invoice/" (:id inv)))
+                             (app)
+                             :status)))))))))
 
   (h/with-memory-store st
     (let [kp (auth/generate-keypair)

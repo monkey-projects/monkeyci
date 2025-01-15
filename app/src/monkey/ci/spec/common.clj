@@ -1,14 +1,29 @@
 (ns monkey.ci.spec.common
   (:require [clojure.spec.alpha :as s]
             [clojure.spec.gen.alpha :as gen]
+            [java-time.api :as jt]
             [monkey.ci
              [cuid :as cuid]
              [protocols :as p]]))
 
+(def ts-gen (gen/choose (jt/to-millis-from-epoch (jt/offset-date-time 2020 1 1))
+                        (jt/to-millis-from-epoch (jt/offset-date-time 2030 1 1))))
+
 (def id? string?)
-(def ts? int?)
+(def ts? (s/with-gen int?
+           (constantly ts-gen)))
 (def path? string?)
 (def cuid? cuid/cuid?)
+(def date? (s/with-gen
+             int?
+             #(gen/bind ts-gen
+                        (fn [epoch]
+                          ;; Convert timestamp to midnight
+                          (gen/return
+                           (-> (jt/instant epoch)
+                               (jt/local-date (jt/zone-id))
+                               (jt/zoned-date-time (jt/local-time 0 0) (jt/zone-id))
+                               (jt/to-millis-from-epoch)))))))
 
 (def url-regex #"^(?:([A-Za-z]+):)(\/{0,3})([0-9.\-A-Za-z]+)(?::(\d+))?(?:\/([^?#]*))?(?:\?([^#]*))?(?:#(.*))?$")
 
@@ -38,3 +53,10 @@
 ;; Bitbucket specific
 (s/def :bb/workspace string?)
 (s/def :bb/repo-slug string?)
+
+(s/def :invoice/invoice-nr string?)
+(s/def :invoice/net-amount (s/and decimal? pos?))
+(s/def :invoice/vat-perc (s/and decimal? pos?))
+(s/def :invoice/currency string?)
+(s/def :invoice/kind #{:invoice :creditnote})
+(s/def :invoice/date date?)

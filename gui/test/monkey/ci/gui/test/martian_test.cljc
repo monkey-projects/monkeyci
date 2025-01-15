@@ -52,11 +52,11 @@
      (is (true? (::err-invoked? @app-db)))))
 
   (testing "on 401 error and refresh token is provided"
-    (rf/reg-cofx :local-storage (fn [cofx id]
-                                  (assoc cofx :local-storage {:refresh-token "test-refresh-token"})))
-    
     (testing "refreshes github token"
       (rf-test/run-test-sync
+       (rf/reg-cofx :local-storage (fn [cofx id]
+                                     (assoc cofx :local-storage {:refresh-token "test-refresh-token"})))
+    
        (let [c (h/catch-fx :martian.re-frame/request)]
          (is (some? (reset! app-db (ldb/set-github-token {} "test-github-token"))))
          (h/initialize-martian {:github-refresh {:status 200

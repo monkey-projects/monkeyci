@@ -78,7 +78,8 @@
     ["/credits/:customer-id" :admin/cust-credits]
     ["/builds/clean" :admin/clean-builds]
     ["/forget" :admin/forget-users]
-    ["/invoicing" :admin/invoicing]]))
+    ["/invoicing" :admin/invoicing]
+    ["/invoicing/:customer-id" :admin/cust-invoices]]))
 
 (defonce router (atom main-router))
 

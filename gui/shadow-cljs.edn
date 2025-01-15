@@ -1,6 +1,7 @@
 ;; shadow-cljs configuration
 {:deps {:aliases [:dev :test]}
- :dev-http {8080 ["target/js/frontend" "resources/public"]
+ :dev-http {8080 ["target/js/frontend" "dev-resources/sites/public" "resources/public"]
+            8081 ["target/js/frontend" "dev-resources/sites/admin" "resources/public"]
             8002 ["dev-resources/devcards" "target/js/frontend" "resources/public"]}
 
  :builds

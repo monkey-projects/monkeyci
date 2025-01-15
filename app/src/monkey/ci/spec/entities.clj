@@ -173,3 +173,15 @@
 
 (s/def :entity/sysadmin
   (s/keys :req-un [:entity/user-id :entity/password]))
+
+(s/def :entity/invoice
+  (-> (s/keys :req-un [:entity/customer-id :invoice/kind :invoice/invoice-nr :invoice/date
+                       :invoice/net-amount :invoice/vat-perc :invoice/currency
+                       :invoice/details])
+      (s/merge :entity/common)))
+
+(s/def :invoice/details
+  (s/coll-of :invoice/detail))
+
+(s/def :invoice/detail
+  (s/keys :req-un [:invoice/net-amount :invoice/vat-perc :entity/description]))

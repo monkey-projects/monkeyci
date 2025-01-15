@@ -32,8 +32,8 @@
 
 (defn- job-labels [labels]
   (->> labels
-       (map (fn [[k v]]
-              [:li k ": " v]))
+       (map (fn [kv]
+              (vec (interleave [:li ":"] kv))))
        (into [:ul])))
 
 (defn job-details

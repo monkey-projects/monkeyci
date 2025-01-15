@@ -1,10 +1,12 @@
 (ns monkey.ci.web.api.admin
-  (:require [java-time.api :as jt]
+  (:require [clojure.tools.logging :as log]
+            [java-time.api :as jt]
             [monkey.ci
              [build :as b]
              [cuid :as cuid]
              [storage :as s]
              [time :as t]]
+            [monkey.ci.common.preds :as cp]
             [monkey.ci.events.core :as ec]
             [monkey.ci.web
              [auth :as auth]
@@ -57,17 +59,24 @@
   [req]
   (let [at (get-in req [:parameters :body :from-time])
         st (c/req->storage req)]
-    (letfn [(maybe-create-credit [sub]
-              (let [credits (s/list-customer-credits-since st (:customer-id sub) at)]
-                (when (empty? credits)
-                  (s/save-customer-credit st (-> sub
-                                                 (select-keys [:customer-id :amount])
-                                                 (assoc :id (cuid/random-cuid)
-                                                        :type :subscription
-                                                        :subscription-id (:id sub)
-                                                        :from-time at))))))]
+    (letfn [(process-subs [[cust-id cust-subs]]
+              (let [credits (->> (s/list-customer-credits-since st cust-id at)
+                                 (filter (cp/prop-pred :type :subscription))
+                                 (group-by :subscription-id))]
+                (map (fn [sub]
+                       (let [sc (get credits (:id sub))]
+                         (when (empty? sc)
+                           (log/info "Creating new customer credit for sub" (:id sub) ", amount" (:amount sub))
+                           (s/save-customer-credit st (-> sub
+                                                          (select-keys [:customer-id :amount])
+                                                          (assoc :id (cuid/random-cuid)
+                                                                 :type :subscription
+                                                                 :subscription-id (:id sub)
+                                                                 :from-time at))))))
+                     cust-subs)))]
       (->> (s/list-active-credit-subscriptions st at)
-           (map maybe-create-credit)
+           (group-by :customer-id)
+           (mapcat process-subs)
            (doall)
            (remove nil?)
            (map last)
