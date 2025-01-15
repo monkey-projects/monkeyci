@@ -9,7 +9,7 @@
 (defn logo
   ([config]
    [:img.img-fluid.rounded {:src (tc/assets-url config "/img/monkeyci-black.png")
-                            :title "Placeholder Logo"}])
+                            :title "Logo"}])
   ([]
    (logo config)))
 
