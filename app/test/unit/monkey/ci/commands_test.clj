@@ -1,6 +1,7 @@
 (ns monkey.ci.commands-test
   (:require [clojure.test :refer [deftest testing is]]
             [aleph.http :as http]
+            [babashka.fs :as fs]
             [clj-commons.byte-streams :as bs]
             [clojure.java.io :as io]
             [clojure.spec.alpha :as spec]
@@ -9,6 +10,7 @@
              [commands :as sut]
              [edn :as edn]
              [errors :as err]
+             [pem :as pem]
              [process :as proc]
              [runners :as r]
              [sidecar :as sc]]
@@ -159,3 +161,19 @@
     (with-redefs [rc/run-controller (fn [rt]
                                        (when (some? rt) ::ok))]
       (is (= ::ok (sut/controller tc/base-config))))))
+
+(deftest issue-creds
+  (testing "sends http request to api endpoint"
+    (h/with-tmp-dir dir
+      (at/with-fake-http [{:url "http://test/admin/credits/issue"
+                           :request-method :post}
+                          {:status 200}]
+        (let [pk (h/generate-private-key)
+              pk-file (str (fs/path dir "test-key"))]
+          (is (nil? (spit pk-file (pem/private-key->pem pk))))
+          (is (zero?
+               (sut/issue-creds {:args
+                                 {:all true
+                                  :username "testuser"
+                                  :private-key pk-file
+                                  :api "http://test"}}))))))))

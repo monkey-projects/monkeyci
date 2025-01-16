@@ -159,7 +159,11 @@
 
       (testing "`controller` command"
         (testing "runs `controller` command"
-          (is (= cmd/controller (:cmd (run-cli "controller")))))))))
+          (is (= cmd/controller (:cmd (run-cli "controller"))))))
+
+      (testing "`admin` command"
+        (testing "`issue` runs issue-creds command"
+          (is (= cmd/issue-creds (:cmd (run-cli "admin" "issue")))))))))
 
 (deftest set-invoker
   (testing "applies invoker to `runs` in commands"

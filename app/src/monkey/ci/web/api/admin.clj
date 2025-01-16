@@ -85,6 +85,7 @@
                                                                  :subscription-id (:id sub)
                                                                  :from-time ts))))))
                      cust-subs)))]
+      ;; TODO Allow filtering by customer, if specified
       (->> (s/list-active-credit-subscriptions st ts)
            ;; TODO Filter in the query instead of here
            (filter (comp matches-date? :valid-from))

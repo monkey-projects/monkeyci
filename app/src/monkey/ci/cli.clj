@@ -139,6 +139,44 @@
           :app-mode :script
           :runtime? false}})
 
+(def issue-creds-cmd
+  {:command "issue"
+   :description "Issue credits"
+   :opts [{:as "Customer id"
+           :option "customer"
+           :short "c"
+           :type :string}
+          {:as "Issue for all"
+           :option "all"
+           :type :with-flag}
+          {:as "Issue for date"
+           :option "date"
+           :short "d"
+           :type :yyyy-mm-dd}]
+   :runs {:command cmd/issue-creds
+          :app-mode :cli
+          :runtime? false}})
+
+(def admin-cmd
+  {:command "admin"
+   :description "Administrative actions"
+   :opts [{:as "Username"
+           :option "username"
+           :short "u"
+           :type :string
+           :default :present}
+          {:as "Private key file"
+           :option "private-key"
+           :short "k"
+           :type :string
+           :default :present}
+          {:as "API url"
+           :option "api"
+           :short "a"
+           :type :string
+           :default "https://api.monkeyci.com/v1"}]
+   :subcommands [issue-creds-cmd]})
+
 (def base-config
   {:name "monkey-ci"
    :description "MonkeyCI: Powerful build pipeline runner"
@@ -159,7 +197,8 @@
    :subcommands [build-cmd
                  server-cmd
                  sidecar-cmd
-                 controller-cmd]})
+                 controller-cmd
+                 admin-cmd]})
 
 (defn set-invoker
   "Updates the cli config to replace the `runs` config with the given invoker."

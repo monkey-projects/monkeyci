@@ -2,15 +2,18 @@
   "Event handlers for commands"
   (:require [aleph.http :as http]
             [babashka.fs :as fs]
+            [cheshire.core :as json]
             [clj-commons.byte-streams :as bs]
             [clj-kondo.core :as clj-kondo]
             [clojure.tools.logging :as log]
+            [java-time.api :as jt]
             [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
              [build :as b]
              [errors :as err]
              [jobs :as jobs]
+             [pem :as pem]
              [process :as proc]
              [protocols :as p]
              [runtime :as rt]
@@ -24,7 +27,9 @@
              [app :as ra]
              [sidecar :as rs]]
             [monkey.ci.spec.sidecar :as ss]
-            [monkey.ci.web.handler :as h]))
+            [monkey.ci.web
+             [auth :as auth]
+             [handler :as h]]))
 
 (defn run-build
   "Performs a build, using the runner from the context.  Returns a deferred
@@ -212,3 +217,39 @@
   (ra/with-runner-system conf
     (fn [sys]
       (rc/run-controller (:runtime sys)))))
+
+(defn- generate-admin-token
+  "Generates administration token using the credentials specified in the arguments"
+  [{:keys [username private-key]}]
+  (log/debug "Generating admin JWT for user" username "and private key located at" private-key)
+  (let [pk (-> private-key
+               (slurp)
+               (pem/pem->private-key))
+        token (-> (auth/sysadmin-token [auth/role-sysadmin username])
+                  (auth/augment-payload))]
+    (auth/sign-jwt token pk)))
+
+(defn issue-creds
+  "Issues credits.  Mainly used by cronjobs to automatically issue credits according
+   to active subscriptions."
+  [{:keys [args]}]
+  (log/debug "Issuing credits using arguments:" args)
+  (let [{:keys [api]} args
+        date (jt/format
+              :iso-date
+              (or (some-> (:date args) (jt/local-date))
+                  (jt/local-date)))]
+    (letfn [(print-result [res]
+              (log/info (json/generate-string res))
+              res)
+            (->exit-code [res]
+              (if (< (:status res) 400)
+                0 1))]
+      (log/info "Issuing credits to" api "for date" date)
+      (-> @(http/post (str api "/admin/credits/issue")
+                      {:headers {:authentication (str "Bearer " (generate-admin-token args))
+                                 :content-type "application/json"}
+                       :body (json/generate-string {:date date})})
+          (mc/update-existing :body bs/to-string)
+          (print-result)
+          (->exit-code)))))
