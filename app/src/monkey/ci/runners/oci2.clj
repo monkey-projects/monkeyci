@@ -128,8 +128,8 @@
   (u/combine oci/work-dir (b/build-id build)))
 
 (defn script-container [config]
-  ;; TODO Use clojure base image instead of the one from monkeyci, it's smaller
   (-> default-container
+      ;; Use configured image instead of the one from monkeyci (probably a clojure image)
       (mc/assoc-some :image-url (:build-image-url config))
       (assoc :display-name build-container-name
              ;; Run script that waits for run file to be created

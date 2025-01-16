@@ -67,16 +67,18 @@
                    (deref)
                    :metadata)]
     ;; Only perform save if the hash has changed
-    (when (not= (app-hash) (:app-hash md))
-      (log/debug "Saving build cache for build" (b/sid build))
-      (try
-        @(blob/save build-cache
-                    (m2-cache-dir rt)
-                    loc
-                    ;; TODO Include hash of the build deps.edn as well
-                    {:app-hash (app-hash)})
-        (catch Throwable ex
-          (log/error "Failed to save build cache" ex))))
+    (if (not= (app-hash) (:app-hash md))
+      (do
+        (log/debug "Saving build cache for build" (b/sid build))
+        (try
+          @(blob/save build-cache
+                      (m2-cache-dir rt)
+                      loc
+                      ;; TODO Include hash of the build deps.edn as well
+                      {:app-hash (app-hash)})
+          (catch Throwable ex
+            (log/error "Failed to save build cache" ex))))
+      (log/debug "Not saving build cache, hash is unchanged"))
     rt))
 
 (defn- wait-until-run-file-deleted [rt]
@@ -88,6 +90,7 @@
   rt)
 
 (defn- post-end-evt [{:keys [build] :as rt}]
+  (log/debug "Posting :build/end event")
   (ec/post-events (:events rt) (b/build-end-evt build (get rt :exit-code err/error-process-failure)))
   rt)
 

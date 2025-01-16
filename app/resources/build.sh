@@ -44,6 +44,12 @@ wait_for_start()
     done
 }
 
+cleanup()
+{
+    echo "Deleting run file"
+    rm -f $MONKEYCI_START_FILE
+}
+
 echo "Starting build with working directory $MONKEYCI_WORK_DIR"
 # Create any directories
 mkdir -p `dirname $MONKEYCI_START_FILE`
@@ -55,12 +61,14 @@ if [ "$ABORT" = "yes" ]; then
     exit 1
 fi
 
+# Ensure cleanup is executed on termination
+trap cleanup EXIT
+
 cd $MONKEYCI_WORK_DIR
 # Run the build.  This assumes the necessary deps.edn is placed in $CLJ_CONFIG.
 clojure -X:monkeyci/build
 RESULT=$?
-echo "Script finished with exit code $RESULT, deleting run file."
-rm -f $MONKEYCI_START_FILE
+echo "Script finished with exit code $RESULT"
 echo $RESULT > $MONKEYCI_EXIT_FILE
 echo "All done."
 exit $RESULT

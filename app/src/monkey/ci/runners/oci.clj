@@ -195,10 +195,13 @@
                                       (wait-for-build-end-event (:events rt) (b/sid build))
                                       max-script-timeout ::timeout)
                                      (fn [r]
-                                       (when (= r ::timeout)
-                                         (log/warn "Build script timed out after" max-script-timeout "msecs"))
-                                       (if (= :build/end (:type r))
+                                       (cond
+                                         (= r ::timeout)
+                                         ;; TODO Cancel the build at this point
+                                         (log/warn "Build script timed out after" max-script-timeout "msecs")
+                                         (= :build/end (:type r))
                                          (log/debug "Script end event received, fetching full instance details")
+                                         :else
                                          (log/warn "Script failed to initialize"))
                                        (oci/get-full-instance-details client id))))})
       (md/chain
