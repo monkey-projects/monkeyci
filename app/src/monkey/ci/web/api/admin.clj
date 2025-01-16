@@ -52,19 +52,30 @@
       (rur/status 500))))
 
 (defn issue-auto-credits
-  "Issues new credits to all customers that have active subscriptions at the
-   specified time.  The time should be in the future, and credits will only
-   be created if none exist for that time yet.  This avoids creating multiple
-   credits on multiple calls."
+  "Issues new credits to all customers that have active subscriptions that match
+   the specified date.  This means all subscriptions where the `valid-from` date
+   has the same day-of-month.  To avoid issuing credits multiple times, credits 
+   are only issued if none exist for that subscription with the same month/year
+   as the date specified in the request.
+
+   The intention is that this endpoint is invoked once per day.  Should a call 
+   fail, we can easily retry it using the same date."
   [req]
-  (let [at (get-in req [:parameters :body :from-time])
+  (let [date (-> (get-in req [:parameters :body :date])
+                 (jt/local-date))
+        ts (-> (jt/instant date (jt/zone-id))
+               (jt/to-millis-from-epoch))
         st (c/req->storage req)]
-    (letfn [(process-subs [[cust-id cust-subs]]
-              (let [credits (->> (s/list-customer-credits-since st cust-id at)
+    (letfn [(matches-date? [time]
+              (t/same-date? time ts))
+            (process-subs [[cust-id cust-subs]]
+              (let [credits (->> (s/list-customer-credits-since st cust-id (- ts 100))
+                                 ;; TODO Filter in the query
                                  (filter (cp/prop-pred :type :subscription))
                                  (group-by :subscription-id))]
                 (map (fn [sub]
-                       (let [sc (get credits (:id sub))]
+                       (let [sc (->> (get credits (:id sub))
+                                     (filter (comp matches-date? :from-time)))]
                          (when (empty? sc)
                            (log/info "Creating new customer credit for sub" (:id sub) ", amount" (:amount sub))
                            (s/save-customer-credit st (-> sub
@@ -72,9 +83,11 @@
                                                           (assoc :id (cuid/random-cuid)
                                                                  :type :subscription
                                                                  :subscription-id (:id sub)
-                                                                 :from-time at))))))
+                                                                 :from-time ts))))))
                      cust-subs)))]
-      (->> (s/list-active-credit-subscriptions st at)
+      (->> (s/list-active-credit-subscriptions st ts)
+           ;; TODO Filter in the query instead of here
+           (filter (comp matches-date? :valid-from))
            (group-by :customer-id)
            (mapcat process-subs)
            (doall)

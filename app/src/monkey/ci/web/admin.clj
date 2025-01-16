@@ -17,7 +17,8 @@
    (s/optional-key :from-time) s/Int})
 
 (s/defschema AutoCredits
-  {:from-time s/Int})
+  ;; ISO date format
+  {:date #"\d{4}-\d{2}-\d{2}"})
 
 (s/defschema CreditSubscription
   {:amount s/Int

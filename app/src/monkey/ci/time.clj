@@ -21,3 +21,16 @@
   [^OffsetDateTime start]
   (let [m (day-start start)]
     (lazy-seq (cons m (date-seq (jt/plus m (jt/days 1)))))))
+
+(def utc-zone (jt/zone-id "UTC"))
+
+(defn epoch->date
+  "Converts epoch millis to local date using utc zone"
+  [ms]
+  (-> (jt/instant ms)
+      (jt/local-date utc-zone)))
+
+(defn same-date? [a b]
+  (and a b
+       (= (epoch->date a)
+          (epoch->date b))))

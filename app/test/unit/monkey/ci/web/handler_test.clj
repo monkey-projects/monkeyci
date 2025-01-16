@@ -1269,7 +1269,7 @@
 
       (testing "POST `/issue` issues new credits to all customers with subscriptions"
         (is (= 200 (-> (h/json-request :post "/admin/credits/issue"
-                                       {:from-time (t/now)})
+                                       {:date "2025-01-16"})
                        (test-app)
                        :status)))))
 

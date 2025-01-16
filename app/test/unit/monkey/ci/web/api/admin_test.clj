@@ -1,5 +1,6 @@
 (ns monkey.ci.web.api.admin-test
   (:require [clojure.test :refer [deftest testing is]]
+            [java-time.api :as jt]
             [monkey.ci
              [cuid :as cuid]
              [sid :as sid]
@@ -82,55 +83,68 @@
 
 (deftest issue-auto-credits
   (h/with-memory-store st
-    (let [now      (t/now)
-          until    (+ now 1000)
-          cust     (h/gen-cust)
-          sub      (-> (h/gen-credit-subs)
-                       (assoc :customer-id (:id cust)
-                              :amount 200M
-                              :valid-from (- now 1000)
-                              :valid-until until))
-          issue-at (fn [at]
-                     (-> {:storage st}
-                         (h/->req)
-                         (assoc-in [:parameters :body :from-time] at)
-                         (sut/issue-auto-credits)))]
-      (is (st/save-customer st cust))
-      (is (st/save-credit-subscription st sub))
-      (is (not-empty (st/list-active-credit-subscriptions st now)))
+    (letfn [(ts->date [ts]
+              (-> (jt/instant ts)
+                  (jt/local-date (jt/zone-id))
+                  (jt/format)))
+            (issue-at [at]
+              (-> {:storage st}
+                  (h/->req)
+                  (assoc-in [:parameters :body :date] at)
+                  (sut/issue-auto-credits)))]
+      (let [now   (t/now)
+            today (ts->date now)
+            from  (- now 1000)
+            until (+ now (t/hours->millis 30))
+            cust  (h/gen-cust)
+            sub   (-> (h/gen-credit-subs)
+                      (assoc :customer-id (:id cust)
+                             :amount 200M
+                             :valid-from from
+                             :valid-until until))]
+        
+        (is (st/save-customer st cust))
+        (is (st/save-credit-subscription st sub))
+        (is (not-empty (st/list-active-credit-subscriptions st now)))
 
-      (let [resp (issue-at now)]
-        (is (= 200 (:status resp)))
-        (is (not-empty (get-in resp [:body :credits]))))
-      
-      (testing "creates credit for each subscription"
-        (let [cc (st/list-customer-credits-since st (:id cust) now)]
-          (is (= 1 (count cc)))
-          (is (= [200M] (map :amount cc)))))
+        (let [resp (issue-at today)]
+          (is (= 200 (:status resp)))
+          (is (not-empty (get-in resp [:body :credits]))
+              "expected credits to have been issued"))
+        
+        (testing "creates credit for each subscription"
+          (let [cc (st/list-customer-credits-since st (:id cust) 0)]
+            (is (= 1 (count cc)))
+            (is (= [200M] (map :amount cc)))))
 
-      (testing "does not create credit if a future one already exists for that subscription"
-        (is (empty? (-> (issue-at now)
-                        :body
-                        :credits))))
+        (testing "does not issue credits if subscription date is on another day of the month"
+          (is (empty? (-> (issue-at (ts->date (+ now (t/hours->millis 24))))
+                          :body
+                          :credits))))
 
-      (testing "ignores ad-hoc credit issuances"
-        (is (st/save-customer-credit st {:customer-id (:id cust)
-                                         :type :user
-                                         :amount 1000M
-                                         :valid-from (+ now 2000)}))
-        (is (st/save-credit-subscription st (-> (h/gen-credit-subs)
-                                                (assoc :customer-id (:id cust)
-                                                       :amount 300M
-                                                       :valid-from (+ now 2000)
-                                                       :valid-until (+ now 5000)))))
-        (is (not-empty (->> (issue-at (+ now 3000))
-                            :body
-                            :credits))))
+        (testing "does not create credit if one already exists for that subscription and date"
+          (is (empty? (-> (issue-at today)
+                          :body
+                          :credits))))
 
-      (testing "skips expired subscriptions"
-        (is (empty? (-> (issue-at (+ until 1000))
-                        :body
-                        :credits)))))))
+        (testing "ignores ad-hoc credit issuances"
+          (is (st/save-customer-credit st {:customer-id (:id cust)
+                                           :type :user
+                                           :amount 1000M
+                                           :valid-from (+ now 2000)}))
+          (is (st/save-credit-subscription st (-> (h/gen-credit-subs)
+                                                  (assoc :customer-id (:id cust)
+                                                         :amount 300M
+                                                         :valid-from from
+                                                         :valid-until until))))
+          (is (not-empty (->> (issue-at (ts->date now)) 
+                              :body
+                              :credits))))
+
+        (testing "skips expired subscriptions"
+          (is (empty? (-> (issue-at (ts->date (+ until (t/hours->millis 20))))
+                          :body
+                          :credits))))))))
 
 (deftest cancel-dangling-builds
   (testing "invokes process reaper"
