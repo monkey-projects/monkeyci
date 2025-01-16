@@ -1,10 +1,10 @@
 {:deps {org.clojure/clojure {:mvn/version "1.12.0"}
-        aleph/aleph {:mvn/version "0.8.1"} ; For http SSE receiving
+        aleph/aleph {:mvn/version "0.8.2"} ; For http SSE receiving
         babashka/process {:mvn/version "0.5.22"}
         buddy/buddy-auth {:mvn/version "3.0.323"}
         buddy/buddy-core {:mvn/version "1.12.0-430"}
         camel-snake-kebab/camel-snake-kebab {:mvn/version "0.4.3"}
-        ch.qos.logback/logback-classic {:mvn/version "1.5.12"}
+        ch.qos.logback/logback-classic {:mvn/version "1.5.16"}
         clansi/clansi {:mvn/version "1.0.0"}
         clj-commons/clj-yaml {:mvn/version "1.0.29"}
         cli-matic/cli-matic {:mvn/version "0.5.4"}
@@ -16,9 +16,9 @@
                                         org.bouncycastle/bcutil-jdk15on]}
         clj-kondo/clj-kondo {:mvn/version "2024.11.14"}
         clojure.java-time/clojure.java-time {:mvn/version "1.4.3"}
-        com.github.loki4j/loki-logback-appender {:mvn/version "1.6.0-m1"}
-        com.github.seancorfield/honeysql {:mvn/version "2.6.1230"}
-        com.github.seancorfield/next.jdbc {:mvn/version "1.3.967"}
+        com.github.loki4j/loki-logback-appender {:mvn/version "1.6.0"}
+        com.github.seancorfield/honeysql {:mvn/version "2.6.1243"}
+        com.github.seancorfield/next.jdbc {:mvn/version "1.3.981"}
         com.monkeyprojects/aero-ext {:mvn/version "0.2.0"}
         com.monkeyprojects/clompress {:mvn/version "0.1.1"}
         com.monkeyprojects/monkey-jms {:mvn/version "0.2.0"}
@@ -34,21 +34,21 @@
                                 ;; slower however, so maybe later we can change this.
                                 :exclusions [org.zeromq/jzmq]}
         com.stuartsierra/component {:mvn/version "1.1.0"}
-        com.taoensso/telemere {:mvn/version "1.0.0-RC1"}
+        com.taoensso/telemere {:mvn/version "1.0.0-RC2"}
         commons-io/commons-io {:mvn/version "2.18.0"}
-        io.prometheus/prometheus-metrics-core {:mvn/version "1.3.4"}
-        io.prometheus/prometheus-metrics-exporter-pushgateway {:mvn/version "1.3.4"}
-        io.prometheus/prometheus-metrics-instrumentation-jvm {:mvn/version "1.3.4"}
-        io.prometheus/prometheus-metrics-tracer-initializer {:mvn/version "1.3.4"}
+        io.prometheus/prometheus-metrics-core {:mvn/version "1.3.5"}
+        io.prometheus/prometheus-metrics-exporter-pushgateway {:mvn/version "1.3.5"}
+        io.prometheus/prometheus-metrics-instrumentation-jvm {:mvn/version "1.3.5"}
+        io.prometheus/prometheus-metrics-tracer-initializer {:mvn/version "1.3.5"}
         lambdaisland/kaocha {:mvn/version "1.91.1392"} ; Used for running build tests
         medley/medley {:mvn/version "1.4.0"}
         metosin/reitit-middleware {:mvn/version "0.7.2"}
         metosin/reitit-ring {:mvn/version "0.7.2"}
         metosin/reitit-schema {:mvn/version "0.7.2"}
         metosin/reitit-swagger {:mvn/version "0.7.2"}
-        org.apache.activemq/artemis-server {:mvn/version "2.38.0"}
-        org.apache.activemq/artemis-amqp-protocol {:mvn/version "2.38.0"}
-        org.clojure/core.async {:mvn/version "1.6.681"}
+        org.apache.activemq/artemis-server {:mvn/version "2.39.0"}
+        org.apache.activemq/artemis-amqp-protocol {:mvn/version "2.39.0"}
+        org.clojure/core.async {:mvn/version "1.7.701"}
         org.clojure/tools.logging {:mvn/version "1.3.0"}
         org.zeromq/jeromq {:mvn/version "0.6.0"} ; Java implementation of zeromq
         prismatic/schema {:mvn/version "1.4.1"}
