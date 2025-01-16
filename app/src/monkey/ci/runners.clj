@@ -26,7 +26,6 @@
      :message msg}))
 
 (defn- post-build-end [rt build {:keys [exit message] :as res}]
-  ;; FIXME This event is not always sent for some reason
   (log/debug "Posting :build/end event for exit code" exit)
   (md/chain
    (rt/post-events rt (build/build-end-evt

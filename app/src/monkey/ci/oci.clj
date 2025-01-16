@@ -199,9 +199,11 @@
 
           (maybe-delete-instance [{{:keys [id]} :body :as c}]
             (if (and delete? id)
-              (md/chain
-               (with-retry #(ci/delete-container-instance client {:instance-id id}))
-               (constantly c))
+              (do
+                (log/debug "Deleting container instance:" id)
+                (md/chain
+                 (with-retry #(ci/delete-container-instance client {:instance-id id}))
+                 (constantly c)))
               (md/success-deferred c)))
 
           (log-error [ex]
