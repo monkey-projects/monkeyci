@@ -14,6 +14,27 @@
             [monkey.ci.gui.customer.subs]
             [re-frame.core :as rf]))
 
+(defn- issue-all
+  "Component that allows admins to issue credits for all subscriptions"
+  []
+  [:div.card
+   [:div.card-body
+    [:h4.card-title "Issue Credits for All Subscriptions"]
+    [:form
+     {:on-submit (f/submit-handler [:credits/issue-all])}
+     [:div.mb-3
+      [:label.form-label
+       {:for :date}
+       "Date"]
+      [:input.form-control
+       {:id :date
+        :name :date
+        :type :date
+        :default-value (time/format-iso-date (time/now))}]]
+     [:button.btn.btn-danger
+      {:type :submit}
+      [:span.me-2 [co/icon :card-checklist]] "Issue All"]]]])
+
 (defn overview []
   [l/default
    [:<>
@@ -21,7 +42,9 @@
     [:div.mt-3
      [as/search-customers
       {:get-route #(vector :admin/cust-credits {:customer-id (:id %)})
-       :init-view [:p.card-text "Search for a customer to manage their credits."]}]]]])
+       :init-view [:p.card-text "Search for a customer to manage their credits."]}]]
+    [:div.mt-3
+     [issue-all]]]])
 
 (defn- formatted-time [prop]
   (fn [obj]

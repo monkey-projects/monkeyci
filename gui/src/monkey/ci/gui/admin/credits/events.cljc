@@ -181,3 +181,24 @@
    (-> db
        (db/reset-sub-saving)
        (db/set-sub-alerts [(a/sub-save-failed resp)]))))
+
+(rf/reg-event-fx
+ :credits/issue-all
+ (fn [{:keys [db]} [_ data]]
+   {:dispatch [:secure-request
+               :credits-issue-all
+               {:issue-all {:date (-> data :date first)}}
+               [:credits/issue-all--success]
+               [:credits/issue-all--failed]]}))
+
+(rf/reg-event-db
+ :credits/issue-all--success
+ (fn [db [_ result]]
+   ;; TODO
+   ))
+
+(rf/reg-event-db
+ :credits/issue-all--failed
+ (fn [db [_ err]]
+   ;; TODO
+   ))

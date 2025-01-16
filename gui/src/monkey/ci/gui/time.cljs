@@ -13,6 +13,10 @@
   (when d
     (.toISO d)))
 
+(defn format-iso-date [^DateTime d]
+  (when d
+    (.toISODate d)))
+
 (defn format-datetime [^DateTime d]
   (when d
     (.toLocaleString d (.-DATETIME_SHORT DateTime))))

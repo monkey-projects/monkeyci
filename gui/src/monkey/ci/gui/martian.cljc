@@ -91,6 +91,8 @@
    :valid-from s/Int
    (s/optional-key :valid-until) s/Int})
 
+(def Date #"\d{4}-\d{2}-\d{2}")
+
 (defn public-route [conf]
   (merge {:method :get
           :produces #{"application/edn"}
@@ -199,6 +201,12 @@
      :path-parts ["/admin/credits/" :customer-id "/issue"]
      :path-schema customer-schema
      :body-schema {:credits UserCredits}
+     :method :post})
+
+   (api-route
+    {:route-name :credits-issue-all
+     :path-parts ["/admin/credits/issue"]
+     :body-schema {:issue-all {:date Date}}
      :method :post})
 
    (api-route

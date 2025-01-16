@@ -204,3 +204,24 @@
 
   (testing "unmarks saving"
     (is (not (db/sub-saving? @app-db)))))
+
+(deftest credits-issue-all
+  (rf-test/run-test-sync
+   (let [c (h/catch-fx :martian.re-frame/request)]
+     (h/initialize-martian {:create-credit-sub
+                            {:status 200
+                             :body {}
+                             :error-code :no-error}})
+     (rf/dispatch [:credits/issue-all
+                   {:date ["2025-01-16"]}])
+     (testing "invokes admin endpoint"
+       (is (= 1 (count @c)))
+       (is (= :credits-issue-all (-> @c first (nth 2)))))
+
+     (let [params (-> @c first (nth 3) :issue-all)]
+       (testing "passes form params as body"
+         (is (= "2025-01-16"
+                (:date params)))))
+
+     #_(testing "marks saving"
+       (is (db/sub-saving? @app-db))))))
