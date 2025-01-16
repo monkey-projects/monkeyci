@@ -96,3 +96,19 @@
 
 (defn hide-sub-form [db]
   (dissoc db show-sub-form?))
+
+(def issuing-all? ::issuing-all?)
+
+(defn set-issuing-all [db]
+  (assoc db issuing-all? true))
+
+(defn reset-issuing-all [db]
+  (dissoc db issuing-all?))
+
+(def issue-all-alerts ::issue-all-alerts)
+
+(defn set-issue-all-alerts [db a]
+  (assoc db issue-all-alerts a))
+
+(defn reset-issue-all-alerts [db]
+  (dissoc db issue-all-alerts))

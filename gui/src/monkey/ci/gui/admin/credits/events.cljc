@@ -189,16 +189,21 @@
                :credits-issue-all
                {:issue-all {:date (-> data :date first)}}
                [:credits/issue-all--success]
-               [:credits/issue-all--failed]]}))
+               [:credits/issue-all--failed]]
+    :db (-> db
+            (db/set-issuing-all)
+            (db/reset-issue-all-alerts))}))
 
 (rf/reg-event-db
  :credits/issue-all--success
- (fn [db [_ result]]
-   ;; TODO
-   ))
+ (fn [db [_ {result :body}]]
+   (-> db
+       (db/reset-issuing-all)
+       (db/set-issue-all-alerts [(a/credit-issue-all-success (:credits result))]))))
 
 (rf/reg-event-db
  :credits/issue-all--failed
  (fn [db [_ err]]
-   ;; TODO
-   ))
+   (-> db
+       (db/reset-issuing-all)
+       (db/set-issue-all-alerts [(a/credit-issue-all-failed err)]))))

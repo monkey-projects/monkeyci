@@ -104,3 +104,10 @@
 
 (def sub-save-failed
   (error-msg "Failed to create credit subscription"))
+
+(def credit-issue-all-success
+  (alert-msg :success
+             #(str "Issued " (count %) " credit(s).")))
+
+(def credit-issue-all-failed
+  (error-msg "Failed to issue credits for all subscriptions"))

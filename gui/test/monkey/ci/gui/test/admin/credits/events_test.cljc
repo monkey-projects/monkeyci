@@ -208,6 +208,7 @@
 (deftest credits-issue-all
   (rf-test/run-test-sync
    (let [c (h/catch-fx :martian.re-frame/request)]
+     (is (some? (swap! app-db db/set-issue-all-alerts [{:type :info}])))
      (h/initialize-martian {:create-credit-sub
                             {:status 200
                              :body {}
@@ -223,5 +224,35 @@
          (is (= "2025-01-16"
                 (:date params)))))
 
-     #_(testing "marks saving"
-       (is (db/sub-saving? @app-db))))))
+     (testing "marks issuing"
+       (is (db/issuing-all? @app-db)))
+
+     (testing "clears alerts"
+       (is (empty? (db/issue-all-alerts @app-db)))))))
+
+(deftest credits-issue-all--success
+  (is (some? (swap! app-db db/set-issuing-all)))
+
+  (rf/dispatch-sync [:credits/issue-all--success {:body
+                                                  {:credits ["test-credits-id"]}}])
+  
+  (testing "unmarks issuing"
+    (is (not (db/issuing-all? @app-db))))
+
+  (testing "sets alert"
+    (is (= [:success]
+           (->> (db/issue-all-alerts @app-db)
+                (map :type))))))
+
+(deftest credits-issue-all--failed
+  (is (some? (swap! app-db db/set-issuing-all)))
+
+  (rf/dispatch-sync [:credits/issue-all--failed "test error"])
+  
+  (testing "unmarks issuing"
+    (is (not (db/issuing-all? @app-db))))
+
+  (testing "sets error alert"
+    (is (= [:danger]
+           (->> (db/issue-all-alerts @app-db)
+                (map :type))))))

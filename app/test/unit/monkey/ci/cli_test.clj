@@ -163,7 +163,7 @@
 
       (testing "`admin` command"
         (testing "`issue` runs issue-creds command"
-          (is (= cmd/issue-creds (:cmd (run-cli "admin" "issue")))))))))
+          (is (= cmd/issue-creds (:cmd (run-cli "admin" "-u" "testuser" "-k" "test-key" "issue")))))))))
 
 (deftest set-invoker
   (testing "applies invoker to `runs` in commands"
