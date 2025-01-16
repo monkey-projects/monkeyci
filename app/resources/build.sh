@@ -62,7 +62,7 @@ if [ "$ABORT" = "yes" ]; then
 fi
 
 # Ensure cleanup is executed on termination
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
 
 cd $MONKEYCI_WORK_DIR
 # Run the build.  This assumes the necessary deps.edn is placed in $CLJ_CONFIG.
