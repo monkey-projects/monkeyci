@@ -20,7 +20,7 @@
     [:h3 "Credit Management"]
     [:div.mt-3
      [as/search-customers
-      {:get-route #(vector :admin/cust-credits {:customer-id %})
+      {:get-route #(vector :admin/cust-credits {:customer-id (:id %)})
        :init-view [:p.card-text "Search for a customer to manage their credits."]}]]]])
 
 (defn- formatted-time [prop]
@@ -179,14 +179,17 @@
      :header [co/tab-header :repeat "Subscriptions"]
      :contents [subscriptions cust-id]}]])
 
+(defn- title []
+  (let [cust (rf/subscribe [:customer/info])]
+    [:h3.mb-3 (:name @cust) ": Credit Overview"]))
+
 (defn customer-credits
   "Displays credit overview for a single customer"
   [route]
   (let [cust-id (:customer-id (r/path-params route))]
     (rf/dispatch [:customer/load cust-id])
     (fn [route]
-      (let [cust (rf/subscribe [:customer/info])]
-        [l/default
-         [:<>
-          [:h3.mb-3 (:name @cust) ": Credit Overview"]
-          [credit-tabs cust-id]]]))))
+      [l/default
+       [:<>
+        [title]
+        [credit-tabs cust-id]]])))

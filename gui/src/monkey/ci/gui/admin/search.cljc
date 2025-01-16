@@ -107,8 +107,8 @@
        [cust-search-btn]]]]]])
 
 (defn- customers-table [get-route]
-  (letfn [(render-id [{:keys [id]}]
-            [:a {:href (apply r/path-for (get-route id))} id])]
+  (letfn [(render-id [{:keys [id] :as obj}]
+            [:a {:href (apply r/path-for (get-route obj))} id])]
     [t/paged-table
      {:id ::customers
       :items-sub [:admin/customers]
