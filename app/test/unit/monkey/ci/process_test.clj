@@ -1,6 +1,8 @@
 (ns monkey.ci.process-test
   (:require [aleph.http :as http]
-            [babashka.process :as bp]
+            [babashka
+             [fs :as fs]
+             [process :as bp]]
             [clj-commons.byte-streams :as bs]
             [clojure.test :refer :all]
             [clojure.java.io :as io]
@@ -216,11 +218,17 @@
   (let [build {:build-id "test-build"}
         rt (trt/test-runtime)]
     
-    (testing "runs child process to execute unit tests"
-      (with-redefs [bp/process identity]
+    (with-redefs [bp/process identity]
+      (testing "runs child process to execute unit tests"
         (is (= "clojure" (-> (sut/test! build rt)
                              :cmd
-                             first)))))))
+                             first))))
+
+      (testing "enables watch mode if passed in cmdline"
+        (is (cs/includes? (-> (sut/test! build (assoc-in rt [:config :args :watch] true))
+                              :cmd
+                              (nth 2))
+                          ":watch? true"))))))
 
 (deftest generate-test-deps
   (testing "includes monkeyci test lib"
@@ -228,4 +236,22 @@
                        :aliases
                        :monkeyci/test
                        :extra-deps)
-                   'com.monkeyci/test))))
+                   'com.monkeyci/test)))
+
+  (testing "points to local test lib dir in dev mode"
+    (is (= (-> (u/cwd) (fs/parent) (fs/path "test-lib") str)
+           (-> (sut/generate-test-deps {:config
+                                        {:dev-mode true}}
+                                       false)
+               :aliases
+               :monkeyci/test
+               :extra-deps
+               (get 'com.monkeyci/test)
+               :local/root))))
+
+  (testing "enables watching if specified"
+    (is (true? (-> (sut/generate-test-deps {} true)
+                   :aliases
+                   :monkeyci/test
+                   :exec-args
+                   :watch?)))))

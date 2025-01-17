@@ -196,11 +196,12 @@
     (md/finally result #(save-cache! build rt))))
 
 (defn generate-test-deps [rt watch?]
-  (let [v (version-or rt utils/cwd)]
+  (letfn [(test-lib-dir []
+            (-> (utils/cwd) (fs/parent) (fs/path "test-lib") str))]
     {:aliases
      {:monkeyci/test
-      {:extra-deps {'com.monkeyci/app v
-                    'com.monkeyci/test v}
+      {:extra-deps {'com.monkeyci/app (version-or rt utils/cwd)
+                    'com.monkeyci/test (version-or rt test-lib-dir)}
        :paths ["."]
        :exec-fn 'kaocha.runner/exec-fn
        :exec-args (cond-> {:tests [{:type :kaocha.type/clojure.test
@@ -214,7 +215,8 @@
   "Executes any unit tests that have been defined for the build by starting a clojure process
    with a custom alias for running tests using kaocha."
   [build rt]
-  (let [deps (generate-test-deps rt false)]
+  (let [watch? (true? (get-in rt [:config :args :watch]))
+        deps (generate-test-deps rt watch?)]
     (bp/process
      {:cmd ["clojure" "-Sdeps" (pr-str deps) "-X:monkeyci/test"]
       :out :inherit

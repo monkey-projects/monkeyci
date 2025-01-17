@@ -72,57 +72,15 @@
                     :http
                     :port))))
 
+  (testing "includes args"
+    (is (= {::test-arg :test-val}
+           (-> (sut/app-config {} {::test-arg :test-val})
+               :args))))
+
   (testing "takes port from args"
     (is (= 1234 (-> (sut/app-config {} {:port 1234})
                     :http
                     :port))))
-
-  ;; (testing "takes port from env"
-  ;;   (is (= 1234
-  ;;          (-> (sut/app-config {:monkeyci-http-port 1234} {})
-  ;;              :http
-  ;;              :port))))
-
-  ;; (testing "takes github config from env"
-  ;;   (is (= "test-secret"
-  ;;          (-> {:monkeyci-github-secret "test-secret"}
-  ;;              (sut/app-config {})
-  ;;              :github
-  ;;              :secret))))
-
-  ;; (testing "takes storage config from env"
-  ;;   (is (= "test-dir"
-  ;;          (-> {:monkeyci-storage-dir "test-dir"}
-  ;;              (sut/app-config {})
-  ;;              :storage
-  ;;              :dir))))
-
-  ;; (testing "takes cache config from env"
-  ;;   (is (re-matches #"^.*test-dir$"
-  ;;                   (-> {:monkeyci-cache-dir "test-dir"}
-  ;;                       (sut/app-config {})
-  ;;                       :cache
-  ;;                       :dir))))
-
-  ;; (testing "takes artifact config from env"
-  ;;   (is (re-matches #"^.*test-dir$"
-  ;;                   (-> {:monkeyci-artifacts-dir "test-dir"}
-  ;;                       (sut/app-config {})
-  ;;                       :artifacts
-  ;;                       :dir))))
-
-  ;; (testing "takes sidecar config from env"
-  ;;   (is (= "test-file"
-  ;;          (-> {:monkeyci-sidecar-log-config "test-file"}
-  ;;              (sut/app-config {})
-  ;;              :sidecar
-  ;;              :log-config))))
-
-  ;; (testing "sets runner type"
-  ;;   (is (= :test-type (-> {:monkeyci-runner-type "test-type"}
-  ;;                         (sut/app-config {})
-  ;;                         :runner
-  ;;                         :type))))
 
   (testing "sets `dev-mode` from args"
     (is (true? (->> {:dev-mode true}
@@ -170,42 +128,12 @@
   (testing "global `work-dir`"
     (testing "uses current as default"
       (is (some? (-> (sut/app-config {} {})
-                     :work-dir))))
-
-    #_(testing "takes work dir from env"
-      (is (cs/ends-with? (-> (sut/app-config {:monkeyci-work-dir "test-dir"} {})
-                             :work-dir)
-                         "test-dir")))
-
-    #_(testing "takes work dir from arg over env"
-      (is (cs/ends-with? (-> (sut/app-config {:monkeyci-work-dir "test-dir"}
-                                             {:workdir "arg-dir"})
-                             :work-dir)
-                         "arg-dir"))))
-
-  #_(testing "calculates checkout base dir from work dir"
-    (is (cs/includes? (-> (sut/app-config {:monkeyci-work-dir "test-dir"} {})
-                          :checkout-base-dir)
-                      "test-dir")))
-
-  #_(testing "calculates log dir from work dir when type is `file`"
-    (is (cs/includes? (-> (sut/app-config {:monkeyci-work-dir "test-dir"
-                                           :monkeyci-logging-type "file"}
-                                          {})
-                          :logging
-                          :dir)
-                      "test-dir")))
+                     :work-dir)))))
 
   (testing "ignores log dir from work dir when type is not `file`"
     (is (nil? (-> (sut/app-config {:monkeyci-work-dir "test-dir"} {:logging {:type :inherit}})
                   :logging
                   :dir))))
-  
-  ;; (testing "includes account"
-  ;;   (is (= {:customer-id "test-customer"}
-  ;;          (-> (sut/app-config {} {})
-  ;;              :account
-  ;;              (select-keys [:customer-id])))))
 
   (testing "takes account settings from args"
     (is (= {:customer-id "test-customer"
