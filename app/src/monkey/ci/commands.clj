@@ -247,7 +247,7 @@
                 0 1))]
       (log/info "Issuing credits to" api "for date" date)
       (-> @(http/post (str api "/admin/credits/issue")
-                      {:headers {:authentication (str "Bearer " (generate-admin-token args))
+                      {:headers {:authorization (str "Bearer " (generate-admin-token args))
                                  :content-type "application/json"}
                        :body (json/generate-string {:date date})})
           (mc/update-existing :body bs/to-string)
