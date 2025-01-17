@@ -17,23 +17,34 @@
 (defn- issue-all
   "Component that allows admins to issue credits for all subscriptions"
   []
-  [:div.card
-   [:div.card-body
-    [:h4.card-title "Issue Credits for All Subscriptions"]
-    [:form
-     {:on-submit (f/submit-handler [:credits/issue-all])}
-     [:div.mb-3
-      [:label.form-label
-       {:for :date}
-       "Date"]
-      [:input.form-control
-       {:id :date
-        :name :date
-        :type :date
-        :default-value (time/format-iso-date (time/now))}]]
-     [:button.btn.btn-danger
-      {:type :submit}
-      [:span.me-2 [co/icon :card-checklist]] "Issue All"]]]])
+  (let [issuing? (rf/subscribe [:credits/issuing-all?])]
+    [:div.card
+     [:div.card-body
+      [:h4.card-title "Issue Credits for All Subscriptions"]
+      [:div.row
+       [:div.col-6
+        [:form
+         {:on-submit (f/submit-handler [:credits/issue-all])}
+         [:div.mb-3
+          [:label.form-label
+           {:for :date}
+           "Date"]
+          [:input.form-control
+           (cond-> {:id :date
+                    :name :date
+                    :type :date
+                    :default-value (time/format-iso-date (time/now))}
+             @issuing? (assoc :disabled true))]]
+         [:button.btn.btn-danger
+          (cond-> {:type :submit}
+            @issuing? (assoc :disabled true))
+          [:span.me-2 [co/icon :card-checklist]] "Issue All"]]]
+       [:div.col-6
+        [:p
+         "Here you can issue credits for all customers that have active subscriptions on the given date. "
+         "Only subscriptions that have become active on the same day of the month, and for which no existing "
+         "credits exist are being processed."]]]
+      [co/alerts [:credits/issue-all-alerts]]]]))
 
 (defn overview []
   [l/default

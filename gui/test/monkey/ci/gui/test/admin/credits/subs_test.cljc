@@ -82,3 +82,17 @@
    db/show-sub-form
    true
    false))
+
+(deftest issue-all-alerts
+  (h/verify-sub
+   [:credits/issue-all-alerts]
+   #(db/set-issue-all-alerts % ::test-alerts)
+   ::test-alerts
+   nil))
+
+(deftest issuing-all?
+  (h/verify-sub
+   [:credits/issuing-all?]
+   db/set-issuing-all
+   true
+   false))
