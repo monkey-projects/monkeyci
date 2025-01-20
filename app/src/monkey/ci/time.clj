@@ -1,6 +1,7 @@
 (ns monkey.ci.time
   "Time related utility functions"
-  (:require [java-time.api :as jt])
+  (:require [clojure.tools.logging :as log]
+            [java-time.api :as jt])
   (:import java.time.OffsetDateTime))
 
 (defn now []
@@ -30,7 +31,18 @@
   (-> (jt/instant ms)
       (jt/local-date utc-zone)))
 
-(defn same-date? [a b]
+(defn same-date?
+  "True if the two epoch millis denote the same UTC date"
+  [a b]
   (and a b
        (= (epoch->date a)
           (epoch->date b))))
+
+(defn same-dom?
+  "True if the two epoch millis are about the same day-of-month (in UTC)"
+  [a b]
+  (->> [a b]
+       (map (comp (memfn getDayOfMonth)
+                  jt/month-day
+                  epoch->date))
+       (apply =)))

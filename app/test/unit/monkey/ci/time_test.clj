@@ -22,3 +22,10 @@
                         (date->ts 2025 1 15 11)))
     (is (not (sut/same-date? (date->ts 2025 1 15 10)
                              (date->ts 2025 1 16 10))))))
+
+(deftest same-dom?
+  (testing "true if the epoch millis are on the same UTC day of month"
+    (is (sut/same-dom? (date->ts 2025 1 15 10)
+                       (date->ts 2025 2 15 10)))
+    (is (not (sut/same-dom? (date->ts 2025 1 15 10)
+                            (date->ts 2025 1 16 10))))))

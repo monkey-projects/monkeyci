@@ -69,6 +69,7 @@
     (letfn [(matches-date? [time]
               (t/same-date? time ts))
             (process-subs [[cust-id cust-subs]]
+              (log/debug "Found" (count cust-subs) "subscriptions for customer" cust-id)
               (let [credits (->> (s/list-customer-credits-since st cust-id (- ts 100))
                                  ;; TODO Filter in the query
                                  (filter (cp/prop-pred :type :subscription))
@@ -86,9 +87,11 @@
                                                                  :from-time ts))))))
                      cust-subs)))]
       ;; TODO Allow filtering by customer, if specified
+      (log/info "Auto-issuing new credits for date" date)
       (->> (s/list-active-credit-subscriptions st ts)
            ;; TODO Filter in the query instead of here
-           (filter (comp matches-date? :valid-from))
+           ;; FIXME This won't work as it should in shorter months (especially february)
+           (filter (comp (partial t/same-dom? ts) :valid-from))
            (group-by :customer-id)
            (mapcat process-subs)
            (doall)

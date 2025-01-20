@@ -107,7 +107,14 @@
                             {:customer-id "test-cust"}}
                            :identity
                            {:customers
-                            #{"test-cust"}}})))))
+                            #{"test-cust"}}}))))
+
+      (testing "if sysadmin token"
+        (is (= ::ok (auth {:parameters
+                           {:path
+                            {:customer-id "test-cust"}}
+                           :identity
+                           {:type :sysadmin}})))))
 
     (testing "throws authorization error"
       (testing "if customer id is not in identity"

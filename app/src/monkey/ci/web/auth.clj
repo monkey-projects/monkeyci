@@ -187,13 +187,17 @@
         (query-auth-to-bearer)
         (rmp/wrap-params))))
 
+(defn sysadmin? [user]
+  (some-> user :type name (= role-sysadmin)))
+
 (defn- check-cust-authorization!
   "Checks if the request identity grants access to the customer specified in 
    the parameters path."
   [req]
   (when-let [cid (get-in req [:parameters :path :customer-id])]
     (when-not (and (ba/authenticated? req)
-                   (contains? (get-in req [:identity :customers]) cid))
+                   (or (sysadmin? (:identity req))
+                       (contains? (get-in req [:identity :customers]) cid)))
       (throw (ex-info "Credentials do not grant access to this customer"
                       {:type :auth/unauthorized
                        :customer-id cid})))))

@@ -85,7 +85,9 @@
   (h/with-memory-store st
     (letfn [(ts->date [ts]
               (-> (jt/instant ts)
-                  (jt/local-date (jt/zone-id))
+                  (jt/local-date (jt/zone-id))))
+            (ts->date-str [ts]
+              (-> (ts->date ts)
                   (jt/format)))
             (issue-at [at]
               (-> {:storage st}
@@ -93,9 +95,9 @@
                   (assoc-in [:parameters :body :date] at)
                   (sut/issue-auto-credits)))]
       (let [now   (t/now)
-            today (ts->date now)
+            today (ts->date-str now)
             from  (- now 1000)
-            until (+ now (t/hours->millis 30))
+            until (+ now (t/hours->millis (* 24 40)))
             cust  (h/gen-cust)
             sub   (-> (h/gen-credit-subs)
                       (assoc :customer-id (:id cust)
@@ -118,7 +120,7 @@
             (is (= [200M] (map :amount cc)))))
 
         (testing "does not issue credits if subscription date is on another day of the month"
-          (is (empty? (-> (issue-at (ts->date (+ now (t/hours->millis 24))))
+          (is (empty? (-> (issue-at (ts->date-str (+ now (t/hours->millis 24))))
                           :body
                           :credits))))
 
@@ -127,6 +129,15 @@
                           :body
                           :credits))))
 
+        (testing "creates credit for same day of month"
+          (is (not-empty (-> (ts->date now)
+                             (jt/plus (jt/months 1))
+                             (issue-at)
+                             :body
+                             :credits))))
+
+        (testing "when month has fewer days, also creates credits for missing days")
+        
         (testing "ignores ad-hoc credit issuances"
           (is (st/save-customer-credit st {:customer-id (:id cust)
                                            :type :user
@@ -137,12 +148,12 @@
                                                          :amount 300M
                                                          :valid-from from
                                                          :valid-until until))))
-          (is (not-empty (->> (issue-at (ts->date now)) 
+          (is (not-empty (->> (issue-at (ts->date-str now)) 
                               :body
                               :credits))))
 
         (testing "skips expired subscriptions"
-          (is (empty? (-> (issue-at (ts->date (+ until (t/hours->millis 20))))
+          (is (empty? (-> (issue-at (ts->date-str (+ until (t/hours->millis 20))))
                           :body
                           :credits))))))))
 

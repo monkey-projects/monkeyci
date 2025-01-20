@@ -238,7 +238,8 @@
         date (jt/format
               :iso-date
               (or (some-> (:date args) (jt/local-date))
-                  (jt/local-date)))]
+                  (jt/local-date)))
+        token (generate-admin-token args)]
     (letfn [(print-result [res]
               (log/info (json/generate-string res))
               res)
@@ -246,9 +247,11 @@
               (if (< (:status res) 400)
                 0 1))]
       (log/info "Issuing credits to" api "for date" date)
+      (log/debug "Using token:" token)
       (-> @(http/post (str api "/admin/credits/issue")
-                      {:headers {:authorization (str "Bearer " (generate-admin-token args))
+                      {:headers { ;;:authorization (str "Bearer " (generate-admin-token args))
                                  :content-type "application/json"}
+                       :oauth-token token
                        :body (json/generate-string {:date date})})
           (mc/update-existing :body bs/to-string)
           (print-result)
