@@ -4,6 +4,7 @@
             [monkey.ci
              [cuid :as cuid]
              [helpers :as h]
+             [protocols :as p]
              [sid :as sid]
              [storage :as st]
              [utils :as u]]
@@ -58,20 +59,35 @@
       (is (= "new customer" (:name r)))
       (is (string? (:id r)))))
 
-  (testing "links current user to customer"
-    (let [user (-> (h/gen-user)
-                   (dissoc :customers))
-          {st :storage :as rt} (trt/test-runtime)
-          r (-> rt
-                (h/->req)
-                (h/with-body {:name "another customer"})
-                (h/with-identity user)
-                (sut/create-customer)
-                :body)]
-      (is (some? r))
+  (let [user (-> (h/gen-user)
+                 (dissoc :customers))
+        {st :storage :as rt} (trt/test-runtime)
+        r (-> rt
+              (h/->req)
+              (h/with-body {:name "another customer"})
+              (h/with-identity user)
+              (sut/create-customer)
+              :body)]
+    (is (some? r))
+
+    (testing "links current user to customer"
       (is (= [(:id r)] (-> (st/find-user st (:id user))
                            :customers)))
-      (is (= [r] (st/list-user-customers st (:id user)))))))
+      (is (= [r] (st/list-user-customers st (:id user)))))
+
+    (let [cust-id (:id r)]
+      (testing "creates subscription"
+        (is (= 1 (-> (st/list-customer-credit-subscriptions st cust-id)
+                     (count)))))
+
+      (testing "issues credits"
+        (let [cc (st/list-customer-credits st cust-id)]
+          (is (= 1 (count cc)))
+          (is (some? (->> cc
+                          first
+                          :subscription-id
+                          (vector cust-id)
+                          (st/find-credit-subscription st)))))))))
 
 (deftest update-customer
   (testing "returns customer in body"

@@ -4,6 +4,8 @@
             [java-time.api :as jt]
             [medley.core :as mc]
             [monkey.ci
+             [config :as config]
+             [cuid :as cuid]
              [storage :as st]
              [time :as t]]
             [monkey.ci.web.common :as c]
@@ -23,16 +25,40 @@
                           :getter (comp repos->out st/find-customer)
                           :saver st/save-customer})
 
-(defn create-customer [req]
-  (let [creator (c/entity-creator st/save-customer c/default-id)
+(defn- maybe-link-user [req st cust-id]
+  (let [user (:identity req)
         user? (every-pred :type)]
-    (when-let [reply (creator req)]
-      (let [user (:identity req)]
-        ;; When a user is creating the customer, link them up
-        (if (user? user)
-          (st/save-user (c/req->storage req) (update user :customers conj (get-in reply [:body :id])))
-          (log/warn "No user in request, so creating customer that is not linked to a user."))
-        reply))))
+    ;; When a user is creating the customer, link them up
+    (if (user? user)
+      (st/save-user st (update user :customers conj cust-id))
+      (log/warn "No user in request, so creating customer that is not linked to a user."))))
+
+(defn- create-subscription [st cust-id]
+  (let [ts (t/now)
+        cs {:id (cuid/random-cuid)
+            :customer-id cust-id
+            :amount config/free-credits
+            :valid-from ts}]
+    (when (st/save-credit-subscription st cs)
+      (st/save-customer-credit st {:id (cuid/random-cuid)
+                                   :customer-id cust-id
+                                   :subscription-id (:id cs)
+                                   :type :subscription
+                                   :amount (:amount cs)
+                                   :from-time ts}))))
+
+(defn create-customer [req]
+  ;; Remove the transaction when it's configured on all endpoints
+  (st/with-transaction (c/req->storage req) st
+    (let [creator (c/entity-creator (fn [_ cust]
+                                      ;; Use trx storage
+                                      (st/save-customer st cust))
+                                    c/default-id)]
+      (when-let [reply (creator req)]
+        (let [cust-id (get-in reply [:body :id])]
+          (maybe-link-user req st cust-id)
+          (create-subscription st cust-id)
+          reply)))))
 
 (defn search-customers [req]
   (let [f (get-in req [:parameters :query])]

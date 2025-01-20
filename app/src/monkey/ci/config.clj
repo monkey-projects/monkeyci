@@ -86,6 +86,8 @@
   ;; One hour
   (* 3600 1000))
 
+(def free-credits 1000) ; Maybe we should make this configurable?
+
 (def default-app-config
   "Default configuration for the application, without env vars or args applied."
   {:http
