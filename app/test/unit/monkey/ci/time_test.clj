@@ -3,6 +3,11 @@
             [java-time.api :as jt]
             [monkey.ci.time :as sut]))
 
+(deftest day-start
+  (testing "returns offset date at midnight"
+    (is (= (jt/offset-date-time 2025 1 20)
+           (sut/day-start (jt/offset-date-time 2025 1 20 10))))))
+
 (deftest date-seq
   (testing "returns lazy seq of dates from given date"
     (let [ds (sut/date-seq (jt/offset-date-time 2024 9 17))]

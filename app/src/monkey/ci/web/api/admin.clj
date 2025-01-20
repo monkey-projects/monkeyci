@@ -65,9 +65,16 @@
                  (jt/local-date))
         ts (-> (jt/instant date (jt/zone-id))
                (jt/to-millis-from-epoch))
-        st (c/req->storage req)]
-    (letfn [(matches-date? [time]
-              (t/same-date? time ts))
+        st (c/req->storage req)
+        max-dom (-> date
+                    (jt/property :day-of-month)
+                    (jt/max-value))]
+    (letfn [(should-process? [time]
+              ;; Process the subscription if it's on the same day of month, or
+              ;; the max has been reached
+              (or (t/same-dom? time ts)
+                  (let [dom (jt/as (t/epoch->date time) :day-of-month)]
+                    (< max-dom dom))))
             (process-subs [[cust-id cust-subs]]
               (log/debug "Found" (count cust-subs) "subscriptions for customer" cust-id)
               (let [credits (->> (s/list-customer-credits-since st cust-id (- ts 100))
@@ -76,7 +83,7 @@
                                  (group-by :subscription-id))]
                 (map (fn [sub]
                        (let [sc (->> (get credits (:id sub))
-                                     (filter (comp matches-date? :from-time)))]
+                                     (filter (comp (partial t/same-date? ts) :from-time)))]
                          (when (empty? sc)
                            (log/info "Creating new customer credit for sub" (:id sub) ", amount" (:amount sub))
                            (s/save-customer-credit st (-> sub
@@ -91,7 +98,7 @@
       (->> (s/list-active-credit-subscriptions st ts)
            ;; TODO Filter in the query instead of here
            ;; FIXME This won't work as it should in shorter months (especially february)
-           (filter (comp (partial t/same-dom? ts) :valid-from))
+           (filter (comp should-process? :valid-from))
            (group-by :customer-id)
            (mapcat process-subs)
            (doall)

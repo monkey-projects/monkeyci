@@ -136,7 +136,17 @@
                              :body
                              :credits))))
 
-        (testing "when month has fewer days, also creates credits for missing days")
+        (testing "when month has fewer days, also creates credits for missing days"
+          (let [cust (h/gen-cust)
+                cs {:valid-from (-> (jt/offset-date-time 2025 1 31)
+                                    (jt/to-millis-from-epoch))
+                    :customer-id (:id cust)
+                    :amount 100}]
+            (is (some? (st/save-customer st cust)))
+            (is (some? (st/save-credit-subscription st cs)))
+            (is (not-empty (->> (issue-at "2025-02-28")
+                                :body
+                                :credits)))))
         
         (testing "ignores ad-hoc credit issuances"
           (is (st/save-customer-credit st {:customer-id (:id cust)

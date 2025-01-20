@@ -13,9 +13,7 @@
 (defn day-start
   "Given an offset date time, returns the date at midnight"
   [^OffsetDateTime date]
-  (-> date
-      (jt/local-date)
-      (jt/offset-date-time (jt/local-time 0) (jt/zone-offset date))))
+  (jt/truncate-to date :days))
 
 (defn date-seq
   "Lazy seq of dates, starting at given date."
@@ -42,7 +40,6 @@
   "True if the two epoch millis are about the same day-of-month (in UTC)"
   [a b]
   (->> [a b]
-       (map (comp (memfn getDayOfMonth)
-                  jt/month-day
+       (map (comp #(jt/as % :day-of-month)
                   epoch->date))
        (apply =)))
