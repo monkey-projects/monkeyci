@@ -64,6 +64,7 @@
   (let [date (-> (get-in req [:parameters :body :date])
                  (jt/local-date))
         ts (-> (jt/instant date (jt/zone-id))
+               (t/day-start)
                (jt/to-millis-from-epoch))
         st (c/req->storage req)
         max-dom (-> date
@@ -94,10 +95,10 @@
                                                                  :from-time ts))))))
                      cust-subs)))]
       ;; TODO Allow filtering by customer, if specified
-      (log/info "Auto-issuing new credits for date" date)
-      (->> (s/list-active-credit-subscriptions st ts)
+      (log/info "Auto-issuing new credits for date" date " (timestamp" ts ")")
+      ;; List all subscriptions that have become active on that day, so move ts to end of day
+      (->> (s/list-active-credit-subscriptions st (+ ts (t/hours->millis 24)))
            ;; TODO Filter in the query instead of here
-           ;; FIXME This won't work as it should in shorter months (especially february)
            (filter (comp should-process? :valid-from))
            (group-by :customer-id)
            (mapcat process-subs)
