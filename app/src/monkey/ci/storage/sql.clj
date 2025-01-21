@@ -15,6 +15,7 @@
              [customer :as ecu]
              [customer-credit :as ecc]
              [invoice :as ei]
+             [job :as ej]
              [join-request :as jr]
              [migrations :as emig]
              [param :as eparam]
@@ -550,6 +551,30 @@
   ;; TODO Lock table for update
   (eb/select-max-idx conn cust-id repo-id))
 
+(defn- insert-job [conn job build-sid]
+  (when-let [build (apply eb/select-build-by-sid conn build-sid)]
+    (ec/insert-job conn (-> job
+                            (job->db)
+                            (assoc :build-id (:id build))))
+    build-sid))
+
+(defn- update-job [conn job existing]
+  (let [upd (-> existing
+                (dissoc :cust-cuid :repo-display-id :build-display-id)
+                (merge (job->db job)))]
+    (when (ec/update-job conn upd)
+      ;; Return build sid
+      ((juxt :cust-cuid :repo-display-id :build-display-id) existing))))
+
+(defn- upsert-job [{:keys [conn]} build-sid job]
+  (if-let [existing (ej/select-by-sid conn (concat build-sid [(:id job)]))]
+    (update-job conn job existing)
+    (insert-job conn job build-sid)))
+
+(defn- select-job [{:keys [conn]} job-sid]
+  (some-> (ej/select-by-sid conn job-sid)
+          (db->job)))
+
 (def join-request? (partial global-sid? st/join-requests))
 
 (defn- insert-join-request [conn jr]
@@ -1027,6 +1052,9 @@
     :list select-repo-builds
     :list-since select-customer-builds-since
     :find-latest select-latest-build}
+   :job
+   {:save upsert-job
+    :find select-job}
    :email-registration
    {:list select-email-registrations
     :find-by-email select-email-registration-by-email}

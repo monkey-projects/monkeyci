@@ -433,6 +433,21 @@
             (mapcat #(list-builds s [cust-id %]))
             (filter since?))))))
 
+(def save-job
+  "Saves the job in the build indicated by the sid"
+  (override-or
+   [:job :save]
+   (fn [s build-sid job]
+     (update-build s build-sid assoc-in [:script :jobs (:id job)] job))))
+
+(def find-job
+  "Finds job by it's sid, which is the build sid with the job id added"
+  (override-or
+   [:job :find]
+   (fn [s job-sid]
+     (some-> (find-build s (sid/->sid (take 3 job-sid)))
+             (get-in [:script :jobs (nth job-sid 3)])))))
+
 (defn params-sid [customer-id & [param-id]]
   ;; All parameters for a customer are stored together
   (cond-> ["build-params" customer-id]

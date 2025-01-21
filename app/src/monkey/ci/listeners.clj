@@ -104,14 +104,16 @@
                                  (mc/assoc-some :message message)))))
 
 (defn- patch-job [storage {:keys [sid job-id]} patch]
-  ;; TODO Allow patching individual jobs to avoid multiple replicas writing back stale
-  ;; information.  This would also allow us to lock job records.
-  (patch-build storage sid
-               (fn [build]
-                 (update-in build [:script :jobs job-id]
-                            (if (fn? patch)
-                              patch
-                              #(merge % patch))))))
+  ;; TODO Update job atomically in storage
+  (when-let [job (st/find-job storage (concat sid [job-id]))]
+    (log/debug "Patching job:" job)
+    (st/save-job storage
+                 sid
+                 (if (fn? patch)
+                   (patch job)
+                   (merge job patch)))
+    ;; Re-read the build for return
+    (st/find-build storage sid)))
 
 (defn init-job [storage {:keys [credit-multiplier] :as evt}]
   (patch-job storage evt {:status :initializing

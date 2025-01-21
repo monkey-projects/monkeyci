@@ -250,6 +250,23 @@
                     inc)
                (sut/find-next-build-idx st repo-sid)))))))
 
+(deftest jobs
+  (h/with-memory-store st
+    (testing "can save and retrieve"
+      (let [[cust-id repo-id build-id :as sid] (repeatedly 3 cuid/random-cuid)
+            build (-> (h/gen-build)
+                      (assoc :customer-id cust-id
+                             :repo-id repo-id
+                             :build-id build-id
+                             :script {}))
+            job {:id "test-job"}]
+        (is (sid/sid? (sut/save-build st build)))
+        (is (sid/sid? (sut/save-job st sid job)))
+        (is (= job (sut/find-job st (concat sid [(:id job)]))))
+        (is (= job (-> (sut/find-build st sid)
+                       (get-in [:script :jobs (:id job)])))
+            "updates job in build")))))
+
 (deftest save-ssh-keys
   (testing "writes ssh keys object"
     (h/with-memory-store st

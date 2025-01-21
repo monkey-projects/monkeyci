@@ -480,6 +480,38 @@
           (is (= :running (-> (st/find-build s sid)
                               :status))))))))
 
+(deftest ^:sql jobs
+  (with-storage conn s
+    (let [cust (-> (h/gen-cust)
+                   (assoc :repos {}))
+          repo (-> (h/gen-repo)
+                   (assoc :customer-id (:id cust)))
+          build (-> (h/gen-build)
+                    (assoc :script {}
+                           :customer-id (:id cust)
+                           :repo-id (:id repo)))
+          sid [(:id cust) (:id repo) (:build-id build)]
+          job {:id "test-job"}]
+      (is (some? (st/save-customer s cust)))
+      (is (some? (st/save-repo s repo)))
+      (is (some? (st/save-build s build)))
+      
+      (testing "can add to build and retrieve"
+        (is (some? (st/save-job s sid job)))
+        (is (= {"test-job" job}
+               (-> (st/find-build s sid)
+                   :script
+                   :jobs)))
+        (is (= job (st/find-job s (conj sid (:id job))))))
+
+      (testing "can update in build"
+        (let [upd (assoc job :status :success)]
+          (is (some? (st/save-job s sid upd)))
+          (is (= {"test-job" upd}
+                 (-> (st/find-build s sid)
+                     :script
+                     :jobs))))))))
+
 (deftest ^:sql join-requests
   (with-storage conn s
     (let [cust (h/gen-cust)

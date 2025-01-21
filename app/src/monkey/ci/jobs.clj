@@ -367,6 +367,7 @@
         ;; Mark any jobs that have not been executed as skipped.
         (mark-pending-skipped state results)
         ;; More jobs to run, or at least one job is still executing
+        ;; TODO Set a limit on the number of jobs to execute at the same time
         (md/chain
          (md/let-flow [to-execute (vals n)
                        updated-state (update-multiple-jobs state to-execute :running)
