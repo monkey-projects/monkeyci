@@ -82,7 +82,9 @@
      :data {:labels (map :test-case cases)
             :datasets [{:label "Seconds Elapsed"
                         :data (map :time cases)
-                        :backgroundColor colors/primary}]}}))
+                        :backgroundColor colors/primary}]}
+     :options {:indexAxis "y"
+               :maxBarThickness 40}}))
 
 (def default-chart-form {:count 5})
 
@@ -149,5 +151,5 @@
        [:label.form-label.col-form-label {:for count-id} "Show top:"]
        [:div
         [test-count-dropdown id count-id]]]]
-     [:div {:style {:height "20em"}}
+     [:div #_{:style {:height "20em"}}
       [charts/chart-component id (timings->chart results @conf)]]]))
