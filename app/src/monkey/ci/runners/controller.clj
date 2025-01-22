@@ -118,8 +118,11 @@
         (create-run-file)
         (wait-until-run-file-deleted)
         (read-exit-code)
-        (post-end-evt)
         (save-build-cache)
+        ;; Post the end event last, because it's the trigger for deleting the container.
+        ;; This may cause builds to run slightly longer if the cache needs to be re-uploaded
+        ;; so we may consider using the :script/end event to calculate credits instead.
+        (post-end-evt)
         :exit-code)
     (catch Throwable ex
       (log/error "Failed to run controller" ex)
