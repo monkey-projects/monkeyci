@@ -454,7 +454,6 @@
       ins)))
 
 (defn- update-build [conn build existing]
-  ;; TODO Lock records before updating
   (ec/update-build conn (merge existing (build->db build)))
   (let [jobs (get-in build [:script :jobs])
         ex-jobs (ec/select-jobs conn (ec/by-build (:id existing)))
@@ -487,14 +486,16 @@
     (update-build conn build existing)
     (insert-build conn build)))
 
-(defn- select-jobs [conn build-id]
-  (->> (ec/select-jobs conn (ec/by-build build-id))
+(defn- select-jobs-for-update [conn build-id & [query-fn]]
+  (->> (ej/select-for-update conn (ec/by-build build-id))
        (map db->job)
        (map (fn [j] [(:id j) j]))
        (into {})))
 
-(defn- hydrate-build [conn [cust-id repo-id] build]
-  (let [jobs (select-jobs conn (:id build))]
+(defn- hydrate-build
+  "Fetches jobs related to the build"
+  [conn [cust-id repo-id] build]
+  (let [jobs (select-jobs-for-update conn (:id build))]
     (cond-> (-> (db->build build)
                 (assoc :customer-id cust-id
                        :repo-id repo-id)
@@ -506,7 +507,13 @@
   "Updates build atomically by locking build and job records."
   [{:keys [conn]} sid f & args]
   (when-let [b (apply eb/select-build-by-sid-for-update conn sid)]
-    ;; TODO Lock jobs as well?
+    ;; Since this operation also fetches and updates jobs, it could still be that
+    ;; stale data is written to the database, if in the meantime another process/thread
+    ;; modifies any job in the build.  In order to prevent this, we'd either have to lock
+    ;; all relevant job records, or only update jobs if they are actually modified (but
+    ;; this is difficult to determine).  We could also keep a version property, and check
+    ;; that before writing the update.  Currently, we have chosen to just lock the job
+    ;; records during the transaction.
     (let [h (hydrate-build conn sid b)]
       (when (update-build conn (apply f h args) b)
         sid))))
