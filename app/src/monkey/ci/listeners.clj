@@ -109,8 +109,9 @@
     (let [upd (if (fn? patch)
                 (patch job)
                 (merge job patch))]
-      (st/save-job storage sid upd)
-      (log/debug "Job updated, status:" (:status job) "->" (:status upd)))
+      (if (st/save-job storage sid upd)
+        (log/debug "Job" job-id "updated, status:" (:status job) "->" (:status upd))
+        (log/warn "Job update failed:" job-id (:status job) "->" (:status upd))))
     ;; Re-read the build for return
     (st/find-build storage sid)))
 
