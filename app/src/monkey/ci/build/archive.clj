@@ -1,4 +1,4 @@
-(ns monkey.ci.build.archive
+(ns ^:no-doc monkey.ci.build.archive
   "Functions for working with downloaded archives"
   (:require [clojure.tools.logging :as log]
             [clojure.java.io :as io]

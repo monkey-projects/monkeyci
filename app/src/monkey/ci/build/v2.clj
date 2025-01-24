@@ -31,10 +31,15 @@
   "Checks if argument is an container job"
   bc/container-job?)
 
-(def job-id bc/job-id)
-(def dependencies :dependencies)
+(def job-id
+  "Gets the id of the given job"
+  bc/job-id)
 
-(defn try-unwrap
+(def dependencies
+  "Gets the configured dependencies of a job"
+  :dependencies)
+
+(defn ^:no-doc try-unwrap
   "Applies `f` to the job.  If `job` is a function, returns a new function 
    that applies `f` to the result of the function."
   [job f & args]
@@ -88,17 +93,23 @@
   {:id id
    :path path})
 
-(defn save-artifacts [job & arts]
+(defn save-artifacts
+  "Configures the artifacts to save on a job."
+  [job & arts]
   (try-unwrap job update :save-artifacts concat (flatten arts)))
 
-(defn restore-artifacts [job & arts]
+(defn restore-artifacts
+  "Configures the artifacts to restore on a job."
+  [job & arts]
   (try-unwrap job update :restore-artifacts concat (flatten arts)))
 
 (def cache
   "Defines a cache with given id an path, that can be passed to `caches`"
   artifact)
 
-(defn caches [job & arts]
+(defn caches
+  "Configures the caches a job uses."
+  [job & arts]
   (try-unwrap job update :caches concat (flatten arts)))
 
 (defn- file-test [tester]
@@ -151,7 +162,9 @@
   "Retrieves parameters this build has access to"
   api/build-params)
 
-(def params build-params)
+(def params
+  "Shorthand for `build-params`"
+  build-params)
 
 (defn bash
   "Creates an action job that executes given command in a bash script"

@@ -1,4 +1,5 @@
 (ns monkey.ci.build.shell
+  "Low-level API functions to invoke shells from your build scripts."
   (:require [babashka
              [fs :as fs]
              [process :as bp]]

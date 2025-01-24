@@ -2,7 +2,10 @@
   "Core build script functionality.  This is used by build scripts to create
    the configuration which is then executed by the configured runner.  Which
    runner is configured or active depends on the configuration of the MonkeyCI
-   application that executes the script."
+   application that executes the script.
+
+   This namespace provides low-level functions.  For more user-friendly functionality,
+   check out the `monkey.ci.build.v2` namespace."
   (:require [clojure.spec.alpha :as s]
             [medley.core :as mc]
             [monkey.ci.build.spec]))

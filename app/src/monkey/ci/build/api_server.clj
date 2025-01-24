@@ -1,4 +1,4 @@
-(ns monkey.ci.build.api-server
+(ns ^:no-doc monkey.ci.build.api-server
   "Functions for setting up a build script API.  The build runner starts its own
    API server, which is only accessible by the build script and any containers it
    starts.  This is for security reasons, since the build script is untrusted code.

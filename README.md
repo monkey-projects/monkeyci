@@ -12,6 +12,8 @@ It is (very remotely) inspired by [Lambda-CD](https://www.lambda.cd), but I did 
 use any of their code.  Only the part where you use [Clojure](https://clojure.org) as
 the build script language ;-).
 
+Check out the [official documentation site](https://docs.monkeyci.com).
+
 ### Why? ###
 
 Why build another CI tool is so many already exist?  Well, throughout my career I've
