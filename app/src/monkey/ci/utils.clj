@@ -187,6 +187,7 @@
 (defn file-hash
   "Calculates md5 hash for given file"
   [path]
-  (with-open [in (io/input-stream path)]
-    (-> (bch/md5 in)
-        (bcc/bytes->hex))))
+  (when (fs/exists? path)
+    (with-open [in (io/input-stream path)]
+      (-> (bch/md5 in)
+          (bcc/bytes->hex)))))
