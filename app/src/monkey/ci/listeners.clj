@@ -106,11 +106,11 @@
 (defn- patch-job [storage {:keys [sid job-id]} patch]
   ;; TODO Update job atomically in storage
   (when-let [job (st/find-job storage (concat sid [job-id]))]
-    (st/save-job storage
-                 sid
-                 (if (fn? patch)
-                   (patch job)
-                   (merge job patch)))
+    (let [upd (if (fn? patch)
+                (patch job)
+                (merge job patch))]
+      (st/save-job storage sid upd)
+      (log/debug "Job updated, status:" (:status job) "->" (:status upd)))
     ;; Re-read the build for return
     (st/find-build storage sid)))
 
