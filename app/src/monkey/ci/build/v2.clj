@@ -22,6 +22,30 @@
   "Checks if argument is an action job"
   bc/action-job?)
 
+;; Job return values
+(def success "Indicates the job was successful"
+  bc/success)
+
+(def failure
+  "Indicates the job has failed"
+  bc/failure)
+
+(def error
+  "Same as `failure`"
+  failure)
+
+(def failed
+  "Same as `failure`"
+  failure)
+
+(def skipped
+  "Indicates the job was intentionally skipped"
+  bc/skipped)
+
+(def with-message
+  "Sets a human-readable message on the return value"
+  bc/with-message)
+
 (defn container-job
   "Declares an container job with id and container options"
   [id & [opts]]

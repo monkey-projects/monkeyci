@@ -109,6 +109,7 @@
     (let [upd (if (fn? patch)
                 (patch job)
                 (merge job patch))]
+      ;; FIXME When running multiple replicas, this sometimes has no effect??
       (if (st/save-job storage sid upd)
         (log/debug "Job" job-id "updated, status:" (:status job) "->" (:status upd))
         (log/warn "Job update failed:" job-id (:status job) "->" (:status upd))))

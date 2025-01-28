@@ -58,6 +58,13 @@
     (swap! entries conj p)
     p))
 
+(defn- set-mode
+  "Sets the TAR entry file mode using the posix file permissions"
+  [entry]
+  (.setMode entry (-> (.getFile entry)
+                      (fs/posix-file-permissions)
+                      (a/posix->mode))))
+
 (defn make-archive
   "Archives the `src` directory or file into `dest`, which should be something
    that can be converted into an `OutputStream`."
@@ -73,7 +80,8 @@
        {:output-stream os
         :compression compression-type
         :archive-type archive-type
-        :entry-name-resolver (comp gatherer (partial drop-prefix-resolver prefix))}
+        :entry-name-resolver (comp gatherer (partial drop-prefix-resolver prefix))
+        :before-add set-mode}
        (u/abs-path src)))
     ;; Return some info, since clompress returns `nil`
     {:src src
