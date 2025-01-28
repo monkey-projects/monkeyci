@@ -110,6 +110,20 @@
   ([job wd]
    (try-unwrap job assoc :work-dir wd)))
 
+(defn cpus
+  "Gets or sets requested cpu count for container jobs"
+  ([job]
+   (:cpus job))
+  ([job n]
+   (try-unwrap job assoc :cpus n)))
+
+(defn memory
+  "Gets or sets requested memory for container jobs, in GBs"
+  ([job]
+   (:memory job))
+  ([job n]
+   (try-unwrap job assoc :memory n)))
+
 (defn artifact
   "Defines a new artifact with given id, located at given `path`.  This can be passed
    to `save-artifacts` or `restore-artifacts`."

@@ -486,16 +486,19 @@
     (update-build conn build existing)
     (insert-build conn build)))
 
-(defn- select-jobs-for-update [conn build-id & [query-fn]]
-  (->> (ej/select-for-update conn (ec/by-build build-id))
-       (map db->job)
-       (map (fn [j] [(:id j) j]))
-       (into {})))
+(defn- select-jobs [conn build-id for-update? & [query-fn]]
+  (let [fetcher (if for-update?
+                  ej/select-for-update 
+                  ec/select-jobs)]
+    (->> (fetcher conn (ec/by-build build-id))
+         (map db->job)
+         (map (fn [j] [(:id j) j]))
+         (into {}))))
 
 (defn- hydrate-build
   "Fetches jobs related to the build"
-  [conn [cust-id repo-id] build]
-  (let [jobs (select-jobs-for-update conn (:id build))]
+  [conn [cust-id repo-id] build for-update?]
+  (let [jobs (select-jobs conn (:id build) for-update?)]
     (cond-> (-> (db->build build)
                 (assoc :customer-id cust-id
                        :repo-id repo-id)
@@ -514,13 +517,13 @@
     ;; this is difficult to determine).  We could also keep a version property, and check
     ;; that before writing the update.  Currently, we have chosen to just lock the job
     ;; records during the transaction.
-    (let [h (hydrate-build conn sid b)]
+    (let [h (hydrate-build conn sid b true)]
       (when (update-build conn (apply f h args) b)
         sid))))
 
 (defn- select-build [conn [cust-id repo-id :as sid]]
   (when-let [build (apply eb/select-build-by-sid conn sid)]
-    (hydrate-build conn sid build)))
+    (hydrate-build conn sid build false)))
 
 (defn- select-repo-builds
   "Retrieves all builds and their details for given repository"

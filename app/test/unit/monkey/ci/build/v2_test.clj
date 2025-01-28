@@ -2,7 +2,9 @@
   (:require [clojure.test :refer [deftest testing is]]
             [babashka.process :as bp]
             [monkey.ci.build.v2 :as sut]
-            [monkey.ci.jobs :as j]))
+            [monkey.ci
+             [jobs :as j]
+             [oci :as oci]]))
 
 (def test-ctx {})
 
@@ -268,3 +270,19 @@
            (sut/build-id
             {:build
              {:build-id "test-build"}})))))
+
+(deftest cpus
+  (testing "gets and sets job cpu count"
+    (is (= 2 (-> (sut/container-job "test-job")
+                 (sut/cpus 2)
+                 (sut/cpus)))))
+
+  (testing "`nil` on action job"))
+
+(deftest memory
+  (testing "gets and sets job requested memory"
+    (is (= 2 (-> (sut/container-job "test-job")
+                 (sut/memory 2)
+                 (sut/memory)))))
+
+  (testing "`nil` on action job"))
