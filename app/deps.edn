@@ -22,7 +22,7 @@
         com.monkeyprojects/aero-ext {:mvn/version "0.2.0"}
         com.monkeyprojects/clompress {:mvn/version "0.1.2"}
         com.monkeyprojects/monkey-jms {:mvn/version "0.2.0"}
-        com.monkeyprojects/oci-container-instance {:mvn/version "0.2.1"}
+        com.monkeyprojects/oci-container-instance {:mvn/version "0.2.2"}
         com.monkeyprojects/oci-os {:mvn/version "0.4.1"}
         com.monkeyprojects/oci-sign {:mvn/version "0.1.4"}
         com.monkeyprojects/oci-vault {:mvn/version "0.2.1"}

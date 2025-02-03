@@ -1,7 +1,8 @@
 (ns monkey.ci.test
   "This is the basic namespace to use in unit tests.  It provides various functions that
    can be used to simulate a MonkeyCI build environment."
-  (:require [monkey.ci.build.api :as ba]))
+  (:require [monkey.ci.build.api :as ba]
+            [monkey.ci.protocols :as p]))
 
 (defn with-build-params* [params f]
   (with-redefs [ba/build-params (constantly params)]
@@ -52,3 +53,10 @@
   "Defines a set of removed files."
   [files]
   {:removed files})
+
+(defn resolve-jobs
+  "Given one or more unresolved jobs, resolves them using the given context.  This is
+   useful if you want to get a full list of the actual jobs that MonkeyCI will run given
+   a specific context."
+  [jobs ctx]
+  (p/resolve-jobs jobs ctx))
