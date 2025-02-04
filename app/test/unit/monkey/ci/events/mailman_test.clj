@@ -43,12 +43,12 @@
 
 (deftest save-build
   (h/with-memory-store s
-    (testing "`leave` saves build in result"
+    (testing "`leave` saves build from result event"
       (let [{:keys [leave] :as i} sut/save-build
             build (h/gen-build)
             get-sid (apply juxt st/build-sid-keys)]
         (is (keyword? (:name i)))
-        (is (= build (-> {:result build}
+        (is (= build (-> {:result {:build build}}
                          (sut/set-db s)
                          (leave)
                          (sut/get-build))))
@@ -79,39 +79,73 @@
                   (leave))]
       (validate-spec ::se/event (first (:result res))))))
 
+(deftest add-time
+  (let [{:keys [leave] :as i} sut/add-time]
+    (is (keyword? (:name i)))
+    
+    (testing "sets event times"
+      (is (number? (-> {:result [{:type ::test-event}]}
+                       (leave)
+                       :result
+                       first
+                       :time))))))
+
 (deftest check-credits
   (let [build (h/gen-build)
         ctx {:event {:type :build/triggered
                      :build build}}]
     
-    (testing "returns build if credits available"
+    (testing "returns `build/pending` event if credits available"
       (let [res (-> ctx
                     (sut/set-credits 100M)
                     (sut/check-credits))]
-        (validate-spec :entity/build res)
-        (is (= :pending (:status res)))))
+        (validate-spec :entity/build (:build res))
+        (is (= :pending (get-in res [:build :status])))
+        (is (= :build/pending (:type res)))))
 
-    (testing "returns `nil` if no credits available"
-      (is (nil? (sut/check-credits ctx))))))
+    (testing "returns `build/failed` event if no credits available"
+      (is (= :build/failed (-> (sut/check-credits ctx)
+                               :type))))))
 
 (deftest router
   (let [{st :storage :as rt} (trt/test-runtime)
-        router (sut/make-router rt)
-        cust (h/gen-cust)]
-    (is (some? (st/save-customer st cust)))
+        router (sut/make-router rt)]
     
     (testing "`build/triggered`"
-      (is (some? (st/save-customer-credit st {:customer-id (:id cust)
-                                              :amount 100M})))
-      (let [res (-> {:type :build/triggered
-                     :build (-> (h/gen-build)
-                                (assoc :customer-id (:id cust)))}
-                    (router)
-                    first
-                    :result)]
-        (testing "results in `build/pending` event"
-          (is (= :build/pending
-                 (-> res first :type))))
+      (testing "with available credits"
+        (let [cust (h/gen-cust)
+              creds {:id (cuid/random-cuid)
+                     :customer-id (:id cust)
+                     :amount 100M}]
+          (is (some? (st/save-customer st cust)))
+          (is (some? (st/save-customer-credit st creds)))
+          
+          (let [res (-> {:type :build/triggered
+                         :build (-> (h/gen-build)
+                                    (assoc :customer-id (:id cust)))}
+                        (router)
+                        first
+                        :result)]
+            (testing "results in `build/pending` event"
+              (is (= :build/pending
+                     (-> res first :type))))
 
-        (testing "saves build in db"
-          (is (some? (st/find-build st (-> res first :sid)))))))))
+            (testing "saves build in db"
+              (is (some? (st/find-build st (-> res first :sid))))))))
+
+      (testing "when no credits"
+        (let [cust (h/gen-cust)]
+          (is (some? (st/save-customer st cust)))
+
+          (let [res (-> {:type :build/triggered
+                         :build (-> (h/gen-build)
+                                    (assoc :customer-id (:id cust)))}
+                        (router)
+                        first
+                        :result)]
+            
+            (testing "results in `build/failed` event"
+              (is (= :build/failed (-> res first :type))))
+
+            (testing "saves build in db"
+              (is (some? (st/find-build st (-> res first :sid)))))))))))

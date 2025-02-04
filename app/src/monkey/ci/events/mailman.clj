@@ -56,7 +56,7 @@
 (def save-build
   {:name ::save-build
    :leave (fn [ctx]
-            (let [build (let [b (get-result ctx)]
+            (let [build (let [b (:build (get-result ctx))]
                           (when (and (spec/valid? :entity/build b)
                                      (st/save-build (get-db ctx) b))
                             b))]
@@ -74,21 +74,33 @@
                                 :sid (build->sid b)
                                 :build b}])))})
 
+(def add-time
+  {:name ::add-evt-time
+   :leave (letfn [(set-time [evt]
+                    (update evt :time #(or % (t/now))))]
+            (fn [ctx]
+              (update ctx :result (partial map set-time))))})
+
 ;;; Event handlers
 
 (defn check-credits
   "Checks if credits are available.  Returns the build from the event if so, otherwise `nil`."
   [ctx]
-  (let [creds (get-credits ctx)]
-    (when (and (some? creds) (pos? creds))
-      (assoc (get-in ctx [:event :build]) :status :pending))))
+  (let [has-creds? (let [c (get-credits ctx)]
+                     (and (some? c) (pos? c)))]
+    (cond-> {:type :build/pending
+             :sid (build->sid (get-in ctx [:event :build]))
+             :build (-> (get-in ctx [:event :build])
+                        (assoc :status :pending))}
+      (not has-creds?) (assoc :type :build/failed
+                              :message "No credits available"))))
 
 (defn make-routes [rt]
   [[:build/triggered [{:handler check-credits
-                       :interceptors [(mi/sanitize-result)
+                       :interceptors [add-time
+                                      (mi/sanitize-result)
                                       (use-db (:storage rt))
                                       customer-credits
-                                      (build-event :build/pending)
                                       save-build]}]]])
 
 (defn make-router [rt]
