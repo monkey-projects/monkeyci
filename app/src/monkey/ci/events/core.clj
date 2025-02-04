@@ -8,8 +8,7 @@
              [time :as t]]
             [monkey.ci.events
              [jms :as jms]
-             [manifold :as manifold]
-             [zmq :as zmq]]))
+             [manifold :as manifold]]))
 
 (defn post-events [e evts]
   (if e
@@ -91,13 +90,6 @@
 
 (defmethod make-events :manifold [_]
   (manifold/make-manifold-events matches-event?))
-
-(defmethod make-events :zmq [config]
-  (zmq/make-zeromq-events config matches-event?))
-
-(defmethod rt/setup-runtime :events [conf _]
-  (when-let [ec (:events conf)]
-    (make-events ec)))
 
 (defn wrapped
   "Returns a new function that wraps `f` and posts an event before 
