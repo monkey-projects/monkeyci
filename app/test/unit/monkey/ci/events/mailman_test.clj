@@ -70,14 +70,29 @@
                          (enter)
                          (sut/get-build))))))))
 
-(deftest build-event
-  (testing "converts build into event"
-    (let [{:keys [leave] :as i} (sut/build-event :build/pending)
-          build (h/gen-build)
-          res (-> {}
-                  (sut/set-build build)
-                  (leave))]
-      (validate-spec ::se/event (first (:result res))))))
+(deftest with-build
+  (h/with-memory-store s
+    (let [sid-keys [:customer-id :repo-id :build-id]
+          sid (repeatedly 3 cuid/random-cuid)
+          build (-> (h/gen-build)
+                    (merge (zipmap sid-keys sid)))
+          {:keys [enter leave] :as i} sut/with-build]
+      (is (some? (st/save-build s build)))
+      (is (keyword? (:name i)))
+      
+      (testing "`enter` reads build in context using sid"
+        (is (= build (-> {:event {:sid sid}}
+                         (sut/set-db s)
+                         (enter)
+                         (sut/get-build)))))
+
+      (testing "`leave` saves build from result event"
+        (let [upd (assoc build :status :success)]
+          (is (= upd (-> {:result {:build upd}}
+                         (sut/set-db s)
+                         (leave)
+                         (sut/get-build))))
+          (is (= upd (st/find-build s (sut/build->sid build)))))))))
 
 (deftest add-time
   (let [{:keys [leave] :as i} sut/add-time]
@@ -89,6 +104,16 @@
                        :result
                        first
                        :time))))))
+
+(deftest trace-evt
+  (let [{:keys [enter leave] :as i} sut/trace-evt]
+    (is (keyword? (:name i)))
+    
+    (testing "`enter` returns context as-is"
+      (is (= ::test-ctx (enter ::test-ctx))))
+
+    (testing "`leave` returns context as-is"
+      (is (= ::test-ctx (leave ::test-ctx))))))
 
 (deftest check-credits
   (let [build (h/gen-build)
@@ -107,9 +132,67 @@
       (is (= :build/failed (-> (sut/check-credits ctx)
                                :type))))))
 
+(deftest queue-build
+  (testing "returns `build/queued` event"
+    (let [build (h/gen-build)]
+      (is (= :build/queued (-> {:event {:type :build/pending
+                                        :sid (sut/build->sid build)
+                                        :build build}}
+                               (sut/queue-build)
+                               :type))))))
+
+(deftest build-initializing
+  (let [build (h/gen-build)
+        r (-> {:event {:type :build/initializing
+                       :sid (sut/build->sid build)
+                       :build {}}}
+              (sut/set-build build)
+              (sut/build-initializing))]
+    (testing "returns `build/updated` event"
+      (validate-spec ::se/event r)
+      (is (= :build/updated (:type r))))
+
+    (testing "marks build as initializing"
+      (is (= :initializing (get-in r [:build :status]))))))
+
+(deftest build-start
+  (let [build (h/gen-build)
+        r (-> {:event {:type :build/initializing
+                       :sid (sut/build->sid build)
+                       :time 100
+                       :credit-multiplier 3}}
+              (sut/set-build build)
+              (sut/build-start))]
+    (testing "returns `build/updated` event"
+      (validate-spec ::se/event r)
+      (is (= :build/updated (:type r))))
+
+    (testing "marks build as running"
+      (is (= :running (get-in r [:build :status]))))
+
+    (testing "sets credit multiplier"
+      (is (= 3 (get-in r [:build :credit-multiplier]))))
+
+    (testing "sets start time"
+      (is (= 100 (get-in r [:build :start-time]))))))
+
+(deftest routes
+  (let [routes (->> (sut/make-routes (trt/test-runtime))
+                    (into {}))
+        event-types [:build/triggered
+                     :build/pending
+                     :build/initializing
+                     :build/start]]
+    (doseq [t event-types]
+      (testing (format "`%s` is handled" (str t))
+        (is (contains? routes t))))))
+
 (deftest router
   (let [{st :storage :as rt} (trt/test-runtime)
         router (sut/make-router rt)]
+
+    ;; We could also just test if the necessary interceptors have been
+    ;; provided for each route
     
     (testing "`build/triggered`"
       (testing "with available credits"
@@ -127,6 +210,7 @@
                         first
                         :result)]
             (testing "results in `build/pending` event"
+              (validate-spec ::se/event (first res))
               (is (= :build/pending
                      (-> res first :type))))
 
