@@ -165,6 +165,14 @@
                              :credits (b/calc-credits b))
                       (mc/assoc-some :message (:message event))))))
 
+
+(def build-canceled
+  (build-update (fn [b {:keys [event]}]
+                  (assoc b
+                         :status :canceled
+                         :end-time (:time event)
+                         :credits (b/calc-credits b)))))
+
 ;;; Event routing configuration
 
 (defn make-routes [rt]
@@ -190,6 +198,12 @@
 
      [:build/end
       [{:handler build-end
+        :interceptors [use-db
+                       save-credit-consumption
+                       with-build]}]]
+
+     [:build/canceled
+      [{:handler build-canceled
         :interceptors [use-db
                        save-credit-consumption
                        with-build]}]]]))

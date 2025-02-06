@@ -181,7 +181,7 @@
 
 (deftest build-start
   (let [build (h/gen-build)
-        r (-> {:event {:type :build/initializing
+        r (-> {:event {:type :build/start
                        :sid (sut/build->sid build)
                        :time 100
                        :credit-multiplier 3}}
@@ -202,7 +202,7 @@
 
 (deftest build-end
   (let [build (h/gen-build)
-        r (-> {:event {:type :build/initializing
+        r (-> {:event {:type :build/end
                        :sid (sut/build->sid build)
                        :time 100
                        :status :success}}
@@ -221,6 +221,26 @@
     (testing "sets end time"
       (is (= 100 (get-in r [:build :end-time]))))))
 
+(deftest build-canceled
+  (let [build (h/gen-build)
+        r (-> {:event {:type :build/canceled
+                       :sid (sut/build->sid build)
+                       :time 100}}
+              (sut/set-build build)
+              (sut/build-canceled))]
+    (testing "returns `build/updated` event"
+      (validate-spec ::se/event r)
+      (is (= :build/updated (:type r))))
+
+    (testing "calculates consumed credits"
+      (is (number? (get-in r [:build :credits]))))
+
+    (testing "updates build status"
+      (is (= :canceled (get-in r [:build :status]))))
+
+    (testing "sets end time"
+      (is (= 100 (get-in r [:build :end-time]))))))
+
 (deftest routes
   (let [routes (->> (sut/make-routes (trt/test-runtime))
                     (into {}))
@@ -228,7 +248,8 @@
                      :build/pending
                      :build/initializing
                      :build/start
-                     :build/end]]
+                     :build/end
+                     :build/canceled]]
     (doseq [t event-types]
       (testing (format "`%s` is handled" (str t))
         (is (contains? routes t))))))
