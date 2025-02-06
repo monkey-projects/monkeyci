@@ -3,6 +3,7 @@
             [com.stuartsierra.component :as co]
             [manifold.stream :as ms]
             [medley.core :as mc]
+            [monkey.ci.common.preds :as cp]
             [monkey.ci.prometheus :as prom]
             [taoensso.telemere :as t]))
 
@@ -70,6 +71,9 @@
          ([])))
       counter)))
 
+(defn- id-filter [id]
+  (filter (cp/prop-pred :id id)))
+
 (defn- add-oci-metrics [reg]
   (letfn [(tags
             ([]
@@ -79,18 +83,37 @@
     (signal->counter ::oci-calls reg "monkey_oci_calls"
                      {:description "Number of calls to OCI API endpoints"
                       :tags tags
-                      :tx (filter (comp (partial = :oci/invocation) :id))})
+                      :tx (id-filter :oci/invocation)})
     reg))
 
+(defn- add-build-metrics [reg]
+  (signal->counter :build/triggered reg "monkey_builds_triggered"
+                   {:description "Number of triggered builds"
+                    :tx (id-filter :build/triggered)})
+  (signal->counter :build/started reg "monkey_builds_started"
+                   {:description "Number of started builds"
+                    :tx (id-filter :build/started)})
+  (signal->counter :build/completed reg "monkey_builds_completed"
+                   ;; TODO Include build result as tag
+                   {:description "Number of completed builds"
+                    :tx (id-filter :build/completed)})
+  reg)
+
 (defn- remove-signal-handlers []
-  (t/remove-handler! ::oci-calls))
+  (let [handlers [::oci-calls
+                  :build/triggered
+                  :build/started
+                  :build/completed]]
+    (doseq [h handlers]
+      (t/remove-handler! h))))
 
 (defrecord Metrics []
   co/Lifecycle
   (start [this]
     ;; TODO Add build labels if present
     (assoc this :registry (-> (make-registry)
-                              (add-oci-metrics))))
+                              (add-oci-metrics)
+                              (add-build-metrics))))
 
   (stop [this]
     (remove-signal-handlers)

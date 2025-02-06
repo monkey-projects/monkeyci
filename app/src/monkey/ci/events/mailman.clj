@@ -2,13 +2,14 @@
   "Mailman-style event handling"
   (:require [clojure.spec.alpha :as spec]
             [clojure.tools.logging :as log]
+            [medley.core :as mc]
             [monkey.ci
              [build :as b]
              [storage :as st]
              [time :as t]]
             [monkey.ci.spec.entities :as se]
             [monkey.mailman
-             [core :as mc]
+             [core :as mmc]
              [interceptors :as mi]]))
 
 (def get-db ::db)
@@ -72,6 +73,29 @@
    :enter (:enter load-build)
    :leave (:leave save-build)})
 
+(def save-credit-consumption
+  "Assuming the result contains a build with credits, creates a credit consumption for
+   the associated customer."
+  {:name ::save-credit-consumption
+   :leave (fn [ctx]
+            (let [{:keys [credits customer-id] :as build} (or (get-build ctx)
+                                                              (:build (get-result ctx)))
+                  storage (get-db ctx)]
+              (when (and (some? credits) (pos? credits))
+                (log/debug "Consumed credits for build" (build->sid build) ":" credits)
+                (let [avail (st/list-available-credits storage customer-id)]
+                  ;; TODO To avoid problems when there are no available credits at this point, we should
+                  ;; consider "reserving" one at the start of the build.  We have to do a check at that
+                  ;; point anyway.
+                  (if (empty? avail)
+                    (log/warn "No available customer credits for build" (build->sid build))
+                    (st/save-credit-consumption storage
+                                                (-> (select-keys build [:customer-id :repo-id :build-id])
+                                                    (assoc :amount credits
+                                                           :consumed-at (t/now)
+                                                           :credit-id (-> avail first :id)))))))
+              ctx))})
+
 (def add-time
   {:name ::add-evt-time
    :leave (letfn [(set-time [evt]
@@ -133,6 +157,14 @@
                          :start-time (:time event)
                          :credit-multiplier (:credit-multiplier event)))))
 
+(def build-end
+  (build-update (fn [b {:keys [event]}]
+                  (-> b
+                      (assoc :status (:status event)
+                             :end-time (:time event)
+                             :credits (b/calc-credits b))
+                      (mc/assoc-some :message (:message event))))))
+
 ;;; Event routing configuration
 
 (defn make-routes [rt]
@@ -154,10 +186,16 @@
      [:build/start
       [{:handler build-start
         :interceptors [use-db
+                       with-build]}]]
+
+     [:build/end
+      [{:handler build-end
+        :interceptors [use-db
+                       save-credit-consumption
                        with-build]}]]]))
 
 (defn make-router [rt]
-  (mc/router (make-routes rt)
+  (mmc/router (make-routes rt)
              {:interceptors [trace-evt
                              add-time
                              (mi/sanitize-result)]}))
