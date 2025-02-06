@@ -127,9 +127,9 @@
         (inv args)))))
 
 (defn wait-for-event
-  "Utility fn that registers using an event filter and invokes the handler when one has
-   been received.  Returns a deferred that realizes with the received event.  An additional
-   predicate can do extra filtering if it's not supported by the event filter."
+  "Utility fn that registers a listener using an event filter and invokes the handler when 
+   one has been received.  Returns a deferred that realizes with the received event.  An 
+   additional predicate can do extra filtering if it's not supported by the event filter."
   [events ef & [pred]]
   (log/debug "Waiting for event to arrive that matches filter:" ef)
   (let [r (md/deferred)

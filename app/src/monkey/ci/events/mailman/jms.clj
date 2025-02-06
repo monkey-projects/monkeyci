@@ -13,12 +13,13 @@
    [:script/initializing :script/start :script/end]
    "queue://%s.jobs"
    [:job/pending :job/initializing :job/start :job/end :job/skipped :job/executed]
-   "queue://%s.containers"
+   "queue://%s.jobs.containers"
    [:container/pending :container/initializing :container/start :container/end]
-   "queue://%s.commands"
+   "queue://%s.jobs.commands"
    [:command/start :command/end]
-   "queue://%s.runner.queue"
-   [:build/queued]
+   "queue://%s.containers"
+   ;; All things that need to be run in a container go here
+   [:build/queued :job/queued]
    "topic://%s.build.updates"
    [:build/updated]})
 

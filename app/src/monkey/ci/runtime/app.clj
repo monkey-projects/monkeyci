@@ -225,8 +225,8 @@
   (rep/make-reporter (:reporter conf)))
 
 (defn- new-jwk [conf]
-  ;; Wrapped in a map because component doesn't allow nils
-  {:jwk (auth/config->keypair conf)})
+  ;; Return a map because component doesn't allow nils
+  (select-keys conf [:jwk]))
 
 (defrecord ListenersWrapper [listeners-events storage]
   co/Lifecycle
