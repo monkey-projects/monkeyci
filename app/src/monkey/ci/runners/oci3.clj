@@ -4,9 +4,15 @@
    it more robust and better suited for multiple replicas.  Instead of waiting
    for a container instance to complete, we just register multiple event 
    handlers that follow the flow."
-  (:require [monkey.ci.oci :as oci]
+  (:require [clojure.tools.logging :as log]
+            [io.pedestal.interceptor.chain :as pi]
+            [monkey.ci
+             [build :as b]
+             [oci :as oci]]
             [monkey.ci.runners.oci2 :as oci2]
-            [monkey.mailman.core :as mmc]
+            [monkey.mailman
+             [core :as mmc]
+             [interceptors :as mmi]]
             [monkey.oci.container-instance.core :as ci]))
 
 (def get-ci-config ::ci-config)
@@ -34,21 +40,40 @@
   (let [ic (oci2/instance-config conf build)]
     ))
 
+(defn- create-instance [client config]
+  (oci/with-retry
+    #(ci/create-container-instance client {:container-instance config})))
+
 (defn start-ci [client]
   "Interceptor that starts container instance using the config specified in the context"
   {:name ::start-ci
    :enter (fn [ctx]
             ;; Start container instance, put result back in the context
-            (->> @(ci/create-container-instance client (get-ci-config ctx))
+            ;; TODO Async processing?
+            (->> @(create-instance client (get-ci-config ctx))
                  (set-ci-response ctx)))})
 
-(defn start-instance [ctx]
-  ;; TODO
-  )
+(def end-on-ci-failure
+  {:name ::end-on-ci-failure
+   :enter (fn [ctx]
+            (let [resp (get-ci-response ctx)
+                  build (get-in ctx [:event :build])]
+              (cond-> ctx
+                (>= (:status resp) 400)
+                (-> (assoc :result (b/build-end-evt
+                                    (assoc build :message "Failed to create container instance")))
+                    ;; Do not proceed
+                    (pi/terminate)))))})
+
+(defn initialize-build [ctx]
+  (b/build-init-evt (get-in ctx [:event :build])))
 
 (defn delete-instance
   "Deletes the container instance associated with the build"
-  [ctx])
+  [ctx]
+  ;; TODO Find the instance id for the build.  Ideally, this is stored in the build.
+  ;; otherwise we'll have to look it up.
+  )
 
 (defn- make-ci-context [conf]
   (-> (ci/make-context conf)
@@ -57,10 +82,14 @@
 (defn make-routes [conf]
   (let [client (make-ci-context conf)]
     [[:build/pending
-      {:handler start-instance
-       :interceptors [(ci-base-config conf)
-                      (start-ci client)]}]
+      [{:handler initialize-build
+        :interceptors [(ci-base-config conf)
+                       (start-ci client)
+                       end-on-ci-failure]}]]
 
      [:build/end
-      {:handler delete-instance}]]))
+      [{:handler delete-instance}]]]))
 
+(defn make-router [conf]
+  (mmc/router (make-routes conf)
+              {:interceptors [(mmi/sanitize-result)]}))

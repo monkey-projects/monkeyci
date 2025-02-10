@@ -210,6 +210,6 @@
 
 (defn make-router [rt]
   (mmc/router (make-routes rt)
-             {:interceptors [trace-evt
-                             add-time
-                             (mi/sanitize-result)]}))
+              {:interceptors [trace-evt
+                              add-time
+                              (mi/sanitize-result)]}))

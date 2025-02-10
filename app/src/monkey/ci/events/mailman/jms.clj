@@ -17,8 +17,8 @@
    [:container/pending :container/initializing :container/start :container/end]
    "queue://%s.jobs.commands"
    [:command/start :command/end]
-   "queue://%s.containers"
    ;; All things that need to be run in a container go here
+   "queue://%s.containers"
    [:build/queued :job/queued]
    "topic://%s.build.updates"
    [:build/updated]})
