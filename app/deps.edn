@@ -22,7 +22,9 @@
         com.monkeyprojects/aero-ext {:mvn/version "0.3.0"}
         com.monkeyprojects/clompress {:mvn/version "0.1.2"}
         com.monkeyprojects/mailman-core {:mvn/version "0.2.0-SNAPSHOT"}
-        com.monkeyprojects/monkey-jms {:mvn/version "0.2.1"}
+        com.monkeyprojects/mailman-jms {:mvn/version "0.2.0-SNAPSHOT"}
+        com.monkeyprojects/mailman-manifold {:mvn/version "0.2.0-SNAPSHOT"}
+        com.monkeyprojects/monkey-jms-artemis {:mvn/version "0.3.0-SNAPSHOT"}
         com.monkeyprojects/oci-container-instance {:mvn/version "0.2.2"}
         com.monkeyprojects/oci-os {:mvn/version "0.4.1"}
         com.monkeyprojects/oci-sign {:mvn/version "0.1.4"}
@@ -64,7 +66,7 @@
   :test
   {:extra-paths [:test-paths]
    :extra-deps {com.monkeyprojects/build {:mvn/version "0.3.1"}
-                com.h2database/h2 {:mvn/version "2.3.232"}
+                com.h2database/h2 {:mvn/version "2.3.232"}                
                 org.clojure/test.check {:mvn/version "1.1.1"}
                 ring/ring-mock {:mvn/version "0.4.0"}}
    :exec-fn monkey.test/all}

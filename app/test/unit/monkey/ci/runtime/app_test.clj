@@ -174,7 +174,13 @@
         (is (ifn? (get-in sys [:http :rt :process-reaper]))))
 
       (testing "provides vault in runtime"
-        (is (p/vault? (get-in sys [:http :rt :vault])))))))
+        (is (p/vault? (get-in sys [:http :rt :vault]))))
+
+      (testing "provides mailman"
+        (is (some? (:mailman sys))))
+
+      (testing "provides mailman routes"
+        (is (some? (:mailman-routes sys)))))))
 
 (deftest process-reaper
   (testing "returns empty list when no oci runner"

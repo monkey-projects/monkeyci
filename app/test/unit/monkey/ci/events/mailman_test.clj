@@ -1,6 +1,7 @@
 (ns monkey.ci.events.mailman-test
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.spec.alpha :as spec]
+            [com.stuartsierra.component :as co]
             [monkey.ci.events.mailman :as sut]
             [monkey.ci
              [cuid :as cuid]
@@ -9,7 +10,9 @@
              [events :as se]
              [entities :as sen]]
             [monkey.ci.helpers :as h]
-            [monkey.ci.test.runtime :as trt]))
+            [monkey.ci.test.runtime :as trt]
+            [monkey.jms :as jms]
+            [monkey.mailman.mem :as mmm]))
 
 (defn- validate-spec [spec obj]
   (is (spec/valid? spec obj)
@@ -242,7 +245,7 @@
       (is (= 100 (get-in r [:build :end-time]))))))
 
 (deftest routes
-  (let [routes (->> (sut/make-routes (trt/test-runtime))
+  (let [routes (->> (sut/make-routes (st/make-memory-storage))
                     (into {}))
         event-types [:build/triggered
                      :build/pending
@@ -255,8 +258,8 @@
         (is (contains? routes t))))))
 
 (deftest router
-  (let [{st :storage :as rt} (trt/test-runtime)
-        router (sut/make-router rt)]
+  (let [st (st/make-memory-storage)
+        router (sut/make-router (sut/make-routes st))]
 
     ;; We could also just test if the necessary interceptors have been
     ;; provided for each route
@@ -329,3 +332,54 @@
             (is (some? match))
             (is (= 1 (count cc)))
             (is (= 10 (:amount (first cc))))))))))
+
+(deftest make-component
+  (testing " manifold"
+    (let [c (-> {:type :manifold}
+                         (sut/make-component)
+                         (assoc :router (constantly "ok"))
+                         (co/start))]
+      (testing "can make component"
+        (is (some? c)))
+
+      (testing "`start` registers listener"
+        (is (not-empty (:listener c))))
+
+      (testing "`stop` unregisters listener"
+        (is (nil? (-> (co/stop c)
+                      :listener))))))
+
+  (testing "jms"
+    (let [c (sut/make-component {:type :jms})]
+      (testing "can make component"
+        (is (some? c)))
+
+      (testing "`start`"
+        (with-redefs [jms/connect (constantly ::connected)
+                      jms/make-consumer (constantly ::consumer)
+                      jms/set-listener (constantly nil)]
+          (let [s (co/start c)]
+            (testing "connects to broker"
+              (is (= ::connected (get-in s [:broker :context]))))
+
+            (testing "registers listeners"
+              (is (not-empty (:listeners s)))))))
+
+      (testing "`stop`"
+        (let [closed? (atom false)]
+          (with-redefs [jms/disconnect (fn [_]
+                                         (reset! closed? true))]
+            (let [s (-> (sut/map->JmsComponent {:broker ::test-broker})
+                        (co/stop))]
+              (testing "disconnects from broker"
+                (is (nil? (:broker s)))
+                (is (true? @closed?)))
+
+              (testing "unregisters listeners"))))))))
+
+(deftest make-routes-component
+  (testing "`start` creates routes"
+    (is (not-empty (-> (sut/make-routes-component)
+                       (assoc :storage (st/make-memory-storage))
+                       (co/start)
+                       :routes)))))

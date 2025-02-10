@@ -2,15 +2,19 @@
   "Mailman-style event handling"
   (:require [clojure.spec.alpha :as spec]
             [clojure.tools.logging :as log]
+            [com.stuartsierra.component :as co]
             [medley.core :as mc]
             [monkey.ci
              [build :as b]
              [storage :as st]
              [time :as t]]
+            [monkey.ci.events.mailman.jms :as emj]
             [monkey.ci.spec.entities :as se]
             [monkey.mailman
              [core :as mmc]
-             [interceptors :as mi]]))
+             [interceptors :as mi]
+             [jms :as mj]
+             [manifold :as mm]]))
 
 (def get-db ::db)
 
@@ -175,8 +179,8 @@
 
 ;;; Event routing configuration
 
-(defn make-routes [rt]
-  (let [use-db (use-db (:storage rt))]
+(defn make-routes [storage]
+  (let [use-db (use-db storage)]
     [[:build/triggered
       [{:handler check-credits
         :interceptors [use-db
@@ -208,8 +212,64 @@
                        save-credit-consumption
                        with-build]}]]]))
 
-(defn make-router [rt]
-  (mmc/router (make-routes rt)
-              {:interceptors [trace-evt
-                              add-time
-                              (mi/sanitize-result)]}))
+(def global-interceptors [trace-evt
+                          add-time
+                          (mi/sanitize-result)])
+
+(defn make-router [routes]
+  (mmc/router routes
+              {:interceptors global-interceptors}))
+
+;;; Components
+
+(defmulti make-component :type)
+
+(defrecord ManifoldComponent [broker routes]
+  co/Lifecycle
+  (start [this]
+    (let [broker (mm/manifold-broker {})]
+      (assoc this
+             :broker broker
+             :listener (mmc/add-listener broker (make-router (:routes routes))))))
+
+  (stop [{:keys [listener] :as this}]
+    (when listener
+      (mmc/unregister-listener listener))
+    (dissoc this :listener)))
+
+(defmethod make-component :manifold [_]
+  (map->ManifoldComponent {}))
+
+(defrecord JmsComponent [config broker routes]
+  co/Lifecycle
+  (start [this]
+    (let [broker (mj/jms-broker config)
+          router (make-router (:routes routes))]
+      ;; TODO Add listeners for each destination referred to by route event types
+      ;; but split up the routes so only those for the destination are added
+      (assoc this
+             :broker broker
+             :listeners (->> (emj/event-destinations config)
+                             (vals)
+                             (map (partial hash-map :handler router :destination))
+                             (map (partial mmc/add-listener broker))
+                             (doall)))))
+
+  (stop [this]
+    (when broker
+      (mj/disconnect broker))
+    (assoc this :broker nil)))
+
+(defmethod make-component :jms [config]
+  (map->JmsComponent {:config config}))
+
+(defrecord Routes [storage]
+  co/Lifecycle
+  (start [this]
+    (assoc this :routes (make-routes storage)))
+
+  (stop [this]
+    (dissoc this :routes)))
+
+(defn make-routes-component []
+  (->Routes nil))

@@ -26,6 +26,7 @@
              [oci :as cco]]
             [monkey.ci.events
              [core :as ec]
+             [mailman :as em]
              [split :as es]]
             [monkey.ci.runners
              [oci]
@@ -173,6 +174,11 @@
 (defn new-push-gw [config]
   (map->PushGateway {:config (:push-gw config)}))
 
+(defn new-mailman
+  "Creates new mailman event broker component.  This will replace the old events."
+  [config]
+  (em/make-component (:mailman config)))
+
 (defn make-runner-system
   "Given a runner configuration object, creates component system.  When started,
    it contains a fully configured `runtime` component that can be used by the
@@ -208,7 +214,8 @@
    :metrics    (new-metrics)
    :push-gw    (co/using
                 (new-push-gw config)
-                [:metrics])))
+                [:metrics])
+   :mailman    (new-mailman config)))
 
 (defn with-runner-system [config f]
   (rc/with-system (make-runner-system config) f))
@@ -269,6 +276,9 @@
 (defn- new-vault [config]
   (v/make-vault (:vault config)))
 
+(defn- new-mailman-routes []
+  (em/make-routes-component))
+
 (defrecord ServerRuntime [config]
   co/Lifecycle
   (start [this]
@@ -321,7 +331,13 @@
                (new-metrics)
                [:events])
    :process-reaper (new-process-reaper config)
-   :vault     (new-vault config)))
+   :vault     (new-vault config)
+   :mailman   (co/using
+               (new-mailman config)
+               {:routes :mailman-routes})
+   :mailman-routes (co/using
+                    (new-mailman-routes)
+                    [:storage])))
 
 (defn with-server-system [config f]
   (rc/with-system (make-server-system config) f))
