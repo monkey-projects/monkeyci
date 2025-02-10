@@ -172,3 +172,9 @@
 
 (s/def :db-invoice/detail
   (s/keys :req-un [:invoice/net-amount :invoice/vat-perc :db/description]))
+
+(s/def :db/runner keyword?)
+(s/def :runner/details map?)
+
+(s/def :db/runner-details
+  (s/keys :req-un [:db/runner :runner/details]))

@@ -6,9 +6,12 @@
    handlers that follow the flow."
   (:require [clojure.tools.logging :as log]
             [io.pedestal.interceptor.chain :as pi]
+            [manifold.deferred :as md]
             [monkey.ci
              [build :as b]
-             [oci :as oci]]
+             [oci :as oci]
+             [storage :as st]]
+            [monkey.ci.events.mailman :as em]
             [monkey.ci.runners.oci2 :as oci2]
             [monkey.mailman
              [core :as mmc]
@@ -25,7 +28,14 @@
 (defn set-ci-response [ctx bi]
   (assoc ctx ::ci-response bi))
 
-(defn ci-base-config
+(def get-runner-details ::runner-details)
+
+(defn set-runner-details [ctx bi]
+  (assoc ctx ::runner-details bi))
+
+(def evt-build (comp :build :event))
+
+#_(defn ci-base-config
   "Interceptor that adds basic container configuration to the context using parameters
    specified in the app config."
   [config]
@@ -33,12 +43,11 @@
    :enter (fn [ctx]
             (set-ci-config ctx (oci/instance-config config)))})
 
-(defn start-build
-  "Starts a build by creating a container instance with a configuration as
-   specified by the oci2 runner."
-  [conf build]
-  (let [ic (oci2/instance-config conf build)]
-    ))
+(defn prepare-ci-config [config]
+  "Creates the ci config to run the required containers for the build."
+  {:name ::instance-config
+   :enter (fn [ctx]
+            (set-ci-config ctx (oci2/instance-config config (evt-build ctx))))})
 
 (defn- create-instance [client config]
   (oci/with-retry
@@ -57,7 +66,7 @@
   {:name ::end-on-ci-failure
    :enter (fn [ctx]
             (let [resp (get-ci-response ctx)
-                  build (get-in ctx [:event :build])]
+                  build (evt-build ctx)]
               (cond-> ctx
                 (>= (:status resp) 400)
                 (-> (assoc :result (b/build-end-evt
@@ -65,15 +74,39 @@
                     ;; Do not proceed
                     (pi/terminate)))))})
 
+(def save-runner-details
+  "Interceptor that stores build runner details for oci, such as container instance ocid.
+   This assumes the db is present in the context."
+  {:name ::save-runner-details
+   :enter (fn [ctx]
+            (let [sid (get-in ctx [:event :sid])
+                  details {:runner :oci
+                           :details {:instance-id (get-in (get-ci-response ctx) [:body :id])}}]
+              (log/debug "Saving runner details:" details)
+              (st/save-runner-details (em/get-db ctx) sid details)
+              ctx))})
+
+(def load-runner-details
+  "Interceptor that fetches build runner details from the db.
+   This assumes the db is present in the context."
+  {:name ::load-runner-details
+   :enter (fn [ctx]
+            (set-runner-details ctx (st/find-runner-details (em/get-db ctx) (get-in ctx [:event :sid]))))})
+
 (defn initialize-build [ctx]
   (b/build-init-evt (get-in ctx [:event :build])))
 
 (defn delete-instance
   "Deletes the container instance associated with the build"
-  [ctx]
-  ;; TODO Find the instance id for the build.  Ideally, this is stored in the build.
-  ;; otherwise we'll have to look it up.
-  )
+  [client ctx]
+  (if-let [instance-id (-> ctx (get-runner-details) :details :instance-id)]
+    @(md/chain
+      (oci/with-retry #(ci/delete-container-instance client {:instance-id instance-id}))
+      (fn [res]
+        (if (= 200 (:status res))
+          (log/info "Container instance" instance-id "has been deleted")
+          (log/warn "Unable to delete container instance" instance-id ", got status" (:status res)))))
+    (log/warn "Unable to delete container instance, no instance id in context")))
 
 (defn- make-ci-context [conf]
   (-> (ci/make-context conf)
@@ -83,13 +116,16 @@
   (let [client (make-ci-context conf)]
     [[:build/pending
       [{:handler initialize-build
-        :interceptors [(ci-base-config conf)
+        :interceptors [(prepare-ci-config conf)
                        (start-ci client)
+                       save-runner-details
                        end-on-ci-failure]}]]
 
      [:build/end
-      [{:handler delete-instance}]]]))
+      [{:handler (partial delete-instance client)
+        :interceptors [load-runner-details]}]]]))
 
-(defn make-router [conf]
+(defn make-router [conf storage]
   (mmc/router (make-routes conf)
-              {:interceptors [(mmi/sanitize-result)]}))
+              {:interceptors [(em/use-db storage)
+                              (mmi/sanitize-result)]}))
