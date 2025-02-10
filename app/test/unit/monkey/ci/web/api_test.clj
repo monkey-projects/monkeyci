@@ -217,9 +217,9 @@
           _ (ms/consume (fn [evt]
                           (swap! sent #(conj % (parse-event evt))))
                         (:body f))]
-      (is (some? (ec/post-events evt {:type :script/start
+      (is (some? (ec/post-events evt {:type :build/start
                                       :sid ["other-customer" "test-repo" "test-build"]})))
-      (is (some? (ec/post-events evt {:type :script/start
+      (is (some? (ec/post-events evt {:type :build/start
                                       :sid [cid "test-repo" "test-build"]})))
       (is (not= :timeout (h/wait-until #(some (comp (partial = "test-customer")
                                                     first

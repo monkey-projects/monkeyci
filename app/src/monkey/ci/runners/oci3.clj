@@ -112,8 +112,11 @@
   (-> (ci/make-context conf)
       (oci/add-inv-interceptor :runners)))
 
-(defn make-routes [conf]
+(defn make-routes
+  "Creates event handling routes for the given oci configuration"
+  [conf]
   (let [client (make-ci-context conf)]
+    ;; TODO Timeout handling
     [[:build/pending
       [{:handler initialize-build
         :interceptors [(prepare-ci-config conf)
