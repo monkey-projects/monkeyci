@@ -292,7 +292,7 @@
    :runner    (new-server-runner config)
    :runtime   (co/using
                (new-server-runtime config)
-               [:artifacts :events :metrics :runner :storage :jwk :process-reaper :vault])
+               [:artifacts :events :metrics :runner :storage :jwk :process-reaper :vault :mailman])
    :storage   (co/using
                (new-storage config)
                [:vault])
