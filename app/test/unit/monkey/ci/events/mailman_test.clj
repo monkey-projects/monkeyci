@@ -356,6 +356,80 @@
     (testing "sets job credit multiplier"
       (is (= 3 (get-in r [:build :script :jobs (:id job) :credit-multiplier]))))))
 
+(deftest job-start
+  (let [job (-> (h/gen-job)
+                (assoc :status :initializing))
+        build (-> (h/gen-build)
+                  (assoc-in [:script :jobs] {(:id job) job}))
+        r (-> {:event {:type :job/start
+                       :sid (sut/build->sid build)
+                       :job-id (:id job)
+                       :credit-multiplier 3
+                       :time 1000}}
+              (sut/set-build build)
+              (sut/set-job job)
+              (sut/job-start))]
+    (testing "returns `build/updated` event"
+      (validate-spec ::se/event r)
+      (is (= :build/updated (:type r))))
+
+    (let [res (get-in r [:build :script :jobs (:id job)])]
+      (testing "marks job as running"
+        (is (= :running (:status res))))
+      
+      (testing "sets start time"
+        (is (= 1000 (:start-time res))))
+      
+      (testing "sets credit multiplier if specified"
+        (is (= 3 (:credit-multiplier res)))))))
+
+(deftest job-end
+  (let [job (-> (h/gen-job)
+                (assoc :status :running))
+        build (-> (h/gen-build)
+                  (assoc-in [:script :jobs] {(:id job) job}))
+        r (-> {:event {:type :job/end
+                       :sid (sut/build->sid build)
+                       :job-id (:id job)
+                       :status :error
+                       :result ::test-result
+                       :time 1000}}
+              (sut/set-build build)
+              (sut/set-job job)
+              (sut/job-end))]
+    (testing "returns `build/updated` event"
+      (validate-spec ::se/event r)
+      (is (= :build/updated (:type r))))
+
+    (let [res (get-in r [:build :script :jobs (:id job)])]
+      (testing "sets job status"
+        (is (= :error (:status res))))
+      
+      (testing "sets end time"
+        (is (= 1000 (:end-time res))))
+      
+      (testing "sets result if specified"
+        (is (= ::test-result (:result res)))))))
+
+(deftest job-skipped
+  (let [job (-> (h/gen-job)
+                (assoc :status :running))
+        build (-> (h/gen-build)
+                  (assoc-in [:script :jobs] {(:id job) job}))
+        r (-> {:event {:type :job/skipped
+                       :sid (sut/build->sid build)
+                       :job-id (:id job)}}
+              (sut/set-build build)
+              (sut/set-job job)
+              (sut/job-skipped))]
+    (testing "returns `build/updated` event"
+      (validate-spec ::se/event r)
+      (is (= :build/updated (:type r))))
+
+    (let [res (get-in r [:build :script :jobs (:id job)])]
+      (testing "marks job skipped"
+        (is (= :skipped (:status res)))))))
+
 (deftest routes
   (let [routes (->> (sut/make-routes (st/make-memory-storage))
                     (into {}))
@@ -368,7 +442,10 @@
                      :script/initializing
                      :script/start
                      :script/end
-                     :job/initializing]]
+                     :job/initializing
+                     :job/start
+                     :job/end
+                     :job/skipped]]
     (doseq [t event-types]
       (testing (format "`%s` is handled" (str t))
         (is (contains? routes t))))))

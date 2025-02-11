@@ -8,7 +8,6 @@
              [build :as b]
              [containers :as c]
              [git :as git]
-             [listeners :as li]
              [logging :as l]
              [metrics :as m]
              [oci :as oci]
@@ -28,6 +27,7 @@
              [core :as ec]
              [mailman :as em]
              [split :as es]]
+            [monkey.ci.events.mailman.bridge :as emb]
             [monkey.ci.runners
              [oci]
              [oci2]]
@@ -179,6 +179,11 @@
   [config]
   (em/make-component (:mailman config)))
 
+(defn new-mailman-events
+  "Creates a mailman-events bridge for compatibility purposes"
+  []
+  (emb/->MailmanEventPoster nil))
+
 (defn make-runner-system
   "Given a runner configuration object, creates component system.  When started,
    it contains a fully configured `runtime` component that can be used by the
@@ -235,44 +240,6 @@
   ;; Return a map because component doesn't allow nils
   (select-keys conf [:jwk]))
 
-(defrecord ListenersWrapper [listeners-events storage]
-  co/Lifecycle
-  (start [this]
-    (log/debug "Creating listeners with events" (:events listeners-events))
-    (assoc this :listeners (-> (li/->Listeners (:events listeners-events)
-                                               storage)
-                               (co/start))))
-  (stop [this]
-    (when-let [l (:listeners this)]
-      (co/stop l))))
-
-(defn- new-listeners []
-  (map->ListenersWrapper {}))
-
-(defn- maybe-make-listeners-events [config]
-  (when-let [c (get-in config [:listeners :events])]
-    (ec/make-events c)))
-
-(defrecord ListenersEvents [config out-events]
-  ;; Either uses own created events, or external (top level) events, depending
-  ;; on configuration.
-  co/Lifecycle
-  (start [this]
-    (if-let [le (some-> (maybe-make-listeners-events config)
-                        (co/start))]
-      (assoc this
-             :in-events le
-             ;; Split events input from output
-             :events (es/->SplitEvents le out-events))
-      (assoc this :events out-events)))
-
-  (stop [this]
-    (when-let [le (:in-events this)]
-      (co/stop le))))
-
-(defn- new-listeners-events [config]
-  (->ListenersEvents config nil))
-
 (defn- new-vault [config]
   (v/make-vault (:vault config)))
 
@@ -316,7 +283,9 @@
   [config]
   (co/system-map
    :artifacts (new-artifacts config)
-   :events    (new-events config)
+   :events    (co/using
+               (new-mailman-events)
+               {:broker :mailman})
    :http      (co/using
                (new-http-server config)
                {:rt :runtime})
@@ -328,12 +297,6 @@
                (new-storage config)
                [:vault])
    :jwk       (new-jwk config)
-   :listeners (co/using
-               (new-listeners)
-               [:listeners-events :storage])
-   :listeners-events (co/using
-                      (new-listeners-events config)
-                      {:out-events :events})
    :metrics   (co/using
                (new-metrics)
                [:events])

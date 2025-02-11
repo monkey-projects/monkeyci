@@ -237,10 +237,32 @@
                        :status :initializing
                        :credit-multiplier (get-in ctx [:event :credit-multiplier])))))
 
+(def job-start
+  (job-update (fn [job {:keys [event]}]
+                (-> job
+                    (assoc :status :running
+                           :start-time (:time event))
+                    (merge (select-keys event [:credit-multiplier]))))))
+
+(def job-end
+  (job-update (fn [job {:keys [event]}]
+                (-> job
+                    (assoc :end-time (:time event))
+                    (merge (select-keys event [:status :result]))))))
+
+(def job-skipped
+  (job-update (fn [job _]
+                (assoc job :status :skipped))))
+
 ;;; Event routing configuration
 
 (defn make-routes [storage]
-  (let [use-db (use-db storage)]
+  (let [use-db (use-db storage)
+        build-int [use-db
+                   with-build]
+        job-int [use-db
+                 load-build
+                 with-job]]
     [[:build/triggered
       [{:handler check-credits
         :interceptors [use-db
@@ -252,13 +274,11 @@
 
      [:build/initializing
       [{:handler build-initializing
-        :interceptors [use-db
-                       with-build]}]]
+        :interceptors build-int}]]
 
      [:build/start
       [{:handler build-start
-        :interceptors [use-db
-                       with-build]}]]
+        :interceptors build-int}]]
 
      [:build/end
       [{:handler build-end
@@ -274,24 +294,31 @@
 
      [:script/initializing
       [{:handler script-init
-        :interceptors [use-db
-                       with-build]}]]
+        :interceptors build-int}]]
 
      [:script/start
       [{:handler script-start
-        :interceptors [use-db
-                       with-build]}]]
+        :interceptors build-int}]]
 
      [:script/end
       [{:handler script-end
-        :interceptors [use-db
-                       with-build]}]]
+        :interceptors build-int}]]
 
      [:job/initializing
       [{:handler job-init
-        :interceptors [use-db
-                       load-build
-                       with-job]}]]]))
+        :interceptors job-int}]]
+
+     [:job/start
+      [{:handler job-start
+        :interceptors job-int}]]
+
+     [:job/end
+      [{:handler job-end
+        :interceptors job-int}]]
+
+     [:job/skipped
+      [{:handler job-skipped
+        :interceptors job-int}]]]))
 
 (def global-interceptors [trace-evt
                           add-time

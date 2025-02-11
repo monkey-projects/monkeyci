@@ -149,23 +149,23 @@
       (testing "provides empty jwk if not configured"
         (is (nil? (get-in sys [:http :rt :jwk]))))
 
-      (testing "activates listeners"
-        (is (instance? monkey.ci.listeners.Listeners (get-in sys [:listeners :listeners]))))
+      ;; (testing "activates listeners"
+      ;;   (is (instance? monkey.ci.listeners.Listeners (get-in sys [:listeners :listeners]))))
 
-      (testing "passes events to listeners"
-        (is (some? (-> sys :listeners :listeners :events))))
+      ;; (testing "passes events to listeners"
+      ;;   (is (some? (-> sys :listeners :listeners :events))))
 
-      (testing "passes listener events if configured"
-        (is (= ::listener-events
-               (-> server-config
-                   (assoc :listeners {:events {:type :fake
-                                               ::kind ::listener-events}})
-                   (sut/with-server-system :listeners)
-                   :listeners
-                   :events
-                   :in
-                   :config
-                   ::kind))))
+      ;; (testing "passes listener events if configured"
+      ;;   (is (= ::listener-events
+      ;;          (-> server-config
+      ;;              (assoc :listeners {:events {:type :fake
+      ;;                                          ::kind ::listener-events}})
+      ;;              (sut/with-server-system :listeners)
+      ;;              :listeners
+      ;;              :events
+      ;;              :in
+      ;;              :config
+      ;;              ::kind))))
 
       (testing "provides metrics"
         (is (some? (get sys :metrics)))
