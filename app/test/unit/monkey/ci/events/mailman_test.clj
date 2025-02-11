@@ -2,6 +2,9 @@
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.spec.alpha :as spec]
             [com.stuartsierra.component :as co]
+            [manifold
+             [bus :as mb]
+             [stream :as ms]]
             [monkey.ci.events.mailman :as sut]
             [monkey.ci
              [cuid :as cuid]
@@ -195,6 +198,17 @@
     (testing "returns `build/failed` event if no credits available"
       (is (= :build/failed (-> (sut/check-credits ctx)
                                :type))))))
+
+(deftest update-bus
+  (testing "`enter` publishes event to update bus"
+    (let [bus (mb/event-bus)
+          s (mb/subscribe bus :build/updated)
+          {:keys [enter] :as i} (sut/update-bus bus)
+          evt {:type :build/updated
+               :build (h/gen-build)}]
+      (is (keyword? (:name i)))
+      (is (some? (enter {:event evt})))
+      (is (= evt (deref (ms/take! s) 1000 :timeout))))))
 
 (deftest queue-build
   (testing "returns `build/queued` event"
@@ -431,7 +445,8 @@
         (is (= :skipped (:status res)))))))
 
 (deftest routes
-  (let [routes (->> (sut/make-routes (st/make-memory-storage))
+  (let [routes (->> (sut/make-routes (st/make-memory-storage)
+                                     (mb/event-bus))
                     (into {}))
         event-types [:build/triggered
                      :build/pending
@@ -439,6 +454,7 @@
                      :build/start
                      :build/end
                      :build/canceled
+                     :build/updated
                      :script/initializing
                      :script/start
                      :script/end
@@ -452,7 +468,7 @@
 
 (deftest router
   (let [st (st/make-memory-storage)
-        router (sut/make-router (sut/make-routes st))]
+        router (sut/make-router (sut/make-routes st (mb/event-bus)))]
 
     ;; We could also just test if the necessary interceptors have been
     ;; provided for each route

@@ -2,7 +2,9 @@
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.spec.alpha :as spec]
             [clojure.string :as cs]
-            [manifold.stream :as ms]
+            [manifold
+             [bus :as mb]
+             [stream :as ms]]
             [monkey.ci
              [storage :as st]
              [protocols :as p]
@@ -190,18 +192,22 @@
 (defn- make-events []
   (ec/make-events {:type :sync}))
 
+(defn- publish [bus evt]
+  (deref (mb/publish! bus (:type evt) evt) 1000 :timeout))
+
 (deftest event-stream
   (testing "returns stream reply"
-    (is (ms/source? (-> (sut/event-stream (h/->req {:events (make-events)}))
+    (is (ms/source? (-> (sut/event-stream (h/->req {:update-bus (mb/event-bus)}))
                         :body))))
 
   (testing "sends ping on open"
     (let [sent (atom [])
-          evt (make-events)
-          f (sut/event-stream (h/->req {:events evt}))
-          _ (ms/consume (partial swap! sent conj) (:body f))]
-      (is (some? (ec/post-events evt {:type :script/start})))
-      (is (not= :timeout (h/wait-until #(not-empty @sent) 1000)))
+          bus (mb/event-bus)
+          f (sut/event-stream (h/->req {:update-bus bus}))
+          _ (ms/consume (partial swap! sent conj) (:body f))
+          evt {:type :build/updated}]
+      (is (true? (publish bus evt)))
+      (is (not-empty @sent))
       (is (= :ping (-> @sent
                        first
                        (parse-event)
@@ -210,26 +216,24 @@
   (testing "only sends events for customer specified in path"
     (let [sent (atom [])
           cid "test-customer"
-          evt (make-events)
-          f (-> (h/->req {:events evt})
+          bus (mb/event-bus)
+          f (-> (h/->req {:update-bus bus})
                 (assoc-in [:parameters :path :customer-id] cid)
                 (sut/event-stream))
           _ (ms/consume (fn [evt]
-                          (swap! sent #(conj % (parse-event evt))))
+                          (swap! sent conj (parse-event evt)))
                         (:body f))]
-      (is (some? (ec/post-events evt {:type :build/start
-                                      :sid ["other-customer" "test-repo" "test-build"]})))
-      (is (some? (ec/post-events evt {:type :build/start
-                                      :sid [cid "test-repo" "test-build"]})))
-      (is (not= :timeout (h/wait-until #(some (comp (partial = "test-customer")
-                                                    first
-                                                    :sid)
-                                              @sent)
-                                       1000)))))
+      (is (true? (publish bus {:type :build/updated
+                               :sid ["other-customer" "test-repo" "test-build"]})))
+      (is (true? (publish bus {:type :build/updated
+                               :sid [cid "test-repo" "test-build"]})))
+      (is (some (comp (partial = "test-customer")
+                      first
+                      :sid)
+                @sent))))
 
   (testing "sets `x-accel-buffering` header for nginx proxying"
-    (let [evt (make-events)
-          r (-> (h/->req {:events evt})
+    (let [r (-> (h/->req {:update-bus (mb/event-bus)})
                 (sut/event-stream))]
       (is (= "no" (get-in r [:headers "x-accel-buffering"]))))))
 

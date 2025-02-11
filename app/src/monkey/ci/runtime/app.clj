@@ -2,6 +2,7 @@
   "Functions for setting up a runtime for application (cli or server)"
   (:require [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
+            [manifold.bus :as mb]
             [medley.core :as mc]
             [monkey.ci
              [blob :as blob]
@@ -267,16 +268,16 @@
 (defn- new-process-reaper [conf]
   (->ProcessReaper conf))
 
-(defrecord AppEventRoutes [storage]
+(defrecord AppEventRoutes [storage update-bus]
   co/Lifecycle
   (start [this]
-    (assoc this :routes (em/make-routes storage)))
+    (assoc this :routes (em/make-routes storage update-bus)))
 
   (stop [this]
     (dissoc this :routes)))
 
 (defn new-app-routes []
-  (->AppEventRoutes nil))
+  (map->AppEventRoutes {}))
 
 (defn make-server-system
   "Creates a component system that can be used to start an application server."
@@ -292,7 +293,7 @@
    :runner    (new-server-runner config)
    :runtime   (co/using
                (new-server-runtime config)
-               [:artifacts :events :metrics :runner :storage :jwk :process-reaper :vault :mailman])
+               [:artifacts :events :metrics :runner :storage :jwk :process-reaper :vault :mailman :update-bus])
    :storage   (co/using
                (new-storage config)
                [:vault])
@@ -307,7 +308,8 @@
                {:routes :mailman-routes})
    :mailman-routes (co/using
                     (new-app-routes)
-                    [:storage])))
+                    [:storage :update-bus])
+   :update-bus (mb/event-bus)))
 
 (defn with-server-system [config f]
   (rc/with-system (make-server-system config) f))

@@ -3,6 +3,7 @@
   (:require [clojure.spec.alpha :as spec]
             [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
+            [manifold.bus :as mb]
             [medley.core :as mc]
             [monkey.ci
              [build :as b]
@@ -143,6 +144,13 @@
             (log/trace "Result from handling" (get-in ctx [:event :type]) ":" (:result ctx))
             ctx)})
 
+(defn update-bus [bus]
+  "Publishes the event to the given manifold bus"
+  {:name ::update-bus
+   :enter (fn [{:keys [event] :as ctx}]
+            (mb/publish! bus (:type event) event)
+            ctx)})
+
 ;;; Event handlers
 
 (defn check-credits
@@ -256,7 +264,7 @@
 
 ;;; Event routing configuration
 
-(defn make-routes [storage]
+(defn make-routes [storage bus]
   (let [use-db (use-db storage)
         build-int [use-db
                    with-build]
@@ -291,6 +299,10 @@
         :interceptors [use-db
                        save-credit-consumption
                        with-build]}]]
+
+     [:build/updated
+      [{:handler (constantly nil)
+        :interceptors [(update-bus bus)]}]]
 
      [:script/initializing
       [{:handler script-init

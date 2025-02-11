@@ -293,19 +293,13 @@
           (rur/content-type "text/plain"))
       (rur/not-found nil))))
 
-(def allowed-events
-  #{:build/pending
-    :build/initializing
-    :build/start
-    :build/end
-    :build/updated})
-
 (defn event-stream
-  "Sets up an event stream for the specified filter."
+  "Sets up an event stream for all `build/updated` events for the customer specified in the
+   request path."
   [req]
-  (eh/event-stream (c/from-rt req rt/events-receiver)
-                   {:types allowed-events
-                    :sid [(customer-id req)]}))
+  (eh/bus-stream (c/from-rt req :update-bus)
+                 :build/updated
+                 (comp (partial = (customer-id req)) first :sid)))
 
 (c/make-entity-endpoints "email-registration"
                          {:get-id (c/id-getter :email-registration-id)
