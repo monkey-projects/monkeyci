@@ -6,6 +6,7 @@
             [medley.core :as mc]
             [monkey.ci
              [build :as b]
+             [jobs :as j]
              [storage :as st]
              [time :as t]]
             [monkey.ci.events.mailman.jms :as emj]
@@ -31,12 +32,17 @@
 (defn set-build [ctx b]
   (assoc ctx ::build b))
 
+(def get-job ::job)
+
+(defn set-job [ctx job]
+  (assoc ctx ::job job))
+
 (def get-result :result)
 
 (defn set-result [ctx r]
   (assoc ctx :result r))
 
-(def build->sid (apply juxt st/build-sid-keys))
+(def build->sid st/ext-build-sid)
 
 ;;; Interceptors for side effects
 
@@ -76,6 +82,26 @@
   {:name ::with-build
    :enter (:enter load-build)
    :leave (:leave save-build)})
+
+(def load-job
+  {:name ::load-job
+   :enter (fn [{{:keys [sid job-id]} :event :as ctx}]
+            (set-job ctx (st/find-job (get-db ctx) (concat sid [job-id]))))})
+
+(def save-job
+  "Saves the job found in the result build by id specified in the event."
+  {:name ::save-job
+   :leave (fn [{{:keys [sid job-id]} :event :as ctx}]
+            (let [job (let [j (-> ctx (get-result) (get-in [:build :script :jobs job-id]))]
+                        (when (and j (st/save-job (get-db ctx) sid j))
+                          j))]
+              (cond-> ctx
+                job (set-job job))))})
+
+(def with-job
+  {:name ::with-job
+   :enter (:enter load-job)
+   :leave (:leave save-job)})
 
 (def save-credit-consumption
   "Assuming the result contains a build with credits, creates a credit consumption for
@@ -177,6 +203,40 @@
                          :end-time (:time event)
                          :credits (b/calc-credits b)))))
 
+(def script-init
+  (build-update (fn [b ctx]
+                  (assoc-in b [:script :script-dir] (get-in ctx [:event :script-dir])))))
+
+(def script-start
+  (build-update (fn [b ctx]
+                  (assoc-in b [:script :jobs] (->> (get-in ctx [:event :jobs])
+                                                   (map #(vector (j/job-id %) %))
+                                                   (into {}))))))
+
+(def script-end
+  (build-update (fn [b {{:keys [message status]} :event}]
+                  (-> b
+                      (assoc-in [:script :status] status)
+                      (mc/assoc-some :message message)))))
+
+(defn- job-update
+  "Applies patch to the job in the context.  Also requires the build, as it returns
+   a `build/updated` event."
+  [patch]
+  (fn [ctx]
+    (let [job (-> ctx
+                  (get-job)
+                  (patch ctx))]
+      (-> (get-build ctx)
+          (assoc-in [:script :jobs (:id job)] job)
+          (build-update-evt)))))
+
+(def job-init
+  (job-update (fn [job ctx]
+                (assoc job
+                       :status :initializing
+                       :credit-multiplier (get-in ctx [:event :credit-multiplier])))))
+
 ;;; Event routing configuration
 
 (defn make-routes [storage]
@@ -210,7 +270,28 @@
       [{:handler build-canceled
         :interceptors [use-db
                        save-credit-consumption
-                       with-build]}]]]))
+                       with-build]}]]
+
+     [:script/initializing
+      [{:handler script-init
+        :interceptors [use-db
+                       with-build]}]]
+
+     [:script/start
+      [{:handler script-start
+        :interceptors [use-db
+                       with-build]}]]
+
+     [:script/end
+      [{:handler script-end
+        :interceptors [use-db
+                       with-build]}]]
+
+     [:job/initializing
+      [{:handler job-init
+        :interceptors [use-db
+                       load-build
+                       with-job]}]]]))
 
 (def global-interceptors [trace-evt
                           add-time
@@ -219,6 +300,17 @@
 (defn make-router [routes]
   (mmc/router routes
               {:interceptors global-interceptors}))
+
+(defn merge-routes
+  "Merges multiple routes together into one routing config"
+  [routes & others]
+  (letfn [(merge-one [a b]
+            (merge-with concat (into {} a) (into {} b)))]
+    (loop [res []
+           todo (cons routes others)]
+      (if (empty? todo)
+        (seq res)
+        (recur (merge-one res (first todo)) (rest todo))))))
 
 ;;; Components
 
@@ -262,14 +354,3 @@
 
 (defmethod make-component :jms [config]
   (map->JmsComponent {:config config}))
-
-(defrecord Routes [storage]
-  co/Lifecycle
-  (start [this]
-    (assoc this :routes (make-routes storage)))
-
-  (stop [this]
-    (dissoc this :routes)))
-
-(defn make-routes-component []
-  (->Routes nil))

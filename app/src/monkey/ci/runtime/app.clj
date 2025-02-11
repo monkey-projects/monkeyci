@@ -276,9 +276,6 @@
 (defn- new-vault [config]
   (v/make-vault (:vault config)))
 
-(defn- new-mailman-routes []
-  (em/make-routes-component))
-
 (defrecord ServerRuntime [config]
   co/Lifecycle
   (start [this]
@@ -303,6 +300,17 @@
 (defn- new-process-reaper [conf]
   (->ProcessReaper conf))
 
+(defrecord AppEventRoutes [storage]
+  co/Lifecycle
+  (start [this]
+    (assoc this :routes (em/make-routes storage)))
+
+  (stop [this]
+    (dissoc this :routes)))
+
+(defn new-app-routes []
+  (->AppEventRoutes nil))
+
 (defn make-server-system
   "Creates a component system that can be used to start an application server."
   [config]
@@ -312,11 +320,10 @@
    :http      (co/using
                (new-http-server config)
                {:rt :runtime})
-   :reporter  (new-reporter config)
    :runner    (new-server-runner config)
    :runtime   (co/using
                (new-server-runtime config)
-               [:artifacts :events :metrics :reporter :runner :storage :jwk :process-reaper :vault])
+               [:artifacts :events :metrics :runner :storage :jwk :process-reaper :vault])
    :storage   (co/using
                (new-storage config)
                [:vault])
@@ -336,7 +343,7 @@
                (new-mailman config)
                {:routes :mailman-routes})
    :mailman-routes (co/using
-                    (new-mailman-routes)
+                    (new-app-routes)
                     [:storage])))
 
 (defn with-server-system [config f]

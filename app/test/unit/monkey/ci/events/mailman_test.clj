@@ -97,6 +97,43 @@
                          (sut/get-build))))
           (is (= upd (st/find-build s (sut/build->sid build)))))))))
 
+(deftest load-job
+  (h/with-memory-store s
+    (let [job (h/gen-job)
+          build (-> (h/gen-build)
+                    (assoc-in [:script :jobs] {(:id job) job}))
+          sid (sut/build->sid build)
+          {:keys [enter] :as i} sut/load-job]
+      (is (keyword? (:name i)))
+      (is (some? (st/save-build s build)))
+
+      (testing "retrieves job from db"
+        (is (= job (-> {:event {:sid sid
+                                :job-id (:id job)}}
+                       (sut/set-db s)
+                       (enter)
+                       (sut/get-job))))))))
+
+(deftest save-job
+  (h/with-memory-store s
+    (let [job (h/gen-job)
+          build (-> (h/gen-build)
+                    (assoc-in [:script :jobs] {}))
+          sid (sut/build->sid build)
+          {:keys [leave] :as i} sut/save-job
+          evt {:event {:sid sid
+                       :job-id (:id job)}}]
+      (is (keyword? (:name i)))
+      (is (some? (st/save-build s build)))
+
+      (testing "`leave` saves job from result in db"
+        (is (= job (-> evt
+                       (sut/set-db s)
+                       (sut/set-result {:build (assoc-in build [:script :jobs (:id job)] job)})
+                       (leave)
+                       (sut/get-job))))
+        (is (= job (st/find-job s (concat sid [(:id job)]))))))))
+
 (deftest save-credit-consumption
   (let [{:keys [leave] :as i} sut/save-credit-consumption]
     (is (keyword? (:name i)))
@@ -244,6 +281,81 @@
     (testing "sets end time"
       (is (= 100 (get-in r [:build :end-time]))))))
 
+(deftest script-init
+  (let [build (-> (h/gen-build)
+                  (dissoc :script))
+        r (-> {:event {:type :script/initializing
+                       :sid (sut/build->sid build)
+                       :script-dir "test/dir"}}
+              (sut/set-build build)
+              (sut/script-init))]
+    (testing "returns `build/updated` event"
+      (validate-spec ::se/event r)
+      (is (= :build/updated (:type r))))
+    
+    (testing "sets script dir in build"
+      (is (= "test/dir" (get-in r [:build :script :script-dir]))))))
+
+(deftest script-start
+  (let [build (-> (h/gen-build)
+                  (update :script dissoc :jobs))
+        r (-> {:event {:type :script/start
+                       :sid (sut/build->sid build)
+                       :jobs [{:id ::test-job}]}}
+              (sut/set-build build)
+              (sut/script-start))]
+    (testing "returns `build/updated` event"
+      (validate-spec ::se/event r)
+      (is (= :build/updated (:type r))))
+
+    (testing "adds jobs to build"
+      (is (= {::test-job {:id ::test-job}}
+             (get-in r [:build :script :jobs]))))))
+
+(deftest script-end
+  (let [build (-> (h/gen-build)
+                  (update :script dissoc :jobs))
+        r (-> {:event {:type :script/end
+                       :sid (sut/build->sid build)
+                       :status :success
+                       :message "everything ok"}}
+              (sut/set-build build)
+              (sut/script-end))]
+    (testing "returns `build/updated` event"
+      (validate-spec ::se/event r)
+      (is (= :build/updated (:type r))))
+
+    (testing "sets script status"
+      (is (= :success
+             (get-in r [:build :script :status]))))
+
+    (testing "sets build message"
+      (is (= "everything ok"
+             (get-in r [:build :message]))))))
+
+(deftest job-init
+  (let [job (-> (h/gen-job)
+                (assoc :status :pending))
+        build (-> (h/gen-build)
+                  (assoc-in [:script :jobs] {(:id job) job}))
+        r (-> {:event {:type :job/initializing
+                       :sid (sut/build->sid build)
+                       :job-id (:id job)
+                       :credit-multiplier 3}}
+              (sut/set-build build)
+              (sut/set-job job)
+              (sut/job-init))]
+    (testing "returns `build/updated` event"
+      (validate-spec ::se/event r)
+      (is (= :build/updated (:type r))))
+
+    (testing "marks job initializing"
+      (is (= :initializing
+             (get-in r [:build :script :jobs (:id job) :status]))))
+
+    (testing "sets job credit multiplier"
+      (is (= 3 (get-in r [:build :script :jobs (:id job) :credit-multiplier]))))))
+
 (deftest routes
   (let [routes (->> (sut/make-routes (st/make-memory-storage))
                     (into {}))
@@ -252,7 +364,11 @@
                      :build/initializing
                      :build/start
                      :build/end
-                     :build/canceled]]
+                     :build/canceled
+                     :script/initializing
+                     :script/start
+                     :script/end
+                     :job/initializing]]
     (doseq [t event-types]
       (testing (format "`%s` is handled" (str t))
         (is (contains? routes t))))))
@@ -377,9 +493,12 @@
 
               (testing "unregisters listeners"))))))))
 
-(deftest make-routes-component
-  (testing "`start` creates routes"
-    (is (not-empty (-> (sut/make-routes-component)
-                       (assoc :storage (st/make-memory-storage))
-                       (co/start)
-                       :routes)))))
+(deftest merge-routes
+  (testing "merges handlers together per type"
+    (is (= [[::type-1 [::handler-1 ::handler-2]]
+            [::type-2 [::handler-3 ::handler-4]]]
+           (sut/merge-routes
+            [[::type-1 [::handler-1]]
+             [::type-2 [::handler-3]]]
+            [[::type-1 [::handler-2]]]
+            [[::type-2 [::handler-4]]])))))
