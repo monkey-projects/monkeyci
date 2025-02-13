@@ -5,11 +5,14 @@
    for a container instance to complete, we just register multiple event 
    handlers that follow the flow."
   (:require [clojure.tools.logging :as log]
+            [com.stuartsierra.component :as co]
             [io.pedestal.interceptor.chain :as pi]
             [manifold.deferred :as md]
+            [medley.core :as mc]
             [monkey.ci
              [build :as b]
              [oci :as oci]
+             [protocols :as p]
              [storage :as st]]
             [monkey.ci.events.mailman :as em]
             [monkey.ci.runners.oci2 :as oci2]
@@ -35,13 +38,19 @@
 
 (def evt-build (comp :build :event))
 
-#_(defn ci-base-config
-  "Interceptor that adds basic container configuration to the context using parameters
-   specified in the app config."
-  [config]
-  {:name ::instance-config
-   :enter (fn [ctx]
-            (set-ci-config ctx (oci/instance-config config)))})
+(defn decrypt-ssh-keys
+  "Interceptor that decrypts ssh keys on incoming build event"
+  [vault]
+  (letfn [(decrypt-keys [get-iv ssh-keys]
+            (let [iv (get-iv)]
+              (map (partial p/decrypt vault iv) ssh-keys)))]
+    {:name ::decrypt-ssh-keys
+     :enter (fn [ctx]
+              (update-in ctx [:event :build :git]
+                         mc/update-existing
+                         :ssh-keys
+                         (partial decrypt-keys
+                                  #(st/find-crypto (em/get-db ctx) (-> ctx :event :sid first)))))}))
 
 (defn prepare-ci-config [config]
   "Creates the ci config to run the required containers for the build."
@@ -114,12 +123,13 @@
 
 (defn make-routes
   "Creates event handling routes for the given oci configuration"
-  [conf]
+  [conf vault]
   (let [client (make-ci-context conf)]
     ;; TODO Timeout handling
     [[:build/pending
       [{:handler initialize-build
-        :interceptors [(prepare-ci-config conf)
+        :interceptors [(decrypt-ssh-keys vault)
+                       (prepare-ci-config conf)
                        (start-ci client)
                        save-runner-details
                        end-on-ci-failure]}]]
@@ -128,7 +138,19 @@
       [{:handler (partial delete-instance client)
         :interceptors [load-runner-details]}]]]))
 
-(defn make-router [conf storage]
-  (mmc/router (make-routes conf)
+(defn make-router [conf storage vault]
+  (mmc/router (make-routes conf vault)
               {:interceptors [(em/use-db storage)
                               (mmi/sanitize-result)]}))
+
+;; This component is used by the app runtime to enable oci3 runner
+(defrecord OciRunner [config storage mailman vault]
+  co/Lifecycle
+  (start [this]
+    (assoc this :listener (mmc/add-listener (:broker mailman)
+                                            (make-router config storage vault))))
+
+  (stop [{l :listener :as this}]
+    (when l
+      (mmc/unregister-listener l))
+    (dissoc this :listener)))

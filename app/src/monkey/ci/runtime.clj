@@ -76,7 +76,6 @@
 (def log-retriever (comp :retriever :logging))
 (def work-dir (from-config :work-dir))
 (def dev-mode? (from-config :dev-mode))
-(def ssh-keys-dir (from-config :ssh-keys-dir))
 (def runner :runner)
 (def ^:deprecated build "Gets build info from runtime" :build)
 

@@ -36,7 +36,8 @@
             [monkey.ci.spec.api-server :as aspec]
             [monkey.ci.web
              [common :as c]
-             [handler :as h]]
+             [handler :as h]
+             [middleware :as wm]]
             [reitit.ring :as ring]
             [reitit.coercion.schema]
             [ring.util.response :as rur]
@@ -311,7 +312,7 @@
    (ring/router
     routes
     {:data {:middleware (concat [[security-middleware (:token opts)]]
-                                c/default-middleware)
+                                wm/default-middleware)
             :muuntaja (c/make-muuntaja)
             :coercion reitit.coercion.schema/coercion
             context opts}}))

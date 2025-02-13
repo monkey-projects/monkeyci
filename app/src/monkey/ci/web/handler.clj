@@ -3,11 +3,9 @@
   (:require [aleph
              [http :as aleph]
              [netty :as netty]]
-            [camel-snake-kebab.core :as csk]
             [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
             [manifold.deferred :as md]
-            [medley.core :refer [update-existing] :as mc]
             [monkey.ci
              [metrics :as metrics]
              [runtime :as rt]
@@ -18,7 +16,8 @@
              [auth :as auth]
              [bitbucket :as bitbucket]
              [common :as c]
-             [github :as github]]
+             [github :as github]
+             [middleware :as wm]]
             [monkey.ci.web.api
              [customer :as cust-api]
              [invoice :as inv-api]
@@ -438,58 +437,26 @@
    email-registration-routes
    ["/admin" admin/admin-routes]])
 
-(defn- stringify-body
-  "Since the raw body could be read more than once (security, content negotiation...),
-   this interceptor replaces it with a string that can be read multiple times.  This
-   should only be used for requests that have reasonably small bodies!  In other
-   cases, the body could be written to a temp file."
-  [h]
-  (fn [req]
-    (-> req
-        (update-existing :body (fn [s]
-                                 (when (instance? java.io.InputStream s)
-                                   (slurp s))))
-        (h))))
-
-(defn- kebab-case-query
-  "Middleware that converts any query params to kebab-case, to make them more idiomatic."
-  [h]
-  (fn [req]
-    (-> req
-        (mc/update-existing-in [:parameters :query] (partial mc/map-keys csk/->kebab-case-keyword))
-        (h))))
-
-(defn- log-request
-  "Just logs the request, for monitoring or debugging purposes."
-  [h]
-  (fn [req]
-    (log/info "Handling request:" (select-keys req [:uri :request-method :parameters]))
-    (h req)))
-
-(defn- passthrough-middleware
-  "No-op middleware, just passes the request to the parent handler."
-  [h]
-  (fn [req]
-    (h req)))
-
 (defn- non-dev [rt mw]
   (if (rt/dev-mode? rt)
     ;; Disable security in dev mode
-    [passthrough-middleware]
+    [wm/passthrough-middleware]
     mw))
 
 (defn make-router
   ([rt routes]
    (ring/router
     routes
-    {:data {:middleware (vec (concat [stringify-body
+    {:data {:middleware (vec (concat [wm/stringify-body
                                       [cors/wrap-cors
                                        :access-control-allow-origin #".*"
                                        :access-control-allow-methods [:get :put :post :delete]
                                        :access-control-allow-credentials true]]
-                                     c/default-middleware
-                                     [kebab-case-query
-                                      log-request]))
+                                     ;; TODO Transactions for sql storage
+                                     wm/default-middleware
+                                     [wm/kebab-case-query
+                                      wm/log-request
+                                      wm/post-events]))
             :muuntaja (c/make-muuntaja)
             :coercion reitit.coercion.schema/coercion
             ;; Wrap the runtime in a type, so reitit doesn't change the records into maps

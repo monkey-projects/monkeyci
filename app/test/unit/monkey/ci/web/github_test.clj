@@ -5,12 +5,12 @@
             [monkey.ci
              [cuid :as cuid]
              [protocols :as p]
-             [storage :as st]
-             [vault :as v]]
+             [storage :as st]]
             [monkey.ci.web
              [auth :as auth]
              [common :as wc]
-             [github :as sut]]
+             [github :as sut]
+             [response :as r]]
             [monkey.ci.helpers :as h]
             [monkey.ci.test
              [aleph-test :as af]
@@ -18,128 +18,95 @@
             [ring.mock.request :as mock]))
 
 (deftest webhook
-  (testing "invokes runner from runtime"
-    (let [inv (atom nil)
-          cid (cuid/random-cuid)
-          st (st/make-memory-storage)
+  (testing "posts `build/pending` event"
+    (let [cid (cuid/random-cuid)
+          {st :storage :as rt} (trt/test-runtime)
           _ (st/save-webhook st {:id "test-hook"
                                  :customer-id cid})
           _ (st/save-customer-credit st {:customer-id cid
                                          :amount 1000})
-          req (-> {:runner (fn [_ build]
-                             (swap! inv conj build))
-                   :storage st}
-                  (h/->req)
-                  (assoc :headers {"x-github-event" "push"}
-                         :parameters {:path {:id "test-hook"}
-                                      :body
-                                      {:head-commit {:id "test-id"}}}))]
-      (is (= 202 (:status (sut/webhook req))))
-      (is (not= :timeout (h/wait-until #(some? @inv) 1000)))))
-
-  (testing "ignores non-push events"
-    (let [inv (atom nil)
-          req (-> {:runner (fn [_ build]
-                             (swap! inv conj build))}
-                  (h/->req)
-                  (assoc :headers {"x-github-event" "ping"}
-                         :parameters {:body 
-                                      {:key "value"}}))]
-      (is (= 204 (:status (sut/webhook req))))
-      (is (nil? @inv))))
-
-  (testing "ignores ref delete events"
-    (let [inv (atom nil)
-          st (st/make-memory-storage)
-          _ (st/save-webhook st {:id "test-hook"})
-          req (-> {:runner (fn [_ build]
-                             (swap! inv conj build))
-                   :storage st}
-                  (h/->req)
-                  (assoc :headers {"x-github-event" "push"}
-                         :parameters {:path {:id "test-hook"}
-                                      :body
-                                      {:head-commit {:id "test-id"}
-                                       :deleted true}}))]
-      (is (= 204 (:status (sut/webhook req))))
-      (is (empty? @inv))))
-
-  (testing "fires build end event on failure"
-    (let [st (st/make-memory-storage)
-          _ (st/save-webhook st {:id "test-hook"})
-          {:keys [recv] :as e} (h/fake-events)
-          req (-> {:runner (fn [rt _]
-                             (throw (ex-info "Test error" {:runtime rt})))
-                   :storage st
-                   :events e}
+          req (-> rt
                   (h/->req)
                   (assoc :headers {"x-github-event" "push"}
                          :parameters {:path {:id "test-hook"}
                                       :body
                                       {:head-commit {:id "test-id"}}}))
-          build-end? (comp (partial = :build/end) :type)
-          recv-build-end (fn []
-                           (some build-end? @recv))]
-      (is (= 202 (:status (sut/webhook req))))
-      (is (not= :timeout (h/wait-until recv-build-end 1000))))))
+          resp (sut/webhook req)]
+      (is (= 202 (:status resp)))
+      (is (= [:build/pending] (->> resp (r/get-events) (map :type))))))
+
+  (testing "ignores non-push events"
+    (let [req (-> (trt/test-runtime)
+                  (h/->req)
+                  (assoc :headers {"x-github-event" "ping"}
+                         :parameters {:body 
+                                      {:key "value"}}))
+          resp (sut/webhook req)]
+      (is (= 204 (:status resp)))
+      (is (empty? (r/get-events resp)))))
+
+  (testing "ignores ref delete events"
+    (let [{st :storage :as rt} (trt/test-runtime)
+          _ (st/save-webhook st {:id "test-hook"})
+          req (-> rt
+                  (h/->req)
+                  (assoc :headers {"x-github-event" "push"}
+                         :parameters {:path {:id "test-hook"}
+                                      :body
+                                      {:head-commit {:id "test-id"}
+                                       :deleted true}}))
+          resp (sut/webhook req)]
+      (is (= 204 (:status resp)))
+      (is (empty? (r/get-events resp))))))
 
 (deftest app-webhook
   (testing "triggers build on push for watched repo"
-    (h/with-memory-store s
-      (let [gid "test-id"
-            cid "test-cust"
-            sid (st/watch-github-repo s {:customer-id cid
-                                         :id "test-repo"
-                                         :github-id gid})
-            _ (st/save-customer-credit s {:customer-id cid
-                                          :amount 1000})
-            runs (atom [])
-            req (-> {:storage s
-                     :runner (fn [_ build]
-                               (swap! runs conj build))}
-                    (h/->req)
-                    (assoc :headers {"x-github-event" "push"}
-                           :parameters {:body
-                                        {:repository {:id gid}}}))
-            resp (sut/app-webhook req)]
-        (is (some? (st/find-repo s (st/ext-repo-sid sid))))
-        (is (= 202 (:status resp)))
-        (is (= 1 (-> resp :body :builds count)))
-        (is (not= :timeout (h/wait-until #(pos? (count @runs)) 500))))))
+    (let [gid "test-id"
+          cid "test-cust"
+          {s :storage :as rt} (trt/test-runtime)
+          sid (st/watch-github-repo s {:customer-id cid
+                                       :id "test-repo"
+                                       :github-id gid})
+          _ (st/save-customer-credit s {:customer-id cid
+                                        :amount 1000})
+          req (-> rt
+                  (h/->req)
+                  (assoc :headers {"x-github-event" "push"}
+                         :parameters {:body
+                                      {:repository {:id gid}}}))
+          resp (sut/app-webhook req)]
+      (is (some? (st/find-repo s (st/ext-repo-sid sid))))
+      (is (= 202 (:status resp)))
+      (is (= 1 (-> resp :body :builds count)))
+      (is (= [:build/pending] (->> resp (r/get-events) (map :type))))))
 
   (testing "ignores non-push events"
-    (h/with-memory-store s
-      (let [gid "test-id"
-            sid (st/watch-github-repo s {:customer-id "test-cust"
-                                         :id "test-repo"
-                                         :github-id gid})
-            runs (atom [])
-            req (-> {:storage s
-                     :runner (fn [_ build]
-                               (swap! runs conj build))}
-                    (h/->req)
-                    (assoc :headers {"x-github-event" "other"}
-                           :parameters {:body
-                                        {:repository {:id gid}}}))
-            resp (sut/app-webhook req)]
-        (is (some? (st/find-repo s (st/ext-repo-sid sid))))
-        (is (= 204 (:status resp)))
-        (is (= 0 (-> resp :body :builds count))))))
+    (let [gid "test-id"
+          {s :storage :as rt} (trt/test-runtime)
+          sid (st/watch-github-repo s {:customer-id "test-cust"
+                                       :id "test-repo"
+                                       :github-id gid})
+          req (-> rt
+                  (h/->req)
+                  (assoc :headers {"x-github-event" "other"}
+                         :parameters {:body
+                                      {:repository {:id gid}}}))
+          resp (sut/app-webhook req)]
+      (is (some? (st/find-repo s (st/ext-repo-sid sid))))
+      (is (= 204 (:status resp)))
+      (is (= 0 (-> resp :body :builds count)))
+      (is (empty? (r/get-events resp)))))
 
   (testing "ignores push events for non-watched repos"
-    (h/with-memory-store s
-      (let [gid "test-id"
-            runs (atom [])
-            req (-> {:storage s
-                     :runner (fn [_ build]
-                               (swap! runs conj build))}
-                    (h/->req)
-                    (assoc :headers {"x-github-event" "push"}
-                           :parameters {:body
-                                        {:repository {:id gid}}}))
-            resp (sut/app-webhook req)]
-        (is (= 204 (:status resp)))
-        (is (= 0 (-> resp :body :builds count)))))))
+    (let [req (-> (trt/test-runtime)
+                  (h/->req)
+                  (assoc :headers {"x-github-event" "push"}
+                         :parameters {:body
+                                      {:repository {:id "unwatched"}}}))
+          resp (sut/app-webhook req)]
+      (is (= 204 (:status resp)))
+      (is (= 0 (-> resp :body :builds count)))
+      (is (empty? (r/get-events resp))))))
 
 (defn- test-webhook []
   (zipmap [:id :customer-id :repo-id] (repeatedly st/new-id)))
@@ -270,30 +237,25 @@
           (is (= "test-commit-id"
                  (get-in r [:git :commit-id])))))))
 
-  (testing "adds configured and decrypted ssh key matching repo labels"
+  (testing "adds configured encrypted ssh key matching repo labels"
     (h/with-memory-store s
-      (let [vault (v/make-fixed-key-vault {})
-            iv (v/generate-iv)
-            wh (test-webhook)
+      (let [wh (test-webhook)
             cid (:customer-id wh)
             rid (:repo-id wh)
             ssh-key {:id "test-key"
-                     :private-key (p/encrypt vault iv "test-ssh-key")}]
+                     :private-key "encrypted-key"}]
         (is (st/sid? (st/save-webhook s wh)))
         (is (st/sid? (st/save-repo s {:customer-id cid
                                       :id rid
                                       :labels [{:name "ssh-lbl"
                                                 :value "lbl-val"}]})))
         (is (st/sid? (st/save-ssh-keys s cid [ssh-key])))
-        (is (st/sid? (st/save-crypto s {:customer-id cid
-                                        :iv iv})))
-        (let [r (sut/create-webhook-build {:storage s
-                                           :vault vault}
+        (let [r (sut/create-webhook-build {:storage s}
                                           (:id wh)
                                           {:ref "test-ref"
                                            :repository {:master-branch "test-main"}})]
           (is (= [{:id (:id ssh-key)
-                   :private-key "test-ssh-key"}]
+                   :private-key "encrypted-key"}]
                  (get-in r [:git :ssh-keys])))))))
 
   (testing "sets cleanup flag"

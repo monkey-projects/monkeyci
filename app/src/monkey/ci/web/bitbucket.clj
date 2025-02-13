@@ -7,6 +7,7 @@
             [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
+             [build :as b]
              [cuid :as cuid]
              [labels :as lbl]
              [runtime :as rt]
@@ -15,7 +16,8 @@
             [monkey.ci.web
              [auth :as auth]
              [common :as c]
-             [oauth2 :as oauth2]]
+             [oauth2 :as oauth2]
+             [response :as r]]
             [ring.util.response :as rur]))
 
 (defn- handle-error [ex]
@@ -179,12 +181,13 @@
 
 (defn- make-build [req {:keys [customer-id repo-id] :as wh}]
   (let [st (c/req->storage req)
-        idx (st/find-next-build-idx st [customer-id repo-id])
+        rsid [customer-id repo-id]
+        idx (st/find-next-build-idx st rsid)
         build-id (c/new-build-id idx)
-        sid [customer-id repo-id build-id]
+        sid (conj rsid build-id)
         body (c/body req)
-        repo (st/find-repo st [customer-id repo-id])
-        ssh-keys (c/find-ssh-keys st (c/req->vault req) repo)]
+        repo (st/find-repo st rsid)
+        ssh-keys (c/find-ssh-keys st repo)]
     (-> (zipmap [:customer-id :repo-id :build-id] sid)
         (assoc :sid sid
                :source :bitbucket-webhook
@@ -194,8 +197,7 @@
                :cleanup? true
                ;; TODO Changed files
                :git (cond-> {:url (:url repo)
-                             :ref (git-ref body)
-                             :ssh-keys-dir (rt/ssh-keys-dir (c/req->rt req) build-id)}
+                             :ref (git-ref body)}
                       (not-empty ssh-keys) (assoc :ssh-keys ssh-keys)
                       true (mc/assoc-some :message (some-> (new-changes body)
                                                            :target
@@ -207,8 +209,8 @@
         wh (st/find-webhook st webhook-id)]
     (if wh
       (let [build (make-build req wh)]
-        (c/run-build-async (c/req->rt req) build)
         (-> (rur/response (select-keys build [:build-id]))
+            (r/add-event (b/build-pending-evt build))
             (rur/status 202)))
       (c/error-response "Webhook not found" 404))))
 

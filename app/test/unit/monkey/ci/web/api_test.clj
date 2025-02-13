@@ -8,11 +8,12 @@
             [monkey.ci
              [storage :as st]
              [protocols :as p]
-             [utils :as u]
-             [vault :as v]]
+             [utils :as u]]
             [monkey.ci.events.core :as ec]
             [monkey.ci.spec.events :as se]
-            [monkey.ci.web.api :as sut]
+            [monkey.ci.web
+             [api :as sut]
+             [response :as r]]
             [monkey.ci.helpers :as h]
             [monkey.ci.test.runtime :as trt]))
 
@@ -265,21 +266,16 @@
                :git
                :tag))))
 
-  (testing "adds decrypted configured ssh keys"
-    (let [vault (v/make-fixed-key-vault {})
-          iv (v/generate-iv)
-          {st :storage :as rt} (-> (trt/test-runtime)
-                                   (trt/set-vault vault))
+  (testing "adds configured encrypted ssh keys"
+    (let [{st :storage :as rt} (trt/test-runtime)
           [cid rid] (repeatedly st/new-id)
           repo {:id rid
                 :customer-id cid}
-          ssh-key {:private-key "private-key"
+          ssh-key {:private-key "enc-private-key"
                    :public-key "public-key"}]
       (is (st/sid? (st/save-customer st {:id cid
                                          :repos {rid repo}})))
-      (is (st/sid? (st/save-ssh-keys st cid [(update ssh-key :private-key (partial p/encrypt vault iv))])))
-      (is (st/sid? (st/save-crypto st {:customer-id cid
-                                       :iv iv})))
+      (is (st/sid? (st/save-ssh-keys st cid [ssh-key])))
       (is (= [ssh-key]
              (-> (h/->req rt)
                  (assoc-in [:parameters :path] {:customer-id cid
@@ -359,135 +355,137 @@
                 (f cust repo)))
 
             (make-rt []
-              {:storage st})
+              (-> (trt/test-runtime)
+                  (trt/set-storage st)))
 
-            (make-req [runner params]
+            (make-req [params]
               (-> (make-rt)
-                  (assoc :runner runner)
                   (h/->req)
                   (assoc :parameters params)))
             
-            (verify-runner [p f]
-              (let [runner-args (atom nil)
-                    runner (fn [build _]
-                             (reset! runner-args build))]
-                (with-repo
-                  (fn [cust repo]
-                    (let [rt (-> (make-rt)
-                                 (assoc :runner runner))]
-                      (is (= 202 (-> rt
-                                     (h/->req)
-                                     (assoc :parameters p)
-                                     (assoc-in [:parameters :path] {:customer-id (:id cust)
-                                                                    :repo-id (:id repo)})
-                                     (sut/trigger-build)
-                                     :status)))
-                      (h/wait-until #(some? @runner-args) 500)
-                      (f (assoc rt
-                                :sid [(:id cust) (:id repo)]
-                                :runner-args runner-args)))))))]
+            (verify-response [p f]
+              (with-repo
+                (fn [cust repo]
+                  (let [rt (make-rt)
+                        res (-> rt
+                                (h/->req)
+                                (assoc :parameters p)
+                                (assoc-in [:parameters :path] {:customer-id (:id cust)
+                                                               :repo-id (:id repo)})
+                                (sut/trigger-build))]
+                    (is (= 202 (:status res)))
+                    (f (assoc rt
+                              :sid [(:id cust) (:id repo)]
+                              :response res))))))
+
+            (verify-trigger [p f]
+              (verify-response
+               p
+               (fn [{:keys [response]}]
+                 (-> response
+                     (r/get-events)
+                     first
+                     (f)))))]
       
-      (testing "starts new build for repo using runner"
-        (verify-runner
+      (testing "posts build/pending event"
+        (verify-response
          {}
-         (fn [{:keys [runner-args]}]
-           (is (some? @runner-args)))))
+         (fn [{:keys [response]}]
+           (is (= :build/pending (-> response
+                                     (r/get-events)
+                                     first
+                                     :type))))))
       
       (testing "looks up url in repo config"
-        (let [runner-args (atom nil)
-              runner (fn [build _]
-                       (reset! runner-args build))]
-          (with-repo
-            (fn [{customer-id :id} {repo-id :id}]
-              (is (some? (st/save-customer st {:id customer-id
-                                               :repos
-                                               {repo-id
-                                                {:id repo-id
-                                                 :url "http://test-url"}}})))
-              (is (= 202 (-> (make-req runner {:path {:customer-id customer-id
-                                                      :repo-id repo-id}})
-                             (sut/trigger-build)
-                             :status)))
-              (is (not= :timeout (h/wait-until #(not-empty @runner-args) 1000)))
-              (is (= "http://test-url"
-                     (-> @runner-args :git :url)))))))
+        (with-repo
+          (fn [{customer-id :id} {repo-id :id}]
+            (is (some? (st/save-customer st {:id customer-id
+                                             :repos
+                                             {repo-id
+                                              {:id repo-id
+                                               :url "http://test-url"}}})))
+            (is (= "http://test-url"
+                   (-> (make-req {:path {:customer-id customer-id
+                                         :repo-id repo-id}})
+                       (sut/trigger-build)
+                       (r/get-events)
+                       first
+                       :build
+                       :git
+                       :url))))))
       
       (testing "adds commit id from query params"
-        (verify-runner
+        (verify-trigger
          {:query {:commit-id "test-id"}}
-         (fn [{:keys [runner-args]}]
+         (fn [{:keys [build]}]
            (is (= "test-id"
-                  (-> @runner-args :git :commit-id))))))
+                  (-> build
+                      :git
+                      :commit-id))))))
 
       (testing "adds branch from query params as ref"
-        (verify-runner
+        (verify-trigger
          {:query {:branch "test-branch"}}
-         (fn [{:keys [runner-args]}]
+         (fn [{:keys [build]}]
            (is (= "refs/heads/test-branch"
-                  (-> @runner-args :git :ref))))))
+                  (-> build :git :ref))))))
 
       (testing "adds tag from query params as ref"
-        (verify-runner
+        (verify-trigger
          {:query {:tag "test-tag"}}
-         (fn [{:keys [runner-args]}]
+         (fn [{:keys [build]}]
            (is (= "refs/tags/test-tag"
-                  (-> @runner-args :git :ref))))))
+                  (-> build :git :ref))))))
 
       (testing "adds `sid` to build props"
-        (verify-runner
+        (verify-response
          {}
-         (fn [{:keys [sid runner-args]}]
-           (let [bsid (:sid @runner-args)]
+         (fn [{:keys [sid response]}]
+           (let [bsid (-> response (r/get-events) first :build :sid)]
              (is (= 3 (count bsid)) "expected sid to contain repo path and build id")
              (is (= (take 2 sid) (take 2 bsid)))
-             (is (= (:build-id @runner-args)
+             (is (= (-> response (r/get-events) first :build :build-id)
                     (last bsid)))))))
       
       (testing "creates build in storage"
-        (verify-runner
+        (verify-trigger
          {:query {:branch "test-branch"}}
-         (fn [{:keys [runner-args] st :storage}]
-           (let [bsid (:sid @runner-args)
+         (fn [evt]
+           (let [bsid (:sid evt)
                  build (st/find-build st bsid)]
              (is (some? build))
              (is (= :api (:source build)))
              (is (= "refs/heads/test-branch" (get-in build [:git :ref])))))))
 
       (testing "assigns index to build"
-        (verify-runner
+        (verify-trigger
          {}
-         (fn [{:keys [runner-args] st :storage}]
-           (let [bsid (:sid @runner-args)
-                 build (st/find-build st bsid)]
+         (fn [{:keys [sid]}]
+           (let [build (st/find-build st sid)]
              (is (number? (:idx build)))))))
 
       (testing "build id incorporates index"
-        (verify-runner
+        (verify-trigger
          {}
-         (fn [{:keys [runner-args] st :storage}]
-           (let [bsid (:sid @runner-args)
-                 build (st/find-build st bsid)]
+         (fn [{:keys [sid]}]
+           (let [build (st/find-build st sid)]
              (is (= (str "build-" (:idx build))
                     (:build-id build)))))))
       
       (testing "returns build id"
         (with-repo
           (fn [cust repo]
-            (is (string? (-> (make-req (constantly "ok")
-                                       {:path {:customer-id (:id cust)
+            (is (string? (-> (make-req {:path {:customer-id (:id cust)
                                                :repo-id (:id repo)}})
                              (sut/trigger-build)
                              :body
                              :build-id))))))
 
       (testing "returns 404 (not found) when repo does not exist"
-        (is (= 404 (-> (make-req (constantly nil)
-                                 {:path {:customer-id "nonexisting"
+        (is (= 404 (-> (make-req {:path {:customer-id "nonexisting"
                                          :repo-id "also-nonexisting"}})
                        (sut/trigger-build)
-                       :status))))
-
-      (testing "fails if no available credit"))))
+                       :status)))))))
 
 (deftest retry-build
   (h/with-memory-store st
@@ -512,7 +510,7 @@
         (testing "creates new build with same settings but without script details"
           (let [new (st/find-build st [(:customer-id build) (:repo-id build) bid])]
             (is (some? new))
-            (is (= :initializing (:status new)))
+            (is (= :pending (:status new)))
             (is (= (:git build) (:git new)))
             (is (number? (:start-time new)))
             (is (nil? (:end-time new)))
