@@ -515,14 +515,21 @@
 
     (testing "`build/end`"
       (testing "creates credit consumption"
-        (let [repo (h/gen-repo)
+        (let [job {:id "test-job"
+                   :start-time 1000
+                   :end-time 2000
+                   :status :success
+                   :credit-multiplier 1}
+              repo (h/gen-repo)
               cust (-> (h/gen-cust)
                        (assoc :repos {(:id repo) repo}))
               build (-> (h/gen-build)
                         (assoc :customer-id (:id cust)
                                :repo-id (:id repo)
                                :credit-multiplier 1
-                               :credits 10))]
+                               :start-time 1000
+                               :script
+                               {:jobs {(:id job) job}}))]
           (is (some? (st/save-customer st cust)))
           (is (some? (st/save-repo st repo)))
           (is (some? (st/save-build st build)))
@@ -532,15 +539,16 @@
 
           (let [res (-> {:type :build/end
                          :build build
+                         :time 2000
                          :sid (sut/build->sid build)}
                         (router)
                         first
                         :result)
                 match (st/find-build st (-> res first :sid))
                 cc (st/list-customer-credit-consumptions st (:id cust))]
-            (is (some? match))
+            (is (= (:id build) (:id match)))
             (is (= 1 (count cc)))
-            (is (= 10 (:amount (first cc))))))))))
+            (is (= 1 (:amount (first cc))))))))))
 
 (deftest make-component
   (testing " manifold"
