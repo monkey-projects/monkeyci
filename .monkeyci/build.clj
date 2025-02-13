@@ -154,17 +154,19 @@
 
 (defn build-gui-image [ctx]
   (when (publish-gui? ctx)
-    (kaniko/image
-     {:job-id "publish-gui-img"
-      :subdir "gui"
+    (kaniko/multi-platform-image-jobs
+     {:subdir "gui"
       :dockerfile "Dockerfile"
       :target-img (str gui-img ":" (image-version ctx))
-      :container-opts
-      {:memory 3 ;GB
-       ;; Restore artifacts but modify the path because work dir is not the same
-       :restore-artifacts [(update gui-release-artifact :path (partial str "gui/"))]
-       :dependencies ["release-gui"]}}
-     ctx)))
+      :image
+      {:job-id "publish-gui-img"
+       :container-opts
+       {:memory 3                       ;GB
+        ;; Restore artifacts but modify the path because work dir is not the same
+        :restore-artifacts [(update gui-release-artifact :path (partial str "gui/"))]
+        :dependencies ["release-gui"]}}
+      :manifest
+      {:job-id "gui-img-manifest"}})))
 
 (defn publish 
   "Executes script in clojure container that has clojars publish env vars"
@@ -259,7 +261,7 @@
   (when (release? ctx)
     (po/pushover-msg
      {:msg (str "MonkeyCI version " (tag-version ctx) " has been released.")
-      :dependencies ["app-img-manifest" "publish-gui-img"]})))
+      :dependencies ["app-img-manifest" "gui-img-manifest"]})))
 
 ;; TODO Add jobs that auto-deploy to staging after running some sanity checks
 ;; We could do a git push with updated kustomization file.
