@@ -211,7 +211,7 @@
   (assoc build
          :source :api
          :start-time (t/now)
-         :status :initializing
+         :status :pending
          :cleanup? (not (rt/dev-mode? rt))))
 
 (defn make-build-ctx

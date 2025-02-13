@@ -20,12 +20,15 @@
 (def exit-path (comp :exit-path :config))
 (def m2-cache-dir (comp :m2-cache-path :config))
 
+(defn- post-events [rt evt]
+  (ec/post-events (:events rt) evt))
+
 (defn- post-init-evt
   "Post both build/start and script/initializing events.  Indicates the build has started,
    but the script is not running yet."
   [{:keys [build] :as rt}]
-  (ec/post-events (:events rt) [(b/build-start-evt build)
-                                (script/script-init-evt build (b/script-dir build))])
+  (post-events rt [(b/build-start-evt build)
+                   (script/script-init-evt build (b/script-dir build))])
   rt)
 
 (defn- create-run-file [rt]
@@ -68,16 +71,15 @@
                    :metadata)]
     ;; Only perform save if the hash has changed
     (if (not= (app-hash) (:app-hash md))
-      (do
+      (try
         (log/debug "Saving build cache for build" (b/sid build))
-        (try
-          @(blob/save build-cache
-                      (m2-cache-dir rt)
-                      loc
-                      ;; TODO Include hash of the build deps.edn as well
-                      {:app-hash (app-hash)})
-          (catch Throwable ex
-            (log/error "Failed to save build cache" ex))))
+        @(blob/save build-cache
+                    (m2-cache-dir rt)
+                    loc
+                    ;; TODO Include hash of the build deps.edn as well
+                    {:app-hash (app-hash)})
+        (catch Throwable ex
+          (log/error "Failed to save build cache" ex)))
       (log/debug "Not saving build cache, hash is unchanged"))
     rt))
 
@@ -91,14 +93,14 @@
 
 (defn- post-end-evt [{:keys [build] :as rt}]
   (log/debug "Posting :build/end event")
-  (ec/post-events (:events rt) (b/build-end-evt build (get rt :exit-code err/error-process-failure)))
+  (post-events rt (b/build-end-evt build (get rt :exit-code err/error-process-failure)))
   rt)
 
 (defn- post-failure-evt [{:keys [build] :as rt} msg]
   (try
-    (ec/post-events (:events rt) (-> build
-                                     (mc/assoc-some :message msg)
-                                     (b/build-end-evt build err/error-process-failure)))
+    (post-events rt (-> build
+                        (mc/assoc-some :message msg)
+                        (b/build-end-evt build err/error-process-failure)))
     (catch Exception ex
       (log/warn "Failed to post :build/end event" ex))))
 

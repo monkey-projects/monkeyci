@@ -402,3 +402,10 @@
 
 (defmethod make-component :jms [config]
   (map->JmsComponent {:config config}))
+
+(defn post-events
+  "Posts events using the broker in the mailman component"
+  [mm events]
+  (some-> mm
+          :broker
+          (mmc/post-events events)))

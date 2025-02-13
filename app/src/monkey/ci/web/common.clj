@@ -1,6 +1,5 @@
 (ns monkey.ci.web.common
-  (:require [buddy.auth :as ba]
-            [camel-snake-kebab.core :as csk]
+  (:require [camel-snake-kebab.core :as csk]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
@@ -13,12 +12,8 @@
              [storage :as st]
              [vault :as v]]
             [monkey.ci.events.core :as ec]
+            [monkey.ci.web.middleware :as wm]
             [reitit.ring :as ring]
-            [reitit.ring.coercion :as rrc]
-            [reitit.ring.middleware
-             [exception :as rrme]
-             [muuntaja :as rrmm]
-             [parameters :as rrmp]]
             [ring.util.response :as rur]
             [schema.core :as s]))
 
@@ -104,6 +99,10 @@
         (format "%s://%s%s" (name (:scheme req)) (get-in req [:headers "host"]) (subs (:uri req) 0 idx)))))
 
 (def req->vault #(from-rt % :vault))
+
+(def req->mailman
+  "Retrieves mailman component from request"
+  #(from-rt % :mailman))
 
 (defn id-getter [id-key]
   (comp id-key :path :parameters))
@@ -238,35 +237,6 @@
        (assoc-in
         [:formats "application/json" :encoder-opts]
         {:encode-key-fn (comp csk/->camelCase name)}))))
-
-(defn- exception-logger [h]
-  (fn [req]
-    (try
-      (h req)
-      (catch Exception ex
-        ;; Log and rethrow
-        (log/error (str "Got error while handling request: " (:uri req)) ex)
-        (throw ex)))))
-
-(def exception-middleware
-  (rrme/create-exception-middleware
-   (merge rrme/default-handlers
-          {:auth/unauthorized (fn [e req]
-                                (if (ba/authenticated? req)
-                                  {:status 403
-                                   :body (.getMessage e)}
-                                  {:status 401
-                                   :body "Unauthenticated"}))})))
-
-(def default-middleware
-  ;; TODO Transactions for sql storage
-  [rrmp/parameters-middleware
-   rrmm/format-middleware
-   exception-middleware
-   exception-logger
-   rrc/coerce-exceptions-middleware
-   rrc/coerce-request-middleware
-   rrc/coerce-response-middleware])
 
 (defn make-app [router]
   (ring/ring-handler

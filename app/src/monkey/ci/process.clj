@@ -172,7 +172,6 @@
              (pr-str {:config-file (config->edn (child-config build (:api-config rt)))})]]
     (log/debug "Running in script dir:" script-dir ", this command:" cmd)
     (rt/post-events rt [(script/script-init-evt build script-dir)])
-    ;; TODO Run as another unprivileged user for security (we'd need `su -c` for that)
     ;; TODO Validate script before spawning the child process?
     (restore-cache! build rt)
     (-> (bp/process

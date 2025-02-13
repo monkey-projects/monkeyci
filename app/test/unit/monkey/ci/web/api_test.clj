@@ -512,7 +512,7 @@
         (testing "creates new build with same settings but without script details"
           (let [new (st/find-build st [(:customer-id build) (:repo-id build) bid])]
             (is (some? new))
-            (is (= :initializing (:status new)))
+            (is (= :pending (:status new)))
             (is (= (:git build) (:git new)))
             (is (number? (:start-time new)))
             (is (nil? (:end-time new)))
