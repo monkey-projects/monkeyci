@@ -878,8 +878,33 @@
     (update-invoice conn inv existing)
     (insert-invoice conn inv)))
 
+(defn- runner-details-sid->build-sid [sid]
+  (take-last (count st/build-sid-keys) sid))
+
+(defn- runner-details->db [details]
+  (select-keys details [:runner :details]))
+
+(defn- insert-runner-details [conn details sid]
+  (when-let [b (apply eb/select-build-by-sid conn sid)]
+    (ec/insert-build-runner-detail conn (-> (runner-details->db details)
+                                            (assoc :build-id (:id b))))))
+
+(defn- update-runner-details [conn details existing]
+  (ec/update-build-runner-detail conn (merge existing (runner-details->db details))))
+
+(defn- upsert-runner-details [conn sid details]
+  (if-let [match (eb/select-runner-details conn (eb/by-build-sid sid))]
+    (update-runner-details conn details match)
+    (insert-runner-details conn details sid)))
+
+(defn- select-runner-details [conn sid]
+  (some-> (eb/select-runner-details conn (eb/by-build-sid sid))
+          (dissoc :build-id)))
+
 (defn- sid-pred [t sid]
   (t sid))
+
+(def runner-details? (partial global-sid? st/runner-details))
 
 (defrecord SqlStorage [conn vault]
   p/Storage
@@ -914,7 +939,9 @@
       sysadmin?
       (select-sysadmin conn (last sid))
       invoice?
-      (select-invoice conn (last sid))))
+      (select-invoice conn (last sid))
+      runner-details?
+      (select-runner-details conn (runner-details-sid->build-sid sid))))
   
   (write-obj [_ sid obj]
     (when (condp sid-pred sid
@@ -948,6 +975,8 @@
             (upsert-sysadmin conn obj)
             invoice?
             (upsert-invoice conn obj)
+            runner-details?
+            (upsert-runner-details conn (runner-details-sid->build-sid sid) obj)
             (log/warn "Unrecognized sid when writing:" sid))
       sid))
 

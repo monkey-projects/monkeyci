@@ -32,13 +32,17 @@
 
 (def customer-id (comp :customer-id :path :parameters))
 
-(def repo-sid (comp (juxt :customer-id :repo-id)
-                    :path
-                    :parameters))
+(def repo-sid
+  "Retrieves repo sid from the request"
+  (comp (juxt :customer-id :repo-id)
+        :path
+        :parameters))
 
-(def build-sid (comp (juxt :customer-id :repo-id :build-id)
-                     :path
-                     :parameters))
+(def build-sid
+  "Retrieves build sid from the request"
+  (comp st/ext-build-sid
+        :path
+        :parameters))
 
 (defn generic-routes
   "Generates generic entity routes.  If child routes are given, they are added

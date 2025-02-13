@@ -24,7 +24,7 @@
 (defmethod setup-runtime :default [_ k]
   {})
 
-(defn config->runtime
+(defn ^:deprecated config->runtime
   "Creates the runtime from the normalized config map"
   [conf]
   ;; TODO Re-enable this but allow for more flexible checks
@@ -98,7 +98,7 @@
   (when-let [r (reporter rt)]
     (r obj)))
 
-(defn with-runtime-fn
+(defn ^:deprecated with-runtime-fn
   "Creates a runtime for the given mode (server, cli, script) from the specified 
    configuration and passes it to `f`."
   [conf mode f]

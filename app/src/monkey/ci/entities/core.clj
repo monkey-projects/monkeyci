@@ -64,10 +64,12 @@
 
 (defn update-entity
   "Updates entity by id, returns the number of records updated (should be either 0 or 1)."
-  [conn table obj]
-  (execute-update conn {:update table
-                        :set obj
-                        :where [:= :id (:id obj)]}))
+  ([conn table obj id-col]
+   (execute-update conn {:update table
+                         :set obj
+                         :where [:= id-col (id-col obj)]}))
+  ([conn table obj]
+   (update-entity conn table obj :id)))
 
 (def select-opts default-opts)
 
@@ -114,14 +116,15 @@
         [bi ai bu au as] (map #(maybe-comp % extra-opts opts default-opts)
                               [:before-insert :after-insert
                                :before-update :after-update
-                               :after-select])]
+                               :after-select])
+        id-col (get extra-opts :id-col :id)]
     (intern *ns* (symbol (str "insert-" (name n)))
             (fn [conn e]
               (first (ai [(insert-entity conn (keyword pl) (bi e)) e]))))
     (intern *ns* (symbol (str "update-" (name n)))
             (fn [conn e]
               (let [upd (bu e)]
-                (when (pos? (update-entity conn (keyword pl) upd))
+                (when (pos? (update-entity conn (keyword pl) upd id-col))
                   (first (au [upd e]))))))
     (intern *ns* (symbol (str "delete-" pl))
             (fn [conn f]
@@ -401,3 +404,18 @@
    :before-update prepare-inv
    :after-update  convert-inv
    :after-select  convert-inv-select})
+
+(def prepare-runner-details (comp (partial prop->edn :details)
+                                  (partial keyword->str :runner)))
+(def convert-runner-details (comp (partial copy-prop :details)
+                                  (partial str->keyword :runner)))
+(def convert-runner-details-select (comp (partial edn->prop :details)
+                                         (partial str->keyword :runner)))
+
+(defaggregate build-runner-detail
+  {:id-col :build-id
+   :before-insert prepare-runner-details
+   :after-insert  convert-runner-details
+   :before-update prepare-runner-details
+   :after-update  convert-runner-details
+   :after-select  convert-runner-details-select})

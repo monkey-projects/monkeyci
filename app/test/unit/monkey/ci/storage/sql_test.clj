@@ -801,6 +801,30 @@
           (is (some? (st/save-invoice st upd)))
           (is (= upd (st/find-invoice st [(:id cust) (:id inv)]))))))))
 
+(deftest ^:sql runner-details
+  (with-storage conn st
+    (let [repo (h/gen-repo)
+          cust (-> (h/gen-cust)
+                   (assoc :repos {(:id repo) repo}))
+          build (-> (h/gen-build)
+                    (assoc :customer-id (:id cust)
+                           :repo-id (:id repo)))
+          sid (st/ext-build-sid build)]
+      (is (sid/sid? (st/save-customer st cust)))
+      (is (sid/sid? (st/save-build st build)))
+      
+      (testing "can save and find by build sid"
+        (let [details {:runner :test-runner
+                       :details {:test :details}}]
+          (is (sid/sid? (st/save-runner-details st sid details)))
+          (is (= details (st/find-runner-details st sid)))))
+
+      (testing "can update"
+        (let [upd {:details {:updated :details}}]
+          (is (sid/sid? (st/save-runner-details st sid upd)))
+          (is (= upd (-> (st/find-runner-details st sid)
+                         (select-keys [:details])))))))))
+
 (deftest make-storage
   (testing "creates sql storage object using connection settings"
     (let [s (st/make-storage {:storage {:type :sql

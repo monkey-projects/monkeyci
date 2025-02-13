@@ -19,9 +19,9 @@
                      :entries
                      count))
             "entry for each file and the dir")
-        (is (= ["sub/file-1.txt"
-                "sub/file-2.txt"]
-               (sut/list-files arch)))))))
+        (is (= #{"sub/file-1.txt"
+                 "sub/file-2.txt"}
+               (set (sut/list-files arch))))))))
 
 (deftest extract
   (testing "extracts files matching regex"

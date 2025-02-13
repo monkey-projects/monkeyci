@@ -7,6 +7,7 @@
              [metrics :as m]
              [oci :as oci]
              [runtime :as rt]
+             [storage :as st]
              [prometheus :as prom]
              [protocols :as p]]
             [monkey.ci.containers.oci :as cco]
@@ -148,24 +149,6 @@
       (testing "provides empty jwk if not configured"
         (is (nil? (get-in sys [:http :rt :jwk]))))
 
-      (testing "activates listeners"
-        (is (instance? monkey.ci.listeners.Listeners (get-in sys [:listeners :listeners]))))
-
-      (testing "passes events to listeners"
-        (is (some? (-> sys :listeners :listeners :events))))
-
-      (testing "passes listener events if configured"
-        (is (= ::listener-events
-               (-> server-config
-                   (assoc :listeners {:events {:type :fake
-                                               ::kind ::listener-events}})
-                   (sut/with-server-system :listeners)
-                   :listeners
-                   :events
-                   :in
-                   :config
-                   ::kind))))
-
       (testing "provides metrics"
         (is (some? (get sys :metrics)))
         (is (some? (get-in sys [:http :rt :metrics]))))
@@ -174,7 +157,16 @@
         (is (ifn? (get-in sys [:http :rt :process-reaper]))))
 
       (testing "provides vault in runtime"
-        (is (p/vault? (get-in sys [:http :rt :vault])))))))
+        (is (p/vault? (get-in sys [:http :rt :vault]))))
+
+      (testing "provides mailman"
+        (is (some? (:mailman sys))))
+
+      (testing "provides mailman routes"
+        (is (some? (:mailman-routes sys))))
+
+      (testing "provides update bus"
+        (is (some? (:update-bus sys)))))))
 
 (deftest process-reaper
   (testing "returns empty list when no oci runner"
@@ -194,3 +186,10 @@
       (testing "not for other runners"
         (let [r (sut/->ProcessReaper {:runner {:type :some-other}})]
           (is (empty? (r))))))))
+
+(deftest app-event-routes-component
+  (testing "`start` creates routes"
+    (is (not-empty (-> (sut/new-app-routes)
+                       (assoc :storage (st/make-memory-storage))
+                       (co/start)
+                       :routes)))))

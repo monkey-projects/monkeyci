@@ -497,6 +497,7 @@
      ;; Disabled, results in 405 errors for some reason
      ;;:compile rc/compile-request-coercers
      :reitit.middleware/registry
+     ;; TODO Move the dev-mode checks into the runtime startup code
      {:github-security
       (non-dev rt [github/validate-security])
       :github-app-security

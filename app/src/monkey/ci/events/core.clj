@@ -8,8 +8,7 @@
              [time :as t]]
             [monkey.ci.events
              [jms :as jms]
-             [manifold :as manifold]
-             [zmq :as zmq]]))
+             [manifold :as manifold]]))
 
 (defn post-events [e evts]
   (if e
@@ -92,10 +91,8 @@
 (defmethod make-events :manifold [_]
   (manifold/make-manifold-events matches-event?))
 
-(defmethod make-events :zmq [config]
-  (zmq/make-zeromq-events config matches-event?))
-
 (defmethod rt/setup-runtime :events [conf _]
+  ;; Can be removed once we no longer use the old runtime in cli commands
   (when-let [ec (:events conf)]
     (make-events ec)))
 
@@ -130,9 +127,9 @@
         (inv args)))))
 
 (defn wait-for-event
-  "Utility fn that registers using an event filter and invokes the handler when one has
-   been received.  Returns a deferred that realizes with the received event.  An additional
-   predicate can do extra filtering if it's not supported by the event filter."
+  "Utility fn that registers a listener using an event filter and invokes the handler when 
+   one has been received.  Returns a deferred that realizes with the received event.  An 
+   additional predicate can do extra filtering if it's not supported by the event filter."
   [events ef & [pred]]
   (log/debug "Waiting for event to arrive that matches filter:" ef)
   (let [r (md/deferred)

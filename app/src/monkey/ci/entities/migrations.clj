@@ -432,7 +432,16 @@
      [:currency [:varchar 30] [:not nil]]
      [:details :text]
      fk-customer]
-    [(col-idx :invoices :customer-id)])])
+    [(col-idx :invoices :customer-id)])
+
+   (table-migration
+    33 :build-runner-details
+    ;; Contains additional information about the runner for a build
+    [[:build-id :integer [:not nil] [:primary-key]]
+     [:runner [:varchar 50] [:not nil]]
+     [:details :text]
+     (fk :build-id :builds :id)]
+    [(col-idx :build-runner-details :build-id)])])
 
 (defn prepare-migrations
   "Prepares all migrations by formatting to sql, creates a ragtime migration object from it."

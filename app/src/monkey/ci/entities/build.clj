@@ -82,3 +82,20 @@
                                            [:= :latest.idx :b.idx]
                                            [:= :latest.repo-id :b.repo-id]]])))
        (map ec/convert-build-select)))
+
+(defn select-runner-details [conn f]
+  (some->> {:select [:rd.*]
+            :from [[:build-runner-details :rd]]
+            :join [[:builds :b] [:= :b.id :rd.build-id]
+                   [:repos :r] [:= :r.id :b.repo-id]
+                   [:customers :c] [:= :c.id :r.customer-id]]
+            :where f}
+           (ec/select conn)
+           (first)
+           (ec/convert-runner-details-select)))
+
+(defn by-build-sid [[cust-id repo-id build-id]]
+  [:and
+   [:= :c.cuid cust-id]
+   [:= :r.display-id repo-id]
+   [:= :b.display-id build-id]])
