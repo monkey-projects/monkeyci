@@ -72,7 +72,7 @@
   {:name ::save-build
    :leave (fn [ctx]
             (let [build (let [b (:build (get-result ctx))]
-                          (when (and (spec/valid? :entity/build b)
+                          (when (and b #_(spec/valid? :entity/build b)
                                      (st/save-build (get-db ctx) b))
                             b))]
               (cond-> ctx
@@ -376,7 +376,8 @@
 (defrecord JmsComponent [config broker routes]
   co/Lifecycle
   (start [this]
-    (let [broker (mj/jms-broker config)
+    (let [broker (mj/jms-broker (assoc config
+                                       :destination-mapper (comp (emj/event-destinations config) :type)))
           router (make-router (:routes routes))
           bridge-dest (get-in config [:bridge :dest])]
       ;; TODO Add listeners for each destination referred to by route event types
@@ -390,7 +391,7 @@
                                     (doall)))
         ;; Listen to legacy events, if configured
         bridge-dest (assoc :bridge (mmc/add-listener broker {:destination bridge-dest
-                                                             :router (mmc/router emb/bridge-routes)})))))
+                                                             :handler (mmc/router emb/bridge-routes)})))))
 
   (stop [this]
     (when broker

@@ -269,7 +269,7 @@
     (testing "calculates consumed credits"
       (is (number? (get-in r [:build :credits]))))
 
-    (testing "updates build status"
+    (testing "updates build status according to event"
       (is (= :success (get-in r [:build :status]))))
 
     (testing "sets end time"

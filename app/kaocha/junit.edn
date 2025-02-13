@@ -5,4 +5,5 @@
   :kaocha/plugins [:kaocha.plugin/junit-xml
                    :kaocha.plugin/profiling]
   :kaocha.plugin.junit-xml/target-file "junit.xml"
-  :kaocha/reporter [kaocha.report/documentation]}]
+  ;;:kaocha/reporter [kaocha.report/documentation]
+  }]

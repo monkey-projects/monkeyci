@@ -118,9 +118,9 @@
 (s/def :sidecar/log-config string?)
 (s/def :conf/sidecar (s/keys :opt-un [:sidecar/poll-interval :sidecar/log-config]))
 
-(s/def :conf-jwk/public-key string?)
-(s/def :conf-jwk/private-key string?)
-(s/def :conf/jwk (s/keys :req-un [:conf-jwk/public-key :conf-jwk/private-key]))
+(s/def :conf-jwk/pub (partial instance? java.security.PublicKey))
+(s/def :conf-jwk/priv (partial instance? java.security.PrivateKey))
+(s/def :conf/jwk (s/keys :req-un [:conf-jwk/pub :conf-jwk/priv]))
 
 ;; Command line arguments
 (s/def :arg/pipeline string?)
