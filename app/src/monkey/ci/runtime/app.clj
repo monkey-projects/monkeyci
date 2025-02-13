@@ -29,9 +29,7 @@
              [mailman :as em]
              [split :as es]]
             [monkey.ci.events.mailman.bridge :as emb]
-            [monkey.ci.runners
-             [oci]
-             [oci2]]
+            [monkey.ci.runners.oci3 :as ro3]
             [monkey.ci.runtime.common :as rc]
             [monkey.ci.web
              [auth :as auth]
@@ -70,9 +68,6 @@
 
 (defn- new-build-runner [config]
   (map->BuildRunner {:runner (r/make-runner config)}))
-
-(defn- new-server-runner [config]
-  (r/make-runner config))
 
 (defn- make-container-runner [{:keys [containers] :as config} events build api-config logging]
   (case (:type containers)
@@ -206,6 +201,7 @@
                 (new-container-runner config)
                 [:events :build :api-config :logging])
    :logging    (new-logging config)
+   ;; Runner is only needed when using this runtime for local builds
    :runner     (co/using
                 (new-build-runner config)
                 [:build :runtime])
@@ -279,6 +275,19 @@
 (defn new-app-routes []
   (map->AppEventRoutes {}))
 
+(defmulti make-server-runner :type)
+
+(defmethod make-server-runner :oci3 [config]
+  (ro3/map->OciRunner {:config config}))
+
+;; TODO Add other runners
+
+(defmethod make-server-runner :default [_]
+  {})
+
+(defn- new-server-runner [config]
+  (make-server-runner (:runner config)))
+
 (defn make-server-system
   "Creates a component system that can be used to start an application server."
   [config]
@@ -293,7 +302,7 @@
    :runner    (new-server-runner config)
    :runtime   (co/using
                (new-server-runtime config)
-               [:artifacts :events :metrics :runner :storage :jwk :process-reaper :vault :mailman :update-bus])
+               [:artifacts :events :metrics :storage :jwk :process-reaper :vault :mailman :update-bus])
    :storage   (co/using
                (new-storage config)
                [:vault])

@@ -24,7 +24,10 @@
              [github :as github]
              [handler :as sut]]
             [monkey.ci.helpers :refer [try-take] :as h]
-            [monkey.ci.test.aleph-test :as at]
+            [monkey.ci.test
+             [aleph-test :as at]
+             [mailman :as tmm]
+             [runtime :as trt]]
             [reitit
              [core :as rc]
              [ring :as ring]]
@@ -749,31 +752,26 @@
   (str (repo-path sid) "/" (last sid)))
 
 (defn- with-repo [f & [rt]]
-  (h/with-memory-store st
-    (let [events (h/fake-events)
-          app (sut/make-app (mm/meta-merge
-                             {:storage st
-                              :events events
-                              :config {:dev-mode true}
-                              :runner (constantly nil)}
-                             rt))
-          [_ repo-id _ :as sid] (generate-build-sid)
-          build (-> (zipmap [:customer-id :repo-id :build-id] sid)
-                    (assoc :status :success
-                           :message "test msg"
-                           :git {:message "test meta"}))
-          path (repo-path sid)]
-      (is (st/sid? (st/save-customer st {:id (first sid)
-                                         :repos {repo-id {:id repo-id
-                                                          :name "test repo"}}})))
-      (is (st/sid? (st/save-build st build)))
-      (is (st/sid? (st/save-customer-credit st {:customer-id (first sid)
-                                                :amount 1000})))
-      (f {:events events
-          :storage st
-          :sid sid
-          :path path
-          :app app}))))
+  (let [{st :storage :as trt} (-> (trt/test-runtime)
+                                  (assoc :config {:dev-mode true})
+                                  (mm/meta-merge rt))
+        app (sut/make-app trt)
+        [_ repo-id _ :as sid] (generate-build-sid)
+        build (-> (zipmap [:customer-id :repo-id :build-id] sid)
+                  (assoc :status :success
+                         :message "test msg"
+                         :git {:message "test meta"}))
+        path (repo-path sid)]
+    (is (st/sid? (st/save-customer st {:id (first sid)
+                                       :repos {repo-id {:id repo-id
+                                                        :name "test repo"}}})))
+    (is (st/sid? (st/save-build st build)))
+    (is (st/sid? (st/save-customer-credit st {:customer-id (first sid)
+                                              :amount 1000})))
+    (f (assoc trt
+              :sid sid
+              :path path
+              :app app))))
 
 (deftest build-endpoints
   (testing "`GET` lists repo builds"
@@ -788,45 +786,17 @@
           (is (= build-id (:build-id (first b))) "should contain build id")))))
   
   (testing "`POST /trigger`"
-    (letfn [(verify-runner [p f]
-              (let [runner-args (atom nil)
-                    runner (fn [build _]
-                             (reset! runner-args build))]
-                (with-repo
-                  (fn [{:keys [app path] :as ctx}]
-                    (is (= 202 (-> (mock/request :post (str path p))
-                                   (app)
-                                   :status)))
-                    (h/wait-until #(some? @runner-args) 500)
-                    (f (assoc ctx :runner-args runner-args)))
-                  {:runner runner})))]
-      
-      (testing "starts new build for repo using runner"
-        (verify-runner
-         "/trigger"
-         (fn [{:keys [runner-args]}]
-           (is (some? @runner-args)))))
-      
-      (testing "adds commit id from query params"
-        (verify-runner
-         "/trigger?commitId=test-id"
-         (fn [{:keys [runner-args]}]
-           (is (= "test-id"
-                  (-> @runner-args :git :commit-id))))))
-
-      (testing "adds branch from query params as ref"
-        (verify-runner
-         "/trigger?branch=test-branch"
-         (fn [{:keys [runner-args]}]
-           (is (= "refs/heads/test-branch"
-                  (-> @runner-args :git :ref))))))
-
-      (testing "adds tag from query params as ref"
-        (verify-runner
-         "/trigger?tag=test-tag"
-         (fn [{:keys [runner-args]}]
-           (is (= "refs/tags/test-tag"
-                  (-> @runner-args :git :ref))))))))
+    (testing "posts `build/pending` event"
+      (with-repo
+        (fn [{:keys [app path] :as ctx}]
+          (is (= 202 (-> (mock/request :post (str path "/trigger"))
+                         (app)
+                         :status)))
+          (is (= [:build/pending]
+                 (->> ctx
+                      (trt/get-mailman)
+                      (tmm/get-posted)
+                      (map :type))))))))
   
   (testing "`GET /latest`"
     (with-repo

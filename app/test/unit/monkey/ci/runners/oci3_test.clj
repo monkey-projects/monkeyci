@@ -1,6 +1,7 @@
 (ns monkey.ci.runners.oci3-test
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.spec.alpha :as spec]
+            [com.stuartsierra.component :as co]
             [manifold.deferred :as md]
             [monkey.ci
              [cuid :as cuid]
@@ -11,14 +12,6 @@
             [monkey.oci.container-instance.core :as ci]
             [monkey.ci.helpers :as h]
             [monkey.mailman.core :as mmc]))
-
-#_(deftest ci-base-config
-  (testing "`enter` adds base container instance config to context"
-    (let [{:keys [enter] :as i} (sut/ci-base-config {})]
-      (is (keyword? (:name i)))
-      (is (map? (-> {}
-                    (enter)
-                    (sut/get-ci-config)))))))
 
 (deftest start-ci
   (let [{:keys [enter] :as i} (sut/start-ci ::test-client)
@@ -45,6 +38,22 @@
                  (sut/get-ci-response r)))))
 
       (testing "fails if creation fails"))))
+
+(deftest decrypt-ssh-keys
+  (h/with-memory-store st
+    (let [{:keys [enter] :as i} (sut/decrypt-ssh-keys (h/dummy-vault nil (constantly "decrypted-key")))]
+      (is (keyword? (:name i)))
+      (let [build (-> (h/gen-build)
+                      (assoc-in [:git :ssh-keys] ["encrypted-key"]))
+            r (-> {:event {:type :build/pending
+                           :build build}}
+                  (em/set-db st)
+                  (enter))]
+        (is (= ["decrypted-key"] (-> r
+                                     :event
+                                     :build
+                                     :git
+                                     :ssh-keys)))))))
 
 (deftest prepare-ci-config
   (let [{:keys [enter] :as i} (sut/prepare-ci-config {:private-key (h/generate-private-key)})]
@@ -125,7 +134,7 @@
                              :enter (fn [ctx]
                                       (sut/set-ci-response ctx {:status 200
                                                                 :body {:id "test-instance"}}))}
-              router (-> (sut/make-router conf st)
+              router (-> (sut/make-router conf st (h/fake-vault))
                          (mmc/replace-interceptors [fake-start-ci]))
 
               r (router {:type :build/pending
@@ -143,7 +152,7 @@
                              :enter (fn [ctx]
                                       (sut/set-ci-response ctx {:status 500
                                                                 :body {:id "test-instance"}}))}
-              router (-> (sut/make-router conf st)
+              router (-> (sut/make-router conf st (h/fake-vault))
                          (mmc/replace-interceptors [fail-start-ci]))
 
               r (router {:type :build/pending
@@ -156,3 +165,24 @@
           (is (spec/valid? ::se/event res))
           (is (= :build/end (:type res)))
           (is (= :error (-> res :build :status))))))))
+
+(defrecord FakeListener [unreg?]
+  mmc/Listener
+  (unregister-listener [this]
+    (reset! unreg? true)))
+
+(deftest runner-component
+  (let [mm (-> (em/make-component {:type :manifold})
+               (co/start))]
+    (testing "`start` registers broker listener"
+      (is (some? (-> (sut/map->OciRunner {:mailman mm})
+                     (co/start)
+                     :listener))))
+
+    (testing "`stop` unregisters broker listener"
+      (let [unreg? (atom false)
+            l (->FakeListener unreg?)]
+        (is (nil? (-> (sut/map->OciRunner {:listener l})
+                      (co/stop)
+                      :listener)))
+        (is (true? @unreg?))))))
