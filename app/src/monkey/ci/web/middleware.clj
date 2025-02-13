@@ -5,7 +5,9 @@
             [clojure.tools.logging :as log]
             [medley.core :as mc]
             [monkey.ci.events.mailman :as em]
-            [monkey.ci.web.common :as c]
+            [monkey.ci.web
+             [common :as c]
+             [response :as r]]
             [reitit.ring.coercion :as rrc]
             [reitit.ring.middleware
              [exception :as rrme]
@@ -65,27 +67,15 @@
   (fn [req]
     (h req)))
 
-(def get-events ::events)
-
-(defn add-events [r evts]
-  (update r ::events concat evts))
-
-(defn add-event [r evt]
-  (update r ::events conj evt))
-
-(defn remove-events [r]
-  (dissoc r ::events))
-
 (defn post-events
   "Middleware that posts any events that are found in the response map"
   [h]
   (fn [req]
     (let [resp (h req)
-          mm (c/req->mailman req)
-          evt (get-events resp)]
+          evt (r/get-events resp)]
       (when (not-empty evt)
-        (em/post-events mm evt))
-      (remove-events resp))))
+        (em/post-events (c/req->mailman req) evt))
+      (r/remove-events resp))))
 
 (def default-middleware
   "Default middleware for http servers"

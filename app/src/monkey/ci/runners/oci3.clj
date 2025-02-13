@@ -35,14 +35,6 @@
 
 (def evt-build (comp :build :event))
 
-#_(defn ci-base-config
-  "Interceptor that adds basic container configuration to the context using parameters
-   specified in the app config."
-  [config]
-  {:name ::instance-config
-   :enter (fn [ctx]
-            (set-ci-config ctx (oci/instance-config config)))})
-
 (defn prepare-ci-config [config]
   "Creates the ci config to run the required containers for the build."
   {:name ::instance-config

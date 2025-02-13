@@ -32,9 +32,9 @@
    send other types of requests."
   (comp (partial = "push") github-event))
 
-(defn- find-ssh-keys [{st :storage :keys [vault]} customer-id repo-id]
+(defn- find-ssh-keys [{st :storage} customer-id repo-id]
   (let [repo (s/find-repo st [customer-id repo-id])]
-    (c/find-ssh-keys st vault repo)))
+    (c/find-ssh-keys st repo)))
 
 (defn- file-changes
   "Determines file changes according to the payload commits."
@@ -64,8 +64,7 @@
                                   (assoc :url (if private ssh-url clone-url)
                                          :main-branch master-branch
                                          :ref (:ref payload)
-                                         :commit-id commit-id
-                                         :ssh-keys-dir (rt/ssh-keys-dir rt build-id))
+                                         :commit-id commit-id)
                                   (mc/assoc-some :ssh-keys ssh-keys))
                          ;; Do not use the commit timestamp, because when triggered from a tag
                          ;; this is still the time of the last commit, not of the tag creation.

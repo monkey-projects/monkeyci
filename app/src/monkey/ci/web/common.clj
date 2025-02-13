@@ -12,7 +12,6 @@
              [storage :as st]
              [vault :as v]]
             [monkey.ci.events.core :as ec]
-            [monkey.ci.web.middleware :as wm]
             [reitit.ring :as ring]
             [ring.util.response :as rur]
             [schema.core :as s]))
@@ -264,7 +263,7 @@
       (throw (ex-info "Customer does not have available credits"
                       {:build build})))))
 
-(defn run-build-async
+(defn ^:deprecated run-build-async
   "Starts the build in a new thread"
   [rt build]
   (let [runner (rt/runner rt)
@@ -277,9 +276,7 @@
     (md/future
       (try
         (check-avail-credits! rt build)
-        (rt/post-events rt (ec/make-event :build/pending
-                                          :build (b/build->evt build)
-                                          :sid (b/sid build)))
+        (rt/post-events rt (b/build-pending-evt build))
         ;; Catch both the deferred error, or the direct exception, because both
         ;; can be thrown here.
         (-> (runner build rt)
@@ -304,10 +301,13 @@
      (crypto-iv st cust-id))))
 
 (defn find-ssh-keys
-  "Finds and decrypts ssh keys for the given repo"
-  [st vault repo]
-  (let [cust-id (:customer-id repo)
-        iv (crypto-iv st cust-id)]
-    (->> (st/find-ssh-keys st cust-id)
-         (lbl/filter-by-label repo)
-         (map #(update % :private-key (partial p/decrypt vault iv))))))
+  "Finds ssh keys for the given repo, and if the vault is specified, also decrypts them."
+  ([st repo]
+   (let [cust-id (:customer-id repo)]
+     (->> (st/find-ssh-keys st cust-id)
+          (lbl/filter-by-label repo))))
+  ([st vault repo]
+   (let [cust-id (:customer-id repo)
+         iv (crypto-iv st cust-id)]
+     (->> (find-ssh-keys st repo)
+          (map #(update % :private-key (partial p/decrypt vault iv)))))))

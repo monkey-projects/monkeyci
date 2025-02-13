@@ -455,7 +455,8 @@
                                      ;; TODO Transactions for sql storage
                                      wm/default-middleware
                                      [wm/kebab-case-query
-                                      wm/log-request]))
+                                      wm/log-request
+                                      wm/post-events]))
             :muuntaja (c/make-muuntaja)
             :coercion reitit.coercion.schema/coercion
             ;; Wrap the runtime in a type, so reitit doesn't change the records into maps
