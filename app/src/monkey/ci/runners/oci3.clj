@@ -143,6 +143,7 @@
               {:interceptors [(em/use-db storage)
                               (mmi/sanitize-result)]}))
 
+;; This component is used by the app runtime to enable oci3 runner
 (defrecord OciRunner [config storage mailman vault]
   co/Lifecycle
   (start [this]
