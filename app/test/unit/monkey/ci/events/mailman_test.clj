@@ -572,7 +572,10 @@
               (is (= ::connected (get-in s [:broker :context]))))
 
             (testing "registers listeners"
-              (is (not-empty (:listeners s)))))))
+              (is (not-empty (:listeners s))))
+
+            (testing "does not registers compatibility bridge if not configured"
+              (is (nil? (:bridge s)))))))
 
       (testing "`stop`"
         (let [closed? (atom false)]
@@ -584,7 +587,18 @@
                 (is (nil? (:broker s)))
                 (is (true? @closed?)))
 
-              (testing "unregisters listeners"))))))))
+              (testing "unregisters listeners"))))))
+
+    (testing "with compatibility bridge"
+      (with-redefs [jms/connect (constantly ::connected)
+                    jms/make-consumer (constantly ::consumer)
+                    jms/set-listener (constantly nil)]
+        (let [c (->  {:type :jms
+                      :bridge {:dest "queue://legacy-dest"}}
+                     (sut/make-component)
+                     (co/start))]
+          (testing "registers listener at start"
+            (is (some? (:bridge c)))))))))
 
 (deftest merge-routes
   (testing "merges handlers together per type"

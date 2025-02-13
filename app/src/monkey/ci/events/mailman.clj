@@ -10,7 +10,9 @@
              [jobs :as j]
              [storage :as st]
              [time :as t]]
-            [monkey.ci.events.mailman.jms :as emj]
+            [monkey.ci.events.mailman
+             [bridge :as emb]
+             [jms :as emj]]
             [monkey.ci.spec.entities :as se]
             [monkey.mailman
              [core :as mmc]
@@ -375,21 +377,27 @@
   co/Lifecycle
   (start [this]
     (let [broker (mj/jms-broker config)
-          router (make-router (:routes routes))]
+          router (make-router (:routes routes))
+          bridge-dest (get-in config [:bridge :dest])]
       ;; TODO Add listeners for each destination referred to by route event types
       ;; but split up the routes so only those for the destination are added
-      (assoc this
-             :broker broker
-             :listeners (->> (emj/event-destinations config)
-                             (vals)
-                             (map (partial hash-map :handler router :destination))
-                             (map (partial mmc/add-listener broker))
-                             (doall)))))
+      (cond-> this
+        true (assoc :broker broker
+                    :listeners (->> (emj/event-destinations config)
+                                    (vals)
+                                    (map (partial hash-map :handler router :destination))
+                                    (map (partial mmc/add-listener broker))
+                                    (doall)))
+        ;; Listen to legacy events, if configured
+        bridge-dest (assoc :bridge (mmc/add-listener broker {:destination bridge-dest
+                                                             :router (mmc/router emb/bridge-routes)})))))
 
   (stop [this]
     (when broker
       (mj/disconnect broker))
-    (assoc this :broker nil)))
+    (-> this
+        (assoc :broker nil)
+        (dissoc :bridge :listeners))))
 
 (defmethod make-component :jms [config]
   (map->JmsComponent {:config config}))
