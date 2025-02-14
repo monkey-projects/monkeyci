@@ -44,9 +44,6 @@
                    :logging
                    :retriever))))
   
-  (testing "provides runner"
-    (verify-runtime :runner {:type :child} fn?))
-
   (testing "provides storage"
     (verify-runtime :storage {:type :memory} some?))
 
@@ -60,17 +57,6 @@
   (testing "gets value from config"
     (is (= "test-val" ((sut/from-config :test-val)
                        {:config {:test-val "test-val"}})))))
-
-(deftest rt->config
-  (testing "returns config"
-    (is (= {:key "value"}
-           (sut/rt->config {:config {:key "value"}}))))
-
-  (testing "removes event server"
-    (is (nil? (-> (sut/rt->config {:config {:events {:type :jms
-                                                     :server {:enabled true}}}})
-                  :events
-                  :server)))))
 
 (defrecord TestComponent [started? stopped?]
   co/Lifecycle

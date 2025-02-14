@@ -140,10 +140,11 @@
      (println "Deleting" (count m) "container instances...")
      (let [conf (co/oci-container-config)
            client (ci/make-context conf)]
-       (doseq [ci m]
-         (let [id (:id ci)]
-           (println "Deleting" id)
-           @(ci/delete-container-instance client {:instance-id id})))
+       (->> m
+            (map (fn [{:keys [id]}]
+                   (println "Deleting" id)
+                   @(ci/delete-container-instance client {:instance-id id})))
+            (doall))
        ;; Results in 429
        #_(md/loop [td m
                    res []]
