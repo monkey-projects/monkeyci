@@ -347,15 +347,15 @@
 (deftest runner-component
   (let [mm (-> (em/make-component {:type :manifold})
                (co/start))]
-    (testing "`start` registers broker listener"
-      (is (some? (-> (sut/map->OciRunner {:mailman mm})
-                     (co/start)
-                     :listener))))
+    (testing "`start` registers broker listeners"
+      (is (not-empty (-> (sut/map->OciRunner {:mailman mm})
+                         (co/start)
+                         :listeners))))
 
-    (testing "`stop` unregisters broker listener"
+    (testing "`stop` unregisters broker listeners"
       (let [unreg? (atom false)
             l (->FakeListener unreg?)]
-        (is (nil? (-> (sut/map->OciRunner {:listener l})
+        (is (nil? (-> (sut/map->OciRunner {:listeners [l]})
                       (co/stop)
-                      :listener)))
+                      :listeners)))
         (is (true? @unreg?))))))

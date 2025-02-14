@@ -567,7 +567,8 @@
                       :listener))))))
 
   (testing "jms"
-    (let [c (sut/make-component {:type :jms})]
+    (let [c (-> (sut/make-component {:type :jms})
+                (assoc :routes {:routes [[:build/start [{:handler (constantly nil)}]]]}))]
       (testing "can make component"
         (is (some? c)))
 

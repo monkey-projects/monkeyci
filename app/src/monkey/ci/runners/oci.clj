@@ -347,19 +347,25 @@
       [{:handler (partial delete-instance client)
         :interceptors [load-runner-details]}]]]))
 
+(defn- make-interceptors [storage]
+  [(em/use-db storage)
+   (mmi/sanitize-result)])
+
 (defn make-router [conf storage vault]
   (mmc/router (make-routes conf vault)
-              {:interceptors [(em/use-db storage)
-                              (mmi/sanitize-result)]}))
+              {:interceptors (make-interceptors storage)}))
 
 ;; This component is used by the app runtime to enable oci3 runner
-(defrecord OciRunner [config storage mailman vault]
+(defrecord OciRunner [storage mailman vault]
   co/Lifecycle
-  (start [this]
-    (assoc this :listener (mmc/add-listener (:broker mailman)
-                                            (make-router config storage vault))))
+  (start [{:keys [config] :as this}]
+    (-> this
+        (assoc :listeners (em/add-router mailman
+                                         (make-routes config vault)
+                                         {:interceptors (make-interceptors storage)}))
+        (dissoc :config)))
 
-  (stop [{l :listener :as this}]
-    (when l
+  (stop [{:keys [listeners] :as this}]
+    (doseq [l listeners]
       (mmc/unregister-listener l))
-    (dissoc this :listener)))
+    (dissoc this :listeners)))
