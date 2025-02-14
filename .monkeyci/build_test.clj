@@ -79,3 +79,23 @@
     (let [ctx (-> mt/test-ctx
                   (mt/with-git-ref "refs/tags/0.1.0"))]
       (is (nil? (sut/deploy ctx))))))
+
+(deftest gui-image
+  (mt/with-build-params {}
+    (testing "no jobs if no release or gui not changed on main"
+      (is (nil? (-> mt/test-ctx
+                    (sut/build-gui-image)))))
+
+    (testing "on main branch"
+      (testing "with gui changed"
+        (let [ctx (-> mt/test-ctx
+                      (mt/with-git-ref "refs/heads/main")
+                      (mt/with-changes (mt/modified ["gui/deps.edn"])))
+              jobs ((sut/build-gui-image ctx) ctx)
+              job-ids (set (map b/job-id jobs))]
+          (testing "creates publish jobs"
+            (is (contains? job-ids "publish-gui-img-amd"))
+            (is (contains? job-ids "publish-gui-img-arm")))
+
+          (testing "creates manifest job"
+            (is (contains? job-ids "gui-img-manifest"))))))))

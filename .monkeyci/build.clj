@@ -158,6 +158,7 @@
      {:subdir "gui"
       :dockerfile "Dockerfile"
       :target-img (str gui-img ":" (image-version ctx))
+      :archs [:arm :amd]
       :image
       {:job-id "publish-gui-img"
        :container-opts

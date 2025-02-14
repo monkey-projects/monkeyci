@@ -371,7 +371,7 @@
   (mmc/router (make-routes conf vault)
               {:interceptors (make-interceptors storage)}))
 
-;; This component is used by the app runtime to enable oci3 runner
+;; This component is used by the app runtime to enable oci runner
 (defrecord OciRunner [storage mailman vault]
   co/Lifecycle
   (start [{:keys [config] :as this}]
