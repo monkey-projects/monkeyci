@@ -14,6 +14,7 @@
             [monkey.ci
              [build :as b]
              [edn :as edn]
+             [errors :as errors]
              [oci :as oci]
              [protocols :as p]
              [storage :as st]
@@ -311,6 +312,18 @@
    :enter (fn [ctx]
             (set-runner-details ctx (st/find-runner-details (em/get-db ctx) (get-in ctx [:event :sid]))))})
 
+(def handle-error
+  "Marks build as failed"
+  {:name ::error-handler
+   :error (fn [{:keys [event] :as ctx} ex]
+            (log/error "Failed to handle event" (:type event) ", marking build as failed")
+            (-> ctx
+                (em/set-result (b/build-end-evt (-> (:build event)
+                                                    (assoc :message (ex-message ex)))
+                                                errors/error-process-failure))
+                ;; Remove the error to ensure leave chain is processed
+                (dissoc ::pi/error)))})
+
 (defn initialize-build [ctx]
   (b/build-init-evt (get-in ctx [:event :build])))
 
@@ -349,7 +362,8 @@
 
 (defn- make-interceptors [storage]
   [(em/use-db storage)
-   (mmi/sanitize-result)])
+   (mmi/sanitize-result)
+   handle-error])
 
 (defn make-router [conf storage vault]
   (mmc/router (make-routes conf vault)
