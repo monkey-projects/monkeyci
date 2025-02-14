@@ -6,10 +6,12 @@
             [monkey.ci
              [cuid :as cuid]
              [edn :as edn]
-             [storage :as st]]
+             [oci :as oci]
+             [protocols :as p]
+             [storage :as st]
+             [vault :as v]]
             [monkey.ci.config.script :as cs]
             [monkey.ci.events.mailman :as em]
-            [monkey.ci.oci :as oci]
             [monkey.ci.runners.oci :as sut]
             [monkey.ci.spec.events :as se]
             [monkey.oci.container-instance.core :as ci]
@@ -214,19 +216,29 @@
 
 (deftest decrypt-ssh-keys
   (h/with-memory-store st
-    (let [{:keys [enter] :as i} (sut/decrypt-ssh-keys (h/dummy-vault nil (constantly "decrypted-key")))]
+    (let [vault (v/->FixedKeyVault (v/generate-key))
+          iv (v/generate-iv)
+          {:keys [enter] :as i} (sut/decrypt-ssh-keys vault)]
       (is (keyword? (:name i)))
-      (let [build (-> (h/gen-build)
-                      (assoc-in [:git :ssh-keys] ["encrypted-key"]))
-            r (-> {:event {:type :build/pending
-                           :build build}}
-                  (em/set-db st)
-                  (enter))]
-        (is (= ["decrypted-key"] (-> r
-                                     :event
-                                     :build
-                                     :git
-                                     :ssh-keys)))))))
+
+      (testing "decrypts key using customer iv"
+        (let [ssh-key "decrypted-key"
+              cust (h/gen-cust)
+              build (-> (h/gen-build)
+                        (assoc :customer-id (:id cust))
+                        (assoc-in [:git :ssh-keys] [(p/encrypt vault iv ssh-key)]))
+              _ (st/save-crypto st {:customer-id (:id cust)
+                                    :iv iv})
+              r (-> {:event {:type :build/pending
+                             :sid (st/ext-build-sid build)
+                             :build build}}
+                    (em/set-db st)
+                    (enter))]
+          (is (= ["decrypted-key"] (-> r
+                                       :event
+                                       :build
+                                       :git
+                                       :ssh-keys))))))))
 
 (deftest prepare-ci-config
   (let [{:keys [enter] :as i} (sut/prepare-ci-config {:private-key (h/generate-private-key)})]

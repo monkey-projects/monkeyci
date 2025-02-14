@@ -259,7 +259,7 @@
                          mc/update-existing
                          :ssh-keys
                          (partial decrypt-keys
-                                  #(st/find-crypto (em/get-db ctx) (-> ctx :event :sid first)))))}))
+                                  (comp :iv #(st/find-crypto (em/get-db ctx) (-> ctx :event :sid first))))))}))
 
 (defn prepare-ci-config [config]
   "Creates the ci config to run the required containers for the build."
