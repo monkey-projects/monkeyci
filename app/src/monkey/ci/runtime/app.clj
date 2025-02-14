@@ -302,8 +302,9 @@
    :http      (co/using
                (new-http-server config)
                {:rt :runtime})
-   :reporter  (new-reporter config)
-   :runner    (new-server-runner config)
+   :runner    (co/using
+               (new-server-runner config)
+               [:storage :vault])
    :runtime   (co/using
                (new-server-runtime config)
                [:artifacts :events :metrics :reporter :runner :storage :jwk :process-reaper :vault])
