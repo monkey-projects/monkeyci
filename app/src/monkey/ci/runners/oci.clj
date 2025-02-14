@@ -118,7 +118,8 @@
                  (update :build build->out)
                  (add-ssh-keys-dir (:build config))
                  (assoc :m2-cache-path m2-cache-dir)
-                 (dissoc :private-key)
+                 ;; Remove stuff we don't need
+                 (dissoc :private-key :jwk)
                  (edn/->edn))]
     (oci/make-config-vol
      config-vol
@@ -349,7 +350,7 @@
   [conf vault]
   (let [client (make-ci-context conf)]
     ;; TODO Timeout handling
-    [[:build/pending
+    [[:build/queued
       [{:handler initialize-build
         :interceptors [(decrypt-ssh-keys vault)
                        (prepare-ci-config conf)

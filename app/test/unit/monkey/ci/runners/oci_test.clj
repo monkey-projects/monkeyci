@@ -32,7 +32,9 @@
                                  :public-key "test-pubkey"}]}}
         ic (sut/instance-config {:log-config "test-log-config"
                                  :build-image-url "test-clojure-img"
-                                 :private-key (h/generate-private-key)}
+                                 :private-key (h/generate-private-key)
+                                 :jwk {:priv (h/generate-private-key)
+                                       :pub "test-pub-key"}}
                                 build)
         co (:containers ic)]
     (testing "creates container instance configuration"
@@ -132,6 +134,9 @@
 
               (testing "with public api token"
                 (is (string? (get-in conf [:api :token]))))
+
+              (testing "without jwk"
+                (is (not (contains? conf :jwk))))
 
               (testing "with `checkout-base-dir`"
                 (is (= oci/work-dir (:checkout-base-dir conf))))))
@@ -333,7 +338,7 @@
         st (st/make-memory-storage)
         conf {:private-key (h/generate-private-key)}]
     
-    (testing "`build/pending`"
+    (testing "`build/queued`"
       (testing "returns `build/initializing` event"
         (let [fake-start-ci {:name ::sut/start-ci
                              :enter (fn [ctx]
@@ -342,7 +347,7 @@
               router (-> (sut/make-router conf st (h/fake-vault))
                          (mmc/replace-interceptors [fake-start-ci]))
 
-              r (router {:type :build/pending
+              r (router {:type :build/queued
                          :sid (st/ext-build-sid build)
                          :build build})
               res (-> r
@@ -360,7 +365,7 @@
               router (-> (sut/make-router conf st (h/fake-vault))
                          (mmc/replace-interceptors [fail-start-ci]))
 
-              r (router {:type :build/pending
+              r (router {:type :build/queued
                          :sid (st/ext-build-sid build)
                          :build build})
               res (-> r
