@@ -226,7 +226,8 @@
               cust (h/gen-cust)
               build (-> (h/gen-build)
                         (assoc :customer-id (:id cust))
-                        (assoc-in [:git :ssh-keys] [(p/encrypt vault iv ssh-key)]))
+                        (assoc-in [:git :ssh-keys] [{:private-key (p/encrypt vault iv ssh-key)
+                                                     :public-key "test-pub"}]))
               _ (st/save-crypto st {:customer-id (:id cust)
                                     :iv iv})
               r (-> {:event {:type :build/pending
@@ -234,11 +235,13 @@
                              :build build}}
                     (em/set-db st)
                     (enter))]
-          (is (= ["decrypted-key"] (-> r
-                                       :event
-                                       :build
-                                       :git
-                                       :ssh-keys))))))))
+          (is (= [{:private-key "decrypted-key"
+                   :public-key "test-pub"}]
+                 (->> r
+                      :event
+                      :build
+                      :git
+                      :ssh-keys))))))))
 
 (deftest prepare-ci-config
   (let [{:keys [enter] :as i} (sut/prepare-ci-config {:private-key (h/generate-private-key)})]

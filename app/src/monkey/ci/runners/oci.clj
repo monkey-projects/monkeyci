@@ -253,7 +253,7 @@
   [vault]
   (letfn [(decrypt-keys [get-iv ssh-keys]
             (let [iv (get-iv)]
-              (map (partial p/decrypt vault iv) ssh-keys)))]
+              (mapv #(update % :private-key (partial p/decrypt vault iv)) ssh-keys)))]
     {:name ::decrypt-ssh-keys
      :enter (fn [ctx]
               (update-in ctx [:event :build :git]
@@ -269,6 +269,7 @@
             (set-ci-config ctx (instance-config config (evt-build ctx))))})
 
 (defn- create-instance [client config]
+  (log/debug "Creating container instance using config" config)
   (oci/with-retry
     #(ci/create-container-instance client {:container-instance config})))
 
@@ -316,7 +317,7 @@
   "Marks build as failed"
   {:name ::error-handler
    :error (fn [{:keys [event] :as ctx} ex]
-            (log/error "Failed to handle event" (:type event) ", marking build as failed")
+            (log/error "Failed to handle event" (:type event) ", marking build as failed" ex)
             (-> ctx
                 (em/set-result (b/build-end-evt (-> (:build event)
                                                     (assoc :message (ex-message ex)))

@@ -416,6 +416,7 @@
       (->> routes
            (map first)
            (map destinations)
+           (distinct)
            (map (partial hash-map :handler router :destination))
            (map (partial mmc/add-listener broker))
            (doall)))))
