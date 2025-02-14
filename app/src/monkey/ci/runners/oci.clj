@@ -336,7 +336,7 @@
     @(md/chain
       (oci/with-retry #(ci/delete-container-instance client {:instance-id instance-id}))
       (fn [res]
-        (if (= 200 (:status res))
+        (if (< (:status res) 400)
           (log/info "Container instance" instance-id "has been deleted")
           (log/warn "Unable to delete container instance" instance-id ", got status" (:status res)))))
     (log/warn "Unable to delete container instance, no instance id in context")))

@@ -140,20 +140,15 @@
      (println "Deleting" (count m) "container instances...")
      (let [conf (co/oci-container-config)
            client (ci/make-context conf)]
-       (->> m
-            (map (fn [{:keys [id]}]
-                   (println "Deleting" id)
-                   @(ci/delete-container-instance client {:instance-id id})))
-            (doall))
-       ;; Results in 429
-       #_(md/loop [td m
-                   res []]
-           (if (not-empty td)
-             (md/chain
-              (ci/delete-container-instance client {:instance-id (:id (first td))})
-              (fn [r]
-                (md/recur (rest td) (conj res r))))
-             (apply md/zip res)))))))
+       (md/loop [td m
+                 res []]
+         (if (not-empty td)
+           (md/chain
+            ;; Results in 429 so we put a timeout
+            (mt/in 2000 #(ci/delete-container-instance client {:instance-id (:id (first td))}))
+            (fn [r]
+              (md/recur (rest td) (conj res r))))
+           (apply md/zip res)))))))
 
 (defn print-job-logs
   "Prints the logs of the (active) job container in the given instance"
