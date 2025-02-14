@@ -94,7 +94,8 @@ library that can be included in build script unit tests.
 * Install [Clojure tools](https://clojure.org/guides/deps_and_cli)
 * Running tests once: `clojure -X:test`
 * Running tests continuously: `clojure -X:test:watch`
-* Get coverage: `clojure -X:test:coverage`
+* Get coverage: `clojure -M:test:coverage`
+* Running with junit output: `clojure -M:test:junit`
 * Running the app: `clojure -M:run`
 
 The test runner used is [Kaocha](https://github.com/lambdaisland/kaocha), which
@@ -103,8 +104,8 @@ activated or not (see the [deps.edn](builder/deps.edn) file).
 
 #### Building ####
 
-Initially we're using [CircleCI](https://circleci.com) to build the app, but as Monkey-CI
-matures, it will be built "by itself" as it were.
+*MonkeyCI* is self-building since quite some time, [check out the application
+site here](https://app.monkeyci.com).
 
 ### More Details ###
 
@@ -119,11 +120,13 @@ matures, it will be built "by itself" as it were.
 
 ### Who do I talk to? ###
 
-* wout.neirynck@monkey-projects.be is the (initial?) developer and designer
+* wout@monkey-projects.be is the (initial?) developer and designer
 
 ### License ###
 
-Copyright (c) 2023 by Monkey Projects BV
+[GPL v3](LICENSE)
+
+Copyright (c) 2023-2025 by Monkey Projects BV
 
 [https://www.monkey-projects.be](https://www.monkey-projects.be)
 

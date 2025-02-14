@@ -12,7 +12,6 @@
              [runtime :as rt]
              [utils :as u]]
             [monkey.ci.containers.oci :as oci-cont]
-            [monkey.ci.runners.oci :as ro]
             [monkey.oci.container-instance.core :as ci]
             [manifold
              [deferred :as md]
@@ -52,42 +51,6 @@
   (when (= "ACTIVE" (get-in evt [:details :lifecycle-state]))
     (println "Instance is running:" (get-in evt [:details :display-name]))
     (mt/in 4000 #(fetch-logs client (:details evt)))))
-
-(defn run-test-container [opts]
-  (let [conf (co/oci-container-config)
-        client (ci/make-context conf)
-        ic (-> (ro/instance-config conf {})
-               (assoc :display-name (:display-name opts)
-                      :containers [(dissoc opts :shape)])
-               (mc/assoc-some :shape (:shape opts))
-               (dissoc :volumes))]
-    (log/info "Running instance with config:" ic)
-    (oci/run-instance client ic {:delete? true
-                                 :poll-interval 1000
-                                 :post-event (partial handle-event client)})))
-
-(defn run-tests [configs]
-  (->> configs
-       (map (fn [c]
-              (md/chain
-               (run-test-container c)
-               (partial hash-map :config c :result))))
-       (apply md/zip)))
-
-(defn pinp-test
-  "Trying to get podman-in-podman to run on a container instance."
-  []
-  (let [conf (co/oci-container-config)
-        client (ci/make-context conf)
-        ic (-> (ro/instance-config conf {:build {:build-id "podman-in-container"}})
-               (assoc :containers [{:image-url "fra.ocir.io/frjdhmocn5qi/pinp:latest"
-                                    :display-name "pinp"
-                                    :arguments ["podman" "info"]
-                                    :security-context
-                                    {:security-context-type "LINUX"
-                                     :run-as-user 1000}}])
-               (dissoc :volumes))]
-    (oci/run-instance client ic (partial print-container-logs client))))
 
 (defn delete-container-instance
   "Deletes container instance with given name"
