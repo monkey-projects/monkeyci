@@ -16,7 +16,8 @@
              [http :as eh]]
             [monkey.ci.web
              [auth :as auth]
-             [common :as c]]
+             [common :as c]
+             [response :as r]]
             [ring.util.response :as rur]))
 
 (def body c/body)
@@ -211,16 +212,15 @@
   (assoc build
          :source :api
          :start-time (t/now)
-         :status :initializing
+         :status :pending
          :cleanup? (not (rt/dev-mode? rt))))
 
 (defn make-build-ctx
   "Creates a build object from the request for the repo"
   [{p :parameters :as req} repo]
   (let [acc (:path p)
-        {st :storage :keys [vault] :as rt} (c/req->rt req)
-        ;;st (c/req->storage req)
-        ssh-keys (c/find-ssh-keys st vault repo)
+        {st :storage :as rt} (c/req->rt req)
+        ssh-keys (c/find-ssh-keys st repo)
         {bid :build-id :as build} (-> acc
                                       (select-keys [:customer-id :repo-id])
                                       (assign-build-id req))]
@@ -228,8 +228,7 @@
         (initialize-build rt)
         (assoc :git (-> (:query p)
                         (select-keys [:commit-id :branch :tag])
-                        (assoc :url (:url repo)
-                               :ssh-keys-dir (rt/ssh-keys-dir rt bid))
+                        (assoc :url (:url repo))
                         (mc/assoc-some :ref (or (params->ref p)
                                                 (some->> (:main-branch repo) (str "refs/heads/")))
                                        :ssh-keys ssh-keys
@@ -238,9 +237,8 @@
 (defn- save-and-run-build [rt build]
   (if (st/save-build (c/rt->storage rt) build)
     (do
-      ;; Trigger the build but don't wait for the result
-      (c/run-build-async rt build)
       (-> (rur/response (select-keys build [:build-id]))
+          (r/add-event (b/build-pending-evt build))
           (rur/status 202)))
     (-> (rur/response {:message "Unable to create build"})
         (rur/status 500))))
@@ -280,12 +278,12 @@
     (rur/not-found {:message "Build not found"})))
 
 (defn list-build-logs [req]
-  (let [build-sid (st/ext-build-sid (get-in req [:parameters :path]))
+  (let [build-sid (c/build-sid req)
         retriever (c/from-rt req rt/log-retriever)]
     (rur/response (l/list-logs retriever build-sid))))
 
 (defn download-build-log [req]
-  (let [build-sid (st/ext-build-sid (get-in req [:parameters :path]))
+  (let [build-sid (c/build-sid req)
         path (get-in req [:parameters :query :path])
         retriever (c/from-rt req rt/log-retriever)]
     (if-let [r (l/fetch-log retriever build-sid path)]
@@ -293,25 +291,13 @@
           (rur/content-type "text/plain"))
       (rur/not-found nil))))
 
-(def allowed-events
-  #{:build/pending
-    :build/initializing
-    :build/start
-    :build/end
-    :build/updated
-    :script/start
-    :script/end
-    :job/initializing
-    :job/start
-    :job/updated
-    :job/end})
-
 (defn event-stream
-  "Sets up an event stream for the specified filter."
+  "Sets up an event stream for all `build/updated` events for the customer specified in the
+   request path."
   [req]
-  (eh/event-stream (c/from-rt req rt/events-receiver)
-                   {:types allowed-events
-                    :sid [(customer-id req)]}))
+  (eh/bus-stream (c/from-rt req :update-bus)
+                 :build/updated
+                 (comp (partial = (customer-id req)) first :sid)))
 
 (c/make-entity-endpoints "email-registration"
                          {:get-id (c/id-getter :email-registration-id)

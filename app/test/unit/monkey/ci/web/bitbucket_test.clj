@@ -10,10 +10,12 @@
             [monkey.ci.spec.build :as sb]
             [monkey.ci.web
              [auth :as auth]
-             [bitbucket :as sut]]
+             [bitbucket :as sut]
+             [response :as r]]
             [monkey.ci.helpers :as h]
             [monkey.ci.test
              [aleph-test :as at]
+             [mailman :as tmm]
              [runtime :as trt]]))
 
 (deftest login
@@ -216,11 +218,8 @@
   (let [rt (-> (trt/test-runtime)
                (assoc :config {:ssh-keys-dir "/tmp"}))
         s (:storage rt)
-        runs (atom [])
         vault (v/make-fixed-key-vault {})
         rt (-> rt
-               (trt/set-runner (fn [build _]
-                                 (swap! runs conj build)))
                (trt/set-vault vault))
         repo (-> (h/gen-repo)
                  (assoc :url "http://test-url"))
@@ -252,29 +251,31 @@
       (let [resp (sut/webhook req)]
         (is (= 202 (:status resp)))
         (is (re-matches #"^build-\d+$" (get-in resp [:body :build-id])))
-        (is (not= :timeout (h/wait-until #(not-empty @runs) 500)))
-        (let [{:keys [git] :as build} (first @runs)]
+        (let [evts (r/get-events resp)
+              {:keys [git] :as build} (:build (first evts))]
+          (is (= 1 (count evts)))
+          (is (= :build/pending (-> evts first :type)))
           (is (spec/valid? ::sb/build build)
               (spec/explain-str ::sb/build build))
           (is (some? git) "contains git info")
           (is (= "http://test-url" (:url git)))
           (is (= "refs/heads/main" (:ref git))))))
 
-    (testing "adds configured and decrypted ssh key matching repo labels"
-      (reset! runs [])
+    (testing "adds configured encrypted ssh key matching repo labels"
       (let [iv (v/generate-iv)
             ssh-key {:id "test-key"
-                     :private-key (p/encrypt vault iv "test-ssh-key")}]
+                     :private-key "encrypted-key"}]
         (is (st/sid? (st/save-repo s (assoc repo :labels [{:name "ssh-lbl"
                                                            :value "lbl-val"}]))))
         (is (st/sid? (st/save-ssh-keys s (:id cust) [ssh-key])))
         (is (st/sid? (st/save-crypto s {:customer-id (:id cust)
                                         :iv iv})))
-        (is (some? (sut/webhook req)))
-        (is (not= :timeout (h/wait-until #(not-empty @runs) 500)))
-        (is (= [{:id (:id ssh-key)
-                 :private-key "test-ssh-key"}]
-               (-> @runs first (get-in [:git :ssh-keys]))))))
+        (let [evts (-> (sut/webhook req)
+                       (r/get-events))]
+          (is (= 1 (count evts)))
+          (is (= [{:id (:id ssh-key)
+                   :private-key "encrypted-key"}]
+                 (-> evts first :build (get-in [:git :ssh-keys])))))))
   
     (testing "404 if webhook does not exist"
       (is (= 404 (-> rt

@@ -4,6 +4,7 @@
             [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
+             [build :as b]
              [labels :as lbl]
              [runtime :as rt]
              [storage :as s]
@@ -12,7 +13,8 @@
             [monkey.ci.web
              [auth :as auth]
              [common :as c]
-             [oauth2 :as oauth2]]
+             [oauth2 :as oauth2]
+             [response :as r]]
             [aleph.http :as http]
             [ring.util.response :as rur]))
 
@@ -32,9 +34,9 @@
    send other types of requests."
   (comp (partial = "push") github-event))
 
-(defn- find-ssh-keys [{st :storage :keys [vault]} customer-id repo-id]
+(defn- find-ssh-keys [{st :storage} customer-id repo-id]
   (let [repo (s/find-repo st [customer-id repo-id])]
-    (c/find-ssh-keys st vault repo)))
+    (c/find-ssh-keys st repo)))
 
 (defn- file-changes
   "Determines file changes according to the payload commits."
@@ -64,8 +66,7 @@
                                   (assoc :url (if private ssh-url clone-url)
                                          :main-branch master-branch
                                          :ref (:ref payload)
-                                         :commit-id commit-id
-                                         :ssh-keys-dir (rt/ssh-keys-dir rt build-id))
+                                         :commit-id commit-id)
                                   (mc/assoc-some :ssh-keys ssh-keys))
                          ;; Do not use the commit timestamp, because when triggered from a tag
                          ;; this is still the time of the last commit, not of the tag creation.
@@ -114,10 +115,9 @@
   (if (should-trigger-build? req)
     (let [rt (c/req->rt req)]
       (if-let [build (create-webhook-build rt (get-in p [:path :id]) (body req))]
-        (do
-          (c/run-build-async rt build)
-          (-> (rur/response (select-keys build [:build-id]))
-              (rur/status 202)))
+        (-> (rur/response (select-keys build [:build-id]))
+            (r/add-event (b/build-pending-evt build))
+            (rur/status 202))
         ;; No valid webhook found
         (rur/not-found {:message "No valid webhook configuration found"})))
     ;; If this is not a build event, just respond with a '204 no content'
@@ -128,19 +128,16 @@
   (log/debug "Event type:" (get-in req [:headers "x-github-event"]))
   (if (should-trigger-build? req)
     (let [github-id (get-in (body req) [:repository :id])
-          matches (s/find-watched-github-repos (c/req->storage req) github-id)
-          run-build (fn [repo]
-                      (let [rt (c/req->rt req)
-                            build (create-app-build rt repo (body req))]
-                        (c/run-build-async rt build)
-                        build))]
-      (log/debug "Found" (count matches) "watched builds for id" github-id)
-      (-> (->> matches
-               (map run-build)
-               (map (comp (partial hash-map :build-id) :build-id))
-               (hash-map :builds)
-               (rur/response))
-          (rur/status (if (empty? matches) 204 202))))
+          builds (->> (s/find-watched-github-repos (c/req->storage req) github-id)
+                      (map (fn [repo]
+                             (create-app-build (c/req->rt req) repo (body req)))))]
+      (log/debug "Found" (count builds) "watched builds for id" github-id)
+      (-> builds
+          (as-> b (->> (map #(select-keys % [:build-id]) b)
+                       (hash-map :builds)))
+          (rur/response)
+          (r/add-events (map b/build-pending-evt builds))
+          (rur/status (if (empty? builds) 204 202))))
     ;; Don't trigger build, just say fine
     (rur/status 204)))
 

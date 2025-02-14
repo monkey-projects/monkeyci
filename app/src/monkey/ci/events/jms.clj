@@ -8,33 +8,17 @@
             [monkey.ci
              [protocols :as p]
              [utils :as u]]
-            [monkey.jms :as jms])
-  (:import org.apache.activemq.artemis.core.server.embedded.EmbeddedActiveMQ
-           org.apache.activemq.artemis.core.config.impl.ConfigurationImpl
-           org.apache.activemq.artemis.api.core.TransportConfiguration
-           org.apache.activemq.artemis.core.remoting.impl.netty.NettyAcceptorFactory))
-
-(defn transport-config [port]
-  (TransportConfiguration.
-   (.getName NettyAcceptorFactory)
-   {"port" (str port)
-    "protocols" "AMQP"}))
+            [monkey.jms :as jms]
+            [monkey.jms.artemis :as artemis]))
 
 (defn- start-broker
   "Starts an embedded Artemis broker with AMQP connector"
   [port]
   (log/info "Starting AMQP broker at port" port)
-  (doto (EmbeddedActiveMQ.)
-    (.setConfiguration
-     (.. (ConfigurationImpl.)
-         (setPersistenceEnabled false)
-         (setJournalDirectory "target/data/journal")
-         (setSecurityEnabled false)
-         (addAcceptorConfiguration (transport-config port))))
-    (.start)))
+  (artemis/start-broker {:broker-port port}))
 
 (defn- stop-broker [b]
-  (.stop b))
+  (artemis/stop-broker b))
 
 (defn- url->port [url]
   (or (some-> url

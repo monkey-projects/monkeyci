@@ -17,6 +17,7 @@
             [monkey.ci.build.api-server :as bas]
             [monkey.ci.config.script :as cos]
             [monkey.ci.runners.oci :as ro]
+            [monkey.ci.web.auth :as auth]
             [monkey.oci.container-instance.core :as ci]))
 
 ;; Necessary to be able to write to the shared volume
@@ -63,12 +64,21 @@
       (dissoc :status :cleanup?)
       (update :git dissoc :ssh-keys)))
 
-(defn- config-volume [config build rt]
+(defn- add-api-token
+  "Generates a new API token that can be used by the build runner to invoke
+   certain API calls."
+  [conf build]
+  (assoc-in conf [:api :token] (auth/generate-and-sign-jwt
+                                (auth/build-token (b/sid build))
+                                (get conf :private-key))))
+
+(defn- config-volume [config build]
   (let [conf (-> config
-                 (ro/add-api-token build rt)
+                 (add-api-token build)
                  (update :build build->out)
                  (ro/add-ssh-keys-dir (:build config))
                  (assoc :m2-cache-path m2-cache-dir)
+                 (dissoc :private-key)
                  (edn/->edn))]
     (oci/make-config-vol
      config-vol
@@ -155,7 +165,7 @@
    containers, one for the controller process and another one for the script
    itself.  The controller is responsible for preparing the workspace and 
    starting an API server, which the script will connect to."
-  [config build rt]
+  [config build]
   (let [bid (b/build-id build)
         file-path (fn [ext]
                     (u/combine oci/checkout-dir (str bid ext)))
@@ -175,7 +185,7 @@
     (-> (oci/instance-config config)      
         (assoc :display-name bid)
         (update :containers make-containers ctx)
-        (update :volumes concat (->> [(config-volume ctx build rt)
+        (update :volumes concat (->> [(config-volume ctx build)
                                       (script-volume ctx)
                                       (log-config-volume ctx)]
                                      (remove nil?)))
@@ -183,10 +193,10 @@
 
 (defn- oci-runner [client conf build rt]
   (ro/run-oci-build
-   (instance-config conf build rt)
+   (instance-config conf build)
    {:client client
     :build build
-    :rt rt
+    :rt rt ; Only needed for event posting
     :conf conf
     :find-container (partial filter (comp (partial = build-container-name)
                                           :display-name))}))

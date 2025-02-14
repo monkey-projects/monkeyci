@@ -67,13 +67,16 @@
          :iss "https://app.monkeyci.com"
          :aud ["https://api.monkeyci.com"]))
 
+(defn generate-and-sign-jwt [payload pk]
+  (-> payload
+      (augment-payload)
+      (sign-jwt pk)))
+
 (defn generate-jwt-from-rt
   "Generates a JWT from the private key in the runtime"
   [rt payload]
-  (when-let [pk (get-in rt [:jwk :priv])]
-    (-> payload
-        (augment-payload)
-        (sign-jwt pk))))
+  (some->> (get-in rt [:jwk :priv])
+           (generate-and-sign-jwt payload)))
 
 (defn generate-jwt
   "Signs a JWT using the keypair from the request context."
@@ -93,7 +96,7 @@
   {:pub (.getPublic kp)
    :priv (.getPrivate kp)})
 
-(defn config->keypair
+(defn ^:deprecated config->keypair
   "Loads private and public keys from the app config, returns a map that can be
    used in the context `:jwk`."
   [conf]

@@ -155,7 +155,6 @@
    errors from OCI."
   [client instance-config & [{:keys [delete? exited?] :as opts}]]
   (log/debug "Running OCI instance with config:" instance-config)
-  ;; TODO Add auto-retry on 429 errors ("too many requests")
   (letfn [(check-error [handler]
             (fn [{:keys [body status] :as r}]
               (if status

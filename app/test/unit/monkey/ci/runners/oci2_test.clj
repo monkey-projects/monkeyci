@@ -26,9 +26,9 @@
                :git {:ssh-keys [{:private-key "test-privkey"
                                  :public-key "test-pubkey"}]}}
         ic (sut/instance-config {:log-config "test-log-config"
-                                 :build-image-url "test-clojure-img"}
-                                build
-                                (trt/test-runtime))
+                                 :build-image-url "test-clojure-img"
+                                 :private-key (h/generate-private-key)}
+                                build)
         co (:containers ic)]
     (testing "creates container instance configuration"
       (is (map? ic))

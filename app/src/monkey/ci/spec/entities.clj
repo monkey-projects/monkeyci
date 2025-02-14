@@ -185,3 +185,11 @@
 
 (s/def :invoice/detail
   (s/keys :req-un [:invoice/net-amount :invoice/vat-perc :entity/description]))
+
+(s/def :runner/details map?)
+
+(s/def :entity/runner keyword?)
+(s/def :runner/details map?)
+
+(s/def :entity/runner-details
+  (s/keys :req-un [:entity/runner :runner/details]))

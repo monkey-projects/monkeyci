@@ -792,3 +792,18 @@
      (->> (p/list-obj st (invoice-sid cust-id))
           (map (partial vector cust-id))
           (map (partial find-invoice st))))))
+
+
+(def runner-details :runner-details)
+(defn runner-details-sid [build-sid]
+  (into [global (name runner-details)] build-sid))
+
+(defn save-runner-details
+  "Saves runner details for the given build sid"
+  [st sid details]
+  (p/write-obj st (runner-details-sid sid) details))
+
+(defn find-runner-details
+  "Retrieves runner details for given build sid"
+  [st sid]
+  (p/read-obj st (runner-details-sid sid)))

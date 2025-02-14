@@ -34,7 +34,7 @@
     (md/error-deferred "Blob stream not supported yet" {}))
 
   (get-blob-info [_ src]
-    (get @stored src)))
+    (md/success-deferred (get @stored src))))
 
 (defn test-store [& [stored]]
   (->TestBlobStore (atom (or stored {})) (atom [])))

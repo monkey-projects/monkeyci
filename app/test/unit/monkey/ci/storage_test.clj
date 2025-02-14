@@ -520,3 +520,18 @@
 
       (testing "can list for customer"
         (is (= [inv] (sut/list-invoices-for-customer st (:id cust))))))))
+
+(deftest runner-details
+  (h/with-memory-store st
+    (let [build (h/gen-build)
+          build->sid sut/ext-build-sid
+          details {:build-id (:build-id build)
+                   :runner :test-runner
+                   :details {:test :details}}]
+      (is (sid/sid? (sut/save-build st build)))
+      
+      (testing "can save"
+        (is (sid/sid? (sut/save-runner-details st (build->sid build) details))))
+
+      (testing "can find by build sid"
+        (is (= details (sut/find-runner-details st (build->sid build))))))))

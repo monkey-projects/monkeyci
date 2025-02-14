@@ -159,27 +159,26 @@
     :success
     :error))
 
-(defn build->evt
-  "Prepare build object so it can be added to an event"
-  [build]
-  (mc/update-existing build :git dissoc :ssh-keys :ssh-keys-dir))
-
 (defn build-evt [type build & keyvals]
   (apply ec/make-event type :sid (sid build) keyvals))
 
-(defn build-init-evt [build]
-  (build-evt :build/initializing
+(defn- with-build-evt [type build]
+  (build-evt type
              build
-             :build (build->evt build)))
+             :build build))
+
+(defn build-pending-evt [build]
+  (with-build-evt :build/pending build))
+
+(defn build-init-evt [build]
+  (with-build-evt :build/initializing build))
 
 (defn build-start-evt [build]
   (build-evt :build/start
              build
              :credit-multiplier (credit-multiplier build)
              ;; TODO Remove this
-             :build (-> build
-                        (build->evt)
-                        (assoc :start-time (t/now)))))
+             :build (assoc build :start-time (t/now))))
 
 (defn build-end-evt
   "Creates a `build/end` event"
@@ -188,7 +187,6 @@
       (assoc :status (exit-code->status exit-code)
              ;; TODO Remove this
              :build (-> build
-                        (build->evt)
                         (assoc :end-time (u/now))
                         (mc/assoc-some :status (exit-code->status exit-code))))
       (mc/assoc-some :message (:message build))))

@@ -2,13 +2,13 @@
   "Functions for setting up a runtime for application (cli or server)"
   (:require [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
+            [manifold.bus :as mb]
             [medley.core :as mc]
             [monkey.ci
              [blob :as blob]
              [build :as b]
              [containers :as c]
              [git :as git]
-             [listeners :as li]
              [logging :as l]
              [metrics :as m]
              [oci :as oci]
@@ -26,10 +26,10 @@
              [oci :as cco]]
             [monkey.ci.events
              [core :as ec]
+             [mailman :as em]
              [split :as es]]
-            [monkey.ci.runners
-             [oci]
-             [oci2]]
+            [monkey.ci.events.mailman.bridge :as emb]
+            [monkey.ci.runners.oci3 :as ro3]
             [monkey.ci.runtime.common :as rc]
             [monkey.ci.web
              [auth :as auth]
@@ -68,9 +68,6 @@
 
 (defn- new-build-runner [config]
   (map->BuildRunner {:runner (r/make-runner config)}))
-
-(defn- new-server-runner [config]
-  (r/make-runner config))
 
 (defn- make-container-runner [{:keys [containers] :as config} events build api-config logging]
   (case (:type containers)
@@ -173,6 +170,16 @@
 (defn new-push-gw [config]
   (map->PushGateway {:config (:push-gw config)}))
 
+(defn new-mailman
+  "Creates new mailman event broker component.  This will replace the old events."
+  [config]
+  (em/make-component (:mailman config)))
+
+(defn new-mailman-events
+  "Creates a mailman-events bridge for compatibility purposes"
+  []
+  (emb/->MailmanEventPoster nil))
+
 (defn make-runner-system
   "Given a runner configuration object, creates component system.  When started,
    it contains a fully configured `runtime` component that can be used by the
@@ -194,6 +201,7 @@
                 (new-container-runner config)
                 [:events :build :api-config :logging])
    :logging    (new-logging config)
+   ;; Runner is only needed when using this runtime for local builds
    :runner     (co/using
                 (new-build-runner config)
                 [:build :runtime])
@@ -208,7 +216,8 @@
    :metrics    (new-metrics)
    :push-gw    (co/using
                 (new-push-gw config)
-                [:metrics])))
+                [:metrics])
+   :mailman    (new-mailman config)))
 
 (defn with-runner-system [config f]
   (rc/with-system (make-runner-system config) f))
@@ -225,46 +234,8 @@
   (rep/make-reporter (:reporter conf)))
 
 (defn- new-jwk [conf]
-  ;; Wrapped in a map because component doesn't allow nils
-  {:jwk (auth/config->keypair conf)})
-
-(defrecord ListenersWrapper [listeners-events storage]
-  co/Lifecycle
-  (start [this]
-    (log/debug "Creating listeners with events" (:events listeners-events))
-    (assoc this :listeners (-> (li/->Listeners (:events listeners-events)
-                                               storage)
-                               (co/start))))
-  (stop [this]
-    (when-let [l (:listeners this)]
-      (co/stop l))))
-
-(defn- new-listeners []
-  (map->ListenersWrapper {}))
-
-(defn- maybe-make-listeners-events [config]
-  (when-let [c (get-in config [:listeners :events])]
-    (ec/make-events c)))
-
-(defrecord ListenersEvents [config out-events]
-  ;; Either uses own created events, or external (top level) events, depending
-  ;; on configuration.
-  co/Lifecycle
-  (start [this]
-    (if-let [le (some-> (maybe-make-listeners-events config)
-                        (co/start))]
-      (assoc this
-             :in-events le
-             ;; Split events input from output
-             :events (es/->SplitEvents le out-events))
-      (assoc this :events out-events)))
-
-  (stop [this]
-    (when-let [le (:in-events this)]
-      (co/stop le))))
-
-(defn- new-listeners-events [config]
-  (->ListenersEvents config nil))
+  ;; Return a map because component doesn't allow nils
+  (select-keys conf [:jwk]))
 
 (defn- new-vault [config]
   (v/make-vault (:vault config)))
@@ -293,12 +264,38 @@
 (defn- new-process-reaper [conf]
   (->ProcessReaper conf))
 
+(defrecord AppEventRoutes [storage update-bus]
+  co/Lifecycle
+  (start [this]
+    (assoc this :routes (em/make-routes storage update-bus)))
+
+  (stop [this]
+    (dissoc this :routes)))
+
+(defn new-app-routes []
+  (map->AppEventRoutes {}))
+
+(defmulti make-server-runner :type)
+
+(defmethod make-server-runner :oci3 [config]
+  (ro3/map->OciRunner {:config config}))
+
+;; TODO Add other runners
+
+(defmethod make-server-runner :default [_]
+  {})
+
+(defn- new-server-runner [config]
+  (make-server-runner (:runner config)))
+
 (defn make-server-system
   "Creates a component system that can be used to start an application server."
   [config]
   (co/system-map
    :artifacts (new-artifacts config)
-   :events    (new-events config)
+   :events    (co/using
+               (new-mailman-events)
+               {:broker :mailman})
    :http      (co/using
                (new-http-server config)
                {:rt :runtime})
@@ -307,22 +304,23 @@
                [:storage :vault])
    :runtime   (co/using
                (new-server-runtime config)
-               [:artifacts :events :metrics :reporter :runner :storage :jwk :process-reaper :vault])
+               [:artifacts :events :metrics :storage :jwk :process-reaper :vault :mailman :update-bus])
    :storage   (co/using
                (new-storage config)
                [:vault])
    :jwk       (new-jwk config)
-   :listeners (co/using
-               (new-listeners)
-               [:listeners-events :storage])
-   :listeners-events (co/using
-                      (new-listeners-events config)
-                      {:out-events :events})
    :metrics   (co/using
                (new-metrics)
                [:events])
    :process-reaper (new-process-reaper config)
-   :vault     (new-vault config)))
+   :vault     (new-vault config)
+   :mailman   (co/using
+               (new-mailman config)
+               {:routes :mailman-routes})
+   :mailman-routes (co/using
+                    (new-app-routes)
+                    [:storage :update-bus])
+   :update-bus (mb/event-bus)))
 
 (defn with-server-system [config f]
   (rc/with-system (make-server-system config) f))

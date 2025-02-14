@@ -1,6 +1,5 @@
 (ns monkey.ci.web.common
-  (:require [buddy.auth :as ba]
-            [camel-snake-kebab.core :as csk]
+  (:require [camel-snake-kebab.core :as csk]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
@@ -14,11 +13,6 @@
              [vault :as v]]
             [monkey.ci.events.core :as ec]
             [reitit.ring :as ring]
-            [reitit.ring.coercion :as rrc]
-            [reitit.ring.middleware
-             [exception :as rrme]
-             [muuntaja :as rrmm]
-             [parameters :as rrmp]]
             [ring.util.response :as rur]
             [schema.core :as s]))
 
@@ -32,13 +26,17 @@
 
 (def customer-id (comp :customer-id :path :parameters))
 
-(def repo-sid (comp (juxt :customer-id :repo-id)
-                    :path
-                    :parameters))
+(def repo-sid
+  "Retrieves repo sid from the request"
+  (comp (juxt :customer-id :repo-id)
+        :path
+        :parameters))
 
-(def build-sid (comp (juxt :customer-id :repo-id :build-id)
-                     :path
-                     :parameters))
+(def build-sid
+  "Retrieves build sid from the request"
+  (comp st/ext-build-sid
+        :path
+        :parameters))
 
 (defn generic-routes
   "Generates generic entity routes.  If child routes are given, they are added
@@ -100,6 +98,10 @@
         (format "%s://%s%s" (name (:scheme req)) (get-in req [:headers "host"]) (subs (:uri req) 0 idx)))))
 
 (def req->vault #(from-rt % :vault))
+
+(def req->mailman
+  "Retrieves mailman component from request"
+  #(from-rt % :mailman))
 
 (defn id-getter [id-key]
   (comp id-key :path :parameters))
@@ -235,35 +237,6 @@
         [:formats "application/json" :encoder-opts]
         {:encode-key-fn (comp csk/->camelCase name)}))))
 
-(defn- exception-logger [h]
-  (fn [req]
-    (try
-      (h req)
-      (catch Exception ex
-        ;; Log and rethrow
-        (log/error (str "Got error while handling request: " (:uri req)) ex)
-        (throw ex)))))
-
-(def exception-middleware
-  (rrme/create-exception-middleware
-   (merge rrme/default-handlers
-          {:auth/unauthorized (fn [e req]
-                                (if (ba/authenticated? req)
-                                  {:status 403
-                                   :body (.getMessage e)}
-                                  {:status 401
-                                   :body "Unauthenticated"}))})))
-
-(def default-middleware
-  ;; TODO Transactions for sql storage
-  [rrmp/parameters-middleware
-   rrmm/format-middleware
-   exception-middleware
-   exception-logger
-   rrc/coerce-exceptions-middleware
-   rrc/coerce-request-middleware
-   rrc/coerce-response-middleware])
-
 (defn make-app [router]
   (ring/ring-handler
    router
@@ -290,7 +263,7 @@
       (throw (ex-info "Customer does not have available credits"
                       {:build build})))))
 
-(defn run-build-async
+(defn ^:deprecated run-build-async
   "Starts the build in a new thread"
   [rt build]
   (let [runner (rt/runner rt)
@@ -303,9 +276,7 @@
     (md/future
       (try
         (check-avail-credits! rt build)
-        (rt/post-events rt (ec/make-event :build/pending
-                                          :build (b/build->evt build)
-                                          :sid (b/sid build)))
+        (rt/post-events rt (b/build-pending-evt build))
         ;; Catch both the deferred error, or the direct exception, because both
         ;; can be thrown here.
         (-> (runner build rt)
@@ -330,10 +301,13 @@
      (crypto-iv st cust-id))))
 
 (defn find-ssh-keys
-  "Finds and decrypts ssh keys for the given repo"
-  [st vault repo]
-  (let [cust-id (:customer-id repo)
-        iv (crypto-iv st cust-id)]
-    (->> (st/find-ssh-keys st cust-id)
-         (lbl/filter-by-label repo)
-         (map #(update % :private-key (partial p/decrypt vault iv))))))
+  "Finds ssh keys for the given repo, and if the vault is specified, also decrypts them."
+  ([st repo]
+   (let [cust-id (:customer-id repo)]
+     (->> (st/find-ssh-keys st cust-id)
+          (lbl/filter-by-label repo))))
+  ([st vault repo]
+   (let [cust-id (:customer-id repo)
+         iv (crypto-iv st cust-id)]
+     (->> (find-ssh-keys st repo)
+          (map #(update % :private-key (partial p/decrypt vault iv)))))))
