@@ -145,8 +145,14 @@
       (cos/set-api {:url (format "http://localhost:%d" (:api-port runner))
                     :token (:api-token runner)})))
 
+(defn- checkout-dir [build]
+  (u/combine oci/work-dir (b/build-id build)))
+
+(defn- script-dir [build]
+  (b/calc-script-dir (checkout-dir build) (b/script-dir build)))
+
 (defn- generate-deps [{:keys [build lib-version] :as config}]
-  {:paths [(b/calc-script-dir oci/work-dir (b/script-dir build))]
+  {:paths [(script-dir build)]
    :aliases
    {:monkeyci/build
     (cond-> {:exec-fn 'monkey.ci.process/run
@@ -175,9 +181,6 @@
              :volume-mounts [config-mount])
       (add-ssh-keys-mount (:build config))))
 
-(defn- checkout-dir [build]
-  (u/combine oci/work-dir (b/build-id build)))
-
 (defn script-container [config]
   (-> default-container
       ;; Use configured image instead of the one from monkeyci (probably a clojure image)
@@ -189,7 +192,7 @@
              :environment-variables
              ;; TODO Replace CLJ_CONFIG with command-line argument to avoid messing up clj invocations in the script
              {"CLJ_CONFIG" script-path
-              "MONKEYCI_WORK_DIR" (b/calc-script-dir (checkout-dir (:build config)) nil)
+              "MONKEYCI_WORK_DIR" (script-dir (:build config))
               "MONKEYCI_START_FILE" (:run-path config)
               "MONKEYCI_ABORT_FILE" (:abort-path config)
               "MONKEYCI_EXIT_FILE" (:exit-path config)}
@@ -363,7 +366,8 @@
         :interceptors [load-runner-details]}]]]))
 
 (defn- make-interceptors [storage]
-  [(em/use-db storage)
+  [em/trace-evt
+   (em/use-db storage)
    (mmi/sanitize-result)
    handle-error])
 

@@ -1,6 +1,7 @@
 (ns monkey.ci.runners.oci-test
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.spec.alpha :as spec]
+            [clojure.string :as cstr]
             [com.stuartsierra.component :as co]
             [manifold.deferred :as md]
             [monkey.ci
@@ -153,6 +154,10 @@
                              (edn/edn->))]
             (testing "contains `deps.edn`"
               (is (some? deps)))
+
+            (testing "uses script dir as source path"
+              (is (= (cstr/join "/" [oci/work-dir (:build-id build) ".monkeyci"])
+                     (-> deps :paths first))))
 
             (testing "provides monkeyci dependency"
               (is (string? (get-in deps [:aliases :monkeyci/build :extra-deps 'com.monkeyci/app :mvn/version]))))

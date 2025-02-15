@@ -25,7 +25,7 @@
   <logger name="net" level="WARN"/>
   <logger name="io" level="WARN"/>
   <logger name="monkey.ci" level="DEBUG"/>
-  <logger name="monkey.mailman" level="DEBUG"/>
+  <logger name="monkey.mailman" level="TRACE"/>
   
   <root level="INFO">
     <appender-ref ref="STDOUT" />
