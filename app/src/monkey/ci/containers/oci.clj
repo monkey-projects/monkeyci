@@ -426,10 +426,6 @@
         (catch Exception ex
           (fire-job-error conf ex))))))
 
-(defmethod mcc/normalize-containers-config :oci [conf]
-  ;; Take app version if no image version specified
-  (update-in conf [:containers :image-tag] #(format (or % "%s") (v/version))))
-
 (defrecord OciContainerRunner [conf events credit-consumer]
   p/ContainerRunner
   (run-container [this job]
