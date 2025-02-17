@@ -74,6 +74,12 @@
     (testing "provides runner"
       (is (ifn? (:runner sys))))
 
+    (testing "provides mailman"
+      (is (some? (:mailman sys))))
+
+    (testing "provides local mailman"
+      (is (some? (:mailman/local sys))))
+
     (testing "provides workspace"
       (is (some? (:workspace rt))))
 

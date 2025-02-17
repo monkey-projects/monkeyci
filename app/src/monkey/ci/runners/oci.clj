@@ -384,7 +384,6 @@
 (defrecord OciRunner [storage mailman vault]
   co/Lifecycle
   (start [{:keys [config] :as this}]
-    (log/debug "Starting OCI runner using private key:" (get-in config [:api :private-key]))
     (-> this
         (assoc :listeners (em/add-router mailman
                                          (make-routes config vault)

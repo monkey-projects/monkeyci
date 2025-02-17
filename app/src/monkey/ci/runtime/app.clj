@@ -175,6 +175,13 @@
   [config]
   (em/make-component (:mailman config)))
 
+(defn new-local-mailman
+  "Creates local mailman component for runners.  This is used to handle events 
+   between the build api, the script and container jobs."
+  []
+  ;; TODO Routes
+  (em/make-component {:type :manifold}))
+
 (defn new-mailman-events
   "Creates a mailman-events bridge for compatibility purposes"
   []
@@ -217,7 +224,8 @@
    :push-gw    (co/using
                 (new-push-gw config)
                 [:metrics])
-   :mailman    (new-mailman config)))
+   :mailman    (new-mailman config)
+   :mailman/local (new-local-mailman)))
 
 (defn with-runner-system [config f]
   (rc/with-system (make-runner-system config) f))
