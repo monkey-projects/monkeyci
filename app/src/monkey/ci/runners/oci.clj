@@ -82,7 +82,7 @@
   [conf build]
   (assoc-in conf [:api :token] (auth/generate-and-sign-jwt
                                 (auth/build-token (b/sid build))
-                                (get conf :private-key))))
+                                (get-in conf [:api :private-key]))))
 
 (defn- add-ssh-keys-dir [conf build]
   (cond-> conf
@@ -204,6 +204,10 @@
   [(mm/meta-merge orig (controller-container config))
    (mm/meta-merge orig (script-container config))])
 
+(defn- set-script-dir [build]
+  ;; Recalculates script dir for container
+  (b/set-script-dir build (script-dir build)))
+
 (defn instance-config
   "Prepares container instance configuration to run a build.  It contains two
    containers, one for the controller process and another one for the script
@@ -218,7 +222,8 @@
                    :build (-> build
                               (dissoc :ssh-keys :cleanup? :status)
                               (assoc-in [:git :dir] wd)
-                              (assoc :checkout-dir wd))
+                              (assoc :checkout-dir wd)
+                              (set-script-dir))
                    :checkout-base-dir oci/work-dir
                    :runner {:type :noop
                             :api-port 3000
@@ -226,7 +231,7 @@
                    :run-path (file-path ".run")
                    :abort-path (file-path ".abort")
                    :exit-path (file-path ".exit"))]
-    (-> (oci/instance-config config)      
+    (-> (oci/instance-config (:containers config))      
         (assoc :display-name bid)
         (update :containers make-containers ctx)
         (update :volumes concat (->> [(config-volume ctx build)
@@ -351,7 +356,7 @@
 (defn make-routes
   "Creates event handling routes for the given oci configuration"
   [conf vault]
-  (let [client (make-ci-context conf)]
+  (let [client (make-ci-context (:containers conf))]
     ;; TODO Timeout handling
     [[:build/queued
       [{:handler initialize-build
@@ -379,6 +384,7 @@
 (defrecord OciRunner [storage mailman vault]
   co/Lifecycle
   (start [{:keys [config] :as this}]
+    (log/debug "Starting OCI runner using private key:" (:private-key config))
     (-> this
         (assoc :listeners (em/add-router mailman
                                          (make-routes config vault)

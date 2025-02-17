@@ -92,6 +92,7 @@
                     (-> (ex-data ex)
                         ;; Read the response body in case of error
                         (mc/update-existing :body bs/to-string)))))]
+    (log/debug "Sending API request using token:" token)
     (-> (api-client (-> req
                         (assoc :url (str url (:path req))
                                :accept "application/edn"

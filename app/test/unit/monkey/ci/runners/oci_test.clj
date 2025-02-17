@@ -33,7 +33,7 @@
                                  :public-key "test-pubkey"}]}}
         ic (sut/instance-config {:log-config "test-log-config"
                                  :build-image-url "test-clojure-img"
-                                 :private-key (h/generate-private-key)
+                                 :api {:private-key (h/generate-private-key)}
                                  :jwk {:priv (h/generate-private-key)
                                        :pub "test-pub-key"}}
                                 build)
@@ -254,7 +254,8 @@
                       :ssh-keys))))))))
 
 (deftest prepare-ci-config
-  (let [{:keys [enter] :as i} (sut/prepare-ci-config {:private-key (h/generate-private-key)})]
+  (let [{:keys [enter] :as i} (sut/prepare-ci-config
+                               {:api {:private-key (h/generate-private-key)}})]
     (is (keyword? (:name i)))
     
     (testing "updates ci config with container details"
@@ -341,7 +342,7 @@
 (deftest make-router
   (let [build (h/gen-build)
         st (st/make-memory-storage)
-        conf {:private-key (h/generate-private-key)}]
+        conf {:api {:private-key (h/generate-private-key)}}]
     
     (testing "`build/queued`"
       (testing "returns `build/initializing` event"
