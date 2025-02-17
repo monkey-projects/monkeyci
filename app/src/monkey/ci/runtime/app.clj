@@ -29,7 +29,7 @@
              [mailman :as em]
              [split :as es]]
             [monkey.ci.events.mailman.bridge :as emb]
-            [monkey.ci.runners.oci3 :as ro3]
+            [monkey.ci.runners.oci :as ro]
             [monkey.ci.runtime.common :as rc]
             [monkey.ci.web
              [auth :as auth]
@@ -277,8 +277,12 @@
 
 (defmulti make-server-runner :type)
 
+(defmethod make-server-runner :oci [config]
+  (ro/map->OciRunner {:config config}))
+
+;; To be removed, provided for compatibility
 (defmethod make-server-runner :oci3 [config]
-  (ro3/map->OciRunner {:config config}))
+  (ro/map->OciRunner {:config config}))
 
 ;; TODO Add other runners
 
@@ -299,7 +303,9 @@
    :http      (co/using
                (new-http-server config)
                {:rt :runtime})
-   :runner    (new-server-runner config)
+   :runner    (co/using
+               (new-server-runner config)
+               [:storage :vault :mailman])
    :runtime   (co/using
                (new-server-runtime config)
                [:artifacts :events :metrics :storage :jwk :process-reaper :vault :mailman :update-bus])

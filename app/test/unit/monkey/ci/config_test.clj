@@ -23,49 +23,6 @@
     (is (s/valid? ::spec/app-config sut/default-app-config)
         (s/explain-str ::spec/app-config sut/default-app-config))))
 
-(deftest group-keys
-  (testing "groups according to prefix"
-    (is (= {:test {:key "value"}}
-           (sut/group-keys {:test-key "value"} :test))))
-
-  (testing "keeps non-matching keys"
-    (is (= {:test {:key "value"}
-            :other "value"}
-           (sut/group-keys {:test-key "value"
-                            :other "value"}
-                           :test))))
-
-  (testing "merges with existing"
-    (is (= {:test {:key "value"
-                   :existing "value"}}
-           (sut/group-keys {:test-key "value"
-                            :test {:existing "value"}}
-                           :test))))
-
-  (testing "leaves unchanged if no matches"
-    (is (= {:other "value"}
-           (sut/group-keys {:other "value"} :test)))))
-
-(deftest group-and-merge-from-env
-  (testing "merges existing with grouped"
-    (is (= {:key "value"
-            :other-key "other-value"}
-           (-> (sut/group-and-merge-from-env
-                {:test {:key "value"}
-                 :env {:test-other-key "other-value"}}
-                :test)
-               :test))))
-
-  (testing "retains submaps"
-    (is (= {:test {:credentials {:username "test-user"}}}
-           (sut/group-and-merge-from-env
-            {:test {:credentials {:username "test-user"}}}
-            :test))))
-  
-  (testing "leaves unchanged when no matches"
-    (is (= {:key "value"}
-           (sut/group-and-merge-from-env {:key "value"} :test)))))
-
 (deftest app-config
   (testing "provides default values"
     (is (= 3000 (-> (sut/app-config {} {})

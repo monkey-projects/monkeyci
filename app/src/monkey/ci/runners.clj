@@ -142,8 +142,3 @@
   ;; Fallback
   (log/warn "No runner configured, using fallback configuration")
   (constantly 2))
-
-;;; Configuration handling
-
-(defmethod rt/setup-runtime :runner [conf _]
-  (make-runner conf))

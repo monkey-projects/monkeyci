@@ -92,7 +92,7 @@
   rt)
 
 (defn- post-end-evt [{:keys [build] :as rt}]
-  (log/debug "Posting :build/end event")
+  (log/debug "Posting :build/end event for exit code" (:exit-code rt))
   (post-events rt (b/build-end-evt build (get rt :exit-code err/error-process-failure)))
   rt)
 

@@ -528,31 +528,26 @@
 (deftest cancel-build
   (h/with-memory-store st
     (let [build (h/gen-build)
-          events (h/fake-events)
           make-req (fn [& [params]]
-                     (-> {:storage st
-                          :events events}
+                     (-> {:storage st}
                          (h/->req)
                          (assoc :parameters
-                                (merge {:path (select-keys build [:customer-id :repo-id :build-id])}
+                                (merge {:path (select-keys build st/build-sid-keys)}
                                        params))))
-          sid (juxt :customer-id :repo-id :build-id)]
+          sid st/ext-build-sid]
       (is (some? (st/save-build st build)))
       
       (testing "dispatchs `build/canceled` event"
-        (is (= 202 (-> (make-req)
-                       (sut/cancel-build)
-                       :status)))
-        (let [evt (->> events
-                       (h/received-events)
-                       (h/first-event-by-type :build/canceled))]
-          (is (some? evt))
-          (is (spec/valid? ::se/event evt))
-          (is (= (sid build) (:sid evt)))))
+        (let [resp (-> (make-req)
+                       (sut/cancel-build))
+              [e :as evts] (r/get-events resp)]
+          (is (= 202 (:status resp)))
+          (is (= [:build/canceled] (map :type evts)))
+          (is (spec/valid? ::se/event e))
+          (is (= (sid build) (:sid e)))))
       
       (testing "404 if build not found"
-        (h/reset-events events)
-        (is (= 404 (-> (make-req {:path {:build-id "non-existing"}})
-                       (sut/cancel-build)
-                       :status)))
-        (is (empty? (h/received-events events)))))))
+        (let [resp (-> (make-req {:path {:build-id "non-existing"}})
+                       (sut/cancel-build))]
+          (is (= 404 (:status resp)))
+          (is (empty? (r/get-events resp))))))))

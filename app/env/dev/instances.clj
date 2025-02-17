@@ -12,7 +12,6 @@
              [runtime :as rt]
              [utils :as u]]
             [monkey.ci.containers.oci :as oci-cont]
-            [monkey.ci.runners.oci :as ro]
             [monkey.oci.container-instance.core :as ci]
             [manifold
              [deferred :as md]
@@ -52,42 +51,6 @@
   (when (= "ACTIVE" (get-in evt [:details :lifecycle-state]))
     (println "Instance is running:" (get-in evt [:details :display-name]))
     (mt/in 4000 #(fetch-logs client (:details evt)))))
-
-(defn run-test-container [opts]
-  (let [conf (co/oci-container-config)
-        client (ci/make-context conf)
-        ic (-> (ro/instance-config conf {})
-               (assoc :display-name (:display-name opts)
-                      :containers [(dissoc opts :shape)])
-               (mc/assoc-some :shape (:shape opts))
-               (dissoc :volumes))]
-    (log/info "Running instance with config:" ic)
-    (oci/run-instance client ic {:delete? true
-                                 :poll-interval 1000
-                                 :post-event (partial handle-event client)})))
-
-(defn run-tests [configs]
-  (->> configs
-       (map (fn [c]
-              (md/chain
-               (run-test-container c)
-               (partial hash-map :config c :result))))
-       (apply md/zip)))
-
-(defn pinp-test
-  "Trying to get podman-in-podman to run on a container instance."
-  []
-  (let [conf (co/oci-container-config)
-        client (ci/make-context conf)
-        ic (-> (ro/instance-config conf {:build {:build-id "podman-in-container"}})
-               (assoc :containers [{:image-url "fra.ocir.io/frjdhmocn5qi/pinp:latest"
-                                    :display-name "pinp"
-                                    :arguments ["podman" "info"]
-                                    :security-context
-                                    {:security-context-type "LINUX"
-                                     :run-as-user 1000}}])
-               (dissoc :volumes))]
-    (oci/run-instance client ic (partial print-container-logs client))))
 
 (defn delete-container-instance
   "Deletes container instance with given name"
@@ -177,19 +140,15 @@
      (println "Deleting" (count m) "container instances...")
      (let [conf (co/oci-container-config)
            client (ci/make-context conf)]
-       (doseq [ci m]
-         (let [id (:id ci)]
-           (println "Deleting" id)
-           @(ci/delete-container-instance client {:instance-id id})))
-       ;; Results in 429
-       #_(md/loop [td m
-                   res []]
-           (if (not-empty td)
-             (md/chain
-              (ci/delete-container-instance client {:instance-id (:id (first td))})
-              (fn [r]
-                (md/recur (rest td) (conj res r))))
-             (apply md/zip res)))))))
+       (md/loop [td m
+                 res []]
+         (if (not-empty td)
+           (md/chain
+            ;; Results in 429 so we put a timeout
+            (mt/in 2000 #(ci/delete-container-instance client {:instance-id (:id (first td))}))
+            (fn [r]
+              (md/recur (rest td) (conj res r))))
+           (apply md/zip res)))))))
 
 (defn print-job-logs
   "Prints the logs of the (active) job container in the given instance"

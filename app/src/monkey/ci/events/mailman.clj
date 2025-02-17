@@ -355,6 +355,9 @@
 
 ;;; Components
 
+(defprotocol AddRouter
+  (add-router [broker routes opts] "Registers a listener for given routes in the broker"))
+
 (defmulti make-component :type)
 
 (defrecord ManifoldComponent [broker routes]
@@ -368,27 +371,34 @@
   (stop [{:keys [listener] :as this}]
     (when listener
       (mmc/unregister-listener listener))
-    (dissoc this :listener)))
+    (dissoc this :listener))
+
+  AddRouter
+  (add-router [this routes opts]
+    (mmc/add-listener broker (mmc/router routes opts))))
 
 (defmethod make-component :manifold [_]
   (map->ManifoldComponent {}))
 
-(defrecord JmsComponent [config broker routes]
+(defrecord JmsComponent [broker routes]
   co/Lifecycle
-  (start [this]
+  (start [{:keys [config] :as this}]
     (let [broker (mj/jms-broker (assoc config
                                        :destination-mapper (comp (emj/event-destinations config) :type)))
           router (make-router (:routes routes))
-          bridge-dest (get-in config [:bridge :dest])]
+          bridge-dest (get-in config [:bridge :dest])
+          dests (emj/event-destinations config)
+          add-listeners (fn [{:keys [destinations] :as c}]
+                          (assoc c :listeners (add-router c
+                                                          (:routes routes)
+                                                          {:interceptors global-interceptors})))]
       ;; TODO Add listeners for each destination referred to by route event types
       ;; but split up the routes so only those for the destination are added
       (cond-> this
+        true (dissoc :config) ; no longer needed
         true (assoc :broker broker
-                    :listeners (->> (emj/event-destinations config)
-                                    (vals)
-                                    (map (partial hash-map :handler router :destination))
-                                    (map (partial mmc/add-listener broker))
-                                    (doall)))
+                    :destinations dests)
+        true (add-listeners)
         ;; Listen to legacy events, if configured
         bridge-dest (assoc :bridge (mmc/add-listener broker {:destination bridge-dest
                                                              :handler (mmc/router emb/bridge-routes)})))))
@@ -398,7 +408,18 @@
       (mj/disconnect broker))
     (-> this
         (assoc :broker nil)
-        (dissoc :bridge :listeners))))
+        (dissoc :bridge :listeners)))
+
+  AddRouter
+  (add-router [{:keys [destinations]} routes opts]
+    (let [router (mmc/router routes opts)]
+      (->> routes
+           (map first)
+           (map destinations)
+           (distinct)
+           (map (partial hash-map :handler router :destination))
+           (map (partial mmc/add-listener broker))
+           (doall)))))
 
 (defmethod make-component :jms [config]
   (map->JmsComponent {:config config}))

@@ -1,272 +1,404 @@
 (ns monkey.ci.runners.oci-test
   (:require [clojure.test :refer [deftest testing is]]
-            [clojure.core.async :as ca]
-            [clojure.java.io :as io]
             [clojure.spec.alpha :as spec]
-            [clojure.string :as cs]
+            [clojure.string :as cstr]
+            [com.stuartsierra.component :as co]
             [manifold.deferred :as md]
             [monkey.ci
+             [cuid :as cuid]
+             [edn :as edn]
              [oci :as oci]
-             [runners :as r]
-             [sid :as sid]
-             [utils :as u]
-             [version :as v]]
-            [monkey.ci.events.core :as ec]
+             [protocols :as p]
+             [storage :as st]
+             [vault :as v]]
+            [monkey.ci.config.script :as cs]
+            [monkey.ci.events.mailman :as em]
             [monkey.ci.runners.oci :as sut]
             [monkey.ci.spec.events :as se]
-            [monkey.ci.helpers :as h]
             [monkey.oci.container-instance.core :as ci]
-            [monkey.ci.test.runtime :as trt]))
+            [monkey.ci.helpers :as h]
+            [monkey.mailman.core :as mmc]))
 
-(deftest make-runner
-  (testing "provides for `:oci` type"
-    (is (some? (get-method r/make-runner :oci))))
-
-  (testing "creates oci runner"
-    (is (fn? (r/make-runner {:runner {:type :oci}})))))
-
-(deftest oci-runner
-  (let [build {:sid ["test-cust" "test-repo" "test-build"]
-               :git {:url "test-url"
-                     :branch "main"}}
-        rt (trt/test-runtime)]
-    (testing "runs container instance"
-      (with-redefs [oci/run-instance (constantly (md/success-deferred
-                                                  {:status 200
-                                                   :body {:containers [{:exit-code 0}]}}))]
-        (is (= 0 (-> (sut/oci-runner {} {} build rt)
-                     (deref))))))
-
-    (testing "posts `build/initializing` event"
-      (with-redefs [oci/run-instance (constantly (md/success-deferred
-                                                  {:status 200
-                                                   :body {:containers [{:exit-code 0}]}}))]
-        (is (some? (-> (sut/oci-runner {} {} build rt)
-                       (deref))))
-        (let [evt (->> rt
-                       :events
-                       (h/received-events)
-                       (h/first-event-by-type :build/initializing))]
-          (is (spec/valid? ::se/event evt))
-          (is (= build (:build evt))))))
-
-    (testing "posts `build/end` event on error"
-      (with-redefs [oci/run-instance (constantly (md/error-deferred
-                                                  {:status 500
-                                                   :body {:message "test error"}}))]
-        (is (some? (-> (sut/oci-runner {} {} build rt)
-                       (deref))))
-        (let [evt (->> rt
-                       :events
-                       (h/received-events)
-                       (h/first-event-by-type :build/end))]
-          (is (spec/valid? ::se/event evt))
-          (is (= :error (:status evt))))))))
-
-(defn- parse-config-vol [ic]
-  (-> (oci/find-volume ic sut/config-volume)
-      :configs
-      first
-      :data
-      h/base64->
-      u/parse-edn-str))
+(defn- decode-vol-config [vol fn]
+  (some->> vol
+           :configs
+           (filter (comp (partial = fn) :file-name))
+           first
+           :data
+           (h/base64->)))
 
 (deftest instance-config
-  (let [priv-key (h/generate-private-key)
-        build {:build-id "test-build-id"
-               :sid ["a" "b" "test-build-id"]
-               :git {:url "http://git-url"
-                     :branch "main"
-                     :commit-id "test-commit"
-                     :ssh-keys [{:private-key "test-privkey"
+  (let [build {:build-id "test-build"
+               :git {:ssh-keys [{:private-key "test-privkey"
                                  :public-key "test-pubkey"}]}}
-        rt (-> (trt/test-runtime)
-               (trt/set-config
-                {:api {:url "http://test-api"}
-                 :artifacts {:type :disk}
-                 :cache {:type :disk}
-                 :build-cache {:type :disk}}))
-        conf {:availability-domain "test-ad"
-              :compartment-id "test-compartment"
-              :image-pull-secrets "test-secrets"
-              :vnics "test-vnics"
-              :image-url "test-image"
-              :image-tag "test-version"
-              :credentials {:private-key priv-key}}
-        inst (sut/instance-config conf build rt)]
+        ic (sut/instance-config {:log-config "test-log-config"
+                                 :build-image-url "test-clojure-img"
+                                 :api {:private-key (h/generate-private-key)}
+                                 :jwk {:priv (h/generate-private-key)
+                                       :pub "test-pub-key"}}
+                                build)
+        co (:containers ic)]
+    (testing "creates container instance configuration"
+      (is (map? ic))
+      (is (= "test-build" (:display-name ic))))
 
-    (testing "creates display name from build info"
-      (is (= "test-build-id" (:display-name inst))))
+    (testing "contains two containers"
+      (is (= 2 (count co)))
+      (is (every? string? (map :image-url co))))
 
-    (testing "sets tags from sid"
-      (is (= {"customer-id" "a"
-              "repo-id" "b"}
-             (:freeform-tags inst))))
+    (testing "containers run as root"
+      (is (every? zero? (map (comp :run-as-user :security-context) co))))
 
-    (testing "merges with configured tags"
-      (let [inst (sut/instance-config (assoc conf :freeform-tags {"env" "test"})
-                                      build
-                                      rt)]
-        (is (= "a" (get-in inst [:freeform-tags "customer-id"])))
-        (is (= "test" (get-in inst [:freeform-tags "env"])))))
+    (testing "assigns freeform tags containing build info")
 
-    (testing "fails when no git url specified"
-      (is (thrown? Exception (sut/instance-config conf (update build :git dissoc :url) rt))))
+    (testing "controller"
+      (let [c (->> co
+                   (filter (comp (partial = "controller") :display-name))
+                   (first))]
+        (is (some? c))
 
-    (testing "fails when no git branch, tag or commit-id specified"
-      (is (thrown? Exception (sut/instance-config conf
-                                                  (update build :git dissoc :branch :commit-id)
-                                                  rt)))
-      (is (some? (sut/instance-config conf
-                                      (-> build
-                                          (update :git dissoc :branch :commit-id)
-                                          (assoc-in [:git :tag] "test-tag"))
-                                      rt))))
+        (testing "runs monkeyci controller main"
+          (let [args (:arguments c)]
+            (is (= "controller" (last args)))))
 
-    (testing "container"
-      (let [c (first (:containers inst))]
-        
-        (testing "uses configured image tag"
-          (is (= "test-tag"
-                 (-> conf
-                     (assoc :image-tag "test-tag")
-                     (sut/instance-config build rt)
-                     :containers
-                     first
-                     :image-url
-                     (.split ":")
-                     last))))
-        
-        (testing "configures basic properties"
-          (is (string? (:display-name c))))
+        (testing "has config volume mount"
+          (let [vm (oci/find-mount c "config")]
+            (is (some? vm))
+            (is (= "/home/monkeyci/config" (:mount-path vm)))))
 
-        (testing "provides arguments as to monkeyci build"
-          (is (= ["-w" "/opt/monkeyci/checkout"
-                  "build" "run"
-                  "-u" "http://git-url"
-                  "-b" "main"
-                  "--commit-id" "test-commit"]
-                 (:arguments c))))
+        (testing "has checkout volume mount"
+          (is (some? (oci/find-mount c oci/checkout-vol))))
 
-        (testing "config"
-          (testing "passed at global config path"
-            (let [mnt (oci/find-mount c sut/config-volume)]
-              (is (some? mnt))
-              (is (= "/etc/monkeyci" (:mount-path mnt)))))
+        (testing "has ssh keys volume mount"
+          (is (some? (oci/find-mount c "ssh-keys"))))))
 
-          (let [vol (oci/find-volume inst sut/config-volume)
-                parsed (-> vol
-                           :configs
-                           first
-                           :data
-                           h/base64->
-                           u/parse-edn-str)]
-            (testing "contains `config.edn`"
-              (is (= 1 (count (:configs vol))))
-              (is (= "config.edn" (:file-name (first (:configs vol))))))
+    (testing "build"
+      (let [c (->> co
+                   (filter (comp (partial = "build") :display-name))
+                   (first))
+            env (:environment-variables c)]
+        (is (some? c))
 
-            (testing "runner"
-              (let [r (:runner parsed)]
-                (testing "enforces in-container runner"
-                  (is (= :in-container (:type r))))
+        (testing "uses configured image url"
+          (is (= "test-clojure-img" (:image-url c))))
 
-                (testing "adds calculated credit multiplier"
-                  (is (number? (:credit-multiplier r))))))
-            
-            (testing "adds api token"
-              (is (not-empty (get-in parsed [:api :token]))))
+        (testing "invokes script"
+          (is (= "bash" (first (:command c)))))
 
-            (testing "copies configured api"
-              (is (some? (get-in parsed [:api :url]))))
+        (let [config-env (get env "CLJ_CONFIG")]
+          (testing "sets `CLJ_CONFIG` location"
+            (is (some? config-env)))
 
-            (testing "api token contains serialized build sid in sub"
-              (is (= (sid/serialize-sid (:sid build))
-                     (-> parsed
-                         (get-in [:api :token])
-                         (h/parse-token-payload)
-                         :sub))))
+          (testing "mounts script to `CLJ_CONFIG`"
+            (let [vm (oci/find-mount c "script")]
+              (is (some? vm))
+              (is (= config-env (:mount-path vm))))))
 
-            (testing "adds build sid"
-              (is (= (:sid build) (get-in parsed [:build :sid]))))
+        (testing "sets work dir to script dir"
+          (is (= (str oci/work-dir "/" (:build-id build) "/.monkeyci") (get env "MONKEYCI_WORK_DIR"))))
 
-            (testing "containes checkout-base-dir"
-              (is (string? (:checkout-base-dir parsed))))
+        (testing "sets run file"
+          (is (= (str oci/checkout-dir "/" (:build-id build) ".run")
+                 (get env "MONKEYCI_START_FILE"))))
 
-            (testing "contains `build-cache` configuration"
-              (is (some? (:build-cache parsed))))))))
+        (testing "sets abort file"
+          (is (= (str oci/checkout-dir "/" (:build-id build) ".abort")
+                 (get env "MONKEYCI_ABORT_FILE"))))
 
-    (testing "ssh keys"
-      (testing "adds as volume"
-        (let [vol (oci/find-volume inst sut/ssh-keys-volume)]
+        (testing "has checkout volume mount"
+          (is (some? (oci/find-mount c oci/checkout-vol))))))
+
+    (testing "volumes"
+      (testing "contains config"
+        (let [vol (oci/find-volume ic "config")]
           (is (some? vol))
-          (is (= ["key-0" "key-0.pub"]
-                 (->> vol
-                      :configs
-                      (map :file-name))))))
-
-      (let [cc (first (:containers inst))
-            mnt (oci/find-mount cc sut/ssh-keys-volume)
-            conf (parse-config-vol inst)]
-        (testing "mounts in container"
-          (is (some? mnt)))
-
-        (testing "adds ssh keys dir in config"
-          (is (= (:mount-path mnt)
-                 (get-in conf [:build :git :ssh-keys-dir]))))))
-
-    (testing "log config"
-      (h/with-tmp-dir dir
-        (let [log-path (io/file dir "logback-test.xml")
-              rt (assoc-in rt [:config :runner :log-config] (.getAbsolutePath log-path))
-              _ (spit log-path "test log contents")
-              inst (sut/instance-config conf build rt)
-              vol (oci/find-volume inst sut/log-config-volume)]
           
-          (testing "adds as volume"
-            (is (some? vol))
-            (is (sequential? (:configs vol))))
+          (testing "contains `config.edn`"
+            (let [conf (some-> (decode-vol-config vol "config.edn")
+                               (edn/edn->))]
+              (is (some? conf)
+                  "should contain config file")
 
-          (let [cc (first (:containers inst))
-                mnt (oci/find-mount cc sut/log-config-volume)
-                conf (parse-config-vol inst)]
-            (testing "mounts in container"
-              (is (some? mnt)))
+              (testing "with git checkout dir"
+                (is (= (str oci/work-dir "/" (:build-id build))
+                       (get-in conf [:build :git :dir]))))
 
-            (testing "adds config file path as env var"
-              (is (= (str (:mount-path mnt) "/" (-> vol :configs first :file-name))
-                     (get-in conf [:runner :log-config]))))))))
+              (testing "with build checkout dir"
+                (is (some? (get-in conf [:build :checkout-dir]))))
+              
+              (testing "with ssh keys dir"
+                (is (some? (get-in conf [:build :git :ssh-keys-dir]))))
 
-    (testing "events config"
-      (testing "taken from top level"
-        (let [rt (assoc-in rt [:config :events :client :address] "test-addr")
-              inst (sut/instance-config conf build rt)
-              conf (parse-config-vol inst)]
-          (is (= "test-addr" (get-in conf [:events :client :address])))))
+              (testing "with api token and port"
+                (is (number? (get-in conf [:runner :api-port])))
+                (is (string? (get-in conf [:runner :api-token]))))
 
-      (testing "merges with runner specific config"
-        (let [rt (-> rt
-                     (assoc-in [:config :events] {:type :jms
-                                                  :client {:address "test-addr"
-                                                           :username "test-user"}})
-                     (assoc-in [:config :runner :events :client :address] "runner-addr"))
-              inst (sut/instance-config conf build rt)
-              conf (parse-config-vol inst)]
-          (is (= "runner-addr" (get-in conf [:events :client :address])))
-          (is (= "test-user" (get-in conf [:events :client :username])))
-          (is (= :jms (get-in conf [:events :type]))))))))
- 
-(deftest wait-for-build-end-event
-  (testing "returns a deferred that holds the script end event"
-    (let [events (ec/make-events {:type :manifold})
-          sid (repeatedly 3 random-uuid)
-          d (sut/wait-for-build-end-event events sid)]
-      (is (md/deferred? d))
-      (is (not (md/realized? d)) "should not be realized initially")
-      (is (some? (ec/post-events events [{:type :script/start
-                                          :sid sid}])))
-      (is (not (md/realized? d)) "should not be realized after start event")
-      (is (some? (ec/post-events events [{:type :build/end
-                                          :sid sid}])))
-      (is (= :build/end (-> (deref d 100 :timeout)
-                            :type))))))
+              (testing "with public api token"
+                (is (string? (get-in conf [:api :token]))))
 
+              (testing "without jwk"
+                (is (not (contains? conf :jwk))))
+
+              (testing "with `checkout-base-dir`"
+                (is (= oci/work-dir (:checkout-base-dir conf))))))
+
+          (testing "contains `logback.xml`"
+            (let [f (decode-vol-config vol "logback.xml")]
+              (is (= "test-log-config" f))))))
+
+      (testing "contains script"
+        (let [vol (oci/find-volume ic "script")]
+          (is (some? vol))
+
+          (let [deps (some-> (decode-vol-config vol "deps.edn")
+                             (edn/edn->))]
+            (testing "contains `deps.edn`"
+              (is (some? deps)))
+
+            (testing "uses script dir as source path"
+              (is (= (cstr/join "/" [oci/work-dir (:build-id build) ".monkeyci"])
+                     (-> deps :paths first))))
+
+            (testing "provides monkeyci dependency"
+              (is (string? (get-in deps [:aliases :monkeyci/build :extra-deps 'com.monkeyci/app :mvn/version]))))
+
+            (let [sc (get-in deps [:aliases :monkeyci/build :exec-args :config])]
+              (testing "passes script config as exec arg"
+                (is (map? sc)))
+
+              (testing "contains build"
+                (let [r (cs/build sc)]
+                  (is (= (:build-id build) (:build-id r)))
+                  
+                  (testing "without ssh keys"
+                    (is (nil? (get-in r [:git :ssh-keys]))))
+
+                  (testing "with credit multiplier"
+                    (is (number? (:credit-multiplier r))))))
+
+              (testing "contains api url and token"
+                (let [api (cs/api sc)]
+                  (is (string? (:url api)))
+                  (is (string? (:token api))))))
+
+            (testing "points to logback config file"
+              (is (re-matches #"^-Dlogback\.configurationFile=.*$"
+                              (-> (get-in deps [:aliases :monkeyci/build :jvm-opts])
+                                  first))))
+
+            (testing "sets m2 cache dir"
+              (is (string? (:mvn/local-repo deps)))))
+
+          (testing "contains `build.sh`"
+            (is (some? (decode-vol-config vol "build.sh"))))))
+
+      (testing "contains log config"
+        (is (some? (oci/find-volume ic "log-config"))))
+
+      (testing "contains ssh keys"
+        (is (some? (oci/find-volume ic "ssh-keys")))))))
+
+(deftest start-ci
+  (let [{:keys [enter] :as i} (sut/start-ci ::test-client)
+        inv (atom [])]
+    (is (keyword? (:name i)))
+
+    (with-redefs [ci/create-container-instance (fn [client ic]
+                                                 (swap! inv conj {:client client
+                                                                  :config ic})
+                                                 (md/success-deferred {:status 200}))]
+      (testing "`enter` starts container instance"
+        (let [r (-> {}
+                    (sut/set-ci-config ::test-config)
+                    (enter))]
+          (is (= {:container-instance ::test-config}
+                 (-> @inv
+                     first
+                     :config)))
+          (is (= ::test-client
+                 (-> @inv
+                     first
+                     :client)))
+          (is (= {:status 200}
+                 (sut/get-ci-response r)))))
+
+      (testing "fails if creation fails"))))
+
+(deftest decrypt-ssh-keys
+  (h/with-memory-store st
+    (let [vault (v/->FixedKeyVault (v/generate-key))
+          iv (v/generate-iv)
+          {:keys [enter] :as i} (sut/decrypt-ssh-keys vault)]
+      (is (keyword? (:name i)))
+
+      (testing "decrypts key using customer iv"
+        (let [ssh-key "decrypted-key"
+              cust (h/gen-cust)
+              build (-> (h/gen-build)
+                        (assoc :customer-id (:id cust))
+                        (assoc-in [:git :ssh-keys] [{:private-key (p/encrypt vault iv ssh-key)
+                                                     :public-key "test-pub"}]))
+              _ (st/save-crypto st {:customer-id (:id cust)
+                                    :iv iv})
+              r (-> {:event {:type :build/pending
+                             :sid (st/ext-build-sid build)
+                             :build build}}
+                    (em/set-db st)
+                    (enter))]
+          (is (= [{:private-key "decrypted-key"
+                   :public-key "test-pub"}]
+                 (->> r
+                      :event
+                      :build
+                      :git
+                      :ssh-keys))))))))
+
+(deftest prepare-ci-config
+  (let [{:keys [enter] :as i} (sut/prepare-ci-config
+                               {:api {:private-key (h/generate-private-key)}})]
+    (is (keyword? (:name i)))
+    
+    (testing "updates ci config with container details"
+      (let [r (enter {})]
+        (is (= 2 (-> (sut/get-ci-config r)
+                     :containers
+                     count)))))))
+
+(deftest save-runner-details
+  (let [{:keys [enter]:as i} sut/save-runner-details]
+    (is (keyword? (:name i)))
+    
+    (testing "`enter` saves ci results in db"
+      (h/with-memory-store st
+        (let [sid (repeatedly 3 cuid/random-cuid)
+              ctx (-> {:event {:sid sid}}
+                      (sut/set-ci-response {:status 200
+                                            :body {:id "test-ocid"}})
+                      (em/set-db st))
+              r (enter ctx)]
+          (is (= ctx r))
+          (is (= {:runner :oci
+                  :details {:instance-id "test-ocid"}}
+                 (st/find-runner-details st sid))))))))
+
+(deftest load-runner-details
+  (let [{:keys [enter]:as i} sut/load-runner-details]
+    (is (keyword? (:name i)))
+    
+    (testing "`enter` fetches runner details from db"
+      (h/with-memory-store st
+        (let [sid (repeatedly 3 cuid/random-cuid)
+              ctx (-> {:event {:sid sid}}
+                      (em/set-db st))
+              details {:runner :oci
+                       :details {:instance-id (random-uuid)}}
+              _ (st/save-runner-details st sid details)
+              r (enter ctx)]
+          (is (= details
+                 (sut/get-runner-details r))))))))
+
+(deftest handle-error
+  (let [{:keys [error] :as i} sut/handle-error
+        test-error (ex-info "test error" {})]
+    (is (keyword? (:name i)))
+    (testing "has error handler"
+      (is (fn? error)))
+
+    (testing "returns `build/end` event with failure"
+      (let [r (:result (error {} test-error))]
+        (is (= :build/end (:type r)))
+        (is (= "test error" (get-in r [:build :message])))))
+
+    (testing "removes exception from context"
+      (is (nil? (-> {:io.pedestal.interceptor.chain/error test-error}
+                    (error test-error)
+                    :io.pedestal.interceptor.chain/error))))))
+
+(deftest initialize-build
+  (testing "returns `build/initializing` event"
+    (is (= :build/initializing
+           (-> {:event {:build {:sid ::test-build}}}
+               (sut/initialize-build)
+               :type)))))
+
+(deftest delete-instance
+  (testing "deletes container instance according to runner details"
+    (h/with-memory-store st
+      (let [build (h/gen-build)
+            sid (st/ext-build-sid build)
+            ocid (random-uuid)
+            ctx (-> {:event {:sid sid
+                             :type :build/end
+                             :build build}}
+                    (em/set-db st)
+                    (sut/set-runner-details {:details {:instance-id ocid}}))
+            deleted (atom nil)]
+        (with-redefs [ci/delete-container-instance (fn [client opts]
+                                                     (reset! deleted opts)
+                                                     (md/success-deferred {:status 200}))]
+          (is (nil? (sut/delete-instance ::test-client ctx)))
+          (is (= {:instance-id ocid} @deleted)))))))
+
+(deftest make-router
+  (let [build (h/gen-build)
+        st (st/make-memory-storage)
+        conf {:api {:private-key (h/generate-private-key)}}]
+    
+    (testing "`build/queued`"
+      (testing "returns `build/initializing` event"
+        (let [fake-start-ci {:name ::sut/start-ci
+                             :enter (fn [ctx]
+                                      (sut/set-ci-response ctx {:status 200
+                                                                :body {:id "test-instance"}}))}
+              router (-> (sut/make-router conf st (h/fake-vault))
+                         (mmc/replace-interceptors [fake-start-ci]))
+
+              r (router {:type :build/queued
+                         :sid (st/ext-build-sid build)
+                         :build build})
+              res (-> r
+                      first
+                      :result
+                      first)]
+          (is (spec/valid? ::se/event res))
+          (is (= :build/initializing (:type res)))))
+
+      (testing "when instance creation fails, returns `build/end` event"
+        (let [fail-start-ci {:name ::sut/start-ci
+                             :enter (fn [ctx]
+                                      (sut/set-ci-response ctx {:status 500
+                                                                :body {:id "test-instance"}}))}
+              router (-> (sut/make-router conf st (h/fake-vault))
+                         (mmc/replace-interceptors [fail-start-ci]))
+
+              r (router {:type :build/queued
+                         :sid (st/ext-build-sid build)
+                         :build build})
+              res (-> r
+                      first
+                      :result
+                      first)]
+          (is (spec/valid? ::se/event res))
+          (is (= :build/end (:type res)))
+          (is (= :error (-> res :build :status))))))))
+
+(defrecord FakeListener [unreg?]
+  mmc/Listener
+  (unregister-listener [this]
+    (reset! unreg? true)))
+
+(deftest runner-component
+  (let [mm (-> (em/make-component {:type :manifold})
+               (co/start))]
+    (testing "`start` registers broker listeners"
+      (is (not-empty (-> (sut/map->OciRunner {:mailman mm})
+                         (co/start)
+                         :listeners))))
+
+    (testing "`stop` unregisters broker listeners"
+      (let [unreg? (atom false)
+            l (->FakeListener unreg?)]
+        (is (nil? (-> (sut/map->OciRunner {:listeners [l]})
+                      (co/stop)
+                      :listeners)))
+        (is (true? @unreg?))))))

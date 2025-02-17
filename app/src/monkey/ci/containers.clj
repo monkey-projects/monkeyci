@@ -1,15 +1,5 @@
 (ns monkey.ci.containers
-  "Generic functionality for running containers"
-  (:require [monkey.ci
-             [protocols :as p]
-             [runtime :as rt]]))
-
-;;; Configuration handling
-
-(defmulti normalize-containers-config (comp :type :containers))
-
-(defmethod normalize-containers-config :default [conf]
-  conf)
+  "Generic functionality for running containers")
 
 (def image (some-fn :container/image :image))
 (def env :container/env)

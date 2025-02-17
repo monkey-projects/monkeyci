@@ -15,7 +15,9 @@
             [monkey.ci.helpers :as h]
             [monkey.ci.test.runtime :as trt]
             [monkey.jms :as jms]
-            [monkey.mailman.mem :as mmm]))
+            [monkey.mailman
+             [core :as mmc]
+             [mem :as mmm]]))
 
 (defn- validate-spec [spec obj]
   (is (spec/valid? spec obj)
@@ -567,14 +569,15 @@
                       :listener))))))
 
   (testing "jms"
-    (let [c (sut/make-component {:type :jms})]
-      (testing "can make component"
-        (is (some? c)))
+    (with-redefs [jms/connect (constantly ::connected)
+                  jms/make-consumer (constantly ::consumer)
+                  jms/set-listener (constantly nil)]
+      (let [c (-> (sut/make-component {:type :jms})
+                  (assoc :routes {:routes [[:build/start [{:handler (constantly nil)}]]]}))]
+        (testing "can make component"
+          (is (some? c)))
 
-      (testing "`start`"
-        (with-redefs [jms/connect (constantly ::connected)
-                      jms/make-consumer (constantly ::consumer)
-                      jms/set-listener (constantly nil)]
+        (testing "`start`"
           (let [s (co/start c)]
             (testing "connects to broker"
               (is (= ::connected (get-in s [:broker :context]))))
@@ -583,30 +586,37 @@
               (is (not-empty (:listeners s))))
 
             (testing "does not registers compatibility bridge if not configured"
-              (is (nil? (:bridge s)))))))
+              (is (nil? (:bridge s))))))
 
-      (testing "`stop`"
-        (let [closed? (atom false)]
-          (with-redefs [jms/disconnect (fn [_]
-                                         (reset! closed? true))]
-            (let [s (-> (sut/map->JmsComponent {:broker ::test-broker})
-                        (co/stop))]
-              (testing "disconnects from broker"
-                (is (nil? (:broker s)))
-                (is (true? @closed?)))
+        (testing "`stop`"
+          (let [closed? (atom false)]
+            (with-redefs [jms/disconnect (fn [_]
+                                           (reset! closed? true))]
+              (let [s (-> (sut/map->JmsComponent {:broker ::test-broker})
+                          (co/stop))]
+                (testing "disconnects from broker"
+                  (is (nil? (:broker s)))
+                  (is (true? @closed?)))
 
-              (testing "unregisters listeners"))))))
+                (testing "unregisters listeners"))))))
 
-    (testing "with compatibility bridge"
-      (with-redefs [jms/connect (constantly ::connected)
-                    jms/make-consumer (constantly ::consumer)
-                    jms/set-listener (constantly nil)]
+      (testing "with compatibility bridge"
         (let [c (->  {:type :jms
                       :bridge {:dest "queue://legacy-dest"}}
                      (sut/make-component)
                      (co/start))]
           (testing "registers listener at start"
-            (is (some? (:bridge c)))))))))
+            (is (some? (:bridge c))))))
+
+      (testing "`add-router` adds one listener per destination"
+        (let [c (-> (sut/make-component {:type :jms})
+                    (co/start))
+              l (sut/add-router c
+                                [[:build/start [{:handler (constantly nil)}]]
+                                 [:build/end [{:handler (constantly nil)}]]]
+                                {})]
+          (is (= 1 (count l)))
+          (is (every? (partial satisfies? mmc/Listener) l)))))))
 
 (deftest merge-routes
   (testing "merges handlers together per type"
