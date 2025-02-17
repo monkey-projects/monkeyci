@@ -36,4 +36,8 @@
 (deftest job-end
   (testing "queues pending jobs with completed dependencies")
 
-  (testing "returns `script/end` when no more jobs to run"))
+  (testing "returns `script/end` event when no more jobs to run"
+    (is (= [:script/end]
+           (->> (sut/job-end {})
+                (sut/get-events)
+                (map :type))))))

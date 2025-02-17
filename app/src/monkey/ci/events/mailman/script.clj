@@ -58,7 +58,7 @@
    if all jobs have been executed."
   [ctx]
   ;; TODO
-  nil)
+  (set-events ctx [(script-end-evt ctx :success)]))
 
 (defn make-routes [conf]
   [[:script/start
