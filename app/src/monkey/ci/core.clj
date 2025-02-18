@@ -8,31 +8,13 @@
             [clojure.tools.logging :as log]
             [config.core :refer [env]]
             [monkey.ci
-             [artifacts]
-             [cache]
              [cli :as mcli]
              [config :as config]
-             [containers]
-             [git]
-             [listeners]
-             [logging]
              [runtime :as rt]
-             [runners]
-             [sidecar]
              [utils :as u]
-             [version :as v]
-             [workspace]]
-            [monkey.ci.containers
-             [oci]]
+             [version :as v]]
             [monkey.ci.events.core :as ec]
-            [monkey.ci.reporting.print]
-            [monkey.ci.runners
-             [server]]
-            [monkey.ci.storage
-             [cached]
-             [file]
-             [oci]
-             [sql]]))
+            [monkey.ci.reporting.print]))
 
 (defn system-invoker
   "Creates a new runtime and invokes the command using the specified application 

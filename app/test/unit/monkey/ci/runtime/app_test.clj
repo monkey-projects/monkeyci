@@ -14,8 +14,7 @@
             [monkey.ci.runtime.app :as sut]
             [monkey.ci.spec.runner :as sr]
             [monkey.ci.test.config :as tc]
-            [monkey.ci.helpers :as h])
-  (:import monkey.ci.listeners.Listeners))
+            [monkey.ci.helpers :as h]))
 
 (def runner-config
   (assoc tc/base-config
