@@ -9,6 +9,7 @@
 
 (s/def ::api ::ba/api)
 (s/def ::build map?) ; TODO specify
+(s/def ::job map?) ; TODO specify
 
 (s/def ::config
   (s/keys :req [::api ::build]))
@@ -20,3 +21,9 @@
 
 (s/def ::runtime
   (s/keys :req-un [::containers ::artifacts ::cache ::events]))
+
+(s/def :context/api ::ba/client)
+
+(s/def ::context
+  (s/keys :req-un [::build :context/api]
+          :opt-un [::job]))

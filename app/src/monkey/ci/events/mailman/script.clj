@@ -1,12 +1,15 @@
 (ns monkey.ci.events.mailman.script
   "Mailman event routes for scripts"
-  (:require [monkey.ci
+  (:require [meta-merge.core :as mm]
+            [monkey.ci
              [build :as b]
-             [jobs :as j]]
+             [jobs :as j]
+             [script :as s]]
             [monkey.ci.events
-             [core :as ec]
-             [mailman :as em]]
+             [core :as ec]]
             [monkey.ci.build.core :as bc]))
+
+;;; Context management
 
 (def get-queued ::queued)
 
@@ -18,6 +21,53 @@
 (defn set-events [ctx q]
   (assoc ctx ::events q))
 
+(def get-state ::state)
+
+(defn set-state [ctx q]
+  (assoc ctx ::state q))
+
+(defn update-state [ctx f & args]
+  (apply update ctx ::state f args))
+
+(def get-jobs (comp :jobs get-state))
+
+(defn set-jobs [ctx jobs]
+  (update-state ctx assoc :jobs jobs))
+
+(def get-build (comp :build get-state))
+
+(defn set-build [ctx build]
+  (update-state ctx assoc :build build))
+
+(defn job-ctx
+  "Creates a job execution context from the event context"
+  [ctx]
+  {:build (get-build ctx)
+   :api (:api ctx)})
+
+;;; Interceptors
+
+(defn with-state
+  "Interceptor that keeps track of a global state object in the context.
+   The updated state is `meta-merge`d into the global state."
+  [state]
+  {:name ::state
+   :enter (fn [ctx]
+            (set-state ctx @state))
+   :leave (fn [ctx]
+            (swap! state mm/meta-merge (get-state ctx))
+            ctx)})
+
+(def load-jobs
+  "Interceptor that loads jobs from the location pointed to by the script-dir 
+   and adds them to the state."
+  {:name ::load-jobs
+   :enter (fn [ctx]
+            (set-jobs ctx (s/load-jobs (get-build ctx)
+                                       (job-ctx ctx))))})
+
+;;; Event builders
+
 (defn- base-event
   "Creates a skeleton event with basic properties"
   [build type]
@@ -28,18 +78,28 @@
 
 (defn- script-end-evt [ctx status]
   ;; TODO Add job results
-  (-> (base-event (em/get-build ctx) :script/end)
+  (-> (base-event (get-build ctx) :script/end)
       (assoc :status status)))
+
+;;; Handlers
+
+(defn script-init
+  "Loads all jobs in the build script, then starts the script"
+  [ctx]
+  (letfn [(mark-pending [job]
+            (assoc job :status :pending))]
+    (-> (base-event (get-build ctx) :script/start)
+        (assoc :jobs (map (comp mark-pending j/job->event) (get-jobs ctx))))))
 
 (defn script-start
   "Queues all jobs that have no dependencies"
   [ctx]
-  (let [jobs (-> ctx :event :script :jobs (j/next-jobs))]
+  (let [jobs (get-jobs ctx)]
     (if (empty? jobs)
       ;; TODO Should be warning instead of error
       (set-events ctx [(-> (script-end-evt ctx :error)
                            (bc/with-message "No jobs to run"))])
-      (set-queued ctx jobs))))
+      (set-queued ctx (j/next-jobs jobs)))))
 
 (defn job-queued
   "It's up to the container runner to handle this.  Or if it's an action job,
@@ -61,14 +121,19 @@
   (set-events ctx [(script-end-evt ctx :success)]))
 
 (defn make-routes [conf]
-  [[:script/start
-    [{:handler script-start}]]
+  (let [state (with-state (atom {}))]
+    [[:script/initializing
+      [{:handler script-init
+        :initializers [load-jobs]}]]
 
-   [:job/queued
-    [{:handler job-queued}]]
+     [:script/start
+      [{:handler script-start}]]
 
-   [:job/executed
-    [{:handler job-executed}]]
+     [:job/queued
+      [{:handler job-queued}]]
 
-   [:job/end
-    [{:handler job-end}]]])
+     [:job/executed
+      [{:handler job-executed}]]
+
+     [:job/end
+      [{:handler job-end}]]]))
