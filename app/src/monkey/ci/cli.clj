@@ -47,20 +47,19 @@
    :description "Verifies local build script"
    :opts [script-location-opt]
    :runs {:command cmd/verify-build
-          :app-mode :cli
-          :runtime? false}})
-
-(def list-build-cmd
-  {:command "list"
-   :description "Lists builds for customer or repo"
-   :runs {:command cmd/list-builds
           :app-mode :cli}})
 
-(def watch-cmd
-  {:command "watch"
-   :description "Logs build events for customer or repo"
-   :runs {:command cmd/watch
-          :app-mode :cli}})
+;; (def list-build-cmd
+;;   {:command "list"
+;;    :description "Lists builds for customer or repo"
+;;    :runs {:command cmd/list-builds
+;;           :app-mode :cli}})
+
+;; (def watch-cmd
+;;   {:command "watch"
+;;    :description "Logs build events for customer or repo"
+;;    :runs {:command cmd/watch
+;;           :app-mode :cli}})
 
 (def test-cmd
   {:command "test"
@@ -70,8 +69,7 @@
            :short "w"
            :type :with-flag}]
    :runs {:command cmd/run-tests
-          :app-mode :cli
-          :runtime? false}})
+          :app-mode :cli}})
 
 (def build-cmd
   {:command "build"
@@ -90,8 +88,9 @@
            :type :string}]
    :subcommands [run-build-cmd
                  verify-build-cmd
-                 list-build-cmd
-                 watch-cmd
+                 ;; Disbled until refactored
+                 #_list-build-cmd
+                 #_watch-cmd
                  test-cmd]})
 
 (def server-cmd
@@ -104,9 +103,7 @@
            :default 3000
            :env "PORT"}]
    :runs {:command cmd/http-server
-          ;;:requires [:http]
-          :app-mode :server
-          :runtime? false}})
+          :app-mode :server}})
 
 (def sidecar-cmd
   {:command "sidecar"
@@ -131,15 +128,13 @@
            :short "t"
            :type :ednfile}]
    :runs {:command cmd/sidecar
-          :app-mode :script
-          :runtime? false}})
+          :app-mode :script}})
 
 (def controller-cmd
   {:command "controller"
    :description "Runs as controller (for internal use)"
    :runs {:command cmd/controller
-          :app-mode :script
-          :runtime? false}})
+          :app-mode :script}})
 
 (def issue-creds-cmd
   {:command "issue"
@@ -156,8 +151,7 @@
            :short "d"
            :type :yyyy-mm-dd}]
    :runs {:command cmd/issue-creds
-          :app-mode :cli
-          :runtime? false}})
+          :app-mode :cli}})
 
 (def admin-cmd
   {:command "admin"

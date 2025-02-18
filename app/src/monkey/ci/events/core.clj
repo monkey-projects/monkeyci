@@ -91,11 +91,6 @@
 (defmethod make-events :manifold [_]
   (manifold/make-manifold-events matches-event?))
 
-(defmethod rt/setup-runtime :events [conf _]
-  ;; Can be removed once we no longer use the old runtime in cli commands
-  (when-let [ec (:events conf)]
-    (make-events ec)))
-
 (defn wrapped
   "Returns a new function that wraps `f` and posts an event before 
    and after.  The `before` fn just receives the same arguments as 

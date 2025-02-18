@@ -101,9 +101,9 @@
                            (bc/with-message "No jobs to run"))])
       (set-queued ctx (j/next-jobs jobs)))))
 
-(defn job-queued
-  "It's up to the container runner to handle this.  Or if it's an action job,
-   should be executed in a new thread."
+(defn action-job-queued
+  "Executes an action job in a new thread.  For container jobs, it's up to the
+   container runner implementation to handle the events."
   [ctx]
   )
 
@@ -129,8 +129,8 @@
      [:script/start
       [{:handler script-start}]]
 
-     [:job/queued
-      [{:handler job-queued}]]
+     [:job/action-queued
+      [{:handler action-job-queued}]]
 
      [:job/executed
       [{:handler job-executed}]]

@@ -43,10 +43,7 @@
     (log/debug "Invoking command with arguments:" args)
     (let [config (config/app-config env args)]
       (log/info "Executing command:" command)
-      (if runtime?
-        (rt/with-runtime config app-mode runtime
-          (command runtime))
-        (command config)))))
+      (command config))))
 
 (defn make-cli-config [{:keys [cmd-invoker env] :or {cmd-invoker system-invoker}}]
   (letfn [(invoker [cmd]

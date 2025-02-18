@@ -6,8 +6,7 @@
             [monkey.ci
              [blob :as b]
              [build :as build]
-             [protocols :as p]
-             [runtime :as rt]]
+             [protocols :as p]]
             [monkey.ci.build.archive :as arch]))
 
 (defn workspace-dest
@@ -65,10 +64,3 @@
      #(arch/extract % (checkout-dir build)))))
 
 (def make-build-api-workspace ->BuildApiWorkspace)
-
-;;; Configuration handling
-
-(defmethod rt/setup-runtime :workspace [conf k]
-  (when (k conf)
-    (b/make-blob-store conf k)))
-

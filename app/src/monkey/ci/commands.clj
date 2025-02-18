@@ -51,39 +51,6 @@
   ;; TODO
   [config])
 
-;; (defn- deps-exists? [rt]
-;;   (fs/exists? (fs/path (get-in rt [:build :script :script-dir]) "deps.edn")))
-
-;; (defn- verify-child-proc
-;;   "Starts a child process to perform verification.  This is necessary if a `deps.edn`
-;;    exists with custom dependencies."
-;;   [rt]
-;;   ;; TODO Need to get back reported info.  Using a UDS?
-;;   1)
-
-;; (defn- verify-in-proc
-;;   "Verifies the build in the current directory by loading the script files in-process
-;;    and resolving the jobs.  This is useful when checking if there are any compilation
-;;    errors in the script."
-;;   [rt]
-;;   (letfn [(report [rep]
-;;             (rt/report rt rep)
-;;             (if (= :verify/success (:type rep)) 0 err/error-script-failure))]
-;;     (try
-;;       ;; TODO Git branch and other options
-;;       ;; TODO Build parameters
-;;       (let [jobs (script/load-jobs (:build rt) rt)]
-;;         (report
-;;          (if (not-empty jobs)
-;;            {:type :verify/success
-;;             :jobs jobs}
-;;            {:type :verify/failed
-;;             :message "No jobs found in build script for the active configuration"})))
-;;       (catch Exception ex
-;;         (log/error "Error verifying build" ex)
-;;         (report {:type :verify/failed
-;;                  :message (ex-message ex)})))))
-
 (defn verify-build
   "Runs a linter agains the build script to catch any grammatical errors."
   [conf]
@@ -104,7 +71,7 @@
                      :build (:build rt)})
       (:exit @(proc/test! (:build rt) rt)))))
 
-(defn list-builds [rt]
+(defn ^:deprecated list-builds [rt]
   (->> (http/get (apply format "%s/customer/%s/repo/%s/builds"
                         ((juxt :url :customer-id :repo-id) (rt/account rt)))
                  {:headers {"accept" "application/edn"}})
@@ -128,7 +95,7 @@
       ;; Wait for server to stop
       (h/on-server-close http))))
 
-(defn watch
+(defn ^:deprecated watch
   "Starts listening for events and prints the results.  The arguments determine
    the event filter (all for a customer, project, or repo)."
   [rt]
@@ -160,21 +127,6 @@
                     (log/error "Unable to receive server events:" err))))
     ;; Return a deferred that only resolves when the event stream stops
     d))
-
-(defn- sidecar-rt->job [rt]
-  (get-in rt [rt/config :args :job-config :job]))
-
-(defn- ^:deprecated ->sidecar-rt
-  "Creates a runtime for the sidecar from the generic runtime.  To be removed."
-  [rt]
-  (let [conf (get-in rt [rt/config :sidecar])
-        args (get-in rt [rt/config :args])]
-    (-> rt
-        (select-keys [:build :events :workspace :artifacts :cache])
-        (assoc :job (sidecar-rt->job rt)
-               :log-maker (rt/log-maker rt)
-               :paths (select-keys args [:events-file :start-file :abort-file]))
-        (mc/assoc-some :poll-interval (get-in rt [rt/config :sidecar :poll-interval])))))
 
 (defn- run-sidecar [{:keys [events job] :as rt}]
   (let [sid (b/get-sid rt)

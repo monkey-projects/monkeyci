@@ -9,7 +9,6 @@
             [monkey.ci
              [cuid :as cuid]
              [protocols :as p]
-             [runtime :as rt]
              [sid :as sid]]
             [monkey.ci.common.preds :as cp]
             [monkey.ci.storage.cached :as cached])
@@ -70,12 +69,6 @@
 (defmethod make-storage :memory [_]
   (log/info "Using memory storage (only for dev purposes!)")
   (make-memory-storage))
-
-(defmethod rt/setup-runtime :storage [conf _]
-  ;; Wrap in cache if so requested by storage object
-  (let [st (make-storage conf)]
-    (cond-> st
-      (:cached? st) (cached/->CachedStorage (make-memory-storage)))))
 
 (defn- override-or
   "Invokes the override function in the storage at given path, or calls the
