@@ -38,7 +38,7 @@
           {:as "Repository sid"
            :option "sid"
            :type :string}]
-   :runs {:command cmd/run-build
+   :runs {:command cmd/run-build-local
           :app-mode :cli
           :runtime? false}})
 

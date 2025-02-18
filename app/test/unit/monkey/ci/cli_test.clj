@@ -28,7 +28,7 @@
         (testing "`run` subcommand"
           (testing "runs `run-build` command"
             (let [lc (run-cli "build" "run")]
-              (is (= cmd/run-build (:cmd lc)))))
+              (is (= cmd/run-build-local (:cmd lc)))))
 
           (testing "accepts script dir `-d`"
             (let [lc (run-cli "build" "run" "-d" "test-dir")]

@@ -31,7 +31,8 @@
              [auth :as auth]
              [handler :as h]]))
 
-(defn run-build
+;; Deprecated, only used by the server build runner, which will be phased out.
+(defn ^:deprecated run-build
   "Performs a build, using the runner from the context.  Returns a deferred
    that will complete when the build finishes."
   [config]
