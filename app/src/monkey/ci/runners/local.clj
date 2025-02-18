@@ -15,17 +15,34 @@
    The build controller, responsible for managing build params and events, is
    run in the main process.  Builds connect to it using http, same as for 
    server-side builds."
-  (:require [monkey.ci.build :as b]))
+  
+  (:require [clojure.tools.logging :as log]
+            [monkey.ci
+             [build :as b]
+             [git :as git]]))
+
+;;; Context management
+
+(def get-git-repo ::git-repo)
+
+(defn set-git-repo [ctx r]
+  (assoc ctx ::git-repo r))
 
 ;;; Interceptors
 
 (def checkout-src
   {:name ::checkout
    :enter (fn [ctx]
-            ;; TODO Download source from git
-            )})
+            (let [git (get-in ctx [:event :build :git])]
+              (log/debug "Cloning repo" (:url git) "into" (:dir git))
+              (set-git-repo ctx (git/clone+checkout git))))})
 
-(def save-workspace)
+(defn save-workspace [dest]
+  {:name ::save-ws
+   :enter (fn [ctx]
+            ;; TODO Copy local dir into workspace, but skip all git ignored files
+            ;; TODO Use git/copy-with-ignore
+            ctx)})
 
 (def start-child)
 
@@ -48,7 +65,13 @@
   "Starts the build using a child process."
   [ctx])
 
-(defn build-end [ctx])
+(defn build-init-container
+  "Starts the build using a container"
+  [ctx])
+
+(defn build-end [ctx]
+  ;; Clean up
+  )
 
 ;;; Routes
 
@@ -56,7 +79,9 @@
   [[:build/pending
     ;; Responsible for preparing the build environment and starting the
     ;; child process or container.
-    [{:handler build-pending}]]
+    [{:handler build-pending
+      :interceptors (cond-> []
+                      (get-in conf [:build :git]) (conj checkout-src))}]]
    [:build/initializing
     ;; Checkout build code, start controller
     [{:handler build-init-child}]]
@@ -64,5 +89,5 @@
     ;; Build process has started, script can be loaded
     [{:handler build-start}]]
    [:build/end
-    ;; Build has completed
+    ;; Build has completed, clean up
     [{:handler build-end}]]])

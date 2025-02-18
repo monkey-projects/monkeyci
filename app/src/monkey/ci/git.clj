@@ -4,8 +4,7 @@
             [clj-jgit.porcelain :as git]
             [clojure.java.io :as io]
             [clojure.string :as cs]
-            [clojure.tools.logging :as log]
-            [monkey.ci.utils :as u]))
+            [clojure.tools.logging :as log]))
 
 (defn- write-ssh-keys [dir idx r]
   (let [keys ((juxt :public-key :private-key) r)
@@ -79,11 +78,25 @@
       (checkout repo commit-id))
     repo))
 
+(defn repo-work-tree
+  "Gets the work tree location of the given repository"
+  [repo]
+  (.. repo
+      (getRepository)
+      (getWorkTree)))
+
 (defn delete-repo
   "Deletes the previously checked out local repo"
   [repo]
   (log/debug "Deleting repository" repo)
   (-> repo
-      (.getRepository)
-      (.getWorkTree)
-      (u/delete-dir)))
+      (repo-work-tree)
+      (fs/delete-tree)))
+
+(defn copy-with-ignore
+  "Copies files from src to dest but skip any files matching the .gitignore files"
+  [src dest]
+  ;; TODO Use org.eclipse.jgit.ignore.IgnoreNode from jgit in combination with
+  ;; babashka.fs/walk-file-tree to copy all files keeping in mind the .gitignore
+  ;; information in each dir.
+  )
