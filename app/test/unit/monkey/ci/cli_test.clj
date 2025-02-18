@@ -41,10 +41,6 @@
           (testing "accepts global working dir `-w`"
             (let [lc (run-cli "-w" "work-dir" "build" "run")]
               (is (= "work-dir" (get-in lc [:args :workdir])))))
-
-          (testing "allows specifying pipeline name"
-            (let [lc (run-cli "build" "run" "-p" "test-pipeline")]
-              (is (= "test-pipeline" (get-in lc [:args :pipeline])))))
           
           (testing "accepts dev mode"
             (let [lc (run-cli "--dev-mode" "build" "run")]

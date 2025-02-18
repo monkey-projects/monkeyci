@@ -16,10 +16,6 @@
   {:command "run"
    :description "Runs build locally"
    :opts [script-location-opt
-          {:as "Pipeline name"
-           :option "pipeline"
-           :short "p"
-           :type :string}
           {:as "Git repository url"
            :option "git-url"
            :short "u"

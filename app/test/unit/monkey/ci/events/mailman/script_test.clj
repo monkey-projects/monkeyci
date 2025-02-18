@@ -36,7 +36,7 @@
 (deftest routes
   (let [types [:script/initializing
                :script/start
-               :job/queued
+               :job/action-queued
                :job/executed
                :job/end]
         routes (->> (sut/make-routes {})
