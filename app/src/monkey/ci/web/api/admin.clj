@@ -63,7 +63,7 @@
   [req]
   (let [date (-> (get-in req [:parameters :body :date])
                  (jt/local-date))
-        ts (-> (jt/instant date (jt/zone-id))
+        ts (-> (jt/instant date (jt/zone-id "UTC"))
                (t/day-start)
                (jt/to-millis-from-epoch))
         st (c/req->storage req)

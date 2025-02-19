@@ -163,7 +163,7 @@
                               :credits))))
 
         (testing "skips expired subscriptions"
-          (is (empty? (-> (issue-at (ts->date-str (+ until (t/hours->millis 100))))
+          (is (empty? (-> (issue-at (ts->date-str (+ until (t/hours->millis 20))))
                           :body
                           :credits))))))))
 

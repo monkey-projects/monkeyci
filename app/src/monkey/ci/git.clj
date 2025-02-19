@@ -125,7 +125,8 @@
 (defn copy-with-ignore
   "Copies files from src to dest but skip any files matching the .gitignore files"
   ([src dest chain]
-   (fs/create-dir dest)
+   (when-not (fs/exists? dest)
+     (fs/create-dir dest))
    (let [{files false dirs true} (->> (fs/list-dir src)
                                       (group-by fs/directory?))]
      ;; First copy files, then descend into subdirs

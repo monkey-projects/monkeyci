@@ -1,5 +1,6 @@
 (ns monkey.ci.runners.local-test
   (:require [clojure.test :refer [deftest testing is]]
+            [babashka.fs :as fs]
             [monkey.ci.git :as git]
             [monkey.ci.runners.local :as sut]
             [monkey.ci.helpers :as h]))
@@ -20,10 +21,20 @@
 
 (deftest save-workspace
   (h/with-tmp-dir dir
-    (let [{:keys [enter] :as i} (sut/save-workspace dir)]
+    (let [src (fs/path dir "checkout")
+          dest (fs/path dir "workspace")
+          {:keys [enter] :as i} (sut/save-workspace dest)]
       (is (keyword? (:name i)))
+
       (testing "copies build checkout dir into destination"
-        ))))
+        (is (some? (fs/create-dir src)))
+        (is (some? (fs/create-dir dest)))
+        (is (nil? (spit (str (fs/path src "test.txt")) "test file")))
+        (is (= dest (-> (enter {:event
+                                {:build
+                                 {:checkout-dir (str src)}}})
+                        (sut/get-workspace))))
+        (is (fs/exists? (fs/path dest "test.txt")))))))
 
 (defn- has-interceptor? [routes evt id]
   (contains? (->> routes

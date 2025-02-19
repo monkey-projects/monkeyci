@@ -23,26 +23,32 @@
 
 ;;; Context management
 
+(def ctx->build (comp :build :event))
+
 (def get-git-repo ::git-repo)
 
 (defn set-git-repo [ctx r]
   (assoc ctx ::git-repo r))
+
+(def get-workspace ::workspace)
+
+(defn set-workspace [ctx ws]
+  (assoc ctx ::workspace ws))
 
 ;;; Interceptors
 
 (def checkout-src
   {:name ::checkout
    :enter (fn [ctx]
-            (let [git (get-in ctx [:event :build :git])]
+            (let [git (:git (ctx->build ctx))]
               (log/debug "Cloning repo" (:url git) "into" (:dir git))
               (set-git-repo ctx (git/clone+checkout git))))})
 
 (defn save-workspace [dest]
   {:name ::save-ws
    :enter (fn [ctx]
-            ;; TODO Copy local dir into workspace, but skip all git ignored files
-            ;; TODO Use git/copy-with-ignore
-            ctx)})
+            (->> (git/copy-with-ignore (b/checkout-dir (ctx->build ctx)) dest)
+                 (set-workspace ctx)))})
 
 (def start-child)
 
