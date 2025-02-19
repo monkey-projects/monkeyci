@@ -165,7 +165,9 @@
         (testing "skips expired subscriptions"
           (is (empty? (-> (issue-at (ts->date-str (+ until (t/hours->millis 20))))
                           :body
-                          :credits))))))))
+                          :credits)))
+          (is (= :test (st/list-customer-credit-subscriptions st (:id cust))))
+          (is (= :test (st/list-customer-credits st (:id cust)))))))))
 
 (deftest cancel-dangling-builds
   (testing "invokes process reaper"

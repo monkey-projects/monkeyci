@@ -16,7 +16,8 @@
    run in the main process.  Builds connect to it using http, same as for 
    server-side builds."
   
-  (:require [clojure.tools.logging :as log]
+  (:require [babashka.fs :as fs]
+            [clojure.tools.logging :as log]
             [monkey.ci
              [build :as b]
              [git :as git]]))
@@ -81,13 +82,23 @@
 
 ;;; Routes
 
+(def conf->work-dir "Retrieves working directory from config"
+  :work-dir)
+
+(defn set-work-dir [conf wd]
+  (assoc conf :work-dir wd))
+
+(defn conf->workspace [conf]
+  (fs/path (get-work-dir conf) "workspace"))
+
 (defn make-routes [conf]
   [[:build/pending
     ;; Responsible for preparing the build environment and starting the
     ;; child process or container.
     [{:handler build-pending
       :interceptors (cond-> []
-                      (get-in conf [:build :git]) (conj checkout-src))}]]
+                      (get-in conf [:build :git]) (conj checkout-src)
+                      true (conj (save-workspace (conf->workspace conf))))}]]
    [:build/initializing
     ;; Checkout build code, start controller
     [{:handler build-init-child}]]
