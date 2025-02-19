@@ -23,6 +23,16 @@
       (finally
         (stop)))))
 
+(defn with-system-async
+  "Same as `with-system` but assumes `f` returns a deferred that is not being `deref`ed
+   but wrapped so the system is stopped when the deferred is realized."
+  [sys f]
+  (let [sys (co/start sys)
+        stop (fn []
+               (log/debug "Stopping system")
+               (co/stop sys))]
+    (md/finally (f sys) stop)))
+
 (defn with-runtime
   "Starts the given component system and then passes the `runtime` 
    component from the started system to `f`.  When complete, shuts 

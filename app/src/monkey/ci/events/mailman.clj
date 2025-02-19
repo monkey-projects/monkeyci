@@ -12,6 +12,7 @@
              [time :as t]]
             [monkey.ci.events.mailman
              [bridge :as emb]
+             [interceptors :as emi]
              [jms :as emj]]
             [monkey.ci.spec.entities :as se]
             [monkey.mailman
@@ -128,23 +129,6 @@
                                                            :consumed-at (t/now)
                                                            :credit-id (-> avail first :id)))))))
               ctx))})
-
-(def add-time
-  {:name ::add-evt-time
-   :leave (letfn [(set-time [evt]
-                    (update evt :time #(or % (t/now))))]
-            (fn [ctx]
-              (update ctx :result (partial map set-time))))})
-
-(def trace-evt
-  "Logs event info, for debugging purposes."
-  {:name ::trace
-   :enter (fn [ctx]
-            (log/trace "Incoming event:" (:event ctx))
-            ctx)
-   :leave (fn [ctx]
-            (log/trace "Result from handling" (get-in ctx [:event :type]) ":" (:result ctx))
-            ctx)})
 
 (defn update-bus [bus]
   "Publishes the event to the given manifold bus"
@@ -334,8 +318,8 @@
       [{:handler job-skipped
         :interceptors job-int}]]]))
 
-(def global-interceptors [trace-evt
-                          add-time
+(def global-interceptors [emi/trace-evt
+                          emi/add-time
                           (mi/sanitize-result)])
 
 (defn make-router [routes]

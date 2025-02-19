@@ -8,5 +8,24 @@
 (defn set-work-dir [conf wd]
   (assoc conf :work-dir wd))
 
+(defn- work-path [conf dir]
+  (fs/path (get-work-dir conf) dir))
+
 (defn get-workspace [conf]
-  (fs/path (get-work-dir conf) "workspace"))
+  (work-path conf "workspace"))
+
+(defn get-artifact-dir [conf]
+  (work-path conf "artifacts"))
+
+(defn get-cache-dir [conf]
+  (work-path conf "cache"))
+
+(def get-build :build)
+
+(defn set-build [conf b]
+  (assoc conf :build b))
+
+(def get-params :params)
+
+(defn set-params [conf p]
+  (assoc conf :params p))

@@ -6,22 +6,6 @@
             [monkey.ci.spec.events :as se]
             [monkey.ci.helpers :as h]))
 
-(deftest with-state
-  (let [state (atom {:key :initial})
-        {:keys [enter leave] :as i} (sut/with-state state)]
-    (is (keyword? (:name i)))
-
-    (testing "`enter` adds state to context"
-      (is (= @state (-> (enter {})
-                        (sut/get-state)))))
-
-    (testing "`leave` updates state"
-      (is (some? (-> (-> {}
-                         (sut/set-state {:key :updated})
-                         (leave)))))
-      (is (= {:key :updated}
-             @state)))))
-
 (deftest load-jobs
   (let [{:keys [enter] :as i} sut/load-jobs]
     (is (keyword? (:name i)))

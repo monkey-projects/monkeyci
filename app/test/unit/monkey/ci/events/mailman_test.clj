@@ -163,27 +163,6 @@
           (is (= build (-> (leave ctx) :result :build)))
           (is (empty? (st/list-customer-credit-consumptions s (:customer-id build)))))))))
 
-(deftest add-time
-  (let [{:keys [leave] :as i} sut/add-time]
-    (is (keyword? (:name i)))
-    
-    (testing "sets event times"
-      (is (number? (-> {:result [{:type ::test-event}]}
-                       (leave)
-                       :result
-                       first
-                       :time))))))
-
-(deftest trace-evt
-  (let [{:keys [enter leave] :as i} sut/trace-evt]
-    (is (keyword? (:name i)))
-    
-    (testing "`enter` returns context as-is"
-      (is (= ::test-ctx (enter ::test-ctx))))
-
-    (testing "`leave` returns context as-is"
-      (is (= ::test-ctx (leave ::test-ctx))))))
-
 (deftest check-credits
   (let [build (h/gen-build)
         ctx {:event {:type :build/triggered

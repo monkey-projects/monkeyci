@@ -20,6 +20,7 @@
              [fs :as fs]
              [process :as bp]]
             [clojure.tools.logging :as log]
+            [manifold.deferred :as md]
             [monkey.ci
              [build :as b]
              [git :as git]]
@@ -47,6 +48,9 @@
 
 (defn set-process [ctx ws]
   (assoc ctx ::process ws))
+
+(defn set-process-result! [ctx r]
+  (update ctx ::process-result md/success! r))
 
 ;;; Interceptors
 
@@ -113,17 +117,11 @@
   (let [build (ctx->build ctx)]
     {:dir (b/calc-script-dir (b/checkout-dir build) (b/script-dir build))
      ;; TODO Config
-     :cmd ["clojure" "-X:monkeyci/build"]}))
+     :cmd ["clojure" "-X:monkeyci/build"]
+     ;; On exit, set the arg in the result deferred
+     :exit-fn (partial set-process-result! ctx)}))
 
 (defn build-start [ctx])
-
-(defn build-init-child
-  "Starts the build using a child process."
-  [ctx])
-
-(defn build-init-container
-  "Starts the build using a container"
-  [ctx])
 
 (defn build-end [ctx]
   ;; Clean up
@@ -136,16 +134,11 @@
     ;; Responsible for preparing the build environment and starting the
     ;; child process or container.
     [{:handler prepare-child-cmd
-      :interceptors (cond-> []
+      :interceptors (cond-> [no-result
+                             start-process]
                       (get-in conf [:build :git]) (conj checkout-src)
-                      true (concat [no-result
-                                    (save-workspace (conf/get-workspace conf))
-                                    start-process]))}
+                      true (conj (save-workspace (conf/get-workspace conf))))}
      {:handler make-build-init-evt}]]
-   
-   [:build/initializing
-    ;; Checkout build code, start controller
-    [{:handler build-init-child}]]
    
    [:build/start
     ;; Build process has started, script can be loaded

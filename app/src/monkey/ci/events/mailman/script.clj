@@ -1,12 +1,12 @@
 (ns monkey.ci.events.mailman.script
   "Mailman event routes for scripts"
-  (:require [meta-merge.core :as mm]
-            [monkey.ci
+  (:require [monkey.ci
              [build :as b]
              [jobs :as j]
              [script :as s]]
             [monkey.ci.events
              [core :as ec]]
+            [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.ci.build.core :as bc]))
 
 ;;; Context management
@@ -21,23 +21,15 @@
 (defn set-events [ctx q]
   (assoc ctx ::events q))
 
-(def get-state ::state)
-
-(defn set-state [ctx q]
-  (assoc ctx ::state q))
-
-(defn update-state [ctx f & args]
-  (apply update ctx ::state f args))
-
-(def get-jobs (comp :jobs get-state))
+(def get-jobs (comp :jobs emi/get-state))
 
 (defn set-jobs [ctx jobs]
-  (update-state ctx assoc :jobs jobs))
+  (emi/update-state ctx assoc :jobs jobs))
 
-(def get-build (comp :build get-state))
+(def get-build (comp :build emi/get-state))
 
 (defn set-build [ctx build]
-  (update-state ctx assoc :build build))
+  (emi/update-state ctx assoc :build build))
 
 (defn job-ctx
   "Creates a job execution context from the event context"
@@ -46,17 +38,6 @@
    :api (:api ctx)})
 
 ;;; Interceptors
-
-(defn with-state
-  "Interceptor that keeps track of a global state object in the context.
-   The updated state is `meta-merge`d into the global state."
-  [state]
-  {:name ::state
-   :enter (fn [ctx]
-            (set-state ctx @state))
-   :leave (fn [ctx]
-            (swap! state mm/meta-merge (get-state ctx))
-            ctx)})
 
 (def load-jobs
   "Interceptor that loads jobs from the location pointed to by the script-dir 
@@ -121,7 +102,7 @@
   (set-events ctx [(script-end-evt ctx :success)]))
 
 (defn make-routes [conf]
-  (let [state (with-state (atom {}))]
+  (let [state (emi/with-state (atom {}))]
     [[:script/initializing
       [{:handler script-init
         :initializers [load-jobs]}]]

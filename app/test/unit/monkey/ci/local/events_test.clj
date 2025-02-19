@@ -3,6 +3,7 @@
             [babashka
              [fs :as fs]
              [process :as bp]]
+            [manifold.deferred :as md]
             [monkey.ci.git :as git]
             [monkey.ci.local.events :as sut]
             [monkey.ci.helpers :as h]))
@@ -69,7 +70,6 @@
 
 (deftest make-routes
   (let [types [:build/pending
-               :build/initializing
                :build/start
                :build/end]
         routes (->> (sut/make-routes {})
@@ -104,13 +104,21 @@
 
 (deftest prepare-child-cmd
   (let [build {:checkout-dir "/test/checkout"}
-        r (sut/prepare-child-cmd
-           {:event
-            {:type :build/pending
-             :build build}})]
+        pr (md/deferred)
+        r (-> {:event
+               {:type :build/pending
+                :build build}
+               ::sut/process-result pr}
+              (sut/prepare-child-cmd))]
     (testing "starts child process command"
       (testing "in script dir"
         (is (= "/test/checkout/.monkeyci" (:dir r))))
 
       (testing "runs clojure"
-        (is (= "clojure" (-> r :cmd first)))))))
+        (is (= "clojure" (-> r :cmd first)))))
+
+    (testing "exit fn sets result in deferred"
+      (let [exit-fn (:exit-fn r)]
+        (is (fn? exit-fn))
+        (is (map? (exit-fn ::process-result)))
+        (is (= ::process-result (deref pr 100 :timeout)))))))
