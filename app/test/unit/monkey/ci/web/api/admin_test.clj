@@ -163,11 +163,14 @@
                               :credits))))
 
         (testing "skips expired subscriptions"
-          (is (empty? (-> (issue-at (ts->date-str (+ until (t/hours->millis 20))))
-                          :body
-                          :credits)))
-          (is (= :test (st/list-customer-credit-subscriptions st (:id cust))))
-          (is (= :test (st/list-customer-credits st (:id cust)))))))))
+          (let [ids (-> (issue-at (ts->date-str (+ until (t/hours->millis 20))))
+                        :body
+                        :credits)]
+            (is (empty? ids))
+            ;; Debugging
+            (when-not (empty? ids)
+              (is (empty? (->> ids
+                               (map (partial st/find-customer-credit st))))))))))))
 
 (deftest cancel-dangling-builds
   (testing "invokes process reaper"

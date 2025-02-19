@@ -61,6 +61,9 @@
           (is (= :build/end (:type evt)))
           (is (some? (:build evt))))))))
 
+(deftest ^:kaocha/skip run-build-local
+  (testing "creates event broker and posts `build/pending` event"))
+
 (deftest verify-build
   (testing "zero when successful"
     (is (zero? (sut/verify-build {:work-dir "examples"
