@@ -138,13 +138,18 @@
 
         (testing "when month has fewer days, also creates credits for missing days"
           (let [cust (h/gen-cust)
-                cs {:valid-from (-> (jt/offset-date-time 2025 1 31)
-                                    (jt/to-millis-from-epoch))
+                date (-> (jt/offset-date-time 2024 1 31)
+                         (jt/with-offset 0) ; force UTC
+                         (jt/to-millis-from-epoch))
+                cs {:id (cuid/random-cuid)
+                    ;; Create a sub in the past, so it won't interfere with other tests
+                    :valid-from date
+                    :valid-until (+ date (t/hours->millis (* 24 100)))
                     :customer-id (:id cust)
                     :amount 100}]
             (is (some? (st/save-customer st cust)))
             (is (some? (st/save-credit-subscription st cs)))
-            (is (not-empty (->> (issue-at "2025-02-28")
+            (is (not-empty (->> (issue-at "2024-02-28")
                                 :body
                                 :credits)))))
         
@@ -166,11 +171,7 @@
           (let [ids (-> (issue-at (ts->date-str (+ until (t/hours->millis 20))))
                         :body
                         :credits)]
-            (is (empty? ids))
-            ;; Debugging
-            (when-not (empty? ids)
-              (is (empty? (->> ids
-                               (map (partial st/find-customer-credit st))))))))))))
+            (is (empty? ids))))))))
 
 (deftest cancel-dangling-builds
   (testing "invokes process reaper"

@@ -49,6 +49,7 @@
 (defn save-workspace [dest]
   {:name ::save-ws
    :enter (fn [ctx]
+            (log/debug "Copying repo files from " (b/checkout-dir (ctx->build ctx)) "to" dest)
             (->> (git/copy-with-ignore (b/checkout-dir (ctx->build ctx)) dest)
                  (set-workspace ctx)))})
 
