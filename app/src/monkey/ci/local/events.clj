@@ -1,4 +1,4 @@
-(ns monkey.ci.runners.local
+(ns monkey.ci.local.events
   "Event routes for local build runners.  When running a build locally via cli,
    these routes will be registered in mailman and will perform all necessary
    build steps.
@@ -20,7 +20,8 @@
             [clojure.tools.logging :as log]
             [monkey.ci
              [build :as b]
-             [git :as git]]))
+             [git :as git]]
+            [monkey.ci.local.config :as conf]))
 
 ;;; Context management
 
@@ -82,15 +83,6 @@
 
 ;;; Routes
 
-(def conf->work-dir "Retrieves working directory from config"
-  :work-dir)
-
-(defn set-work-dir [conf wd]
-  (assoc conf :work-dir wd))
-
-(defn conf->workspace [conf]
-  (fs/path (get-work-dir conf) "workspace"))
-
 (defn make-routes [conf]
   [[:build/pending
     ;; Responsible for preparing the build environment and starting the
@@ -98,7 +90,7 @@
     [{:handler build-pending
       :interceptors (cond-> []
                       (get-in conf [:build :git]) (conj checkout-src)
-                      true (conj (save-workspace (conf->workspace conf))))}]]
+                      true (conj (save-workspace (conf/get-workspace conf))))}]]
    [:build/initializing
     ;; Checkout build code, start controller
     [{:handler build-init-child}]]

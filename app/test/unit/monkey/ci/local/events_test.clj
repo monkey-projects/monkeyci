@@ -1,8 +1,8 @@
-(ns monkey.ci.runners.local-test
+(ns monkey.ci.local.events-test
   (:require [clojure.test :refer [deftest testing is]]
             [babashka.fs :as fs]
             [monkey.ci.git :as git]
-            [monkey.ci.runners.local :as sut]
+            [monkey.ci.local.events :as sut]
             [monkey.ci.helpers :as h]))
 
 (deftest checkout-src
