@@ -23,6 +23,7 @@
             [monkey.ci.build.api-server :as bas]
             [monkey.ci.config.script :as cos]
             [monkey.ci.events.mailman :as em]
+            [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.ci.web.auth :as auth]
             [monkey.mailman
              [core :as mmc]
@@ -371,7 +372,7 @@
         :interceptors [load-runner-details]}]]]))
 
 (defn- make-interceptors [storage]
-  [em/trace-evt
+  [emi/trace-evt
    (em/use-db storage)
    (mmi/sanitize-result)
    handle-error])
