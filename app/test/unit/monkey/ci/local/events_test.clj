@@ -1,6 +1,8 @@
 (ns monkey.ci.local.events-test
   (:require [clojure.test :refer [deftest testing is]]
-            [babashka.fs :as fs]
+            [babashka
+             [fs :as fs]
+             [process :as bp]]
             [monkey.ci.git :as git]
             [monkey.ci.local.events :as sut]
             [monkey.ci.helpers :as h]))
@@ -35,6 +37,25 @@
                                  {:checkout-dir (str src)}}})
                         (sut/get-workspace))))
         (is (fs/exists? (fs/path dest "test.txt")))))))
+
+(deftest start-process
+  (let [{:keys [leave] :as i} sut/start-process]
+    (is (keyword? (:name i)))
+
+    (testing "`leave` starts child process"
+      (with-redefs [bp/process identity]
+        (is (= ::test-cmd (-> {:result {:cmd ::test-cmd}}
+                              (leave)
+                              (sut/get-process))))))))
+
+(deftest no-result
+  (let [{:keys [leave] :as i} sut/no-result]
+    (is (keyword? (:name i)))
+    
+    (testing "`leave` removes result from context"
+      (is (nil? (-> {:result ::test-result}
+                    (leave)
+                    :result))))))
 
 (defn- has-interceptor? [routes evt id]
   (contains? (->> routes
@@ -71,11 +92,25 @@
                        (sut/make-routes)
                        (has-interceptor? :build/pending ::sut/checkout)))))))))
 
-(deftest build-pending
-  (testing "returns `build/initializing` event"
-    (let [build {:status :pending}
-          r (sut/build-pending {:event
-                                {:type :build/pending
-                                 :build build}})]
+(deftest make-build-init-evt
+  (let [build {:status :pending}
+        r (sut/make-build-init-evt
+           {:event
+            {:type :build/pending
+             :build build}})]
+    (testing "returns `build/initializing` event"
       (is (= :build/initializing (:type r)))
       (is (= :initializing (-> r :build :status))))))
+
+(deftest prepare-child-cmd
+  (let [build {:checkout-dir "/test/checkout"}
+        r (sut/prepare-child-cmd
+           {:event
+            {:type :build/pending
+             :build build}})]
+    (testing "starts child process command"
+      (testing "in script dir"
+        (is (= "/test/checkout/.monkeyci" (:dir r))))
+
+      (testing "runs clojure"
+        (is (= "clojure" (-> r :cmd first)))))))

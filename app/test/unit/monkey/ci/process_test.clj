@@ -147,10 +147,10 @@
       (let [logfile (io/file dir "logback-test.xml")]
         (is (nil? (spit logfile "test file")))
         (is (= (str "-Dlogback.configurationFile=" logfile)
-               (->> {:config {:runner
-                              {:type :child
-                               :log-config "logback-test.xml"}
-                              :work-dir dir}}
+               (->> {:runner
+                     {:type :child
+                      :log-config "logback-test.xml"}
+                     :work-dir dir}
                     (sut/generate-deps {})
                     :aliases
                     :monkeyci/build
@@ -169,10 +169,10 @@
           (let [logfile (io/file dir "logback-test.xml")]
             (is (nil? (spit logfile "test file")))
             (is (= (str "-Dlogback.configurationFile=" logfile)
-                   (->> {:config {:runner
-                                  {:type :child
-                                   :log-config (.getAbsolutePath logfile)}
-                                  :work-dir "other"}}
+                   (->> {:runner
+                         {:type :child
+                          :log-config (.getAbsolutePath logfile)}
+                         :work-dir "other"}
                         (sut/generate-deps {})
                         (get-jvm-opts)))))))
 
@@ -232,7 +232,7 @@
 
 (deftest generate-test-deps
   (testing "includes monkeyci test lib"
-    (is (contains? (-> (sut/generate-test-deps {} false)
+    (is (contains? (-> (sut/generate-test-deps false false)
                        :aliases
                        :monkeyci/test
                        :extra-deps)
@@ -240,8 +240,7 @@
 
   (testing "points to local test lib dir in dev mode"
     (is (= (-> (u/cwd) (fs/parent) (fs/path "test-lib") str)
-           (-> (sut/generate-test-deps {:config
-                                        {:dev-mode true}}
+           (-> (sut/generate-test-deps true
                                        false)
                :aliases
                :monkeyci/test
@@ -250,7 +249,7 @@
                :local/root))))
 
   (testing "enables watching if specified"
-    (is (true? (-> (sut/generate-test-deps {} true)
+    (is (true? (-> (sut/generate-test-deps false true)
                    :aliases
                    :monkeyci/test
                    :exec-args
