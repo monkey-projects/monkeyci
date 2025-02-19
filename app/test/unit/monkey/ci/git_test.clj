@@ -95,3 +95,35 @@
                                       :ssh-keys-dir ssh-dir})))
         (is (fs/exists? (fs/path ssh-dir "key-0")))
         (is (fs/exists? (fs/path ssh-dir "key-0.pub")))))))
+
+(deftest copy-with-ignore
+  (h/with-tmp-dir dir
+    (testing "when no .gitignore, copies src to dest"
+      (let [src (fs/path dir (str (random-uuid)))
+            dest (fs/path dir (str (random-uuid)))]
+        (is (some? (fs/create-dirs src)))
+        (is (nil? (spit (fs/file (fs/path src "test.txt")) "test file")))
+        (is (= dest (sut/copy-with-ignore src dest)))
+        (is (fs/exists? (fs/path dest "test.txt")))))
+
+    (testing "applies gitignore in each directory"
+      (let [src (fs/path dir (str (random-uuid)))
+            sub (fs/path src "sub")
+            dest (fs/path dir (str (random-uuid)))
+            files {".gitignore" "*.txt\nsub/other"
+                   "sub/.gitignore" "*.edn"
+                   "ignored.txt" "ignored"
+                   "included.edn" "not ignored"
+                   "sub/ignored.edn" "ignored"
+                   "sub/ignored.txt" "ignored"
+                   "sub/other" "ignored"}]
+        (is (some? (fs/create-dirs src)))
+        (is (some? (fs/create-dirs sub)))
+        (doseq [[p c] files]
+          (is (nil? (spit (fs/file (fs/path src p)) c))))
+        (is (= dest (sut/copy-with-ignore src dest)))
+        (is (not (fs/exists? (fs/path dest "test.txt"))))
+        (is (fs/exists? (fs/path dest "included.edn")))
+        (is (not (fs/exists? (fs/path dest "sub/ignored.edn"))))
+        (is (not (fs/exists? (fs/path dest "sub/ignored.txt"))))
+        (is (not (fs/exists? (fs/path dest "sub/other"))))))))

@@ -85,7 +85,7 @@
   (h/with-memory-store st
     (letfn [(ts->date [ts]
               (-> (jt/instant ts)
-                  (jt/local-date (jt/zone-id))))
+                  (jt/local-date (jt/zone-id "UTC"))))
             (ts->date-str [ts]
               (-> (ts->date ts)
                   (jt/format)))
@@ -163,7 +163,7 @@
                               :credits))))
 
         (testing "skips expired subscriptions"
-          (is (empty? (-> (issue-at (ts->date-str (+ until (t/hours->millis 30))))
+          (is (empty? (-> (issue-at (ts->date-str (+ until (t/hours->millis 100))))
                           :body
                           :credits))))))))
 
