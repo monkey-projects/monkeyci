@@ -16,13 +16,27 @@
              [events :as le]]
             [monkey.ci.runtime
              [app :as ra]
-             [common :as rc]]))
+             [common :as rc]]
+            [monkey.mailman.core :as mmc]))
 
 (defn- new-mailman []
   (em/make-component {:type :manifold}))
 
+(defrecord Routes [routes mailman]
+  co/Lifecycle
+  (start [this]
+    (let [routes (le/make-routes (:config this) mailman)]
+      (assoc this
+             :routes routes
+             :listener (em/add-router mailman routes {:interceptors em/global-interceptors}))))
+
+  (stop [{:keys [listener] :as this}]
+    (when listener
+      (mmc/unregister-listener listener))
+    (dissoc this :listener)))
+
 (defn- new-routes [conf]
-  {:routes (le/make-routes conf)})
+  (map->Routes {:config conf}))
 
 (defn- new-events []
   (emb/->MailmanEventPoster nil))
@@ -55,11 +69,11 @@
   [conf]
   (co/system-map
    :build      (lc/get-build conf)
-   :mailman    (co/using
-                ;; Can specify custom event broker, for testing
-                (or (:mailman conf) (new-mailman))
-                [:routes])
-   :routes     (new-routes conf)
+   :mailman    ;; Can specify custom event broker, for testing
+               (or (:mailman conf) (new-mailman))
+   :routes     (co/using
+                (new-routes conf)
+                [:mailman])
    :events     (co/using
                 (new-events)
                 {:broker :mailman})

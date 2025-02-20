@@ -1,5 +1,6 @@
 (ns monkey.ci.local.runtime-test
   (:require [clojure.test :refer [deftest testing is]]
+            [com.stuartsierra.component :as co]
             [manifold.deferred :as md]
             [monkey.ci
              [artifacts :as a]
@@ -8,6 +9,7 @@
             [monkey.ci.local
              [config :as lc]
              [runtime :as sut]]
+            [monkey.mailman.core :as mmc]
             [monkey.ci.helpers :as h]
             [monkey.ci.test.mailman :as tm]))
 
@@ -55,3 +57,23 @@
 
       (testing "when container build"
         (testing "has workspace")))))
+
+(defrecord TestListener [unreg?]
+  mmc/Listener
+  (unregister-listener [this]
+    (reset! unreg? true)))
+
+(deftest routes
+  (let [mailman (-> (em/make-component {:type :manifold})
+                    (co/start))]
+    (testing "`start` registers a listener"
+      (is (some? (-> (sut/->Routes [] mailman)
+                     (co/start)
+                     :listener))))
+
+    (testing "`stop` unregisters listener"
+      (let [unreg? (atom false)]
+        (is (nil? (-> (sut/map->Routes {:listener (->TestListener unreg?)})
+                      (co/stop)
+                      :listener)))
+        (is (true? @unreg?))))))
