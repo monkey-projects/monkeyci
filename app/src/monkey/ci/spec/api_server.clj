@@ -12,8 +12,8 @@
 (s/def ::containers ::c/containers)
 
 (s/def ::base-config
-  (s/keys :req-un [::artifacts ::workspace ::events ::containers ::params]
-          :opt-un [::cache]))
+  (s/keys :req-un [::artifacts ::events ::containers ::params]
+          :opt-un [::cache ::workspace]))
 
 (s/def ::config
   (-> (s/merge ::base-config

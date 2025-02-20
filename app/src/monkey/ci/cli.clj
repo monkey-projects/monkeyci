@@ -35,8 +35,7 @@
            :option "sid"
            :type :string}]
    :runs {:command cmd/run-build-local
-          :app-mode :cli
-          :runtime? false}})
+          :app-mode :cli}})
 
 (def verify-build-cmd
   {:command "verify"

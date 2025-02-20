@@ -22,6 +22,9 @@
              [spec :as spec]
              [utils :as u]]
             [monkey.ci.events.core :as ec]
+            [monkey.ci.local
+             [config :as lc]
+             [runtime :as lr]]
             [monkey.ci.runners.controller :as rc]
             [monkey.ci.runtime
              [app :as ra]
@@ -49,8 +52,16 @@
 
 (defn run-build-local
   "Run a build locally, normally from local source but can also be from a git checkout."
-  ;; TODO
-  [config])
+  [config]
+  (let [wd (fs/create-temp-dir) ; TODO Use subdir of current dir .monkeyci?
+        build {:checkout-dir (u/cwd)}
+        conf (-> lc/empty-config
+                 (lc/set-work-dir wd)
+                 (lc/set-build build))]
+    (log/info "Running local build for src:" (:checkout-dir build))
+    (log/debug "Using working directory" (str wd))
+    (lr/start-and-post config (ec/make-event :build/pending
+                                             :build build))))
 
 (defn verify-build
   "Runs a linter agains the build script to catch any grammatical errors."

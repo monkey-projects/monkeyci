@@ -8,11 +8,15 @@
              [cache :as c]
              [protocols :as p]]
             [monkey.ci.events.mailman :as em]
+            [monkey.ci.events.mailman.bridge :as emb]
             [monkey.ci.local.config :as lc]
             [monkey.ci.runtime.common :as rc]))
 
 (defn- new-mailman []
   (em/make-component {:type :manifold}))
+
+(defn- new-events []
+  (emb/->MailmanEventPoster nil))
 
 (defn- blob-store [dir]
   (blob/->DiskBlobStore (str dir)))
@@ -37,7 +41,12 @@
   "Creates a component system that can be used for local builds"
   [conf]
   (co/system-map
-   :mailman (new-mailman)
+   ;; Can specify custom event broker, for testing
+   :mailman (or (:mailman conf) (new-mailman))
+   ;; TODO Mailman routes
+   :events (co/using
+            (new-events)
+            {:broker :mailman})
    :artifacts (new-artifacts conf)
    :cache (new-cache conf)
    :params (new-params conf)))

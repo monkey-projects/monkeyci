@@ -12,3 +12,6 @@
 
 (defn test-broker []
   (->TestBroker (atom [])))
+
+(defn test-component []
+  {:broker (test-broker)})

@@ -15,13 +15,17 @@
              [runners :as r]
              [sidecar :as sc]]
             [monkey.ci.config.sidecar :as cs]
+            [monkey.ci.events.mailman :as em]
             [monkey.ci.helpers :as h]
             [monkey.ci.runners.controller :as rc]
-            [monkey.ci.spec.sidecar :as ss]
+            [monkey.ci.spec
+             [build :as sb]
+             [sidecar :as ss]]
             [monkey.ci.web.handler :as wh]
             [monkey.ci.test
              [config :as tc]
-             [aleph-test :as at]]))
+             [aleph-test :as at]
+             [mailman :as tm]]))
 
 (defmethod r/make-runner ::dummy [_]
   (constantly :invoked))
@@ -61,8 +65,16 @@
           (is (= :build/end (:type evt)))
           (is (some? (:build evt))))))))
 
-(deftest ^:kaocha/skip run-build-local
-  (testing "creates event broker and posts `build/pending` event"))
+(deftest run-build-local
+  (testing "creates event broker and posts `build/pending` event"
+    (let [broker (tm/test-component)]
+      (is (md/deferred? (sut/run-build-local {:mailman broker})))
+      (let [evt (-> broker
+                    :broker
+                    (tm/get-posted)
+                    first)]
+        (is (= :build/pending (:type evt)))
+        (is (some? (:build evt)))))))
 
 (deftest verify-build
   (testing "zero when successful"

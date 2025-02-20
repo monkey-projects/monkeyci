@@ -2,6 +2,8 @@
   "Configuration management functions for local builds"
   (:require [babashka.fs :as fs]))
 
+(def empty-config {})
+
 (def get-work-dir "Retrieves working directory from config"
   :work-dir)
 

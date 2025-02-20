@@ -75,6 +75,10 @@
    :sid build-sid
    :job-id job-id))
 
+(defn job-pending-evt [job build-sid]
+  (-> (base-event :job/pending (job-id job) build-sid)
+      (assoc :job job)))
+
 (defn job-initializing-evt [job-id build-sid cm]
   (-> (base-event :job/initializing job-id build-sid)
       (assoc :credit-multiplier cm)))
