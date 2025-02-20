@@ -5,7 +5,9 @@
              [process :as bp]]
             [manifold.deferred :as md]
             [monkey.ci.git :as git]
-            [monkey.ci.local.events :as sut]
+            [monkey.ci.local
+             [config :as lc]
+             [events :as sut]]
             [monkey.ci.helpers :as h]))
 
 (deftest checkout-src
@@ -45,7 +47,7 @@
 
     (testing "`leave` starts child process"
       (with-redefs [bp/process identity]
-        (is (= ::test-cmd (-> {:result {:cmd ::test-cmd}}
+        (is (= ::test-cmd (-> {:result ::test-cmd}
                               (leave)
                               (sut/get-process))))))))
 
@@ -57,6 +59,15 @@
       (is (nil? (-> {:result ::test-result}
                     (leave)
                     :result))))))
+
+(deftest set-result
+  (let [r (md/deferred)
+        {:keys [leave] :as i} (sut/set-result r)]
+    (is (keyword? (:name i)))
+    
+    (testing "sets value in result deferred"
+      (is (some? (leave {:result ::test-result})))
+      (is (= ::test-result (deref r 100 :timeout))))))
 
 (defn- has-interceptor? [routes evt id]
   (contains? (->> routes
@@ -105,11 +116,10 @@
 (deftest prepare-child-cmd
   (let [build {:checkout-dir "/test/checkout"}
         pr (md/deferred)
-        r (-> {:event
-               {:type :build/pending
-                :build build}
-               ::sut/process-result pr}
-              (sut/prepare-child-cmd))]
+        r (->> {:event
+                {:type :build/pending
+                 :build build}}
+               (sut/prepare-child-cmd pr))]
     (testing "starts child process command"
       (testing "in script dir"
         (is (= "/test/checkout/.monkeyci" (:dir r))))
@@ -120,5 +130,10 @@
     (testing "exit fn sets result in deferred"
       (let [exit-fn (:exit-fn r)]
         (is (fn? exit-fn))
-        (is (map? (exit-fn ::process-result)))
+        (is (true? (exit-fn ::process-result)))
         (is (= ::process-result (deref pr 100 :timeout)))))))
+
+(deftest build-end
+  (testing "returns build"
+    (let [build (h/gen-build)]
+      (is (= build (sut/build-end {:event {:build build}}))))))

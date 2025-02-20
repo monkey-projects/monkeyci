@@ -74,7 +74,22 @@
                     (tm/get-posted)
                     first)]
         (is (= :build/pending (:type evt)))
-        (is (some? (:build evt)))))))
+        (is (some? (:build evt))))))
+
+  (testing "passes `workdir` as checkout dir and `dir` as script dir"
+    (let [broker (tm/test-component)]
+      (is (md/deferred? (sut/run-build-local {:mailman broker
+                                              :workdir "/test/dir"
+                                              :dir ".script"})))
+      (let [build (-> broker
+                      :broker
+                      (tm/get-posted)
+                      first
+                      :build)]
+        (is (= "/test/dir" (:checkout-dir build)))
+        (is (= ".script" (-> build
+                             :script
+                             :script-dir)))))))
 
 (deftest verify-build
   (testing "zero when successful"

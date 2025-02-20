@@ -17,6 +17,7 @@
           evt {:type :test}
           r (-> {:mailman broker}
                 (lc/set-work-dir dir)
+                (lc/set-build (h/gen-build))
                 (sut/start-and-post evt))]
       (testing "returns deferred"
         (is (md/deferred? r)))
@@ -35,15 +36,22 @@
         (is (some? (:mailman sys))))
 
       (testing "has artifacts"
-        (is (a/repo? (:artifacts sys))))
+        (is (p/blob-store? (:artifacts sys))))
 
       (testing "has cache"
-        (is (a/repo? (:cache sys))))
+        (is (p/blob-store? (:cache sys))))
 
       (testing "has build params"
         (is (satisfies? p/BuildParams (:params sys))))
 
-      (testing "has containers")
+      (testing "has containers"
+        (is (p/container-runner? (:containers sys))))
+
+      (testing "has api server"
+        (is (some? (:api-server sys))))
+
+      (testing "has mailman routes"
+        (is (some? (:routes sys))))
 
       (testing "when container build"
         (testing "has workspace")))))

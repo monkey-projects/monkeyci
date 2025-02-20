@@ -52,16 +52,20 @@
 
 (defn run-build-local
   "Run a build locally, normally from local source but can also be from a git checkout."
-  [config]
+  [{:keys [workdir dir] :as config}]
   (let [wd (fs/create-temp-dir) ; TODO Use subdir of current dir .monkeyci?
-        build {:checkout-dir (u/cwd)}
-        conf (-> lc/empty-config
+        cwd (u/cwd)
+        build (cond-> {:checkout-dir (or (some->> workdir
+                                                  (u/abs-path cwd))
+                                         cwd)}
+                dir (b/set-script-dir dir))
+        conf (-> (select-keys config [:mailman])
                  (lc/set-work-dir wd)
                  (lc/set-build build))]
     (log/info "Running local build for src:" (:checkout-dir build))
     (log/debug "Using working directory" (str wd))
-    (lr/start-and-post config (ec/make-event :build/pending
-                                             :build build))))
+    (lr/start-and-post conf (ec/make-event :build/pending
+                                           :build build))))
 
 (defn verify-build
   "Runs a linter agains the build script to catch any grammatical errors."

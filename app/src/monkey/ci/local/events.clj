@@ -30,6 +30,8 @@
 
 (def ctx->build (comp :build :event))
 
+(def get-result :result)
+
 (def get-checkout-dir (comp b/checkout-dir ctx->build))
 
 (def get-git-repo ::git-repo)
@@ -42,15 +44,14 @@
 (defn set-workspace [ctx ws]
   (assoc ctx ::workspace ws))
 
-(def get-cmd (comp :cmd :result))
-
 (def get-process ::process)
 
 (defn set-process [ctx ws]
   (assoc ctx ::process ws))
 
-(defn set-process-result! [ctx r]
-  (update ctx ::process-result md/success! r))
+(defn set-process-result! [d r]
+  (log/debug "Child process finished, setting result:" r)
+  (md/success! d r))
 
 ;;; Interceptors
 
@@ -72,7 +73,8 @@
   "Starts a child process using the command line stored in the result"
   {:name ::start-process
    :leave (fn [ctx]
-            (let [cmd (get-cmd ctx)]
+            (let [cmd (get-result ctx)]
+              (log/debug "Starting child process:" cmd)
               (cond-> ctx
                 cmd (set-process (bp/process cmd)))))})
 
@@ -102,6 +104,18 @@
   {:name ::no-result
    :leave #(dissoc % :result)})
 
+(def handle-error
+  {:name ::error
+   :error (fn [ctx err]
+            (log/error "Got error:" err)
+            ctx)})
+
+(defn set-result [d]
+  {:name ::set-result
+   :leave (fn [ctx]
+            (md/success! d (get-result ctx))
+            ctx)})
+
 ;;; Handlers
 
 (defn make-build-init-evt
@@ -113,19 +127,19 @@
 
 (defn prepare-child-cmd
   "Initializes child process command line"
-  [ctx]
+  [res ctx]
   (let [build (ctx->build ctx)]
     {:dir (b/calc-script-dir (b/checkout-dir build) (b/script-dir build))
      ;; TODO Config
      :cmd ["clojure" "-X:monkeyci/build"]
      ;; On exit, set the arg in the result deferred
-     :exit-fn (partial set-process-result! ctx)}))
+     :exit-fn (partial set-process-result! res)}))
 
 (defn build-start [ctx])
 
 (defn build-end [ctx]
-  ;; Clean up
-  )
+  ;; Just return the build, it will be set in the result
+  (ctx->build ctx))
 
 ;;; Routes
 
@@ -133,8 +147,9 @@
   [[:build/pending
     ;; Responsible for preparing the build environment and starting the
     ;; child process or container.
-    [{:handler prepare-child-cmd
-      :interceptors (cond-> [no-result
+    [{:handler (partial prepare-child-cmd (conf/get-result conf))
+      :interceptors (cond-> [handle-error
+                             no-result
                              start-process]
                       (get-in conf [:build :git]) (conj checkout-src)
                       true (conj (save-workspace (conf/get-workspace conf))))}
@@ -146,4 +161,6 @@
    
    [:build/end
     ;; Build has completed, clean up
-    [{:handler build-end}]]])
+    [{:handler build-end
+      :interceptors [no-result
+                     (set-result (conf/get-result conf))]}]]])

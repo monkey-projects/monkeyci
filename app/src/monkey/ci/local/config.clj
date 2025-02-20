@@ -31,3 +31,11 @@
 
 (defn set-params [conf p]
   (assoc conf :params p))
+
+(def get-result
+  "Retrieves the result deferred, that is used to pass build result to the caller."
+  :result)
+
+(defn set-result [ctx r]
+  (assoc ctx :result r))
+
