@@ -7,11 +7,13 @@
   (post-events [this events]
     (swap! posted (comp vec concat) events)))
 
-(defn get-posted [broker]
-  @(:posted broker))
-
 (defn test-broker []
   (->TestBroker (atom [])))
 
 (defn test-component []
   {:broker (test-broker)})
+
+(defn get-posted [broker]
+  (some-> (or (:posted broker)
+              (get-in broker [:broker :posted]))
+          (deref)))

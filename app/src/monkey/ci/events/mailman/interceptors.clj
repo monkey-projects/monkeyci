@@ -1,8 +1,12 @@
 (ns monkey.ci.events.mailman.interceptors
   "General purpose interceptors"
   (:require [clojure.tools.logging :as log]
+            [io.pedestal.interceptor.chain :as pi]
             [meta-merge.core :as mm]
-            [monkey.ci.time :as t]))
+            [monkey.ci
+             [build :as b]
+             [errors :as errors]
+             [time :as t]]))
 
 (def add-time
   {:name ::add-evt-time
@@ -39,3 +43,15 @@
    :leave (fn [ctx]
             (swap! state mm/meta-merge (get-state ctx))
             ctx)})
+
+(def handle-build-error
+  "Marks build as failed"
+  {:name ::build-error-handler
+   :error (fn [{:keys [event] :as ctx} ex]
+            (log/error "Failed to handle event" (:type event) ", marking build as failed" ex)
+            (-> ctx
+                (assoc :result (b/build-end-evt (-> (:build event)
+                                                    (assoc :message (ex-message ex)))
+                                                errors/error-process-failure))
+                ;; Remove the error to ensure leave chain is processed
+                (dissoc ::pi/error)))})

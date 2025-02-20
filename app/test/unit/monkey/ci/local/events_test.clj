@@ -8,7 +8,8 @@
             [monkey.ci.local
              [config :as lc]
              [events :as sut]]
-            [monkey.ci.helpers :as h]))
+            [monkey.ci.helpers :as h]
+            [monkey.ci.test.mailman :as tm]))
 
 (deftest checkout-src
   (let [{:keys [enter] :as i} sut/checkout-src]
@@ -60,14 +61,17 @@
                     (leave)
                     :result))))))
 
-(deftest set-result
-  (let [r (md/deferred)
-        {:keys [leave] :as i} (sut/set-result r)]
+(deftest realize-ending
+  (let [e (md/deferred)
+        {:keys [leave] :as i} (sut/realize-ending e)
+        build (h/gen-build)]
     (is (keyword? (:name i)))
     
-    (testing "sets value in result deferred"
-      (is (some? (leave {:result ::test-result})))
-      (is (= ::test-result (deref r 100 :timeout))))))
+    (testing "`leave` sets result in ending"
+      (is (map? (-> {:result build}
+                    (sut/set-ending e)
+                    (leave))))
+      (is (= build (deref e 100 :timeout))))))
 
 (defn- has-interceptor? [routes evt id]
   (contains? (->> routes
@@ -83,7 +87,8 @@
   (let [types [:build/pending
                :build/start
                :build/end]
-        routes (->> (sut/make-routes {})
+        mailman (tm/test-component)
+        routes (->> (sut/make-routes {} mailman)
                     (into {}))]
     (doseq [t types]
       (testing (format "handles `%s` event type" t)
@@ -94,13 +99,13 @@
         (testing "does git checkout"
           (is (-> {:build
                    {:git {:url "test-url"}}}
-                  (sut/make-routes)
+                  (sut/make-routes mailman)
                   (has-interceptor? :build/pending ::sut/checkout)))))
 
       (testing "without git config"
         (testing "does no git checkout"
           (is (not (-> {:build {}}
-                       (sut/make-routes)
+                       (sut/make-routes mailman)
                        (has-interceptor? :build/pending ::sut/checkout)))))))))
 
 (deftest make-build-init-evt
@@ -116,10 +121,12 @@
 (deftest prepare-child-cmd
   (let [build {:checkout-dir "/test/checkout"}
         pr (md/deferred)
-        r (->> {:event
-                {:type :build/pending
-                 :build build}}
-               (sut/prepare-child-cmd pr))]
+        mailman (tm/test-component)
+        r (-> {:event
+               {:type :build/pending
+                :build build}}
+              (sut/set-mailman mailman)
+              (sut/prepare-child-cmd))]
     (testing "starts child process command"
       (testing "in script dir"
         (is (= "/test/checkout/.monkeyci" (:dir r))))
@@ -127,11 +134,12 @@
       (testing "runs clojure"
         (is (= "clojure" (-> r :cmd first)))))
 
-    (testing "exit fn sets result in deferred"
+    (testing "exit fn fires `build/end`"
       (let [exit-fn (:exit-fn r)]
         (is (fn? exit-fn))
-        (is (true? (exit-fn ::process-result)))
-        (is (= ::process-result (deref pr 100 :timeout)))))))
+        (is (some? (exit-fn ::process-result)))
+        (is (= [:build/end] (->> (tm/get-posted mailman)
+                                 (map :type))))))))
 
 (deftest build-end
   (testing "returns build"

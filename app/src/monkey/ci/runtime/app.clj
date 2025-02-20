@@ -28,7 +28,9 @@
              [core :as ec]
              [mailman :as em]
              [split :as es]]
-            [monkey.ci.events.mailman.bridge :as emb]
+            [monkey.ci.events.mailman
+             [bridge :as emb]
+             [db :as emd]]
             [monkey.ci.runners.oci :as ro]
             [monkey.ci.runtime.common :as rc]
             [monkey.ci.web
@@ -275,7 +277,7 @@
 (defrecord AppEventRoutes [storage update-bus]
   co/Lifecycle
   (start [this]
-    (assoc this :routes (em/make-routes storage update-bus)))
+    (assoc this :routes (emd/make-routes storage update-bus)))
 
   (stop [this]
     (dissoc this :routes)))

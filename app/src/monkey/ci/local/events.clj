@@ -24,13 +24,16 @@
             [monkey.ci
              [build :as b]
              [git :as git]]
+            [monkey.ci.events.mailman :as em]
+            [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.ci.local.config :as conf]))
 
 ;;; Context management
 
 (def ctx->build (comp :build :event))
 
-(def get-result :result)
+(def get-result em/get-result)
+(def set-result em/set-result)
 
 (def get-checkout-dir (comp b/checkout-dir ctx->build))
 
@@ -49,9 +52,19 @@
 (defn set-process [ctx ws]
   (assoc ctx ::process ws))
 
-(defn set-process-result! [d r]
+(def get-ending ::ending)
+
+(defn set-ending [ctx e]
+  (assoc ctx ::ending e))
+
+(defn set-ending! [d r]
   (log/debug "Child process finished, setting result:" r)
   (md/success! d r))
+
+(def get-mailman ::mailman)
+
+(defn set-mailman [ctx e]
+  (assoc ctx ::mailman e))
 
 ;;; Interceptors
 
@@ -104,16 +117,26 @@
   {:name ::no-result
    :leave #(dissoc % :result)})
 
+(defn add-ending [e]
+  "Adds ending to the context"
+  {:name ::add-ending
+   :enter #(set-ending % e)})
+
+(defn add-mailman [mm]
+  "Adds mailman component to the context"
+  {:name ::add-mailman
+   :enter #(set-mailman % mm)})
+
 (def handle-error
   {:name ::error
    :error (fn [ctx err]
             (log/error "Got error:" err)
             ctx)})
 
-(defn set-result [d]
-  {:name ::set-result
+(defn realize-ending [e]
+  {:name ::realize-ending
    :leave (fn [ctx]
-            (md/success! d (get-result ctx))
+            (set-ending! (get-ending ctx) (get-result ctx))
             ctx)})
 
 ;;; Handlers
@@ -127,13 +150,15 @@
 
 (defn prepare-child-cmd
   "Initializes child process command line"
-  [res ctx]
+  [ctx]
   (let [build (ctx->build ctx)]
     {:dir (b/calc-script-dir (b/checkout-dir build) (b/script-dir build))
      ;; TODO Config
      :cmd ["clojure" "-X:monkeyci/build"]
      ;; On exit, set the arg in the result deferred
-     :exit-fn (partial set-process-result! res)}))
+     :exit-fn (fn [{:keys [exit]}]
+                (em/post-events (get-mailman ctx)
+                                [(b/build-end-evt build exit)]))}))
 
 (defn build-start [ctx])
 
@@ -143,14 +168,16 @@
 
 ;;; Routes
 
-(defn make-routes [conf]
+(defn make-routes [conf mailman]
   [[:build/pending
     ;; Responsible for preparing the build environment and starting the
     ;; child process or container.
-    [{:handler (partial prepare-child-cmd (conf/get-result conf))
-      :interceptors (cond-> [handle-error
+    [{:handler prepare-child-cmd
+      :interceptors (cond-> [emi/handle-build-error
                              no-result
-                             start-process]
+                             start-process
+                             (add-ending (conf/get-ending conf))
+                             (add-mailman mailman)]
                       (get-in conf [:build :git]) (conj checkout-src)
                       true (conj (save-workspace (conf/get-workspace conf))))}
      {:handler make-build-init-evt}]]
@@ -163,4 +190,4 @@
     ;; Build has completed, clean up
     [{:handler build-end
       :interceptors [no-result
-                     (set-result (conf/get-result conf))]}]]])
+                     realize-ending]}]]])
