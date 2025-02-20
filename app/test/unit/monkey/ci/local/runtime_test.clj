@@ -65,11 +65,14 @@
 
 (deftest routes
   (let [mailman (-> (em/make-component {:type :manifold})
-                    (co/start))]
-    (testing "`start` registers a listener"
-      (is (some? (-> (sut/->Routes [] mailman)
-                     (co/start)
-                     :listener))))
+                    (co/start))
+        api-config {:port 12342
+                    :token "test-token"}]
+    (testing "`start`"
+      (let [c (-> (sut/->Routes [] mailman api-config)
+                  (co/start))]
+        (testing "registers a listener"
+          (is (some? (:listener c))))))
 
     (testing "`stop` unregisters listener"
       (let [unreg? (atom false)]

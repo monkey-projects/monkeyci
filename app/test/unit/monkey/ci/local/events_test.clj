@@ -4,7 +4,10 @@
              [fs :as fs]
              [process :as bp]]
             [manifold.deferred :as md]
-            [monkey.ci.git :as git]
+            [monkey.ci
+             [edn :as edn]
+             [git :as git]]
+            [monkey.ci.config.script :as cs]
             [monkey.ci.local
              [config :as lc]
              [events :as sut]]
@@ -85,7 +88,7 @@
 
 (deftest make-routes
   (let [types [:build/pending
-               :build/start
+               :build/initializing
                :build/end]
         mailman (tm/test-component)
         routes (->> (sut/make-routes {} mailman)
@@ -126,13 +129,26 @@
                {:type :build/pending
                 :build build}}
               (sut/set-mailman mailman)
+              (sut/set-api {:port 1234
+                            :token "test-token"})
               (sut/prepare-child-cmd))]
     (testing "starts child process command"
       (testing "in script dir"
         (is (= "/test/checkout/.monkeyci" (:dir r))))
 
       (testing "runs clojure"
-        (is (= "clojure" (-> r :cmd first)))))
+        (is (= "clojure" (-> r :cmd first))))
+
+      (testing "passes config"
+        (let [conf (-> r :cmd last (edn/edn->) :config)]
+          (testing "with build"
+            (is (= build (cs/build conf))))
+          
+          (testing "with api settings"
+            (let [api (cs/api conf)]
+              (is (not-empty api))
+              (is (= "http://localhost:1234" (:url api)))
+              (is (= "test-token" (:token api))))))))
 
     (testing "exit fn fires `build/end`"
       (let [exit-fn (:exit-fn r)]

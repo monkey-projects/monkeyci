@@ -36,6 +36,10 @@
   "Retrieves the result deferred, that is used to pass build result to the caller."
   :ending)
 
-(defn set-ending [ctx r]
-  (assoc ctx :ending r))
+(defn set-ending [conf r]
+  (assoc conf :ending r))
 
+(def get-api :api)
+
+(defn set-api [conf api]
+  (assoc conf :api api))

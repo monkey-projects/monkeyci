@@ -51,7 +51,8 @@
           err/error-process-failure)))))
 
 (defn run-build-local
-  "Run a build locally, normally from local source but can also be from a git checkout."
+  "Run a build locally, normally from local source but can also be from a git checkout.
+   Returns a deferred that will hold zero if the build succeeds, nonzero if it fails."
   [{:keys [workdir dir] :as config}]
   (let [wd (fs/create-temp-dir) ; TODO Use subdir of current dir .monkeyci?
         cwd (u/cwd)
@@ -59,7 +60,7 @@
                                                   (u/abs-path cwd))
                                          cwd)}
                 dir (b/set-script-dir dir))
-        conf (-> (select-keys config [:mailman])
+        conf (-> (select-keys config [:mailman]) ; Allow override for testing
                  (lc/set-work-dir wd)
                  (lc/set-build build))]
     (log/info "Running local build for src:" (:checkout-dir build))

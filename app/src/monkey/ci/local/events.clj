@@ -23,7 +23,9 @@
             [manifold.deferred :as md]
             [monkey.ci
              [build :as b]
-             [git :as git]]
+             [git :as git]
+             [process :as p]]
+            [monkey.ci.config.script :as cos]
             [monkey.ci.events.mailman :as em]
             [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.ci.local.config :as conf]))
@@ -65,6 +67,11 @@
 
 (defn set-mailman [ctx e]
   (assoc ctx ::mailman e))
+
+(def get-api ::api)
+
+(defn set-api [ctx e]
+  (assoc ctx ::api e))
 
 ;;; Interceptors
 
@@ -127,6 +134,11 @@
   {:name ::add-mailman
    :enter #(set-mailman % mm)})
 
+(defn add-api [api]
+  "Adds api configuration to the context"
+  {:name ::add-api-conf
+   :enter #(set-api % api)})
+
 (def handle-error
   {:name ::error
    :error (fn [ctx err]
@@ -148,19 +160,30 @@
       (assoc :status :initializing)
       (b/build-init-evt)))
 
+(defn- child-config [ctx]
+  (let [build (ctx->build ctx)
+        {:keys [port token]} (get-api ctx)]
+    (-> cos/empty-config
+        (cos/set-build build)
+        (cos/set-api {:url (str "http://localhost:" port)
+                      :token token}))))
+
 (defn prepare-child-cmd
   "Initializes child process command line"
   [ctx]
   (let [build (ctx->build ctx)]
     {:dir (b/calc-script-dir (b/checkout-dir build) (b/script-dir build))
-     ;; TODO Config
-     :cmd ["clojure" "-X:monkeyci/build"]
+     :cmd ["clojure"
+           "-Sdeps" (pr-str (p/generate-deps build {}))
+           "-X:monkeyci/build"
+           (pr-str {:config (child-config ctx)})]
      ;; On exit, set the arg in the result deferred
      :exit-fn (fn [{:keys [exit]}]
                 (em/post-events (get-mailman ctx)
                                 [(b/build-end-evt build exit)]))}))
 
-(defn build-start [ctx])
+(defn build-init [ctx]
+  (b/build-start-evt (ctx->build ctx)))
 
 (defn build-end [ctx]
   ;; Just return the build, it will be set in the result
@@ -177,14 +200,15 @@
                              no-result
                              start-process
                              (add-ending (conf/get-ending conf))
-                             (add-mailman mailman)]
+                             (add-mailman mailman)
+                             (add-api (conf/get-api conf))]
                       (get-in conf [:build :git]) (conj checkout-src)
                       true (conj (save-workspace (conf/get-workspace conf))))}
      {:handler make-build-init-evt}]]
    
-   [:build/start
-    ;; Build process has started, script can be loaded
-    [{:handler build-start}]]
+   [:build/initializing
+    ;; Build process is starting
+    [{:handler build-init}]]
    
    [:build/end
     ;; Build has completed, clean up
