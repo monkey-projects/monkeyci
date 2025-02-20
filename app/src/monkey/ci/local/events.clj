@@ -145,7 +145,7 @@
             (log/error "Got error:" err)
             ctx)})
 
-(defn realize-ending [e]
+(def realize-ending
   {:name ::realize-ending
    :leave (fn [ctx]
             (set-ending! (get-ending ctx) (get-result ctx))
@@ -179,8 +179,12 @@
            (pr-str {:config (child-config ctx)})]
      ;; On exit, set the arg in the result deferred
      :exit-fn (fn [{:keys [exit]}]
-                (em/post-events (get-mailman ctx)
-                                [(b/build-end-evt build exit)]))}))
+                (log/info "Child process exited with exit code" exit)
+                (try
+                  (em/post-events (get-mailman ctx)
+                                  [(b/build-end-evt build exit)])
+                  (catch Exception ex
+                    (log/error "Unable to post build/end event" ex))))}))
 
 (defn build-init [ctx]
   (b/build-start-evt (ctx->build ctx)))
@@ -199,7 +203,6 @@
       :interceptors (cond-> [emi/handle-build-error
                              no-result
                              start-process
-                             (add-ending (conf/get-ending conf))
                              (add-mailman mailman)
                              (add-api (conf/get-api conf))]
                       (get-in conf [:build :git]) (conj checkout-src)
@@ -214,4 +217,5 @@
     ;; Build has completed, clean up
     [{:handler build-end
       :interceptors [no-result
+                     (add-ending (conf/get-ending conf))
                      realize-ending]}]]])

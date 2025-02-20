@@ -66,7 +66,7 @@
 
 (deftest realize-ending
   (let [e (md/deferred)
-        {:keys [leave] :as i} (sut/realize-ending e)
+        {:keys [leave] :as i} sut/realize-ending
         build (h/gen-build)]
     (is (keyword? (:name i)))
     

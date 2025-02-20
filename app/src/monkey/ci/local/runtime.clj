@@ -98,7 +98,7 @@
    to wait upon."
   [conf evt]
   (let [result (md/deferred)]
-    (rc/with-system-async (make-system (assoc conf :result result))
+    (rc/with-system-async (make-system (lc/set-ending conf result))
       (fn [sys]
         (log/debug "System started, posting event:" evt)
         (em/post-events (:mailman sys) [evt])
