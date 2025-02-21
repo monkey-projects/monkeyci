@@ -20,11 +20,11 @@
              [utils :as u]
              [version :as v]]
             [monkey.ci.build.api-server :as bas]
-            [monkey.ci.config.script :as cos]
             [monkey.ci.events.mailman :as em]
             [monkey.ci.events.mailman
              [db :as emd]
              [interceptors :as emi]]
+            [monkey.ci.script.config :as sc]
             [monkey.ci.web.auth :as auth]
             [monkey.mailman
              [core :as mmc]
@@ -136,16 +136,16 @@
      [lc])))
 
 (defn- script-config [{:keys [runner] :as config}]
-  (-> cos/empty-config
-      (cos/set-build (-> (:build config)
-                         ;; Credit multiplier for action jobs
-                         (assoc :credit-multiplier (oci/credit-multiplier
-                                                    oci/default-arch
-                                                    oci/default-cpu-count
-                                                    oci/default-memory-gb))
-                         (build->out)))
-      (cos/set-api {:url (format "http://localhost:%d" (:api-port runner))
-                    :token (:api-token runner)})))
+  (-> sc/empty-config
+      (sc/set-build (-> (:build config)
+                        ;; Credit multiplier for action jobs
+                        (assoc :credit-multiplier (oci/credit-multiplier
+                                                   oci/default-arch
+                                                   oci/default-cpu-count
+                                                   oci/default-memory-gb))
+                        (build->out)))
+      (sc/set-api {:url (format "http://localhost:%d" (:api-port runner))
+                   :token (:api-token runner)})))
 
 (defn- checkout-dir [build]
   (u/combine oci/work-dir (b/build-id build)))

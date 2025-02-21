@@ -24,7 +24,7 @@
             [monkey.ci
              [build :as b]
              [git :as git]]
-            [monkey.ci.config.script :as cos]
+            [monkey.ci.script.config :as sc]
             [monkey.ci.events.mailman :as em]
             [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.ci.local.config :as conf]))
@@ -185,10 +185,10 @@
 (defn- child-config [ctx]
   (let [build (ctx->build ctx)
         {:keys [port token]} (get-api ctx)]
-    (-> cos/empty-config
-        (cos/set-build build)
-        (cos/set-api {:url (str "http://localhost:" port)
-                      :token token}))))
+    (-> sc/empty-config
+        (sc/set-build build)
+        (sc/set-api {:url (str "http://localhost:" port)
+                     :token token}))))
 
 (defn generate-deps [script-dir lib-coords log-config]
   {:paths [script-dir]

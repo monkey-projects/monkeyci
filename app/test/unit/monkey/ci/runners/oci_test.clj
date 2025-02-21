@@ -11,10 +11,10 @@
              [protocols :as p]
              [storage :as st]
              [vault :as v]]
-            [monkey.ci.config.script :as cs]
             [monkey.ci.events.mailman :as em]
             [monkey.ci.events.mailman.db :as emd]
             [monkey.ci.runners.oci :as sut]
+            [monkey.ci.script.config :as sc]
             [monkey.ci.spec.events :as se]
             [monkey.oci.container-instance.core :as ci]
             [monkey.ci.helpers :as h]
@@ -168,7 +168,7 @@
                 (is (map? sc)))
 
               (testing "contains build"
-                (let [r (cs/build sc)]
+                (let [r (sc/build sc)]
                   (is (= (:build-id build) (:build-id r)))
                   
                   (testing "without ssh keys"
@@ -178,7 +178,7 @@
                     (is (number? (:credit-multiplier r))))))
 
               (testing "contains api url and token"
-                (let [api (cs/api sc)]
+                (let [api (sc/api sc)]
                   (is (string? (:url api)))
                   (is (string? (:token api))))))
 

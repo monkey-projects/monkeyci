@@ -7,10 +7,10 @@
             [monkey.ci
              [edn :as edn]
              [git :as git]]
-            [monkey.ci.config.script :as cs]
             [monkey.ci.local
              [config :as lc]
              [events :as sut]]
+            [monkey.ci.script.config :as sc]
             [monkey.ci.helpers :as h]
             [monkey.ci.test.mailman :as tm]))
 
@@ -154,10 +154,10 @@
       (testing "passes config"
         (let [conf (-> r :cmd last (edn/edn->) :config)]
           (testing "with build"
-            (is (= build (cs/build conf))))
+            (is (= build (sc/build conf))))
           
           (testing "with api settings"
-            (let [api (cs/api conf)]
+            (let [api (sc/api conf)]
               (is (not-empty api))
               (is (= "http://localhost:1234" (:url api)))
               (is (= "test-token" (:token api))))))))

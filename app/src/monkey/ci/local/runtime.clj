@@ -106,6 +106,7 @@
    to wait upon."
   [conf evt]
   (let [result (md/deferred)]
+    ;; Alternatively, we could add a component in the system that posts the event
     (rc/with-system-async (make-system (lc/set-ending conf result))
       (fn [sys]
         (log/debug "System started, posting event:" evt)

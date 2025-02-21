@@ -85,7 +85,9 @@
    :containers (co/using
                 (new-container-runner)
                 {:client :api-client
-                 :bus :event-bus})))
+                 :bus :event-bus})
+   ;; TODO Mailman broker and routes
+   ))
 
 (defn with-runtime [config f]
   (rc/with-runtime (make-system config) f))

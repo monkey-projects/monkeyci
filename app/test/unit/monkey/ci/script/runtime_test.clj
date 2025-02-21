@@ -4,8 +4,9 @@
             [monkey.ci
              [artifacts :as art]
              [protocols :as p]]
-            [monkey.ci.script.config :as sc]
-            [monkey.ci.script.runtime :as sut]
+            [monkey.ci.script
+             [config :as sc]
+             [runtime :as sut]]
             [monkey.ci.test.aleph-test :as at]))
 
 (def test-config (-> sc/empty-config

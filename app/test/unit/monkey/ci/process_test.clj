@@ -18,7 +18,7 @@
              [sid :as sid]
              [utils :as u]]
             [monkey.ci.build.core :as bc]
-            [monkey.ci.config.script :as cos]
+            [monkey.ci.script.config :as sco]
             [monkey.ci.spec
              [common :as sc]
              [events :as se]
@@ -37,9 +37,9 @@
   (at/with-fake-http ["http://test/events" {:status 200
                                             :body (bs/to-input-stream "")}]
     (let [build {:build-id "test-build"}
-          config (-> cos/empty-config
-                     (cos/set-build build)
-                     (cos/set-api {:url "http://test"
+          config (-> sco/empty-config
+                     (sco/set-build build)
+                     (sco/set-api {:url "http://test"
                                    :token "test-token"}))]    
       (with-redefs [sut/exit! (constantly nil)]
         (testing "parses arg as config file"
@@ -203,16 +203,16 @@
   (testing "adds build to config"
     (let [build {:build-id "test-build"}
           e (sut/child-config build {})]
-      (is (= build (cos/build e)))))
+      (is (= build (sco/build e)))))
 
   (testing "adds api server url and ip address"
     (let [conf (sut/child-config {}  {:port 1234})]
-      (is (sc/url? (:url (cos/api conf))))
-      (is (= 1234 (:port (cos/api conf))))))
+      (is (sc/url? (:url (sco/api conf))))
+      (is (= 1234 (:port (sco/api conf))))))
 
   (testing "adds api server token"
     (let [conf (sut/child-config {} {:token "test-token"})]
-      (is (= "test-token" (:token (cos/api conf)))))))
+      (is (= "test-token" (:token (sco/api conf)))))))
 
 (deftest test!
   (let [build {:build-id "test-build"}
