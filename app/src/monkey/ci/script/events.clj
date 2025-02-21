@@ -1,4 +1,4 @@
-(ns monkey.ci.events.mailman.script
+(ns monkey.ci.script.events
   "Mailman event routes for scripts"
   (:require [monkey.ci
              [build :as b]

@@ -1,4 +1,4 @@
-(ns monkey.ci.runtime.script
+(ns monkey.ci.script.runtime
   "Functions for creating a runtime for build scripts"
   (:require [com.stuartsierra.component :as co]
             [monkey.ci
@@ -7,7 +7,7 @@
              [runtime :as rt]
              [spec :as spec]]
             [monkey.ci.build.api :as api]
-            [monkey.ci.config.script :as cs]
+            [monkey.ci.script.config :as sc]
             [monkey.ci.containers.build-api :as cba]
             [monkey.ci.events.build-api :as eba]
             [monkey.ci.runtime.common :as rc]
@@ -17,7 +17,7 @@
   co/Lifecycle
   (start [{:keys [config] :as this}]
     (assoc this
-           :build (cs/build config)
+           :build (sc/build config)
            :api {:client api-client}))
   
   (stop [this]
@@ -35,7 +35,7 @@
     url))
 
 (defn- new-api-client [config]
-  (let [{:keys [token] :as ac} (cs/api config)]
+  (let [{:keys [token] :as ac} (sc/api config)]
     (api/make-client (client-url ac) token)))
 
 (defn- new-events []

@@ -1,18 +1,18 @@
-(ns monkey.ci.runtime.script-test
+(ns monkey.ci.script.runtime-test
   (:require [clojure.test :refer [deftest testing is]]
             [clj-commons.byte-streams :as bs]
             [monkey.ci
              [artifacts :as art]
              [protocols :as p]]
-            [monkey.ci.config.script :as cs]
-            [monkey.ci.runtime.script :as sut]
+            [monkey.ci.script.config :as sc]
+            [monkey.ci.script.runtime :as sut]
             [monkey.ci.test.aleph-test :as at]))
 
-(def test-config (-> cs/empty-config
-                     (cs/set-api {:url "http://test"
+(def test-config (-> sc/empty-config
+                     (sc/set-api {:url "http://test"
                                   :port 1234
                                   :token "test-token"})
-                     (cs/set-build {:build-id "test-build"})))
+                     (sc/set-build {:build-id "test-build"})))
 
 (deftest make-system
   (testing "creates system map with runtime"

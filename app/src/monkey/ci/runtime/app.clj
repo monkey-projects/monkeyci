@@ -189,6 +189,9 @@
   []
   (emb/->MailmanEventPoster nil))
 
+(defn new-event-bus []
+  (mb/event-bus))
+
 (defn make-runner-system
   "Given a runner configuration object, creates component system.  When started,
    it contains a fully configured `runtime` component that can be used by the
@@ -201,7 +204,9 @@
                 (new-runtime config)
                 [:events :artifacts :cache :containers :workspace :logging :git :build :api-config :build-cache])
    :build      (prepare-build config)
+   ;; TODO Replace with mailman
    :events     (new-events config)
+   :event-bus  (new-event-bus)
    :artifacts  (new-artifacts config)
    :cache      (new-cache config)
    :build-cache (new-build-cache config)
@@ -218,7 +223,7 @@
    :api-config (new-api-config config) ; Necessary to avoid circular dependency between containers and api server
    :api-server (co/using
                 (new-api-server config)
-                [:events :artifacts :cache :containers :workspace :build :params :api-config])
+                [:events :artifacts :cache :containers :workspace :build :params :api-config :event-bus])
    :params     (co/using
                 (new-params config)
                 [:build])

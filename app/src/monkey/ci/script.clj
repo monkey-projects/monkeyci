@@ -17,7 +17,7 @@
              [utils :as u]]
             [monkey.ci.build.core :as bc]
             [monkey.ci.events.core :as ec]
-            [monkey.ci.runtime.script :as rs]
+            [monkey.ci.script.runtime :as sr]
             [monkey.ci.spec.build :as sb]))
 
 (defn- base-event
@@ -185,7 +185,7 @@
   "Loads a script from a directory and executes it.  The script is executed in 
    this same process."
   [rt]
-  (let [build (rs/build rt)
+  (let [build (sr/build rt)
         build-id (build/build-id build)
         script-dir (build/script-dir build)]
     #_(s/valid? ::sb/build build)

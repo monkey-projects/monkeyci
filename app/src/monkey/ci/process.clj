@@ -25,11 +25,11 @@
             [monkey.ci.build
              [api-server :as as]
              [core :as bc]]
-            [monkey.ci.config.script :as cos]
+            [monkey.ci.script.config :as sc]
             ;; Need to require these for the multimethod discovery
             [monkey.ci.containers.oci]
             [monkey.ci.events.core]
-            [monkey.ci.runtime.script :as rs]            
+            [monkey.ci.script.runtime :as sr]
             [monkey.ci.storage
              [file]
              [sql]]))
@@ -55,7 +55,7 @@
   (try
     (let [config (load-config args)]
       (when (-> (merge default-script-config config)
-                (rs/with-runtime
+                (sr/with-runtime
                   (fn [rt]
                     (log/debug "Executing script with config" (:config rt))
                     (log/debug "Script working directory:" (utils/cwd))
@@ -111,9 +111,9 @@
 (defn child-config
   "Creates a configuration map that can then be passed to the child process."
   [build api-conf]
-  (-> cos/empty-config
-      (cos/set-build build)
-      (cos/set-api (as/srv->api-config api-conf))))
+  (-> sc/empty-config
+      (sc/set-build build)
+      (sc/set-api (as/srv->api-config api-conf))))
 
 (defn- config->edn
   "Writes the configuration to an edn file that is then passed as command line to the app."

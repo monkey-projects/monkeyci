@@ -1,8 +1,8 @@
-(ns monkey.ci.events.mailman.script-test
+(ns monkey.ci.script.events-test
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.spec.alpha :as spec]
             [monkey.ci.build.core :as bc]
-            [monkey.ci.events.mailman.script :as sut]
+            [monkey.ci.script.events :as sut]
             [monkey.ci.spec.events :as se]
             [monkey.ci.helpers :as h]))
 
