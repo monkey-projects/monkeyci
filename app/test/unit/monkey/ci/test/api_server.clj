@@ -19,5 +19,4 @@
   (let [rt (trt/test-runtime)]
     (assoc rt
            :event-bus (mb/event-bus)
-           :params (->EmptyParams)
-           :port 3000)))
+           :params (->EmptyParams))))

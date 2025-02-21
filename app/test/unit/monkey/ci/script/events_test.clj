@@ -36,8 +36,7 @@
                   (leave))
             a (sut/get-running-actions r)]
         (is (= (count jobs) (count a)))
-        (is (every? md/deferred? a))
-        (is (nil? (em/get-result r)))))))
+        (is (every? md/deferred? a))))))
 
 (deftest routes
   (let [types [:script/initializing

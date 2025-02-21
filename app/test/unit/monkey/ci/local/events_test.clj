@@ -55,15 +55,6 @@
                               (leave)
                               (sut/get-process))))))))
 
-(deftest no-result
-  (let [{:keys [leave] :as i} sut/no-result]
-    (is (keyword? (:name i)))
-    
-    (testing "`leave` removes result from context"
-      (is (nil? (-> {:result ::test-result}
-                    (leave)
-                    :result))))))
-
 (deftest realize-ending
   (let [e (md/deferred)
         {:keys [leave] :as i} sut/realize-ending

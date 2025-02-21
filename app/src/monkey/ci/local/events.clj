@@ -128,11 +128,6 @@
             ;; TODO
             )})
 
-(def no-result
-  "Empties result"
-  {:name ::no-result
-   :leave #(dissoc % :result)})
-
 (defn add-ending [e]
   "Adds ending to the context"
   {:name ::add-ending
@@ -239,7 +234,7 @@
     ;; child process or container.
     [{:handler prepare-child-cmd
       :interceptors (cond-> [emi/handle-build-error
-                             no-result
+                             emi/no-result
                              start-process
                              (add-mailman mailman)
                              (add-api (conf/get-api conf))

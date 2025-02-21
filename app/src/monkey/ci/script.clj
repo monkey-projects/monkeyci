@@ -173,6 +173,7 @@
    return value."
   [p rt]
   (-> (j/resolve-jobs p rt)
+      ;; TODO Wrap errors and extensions here?
       (assign-ids)))
 
 (defn load-jobs

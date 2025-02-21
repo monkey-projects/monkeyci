@@ -67,10 +67,9 @@
     {:name ::execute-actions
      :leave (fn [ctx]
               ;; Execute the jobs with the job context
-              (-> (->> (em/get-result ctx)
-                       (map execute-job)
-                       (set-running-actions ctx))
-                  (em/set-result nil)))}))
+              (->> (em/get-result ctx)
+                   (map execute-job)
+                   (set-running-actions ctx)))}))
 
 ;;; Event builders
 
@@ -105,6 +104,7 @@
       ;; TODO Should be warning instead of error
       (set-events ctx [(-> (script-end-evt ctx :error)
                            (bc/with-message "No jobs to run"))])
+      ;; TODO Change this into job/queued events instead
       (set-queued ctx (j/next-jobs jobs)))))
 
 (defn action-job-queued
@@ -149,6 +149,7 @@
      [:job/queued
       [{:handler action-job-queued
         :interceptors [state
+                       emi/no-result
                        (execute-actions (make-job-ctx conf))]}]]
 
      [:job/executed

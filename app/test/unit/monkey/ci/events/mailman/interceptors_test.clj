@@ -43,6 +43,15 @@
       (is (= {:key :updated}
              @state)))))
 
+(deftest no-result
+  (let [{:keys [leave] :as i} sut/no-result]
+    (is (keyword? (:name i)))
+    
+    (testing "`leave` removes result from context"
+      (is (nil? (-> {:result ::test-result}
+                    (leave)
+                    :result))))))
+
 (deftest handle-build-error
   (let [{:keys [error] :as i} sut/handle-build-error
         test-error (ex-info "test error" {})]

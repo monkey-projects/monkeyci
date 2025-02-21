@@ -26,6 +26,11 @@
             (log/trace "Result from handling" (get-in ctx [:event :type]) ":" (:result ctx))
             ctx)})
 
+(def no-result
+  "Empties result"
+  {:name ::no-result
+   :leave #(dissoc % :result)})
+
 (def get-state ::state)
 
 (defn set-state [ctx q]
