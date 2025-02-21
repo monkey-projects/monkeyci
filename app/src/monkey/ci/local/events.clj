@@ -251,6 +251,6 @@
    [:build/end
     ;; Build has completed, clean up
     [{:handler build-end
-      :interceptors [no-result
+      :interceptors [emi/no-result
                      (add-ending (conf/get-ending conf))
                      realize-ending]}]]])

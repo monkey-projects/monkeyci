@@ -111,6 +111,7 @@
   "Executes an action job in a new thread.  For container jobs, it's up to the
    container runner implementation to handle the events."
   [ctx]
+  ;; TODO Only execute it if the max number of concurrent jobs has not been reached
   (when-let [job (get (get-jobs ctx) (get-in ctx [:event :job-id]))]
     (when (bc/action-job? job)
       [job])))
