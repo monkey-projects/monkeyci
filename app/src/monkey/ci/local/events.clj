@@ -23,8 +23,7 @@
             [manifold.deferred :as md]
             [monkey.ci
              [build :as b]
-             [git :as git]
-             [process :as p]]
+             [git :as git]]
             [monkey.ci.config.script :as cos]
             [monkey.ci.events.mailman :as em]
             [monkey.ci.events.mailman.interceptors :as emi]
@@ -72,6 +71,16 @@
 
 (defn set-api [ctx e]
   (assoc ctx ::api e))
+
+(def get-log-dir ::log-dir)
+
+(defn set-log-dir [ctx e]
+  (assoc ctx ::log-dir e))
+
+(def get-lib-coords ::lib-coords)
+
+(defn set-lib-coords [ctx e]
+  (assoc ctx ::lib-coords e))
 
 ;;; Interceptors
 
@@ -139,6 +148,19 @@
   {:name ::add-api-conf
    :enter #(set-api % api)})
 
+(defn add-log-dir [dir]
+  "Adds log dir to the context"
+  {:name ::add-log-dir
+   :enter (fn [ctx]
+            (when-not (fs/exists? dir)
+              (fs/create-dirs dir))
+            (set-log-dir ctx dir))})
+
+(defn add-lib-coords [lib-coords]
+  "Adds library coordinates configuration to the context"
+  {:name ::add-lib-coords
+   :enter #(set-lib-coords % lib-coords)})
+
 (def handle-error
   {:name ::error
    :error (fn [ctx err]
@@ -168,16 +190,32 @@
         (cos/set-api {:url (str "http://localhost:" port)
                       :token token}))))
 
+(defn generate-deps [script-dir lib-coords log-config]
+  {:paths [script-dir]
+   :aliases
+   {:monkeyci/build
+    (cond-> {:exec-fn 'monkey.ci.process/run
+             :extra-deps {'com.monkeyci/app lib-coords}}
+      log-config (assoc :jvm-opts
+                        [(str "-Dlogback.configurationFile=" log-config)]))
+    ;; m2 cache dir?
+    }})
+
 (defn prepare-child-cmd
   "Initializes child process command line"
   [ctx]
-  (let [build (ctx->build ctx)]
+  (let [build (ctx->build ctx)
+        log-file (comp fs/file (partial fs/path (get-log-dir ctx)))]
     {:dir (b/calc-script-dir (b/checkout-dir build) (b/script-dir build))
      :cmd ["clojure"
-           "-Sdeps" (pr-str (p/generate-deps build {}))
+           "-Sdeps" (pr-str (generate-deps (b/script-dir build)
+                                           (get-lib-coords ctx)
+                                           nil))
            "-X:monkeyci/build"
            (pr-str {:config (child-config ctx)})]
-     ;; On exit, set the arg in the result deferred
+     :out (log-file "out.log")
+     :err (log-file "err.log")
+     ;; On exit, post build/end event
      :exit-fn (fn [{:keys [exit]}]
                 (log/info "Child process exited with exit code" exit)
                 (try
@@ -204,7 +242,9 @@
                              no-result
                              start-process
                              (add-mailman mailman)
-                             (add-api (conf/get-api conf))]
+                             (add-api (conf/get-api conf))
+                             (add-log-dir (conf/get-log-dir conf))
+                             (add-lib-coords (conf/get-lib-coords conf))]
                       (get-in conf [:build :git]) (conj checkout-src)
                       true (conj (save-workspace (conf/get-workspace conf))))}
      {:handler make-build-init-evt}]]

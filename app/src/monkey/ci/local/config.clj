@@ -1,6 +1,7 @@
 (ns monkey.ci.local.config
   "Configuration management functions for local builds"
-  (:require [babashka.fs :as fs]))
+  (:require [babashka.fs :as fs]
+            [monkey.ci.version :as v]))
 
 (def empty-config {})
 
@@ -21,6 +22,9 @@
 
 (defn get-cache-dir [conf]
   (work-path conf "cache"))
+
+(defn get-log-dir [conf]
+  (work-path conf "logs"))
 
 (def get-build :build)
 
@@ -43,3 +47,9 @@
 
 (defn set-api [conf api]
   (assoc conf :api api))
+
+(defn get-lib-coords [ctx]
+  (get ctx :lib-coords {:mvn/version (v/version)}))
+
+(defn set-lib-coords [conf lib-coords]
+  (assoc conf :lib-coords lib-coords))

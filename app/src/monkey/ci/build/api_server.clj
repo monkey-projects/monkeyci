@@ -142,6 +142,7 @@
 (defn dispatch-events [req]
   (let [sid (build/sid (req->build req))]
     (log/info "Dispatching event stream to client for build" sid)
+    ;; TODO Use mailman instead
     (eh/event-stream (req->events req) {:sid sid})))
 
 (defn- stream-response [s & [nil-code]]
@@ -337,13 +338,6 @@
     {:server srv
      :port (an/port srv)
      :token token}))
-
-(defn rt->api-server-config
-  "Creates a config map for the api server from the given runtime"
-  [rt]
-  (->> {:port (rt/runner-api-port rt)}
-       (merge (select-keys rt [:events :artifacts :cache :workspace :containers]))
-       (mc/filter-vals some?)))
 
 (defn with-build [conf b]
   (assoc conf :build b))

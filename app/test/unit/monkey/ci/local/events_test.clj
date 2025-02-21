@@ -76,6 +76,18 @@
                     (leave))))
       (is (= build (deref e 100 :timeout))))))
 
+(deftest add-log-dir
+  (h/with-tmp-dir dir
+    (let [log-dir (fs/path dir "logs")
+          {:keys [enter] :as i} (sut/add-log-dir log-dir)]
+      (testing "adds log dir to context"
+        (is (= log-dir (-> {}
+                           (enter)
+                           (sut/get-log-dir)))))
+
+      (testing "ensures log dir exists"
+        (is (fs/exists? log-dir))))))
+
 (defn- has-interceptor? [routes evt id]
   (contains? (->> routes
                   (into {})

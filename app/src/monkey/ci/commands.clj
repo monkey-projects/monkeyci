@@ -60,7 +60,7 @@
                                                   (u/abs-path cwd))
                                          cwd)}
                 dir (b/set-script-dir dir))
-        conf (-> (select-keys config [:mailman]) ; Allow override for testing
+        conf (-> (select-keys config [:mailman :lib-coords]) ; Allow override for testing
                  (lc/set-work-dir wd)
                  (lc/set-build build))]
     (log/info "Running local build for src:" (:checkout-dir build))
