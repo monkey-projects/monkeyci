@@ -2,7 +2,9 @@
   "Set up runtime for local builds"
   (:require [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
-            [manifold.deferred :as md]
+            [manifold
+             [bus :as mb]
+             [deferred :as md]]
             [monkey.ci
              [artifacts :as a]
              [blob :as blob]
@@ -67,13 +69,18 @@
 (defn- new-api-server []
   (ra/new-api-server {}))
 
+(defn- new-event-bus
+  "Creates a new event bus, that can be used by the api server to send events to the client."
+  []
+  (mb/event-bus))
+
 (defn make-system
   "Creates a component system that can be used for local builds"
   [conf]
   (co/system-map
    :build      (lc/get-build conf)
-   :mailman    ;; Can specify custom event broker, for testing
-               (or (:mailman conf) (new-mailman))
+   :mailman ;; Can specify custom event broker, for testing
+   (or (:mailman conf) (new-mailman))
    :routes     (co/using
                 (new-routes conf)
                 [:mailman :api-config])
@@ -89,7 +96,8 @@
    :api-config (ra/new-api-config {})
    :api-server (co/using
                 (new-api-server)
-                [:api-config :events :artifacts :cache :params :containers :build])))
+                [:api-config :events :artifacts :cache :params :containers :build :event-bus])
+   :event-bus  (new-event-bus)))
 
 (defn start-and-post
   "Starts component system and posts an event to the event broker to trigger

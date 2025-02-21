@@ -58,7 +58,10 @@
         cwd (u/cwd)
         build (cond-> {:checkout-dir (or (some->> workdir
                                                   (u/abs-path cwd))
-                                         cwd)}
+                                         cwd)
+                       :customer-id "local"
+                       :repo-id "local"
+                       :build-id (b/local-build-id)}
                 dir (b/set-script-dir dir))
         conf (-> (select-keys config [:mailman :lib-coords]) ; Allow override for testing
                  (lc/set-work-dir wd)

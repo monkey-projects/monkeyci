@@ -1,6 +1,10 @@
 (ns monkey.ci.events.mailman.interceptors-test
   (:require [clojure.test :refer [deftest testing is]]
-            [monkey.ci.events.mailman.interceptors :as sut]))
+            [manifold
+             [bus :as mb]
+             [stream :as ms]]
+            [monkey.ci.events.mailman.interceptors :as sut]
+            [monkey.ci.helpers :as h]))
 
 (deftest add-time
   (let [{:keys [leave] :as i} sut/add-time]
@@ -56,3 +60,13 @@
                     (error test-error)
                     :io.pedestal.interceptor.chain/error))))))
 
+(deftest update-bus
+  (testing "`enter` publishes event to update bus"
+    (let [bus (mb/event-bus)
+          s (mb/subscribe bus :build/updated)
+          {:keys [enter] :as i} (sut/update-bus bus)
+          evt {:type :build/updated
+               :build (h/gen-build)}]
+      (is (keyword? (:name i)))
+      (is (some? (enter {:event evt})))
+      (is (= evt (deref (ms/take! s) 1000 :timeout))))))

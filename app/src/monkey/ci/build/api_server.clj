@@ -63,6 +63,9 @@
 (def req->events
   (comp :events req->ctx))
 
+(def req->event-bus
+  (comp :event-bus req->ctx))
+
 (def req->workspace
   (comp :workspace req->ctx))
 
@@ -142,8 +145,11 @@
 (defn dispatch-events [req]
   (let [sid (build/sid (req->build req))]
     (log/info "Dispatching event stream to client for build" sid)
-    ;; TODO Use mailman instead
-    (eh/event-stream (req->events req) {:sid sid})))
+    (eh/bus-stream (req->event-bus req)
+                   ;; Listen for all event types the script may need
+                   ;; Should we make this configurable on client-side?
+                   [:build/canceled :job/end]
+                   (comp (partial = sid) :sid))))
 
 (defn- stream-response [s & [nil-code]]
   (log/debug "Sending stream to client:" s)

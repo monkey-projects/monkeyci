@@ -1,14 +1,14 @@
 (ns monkey.ci.events.mailman.db
   (:require #_[clojure.spec.alpha :as spec]
             [clojure.tools.logging :as log]
-            [manifold.bus :as mb]
             [medley.core :as mc]
             [monkey.ci
              [build :as b]
              [jobs :as j]
              [storage :as st]
              [time :as t]]
-            [monkey.ci.events.mailman :as em]))
+            [monkey.ci.events.mailman :as em]
+            [monkey.ci.events.mailman.interceptors :as mi]))
 
 (def get-db ::db)
 
@@ -113,13 +113,6 @@
                                                            :consumed-at (t/now)
                                                            :credit-id (-> avail first :id)))))))
               ctx))})
-
-(defn update-bus [bus]
-  "Publishes the event to the given manifold bus"
-  {:name ::update-bus
-   :enter (fn [{:keys [event] :as ctx}]
-            (mb/publish! bus (:type event) event)
-            ctx)})
 
 ;;; Event handlers
 
@@ -272,7 +265,7 @@
 
      [:build/updated
       [{:handler (constantly nil)
-        :interceptors [(update-bus bus)]}]]
+        :interceptors [(mi/update-bus bus)]}]]
 
      [:script/initializing
       [{:handler script-init

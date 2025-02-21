@@ -55,6 +55,9 @@
       (testing "has mailman routes"
         (is (some? (:routes sys))))
 
+      (testing "has event bus"
+        (is (some? (:event-bus sys))))
+
       (testing "when container build"
         (testing "has workspace")))))
 

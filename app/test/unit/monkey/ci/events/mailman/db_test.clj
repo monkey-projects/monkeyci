@@ -1,9 +1,7 @@
 (ns monkey.ci.events.mailman.db-test
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.spec.alpha :as spec]
-            [manifold
-             [bus :as mb]
-             [stream :as ms]]
+            [manifold.bus :as mb]
             [monkey.ci
              [cuid :as cuid]
              [storage :as st]]
@@ -174,17 +172,6 @@
     (testing "returns `build/failed` event if no credits available"
       (is (= :build/failed (-> (sut/check-credits ctx)
                                :type))))))
-
-(deftest update-bus
-  (testing "`enter` publishes event to update bus"
-    (let [bus (mb/event-bus)
-          s (mb/subscribe bus :build/updated)
-          {:keys [enter] :as i} (sut/update-bus bus)
-          evt {:type :build/updated
-               :build (h/gen-build)}]
-      (is (keyword? (:name i)))
-      (is (some? (enter {:event evt})))
-      (is (= evt (deref (ms/take! s) 1000 :timeout))))))
 
 (deftest queue-build
   (testing "returns `build/queued` event"

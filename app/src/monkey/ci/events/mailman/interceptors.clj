@@ -2,6 +2,7 @@
   "General purpose interceptors"
   (:require [clojure.tools.logging :as log]
             [io.pedestal.interceptor.chain :as pi]
+            [manifold.bus :as mb]
             [meta-merge.core :as mm]
             [monkey.ci
              [build :as b]
@@ -55,3 +56,10 @@
                                                 errors/error-process-failure))
                 ;; Remove the error to ensure leave chain is processed
                 (dissoc ::pi/error)))})
+
+(defn update-bus [bus]
+  "Publishes the event to the given manifold bus"
+  {:name ::update-bus
+   :enter (fn [{:keys [event] :as ctx}]
+            (mb/publish! bus (:type event) event)
+            ctx)})
