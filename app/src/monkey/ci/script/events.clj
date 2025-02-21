@@ -1,11 +1,14 @@
 (ns monkey.ci.script.events
   "Mailman event routes for scripts"
-  (:require [monkey.ci
+  (:require [medley.core :as mc]
+            [monkey.ci
              [build :as b]
              [jobs :as j]
              [script :as s]]
+            [monkey.ci.build.core :as bc]
             [monkey.ci.events
-             [core :as ec]]
+             [core :as ec]
+             [mailman :as em]]
             [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.ci.build.core :as bc]))
 
@@ -31,6 +34,11 @@
 (defn set-build [ctx build]
   (emi/update-state ctx assoc :build build))
 
+(def get-running-actions ::running-actions)
+
+(defn set-running-actions [ctx a]
+  (assoc ctx ::running-actions a))
+
 (defn job-ctx
   "Creates a job execution context from the event context"
   [ctx]
@@ -44,8 +52,25 @@
    and adds them to the state."
   {:name ::load-jobs
    :enter (fn [ctx]
-            (set-jobs ctx (s/load-jobs (get-build ctx)
-                                       (job-ctx ctx))))})
+            (->> (s/load-jobs (get-build ctx)
+                              (job-ctx ctx))
+                 (group-by j/job-id)
+                 (mc/map-vals first)
+                 (set-jobs ctx)))})
+
+(defn execute-actions [job-ctx]
+  "Interceptor that executes all action jobs in the result in a new thread.
+   The job context must contain all necessary components for the job to run properly,
+   such as artifacts, cache and events."
+  (letfn [(execute-job [job]
+            (j/execute! job (assoc job-ctx :job job)))]
+    {:name ::execute-actions
+     :leave (fn [ctx]
+              ;; Execute the jobs with the job context
+              (-> (->> (em/get-result ctx)
+                       (map execute-job)
+                       (set-running-actions ctx))
+                  (em/set-result nil)))}))
 
 ;;; Event builders
 
@@ -86,7 +111,9 @@
   "Executes an action job in a new thread.  For container jobs, it's up to the
    container runner implementation to handle the events."
   [ctx]
-  )
+  (when-let [job (get (get-jobs ctx) (get-in ctx [:event :job-id]))]
+    (when (bc/action-job? job)
+      [job])))
 
 (defn job-executed
   "Runs any extensions for the job"
@@ -101,17 +128,28 @@
   ;; TODO
   (set-events ctx [(script-end-evt ctx :success)]))
 
+(defn- make-job-ctx
+  "Constructs job context object from the route configuration"
+  [ctx]
+  (-> ctx
+      (select-keys [:artifacts :cache :build])
+      (assoc :api {:client (:api-client ctx)})))
+
 (defn make-routes [conf]
   (let [state (emi/with-state (atom {}))]
     [[:script/initializing
       [{:handler script-init
-        :initializers [load-jobs]}]]
+        :interceptors [state
+                       load-jobs]}]]
 
      [:script/start
-      [{:handler script-start}]]
+      [{:handler script-start
+        :interceptors [state]}]]
 
-     [:job/action-queued
-      [{:handler action-job-queued}]]
+     [:job/queued
+      [{:handler action-job-queued
+        :interceptors [state
+                       (execute-actions (make-job-ctx conf))]}]]
 
      [:job/executed
       [{:handler job-executed}]]

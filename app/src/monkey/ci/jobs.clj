@@ -127,9 +127,9 @@
    tries to construct a new job from it and execute it recursively."
   [{:keys [action] :as job}]
   (fn [rt]
-    (let [assign-id (fn [j]
-                      (cond-> j
-                        (nil? (bc/job-id j)) (assoc :id (bc/job-id job))))]
+    (letfn [(assign-id [j]
+              (cond-> j
+                (nil? (bc/job-id j)) (assoc :id (bc/job-id job))))]
       (md/chain
        ;; Ensure this executes async by wrapping it in a future
        (md/future
