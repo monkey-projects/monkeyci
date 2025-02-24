@@ -29,6 +29,11 @@
 (defn set-jobs [ctx jobs]
   (emi/update-state ctx assoc :jobs jobs))
 
+(defn update-job
+  "Applies `f` to the job with given id in the state"
+  [ctx job-id f & args]
+  (apply emi/update-state ctx update-in [:jobs job-id] f args))
+
 (def get-build (comp :build emi/get-state))
 
 (defn set-build [ctx build]
@@ -66,6 +71,7 @@
             (j/execute! job (assoc job-ctx :job job)))]
     {:name ::execute-actions
      :leave (fn [ctx]
+              ;; TODO Apply "before" extensions
               ;; Execute the jobs with the job context
               (->> (em/get-result ctx)
                    (map execute-job)
@@ -99,34 +105,40 @@
 (defn script-start
   "Queues all jobs that have no dependencies"
   [ctx]
-  (let [jobs (get-jobs ctx)]
+  (let [jobs (get-jobs ctx)
+        build-sid (b/sid (get-build ctx))]
     (if (empty? jobs)
       ;; TODO Should be warning instead of error
       (set-events ctx [(-> (script-end-evt ctx :error)
                            (bc/with-message "No jobs to run"))])
-      ;; TODO Change this into job/queued events instead
-      (set-queued ctx (j/next-jobs jobs)))))
+      (->> (j/next-jobs jobs)
+           (map #(j/job-queued-evt % build-sid))
+           (set-events ctx)))))
 
-(defn action-job-queued
+(defn job-queued
   "Executes an action job in a new thread.  For container jobs, it's up to the
    container runner implementation to handle the events."
   [ctx]
   ;; TODO Only execute it if the max number of concurrent jobs has not been reached
-  (when-let [job (get (get-jobs ctx) (get-in ctx [:event :job-id]))]
-    (when (bc/action-job? job)
-      [job])))
+  (let [job-id (get-in ctx [:event :job-id])
+        job (get (get-jobs ctx) job-id)]
+    (cond-> ctx
+      job (update-job job-id assoc :status :queued)
+      (bc/action-job? job)
+      (em/set-result [job]))))
 
 (defn job-executed
   "Runs any extensions for the job"
   [ctx]
-  ;; TODO
-  nil)
+  ;; TODO Apply "after" extensions
+  (let [{:keys [job-id sid result]} (:event ctx)]
+    (set-events ctx [(j/job-end-evt job-id sid result)])))
 
 (defn job-end
   "Queues jobs that have their dependencies resolved, or ends the script
    if all jobs have been executed."
   [ctx]
-  ;; TODO
+  ;; TODO Enqueue jobs that have become ready to run
   (set-events ctx [(script-end-evt ctx :success)]))
 
 (defn- make-job-ctx
@@ -148,7 +160,7 @@
         :interceptors [state]}]]
 
      [:job/queued
-      [{:handler action-job-queued
+      [{:handler job-queued
         :interceptors [state
                        emi/no-result
                        (execute-actions (make-job-ctx conf))]}]]

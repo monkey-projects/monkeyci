@@ -43,6 +43,7 @@
   (satisfies? p/JobResolvable x))
 
 (def pending? (comp (some-fn nil? (partial = :pending)) status))
+(def queued? (comp (partial = :queued) status))
 (def running? (comp (partial = :running) status))
 (def failed?  (comp (partial = :failure) status))
 (def success? (comp (partial = :success) status))
@@ -75,9 +76,15 @@
    :sid build-sid
    :job-id job-id))
 
-(defn job-pending-evt [job build-sid]
-  (-> (base-event :job/pending (job-id job) build-sid)
+(defn- job-evt [type job build-sid]
+  (-> (base-event type (job-id job) build-sid)
       (assoc :job job)))
+
+(defn job-pending-evt [job build-sid]
+  (job-evt :job/pending job build-sid))
+
+(defn job-queued-evt [job build-sid]
+  (job-evt :job/queued job build-sid))
 
 (defn job-initializing-evt [job-id build-sid cm]
   (-> (base-event :job/initializing job-id build-sid)
