@@ -1,6 +1,7 @@
 (ns monkey.ci.script.events
   "Mailman event routes for scripts"
-  (:require [medley.core :as mc]
+  (:require [clojure.tools.logging :as log]
+            [medley.core :as mc]
             [monkey.ci
              [build :as b]
              [jobs :as j]
@@ -32,7 +33,7 @@
 (defn update-job
   "Applies `f` to the job with given id in the state"
   [ctx job-id f & args]
-  (apply emi/update-state ctx update-in [:jobs job-id] f args))
+  (apply emi/update-state ctx update :jobs mc/update-existing job-id f args))
 
 (def get-build (comp :build emi/get-state))
 
@@ -77,6 +78,12 @@
                    (map execute-job)
                    (set-running-actions ctx)))}))
 
+(def events->result
+  "Interceptor that puts events in the result"
+  {:name ::events->result
+   :leave (fn [ctx]
+            (em/set-result ctx (get-events ctx)))})
+
 ;;; Event builders
 
 (defn- base-event
@@ -100,7 +107,15 @@
   (letfn [(mark-pending [job]
             (assoc job :status :pending))]
     (-> (base-event (get-build ctx) :script/start)
-        (assoc :jobs (map (comp mark-pending j/job->event) (get-jobs ctx))))))
+        (assoc :jobs (map (comp mark-pending j/job->event) (vals (get-jobs ctx)))))))
+
+(defn- enqueue-jobs
+  "Marks given jobs as enqueued in the state"
+  [ctx jobs]
+  (reduce (fn [r j]
+            (update-job r (:id j) assoc :status :queued))
+          ctx
+          jobs))
 
 (defn script-start
   "Queues all jobs that have no dependencies"
@@ -111,9 +126,10 @@
       ;; TODO Should be warning instead of error
       (set-events ctx [(-> (script-end-evt ctx :error)
                            (bc/with-message "No jobs to run"))])
-      (->> (j/next-jobs jobs)
-           (map #(j/job-queued-evt % build-sid))
-           (set-events ctx)))))
+      (let [next-jobs (j/next-jobs (vals jobs))]
+        (-> ctx
+            (set-events (map #(j/job-queued-evt % build-sid) next-jobs))
+            (enqueue-jobs next-jobs))))))
 
 (defn job-queued
   "Executes an action job in a new thread.  For container jobs, it's up to the
@@ -123,7 +139,6 @@
   (let [job-id (get-in ctx [:event :job-id])
         job (get (get-jobs ctx) job-id)]
     (cond-> ctx
-      job (update-job job-id assoc :status :queued)
       (bc/action-job? job)
       (em/set-result [job]))))
 
@@ -134,12 +149,25 @@
   (let [{:keys [job-id sid result]} (:event ctx)]
     (set-events ctx [(j/job-end-evt job-id sid result)])))
 
+(defn- script-status
+  "Determines script status according to the status of all jobs"
+  [ctx]
+  (if (some bc/failed? (vals (get-jobs ctx))) :error :success))
+
 (defn job-end
   "Queues jobs that have their dependencies resolved, or ends the script
    if all jobs have been executed."
   [ctx]
-  ;; TODO Enqueue jobs that have become ready to run
-  (set-events ctx [(script-end-evt ctx :success)]))
+  ;; Enqueue jobs that have become ready to run
+  (let [{:keys [job-id sid] :as e} (:event ctx)
+        upd (update-job ctx job-id merge (select-keys e [:status :result]))
+        jobs (get-jobs upd)
+        next-jobs (j/next-jobs (vals jobs))]
+    (-> upd
+        (set-events (if (empty? next-jobs)
+                      [(script-end-evt ctx (script-status upd))]
+                      (map #(j/job-queued-evt % sid) next-jobs)))
+        (enqueue-jobs next-jobs))))
 
 (defn- make-job-ctx
   "Constructs job context object from the route configuration"
@@ -157,7 +185,8 @@
 
      [:script/start
       [{:handler script-start
-        :interceptors [state]}]]
+        :interceptors [state
+                       events->result]}]]
 
      [:job/queued
       [{:handler job-queued
@@ -166,7 +195,10 @@
                        (execute-actions (make-job-ctx conf))]}]]
 
      [:job/executed
-      [{:handler job-executed}]]
+      [{:handler job-executed
+        :interceptors [events->result]}]]
 
      [:job/end
-      [{:handler job-end}]]]))
+      [{:handler job-end
+        :interceptors [state
+                       events->result]}]]]))

@@ -23,7 +23,8 @@
             [manifold.deferred :as md]
             [monkey.ci
              [build :as b]
-             [git :as git]]
+             [git :as git]
+             [utils :as u]]
             [monkey.ci.script.config :as sc]
             [monkey.ci.events.mailman :as em]
             [monkey.ci.events.mailman.interceptors :as emi]
@@ -177,11 +178,15 @@
       (assoc :status :initializing)
       (b/build-init-evt)))
 
+(defn- absolutize-script-dir [build]
+  (b/set-script-dir build (u/abs-path (b/checkout-dir build) (or (b/script-dir build)
+                                                                 b/default-script-dir))))
+
 (defn- child-config [ctx]
   (let [build (ctx->build ctx)
         {:keys [port token]} (get-api ctx)]
     (-> sc/empty-config
-        (sc/set-build build)
+        (sc/set-build (absolutize-script-dir build))
         (sc/set-api {:url (str "http://localhost:" port)
                      :token token}))))
 

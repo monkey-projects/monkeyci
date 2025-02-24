@@ -5,6 +5,7 @@
              [process :as bp]]
             [manifold.deferred :as md]
             [monkey.ci
+             [build :as b]
              [edn :as edn]
              [git :as git]]
             [monkey.ci.local
@@ -144,8 +145,8 @@
 
       (testing "passes config"
         (let [conf (-> r :cmd last (edn/edn->) :config)]
-          (testing "with build"
-            (is (= build (sc/build conf))))
+          (testing "with build script dir"
+            (is (= (:dir r) (b/script-dir (sc/build conf)))))
           
           (testing "with api settings"
             (let [api (sc/api conf)]

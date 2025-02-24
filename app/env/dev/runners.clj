@@ -11,9 +11,8 @@
              [script :as s]
              [time :as t]]
             [monkey.ci.build.api-server :as bas]
-            [monkey.ci.runtime
-             [app :as ra]
-             [script :as rs]]
+            [monkey.ci.runtime.app :as ra]
+            [monkey.ci.script.runtime :as sr]
             [monkey.ci.web.auth :as auth]))
 
 (defn clear-git-dir [build]
@@ -80,7 +79,7 @@
 ;;   (while (not (fs/exists? run-file)) 
 ;;     (Thread/sleep 1000))
 ;;   (log/info "Run file created, starting script")
-;;   (rs/with-runtime config
+;;   (sr/with-runtime config
 ;;     (fn [rt]
 ;;       (let [ns *ns*]
 ;;         (try
