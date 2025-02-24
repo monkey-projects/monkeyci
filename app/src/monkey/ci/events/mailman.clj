@@ -106,6 +106,20 @@
 (defmethod make-component :jms [config]
   (map->JmsComponent {:config config}))
 
+;; Generic component that can be used to add a new route listener to mailman
+(defrecord RouteComponent [routes make-routes mailman]
+  co/Lifecycle
+  (start [this]
+    (let [routes (make-routes this)]
+      (assoc this
+             :routes routes
+             :listener (add-router mailman routes {:interceptors global-interceptors}))))
+
+  (stop [{:keys [listener] :as this}]
+    (when listener
+      (mmc/unregister-listener listener))
+    (dissoc this :listener)))
+
 (defn post-events
   "Posts events using the broker in the mailman component"
   [mm events]

@@ -72,6 +72,29 @@
           (is (= 1 (count l)))
           (is (every? (partial satisfies? mmc/Listener) l)))))))
 
+(defrecord TestListener [unreg?]
+  mmc/Listener
+  (unregister-listener [this]
+    (reset! unreg? true)))
+
+(deftest routes
+  (let [mailman (-> (sut/make-component {:type :manifold})
+                    (co/start))
+        api-config {:port 12342
+                    :token "test-token"}]
+    (testing "`start`"
+      (let [c (-> (sut/->RouteComponent [] (constantly [] )mailman)
+                  (co/start))]
+        (testing "registers a listener"
+          (is (some? (:listener c))))))
+
+    (testing "`stop` unregisters listener"
+      (let [unreg? (atom false)]
+        (is (nil? (-> (sut/map->RouteComponent {:listener (->TestListener unreg?)})
+                      (co/stop)
+                      :listener)))
+        (is (true? @unreg?))))))
+
 (deftest merge-routes
   (testing "merges handlers together per type"
     (is (= [[::type-1 [::handler-1 ::handler-2]]

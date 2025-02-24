@@ -2,6 +2,7 @@
   (:require [clojure.test :refer [deftest testing is]]
             [manifold
              [bus :as mb]
+             [deferred :as md]
              [stream :as ms]]
             [monkey.ci.events.mailman.interceptors :as sut]
             [monkey.ci.helpers :as h]))
@@ -79,3 +80,14 @@
       (is (keyword? (:name i)))
       (is (some? (enter {:event evt})))
       (is (= evt (deref (ms/take! s) 1000 :timeout))))))
+
+
+(deftest realize-deferred
+  (let [e (md/deferred)
+        {:keys [leave] :as i} (sut/realize-deferred e)]
+    (is (keyword? (:name i)))
+    
+    (testing "`leave` sets result in deferred"
+      (is (map? (-> {:result ::test-result}
+                    (leave))))
+      (is (= ::test-result (deref e 100 :timeout))))))

@@ -60,26 +60,3 @@
 
       (testing "when container build"
         (testing "has workspace")))))
-
-(defrecord TestListener [unreg?]
-  mmc/Listener
-  (unregister-listener [this]
-    (reset! unreg? true)))
-
-(deftest routes
-  (let [mailman (-> (em/make-component {:type :manifold})
-                    (co/start))
-        api-config {:port 12342
-                    :token "test-token"}]
-    (testing "`start`"
-      (let [c (-> (sut/->Routes [] mailman api-config)
-                  (co/start))]
-        (testing "registers a listener"
-          (is (some? (:listener c))))))
-
-    (testing "`stop` unregisters listener"
-      (let [unreg? (atom false)]
-        (is (nil? (-> (sut/map->Routes {:listener (->TestListener unreg?)})
-                      (co/stop)
-                      :listener)))
-        (is (true? @unreg?))))))

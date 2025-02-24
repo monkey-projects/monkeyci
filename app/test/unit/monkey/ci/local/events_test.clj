@@ -56,18 +56,6 @@
                               (leave)
                               (sut/get-process))))))))
 
-(deftest realize-ending
-  (let [e (md/deferred)
-        {:keys [leave] :as i} sut/realize-ending
-        build (h/gen-build)]
-    (is (keyword? (:name i)))
-    
-    (testing "`leave` sets result in ending"
-      (is (map? (-> {:result build}
-                    (sut/set-ending e)
-                    (leave))))
-      (is (= build (deref e 100 :timeout))))))
-
 (deftest add-log-dir
   (h/with-tmp-dir dir
     (let [log-dir (fs/path dir "logs")
@@ -135,6 +123,7 @@
               (sut/set-mailman mailman)
               (sut/set-api {:port 1234
                             :token "test-token"})
+              (sut/set-child-opts {:log-config "test-config.xml"})
               (sut/prepare-child-cmd))]
     (testing "starts child process command"
       (testing "in script dir"
@@ -152,7 +141,17 @@
             (let [api (sc/api conf)]
               (is (not-empty api))
               (is (= "http://localhost:1234" (:url api)))
-              (is (= "test-token" (:token api))))))))
+              (is (= "test-token" (:token api)))))))
+
+      (testing "passes deps"
+        (let [deps (-> r :cmd (nth 2) (edn/edn->))]
+          (testing "with log config from child opts"
+            (is (= "-Dlogback.configurationFile=test-config.xml"
+                   (-> deps
+                       (get-in [:aliases :monkeyci/build :jvm-opts])
+                       first))))
+
+          (testing "with m2 cache dir"))))
 
     (testing "exit fn fires `build/end`"
       (let [exit-fn (:exit-fn r)]

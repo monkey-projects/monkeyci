@@ -14,3 +14,9 @@
 
 (defn set-build [c b]
   (assoc c build b))
+
+(def result ::ss/result)
+
+(defn set-result [c b]
+  (assoc c result b))
+

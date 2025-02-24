@@ -54,6 +54,7 @@
 (deftest routes
   (let [types [:script/initializing
                :script/start
+               :script/end
                :job/queued
                :job/executed
                :job/end]
@@ -116,6 +117,14 @@
       (is (= [:script/end] (->> (sut/get-events r)
                                 (map :type))))
       (is (bc/failed? (first (sut/get-events r)))))))
+
+(deftest script-end
+  (testing "sets event in result for realization"
+    (let [evt {:type :script/end
+               :status :success}]
+      (is (= evt (-> {:event evt}
+                     (sut/script-end)
+                     (em/get-result)))))))
 
 (deftest job-queued
   (let [jobs {"first" (bc/action-job "first" (constantly nil))

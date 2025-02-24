@@ -53,3 +53,16 @@
 
 (defn set-lib-coords [conf lib-coords]
   (assoc conf :lib-coords lib-coords))
+
+(def get-log-config :log-config)
+
+(defn set-log-config [conf p]
+  (assoc conf :log-config p))
+
+(def get-m2-cache-dir :m2-cache-dir)
+
+(defn set-m2-cache-dir [conf p]
+  (assoc conf :m2-cache-dir p))
+
+(defn get-child-opts [conf]
+  (select-keys conf [:lib-coords :log-config :m2-cache-dir]))

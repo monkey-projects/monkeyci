@@ -2,7 +2,9 @@
   "General purpose interceptors"
   (:require [clojure.tools.logging :as log]
             [io.pedestal.interceptor.chain :as pi]
-            [manifold.bus :as mb]
+            [manifold
+             [bus :as mb]
+             [deferred :as md]]
             [meta-merge.core :as mm]
             [monkey.ci
              [build :as b]
@@ -67,4 +69,13 @@
   {:name ::update-bus
    :enter (fn [{:keys [event] :as ctx}]
             (mb/publish! bus (:type event) event)
+            ctx)})
+
+
+(defn realize-deferred [d]
+  "Interceptor that takes a deferred and realizes it on leave with the result
+   specified in the context."
+  {:name ::realize-deferred
+   :leave (fn [ctx]
+            (md/success! d (:result ctx))
             ctx)})

@@ -20,7 +20,6 @@
              [fs :as fs]
              [process :as bp]]
             [clojure.tools.logging :as log]
-            [manifold.deferred :as md]
             [monkey.ci
              [build :as b]
              [git :as git]
@@ -54,15 +53,6 @@
 (defn set-process [ctx ws]
   (assoc ctx ::process ws))
 
-(def get-ending ::ending)
-
-(defn set-ending [ctx e]
-  (assoc ctx ::ending e))
-
-(defn set-ending! [d r]
-  (log/debug "Child process finished, setting result:" r)
-  (md/success! d r))
-
 (def get-mailman ::mailman)
 
 (defn set-mailman [ctx e]
@@ -78,10 +68,10 @@
 (defn set-log-dir [ctx e]
   (assoc ctx ::log-dir e))
 
-(def get-lib-coords ::lib-coords)
+(def get-child-opts ::child-opts)
 
-(defn set-lib-coords [ctx e]
-  (assoc ctx ::lib-coords e))
+(defn set-child-opts [ctx e]
+  (assoc ctx ::child-opts e))
 
 ;;; Interceptors
 
@@ -129,11 +119,6 @@
             ;; TODO
             )})
 
-(defn add-ending [e]
-  "Adds ending to the context"
-  {:name ::add-ending
-   :enter #(set-ending % e)})
-
 (defn add-mailman [mm]
   "Adds mailman component to the context"
   {:name ::add-mailman
@@ -152,21 +137,15 @@
               (fs/create-dirs dir))
             (set-log-dir ctx dir))})
 
-(defn add-lib-coords [lib-coords]
-  "Adds library coordinates configuration to the context"
-  {:name ::add-lib-coords
-   :enter #(set-lib-coords % lib-coords)})
+(defn add-child-opts [child-opts]
+  "Adds options for child process to the context"
+  {:name ::add-child-opts
+   :enter #(set-child-opts % child-opts)})
 
 (def handle-error
   {:name ::error
    :error (fn [ctx err]
             (log/error "Got error:" err)
-            ctx)})
-
-(def realize-ending
-  {:name ::realize-ending
-   :leave (fn [ctx]
-            (set-ending! (get-ending ctx) (get-result ctx))
             ctx)})
 
 ;;; Handlers
@@ -190,11 +169,11 @@
         (sc/set-api {:url (str "http://localhost:" port)
                      :token token}))))
 
-(defn generate-deps [script-dir lib-coords log-config]
+(defn generate-deps [script-dir {:keys [lib-coords log-config m2-cache-dir]}]
   {:paths [script-dir]
    :aliases
    {:monkeyci/build
-    (cond-> {:exec-fn 'monkey.ci.process/run
+    (cond-> {:exec-fn 'monkey.ci.script.runtime/run-script!
              :extra-deps {'com.monkeyci/app lib-coords}}
       log-config (assoc :jvm-opts
                         [(str "-Dlogback.configurationFile=" log-config)]))
@@ -209,8 +188,7 @@
     {:dir (b/calc-script-dir (b/checkout-dir build) (b/script-dir build))
      :cmd ["clojure"
            "-Sdeps" (pr-str (generate-deps (b/script-dir build)
-                                           (get-lib-coords ctx)
-                                           nil))
+                                           (get-child-opts ctx)))
            "-X:monkeyci/build"
            (pr-str {:config (child-config ctx)})]
      :out (log-file "out.log")
@@ -244,7 +222,7 @@
                              (add-mailman mailman)
                              (add-api (conf/get-api conf))
                              (add-log-dir (conf/get-log-dir conf))
-                             (add-lib-coords (conf/get-lib-coords conf))]
+                             (add-child-opts (conf/get-child-opts conf))]
                       (get-in conf [:build :git]) (conj checkout-src)
                       true (conj (save-workspace (conf/get-workspace conf))))}
      {:handler make-build-init-evt}]]
@@ -257,5 +235,4 @@
     ;; Build has completed, clean up
     [{:handler build-end
       :interceptors [emi/no-result
-                     (add-ending (conf/get-ending conf))
-                     realize-ending]}]]])
+                     (emi/realize-deferred (conf/get-ending conf))]}]]])

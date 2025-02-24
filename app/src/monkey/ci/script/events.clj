@@ -131,6 +131,10 @@
             (set-events (map #(j/job-queued-evt % build-sid) next-jobs))
             (enqueue-jobs next-jobs))))))
 
+(defn script-end [ctx]
+  ;; Just set the event in the result, so it can be passed to the deferred
+  (em/set-result ctx (:event ctx)))
+
 (defn job-queued
   "Executes an action job in a new thread.  For container jobs, it's up to the
    container runner implementation to handle the events."
@@ -187,6 +191,11 @@
       [{:handler script-start
         :interceptors [state
                        events->result]}]]
+
+     [:script/end
+      [{:handler script-end
+        :interceptors [emi/no-result
+                       (emi/realize-deferred (:result conf))]}]]
 
      [:job/queued
       [{:handler job-queued

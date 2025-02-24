@@ -1,15 +1,20 @@
 (ns monkey.ci.script.runtime
   "Functions for creating a runtime for build scripts"
   (:require [com.stuartsierra.component :as co]
+            [manifold.deferred :as md]
             [monkey.ci
              [artifacts :as art]
              [cache :as cache]
              [runtime :as rt]
              [spec :as spec]]
             [monkey.ci.build.api :as api]
-            [monkey.ci.script.config :as sc]
+            [monkey.ci.script
+             [config :as sc]
+             [events :as se]]
             [monkey.ci.containers.build-api :as cba]
-            [monkey.ci.events.build-api :as eba]
+            [monkey.ci.events
+             [build-api :as eba]
+             [mailman :as em]]
             [monkey.ci.runtime.common :as rc]
             [monkey.ci.spec.script :as ss]))
 
@@ -62,6 +67,16 @@
 (defn- new-event-bus []
   (->EventBus nil))
 
+(defn- new-mailman []
+  (em/make-component {:type :manifold}))
+
+(defn- new-routes [conf] 
+  (letfn [(make-routes [c]
+            (se/make-routes (assoc c
+                                   :build (sc/build conf)
+                                   :result (sc/result conf))))]
+    (em/map->RouteComponent {:make-routes make-routes})))
+
 (defn- using-api [obj]
   (co/using
    obj
@@ -86,10 +101,23 @@
                 (new-container-runner)
                 {:client :api-client
                  :bus :event-bus})
-   ;; TODO Mailman broker and routes
-   ))
+   :mailman    (new-mailman)
+   :routes     (co/using
+                (new-routes config)
+                [:mailman :artifacts :cache :api-client])))
 
-(defn with-runtime [config f]
+(defn ^:deprecated with-runtime [config f]
   (rc/with-runtime (make-system config) f))
 
 (def build :build)
+
+(defn run-script!
+  "Starts the script runtime using given configuration and runs the script jobs.
+   Returns a deferred that will realize on completion."
+  [{:keys [config]}]
+  (let [r (md/deferred)
+        sys (-> config
+                (sc/set-result r)
+                (make-system)
+                (co/start))]
+    (md/finally r #(co/stop sys))))

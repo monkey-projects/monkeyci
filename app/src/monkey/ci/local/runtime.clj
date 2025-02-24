@@ -24,24 +24,12 @@
 (defn- new-mailman []
   (em/make-component {:type :manifold}))
 
-(defrecord Routes [routes mailman api-config]
-  co/Lifecycle
-  (start [this]
-    (let [routes (-> this
-                     :config
-                     (lc/set-api api-config)
-                     (le/make-routes mailman))]
-      (assoc this
-             :routes routes
-             :listener (em/add-router mailman routes {:interceptors em/global-interceptors}))))
-
-  (stop [{:keys [listener] :as this}]
-    (when listener
-      (mmc/unregister-listener listener))
-    (dissoc this :listener)))
-
 (defn- new-routes [conf]
-  (map->Routes {:config conf}))
+  (letfn [(make-routes [c]
+            (-> (:config c)
+                (lc/set-api (:api-config c))
+                (le/make-routes (:mailman c))))]
+    (em/map->RouteComponent {:config conf :make-routes make-routes})))
 
 (defn- new-events []
   (emb/->MailmanEventPoster nil))
