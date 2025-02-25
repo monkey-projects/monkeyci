@@ -14,7 +14,8 @@
 (s/def ::result md/deferred?)
 
 (s/def ::config
-  (s/keys :req [::api ::build ::result]))
+  (s/keys :req [::api ::build]
+          :opt [::result]))
 
 (s/def ::events ::c/events)
 (s/def ::artifacts art/repo?)

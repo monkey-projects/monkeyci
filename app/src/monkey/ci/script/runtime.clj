@@ -101,6 +101,7 @@
                 (new-container-runner)
                 {:client :api-client
                  :bus :event-bus})
+   ;; TODO Connect to the controller
    :mailman    (new-mailman)
    :routes     (co/using
                 (new-routes config)
