@@ -1,6 +1,7 @@
 (ns monkey.ci.script.events
   "Mailman event routes for scripts"
   (:require [clojure.tools.logging :as log]
+            [io.pedestal.interceptor.chain :as pi]
             [medley.core :as mc]
             [monkey.ci
              [build :as b]
@@ -45,6 +46,21 @@
   [ctx]
   {:build (get-build ctx)
    :api (:api ctx)})
+
+;;; Event builders
+
+(defn- base-event
+  "Creates a skeleton event with basic properties"
+  [build type]
+  (ec/make-event
+   type 
+   :src :script
+   :sid (b/sid build)))
+
+(defn- script-end-evt [ctx status]
+  ;; TODO Add job results
+  (-> (base-event (get-build ctx) :script/end)
+      (assoc :status status)))
 
 ;;; Interceptors
 
@@ -93,20 +109,15 @@
             (let [{:keys [job-id] :as e} (:event ctx)]
               (update-job ctx job-id merge (select-keys e [:status :result]))))})
 
-;;; Event builders
-
-(defn- base-event
-  "Creates a skeleton event with basic properties"
-  [build type]
-  (ec/make-event
-   type 
-   :src :script
-   :sid (b/sid build)))
-
-(defn- script-end-evt [ctx status]
-  ;; TODO Add job results
-  (-> (base-event (get-build ctx) :script/end)
-      (assoc :status status)))
+(def handle-script-error
+  "Marks script as failed"
+  {:name ::script-error-handler
+   :error (fn [{:keys [event] :as ctx} ex]
+            (log/error "Failed to handle event" (:type event) ", marking script as failed" ex)
+            (-> ctx
+                (assoc :result (script-end-evt ctx :error))
+                ;; Remove the error to ensure leave chain is processed
+                (dissoc ::pi/error)))})
 
 ;;; Handlers
 
@@ -169,12 +180,14 @@
   (let [state (emi/with-state (atom {:build build}))]
     [[:script/initializing
       [{:handler script-init
-        :interceptors [state
+        :interceptors [handle-script-error
+                       state
                        load-jobs]}]]
 
      [:script/start
       [{:handler script-start
-        :interceptors [state
+        :interceptors [handle-script-error
+                       state
                        enqueue-jobs]}]]
 
      [:script/end
