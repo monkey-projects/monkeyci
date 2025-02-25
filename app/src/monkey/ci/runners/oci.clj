@@ -4,7 +4,8 @@
    it more robust and better suited for multiple replicas.  Instead of waiting
    for a container instance to complete, we just register multiple event 
    handlers that follow the flow."
-  (:require [clojure.java.io :as io]
+  (:require [clj-commons.byte-streams :as bs]
+            [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
             [io.pedestal.interceptor.chain :as pi]
@@ -282,6 +283,11 @@
   (oci/with-retry
     #(ci/create-container-instance client {:container-instance config})))
 
+(defn- log-ci-error [{:keys [status body] :as resp}]
+  (when (or (nil? status) (>= status 400))
+    (log/error "Failed to create container instance:" resp))
+  resp)
+
 (defn start-ci [client]
   "Interceptor that starts container instance using the config specified in the context"
   {:name ::start-ci
@@ -289,6 +295,7 @@
             ;; Start container instance, put result back in the context
             ;; TODO Async processing?
             (->> @(create-instance client (get-ci-config ctx))
+                 (log-ci-error)
                  (set-ci-response ctx)))})
 
 (def end-on-ci-failure
