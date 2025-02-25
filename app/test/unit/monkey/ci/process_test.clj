@@ -33,7 +33,7 @@
 (defn example [subdir]
   (.getAbsolutePath (io/file cwd "examples" subdir)))
 
-(deftest run
+#_(deftest run
   (at/with-fake-http ["http://test/events" {:status 200
                                             :body (bs/to-input-stream "")}]
     (let [build {:build-id "test-build"}

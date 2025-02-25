@@ -24,9 +24,6 @@
                        :body (bs/to-input-stream "")}]
     (let [sys (-> (sut/make-system test-config)
                   (co/start))]
-      (testing "creates system map with runtime"
-        (is (sut/runtime? (:runtime sys))))
-
       (testing "adds mailman"
         (is (some? (:mailman sys))))
 
@@ -38,8 +35,9 @@
 
       (testing "adds cache repo"
         (is (art/repo? (:cache sys))))
-      (testing "adds event bus"
-        (is (some? (:event-bus sys))))
+
+      (testing "adds event stream"
+        (is (some? (:event-stream sys))))
 
       (let [api-client (:api-client sys)]
         (testing "adds api client"
@@ -51,49 +49,9 @@
                            (deref)
                            :status)))))))))
 
-(deftest with-runtime
-  (at/with-fake-http ["http://localhost:1234/events"
-                      {:status 200
-                       :body (bs/to-input-stream "")}]
-    (testing "invokes target function with runtime"
-      (is (= ::invoked (sut/with-runtime test-config (constantly ::invoked)))))
-
-    (testing "drops workspace from runtime"
-      (is (nil? (sut/with-runtime test-config :workspace))))
-
-    (testing "adds artifact repo"
-      (is (art/repo? (sut/with-runtime
-                       test-config
-                       :artifacts))))
-
-    (testing "adds cache repo"
-      (is (art/repo? (sut/with-runtime
-                       test-config
-                       :cache))))
-
-    (testing "adds container runner"
-      (is (p/container-runner? (sut/with-runtime
-                                 test-config
-                                 :containers))))
-
-    (testing "adds event bus"
-      (is (some? (sut/with-runtime
-                   test-config
-                   :event-bus))))
-
-    (let [api-client (sut/with-runtime test-config (comp :client :api))]
-      (testing "adds api client"
-        (is (fn? api-client)))
-
-      (testing "api client connects to localhost"
-        (at/with-fake-http ["http://localhost:1234/test" {:status 200}]
-          (is (= 200 (-> (api-client {:path "/test" :request-method :get})
-                         (deref)
-                         :status))))))))
-
-(deftest run-script!
+(deftest run-script
   (at/with-fake-http ["http://localhost:1234/events"
                       {:status 200
                        :body (bs/to-input-stream "")}]
     (testing "returns a deferred"
-      (is (md/deferred? (sut/run-script! {:config test-config}))))))
+      (is (md/deferred? (sut/run-script test-config))))))

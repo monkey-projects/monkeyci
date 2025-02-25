@@ -10,6 +10,11 @@
             [monkey.ci.spec.events :as se]
             [monkey.ci.helpers :as h]))
 
+(defn- jobs->map [jobs]
+  (->> jobs
+       (group-by :id)
+       (mc/map-vals first)))
+
 (deftest load-jobs
   (let [{:keys [enter] :as i} sut/load-jobs]
     (is (keyword? (:name i)))
@@ -25,31 +30,56 @@
 
     (is (some? (remove-ns 'build)))))
 
-(deftest execute-actions
-  (let [{:keys [leave] :as i} (sut/execute-actions {:events (h/fake-events)})]
+(deftest execute-action
+  (let [{:keys [enter] :as i} (sut/execute-action {:events (h/fake-events)})]
     (is (keyword? (:name i)))
     
     (testing "executes each job in the result in a new thread"
-      (let [jobs [(bc/action-job "job-1" (constantly ::first))
-                  (bc/action-job "job-2" (constantly ::second))]
-            r (-> {}
-                  (em/set-result jobs)
-                  (leave))
+      (let [jobs (jobs->map [(bc/action-job "job-1" (constantly ::first))
+                             (bc/action-job "job-2" (constantly ::second))])
+            r (-> {:event
+                   {:job-id "job-1"}}
+                  (sut/set-jobs jobs)
+                  (enter))
             a (sut/get-running-actions r)]
-        (is (= (count jobs) (count a)))
-        (is (every? md/deferred? a))))))
+        (is (= 1 (count a)))
+        (is (every? md/deferred? a))))
 
-(deftest events->result
-  (let [{:keys [leave] :as i} sut/events->result]
+    (testing "does not execute non-action job"
+      (is (empty? (-> {:event {:job-id "non-action"}}
+                      (sut/set-jobs (jobs->map [(bc/container-job "non-action" {})]))
+                      (enter)
+                      (sut/get-running-actions)))))))
+
+(deftest enqueue-jobs
+  (let [{:keys [leave] :as i} sut/enqueue-jobs]
     (is (keyword? (:name i)))
+    
+    (testing "marks jobs enqueued in state"
+      (let [job-id "test-job"
+            r (-> {:result
+                   [{:type :job/queued
+                     :job-id job-id}]}
+                  (sut/set-jobs (jobs->map
+                                 [{:id job-id
+                                   :status :pending}]))
+                  (leave))]
+        (is (j/queued? (-> (sut/get-jobs r)
+                           (get job-id))))))))
 
-    (testing "`leave` overwrites result with events"
-      (let [evts [{:type ::test-event}]]
-        (is (= evts
-               (-> {}
-                   (sut/set-events evts)
-                   (leave)
-                   (em/get-result))))))))
+(deftest set-job-result
+  (let [{:keys [enter] :as i} sut/set-job-result
+        jobs (jobs->map [{:id "test-job"
+                          :status :running}])]
+    (testing "updates job in state"
+      (is (= :success (-> {:event
+                           {:job-id "test-job"
+                            :status :success}}
+                          (sut/set-jobs jobs)
+                          (enter)
+                          (sut/get-jobs)
+                          (get "test-job")
+                          :status))))))
 
 (deftest routes
   (let [types [:script/initializing
@@ -63,11 +93,6 @@
     (doseq [t types]
       (testing (format "handles `%s` event type" t)
         (is (contains? routes t))))))
-
-(defn- jobs->map [jobs]
-  (->> jobs
-       (group-by :id)
-       (mc/map-vals first)))
 
 (deftest script-init
   (testing "fires `script/start` event with pending jobs"
@@ -98,49 +123,24 @@
                   (sut/set-build (h/gen-build))
                   (sut/script-start))]
         (testing "queues jobs without dependencies"
-          (let [evts (sut/get-events r)]
-            (is (= 1 (count evts)))
-            (is (every? (comp (partial = :job/queued) :type) evts))
-            (is (spec/valid? ::se/event (first evts))
-                (spec/explain-str ::se/event (first evts)))
-            (is (= [(get jobs "start")]
-                   (map :job evts)))))
-
-        (testing "marks jobs enqueued in state"
-          (let [s (sut/get-jobs r)]
-            (is (j/queued? (get s "start")))
-            (is (j/pending? (get s "next"))))))))
+          (is (= 1 (count r)))
+          (is (every? (comp (partial = :job/queued) :type) r))
+          (is (spec/valid? ::se/event (first r))
+              (spec/explain-str ::se/event (first r)))
+          (is (= [(get jobs "start")]
+                 (map :job r)))))))
 
   (testing "returns `script/end` when no jobs"
     (let [r (sut/script-start {:event {:script {:jobs []}}})]
-      (is (empty? (sut/get-queued r)))
-      (is (= [:script/end] (->> (sut/get-events r)
-                                (map :type))))
-      (is (bc/failed? (first (sut/get-events r)))))))
+      (is (= [:script/end] (map :type r)))
+      (is (bc/failed? (first r))))))
 
 (deftest script-end
   (testing "sets event in result for realization"
     (let [evt {:type :script/end
                :status :success}]
       (is (= evt (-> {:event evt}
-                     (sut/script-end)
-                     (em/get-result)))))))
-
-(deftest job-queued
-  (let [jobs {"first" (bc/action-job "first" (constantly nil))
-              "second" (bc/container-job "second" {})}]
-    (testing "returns action job for execution"
-      (is (= [(get jobs "first")]
-             (-> {:event {:job-id "first"}}
-                 (sut/set-jobs jobs)
-                 (sut/job-queued)
-                 (em/get-result)))))
-    
-    (testing "does not execute non-action job"
-      (is (nil? (-> {:event {:job-id "second"}}
-                    (sut/set-jobs jobs)
-                    (sut/job-queued)
-                    (em/get-result)))))))
+                     (sut/script-end)))))))
 
 (deftest job-executed
   (testing "returns `job/end` event"
@@ -148,19 +148,17 @@
            (->> {:event
                  {:job-id "test-job"}}
                 (sut/job-executed)
-                (sut/get-events)
                 (map :type)))))
 
   (testing "executes 'after' extensions"))
 
 (deftest job-end
-  (let [jobs (->> [{:id "first"
-                    :status :running}
-                   {:id "second"
-                    :dependencies ["first"]
-                    :status :pending}]
-                  (group-by :id)
-                  (mc/map-vals first))]
+  (let [jobs (jobs->map
+              [{:id "first"
+                :status :success}
+               {:id "second"
+                :dependencies ["first"]
+                :status :pending}])]
     
     (let [r (-> {:event
                  {:job-id "first"
@@ -168,21 +166,12 @@
                 (sut/set-jobs jobs)
                 (sut/job-end))]
       (testing "queues pending jobs with completed dependencies"
-        (let [evts (sut/get-events r)]
-          (is (= [:job/queued] (map :type evts)))
-          (is (= "second" (-> evts first :job-id)))))
-
-      (testing "updates queued jobs in state"
-        (is (= :queued
-               (-> r
-                   (sut/get-jobs)
-                   (get "second")
-                   :status)))))
+        (is (= [:job/queued] (map :type r)))
+        (is (= "second" (-> r first :job-id)))))
 
     (testing "returns `script/end` event when no more jobs to run"
       (is (= [:script/end]
              (->> (sut/job-end {})
-                  (sut/get-events)
                   (map :type)))))
 
     (testing "marks script as `:error` if a job has failed"
@@ -191,9 +180,8 @@
                   {:job-id "failed"
                    :status :error}}
                  (sut/set-jobs (jobs->map [{:id "failed"
-                                            :status :running}]))
+                                            :status :error}]))
                  (sut/job-end)
-                 (sut/get-events)
                  first
                  :status))))
 
@@ -205,16 +193,5 @@
                  (sut/set-jobs (jobs->map [{:id "success"
                                             :status :running}]))
                  (sut/job-end)
-                 (sut/get-events)
                  first
-                 :status))))
-
-    (testing "updates job in state"
-      (is (= :success (-> {:event
-                           {:job-id "first"
-                            :status :success}}
-                          (sut/set-jobs jobs)
-                          (sut/job-end)
-                          (sut/get-jobs)
-                          (get "first")
-                          :status))))))
+                 :status))))))

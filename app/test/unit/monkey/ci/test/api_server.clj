@@ -1,8 +1,8 @@
 (ns monkey.ci.test.api-server
   "Helper functions for working with api servers"
   (:require [manifold
-             [bus :as mb]
-             [deferred :as md]]
+             [deferred :as md]
+             [stream :as ms]]
             [monkey.ci
              [protocols :as p]
              [runtime :as rt]]
@@ -18,5 +18,5 @@
   []
   (let [rt (trt/test-runtime)]
     (assoc rt
-           :event-bus (mb/event-bus)
+           :event-stream (ms/stream 1)
            :params (->EmptyParams))))

@@ -6,7 +6,12 @@
 (defrecord TestBroker [posted]
   mmc/EventPoster
   (post-events [this events]
-    (swap! posted (comp vec concat) events)))
+    (swap! posted (comp vec concat) events))
+
+  mmc/EventReceiver
+  (add-listener [this l]
+    ;; Noop
+    ))
 
 (defn test-broker []
   (->TestBroker (atom [])))

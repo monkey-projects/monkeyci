@@ -15,11 +15,6 @@
 
 ;;; Context management
 
-(def get-queued ::queued)
-
-(defn set-queued [ctx q]
-  (assoc ctx ::queued q))
-
 (def get-events ::events)
 
 (defn set-events [ctx q]
@@ -64,25 +59,39 @@
                  (mc/map-vals first)
                  (set-jobs ctx)))})
 
-(defn execute-actions [job-ctx]
-  "Interceptor that executes all action jobs in the result in a new thread.
-   The job context must contain all necessary components for the job to run properly,
-   such as artifacts, cache and events."
+(defn execute-action [job-ctx]
+  "Interceptor that executes the job in the input event in a new thread, provided
+   it's an action job.  The job context must contain all necessary components for 
+   the job to run properly, such as artifacts, cache and events."
   (letfn [(execute-job [job]
             (j/execute! job (assoc job-ctx :job job)))]
-    {:name ::execute-actions
-     :leave (fn [ctx]
-              ;; TODO Apply "before" extensions
-              ;; Execute the jobs with the job context
-              (->> (em/get-result ctx)
-                   (map execute-job)
-                   (set-running-actions ctx)))}))
+    {:name ::execute-action
+     :enter (fn [ctx]
+              (let [job (get (get-jobs ctx) (get-in ctx [:event :job-id]))]
+                ;; TODO Apply "before" extensions
+                ;; TODO Only execute it if the max number of concurrent jobs has not been reached
+                ;; Execute the jobs with the job context
+                (set-running-actions ctx (when (bc/action-job? job) [(execute-job job)]))))}))
 
-(def events->result
-  "Interceptor that puts events in the result"
-  {:name ::events->result
+(def enqueue-jobs
+  "Interceptor that enqueues all jobs indicated in the `job/queued` events in the result"
+  {:name ::enqueue-jobs
    :leave (fn [ctx]
-            (em/set-result ctx (get-events ctx)))})
+            (let [job-ids (->> (em/get-result ctx)
+                               (filter (comp (partial = :job/queued) :type))
+                               (map :job-id))]
+              (log/debug "Enqueueing these jobs:" job-ids)
+              (reduce (fn [r id]
+                        (update-job r id assoc :status :queued))
+                      ctx
+                      job-ids)))})
+
+(def set-job-result
+  "Sets job result according to the event"
+  {:name ::set-job-result
+   :enter (fn [ctx]
+            (let [{:keys [job-id] :as e} (:event ctx)]
+              (update-job ctx job-id merge (select-keys e [:status :result]))))})
 
 ;;; Event builders
 
@@ -109,49 +118,29 @@
     (-> (base-event (get-build ctx) :script/start)
         (assoc :jobs (map (comp mark-pending j/job->event) (vals (get-jobs ctx)))))))
 
-(defn- enqueue-jobs
-  "Marks given jobs as enqueued in the state"
-  [ctx jobs]
-  (reduce (fn [r j]
-            (update-job r (:id j) assoc :status :queued))
-          ctx
-          jobs))
-
 (defn script-start
   "Queues all jobs that have no dependencies"
   [ctx]
   (let [jobs (get-jobs ctx)
         build-sid (b/sid (get-build ctx))]
+    (log/debug "Starting script with" (count jobs) "job(s):" (keys jobs))
     (if (empty? jobs)
-      ;; TODO Should be warning instead of error
-      (set-events ctx [(-> (script-end-evt ctx :error)
-                           (bc/with-message "No jobs to run"))])
+      ;; TODO Should be warning instead of error      
+      [(-> (script-end-evt ctx :error)
+           (bc/with-message "No jobs to run"))]
       (let [next-jobs (j/next-jobs (vals jobs))]
-        (-> ctx
-            (set-events (map #(j/job-queued-evt % build-sid) next-jobs))
-            (enqueue-jobs next-jobs))))))
+        (map #(j/job-queued-evt % build-sid) next-jobs)))))
 
 (defn script-end [ctx]
   ;; Just set the event in the result, so it can be passed to the deferred
-  (em/set-result ctx (:event ctx)))
-
-(defn job-queued
-  "Executes an action job in a new thread.  For container jobs, it's up to the
-   container runner implementation to handle the events."
-  [ctx]
-  ;; TODO Only execute it if the max number of concurrent jobs has not been reached
-  (let [job-id (get-in ctx [:event :job-id])
-        job (get (get-jobs ctx) job-id)]
-    (cond-> ctx
-      (bc/action-job? job)
-      (em/set-result [job]))))
+  (:event ctx))
 
 (defn job-executed
   "Runs any extensions for the job"
   [ctx]
   ;; TODO Apply "after" extensions
   (let [{:keys [job-id sid result]} (:event ctx)]
-    (set-events ctx [(j/job-end-evt job-id sid result)])))
+    [(j/job-end-evt job-id sid result)]))
 
 (defn- script-status
   "Determines script status according to the status of all jobs"
@@ -163,25 +152,21 @@
    if all jobs have been executed."
   [ctx]
   ;; Enqueue jobs that have become ready to run
-  (let [{:keys [job-id sid] :as e} (:event ctx)
-        upd (update-job ctx job-id merge (select-keys e [:status :result]))
-        jobs (get-jobs upd)
-        next-jobs (j/next-jobs (vals jobs))]
-    (-> upd
-        (set-events (if (empty? next-jobs)
-                      [(script-end-evt ctx (script-status upd))]
-                      (map #(j/job-queued-evt % sid) next-jobs)))
-        (enqueue-jobs next-jobs))))
+  (let [next-jobs (j/next-jobs (vals (get-jobs ctx)))]
+    (if (empty? next-jobs)
+      ;; TODO Also add job/skipped for any leftover jobs
+      [(script-end-evt ctx (script-status ctx))]
+      (map #(j/job-queued-evt % (get-in ctx [:event :sid])) next-jobs))))
 
 (defn- make-job-ctx
   "Constructs job context object from the route configuration"
   [ctx]
   (-> ctx
-      (select-keys [:artifacts :cache :build])
+      (select-keys [:artifacts :cache :events :build])
       (assoc :api {:client (:api-client ctx)})))
 
-(defn make-routes [conf]
-  (let [state (emi/with-state (atom {}))]
+(defn make-routes [{:keys [build] :as conf}]
+  (let [state (emi/with-state (atom {:build build}))]
     [[:script/initializing
       [{:handler script-init
         :interceptors [state
@@ -190,7 +175,7 @@
      [:script/start
       [{:handler script-start
         :interceptors [state
-                       events->result]}]]
+                       enqueue-jobs]}]]
 
      [:script/end
       [{:handler script-end
@@ -198,16 +183,15 @@
                        (emi/realize-deferred (:result conf))]}]]
 
      [:job/queued
-      [{:handler job-queued
+      [{:handler (constantly nil)
         :interceptors [state
-                       emi/no-result
-                       (execute-actions (make-job-ctx conf))]}]]
+                       (execute-action (make-job-ctx conf))]}]]
 
      [:job/executed
-      [{:handler job-executed
-        :interceptors [events->result]}]]
+      [{:handler job-executed}]]
 
      [:job/end
       [{:handler job-end
         :interceptors [state
-                       events->result]}]]]))
+                       enqueue-jobs
+                       set-job-result]}]]]))

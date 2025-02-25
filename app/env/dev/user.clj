@@ -42,4 +42,4 @@
   (cmd/run-build-local {:workdir wd
                         :dir sd
                         :lib-coords {:local/root (u/cwd)}
-                        :log-config (str (fs/absolutize "dev-resources/logback-test.xml"))}))
+                        :log-config (str (fs/absolutize "dev-resources/logback-script.xml"))}))

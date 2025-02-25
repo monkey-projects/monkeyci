@@ -1,7 +1,9 @@
 (ns monkey.ci.local.runtime-test
   (:require [clojure.test :refer [deftest testing is]]
             [com.stuartsierra.component :as co]
-            [manifold.deferred :as md]
+            [manifold
+             [deferred :as md]
+             [stream :as ms]]
             [monkey.ci
              [artifacts :as a]
              [protocols :as p]]
@@ -55,8 +57,32 @@
       (testing "has mailman routes"
         (is (some? (:routes sys))))
 
-      (testing "has event bus"
-        (is (some? (:event-bus sys))))
+      (testing "has event stream"
+        (is (some? (:event-stream sys))))
+
+      (testing "has event pipe"
+        (is (some? (:event-pipe sys))))
 
       (testing "when container build"
         (testing "has workspace")))))
+
+(deftest event-pipe
+  (let [broker (em/make-component {:type :manifold})
+        stream (sut/new-event-stream)
+        c (-> (sut/new-event-pipe)
+              (assoc :mailman broker
+                     :event-stream stream)
+              (co/start))]
+    (testing "`start`"
+      (testing "registers listener in mailman"
+        (is (some? (:listener c))))
+
+      (testing "pipes all received events to stream"
+        (let [evt {:type ::test-event}]
+          (is (some? (em/post-events broker [evt])))
+          (is (= evt (deref (ms/take! stream) 100 :timeout))))))
+
+    (testing "`stop` unregisters listener"
+      (let [s (co/stop c)]
+        (is (nil? (:listener s)))
+        (is (empty? (-> broker :broker :listeners deref)))))))

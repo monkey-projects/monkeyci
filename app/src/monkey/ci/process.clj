@@ -46,7 +46,7 @@
   [{:keys [config config-file]}]
   (or config (config/load-config-file config-file)))
 
-(defn run
+#_(defn run
   "Run function for when a build task is executed using clojure tools.  This function
    is run in a child process by the `execute!` function below.  This exits the VM
    with a nonzero value on failure."

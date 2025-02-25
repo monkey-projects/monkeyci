@@ -1,6 +1,7 @@
 (ns monkey.ci.events.mailman
   "Mailman-style event handling"
-  (:require [com.stuartsierra.component :as co]
+  (:require [clojure.tools.logging :as log]
+            [com.stuartsierra.component :as co]
             [monkey.ci.events.mailman
              [bridge :as emb]
              [interceptors :as emi]
@@ -42,13 +43,11 @@
 
 (defmulti make-component :type)
 
-(defrecord ManifoldComponent [broker routes]
+(defrecord GenericComponent [broker routes]
   co/Lifecycle
   (start [this]
-    (let [broker (mm/manifold-broker {})]
-      (assoc this
-             :broker broker
-             :listener (mmc/add-listener broker (make-router (:routes routes))))))
+    (assoc this
+           :listener (mmc/add-listener broker (make-router (:routes routes)))))
 
   (stop [{:keys [listener] :as this}]
     (when listener
@@ -59,8 +58,11 @@
   (add-router [this routes opts]
     (mmc/add-listener broker (mmc/router routes opts))))
 
+(defn make-generic-component [broker]
+  (->GenericComponent broker nil))
+
 (defmethod make-component :manifold [_]
-  (map->ManifoldComponent {}))
+  (make-generic-component (mm/manifold-broker {})))
 
 (defrecord JmsComponent [broker routes]
   co/Lifecycle
@@ -111,6 +113,7 @@
   co/Lifecycle
   (start [this]
     (let [routes (make-routes this)]
+      (log/debug "Registering" (count routes) "routes in broker:" (map first routes))
       (assoc this
              :routes routes
              :listener (add-router mailman routes {:interceptors global-interceptors}))))
@@ -123,6 +126,7 @@
 (defn post-events
   "Posts events using the broker in the mailman component"
   [mm events]
+  (log/trace "Posting events:" events)
   (some-> mm
           :broker
           (mmc/post-events events)))

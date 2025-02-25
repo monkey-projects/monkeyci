@@ -98,6 +98,20 @@
         (ms/connect in out {:upstream? true})))
     (stream-response out)))
 
+(defn stream->sse
+  "Returns SSE response for events that are received from a manifold bus.
+   The stream will contain all events the given types, for which `pred`
+   returns `true`."
+  [stream pred]
+  (let [out (->> (ms/stream 1)
+                 (add-keepalive)
+                 (ms/sliding-stream 10))]
+    (let [in (cond->> stream
+               pred (ms/filter pred)
+               true (ms/transform (map ->sse)))]
+      (ms/connect in out {:upstream? true}))
+    (stream-response out)))
+
 (defn parse-event-line [line]
   (when (and line (.startsWith line evt-prefix))
     (edn/edn-> (subs line (count evt-prefix)))))

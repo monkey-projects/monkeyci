@@ -88,6 +88,29 @@
       (is (@recv ::type-2))
       (is (not (@recv ::type-3))))))
 
+(deftest stream->sse
+  (testing "returns sse stream"
+    (let [stream (ms/stream)
+          r (sut/stream->sse stream (constantly true))]
+      (is (= 200 (:status r)))
+      (is (ms/stream? (:body r)))))
+
+  (testing "filters by predicate for events"
+    (let [stream (ms/stream)
+          {s :body} (sut/stream->sse stream (comp (partial = :ok) :type))
+          recv (atom #{})]
+      (is (some? (ms/consume (fn [evt]
+                               (let [v (-> evt
+                                           (parse-sse)
+                                           :type)]
+                                 (swap! recv conj v)))
+                             s)))
+      (is (true? (deref (ms/put! stream {:type :other}) 1000 :timeout)))
+      (is (true? (deref (ms/put! stream {:type :ok}) 1000 :timeout)))
+      (is (nil? (ms/close! s)))
+      (is (@recv :ok))
+      (is (not (@recv :other))))))
+
 (deftest parse-event-line
   (testing "`nil` if invalid"
     (is (nil? (sut/parse-event-line "invalid"))))

@@ -7,11 +7,11 @@
             [monkey.mailman.core :as mmc]))
 
 (deftest make-component
-  (testing " manifold"
+  (testing "manifold"
     (let [c (-> {:type :manifold}
-                         (sut/make-component)
-                         (assoc :router (constantly "ok"))
-                         (co/start))]
+                (sut/make-component)
+                (assoc :router (constantly "ok"))
+                (co/start))]
       (testing "can make component"
         (is (some? c)))
 

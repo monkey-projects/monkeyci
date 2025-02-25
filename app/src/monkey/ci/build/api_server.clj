@@ -32,7 +32,9 @@
              [utils :as u]]
             ;; Very strange, but including this causes spec gen exceptions when using cloverage :confused:
             ;; [monkey.ci.spec.build]
-            [monkey.ci.events.http :as eh]
+            [monkey.ci.events
+             [http :as eh]
+             [mailman :as em]]
             [monkey.ci.spec.api-server :as aspec]
             [monkey.ci.web
              [common :as c]
@@ -60,11 +62,8 @@
   "Gets current build configuration from the request"
   (comp :build req->ctx))
 
-(def req->events
-  (comp :events req->ctx))
-
-(def req->event-bus
-  (comp :event-bus req->ctx))
+(def req->event-stream
+  (comp :event-stream req->ctx))
 
 (def req->workspace
   (comp :workspace req->ctx))
@@ -80,6 +79,9 @@
 
 (def req->params
   (comp :params req->ctx))
+
+(def req->mailman
+  (comp :mailman req->ctx))
 
 (def repo-id
   (comp (juxt :customer-id :repo-id) req->build))
@@ -135,7 +137,7 @@
   (let [evt (get-in req [:parameters :body])]
     (log/debug "Received events from build script:" evt)
     (try 
-      {:status (if (rt/post-events (req->ctx req) evt)
+      {:status (if (em/post-events (req->mailman req) evt)
                  202
                  500)}
       (catch Exception ex
@@ -145,11 +147,8 @@
 (defn dispatch-events [req]
   (let [sid (build/sid (req->build req))]
     (log/info "Dispatching event stream to client for build" sid)
-    (eh/bus-stream (req->event-bus req)
-                   ;; Listen for all event types the script may need
-                   ;; Should we make this configurable on client-side?
-                   [:build/canceled :job/end]
-                   (comp (partial = sid) :sid))))
+    (eh/stream->sse (req->event-stream req)
+                    (comp (partial = sid) :sid))))
 
 (defn- stream-response [s & [nil-code]]
   (log/debug "Sending stream to client:" s)

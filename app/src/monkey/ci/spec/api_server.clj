@@ -8,11 +8,11 @@
 (s/def ::artifacts ::c/blob-store)
 (s/def ::workspace ::c/blob-store)
 (s/def ::params ::c/params)
-(s/def ::events ::c/events)
 (s/def ::containers ::c/containers)
+;;(s/def ::mailman ::c/mailman)
 
 (s/def ::base-config
-  (s/keys :req-un [::artifacts ::events ::containers ::params]
+  (s/keys :req-un [::artifacts ::containers ::params ::mailman]
           :opt-un [::cache ::workspace]))
 
 (s/def ::config

@@ -3,8 +3,8 @@
   (:require [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
             [manifold
-             [bus :as mb]
-             [deferred :as md]]
+             [deferred :as md]
+             [stream :as ms]]
             [monkey.ci
              [artifacts :as a]
              [blob :as blob]
@@ -21,7 +21,11 @@
              [common :as rc]]
             [monkey.mailman.core :as mmc]))
 
-(defn- new-mailman []
+(defn- new-mailman
+  "Creates a new internal event broker.  This broker is intended to dispatch events
+   between the controller, the script and container job sidecars, so it's only 
+   in-memory."
+  []
   (em/make-component {:type :manifold}))
 
 (defn- new-routes [conf]
@@ -30,9 +34,6 @@
                 (lc/set-api (:api-config c))
                 (le/make-routes (:mailman c))))]
     (em/map->RouteComponent {:config conf :make-routes make-routes})))
-
-(defn- new-events []
-  (emb/->MailmanEventPoster nil))
 
 (defn- blob-store [dir]
   (blob/->DiskBlobStore (str dir)))
@@ -57,35 +58,54 @@
 (defn- new-api-server []
   (ra/new-api-server {}))
 
-(defn- new-event-bus
-  "Creates a new event bus, that can be used by the api server to send events to the client."
+(defn new-event-stream
+  "Creates a new event stream, that can be used by the api server to send events to the client."
   []
-  (mb/event-bus))
+  (ms/stream))
+
+(defrecord EventPipe [mailman event-stream]
+  co/Lifecycle
+  (start [this]
+    (assoc this :listener (mmc/add-listener (:broker mailman)
+                                            (fn [evt]
+                                              (ms/put! event-stream evt)
+                                              nil))))
+
+  (stop [{l :listener :as this}]
+    (when l
+      (mmc/unregister-listener l))
+    (dissoc this :listener)))
+
+(defn new-event-pipe
+  "Registers a listener in mailman to pipe all events to the event bus, where
+   they will be picked up by the api server to send events to clients using SSE."
+  []
+  (map->EventPipe {}))
 
 (defn make-system
   "Creates a component system that can be used for local builds"
   [conf]
   (co/system-map
-   :build      (lc/get-build conf)
-   :mailman ;; Can specify custom event broker, for testing
-   (or (:mailman conf) (new-mailman))
-   :routes     (co/using
-                (new-routes conf)
-                [:mailman :api-config])
-   :events     (co/using
-                (new-events)
-                {:broker :mailman})
-   :artifacts  (new-artifacts conf)
-   :cache      (new-cache conf)
-   :params     (new-params conf)
-   :containers (co/using
-                (new-containers)
-                [:mailman :build])
-   :api-config (ra/new-api-config {})
-   :api-server (co/using
-                (new-api-server)
-                [:api-config :events :artifacts :cache :params :containers :build :event-bus])
-   :event-bus  (new-event-bus)))
+   :build        (lc/get-build conf)
+   :mailman      (or (:mailman conf) (new-mailman)) ; Can specify custom event broker, for testing
+   ;; TODO "upstream" mailman to push events to global broker and to capture build/canceled events.
+   :routes       (co/using
+                  (new-routes conf)
+                  [:mailman :api-config])
+   :artifacts    (new-artifacts conf)
+   :cache        (new-cache conf)
+   :params       (new-params conf)
+   :containers   (co/using
+                  (new-containers)
+                  [:mailman :build])
+   :api-config   (ra/new-api-config {})
+   :api-server   (co/using
+                  (new-api-server)
+                  [:api-config :artifacts :cache :params :containers :build :event-stream :mailman])
+   :event-stream (new-event-stream)
+   :event-pipe   (co/using
+                  (new-event-pipe)
+                  [:event-stream :mailman])))
 
 (defn start-and-post
   "Starts component system and posts an event to the event broker to trigger

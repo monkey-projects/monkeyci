@@ -71,9 +71,10 @@
                     {:cause resp}))
     body))
 
-(defn- events-to-bus
+(defn events-to-stream
   "Listens to events on the build api server.  This opens a streaming request
-   that reads SSE from the server, and puts them on a stream, which is returned."
+   that reads SSE from the server, and puts them on a manifold stream, which
+   is returned, along with a function that can be used to close the stream."
   [client]
   (let [evt-stream (promise)
         src (-> (client {:request-method :get
@@ -92,7 +93,9 @@
                  (partial ms/filter not-empty)
                  (partial ms/map eh/parse-event-line))
                 (deref))]
-    ;; Return the source and a fn that can close the input stream
+    ;; Return the source and a fn that can close the input stream.  We can't
+    ;; rely on the on-drained handler from manifold because it's never called
+    ;; when you close the source.
     [src
      (fn []
        ;; FIXME It seems that the connection to the server is never closed, even
@@ -104,14 +107,14 @@
          (log/warn "Unable to close event inputstream, not delivered yet."))
        (log/debug "Stream closed"))]))
 
-(defn event-bus
+(defn ^:deprecated event-bus
   "Creates an event bus that receives all events from the build api using the
    `/events` endpoint.  The bus can be subscribed to using `manifold.bus/subscribe`.
    Returns both the bus and a function which, when invoked, should close the http 
    connection."
   [client]
   (let [eb (bus/event-bus)
-        [src close-fn] (events-to-bus client)]
+        [src close-fn] (events-to-stream client)]
     (ms/consume (fn [evt]
                   (log/debug "Got event from build API:" evt)
                   @(bus/publish! eb (:type evt) evt))
