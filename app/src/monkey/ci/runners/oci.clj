@@ -307,8 +307,11 @@
                   build (evt-build ctx)]
               (cond-> ctx
                 (>= (:status resp) 400)
-                (-> (assoc :result (b/build-end-evt
-                                    (assoc build :message "Failed to create container instance")))
+                (-> (assoc :result
+                           (b/build-end-evt
+                            (assoc build
+                                   :message
+                                   (str "Failed to create container instance: " (get-in resp [:body :message])))))
                     ;; Do not proceed
                     (pi/terminate)))))})
 

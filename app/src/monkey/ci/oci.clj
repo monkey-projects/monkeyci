@@ -34,6 +34,7 @@
    arch-amd
    {:shape "CI.Standard.E4.Flex"
     :credits 2}})
+
 (def default-arch arch-arm)
 
 (defn invocation-interceptor
