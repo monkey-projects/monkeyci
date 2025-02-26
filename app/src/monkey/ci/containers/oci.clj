@@ -256,6 +256,8 @@
         ;; delete the container instance when the sidecar and the job have completed.
         (add-promtail-container conf))))
 
+;;; Container runner implementation
+
 (def container-start-timeout
   "Max msecs to wait until container has started"
   (* 5 60 1000))
@@ -437,3 +439,12 @@
 
 (defn make-container-runner [conf events]
   (->OciContainerRunner conf events job-credit-multiplier))
+
+;;; Mailman events
+
+(defn job-queued [evt]
+  ;; TODO
+  )
+
+(defn make-routes [conf]
+  [[:job/queued [{:handler job-queued}]]])

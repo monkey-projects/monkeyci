@@ -1,6 +1,7 @@
 (ns monkey.ci.events.mailman.interceptors
   "General purpose interceptors"
-  (:require [clojure.tools.logging :as log]
+  (:require [babashka.process :as bp]
+            [clojure.tools.logging :as log]
             [manifold
              [bus :as mb]
              [deferred :as md]]
@@ -9,6 +10,8 @@
              [build :as b]
              [errors :as errors]
              [time :as t]]))
+
+(def get-result :result)
 
 (def add-time
   {:name ::add-evt-time
@@ -24,7 +27,7 @@
             (log/trace "Incoming event:" (:event ctx))
             ctx)
    :leave (fn [ctx]
-            (log/trace "Result from handling" (get-in ctx [:event :type]) ":" (:result ctx))
+            (log/trace "Result from handling" (get-in ctx [:event :type]) ":" (get-result ctx))
             ctx)})
 
 (def no-result
@@ -67,11 +70,34 @@
             (mb/publish! bus (:type event) event)
             ctx)})
 
-
 (defn realize-deferred [d]
   "Interceptor that takes a deferred and realizes it on leave with the result
    specified in the context."
   {:name ::realize-deferred
    :leave (fn [ctx]
-            (md/success! d (:result ctx))
+            (md/success! d (get-result ctx))
             ctx)})
+
+(def get-process ::process)
+
+(defn set-process [ctx ws]
+  (assoc ctx ::process ws))
+
+(def start-process
+  "Starts a child process using the command line stored in the result"
+  {:name ::start-process
+   :leave (fn [ctx]
+            (let [cmd (get-result ctx)]
+              (log/debug "Starting child process:" cmd)
+              (cond-> ctx
+                cmd (set-process (bp/process cmd)))))})
+
+(def get-mailman ::mailman)
+
+(defn set-mailman [ctx e]
+  (assoc ctx ::mailman e))
+
+(defn add-mailman [mm]
+  "Adds mailman component to the context"
+  {:name ::add-mailman
+   :enter #(set-mailman % mm)})

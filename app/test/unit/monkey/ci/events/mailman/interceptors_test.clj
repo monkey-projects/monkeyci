@@ -1,5 +1,6 @@
 (ns monkey.ci.events.mailman.interceptors-test
   (:require [clojure.test :refer [deftest testing is]]
+            [babashka.process :as bp]
             [manifold
              [bus :as mb]
              [deferred :as md]
@@ -86,3 +87,13 @@
       (is (map? (-> {:result ::test-result}
                     (leave))))
       (is (= ::test-result (deref e 100 :timeout))))))
+
+(deftest start-process
+  (let [{:keys [leave] :as i} sut/start-process]
+    (is (keyword? (:name i)))
+
+    (testing "`leave` starts child process"
+      (with-redefs [bp/process identity]
+        (is (= ::test-cmd (-> {:result ::test-cmd}
+                              (leave)
+                              (sut/get-process))))))))

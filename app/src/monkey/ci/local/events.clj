@@ -48,15 +48,7 @@
 (defn set-workspace [ctx ws]
   (assoc ctx ::workspace ws))
 
-(def get-process ::process)
-
-(defn set-process [ctx ws]
-  (assoc ctx ::process ws))
-
-(def get-mailman ::mailman)
-
-(defn set-mailman [ctx e]
-  (assoc ctx ::mailman e))
+(def get-mailman emi/get-mailman)
 
 (def get-api ::api)
 
@@ -89,15 +81,6 @@
             (->> (git/copy-with-ignore (get-checkout-dir ctx) dest)
                  (set-workspace ctx)))})
 
-(def start-process
-  "Starts a child process using the command line stored in the result"
-  {:name ::start-process
-   :leave (fn [ctx]
-            (let [cmd (get-result ctx)]
-              (log/debug "Starting child process:" cmd)
-              (cond-> ctx
-                cmd (set-process (bp/process cmd)))))})
-
 (def start-container
   ;; TODO
   )
@@ -118,11 +101,6 @@
    :enter (fn [ctx]
             ;; TODO
             )})
-
-(defn add-mailman [mm]
-  "Adds mailman component to the context"
-  {:name ::add-mailman
-   :enter #(set-mailman % mm)})
 
 (defn add-api [api]
   "Adds api configuration to the context"
@@ -218,8 +196,8 @@
     [{:handler prepare-child-cmd
       :interceptors (cond-> [emi/handle-build-error
                              emi/no-result
-                             start-process
-                             (add-mailman mailman)
+                             emi/start-process
+                             (emi/add-mailman mailman)
                              (add-api (conf/get-api conf))
                              (add-log-dir (conf/get-log-dir conf))
                              (add-child-opts (conf/get-child-opts conf))]

@@ -1,13 +1,12 @@
 (ns monkey.ci.local.events-test
   (:require [clojure.test :refer [deftest testing is]]
-            [babashka
-             [fs :as fs]
-             [process :as bp]]
+            [babashka.fs :as fs]
             [manifold.deferred :as md]
             [monkey.ci
              [build :as b]
              [edn :as edn]
              [git :as git]]
+            [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.ci.local
              [config :as lc]
              [events :as sut]]
@@ -45,16 +44,6 @@
                                  {:checkout-dir (str src)}}})
                         (sut/get-workspace))))
         (is (fs/exists? (fs/path dest "test.txt")))))))
-
-(deftest start-process
-  (let [{:keys [leave] :as i} sut/start-process]
-    (is (keyword? (:name i)))
-
-    (testing "`leave` starts child process"
-      (with-redefs [bp/process identity]
-        (is (= ::test-cmd (-> {:result ::test-cmd}
-                              (leave)
-                              (sut/get-process))))))))
 
 (deftest add-log-dir
   (h/with-tmp-dir dir
@@ -120,7 +109,7 @@
         r (-> {:event
                {:type :build/pending
                 :build build}}
-              (sut/set-mailman mailman)
+              (emi/set-mailman mailman)
               (sut/set-api {:port 1234
                             :token "test-token"})
               (sut/set-child-opts {:log-config "test-config.xml"})

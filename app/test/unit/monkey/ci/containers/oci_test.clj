@@ -614,3 +614,9 @@
             (is (some? evt))
             (is (= "infra error" (get-in evt [:result :message])))))))))
 
+(deftest make-routes
+  (let [routes (sut/make-routes {})
+        expected [:job/queued]]
+    (doseq [t expected]
+      (testing (format "handles `%s`" t)
+        (is (contains? (set (first routes)) t))))))

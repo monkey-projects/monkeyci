@@ -192,8 +192,8 @@
       (mc/assoc-some :message (:message build))))
 
 (defn job-work-dir
-  "Given a runtime, determines the job working directory.  This is either the
-   work dir as configured on the job, or the context work dir, or the process dir."
+  "Given a job and a build, determines the job working directory.  This is either the
+   work dir as configured on the job, or the build checkout dir, or the process dir."
   [job build]
   (-> (if-let [jwd (:work-dir job)]
         (if (fs/absolute? jwd)

@@ -1,7 +1,9 @@
 (ns monkey.ci.containers.podman-test
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.spec.alpha :as spec]
-            [babashka.process :as bp]
+            [babashka
+             [fs :as fs]
+             [process :as bp]]
             [monkey.ci
              [artifacts :as art]
              [cache :as ca]
@@ -207,3 +209,94 @@
                                 (assoc :work-dir "sub-dir")
                                 (sut/build-cmd-args base-conf))
                             ["-v" "/test-dir/checkout/sub-dir:/home/monkeyci:Z"])))))
+
+(deftest job-work-dir
+  (testing "returns context work dir"
+    (is (= "test-wd"
+           (-> {}
+               (sut/set-work-dir "test-wd")
+               (sut/job-work-dir {})))))
+
+  (testing "combines job work dir with context wd"
+    (is (= "/test/wd/job-dir"
+           (-> {}
+               (sut/set-work-dir "/test/wd")
+               (sut/job-work-dir {:work-dir "job-dir"}))))))
+
+(deftest make-routes
+  (let [routes (sut/make-routes {})
+        expected [:job/queued
+                  :job/initializing
+                  :job/executed
+                  :job/end]]
+    (doseq [t expected]
+      (testing (format "handles `%s`" t)
+        (is (contains? (set (map first routes)) t))))))
+
+(deftest copy-ws
+  (h/with-tmp-dir dir
+    (let [ws (fs/create-dir (fs/path dir "workspace"))
+          wd (fs/create-dir (fs/path dir "workdir"))
+          {:keys [enter] :as i} (sut/copy-ws ws wd)]
+      (is (keyword? (:name i)))
+
+      (is (nil? (spit (fs/file (fs/path ws "test.txt")) "test file")))
+
+      (testing "`enter`"
+        (let [r (-> {:event
+                      {:job-id "test-job"}}
+                     (enter))]
+          (testing "adds work dir to context"
+            (is (= (fs/path wd "test-job/work")
+                   (sut/get-work-dir r))))
+
+          (testing "adds log dir to context"
+            (is (= (fs/path wd "test-job/logs")
+                   (sut/get-log-dir r))))
+          
+          (testing "copies files from workspace to job work dir"
+            (let [p (fs/path wd "test-job/work/test.txt")]
+              (is (fs/exists? p))
+              (is (= "test file" (slurp (fs/file p)))))))))))
+
+(deftest job-queued
+  (testing "returns `job/initializing` event"
+    (is (= [:job/initializing]
+           (->> {:event
+                 {:type :job/queued
+                  :job-id "test-job"}}
+                (sut/job-queued)
+                (map :type))))))
+
+(deftest job-init
+  (testing "returns `job/start` event"
+    (is (= :job/start
+           (-> {:event
+                {:type :job/initializing
+                 :job-id "test-job"}}
+               (sut/job-init)
+               first
+               :type)))))
+
+(deftest prepare-child-cmd
+  (testing "executes podman"
+    (is (= "/usr/bin/podman"
+           (-> {:job {:id "test-job"
+                      :image "test-image"}
+                :job-id "test-job"
+                :sid ["test" "build"]}
+               (sut/set-build (h/gen-build))
+               (sut/prepare-child-cmd)
+               :cmd
+               first)))))
+
+(deftest job-executed
+  (testing "returns `job/end` event"
+    (let [r (-> {:event
+                {:type :job/executed
+                 :job-id "test-job"
+                 :status :success}}
+               (sut/job-executed)
+               first)]
+      (is (= :job/end (:type r)))
+      (is (= :success (:status r))))))
