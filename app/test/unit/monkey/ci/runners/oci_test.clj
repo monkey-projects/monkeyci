@@ -33,9 +33,14 @@
                                  :public-key "test-pubkey"}]}}
         ic (sut/instance-config {:log-config "test-log-config"
                                  :build-image-url "test-clojure-img"
-                                 :api {:private-key (h/generate-private-key)}
-                                 :jwk {:priv (h/generate-private-key)
-                                       :pub "test-pub-key"}}
+                                 :api
+                                 {:private-key (h/generate-private-key)}
+                                 :jwk
+                                 {:priv (h/generate-private-key)
+                                  :pub "test-pub-key"}
+                                 :containers
+                                 {:shape "test-shape"
+                                  :shape-config {:memory-in-g-bs 10}}}
                                 build)
         co (:containers ic)]
     (testing "creates container instance configuration"
@@ -51,6 +56,12 @@
 
     (testing "assigns freeform tags containing build info")
 
+    (testing "uses configured shape"
+      (is (= "test-shape" (:shape ic))))
+    
+    (testing "uses configured shape config"
+      (is (= 10 (-> ic :shape-config :memory-in-g-bs))))
+    
     (testing "controller"
       (let [c (->> co
                    (filter (comp (partial = "controller") :display-name))

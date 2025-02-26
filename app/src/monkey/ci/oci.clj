@@ -36,6 +36,12 @@
     :credits 2}})
 (def default-arch arch-arm)
 
+(defn find-shape [shape-name]
+  (->> arch-shapes
+       (vals)
+       (filter (comp (partial = shape-name) :shape))
+       (first)))
+
 (defn invocation-interceptor
   "A Martian interceptor that dispatches telemere events for each invocation.  Useful
    for metrics to know how many api calls were done."
@@ -249,9 +255,12 @@
   (-> conf
       (select-keys [:compartment-id :image-pull-secrets :vnics :freeform-tags])
       (assoc :container-restart-policy "NEVER"
-             :shape (get-in arch-shapes [default-arch :shape]) ; Use ARM shape, it's cheaper
-             :shape-config {:ocpus default-cpu-count
-                            :memory-in-g-bs default-memory-gb}
+             :shape (or (:shape conf)
+                        (get-in arch-shapes [default-arch :shape])) ; Use ARM shape, it's cheaper
+             :shape-config (merge
+                            {:ocpus default-cpu-count
+                             :memory-in-g-bs default-memory-gb}
+                            (:shape-config conf))
              :availability-domain (pick-ad conf)
              :volumes [{:name checkout-vol
                         :volume-type "EMPTYDIR"
@@ -305,10 +314,14 @@
   "Calculates the credit multiplier that needs to be applied for the container
    instance.  This varies depending on the architecture, number of cpu's and 
    amount of memory."
-  [arch cpus mem]
-  (+ (* cpus
-        (get-in arch-shapes [arch :credits] 1))
-     mem))
+  ([arch cpus mem]
+   (+ (* cpus
+         (get-in arch-shapes [arch :credits] 1))
+      mem))
+  ([{:keys [shape shape-config]}]
+   (let [a (find-shape shape)]
+     (+ (* (:credits a) (:ocpus shape-config))
+        (:memory-in-g-bs shape-config)))))
 
 (defn delete-stale-instances [client cid]
   ;; Timeout is the max time a script may run, with a margin of one minute

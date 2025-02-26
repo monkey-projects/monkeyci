@@ -51,6 +51,13 @@
       (is (map? ic))
       (is (string? (:shape ic)))))
 
+  (let [ic (-> default-config
+               (assoc :oci {:shape "test-shape"
+                            :shape-config {:memory-in-g-bs 10}})
+               (sut/instance-config))]
+    (testing "applies shape from config"
+      (is (= "test-shape" (:shape ic)))))
+
   (testing "display name contains build id, pipeline index and job index"
     (is (= "test-build-test-job"
            (->> {:build {:build-id "test-build"
