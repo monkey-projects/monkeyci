@@ -355,3 +355,12 @@
                                                (md/success-deferred
                                                 {:status 500}))]
       (is (thrown? Exception (sut/delete-stale-instances ::test-client "test-compartment"))))))
+
+(deftest credit-multiplier
+  (testing "calculates value according to job settings"
+    (is (= 4 (sut/credit-multiplier :arm 2 2))))
+
+  (testing "calculates according to container instance settings"
+    (is (= 4 (sut/credit-multiplier {:shape "CI.Standard.E4.Flex"
+                                     :shape-config {:ocpus 1
+                                                    :memory-in-g-bs 2}})))))

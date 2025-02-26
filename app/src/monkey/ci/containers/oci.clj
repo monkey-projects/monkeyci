@@ -50,7 +50,7 @@
 (def promtail-config-file "config.yml")
 
 (defn- job-arch [job]
-  (get job :arch oci/default-arch))
+  (get job :arch))
 
 (defn- checkout-dir
   "Checkout dir for the build in the job container"
@@ -212,7 +212,8 @@
                 log-config (conj (oci/config-entry "logback.xml" log-config)))}))
 
 (defn- set-pod-shape [ic job]
-  (assoc ic :shape (get-in oci/arch-shapes [(job-arch job) :shape])))
+  (mc/assoc-some ic :shape (when-let [a (job-arch job)]
+                             (get-in oci/arch-shapes [a :shape]))))
 
 (defn- set-pod-memory [ic job]
   (-> ic
@@ -347,16 +348,17 @@
        ;; exited completely when the events have arrived, so we use the event values instead.
        (update-in details [:body :containers] (partial map add-exit))))))
 
-(defn- credit-multiplier
+(defn- job-credit-multiplier
   "Calculates the credit multiplier that needs to be applied for the job.  This 
-   varies depending on the architecture, number of cpu's and amount of memory."
+   varies depending on the architecture, number of cpu's and amount of memory and
+   is taken from the actual instance configuration."
   [job]
   (oci/credit-multiplier (job-arch job)
                          (get job :cpus oci/default-cpu-count)
                          (get job :memory oci/default-memory-gb)))
 
-(defn- fire-job-initializing [job build-sid events]
-  (ec/post-events events [(j/job-initializing-evt (j/job-id job) build-sid (credit-multiplier job))]))
+(defn- fire-job-initializing [job build-sid events ic]
+  (ec/post-events events [(j/job-initializing-evt (j/job-id job) build-sid (oci/credit-multiplier ic))]))
 
 (defn- fire-job-executed [job-id build-sid result events]
   (let [result (-> result
@@ -386,7 +388,7 @@
   (let [client (-> (ci/make-context (:oci conf))
                    (oci/add-inv-interceptor :containers))
         ic     (instance-config conf)]
-    (fire-job-initializing job (b/sid build) events)
+    (fire-job-initializing job (b/sid build) events ic)
     (when (validate-job! conf)
       (try 
         (-> (oci/run-instance client ic
@@ -434,4 +436,4 @@
                           :job job))))
 
 (defn make-container-runner [conf events]
-  (->OciContainerRunner conf events credit-multiplier))
+  (->OciContainerRunner conf events job-credit-multiplier))
