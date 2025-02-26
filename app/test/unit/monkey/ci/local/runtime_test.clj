@@ -57,6 +57,9 @@
       (testing "has mailman routes"
         (is (some? (:routes sys))))
 
+      (testing "has podman routes"
+        (is (some? (:podman sys))))
+
       (testing "has event stream"
         (is (some? (:event-stream sys))))
 

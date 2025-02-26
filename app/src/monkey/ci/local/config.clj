@@ -26,6 +26,9 @@
 (defn get-log-dir [conf]
   (work-path conf "logs"))
 
+(defn get-jobs-dir [conf]
+  (work-path conf "jobs"))
+
 (def get-build :build)
 
 (defn set-build [conf b]

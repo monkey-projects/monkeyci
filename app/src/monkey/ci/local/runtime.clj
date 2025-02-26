@@ -10,7 +10,9 @@
              [blob :as blob]
              [cache :as c]
              [protocols :as p]]
-            [monkey.ci.containers.mailman :as cm]
+            [monkey.ci.containers
+             [mailman :as cm]
+             [podman :as cp]]
             [monkey.ci.events.mailman :as em]
             [monkey.ci.events.mailman.bridge :as emb]
             [monkey.ci.local
@@ -33,6 +35,14 @@
             (-> (:config c)
                 (lc/set-api (:api-config c))
                 (le/make-routes (:mailman c))))]
+    (em/map->RouteComponent {:config conf :make-routes make-routes})))
+
+(defn- new-podman-routes [conf]
+  (letfn [(make-routes [{:keys [config] :as c}]
+            (-> (select-keys c [:build :mailman])
+                (assoc :workspace (lc/get-workspace config)
+                       :work-dir (lc/get-jobs-dir config))
+                (cp/make-routes)))]
     (em/map->RouteComponent {:config conf :make-routes make-routes})))
 
 (defn- blob-store [dir]
@@ -92,9 +102,13 @@
    :routes       (co/using
                   (new-routes conf)
                   [:mailman :api-config])
+   :podman       (co/using
+                  (new-podman-routes conf)
+                  [:mailman :build])
    :artifacts    (new-artifacts conf)
    :cache        (new-cache conf)
    :params       (new-params conf)
+   ;; TODO Remove
    :containers   (co/using
                   (new-containers)
                   [:mailman :build])

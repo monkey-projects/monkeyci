@@ -8,6 +8,7 @@
             [cheshire.core :as json]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
+            [io.pedestal.interceptor.chain :as pi]
             [manifold.deferred :as md]
             [monkey.ci
              [artifacts :as art]
@@ -19,6 +20,7 @@
              [protocols :as p]
              [runtime :as rt]
              [utils :as u]]
+            [monkey.ci.build.core :as bc]
             [monkey.ci.events
              [core :as ec]
              [mailman :as em]]
@@ -153,6 +155,13 @@
 (defn set-build [ctx b]
   (emi/update-state ctx assoc :build b))
 
+(defn get-job [ctx id]
+  (some-> (emi/get-state ctx)
+          (get-in [:jobs id])))
+
+(defn set-job [ctx job]
+  (emi/update-state ctx assoc-in [:jobs (:id job)] job))
+
 (def get-work-dir
   "The directory where the container process is run"
   ::work-dir)
@@ -187,6 +196,35 @@
                   (set-work-dir dest)
                   (set-log-dir (fs/create-dirs (fs/path job-dir "logs"))))))})
 
+(def handle-error
+  {:name ::handle-error
+   :error (fn [ctx ex]
+            (let [{:keys [job-id sid] :as e} (:event ctx)]
+              (log/error "Got error while handling event" e ex)
+              (em/set-result ctx
+                             [(j/job-end-evt job-id sid (-> bc/failure
+                                                            (bc/with-message (ex-message ex))))])))})
+
+(def filter-container-job
+  "Interceptor that terminates when the job in the event is not a container job"
+  {:name ::filter-container-job
+   :enter (fn [ctx]
+            (cond-> ctx
+              (nil? (mcc/image (get-in ctx [:event :job]))) (pi/terminate)))})
+
+(def save-job
+  "Saves job to state for future reference"
+  {:name ::save-job
+   :enter (fn [ctx]
+            (set-job ctx (get-in ctx [:event :job])))})
+
+(def require-job
+  "Terminates if no job is present in the state"
+  {:name ::require-job
+   :enter (fn [ctx]
+            (cond-> ctx
+              (nil? (get-job ctx (get-in ctx [:event :job-id]))) (pi/terminate)))})
+
 ;;; Event handlers
 
 (defn prepare-child-cmd
@@ -208,7 +246,7 @@
                 (log/info "Container job exited with code" exit)
                 (try
                   (em/post-events (emi/get-mailman ctx)
-                                  [(j/job-executed-evt job-id sid {:status (if (= 0 exit) :success :error)})])
+                                  [(j/job-executed-evt job-id sid {:status (if (= 0 exit) :success :failure)})])
                   (catch Exception ex
                     (log/error "Failed to post job/executed event" ex))))}))
 
@@ -231,7 +269,10 @@
   (let [state (emi/with-state (atom {:build build}))]
     [[:job/queued
       [{:handler prepare-child-cmd
-        :interceptors [(copy-ws workspace work-dir)
+        :interceptors [handle-error
+                       filter-container-job
+                       save-job
+                       (copy-ws workspace work-dir)
                        (emi/add-mailman mailman)
                        ;; TODO Artifacts and caches
                        emi/start-process]}
@@ -240,11 +281,15 @@
      [:job/initializing
       ;; TODO Start sidecar event polling
       ;; TODO Execute "before" extensions
-      [{:handler job-init}]]
+      [{:handler job-init
+        :interceptors [handle-error
+                       require-job]}]]
 
      [:job/executed
       ;; TODO Execute "after" extensions
-      [{:handler job-executed}]]
+      [{:handler job-executed
+        :interceptors [handle-error
+                       require-job]}]]
 
      [:job/end
       ;; TODO Clean up?

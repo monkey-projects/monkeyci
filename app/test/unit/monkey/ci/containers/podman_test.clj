@@ -4,6 +4,8 @@
             [babashka
              [fs :as fs]
              [process :as bp]]
+            [io.pedestal.interceptor :as i]
+            [io.pedestal.interceptor.chain :as pi]
             [monkey.ci
              [artifacts :as art]
              [cache :as ca]
@@ -11,6 +13,7 @@
              [logging :as l]
              [protocols :as p]]
             [monkey.ci.containers.podman :as sut]
+            [monkey.ci.events.mailman :as em]
             [monkey.ci.spec.events :as se]
             [monkey.ci.helpers :as h :refer [contains-subseq?]]
             [monkey.ci.test.runtime :as trt]))
@@ -258,6 +261,72 @@
             (let [p (fs/path wd "test-job/work/test.txt")]
               (is (fs/exists? p))
               (is (= "test file" (slurp (fs/file p)))))))))))
+
+(deftest handle-error
+  (let [{:keys [error] :as i} sut/handle-error]
+    (is (keyword? (:name i)))
+    
+    (testing "`error` puts `job/end` failure event in result"
+      (let [r (-> (error {:event
+                          {:type :job/initializing
+                           :sid ["build" "sid"]
+                           :job-id "test-job"}}
+                         (ex-info "test error" {}))
+                  (em/get-result))]
+        (is (= [:job/end]
+               (map :type r)))
+        (is (= "test-job" (-> r first :job-id)))
+        (is (= :failure (-> r first :status)))))))
+
+(deftest filter-container-job
+  (let [{:keys [enter] :as i} sut/filter-container-job
+        ctx (-> {:event {:job {:id "action-job"}}}
+                (pi/enqueue [(i/interceptor {:name ::test-interceptor
+                                             :enter identity})]))]
+    (is (keyword? (:name i)))
+    
+    (testing "terminates if no container job"
+      (is (nil? (-> ctx
+                    (enter)
+                    ::pi/queue))))
+
+    (testing "continues if container job"
+      (is (some? (-> ctx
+                     (assoc-in [:event :job :image] "test-img")
+                     (enter)
+                     ::pi/queue))))))
+
+(deftest save-job
+  (let [{:keys [enter] :as i} sut/save-job]
+    (is (keyword? (:name i)))
+
+    (testing "adds event job to state"
+      (let [job (h/gen-job)]
+        (is (= job (-> {:event
+                        {:job job}}
+                       (enter)
+                       (sut/get-job (:id job)))))))))
+
+(deftest require-job
+  (let [{:keys [enter] :as i} sut/require-job
+        ctx (-> {}
+                (pi/enqueue [(i/interceptor {:name ::test-interceptor
+                                             :enter identity})]))]
+    (is (keyword? (:name i)))
+    
+    (testing "terminates if no job in state"
+      (is (nil? (-> ctx
+                    (enter)
+                    ::pi/queue))))
+
+    (testing "continues if job in state"
+      (let [job (h/gen-job)]
+        (is (some? (-> {:event {:job-id (:id job)}}
+                       (sut/set-job job)
+                       (pi/enqueue [(i/interceptor {:name ::test-interceptor
+                                                    :enter identity})])
+                       (enter)
+                       ::pi/queue)))))))
 
 (deftest job-queued
   (testing "returns `job/initializing` event"
