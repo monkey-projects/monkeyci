@@ -25,11 +25,11 @@
             [monkey.ci.build
              [api-server :as as]
              [core :as bc]]
-            [monkey.ci.config.script :as cos]
+            [monkey.ci.script.config :as sc]
             ;; Need to require these for the multimethod discovery
             [monkey.ci.containers.oci]
             [monkey.ci.events.core]
-            [monkey.ci.runtime.script :as rs]            
+            [monkey.ci.script.runtime :as sr]
             [monkey.ci.storage
              [file]
              [sql]]))
@@ -46,7 +46,7 @@
   [{:keys [config config-file]}]
   (or config (config/load-config-file config-file)))
 
-(defn run
+#_(defn run
   "Run function for when a build task is executed using clojure tools.  This function
    is run in a child process by the `execute!` function below.  This exits the VM
    with a nonzero value on failure."
@@ -55,7 +55,7 @@
   (try
     (let [config (load-config args)]
       (when (-> (merge default-script-config config)
-                (rs/with-runtime
+                (sr/with-runtime
                   (fn [rt]
                     (log/debug "Executing script with config" (:config rt))
                     (log/debug "Script working directory:" (utils/cwd))
@@ -70,49 +70,50 @@
 (defn- find-log-config
   "Finds logback configuration file, either configured on the runner, or present 
    in the script dir"
-  [build rt]
+  [build conf]
   ;; TODO Use some sort of templating engine to generate a custom log config to add
   ;; the build id as a label to the logs (e.g. moustache).  That would make it easier
   ;; to fetch logs for a specific build.
   ;; FIXME When using aero tags, it could be that instead of a path, we have the file
   ;; contents instead.  In that case we should write it to a tmp file.
   (->> [(io/file (get-in build [:script :script-dir]) "logback.xml")
-        (some->> (get-in rt [:config :runner :log-config])
-                 (utils/abs-path (rt/work-dir rt)))]
+        (some->> (get-in conf [:runner :log-config])
+                 (utils/abs-path (:work-dir conf)))]
        (filter fs/exists?)
        (first)))
 
 (def m2-cache-dir "/tmp/m2")
 
-(defn- version-or [rt f]
-  (if (rt/dev-mode? rt)
+(defn- version-or [dev? f]
+  (if dev?
     {:local/root (f)}
     {:mvn/version (v/version)}))
 
 (defn generate-deps
-  "Generates a string that will be added as a commandline argument
+  "Generates contents for `deps.edn` that will be added as a commandline argument
    to the clojure process when running the script.  Any existing `deps.edn`
    should be used as well."
-  [build rt]
-  (when (rt/dev-mode? rt)
-    (log/debug "Running in development mode, using local src instead of libs"))
-  (let [log-config (find-log-config build rt)]
-    (log/debug "Child process log config:" log-config)
-    {:paths [(b/script-dir build)]
-     :aliases
-     {:monkeyci/build
-      (cond-> {:exec-fn 'monkey.ci.process/run
-               :extra-deps {'com.monkeyci/app (version-or rt utils/cwd)}}
-        log-config (assoc :jvm-opts
-                          [(str "-Dlogback.configurationFile=" log-config)]))}
-     :mvn/local-repo m2-cache-dir}))
+  [build conf]
+  (let [dev? (:dev-mode conf)]
+    (when dev?
+      (log/debug "Running in development mode, using local src instead of libs"))
+    (let [log-config (find-log-config build conf)]
+      (log/debug "Child process log config:" log-config)
+      {:paths [(b/script-dir build)]
+       :aliases
+       {:monkeyci/build
+        (cond-> {:exec-fn 'monkey.ci.process/run
+                 :extra-deps {'com.monkeyci/app (version-or dev? utils/cwd)}}
+          log-config (assoc :jvm-opts
+                            [(str "-Dlogback.configurationFile=" log-config)]))}
+       :mvn/local-repo m2-cache-dir})))
 
 (defn child-config
   "Creates a configuration map that can then be passed to the child process."
   [build api-conf]
-  (-> cos/empty-config
-      (cos/set-build build)
-      (cos/set-api (as/srv->api-config api-conf))))
+  (-> sc/empty-config
+      (sc/set-build build)
+      (sc/set-api (as/srv->api-config api-conf))))
 
 (defn- config->edn
   "Writes the configuration to an edn file that is then passed as command line to the app."
@@ -150,8 +151,7 @@
   (when build-cache
     (log/debug "Saving build cache for build" (b/sid build))
     (try
-      ;; This results in class not found error?
-      ;; Something with running a sub process in oci container instances?
+      ;; This results in class not found error when running a sub process in oci container instances?
       ;; We could run the script in a second container instead, similar to oci container jobs.
       @(blob/save build-cache m2-cache-dir (repo-cache-location build))
       (catch Throwable ex
@@ -167,7 +167,7 @@
         [out err :as loggers] (map (partial make-logger rt build) [:out :err])
         result (md/deferred)
         cmd ["clojure"
-             "-Sdeps" (pr-str (generate-deps build rt))
+             "-Sdeps" (pr-str (generate-deps build (rt/config rt)))
              "-X:monkeyci/build"
              (pr-str {:config-file (config->edn (child-config build (:api-config rt)))})]]
     (log/debug "Running in script dir:" script-dir ", this command:" cmd)
@@ -194,13 +194,13 @@
         (l/handle-process-streams loggers))
     (md/finally result #(save-cache! build rt))))
 
-(defn generate-test-deps [rt watch?]
+(defn generate-test-deps [dev? watch?]
   (letfn [(test-lib-dir []
             (-> (utils/cwd) (fs/parent) (fs/path "test-lib") str))]
     {:aliases
      {:monkeyci/test
-      {:extra-deps {'com.monkeyci/app (version-or rt utils/cwd)
-                    'com.monkeyci/test (version-or rt test-lib-dir)}
+      {:extra-deps {'com.monkeyci/app (version-or dev? utils/cwd)
+                    'com.monkeyci/test (version-or dev? test-lib-dir)}
        :paths ["."]
        :exec-fn 'kaocha.runner/exec-fn
        :exec-args (cond-> {:tests [{:type :kaocha.type/clojure.test
@@ -215,7 +215,7 @@
    with a custom alias for running tests using kaocha."
   [build rt]
   (let [watch? (true? (get-in rt [:config :args :watch]))
-        deps (generate-test-deps rt watch?)]
+        deps (generate-test-deps (rt/dev-mode? rt) watch?)]
     (bp/process
      {:cmd ["clojure" "-Sdeps" (pr-str deps) "-X:monkeyci/test"]
       :out :inherit

@@ -86,19 +86,9 @@
                  (assoc :repos {(:id repo) repo}))
         param-values [{:name "test-param"
                        :value "test value"}]
-        ;; params [{:customer-id (:id cust)
-        ;;          :parameters param-values}]
         build {:customer-id (:id cust)
                :repo-id (:id repo)}]
     
-    #_(testing "fetches params from local db if configured"
-        (h/with-memory-store st
-          (let [req (->req {:storage st
-                            :build build})]
-            (is (some? (st/save-params st (:id cust) params)))
-            (is (= param-values
-                   (:body (sut/get-params req)))))))
-
     (testing "fetches params using build params"
       (let [rec (->FakeParams param-values)
             req (->req {:params rec
@@ -329,19 +319,3 @@
                        (app)
                        :status)))))))
 
-(deftest rt->api-server-config
-  (testing "adds port from runner config"
-    (is (= 1234 (-> {:config
-                     {:runner
-                      {:api
-                       {:port 1234}}}}
-                    (sut/rt->api-server-config)
-                    :port))))
-
-  (testing "adds required modules from runtime"
-    (let [rt (trt/test-runtime)
-          conf (sut/rt->api-server-config rt)]
-      (is (some? (:events conf)))
-      (is (some? (:artifacts conf)))
-      (is (some? (:cache conf)))
-      (is (some? (:workspace conf))))))

@@ -5,17 +5,20 @@
             [monkey.ci.protocols :as p]
             [monkey.ci.build.api :as api]))
 
+(defn post-events [client evts]
+  (client (api/as-edn {:method :post
+                       :path "/events"
+                       :body (pr-str evts)
+                       :content-type :edn
+                       :throw-exceptions false})))
+
 (defrecord BuildApiEventPoster [client]
   p/EventPoster
   (post-events [this evts]
     (let [e (cond-> evts
               (not (sequential? evts)) vector)]
       @(md/chain
-        (client (api/as-edn {:method :post
-                             :path "/events"
-                             :body (pr-str e)
-                             :content-type :edn
-                             :throw-exceptions false}))
+        (post-events client e)
         (fn [{:keys [status] :as resp}]
           (when (or (nil? status) (>= status 400))
             (log/warn "Unable to post event" resp)))

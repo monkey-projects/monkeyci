@@ -77,6 +77,7 @@
                      (log/debug "Closing event stream")
                      (when @l
                        (mmc/unregister-listener @l))))
+    ;; FIXME Not portable, listener format depends on broker
     (reset! l (mmc/add-listener broker (fn [evt]
                                          (when (or (not pred) (pred evt))
                                            (handler evt)))))
@@ -84,16 +85,31 @@
 
 (defn bus-stream
   "Returns SSE response for events that are received from a manifold bus.
-   The stream will contain all events of given type, for which `pred`
+   The stream will contain all events the given types, for which `pred`
    returns `true`."
-  [bus evt-type pred]
+  [bus evt-types pred]
   (let [out (->> (ms/stream 1)
                  (add-keepalive)
-                 (ms/sliding-stream 10))
-        in (cond->> (mb/subscribe bus evt-type)
-             pred (ms/filter pred)
-             true (ms/transform (map ->sse)))]
-    (ms/connect in out {:upstream? true})
+                 (ms/sliding-stream 10))]
+    (doseq [t evt-types]
+      (let [in (cond->> (mb/subscribe bus t)
+                 pred (ms/filter pred)
+                 true (ms/transform (map ->sse)))]
+        (ms/connect in out {:upstream? true})))
+    (stream-response out)))
+
+(defn stream->sse
+  "Returns SSE response for events that are received from a manifold bus.
+   The stream will contain all events the given types, for which `pred`
+   returns `true`."
+  [stream pred]
+  (let [out (->> (ms/stream 1)
+                 (add-keepalive)
+                 (ms/sliding-stream 10))]
+    (let [in (cond->> stream
+               pred (ms/filter pred)
+               true (ms/transform (map ->sse)))]
+      (ms/connect in out {:upstream? true}))
     (stream-response out)))
 
 (defn parse-event-line [line]

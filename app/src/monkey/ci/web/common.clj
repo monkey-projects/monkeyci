@@ -257,33 +257,6 @@
 (defn new-build-id [idx]
   (str "build-" idx))
 
-(defn- check-avail-credits! [{st :storage} build]
-  (let [avail (st/calc-available-credits st (:customer-id build))]
-    (when (or (nil? avail) (<= avail 0))
-      (throw (ex-info "Customer does not have available credits"
-                      {:build build})))))
-
-(defn ^:deprecated run-build-async
-  "Starts the build in a new thread"
-  [rt build]
-  (let [runner (rt/runner rt)
-        report-error (fn [ex]
-                       (log/error "Unable to start build:" ex)
-                       (rt/post-events rt (b/build-end-evt
-                                           (-> build
-                                               (assoc :status :error
-                                                      :message (ex-message ex))))))]
-    (md/future
-      (try
-        (check-avail-credits! rt build)
-        (rt/post-events rt (b/build-pending-evt build))
-        ;; Catch both the deferred error, or the direct exception, because both
-        ;; can be thrown here.
-        (-> (runner build rt)
-            (md/catch report-error))
-        (catch Exception ex
-          (report-error ex))))))
-
 (defn crypto-iv
   "Looks up crypto initialization vector for the customer associated with the
    request.  If no crypto record is found, one is generated."

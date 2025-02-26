@@ -4,10 +4,8 @@
             [clj-jgit.porcelain :as git]
             [clojure.java.io :as io]
             [clojure.string :as cs]
-            [clojure.tools.logging :as log]
-            [monkey.ci
-             [runtime :as rt]
-             [utils :as u]]))
+            [clojure.tools.logging :as log])
+  (:import [org.eclipse.jgit.ignore IgnoreNode IgnoreNode$MatchResult]))
 
 (defn- write-ssh-keys [dir idx r]
   (let [keys ((juxt :public-key :private-key) r)
@@ -81,17 +79,63 @@
       (checkout repo commit-id))
     repo))
 
+(defn repo-work-tree
+  "Gets the work tree location of the given repository"
+  [repo]
+  (.. repo
+      (getRepository)
+      (getWorkTree)))
+
 (defn delete-repo
   "Deletes the previously checked out local repo"
   [repo]
   (log/debug "Deleting repository" repo)
   (-> repo
-      (.getRepository)
-      (.getWorkTree)
-      (u/delete-dir)))
+      (repo-work-tree)
+      (fs/delete-tree)))
 
-(defmethod rt/setup-runtime :git [_ _]
-  {:clone (fn default-git-clone [opts]
-            (clone+checkout opts)
-            ;; Return the checkout dir
-            (:dir opts))})
+(defn- load-ignore
+  "Loads the ignore file in the directory, returns an `IgnoreNode` with the
+   loaded rules.  If no `.gitignore` file exists, the ruleset is empty."
+  [dir]
+  (let [p (fs/path dir ".gitignore")
+        n (IgnoreNode.)]
+    (when (fs/exists? p)
+      (with-open [i (io/input-stream (fs/file p))]
+        (.parse n i)))
+    n))
+
+(defn- ignored?
+  "Checks if given path should be ignored, given the ignore rule chain."
+  [p dir? chain]
+  (loop [c (reverse chain)
+         dir (fs/parent p)]
+    (if (empty? c)
+      false
+      ;; The ignore node expects the path to be relative to the node location, so we relativize
+      (let [r (.isIgnored (first c) (str (fs/relativize dir p)) dir?)]
+        (condp = r
+          IgnoreNode$MatchResult/IGNORED true
+          IgnoreNode$MatchResult/NOT_IGNORED false
+          ;; Other values: CHECK_PARENT, CHECK_PARENT_NEGATE_FIRST_MATCH but
+          ;; unclear what the latter means and it's not even used in jgit code.
+          (recur (rest c)
+                 (fs/parent dir)))))))
+
+(defn copy-with-ignore
+  "Copies files from src to dest but skip any files matching the .gitignore files"
+  ([src dest chain]
+   (when-not (fs/exists? dest)
+     (fs/create-dir dest))
+   (let [{files false dirs true} (->> (fs/list-dir src)
+                                      (group-by fs/directory?))]
+     ;; First copy files, then descend into subdirs
+     (doseq [p (->> files
+                    (remove #(ignored? % false chain)))]
+       (fs/copy p (fs/path dest (fs/file-name p))))
+     (doseq [d (->> dirs
+                    (remove #(ignored? % true chain)))]
+       (copy-with-ignore d (fs/path dest (fs/file-name d)) (conj chain (load-ignore d)))))
+   dest)
+  ([src dest]
+   (copy-with-ignore src dest [(load-ignore src)])))

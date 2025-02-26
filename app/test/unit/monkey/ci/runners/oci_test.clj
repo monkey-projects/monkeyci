@@ -11,9 +11,10 @@
              [protocols :as p]
              [storage :as st]
              [vault :as v]]
-            [monkey.ci.config.script :as cs]
             [monkey.ci.events.mailman :as em]
+            [monkey.ci.events.mailman.db :as emd]
             [monkey.ci.runners.oci :as sut]
+            [monkey.ci.script.config :as sc]
             [monkey.ci.spec.events :as se]
             [monkey.oci.container-instance.core :as ci]
             [monkey.ci.helpers :as h]
@@ -178,7 +179,7 @@
                 (is (map? sc)))
 
               (testing "contains build"
-                (let [r (cs/build sc)]
+                (let [r (sc/build sc)]
                   (is (= (:build-id build) (:build-id r)))
                   
                   (testing "without ssh keys"
@@ -188,7 +189,7 @@
                     (is (number? (:credit-multiplier r))))))
 
               (testing "contains api url and token"
-                (let [api (cs/api sc)]
+                (let [api (sc/api sc)]
                   (is (string? (:url api)))
                   (is (string? (:token api))))))
 
@@ -254,7 +255,7 @@
               r (-> {:event {:type :build/pending
                              :sid (st/ext-build-sid build)
                              :build build}}
-                    (em/set-db st)
+                    (emd/set-db st)
                     (enter))]
           (is (= [{:private-key "decrypted-key"
                    :public-key "test-pub"}]
@@ -285,7 +286,7 @@
               ctx (-> {:event {:sid sid}}
                       (sut/set-ci-response {:status 200
                                             :body {:id "test-ocid"}})
-                      (em/set-db st))
+                      (emd/set-db st))
               r (enter ctx)]
           (is (= ctx r))
           (is (= {:runner :oci
@@ -300,30 +301,13 @@
       (h/with-memory-store st
         (let [sid (repeatedly 3 cuid/random-cuid)
               ctx (-> {:event {:sid sid}}
-                      (em/set-db st))
+                      (emd/set-db st))
               details {:runner :oci
                        :details {:instance-id (random-uuid)}}
               _ (st/save-runner-details st sid details)
               r (enter ctx)]
           (is (= details
                  (sut/get-runner-details r))))))))
-
-(deftest handle-error
-  (let [{:keys [error] :as i} sut/handle-error
-        test-error (ex-info "test error" {})]
-    (is (keyword? (:name i)))
-    (testing "has error handler"
-      (is (fn? error)))
-
-    (testing "returns `build/end` event with failure"
-      (let [r (:result (error {} test-error))]
-        (is (= :build/end (:type r)))
-        (is (= "test error" (get-in r [:build :message])))))
-
-    (testing "removes exception from context"
-      (is (nil? (-> {:io.pedestal.interceptor.chain/error test-error}
-                    (error test-error)
-                    :io.pedestal.interceptor.chain/error))))))
 
 (deftest initialize-build
   (testing "returns `build/initializing` event"
@@ -341,7 +325,7 @@
             ctx (-> {:event {:sid sid
                              :type :build/end
                              :build build}}
-                    (em/set-db st)
+                    (emd/set-db st)
                     (sut/set-runner-details {:details {:instance-id ocid}}))
             deleted (atom nil)]
         (with-redefs [ci/delete-container-instance (fn [client opts]

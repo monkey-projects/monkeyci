@@ -5,57 +5,19 @@
    by the modules to perform work.  This allows us to change application 
    behaviour depending on configuration, but also when testing.
 
-   Thie namespace also provides some utility functions for working with the
-   context.  This is more stable than reading properties from the runtime 
-   directly."
-  (:require [clojure.spec.alpha :as spec]
-            [clojure.tools.logging :as log]
-            [com.stuartsierra.component :as co]
+   This namespace also provides some utility functions for working with the
+   runtime.  This is more stable than reading properties from the runtime 
+   directly.
+
+   This namespace is being phased out in favor of passing specific information
+   to components directly, since passing around too much information is an
+   antipattern."
+  (:require [clojure.tools.logging :as log]
             [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
              [protocols :as p]
-             [spec :as s]
              [utils :as u]]))
-
-;; To be replaced with components
-(defmulti ^:deprecated setup-runtime (fn [_ k] k))
-
-(defmethod setup-runtime :default [_ k]
-  {})
-
-(defn ^:deprecated config->runtime
-  "Creates the runtime from the normalized config map"
-  [conf]
-  ;; TODO Re-enable this but allow for more flexible checks
-  #_{:pre  [(spec/valid? ::s/app-config conf)]
-     :post [(spec/valid? ::s/runtime %)]}
-  ;; Apply each of the discovered runtime setup implementations
-  (let [m (-> (methods setup-runtime)
-              (dissoc :default)
-              (keys))]
-    (-> (reduce (fn [r k]
-                  (assoc r k (setup-runtime conf k)))
-                {}
-                m)
-        (assoc :config conf))))
-
-(defn start
-  "Starts the runtime by starting all parts as a component tree.  Returns a
-   component system that can be passed to `stop`."
-  [rt]
-  (log/info "Starting runtime system")
-  (->> rt
-       (mc/filter-vals some?)
-       ;; TODO Check if we should create a separate system from the runtime instead of this
-       (co/map->SystemMap)
-       (co/start-system)))
-
-(defn stop
-  "Stops a previously started runtime"
-  [rt]
-  (log/info "Stopping runtime system")
-  (co/stop-system rt))
 
 ;;; Accessors and utilities
 
@@ -97,28 +59,6 @@
   (when-let [r (reporter rt)]
     (r obj)))
 
-(defn ^:deprecated with-runtime-fn
-  "Creates a runtime for the given mode (server, cli, script) from the specified 
-   configuration and passes it to `f`."
-  [conf mode f]
-  (let [rt (-> conf
-               (assoc :app-mode mode)
-               (config->runtime)
-               (start))]
-    (try
-      (let [v (f rt)]
-        (cond-> v
-          (md/deferred? v) deref))
-      (finally (stop rt)))))
-
-(defmacro with-runtime
-  "Convenience macro that wraps `with-runtime-fn` by binding runtime to `r` and 
-   invoking the body."
-  [conf mode r & body]
-  `(with-runtime-fn ~conf ~mode
-     (fn [~r]
-       ~@body)))
-
 (defn- prepare-events [evt]
   (letfn [(add-time [evt]
             (update evt :time #(or % (u/now))))]
@@ -138,13 +78,3 @@
       ((:poster events) evt)
       :else
       (log/warn "No event poster configured"))))
-
-(defn ^:deprecated rt->config
-  "Returns a map that can be serialized to `edn`.  This is used
-   to pass application configuration to child processes or containers."
-  [rt]
-  ;; Return the original, non-normalized configuration
-  (-> rt
-      :config
-      ;; Child processes never start an event server
-      (mc/update-existing :events dissoc :server)))

@@ -1,10 +1,14 @@
 (ns user
-  (:require [config :as c]
+  (:require [babashka.fs :as fs]
+            [config :as c]
             [instances :as i]
             [logging :as l]
             [server :as server]
             [storage :as s]
-            [clojure.tools.namespace.repl :as nr]))
+            [clojure.tools.namespace.repl :as nr]
+            [monkey.ci
+             [commands :as cmd]
+             [utils :as u]]))
 
 (defn global-config []
   @c/global-config)
@@ -33,3 +37,9 @@
   (c/load-config! "oci/staging-config.edn")
   (->> @(i/list-active)
        (map (juxt :id :display-name :time-created :lifecycle-state))))
+
+(defn run-local [wd & [sd]]
+  (cmd/run-build-local {:workdir wd
+                        :dir sd
+                        :lib-coords {:local/root (u/cwd)}
+                        :log-config (str (fs/absolutize "dev-resources/logback-script.xml"))}))

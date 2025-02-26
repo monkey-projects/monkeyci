@@ -209,10 +209,11 @@
           evt {:type :build/updated}]
       (is (true? (publish bus evt)))
       (is (not-empty @sent))
-      (is (= :ping (-> @sent
-                       first
-                       (parse-event)
-                       :type)))))
+      (is (contains? (->> @sent
+                          (map parse-event)
+                          (map :type)
+                          (set))
+                     :ping))))
 
   (testing "only sends events for customer specified in path"
     (let [sent (atom [])

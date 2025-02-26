@@ -51,6 +51,31 @@
       (rur/created (last sid) creds)
       (rur/status 500))))
 
+(defn issue-credits-for-subs
+  "Given a customer id and list of subscriptions, issues any credits for the given 
+   timestamp.  Returns a list of issued customer credit sids."
+  [st ts [cust-id cust-subs]]
+  (log/debug "Found" (count cust-subs) "subscriptions for customer" cust-id)
+  (let [credits (->> (s/list-customer-credits-since st cust-id (- ts 100))
+                     ;; TODO Filter in the query
+                     (filter (cp/prop-pred :type :subscription))
+                     (group-by :subscription-id))]
+    (letfn [(issue-credits-for-sub [sub]
+              (let [sc (->> (get credits (:id sub))
+                            (filter (comp (partial t/same-date? ts) :from-time)))]
+                (when (empty? sc)
+                  (log/info "Creating new customer credit for sub" (:id sub) ", amount" (:amount sub))
+                  (s/save-customer-credit st (-> sub
+                                                 (select-keys [:customer-id :amount])
+                                                 (assoc :id (cuid/random-cuid)
+                                                        :type :subscription
+                                                        :subscription-id (:id sub)
+                                                        :from-time ts))))))]
+      (->> cust-subs
+           (map issue-credits-for-sub)
+           (remove nil?)
+           (doall)))))
+
 (defn issue-auto-credits
   "Issues new credits to all customers that have active subscriptions that match
    the specified date.  This means all subscriptions where the `valid-from` date
@@ -63,7 +88,7 @@
   [req]
   (let [date (-> (get-in req [:parameters :body :date])
                  (jt/local-date))
-        ts (-> (jt/instant date (jt/zone-id))
+        ts (-> (jt/instant date (jt/zone-id "UTC"))
                (t/day-start)
                (jt/to-millis-from-epoch))
         st (c/req->storage req)
@@ -75,25 +100,7 @@
               ;; the max has been reached
               (or (t/same-dom? time ts)
                   (let [dom (jt/as (t/epoch->date time) :day-of-month)]
-                    (< max-dom dom))))
-            (process-subs [[cust-id cust-subs]]
-              (log/debug "Found" (count cust-subs) "subscriptions for customer" cust-id)
-              (let [credits (->> (s/list-customer-credits-since st cust-id (- ts 100))
-                                 ;; TODO Filter in the query
-                                 (filter (cp/prop-pred :type :subscription))
-                                 (group-by :subscription-id))]
-                (map (fn [sub]
-                       (let [sc (->> (get credits (:id sub))
-                                     (filter (comp (partial t/same-date? ts) :from-time)))]
-                         (when (empty? sc)
-                           (log/info "Creating new customer credit for sub" (:id sub) ", amount" (:amount sub))
-                           (s/save-customer-credit st (-> sub
-                                                          (select-keys [:customer-id :amount])
-                                                          (assoc :id (cuid/random-cuid)
-                                                                 :type :subscription
-                                                                 :subscription-id (:id sub)
-                                                                 :from-time ts))))))
-                     cust-subs)))]
+                    (< max-dom dom))))]
       ;; TODO Allow filtering by customer, if specified
       (log/info "Auto-issuing new credits for date" date " (timestamp" ts ")")
       ;; List all subscriptions that have become active on that day, so move ts to end of day
@@ -101,9 +108,8 @@
            ;; TODO Filter in the query instead of here
            (filter (comp should-process? :valid-from))
            (group-by :customer-id)
-           (mapcat process-subs)
-           (doall)
-           (remove nil?)
+           (mapcat (partial issue-credits-for-subs st ts))
+           ;; Return list of issued credit ids
            (map last)
            (hash-map :credits)
            (rur/response)))))

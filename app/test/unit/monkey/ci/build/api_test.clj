@@ -9,10 +9,14 @@
             [monkey.ci.build
              [api :as sut]
              [api-server :as server]]
-            [monkey.ci.events.build-api :as events]
+            [monkey.ci.events.mailman :as em]
+            [monkey.ci.events.mailman.build-api :as emba]
             [monkey.ci.helpers :as h]
             [monkey.ci.protocols :as p]
-            [monkey.ci.test.api-server :as tas])
+            [monkey.mailman.core :as mmc]
+            [monkey.ci.test
+             [api-server :as tas]
+             [mailman :as tm]])
   (:import [java.io PipedInputStream PipedOutputStream PrintWriter]))
 
 (deftest api-client
@@ -33,12 +37,12 @@
                                             :method :get}))))))
 
       (testing "can post events"
-        (let [ep (events/make-event-poster client)
-              recv (-> config :events :recv)
-              event {:type ::test-event :message "test event"}]
-          (is (some? (p/post-events ep event)))
-          (is (not= :timeout (h/wait-until #(not-empty @recv) 1000)))
-          (is (= event (-> (first @recv)
+        (let [broker (emba/make-broker client nil)
+              event {:type ::test-event :message "test event"}
+              get-posted #(tm/get-posted (:mailman config))]
+          (is (some? (mmc/post-events broker [event])))
+          (is (not= :timeout (h/wait-until #(not-empty (get-posted)) 1000)))
+          (is (= event (-> (first (get-posted))
                            (select-keys (keys event))))))))))
 
 (deftest build-params
@@ -62,6 +66,35 @@
               :build {:sid ["test-cust" "test-repo" "test-build"]}}]
       (is (= "test artifact contents"
              (sut/download-artifact rt "test-artifact"))))))
+
+(deftest events-to-stream
+  (let [input (PipedInputStream.)
+        output (PipedOutputStream. input)
+        client (fn [req]
+                 (md/success-deferred {:status 200
+                                       :body input}))
+        [stream close] (sut/events-to-stream client)]
+    (with-open [w (io/writer output)
+                pw (PrintWriter. w)]
+      (letfn [(post-event [evt]
+                (.println pw (str "data: " (pr-str evt) "\n"))
+                (.flush pw))]
+        (testing "returns a manifold source"
+          (is (ms/source? stream)))
+
+        (testing "returns a close fn"
+          (is (fn? close)))
+
+        (testing "dispatches events"
+          (let [evt {:type ::test-event :message "test event"}]
+            (post-event evt)
+            (is (= evt (-> stream (ms/take!) (deref 1000 :timeout))))))
+
+        (testing "dispatches events to multiple listeners"
+          (let [evt {:type ::test-event :message "other event"}]
+            (post-event evt)
+            (is (= evt (-> stream (ms/take!) (deref 1000 :timeout))))
+            (is (nil? (ms/close! stream)))))))))
 
 (deftest event-bus
   (let [input (PipedInputStream.)

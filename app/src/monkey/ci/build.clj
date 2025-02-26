@@ -237,7 +237,3 @@
            (remove nil?)
            (reduce + 0)
            (u/round-up)))))
-
-(defmethod rt/setup-runtime :build [conf _]
-  ;; Just copy the build info to the runtime
-  (get conf :build))

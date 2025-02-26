@@ -1,32 +1,10 @@
 (ns sidecar
   (:require [config :as co]
-            [monkey.ci
-             [commands :as cmd]
-             [config :as c]
-             [runtime :as rt]
-             [sidecar :as sc]]
-            [monkey.ci.build.api-server :as bas]
+            [monkey.ci.sidecar :as sc]
             [monkey.ci.config.sidecar :as cs]
             [monkey.ci.runtime
              [app :as ra]
              [sidecar :as rs]]))
-
-(defn run-test-legacy []
-  (let [build {:build-id "test-build"
-               :workspace "test-ws"}
-        job {:id "test-job"}]
-    (rt/with-runtime-fn (-> @co/global-config
-                            (assoc :build build
-                                   :sidecar {:events-file "/tmp/events.edn"
-                                             :start-file "/tmp/start"
-                                             :abort-file "/tmp/abort"
-                                             :job-config {:job job}}))
-      :sidecar
-      cmd/sidecar)))
-
-(defn api-server-config []
-  (rt/with-runtime @co/global-config :repl rt
-    (bas/rt->api-server-config rt)))
 
 (defn run-test []
   (ra/with-runner-system @co/global-config

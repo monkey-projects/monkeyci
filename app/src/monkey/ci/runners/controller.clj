@@ -28,6 +28,7 @@
    but the script is not running yet."
   [{:keys [build] :as rt}]
   (post-events rt [(b/build-start-evt build)
+                   ;; TODO Remove this, script init should be fired in the script itself
                    (script/script-init-evt build (b/script-dir build))])
   rt)
 

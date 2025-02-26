@@ -2,7 +2,9 @@
   "Functions for setting up a runtime for application (cli or server)"
   (:require [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
-            [manifold.bus :as mb]
+            [manifold
+             [bus :as mb]
+             [stream :as ms]]
             [medley.core :as mc]
             [monkey.ci
              [blob :as blob]
@@ -28,7 +30,9 @@
              [core :as ec]
              [mailman :as em]
              [split :as es]]
-            [monkey.ci.events.mailman.bridge :as emb]
+            [monkey.ci.events.mailman
+             [bridge :as emb]
+             [db :as emd]]
             [monkey.ci.runners.oci :as ro]
             [monkey.ci.runtime.common :as rc]
             [monkey.ci.web
@@ -175,10 +179,20 @@
   [config]
   (em/make-component (:mailman config)))
 
+(defn new-local-mailman
+  "Creates local mailman component for runners.  This is used to handle events 
+   between the build api, the script and container jobs."
+  []
+  ;; TODO Routes
+  (em/make-component {:type :manifold}))
+
 (defn new-mailman-events
   "Creates a mailman-events bridge for compatibility purposes"
   []
   (emb/->MailmanEventPoster nil))
+
+(defn new-event-stream []
+  (ms/stream))
 
 (defn make-runner-system
   "Given a runner configuration object, creates component system.  When started,
@@ -192,7 +206,9 @@
                 (new-runtime config)
                 [:events :artifacts :cache :containers :workspace :logging :git :build :api-config :build-cache])
    :build      (prepare-build config)
+   ;; TODO Replace with mailman
    :events     (new-events config)
+   :event-stream  (new-event-stream)
    :artifacts  (new-artifacts config)
    :cache      (new-cache config)
    :build-cache (new-build-cache config)
@@ -209,7 +225,7 @@
    :api-config (new-api-config config) ; Necessary to avoid circular dependency between containers and api server
    :api-server (co/using
                 (new-api-server config)
-                [:events :artifacts :cache :containers :workspace :build :params :api-config])
+                [:artifacts :cache :containers :workspace :build :params :api-config :event-stream :mailman])
    :params     (co/using
                 (new-params config)
                 [:build])
@@ -217,7 +233,8 @@
    :push-gw    (co/using
                 (new-push-gw config)
                 [:metrics])
-   :mailman    (new-mailman config)))
+   :mailman    (new-mailman config)
+   :mailman/local (new-local-mailman)))
 
 (defn with-runner-system [config f]
   (rc/with-system (make-runner-system config) f))
@@ -267,7 +284,7 @@
 (defrecord AppEventRoutes [storage update-bus]
   co/Lifecycle
   (start [this]
-    (assoc this :routes (em/make-routes storage update-bus)))
+    (assoc this :routes (emd/make-routes storage update-bus)))
 
   (stop [this]
     (dissoc this :routes)))

@@ -293,7 +293,7 @@
    request path."
   [req]
   (eh/bus-stream (c/from-rt req :update-bus)
-                 :build/updated
+                 #{:build/updated}
                  (comp (partial = (customer-id req)) first :sid)))
 
 (c/make-entity-endpoints "email-registration"
