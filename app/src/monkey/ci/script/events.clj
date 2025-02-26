@@ -155,6 +155,11 @@
   [ctx]
   (if (some bc/failed? (vals (get-jobs ctx))) :error :success))
 
+(defn- pending-jobs [ctx]
+  (->> (get-jobs ctx)
+       vals
+       (filter j/pending?)))
+
 (defn job-end
   "Queues jobs that have their dependencies resolved, or ends the script
    if all jobs have been executed."
@@ -162,8 +167,9 @@
   ;; Enqueue jobs that have become ready to run
   (let [next-jobs (j/next-jobs (vals (get-jobs ctx)))]
     (if (empty? next-jobs)
-      ;; TODO Also add job/skipped for any leftover jobs
-      [(script-end-evt ctx (script-status ctx))]
+      (->> (pending-jobs ctx)
+           (map #(j/job-skipped-evt (j/job-id %) (get-in ctx [:event :sid])))
+           (into [(script-end-evt ctx (script-status ctx))]))
       (map #(j/job-queued-evt % (get-in ctx [:event :sid])) next-jobs))))
 
 (defn- make-job-ctx

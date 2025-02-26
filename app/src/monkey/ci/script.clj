@@ -103,7 +103,8 @@
    dynamically.  If the build script does not define its own namespace,
    one will be randomly generated to avoid collisions."
   [dir build-id]
-  ;; Don't wrap in ns, since `in-ns` may throw an exception at runtime
+  ;; Don't wrap in ns, since `in-ns` may throw an exception at runtime if it
+  ;; can't rebind `*ns*`
   (let [path (io/file dir "build.clj")]
     (log/debug "Loading script:" path)
     ;; This should return jobs to run
@@ -139,9 +140,7 @@
                      (map (comp j/job-id :job)))]
     (->> [(-> (base-event (:build rt) :script/end)
               (assoc :status (:status res)))]
-         (concat (mapv #(ec/make-event :job/skipped
-                                       :sid (build/sid (:build rt))
-                                       :job-id %)
+         (concat (mapv #(j/job-skipped-evt % (build/sid (:build rt)))
                        skipped)))))
 
 (defn script-init-evt [build script-dir]

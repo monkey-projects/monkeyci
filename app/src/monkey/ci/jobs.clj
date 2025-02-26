@@ -86,6 +86,9 @@
 (defn job-queued-evt [job build-sid]
   (job-evt :job/queued job build-sid))
 
+(defn job-skipped-evt [job-id build-sid]
+  (base-event :job/skipped job-id build-sid))
+
 (defn job-initializing-evt [job-id build-sid cm]
   (-> (base-event :job/initializing job-id build-sid)
       (assoc :credit-multiplier cm)))

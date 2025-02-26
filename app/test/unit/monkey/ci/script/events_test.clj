@@ -180,29 +180,44 @@
         (is (= [:job/queued] (map :type r)))
         (is (= "second" (-> r first :job-id)))))
 
-    (testing "returns `script/end` event when no more jobs to run"
-      (is (= [:script/end]
-             (->> (sut/job-end {})
-                  (map :type)))))
+    (testing "when no more jobs to run"
+      (testing "returns `script/end` event"
+        (is (= [:script/end]
+               (->> (sut/job-end {})
+                    (map :type)))))
 
-    (testing "marks script as `:error` if a job has failed"
-      (is (= :error
-             (-> {:event
-                  {:job-id "failed"
-                   :status :error}}
-                 (sut/set-jobs (jobs->map [{:id "failed"
-                                            :status :error}]))
-                 (sut/job-end)
-                 first
-                 :status))))
+      (testing "marks script as `:error` if a job has failed"
+        (is (= :error
+               (-> {:event
+                    {:job-id "failed"
+                     :status :error}}
+                   (sut/set-jobs (jobs->map [{:id "failed"
+                                              :status :error}]))
+                   (sut/job-end)
+                   first
+                   :status))))
 
-    (testing "marks script as `:success` if all jobs succeeded"
-      (is (= :success
-             (-> {:event
-                  {:job-id "success"
-                   :status :success}}
-                 (sut/set-jobs (jobs->map [{:id "success"
-                                            :status :running}]))
-                 (sut/job-end)
-                 first
-                 :status))))))
+      (testing "marks script as `:success` if all jobs succeeded"
+        (is (= :success
+               (-> {:event
+                    {:job-id "success"
+                     :status :success}}
+                   (sut/set-jobs (jobs->map [{:id "success"
+                                              :status :running}]))
+                   (sut/job-end)
+                   first
+                   :status))))
+
+      (testing "marks remaining pending jobs as skipped"
+        (let [jobs (jobs->map [{:id "first"
+                                :status :error}
+                               {:id "second"
+                                :status :pending
+                                :dependencies ["first"]}])]
+          (is (= ["second"]
+                 (->> (-> {:event {:type :job/end
+                                   :status :error}}
+                          (sut/set-jobs jobs)
+                          (sut/job-end))
+                      (filter (comp (partial = :job/skipped) :type))
+                      (map :job-id)))))))))
