@@ -1,7 +1,6 @@
 (ns monkey.ci.events.mailman.interceptors
   "General purpose interceptors"
   (:require [clojure.tools.logging :as log]
-            [io.pedestal.interceptor.chain :as pi]
             [manifold
              [bus :as mb]
              [deferred :as md]]
@@ -57,12 +56,9 @@
   {:name ::build-error-handler
    :error (fn [{:keys [event] :as ctx} ex]
             (log/error "Failed to handle event" (:type event) ", marking build as failed" ex)
-            (-> ctx
-                (assoc :result (b/build-end-evt (-> (:build event)
+            (assoc ctx :result (b/build-end-evt (-> (:build event)
                                                     (assoc :message (ex-message ex)))
-                                                errors/error-process-failure))
-                ;; Remove the error to ensure leave chain is processed
-                (dissoc ::pi/error)))})
+                                                errors/error-process-failure)))})
 
 (defn update-bus [bus]
   "Publishes the event to the given manifold bus"

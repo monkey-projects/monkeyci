@@ -78,7 +78,7 @@
 
 (defn- job-evt [type job build-sid]
   (-> (base-event type (job-id job) build-sid)
-      (assoc :job job)))
+      (assoc :job (job->event job))))
 
 (defn job-pending-evt [job build-sid]
   (job-evt :job/pending job build-sid))

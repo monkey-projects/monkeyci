@@ -1,7 +1,6 @@
 (ns monkey.ci.script.events
   "Mailman event routes for scripts"
   (:require [clojure.tools.logging :as log]
-            [io.pedestal.interceptor.chain :as pi]
             [medley.core :as mc]
             [monkey.ci
              [build :as b]
@@ -114,10 +113,8 @@
   {:name ::script-error-handler
    :error (fn [{:keys [event] :as ctx} ex]
             (log/error "Failed to handle event" (:type event) ", marking script as failed" ex)
-            (-> ctx
-                (assoc :result (script-end-evt ctx :error))
-                ;; Remove the error to ensure leave chain is processed
-                (dissoc ::pi/error)))})
+            (assoc ctx :result [(-> (script-end-evt ctx :error)
+                                    (assoc :message (ex-message ex)))]))})
 
 ;;; Handlers
 
@@ -150,8 +147,8 @@
   "Runs any extensions for the job"
   [ctx]
   ;; TODO Apply "after" extensions
-  (let [{:keys [job-id sid result]} (:event ctx)]
-    [(j/job-end-evt job-id sid result)]))
+  (let [{:keys [job-id sid status result]} (:event ctx)]
+    [(j/job-end-evt job-id sid (assoc result :status status))]))
 
 (defn- script-status
   "Determines script status according to the status of all jobs"

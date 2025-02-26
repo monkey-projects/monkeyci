@@ -81,6 +81,15 @@
                           (get "test-job")
                           :status))))))
 
+(deftest handle-script-error
+  (let [{:keys [error] :as i} sut/handle-script-error]
+    (is (keyword? (:name i)))
+    (testing "adds script/end event to result"
+      (is (= [:script/end]
+             (->> (error {} (ex-info "test error" {}))
+                  (em/get-result)
+                  (map :type)))))))
+
 (deftest routes
   (let [types [:script/initializing
                :script/start
@@ -144,11 +153,13 @@
 
 (deftest job-executed
   (testing "returns `job/end` event"
-    (is (= [:job/end]
-           (->> {:event
-                 {:job-id "test-job"}}
-                (sut/job-executed)
-                (map :type)))))
+    (let [r (->> {:event
+                 {:job-id "test-job"
+                  :status :success}}
+                (sut/job-executed))]
+      (is (= [:job/end]
+             (map :type r)))
+      (is (= :success (-> r first :status)))))
 
   (testing "executes 'after' extensions"))
 

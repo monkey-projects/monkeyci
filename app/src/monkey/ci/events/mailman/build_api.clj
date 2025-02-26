@@ -8,37 +8,53 @@
             [monkey.ci.events.build-api :as eba]
             [monkey.mailman
              [core :as mmc]
-             [manifold :as mmm]]))
+             [manifold :as mmm]
+             [utils :as mmu]]))
 
 ;; The broker implementation posts directly to the build api using the HTTP
 ;; client.  Receiving however is done using manifold streams: when a listener
 ;; is first added, it opens an SSE stream that receives all events from the
 ;; remote api server.  These events are piped to the registered listeners.
 
-(defrecord Listener [id handler listeners]
+(deftype Listener [id handler stream listeners]
   mmc/Listener
+  (invoke-listener [this evt]
+    (handler evt))
   (unregister-listener [this]
     (swap! listeners dissoc id)
+    (ms/close! stream)
     true))
+
+(defn- reposting-handler [l broker]
+  (fn [evt]
+    (mmu/invoke-and-repost evt broker [l])))
 
 (defrecord BuildApiBroker [api-client event-stream listeners]
   mmc/EventPoster
   (post-events [this evts]
-    (log/trace "Posting events to build api:" evts)
-    @(md/chain
-      (eba/post-events api-client evts)
-      (fn [{:keys [status] :as res}]
-        (if (and status (< status 400))
-          evts
-          (log/warn "Unable to post events to build api" res)))))
+    (when-not (empty? evts)
+      (log/trace "Posting events to build api:" evts)
+      @(md/chain
+        (eba/post-events api-client evts)
+        (fn [{:keys [status] :as res}]
+          (if (and status (< status 400))
+            evts
+            (log/warn "Unable to post events to build api" res))))))
   
   mmc/EventReceiver
   ;; Only listeners are supported, no polling
   (add-listener [this h]
-    (let [l (->Listener (random-uuid) h listeners)]
-      (log/debug "Adding listener for build api events:" (:id l))
-      (swap! listeners assoc (:id l) l)
-      (ms/consume h event-stream)
+    (let [s (ms/stream)
+          id (random-uuid)
+          l (->Listener id h s listeners)]
+      (log/debug "Adding listener for build api events:" id)
+      (swap! listeners assoc id l)
+      ;; Connect the listener stream and consume it
+      (ms/connect event-stream s)
+      (md/finally
+        (ms/consume (reposting-handler l this) s)
+        (fn []
+          (log/debug "Listener shut down:" id)))
       l)))
 
 (defn make-broker [api-client event-stream]

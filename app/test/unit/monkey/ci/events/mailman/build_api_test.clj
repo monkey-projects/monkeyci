@@ -3,6 +3,7 @@
             [manifold
              [deferred :as md]
              [stream :as ms]]
+            [monkey.ci.edn :as edn]
             [monkey.ci.events.mailman.build-api :as sut]
             [monkey.mailman.core :as mmc]))
 
@@ -32,4 +33,19 @@
       (is (true? (deref (ms/put! stream evt) 100 :timeout))))
 
     (testing "can unregister listener"
-      (is (true? (mmc/unregister-listener l))))))
+      (is (true? (mmc/unregister-listener l)))))
+
+  (let [stream (ms/stream)
+        client (fn [req]
+                 (ms/put-all! stream (edn/edn-> (:body req)))
+                 (md/success-deferred {:status 200}))
+        broker (sut/make-broker client stream)]
+    (testing "re-posts resulting events"
+      (let [recv (atom [])
+            l (mmc/add-listener broker (fn [evt]
+                                         (swap! recv conj evt)
+                                         (when (= ::first (:type evt))
+                                           [{:result [{:type ::second}]}])))]
+        (is (some? (mmc/post-events broker [{:type ::first}])))
+        (is (= 2 (count @recv)))
+        (is (= [::first ::second] (map :type @recv)))))))

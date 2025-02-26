@@ -63,12 +63,7 @@
     (testing "returns `build/end` event with failure"
       (let [r (:result (error {} test-error))]
         (is (= :build/end (:type r)))
-        (is (= "test error" (get-in r [:build :message])))))
-
-    (testing "removes exception from context"
-      (is (nil? (-> {:io.pedestal.interceptor.chain/error test-error}
-                    (error test-error)
-                    :io.pedestal.interceptor.chain/error))))))
+        (is (= "test error" (get-in r [:build :message])))))))
 
 (deftest update-bus
   (testing "`enter` publishes event to update bus"

@@ -103,20 +103,25 @@
    dynamically.  If the build script does not define its own namespace,
    one will be randomly generated to avoid collisions."
   [dir build-id]
-  (let [tmp-ns (symbol (or build-id (str "build-" (random-uuid))))]
-    ;; Declare a temporary namespace to load the file in, in case
-    ;; it does not declare an ns of it's own.
-    (in-ns tmp-ns)
-    (clojure.core/use 'clojure.core)
-    (try
-      (let [path (io/file dir "build.clj")]
-        (log/debug "Loading script:" path)
-        ;; This should return jobs to run
-        (load-file (str path)))
-      (finally
-        ;; Return
-        (in-ns 'monkey.ci.script)
-        (remove-ns tmp-ns)))))
+  ;; Don't wrap in ns, since `in-ns` may throw an exception at runtime
+  (let [path (io/file dir "build.clj")]
+    (log/debug "Loading script:" path)
+    ;; This should return jobs to run
+    (load-file (str path)))
+  #_(let [tmp-ns (symbol (or build-id (str "build-" (random-uuid))))]
+      ;; Declare a temporary namespace to load the file in, in case
+      ;; it does not declare an ns of it's own.
+      (in-ns tmp-ns)
+      #_(clojure.core/use 'clojure.core)
+      (try
+        (let [path (io/file dir "build.clj")]
+          (log/debug "Loading script:" path)
+          ;; This should return jobs to run
+          (load-file (str path)))
+        (finally
+          ;; Return
+          (in-ns 'monkey.ci.script)
+          (remove-ns tmp-ns)))))
 
 (defn- script-start-evt [rt jobs]
   (letfn [(mark-pending [job]
