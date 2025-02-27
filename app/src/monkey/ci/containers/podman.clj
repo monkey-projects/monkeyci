@@ -14,6 +14,7 @@
              [build :as b]
              [cache :as cache]
              [containers :as mcc]
+             [extensions :as ext]
              [jobs :as j]
              [logging :as l]
              [protocols :as p]
@@ -96,7 +97,7 @@
 
 ;;; Container runner implementation
 
-(defn- run-container [job {:keys [build events] :as conf}]
+(defn- ^:deprecated run-container [job {:keys [build events] :as conf}]
   (let [log-maker (rt/log-maker conf)
         ;; Don't prefix the sid here, that's the responsability of the logger
         log-base (b/get-job-sid job build)
@@ -154,9 +155,12 @@
 (defn set-build [ctx b]
   (emi/update-state ctx assoc :build b))
 
-(defn get-job [ctx id]
-  (some-> (emi/get-state ctx)
-          (get-in [:jobs id])))
+(defn get-job
+  ([ctx id]
+   (some-> (emi/get-state ctx)
+           (get-in [:jobs id])))
+  ([ctx]
+   (get-job ctx (get-in ctx [:event :job-id]))))
 
 (defn set-job [ctx job]
   (emi/update-state ctx assoc-in [:jobs (:id job)] job))
@@ -219,7 +223,16 @@
   "Terminates if no job is present in the state"
   (emi/terminate-when ::require-job #(nil? (get-job % (get-in % [:event :job-id])))))
 
+(def add-job-to-ctx
+  "Adds the job from the state to the job context.  Used by extensions."
+  (emi/add-job-to-ctx get-job))
+
 ;;; Event handlers
+
+(def job-executed-evt
+  "Creates an internal job-executed event, specifically for podman containers.  This is used
+   as an intermediate step to save artifacts."
+  (partial j/job-status-evt :podman/job-executed))
 
 (defn prepare-child-cmd
   "Prepares podman command to execute as child process"
@@ -240,7 +253,7 @@
                 (log/info "Container job exited with code" exit)
                 (try
                   (em/post-events (emi/get-mailman ctx)
-                                  [(j/job-executed-evt job-id sid {:status (if (= 0 exit) :success :failure)})])
+                                  [(job-executed-evt job-id sid (if (= 0 exit) bc/success bc/failure))])
                   (catch Exception ex
                     (log/error "Failed to post job/executed event" ex))))}))
 
@@ -255,6 +268,16 @@
     ;; similar to the oci sidecar.
     [(j/job-start-evt job-id sid)]))
 
+(defn job-exec
+  "Invoked after the podman container has exited.  Posts a job/executed event."
+  [{{:keys [job-id sid status result]} :event}]
+  [(j/job-executed-evt job-id sid (assoc result :status status))])
+
+(defn- make-job-ctx [conf]
+  (-> conf
+      (select-keys [:build])
+      (assoc :api {:client (:api-client conf)})))
+
 (defn make-routes [{:keys [build workspace work-dir mailman] :as conf}]
   (let [state (emi/with-state (atom {:build build}))]
     [[:job/queued
@@ -264,8 +287,11 @@
                        save-job
                        (copy-ws workspace work-dir)
                        (emi/add-mailman mailman)
-                       ;; TODO Execute "before" extensions
-                       ;; TODO Artifacts and caches
+                       (emi/add-job-ctx (make-job-ctx conf))
+                       add-job-to-ctx
+                       ext/before-interceptor
+                       (art/restore-interceptor (:artifacts conf) get-job)
+                       ;; TODO Restore caches
                        emi/start-process]}
        {:handler job-queued}]]
 
@@ -273,4 +299,8 @@
       ;; TODO Start sidecar event polling
       [{:handler job-init
         :interceptors [handle-error
-                       require-job]}]]]))
+                       require-job]}]]
+
+     [:podman/job-executed
+      [{:handler job-exec
+        :interceptors [(art/save-interceptor (:artifacts conf) get-job)]}]]]))

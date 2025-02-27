@@ -90,10 +90,7 @@
 (def add-job-to-ctx
   "Interceptor that adds the job indicated in the event (by job-id) to the job context.
    This is required by jobs and extensions to be present."
-  {:name ::add-job-to-ctx
-   :enter (fn [ctx]
-            (let [job (get-job-from-state ctx)]
-              (emi/update-job-ctx ctx assoc :job job)))})
+  (emi/add-job-to-ctx get-job-from-state))
 
 (defn execute-action [job-ctx]
   "Interceptor that executes the job in the input event in a new thread, provided
@@ -243,7 +240,7 @@
      [:job/executed
       ;; Handle this for both container and action jobs
       [{:handler job-executed
-        ;; FIXME After interceptors may need values from the before handlers, so we'll need state here
+        ;; FIXME 'After' interceptors may need values from the 'before' handlers, so we'll need state here
         :interceptors [(emi/add-job-ctx (make-job-ctx conf))
                        add-job-to-ctx
                        add-result-to-ctx

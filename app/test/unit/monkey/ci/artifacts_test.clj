@@ -12,7 +12,9 @@
              [api :as api]
              [api-server :as bas]]
             [monkey.ci.helpers :as h]
-            [monkey.ci.test.api-server :as ta]))
+            [monkey.ci.test
+             [api-server :as ta]
+             [blob :as tb]]))
 
 (deftest save-artifacts
   (testing "saves path using blob store, relative to job work dir"
@@ -112,3 +114,41 @@
 
         (testing "does nothing if artifact does not exist"
           (is (nil? @(sut/restore-artifact repo "nonexisting" (str out-dir)))))))))
+
+(deftest restore-interceptor
+  (let [blob (tb/test-store {"test/build/test-art.tgz" {:file "test.txt"}})
+        build {:sid ["test" "build"]}
+        job {:id "test-job"
+             :restore-artifacts [{:id "test-art"
+                                  :path "test/path"}]}
+        art (sut/make-blob-repository blob build)
+        {:keys [enter] :as i} (sut/restore-interceptor art ::job)]
+    (is (keyword? (:name i)))
+    
+    (testing "`enter` restores artifacts for job using repository"
+      (is (= "test.txt"
+             (-> {::job job}
+                 (enter)
+                 (sut/get-restored)
+                 first
+                 :dest))))))
+
+(deftest save-interceptor
+  (let [blob (tb/test-store)
+        build {:sid ["test" "build"]}
+        job {:id "test-job"
+             :save-artifacts [{:id "test-art"
+                               :path "test/path"}]}
+        art (sut/make-blob-repository blob build)
+        {:keys [enter] :as i} (sut/save-interceptor art ::job)]
+    (is (keyword? (:name i)))
+    
+    (testing "`enter` saves artifacts for job using repository"
+      (is (= 1 
+             (-> {::job job}
+                 (enter)
+                 (sut/get-saved)
+                 (count))))
+      (is (= "test/path" (-> (tb/stored blob)
+                             (get "test/build/test-art.tgz")
+                             :file))))))

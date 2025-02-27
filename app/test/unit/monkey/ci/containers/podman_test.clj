@@ -229,7 +229,8 @@
 (deftest make-routes
   (let [routes (sut/make-routes {})
         expected [:job/queued
-                  :job/initializing]]
+                  :job/initializing
+                  :podman/job-executed]]
     (doseq [t expected]
       (testing (format "handles `%s`" t)
         (is (contains? (set (map first routes)) t))))))
@@ -344,6 +345,16 @@
                (sut/job-init)
                first
                :type)))))
+
+(deftest job-exec
+  (testing "returns `job/executed` event"
+    (let [r (-> {:event
+                {:type :podman/job-executed
+                 :job-id "test-job"}}
+               (sut/job-exec)
+               first)]
+      (is (= :job/executed
+             (:type r))))))
 
 (deftest prepare-child-cmd
   (testing "executes podman"

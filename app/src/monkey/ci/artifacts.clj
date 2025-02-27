@@ -189,3 +189,49 @@
 
 (defn make-build-api-repository [client]
   (->BuildApiArtifactRepository client "/artifact/"))
+
+;;; Interceptors
+
+(def get-restored ::restored)
+
+(defn set-restored [ctx r]
+  (assoc ctx ::restored r))
+
+(defn restore-interceptor
+  "Interceptor that restores artifacts using the given repo and the job retrieved
+   from the context using `get-job`.  Adds details about the restored artifacts to
+   the context."
+  [artifacts get-job]
+  {:name ::restore-artifacts
+   :enter (fn [ctx]
+            (let [job (get-job ctx)]
+              (->> (:restore-artifacts job)
+                   (map (fn [{:keys [id path]}]
+                          (restore-artifact artifacts id path)))
+                   ;; Note that this will block the event processing while the operation continues
+                   ;; so we may consider switching to async handling.
+                   (apply md/zip)
+                   (deref)
+                   (set-restored ctx))))})
+
+(def get-saved ::saved)
+
+(defn set-saved [ctx r]
+  (assoc ctx ::saved r))
+
+(defn save-interceptor
+  "Interceptor that saves artifacts using the given repo and the job retrieved
+   from the context using `get-job`.  Adds details about the saved artifacts to
+   the context."
+  [artifacts get-job]
+  {:name ::save-artifacts
+   :enter (fn [ctx]
+            (let [job (get-job ctx)]
+              (->> (:save-artifacts job)
+                   (map (fn [{:keys [id path]}]
+                          (save-artifact artifacts id path)))
+                   ;; Note that this will block the event processing while the operation continues
+                   ;; so we may consider switching to async handling.
+                   (apply md/zip)
+                   (deref)
+                   (set-saved ctx))))})

@@ -116,6 +116,14 @@
   {:name ::add-job-ctx
    :enter #(set-job-ctx % jc)})
 
+(defn add-job-to-ctx [get-job]
+  "Interceptor that adds the job indicated in the event (by job-id) to the job context.
+   This is required by jobs and extensions to be present."
+  {:name ::add-job-to-ctx
+   :enter (fn [ctx]
+            (let [job (get-job ctx)]
+              (update-job-ctx ctx assoc :job job)))})
+
 (defn terminate-when [id pred]
   "Interceptor that terminates when given predicate is truthy"
   {:name id

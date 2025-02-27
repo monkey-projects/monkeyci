@@ -95,7 +95,7 @@
 
 (def job-start-evt (partial base-event :job/start))
 
-(defn- job-status-evt [type job-id build-sid {:keys [status] :as r}]
+(defn job-status-evt [type job-id build-sid {:keys [status] :as r}]
   (let [r (dissoc r :status :exception)]
     (-> (base-event type job-id build-sid)
         (assoc :status status
