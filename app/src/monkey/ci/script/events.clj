@@ -92,25 +92,26 @@
    This is required by jobs and extensions to be present."
   (emi/add-job-to-ctx get-job-from-state))
 
-(defn execute-action [job-ctx]
+(def execute-action
   "Interceptor that executes the job in the input event in a new thread, provided
    it's an action job.  The job context must contain all necessary components for 
    the job to run properly, such as artifacts, cache and events."
-  (letfn [(post-job-error [job {:keys [job-id sid]} ex]
-            (em/post-events (:mailman job-ctx)
+  (letfn [(post-job-error [job mailman {:keys [job-id sid]} ex]
+            (em/post-events mailman
                             [(j/job-end-evt job-id sid (-> bc/failure
                                                            (bc/with-message (ex-message ex))))]))
-          (execute-job [job evt]
-            ;; TODO Capture output
-            (-> (j/execute! job (assoc job-ctx :job job))
-                ;; Catch exceptions and mark job failed
-                (md/catch (partial post-job-error job evt))))]
+          (execute-job [job ctx]
+            (let [job-ctx (emi/get-job-ctx ctx)]
+              ;; TODO Capture output
+              (-> (j/execute! job job-ctx)
+                  ;; Catch exceptions and mark job failed
+                  (md/catch (partial post-job-error job (:mailman job-ctx) (:event ctx))))))]
     {:name ::execute-action
      :enter (fn [ctx]
-              (let [job (get (get-jobs ctx) (get-in ctx [:event :job-id]))]
+              (let [job (get-job-from-state ctx)]
                 ;; TODO Only execute it if the max number of concurrent jobs has not been reached
                 ;; Execute the jobs with the job context
-                (set-running-actions ctx [(execute-job job (:event ctx))])))}))
+                (set-running-actions ctx [(execute-job job ctx)])))}))
 
 (def enqueue-jobs
   "Interceptor that enqueues all jobs indicated in the `job/queued` events in the result"
@@ -146,6 +147,16 @@
             (log/error "Failed to handle event" (:type event) ", marking script as failed" ex)
             (assoc ctx :result [(-> (script-end-evt ctx :error)
                                     (assoc :message (ex-message ex)))]))})
+
+(def handle-job-error
+  "Marks job as failed"
+  {:name ::job-error-handler
+   :error (fn [{{:keys [job-id sid] :as event} :event :as ctx} ex]
+            (log/error "Error in job event" (:type event) "for" job-id ex)
+            (assoc ctx :result [(-> (j/job-end-evt job-id
+                                                   sid
+                                                   (-> bc/failure
+                                                       (bc/with-message (ex-message ex)))))]))})
 
 ;;; Handlers
 
@@ -230,7 +241,8 @@
 
      [:job/queued
       [{:handler (constantly nil)
-        :interceptors [state
+        :interceptors [handle-job-error
+                       state
                        filter-action-job
                        (emi/add-job-ctx (make-job-ctx conf))
                        add-job-to-ctx
@@ -241,7 +253,8 @@
       ;; Handle this for both container and action jobs
       [{:handler job-executed
         ;; FIXME 'After' interceptors may need values from the 'before' handlers, so we'll need state here
-        :interceptors [(emi/add-job-ctx (make-job-ctx conf))
+        :interceptors [handle-job-error
+                       (emi/add-job-ctx (make-job-ctx conf))
                        add-job-to-ctx
                        add-result-to-ctx
                        ext/after-interceptor]}]]

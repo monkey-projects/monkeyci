@@ -39,7 +39,7 @@
 
 (defn- new-podman-routes [conf]
   (letfn [(make-routes [{:keys [config] :as c}]
-            (-> (select-keys c [:build :mailman])
+            (-> (select-keys c [:build :mailman :artifacts :cache])
                 (assoc :workspace (lc/get-workspace config)
                        :work-dir (lc/get-jobs-dir config))
                 (cp/make-routes)))]
@@ -104,7 +104,7 @@
                   [:mailman :api-config])
    :podman       (co/using
                   (new-podman-routes conf)
-                  [:mailman :build])
+                  [:mailman :build :artifacts :cache])
    :artifacts    (new-artifacts conf)
    :cache        (new-cache conf)
    :params       (new-params conf)

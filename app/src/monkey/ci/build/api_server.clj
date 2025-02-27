@@ -190,7 +190,7 @@
     (let [store (req->artifacts req)
           id (get-in req [:parameters :path :artifact-id])
           path (when id (art/artifact-archive-path (req->build req) id))]
-      (log/debug "Uploading artifact:" id ", storing it at path" path)
+      (log/debug "Handling artifact:" id)
       (f req store path id))))
 
 (def upload-artifact

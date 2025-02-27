@@ -208,10 +208,11 @@
                             ["--name" "test-build-test-job"])))
 
     (testing "makes job work dir relative to build checkout dir"
-      (is (contains-subseq? (-> job
-                                (assoc :work-dir "sub-dir")
-                                (sut/build-cmd-args base-conf))
-                            ["-v" "/test-dir/checkout/sub-dir:/home/monkeyci:Z"])))))
+      (let [cmd (-> job
+                    (assoc :work-dir "sub-dir")
+                    (sut/build-cmd-args base-conf))]
+        (is (contains-subseq? cmd ["-v" "/test-dir/checkout:/home/monkeyci:Z"]))
+        (is (contains-subseq? cmd ["-w" "/home/monkeyci/sub-dir"]))))))
 
 (deftest job-work-dir
   (testing "returns context work dir"

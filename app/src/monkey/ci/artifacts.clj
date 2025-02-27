@@ -157,6 +157,7 @@
 (defn save-artifacts
   "Saves all artifacts according to the job configuration."
   [rt]
+  (log/debug "Saving artifacts for job" (:job rt))
   (-> (rt->config rt)
       (assoc :job-key :save-artifacts)
       (save-generic)))
@@ -198,21 +199,18 @@
   (assoc ctx ::restored r))
 
 (defn restore-interceptor
-  "Interceptor that restores artifacts using the given repo and the job retrieved
-   from the context using `get-job`.  Adds details about the restored artifacts to
+  "Interceptor that restores artifacts using the given repo, build and job retrieved
+   from the context using `get-job-ctx`.  Adds details about the restored artifacts to
    the context."
-  [artifacts get-job]
+  [get-job-ctx]
   {:name ::restore-artifacts
    :enter (fn [ctx]
-            (let [job (get-job ctx)]
-              (->> (:restore-artifacts job)
-                   (map (fn [{:keys [id path]}]
-                          (restore-artifact artifacts id path)))
-                   ;; Note that this will block the event processing while the operation continues
-                   ;; so we may consider switching to async handling.
-                   (apply md/zip)
-                   (deref)
-                   (set-restored ctx))))})
+            (->> (get-job-ctx ctx)
+                 (restore-artifacts)
+                 ;; Note that this will block the event processing while the operation continues
+                 ;; so we may consider switching to async handling.
+                 (deref)
+                 (set-restored ctx)))})
 
 (def get-saved ::saved)
 
@@ -220,18 +218,15 @@
   (assoc ctx ::saved r))
 
 (defn save-interceptor
-  "Interceptor that saves artifacts using the given repo and the job retrieved
-   from the context using `get-job`.  Adds details about the saved artifacts to
+  "Interceptor that saves artifacts using the repo, build and job retrieved
+   from the context using `get-job-ctx`.  Adds details about the saved artifacts to
    the context."
-  [artifacts get-job]
+  [get-job-ctx]
   {:name ::save-artifacts
    :enter (fn [ctx]
-            (let [job (get-job ctx)]
-              (->> (:save-artifacts job)
-                   (map (fn [{:keys [id path]}]
-                          (save-artifact artifacts id path)))
-                   ;; Note that this will block the event processing while the operation continues
-                   ;; so we may consider switching to async handling.
-                   (apply md/zip)
-                   (deref)
-                   (set-saved ctx))))})
+            (->> (get-job-ctx ctx)
+                 (save-artifacts)
+                 ;; Note that this will block the event processing while the operation continues
+                 ;; so we may consider switching to async handling.
+                 (deref)
+                 (set-saved ctx)))})

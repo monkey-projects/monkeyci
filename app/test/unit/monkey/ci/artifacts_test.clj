@@ -116,39 +116,45 @@
           (is (nil? @(sut/restore-artifact repo "nonexisting" (str out-dir)))))))))
 
 (deftest restore-interceptor
-  (let [blob (tb/test-store {"test/build/test-art.tgz" {:file "test.txt"}})
-        build {:sid ["test" "build"]}
+  (let [blob (tb/test-store {"test/build/test-art.tgz" {:file "/tmp/test.txt"}})
+        build {:sid ["test" "build"]
+               :checkout-dir "/test/dir"}
         job {:id "test-job"
              :restore-artifacts [{:id "test-art"
                                   :path "test/path"}]}
         art (sut/make-blob-repository blob build)
-        {:keys [enter] :as i} (sut/restore-interceptor art ::job)]
+        {:keys [enter] :as i} (sut/restore-interceptor ::job-ctx)]
     (is (keyword? (:name i)))
     
     (testing "`enter` restores artifacts for job using repository"
-      (is (= "test.txt"
-             (-> {::job job}
-                 (enter)
-                 (sut/get-restored)
-                 first
-                 :dest))))))
+      (let [r (-> {::job-ctx {:job job
+                              :build build
+                              :artifacts art}}
+                  (enter)
+                  (sut/get-restored)
+                  first)]
+        (is (= "/tmp/test.txt" (:dest r)))
+        (is (cs/ends-with? (:src r) "test/build/test-art.tgz"))))))
 
 (deftest save-interceptor
   (let [blob (tb/test-store)
-        build {:sid ["test" "build"]}
+        build {:sid ["test" "build"]
+               :checkout-dir "/tmp"}
         job {:id "test-job"
              :save-artifacts [{:id "test-art"
                                :path "test/path"}]}
         art (sut/make-blob-repository blob build)
-        {:keys [enter] :as i} (sut/save-interceptor art ::job)]
+        {:keys [enter] :as i} (sut/save-interceptor ::job-ctx)]
     (is (keyword? (:name i)))
     
     (testing "`enter` saves artifacts for job using repository"
       (is (= 1 
-             (-> {::job job}
+             (-> {::job-ctx {:job job
+                             :artifacts art
+                             :build build}}
                  (enter)
                  (sut/get-saved)
                  (count))))
-      (is (= "test/path" (-> (tb/stored blob)
-                             (get "test/build/test-art.tgz")
-                             :file))))))
+      (is (= "/tmp/test/path" (-> (tb/stored blob)
+                                  (get "test/build/test-art.tgz")
+                                  :file))))))

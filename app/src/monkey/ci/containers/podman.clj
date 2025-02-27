@@ -75,7 +75,9 @@
                            "-t"
                            "--name" cn
                            "-v" (str wd ":" cwd ":Z")
-                           "-w" cwd]
+                           "-w" (if-let [jwd (j/work-dir job)]
+                                  (str (fs/path cwd jwd))
+                                  cwd)]
                     ;; Do not delete container in dev mode
                     (not (:dev-mode opts)) (conj "--rm"))]
      (concat
@@ -92,7 +94,7 @@
   ([job {:keys [build] :as conf}]
    (build-cmd-args job
                    (b/get-job-sid job build)
-                   (b/job-work-dir job build)
+                   (b/checkout-dir build)
                    conf)))
 
 ;;; Container runner implementation
@@ -227,6 +229,12 @@
   "Adds the job from the state to the job context.  Used by extensions."
   (emi/add-job-to-ctx get-job))
 
+(def log-job-ctx
+  {:name ::log-job-ctx
+   :enter (fn [ctx]
+            (log/debug "Job context:" (emi/get-job-ctx ctx))
+            ctx)})
+
 ;;; Event handlers
 
 (def job-executed-evt
@@ -274,33 +282,47 @@
   [(j/job-executed-evt job-id sid (assoc result :status status))])
 
 (defn- make-job-ctx [conf]
-  (-> conf
-      (select-keys [:build])
-      (assoc :api {:client (:api-client conf)})))
+  (select-keys conf [:build :artifacts :cache]))
 
 (defn make-routes [{:keys [build workspace work-dir mailman] :as conf}]
-  (let [state (emi/with-state (atom {:build build}))]
+  (log/debug "Creating podman event routes for build" build)
+  (let [state (emi/with-state (atom {:build build}))
+        job-ctx (make-job-ctx conf)]
     [[:job/queued
       [{:handler prepare-child-cmd
         :interceptors [handle-error
+                       state
                        filter-container-job
                        save-job
                        (copy-ws workspace work-dir)
                        (emi/add-mailman mailman)
-                       (emi/add-job-ctx (make-job-ctx conf))
+                       (emi/add-job-ctx job-ctx)
                        add-job-to-ctx
+                       ;; XXX Note that this will run interceptors on controller side.  Do we want this?
                        ext/before-interceptor
-                       (art/restore-interceptor (:artifacts conf) get-job)
+                       (art/restore-interceptor emi/get-job-ctx)
                        ;; TODO Restore caches
                        emi/start-process]}
-       {:handler job-queued}]]
+       {:handler job-queued
+        :interceptors [filter-container-job]}]]
 
      [:job/initializing
       ;; TODO Start sidecar event polling
       [{:handler job-init
         :interceptors [handle-error
+                       state
                        require-job]}]]
 
      [:podman/job-executed
       [{:handler job-exec
-        :interceptors [(art/save-interceptor (:artifacts conf) get-job)]}]]]))
+        ;; TODO Use state for job context since extensions may modify it in the before-handler
+        :interceptors [handle-error
+                       state
+                       (emi/add-job-ctx job-ctx)
+                       log-job-ctx
+                       add-job-to-ctx
+                       log-job-ctx
+                       ;; FIXME The artifact store here is not a client-side store since this
+                       ;; is running on controller end.  Is this what we want or should be move
+                       ;; this code to the script side?
+                       (art/save-interceptor emi/get-job-ctx)]}]]]))

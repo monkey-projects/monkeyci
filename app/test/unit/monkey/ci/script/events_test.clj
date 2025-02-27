@@ -63,8 +63,9 @@
 
 (deftest execute-action
   (let [broker (tm/test-component)
-        {:keys [enter] :as i} (sut/execute-action {:events (h/fake-events)
-                                                   :mailman broker})]
+        job-ctx  {:events (h/fake-events)
+                  :mailman broker}
+        {:keys [enter] :as i} sut/execute-action]
     (is (keyword? (:name i)))
     
     (testing "executes each job in the result in a new thread"
@@ -73,6 +74,7 @@
             r (-> {:event
                    {:job-id "job-1"}}
                   (sut/set-jobs jobs)
+                  (emi/set-job-ctx job-ctx)
                   (enter))
             a (sut/get-running-actions r)]
         (is (= 1 (count a)))
@@ -83,6 +85,7 @@
         (let [job (bc/action-job "failing-sync" nil)
               r (-> {:event {:job-id (:id job)}}
                     (sut/set-jobs (jobs->map [job]))
+                    (emi/set-job-ctx job-ctx)
                     (enter))]
           (is (= 1 (count (sut/get-running-actions r))))
           (is (not= :timeout (h/wait-until #(not-empty (tm/get-posted broker)) 1000)))
@@ -98,6 +101,7 @@
                      (throw (ex-info "Test error" {}))))
               r (-> {:event {:job-id (:id job)}}
                     (sut/set-jobs (jobs->map [job]))
+                    (emi/set-job-ctx job-ctx)
                     (enter))]
           (is (= 1 (count (sut/get-running-actions r))))
           (is (not= :timeout (h/wait-until #(= 2 (count (tm/get-posted broker))) 1000)))

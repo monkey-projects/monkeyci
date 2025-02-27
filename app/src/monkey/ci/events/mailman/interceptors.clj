@@ -6,7 +6,7 @@
             [manifold
              [bus :as mb]
              [deferred :as md]]
-            [meta-merge.core :as mm]
+            [medley.core :as mc]
             [monkey.ci
              [build :as b]
              [errors :as errors]
@@ -46,13 +46,13 @@
 
 (defn with-state
   "Interceptor that keeps track of a global state object in the context.
-   The updated state is `meta-merge`d into the global state."
+   The updated state is `deep-merge`d into the global state."
   [state]
   {:name ::state
    :enter (fn [ctx]
             (set-state ctx @state))
    :leave (fn [ctx]
-            (swap! state mm/meta-merge (get-state ctx))
+            (swap! state mc/deep-merge (get-state ctx))
             ctx)})
 
 (def handle-build-error
