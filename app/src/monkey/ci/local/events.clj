@@ -81,10 +81,6 @@
             (->> (git/copy-with-ignore (get-checkout-dir ctx) dest)
                  (set-workspace ctx)))})
 
-(def start-container
-  ;; TODO
-  )
-
 (defn restore-build-cache
   "Restores build cache to the checkout dir.  This is only done when running 
    in a container."
@@ -119,12 +115,6 @@
   "Adds options for child process to the context"
   {:name ::add-child-opts
    :enter #(set-child-opts % child-opts)})
-
-(def handle-error
-  {:name ::error
-   :error (fn [ctx err]
-            (log/error "Got error:" err)
-            ctx)})
 
 ;;; Handlers
 

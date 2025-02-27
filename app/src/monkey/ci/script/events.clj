@@ -1,6 +1,7 @@
 (ns monkey.ci.script.events
   "Mailman event routes for scripts"
   (:require [clojure.tools.logging :as log]
+            [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
              [build :as b]
@@ -57,7 +58,6 @@
    :sid (b/sid build)))
 
 (defn- script-end-evt [ctx status]
-  ;; TODO Add job results
   (-> (base-event (get-build ctx) :script/end)
       (assoc :status status)))
 
@@ -78,15 +78,21 @@
   "Interceptor that executes the job in the input event in a new thread, provided
    it's an action job.  The job context must contain all necessary components for 
    the job to run properly, such as artifacts, cache and events."
-  (letfn [(execute-job [job]
-            (j/execute! job (assoc job-ctx :job job)))]
+  (letfn [(post-job-error [job {:keys [job-id sid]} ex]
+            (em/post-events (:mailman job-ctx)
+                            [(j/job-end-evt job-id sid (-> bc/failure
+                                                           (bc/with-message (ex-message ex))))]))
+          (execute-job [job evt]
+            ;; TODO Capture output
+            (-> (j/execute! job (assoc job-ctx :job job))
+                ;; Catch exceptions and mark job failed
+                (md/catch (partial post-job-error job evt))))]
     {:name ::execute-action
      :enter (fn [ctx]
               (let [job (get (get-jobs ctx) (get-in ctx [:event :job-id]))]
-                ;; TODO Apply "before" extensions
                 ;; TODO Only execute it if the max number of concurrent jobs has not been reached
                 ;; Execute the jobs with the job context
-                (set-running-actions ctx (when (bc/action-job? job) [(execute-job job)]))))}))
+                (set-running-actions ctx (when (bc/action-job? job) [(execute-job job (:event ctx))]))))}))
 
 (def enqueue-jobs
   "Interceptor that enqueues all jobs indicated in the `job/queued` events in the result"
@@ -201,9 +207,11 @@
      [:job/queued
       [{:handler (constantly nil)
         :interceptors [state
+                       ;; TODO Apply "before" extensions
                        (execute-action (make-job-ctx conf))]}]]
 
      [:job/executed
+      ;; TODO Apply "after" extensions
       [{:handler job-executed}]]
 
      [:job/end

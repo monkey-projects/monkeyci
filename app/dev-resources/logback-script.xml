@@ -32,7 +32,6 @@
   <logger name="io" level="WARN"/>
   <logger name="monkey.ci" level="DEBUG"/>
   <logger name="monkey.ci.events.mailman" level="TRACE"/>
-  <logger name="monkey.mailman" level="TRACE"/>
 
   <root level="INFO">
     <appender-ref ref="LOKI"/>
