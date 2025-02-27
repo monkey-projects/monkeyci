@@ -38,8 +38,10 @@
     (em/map->RouteComponent {:config conf :make-routes make-routes})))
 
 (defn- new-podman-routes [conf]
-  (letfn [(make-routes [{:keys [config] :as c}]
+  (letfn [(make-routes [{:keys [config build] :as c}]
             (-> (select-keys c [:build :mailman :artifacts :cache])
+                (update :artifacts a/make-blob-repository build)
+                (update :cache c/make-blob-repository build)
                 (assoc :workspace (lc/get-workspace config)
                        :work-dir (lc/get-jobs-dir config))
                 (cp/make-routes)))]

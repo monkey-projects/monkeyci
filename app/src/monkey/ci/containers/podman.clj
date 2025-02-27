@@ -169,10 +169,10 @@
 
 (def get-work-dir
   "The directory where the container process is run"
-  ::work-dir)
+  (comp ::work-dir emi/get-state))
 
 (defn set-work-dir [ctx wd]
-  (assoc ctx ::work-dir wd))
+  (emi/update-state ctx assoc ::work-dir wd))
 
 (def get-log-dir
   "The directory where container output is written to"
@@ -225,15 +225,16 @@
   "Terminates if no job is present in the state"
   (emi/terminate-when ::require-job #(nil? (get-job % (get-in % [:event :job-id])))))
 
-(def add-job-to-ctx
-  "Adds the job from the state to the job context.  Used by extensions."
-  (emi/add-job-to-ctx get-job))
-
-(def log-job-ctx
-  {:name ::log-job-ctx
+(defn add-job-ctx
+  "Adds the job context to the event context, and adds the job from state.  Also
+   updates the build in the context so the checkout dir is the workspace dir."
+  [initial-ctx]
+  {:name ::add-job-ctx
    :enter (fn [ctx]
-            (log/debug "Job context:" (emi/get-job-ctx ctx))
-            ctx)})
+            (-> ctx
+                (emi/set-job-ctx (-> initial-ctx
+                                     (assoc :job (get-job ctx))
+                                     (assoc-in [:build :checkout-dir] (get-work-dir ctx))))))})
 
 ;;; Event handlers
 
@@ -296,8 +297,7 @@
                        save-job
                        (copy-ws workspace work-dir)
                        (emi/add-mailman mailman)
-                       (emi/add-job-ctx job-ctx)
-                       add-job-to-ctx
+                       (add-job-ctx job-ctx)
                        ;; XXX Note that this will run interceptors on controller side.  Do we want this?
                        ext/before-interceptor
                        (art/restore-interceptor emi/get-job-ctx)
@@ -318,11 +318,5 @@
         ;; TODO Use state for job context since extensions may modify it in the before-handler
         :interceptors [handle-error
                        state
-                       (emi/add-job-ctx job-ctx)
-                       log-job-ctx
-                       add-job-to-ctx
-                       log-job-ctx
-                       ;; FIXME The artifact store here is not a client-side store since this
-                       ;; is running on controller end.  Is this what we want or should be move
-                       ;; this code to the script side?
+                       (add-job-ctx job-ctx)
                        (art/save-interceptor emi/get-job-ctx)]}]]]))
