@@ -5,6 +5,7 @@
             [medley.core :as mc]
             [monkey.ci
              [build :as b]
+             [extensions :as ext]
              [jobs :as j]
              [script :as s]]
             [monkey.ci.build.core :as bc]
@@ -47,6 +48,11 @@
   {:build (get-build ctx)
    :api (:api ctx)})
 
+(defn- get-job-from-state
+  "Gets current job from the jobs stored in the state"
+  [ctx]
+  (get (get-jobs ctx) (get-in ctx [:event :job-id])))
+
 ;;; Event builders
 
 (defn- base-event
@@ -74,6 +80,21 @@
                  (mc/map-vals first)
                  (set-jobs ctx)))})
 
+(def filter-action-job
+  (emi/terminate-when
+   ::filter-action-job
+   (fn [ctx]
+     (not (-> (get-job-from-state ctx)
+              (bc/action-job?))))))
+
+(def add-job-to-ctx
+  "Interceptor that adds the job indicated in the event (by job-id) to the job context.
+   This is required by jobs and extensions to be present."
+  {:name ::add-job-to-ctx
+   :enter (fn [ctx]
+            (let [job (get-job-from-state ctx)]
+              (emi/update-job-ctx ctx assoc :job job)))})
+
 (defn execute-action [job-ctx]
   "Interceptor that executes the job in the input event in a new thread, provided
    it's an action job.  The job context must contain all necessary components for 
@@ -92,7 +113,7 @@
               (let [job (get (get-jobs ctx) (get-in ctx [:event :job-id]))]
                 ;; TODO Only execute it if the max number of concurrent jobs has not been reached
                 ;; Execute the jobs with the job context
-                (set-running-actions ctx (when (bc/action-job? job) [(execute-job job (:event ctx))]))))}))
+                (set-running-actions ctx [(execute-job job (:event ctx))])))}))
 
 (def enqueue-jobs
   "Interceptor that enqueues all jobs indicated in the `job/queued` events in the result"
@@ -113,6 +134,13 @@
    :enter (fn [ctx]
             (let [{:keys [job-id] :as e} (:event ctx)]
               (update-job ctx job-id merge (select-keys e [:status :result]))))})
+
+(def add-result-to-ctx
+  "Adds the result from the event to the job context.  Used by extensions."
+  {:name ::add-result-to-ctx
+   :enter (fn [{:keys [event] :as ctx}]
+            (emi/update-job-ctx ctx assoc-in [:job :result] (merge (:result event)
+                                                                   (select-keys event [:status]))))})
 
 (def handle-script-error
   "Marks script as failed"
@@ -152,7 +180,6 @@
 (defn job-executed
   "Runs any extensions for the job"
   [ctx]
-  ;; TODO Apply "after" extensions
   (let [{:keys [job-id sid status result]} (:event ctx)]
     [(j/job-end-evt job-id sid (assoc result :status status))]))
 
@@ -182,7 +209,7 @@
   "Constructs job context object from the route configuration"
   [ctx]
   (-> ctx
-      (select-keys [:artifacts :cache :events :build])
+      (select-keys [:artifacts :cache :events :mailman :build])
       (assoc :api {:client (:api-client ctx)})))
 
 (defn make-routes [{:keys [build] :as conf}]
@@ -207,12 +234,20 @@
      [:job/queued
       [{:handler (constantly nil)
         :interceptors [state
-                       ;; TODO Apply "before" extensions
-                       (execute-action (make-job-ctx conf))]}]]
+                       filter-action-job
+                       (emi/add-job-ctx (make-job-ctx conf))
+                       add-job-to-ctx
+                       ext/before-interceptor
+                       execute-action]}]]
 
      [:job/executed
-      ;; TODO Apply "after" extensions
-      [{:handler job-executed}]]
+      ;; Handle this for both container and action jobs
+      [{:handler job-executed
+        ;; FIXME After interceptors may need values from the before handlers, so we'll need state here
+        :interceptors [(emi/add-job-ctx (make-job-ctx conf))
+                       add-job-to-ctx
+                       add-result-to-ctx
+                       ext/after-interceptor]}]]
 
      [:job/end
       [{:handler job-end

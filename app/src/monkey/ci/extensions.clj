@@ -13,7 +13,8 @@
              [build :as b]
              [credits :as cr]
              [jobs :as j]
-             [runtime :as rt]]))
+             [runtime :as rt]]
+            [monkey.ci.events.mailman.interceptors :as emi]))
 
 (def new-register {})
 
@@ -106,3 +107,21 @@
    must be serializable to `edn`."
   [rt k v]
   (assoc-in rt [:job :result k] v))
+
+;;; Interceptors
+
+(def before-interceptor
+  "Interceptor that applies the `before` extensions to the job in the job context.
+   This expects the job context to be present in the event context, with the job
+   added to that context."
+  {:name ::before
+   :enter (fn [ctx]
+            (emi/update-job-ctx ctx apply-extensions-before))})
+
+(def after-interceptor
+  "Interceptor that applies the `after` extensions to the job in the job context.
+   This expects the job context to be present in the event context, with the job
+   and it's execution result added to that context."
+  {:name ::after
+   :enter (fn [ctx]
+            (emi/update-job-ctx ctx apply-extensions-after))})

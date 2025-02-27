@@ -1,10 +1,12 @@
 (ns monkey.ci.script.events-test
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.spec.alpha :as spec]
+            [io.pedestal.interceptor.chain :as pic]
             [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci.build.core :as bc]
             [monkey.ci.events.mailman :as em]
+            [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.ci.jobs :as j]
             [monkey.ci.script.events :as sut]
             [monkey.ci.spec.events :as se]
@@ -31,6 +33,34 @@
 
     (is (some? (remove-ns 'build)))))
 
+(deftest filter-action-job
+  (let [{:keys [enter] :as i} sut/filter-action-job]
+    (is (keyword? (:name i)))
+    
+    (testing "terminates when job is not an action job"
+      (is (nil? (-> {::pic/queue ::test-queue}
+                    (enter)
+                    ::pic/queue))))
+
+    (testing "continues when job is an action job"
+      (is (some? (-> {::pic/queue ::test-queue
+                      :event {:job-id "test-job"}}
+                     (sut/set-jobs (jobs->map [(bc/action-job "test-job" (constantly nil))]))
+                     (enter)
+                     ::pic/queue))))))
+
+(deftest add-job-to-ctx
+  (let [{:keys [enter] :as i} sut/add-job-to-ctx]
+    (is (keyword? (:name i)))
+    
+    (testing "adds job to job context"
+      (let [job (h/gen-job)]
+        (is (= job (-> {:event {:job-id (:id job)}}
+                       (sut/set-jobs (jobs->map [job]))
+                       (enter)
+                       (emi/get-job-ctx)
+                       :job)))))))
+
 (deftest execute-action
   (let [broker (tm/test-component)
         {:keys [enter] :as i} (sut/execute-action {:events (h/fake-events)
@@ -47,12 +77,6 @@
             a (sut/get-running-actions r)]
         (is (= 1 (count a)))
         (is (every? md/deferred? a))))
-
-    (testing "does not execute non-action job"
-      (is (empty? (-> {:event {:job-id "non-action"}}
-                      (sut/set-jobs (jobs->map [(bc/container-job "non-action" {})]))
-                      (enter)
-                      (sut/get-running-actions)))))
 
     (testing "fires `job/end` event"
       (testing "on exception"
@@ -112,6 +136,20 @@
                           (get "test-job")
                           :status))))))
 
+(deftest add-result-to-ctx
+  (let [{:keys [enter] :as i} sut/add-result-to-ctx]
+    (is (keyword? (:name i)))
+
+    (testing "`enter` adds result and status to job context result"
+      (is (= {:message "ok"
+              :status :success}
+             (-> {:event {:result {:message "ok"}
+                          :status :success}}
+                 (enter)
+                 (emi/get-job-ctx)
+                 :job
+                 :result))))))
+ 
 (deftest handle-script-error
   (let [{:keys [error] :as i} sut/handle-script-error]
     (is (keyword? (:name i)))

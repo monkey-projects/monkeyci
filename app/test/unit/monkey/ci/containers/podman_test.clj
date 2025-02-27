@@ -229,9 +229,7 @@
 (deftest make-routes
   (let [routes (sut/make-routes {})
         expected [:job/queued
-                  :job/initializing
-                  :job/executed
-                  :job/end]]
+                  :job/initializing]]
     (doseq [t expected]
       (testing (format "handles `%s`" t)
         (is (contains? (set (map first routes)) t))))))
@@ -311,7 +309,7 @@
   (let [{:keys [enter] :as i} sut/require-job
         ctx (-> {}
                 (pi/enqueue [(i/interceptor {:name ::test-interceptor
-                                             :enter identity})]))]
+                                             :enter identity})]))] 
     (is (keyword? (:name i)))
     
     (testing "terminates if no job in state"
@@ -358,14 +356,3 @@
                (sut/prepare-child-cmd)
                :cmd
                first)))))
-
-(deftest job-executed
-  (testing "returns `job/end` event"
-    (let [r (-> {:event
-                {:type :job/executed
-                 :job-id "test-job"
-                 :status :success}}
-               (sut/job-executed)
-               first)]
-      (is (= :job/end (:type r)))
-      (is (= :success (:status r))))))

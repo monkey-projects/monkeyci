@@ -8,7 +8,6 @@
             [cheshire.core :as json]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
-            [io.pedestal.interceptor.chain :as pi]
             [manifold.deferred :as md]
             [monkey.ci
              [artifacts :as art]
@@ -207,10 +206,8 @@
 
 (def filter-container-job
   "Interceptor that terminates when the job in the event is not a container job"
-  {:name ::filter-container-job
-   :enter (fn [ctx]
-            (cond-> ctx
-              (nil? (mcc/image (get-in ctx [:event :job]))) (pi/terminate)))})
+  (emi/terminate-when ::filter-container-job
+                      #(nil? (mcc/image (get-in % [:event :job])))))
 
 (def save-job
   "Saves job to state for future reference"
@@ -220,10 +217,7 @@
 
 (def require-job
   "Terminates if no job is present in the state"
-  {:name ::require-job
-   :enter (fn [ctx]
-            (cond-> ctx
-              (nil? (get-job ctx (get-in ctx [:event :job-id]))) (pi/terminate)))})
+  (emi/terminate-when ::require-job #(nil? (get-job % (get-in % [:event :job-id])))))
 
 ;;; Event handlers
 
@@ -261,10 +255,6 @@
     ;; similar to the oci sidecar.
     [(j/job-start-evt job-id sid)]))
 
-(defn job-executed [ctx]
-  (let [{:keys [job-id sid status result]} (:event ctx)]
-    [(j/job-end-evt job-id sid (assoc result :status status))]))
-
 (defn make-routes [{:keys [build workspace work-dir mailman] :as conf}]
   (let [state (emi/with-state (atom {:build build}))]
     [[:job/queued
@@ -274,23 +264,13 @@
                        save-job
                        (copy-ws workspace work-dir)
                        (emi/add-mailman mailman)
+                       ;; TODO Execute "before" extensions
                        ;; TODO Artifacts and caches
                        emi/start-process]}
        {:handler job-queued}]]
 
      [:job/initializing
       ;; TODO Start sidecar event polling
-      ;; TODO Execute "before" extensions
       [{:handler job-init
         :interceptors [handle-error
-                       require-job]}]]
-
-     [:job/executed
-      ;; TODO Execute "after" extensions
-      [{:handler job-executed
-        :interceptors [handle-error
-                       require-job]}]]
-
-     [:job/end
-      ;; TODO Clean up?
-      [{:handler (constantly nil)}]]]))
+                       require-job]}]]]))

@@ -2,6 +2,7 @@
   "General purpose interceptors"
   (:require [babashka.process :as bp]
             [clojure.tools.logging :as log]
+            [io.pedestal.interceptor.chain :as pi]
             [manifold
              [bus :as mb]
              [deferred :as md]]
@@ -97,7 +98,27 @@
 (defn set-mailman [ctx e]
   (assoc ctx ::mailman e))
 
-(defn add-mailman [mm]
+(defn add-mailman
   "Adds mailman component to the context"
+  [mm]
   {:name ::add-mailman
    :enter #(set-mailman % mm)})
+
+(def get-job-ctx ::job-ctx)
+
+(defn set-job-ctx [ctx jc]
+  (assoc ctx ::job-ctx jc))
+
+(defn update-job-ctx [ctx f & args]
+  (apply update ctx ::job-ctx f args))
+
+(defn add-job-ctx [jc]
+  {:name ::add-job-ctx
+   :enter #(set-job-ctx % jc)})
+
+(defn terminate-when [id pred]
+  "Interceptor that terminates when given predicate is truthy"
+  {:name id
+   :enter (fn [ctx]
+            (cond-> ctx
+              (pred ctx) (pi/terminate)))})
