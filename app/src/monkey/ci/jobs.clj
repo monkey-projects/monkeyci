@@ -129,7 +129,15 @@
                    checkout-dir)))))
 
 (defn rt->context [rt]
-  (dissoc rt :events :containers :artifacts :cache))
+  ;; TODO Move all these into a "components" key so we can remove them all at once
+  (dissoc rt :events :containers :artifacts :cache :mailman))
+
+(defn- add-output [r writer]
+  ;; Add output to the result
+  (.flush writer)
+  (let [out (.toString writer)]
+    (cond-> r
+      (not-empty out) (assoc :output out))))
 
 (defn- recurse-action
   "An action may return another job definition, especially in legacy builds.
@@ -140,18 +148,22 @@
     (letfn [(assign-id [j]
               (cond-> j
                 (nil? (bc/job-id j)) (assoc :id (bc/job-id job))))]
-      (md/chain
-       ;; Ensure this executes async by wrapping it in a future
-       (md/future
-         (action (rt->context rt)))        ; Only pass necessary info
-       (fn [r]
-         (cond
-           ;; Valid response
-           (or (nil? r) (bc/status? r)) r
-           (resolvable? r) (when-let [child (some-> (p/resolve-jobs r rt)
-                                                    first
-                                                    (assign-id))]
-                             (execute! child (assoc rt :job child)))))))))
+      (let [writer (java.io.StringWriter.)]
+        (md/chain
+         ;; Ensure this executes async by wrapping it in a future
+         (md/future
+           (binding [*out* writer] ; Capture output
+             (action (rt->context rt)))) ; Only pass necessary info
+         (fn [r]
+           (cond
+             ;; `nil` is treated as a success
+             (nil? r) (add-output bc/success writer)
+             ;; Valid response
+             (bc/status? r) (add-output r writer)
+             (resolvable? r) (when-let [child (some-> (p/resolve-jobs r rt)
+                                                      first
+                                                      (assign-id))]
+                               (execute! child (assoc rt :job child))))))))))
 
 (extend-protocol Job
   monkey.ci.build.core.ActionJob
@@ -171,8 +183,7 @@
       (-> ctx
           (make-job-dir-absolute)
           (a)
-          (md/chain 
-           #(or % bc/success)
+          (md/chain
            (fn [r]
              (md/chain
               (ec/post-events (:events ctx) [(job-executed-evt (job-id job) build-sid r)])

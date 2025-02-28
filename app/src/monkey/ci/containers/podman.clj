@@ -298,7 +298,8 @@
                        (copy-ws workspace work-dir)
                        (emi/add-mailman mailman)
                        (add-job-ctx job-ctx)
-                       ;; XXX Note that this will run interceptors on controller side.  Do we want this?
+                       ;; FIXME Extensions must be run in the script, since it's untrusted code
+                       ;; and we don't have the dependencies here.
                        ext/before-interceptor
                        (art/restore-interceptor emi/get-job-ctx)
                        ;; TODO Restore caches

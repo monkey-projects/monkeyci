@@ -234,7 +234,15 @@
                                   :job-id))))))
 
     (testing "returns success when action returns `nil`"
-      (is (= bc/success @(sut/execute! (bc/action-job "nil-job" (constantly nil)) ctx)))))
+      (is (= bc/success @(sut/execute! (bc/action-job "nil-job" (constantly nil)) ctx))))
+
+    (testing "captures output to stdout"
+      (let [msg "test output"
+            job (bc/action-job "outputting-job" (fn [_]
+                                                  (println msg)))
+            res @(sut/execute! job ctx)]
+        (is (bc/success? res))
+        (is (= msg (some-> (:output res) (.strip)))))))
 
   (let [job (bc/action-job "test-job" (constantly bc/success))
         events (h/fake-events)

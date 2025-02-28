@@ -286,3 +286,9 @@
                  (sut/memory)))))
 
   (testing "`nil` on action job"))
+
+(deftest checkout-dir
+  (testing "returns build checkout dir"
+    (is (= "/test/dir" (sut/checkout-dir
+                        {:build
+                         {:checkout-dir "/test/dir"}})))))
