@@ -230,7 +230,7 @@
 
 (deftest make-routes
   (let [routes (sut/make-routes {})
-        expected [:job/queued
+        expected [:container/job-queued
                   :job/initializing
                   :podman/job-executed]]
     (doseq [t expected]

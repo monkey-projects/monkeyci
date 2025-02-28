@@ -14,7 +14,6 @@
              [build :as b]
              [cache :as cache]
              [containers :as mcc]
-             [extensions :as ext]
              [jobs :as j]
              [logging :as l]
              [protocols :as p]
@@ -289,23 +288,18 @@
   (log/debug "Creating podman event routes for build" build)
   (let [state (emi/with-state (atom {:build build}))
         job-ctx (make-job-ctx conf)]
-    [[:job/queued
+    [[:container/job-queued
       [{:handler prepare-child-cmd
         :interceptors [handle-error
                        state
-                       filter-container-job
                        save-job
                        (copy-ws workspace work-dir)
                        (emi/add-mailman mailman)
                        (add-job-ctx job-ctx)
-                       ;; FIXME Extensions must be run in the script, since it's untrusted code
-                       ;; and we don't have the dependencies here.
-                       ext/before-interceptor
+                       (cache/restore-interceptor emi/get-job-ctx)
                        (art/restore-interceptor emi/get-job-ctx)
-                       ;; TODO Restore caches
                        emi/start-process]}
-       {:handler job-queued
-        :interceptors [filter-container-job]}]]
+       {:handler job-queued}]]
 
      [:job/initializing
       ;; TODO Start sidecar event polling
@@ -320,4 +314,5 @@
         :interceptors [handle-error
                        state
                        (add-job-ctx job-ctx)
-                       (art/save-interceptor emi/get-job-ctx)]}]]]))
+                       (art/save-interceptor emi/get-job-ctx)
+                       (cache/save-interceptor emi/get-job-ctx)]}]]]))

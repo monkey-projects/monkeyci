@@ -42,6 +42,8 @@
 (defn set-running-actions [ctx a]
   (assoc ctx ::running-actions a))
 
+(def job-id (comp :job-id :event))
+
 (defn job-ctx
   "Creates a job execution context from the event context"
   [ctx]
@@ -52,6 +54,20 @@
   "Gets current job from the jobs stored in the state"
   [ctx]
   (get (get-jobs ctx) (get-in ctx [:event :job-id])))
+
+(defn set-initial-job-ctx [ctx job-ctx]
+  (emi/update-state ctx assoc ::initial-job-ctx job-ctx))
+
+(def get-initial-job-ctx (comp ::initial-job-ctx emi/get-state))
+
+(defn get-job-ctx
+  "Gets or creates a job context from the state for the current job."
+  [ctx]
+  (or (some-> (emi/get-state ctx) (get-in [::job-ctx (job-id ctx)]))
+      (get-initial-job-ctx ctx)))
+
+(defn set-job-ctx [ctx job-ctx]
+  (emi/update-state ctx assoc-in [::job-ctx (job-id ctx)] job-ctx))
 
 ;;; Event builders
 
@@ -80,17 +96,22 @@
                  (mc/map-vals first)
                  (set-jobs ctx)))})
 
-(def filter-action-job
-  (emi/terminate-when
-   ::filter-action-job
-   (fn [ctx]
-     (not (-> (get-job-from-state ctx)
-              (bc/action-job?))))))
+(def add-job-ctx
+  "Interceptor that adds the job context, taken from state.  An initial context should
+   be already added to the state.  Extensions may modify this context.  It is passed
+   to the jobs on execution."
+  {:name ::add-job-ctx
+   :enter (fn [ctx]
+            (let [jc (-> (get-job-ctx ctx)
+                         (assoc :job (get-job-from-state ctx)))]
+              (emi/set-job-ctx ctx jc)))})
 
-(def add-job-to-ctx
-  "Interceptor that adds the job indicated in the event (by job-id) to the job context.
-   This is required by jobs and extensions to be present."
-  (emi/add-job-to-ctx get-job-from-state))
+(def with-job-ctx
+  "Adds job context from state in `enter`, and saves any updated context back on `leave`"
+  {:name ::with-job-ctx
+   :enter (:enter add-job-ctx)
+   :leave (fn [ctx]
+            (set-job-ctx ctx (emi/get-job-ctx ctx)))})
 
 (def execute-action
   "Interceptor that executes the job in the input event in a new thread, provided
@@ -185,6 +206,17 @@
   ;; Just set the event in the result, so it can be passed to the deferred
   (:event ctx))
 
+(defn job-queued
+  "Dispatches queued event for action or container job, depending on the type."
+  [ctx]
+  (letfn [(job-queued-evt [t job]
+            (-> (j/job-queued-evt job (get-in ctx [:event :sid]))
+                (assoc :type t)))]
+    (let [job (get-job-from-state ctx)]
+      (cond
+        (bc/action-job? job) [(job-queued-evt :action/job-queued job)]
+        (bc/container-job? job) [(job-queued-evt :container/job-queued job)]))))
+
 (defn job-executed
   "Runs any extensions for the job"
   [ctx]
@@ -221,7 +253,8 @@
       (assoc :api {:client (:api-client ctx)})))
 
 (defn make-routes [{:keys [build] :as conf}]
-  (let [state (emi/with-state (atom {:build build}))]
+  (let [state (emi/with-state (atom {:build build
+                                     ::initial-job-ctx (make-job-ctx conf)}))]
     [[:script/initializing
       [{:handler script-init
         :interceptors [handle-script-error
@@ -240,22 +273,28 @@
                        (emi/realize-deferred (:result conf))]}]]
 
      [:job/queued
+      ;; Raised when a new job is queued.  This handler splits it up according to
+      ;; type and executes before-extensions.
+      [{:handler job-queued
+        :interceptors [handle-job-error
+                       state
+                       with-job-ctx
+                       ext/before-interceptor]}]]
+
+     [:action/job-queued
+      ;; Executes an action job.
       [{:handler (constantly nil)
         :interceptors [handle-job-error
                        state
-                       filter-action-job
-                       (emi/add-job-ctx (make-job-ctx conf))
-                       add-job-to-ctx
-                       ext/before-interceptor
+                       add-job-ctx
                        execute-action]}]]
 
      [:job/executed
       ;; Handle this for both container and action jobs
       [{:handler job-executed
-        ;; FIXME 'After' interceptors may need values from the 'before' handlers, so we'll need state here
         :interceptors [handle-job-error
-                       (emi/add-job-ctx (make-job-ctx conf))
-                       add-job-to-ctx
+                       state
+                       add-job-ctx
                        add-result-to-ctx
                        ext/after-interceptor]}]]
 

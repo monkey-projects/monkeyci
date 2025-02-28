@@ -33,33 +33,30 @@
 
     (is (some? (remove-ns 'build)))))
 
-(deftest filter-action-job
-  (let [{:keys [enter] :as i} sut/filter-action-job]
+(deftest add-job-ctx
+  (let [{:keys [enter] :as i} sut/add-job-ctx
+        job (h/gen-job)
+        ctx (-> {:event {:job-id (:id job)}}
+                (sut/set-initial-job-ctx {::key ::value})
+                (sut/set-jobs (jobs->map [job]))
+                (enter)
+                (emi/get-job-ctx))]
     (is (keyword? (:name i)))
-    
-    (testing "terminates when job is not an action job"
-      (is (nil? (-> {::pic/queue ::test-queue}
-                    (enter)
-                    ::pic/queue))))
 
-    (testing "continues when job is an action job"
-      (is (some? (-> {::pic/queue ::test-queue
-                      :event {:job-id "test-job"}}
-                     (sut/set-jobs (jobs->map [(bc/action-job "test-job" (constantly nil))]))
-                     (enter)
-                     ::pic/queue))))))
-
-(deftest add-job-to-ctx
-  (let [{:keys [enter] :as i} sut/add-job-to-ctx]
-    (is (keyword? (:name i)))
+    (testing "adds initial context values from state"
+      (is (= ::value (::key ctx))))    
     
     (testing "adds job to job context"
-      (let [job (h/gen-job)]
-        (is (= job (-> {:event {:job-id (:id job)}}
-                       (sut/set-jobs (jobs->map [job]))
-                       (enter)
-                       (emi/get-job-ctx)
-                       :job)))))))
+      (is (= job (:job ctx))))))
+
+(deftest with-job-ctx
+  (let [{:keys [leave] :as i} sut/with-job-ctx]
+    (testing "`leave` saves context in state"
+      (is (= ::updated (-> {:event {:job-id "test-job"}}
+                           (emi/set-job-ctx {::value ::updated})
+                           (leave)
+                           (sut/get-job-ctx)
+                           ::value))))))
 
 (deftest execute-action
   (let [broker (tm/test-component)
@@ -167,6 +164,7 @@
   (let [types [:script/initializing
                :script/start
                :script/end
+               :action/job-queued
                :job/queued
                :job/executed
                :job/end]
@@ -224,12 +222,32 @@
       (is (= evt (-> {:event evt}
                      (sut/script-end)))))))
 
+(deftest job-queued
+  (let [jobs (jobs->map
+              [(bc/action-job "action-job" (constantly nil))
+               (bc/container-job "container-job" {})])]
+    (testing "for action job, returns `action/job-queued` event"
+      (is (= [:action/job-queued]
+             (-> {:event
+                  {:job-id "action-job"}}
+                 (sut/set-jobs jobs)
+                 (sut/job-queued)
+                 (as-> x (map :type x))))))
+
+    (testing "for container job, returns `container/job-queued` event"
+      (is (= [:container/job-queued]
+             (-> {:event
+                  {:job-id "container-job"}}
+                 (sut/set-jobs jobs)
+                 (sut/job-queued)
+                 (as-> x (map :type x))))))))
+
 (deftest job-executed
   (testing "returns `job/end` event"
     (let [r (->> {:event
-                 {:job-id "test-job"
-                  :status :success}}
-                (sut/job-executed))]
+                  {:job-id "test-job"
+                   :status :success}}
+                 (sut/job-executed))]
       (is (= [:job/end]
              (map :type r)))
       (is (= :success (-> r first :status)))))

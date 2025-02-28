@@ -52,3 +52,43 @@
   "Creates an `ArtifactRepository` that can be used to upload/download caches"
   [client]
   (art/->BuildApiArtifactRepository client "/cache/"))
+
+;;; Interceptors
+
+(def get-restored ::restored)
+
+(defn set-restored [ctx r]
+  (assoc ctx ::restored r))
+
+(defn restore-interceptor
+  "Interceptor that restores caches using the given repo, build and job retrieved
+   from the context using `get-job-ctx`.  Adds details about the restored caches to
+   the context."
+  [get-job-ctx]
+  {:name ::restore-caches
+   :enter (fn [ctx]
+            (->> (get-job-ctx ctx)
+                 (restore-caches)
+                 ;; Note that this will block the event processing while the operation continues
+                 ;; so we may consider switching to async handling.
+                 (deref)
+                 (set-restored ctx)))})
+
+(def get-saved ::saved)
+
+(defn set-saved [ctx r]
+  (assoc ctx ::saved r))
+
+(defn save-interceptor
+  "Interceptor that saves caches using the repo, build and job retrieved
+   from the context using `get-job-ctx`.  Adds details about the saved caches to
+   the context."
+  [get-job-ctx]
+  {:name ::save-caches
+   :enter (fn [ctx]
+            (->> (get-job-ctx ctx)
+                 (save-caches)
+                 ;; Note that this will block the event processing while the operation continues
+                 ;; so we may consider switching to async handling.
+                 (deref)
+                 (set-saved ctx)))})
