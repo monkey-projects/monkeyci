@@ -243,16 +243,6 @@
                                      (remove nil?)))
         (add-ssh-keys-volume build))))
 
-(def get-ci-config ::ci-config)
-
-(defn set-ci-config [ctx bi]
-  (assoc ctx ::ci-config bi))
-
-(def get-ci-response ::ci-response)
-
-(defn set-ci-response [ctx bi]
-  (assoc ctx ::ci-response bi))
-
 (def get-runner-details ::runner-details)
 
 (defn set-runner-details [ctx bi]
@@ -278,32 +268,12 @@
   "Creates the ci config to run the required containers for the build."
   {:name ::instance-config
    :enter (fn [ctx]
-            (set-ci-config ctx (instance-config config (evt-build ctx))))})
-
-(defn- create-instance [client config]
-  (log/debug "Creating container instance using config" config)
-  (oci/with-retry
-    #(ci/create-container-instance client {:container-instance config})))
-
-(defn- log-ci-error [{:keys [status body] :as resp}]
-  (when (or (nil? status) (>= status 400))
-    (log/error "Failed to create container instance:" resp))
-  resp)
-
-(defn start-ci [client]
-  "Interceptor that starts container instance using the config specified in the context"
-  {:name ::start-ci
-   :enter (fn [ctx]
-            ;; Start container instance, put result back in the context
-            ;; TODO Async processing?
-            (->> @(create-instance client (get-ci-config ctx))
-                 (log-ci-error)
-                 (set-ci-response ctx)))})
+            (oci/set-ci-config ctx (instance-config config (evt-build ctx))))})
 
 (def end-on-ci-failure
   {:name ::end-on-ci-failure
    :enter (fn [ctx]
-            (let [resp (get-ci-response ctx)
+            (let [resp (oci/get-ci-response ctx)
                   build (evt-build ctx)]
               (cond-> ctx
                 (>= (:status resp) 400)
@@ -322,7 +292,7 @@
    :enter (fn [ctx]
             (let [sid (get-in ctx [:event :sid])
                   details {:runner :oci
-                           :details {:instance-id (get-in (get-ci-response ctx) [:body :id])}}]
+                           :details {:instance-id (get-in (oci/get-ci-response ctx) [:body :id])}}]
               (log/debug "Saving runner details:" details)
               (st/save-runner-details (emd/get-db ctx) sid details)
               ctx))})
@@ -363,7 +333,7 @@
       [{:handler initialize-build
         :interceptors [(decrypt-ssh-keys vault)
                        (prepare-ci-config conf)
-                       (start-ci client)
+                       (oci/start-ci-interceptor client)
                        save-runner-details
                        end-on-ci-failure]}]]
 

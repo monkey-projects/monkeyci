@@ -10,9 +10,14 @@
             [monkey.ci
              [build :as b]
              [errors :as errors]
-             [time :as t]]))
+             [jobs :as j]
+             [time :as t]]
+            [monkey.ci.build.core :as bc]))
 
 (def get-result :result)
+
+(defn set-result [ctx r]
+  (assoc ctx :result r))
 
 (def add-time
   {:name ::add-evt-time
@@ -60,9 +65,18 @@
   {:name ::build-error-handler
    :error (fn [{:keys [event] :as ctx} ex]
             (log/error "Failed to handle event" (:type event) ", marking build as failed" ex)
-            (assoc ctx :result (b/build-end-evt (-> (:build event)
-                                                    (assoc :message (ex-message ex)))
-                                                errors/error-process-failure)))})
+            (set-result ctx (b/build-end-evt (-> (:build event)
+                                                 (assoc :message (ex-message ex)))
+                                             errors/error-process-failure)))})
+
+(def handle-job-error
+  {:name ::handle-job-error
+   :error (fn [ctx ex]
+            (let [{:keys [job-id sid] :as e} (:event ctx)]
+              (log/error "Got error while handling event" e ex)
+              (set-result ctx
+                          [(j/job-end-evt job-id sid (-> bc/failure
+                                                         (bc/with-message (ex-message ex))))])))})
 
 (defn update-bus [bus]
   "Publishes the event to the given manifold bus"

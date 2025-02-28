@@ -354,3 +354,35 @@
            (filter (every-pred build? stale?))
            (map delete-instance)
            (mapv ->out)))))
+
+;;; Interceptors
+
+(def get-ci-config ::ci-config)
+
+(defn set-ci-config [ctx bi]
+  (assoc ctx ::ci-config bi))
+
+(def get-ci-response ::ci-response)
+
+(defn set-ci-response [ctx bi]
+  (assoc ctx ::ci-response bi))
+
+(defn- create-instance [client config]
+  (log/debug "Creating container instance using config" config)
+  (with-retry
+    #(ci/create-container-instance client {:container-instance config})))
+
+(defn- log-ci-error [{:keys [status body] :as resp}]
+  (when (or (nil? status) (>= status 400))
+    (log/error "Failed to create container instance:" resp))
+  resp)
+
+(defn start-ci-interceptor [client]
+  "Interceptor that starts container instance using the config specified in the context"
+  {:name ::start-ci
+   :enter (fn [ctx]
+            ;; Start container instance, put result back in the context
+            ;; TODO Async processing?
+            (->> @(create-instance client (get-ci-config ctx))
+                 (log-ci-error)
+                 (set-ci-response ctx)))})

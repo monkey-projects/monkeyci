@@ -615,8 +615,64 @@
             (is (= "infra error" (get-in evt [:result :message])))))))))
 
 (deftest make-routes
-  (let [routes (sut/make-routes {})
-        expected [:job/queued]]
+  (let [routes (sut/make-routes {} (h/gen-build))
+        expected [:container/job-queued
+                  :container/start
+                  :container/end
+                  :sidecar/end]]
     (doseq [t expected]
       (testing (format "handles `%s`" t)
-        (is (contains? (set (first routes)) t))))))
+        (is (contains? (set (map first routes)) t))))))
+
+(deftest prepare-instance-config
+  (let [{:keys [enter] :as i} sut/prepare-instance-config]
+    (is (keyword? (:name i)))
+
+    (testing "adds ci config to context"
+      (is (map? (-> {}
+                    (sut/set-config default-config)
+                    (sut/set-build {:checkout-dir "test/dir"})
+                    (enter)
+                    (oci/get-ci-config)))))))
+
+(deftest job-queued
+  (testing "fires `job/initializing` event with credit multiplier from context"
+    (let [evts (-> {:event
+                    {:job-id "container-job"}}
+                   (sut/set-credit-multiplier 4)
+                   (sut/job-queued))]
+      (is (= [:job/initializing]
+             (map :type evts)))
+      (is (= 4 (-> evts first :credit-multiplier))))))
+
+(deftest container-start
+  (testing "fires `job/start` event"
+    (is (= [:job/start]
+           (->> {:event
+                 {:job-id "test-job"}}
+                (sut/container-start)
+                (map :type))))))
+
+(deftest container-end
+  (testing "fires `job/executed` if sidecar has also ended"
+    (is (= :job/executed
+           (-> {}
+               ((:enter sut/set-sidecar-end))
+               (sut/container-end)
+               first
+               :type))))
+
+  (testing "`nil` if sidecar is still running"
+    (is (nil? (sut/container-end {})))))
+
+(deftest sidecar-end
+  (testing "fires `job/executed` if container has also ended"
+    (is (= :job/executed
+           (-> {}
+               ((:enter sut/set-container-end))
+               (sut/sidecar-end)
+               first
+               :type))))
+
+  (testing "`nil` if container is still running"
+    (is (nil? (sut/sidecar-end {})))))

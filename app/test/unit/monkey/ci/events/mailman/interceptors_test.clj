@@ -66,6 +66,22 @@
         (is (= :build/end (:type r)))
         (is (= "test error" (get-in r [:build :message])))))))
 
+(deftest handle-job-error
+  (let [{:keys [error] :as i} sut/handle-job-error]
+    (is (keyword? (:name i)))
+    
+    (testing "`error` puts `job/end` failure event in result"
+      (let [r (-> (error {:event
+                          {:type :job/initializing
+                           :sid ["build" "sid"]
+                           :job-id "test-job"}}
+                         (ex-info "test error" {}))
+                  (sut/get-result))]
+        (is (= [:job/end]
+               (map :type r)))
+        (is (= "test-job" (-> r first :job-id)))
+        (is (= :failure (-> r first :status)))))))
+
 (deftest update-bus
   (testing "`enter` publishes event to update bus"
     (let [bus (mb/event-bus)

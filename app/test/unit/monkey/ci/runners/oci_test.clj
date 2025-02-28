@@ -210,32 +210,6 @@
       (testing "contains ssh keys"
         (is (some? (oci/find-volume ic "ssh-keys")))))))
 
-(deftest start-ci
-  (let [{:keys [enter] :as i} (sut/start-ci ::test-client)
-        inv (atom [])]
-    (is (keyword? (:name i)))
-
-    (with-redefs [ci/create-container-instance (fn [client ic]
-                                                 (swap! inv conj {:client client
-                                                                  :config ic})
-                                                 (md/success-deferred {:status 200}))]
-      (testing "`enter` starts container instance"
-        (let [r (-> {}
-                    (sut/set-ci-config ::test-config)
-                    (enter))]
-          (is (= {:container-instance ::test-config}
-                 (-> @inv
-                     first
-                     :config)))
-          (is (= ::test-client
-                 (-> @inv
-                     first
-                     :client)))
-          (is (= {:status 200}
-                 (sut/get-ci-response r)))))
-
-      (testing "fails if creation fails"))))
-
 (deftest decrypt-ssh-keys
   (h/with-memory-store st
     (let [vault (v/->FixedKeyVault (v/generate-key))
@@ -272,7 +246,7 @@
     
     (testing "updates ci config with container details"
       (let [r (enter {})]
-        (is (= 2 (-> (sut/get-ci-config r)
+        (is (= 2 (-> (oci/get-ci-config r)
                      :containers
                      count)))))))
 
@@ -284,7 +258,7 @@
       (h/with-memory-store st
         (let [sid (repeatedly 3 cuid/random-cuid)
               ctx (-> {:event {:sid sid}}
-                      (sut/set-ci-response {:status 200
+                      (oci/set-ci-response {:status 200
                                             :body {:id "test-ocid"}})
                       (emd/set-db st))
               r (enter ctx)]
@@ -343,7 +317,7 @@
       (testing "returns `build/initializing` event"
         (let [fake-start-ci {:name ::sut/start-ci
                              :enter (fn [ctx]
-                                      (sut/set-ci-response ctx {:status 200
+                                      (oci/set-ci-response ctx {:status 200
                                                                 :body {:id "test-instance"}}))}
               router (-> (sut/make-router conf st (h/fake-vault))
                          (mmc/replace-interceptors [fake-start-ci]))
@@ -361,7 +335,7 @@
       (testing "when instance creation fails, returns `build/end` event"
         (let [fail-start-ci {:name ::sut/start-ci
                              :enter (fn [ctx]
-                                      (sut/set-ci-response ctx {:status 500
+                                      (oci/set-ci-response ctx {:status 500
                                                                 :body {:id "test-instance"}}))}
               router (-> (sut/make-router conf st (h/fake-vault))
                          (mmc/replace-interceptors [fail-start-ci]))

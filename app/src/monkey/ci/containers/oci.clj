@@ -23,6 +23,7 @@
             [monkey.ci.config.sidecar :as cos]
             [monkey.ci.containers.promtail :as pt]
             [monkey.ci.events.core :as ec]
+            [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.oci.container-instance.core :as ci]))
 
 ;; TODO Get this information from the OCI shapes endpoint
@@ -384,7 +385,7 @@
               {:job job})))
   true)
 
-(defn run-container [{:keys [events job build] :as conf}]
+(defn ^:deprecated run-container [{:keys [events job build] :as conf}]
   (log/debug "Running job as OCI instance:" job)
   (log/debug "Build details:" build)
   (let [client (-> (ci/make-context (:oci conf))
@@ -442,9 +443,111 @@
 
 ;;; Mailman events
 
-(defn job-queued [evt]
-  ;; TODO
-  )
+;;; Context accessors
 
-(defn make-routes [conf]
-  [[:job/queued [{:handler job-queued}]]])
+(def job-id (comp :job-id :event))
+(def build-sid (comp :sid :event))
+
+(def get-credit-multiplier ::credit-multiplier)
+
+(defn set-credit-multiplier [ctx cm]
+  (assoc ctx ::credit-multiplier cm))
+
+(def get-build (comp :build emi/get-state))
+
+(defn set-build [ctx b]
+  (emi/update-state ctx assoc :build b))
+
+(def get-config ::config)
+
+(defn set-config [ctx c]
+  (assoc ctx ::config c))
+
+(def container-ended? (comp true? ::container-end))
+
+(def sidecar-ended? (comp true? ::sidecar-end))
+
+;;; Interceptors
+
+(defn add-config [conf]
+  {:name ::add-config
+   :enter (fn [ctx]
+            (set-config ctx conf))})
+
+(def prepare-instance-config
+  {:name ::prepare-instance
+   :enter (fn [ctx]
+            (-> (get-config ctx)
+                (assoc :build (get-build ctx)
+                       :job (get-in ctx [:event :job]))
+                (instance-config)
+                (as-> c (oci/set-ci-config ctx c))))})
+
+(def set-container-end
+  {:name ::set-container-end
+   :enter (fn [ctx]
+            (assoc ctx ::container-end true))})
+
+(def set-sidecar-end
+  {:name ::set-sidecar-end
+   :enter (fn [ctx]
+            (assoc ctx ::sidecar-end true))})
+
+;;; Event handlers
+
+(defn job-queued [ctx]
+  [(j/job-initializing-evt (job-id ctx) (build-sid ctx) (get-credit-multiplier ctx))])
+
+(defn container-start
+  "Indicates the container script has started.  This means the job is actually running."
+  [ctx]
+  [(j/job-start-evt (job-id ctx) (build-sid ctx))])
+
+(defn- job-executed-evt [{:keys [event] :as ctx}]
+  (j/job-executed-evt (job-id ctx) (build-sid ctx) (assoc (:result event) :status (:status event))))
+
+(defn container-end
+  "Indicates job script has terminated.  If the sidecar has also ended, the job has been
+   executed"
+  [ctx]
+  (when (sidecar-ended? ctx)
+    [(job-executed-evt ctx)]))
+
+(defn sidecar-end
+  "Indicates job sidecar has terminated.  If the container script has also ended, the job
+   has been executed"
+  [ctx]
+  (when (container-ended? ctx)
+    [(job-executed-evt ctx)]))
+
+;;; Route configuration
+
+(defn- make-ci-context [conf]
+  (-> (ci/make-context (:oci conf))
+      (oci/add-inv-interceptor :containers)))
+
+(defn make-routes [conf build]
+  (let [client (make-ci-context conf)
+        state (emi/with-state (atom {:build build
+                                     :config conf}))]
+    [[:container/job-queued
+      ;; Job picked up, start the container instance
+      [{:handler job-queued
+        :interceptors [emi/handle-job-error
+                       (add-config conf)
+                       prepare-instance-config
+                       (oci/start-ci-interceptor client)]}]]
+
+     ;; Container script has started along with the sidecar (which forwards events)
+     [:container/start
+      [{:handler container-start}]]
+     
+     ;; Container script has ended, all commands executed
+     [:container/end
+      [{:handler container-end
+        :interceptors [set-container-end]}]]
+     
+     ;; Sidecar terminated, artifacts have been stored
+     [:sidecar/end
+      [{:handler sidecar-end
+        :interceptors [set-sidecar-end]}]]]))

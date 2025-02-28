@@ -200,14 +200,7 @@
                   (set-work-dir dest)
                   (set-log-dir (fs/create-dirs (fs/path job-dir "logs"))))))})
 
-(def handle-error
-  {:name ::handle-error
-   :error (fn [ctx ex]
-            (let [{:keys [job-id sid] :as e} (:event ctx)]
-              (log/error "Got error while handling event" e ex)
-              (em/set-result ctx
-                             [(j/job-end-evt job-id sid (-> bc/failure
-                                                            (bc/with-message (ex-message ex))))])))})
+
 
 (def filter-container-job
   "Interceptor that terminates when the job in the event is not a container job"
@@ -290,7 +283,7 @@
         job-ctx (make-job-ctx conf)]
     [[:container/job-queued
       [{:handler prepare-child-cmd
-        :interceptors [handle-error
+        :interceptors [emi/handle-job-error
                        state
                        save-job
                        (copy-ws workspace work-dir)
@@ -304,14 +297,13 @@
      [:job/initializing
       ;; TODO Start sidecar event polling
       [{:handler job-init
-        :interceptors [handle-error
+        :interceptors [emi/handle-job-error
                        state
                        require-job]}]]
 
      [:podman/job-executed
       [{:handler job-exec
-        ;; TODO Use state for job context since extensions may modify it in the before-handler
-        :interceptors [handle-error
+        :interceptors [emi/handle-job-error
                        state
                        (add-job-ctx job-ctx)
                        (art/save-interceptor emi/get-job-ctx)

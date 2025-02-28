@@ -263,22 +263,6 @@
               (is (fs/exists? p))
               (is (= "test file" (slurp (fs/file p)))))))))))
 
-(deftest handle-error
-  (let [{:keys [error] :as i} sut/handle-error]
-    (is (keyword? (:name i)))
-    
-    (testing "`error` puts `job/end` failure event in result"
-      (let [r (-> (error {:event
-                          {:type :job/initializing
-                           :sid ["build" "sid"]
-                           :job-id "test-job"}}
-                         (ex-info "test error" {}))
-                  (em/get-result))]
-        (is (= [:job/end]
-               (map :type r)))
-        (is (= "test-job" (-> r first :job-id)))
-        (is (= :failure (-> r first :status)))))))
-
 (deftest filter-container-job
   (let [{:keys [enter] :as i} sut/filter-container-job
         ctx (-> {:event {:job {:id "action-job"}}}
