@@ -57,6 +57,22 @@
       (testing "ensures log dir exists"
         (is (fs/exists? log-dir))))))
 
+(deftest add-job-to-state
+  (let [{:keys [enter] :as i} sut/add-job-to-state]
+    (is (keyword? (:name i)))
+    
+    (testing "saves job state and result in state"
+      (is (= {:status :success
+              :result :ok}
+             (-> {:event
+                  {:job-id "test-job"
+                   :status :success
+                   :result :ok}}
+                 (enter)
+                 (emi/get-state)
+                 :jobs
+                 (get "test-job")))))))
+
 (defn- has-interceptor? [routes evt id]
   (contains? (->> routes
                   (into {})
@@ -70,7 +86,8 @@
 (deftest make-routes
   (let [types [:build/pending
                :build/initializing
-               :build/end]
+               :build/end
+               :job/end]
         mailman (tm/test-component)
         routes (->> (sut/make-routes {} mailman)
                     (into {}))]
@@ -150,6 +167,10 @@
                                  (map :type))))))))
 
 (deftest build-end
-  (testing "returns build"
-    (let [build (h/gen-build)]
-      (is (= build (sut/build-end {:event {:build build}}))))))
+  (testing "returns build with jobs from state"
+    (let [build {:build-id "test-build"}]
+      (is (= {:build-id "test-build"
+              :jobs {"test-job" {:status :success}}}
+             (-> {:event {:build build}}
+                 (sut/update-job-in-state "test-job" assoc :status :success)
+                 (sut/build-end)))))))

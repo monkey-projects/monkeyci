@@ -43,10 +43,10 @@
 (defn set-git-repo [ctx r]
   (assoc ctx ::git-repo r))
 
-(def get-workspace ::workspace)
+(def get-workspace (comp :workspace emi/get-state))
 
 (defn set-workspace [ctx ws]
-  (assoc ctx ::workspace ws))
+  (emi/update-state ctx assoc :workspace ws))
 
 (def get-mailman emi/get-mailman)
 
@@ -116,6 +116,14 @@
   {:name ::add-child-opts
    :enter #(set-child-opts % child-opts)})
 
+(defn update-job-in-state [ctx job-id f & args]
+  (apply emi/update-state ctx update-in [:jobs job-id] f args))
+
+(def add-job-to-state
+  {:name ::add-job-to-state
+   :enter (fn [{:keys [event] :as ctx}]
+            (update-job-in-state ctx (:job-id event) merge (select-keys event [:status :result])))})
+
 ;;; Handlers
 
 (defn make-build-init-evt
@@ -174,33 +182,43 @@
   (b/build-start-evt (ctx->build ctx)))
 
 (defn build-end [ctx]
-  ;; Just return the build, it will be set in the result
-  (ctx->build ctx))
+  ;; Return the build with job details from state, it will be set in the result
+  (-> (ctx->build ctx)
+      (merge (select-keys (emi/get-state ctx) [:jobs]))))
 
 ;;; Routes
 
 (defn make-routes [conf mailman]
-  [[:build/pending
-    ;; Responsible for preparing the build environment and starting the
-    ;; child process or container.
-    [{:handler prepare-child-cmd
-      :interceptors (cond-> [emi/handle-build-error
-                             emi/no-result
-                             emi/start-process
-                             (emi/add-mailman mailman)
-                             (add-api (conf/get-api conf))
-                             (add-log-dir (conf/get-log-dir conf))
-                             (add-child-opts (conf/get-child-opts conf))]
-                      (get-in conf [:build :git]) (conj checkout-src)
-                      true (conj (save-workspace (conf/get-workspace conf))))}
-     {:handler make-build-init-evt}]]
-   
-   [:build/initializing
-    ;; Build process is starting
-    [{:handler build-init}]]
-   
-   [:build/end
-    ;; Build has completed, clean up
-    [{:handler build-end
-      :interceptors [emi/no-result
-                     (emi/realize-deferred (conf/get-ending conf))]}]]])
+  (let [state (emi/with-state (atom {}))]
+    [[:build/pending
+      ;; Responsible for preparing the build environment and starting the
+      ;; child process or container.
+      [{:handler prepare-child-cmd
+        :interceptors (cond-> [emi/handle-build-error
+                               state
+                               emi/no-result
+                               emi/start-process
+                               (emi/add-mailman mailman)
+                               (add-api (conf/get-api conf))
+                               (add-log-dir (conf/get-log-dir conf))
+                               (add-child-opts (conf/get-child-opts conf))]
+                        (get-in conf [:build :git]) (conj checkout-src)
+                        true (conj (save-workspace (conf/get-workspace conf))))}
+       {:handler make-build-init-evt}]]
+     
+     [:build/initializing
+      ;; Build process is starting
+      [{:handler build-init}]]
+     
+     [:build/end
+      ;; Build has completed, clean up
+      [{:handler build-end
+        :interceptors [emi/no-result
+                       state
+                       (emi/realize-deferred (conf/get-ending conf))]}]]
+
+     [:job/end
+      ;; Updates state to add job result
+      [{:handler (constantly nil)
+        :interceptors [state
+                       add-job-to-state]}]]]))

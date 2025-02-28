@@ -57,10 +57,12 @@
   (let [wd (fs/create-temp-dir) ; TODO Use subdir of current dir .monkeyci?
         cwd (u/cwd)
         build (cond-> {:checkout-dir (or (some->> workdir
-                                                  (u/abs-path cwd))
+                                                  (u/abs-path cwd)
+                                                  (fs/canonicalize)
+                                                  str)
                                          cwd)
-                       :customer-id "local"
-                       :repo-id "local"
+                       :customer-id "local-cust"
+                       :repo-id "local-repo"
                        :build-id (b/local-build-id)}
                 dir (b/set-script-dir dir))
         conf (-> (select-keys config [:mailman :lib-coords :log-config]) ; Allow override for testing
