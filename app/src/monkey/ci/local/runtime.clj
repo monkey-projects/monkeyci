@@ -55,9 +55,6 @@
 (defn- new-cache [conf]
   (blob-store (lc/get-cache-dir conf)))
 
-(defn- new-containers []
-  (cm/make-container-runner))
-
 (defrecord FixedBuildParams [params]
   p/BuildParams
   (get-build-params [_]
@@ -109,14 +106,10 @@
    :artifacts    (new-artifacts conf)
    :cache        (new-cache conf)
    :params       (new-params conf)
-   ;; TODO Remove
-   :containers   (co/using
-                  (new-containers)
-                  [:mailman :build])
    :api-config   (rr/new-api-config {})
    :api-server   (co/using
                   (new-api-server)
-                  [:api-config :artifacts :cache :params :containers :build :event-stream :mailman])
+                  [:api-config :artifacts :cache :params :build :event-stream :mailman])
    :event-stream (new-event-stream)
    :event-pipe   (co/using
                   (new-event-pipe)

@@ -116,11 +116,12 @@
       (log/debug "Registering" (count routes) "routes in broker:" (map first routes))
       (assoc this
              :routes routes
-             :listener (add-router mailman routes {:interceptors global-interceptors}))))
+             :listeners (add-router mailman routes {:interceptors global-interceptors}))))
 
-  (stop [{:keys [listener] :as this}]
-    (when listener
-      (mmc/unregister-listener listener))
+  (stop [{:keys [listeners] :as this}]
+    (when listeners
+      (doseq [l listeners]
+        (mmc/unregister-listener l)))
     (dissoc this :listener)))
 
 (defn post-events

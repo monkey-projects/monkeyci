@@ -8,7 +8,6 @@
 (s/def ::artifacts ::c/blob-store)
 (s/def ::workspace ::c/blob-store)
 (s/def ::params ::c/params)
-(s/def ::containers ::c/containers)
 (s/def ::mailman ::c/mailman)
 
 (s/def ::base-config
@@ -17,7 +16,7 @@
 
 (s/def ::config
   (-> (s/merge ::base-config
-               (s/keys :opt-un [::port]))))
+               (s/keys :opt-un [::port ::token]))))
 
 (s/def ::app-config
   (-> (s/merge ::base-config

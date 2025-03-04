@@ -2,12 +2,17 @@
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.spec.alpha :as spec]
             [com.stuartsierra.component :as co]
+            [manifold.stream :as ms]
             [monkey.ci
              [metrics :as m]
              [prometheus :as prom]]
+            [monkey.ci.events.mailman :as em]
             [monkey.ci.runners.runtime :as sut]
             [monkey.ci.spec.runner :as sr]
-            [monkey.ci.test.config :as tc]))
+            [monkey.ci.test
+             [config :as tc]
+             [mailman :as tm]]
+            [monkey.mailman.core :as mmc]))
 
 (def runner-config
   (assoc tc/base-config
@@ -64,10 +69,13 @@
       (is (some? (:routes sys))))
 
     (testing "provides local mailman"
-      (is (some? (:local/mailman sys))))
+      (is (some? (:local-mailman sys))))
 
     (testing "provides container routes"
       (is (some? (:container-routes sys))))
+
+    (testing "provides event forwarder"
+      (is (some? (:event-forwarder sys))))
 
     (testing "provides workspace"
       (is (some? (:workspace rt))))
@@ -116,4 +124,41 @@
     (testing "pushes metrics on system stop"
       (is (true? @pushed?)))))
 
+(defrecord TestListener [unreg?]
+  mmc/Listener
+  (unregister-listener [this]
+    (reset! (:unreg? this) true)))
 
+(deftest event-forwarder
+  (testing "`start` registers listeners in broker"
+    (let [broker (em/make-component {:type :manifold})
+          r (-> (sut/map->EventForwarder {:local-mailman broker
+                                          :event-stream (ms/stream)})
+                (co/start))]
+      (is (not-empty (:listeners r)))
+      (is (every? (partial satisfies? mmc/Listener) (:listeners r)))
+      (is (= (count (:listeners r)) (count @(.listeners (:broker broker)))))))
+
+  (testing "`stop` unregisters listeners"
+    (let [unreg? (atom false)]
+      (is (nil? (-> (sut/map->EventForwarder {:listeners [(->TestListener unreg?)]})
+                    (co/stop)
+                    :listeners)))
+      (is (true? @unreg?))))
+
+  (let [local (->> (em/make-component {:type :manifold})
+                   (co/start))
+        global (tm/test-component)
+        stream (ms/stream 1)
+        fw (-> (sut/map->EventForwarder {:local-mailman local
+                                         :mailman global
+                                         :event-stream stream})
+               (co/start))
+        evt {:type ::test-event}]
+    (is (= [evt] @(em/post-events local [evt])))
+
+    (testing "forwards event from local to global mailman"
+      (is (= [evt] (tm/get-posted global))))
+
+    (testing "forwards to event stream"
+      (is (= evt (deref (ms/take! stream) 100 :timeout))))))
