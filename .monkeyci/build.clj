@@ -259,7 +259,7 @@
              (assoc core/failure :message "Unable to patch version in infra repo"))
            (assoc core/failure :message "No github token provided")))
        {:dependencies (->> [(when (publish-app? ctx) "app-img-manifest")
-                            (when (publish-gui? ctx) "publish-gui-img")]
+                            (when (publish-gui? ctx) "gui-img-manifest")]
                            (remove nil?))}))))
 
 (defn notify [ctx]
