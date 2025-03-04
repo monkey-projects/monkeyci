@@ -267,21 +267,22 @@
                   :details {:instance-id "test-ocid"}}
                  (st/find-runner-details st sid))))))))
 
-(deftest load-runner-details
-  (let [{:keys [enter]:as i} sut/load-runner-details]
+(deftest load-instance-id
+  (let [{:keys [enter]:as i} sut/load-instance-id]
     (is (keyword? (:name i)))
     
     (testing "`enter` fetches runner details from db"
       (h/with-memory-store st
         (let [sid (repeatedly 3 cuid/random-cuid)
-              ctx (-> {:event {:sid sid}}
-                      (emd/set-db st))
+              ocid (random-uuid)
               details {:runner :oci
-                       :details {:instance-id (random-uuid)}}
-              _ (st/save-runner-details st sid details)
-              r (enter ctx)]
-          (is (= details
-                 (sut/get-runner-details r))))))))
+                       :details {:instance-id ocid}}
+              _ (st/save-runner-details st sid details)]
+          (is (= ocid
+                 (-> {:event {:sid sid}}
+                     (emd/set-db st)
+                     (enter)
+                     (oci/get-ci-id)))))))))
 
 (deftest initialize-build
   (testing "returns `build/initializing` event"
@@ -289,24 +290,6 @@
            (-> {:event {:build {:sid ::test-build}}}
                (sut/initialize-build)
                :type)))))
-
-(deftest delete-instance
-  (testing "deletes container instance according to runner details"
-    (h/with-memory-store st
-      (let [build (h/gen-build)
-            sid (st/ext-build-sid build)
-            ocid (random-uuid)
-            ctx (-> {:event {:sid sid
-                             :type :build/end
-                             :build build}}
-                    (emd/set-db st)
-                    (sut/set-runner-details {:details {:instance-id ocid}}))
-            deleted (atom nil)]
-        (with-redefs [ci/delete-container-instance (fn [client opts]
-                                                     (reset! deleted opts)
-                                                     (md/success-deferred {:status 200}))]
-          (is (nil? (sut/delete-instance ::test-client ctx)))
-          (is (= {:instance-id ocid} @deleted)))))))
 
 (deftest make-router
   (let [build (h/gen-build)

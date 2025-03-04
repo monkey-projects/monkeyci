@@ -391,3 +391,16 @@
 
       (testing "fails if creation fails"))))
 
+(deftest delete-ci-interceptor
+  (let [{:keys [leave] :as i} (sut/delete-ci-interceptor ::test-client)]
+    (is (keyword? (:name i)))
+    
+    (testing "deletes container instance with stored id"
+      (let [ocid (random-uuid)
+            ctx (sut/set-ci-id {} ocid)
+            deleted (atom nil)]
+        (with-redefs [ci/delete-container-instance (fn [client opts]
+                                                     (reset! deleted opts)
+                                                     (md/success-deferred {:status 200}))]
+          (is (= ctx (leave ctx)))
+          (is (= {:instance-id ocid} @deleted)))))))

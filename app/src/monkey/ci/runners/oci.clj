@@ -297,28 +297,18 @@
               (st/save-runner-details (emd/get-db ctx) sid details)
               ctx))})
 
-(def load-runner-details
-  "Interceptor that fetches build runner details from the db.
+(def load-instance-id
+  "Interceptor that fetches build runner instance id from the db.
    This assumes the db is present in the context."
-  {:name ::load-runner-details
+  {:name ::load-instance-id
    :enter (fn [ctx]
-            (set-runner-details ctx (st/find-runner-details (emd/get-db ctx) (get-in ctx [:event :sid]))))})
-
+            (->> (st/find-runner-details (emd/get-db ctx) (get-in ctx [:event :sid]))
+                 :details
+                 :instance-id
+                 (oci/set-ci-id ctx)))})
 
 (defn initialize-build [ctx]
   (b/build-init-evt (get-in ctx [:event :build])))
-
-(defn delete-instance
-  "Deletes the container instance associated with the build"
-  [client ctx]
-  (if-let [instance-id (-> ctx (get-runner-details) :details :instance-id)]
-    @(md/chain
-      (oci/with-retry #(ci/delete-container-instance client {:instance-id instance-id}))
-      (fn [res]
-        (if (< (:status res) 400)
-          (log/info "Container instance" instance-id "has been deleted")
-          (log/warn "Unable to delete container instance" instance-id ", got status" (:status res)))))
-    (log/warn "Unable to delete container instance, no instance id in context")))
 
 (defn- make-ci-context [conf]
   (-> (ci/make-context conf)
@@ -338,8 +328,9 @@
                        end-on-ci-failure]}]]
 
      [:build/end
-      [{:handler (partial delete-instance client)
-        :interceptors [load-runner-details]}]]]))
+      [{:handler (constantly nil)
+        :interceptors [load-instance-id
+                       (oci/delete-ci-interceptor client)]}]]]))
 
 (defn- make-interceptors [storage]
   [emi/trace-evt
