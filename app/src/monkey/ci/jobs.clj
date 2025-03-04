@@ -17,7 +17,10 @@
              [protocols :as p]
              [time :as t]
              [utils :as u]]
-            [monkey.ci.events.core :as ec]))
+            [monkey.ci.events
+             [builders :as eb]
+             [core :as ec]
+             [mailman :as em]]))
 
 (def deps "Get job dependencies" :dependencies)
 (def status "Get job status" :status)
@@ -48,67 +51,17 @@
 (def failed?  (comp (partial = :failure) status))
 (def success? (comp (partial = :success) status))
 
-(defn as-serializable
-  "Converts job into something that can be converted to edn"
-  [job]
-  (letfn [(art->ser [a]
-            (select-keys a [:id :path]))]
-    (-> job
-        (select-keys (concat [:status :start-time :end-time deps labels :extensions :credit-multiplier :script
-                              :memory :cpus :arch :work-dir
-                              save-artifacts :restore-artifacts :caches]
-                             co/props))
-        (mc/update-existing :save-artifacts (partial map art->ser))
-        (mc/update-existing :restore-artifacts (partial map art->ser))
-        (mc/update-existing :caches (partial map art->ser))
-        (assoc :id (bc/job-id job)))))
+(def as-serializable eb/job->event)
+(def job->event eb/job->event)
 
-(def job->event
-  "Converts job into something that can be put in an event"
-  as-serializable)
-
-(defn- base-event
-  "Creates a skeleton event with basic properties"
-  [type job-id build-sid]
-  (ec/make-event 
-   type
-   :src :script
-   :sid build-sid
-   :job-id job-id))
-
-(defn- job-evt [type job build-sid]
-  (-> (base-event type (job-id job) build-sid)
-      (assoc :job (job->event job))))
-
-(defn job-pending-evt [job build-sid]
-  (job-evt :job/pending job build-sid))
-
-(defn job-queued-evt [job build-sid]
-  (job-evt :job/queued job build-sid))
-
-(defn job-skipped-evt [job-id build-sid]
-  (base-event :job/skipped job-id build-sid))
-
-(defn job-initializing-evt [job-id build-sid cm]
-  (-> (base-event :job/initializing job-id build-sid)
-      (assoc :credit-multiplier cm)))
-
-(def job-start-evt (partial base-event :job/start))
-
-(defn job-status-evt [type job-id build-sid {:keys [status] :as r}]
-  (let [r (dissoc r :status :exception)]
-    (-> (base-event type job-id build-sid)
-        (assoc :status status
-               :result r))))
-
-(def job-executed-evt
-  "Creates an event that indicates the job has executed, but has not been completed yet.
-   Extensions may need to be applied first."
-  (partial job-status-evt :job/executed))
-
-(def job-end-evt
-  "Event that indicates the job has been fully completed.  The result should not change anymore."
-  (partial job-status-evt :job/end))
+(def job-status-evt eb/job-status-evt)
+(def job-pending-evt eb/job-pending-evt)
+(def job-queued-evt eb/job-queued-evt)
+(def job-skipped-evt eb/job-skipped-evt)
+(def job-initializing-evt eb/job-initializing-evt)
+(def job-start-evt eb/job-start-evt)
+(def job-executed-evt eb/job-executed-evt)
+(def job-end-evt eb/job-end-evt)
 
 (defn ex->result
   "Creates result structure from an exception"
@@ -175,7 +128,7 @@
                 (art/wrap-artifacts))
           job (assoc job
                      :start-time (t/now))]
-      (ec/post-events (:events ctx)
+      (em/post-events (:mailman ctx)
                       [(-> (job-start-evt (job-id job) build-sid)
                            ;; For action jobs, add the credit multiplier on job start since there is
                            ;; no `initializing` event.
@@ -186,7 +139,7 @@
           (md/chain
            (fn [r]
              (md/chain
-              (ec/post-events (:events ctx) [(job-executed-evt (job-id job) build-sid r)])
+              (em/post-events (:mailman ctx) [(job-executed-evt (job-id job) build-sid r)])
               (constantly r)))))))
 
   monkey.ci.build.core.ContainerJob

@@ -11,7 +11,8 @@
              [edn :as edn]
              [jobs :as sut]]
             [monkey.ci.spec.events :as se]
-            [monkey.ci.helpers :as h]))
+            [monkey.ci.helpers :as h]
+            [monkey.ci.test.mailman :as tm]))
 
 (defn dummy-job
   ([id & [opts]]
@@ -139,7 +140,7 @@
 
 (deftest action-job
   (let [job (bc/action-job ::test-job (constantly bc/success))
-        ctx {:events (h/fake-events)
+        ctx {:mailman (tm/test-component)
              :containers ::test-containers}]
     (testing "is a job"
       (is (sut/job? job)))
@@ -246,13 +247,14 @@
 
   (let [job (bc/action-job "test-job" (constantly bc/success))
         events (h/fake-events)
-        ctx {:events events
+        mailman (tm/test-component)
+        ctx {:mailman mailman
              :build {:sid (h/gen-build-sid)
                      :credit-multiplier 10}}]
     (is (bc/success? @(sut/execute! job ctx)))
     
     (testing "fires `job/start` event"
-      (let [evt (h/first-event-by-type :job/start (h/received-events events))]
+      (let [evt (h/first-event-by-type :job/start (tm/get-posted mailman))]
         (is (some? evt))
         (is (= (sut/job-id job) (:job-id evt)))
         (is (spec/valid? ::se/event evt))
@@ -260,7 +262,7 @@
         (is (= 10 (:credit-multiplier evt)) "Adds credit multiplier from build")))
 
     (testing "fires `job/executed` event"
-      (let [evt (h/first-event-by-type :job/executed (h/received-events events))]
+      (let [evt (h/first-event-by-type :job/executed (tm/get-posted mailman))]
         (is (some? evt))
         (is (spec/valid? ::se/event evt))
         (is (= (sut/job-id job) (:job-id evt)))

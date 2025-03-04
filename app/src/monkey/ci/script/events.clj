@@ -249,7 +249,7 @@
   "Constructs job context object from the route configuration"
   [ctx]
   (-> ctx
-      (select-keys [:artifacts :cache :events :mailman :build])
+      (select-keys [:artifacts :cache :mailman :build])
       (assoc :api {:client (:api-client ctx)})))
 
 (defn make-routes [{:keys [build] :as conf}]

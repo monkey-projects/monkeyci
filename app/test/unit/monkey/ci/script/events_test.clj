@@ -85,13 +85,16 @@
                     (emi/set-job-ctx job-ctx)
                     (enter))]
           (is (= 1 (count (sut/get-running-actions r))))
-          (is (not= :timeout (h/wait-until #(not-empty (tm/get-posted broker)) 1000)))
+          (is (not= :timeout (h/wait-until #(contains? (->> (tm/get-posted broker) (map :type) set)
+                                                       :job/end)
+                                           1000)))
           (let [evts (tm/get-posted broker)]
-            (is (= [:job/end] (map :type evts)))
-            (is (= :failure (-> evts first :status)))
-            (is (string? (-> evts first :result :message))))))
+            (is (= :job/end (-> (map :type evts) last)))
+            (is (= :failure (-> evts last :status)))
+            (is (string? (-> evts last :result :message))))))
 
       (testing "on async exception"
+        (tm/clear-posted! broker)
         (let [job (bc/action-job
                    "failing-async"
                    (fn [_]
@@ -101,7 +104,9 @@
                     (emi/set-job-ctx job-ctx)
                     (enter))]
           (is (= 1 (count (sut/get-running-actions r))))
-          (is (not= :timeout (h/wait-until #(= 2 (count (tm/get-posted broker))) 1000)))
+          (is (not= :timeout (h/wait-until #(contains? (->> (tm/get-posted broker) (map :type) set)
+                                                       :job/end)
+                                           1000)))
           (let [evt (last (tm/get-posted broker))]
             (is (= :job/end (:type evt)))
             (is (= :failure (:status evt)))

@@ -24,7 +24,13 @@
 (defn test-component []
   (->TestComponent (test-broker)))
 
+(defn- broker-posted [broker]
+  (or (:posted broker)
+      (get-in broker [:broker :posted])))
+
 (defn get-posted [broker]
-  (some-> (or (:posted broker)
-              (get-in broker [:broker :posted]))
+  (some-> (broker-posted broker)
           (deref)))
+
+(defn clear-posted! [broker]
+  (reset! (broker-posted broker) []))

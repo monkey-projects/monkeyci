@@ -21,7 +21,7 @@
              [mailman :as em]]
             [monkey.ci.events.mailman
              [build-api :as emba]
-             [bridge :as emb]]
+             #_[bridge :as emb]]
             [monkey.ci.runtime.common :as rc]
             [monkey.ci.spec.script :as ss]
             [monkey.mailman.core :as mmc]))
@@ -36,7 +36,7 @@
   (let [{:keys [token] :as ac} (sc/api config)]
     (api/make-client (client-url ac) token)))
 
-(defn- new-events []
+#_(defn- new-events []
   (emb/->MailmanEventPoster nil))
 
 (defn- new-artifacts []
@@ -98,9 +98,9 @@
   {:pre [(spec/valid? ::ss/config config)]}
   (co/system-map
    :api-client (new-api-client config)
-   :events     (co/using
-                (new-events)
-                {:broker :mailman})
+   ;; :events     (co/using
+   ;;              (new-events)
+   ;;              {:broker :mailman})
    :event-stream (using-api (new-event-stream))
    :artifacts  (using-api (new-artifacts))
    :cache      (using-api (new-cache))
@@ -114,7 +114,7 @@
                 [:api-client :event-stream])
    :routes     (co/using
                 (new-routes config)
-                [:mailman :artifacts :cache :api-client :events])))
+                [:mailman :artifacts :cache :api-client])))
 
 (def build :build)
 

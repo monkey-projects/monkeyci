@@ -10,9 +10,11 @@
             [monkey.ci
              [build :as b]
              [errors :as errors]
-             [jobs :as j]
              [time :as t]]
-            [monkey.ci.build.core :as bc]))
+            [monkey.ci.build.core :as bc]
+            [monkey.ci.events
+             [builders :as eb]
+             [core :as ec]]))
 
 (def get-result :result)
 
@@ -75,8 +77,8 @@
             (let [{:keys [job-id sid] :as e} (:event ctx)]
               (log/error "Got error while handling event" e ex)
               (set-result ctx
-                          [(j/job-end-evt job-id sid (-> bc/failure
-                                                         (bc/with-message (ex-message ex))))])))})
+                          [(eb/job-end-evt job-id sid (-> bc/failure
+                                                          (bc/with-message (ex-message ex))))])))})
 
 (defn update-bus [bus]
   "Publishes the event to the given manifold bus"

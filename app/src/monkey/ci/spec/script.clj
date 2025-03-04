@@ -17,13 +17,12 @@
   (s/keys :req [::api ::build]
           :opt [::result]))
 
-(s/def ::events ::c/events)
 (s/def ::artifacts art/repo?)
 (s/def ::cache art/repo?)
-(s/def ::containers ::c/containers)
+(s/def ::mailman #(contains? % :broker))
 
 (s/def ::runtime
-  (s/keys :req-un [::containers ::artifacts ::cache ::events]))
+  (s/keys :req-un [::artifacts ::cache ::mailman]))
 
 (s/def :context/api ::ba/client)
 
