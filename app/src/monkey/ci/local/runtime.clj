@@ -10,11 +10,8 @@
              [blob :as blob]
              [cache :as c]
              [protocols :as p]]
-            [monkey.ci.containers
-             [mailman :as cm]
-             [podman :as cp]]
+            [monkey.ci.containers.podman :as cp]
             [monkey.ci.events.mailman :as em]
-            [monkey.ci.events.mailman.bridge :as emb]
             [monkey.ci.local
              [config :as lc]
              [events :as le]]
