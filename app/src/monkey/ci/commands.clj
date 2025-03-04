@@ -25,7 +25,9 @@
             [monkey.ci.local
              [config :as lc]
              [runtime :as lr]]
-            [monkey.ci.runners.controller :as rc]
+            [monkey.ci.runners
+             [controller :as rc]
+             [runtime :as rr]]
             [monkey.ci.runtime
              [app :as ra]
              [sidecar :as rs]]
@@ -33,22 +35,6 @@
             [monkey.ci.web
              [auth :as auth]
              [handler :as h]]))
-
-;; Deprecated, only used by the server build runner, which will be phased out.
-(defn ^:deprecated run-build
-  "Performs a build, using the runner from the context.  Returns a deferred
-   that will complete when the build finishes."
-  [config]
-  (ra/with-runner-system config
-    (fn [{:keys [runner events build]}]
-      (try
-        (log/debug "Starting runner for build" build)
-        (runner)
-        (catch Exception ex
-          (log/error "Unable to start build" ex)
-          (ec/post-events events (b/build-end-evt (assoc build :message (ex-message (or (ex-cause ex) ex)))
-                                                  err/error-process-failure))
-          err/error-process-failure)))))
 
 (defn run-build-local
   "Run a build locally, normally from local source but can also be from a git checkout.
@@ -188,7 +174,7 @@
    the controller."
   [conf]
   (log/info "Running controller with config:" conf)
-  (ra/with-runner-system conf
+  (rr/with-runner-system conf
     (fn [sys]
       (rc/run-controller (:runtime sys)))))
 

@@ -38,33 +38,6 @@
   (fn [& _]
     (throw (ex-info "test error" {}))))
 
-(deftest run-build
-  (let [config (assoc tc/base-config
-                      :build {:build-id "test-build"})]
-    (testing "invokes runner from context"
-      (is (= :invoked (sut/run-build (assoc config :runner {:type ::dummy})))))
-
-    (testing "adds `build` to runtime"
-      (is (map? (-> config
-                    (assoc :args {:git-url "test-url"
-                                  :branch "test-branch"
-                                  :commit-id "test-id"}
-                           :runner {:type ::build})
-                    (sut/run-build)))))
-
-    (testing "posts `build/end` event on exception"
-      (let [recv (atom [])]
-        (is (= err/error-process-failure
-               (-> config
-                   (assoc :runner {:type ::failing}
-                          :events {:type :fake
-                                   :recv recv})
-                   (sut/run-build))))
-        (is (= 1 (count @recv)))
-        (let [evt (first @recv)]
-          (is (= :build/end (:type evt)))
-          (is (some? (:build evt))))))))
-
 (deftest run-build-local
   (testing "creates event broker and posts `build/pending` event"
     (let [broker (tm/test-component)]

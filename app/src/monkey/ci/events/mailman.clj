@@ -56,7 +56,7 @@
 
   AddRouter
   (add-router [this routes opts]
-    (mmc/add-listener broker (mmc/router routes opts))))
+    [(mmc/add-listener broker (mmc/router routes opts))]))
 
 (defn make-generic-component [broker]
   (->GenericComponent broker nil))

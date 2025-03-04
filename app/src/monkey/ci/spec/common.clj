@@ -47,6 +47,7 @@
 (s/def ::containers p/container-runner?)
 ;;(s/def ::build-containers (partial satisfies? p/BuildContainerRunner))
 (s/def ::params (partial satisfies? p/BuildParams))
+(s/def ::mailman #(contains? % :broker))
 
 (s/def :credit/type #{:subscription :user})
 

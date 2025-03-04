@@ -16,7 +16,7 @@
         (is (some? c)))
 
       (testing "`start` registers listener"
-        (is (not-empty (:listener c))))
+        (is (some? (:listener c))))
 
       (testing "`stop` unregisters listener"
         (is (nil? (-> (co/stop c)

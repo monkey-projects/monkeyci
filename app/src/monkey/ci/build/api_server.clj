@@ -74,9 +74,6 @@
 (def req->cache
   (comp :cache req->ctx))
 
-(def req->containers
-  (comp :containers req->ctx))
-
 (def req->params
   (comp :params req->ctx))
 
@@ -226,22 +223,6 @@
                 (log/debug "Sending cache to client:" path)
                 (download-stream req store path 404))))
 
-(defn start-container [req]
-  (let [job (get-in req [:parameters :body :job])
-        containers (req->containers req)]
-    ;; Start the container, don't wait for the result.  It's up to the client
-    ;; to monitor job end event.
-    (try
-      (log/debug "Got request to start container job:" job)
-      (p/run-container containers job)
-      (-> (rur/response {:job job})
-          (rur/status 202))
-      (catch Exception ex
-        (log/error "Unable to start container job" ex)
-        (-> (rur/response {:job job
-                           :exception ex})
-            (rur/status 500))))))
-
 (def edn #{"application/edn"})
 
 (def params-routes
@@ -284,13 +265,6 @@
     :get {:handler download-cache
           :responses {200 {}}}}])
 
-(def container-routes
-  ["/container"
-   {:post {:handler start-container
-           :responses {202 {}}
-           :produces edn
-           :parameters {:body s/Any}}}])
-
 (def routes [""
              [["/test"
                {:get (constantly (rur/response {:result "ok"}))
@@ -301,7 +275,6 @@
               workspace-routes
               artifact-routes
               cache-routes
-              container-routes
               ;; TODO Log uploads
               ]])
 

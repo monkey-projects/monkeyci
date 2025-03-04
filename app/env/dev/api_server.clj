@@ -12,7 +12,7 @@
              [api-server :as bas]
              [api :as ba]]
             [monkey.ci.events.core :as ec]
-            [monkey.ci.runtime.app :as ra]))
+            [monkey.ci.runners.runtime :as rr]))
 
 (defonce server (atom nil))
 
@@ -33,7 +33,7 @@
    :containers {:type :podman}})
 
 (defn start-system [conf]
-  (-> (ra/make-runner-system conf)
+  (-> (rr/make-runner-system conf)
       (csc/start)))
 
 (defn stop-system [sys]

@@ -15,11 +15,10 @@
 (s/def ::workspace ::sc/blob-store)
 (s/def ::artifacts ::sc/blob-store)
 (s/def ::cache ::sc/blob-store)
-(s/def ::events ::sc/events)
 (s/def ::runner ifn?)
-(s/def ::containers ::sc/containers)
 (s/def ::maker fn?)
 (s/def ::logging (s/keys :req-un [::maker]))
+(s/def ::mailman ::sc/mailman)
 
 (s/def ::port int?)
 (s/def ::token string?)
@@ -27,5 +26,5 @@
   (s/keys :req-un [::port ::token]))
 
 (s/def ::runtime
-  (s/keys :req-un [::config ::workspace ::artifacts ::cache ::containers
-                   ::git ::events ::logging ::build ::api-config]))
+  (s/keys :req-un [::config ::workspace ::artifacts ::cache ::mailman
+                   ::git ::build ::api-config]))

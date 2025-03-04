@@ -9,10 +9,10 @@
 (s/def ::workspace ::c/blob-store)
 (s/def ::params ::c/params)
 (s/def ::containers ::c/containers)
-;;(s/def ::mailman ::c/mailman)
+(s/def ::mailman ::c/mailman)
 
 (s/def ::base-config
-  (s/keys :req-un [::artifacts ::containers ::params ::mailman]
+  (s/keys :req-un [::artifacts ::params ::mailman]
           :opt-un [::cache ::workspace]))
 
 (s/def ::config

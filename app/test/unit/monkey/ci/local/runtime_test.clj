@@ -88,4 +88,4 @@
     (testing "`stop` unregisters listener"
       (let [s (co/stop c)]
         (is (nil? (:listener s)))
-        (is (empty? (-> broker :broker :listeners deref)))))))
+        (is (empty? (-> broker :broker (.listeners) deref)))))))

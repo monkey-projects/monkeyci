@@ -36,17 +36,11 @@
   (let [{:keys [token] :as ac} (sc/api config)]
     (api/make-client (client-url ac) token)))
 
-#_(defn- new-events []
-  (emb/->MailmanEventPoster nil))
-
 (defn- new-artifacts []
   (art/make-build-api-repository nil))
 
 (defn- new-cache []
   (cache/make-build-api-repository nil))
-
-#_(defn- new-container-runner []
-  (cba/map->BuildApiContainerRunner {}))
 
 (defrecord EventStream [client]
   co/Lifecycle
@@ -92,23 +86,14 @@
 
 (defn make-system
   "Given a script configuration object, creates component system.  When started,
-   it contains a fully configured `runtime` component that can be passed to the
-   script functions."
+   it handles and posts events that execute the build script."
   [config]
   {:pre [(spec/valid? ::ss/config config)]}
   (co/system-map
    :api-client (new-api-client config)
-   ;; :events     (co/using
-   ;;              (new-events)
-   ;;              {:broker :mailman})
    :event-stream (using-api (new-event-stream))
    :artifacts  (using-api (new-artifacts))
    :cache      (using-api (new-cache))
-   ;; :containers (co/using
-   ;;              (new-container-runner)
-   ;;              {:client :api-client
-   ;;               :bus :event-bus})
-   ;; TODO Connect to the controller
    :mailman    (co/using
                 (new-mailman)
                 [:api-client :event-stream])
@@ -129,6 +114,7 @@
                 (sc/set-result r)
                 (make-system)
                 (co/start))]
+    ;; Trigger the script by posting an event
     (em/post-events (:mailman sys) [(s/script-init-evt build (b/script-dir build))])
     (md/finally r #(co/stop sys))))
 

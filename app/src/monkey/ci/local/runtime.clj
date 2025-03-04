@@ -18,9 +18,8 @@
             [monkey.ci.local
              [config :as lc]
              [events :as le]]
-            [monkey.ci.runtime
-             [app :as ra]
-             [common :as rc]]
+            [monkey.ci.runners.runtime :as rr]
+            [monkey.ci.runtime.common :as rc]
             [monkey.mailman.core :as mmc]))
 
 (defn- new-mailman
@@ -68,7 +67,7 @@
   (->FixedBuildParams (lc/get-params conf)))
 
 (defn- new-api-server []
-  (ra/new-api-server {}))
+  (rr/new-api-server {}))
 
 (defn new-event-stream
   "Creates a new event stream, that can be used by the api server to send events to the client."
@@ -114,7 +113,7 @@
    :containers   (co/using
                   (new-containers)
                   [:mailman :build])
-   :api-config   (ra/new-api-config {})
+   :api-config   (rr/new-api-config {})
    :api-server   (co/using
                   (new-api-server)
                   [:api-config :artifacts :cache :params :containers :build :event-stream :mailman])

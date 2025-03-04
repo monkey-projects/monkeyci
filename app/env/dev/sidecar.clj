@@ -2,12 +2,11 @@
   (:require [config :as co]
             [monkey.ci.sidecar :as sc]
             [monkey.ci.config.sidecar :as cs]
-            [monkey.ci.runtime
-             [app :as ra]
-             [sidecar :as rs]]))
+            [monkey.ci.runners.runtime :as rr]
+            [monkey.ci.runtime.sidecar :as rs]))
 
 (defn run-test []
-  (ra/with-runner-system @co/global-config
+  (rr/with-runner-system @co/global-config
     (fn [sys]
       (let [api (:api-config sys)
             conf (-> {}

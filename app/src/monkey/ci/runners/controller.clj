@@ -13,7 +13,7 @@
              [runners :as r]
              [script :as script]
              [utils :as u]]
-            [monkey.ci.events.core :as ec]))
+            [monkey.ci.events.mailman :as em]))
 
 (def run-path (comp :run-path :config))
 (def abort-path (comp :abort-path :config))
@@ -21,7 +21,7 @@
 (def m2-cache-dir (comp :m2-cache-path :config))
 
 (defn- post-events [rt evt]
-  (ec/post-events (:events rt) evt))
+  (em/post-events (:mailman rt) evt))
 
 (defn- post-init-evt
   "Post both build/start and script/initializing events.  Indicates the build has started,
@@ -94,14 +94,14 @@
 
 (defn- post-end-evt [{:keys [build] :as rt}]
   (log/debug "Posting :build/end event for exit code" (:exit-code rt))
-  (post-events rt (b/build-end-evt build (get rt :exit-code err/error-process-failure)))
+  (post-events rt [(b/build-end-evt build (get rt :exit-code err/error-process-failure))])
   rt)
 
 (defn- post-failure-evt [{:keys [build] :as rt} msg]
   (try
-    (post-events rt (-> build
-                        (mc/assoc-some :message msg)
-                        (b/build-end-evt build err/error-process-failure)))
+    (post-events rt [(-> build
+                         (mc/assoc-some :message msg)
+                         (b/build-end-evt build err/error-process-failure))])
     (catch Exception ex
       (log/warn "Failed to post :build/end event" ex))))
 

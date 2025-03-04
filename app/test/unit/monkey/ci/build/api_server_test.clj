@@ -215,25 +215,6 @@
         (is (= 200 (:status res)))
         (is (not-empty (slurp (:body res))))))))
 
-(deftest start-container
-  (let [events (h/fake-events)
-        sid (repeatedly 3 (comp str random-uuid))
-        build {:build-id "test-build"
-               :sid sid}
-        rt {:containers (h/fake-container-runner)
-            :build build
-            :events events}]
-    
-    (testing "invokes registered container runner with job settings from body"
-      (let [job {:id "test-job"}
-            res (-> rt
-                    (->req)
-                    (assoc-in [:parameters :body] {:job job})
-                    (sut/start-container))]
-        (is (= 202 (:status res)))
-        (is (= [job]
-               (-> rt :containers :runs deref)))))))
-
 (deftest get-ip-addr
   (testing "returns ipv4 address"
     (is (re-matches #"\d+\.\d+\.\d+\.\d+"
@@ -310,12 +291,5 @@
           (is (= 200 (-> (mock/request :get (str "/cache/" cache-id))
                          (auth)
                          (app)
-                         :status))))))
-
-    (testing "`/container`"
-      (testing "POST `/` starts container job"
-        (is (= 202 (-> (mock/request :post "/container")
-                       (auth)
-                       (app)
-                       :status)))))))
+                         :status))))))))
 

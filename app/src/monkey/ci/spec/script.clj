@@ -19,7 +19,7 @@
 
 (s/def ::artifacts art/repo?)
 (s/def ::cache art/repo?)
-(s/def ::mailman #(contains? % :broker))
+(s/def ::mailman ::c/mailman)
 
 (s/def ::runtime
   (s/keys :req-un [::artifacts ::cache ::mailman]))
