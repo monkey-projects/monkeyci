@@ -134,11 +134,14 @@
 (def app-img (str img-base "/monkeyci"))
 (def gui-img (str img-base "/monkeyci-gui"))
 
+;; Disabled arm because no compute capacity
+(def archs [#_:arm :amd])
+
 (defn build-app-image [ctx]
   (when (publish-app? ctx)
     (kaniko/multi-platform-image
      {:dockerfile "docker/Dockerfile"
-      :archs [:arm :amd]
+      :archs archs
       :target-img (str app-img ":" (image-version ctx))
       :image
       {:job-id "publish-app-img"
@@ -159,7 +162,7 @@
      {:subdir "gui"
       :dockerfile "Dockerfile"
       :target-img (str gui-img ":" (image-version ctx))
-      :archs [:arm :amd]
+      :archs archs
       :image
       {:job-id "publish-gui-img"
        :container-opts
