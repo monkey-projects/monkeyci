@@ -208,12 +208,14 @@
           _ (ms/consume (partial swap! sent conj) (:body f))
           evt {:type :build/updated}]
       (is (true? (publish bus evt)))
-      (is (not-empty @sent))
-      (is (contains? (->> @sent
-                          (map parse-event)
-                          (map :type)
-                          (set))
-                     :ping))))
+      ;;(is (not-empty @sent))
+      (is (not= :timeout
+                (h/wait-until #(contains? (->> @sent
+                                               (map parse-event)
+                                               (map :type)
+                                               (set))
+                                          :ping)
+                              1000)))))
 
   (testing "only sends events for customer specified in path"
     (let [sent (atom [])
