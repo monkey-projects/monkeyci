@@ -315,7 +315,7 @@
     
     (testing "`build/queued`"
       (testing "returns `build/initializing` event"
-        (let [fake-start-ci {:name ::sut/start-ci
+        (let [fake-start-ci {:name ::oci/start-ci
                              :enter (fn [ctx]
                                       (oci/set-ci-response ctx {:status 200
                                                                 :body {:id "test-instance"}}))}
