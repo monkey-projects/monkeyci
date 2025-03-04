@@ -103,9 +103,10 @@
 (defn test-app [ctx]
   (let [junit-artifact (junit-artifact "app")]
     (when (build-app? ctx)
-      (-> (clj-container "test-app" "app" "-M:test:junit:coverage")
+      ;; Disabled coverage because of spec gen errors
+      (-> (clj-container "test-app" "app" "-M:test:junit")
           (assoc :save-artifacts [junit-artifact
-                                  (coverage-artifact "app")]
+                                  #_(coverage-artifact "app")]
                  :junit {:artifact-id (:id junit-artifact)
                          :path "junit.xml"})))))
 

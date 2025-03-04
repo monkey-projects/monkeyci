@@ -11,9 +11,10 @@
              [protocols :as p]
              [storage :as st]
              [vault :as v]]
-            [monkey.ci.config.script :as cs]
             [monkey.ci.events.mailman :as em]
+            [monkey.ci.events.mailman.db :as emd]
             [monkey.ci.runners.oci :as sut]
+            [monkey.ci.script.config :as sc]
             [monkey.ci.spec.events :as se]
             [monkey.oci.container-instance.core :as ci]
             [monkey.ci.helpers :as h]
@@ -178,7 +179,7 @@
                 (is (map? sc)))
 
               (testing "contains build"
-                (let [r (cs/build sc)]
+                (let [r (sc/build sc)]
                   (is (= (:build-id build) (:build-id r)))
                   
                   (testing "without ssh keys"
@@ -188,7 +189,7 @@
                     (is (number? (:credit-multiplier r))))))
 
               (testing "contains api url and token"
-                (let [api (cs/api sc)]
+                (let [api (sc/api sc)]
                   (is (string? (:url api)))
                   (is (string? (:token api))))))
 
@@ -209,32 +210,6 @@
       (testing "contains ssh keys"
         (is (some? (oci/find-volume ic "ssh-keys")))))))
 
-(deftest start-ci
-  (let [{:keys [enter] :as i} (sut/start-ci ::test-client)
-        inv (atom [])]
-    (is (keyword? (:name i)))
-
-    (with-redefs [ci/create-container-instance (fn [client ic]
-                                                 (swap! inv conj {:client client
-                                                                  :config ic})
-                                                 (md/success-deferred {:status 200}))]
-      (testing "`enter` starts container instance"
-        (let [r (-> {}
-                    (sut/set-ci-config ::test-config)
-                    (enter))]
-          (is (= {:container-instance ::test-config}
-                 (-> @inv
-                     first
-                     :config)))
-          (is (= ::test-client
-                 (-> @inv
-                     first
-                     :client)))
-          (is (= {:status 200}
-                 (sut/get-ci-response r)))))
-
-      (testing "fails if creation fails"))))
-
 (deftest decrypt-ssh-keys
   (h/with-memory-store st
     (let [vault (v/->FixedKeyVault (v/generate-key))
@@ -254,7 +229,7 @@
               r (-> {:event {:type :build/pending
                              :sid (st/ext-build-sid build)
                              :build build}}
-                    (em/set-db st)
+                    (emd/set-db st)
                     (enter))]
           (is (= [{:private-key "decrypted-key"
                    :public-key "test-pub"}]
@@ -271,7 +246,7 @@
     
     (testing "updates ci config with container details"
       (let [r (enter {})]
-        (is (= 2 (-> (sut/get-ci-config r)
+        (is (= 2 (-> (oci/get-ci-config r)
                      :containers
                      count)))))))
 
@@ -283,47 +258,31 @@
       (h/with-memory-store st
         (let [sid (repeatedly 3 cuid/random-cuid)
               ctx (-> {:event {:sid sid}}
-                      (sut/set-ci-response {:status 200
+                      (oci/set-ci-response {:status 200
                                             :body {:id "test-ocid"}})
-                      (em/set-db st))
+                      (emd/set-db st))
               r (enter ctx)]
           (is (= ctx r))
           (is (= {:runner :oci
                   :details {:instance-id "test-ocid"}}
                  (st/find-runner-details st sid))))))))
 
-(deftest load-runner-details
-  (let [{:keys [enter]:as i} sut/load-runner-details]
+(deftest load-instance-id
+  (let [{:keys [enter]:as i} sut/load-instance-id]
     (is (keyword? (:name i)))
     
     (testing "`enter` fetches runner details from db"
       (h/with-memory-store st
         (let [sid (repeatedly 3 cuid/random-cuid)
-              ctx (-> {:event {:sid sid}}
-                      (em/set-db st))
+              ocid (random-uuid)
               details {:runner :oci
-                       :details {:instance-id (random-uuid)}}
-              _ (st/save-runner-details st sid details)
-              r (enter ctx)]
-          (is (= details
-                 (sut/get-runner-details r))))))))
-
-(deftest handle-error
-  (let [{:keys [error] :as i} sut/handle-error
-        test-error (ex-info "test error" {})]
-    (is (keyword? (:name i)))
-    (testing "has error handler"
-      (is (fn? error)))
-
-    (testing "returns `build/end` event with failure"
-      (let [r (:result (error {} test-error))]
-        (is (= :build/end (:type r)))
-        (is (= "test error" (get-in r [:build :message])))))
-
-    (testing "removes exception from context"
-      (is (nil? (-> {:io.pedestal.interceptor.chain/error test-error}
-                    (error test-error)
-                    :io.pedestal.interceptor.chain/error))))))
+                       :details {:instance-id ocid}}
+              _ (st/save-runner-details st sid details)]
+          (is (= ocid
+                 (-> {:event {:sid sid}}
+                     (emd/set-db st)
+                     (enter)
+                     (oci/get-ci-id)))))))))
 
 (deftest initialize-build
   (testing "returns `build/initializing` event"
@@ -332,24 +291,6 @@
                (sut/initialize-build)
                :type)))))
 
-(deftest delete-instance
-  (testing "deletes container instance according to runner details"
-    (h/with-memory-store st
-      (let [build (h/gen-build)
-            sid (st/ext-build-sid build)
-            ocid (random-uuid)
-            ctx (-> {:event {:sid sid
-                             :type :build/end
-                             :build build}}
-                    (em/set-db st)
-                    (sut/set-runner-details {:details {:instance-id ocid}}))
-            deleted (atom nil)]
-        (with-redefs [ci/delete-container-instance (fn [client opts]
-                                                     (reset! deleted opts)
-                                                     (md/success-deferred {:status 200}))]
-          (is (nil? (sut/delete-instance ::test-client ctx)))
-          (is (= {:instance-id ocid} @deleted)))))))
-
 (deftest make-router
   (let [build (h/gen-build)
         st (st/make-memory-storage)
@@ -357,9 +298,9 @@
     
     (testing "`build/queued`"
       (testing "returns `build/initializing` event"
-        (let [fake-start-ci {:name ::sut/start-ci
+        (let [fake-start-ci {:name ::oci/start-ci
                              :enter (fn [ctx]
-                                      (sut/set-ci-response ctx {:status 200
+                                      (oci/set-ci-response ctx {:status 200
                                                                 :body {:id "test-instance"}}))}
               router (-> (sut/make-router conf st (h/fake-vault))
                          (mmc/replace-interceptors [fake-start-ci]))
@@ -377,7 +318,7 @@
       (testing "when instance creation fails, returns `build/end` event"
         (let [fail-start-ci {:name ::sut/start-ci
                              :enter (fn [ctx]
-                                      (sut/set-ci-response ctx {:status 500
+                                      (oci/set-ci-response ctx {:status 500
                                                                 :body {:id "test-instance"}}))}
               router (-> (sut/make-router conf st (h/fake-vault))
                          (mmc/replace-interceptors [fail-start-ci]))

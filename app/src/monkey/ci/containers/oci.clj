@@ -23,6 +23,7 @@
             [monkey.ci.config.sidecar :as cos]
             [monkey.ci.containers.promtail :as pt]
             [monkey.ci.events.core :as ec]
+            [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.oci.container-instance.core :as ci]))
 
 ;; TODO Get this information from the OCI shapes endpoint
@@ -256,6 +257,8 @@
         ;; delete the container instance when the sidecar and the job have completed.
         (add-promtail-container conf))))
 
+;;; Container runner implementation
+
 (def container-start-timeout
   "Max msecs to wait until container has started"
   (* 5 60 1000))
@@ -382,7 +385,7 @@
               {:job job})))
   true)
 
-(defn run-container [{:keys [events job build] :as conf}]
+(defn ^:deprecated run-container [{:keys [events job build] :as conf}]
   (log/debug "Running job as OCI instance:" job)
   (log/debug "Build details:" build)
   (let [client (-> (ci/make-context (:oci conf))
@@ -437,3 +440,162 @@
 
 (defn make-container-runner [conf events]
   (->OciContainerRunner conf events job-credit-multiplier))
+
+;;; Mailman events
+
+;;; Context accessors
+
+(def job-id (comp :job-id :event))
+(def build-sid (comp :sid :event))
+
+(def get-credit-multiplier ::credit-multiplier)
+
+(defn set-credit-multiplier [ctx cm]
+  (assoc ctx ::credit-multiplier cm))
+
+(def get-build (comp :build emi/get-state))
+
+(defn set-build [ctx b]
+  (emi/update-state ctx assoc :build b))
+
+(def get-config ::config)
+
+(defn set-config [ctx c]
+  (assoc ctx ::config c))
+
+(defn- get-job-state
+  "Retrieves state for the job indicated by `job-id` in the event."
+  [ctx]
+  (-> (emi/get-state ctx)
+      (get-in [::jobs (job-id ctx)])))
+
+(defn- job-state
+  "Applies `f` to job state.  Does not update state."
+  [ctx f]
+  (f (get-job-state ctx)))
+
+(defn- update-job-state
+  "Applies `f` to job state, updates state."
+  [ctx f & args]
+  (apply emi/update-state ctx update-in [::jobs (job-id ctx)] f args))
+
+(defn container-ended? [ctx]
+  (job-state ctx (comp true? :container-end)))
+
+(defn sidecar-ended? [ctx]
+  (job-state ctx (comp true? :sidecar-end)))
+
+(defn get-instance-id [ctx]
+  (job-state ctx :instance-id))
+
+;;; Interceptors
+
+(defn add-config [conf]
+  {:name ::add-config
+   :enter (fn [ctx]
+            (set-config ctx conf))})
+
+(def prepare-instance-config
+  {:name ::prepare-instance
+   :enter (fn [ctx]
+            (-> (get-config ctx)
+                (assoc :build (get-build ctx)
+                       :job (get-in ctx [:event :job]))
+                (instance-config)
+                (as-> c (oci/set-ci-config ctx c))))})
+
+(def calc-credit-multiplier
+  "Calculates credit multiplier according to instance config"
+  {:name ::calc-credit-multiplier
+   :enter (fn [ctx]
+            (set-credit-multiplier ctx (oci/credit-multiplier (oci/get-ci-config ctx))))})
+
+(def set-container-end
+  {:name ::set-container-end
+   :enter (fn [ctx]
+            (update-job-state ctx assoc :container-end true))})
+
+(def set-sidecar-end
+  {:name ::set-sidecar-end
+   :enter (fn [ctx]
+            (update-job-state ctx assoc :sidecar-end true))})
+
+(def save-instance-id
+  "Stores instance id taken from the instance creation response in the job state."
+  {:name ::save-instance-id
+   :enter (fn [ctx]
+            (update-job-state ctx assoc :instance-id (-> ctx (oci/get-ci-response) :body :id)))})
+
+(def load-instance-id
+  {:name ::load-instance-id
+   :enter (fn [ctx]
+            (oci/set-ci-id ctx (get-instance-id ctx)))})
+
+;;; Event handlers
+
+(defn job-queued [ctx]
+  [(j/job-initializing-evt (job-id ctx) (build-sid ctx) (get-credit-multiplier ctx))])
+
+(defn container-start
+  "Indicates the container script has started.  This means the job is actually running,
+   since events are proliferated by the sidecar, so if events arrive, we're sure that
+   the sidecar is running."
+  [ctx]
+  [(j/job-start-evt (job-id ctx) (build-sid ctx))])
+
+(defn- job-executed-evt [{:keys [event] :as ctx}]
+  (j/job-executed-evt (job-id ctx) (build-sid ctx) (assoc (:result event) :status (:status event))))
+
+(defn container-end
+  "Indicates job script has terminated.  If the sidecar has also ended, the job has been
+   executed"
+  [ctx]
+  (when (sidecar-ended? ctx)
+    [(job-executed-evt ctx)]))
+
+(defn sidecar-end
+  "Indicates job sidecar has terminated.  If the container script has also ended, the job
+   has been executed"
+  [ctx]
+  (when (container-ended? ctx)
+    [(job-executed-evt ctx)]))
+
+;;; Route configuration
+
+(defn- make-ci-context [conf]
+  (-> (ci/make-context (:oci conf))
+      (oci/add-inv-interceptor :containers)))
+
+(defn make-routes [conf build]
+  (let [client (make-ci-context conf)
+        state (emi/with-state (atom {:build build
+                                     :config conf}))]
+    [[:container/job-queued
+      ;; Job picked up, start the container instance
+      [{:handler job-queued
+        :interceptors [emi/handle-job-error
+                       (add-config conf)
+                       prepare-instance-config
+                       calc-credit-multiplier
+                       (oci/start-ci-interceptor client)
+                       save-instance-id]}]]
+
+     ;; Container script has started along with the sidecar (which forwards events)
+     [:container/start
+      [{:handler container-start}]]
+     
+     ;; Container script has ended, all commands executed
+     [:container/end
+      [{:handler container-end
+        :interceptors [set-container-end]}]]
+     
+     ;; Sidecar terminated, artifacts have been stored
+     [:sidecar/end
+      [{:handler sidecar-end
+        :interceptors [set-sidecar-end]}]]
+
+     ;; Job executed, we can delete the container instance
+     [:job/executed
+      [{:handler (constantly nil)
+        :interceptors [load-instance-id
+                       (oci/delete-ci-interceptor client)]}]]]))

@@ -157,6 +157,7 @@
 (defn save-artifacts
   "Saves all artifacts according to the job configuration."
   [rt]
+  (log/debug "Saving artifacts for job" (:job rt))
   (-> (rt->config rt)
       (assoc :job-key :save-artifacts)
       (save-generic)))
@@ -189,3 +190,43 @@
 
 (defn make-build-api-repository [client]
   (->BuildApiArtifactRepository client "/artifact/"))
+
+;;; Interceptors
+
+(def get-restored ::restored)
+
+(defn set-restored [ctx r]
+  (assoc ctx ::restored r))
+
+(defn restore-interceptor
+  "Interceptor that restores artifacts using the given repo, build and job retrieved
+   from the context using `get-job-ctx`.  Adds details about the restored artifacts to
+   the context."
+  [get-job-ctx]
+  {:name ::restore-artifacts
+   :enter (fn [ctx]
+            (->> (get-job-ctx ctx)
+                 (restore-artifacts)
+                 ;; Note that this will block the event processing while the operation continues
+                 ;; so we may consider switching to async handling.
+                 (deref)
+                 (set-restored ctx)))})
+
+(def get-saved ::saved)
+
+(defn set-saved [ctx r]
+  (assoc ctx ::saved r))
+
+(defn save-interceptor
+  "Interceptor that saves artifacts using the repo, build and job retrieved
+   from the context using `get-job-ctx`.  Adds details about the saved artifacts to
+   the context."
+  [get-job-ctx]
+  {:name ::save-artifacts
+   :enter (fn [ctx]
+            (->> (get-job-ctx ctx)
+                 (save-artifacts)
+                 ;; Note that this will block the event processing while the operation continues
+                 ;; so we may consider switching to async handling.
+                 (deref)
+                 (set-saved ctx)))})

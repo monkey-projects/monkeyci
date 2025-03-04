@@ -1,8 +1,7 @@
 (ns monkey.ci.reporting
   "Provides functions for reporting output.  This can be logging, or printing
    to stdout, or formatting as json, etc..."
-  (:require [clojure.tools.logging :as log]
-            [monkey.ci.runtime :as rt]))
+  (:require [clojure.tools.logging :as log]))
 
 (defn log-reporter
   "Just logs the input object"
@@ -16,6 +15,3 @@
 
 (defmethod make-reporter :default [_]
   log-reporter)
-
-(defmethod rt/setup-runtime :reporter [conf _]
-  (make-reporter (:reporter conf)))

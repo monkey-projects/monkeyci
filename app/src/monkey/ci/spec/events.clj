@@ -67,6 +67,14 @@
   (->> (s/keys :req-un [::credit-multiplier])
        (s/merge ::job-event)))
 
+(defmethod event-type :job/pending [_]
+  (-> (s/keys :req-un [:script/job])
+      (s/merge ::job-event)))
+
+(defmethod event-type :job/queued [_]
+  (-> (s/keys :req-un [:script/job])
+      (s/merge ::job-event)))
+
 (defmethod event-type :job/start [_]
   ::job-event)
 

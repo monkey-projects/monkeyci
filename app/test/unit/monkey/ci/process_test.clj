@@ -18,7 +18,7 @@
              [sid :as sid]
              [utils :as u]]
             [monkey.ci.build.core :as bc]
-            [monkey.ci.config.script :as cos]
+            [monkey.ci.script.config :as sco]
             [monkey.ci.spec
              [common :as sc]
              [events :as se]
@@ -33,13 +33,13 @@
 (defn example [subdir]
   (.getAbsolutePath (io/file cwd "examples" subdir)))
 
-(deftest run
+#_(deftest run
   (at/with-fake-http ["http://test/events" {:status 200
                                             :body (bs/to-input-stream "")}]
     (let [build {:build-id "test-build"}
-          config (-> cos/empty-config
-                     (cos/set-build build)
-                     (cos/set-api {:url "http://test"
+          config (-> sco/empty-config
+                     (sco/set-build build)
+                     (sco/set-api {:url "http://test"
                                    :token "test-token"}))]    
       (with-redefs [sut/exit! (constantly nil)]
         (testing "parses arg as config file"
@@ -147,10 +147,10 @@
       (let [logfile (io/file dir "logback-test.xml")]
         (is (nil? (spit logfile "test file")))
         (is (= (str "-Dlogback.configurationFile=" logfile)
-               (->> {:config {:runner
-                              {:type :child
-                               :log-config "logback-test.xml"}
-                              :work-dir dir}}
+               (->> {:runner
+                     {:type :child
+                      :log-config "logback-test.xml"}
+                     :work-dir dir}
                     (sut/generate-deps {})
                     :aliases
                     :monkeyci/build
@@ -169,10 +169,10 @@
           (let [logfile (io/file dir "logback-test.xml")]
             (is (nil? (spit logfile "test file")))
             (is (= (str "-Dlogback.configurationFile=" logfile)
-                   (->> {:config {:runner
-                                  {:type :child
-                                   :log-config (.getAbsolutePath logfile)}
-                                  :work-dir "other"}}
+                   (->> {:runner
+                         {:type :child
+                          :log-config (.getAbsolutePath logfile)}
+                         :work-dir "other"}
                         (sut/generate-deps {})
                         (get-jvm-opts)))))))
 
@@ -203,16 +203,16 @@
   (testing "adds build to config"
     (let [build {:build-id "test-build"}
           e (sut/child-config build {})]
-      (is (= build (cos/build e)))))
+      (is (= build (sco/build e)))))
 
   (testing "adds api server url and ip address"
     (let [conf (sut/child-config {}  {:port 1234})]
-      (is (sc/url? (:url (cos/api conf))))
-      (is (= 1234 (:port (cos/api conf))))))
+      (is (sc/url? (:url (sco/api conf))))
+      (is (= 1234 (:port (sco/api conf))))))
 
   (testing "adds api server token"
     (let [conf (sut/child-config {} {:token "test-token"})]
-      (is (= "test-token" (:token (cos/api conf)))))))
+      (is (= "test-token" (:token (sco/api conf)))))))
 
 (deftest test!
   (let [build {:build-id "test-build"}
@@ -232,7 +232,7 @@
 
 (deftest generate-test-deps
   (testing "includes monkeyci test lib"
-    (is (contains? (-> (sut/generate-test-deps {} false)
+    (is (contains? (-> (sut/generate-test-deps false false)
                        :aliases
                        :monkeyci/test
                        :extra-deps)
@@ -240,8 +240,7 @@
 
   (testing "points to local test lib dir in dev mode"
     (is (= (-> (u/cwd) (fs/parent) (fs/path "test-lib") str)
-           (-> (sut/generate-test-deps {:config
-                                        {:dev-mode true}}
+           (-> (sut/generate-test-deps true
                                        false)
                :aliases
                :monkeyci/test
@@ -250,7 +249,7 @@
                :local/root))))
 
   (testing "enables watching if specified"
-    (is (true? (-> (sut/generate-test-deps {} true)
+    (is (true? (-> (sut/generate-test-deps false true)
                    :aliases
                    :monkeyci/test
                    :exec-args

@@ -11,8 +11,8 @@
   (* h 3600 1000))
 
 (defn day-start
-  "Given an offset date time, returns the date at midnight"
-  [^OffsetDateTime date]
+  "Returns the date at midnight for given time object"
+  [date]
   (jt/truncate-to date :days))
 
 (defn date-seq

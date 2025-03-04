@@ -614,3 +614,109 @@
             (is (some? evt))
             (is (= "infra error" (get-in evt [:result :message])))))))))
 
+(deftest make-routes
+  (let [routes (sut/make-routes {} (h/gen-build))
+        expected [:container/job-queued
+                  :container/start
+                  :container/end
+                  :sidecar/end
+                  :job/executed]]
+    (doseq [t expected]
+      (testing (format "handles `%s`" t)
+        (is (contains? (set (map first routes)) t))))))
+
+(deftest prepare-instance-config
+  (let [{:keys [enter] :as i} sut/prepare-instance-config]
+    (is (keyword? (:name i)))
+
+    (testing "adds ci config to context"
+      (is (map? (-> {}
+                    (sut/set-config default-config)
+                    (sut/set-build {:checkout-dir "test/dir"})
+                    (enter)
+                    (oci/get-ci-config)))))))
+
+(deftest calc-credit-multiplier
+  (let [{:keys [enter] :as i} sut/calc-credit-multiplier]
+    (is (keyword? (:name i)))
+    
+    (testing "calculates from instance config"
+      (is (= 5 (-> {}
+                   (oci/set-ci-config {:shape "CI.Standard.E4.Flex"
+                                       :shape-config
+                                       {:ocpus 1
+                                        :memory-in-g-bs 3}})
+                   (enter)
+                   (sut/get-credit-multiplier)))))))
+
+(deftest save-instance-id
+  (let [{:keys [enter] :as i} sut/save-instance-id]
+    (is (keyword? (:name i)))
+
+    (testing "stores response id in job state"
+      (let [ocid (random-uuid)]
+        (is (= ocid
+               (-> {:event {:job-id "test-job"}}
+                   (oci/set-ci-response {:body {:id ocid}})
+                   (enter)
+                   (sut/get-instance-id))))))))
+
+(deftest job-queued
+  (testing "fires `job/initializing` event with credit multiplier from context"
+    (let [evts (-> {:event
+                    {:job-id "container-job"}}
+                   (sut/set-credit-multiplier 4)
+                   (sut/job-queued))]
+      (is (= [:job/initializing]
+             (map :type evts)))
+      (is (= 4 (-> evts first :credit-multiplier))))))
+
+(deftest container-start
+  (testing "fires `job/start` event"
+    (is (= [:job/start]
+           (->> {:event
+                 {:job-id "test-job"}}
+                (sut/container-start)
+                (map :type))))))
+
+(deftest container-end
+  (testing "fires `job/executed` if sidecar has also ended"
+    (is (= :job/executed
+           (-> {:event {:job-id "test-job"}}
+               ((:enter sut/set-sidecar-end))
+               (sut/container-end)
+               first
+               :type))))
+
+  (testing "`nil` if sidecar is still running"
+    (is (nil? (sut/container-end {:event {:job-id "test-job"}}))))
+
+  (testing "handles multiple jobs"
+    (let [[job-1 job-2] (repeatedly 2 random-uuid)
+          se (:enter sut/set-sidecar-end)]
+      (is (nil?
+           (-> {:event {:job-id job-1}}
+               (se) ; Mark sidecar end for job-1, but not job-2
+               (assoc :event {:job-id job-2})
+               (sut/container-end)))))))
+
+(deftest sidecar-end
+  (testing "fires `job/executed` if container has also ended"
+    (is (= :job/executed
+           (-> {:event {:job-id "test-job"}}
+               ((:enter sut/set-container-end))
+               (sut/sidecar-end)
+               first
+               :type))))
+
+  (testing "`nil` if container is still running"
+    (is (nil? (sut/sidecar-end {:event {:job-id "test-job"}}))))
+
+  (testing "handles multiple jobs"
+    (let [[job-1 job-2] (repeatedly 2 random-uuid)
+          ce (:enter sut/set-container-end)]
+      (is (nil?
+           (-> {:event {:job-id job-1}}
+               (ce) ; Mark container end for job-1, but not job-2
+               (assoc :event {:job-id job-2})
+               (sut/container-end)))))))

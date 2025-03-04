@@ -22,7 +22,12 @@
              [spec :as spec]
              [utils :as u]]
             [monkey.ci.events.core :as ec]
-            [monkey.ci.runners.controller :as rc]
+            [monkey.ci.local
+             [config :as lc]
+             [runtime :as lr]]
+            [monkey.ci.runners
+             [controller :as rc]
+             [runtime :as rr]]
             [monkey.ci.runtime
              [app :as ra]
              [sidecar :as rs]]
@@ -31,58 +36,28 @@
              [auth :as auth]
              [handler :as h]]))
 
-(defn run-build
-  "Performs a build, using the runner from the context.  Returns a deferred
-   that will complete when the build finishes."
-  [config]
-  (ra/with-runner-system config
-    (fn [{:keys [runner events build]}]
-      (try
-        (log/debug "Starting runner for build" build)
-        (runner)
-        (catch Exception ex
-          (log/error "Unable to start build" ex)
-          (ec/post-events events (b/build-end-evt (assoc build :message (ex-message (or (ex-cause ex) ex)))
-                                                  err/error-process-failure))
-          err/error-process-failure)))))
-
 (defn run-build-local
-  "Run a build locally, normally from local source but can also be from a git checkout."
-  ;; TODO
-  [config])
-
-;; (defn- deps-exists? [rt]
-;;   (fs/exists? (fs/path (get-in rt [:build :script :script-dir]) "deps.edn")))
-
-;; (defn- verify-child-proc
-;;   "Starts a child process to perform verification.  This is necessary if a `deps.edn`
-;;    exists with custom dependencies."
-;;   [rt]
-;;   ;; TODO Need to get back reported info.  Using a UDS?
-;;   1)
-
-;; (defn- verify-in-proc
-;;   "Verifies the build in the current directory by loading the script files in-process
-;;    and resolving the jobs.  This is useful when checking if there are any compilation
-;;    errors in the script."
-;;   [rt]
-;;   (letfn [(report [rep]
-;;             (rt/report rt rep)
-;;             (if (= :verify/success (:type rep)) 0 err/error-script-failure))]
-;;     (try
-;;       ;; TODO Git branch and other options
-;;       ;; TODO Build parameters
-;;       (let [jobs (script/load-jobs (:build rt) rt)]
-;;         (report
-;;          (if (not-empty jobs)
-;;            {:type :verify/success
-;;             :jobs jobs}
-;;            {:type :verify/failed
-;;             :message "No jobs found in build script for the active configuration"})))
-;;       (catch Exception ex
-;;         (log/error "Error verifying build" ex)
-;;         (report {:type :verify/failed
-;;                  :message (ex-message ex)})))))
+  "Run a build locally, normally from local source but can also be from a git checkout.
+   Returns a deferred that will hold zero if the build succeeds, nonzero if it fails."
+  [{:keys [workdir dir] :as config}]
+  (let [wd (fs/create-temp-dir) ; TODO Use subdir of current dir .monkeyci?
+        cwd (u/cwd)
+        build (cond-> {:checkout-dir (or (some->> workdir
+                                                  (u/abs-path cwd)
+                                                  (fs/canonicalize)
+                                                  str)
+                                         cwd)
+                       :customer-id "local-cust"
+                       :repo-id "local-repo"
+                       :build-id (b/local-build-id)}
+                dir (b/set-script-dir dir))
+        conf (-> (select-keys config [:mailman :lib-coords :log-config]) ; Allow override for testing
+                 (lc/set-work-dir wd)
+                 (lc/set-build build))]
+    (log/info "Running local build for src:" (:checkout-dir build))
+    (log/debug "Using working directory" (str wd))
+    (lr/start-and-post conf (ec/make-event :build/pending
+                                           :build build))))
 
 (defn verify-build
   "Runs a linter agains the build script to catch any grammatical errors."
@@ -104,7 +79,7 @@
                      :build (:build rt)})
       (:exit @(proc/test! (:build rt) rt)))))
 
-(defn list-builds [rt]
+(defn ^:deprecated list-builds [rt]
   (->> (http/get (apply format "%s/customer/%s/repo/%s/builds"
                         ((juxt :url :customer-id :repo-id) (rt/account rt)))
                  {:headers {"accept" "application/edn"}})
@@ -128,7 +103,7 @@
       ;; Wait for server to stop
       (h/on-server-close http))))
 
-(defn watch
+(defn ^:deprecated watch
   "Starts listening for events and prints the results.  The arguments determine
    the event filter (all for a customer, project, or repo)."
   [rt]
@@ -160,21 +135,6 @@
                     (log/error "Unable to receive server events:" err))))
     ;; Return a deferred that only resolves when the event stream stops
     d))
-
-(defn- sidecar-rt->job [rt]
-  (get-in rt [rt/config :args :job-config :job]))
-
-(defn- ^:deprecated ->sidecar-rt
-  "Creates a runtime for the sidecar from the generic runtime.  To be removed."
-  [rt]
-  (let [conf (get-in rt [rt/config :sidecar])
-        args (get-in rt [rt/config :args])]
-    (-> rt
-        (select-keys [:build :events :workspace :artifacts :cache])
-        (assoc :job (sidecar-rt->job rt)
-               :log-maker (rt/log-maker rt)
-               :paths (select-keys args [:events-file :start-file :abort-file]))
-        (mc/assoc-some :poll-interval (get-in rt [rt/config :sidecar :poll-interval])))))
 
 (defn- run-sidecar [{:keys [events job] :as rt}]
   (let [sid (b/get-sid rt)
@@ -214,7 +174,7 @@
    the controller."
   [conf]
   (log/info "Running controller with config:" conf)
-  (ra/with-runner-system conf
+  (rr/with-runner-system conf
     (fn [sys]
       (rc/run-controller (:runtime sys)))))
 

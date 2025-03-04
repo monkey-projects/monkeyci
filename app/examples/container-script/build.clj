@@ -1,12 +1,11 @@
-;; Basic build script that uses Docker
-(require '[monkey.ci.build.core :as core])
-(require '[monkey.ci.build.container :as container])
-(require '[monkey.ci.build.shell :as shell])
+(ns build
+  ;; Basic build script that uses Docker
+  (:require [monkey.ci.build.v2 :as m]))
 
-;; Should run using a step runner that supports docker images
-(core/pipeline
- {:name "test pipeline"
-  :steps [{:container/image "debian:latest"
-           :script ["echo \"I am running from Debian\""]}
-          {:container/image "alpine:latest"
-           :script ["echo \"And I'm running from Alpine\""]}]})
+[(-> (m/container-job "first-container")
+     (m/image "debian:latest")
+     (m/script ["echo \"I am running from Debian\""]))
+
+ (-> (m/container-job "second-container")
+     (m/image "alpine:latest")
+     (m/script ["echo \"And I'm running from Alpine\""]))]

@@ -11,6 +11,7 @@
              [core :as bc]
              [shell :as bs]]
             [monkey.ci
+             [build :as b]
              [containers :as co]
              [jobs :as j]]))
 
@@ -214,3 +215,12 @@
 (def build-id
   "Returns current build id"
   (comp :build-id :build))
+
+(def checkout-dir
+  "Returns the build checkout directory"
+  (comp b/checkout-dir :build))
+
+(def in-work
+  "Given a relative path `p`, returns it as a subpath to the job working directory.
+   Fails if an absolute path is given."
+  bs/in-work)

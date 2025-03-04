@@ -12,7 +12,9 @@
              [api :as api]
              [api-server :as bas]]
             [monkey.ci.helpers :as h]
-            [monkey.ci.test.api-server :as ta]))
+            [monkey.ci.test
+             [api-server :as ta]
+             [blob :as tb]]))
 
 (deftest save-artifacts
   (testing "saves path using blob store, relative to job work dir"
@@ -112,3 +114,47 @@
 
         (testing "does nothing if artifact does not exist"
           (is (nil? @(sut/restore-artifact repo "nonexisting" (str out-dir)))))))))
+
+(deftest restore-interceptor
+  (let [blob (tb/test-store {"test/build/test-art.tgz" {:file "/tmp/test.txt"}})
+        build {:sid ["test" "build"]
+               :checkout-dir "/test/dir"}
+        job {:id "test-job"
+             :restore-artifacts [{:id "test-art"
+                                  :path "test/path"}]}
+        art (sut/make-blob-repository blob build)
+        {:keys [enter] :as i} (sut/restore-interceptor ::job-ctx)]
+    (is (keyword? (:name i)))
+    
+    (testing "`enter` restores artifacts for job using repository"
+      (let [r (-> {::job-ctx {:job job
+                              :build build
+                              :artifacts art}}
+                  (enter)
+                  (sut/get-restored)
+                  first)]
+        (is (= "/tmp/test.txt" (:dest r)))
+        (is (cs/ends-with? (:src r) "test/build/test-art.tgz"))))))
+
+(deftest save-interceptor
+  (let [blob (tb/test-store)
+        build {:sid ["test" "build"]
+               :checkout-dir "/tmp"}
+        job {:id "test-job"
+             :save-artifacts [{:id "test-art"
+                               :path "test/path"}]}
+        art (sut/make-blob-repository blob build)
+        {:keys [enter] :as i} (sut/save-interceptor ::job-ctx)]
+    (is (keyword? (:name i)))
+    
+    (testing "`enter` saves artifacts for job using repository"
+      (is (= 1 
+             (-> {::job-ctx {:job job
+                             :artifacts art
+                             :build build}}
+                 (enter)
+                 (sut/get-saved)
+                 (count))))
+      (is (= "/tmp/test/path" (-> (tb/stored blob)
+                                  (get "test/build/test-art.tgz")
+                                  :file))))))

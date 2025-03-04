@@ -1,8 +1,11 @@
 (ns monkey.ci.test.api-server
   "Helper functions for working with api servers"
-  (:require [manifold.deferred :as md]
-            [monkey.ci.build.api-server :as srv]
-            [monkey.ci.protocols :as p]
+  (:require [manifold
+             [deferred :as md]
+             [stream :as ms]]
+            [monkey.ci
+             [protocols :as p]
+             [runtime :as rt]]
             [monkey.ci.test.runtime :as trt]))
 
 (defrecord EmptyParams []
@@ -13,6 +16,7 @@
 (defn test-config
   "Creates dummy test configuration for api server"
   []
-  (-> (trt/test-runtime)
-      (srv/rt->api-server-config)
-      (assoc :params (->EmptyParams))))
+  (let [rt (trt/test-runtime)]
+    (assoc rt
+           :event-stream (ms/stream 1)
+           :params (->EmptyParams))))

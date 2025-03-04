@@ -10,10 +10,12 @@
             [monkey.ci.helpers :as h]
             [monkey.ci.test
              [blob :as tb]
-             [runtime :as trt]]))
+             [mailman :as tm]
+             [runtime :as trt]]
+            [monkey.mailman.core :as mmc]))
 
 (defrecord FailingEventsPoster []
-  p/EventPoster
+  mmc/EventPoster
   (post-events [this evt]
     (throw (ex-info "Always fails" {}))))
 
@@ -42,7 +44,11 @@
                      (fs/delete p)))
                  ;; Run controller async otherwise it will block tests
                  (md/future (sut/run-controller rt)))
-          res (run! rt)]
+          res (run! rt)
+          first-evt-by-type (fn [t]
+                              (->> (:mailman rt)
+                                   (tm/get-posted)
+                                   (h/first-event-by-type t)))]
       (is (nil? (spit exit-path (str exit-code))))
       (is (not (md/realized? res)))
 
@@ -52,16 +58,10 @@
         (is (not= :timeout (h/wait-until #(fs/exists? run-path) 1000))))
       
       (testing "posts `build/start` event"
-        (let [events (:events rt)]
-          (is (some? events))
-          (is (some? (->> (h/received-events events)
-                          (h/first-event-by-type :build/start))))))
+        (is (some? (first-evt-by-type :build/start))))
       
       (testing "posts `script/initializing` event"
-        (let [events (:events rt)]
-          (is (some? events))
-          (is (some? (->> (h/received-events events)
-                          (h/first-event-by-type :script/initializing))))))
+        (is (some? (first-evt-by-type :script/initializing))))
       
       (testing "performs git clone"
         (is (true? @cloned?)))
@@ -78,10 +78,7 @@
         (is (not-empty (-> rt :build-cache :stored deref))))
       
       (testing "posts `build/end` event"
-        (let [events (:events rt)]
-          (is (some? events))
-          (is (some? (->> (h/received-events events)
-                          (h/first-event-by-type :build/end))))))
+        (is (some? (first-evt-by-type :build/end))))
 
       (testing "returns exit code read from exit file"
         (is (= exit-code (deref res 100 :timeout))))
@@ -90,20 +87,19 @@
         (testing "creates abort file"
           (is (not= 0
                     (-> rt
-                        (assoc :events (->FailingEventsPoster)) ; force error
+                        (assoc :mailman {:broker (->FailingEventsPoster)}) ; force error
                         (run!)
-                        (deref))))
+                        (deref 1000 :timeout))))
           (is (fs/exists? abort-path)))
 
         (testing "posts build failure event"
-          (h/reset-events (:events rt))
+          (tm/clear-posted! (:mailman rt))
           (is (not= 0
                     (-> rt
                         (assoc :git {:clone (fn [& _] (throw (ex-info "test error" {})))}) ; force error
                         (run!)
                         (deref))))
-          (let [evt (->> (h/received-events (:events rt))
-                         (h/first-event-by-type :build/end))]
+          (let [evt (first-evt-by-type :build/end)]
             (is (some? evt))
             (is (= :error (:status evt)))
             (is (= "test error" (:message evt))))))
@@ -121,9 +117,7 @@
           (is (not= :timeout (h/wait-until #(fs/exists? run-path) 1000)))
           (is (nil? (fs/delete run-path)))
           (is (not= :timeout (h/wait-until
-                              (fn []
-                                (some? (->> (h/received-events (:events rt))
-                                            (h/first-event-by-type :build/end))))
+                              #(some? (first-evt-by-type :build/end))
                               1000)))
           (is (some? @res))
           ;; We expect only a restore action, no save

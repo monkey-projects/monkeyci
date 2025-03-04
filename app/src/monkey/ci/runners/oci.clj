@@ -15,15 +15,17 @@
             [monkey.ci
              [build :as b]
              [edn :as edn]
-             [errors :as errors]
              [oci :as oci]
              [protocols :as p]
              [storage :as st]
              [utils :as u]
              [version :as v]]
             [monkey.ci.build.api-server :as bas]
-            [monkey.ci.config.script :as cos]
             [monkey.ci.events.mailman :as em]
+            [monkey.ci.events.mailman
+             [db :as emd]
+             [interceptors :as emi]]
+            [monkey.ci.script.config :as sc]
             [monkey.ci.web.auth :as auth]
             [monkey.mailman
              [core :as mmc]
@@ -135,16 +137,16 @@
      [lc])))
 
 (defn- script-config [{:keys [runner] :as config}]
-  (-> cos/empty-config
-      (cos/set-build (-> (:build config)
-                         ;; Credit multiplier for action jobs
-                         (assoc :credit-multiplier (oci/credit-multiplier
-                                                    oci/default-arch
-                                                    oci/default-cpu-count
-                                                    oci/default-memory-gb))
-                         (build->out)))
-      (cos/set-api {:url (format "http://localhost:%d" (:api-port runner))
-                    :token (:api-token runner)})))
+  (-> sc/empty-config
+      (sc/set-build (-> (:build config)
+                        ;; Credit multiplier for action jobs
+                        (assoc :credit-multiplier (oci/credit-multiplier
+                                                   oci/default-arch
+                                                   oci/default-cpu-count
+                                                   oci/default-memory-gb))
+                        (build->out)))
+      (sc/set-api {:url (format "http://localhost:%d" (:api-port runner))
+                   :token (:api-token runner)})))
 
 (defn- checkout-dir [build]
   (u/combine oci/work-dir (b/build-id build)))
@@ -241,16 +243,6 @@
                                      (remove nil?)))
         (add-ssh-keys-volume build))))
 
-(def get-ci-config ::ci-config)
-
-(defn set-ci-config [ctx bi]
-  (assoc ctx ::ci-config bi))
-
-(def get-ci-response ::ci-response)
-
-(defn set-ci-response [ctx bi]
-  (assoc ctx ::ci-response bi))
-
 (def get-runner-details ::runner-details)
 
 (defn set-runner-details [ctx bi]
@@ -270,43 +262,26 @@
                          mc/update-existing
                          :ssh-keys
                          (partial decrypt-keys
-                                  (comp :iv #(st/find-crypto (em/get-db ctx) (-> ctx :event :sid first))))))}))
+                                  (comp :iv #(st/find-crypto (emd/get-db ctx) (-> ctx :event :sid first))))))}))
 
 (defn prepare-ci-config [config]
   "Creates the ci config to run the required containers for the build."
   {:name ::instance-config
    :enter (fn [ctx]
-            (set-ci-config ctx (instance-config config (evt-build ctx))))})
-
-(defn- create-instance [client config]
-  (log/debug "Creating container instance using config" config)
-  (oci/with-retry
-    #(ci/create-container-instance client {:container-instance config})))
-
-(defn- log-ci-error [{:keys [status body] :as resp}]
-  (when (or (nil? status) (>= status 400))
-    (log/error "Failed to create container instance:" resp))
-  resp)
-
-(defn start-ci [client]
-  "Interceptor that starts container instance using the config specified in the context"
-  {:name ::start-ci
-   :enter (fn [ctx]
-            ;; Start container instance, put result back in the context
-            ;; TODO Async processing?
-            (->> @(create-instance client (get-ci-config ctx))
-                 (log-ci-error)
-                 (set-ci-response ctx)))})
+            (oci/set-ci-config ctx (instance-config config (evt-build ctx))))})
 
 (def end-on-ci-failure
   {:name ::end-on-ci-failure
    :enter (fn [ctx]
-            (let [resp (get-ci-response ctx)
+            (let [resp (oci/get-ci-response ctx)
                   build (evt-build ctx)]
               (cond-> ctx
                 (>= (:status resp) 400)
-                (-> (assoc :result (b/build-end-evt
-                                    (assoc build :message "Failed to create container instance")))
+                (-> (assoc :result
+                           (b/build-end-evt
+                            (assoc build
+                                   :message
+                                   (str "Failed to create container instance: " (get-in resp [:body :message])))))
                     ;; Do not proceed
                     (pi/terminate)))))})
 
@@ -317,44 +292,23 @@
    :enter (fn [ctx]
             (let [sid (get-in ctx [:event :sid])
                   details {:runner :oci
-                           :details {:instance-id (get-in (get-ci-response ctx) [:body :id])}}]
+                           :details {:instance-id (get-in (oci/get-ci-response ctx) [:body :id])}}]
               (log/debug "Saving runner details:" details)
-              (st/save-runner-details (em/get-db ctx) sid details)
+              (st/save-runner-details (emd/get-db ctx) sid details)
               ctx))})
 
-(def load-runner-details
-  "Interceptor that fetches build runner details from the db.
+(def load-instance-id
+  "Interceptor that fetches build runner instance id from the db.
    This assumes the db is present in the context."
-  {:name ::load-runner-details
+  {:name ::load-instance-id
    :enter (fn [ctx]
-            (set-runner-details ctx (st/find-runner-details (em/get-db ctx) (get-in ctx [:event :sid]))))})
-
-(def handle-error
-  "Marks build as failed"
-  {:name ::error-handler
-   :error (fn [{:keys [event] :as ctx} ex]
-            (log/error "Failed to handle event" (:type event) ", marking build as failed" ex)
-            (-> ctx
-                (em/set-result (b/build-end-evt (-> (:build event)
-                                                    (assoc :message (ex-message ex)))
-                                                errors/error-process-failure))
-                ;; Remove the error to ensure leave chain is processed
-                (dissoc ::pi/error)))})
+            (->> (st/find-runner-details (emd/get-db ctx) (get-in ctx [:event :sid]))
+                 :details
+                 :instance-id
+                 (oci/set-ci-id ctx)))})
 
 (defn initialize-build [ctx]
   (b/build-init-evt (get-in ctx [:event :build])))
-
-(defn delete-instance
-  "Deletes the container instance associated with the build"
-  [client ctx]
-  (if-let [instance-id (-> ctx (get-runner-details) :details :instance-id)]
-    @(md/chain
-      (oci/with-retry #(ci/delete-container-instance client {:instance-id instance-id}))
-      (fn [res]
-        (if (< (:status res) 400)
-          (log/info "Container instance" instance-id "has been deleted")
-          (log/warn "Unable to delete container instance" instance-id ", got status" (:status res)))))
-    (log/warn "Unable to delete container instance, no instance id in context")))
 
 (defn- make-ci-context [conf]
   (-> (ci/make-context conf)
@@ -369,19 +323,20 @@
       [{:handler initialize-build
         :interceptors [(decrypt-ssh-keys vault)
                        (prepare-ci-config conf)
-                       (start-ci client)
+                       (oci/start-ci-interceptor client)
                        save-runner-details
                        end-on-ci-failure]}]]
 
      [:build/end
-      [{:handler (partial delete-instance client)
-        :interceptors [load-runner-details]}]]]))
+      [{:handler (constantly nil)
+        :interceptors [load-instance-id
+                       (oci/delete-ci-interceptor client)]}]]]))
 
 (defn- make-interceptors [storage]
-  [em/trace-evt
-   (em/use-db storage)
+  [emi/trace-evt
+   (emd/use-db storage)
    (mmi/sanitize-result)
-   handle-error])
+   emi/handle-build-error])
 
 (defn make-router [conf storage vault]
   (mmc/router (make-routes conf vault)
@@ -391,7 +346,6 @@
 (defrecord OciRunner [storage mailman vault]
   co/Lifecycle
   (start [{:keys [config] :as this}]
-    (log/debug "Starting OCI runner using private key:" (get-in config [:api :private-key]))
     (-> this
         (assoc :listeners (em/add-router mailman
                                          (make-routes config vault)

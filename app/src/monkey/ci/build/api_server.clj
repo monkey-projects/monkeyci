@@ -32,7 +32,9 @@
              [utils :as u]]
             ;; Very strange, but including this causes spec gen exceptions when using cloverage :confused:
             ;; [monkey.ci.spec.build]
-            [monkey.ci.events.http :as eh]
+            [monkey.ci.events
+             [http :as eh]
+             [mailman :as em]]
             [monkey.ci.spec.api-server :as aspec]
             [monkey.ci.web
              [common :as c]
@@ -60,8 +62,8 @@
   "Gets current build configuration from the request"
   (comp :build req->ctx))
 
-(def req->events
-  (comp :events req->ctx))
+(def req->event-stream
+  (comp :event-stream req->ctx))
 
 (def req->workspace
   (comp :workspace req->ctx))
@@ -72,11 +74,11 @@
 (def req->cache
   (comp :cache req->ctx))
 
-(def req->containers
-  (comp :containers req->ctx))
-
 (def req->params
   (comp :params req->ctx))
+
+(def req->mailman
+  (comp :mailman req->ctx))
 
 (def repo-id
   (comp (juxt :customer-id :repo-id) req->build))
@@ -132,7 +134,7 @@
   (let [evt (get-in req [:parameters :body])]
     (log/debug "Received events from build script:" evt)
     (try 
-      {:status (if (rt/post-events (req->ctx req) evt)
+      {:status (if (em/post-events (req->mailman req) evt)
                  202
                  500)}
       (catch Exception ex
@@ -142,7 +144,8 @@
 (defn dispatch-events [req]
   (let [sid (build/sid (req->build req))]
     (log/info "Dispatching event stream to client for build" sid)
-    (eh/event-stream (req->events req) {:sid sid})))
+    (eh/stream->sse (req->event-stream req)
+                    (comp (partial = sid) :sid))))
 
 (defn- stream-response [s & [nil-code]]
   (log/debug "Sending stream to client:" s)
@@ -184,7 +187,7 @@
     (let [store (req->artifacts req)
           id (get-in req [:parameters :path :artifact-id])
           path (when id (art/artifact-archive-path (req->build req) id))]
-      (log/debug "Uploading artifact:" id ", storing it at path" path)
+      (log/debug "Handling artifact:" id)
       (f req store path id))))
 
 (def upload-artifact
@@ -219,22 +222,6 @@
   (with-cache (fn [req store path _]
                 (log/debug "Sending cache to client:" path)
                 (download-stream req store path 404))))
-
-(defn start-container [req]
-  (let [job (get-in req [:parameters :body :job])
-        containers (req->containers req)]
-    ;; Start the container, don't wait for the result.  It's up to the client
-    ;; to monitor job end event.
-    (try
-      (log/debug "Got request to start container job:" job)
-      (p/run-container containers job)
-      (-> (rur/response {:job job})
-          (rur/status 202))
-      (catch Exception ex
-        (log/error "Unable to start container job" ex)
-        (-> (rur/response {:job job
-                           :exception ex})
-            (rur/status 500))))))
 
 (def edn #{"application/edn"})
 
@@ -278,13 +265,6 @@
     :get {:handler download-cache
           :responses {200 {}}}}])
 
-(def container-routes
-  ["/container"
-   {:post {:handler start-container
-           :responses {202 {}}
-           :produces edn
-           :parameters {:body s/Any}}}])
-
 (def routes [""
              [["/test"
                {:get (constantly (rur/response {:result "ok"}))
@@ -295,7 +275,6 @@
               workspace-routes
               artifact-routes
               cache-routes
-              container-routes
               ;; TODO Log uploads
               ]])
 
@@ -337,13 +316,6 @@
     {:server srv
      :port (an/port srv)
      :token token}))
-
-(defn rt->api-server-config
-  "Creates a config map for the api server from the given runtime"
-  [rt]
-  (->> {:port (rt/runner-api-port rt)}
-       (merge (select-keys rt [:events :artifacts :cache :workspace :containers]))
-       (mc/filter-vals some?)))
 
 (defn with-build [conf b]
   (assoc conf :build b))

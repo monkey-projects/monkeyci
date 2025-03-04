@@ -86,19 +86,9 @@
                  (assoc :repos {(:id repo) repo}))
         param-values [{:name "test-param"
                        :value "test value"}]
-        ;; params [{:customer-id (:id cust)
-        ;;          :parameters param-values}]
         build {:customer-id (:id cust)
                :repo-id (:id repo)}]
     
-    #_(testing "fetches params from local db if configured"
-        (h/with-memory-store st
-          (let [req (->req {:storage st
-                            :build build})]
-            (is (some? (st/save-params st (:id cust) params)))
-            (is (= param-values
-                   (:body (sut/get-params req)))))))
-
     (testing "fetches params using build params"
       (let [rec (->FakeParams param-values)
             req (->req {:params rec
@@ -225,25 +215,6 @@
         (is (= 200 (:status res)))
         (is (not-empty (slurp (:body res))))))))
 
-(deftest start-container
-  (let [events (h/fake-events)
-        sid (repeatedly 3 (comp str random-uuid))
-        build {:build-id "test-build"
-               :sid sid}
-        rt {:containers (h/fake-container-runner)
-            :build build
-            :events events}]
-    
-    (testing "invokes registered container runner with job settings from body"
-      (let [job {:id "test-job"}
-            res (-> rt
-                    (->req)
-                    (assoc-in [:parameters :body] {:job job})
-                    (sut/start-container))]
-        (is (= 202 (:status res)))
-        (is (= [job]
-               (-> rt :containers :runs deref)))))))
-
 (deftest get-ip-addr
   (testing "returns ipv4 address"
     (is (re-matches #"\d+\.\d+\.\d+\.\d+"
@@ -320,28 +291,5 @@
           (is (= 200 (-> (mock/request :get (str "/cache/" cache-id))
                          (auth)
                          (app)
-                         :status))))))
+                         :status))))))))
 
-    (testing "`/container`"
-      (testing "POST `/` starts container job"
-        (is (= 202 (-> (mock/request :post "/container")
-                       (auth)
-                       (app)
-                       :status)))))))
-
-(deftest rt->api-server-config
-  (testing "adds port from runner config"
-    (is (= 1234 (-> {:config
-                     {:runner
-                      {:api
-                       {:port 1234}}}}
-                    (sut/rt->api-server-config)
-                    :port))))
-
-  (testing "adds required modules from runtime"
-    (let [rt (trt/test-runtime)
-          conf (sut/rt->api-server-config rt)]
-      (is (some? (:events conf)))
-      (is (some? (:artifacts conf)))
-      (is (some? (:cache conf)))
-      (is (some? (:workspace conf))))))

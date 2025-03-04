@@ -4,6 +4,8 @@
             [monkey.ci
              [extensions :as sut]
              [jobs :as j]]
+            [monkey.ci.events.mailman.interceptors :as emi]
+            [monkey.ci.script.events :as se]
             [monkey.ci.helpers :as h]
             [monkey.ci.test.runtime :as trt]))
 
@@ -111,3 +113,50 @@
     
     (testing "invokes `after` extension"
       (is (true? (::after? @(j/execute! wrapped rt)))))))
+
+(deftest before-interceptor
+  (let [{:keys [enter] :as i} sut/before-interceptor
+        ext {:key :test/wrapped
+             :before (fn [ctx]
+                       (assoc ctx ::before? true))
+             :after  (fn [ctx]
+                       (assoc-in ctx [:job :result ::after?] true))}]
+    
+    (is (keyword? (:name i)))
+    
+    (testing "`enter` applies interceptors to job context"
+      (with-extensions
+        (let [job {:id "test-job"
+                   :test/wrapped {}}]
+          (is (some? (sut/register! ext)))
+          (is (= {::before? true
+                  :job job}
+                 (-> {}
+                     (emi/set-job-ctx {:job job})
+                     (enter)
+                     (emi/get-job-ctx)))))))))
+
+(deftest after-interceptor
+  (let [{:keys [enter] :as i} sut/after-interceptor
+        ext {:key :test/wrapped
+             :before (fn [ctx]
+                       (assoc ctx ::before? true))
+             :after  (fn [ctx]
+                       (assoc-in ctx [:job :result ::after?] true))}]
+    (is (keyword? (:name i)))
+
+    (testing "`enter` applies interceptors to job result"
+      (with-extensions
+        (let [job {:id "test-job"
+                   :test/wrapped {}
+                   :result {}}]
+          (is (some? (sut/register! ext)))
+          (is (= {::after? true}
+                 (-> {:event
+                      {:status :success
+                       :result {}}}
+                     (emi/set-job-ctx {:job job})
+                     (enter)
+                     (emi/get-job-ctx)
+                     :job
+                     :result))))))))

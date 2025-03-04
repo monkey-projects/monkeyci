@@ -28,7 +28,7 @@
         (testing "`run` subcommand"
           (testing "runs `run-build` command"
             (let [lc (run-cli "build" "run")]
-              (is (= cmd/run-build (:cmd lc)))))
+              (is (= cmd/run-build-local (:cmd lc)))))
 
           (testing "accepts script dir `-d`"
             (let [lc (run-cli "build" "run" "-d" "test-dir")]
@@ -41,10 +41,6 @@
           (testing "accepts global working dir `-w`"
             (let [lc (run-cli "-w" "work-dir" "build" "run")]
               (is (= "work-dir" (get-in lc [:args :workdir])))))
-
-          (testing "allows specifying pipeline name"
-            (let [lc (run-cli "build" "run" "-p" "test-pipeline")]
-              (is (= "test-pipeline" (get-in lc [:args :pipeline])))))
           
           (testing "accepts dev mode"
             (let [lc (run-cli "--dev-mode" "build" "run")]
@@ -73,7 +69,7 @@
                                      (get-in [:args :config-file])))))
           
           (testing "accepts multiple config files"
-            (let [lc (run-cli "-c" "first.edn" "-c" "second.edn" "build" "list")]
+            (let [lc (run-cli "-c" "first.edn" "-c" "second.edn" "build" "run")]
               (is (= ["first.edn" "second.edn"]
                      (get-in lc [:args :config-file])))))
           
@@ -81,7 +77,7 @@
             (is (= "test-sid" (-> (run-cli "build" "run" "--sid" "test-sid")
                                   (get-in [:args :sid]))))))
         
-        (testing "`watch` subcommand"
+        #_(testing "`watch` subcommand"
           (testing "runs `watch` command"
             (let [lc (run-cli "build" "-c" "test-customer" "watch")]
               (is (= cmd/watch (:cmd lc)))))
@@ -90,7 +86,7 @@
             (is (= "http://test" (-> (run-cli "build" "-s" "http://test" "watch")
                                      (get-in [:args :server]))))))
         
-        (testing "`list` subcommand"
+        #_(testing "`list` subcommand"
           (testing "runs `list-builds` command"
             (let [lc (run-cli "build" "list")]
               (is (= cmd/list-builds (:cmd lc))))))

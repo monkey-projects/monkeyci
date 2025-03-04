@@ -68,7 +68,7 @@
      :id
      #(ci/delete-container-instance client {:instance-id %}))))
 
-(defn run-container-with-sidecar
+#_(defn run-container-with-sidecar
   "Runs a container in OCI that deploys a sidecar"
   [& [{:keys [version ws] :or {version "latest"}}]]
   (let [build-id (str "test-build-" (System/currentTimeMillis))
@@ -161,7 +161,7 @@
    :container-id
    print-container-logs))
 
-(defn run-build
+#_(defn run-build
   "Runs a build given the specified GIT url and branch name, using the current config."
   [url branch]
   (let [conf @co/global-config]

@@ -15,13 +15,17 @@
              [runners :as r]
              [sidecar :as sc]]
             [monkey.ci.config.sidecar :as cs]
+            [monkey.ci.events.mailman :as em]
             [monkey.ci.helpers :as h]
             [monkey.ci.runners.controller :as rc]
-            [monkey.ci.spec.sidecar :as ss]
+            [monkey.ci.spec
+             [build :as sb]
+             [sidecar :as ss]]
             [monkey.ci.web.handler :as wh]
             [monkey.ci.test
              [config :as tc]
-             [aleph-test :as at]]))
+             [aleph-test :as at]
+             [mailman :as tm]]))
 
 (defmethod r/make-runner ::dummy [_]
   (constantly :invoked))
@@ -34,32 +38,31 @@
   (fn [& _]
     (throw (ex-info "test error" {}))))
 
-(deftest run-build
-  (let [config (assoc tc/base-config
-                      :build {:build-id "test-build"})]
-    (testing "invokes runner from context"
-      (is (= :invoked (sut/run-build (assoc config :runner {:type ::dummy})))))
+(deftest run-build-local
+  (testing "creates event broker and posts `build/pending` event"
+    (let [broker (tm/test-component)]
+      (is (md/deferred? (sut/run-build-local {:mailman broker})))
+      (let [evt (-> broker
+                    :broker
+                    (tm/get-posted)
+                    first)]
+        (is (= :build/pending (:type evt)))
+        (is (some? (:build evt))))))
 
-    (testing "adds `build` to runtime"
-      (is (map? (-> config
-                    (assoc :args {:git-url "test-url"
-                                  :branch "test-branch"
-                                  :commit-id "test-id"}
-                           :runner {:type ::build})
-                    (sut/run-build)))))
-
-    (testing "posts `build/end` event on exception"
-      (let [recv (atom [])]
-        (is (= err/error-process-failure
-               (-> config
-                   (assoc :runner {:type ::failing}
-                          :events {:type :fake
-                                   :recv recv})
-                   (sut/run-build))))
-        (is (= 1 (count @recv)))
-        (let [evt (first @recv)]
-          (is (= :build/end (:type evt)))
-          (is (some? (:build evt))))))))
+  (testing "passes `workdir` as checkout dir and `dir` as script dir"
+    (let [broker (tm/test-component)]
+      (is (md/deferred? (sut/run-build-local {:mailman broker
+                                              :workdir "/test/dir"
+                                              :dir ".script"})))
+      (let [build (-> broker
+                      :broker
+                      (tm/get-posted)
+                      first
+                      :build)]
+        (is (= "/test/dir" (:checkout-dir build)))
+        (is (= ".script" (-> build
+                             :script
+                             :script-dir)))))))
 
 (deftest verify-build
   (testing "zero when successful"

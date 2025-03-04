@@ -9,7 +9,6 @@
             [monkey.ci
              [build :as b]
              [oci :as oci]
-             [runtime :as rt]
              [sid :as sid]
              [utils :as u]]
             [monkey.oci.os.core :as os]))
@@ -210,9 +209,3 @@
         client (-> (os/make-client oci-conf)
                    (oci/add-inv-interceptor :logging))]
     (->OciBucketLogRetriever client oci-conf)))
-
-;;; Configuration handling
-
-(defmethod rt/setup-runtime :logging [conf _]
-  {:maker (make-logger conf)
-   :retriever (make-log-retriever conf)})

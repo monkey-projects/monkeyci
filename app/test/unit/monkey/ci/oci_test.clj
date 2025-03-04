@@ -364,3 +364,43 @@
     (is (= 4 (sut/credit-multiplier {:shape "CI.Standard.E4.Flex"
                                      :shape-config {:ocpus 1
                                                     :memory-in-g-bs 2}})))))
+
+(deftest start-ci-interceptor
+  (let [{:keys [enter] :as i} (sut/start-ci-interceptor ::test-client)
+        inv (atom [])]
+    (is (keyword? (:name i)))
+
+    (with-redefs [ci/create-container-instance (fn [client ic]
+                                                 (swap! inv conj {:client client
+                                                                  :config ic})
+                                                 (md/success-deferred {:status 200}))]
+      (testing "`enter` starts container instance"
+        (let [r (-> {}
+                    (sut/set-ci-config ::test-config)
+                    (enter))]
+          (is (= {:container-instance ::test-config}
+                 (-> @inv
+                     first
+                     :config)))
+          (is (= ::test-client
+                 (-> @inv
+                     first
+                     :client)))
+          (is (= {:status 200}
+                 (sut/get-ci-response r)))))
+
+      (testing "fails if creation fails"))))
+
+(deftest delete-ci-interceptor
+  (let [{:keys [leave] :as i} (sut/delete-ci-interceptor ::test-client)]
+    (is (keyword? (:name i)))
+    
+    (testing "deletes container instance with stored id"
+      (let [ocid (random-uuid)
+            ctx (sut/set-ci-id {} ocid)
+            deleted (atom nil)]
+        (with-redefs [ci/delete-container-instance (fn [client opts]
+                                                     (reset! deleted opts)
+                                                     (md/success-deferred {:status 200}))]
+          (is (= ctx (leave ctx)))
+          (is (= {:instance-id ocid} @deleted)))))))

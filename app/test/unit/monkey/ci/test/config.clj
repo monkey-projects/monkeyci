@@ -11,7 +11,7 @@
                  :dir  "/tmp"}
    :workspace   {:type :disk
                  :dir  "/tmp"}
-   :containers  {:type :podman}
+   :containers  {:type :oci}
    :storage     {:type :memory}
    :runner      {:type :child}
    :mailman     {:type :manifold}})

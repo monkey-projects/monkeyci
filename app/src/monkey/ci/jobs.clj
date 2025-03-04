@@ -17,7 +17,10 @@
              [protocols :as p]
              [time :as t]
              [utils :as u]]
-            [monkey.ci.events.core :as ec]))
+            [monkey.ci.events
+             [builders :as eb]
+             [core :as ec]
+             [mailman :as em]]))
 
 (def deps "Get job dependencies" :dependencies)
 (def status "Get job status" :status)
@@ -43,58 +46,22 @@
   (satisfies? p/JobResolvable x))
 
 (def pending? (comp (some-fn nil? (partial = :pending)) status))
+(def queued? (comp (partial = :queued) status))
 (def running? (comp (partial = :running) status))
 (def failed?  (comp (partial = :failure) status))
 (def success? (comp (partial = :success) status))
 
-(defn as-serializable
-  "Converts job into something that can be converted to edn"
-  [job]
-  (letfn [(art->ser [a]
-            (select-keys a [:id :path]))]
-    (-> job
-        (select-keys (concat [:status :start-time :end-time deps labels :extensions :credit-multiplier :script
-                              :memory :cpus :arch :work-dir
-                              save-artifacts :restore-artifacts :caches]
-                             co/props))
-        (mc/update-existing :save-artifacts (partial map art->ser))
-        (mc/update-existing :restore-artifacts (partial map art->ser))
-        (mc/update-existing :caches (partial map art->ser))
-        (assoc :id (bc/job-id job)))))
+(def as-serializable eb/job->event)
+(def job->event eb/job->event)
 
-(def job->event
-  "Converts job into something that can be put in an event"
-  as-serializable)
-
-(defn- base-event
-  "Creates a skeleton event with basic properties"
-  [type job-id build-sid]
-  (ec/make-event 
-   type
-   :src :script
-   :sid build-sid
-   :job-id job-id))
-
-(defn job-initializing-evt [job-id build-sid cm]
-  (-> (base-event :job/initializing job-id build-sid)
-      (assoc :credit-multiplier cm)))
-
-(def job-start-evt (partial base-event :job/start))
-
-(defn- job-status-evt [type job-id build-sid {:keys [status] :as r}]
-  (let [r (dissoc r :status :exception)]
-    (-> (base-event type job-id build-sid)
-        (assoc :status status
-               :result r))))
-
-(def job-executed-evt
-  "Creates an event that indicates the job has executed, but has not been completed yet.
-   Extensions may need to be applied first."
-  (partial job-status-evt :job/executed))
-
-(def job-end-evt
-  "Event that indicates the job has been fully completed.  The result should not change anymore."
-  (partial job-status-evt :job/end))
+(def job-status-evt eb/job-status-evt)
+(def job-pending-evt eb/job-pending-evt)
+(def job-queued-evt eb/job-queued-evt)
+(def job-skipped-evt eb/job-skipped-evt)
+(def job-initializing-evt eb/job-initializing-evt)
+(def job-start-evt eb/job-start-evt)
+(def job-executed-evt eb/job-executed-evt)
+(def job-end-evt eb/job-end-evt)
 
 (defn ex->result
   "Creates result structure from an exception"
@@ -115,7 +82,15 @@
                    checkout-dir)))))
 
 (defn rt->context [rt]
-  (dissoc rt :events :containers :artifacts :cache))
+  ;; TODO Move all these into a "components" key so we can remove them all at once
+  (dissoc rt :events :containers :artifacts :cache :mailman))
+
+(defn- add-output [r writer]
+  ;; Add output to the result
+  (.flush writer)
+  (let [out (.toString writer)]
+    (cond-> r
+      (not-empty out) (assoc :output out))))
 
 (defn- recurse-action
   "An action may return another job definition, especially in legacy builds.
@@ -123,21 +98,25 @@
    tries to construct a new job from it and execute it recursively."
   [{:keys [action] :as job}]
   (fn [rt]
-    (let [assign-id (fn [j]
-                      (cond-> j
-                        (nil? (bc/job-id j)) (assoc :id (bc/job-id job))))]
-      (md/chain
-       ;; Ensure this executes async by wrapping it in a future
-       (md/future
-         (action (rt->context rt)))        ; Only pass necessary info
-       (fn [r]
-         (cond
-           ;; Valid response
-           (or (nil? r) (bc/status? r)) r
-           (resolvable? r) (when-let [child (some-> (p/resolve-jobs r rt)
-                                                    first
-                                                    (assign-id))]
-                             (execute! child (assoc rt :job child)))))))))
+    (letfn [(assign-id [j]
+              (cond-> j
+                (nil? (bc/job-id j)) (assoc :id (bc/job-id job))))]
+      (let [writer (java.io.StringWriter.)]
+        (md/chain
+         ;; Ensure this executes async by wrapping it in a future
+         (md/future
+           (binding [*out* writer] ; Capture output
+             (action (rt->context rt)))) ; Only pass necessary info
+         (fn [r]
+           (cond
+             ;; `nil` is treated as a success
+             (nil? r) (add-output bc/success writer)
+             ;; Valid response
+             (bc/status? r) (add-output r writer)
+             (resolvable? r) (when-let [child (some-> (p/resolve-jobs r rt)
+                                                      first
+                                                      (assign-id))]
+                               (execute! child (assoc rt :job child))))))))))
 
 (extend-protocol Job
   monkey.ci.build.core.ActionJob
@@ -149,7 +128,7 @@
                 (art/wrap-artifacts))
           job (assoc job
                      :start-time (t/now))]
-      (ec/post-events (:events ctx)
+      (em/post-events (:mailman ctx)
                       [(-> (job-start-evt (job-id job) build-sid)
                            ;; For action jobs, add the credit multiplier on job start since there is
                            ;; no `initializing` event.
@@ -157,11 +136,10 @@
       (-> ctx
           (make-job-dir-absolute)
           (a)
-          (md/chain 
-           #(or % bc/success)
+          (md/chain
            (fn [r]
              (md/chain
-              (ec/post-events (:events ctx) [(job-executed-evt (job-id job) build-sid r)])
+              (em/post-events (:mailman ctx) [(job-executed-evt (job-id job) build-sid r)])
               (constantly r)))))))
 
   monkey.ci.build.core.ContainerJob

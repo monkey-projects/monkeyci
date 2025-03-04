@@ -34,6 +34,7 @@
    arch-amd
    {:shape "CI.Standard.E4.Flex"
     :credits 2}})
+
 (def default-arch arch-arm)
 
 (defn find-shape [shape-name]
@@ -353,3 +354,58 @@
            (filter (every-pred build? stale?))
            (map delete-instance)
            (mapv ->out)))))
+
+;;; Interceptors
+
+(def get-ci-config ::ci-config)
+
+(defn set-ci-config [ctx bi]
+  (assoc ctx ::ci-config bi))
+
+(def get-ci-response ::ci-response)
+
+(defn set-ci-response [ctx bi]
+  (assoc ctx ::ci-response bi))
+
+(def get-ci-id
+  "Retrieves container instance id from the context"
+  ::ci-id)
+
+(defn set-ci-id [ctx bi]
+  (assoc ctx ::ci-id bi))
+
+(defn- create-instance [client config]
+  (log/debug "Creating container instance using config" config)
+  (with-retry
+    #(ci/create-container-instance client {:container-instance config})))
+
+(defn- log-ci-error [{:keys [status body] :as resp}]
+  (when (or (nil? status) (>= status 400))
+    (log/error "Failed to create container instance:" resp))
+  resp)
+
+(defn start-ci-interceptor
+  "Interceptor that starts container instance using the config specified in the context"
+  [client]
+  {:name ::start-ci
+   :enter (fn [ctx]
+            ;; Start container instance, put result back in the context
+            ;; TODO Async processing?
+            (->> @(create-instance client (get-ci-config ctx))
+                 (log-ci-error)
+                 (set-ci-response ctx)))})
+
+(defn delete-ci-interceptor
+  "Deletes the container instance associated with the build"
+  [client]
+  {:name ::delete-ci
+   :leave (fn [ctx]
+            (if-let [instance-id (get-ci-id ctx)]
+              @(md/chain
+                (with-retry #(ci/delete-container-instance client {:instance-id instance-id}))
+                (fn [res]
+                  (if (< (:status res) 400)
+                    (log/info "Container instance" instance-id "has been deleted")
+                    (log/warn "Unable to delete container instance" instance-id ", got status" (:status res)))))
+              (log/warn "Unable to delete container instance, no instance id in context"))
+            ctx)})
