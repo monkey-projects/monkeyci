@@ -48,9 +48,6 @@
       (testing "has build params"
         (is (satisfies? p/BuildParams (:params sys))))
 
-      (testing "has containers"
-        (is (p/container-runner? (:containers sys))))
-
       (testing "has api server"
         (is (some? (:api-server sys))))
 

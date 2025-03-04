@@ -122,7 +122,7 @@
     (when listeners
       (doseq [l listeners]
         (mmc/unregister-listener l)))
-    (dissoc this :listener)))
+    (dissoc this :listeners)))
 
 (defn post-events
   "Posts events using the broker in the mailman component"

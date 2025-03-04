@@ -86,13 +86,13 @@
       (let [c (-> (sut/->RouteComponent [] (constantly [] )mailman)
                   (co/start))]
         (testing "registers a listener"
-          (is (some? (:listener c))))))
+          (is (some? (:listeners c))))))
 
     (testing "`stop` unregisters listener"
       (let [unreg? (atom false)]
-        (is (nil? (-> (sut/map->RouteComponent {:listener (->TestListener unreg?)})
+        (is (nil? (-> (sut/map->RouteComponent {:listeners [(->TestListener unreg?)]})
                       (co/stop)
-                      :listener)))
+                      :listeners)))
         (is (true? @unreg?))))))
 
 (deftest merge-routes
