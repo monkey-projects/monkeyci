@@ -7,7 +7,9 @@
              [storage :as s]
              [time :as t]]
             [monkey.ci.common.preds :as cp]
-            [monkey.ci.events.core :as ec]
+            [monkey.ci.events
+             [core :as ec]
+             [mailman :as em]]
             [monkey.ci.web
              [auth :as auth]
              [common :as c]]
@@ -123,7 +125,7 @@
               (ec/make-event :build/canceled {:sid (b/sid b)
                                               :src :reaper}))
             (dispatch [evts]
-              (ec/post-events (:events rt) evts)
+              (em/post-events (:mailman rt) evts)
               (map :sid evts))]
       (if-let [pr (:process-reaper rt)]
         (->> (pr)

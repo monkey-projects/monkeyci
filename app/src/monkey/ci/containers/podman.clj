@@ -96,57 +96,6 @@
                    (b/checkout-dir build)
                    conf)))
 
-;;; Container runner implementation
-
-(defn- ^:deprecated run-container [job {:keys [build events] :as conf}]
-  (let [log-maker (rt/log-maker conf)
-        ;; Don't prefix the sid here, that's the responsability of the logger
-        log-base (b/get-job-sid job build)
-        [out-log err-log :as loggers] (->> ["out.txt" "err.txt"]
-                                           (map (partial conj log-base))
-                                           (map (partial log-maker build)))
-        cmd (build-cmd-args job conf)
-        wrapped-runner (-> (fn [conf]
-                             (-> (bp/process {:dir (b/job-work-dir job (:build conf))
-                                              :out (l/log-output out-log)
-                                              :err (l/log-output err-log)
-                                              :cmd cmd})
-                                 (l/handle-process-streams loggers)
-                                 (deref)))
-                           (cache/wrap-caches)
-                           (art/wrap-artifacts))
-        handle-error (fn [ex]
-                       (ec/post-events
-                        events
-                        (j/job-executed-evt (j/job-id job) (b/sid build) (ec/exception-result ex))))]
-    (log/info "Running build job" log-base "as podman container")
-    (log/debug "Podman command:" cmd)
-    (ec/post-events events (j/job-start-evt (j/job-id job) (b/sid build)))
-    ;; Job is required by the blob wrappers in the config
-    (try
-      (-> (wrapped-runner (assoc conf :job job))
-          (md/chain
-           (fn [{:keys [exit] :as res}]
-             (ec/post-events events (j/job-executed-evt
-                                     (j/job-id job)
-                                     (b/sid build)
-                                     (ec/make-result
-                                      (b/exit-code->status exit)
-                                      exit
-                                      nil)))
-             res))
-          (md/catch handle-error))
-      (catch Exception ex
-        (handle-error ex)))))
-
-(defrecord PodmanContainerRunner [config credit-consumer]
-  p/ContainerRunner
-  (run-container [this job]
-    (run-container job config)))
-
-(defn make-container-runner [conf]
-  (->PodmanContainerRunner conf (constantly 0)))
-
 ;;; Mailman event handling
 
 ;;; Context management

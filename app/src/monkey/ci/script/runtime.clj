@@ -18,10 +18,9 @@
             [monkey.ci.containers.build-api :as cba]
             [monkey.ci.events
              [build-api :as eba]
+             [builders :as eb]
              [mailman :as em]]
-            [monkey.ci.events.mailman
-             [build-api :as emba]
-             #_[bridge :as emb]]
+            [monkey.ci.events.mailman.build-api :as emba]
             [monkey.ci.runtime.common :as rc]
             [monkey.ci.spec.script :as ss]
             [monkey.mailman.core :as mmc]))
@@ -115,7 +114,7 @@
                 (make-system)
                 (co/start))]
     ;; Trigger the script by posting an event
-    (em/post-events (:mailman sys) [(s/script-init-evt build (b/script-dir build))])
+    (em/post-events (:mailman sys) [(eb/script-init-evt (b/sid build) (b/script-dir build))])
     (md/finally r #(co/stop sys))))
 
 (defn- status->exit-code [{:keys [status]}]

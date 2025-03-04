@@ -14,7 +14,9 @@
              [utils :as u]
              [workspace :as ws]]
             [monkey.ci.config.sidecar :as cs]
-            [monkey.ci.events.core :as ec]
+            [monkey.ci.events
+             [core :as ec]
+             [mailman :as em]]
             [monkey.ci.spec.sidecar :as ss]))
 
 (defn- create-file-with-dirs [f]
@@ -68,7 +70,7 @@
 
 (defn poll-events
   "Reads events from the job container events file and posts them to the event service."
-  [{:keys [job build events] :as rt}]
+  [{:keys [job build mailman] :as rt}]
   (let [f (maybe-create-file (get-in rt [:paths :events-file]))
         read-next (fn [r]
                     (u/parse-edn r {:eof ::eof}))
@@ -94,11 +96,11 @@
                           ;; TODO Start uploading logs as soon as the file is created instead
                           ;; of when the command has finished.
                           (upload-logs evt logger))
-                        (ec/post-events events (ec/make-event
-                                                (:type evt)
-                                                (assoc evt
-                                                       :sid (b/sid build)
-                                                       :job-id (j/job-id job))))))
+                        (em/post-events mailman [(ec/make-event
+                                                  (:type evt)
+                                                  (assoc evt
+                                                         :sid (b/sid build)
+                                                         :job-id (j/job-id job)))])))
                 (if (:done? evt)
                   (set-exit 0)
                   (recur (read-next r)))))))

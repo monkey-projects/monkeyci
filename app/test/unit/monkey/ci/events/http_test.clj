@@ -17,13 +17,6 @@
         (subs (count prefix))
         (edn/edn->))))
 
-(deftest event-stream
-  (testing "returns response with stream"
-    (let [events (h/fake-events)
-          r (sut/event-stream events {:key "value"})]
-      (is (= 200 (:status r)))
-      (is (ms/source? (:body r))))))
-
 (deftest mailman-stream
   (testing "returns response with stream"
     (let [broker (mmm/make-memory-broker)

@@ -5,6 +5,7 @@
             [manifold
              [deferred :as md]
              [stream :as ms]]
+            [monkey.ci.build.api :as api]
             [monkey.ci.events.build-api :as eba]
             [monkey.mailman
              [core :as mmc]
@@ -29,13 +30,20 @@
   (fn [evt]
     (mmu/invoke-and-repost evt broker [l])))
 
+(defn- post-events [client evts]
+  (client (api/as-edn {:method :post
+                       :path "/events"
+                       :body (pr-str evts)
+                       :content-type :edn
+                       :throw-exceptions false})))
+
 (defrecord BuildApiBroker [api-client event-stream listeners]
   mmc/EventPoster
   (post-events [this evts]
     (when-not (empty? evts)
       (log/trace "Posting events to build api:" evts)
       @(md/chain
-        (eba/post-events api-client evts)
+        (post-events api-client evts)
         (fn [{:keys [status] :as res}]
           (if (and status (< status 400))
             evts
