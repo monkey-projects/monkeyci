@@ -6,7 +6,6 @@
              [deferred :as md]
              [stream :as ms]]
             [monkey.ci.build.api :as api]
-            [monkey.ci.events.build-api :as eba]
             [monkey.mailman
              [core :as mmc]
              [manifold :as mmm]

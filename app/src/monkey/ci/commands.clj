@@ -21,7 +21,9 @@
              [sidecar :as sidecar]
              [spec :as spec]
              [utils :as u]]
-            [monkey.ci.events.core :as ec]
+            [monkey.ci.events
+             [core :as ec]
+             [mailman :as em]]
             [monkey.ci.local
              [config :as lc]
              [runtime :as lr]]
@@ -136,20 +138,20 @@
     ;; Return a deferred that only resolves when the event stream stops
     d))
 
-(defn- run-sidecar [{:keys [events job] :as rt}]
+(defn- run-sidecar [{:keys [mailman job] :as rt}]
   (let [sid (b/get-sid rt)
         base-evt {:sid sid
                   :job-id (jobs/job-id job)}
         result (try
-                 (p/post-events events (ec/make-event :sidecar/start base-evt))
+                 (em/post-events mailman [(ec/make-event :sidecar/start base-evt)])
                  (let [r @(sidecar/run rt)
                        e (:exit r)]
                    (ec/make-result (b/exit-code->status e) e (:message r)))
                  (catch Throwable t
                    (ec/exception-result t)))]
     (log/info "Sidecar terminated")
-    (p/post-events events (-> (ec/make-event :sidecar/end base-evt)
-                              (ec/set-result result)))
+    (em/post-events mailman [(-> (ec/make-event :sidecar/end base-evt)
+                                 (ec/set-result result))])
     (:exit result)))
 
 (defn sidecar

@@ -190,9 +190,6 @@
                  (sut/build->out)
                  :status))))))
 
-(defn- make-events []
-  (ec/make-events {:type :sync}))
-
 (defn- publish [bus evt]
   (deref (mb/publish! bus (:type evt) evt) 1000 :timeout))
 

@@ -17,7 +17,6 @@
              [events :as se]]
             [monkey.ci.containers.build-api :as cba]
             [monkey.ci.events
-             [build-api :as eba]
              [builders :as eb]
              [mailman :as em]]
             [monkey.ci.events.mailman.build-api :as emba]

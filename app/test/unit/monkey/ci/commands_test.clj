@@ -27,17 +27,6 @@
              [aleph-test :as at]
              [mailman :as tm]]))
 
-(defmethod r/make-runner ::dummy [_]
-  (constantly :invoked))
-
-(defmethod r/make-runner ::build [_]
-  (fn [build _]
-    build))
-
-(defmethod r/make-runner ::failing [_]
-  (fn [& _]
-    (throw (ex-info "test error" {}))))
-
 (deftest run-build-local
   (testing "creates event broker and posts `build/pending` event"
     (let [broker (tm/test-component)]
