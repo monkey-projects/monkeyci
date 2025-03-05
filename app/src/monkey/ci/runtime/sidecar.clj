@@ -34,7 +34,7 @@
     (api/make-client url token)))
 
 (defn- new-mailman []
-  (eba/make-broker nil nil))
+  (eba/map->BuildApiBrokerComponent {}))
 
 (defn- new-log-maker [config]
   (l/make-logger {:logging (cs/log-maker config)}))

@@ -68,9 +68,17 @@
     (when log-maker (comp (partial log-maker build)
                           (partial concat log-base)))))
 
+(defn- make-evt [evt {:keys [job build]}]
+  (ec/make-event
+   (:type evt)
+   (assoc evt
+          :src :job
+          :sid (b/sid build)
+          :job-id (j/job-id job))))
+
 (defn poll-events
   "Reads events from the job container events file and posts them to the event service."
-  [{:keys [job build mailman] :as rt}]
+  [{:keys [mailman] :as rt}]
   (let [f (maybe-create-file (get-in rt [:paths :events-file]))
         read-next (fn [r]
                     (u/parse-edn r {:eof ::eof}))
@@ -96,11 +104,7 @@
                           ;; TODO Start uploading logs as soon as the file is created instead
                           ;; of when the command has finished.
                           (upload-logs evt logger))
-                        (em/post-events mailman [(ec/make-event
-                                                  (:type evt)
-                                                  (assoc evt
-                                                         :sid (b/sid build)
-                                                         :job-id (j/job-id job)))])))
+                        (em/post-events mailman [(make-evt evt rt)])))
                 (if (:done? evt)
                   (set-exit 0)
                   (recur (read-next r)))))))

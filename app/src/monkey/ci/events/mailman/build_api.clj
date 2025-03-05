@@ -2,10 +2,12 @@
   "Mailman implementation that uses the build api for event posting and
    receiving.  This is used by the build script."
   (:require [clojure.tools.logging :as log]
+            [com.stuartsierra.component :as co]
             [manifold
              [deferred :as md]
              [stream :as ms]]
             [monkey.ci.build.api :as api]
+            [monkey.ci.events.mailman :as em]
             [monkey.mailman
              [core :as mmc]
              [manifold :as mmm]
@@ -66,3 +68,15 @@
 
 (defn make-broker [api-client event-stream]
   (->BuildApiBroker api-client event-stream (atom {})))
+
+(defrecord BuildApiBrokerComponent [api-client event-stream broker]
+  co/Lifecycle
+  (start [this]
+    (assoc this :broker (make-broker api-client (:stream event-stream))))
+
+  (stop [this]
+    this)
+
+  em/AddRouter
+  (add-router [this routes opts]
+    (mmc/add-listener (:broker this) (mmc/router routes opts))))

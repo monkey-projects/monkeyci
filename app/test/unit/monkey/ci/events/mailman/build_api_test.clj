@@ -1,5 +1,6 @@
 (ns monkey.ci.events.mailman.build-api-test
   (:require [clojure.test :refer [deftest testing is]]
+            [com.stuartsierra.component :as co]
             [manifold
              [deferred :as md]
              [stream :as ms]]
@@ -49,3 +50,10 @@
         (is (some? (mmc/post-events broker [{:type ::first}])))
         (is (= 2 (count @recv)))
         (is (= [::first ::second] (map :type @recv)))))))
+
+(deftest build-api-broker-component
+  (testing "`start` creates broker"
+    (is (satisfies? mmc/EventPoster
+                    (-> (sut/map->BuildApiBrokerComponent {})
+                        (co/start)
+                        :broker)))))

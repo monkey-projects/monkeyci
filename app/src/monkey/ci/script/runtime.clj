@@ -55,20 +55,8 @@
 (defn- new-event-stream []
   (->EventStream nil))
 
-(defrecord BuildApiBrokerComponent [api-client event-stream broker]
-  co/Lifecycle
-  (start [this]
-    (assoc this :broker (emba/make-broker api-client (:stream event-stream))))
-
-  (stop [this]
-    this)
-
-  em/AddRouter
-  (add-router [this routes opts]
-    (mmc/add-listener (:broker this) (mmc/router routes opts))))
-
 (defn- new-mailman []
-  (map->BuildApiBrokerComponent {}))
+  (emba/map->BuildApiBrokerComponent {}))
 
 (defn- new-routes [conf] 
   (letfn [(make-routes [c]

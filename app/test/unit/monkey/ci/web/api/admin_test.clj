@@ -9,7 +9,9 @@
             [monkey.ci.web.api.admin :as sut]
             [monkey.ci.web.auth :as auth]
             [monkey.ci.helpers :as h]
-            [monkey.ci.test.runtime :as trt]))
+            [monkey.ci.test
+             [mailman :as tm]
+             [runtime :as trt]]))
 
 (deftest login
   (let [{st :storage :as rt} (trt/test-runtime)
@@ -195,7 +197,7 @@
                    (h/->req)
                    (sut/cancel-dangling-builds))]
       (is (= 200 (:status resp)))
-      (let [[f :as recv] (h/received-events (:events rt))]
+      (let [[f :as recv] (tm/get-posted (:mailman rt))]
         (is (not-empty recv))
         (is (= :build/canceled (:type f)))
         (is (= sid (:sid f))))
