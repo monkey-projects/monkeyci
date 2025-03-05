@@ -4,12 +4,10 @@
    it more robust and better suited for multiple replicas.  Instead of waiting
    for a container instance to complete, we just register multiple event 
    handlers that follow the flow."
-  (:require [clj-commons.byte-streams :as bs]
-            [clojure.java.io :as io]
+  (:require [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
             [io.pedestal.interceptor.chain :as pi]
-            [manifold.deferred :as md]
             [medley.core :as mc]
             [meta-merge.core :as mm]
             [monkey.ci

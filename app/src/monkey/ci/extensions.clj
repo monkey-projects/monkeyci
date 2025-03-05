@@ -8,12 +8,6 @@
    job properties, the associated extension code is executed.  Extensions can
    be executed before or after a job (or both)."
   (:require [clojure.tools.logging :as log]
-            [manifold.deferred :as md]
-            [monkey.ci
-             [build :as b]
-             [credits :as cr]
-             [jobs :as j]
-             [runtime :as rt]]
             [monkey.ci.events.mailman.interceptors :as emi]))
 
 (def new-register {})
@@ -64,36 +58,6 @@
    (apply-extensions rt registered :after after-job))
   ([rt]
    (apply-extensions-after rt @registered-extensions)))
-
-(defrecord ExtensionWrappingJob [target registered-ext]
-  j/Job
-  (execute! [job rt]
-    (let [rt (assoc rt :job target)]
-      ;; FIXME This is fairly dirty: jobs don't return the runtime, but extensions use it,
-      ;; so maybe we need to think about reworking this.
-      (-> rt
-          (apply-extensions-before registered-ext)
-          (as-> r (j/execute! target r))
-          (md/chain
-           ;; Add the result to the job in runtime
-           (partial assoc-in rt [:job :result])
-           ;; Let any extensions work on it
-           #(apply-extensions-after % registered-ext)
-           ;; Return the job result (possibly modified by extensions)
-           (comp :result :job)))))
-
-  cr/CreditConsumer
-  (credit-multiplier [_ rt]
-    (cr/calc-credit-multiplier target rt)))
-
-(defn wrap-job
-  "Wraps job so that extensions are invoked before and after it."
-  ([job registered-ext]
-   (map->ExtensionWrappingJob (-> job
-                                  (j/as-serializable)
-                                  (assoc :target job :registered-ext registered-ext))))
-  ([job]
-   (wrap-job job @registered-extensions)))
 
 ;;; Utility functions
 
