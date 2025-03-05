@@ -1,23 +1,22 @@
-(ns monkey.ci.sidecar
+(ns monkey.ci.sidecar.core
   "Sidecar specific functions"
-  (:require [babashka.fs :as fs]
-            [clojure.java.io :as io]
-            [clojure.tools.logging :as log]
-            [manifold.deferred :as md]
-            [monkey.ci
-             [artifacts :as art]
-             [build :as b]
-             [cache :as cache]
-             [jobs :as j]
-             [logging :as l]
-             [spec :as spec]
-             [utils :as u]
-             [workspace :as ws]]
-            [monkey.ci.config.sidecar :as cs]
-            [monkey.ci.events
-             [core :as ec]
-             [mailman :as em]]
-            [monkey.ci.spec.sidecar :as ss]))
+  (:require
+   [babashka.fs :as fs]
+   [clojure.java.io :as io]
+   [clojure.tools.logging :as log]
+   [manifold.deferred :as md]
+   [monkey.ci.artifacts :as art]
+   [monkey.ci.build :as b]
+   [monkey.ci.cache :as cache]
+   [monkey.ci.events.core :as ec]
+   [monkey.ci.events.mailman :as em]
+   [monkey.ci.jobs :as j]
+   [monkey.ci.logging :as l]
+   [monkey.ci.sidecar.config :as cs]
+   [monkey.ci.spec :as spec]
+   [monkey.ci.spec.sidecar :as ss]
+   [monkey.ci.utils :as u]
+   [monkey.ci.workspace :as ws]))
 
 (defn- create-file-with-dirs [f]
   (let [p (fs/parent f)]

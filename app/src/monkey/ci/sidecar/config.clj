@@ -1,4 +1,4 @@
-(ns monkey.ci.config.sidecar
+(ns monkey.ci.sidecar.config
   "Functions for handling sidecar configuration"
   (:require [medley.core :as mc]
             [monkey.ci.spec :as s]

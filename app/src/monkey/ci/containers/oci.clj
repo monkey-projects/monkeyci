@@ -1,30 +1,29 @@
 (ns monkey.ci.containers.oci
   "Container runner implementation that uses OCI container instances."
-  (:require [babashka.fs :as fs]
-            [camel-snake-kebab.core :as csk]
-            [clojure.java.io :as io]
-            [clojure
-             [string :as cs]
-             [walk :as cw]]
-            [clojure.tools.logging :as log]
-            [manifold.deferred :as md]
-            [medley.core :as mc]
-            [monkey.ci
-             [build :as b]
-             [containers :as mcc]
-             [edn :as edn]
-             [jobs :as j]
-             [oci :as oci]
-             [protocols :as p]
-             [runtime :as rt]
-             [time :as t]
-             [utils :as u]
-             [version :as v]]
-            [monkey.ci.config.sidecar :as cos]
-            [monkey.ci.containers.promtail :as pt]
-            [monkey.ci.events.core :as ec]
-            [monkey.ci.events.mailman.interceptors :as emi]
-            [monkey.oci.container-instance.core :as ci]))
+  (:require
+   [babashka.fs :as fs]
+   [camel-snake-kebab.core :as csk]
+   [clojure.java.io :as io]
+   [clojure.string :as cs]
+   [clojure.tools.logging :as log]
+   [clojure.walk :as cw]
+   [manifold.deferred :as md]
+   [medley.core :as mc]
+   [monkey.ci.build :as b]
+   [monkey.ci.containers :as mcc]
+   [monkey.ci.containers.promtail :as pt]
+   [monkey.ci.edn :as edn]
+   [monkey.ci.events.core :as ec]
+   [monkey.ci.events.mailman.interceptors :as emi]
+   [monkey.ci.jobs :as j]
+   [monkey.ci.oci :as oci]
+   [monkey.ci.protocols :as p]
+   [monkey.ci.runtime :as rt]
+   [monkey.ci.sidecar.config :as cos]
+   [monkey.ci.time :as t]
+   [monkey.ci.utils :as u]
+   [monkey.ci.version :as v]
+   [monkey.oci.container-instance.core :as ci]))
 
 ;; TODO Get this information from the OCI shapes endpoint
 (def max-pod-memory "Max memory that can be assigned to a pod, in gbs" 64)

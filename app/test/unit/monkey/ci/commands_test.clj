@@ -1,31 +1,29 @@
 (ns monkey.ci.commands-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [aleph.http :as http]
-            [babashka.fs :as fs]
-            [clj-commons.byte-streams :as bs]
-            [clojure.java.io :as io]
-            [clojure.spec.alpha :as spec]
-            [manifold.deferred :as md]
-            [monkey.ci
-             [commands :as sut]
-             [edn :as edn]
-             [errors :as err]
-             [pem :as pem]
-             [process :as proc]
-             [runners :as r]
-             [sidecar :as sc]]
-            [monkey.ci.config.sidecar :as cs]
-            [monkey.ci.events.mailman :as em]
-            [monkey.ci.helpers :as h]
-            [monkey.ci.runners.controller :as rc]
-            [monkey.ci.spec
-             [build :as sb]
-             [sidecar :as ss]]
-            [monkey.ci.web.handler :as wh]
-            [monkey.ci.test
-             [config :as tc]
-             [aleph-test :as at]
-             [mailman :as tm]]))
+  (:require
+   [aleph.http :as http]
+   [babashka.fs :as fs]
+   [clj-commons.byte-streams :as bs]
+   [clojure.java.io :as io]
+   [clojure.spec.alpha :as spec]
+   [clojure.test :refer [deftest is testing]]
+   [manifold.deferred :as md]
+   [monkey.ci.commands :as sut]
+   [monkey.ci.edn :as edn]
+   [monkey.ci.errors :as err]
+   [monkey.ci.events.mailman :as em]
+   [monkey.ci.helpers :as h]
+   [monkey.ci.pem :as pem]
+   [monkey.ci.process :as proc]
+   [monkey.ci.runners :as r]
+   [monkey.ci.runners.controller :as rc]
+   [monkey.ci.sidecar.config :as cs]
+   [monkey.ci.sidecar.core :as sc]
+   [monkey.ci.spec.build :as sb]
+   [monkey.ci.spec.sidecar :as ss]
+   [monkey.ci.test.aleph-test :as at]
+   [monkey.ci.test.config :as tc]
+   [monkey.ci.test.mailman :as tm]
+   [monkey.ci.web.handler :as wh]))
 
 (deftest run-build-local
   (testing "creates event broker and posts `build/pending` event"

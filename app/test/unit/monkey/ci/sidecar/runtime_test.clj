@@ -1,9 +1,10 @@
-(ns monkey.ci.runtime.sidecar-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [clojure.spec.alpha :as spec]
-            [monkey.ci.config.sidecar :as sc]
-            [monkey.ci.runtime.sidecar :as sut]
-            [monkey.ci.spec.sidecar :as ss]))
+(ns monkey.ci.sidecar.runtime-test
+  (:require
+   [clojure.spec.alpha :as spec]
+   [clojure.test :refer [deftest is testing]]
+   [monkey.ci.sidecar.config :as sc]
+   [monkey.ci.sidecar.runtime :as sut]
+   [monkey.ci.spec.sidecar :as ss]))
 
 (def config
   (-> {}

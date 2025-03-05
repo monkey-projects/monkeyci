@@ -1,28 +1,27 @@
-(ns monkey.ci.sidecar-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [babashka.fs :as fs]
-            [clojure.java.io :as io]
-            [clojure.spec.alpha :as s]
-            [clojure.tools.logging :as log]
-            [manifold
-             [deferred :as md]
-             [time :as mt]]
-            [monkey.ci
-             [artifacts :as art]
-             [blob :as b]
-             [cache :as ca]
-             [config :as c]
-             [cuid :as cuid]
-             [logging :as l]
-             [protocols :as p]
-             [sidecar :as sut]
-             [workspace :as ws]]
-            [monkey.ci.config.sidecar :as cs]
-            [monkey.ci.events.mailman :as em]
-            [monkey.ci.spec.sidecar :as ss]
-            [monkey.ci.helpers :as h]
-            [monkey.ci.test.mailman :as tm]
-            [monkey.ci.test.runtime.sidecar :as trs]))
+(ns monkey.ci.sidecar.core-test
+  (:require
+   [babashka.fs :as fs]
+   [clojure.java.io :as io]
+   [clojure.spec.alpha :as s]
+   [clojure.test :refer [deftest is testing]]
+   [clojure.tools.logging :as log]
+   [manifold.deferred :as md]
+   [manifold.time :as mt]
+   [monkey.ci.artifacts :as art]
+   [monkey.ci.blob :as b]
+   [monkey.ci.cache :as ca]
+   [monkey.ci.config :as c]
+   [monkey.ci.cuid :as cuid]
+   [monkey.ci.events.mailman :as em]
+   [monkey.ci.helpers :as h]
+   [monkey.ci.logging :as l]
+   [monkey.ci.protocols :as p]
+   [monkey.ci.sidecar.config :as cs]
+   [monkey.ci.sidecar.core :as sut]
+   [monkey.ci.spec.sidecar :as ss]
+   [monkey.ci.test.mailman :as tm]
+   [monkey.ci.test.runtime.sidecar :as trs]
+   [monkey.ci.workspace :as ws]))
 
 (defrecord TestLogger [streams path]
   l/LogCapturer
