@@ -1,16 +1,17 @@
 (ns monkey.ci.web.api.admin-test
-  (:require
-   [clojure.test :refer [deftest is testing]]
-   [java-time.api :as jt]
-   [monkey.ci.cuid :as cuid]
-   [monkey.ci.sid :as sid]
-   [monkey.ci.storage :as st]
-   [monkey.ci.test.helpers :as h]
-   [monkey.ci.test.mailman :as tm]
-   [monkey.ci.test.runtime :as trt]
-   [monkey.ci.time :as t]
-   [monkey.ci.web.api.admin :as sut]
-   [monkey.ci.web.auth :as auth]))
+  (:require [clojure.test :refer [deftest is testing]]
+            [java-time.api :as jt]
+            [monkey.ci
+             [cuid :as cuid]
+             [sid :as sid]
+             [storage :as st]
+             [time :as t]]
+            [monkey.ci.test
+             [helpers :as h]
+             [mailman :as tm]
+             [runtime :as trt]]
+            [monkey.ci.web.api.admin :as sut]
+            [monkey.ci.web.auth :as auth]))
 
 (deftest login
   (let [{st :storage :as rt} (trt/test-runtime)

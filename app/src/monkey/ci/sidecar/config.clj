@@ -1,10 +1,8 @@
 (ns monkey.ci.sidecar.config
   "Functions for handling sidecar configuration"
   (:require [medley.core :as mc]
-            [monkey.ci.spec :as s]
             [monkey.ci.spec
              [blob :as bs]
-             [events :as es]
              [sidecar :as ss]]))
 
 (defn- ns-keys [m]

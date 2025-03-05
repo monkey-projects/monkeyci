@@ -1,29 +1,14 @@
 (ns monkey.ci.process-test
-  (:require
-   [aleph.http :as http]
-   [babashka.fs :as fs]
-   [babashka.process :as bp]
-   [clj-commons.byte-streams :as bs]
-   [clojure.java.io :as io]
-   [clojure.spec.alpha :as s]
-   [clojure.string :as cs]
-   [clojure.test :refer :all]
-   [manifold.deferred :as md]
-   [monkey.ci.build.core :as bc]
-   [monkey.ci.containers]
-   [monkey.ci.logging :as l]
-   [monkey.ci.process :as sut]
-   [monkey.ci.protocols :as p]
-   [monkey.ci.script :as script]
-   [monkey.ci.script.config :as sco]
-   [monkey.ci.sid :as sid]
-   [monkey.ci.spec.common :as sc]
-   [monkey.ci.spec.events :as se]
-   [monkey.ci.spec.script :as ss]
-   [monkey.ci.test.aleph-test :as at]
-   [monkey.ci.test.helpers :as h]
-   [monkey.ci.test.runtime :as trt]
-   [monkey.ci.utils :as u]))
+  (:require [babashka
+             [fs :as fs]
+             [process :as bp]]
+            [clojure
+             [string :as cs]
+             [test :refer :all]]
+            [monkey.ci
+             [process :as sut]
+             [utils :as u]]
+            [monkey.ci.test.runtime :as trt]))
 
 (deftest test!
   (let [build {:build-id "test-build"}
