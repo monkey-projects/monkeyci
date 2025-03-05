@@ -7,10 +7,8 @@
    the global API will not be overloaded by malfunctioning (or misbehaving) builds."
   (:require [aleph
              [http :as http]
-             [netty :as an]]            
-            [aleph.http
-             [client-middleware :as acmw]
-             [multipart :as mp]]
+             [netty :as an]]
+            [aleph.http.client-middleware :as acmw]
             [buddy.core
              [codecs :as bcc]
              [nonce :as bcn]]
@@ -22,16 +20,9 @@
              [artifacts :as art]
              [build :as build]
              [cache :as cache]
-             [credits :as credits]
              [edn :as edn]
-             [jobs :as j]
-             [labels :as lbl]
-             [runtime :as rt]
              [protocols :as p]
-             [spec :as spec]
-             [utils :as u]]
-            ;; Very strange, but including this causes spec gen exceptions when using cloverage :confused:
-            ;; [monkey.ci.spec.build]
+             [spec :as spec]]
             [monkey.ci.events
              [http :as eh]
              [mailman :as em]]
@@ -40,8 +31,8 @@
              [common :as c]
              [handler :as h]
              [middleware :as wm]]
-            [reitit.ring :as ring]
             [reitit.coercion.schema]
+            [reitit.ring :as ring]
             [ring.util.response :as rur]
             [schema.core :as s]))
 

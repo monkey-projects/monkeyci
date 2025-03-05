@@ -1,6 +1,6 @@
 (ns monkey.ci.runners.runtime-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [clojure.spec.alpha :as spec]
+  (:require [clojure.spec.alpha :as spec]
+            [clojure.test :refer [deftest is testing]]
             [com.stuartsierra.component :as co]
             [manifold.stream :as ms]
             [monkey.ci

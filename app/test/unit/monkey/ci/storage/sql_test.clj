@@ -1,23 +1,22 @@
 (ns monkey.ci.storage.sql-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [clojure.spec.alpha :as spec]
-            [clojure.spec.gen.alpha :as gen]
-            [medley.core :as mc]
-            [monkey.ci.entities.helpers :as eh]
-            [monkey.ci
-             [build :as b]
-             [cuid :as cuid]
-             [protocols :as p]
-             [sid :as sid]
-             [storage :as st]
-             [time :as t]]
-            [monkey.ci.entities.core :as ec]
-            [monkey.ci.helpers :as h]
-            [monkey.ci.spec
-             [entities :as se]
-             [gen :as sg]]
-            [monkey.ci.storage.sql :as sut]
-            [monkey.ci.web.auth :as auth]))
+  (:require
+   [clojure.spec.alpha :as spec]
+   [clojure.spec.gen.alpha :as gen]
+   [clojure.test :refer [deftest is testing]]
+   [medley.core :as mc]
+   [monkey.ci.build :as b]
+   [monkey.ci.cuid :as cuid]
+   [monkey.ci.entities.core :as ec]
+   [monkey.ci.entities.helpers :as eh]
+   [monkey.ci.protocols :as p]
+   [monkey.ci.sid :as sid]
+   [monkey.ci.spec.entities :as se]
+   [monkey.ci.spec.gen :as sg]
+   [monkey.ci.storage :as st]
+   [monkey.ci.storage.sql :as sut]
+   [monkey.ci.test.helpers :as h]
+   [monkey.ci.time :as t]
+   [monkey.ci.web.auth :as auth]))
 
 (defmacro with-storage [conn s & body]
   `(eh/with-prepared-db ~conn

@@ -1,11 +1,13 @@
 (ns monkey.ci.logging.loki-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [aleph.http :as http]
-            [manifold.deferred :as md]
-            [monkey.ci.helpers :as h]
-            [monkey.ci.logging.loki :as sut]
-            [monkey.ci.logging :as l])
-  (:import [java.io PipedReader PipedWriter PrintWriter]))
+  (:require
+   [aleph.http :as http]
+   [clojure.test :refer [deftest is testing]]
+   [manifold.deferred :as md]
+   [monkey.ci.logging :as l]
+   [monkey.ci.logging.loki :as sut]
+   [monkey.ci.test.helpers :as h])
+  (:import
+   (java.io PipedReader PipedWriter PrintWriter)))
 
 (deftest post-to-loki
   (testing "sends request"

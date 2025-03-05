@@ -1,11 +1,11 @@
 (ns monkey.ci.storage.file-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [clojure.string :as cs]
-            [monkey.ci
-             [protocols :as p]
-             [storage :as st]]
-            [monkey.ci.storage.file :as sut]
-            [monkey.ci.helpers :as h]))
+  (:require
+   [clojure.string :as cs]
+   [clojure.test :refer [deftest is testing]]
+   [monkey.ci.protocols :as p]
+   [monkey.ci.storage :as st]
+   [monkey.ci.storage.file :as sut]
+   [monkey.ci.test.helpers :as h]))
 
 (deftest file-storage
   (testing "can write and read object"

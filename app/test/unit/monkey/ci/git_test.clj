@@ -1,12 +1,13 @@
 (ns monkey.ci.git-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [babashka.fs :as fs]
-            [buddy.core.codecs :as bcc]
-            [clj-jgit.porcelain :as git]
-            [monkey.ci.git :as sut]
-            [monkey.ci.helpers :as h]
-            [monkey.ci.web.auth :as auth]
-            [monkey.oci.common.utils :as ocu]))
+  (:require
+   [babashka.fs :as fs]
+   [buddy.core.codecs :as bcc]
+   [clj-jgit.porcelain :as git]
+   [clojure.test :refer [deftest is testing]]
+   [monkey.ci.git :as sut]
+   [monkey.ci.test.helpers :as h]
+   [monkey.ci.web.auth :as auth]
+   [monkey.oci.common.utils :as ocu]))
 
 (deftest clone
   (testing "invokes `git-clone` without checking out"

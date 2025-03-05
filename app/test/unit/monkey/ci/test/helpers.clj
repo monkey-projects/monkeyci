@@ -1,29 +1,25 @@
-(ns monkey.ci.helpers
+(ns monkey.ci.test.helpers
   "Helper functions for testing"
   (:require [aleph.netty :as an]
             [camel-snake-kebab.core :as csk]
-            [clojure.java.io :as io]
+            [cheshire.core :as json]
             [clojure.core.async :as ca]
+            [clojure.java.io :as io]
             [clojure.spec.alpha :as spec]
             [clojure.spec.gen.alpha :as gen]
-            [cheshire.core :as json]
             [clojure.string :as cs]
             [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
-             [blob :as blob]
-             [containers :as containers]
              [cuid :as cuid]
              [protocols :as p]
              [storage :as s]
-             [utils :as u]
              [vault :as v]]
-            [monkey.ci.events.core :as ec]
             [monkey.ci.web
-             [common :as wc]
-             [auth :as auth]]
+             [auth :as auth]
+             [common :as wc]]
             [ring.mock.request :as mock])
-  (:import org.apache.commons.io.FileUtils))
+  (:import (org.apache.commons.io FileUtils)))
 
 (defn ^java.io.File create-tmp-dir []
   (doto (io/file (System/getProperty "java.io.tmpdir") (str "tmp-" (random-uuid)))
@@ -180,44 +176,10 @@
 (defn generate-private-key []
   (.getPrivate (auth/generate-keypair)))
 
-(defrecord FakeEvents [recv]
-  p/EventPoster
-  (post-events [this evt]
-    (swap! recv (comp vec concat) (u/->seq evt)))
-
-  p/EventReceiver
-  (add-listener [this ef h]
-    nil)
-  (remove-listener [this ef h]
-    nil))
-
-(defn fake-events
-  "Set up fake events implementation.  It returns an event poster that can be
-   queried for received events."
-  [& [recv]]
-  (->FakeEvents (or recv (atom []))))
-
-(defn received-events [fake]
-  @(:recv fake))
-
-(defn reset-events [fake]
-  (reset! (:recv fake) []))
-
 (defn first-event-by-type [type events]
   (->> events
        (filter (comp (partial = type) :type))
        (first)))
-
-(defrecord FakeEventReceiver [listeners]
-  p/EventReceiver
-  (add-listener [this ef h]
-    (swap! listeners update ef (fnil conj []) h))
-
-  (remove-listener [this ef h]
-    (swap! listeners update ef (partial remove (partial = h)))))
-
-(defn fake-events-receiver []
-  (->FakeEventReceiver (atom {})))
 
 (defrecord FakeServer [closed?]
   java.lang.AutoCloseable

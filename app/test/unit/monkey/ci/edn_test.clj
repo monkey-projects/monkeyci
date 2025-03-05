@@ -1,14 +1,15 @@
 (ns monkey.ci.edn-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [aero.core :as ac]
-            [buddy.core.codecs :as codecs]
-            [monkey.ci
-             [edn :as sut]
-             [vault :as vault]
-             [version :as v]
-             [utils :as u]]
-            [monkey.ci.helpers :as h])
-  (:import java.io.StringReader))
+  (:require
+   [aero.core :as ac]
+   [buddy.core.codecs :as codecs]
+   [clojure.test :refer [deftest is testing]]
+   [monkey.ci.edn :as sut]
+   [monkey.ci.test.helpers :as h]
+   [monkey.ci.utils :as u]
+   [monkey.ci.vault :as vault]
+   [monkey.ci.version :as v])
+  (:import
+   (java.io StringReader)))
 
 (deftest edn-conversion
   (testing "can convert objects to edn and back"

@@ -1,17 +1,16 @@
-(ns monkey.ci.runtime.sidecar
+(ns monkey.ci.sidecar.runtime
   "Functions for creating a runtime for a build-aware environment for the sidecar"
   (:require [com.stuartsierra.component :as co]
             [monkey.ci
              [artifacts :as art]
-             [blob :as blob]
              [cache :as cache]
              [logging :as l]
+             [spec :as spec]
              [workspace :as ws]]
             [monkey.ci.build.api :as api]
-            [monkey.ci.config.sidecar :as cs]
             [monkey.ci.events.mailman.build-api :as eba]
             [monkey.ci.runtime.common :as rc]
-            [monkey.ci.spec :as spec]
+            [monkey.ci.sidecar.config :as cs]
             [monkey.ci.spec.sidecar :as ss]))
 
 (defrecord SidecarRuntime [mailman log-maker workspace artifacts cache]

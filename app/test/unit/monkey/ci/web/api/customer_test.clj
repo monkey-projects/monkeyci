@@ -1,15 +1,15 @@
 (ns monkey.ci.web.api.customer-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [java-time.api :as jt]
-            [monkey.ci
-             [cuid :as cuid]
-             [helpers :as h]
-             [protocols :as p]
-             [sid :as sid]
-             [storage :as st]
-             [utils :as u]]
-            [monkey.ci.web.api.customer :as sut]
-            [monkey.ci.test.runtime :as trt]))
+  (:require
+   [clojure.test :refer [deftest is testing]]
+   [java-time.api :as jt]
+   [monkey.ci.cuid :as cuid]
+   [monkey.ci.protocols :as p]
+   [monkey.ci.sid :as sid]
+   [monkey.ci.storage :as st]
+   [monkey.ci.test.helpers :as h]
+   [monkey.ci.test.runtime :as trt]
+   [monkey.ci.utils :as u]
+   [monkey.ci.web.api.customer :as sut]))
 
 (deftest get-customer
   (testing "returns customer in body"

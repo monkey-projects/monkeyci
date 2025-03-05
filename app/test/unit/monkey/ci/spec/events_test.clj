@@ -1,9 +1,10 @@
 (ns monkey.ci.spec.events-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [clojure.spec.alpha :as s]
-            [monkey.ci.spec.events :as sut]
-            [monkey.ci.time :as t]
-            [monkey.ci.helpers :as h]))
+  (:require
+   [clojure.spec.alpha :as s]
+   [clojure.test :refer [deftest is testing]]
+   [monkey.ci.spec.events :as sut]
+   [monkey.ci.test.helpers :as h]
+   [monkey.ci.time :as t]))
 
 (deftest event-spec
   (testing "validates `:build/initializing` event"

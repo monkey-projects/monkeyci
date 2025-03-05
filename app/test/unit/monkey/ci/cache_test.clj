@@ -1,11 +1,11 @@
 (ns monkey.ci.cache-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [clojure.string :as cs]
-            [monkey.ci
-             [blob :as blob]
-             [cache :as sut]]
-            [monkey.ci.helpers :as h]
-            [monkey.ci.test.blob :as tb]))
+  (:require
+   [clojure.string :as cs]
+   [clojure.test :refer [deftest is testing]]
+   [monkey.ci.blob :as blob]
+   [monkey.ci.cache :as sut]
+   [monkey.ci.test.blob :as tb]
+   [monkey.ci.test.helpers :as h]))
 
 (deftest save-caches
   (testing "saves path using blob store"

@@ -12,7 +12,8 @@
              [pushover :as po]]))
 
 ;; Version assigned when building main branch
-(def snapshot-version "0.15.0-SNAPSHOT")
+;; TODO Read this from app/deps.edn
+(def snapshot-version "0.15.2-SNAPSHOT")
 
 (def tag-regex #"^refs/tags/(\d+\.\d+\.\d+(\.\d+)?$)")
 

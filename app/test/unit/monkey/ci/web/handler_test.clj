@@ -1,37 +1,32 @@
 (ns monkey.ci.web.handler-test
-  (:require [aleph
-             [http :as aleph]
-             [netty :as netty]]
-            [buddy.core
-             [codecs :as codecs]
-             [mac :as mac]]
-            [clj-commons.byte-streams :as bs]
-            [clojure.test :refer [deftest testing is]]
-            [clojure.core.async :as ca]
-            [clojure.string :as cs]
-            [meta-merge.core :as mm]
-            [monkey.ci
-             [artifacts :as a]
-             [cuid :as cuid]
-             [logging :as l]
-             [metrics :as m]
-             [storage :as st]
-             [time :as t]
-             [utils :as u]
-             [version :as v]]
-            [monkey.ci.web
-             [auth :as auth]
-             [github :as github]
-             [handler :as sut]]
-            [monkey.ci.helpers :refer [try-take] :as h]
-            [monkey.ci.test
-             [aleph-test :as at]
-             [mailman :as tmm]
-             [runtime :as trt]]
-            [reitit
-             [core :as rc]
-             [ring :as ring]]
-            [ring.mock.request :as mock]))
+  (:require
+   [aleph.http :as aleph]
+   [aleph.netty :as netty]
+   [buddy.core.codecs :as codecs]
+   [buddy.core.mac :as mac]
+   [clj-commons.byte-streams :as bs]
+   [clojure.core.async :as ca]
+   [clojure.string :as cs]
+   [clojure.test :refer [deftest is testing]]
+   [meta-merge.core :as mm]
+   [monkey.ci.artifacts :as a]
+   [monkey.ci.cuid :as cuid]
+   [monkey.ci.logging :as l]
+   [monkey.ci.metrics :as m]
+   [monkey.ci.storage :as st]
+   [monkey.ci.test.aleph-test :as at]
+   [monkey.ci.test.helpers :as h :refer [try-take]]
+   [monkey.ci.test.mailman :as tmm]
+   [monkey.ci.test.runtime :as trt]
+   [monkey.ci.time :as t]
+   [monkey.ci.utils :as u]
+   [monkey.ci.version :as v]
+   [monkey.ci.web.auth :as auth]
+   [monkey.ci.web.github :as github]
+   [monkey.ci.web.handler :as sut]
+   [reitit.core :as rc]
+   [reitit.ring :as ring]
+   [ring.mock.request :as mock]))
 
 (deftest make-app
   (testing "creates a fn"

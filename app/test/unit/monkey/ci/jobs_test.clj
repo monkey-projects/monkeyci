@@ -1,18 +1,18 @@
 (ns monkey.ci.jobs-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [clojure.spec.alpha :as spec]
-            [manifold.deferred :as md]
-            [monkey.ci.build.core :as bc]
-            [monkey.ci
-             [artifacts :as art]
-             [cache :as cache]
-             [containers :as co]
-             [credits :as cr]
-             [edn :as edn]
-             [jobs :as sut]]
-            [monkey.ci.spec.events :as se]
-            [monkey.ci.helpers :as h]
-            [monkey.ci.test.mailman :as tm]))
+  (:require
+   [clojure.spec.alpha :as spec]
+   [clojure.test :refer [deftest is testing]]
+   [manifold.deferred :as md]
+   [monkey.ci.artifacts :as art]
+   [monkey.ci.build.core :as bc]
+   [monkey.ci.cache :as cache]
+   [monkey.ci.containers :as co]
+   [monkey.ci.credits :as cr]
+   [monkey.ci.edn :as edn]
+   [monkey.ci.jobs :as sut]
+   [monkey.ci.spec.events :as se]
+   [monkey.ci.test.helpers :as h]
+   [monkey.ci.test.mailman :as tm]))
 
 (defn dummy-job
   ([id & [opts]]
@@ -246,7 +246,6 @@
         (is (= msg (some-> (:output res) (.strip)))))))
 
   (let [job (bc/action-job "test-job" (constantly bc/success))
-        events (h/fake-events)
         mailman (tm/test-component)
         ctx {:mailman mailman
              :build {:sid (h/gen-build-sid)

@@ -1,18 +1,17 @@
 (ns monkey.ci.runners.controller-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [babashka.fs :as fs]
-            [manifold.deferred :as md]
-            [monkey.ci
-             [protocols :as p]
-             [utils :as u]]
-            [monkey.ci.build.api-server :as bas]
-            [monkey.ci.runners.controller :as sut]
-            [monkey.ci.helpers :as h]
-            [monkey.ci.test
-             [blob :as tb]
-             [mailman :as tm]
-             [runtime :as trt]]
-            [monkey.mailman.core :as mmc]))
+  (:require
+   [babashka.fs :as fs]
+   [clojure.test :refer [deftest is testing]]
+   [manifold.deferred :as md]
+   [monkey.ci.build.api-server :as bas]
+   [monkey.ci.protocols :as p]
+   [monkey.ci.runners.controller :as sut]
+   [monkey.ci.test.blob :as tb]
+   [monkey.ci.test.helpers :as h]
+   [monkey.ci.test.mailman :as tm]
+   [monkey.ci.test.runtime :as trt]
+   [monkey.ci.utils :as u]
+   [monkey.mailman.core :as mmc]))
 
 (defrecord FailingEventsPoster []
   mmc/EventPoster
@@ -108,8 +107,7 @@
         (let [cache-dir "/tmp/test-cache"
               bc (tb/test-store {"test-cust/test-repo.tgz" {:metadata {:app-hash (sut/app-hash)}}})
               rt (-> rt
-                     (assoc :build-cache bc
-                            :events (h/fake-events))
+                     (assoc :build-cache bc)
                      (assoc-in [:config :m2-cache-path] cache-dir))
               res (run! rt)]
           ;; Simulate running of the build

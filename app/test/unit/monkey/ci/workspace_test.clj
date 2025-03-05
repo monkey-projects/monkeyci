@@ -1,13 +1,13 @@
 (ns monkey.ci.workspace-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [babashka.fs :as fs]
-            [clojure.java.io :as io]
-            [manifold.deferred :as md]
-            [monkey.ci
-             [blob :as blob]
-             [protocols :as p]
-             [workspace :as sut]]
-            [monkey.ci.helpers :as h]))
+  (:require
+   [babashka.fs :as fs]
+   [clojure.java.io :as io]
+   [clojure.test :refer [deftest is testing]]
+   [manifold.deferred :as md]
+   [monkey.ci.blob :as blob]
+   [monkey.ci.protocols :as p]
+   [monkey.ci.test.helpers :as h]
+   [monkey.ci.workspace :as sut]))
 
 (deftest restore
   (testing "nothing if no workspace in build"

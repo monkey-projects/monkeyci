@@ -1,7 +1,8 @@
 (ns monkey.ci.web.oauth2-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [monkey.ci.web.oauth2 :as sut]
-            [monkey.ci.helpers :as h]))
+  (:require
+   [clojure.test :refer [deftest is testing]]
+   [monkey.ci.test.helpers :as h]
+   [monkey.ci.web.oauth2 :as sut]))
 
 (deftest login-handler
   (testing "returns refresh token if provided"

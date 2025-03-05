@@ -1,12 +1,12 @@
 (ns monkey.ci.web.api.params-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [monkey.ci.web.api.params :as sut]
-            [monkey.ci
-             [protocols :as p]
-             [storage :as st]
-             [vault :as v]]
-            [monkey.ci.helpers :as h]
-            [monkey.ci.test.runtime :as trt]))
+  (:require
+   [clojure.test :refer [deftest is testing]]
+   [monkey.ci.protocols :as p]
+   [monkey.ci.storage :as st]
+   [monkey.ci.test.helpers :as h]
+   [monkey.ci.test.runtime :as trt]
+   [monkey.ci.vault :as v]
+   [monkey.ci.web.api.params :as sut]))
 
 (defrecord TestVault []
   p/Vault

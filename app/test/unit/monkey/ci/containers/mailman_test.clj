@@ -1,9 +1,10 @@
 (ns monkey.ci.containers.mailman-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [monkey.ci.containers.mailman :as sut]
-            [monkey.ci.protocols :as p]
-            [monkey.ci.helpers :as h]
-            [monkey.ci.test.mailman :as tm]))
+  (:require
+   [clojure.test :refer [deftest is testing]]
+   [monkey.ci.containers.mailman :as sut]
+   [monkey.ci.protocols :as p]
+   [monkey.ci.test.helpers :as h]
+   [monkey.ci.test.mailman :as tm]))
 
 (deftest mailman-container-runner
   (let [m (tm/test-component)

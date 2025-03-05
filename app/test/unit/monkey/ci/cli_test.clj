@@ -1,13 +1,13 @@
 (ns monkey.ci.cli-test
   "Tests for the CLI configuration"
-  (:require [clojure.test :refer :all]
-            [clojure.java.io :as io]
-            [cli-matic.core :as cli]
-            [monkey.ci
-             [cli :as sut]
-             [commands :as cmd]
-             [core :as core]
-             [helpers :as h]]))
+  (:require
+   [cli-matic.core :as cli]
+   [clojure.java.io :as io]
+   [clojure.test :refer :all]
+   [monkey.ci.cli :as sut]
+   [monkey.ci.commands :as cmd]
+   [monkey.ci.core :as core]
+   [monkey.ci.test.helpers :as h]))
 
 (deftest cli
   (let [last-cmd (atom nil)

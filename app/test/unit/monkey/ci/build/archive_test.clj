@@ -1,11 +1,13 @@
 (ns monkey.ci.build.archive-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [babashka.fs :as fs]
-            [clojure.java.io :as io]
-            [monkey.ci.blob :as blob]
-            [monkey.ci.build.archive :as sut]
-            [monkey.ci.helpers :as h])
-  (:import java.nio.file.attribute.PosixFilePermission))
+  (:require
+   [babashka.fs :as fs]
+   [clojure.java.io :as io]
+   [clojure.test :refer [deftest is testing]]
+   [monkey.ci.blob :as blob]
+   [monkey.ci.build.archive :as sut]
+   [monkey.ci.test.helpers :as h])
+  (:import
+   (java.nio.file.attribute PosixFilePermission)))
 
 (deftest list-files
   (testing "lists files in archive"

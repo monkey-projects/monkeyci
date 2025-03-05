@@ -11,14 +11,10 @@
             [medley.core :as mc]
             [monkey.ci
              [build :as b]
-             [errors :as err]
              [jobs :as jobs]
              [pem :as pem]
              [process :as proc]
-             [protocols :as p]
              [runtime :as rt]
-             [script :as script]
-             [sidecar :as sidecar]
              [spec :as spec]
              [utils :as u]]
             [monkey.ci.events
@@ -30,9 +26,10 @@
             [monkey.ci.runners
              [controller :as rc]
              [runtime :as rr]]
-            [monkey.ci.runtime
-             [app :as ra]
-             [sidecar :as rs]]
+            [monkey.ci.runtime.app :as ra]
+            [monkey.ci.sidecar
+             [core :as sidecar]
+             [runtime :as rs]]
             [monkey.ci.spec.sidecar :as ss]
             [monkey.ci.web
              [auth :as auth]

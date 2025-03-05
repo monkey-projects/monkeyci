@@ -1,14 +1,14 @@
 (ns monkey.ci.config-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [clojure.java.io :as io]
-            [clojure.spec.alpha :as s]
-            [clojure.string :as cs]
-            [monkey.ci
-             [config :as sut]
-             [logging]
-             [spec :as spec]]
-            [monkey.ci.web.github]
-            [monkey.ci.helpers :as h]))
+  (:require
+   [clojure.java.io :as io]
+   [clojure.spec.alpha :as s]
+   [clojure.string :as cs]
+   [clojure.test :refer [deftest is testing]]
+   [monkey.ci.config :as sut]
+   [monkey.ci.logging]
+   [monkey.ci.spec :as spec]
+   [monkey.ci.test.helpers :as h]
+   [monkey.ci.web.github]))
 
 (defn- with-home-config [config body]
   (h/with-tmp-dir dir

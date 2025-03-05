@@ -1,4 +1,4 @@
-(ns monkey.ci.sidecar
+(ns monkey.ci.sidecar.core
   "Sidecar specific functions"
   (:require [babashka.fs :as fs]
             [clojure.java.io :as io]
@@ -13,10 +13,10 @@
              [spec :as spec]
              [utils :as u]
              [workspace :as ws]]
-            [monkey.ci.config.sidecar :as cs]
             [monkey.ci.events
              [core :as ec]
              [mailman :as em]]
+            [monkey.ci.sidecar.config :as cs]
             [monkey.ci.spec.sidecar :as ss]))
 
 (defn- create-file-with-dirs [f]
@@ -138,5 +138,6 @@
                 (mark-abort rt)
                 (error-result ex))))
       (catch Throwable t
+        (log/error "Failed to run sidecar" t)
         (mark-abort rt)
         (md/success-deferred (error-result t))))))
