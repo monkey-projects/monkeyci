@@ -14,6 +14,7 @@
             [monkey.ci.events.mailman.db :as emd]
             [monkey.ci.runners.oci :as ro]
             [monkey.ci.runtime.common :as rc]
+            [monkey.ci.storage.sql]  ; Required for multimethods
             [monkey.ci.web.handler :as wh]
             [monkey.oci.container-instance.core :as ci]))
 
@@ -96,10 +97,6 @@
 (defmulti make-server-runner :type)
 
 (defmethod make-server-runner :oci [config]
-  (ro/map->OciRunner {:config config}))
-
-;; To be removed, provided for compatibility
-(defmethod make-server-runner :oci3 [config]
   (ro/map->OciRunner {:config config}))
 
 ;; TODO Add other runners

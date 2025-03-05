@@ -1,13 +1,8 @@
 (ns monkey.ci.extensions-test
-  (:require
-   [clojure.test :refer [deftest is testing]]
-   [monkey.ci.build.core :as bc]
-   [monkey.ci.events.mailman.interceptors :as emi]
-   [monkey.ci.extensions :as sut]
-   [monkey.ci.jobs :as j]
-   [monkey.ci.script.events :as se]
-   [monkey.ci.test.helpers :as h]
-   [monkey.ci.test.runtime :as trt]))
+  (:require [clojure.test :refer [deftest is testing]]
+            [monkey.ci.build.core :as bc]
+            [monkey.ci.events.mailman.interceptors :as emi]
+            [monkey.ci.extensions :as sut]))
 
 (defmacro with-extensions [& body]
   `(let [ext# @sut/registered-extensions]
@@ -79,38 +74,6 @@
         (is (= "config for extensions"
                (::value res)))
         (remove-method sut/after-job :test/after)))))
-
-(deftest wrap-job
-  (let [ext {:key :test/wrapped
-             :before (fn [rt]
-                       (assoc rt ::before? true))
-             :after  (fn [rt]
-                       (assoc-in rt [:job :result ::after?] true))}
-        reg (sut/register sut/new-register ext)
-        wrapped (sut/wrap-job (bc/action-job "test-job"
-                                             (fn [rt]
-                                               (assoc bc/success
-                                                      ::executed? true
-                                                      ::before? (::before? rt)))
-                                             {(:key ext) ::extension-config})
-                              reg)
-        rt (-> (trt/test-runtime)
-               (assoc :job wrapped))]
-    (testing "creates job"
-      (is (j/job? wrapped)))
-    
-    (testing "executes job"
-      (is (true? (::executed? @(j/execute! wrapped rt)))))
-
-    (testing "executes job without any extensions"
-      (let [wrapped (sut/wrap-job (bc/action-job "regular-job" (constantly bc/success)))]
-        (is (= bc/success @(j/execute! wrapped rt)))))
-    
-    (testing "invokes `before` extension"
-      (is (true? (::before? @(j/execute! wrapped rt)))))
-    
-    (testing "invokes `after` extension"
-      (is (true? (::after? @(j/execute! wrapped rt)))))))
 
 (deftest before-interceptor
   (let [{:keys [enter] :as i} sut/before-interceptor

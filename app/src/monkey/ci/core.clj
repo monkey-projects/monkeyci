@@ -10,11 +10,7 @@
             [monkey.ci
              [cli :as mcli]
              [config :as config]
-             [runtime :as rt]
-             [utils :as u]
-             [version :as v]]
-            [monkey.ci.events.core :as ec]
-            [monkey.ci.reporting.print]))
+             [version :as v]]))
 
 (defn system-invoker
   "Creates a new runtime and invokes the command using the specified application 
