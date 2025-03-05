@@ -154,6 +154,7 @@
 (defmulti make-container-routes (comp :type :containers))
 
 (defmethod make-container-routes :oci [conf]
+  (log/debug "Creating OCI container routes for build" (:build conf))
   (c-oci/make-routes (-> conf
                          (dissoc :containers)
                          (assoc :oci (:containers conf)

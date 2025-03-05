@@ -5,6 +5,7 @@
              [deferred :as md]
              [stream :as ms]]
             [monkey.ci.edn :as edn]
+            [monkey.ci.events.mailman :as em]
             [monkey.ci.events.mailman.build-api :as sut]
             [monkey.mailman.core :as mmc]))
 
@@ -56,4 +57,9 @@
     (is (satisfies? mmc/EventPoster
                     (-> (sut/map->BuildApiBrokerComponent {})
                         (co/start)
-                        :broker)))))
+                        :broker))))
+
+  (testing "`add-router` registers listener"
+    (is (sequential? (-> (sut/map->BuildApiBrokerComponent {:event-stream {:stream (ms/stream)}})
+                         (co/start)
+                         (em/add-router [] {}))))))

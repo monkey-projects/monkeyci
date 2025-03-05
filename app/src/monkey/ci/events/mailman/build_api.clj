@@ -79,4 +79,4 @@
 
   em/AddRouter
   (add-router [this routes opts]
-    (mmc/add-listener (:broker this) (mmc/router routes opts))))
+    [(mmc/add-listener (:broker this) (mmc/router routes opts))]))

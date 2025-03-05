@@ -1,29 +1,21 @@
 (ns monkey.ci.containers.oci
   "Container runner implementation that uses OCI container instances."
-  (:require
-   [babashka.fs :as fs]
-   [camel-snake-kebab.core :as csk]
-   [clojure.java.io :as io]
-   [clojure.string :as cs]
-   [clojure.tools.logging :as log]
-   [clojure.walk :as cw]
-   [manifold.deferred :as md]
-   [medley.core :as mc]
-   [monkey.ci.build :as b]
-   [monkey.ci.containers :as mcc]
-   [monkey.ci.containers.promtail :as pt]
-   [monkey.ci.edn :as edn]
-   [monkey.ci.events.core :as ec]
-   [monkey.ci.events.mailman.interceptors :as emi]
-   [monkey.ci.jobs :as j]
-   [monkey.ci.oci :as oci]
-   [monkey.ci.protocols :as p]
-   [monkey.ci.runtime :as rt]
-   [monkey.ci.sidecar.config :as cos]
-   [monkey.ci.time :as t]
-   [monkey.ci.utils :as u]
-   [monkey.ci.version :as v]
-   [monkey.oci.container-instance.core :as ci]))
+  (:require [babashka.fs :as fs]
+            [clojure.java.io :as io]
+            [clojure.string :as cs]
+            [clojure.tools.logging :as log]
+            [medley.core :as mc]
+            [monkey.ci
+             [build :as b]
+             [containers :as mcc]
+             [edn :as edn]
+             [jobs :as j]
+             [oci :as oci]
+             [utils :as u]]
+            [monkey.ci.containers.promtail :as pt]
+            [monkey.ci.events.mailman.interceptors :as emi]
+            [monkey.ci.sidecar.config :as cos]
+            [monkey.oci.container-instance.core :as ci]))
 
 ;; TODO Get this information from the OCI shapes endpoint
 (def max-pod-memory "Max memory that can be assigned to a pod, in gbs" 64)
@@ -395,6 +387,7 @@
       ;; Job picked up, start the container instance
       [{:handler job-queued
         :interceptors [emi/handle-job-error
+                       state
                        (add-config conf)
                        prepare-instance-config
                        calc-credit-multiplier
@@ -408,15 +401,18 @@
      ;; Container script has ended, all commands executed
      [:container/end
       [{:handler container-end
-        :interceptors [set-container-end]}]]
+        :interceptors [state
+                       set-container-end]}]]
      
      ;; Sidecar terminated, artifacts have been stored
      [:sidecar/end
       [{:handler sidecar-end
-        :interceptors [set-sidecar-end]}]]
+        :interceptors [state
+                       set-sidecar-end]}]]
 
      ;; Job executed, we can delete the container instance
      [:job/executed
       [{:handler (constantly nil)
-        :interceptors [load-instance-id
+        :interceptors [state
+                       load-instance-id
                        (oci/delete-ci-interceptor client)]}]]]))
