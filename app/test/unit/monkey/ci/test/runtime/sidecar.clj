@@ -1,11 +1,7 @@
 (ns monkey.ci.test.runtime.sidecar
   "Helper functions for working with sidecar runtimes"
-  (:require [monkey.ci.logging :as l]))
-
-(def test-rt {})
-
-(defn set-events [rt e]
-  (assoc rt :events e))
+  (:require [monkey.ci.logging :as l]
+            [monkey.ci.test.mailman :as tm]))
 
 (defn set-log-maker [rt e]
   (assoc rt :log-maker e))
@@ -28,6 +24,11 @@
 (defn set-job [rt job]
   (assoc rt :job job))
 
+(defn set-mailman [rt mm]
+  (assoc rt :mailman mm))
+
+(def test-rt {})
+
 (defn make-test-rt [& [conf]]
   (-> test-rt
       (set-log-maker (constantly (l/->InheritLogger)))
@@ -38,4 +39,5 @@
       (set-build {:build-id (str "test-build-" (random-uuid))
                   :workspace "test-ws"})
       (set-job {:id (str "test-job-" (random-uuid))})
+      (set-mailman (tm/test-component))
       (merge conf)))

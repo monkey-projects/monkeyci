@@ -11,9 +11,10 @@
              [process :as proc]
              [protocols :as p]
              [runners :as r]
-             [script :as script]
              [utils :as u]]
-            [monkey.ci.events.mailman :as em]))
+            [monkey.ci.events
+             [builders :as eb]
+             [mailman :as em]]))
 
 (def run-path (comp :run-path :config))
 (def abort-path (comp :abort-path :config))
@@ -29,7 +30,7 @@
   [{:keys [build] :as rt}]
   (post-events rt [(b/build-start-evt build)
                    ;; TODO Remove this, script init should be fired in the script itself
-                   (script/script-init-evt build (b/script-dir build))])
+                   (eb/script-init-evt (b/sid build) (b/script-dir build))])
   rt)
 
 (defn- create-run-file [rt]

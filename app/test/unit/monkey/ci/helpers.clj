@@ -208,10 +208,6 @@
        (filter (comp (partial = type) :type))
        (first)))
 
-(defmethod ec/make-events :fake [{:keys [recv] :as config}]
-  (-> (fake-events recv)
-      (assoc :config config)))
-
 (defrecord FakeEventReceiver [listeners]
   p/EventReceiver
   (add-listener [this ef h]

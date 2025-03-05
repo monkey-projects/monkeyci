@@ -20,9 +20,6 @@
 (defn set-workspace [rt w]
   (assoc rt :workspace w))
 
-(defn set-events [rt e]
-  (assoc rt :events e))
-
 (defn set-mailman [rt mm]
   (assoc rt :mailman {:broker mm}))
 
@@ -55,7 +52,6 @@
       (set-cache (h/fake-blob-store))
       (set-build-cache (h/fake-blob-store))
       (set-workspace (h/fake-blob-store))
-      (set-events (h/fake-events))
       (set-mailman (tmm/test-broker))
       (set-storage (s/make-memory-storage))
       (set-jwk (auth/keypair->rt (auth/generate-keypair)))

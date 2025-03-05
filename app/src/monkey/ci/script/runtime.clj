@@ -17,11 +17,9 @@
              [events :as se]]
             [monkey.ci.containers.build-api :as cba]
             [monkey.ci.events
-             [build-api :as eba]
+             [builders :as eb]
              [mailman :as em]]
-            [monkey.ci.events.mailman
-             [build-api :as emba]
-             #_[bridge :as emb]]
+            [monkey.ci.events.mailman.build-api :as emba]
             [monkey.ci.runtime.common :as rc]
             [monkey.ci.spec.script :as ss]
             [monkey.mailman.core :as mmc]))
@@ -57,20 +55,8 @@
 (defn- new-event-stream []
   (->EventStream nil))
 
-(defrecord BuildApiBrokerComponent [api-client event-stream broker]
-  co/Lifecycle
-  (start [this]
-    (assoc this :broker (emba/make-broker api-client (:stream event-stream))))
-
-  (stop [this]
-    this)
-
-  em/AddRouter
-  (add-router [this routes opts]
-    (mmc/add-listener (:broker this) (mmc/router routes opts))))
-
 (defn- new-mailman []
-  (map->BuildApiBrokerComponent {}))
+  (emba/map->BuildApiBrokerComponent {}))
 
 (defn- new-routes [conf] 
   (letfn [(make-routes [c]
@@ -115,7 +101,7 @@
                 (make-system)
                 (co/start))]
     ;; Trigger the script by posting an event
-    (em/post-events (:mailman sys) [(s/script-init-evt build (b/script-dir build))])
+    (em/post-events (:mailman sys) [(eb/script-init-evt (b/sid build) (b/script-dir build))])
     (md/finally r #(co/stop sys))))
 
 (defn- status->exit-code [{:keys [status]}]

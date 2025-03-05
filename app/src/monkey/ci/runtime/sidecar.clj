@@ -9,12 +9,12 @@
              [workspace :as ws]]
             [monkey.ci.build.api :as api]
             [monkey.ci.config.sidecar :as cs]
-            [monkey.ci.events.build-api :as eba]
+            [monkey.ci.events.mailman.build-api :as eba]
             [monkey.ci.runtime.common :as rc]
             [monkey.ci.spec :as spec]
             [monkey.ci.spec.sidecar :as ss]))
 
-(defrecord SidecarRuntime [events log-maker workspace artifacts cache]
+(defrecord SidecarRuntime [mailman log-maker workspace artifacts cache]
   co/Lifecycle
   (start [{:keys [config] :as this}]
     (let [props (juxt cs/job cs/build cs/poll-interval)
@@ -33,8 +33,8 @@
   (let [{:keys [url token]} (cs/api config)]
     (api/make-client url token)))
 
-(defn- new-events []
-  (eba/make-event-poster nil))
+(defn- new-mailman []
+  (eba/map->BuildApiBrokerComponent {}))
 
 (defn- new-log-maker [config]
   (l/make-logger {:logging (cs/log-maker config)}))
@@ -56,11 +56,11 @@
   (co/system-map
    :runtime    (co/using
                 (new-runtime config)
-                [:events :log-maker :workspace :artifacts :cache])
+                [:mailman :log-maker :workspace :artifacts :cache])
    :api-client (new-api-client config)
-   :events     (co/using
-                (new-events)
-                {:client :api-client})
+   :mailman    (co/using
+                (new-mailman)
+                [:api-client])
    :log-maker  (new-log-maker config)
    :workspace  (co/using
                 (new-workspace config)

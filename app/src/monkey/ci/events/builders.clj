@@ -5,6 +5,16 @@
             [monkey.ci.containers :as co]
             [monkey.ci.events.core :as ec]))
 
+(defn script-event [type build-sid]
+  (ec/make-event 
+   type
+   :src :script
+   :sid build-sid))
+
+(defn script-init-evt [build-sid script-dir]
+  (-> (script-event :script/initializing build-sid)
+      (assoc :script-dir script-dir)))
+
 (defn job->event
   "Converts job into something that can be converted to edn"
   [job]
@@ -24,11 +34,8 @@
 (defn job-event
   "Creates a skeleton job event with basic properties"
   [type job-id build-sid]
-  (ec/make-event 
-   type
-   :src :script
-   :sid build-sid
-   :job-id job-id))
+  (-> (script-event type build-sid)
+      (assoc :job-id job-id)))
 
 (defn- job-holding-evt [type job build-sid]
   (-> (job-event type (bc/job-id job) build-sid)
