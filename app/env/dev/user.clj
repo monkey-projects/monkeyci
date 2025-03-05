@@ -1,14 +1,12 @@
 (ns user
-  (:require [babashka.fs :as fs]
-            [config :as c]
-            [instances :as i]
-            [logging :as l]
-            [server :as server]
-            [storage :as s]
-            [clojure.tools.namespace.repl :as nr]
-            [monkey.ci
-             [commands :as cmd]
-             [utils :as u]]))
+  (:require
+   [babashka.fs :as fs]
+   [clojure.tools.namespace.repl :as nr]
+   [config :as c]
+   [instances :as i]
+   [monkey.ci.commands :as cmd]
+   [monkey.ci.utils :as u]
+   [server :as server]))
 
 (defn global-config []
   @c/global-config)

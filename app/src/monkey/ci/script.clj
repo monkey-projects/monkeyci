@@ -1,23 +1,10 @@
 (ns monkey.ci.script
-  (:require [clojure.java.io :as io]
-            [clojure.tools.logging :as log]
-            [manifold
-             [bus :as mb]
-             [deferred :as md]
-             [stream :as ms]]
-            [medley.core :as mc]
-            [monkey.ci
-             [build :as build]
-             [credits :as cr]
-             [errors :as err]
-             [extensions :as ext]
-             [jobs :as j]
-             [protocols :as p]
-             [spec :as s]
-             [utils :as u]]
-            [monkey.ci.build.core :as bc]
-            [monkey.ci.events.core :as ec]
-            [monkey.ci.spec.build :as sb]))
+  (:require
+   [clojure.java.io :as io]
+   [clojure.tools.logging :as log]
+   [monkey.ci.build :as build]
+   [monkey.ci.build.core :as bc]
+   [monkey.ci.jobs :as j]))
 
 ;;; Script loading
 

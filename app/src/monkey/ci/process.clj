@@ -1,38 +1,13 @@
 (ns monkey.ci.process
   "Process execution functions.  Executes build scripts in a separate process,
    using clojure cli tools."
-  (:require [babashka
-             [fs :as fs]
-             [process :as bp]]
-            [clj-commons.byte-streams :as bs]
-            [clojure.java.io :as io]
-            [clojure.string :as cs]
-            [clojure.tools.logging :as log]
-            [manifold.deferred :as md]
-            [monkey.ci
-             [blob :as blob]
-             [build :as b]
-             [config :as config]
-             [edn :as edn]
-             [errors :as err]
-             [logging :as l]
-             [retry :as retry]
-             [runtime :as rt]
-             [script :as script]
-             [sidecar]
-             [utils :as utils]
-             [version :as v]]
-            [monkey.ci.build
-             [api-server :as as]
-             [core :as bc]]
-            [monkey.ci.script.config :as sc]
-            ;; Need to require these for the multimethod discovery
-            [monkey.ci.containers.oci]
-            [monkey.ci.events.core]
-            [monkey.ci.script.runtime :as sr]
-            [monkey.ci.storage
-             [file]
-             [sql]]))
+  (:require
+   [babashka.fs :as fs]
+   [babashka.process :as bp]
+   [monkey.ci.build :as b]
+   [monkey.ci.runtime :as rt]
+   [monkey.ci.utils :as utils]
+   [monkey.ci.version :as v]))
 
 (defn- version-or [dev? f]
   (if dev?
