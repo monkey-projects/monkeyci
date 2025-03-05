@@ -1,18 +1,18 @@
 (ns monkey.ci.runners-test
-  (:require [clojure.test :refer :all]
-            [clojure.core.async :as ca]
-            [clojure.java.io :as io]
-            [clojure.spec.alpha :as spec]
-            [clojure.string :as cs]
-            [manifold.deferred :as md]
-            [monkey.ci
-             [errors :as err]
-             [process :as p]
-             [runners :as sut]
-             [script :as script]
-             [utils :as u]]
-            [monkey.ci.spec.events :as se]
-            [monkey.ci.helpers :as h]))
+  (:require
+   [clojure.core.async :as ca]
+   [clojure.java.io :as io]
+   [clojure.spec.alpha :as spec]
+   [clojure.string :as cs]
+   [clojure.test :refer :all]
+   [manifold.deferred :as md]
+   [monkey.ci.errors :as err]
+   [monkey.ci.process :as p]
+   [monkey.ci.runners :as sut]
+   [monkey.ci.script :as script]
+   [monkey.ci.spec.events :as se]
+   [monkey.ci.test.helpers :as h]
+   [monkey.ci.utils :as u]))
 
 (deftest download-src
   (testing "no-op if the source is local"

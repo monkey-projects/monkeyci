@@ -1,10 +1,11 @@
 (ns monkey.ci.events.mailman-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [com.stuartsierra.component :as co]
-            [monkey.ci.events.mailman :as sut]
-            [monkey.ci.helpers :as h]
-            [monkey.jms :as jms]
-            [monkey.mailman.core :as mmc]))
+  (:require
+   [clojure.test :refer [deftest is testing]]
+   [com.stuartsierra.component :as co]
+   [monkey.ci.events.mailman :as sut]
+   [monkey.ci.test.helpers :as h]
+   [monkey.jms :as jms]
+   [monkey.mailman.core :as mmc]))
 
 (deftest make-component
   (testing "manifold"

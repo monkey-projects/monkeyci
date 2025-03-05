@@ -1,20 +1,18 @@
 (ns monkey.ci.artifacts-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [babashka.fs :as fs]
-            [clojure.java.io :as io]
-            [clojure.string :as cs]
-            [clojure.tools.logging :as log]
-            [manifold.deferred :as md]
-            [monkey.ci
-             [artifacts :as sut]
-             [blob :as blob]]
-            [monkey.ci.build
-             [api :as api]
-             [api-server :as bas]]
-            [monkey.ci.helpers :as h]
-            [monkey.ci.test
-             [api-server :as ta]
-             [blob :as tb]]))
+  (:require
+   [babashka.fs :as fs]
+   [clojure.java.io :as io]
+   [clojure.string :as cs]
+   [clojure.test :refer [deftest is testing]]
+   [clojure.tools.logging :as log]
+   [manifold.deferred :as md]
+   [monkey.ci.artifacts :as sut]
+   [monkey.ci.blob :as blob]
+   [monkey.ci.build.api :as api]
+   [monkey.ci.build.api-server :as bas]
+   [monkey.ci.test.api-server :as ta]
+   [monkey.ci.test.blob :as tb]
+   [monkey.ci.test.helpers :as h]))
 
 (deftest save-artifacts
   (testing "saves path using blob store, relative to job work dir"

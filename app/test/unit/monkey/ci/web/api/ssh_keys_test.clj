@@ -1,11 +1,11 @@
 (ns monkey.ci.web.api.ssh-keys-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [monkey.ci
-             [cuid :as cuid]
-             [storage :as st]]
-            [monkey.ci.web.api.ssh-keys :as sut]
-            [monkey.ci.helpers :as h]
-            [monkey.ci.test.runtime :as trt]))
+  (:require
+   [clojure.test :refer [deftest is testing]]
+   [monkey.ci.cuid :as cuid]
+   [monkey.ci.storage :as st]
+   [monkey.ci.test.helpers :as h]
+   [monkey.ci.test.runtime :as trt]
+   [monkey.ci.web.api.ssh-keys :as sut]))
 
 (deftest get-customer-ssh-keys
   (testing "decrypts private key using vault"

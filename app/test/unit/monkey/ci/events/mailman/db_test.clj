@@ -1,16 +1,15 @@
 (ns monkey.ci.events.mailman.db-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [clojure.spec.alpha :as spec]
-            [manifold.bus :as mb]
-            [monkey.ci
-             [cuid :as cuid]
-             [storage :as st]]
-            [monkey.ci.spec
-             [events :as se]
-             [entities :as sen]]
-            [monkey.ci.events.mailman :as em]
-            [monkey.ci.events.mailman.db :as sut]
-            [monkey.ci.helpers :as h]))
+  (:require
+   [clojure.spec.alpha :as spec]
+   [clojure.test :refer [deftest is testing]]
+   [manifold.bus :as mb]
+   [monkey.ci.cuid :as cuid]
+   [monkey.ci.events.mailman :as em]
+   [monkey.ci.events.mailman.db :as sut]
+   [monkey.ci.spec.entities :as sen]
+   [monkey.ci.spec.events :as se]
+   [monkey.ci.storage :as st]
+   [monkey.ci.test.helpers :as h]))
 
 (defn- validate-spec [spec obj]
   (is (spec/valid? spec obj)

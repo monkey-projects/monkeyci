@@ -13,12 +13,12 @@
    [monkey.ci.config :as c]
    [monkey.ci.cuid :as cuid]
    [monkey.ci.events.mailman :as em]
-   [monkey.ci.helpers :as h]
    [monkey.ci.logging :as l]
    [monkey.ci.protocols :as p]
    [monkey.ci.sidecar.config :as cs]
    [monkey.ci.sidecar.core :as sut]
    [monkey.ci.spec.sidecar :as ss]
+   [monkey.ci.test.helpers :as h]
    [monkey.ci.test.mailman :as tm]
    [monkey.ci.test.runtime.sidecar :as trs]
    [monkey.ci.workspace :as ws]))

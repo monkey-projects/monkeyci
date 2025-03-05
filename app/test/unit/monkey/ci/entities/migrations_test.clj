@@ -1,12 +1,12 @@
 (ns monkey.ci.entities.migrations-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [honey.sql :as sql]
-            [monkey.ci.vault :as v]
-            [monkey.ci.entities
-             [core :as ec]
-             [migrations :as sut]]
-            [monkey.ci.helpers :as h]
-            [monkey.ci.entities.helpers :as eh]))
+  (:require
+   [clojure.test :refer [deftest is testing]]
+   [honey.sql :as sql]
+   [monkey.ci.entities.core :as ec]
+   [monkey.ci.entities.helpers :as eh]
+   [monkey.ci.entities.migrations :as sut]
+   [monkey.ci.test.helpers :as h]
+   [monkey.ci.vault :as v]))
 
 (deftest fk
   (testing "creates foreign key constraint with cascading"

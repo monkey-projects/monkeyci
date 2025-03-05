@@ -1,21 +1,19 @@
 (ns monkey.ci.web.github-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [clojure.math :as cm]
-            [buddy.sign.jwt :as jwt]
-            [monkey.ci
-             [cuid :as cuid]
-             [protocols :as p]
-             [storage :as st]]
-            [monkey.ci.web
-             [auth :as auth]
-             [common :as wc]
-             [github :as sut]
-             [response :as r]]
-            [monkey.ci.helpers :as h]
-            [monkey.ci.test
-             [aleph-test :as af]
-             [runtime :as trt]]
-            [ring.mock.request :as mock]))
+  (:require
+   [buddy.sign.jwt :as jwt]
+   [clojure.math :as cm]
+   [clojure.test :refer [deftest is testing]]
+   [monkey.ci.cuid :as cuid]
+   [monkey.ci.protocols :as p]
+   [monkey.ci.storage :as st]
+   [monkey.ci.test.aleph-test :as af]
+   [monkey.ci.test.helpers :as h]
+   [monkey.ci.test.runtime :as trt]
+   [monkey.ci.web.auth :as auth]
+   [monkey.ci.web.common :as wc]
+   [monkey.ci.web.github :as sut]
+   [monkey.ci.web.response :as r]
+   [ring.mock.request :as mock]))
 
 (deftest webhook
   (testing "posts `build/pending` event"

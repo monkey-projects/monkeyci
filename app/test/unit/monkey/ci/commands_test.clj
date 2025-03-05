@@ -11,7 +11,6 @@
    [monkey.ci.edn :as edn]
    [monkey.ci.errors :as err]
    [monkey.ci.events.mailman :as em]
-   [monkey.ci.helpers :as h]
    [monkey.ci.pem :as pem]
    [monkey.ci.process :as proc]
    [monkey.ci.runners :as r]
@@ -22,6 +21,7 @@
    [monkey.ci.spec.sidecar :as ss]
    [monkey.ci.test.aleph-test :as at]
    [monkey.ci.test.config :as tc]
+   [monkey.ci.test.helpers :as h]
    [monkey.ci.test.mailman :as tm]
    [monkey.ci.web.handler :as wh]))
 

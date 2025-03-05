@@ -1,19 +1,18 @@
 (ns monkey.ci.blob-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [babashka.fs :as fs]
-            [clj-commons.byte-streams :as bs]
-            [clojure.java.io :as io]
-            [clompress.archivers :as ca]
-            [manifold.deferred :as md]
-            [monkey.ci
-             [blob :as sut]
-             [protocols :as p]
-             [utils :as u]]
-            [monkey.ci.helpers :as h]
-            [monkey.oci.os
-             [core :as os]
-             [martian :as om]
-             [stream :as oss]]))
+  (:require
+   [babashka.fs :as fs]
+   [clj-commons.byte-streams :as bs]
+   [clojure.java.io :as io]
+   [clojure.test :refer [deftest is testing]]
+   [clompress.archivers :as ca]
+   [manifold.deferred :as md]
+   [monkey.ci.blob :as sut]
+   [monkey.ci.protocols :as p]
+   [monkey.ci.test.helpers :as h]
+   [monkey.ci.utils :as u]
+   [monkey.oci.os.core :as os]
+   [monkey.oci.os.martian :as om]
+   [monkey.oci.os.stream :as oss]))
 
 (defmacro with-disk-blob [dir blob & body]
   `(h/with-tmp-dir ~dir

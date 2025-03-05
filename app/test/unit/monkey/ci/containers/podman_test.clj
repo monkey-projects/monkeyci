@@ -1,23 +1,22 @@
 (ns monkey.ci.containers.podman-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [clojure.spec.alpha :as spec]
-            [babashka
-             [fs :as fs]
-             [process :as bp]]
-            [io.pedestal.interceptor :as i]
-            [io.pedestal.interceptor.chain :as pi]
-            [monkey.ci
-             [artifacts :as art]
-             [cache :as ca]
-             [containers :as mcc]
-             [logging :as l]
-             [protocols :as p]]
-            [monkey.ci.containers.podman :as sut]
-            [monkey.ci.events.mailman :as em]
-            [monkey.ci.events.mailman.interceptors :as emi]
-            [monkey.ci.spec.events :as se]
-            [monkey.ci.helpers :as h :refer [contains-subseq?]]
-            [monkey.ci.test.runtime :as trt]))
+  (:require
+   [babashka.fs :as fs]
+   [babashka.process :as bp]
+   [clojure.spec.alpha :as spec]
+   [clojure.test :refer [deftest is testing]]
+   [io.pedestal.interceptor :as i]
+   [io.pedestal.interceptor.chain :as pi]
+   [monkey.ci.artifacts :as art]
+   [monkey.ci.cache :as ca]
+   [monkey.ci.containers :as mcc]
+   [monkey.ci.containers.podman :as sut]
+   [monkey.ci.events.mailman :as em]
+   [monkey.ci.events.mailman.interceptors :as emi]
+   [monkey.ci.logging :as l]
+   [monkey.ci.protocols :as p]
+   [monkey.ci.spec.events :as se]
+   [monkey.ci.test.helpers :as h :refer [contains-subseq?]]
+   [monkey.ci.test.runtime :as trt]))
 
 (deftest build-cmd-args
   (let [job {:id "test-job"

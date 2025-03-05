@@ -1,14 +1,16 @@
 (ns monkey.ci.entities.helpers
   "Helper functions for testing database entities"
-  (:require [clojure.spec.alpha :as s]
-            [clojure.spec.gen.alpha :as gen]
-            [config.core :as cc]
-            [monkey.ci.entities.migrations :as m]
-            [monkey.ci.helpers :as h]
-            [monkey.ci.spec.entities]
-            [next.jdbc :as jdbc]
-            [next.jdbc.connection :as conn])
-  (:import com.zaxxer.hikari.HikariDataSource))
+  (:require
+   [clojure.spec.alpha :as s]
+   [clojure.spec.gen.alpha :as gen]
+   [config.core :as cc]
+   [monkey.ci.entities.migrations :as m]
+   [monkey.ci.spec.entities]
+   [monkey.ci.test.helpers :as h]
+   [next.jdbc :as jdbc]
+   [next.jdbc.connection :as conn])
+  (:import
+   (com.zaxxer.hikari HikariDataSource)))
 
 (defn db-config
   "Takes db config from env"

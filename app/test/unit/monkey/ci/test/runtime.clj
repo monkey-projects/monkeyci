@@ -1,10 +1,11 @@
 (ns monkey.ci.test.runtime
   "Helper functions for working with runtime in tests"
-  (:require [manifold.deferred :as md]
-            [monkey.ci.helpers :as h]
-            [monkey.ci.storage :as s]
-            [monkey.ci.test.mailman :as tmm]
-            [monkey.ci.web.auth :as auth]))
+  (:require
+   [manifold.deferred :as md]
+   [monkey.ci.storage :as s]
+   [monkey.ci.test.helpers :as h]
+   [monkey.ci.test.mailman :as tmm]
+   [monkey.ci.web.auth :as auth]))
 
 (def empty-runtime {})
 

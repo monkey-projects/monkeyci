@@ -1,9 +1,10 @@
 (ns monkey.ci.web.api.invoice-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [monkey.ci.storage :as st]
-            [monkey.ci.web.api.invoice :as sut]
-            [monkey.ci.helpers :as h]
-            [monkey.ci.test.runtime :as trt]))
+  (:require
+   [clojure.test :refer [deftest is testing]]
+   [monkey.ci.storage :as st]
+   [monkey.ci.test.helpers :as h]
+   [monkey.ci.test.runtime :as trt]
+   [monkey.ci.web.api.invoice :as sut]))
 
 (deftest get-invoice
   (testing "retrieves single invoice by id"

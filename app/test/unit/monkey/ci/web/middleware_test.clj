@@ -1,13 +1,12 @@
 (ns monkey.ci.web.middleware-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [monkey.ci.web
-             [middleware :as sut]
-             [response :as r]]
-            [monkey.ci.helpers :as h]
-            [monkey.ci.test
-             [mailman :as tmm]
-             [runtime :as trt]]
-            [ring.util.response :as rur]))
+  (:require
+   [clojure.test :refer [deftest is testing]]
+   [monkey.ci.test.helpers :as h]
+   [monkey.ci.test.mailman :as tmm]
+   [monkey.ci.test.runtime :as trt]
+   [monkey.ci.web.middleware :as sut]
+   [monkey.ci.web.response :as r]
+   [ring.util.response :as rur]))
 
 (deftest post-events
   (testing "returns handler response"

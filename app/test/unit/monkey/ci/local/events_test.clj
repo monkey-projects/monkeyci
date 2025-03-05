@@ -1,18 +1,17 @@
 (ns monkey.ci.local.events-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [babashka.fs :as fs]
-            [manifold.deferred :as md]
-            [monkey.ci
-             [build :as b]
-             [edn :as edn]
-             [git :as git]]
-            [monkey.ci.events.mailman.interceptors :as emi]
-            [monkey.ci.local
-             [config :as lc]
-             [events :as sut]]
-            [monkey.ci.script.config :as sc]
-            [monkey.ci.helpers :as h]
-            [monkey.ci.test.mailman :as tm]))
+  (:require
+   [babashka.fs :as fs]
+   [clojure.test :refer [deftest is testing]]
+   [manifold.deferred :as md]
+   [monkey.ci.build :as b]
+   [monkey.ci.edn :as edn]
+   [monkey.ci.events.mailman.interceptors :as emi]
+   [monkey.ci.git :as git]
+   [monkey.ci.local.config :as lc]
+   [monkey.ci.local.events :as sut]
+   [monkey.ci.script.config :as sc]
+   [monkey.ci.test.helpers :as h]
+   [monkey.ci.test.mailman :as tm]))
 
 (deftest checkout-src
   (let [{:keys [enter] :as i} sut/checkout-src]
