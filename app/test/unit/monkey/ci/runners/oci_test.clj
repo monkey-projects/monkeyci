@@ -1,24 +1,23 @@
 (ns monkey.ci.runners.oci-test
-  (:require
-   [clojure.spec.alpha :as spec]
-   [clojure.string :as cstr]
-   [clojure.test :refer [deftest is testing]]
-   [com.stuartsierra.component :as co]
-   [manifold.deferred :as md]
-   [monkey.ci.cuid :as cuid]
-   [monkey.ci.edn :as edn]
-   [monkey.ci.events.mailman :as em]
-   [monkey.ci.events.mailman.db :as emd]
-   [monkey.ci.oci :as oci]
-   [monkey.ci.protocols :as p]
-   [monkey.ci.runners.oci :as sut]
-   [monkey.ci.script.config :as sc]
-   [monkey.ci.spec.events :as se]
-   [monkey.ci.storage :as st]
-   [monkey.ci.test.helpers :as h]
-   [monkey.ci.vault :as v]
-   [monkey.mailman.core :as mmc]
-   [monkey.oci.container-instance.core :as ci]))
+  (:require [clojure
+             [string :as cstr]
+             [test :refer [deftest is testing]]]
+            [clojure.spec.alpha :as spec]
+            [com.stuartsierra.component :as co]
+            [monkey.ci
+             [cuid :as cuid]
+             [edn :as edn]
+             [oci :as oci]
+             [protocols :as p]
+             [storage :as st]
+             [vault :as v]]
+            [monkey.ci.events.mailman :as em]
+            [monkey.ci.events.mailman.db :as emd]
+            [monkey.ci.runners.oci :as sut]
+            [monkey.ci.script.config :as sc]
+            [monkey.ci.spec.events :as se]
+            [monkey.ci.test.helpers :as h]
+            [monkey.mailman.core :as mmc]))
 
 (defn- decode-vol-config [vol fn]
   (some->> vol
@@ -170,6 +169,10 @@
             (testing "uses script dir as source path"
               (is (= (cstr/join "/" [oci/work-dir (:build-id build) ".monkeyci"])
                      (-> deps :paths first))))
+
+            (testing "runs script"
+              (is (= 'monkey.ci.script.runtime/run-script!
+                     (-> deps :aliases :monkeyci/build :exec-fn))))
 
             (testing "provides monkeyci dependency"
               (is (string? (get-in deps [:aliases :monkeyci/build :extra-deps 'com.monkeyci/app :mvn/version]))))

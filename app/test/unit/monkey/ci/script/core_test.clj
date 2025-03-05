@@ -1,19 +1,7 @@
-(ns monkey.ci.script-test
-  (:require
-   [clojure.spec.alpha :as spec]
-   [clojure.test :refer :all]
-   [manifold.bus :as mb]
-   [manifold.deferred :as md]
-   [monkey.ci.build :as b]
-   [monkey.ci.build.core :as bc]
-   [monkey.ci.events.core :as ec]
-   [monkey.ci.jobs :as j]
-   [monkey.ci.runtime :as rt]
-   [monkey.ci.script :as sut]
-   [monkey.ci.spec.events :as se]
-   [monkey.ci.test.aleph-test :as at]
-   [monkey.ci.test.helpers :as h]
-   [monkey.ci.utils :as u]))
+(ns monkey.ci.script.core-test
+  (:require [clojure.test :refer :all]
+            [monkey.ci.build.core :as bc]
+            [monkey.ci.script.core :as sut]))
 
 (defn dummy-job
   ([r]

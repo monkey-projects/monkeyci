@@ -3,16 +3,16 @@
             [clojure.tools.logging :as log]
             [config :as co]
             [manifold.deferred :as md]
-            [monkey.ci
+            [monkey.ci runners
              [build :as b]
              [commands :as cmd]
              [process :as proc]
-             [runners]
-             [script :as s]
              [time :as t]]
             [monkey.ci.build.api-server :as bas]
             [monkey.ci.runners.runtime :as rr]
-            [monkey.ci.script.runtime :as sr]
+            [monkey.ci.script
+             [core :as s]
+             [runtime :as sr]]
             [monkey.ci.web.auth :as auth]))
 
 (defn clear-git-dir [build]

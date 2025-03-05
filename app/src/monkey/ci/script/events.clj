@@ -6,14 +6,13 @@
             [monkey.ci
              [build :as b]
              [extensions :as ext]
-             [jobs :as j]
-             [script :as s]]
+             [jobs :as j]]
             [monkey.ci.build.core :as bc]
             [monkey.ci.events
              [core :as ec]
              [mailman :as em]]
             [monkey.ci.events.mailman.interceptors :as emi]
-            [monkey.ci.build.core :as bc]))
+            [monkey.ci.script.core :as s]))
 
 ;;; Context management
 

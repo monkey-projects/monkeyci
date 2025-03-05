@@ -1,10 +1,10 @@
-(ns monkey.ci.script
-  (:require
-   [clojure.java.io :as io]
-   [clojure.tools.logging :as log]
-   [monkey.ci.build :as build]
-   [monkey.ci.build.core :as bc]
-   [monkey.ci.jobs :as j]))
+(ns monkey.ci.script.core
+  (:require [clojure.java.io :as io]
+            [clojure.tools.logging :as log]
+            [monkey.ci
+             [build :as build]
+             [jobs :as j]]
+            [monkey.ci.build.core :as bc]))
 
 ;;; Script loading
 
@@ -60,3 +60,4 @@
   [build rt]
   (-> (load-script (build/script-dir build) (build/build-id build))
       (resolve-jobs rt)))
+

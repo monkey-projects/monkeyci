@@ -11,11 +11,11 @@
              [errors :as err]
              [process :as p]
              [runtime :as rt]
-             [script :as s]
              [spec :as spec]
              [utils :as u]
              [workspace :as ws]]
             [monkey.ci.build.core :as bc]
+            [monkey.ci.script.core :as s]
             [monkey.ci.spec.build :as sb]))
 
 (defn download-git

@@ -1,13 +1,14 @@
 (ns monkey.ci.process
   "Process execution functions.  Executes build scripts in a separate process,
    using clojure cli tools."
-  (:require
-   [babashka.fs :as fs]
-   [babashka.process :as bp]
-   [monkey.ci.build :as b]
-   [monkey.ci.runtime :as rt]
-   [monkey.ci.utils :as utils]
-   [monkey.ci.version :as v]))
+  (:require [babashka
+             [fs :as fs]
+             [process :as bp]]
+            [monkey.ci
+             [build :as b]
+             [runtime :as rt]
+             [utils :as utils]
+             [version :as v]]))
 
 (defn- version-or [dev? f]
   (if dev?

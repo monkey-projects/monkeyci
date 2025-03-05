@@ -156,7 +156,7 @@
   {:paths [(script-dir build)]
    :aliases
    {:monkeyci/build
-    (cond-> {:exec-fn 'monkey.ci.process/run
+    (cond-> {:exec-fn 'monkey.ci.script.runtime/run-script!
              :extra-deps {'com.monkeyci/app {:mvn/version (or lib-version (v/version))}}
              :exec-args {:config (script-config config)}}
       (:log-config config) (assoc :jvm-opts

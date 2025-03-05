@@ -1,22 +1,23 @@
 (ns monkey.ci.oci
   "Oracle cloud specific functionality"
-  (:require
-   [babashka.fs :as fs]
-   [clojure.tools.logging :as log]
-   [java-time.api :as jt]
-   [manifold.deferred :as md]
-   [martian.interceptors :as mi]
-   [medley.core :as mc]
-   [monkey.ci.build :as b]
-   [monkey.ci.common.preds :as cp]
-   [monkey.ci.config :as config]
-   [monkey.ci.retry :as retry]
-   [monkey.ci.time :as t]
-   [monkey.ci.utils :as u]
-   [monkey.oci.container-instance.core :as ci]
-   [monkey.oci.os.martian :as os]
-   [monkey.oci.os.stream :as s]
-   [taoensso.telemere :as tt]))
+  (:require [babashka.fs :as fs]
+            [clojure.tools.logging :as log]
+            [java-time.api :as jt]
+            [manifold.deferred :as md]
+            [martian.interceptors :as mi]
+            [medley.core :as mc]
+            [monkey.ci
+             [build :as b]
+             [config :as config]
+             [retry :as retry]
+             [time :as t]
+             [utils :as u]]
+            [monkey.ci.common.preds :as cp]
+            [monkey.oci.container-instance.core :as ci]
+            [monkey.oci.os
+             [martian :as os]
+             [stream :as s]]
+            [taoensso.telemere :as tt]))
 
 ;; Cpu architectures
 (def arch-arm :arm)

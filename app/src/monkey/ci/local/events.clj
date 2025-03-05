@@ -15,19 +15,16 @@
    The build controller, responsible for managing build params and events, is
    run in the main process.  Builds connect to it using http, same as for 
    server-side builds."
-  
-  (:require [babashka
-             [fs :as fs]
-             [process :as bp]]
+  (:require [babashka.fs :as fs]
             [clojure.tools.logging :as log]
             [monkey.ci
              [build :as b]
              [git :as git]
              [utils :as u]]
-            [monkey.ci.script.config :as sc]
             [monkey.ci.events.mailman :as em]
             [monkey.ci.events.mailman.interceptors :as emi]
-            [monkey.ci.local.config :as conf]))
+            [monkey.ci.local.config :as conf]
+            [monkey.ci.script.config :as sc]))
 
 ;;; Context management
 
