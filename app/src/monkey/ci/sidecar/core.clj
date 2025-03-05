@@ -1,22 +1,23 @@
 (ns monkey.ci.sidecar.core
   "Sidecar specific functions"
-  (:require
-   [babashka.fs :as fs]
-   [clojure.java.io :as io]
-   [clojure.tools.logging :as log]
-   [manifold.deferred :as md]
-   [monkey.ci.artifacts :as art]
-   [monkey.ci.build :as b]
-   [monkey.ci.cache :as cache]
-   [monkey.ci.events.core :as ec]
-   [monkey.ci.events.mailman :as em]
-   [monkey.ci.jobs :as j]
-   [monkey.ci.logging :as l]
-   [monkey.ci.sidecar.config :as cs]
-   [monkey.ci.spec :as spec]
-   [monkey.ci.spec.sidecar :as ss]
-   [monkey.ci.utils :as u]
-   [monkey.ci.workspace :as ws]))
+  (:require [babashka.fs :as fs]
+            [clojure.java.io :as io]
+            [clojure.tools.logging :as log]
+            [manifold.deferred :as md]
+            [monkey.ci
+             [artifacts :as art]
+             [build :as b]
+             [cache :as cache]
+             [jobs :as j]
+             [logging :as l]
+             [spec :as spec]
+             [utils :as u]
+             [workspace :as ws]]
+            [monkey.ci.events
+             [core :as ec]
+             [mailman :as em]]
+            [monkey.ci.sidecar.config :as cs]
+            [monkey.ci.spec.sidecar :as ss]))
 
 (defn- create-file-with-dirs [f]
   (let [p (fs/parent f)]
@@ -137,5 +138,6 @@
                 (mark-abort rt)
                 (error-result ex))))
       (catch Throwable t
+        (log/error "Failed to run sidecar" t)
         (mark-abort rt)
         (md/success-deferred (error-result t))))))

@@ -34,11 +34,6 @@
 (defn set-api [conf api]
   (assoc conf ::ss/api api))
 
-(def events ::es/events)
-
-(defn set-events [conf e]
-  (assoc conf ::es/events e))
-
 (def log-maker ::ss/log-maker)
 
 (defn set-log-maker [conf l]

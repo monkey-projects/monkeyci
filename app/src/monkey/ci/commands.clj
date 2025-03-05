@@ -1,37 +1,39 @@
 (ns monkey.ci.commands
   "Event handlers for commands"
-  (:require
-   [aleph.http :as http]
-   [babashka.fs :as fs]
-   [cheshire.core :as json]
-   [clj-commons.byte-streams :as bs]
-   [clj-kondo.core :as clj-kondo]
-   [clojure.tools.logging :as log]
-   [java-time.api :as jt]
-   [manifold.deferred :as md]
-   [medley.core :as mc]
-   [monkey.ci.build :as b]
-   [monkey.ci.errors :as err]
-   [monkey.ci.events.core :as ec]
-   [monkey.ci.events.mailman :as em]
-   [monkey.ci.jobs :as jobs]
-   [monkey.ci.local.config :as lc]
-   [monkey.ci.local.runtime :as lr]
-   [monkey.ci.pem :as pem]
-   [monkey.ci.process :as proc]
-   [monkey.ci.protocols :as p]
-   [monkey.ci.runners.controller :as rc]
-   [monkey.ci.runners.runtime :as rr]
-   [monkey.ci.runtime :as rt]
-   [monkey.ci.runtime.app :as ra]
-   [monkey.ci.script :as script]
-   [monkey.ci.sidecar.core :as sidecar]
-   [monkey.ci.sidecar.runtime :as rs]
-   [monkey.ci.spec :as spec]
-   [monkey.ci.spec.sidecar :as ss]
-   [monkey.ci.utils :as u]
-   [monkey.ci.web.auth :as auth]
-   [monkey.ci.web.handler :as h]))
+  (:require [aleph.http :as http]
+            [babashka.fs :as fs]
+            [cheshire.core :as json]
+            [clj-commons.byte-streams :as bs]
+            [clj-kondo.core :as clj-kondo]
+            [clojure.tools.logging :as log]
+            [java-time.api :as jt]
+            [manifold.deferred :as md]
+            [medley.core :as mc]
+            [monkey.ci
+             [build :as b]
+             [jobs :as jobs]
+             [pem :as pem]
+             [process :as proc]
+             [runtime :as rt]
+             [spec :as spec]
+             [utils :as u]]
+            [monkey.ci.events
+             [core :as ec]
+             [mailman :as em]]
+            [monkey.ci.local
+             [config :as lc]
+             [runtime :as lr]]
+            [monkey.ci.runners
+             [controller :as rc]
+             [runtime :as rr]]
+            [monkey.ci.runtime.app :as ra]
+            [monkey.ci.sidecar
+             [core :as sidecar]
+             [runtime :as rs]]
+            [monkey.ci.spec.sidecar :as ss]
+            [monkey.ci.web
+             [auth :as auth]
+             [handler :as h]]))
 
 (defn run-build-local
   "Run a build locally, normally from local source but can also be from a git checkout.

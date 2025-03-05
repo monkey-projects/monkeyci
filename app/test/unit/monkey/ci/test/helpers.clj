@@ -1,25 +1,25 @@
 (ns monkey.ci.test.helpers
   "Helper functions for testing"
-  (:require
-   [aleph.netty :as an]
-   [camel-snake-kebab.core :as csk]
-   [cheshire.core :as json]
-   [clojure.core.async :as ca]
-   [clojure.java.io :as io]
-   [clojure.spec.alpha :as spec]
-   [clojure.spec.gen.alpha :as gen]
-   [clojure.string :as cs]
-   [manifold.deferred :as md]
-   [medley.core :as mc]
-   [monkey.ci.cuid :as cuid]
-   [monkey.ci.protocols :as p]
-   [monkey.ci.storage :as s]
-   [monkey.ci.vault :as v]
-   [monkey.ci.web.auth :as auth]
-   [monkey.ci.web.common :as wc]
-   [ring.mock.request :as mock])
-  (:import
-   (org.apache.commons.io FileUtils)))
+  (:require [aleph.netty :as an]
+            [camel-snake-kebab.core :as csk]
+            [cheshire.core :as json]
+            [clojure.core.async :as ca]
+            [clojure.java.io :as io]
+            [clojure.spec.alpha :as spec]
+            [clojure.spec.gen.alpha :as gen]
+            [clojure.string :as cs]
+            [manifold.deferred :as md]
+            [medley.core :as mc]
+            [monkey.ci
+             [cuid :as cuid]
+             [protocols :as p]
+             [storage :as s]
+             [vault :as v]]
+            [monkey.ci.web
+             [auth :as auth]
+             [common :as wc]]
+            [ring.mock.request :as mock])
+  (:import (org.apache.commons.io FileUtils)))
 
 (defn ^java.io.File create-tmp-dir []
   (doto (io/file (System/getProperty "java.io.tmpdir") (str "tmp-" (random-uuid)))
