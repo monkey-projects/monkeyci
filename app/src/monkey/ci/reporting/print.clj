@@ -3,33 +3,11 @@
   (:require [babashka.fs :as fs]
             [clansi :as cl]
             [clojure.string :as cs]
-            [monkey.ci.reporting :as r]
+            [monkey.ci
+             [console :as c]
+             [reporting :as r]]
             [monkey.ci.build :as b]
             [monkey.ci.build.core :as bc]))
-
-(defn- error [s]
-  (cl/style s :bright :red))
-
-(defn- warning [s]
-  (cl/style s :bright :yellow))
-
-(defn- success [s]
-  (cl/style s :bright :green))
-
-(defn- accent [s]
-  (cl/style s :bright :yellow))
-
-(def good (success "\u221a"))
-(def bad  (error "X"))
-(def prev-line "\033[F") ; ANSI code to jump back to the start of previous line
-
-(defn- url [url]
-  (cl/style url :underline))
-
-(defn- overwrite
-  "Overwrites the previous line with the string"
-  [s & args]
-  (apply println prev-line s args))
 
 (defmulti printer :type)
 
@@ -37,11 +15,11 @@
   (println "Press" (cl/style "Ctrl+C" :cyan) "to stop."))
 
 (defmethod printer :server/started [msg]
-  (println "Server started at" (url (format "http://localhost:%d" (get-in msg [:http :port]))) good)
+  (println "Server started at" (c/url (format "http://localhost:%d" (get-in msg [:http :port]))) c/good)
   (print-stop))
 
 (defmethod printer :watch/started [m]
-  (println "Watching for build events at" (url (:url m)))
+  (println "Watching for build events at" (c/url (:url m)))
   (print-stop))
 
 (defn- step-name [event]
@@ -63,19 +41,19 @@
       :script/end
       (p (cl/style "Script completed" :green))
       :pipeline/start
-      (p "Pipeline started:" (accent (pn event)))
+      (p "Pipeline started:" (c/accent (pn event)))
       :pipeline/end
       (if (bc/success? event)
-        (p "Pipeline" (accent (pn event)) "succeeded" good)
-        (p "Pipeline" (accent (pn event)) "failed" bad))
+        (p "Pipeline" (c/accent (pn event)) "succeeded" c/good)
+        (p "Pipeline" (c/accent (pn event)) "failed" c/bad))
       :step/start
-      (p "Step started:" (accent (step-name event)))
+      (p "Step started:" (c/accent (step-name event)))
       :step/end
       (if (bc/success? event)
-        (p "Step succeeded:" (accent (step-name event)) good)
+        (p "Step succeeded:" (c/accent (step-name event)) c/good)
         (do
-          (p "Step failed:" (accent (step-name event)) bad)
-          (p "Message:" (accent (:message event)))
+          (p "Step failed:" (c/accent (step-name event)) c/bad)
+          (p "Message:" (c/accent (:message event)))
           (when-let [st (:stack-trace event)]
             (p "Stack trace:" (cl/style st :red)))))
       ;; Other cases, just ignore
@@ -117,7 +95,7 @@
         (fn [{id :id ts :timestamp res :result :as b}]
           (->> (map left-align
                     [id ts (if res
-                             (str (name res) " " (if (= :success res) good bad))
+                             (str (name res) " " (if (= :success res) c/good c/bad))
                              "unknown")]
                     widths)
                (cs/join col-sep)))]
@@ -135,12 +113,12 @@
   (print-all (build-list builds)))
 
 (defmethod printer :verify/success [{:keys [jobs]}]
-  (println (success "Success!") "Build script provides" (count jobs) "jobs with the current settings.")
+  (println (c/success "Success!") "Build script provides" (count jobs) "jobs with the current settings.")
   (doseq [j jobs]
-    (println "  " (accent (:id j)))))
+    (println "  " (c/accent (:id j)))))
 
 (defmethod printer :verify/failed [{:keys [message]}]
-  (println (error "Error:") "Exception while verifying:" message))
+  (println (c/error "Error:") "Exception while verifying:" message))
 
 (defn- print-finding [{:keys [row col message filename] :as f}]
   (printf "%s - at %d:%d: %s%n" (fs/file-name filename) row col message))
@@ -150,22 +128,22 @@
         e? (and e (pos? e))
         w? (and w (pos? w))]
     (when e?
-      (println (error (str "Got " e " error(s)"))))
+      (println (c/error (str "Got " e " error(s)"))))
     (when w?
-      (println (warning (str "Got " w " warning(s)"))))
+      (println (c/warning (str "Got " w " warning(s)"))))
     (when (not (or e? w?))
-      (println (success "Build script is valid!")))
+      (println (c/success "Build script is valid!")))
     (doseq [f (:findings result)]
       (print-finding f))
     ;; Ensure printed stuff is actually sent to stdout
     (flush)))
 
 (defmethod printer :test/starting [{:keys [build]}]
-  (println (accent "Starting unit tests for build..."))
+  (println (c/accent "Starting unit tests for build..."))
   (println "Location:" (b/script-dir build)))
 
 (defmethod printer :default [msg]
-  (println (warning "Warning:") "unknown message type" (accent (str (:type msg)))))
+  (println (c/warning "Warning:") "unknown message type" (c/accent (str (:type msg)))))
 
 (defn print-reporter
   "Nicely prints to stdout, using coloring"

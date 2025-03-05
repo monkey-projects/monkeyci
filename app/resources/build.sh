@@ -64,6 +64,7 @@ fi
 # Ensure cleanup is executed on termination
 trap cleanup EXIT
 
+echo "Start file detected, running clojure process in $MONKEYCI_WORK_DIR"
 cd $MONKEYCI_WORK_DIR
 # Run the build.  This assumes the necessary deps.edn is placed in $CLJ_CONFIG.
 clojure -X:monkeyci/build

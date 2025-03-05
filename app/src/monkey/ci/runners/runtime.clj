@@ -126,12 +126,12 @@
   (ms/put! stream evt)
   nil)
 
-(defrecord EventForwarder [mailman local-mailman event-stream listeners]
+(defrecord EventForwarder [global-mailman mailman event-stream listeners]
   co/Lifecycle
   (start [this]
-    (assoc this :listeners (->> [(partial to-global-broker mailman)
+    (assoc this :listeners (->> [(partial to-global-broker global-mailman)
                                  (partial to-event-stream event-stream)]
-                                (map (partial mmc/add-listener (:broker local-mailman)))
+                                (map (partial mmc/add-listener (:broker mailman)))
                                 (doall))))
 
   (stop [{:keys [listeners] :as this}]
@@ -200,19 +200,19 @@
    :push-gw    (co/using
                 (new-push-gw config)
                 [:metrics])
-   :mailman    (new-mailman config)
+   :global-mailman (new-mailman config)
    :routes     (co/using
                 (new-routes config)
-                [:mailman])
-   :local-mailman (new-local-mailman)
+                {:mailman :global-mailman})
+   :mailman (new-local-mailman)
    :container-routes (co/using
                       (new-container-routes config)
-                      {:mailman :local-mailman
+                      {:mailman :mailman
                        :build :build
                        :api :api-config})
    :event-forwarder (co/using
                      (new-event-forwarder)
-                     [:mailman :local-mailman :event-stream])))
+                     [:global-mailman :mailman :event-stream])))
 
 (defn with-runner-system [config f]
   (rc/with-system (make-runner-system config) f))

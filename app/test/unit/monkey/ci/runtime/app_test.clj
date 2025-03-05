@@ -64,10 +64,6 @@
         (let [r (sut/->ProcessReaper {:runner {:type :oci}})]
           (is (= ::ok (r)))))
 
-      (testing "for `:oci2` runners"
-        (let [r (sut/->ProcessReaper {:runner {:type :oci2}})]
-          (is (= ::ok (r)))))
-
       (testing "not for other runners"
         (let [r (sut/->ProcessReaper {:runner {:type :some-other}})]
           (is (empty? (r))))))))

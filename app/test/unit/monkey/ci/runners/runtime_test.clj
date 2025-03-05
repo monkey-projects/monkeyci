@@ -62,14 +62,14 @@
           (is (= (get-in sys [:api-config :token])
                  (:token (p/run-container (:containers sys) {})))))))
 
-    (testing "provides mailman"
-      (is (some? (:mailman sys))))
+    (testing "provides global mailman"
+      (is (some? (:global-mailman sys))))
 
     (testing "provides mailman routes"
       (is (some? (:routes sys))))
 
     (testing "provides local mailman"
-      (is (some? (:local-mailman sys))))
+      (is (some? (:mailman sys))))
 
     (testing "provides container routes"
       (is (some? (:container-routes sys))))
@@ -132,7 +132,7 @@
 (deftest event-forwarder
   (testing "`start` registers listeners in broker"
     (let [broker (em/make-component {:type :manifold})
-          r (-> (sut/map->EventForwarder {:local-mailman broker
+          r (-> (sut/map->EventForwarder {:mailman broker
                                           :event-stream (ms/stream)})
                 (co/start))]
       (is (not-empty (:listeners r)))
@@ -150,8 +150,8 @@
                    (co/start))
         global (tm/test-component)
         stream (ms/stream 1)
-        fw (-> (sut/map->EventForwarder {:local-mailman local
-                                         :mailman global
+        fw (-> (sut/map->EventForwarder {:mailman local
+                                         :global-mailman global
                                          :event-stream stream})
                (co/start))
         evt {:type ::test-event}]
