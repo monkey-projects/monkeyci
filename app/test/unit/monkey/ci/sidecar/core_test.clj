@@ -1,24 +1,22 @@
-(ns monkey.ci.sidecar-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [babashka.fs :as fs]
+(ns monkey.ci.sidecar.core-test
+  (:require [babashka.fs :as fs]
             [clojure.java.io :as io]
-            [clojure.spec.alpha :as s]
+            [clojure.test :refer [deftest is testing]]
             [clojure.tools.logging :as log]
             [manifold
              [deferred :as md]
              [time :as mt]]
             [monkey.ci
              [artifacts :as art]
-             [blob :as b]
              [cache :as ca]
-             [config :as c]
+             [cuid :as cuid]
              [logging :as l]
              [protocols :as p]
-             [sidecar :as sut]
              [workspace :as ws]]
-            [monkey.ci.config.sidecar :as cs]
-            [monkey.ci.spec.sidecar :as ss]
-            [monkey.ci.helpers :as h]
+            [monkey.ci.sidecar.core :as sut]
+            [monkey.ci.test
+             [helpers :as h]
+             [mailman :as tm]]
             [monkey.ci.test.runtime.sidecar :as trs]))
 
 (defrecord TestLogger [streams path]
@@ -35,16 +33,15 @@
       (let [f (io/file dir "events.edn")
             evt {:type :test/event
                  :message "This is a test event"}
-            {:keys [recv] :as e} (h/fake-events)
-            rt (-> trs/test-rt
-                   (trs/set-events e)
-                   (trs/set-events-file f)
-                   (trs/set-poll-interval 10))
+            {:keys [mailman] :as rt} (-> (trs/make-test-rt)
+                                         (trs/set-events-file f)
+                                         (trs/set-poll-interval 10))
             _ (spit f (prn-str evt))
             c (sut/poll-events rt)]
         (is (md/deferred? c))
-        (is (not= :timeout (h/wait-until #(not-empty @recv) 500)))
-        (is (= evt (-> (first @recv)
+        (is (not= :timeout (h/wait-until #(not-empty (tm/get-posted mailman)) 500)))
+        (is (= evt (-> (tm/get-posted mailman)
+                       (first)
                        (select-keys (keys evt)))))
         (is (true? (.delete f)) "delete the file to stop the sidecar")
         (is (= 0 (wait-for-exit c))))))
@@ -54,16 +51,15 @@
       (let [f (io/file dir "events.edn")
             evt {:type :test/event
                  :message "This is a test event"}
-            {:keys [recv] :as e} (h/fake-events)
-            rt (-> trs/test-rt
-                   (trs/set-events e)
-                   (trs/set-events-file f)
-                   (trs/set-poll-interval 10))
+            {:keys [mailman] :as rt} (-> (trs/make-test-rt)
+                                         (trs/set-events-file f)
+                                         (trs/set-poll-interval 10))
             c (sut/poll-events rt)]
         ;; Post the event after sidecar has started
         (is (nil? (spit f (prn-str evt))))
-        (is (not= :timeout (h/wait-until #(not-empty @recv) 500)))
-        (is (= evt (-> (first @recv)
+        (is (not= :timeout (h/wait-until #(not-empty (tm/get-posted mailman)) 500)))
+        (is (= evt (-> (tm/get-posted mailman)
+                       (first)
                        (select-keys (keys evt)))))
         (is (true? (.delete f)))
         (is (= 0 (wait-for-exit c))))))
@@ -73,20 +69,18 @@
       (let [f (io/file dir "events.edn")
             evt {:type :test/event
                  :message "This is a test event"}
-            {:keys [recv] :as e} (h/fake-events)
-            sid (repeatedly 3 random-uuid)
+            sid (repeatedly 3 cuid/random-cuid)
             job {:id "test-job"}
-            rt (-> trs/test-rt
-                   (trs/set-events e)
-                   (trs/set-events-file f)
-                   (trs/set-poll-interval 10)
-                   (trs/set-job job)
-                   (trs/set-build {:sid sid}))
+            {:keys [mailman] :as rt} (-> (trs/make-test-rt)
+                                         (trs/set-events-file f)
+                                         (trs/set-poll-interval 10)
+                                         (trs/set-job job)
+                                         (trs/set-build {:sid sid}))
             c (sut/poll-events rt)]
         ;; Post the event after sidecar has started
         (is (nil? (spit f (prn-str evt))))
-        (is (not= :timeout (h/wait-until #(not-empty @recv) 500)))
-        (let [evt (first @recv)]
+        (is (not= :timeout (h/wait-until #(not-empty (tm/get-posted mailman)) 500)))
+        (let [evt (first (tm/get-posted mailman))]
           (is (= sid (:sid evt)))
           (is (= (:id job) (:job-id evt))))
         (is (true? (.delete f)))
@@ -98,16 +92,15 @@
             evt {:type :test/event
                  :message "This is a test event"
                  :done? true}
-            {:keys [recv] :as e} (h/fake-events)
-            rt (-> trs/test-rt
-                   (trs/set-events e)
-                   (trs/set-events-file f)
-                   (trs/set-poll-interval 10))
+            {:keys [mailman] :as rt} (-> (trs/make-test-rt)
+                                         (trs/set-events-file f)
+                                         (trs/set-poll-interval 10))
             c (sut/poll-events rt)]
         ;; Post the event after sidecar has started
         (is (nil? (spit f (prn-str evt))))
-        (is (not= :timeout (h/wait-until #(not-empty @recv) 500)))
-        (is (= evt (-> (first @recv)
+        (is (not= :timeout (h/wait-until #(not-empty (tm/get-posted mailman)) 500)))
+        (is (= evt (-> (tm/get-posted mailman)
+                       (first)
                        (select-keys (keys evt)))))
         (is (= 0 (wait-for-exit c))))))
 
@@ -122,8 +115,7 @@
                  :exit 0
                  :done? true}
             streams (atom [])
-            rt (-> trs/test-rt
-                   (trs/set-events (h/fake-events))
+            rt (-> (trs/make-test-rt)
                    (trs/set-events-file f)
                    (trs/set-poll-interval 10)
                    (trs/set-log-maker (fn [_ path]

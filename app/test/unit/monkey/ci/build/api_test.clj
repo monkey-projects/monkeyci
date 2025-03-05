@@ -1,23 +1,22 @@
 (ns monkey.ci.build.api-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [clojure.java.io :as io]
-            [manifold
-             [bus :as bus]
-             [deferred :as md]
-             [stream :as ms]]
-            [martian.core :as mc]
-            [monkey.ci.build
-             [api :as sut]
-             [api-server :as server]]
-            [monkey.ci.events.mailman :as em]
-            [monkey.ci.events.mailman.build-api :as emba]
-            [monkey.ci.helpers :as h]
-            [monkey.ci.protocols :as p]
-            [monkey.mailman.core :as mmc]
-            [monkey.ci.test
-             [api-server :as tas]
-             [mailman :as tm]])
-  (:import [java.io PipedInputStream PipedOutputStream PrintWriter]))
+  (:require
+   [clojure.java.io :as io]
+   [clojure.test :refer [deftest is testing]]
+   [manifold.bus :as bus]
+   [manifold.deferred :as md]
+   [manifold.stream :as ms]
+   [martian.core :as mc]
+   [monkey.ci.build.api :as sut]
+   [monkey.ci.build.api-server :as server]
+   [monkey.ci.events.mailman :as em]
+   [monkey.ci.events.mailman.build-api :as emba]
+   [monkey.ci.protocols :as p]
+   [monkey.ci.test.api-server :as tas]
+   [monkey.ci.test.helpers :as h]
+   [monkey.ci.test.mailman :as tm]
+   [monkey.mailman.core :as mmc])
+  (:import
+   (java.io PipedInputStream PipedOutputStream PrintWriter)))
 
 (deftest api-client
   (let [config (tas/test-config)

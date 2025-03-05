@@ -1,12 +1,12 @@
 (ns monkey.ci.metrics-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [clojure.string :as cs]
-            [com.stuartsierra.component :as co]
-            [monkey.ci
-             [metrics :as sut]
-             [prometheus :as prom]]
-            [monkey.ci.helpers :as h]
-            [taoensso.telemere :as t]))
+  (:require
+   [clojure.string :as cs]
+   [clojure.test :refer [deftest is testing]]
+   [com.stuartsierra.component :as co]
+   [monkey.ci.metrics :as sut]
+   [monkey.ci.prometheus :as prom]
+   [monkey.ci.test.helpers :as h]
+   [taoensso.telemere :as t]))
 
 (deftest metrics
   (testing "can make metrics registry"

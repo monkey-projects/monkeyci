@@ -1,8 +1,9 @@
 (ns monkey.ci.utils-test
-  (:require [clojure.test :refer :all]
-            [clojure.java.io :as io]
-            [monkey.ci.utils :as sut]
-            [monkey.ci.helpers :as h]))
+  (:require
+   [clojure.java.io :as io]
+   [clojure.test :refer :all]
+   [monkey.ci.test.helpers :as h]
+   [monkey.ci.utils :as sut]))
 
 (deftest abs-path
   (testing "returns abs path as is"

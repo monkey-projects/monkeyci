@@ -1,9 +1,10 @@
 (ns sidecar
-  (:require [config :as co]
-            [monkey.ci.sidecar :as sc]
-            [monkey.ci.config.sidecar :as cs]
-            [monkey.ci.runners.runtime :as rr]
-            [monkey.ci.runtime.sidecar :as rs]))
+  (:require
+   [config :as co]
+   [monkey.ci.runners.runtime :as rr]
+   [monkey.ci.sidecar.config :as cs]
+   [monkey.ci.sidecar.core :as sc]
+   [monkey.ci.sidecar.runtime :as rs]))
 
 (defn run-test []
   (rr/with-runner-system @co/global-config

@@ -1,10 +1,8 @@
-(ns monkey.ci.config.sidecar
+(ns monkey.ci.sidecar.config
   "Functions for handling sidecar configuration"
   (:require [medley.core :as mc]
-            [monkey.ci.spec :as s]
             [monkey.ci.spec
              [blob :as bs]
-             [events :as es]
              [sidecar :as ss]]))
 
 (defn- ns-keys [m]
@@ -33,11 +31,6 @@
 
 (defn set-api [conf api]
   (assoc conf ::ss/api api))
-
-(def events ::es/events)
-
-(defn set-events [conf e]
-  (assoc conf ::es/events e))
 
 (def log-maker ::ss/log-maker)
 

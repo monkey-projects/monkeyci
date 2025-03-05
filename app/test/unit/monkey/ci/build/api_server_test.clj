@@ -1,20 +1,19 @@
 (ns monkey.ci.build.api-server-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [aleph.http :as http]
-            [clj-commons.byte-streams :as bs]
-            [clojure.spec.alpha :as s]
-            [manifold.deferred :as md]
-            [monkey.ci.build.api-server :as sut]
-            [monkey.ci.helpers :as h]
-            [monkey.ci.test.aleph-test :as at]
-            [monkey.ci.spec.api-server :as aspec]
-            [monkey.ci
-             [protocols :as p]
-             [storage :as st]]
-            [monkey.ci.test
-             [api-server :as tas]
-             [runtime :as trt]]
-            [ring.mock.request :as mock]))
+  (:require
+   [aleph.http :as http]
+   [clj-commons.byte-streams :as bs]
+   [clojure.spec.alpha :as s]
+   [clojure.test :refer [deftest is testing]]
+   [manifold.deferred :as md]
+   [monkey.ci.build.api-server :as sut]
+   [monkey.ci.protocols :as p]
+   [monkey.ci.spec.api-server :as aspec]
+   [monkey.ci.storage :as st]
+   [monkey.ci.test.aleph-test :as at]
+   [monkey.ci.test.api-server :as tas]
+   [monkey.ci.test.helpers :as h]
+   [monkey.ci.test.runtime :as trt]
+   [ring.mock.request :as mock]))
 
 (def test-config (tas/test-config))
 

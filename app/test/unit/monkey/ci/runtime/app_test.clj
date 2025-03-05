@@ -1,20 +1,20 @@
 (ns monkey.ci.runtime.app-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [aleph.http :as aleph]
-            [clojure.spec.alpha :as spec]
-            [com.stuartsierra.component :as co]
-            [monkey.ci
-             [metrics :as m]
-             [oci :as oci]
-             [runtime :as rt]
-             [storage :as st]
-             [prometheus :as prom]
-             [protocols :as p]]
-            [monkey.ci.containers.oci :as cco]
-            [monkey.ci.runtime.app :as sut]
-            [monkey.ci.spec.runner :as sr]
-            [monkey.ci.test.config :as tc]
-            [monkey.ci.helpers :as h]))
+  (:require
+   [aleph.http :as aleph]
+   [clojure.spec.alpha :as spec]
+   [clojure.test :refer [deftest is testing]]
+   [com.stuartsierra.component :as co]
+   [monkey.ci.containers.oci :as cco]
+   [monkey.ci.metrics :as m]
+   [monkey.ci.oci :as oci]
+   [monkey.ci.prometheus :as prom]
+   [monkey.ci.protocols :as p]
+   [monkey.ci.runtime :as rt]
+   [monkey.ci.runtime.app :as sut]
+   [monkey.ci.spec.runner :as sr]
+   [monkey.ci.storage :as st]
+   [monkey.ci.test.config :as tc]
+   [monkey.ci.test.helpers :as h]))
 
 (def server-config
   (assoc tc/base-config

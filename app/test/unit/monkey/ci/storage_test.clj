@@ -1,13 +1,13 @@
 (ns monkey.ci.storage-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [clojure.string :as cs]
-            [monkey.ci
-             [cuid :as cuid]
-             [protocols :as p]
-             [sid :as sid]
-             [storage :as sut]
-             [time :as t]]
-            [monkey.ci.helpers :as h]))
+  (:require
+   [clojure.string :as cs]
+   [clojure.test :refer [deftest is testing]]
+   [monkey.ci.cuid :as cuid]
+   [monkey.ci.protocols :as p]
+   [monkey.ci.sid :as sid]
+   [monkey.ci.storage :as sut]
+   [monkey.ci.test.helpers :as h]
+   [monkey.ci.time :as t]))
 
 (deftest transaction
   (testing "executes target"

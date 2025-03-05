@@ -1,21 +1,19 @@
 (ns monkey.ci.web.api-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [clojure.spec.alpha :as spec]
-            [clojure.string :as cs]
-            [manifold
-             [bus :as mb]
-             [stream :as ms]]
-            [monkey.ci
-             [storage :as st]
-             [protocols :as p]
-             [utils :as u]]
-            [monkey.ci.events.core :as ec]
-            [monkey.ci.spec.events :as se]
-            [monkey.ci.web
-             [api :as sut]
-             [response :as r]]
-            [monkey.ci.helpers :as h]
-            [monkey.ci.test.runtime :as trt]))
+  (:require
+   [clojure.spec.alpha :as spec]
+   [clojure.string :as cs]
+   [clojure.test :refer [deftest is testing]]
+   [manifold.bus :as mb]
+   [manifold.stream :as ms]
+   [monkey.ci.events.core :as ec]
+   [monkey.ci.protocols :as p]
+   [monkey.ci.spec.events :as se]
+   [monkey.ci.storage :as st]
+   [monkey.ci.test.helpers :as h]
+   [monkey.ci.test.runtime :as trt]
+   [monkey.ci.utils :as u]
+   [monkey.ci.web.api :as sut]
+   [monkey.ci.web.response :as r]))
 
 (defn- parse-edn [s]
   (with-open [r (java.io.StringReader. s)]
@@ -189,9 +187,6 @@
                   :result :success}
                  (sut/build->out)
                  :status))))))
-
-(defn- make-events []
-  (ec/make-events {:type :sync}))
 
 (defn- publish [bus evt]
   (deref (mb/publish! bus (:type evt) evt) 1000 :timeout))

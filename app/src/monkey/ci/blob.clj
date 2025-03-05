@@ -6,14 +6,11 @@
             [clojure.java.io :as io]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
-            [clompress
-             [archivers :as ca]
-             [compression :as cc]]
+            [clompress.archivers :as ca]
             [java-time.api :as jt]
             [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
-             [config :as co]
              [oci :as oci]
              [protocols :as p]
              [utils :as u]]
@@ -22,8 +19,7 @@
              [core :as os]
              [martian :as om]
              [stream :as oss]])
-  (:import [java.io BufferedInputStream PipedInputStream PipedOutputStream]
-           [org.apache.commons.compress.archivers ArchiveStreamFactory]))
+  (:import (java.io PipedOutputStream)))
 
 (defn save
   "Saves blob from src to dest, with optional metadata"

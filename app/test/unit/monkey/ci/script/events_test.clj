@@ -1,17 +1,18 @@
 (ns monkey.ci.script.events-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [clojure.spec.alpha :as spec]
-            [io.pedestal.interceptor.chain :as pic]
-            [manifold.deferred :as md]
-            [medley.core :as mc]
-            [monkey.ci.build.core :as bc]
-            [monkey.ci.events.mailman :as em]
-            [monkey.ci.events.mailman.interceptors :as emi]
-            [monkey.ci.jobs :as j]
-            [monkey.ci.script.events :as sut]
-            [monkey.ci.spec.events :as se]
-            [monkey.ci.helpers :as h]
-            [monkey.ci.test.mailman :as tm]))
+  (:require
+   [clojure.spec.alpha :as spec]
+   [clojure.test :refer [deftest is testing]]
+   [io.pedestal.interceptor.chain :as pic]
+   [manifold.deferred :as md]
+   [medley.core :as mc]
+   [monkey.ci.build.core :as bc]
+   [monkey.ci.events.mailman :as em]
+   [monkey.ci.events.mailman.interceptors :as emi]
+   [monkey.ci.jobs :as j]
+   [monkey.ci.script.events :as sut]
+   [monkey.ci.spec.events :as se]
+   [monkey.ci.test.helpers :as h]
+   [monkey.ci.test.mailman :as tm]))
 
 (defn- jobs->map [jobs]
   (->> jobs
@@ -60,8 +61,7 @@
 
 (deftest execute-action
   (let [broker (tm/test-component)
-        job-ctx  {:events (h/fake-events)
-                  :mailman broker}
+        job-ctx  {:mailman broker}
         {:keys [enter] :as i} sut/execute-action]
     (is (keyword? (:name i)))
     

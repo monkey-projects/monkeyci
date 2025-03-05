@@ -1,13 +1,13 @@
 (ns monkey.ci.extensions-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [monkey.ci.build.core :as bc]
-            [monkey.ci
-             [extensions :as sut]
-             [jobs :as j]]
-            [monkey.ci.events.mailman.interceptors :as emi]
-            [monkey.ci.script.events :as se]
-            [monkey.ci.helpers :as h]
-            [monkey.ci.test.runtime :as trt]))
+  (:require
+   [clojure.test :refer [deftest is testing]]
+   [monkey.ci.build.core :as bc]
+   [monkey.ci.events.mailman.interceptors :as emi]
+   [monkey.ci.extensions :as sut]
+   [monkey.ci.jobs :as j]
+   [monkey.ci.script.events :as se]
+   [monkey.ci.test.helpers :as h]
+   [monkey.ci.test.runtime :as trt]))
 
 (defmacro with-extensions [& body]
   `(let [ext# @sut/registered-extensions]
@@ -94,10 +94,8 @@
                                                       ::before? (::before? rt)))
                                              {(:key ext) ::extension-config})
                               reg)
-        events (h/fake-events)
         rt (-> (trt/test-runtime)
-               (assoc :job wrapped
-                      :events events))]
+               (assoc :job wrapped))]
     (testing "creates job"
       (is (j/job? wrapped)))
     

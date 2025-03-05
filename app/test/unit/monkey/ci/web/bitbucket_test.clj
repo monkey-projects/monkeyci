@@ -1,22 +1,20 @@
 (ns monkey.ci.web.bitbucket-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [clojure.spec.alpha :as spec]
-            [buddy.sign.jwt :as jwt]
-            [monkey.ci
-             [cuid :as cuid]
-             [protocols :as p]
-             [storage :as st]
-             [vault :as v]]
-            [monkey.ci.spec.build :as sb]
-            [monkey.ci.web
-             [auth :as auth]
-             [bitbucket :as sut]
-             [response :as r]]
-            [monkey.ci.helpers :as h]
-            [monkey.ci.test
-             [aleph-test :as at]
-             [mailman :as tmm]
-             [runtime :as trt]]))
+  (:require
+   [buddy.sign.jwt :as jwt]
+   [clojure.spec.alpha :as spec]
+   [clojure.test :refer [deftest is testing]]
+   [monkey.ci.cuid :as cuid]
+   [monkey.ci.protocols :as p]
+   [monkey.ci.spec.build :as sb]
+   [monkey.ci.storage :as st]
+   [monkey.ci.test.aleph-test :as at]
+   [monkey.ci.test.helpers :as h]
+   [monkey.ci.test.mailman :as tmm]
+   [monkey.ci.test.runtime :as trt]
+   [monkey.ci.vault :as v]
+   [monkey.ci.web.auth :as auth]
+   [monkey.ci.web.bitbucket :as sut]
+   [monkey.ci.web.response :as r]))
 
 (deftest login
   (testing "when token request fails, returns 400 status"

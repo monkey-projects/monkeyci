@@ -1,11 +1,11 @@
 (ns monkey.ci.web.api.join-request-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [monkey.ci
-             [cuid :as cuid]
-             [sid :as sid]
-             [storage :as st]]
-            [monkey.ci.web.api.join-request :as sut]
-            [monkey.ci.helpers :as h]))
+  (:require
+   [clojure.test :refer [deftest is testing]]
+   [monkey.ci.cuid :as cuid]
+   [monkey.ci.sid :as sid]
+   [monkey.ci.storage :as st]
+   [monkey.ci.test.helpers :as h]
+   [monkey.ci.web.api.join-request :as sut]))
 
 (deftest search-join-requests
   (testing "for user"

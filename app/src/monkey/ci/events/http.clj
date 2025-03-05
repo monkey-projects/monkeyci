@@ -44,21 +44,6 @@
   (fn [evt]
     (ms/put! stream (->sse evt))))
 
-(defn event-stream
-  "Sets up an event stream for the specified filter."
-  [events evt-filter]
-  (let [stream (-> (ms/stream 1)
-                   (add-keepalive))
-        listener (event-stream-listener stream)]
-    (log/info "Opening event stream for filter:" evt-filter)
-    (ms/on-drained stream
-                   (fn []
-                     (log/info "Closing event stream for filter" evt-filter)
-                     (ec/remove-listener events evt-filter listener)))
-    ;; Only process events matching the filter
-    (ec/add-listener events evt-filter listener)
-    (stream-response stream)))
-
 (defn mailman-stream
   "Sets up an event stream using a mailman listener.  It consumes events from the
    configured topic and returns them as an SSE stream.  The predicate is applied

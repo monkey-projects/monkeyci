@@ -11,6 +11,7 @@
              [runtime :as rt]
              [spec :as mcs]
              [utils :as u]]
+            [monkey.ci.events.mailman :as em]
             [monkey.ci.runtime.app :as ra]
             [monkey.ci.web.auth :as auth]
             [org.httpkit.server :as http]))
@@ -65,8 +66,8 @@
 (defn post-event
   "Posts an event using the runtime in the current server config"
   [evt]
-  (if-let [rt (some-> server deref :rt)]
-    (rt/post-events rt evt)
+  (if-let [broker (some-> server deref :rt :mailman)]
+    (em/post-events broker [evt])
     (throw (ex-info "No server running" @server))))
 
 (defn sse-handler [req]

@@ -11,13 +11,7 @@
 
    This namespace is being phased out in favor of passing specific information
    to components directly, since passing around too much information is an
-   antipattern."
-  (:require [clojure.tools.logging :as log]
-            [manifold.deferred :as md]
-            [medley.core :as mc]
-            [monkey.ci
-             [protocols :as p]
-             [utils :as u]]))
+   antipattern.")
 
 ;;; Accessors and utilities
 
@@ -44,12 +38,6 @@
 (def runner-api-port (from-config (comp :port :api :runner)))
 (def artifacts :artifacts)
 
-(defn events-receiver [{:keys [events]}]
-  (if (satisfies? p/EventReceiver events)
-    events
-    ;; Backwards compatibility, mostly in tests
-    (:receiver events)))
-
 (defn get-arg [rt k]
   (k (args rt)))
 
@@ -58,23 +46,3 @@
   [rt obj]
   (when-let [r (reporter rt)]
     (r obj)))
-
-(defn- prepare-events [evt]
-  (letfn [(add-time [evt]
-            (update evt :time #(or % (u/now))))]
-    (->> (u/->seq evt)
-         (map add-time))))
-
-(defn post-events
-  "Posts one or more events using the event poster in the runtime"
-  [{:keys [events]} evt]
-  (let [evt (prepare-events evt)]
-    (log/trace "Posting events:" evt)
-    (cond
-      (satisfies? p/EventPoster events)
-      (p/post-events events evt)
-      ;; For backwards compatibility, in tests
-      (fn? (:poster events))
-      ((:poster events) evt)
-      :else
-      (log/warn "No event poster configured"))))

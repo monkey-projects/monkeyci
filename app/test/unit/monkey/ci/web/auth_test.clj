@@ -1,13 +1,13 @@
 (ns monkey.ci.web.auth-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [buddy.core.keys :as bk]
-            [monkey.ci
-             [cuid :as cuid]
-             [storage :as st]]
-            [monkey.ci.helpers :as h]
-            [monkey.ci.web.auth :as sut]
-            [monkey.ci.test.runtime :as trt]
-            [ring.mock.request :as mock]))
+  (:require
+   [buddy.core.keys :as bk]
+   [clojure.test :refer [deftest is testing]]
+   [monkey.ci.cuid :as cuid]
+   [monkey.ci.storage :as st]
+   [monkey.ci.test.helpers :as h]
+   [monkey.ci.test.runtime :as trt]
+   [monkey.ci.web.auth :as sut]
+   [ring.mock.request :as mock]))
 
 (deftest generate-secret-key
   (testing "generates random string"

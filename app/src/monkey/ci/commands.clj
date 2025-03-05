@@ -11,26 +11,25 @@
             [medley.core :as mc]
             [monkey.ci
              [build :as b]
-             [errors :as err]
              [jobs :as jobs]
              [pem :as pem]
              [process :as proc]
-             [protocols :as p]
              [runtime :as rt]
-             [script :as script]
-             [sidecar :as sidecar]
              [spec :as spec]
              [utils :as u]]
-            [monkey.ci.events.core :as ec]
+            [monkey.ci.events
+             [core :as ec]
+             [mailman :as em]]
             [monkey.ci.local
              [config :as lc]
              [runtime :as lr]]
             [monkey.ci.runners
              [controller :as rc]
              [runtime :as rr]]
-            [monkey.ci.runtime
-             [app :as ra]
-             [sidecar :as rs]]
+            [monkey.ci.runtime.app :as ra]
+            [monkey.ci.sidecar
+             [core :as sidecar]
+             [runtime :as rs]]
             [monkey.ci.spec.sidecar :as ss]
             [monkey.ci.web
              [auth :as auth]
@@ -136,20 +135,20 @@
     ;; Return a deferred that only resolves when the event stream stops
     d))
 
-(defn- run-sidecar [{:keys [events job] :as rt}]
+(defn- run-sidecar [{:keys [mailman job] :as rt}]
   (let [sid (b/get-sid rt)
         base-evt {:sid sid
                   :job-id (jobs/job-id job)}
         result (try
-                 (p/post-events events (ec/make-event :sidecar/start base-evt))
+                 (em/post-events mailman [(ec/make-event :sidecar/start base-evt)])
                  (let [r @(sidecar/run rt)
                        e (:exit r)]
                    (ec/make-result (b/exit-code->status e) e (:message r)))
                  (catch Throwable t
                    (ec/exception-result t)))]
     (log/info "Sidecar terminated")
-    (p/post-events events (-> (ec/make-event :sidecar/end base-evt)
-                              (ec/set-result result)))
+    (em/post-events mailman [(-> (ec/make-event :sidecar/end base-evt)
+                                 (ec/set-result result))])
     (:exit result)))
 
 (defn sidecar

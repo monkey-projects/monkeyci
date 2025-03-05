@@ -1,4 +1,4 @@
-(ns monkey.ci.sidecar
+(ns monkey.ci.sidecar.core
   "Sidecar specific functions"
   (:require [babashka.fs :as fs]
             [clojure.java.io :as io]
@@ -13,8 +13,10 @@
              [spec :as spec]
              [utils :as u]
              [workspace :as ws]]
-            [monkey.ci.config.sidecar :as cs]
-            [monkey.ci.events.core :as ec]
+            [monkey.ci.events
+             [core :as ec]
+             [mailman :as em]]
+            [monkey.ci.sidecar.config :as cs]
             [monkey.ci.spec.sidecar :as ss]))
 
 (defn- create-file-with-dirs [f]
@@ -66,9 +68,17 @@
     (when log-maker (comp (partial log-maker build)
                           (partial concat log-base)))))
 
+(defn- make-evt [evt {:keys [job build]}]
+  (ec/make-event
+   (:type evt)
+   (assoc evt
+          :src :job
+          :sid (b/sid build)
+          :job-id (j/job-id job))))
+
 (defn poll-events
   "Reads events from the job container events file and posts them to the event service."
-  [{:keys [job build events] :as rt}]
+  [{:keys [mailman] :as rt}]
   (let [f (maybe-create-file (get-in rt [:paths :events-file]))
         read-next (fn [r]
                     (u/parse-edn r {:eof ::eof}))
@@ -94,11 +104,7 @@
                           ;; TODO Start uploading logs as soon as the file is created instead
                           ;; of when the command has finished.
                           (upload-logs evt logger))
-                        (ec/post-events events (ec/make-event
-                                                (:type evt)
-                                                (assoc evt
-                                                       :sid (b/sid build)
-                                                       :job-id (j/job-id job))))))
+                        (em/post-events mailman [(make-evt evt rt)])))
                 (if (:done? evt)
                   (set-exit 0)
                   (recur (read-next r)))))))
@@ -132,5 +138,6 @@
                 (mark-abort rt)
                 (error-result ex))))
       (catch Throwable t
+        (log/error "Failed to run sidecar" t)
         (mark-abort rt)
         (md/success-deferred (error-result t))))))

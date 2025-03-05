@@ -1,12 +1,12 @@
 (ns monkey.ci.logging-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [clojure.java.io :as io]
-            [manifold.deferred :as md]
-            [monkey.ci
-             [logging :as sut]
-             [oci :as oci]]
-            [monkey.ci.helpers :as h]
-            [monkey.oci.os.core :as os]))
+  (:require
+   [clojure.java.io :as io]
+   [clojure.test :refer [deftest is testing]]
+   [manifold.deferred :as md]
+   [monkey.ci.logging :as sut]
+   [monkey.ci.oci :as oci]
+   [monkey.ci.test.helpers :as h]
+   [monkey.oci.os.core :as os]))
 
 (def file? (partial instance? java.io.File))
 
