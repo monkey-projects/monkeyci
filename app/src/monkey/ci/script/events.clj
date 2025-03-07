@@ -240,8 +240,8 @@
   ;; Enqueue jobs that have become ready to run
   (let [all-jobs (vals (get-jobs ctx))
         next-jobs (j/next-jobs all-jobs)
-        running-jobs (j/filter-jobs j/running? all-jobs)]
-    (if (and (empty? next-jobs) (empty? running-jobs))
+        active-jobs (j/filter-jobs j/active? all-jobs)]
+    (if (and (empty? next-jobs) (empty? active-jobs))
       ;; No more jobs eligible for execution, end the script
       (->> (pending-jobs ctx)
            (map #(j/job-skipped-evt (j/job-id %) (build-sid ctx)))

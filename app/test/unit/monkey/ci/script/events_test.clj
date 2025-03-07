@@ -275,12 +275,12 @@
         (is (= [:job/queued] (map :type r)))
         (is (= "second" (-> r first :job-id)))))
 
-    (testing "nothing if no new jobs to queue, but some are still running"
+    (testing "nothing if no new jobs to queue, but some have not ended"
       (let [jobs (jobs->map
                   [{:id "first"
                     :status :success}
                    {:id "second"
-                    :status :running}
+                    :status :initializing}
                    {:id "third"
                     :status :pending
                     :dependencies ["second"]}])
@@ -302,9 +302,9 @@
       (is (= :error
              (-> {:event
                   {:job-id "failed"
-                   :status :error}}
+                   :status :failure}}
                  (sut/set-jobs (jobs->map [{:id "failed"
-                                            :status :error}]))
+                                            :status :failure}]))
                  (sut/job-end)
                  first
                  :status))))
@@ -322,13 +322,13 @@
     
     (testing "marks remaining pending jobs as skipped"
       (let [jobs (jobs->map [{:id "first"
-                              :status :error}
+                              :status :failure}
                              {:id "second"
                               :status :pending
                               :dependencies ["first"]}])]
         (is (= ["second"]
                (->> (-> {:event {:type :job/end
-                                 :status :error}}
+                                 :status :failure}}
                         (sut/set-jobs jobs)
                         (sut/job-end))
                     (filter (comp (partial = :job/skipped) :type))

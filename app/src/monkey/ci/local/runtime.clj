@@ -93,7 +93,6 @@
   (co/system-map
    :build        (lc/get-build conf)
    :mailman      (or (:mailman conf) (new-mailman)) ; Can specify custom event broker, for testing
-   ;; TODO "upstream" mailman to push events to global broker and to capture build/canceled events.
    :routes       (co/using
                   (new-routes conf)
                   [:mailman :api-config])
