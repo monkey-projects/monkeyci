@@ -42,6 +42,7 @@
   (assoc ctx ::running-actions a))
 
 (def job-id (comp :job-id :event))
+(def build-sid (comp :sid :event))
 
 (defn job-ctx
   "Creates a job execution context from the event context"
@@ -209,7 +210,7 @@
   "Dispatches queued event for action or container job, depending on the type."
   [ctx]
   (letfn [(job-queued-evt [t job]
-            (-> (j/job-queued-evt job (get-in ctx [:event :sid]))
+            (-> (j/job-queued-evt job (build-sid ctx))
                 (assoc :type t)))]
     (let [job (get-job-from-state ctx)]
       (cond
@@ -217,7 +218,7 @@
         (bc/container-job? job) [(job-queued-evt :container/job-queued job)]))))
 
 (defn job-executed
-  "Runs any extensions for the job"
+  "Runs any extensions for the job in interceptors, then ends the job."
   [ctx]
   (let [{:keys [job-id sid status result]} (:event ctx)]
     [(j/job-end-evt job-id sid (assoc result :status status))]))
@@ -237,12 +238,16 @@
    if all jobs have been executed."
   [ctx]
   ;; Enqueue jobs that have become ready to run
-  (let [next-jobs (j/next-jobs (vals (get-jobs ctx)))]
-    (if (empty? next-jobs)
+  (let [all-jobs (vals (get-jobs ctx))
+        next-jobs (j/next-jobs all-jobs)
+        running-jobs (j/filter-jobs j/running? all-jobs)]
+    (if (and (empty? next-jobs) (empty? running-jobs))
+      ;; No more jobs eligible for execution, end the script
       (->> (pending-jobs ctx)
-           (map #(j/job-skipped-evt (j/job-id %) (get-in ctx [:event :sid])))
+           (map #(j/job-skipped-evt (j/job-id %) (build-sid ctx)))
            (into [(script-end-evt ctx (script-status ctx))]))
-      (map #(j/job-queued-evt % (get-in ctx [:event :sid])) next-jobs))))
+      ;; Otherwise, enqueue next jobs
+      (map #(j/job-queued-evt % (build-sid ctx)) next-jobs))))
 
 (defn- make-job-ctx
   "Constructs job context object from the route configuration"

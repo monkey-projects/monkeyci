@@ -1,18 +1,17 @@
 (ns monkey.ci.script.events-test
-  (:require
-   [clojure.spec.alpha :as spec]
-   [clojure.test :refer [deftest is testing]]
-   [io.pedestal.interceptor.chain :as pic]
-   [manifold.deferred :as md]
-   [medley.core :as mc]
-   [monkey.ci.build.core :as bc]
-   [monkey.ci.events.mailman :as em]
-   [monkey.ci.events.mailman.interceptors :as emi]
-   [monkey.ci.jobs :as j]
-   [monkey.ci.script.events :as sut]
-   [monkey.ci.spec.events :as se]
-   [monkey.ci.test.helpers :as h]
-   [monkey.ci.test.mailman :as tm]))
+  (:require [clojure.spec.alpha :as spec]
+            [clojure.test :refer [deftest is testing]]
+            [manifold.deferred :as md]
+            [medley.core :as mc]
+            [monkey.ci.build.core :as bc]
+            [monkey.ci.events.mailman :as em]
+            [monkey.ci.events.mailman.interceptors :as emi]
+            [monkey.ci.jobs :as j]
+            [monkey.ci.script.events :as sut]
+            [monkey.ci.spec.events :as se]
+            [monkey.ci.test
+             [helpers :as h]
+             [mailman :as tm]]))
 
 (defn- jobs->map [jobs]
   (->> jobs
@@ -260,60 +259,77 @@
   (testing "executes 'after' extensions"))
 
 (deftest job-end
-  (let [jobs (jobs->map
-              [{:id "first"
-                :status :success}
-               {:id "second"
-                :dependencies ["first"]
-                :status :pending}])]
-    
-    (let [r (-> {:event
-                 {:job-id "first"
-                  :status :success}}
-                (sut/set-jobs jobs)
-                (sut/job-end))]
-      (testing "queues pending jobs with completed dependencies"
+  (testing "when more jobs to run"
+    (testing "queues pending jobs with completed dependencies"
+      (let [jobs (jobs->map
+                  [{:id "first"
+                    :status :success}
+                   {:id "second"
+                    :dependencies ["first"]
+                    :status :pending}])
+            r (-> {:event
+                   {:job-id "first"
+                    :status :success}}
+                  (sut/set-jobs jobs)
+                  (sut/job-end))]
         (is (= [:job/queued] (map :type r)))
         (is (= "second" (-> r first :job-id)))))
 
-    (testing "when no more jobs to run"
-      (testing "returns `script/end` event"
-        (is (= [:script/end]
-               (->> (sut/job-end {})
-                    (map :type)))))
+    (testing "nothing if no new jobs to queue, but some are still running"
+      (let [jobs (jobs->map
+                  [{:id "first"
+                    :status :success}
+                   {:id "second"
+                    :status :running}
+                   {:id "third"
+                    :status :pending
+                    :dependencies ["second"]}])
+            r (-> {:event
+                   {:type :job/end
+                    :job-id "first"
+                    :status :success}}
+                  (sut/set-jobs jobs)
+                  (sut/job-end))]
+        (is (empty? r)))))
 
-      (testing "marks script as `:error` if a job has failed"
-        (is (= :error
-               (-> {:event
-                    {:job-id "failed"
-                     :status :error}}
-                   (sut/set-jobs (jobs->map [{:id "failed"
-                                              :status :error}]))
-                   (sut/job-end)
-                   first
-                   :status))))
+  (testing "when no more jobs to run"
+    (testing "returns `script/end` event"
+      (is (= [:script/end]
+             (->> (sut/job-end {})
+                  (map :type)))))
 
-      (testing "marks script as `:success` if all jobs succeeded"
-        (is (= :success
-               (-> {:event
-                    {:job-id "success"
-                     :status :success}}
-                   (sut/set-jobs (jobs->map [{:id "success"
-                                              :status :running}]))
-                   (sut/job-end)
-                   first
-                   :status))))
+    (testing "marks script as `:error` if a job has failed"
+      (is (= :error
+             (-> {:event
+                  {:job-id "failed"
+                   :status :error}}
+                 (sut/set-jobs (jobs->map [{:id "failed"
+                                            :status :error}]))
+                 (sut/job-end)
+                 first
+                 :status))))
 
-      (testing "marks remaining pending jobs as skipped"
-        (let [jobs (jobs->map [{:id "first"
-                                :status :error}
-                               {:id "second"
-                                :status :pending
-                                :dependencies ["first"]}])]
-          (is (= ["second"]
-                 (->> (-> {:event {:type :job/end
-                                   :status :error}}
-                          (sut/set-jobs jobs)
-                          (sut/job-end))
-                      (filter (comp (partial = :job/skipped) :type))
-                      (map :job-id)))))))))
+    (testing "marks script as `:success` if all jobs succeeded"
+      (is (= :success
+             (-> {:event
+                  {:job-id "success"
+                   :status :success}}
+                 (sut/set-jobs (jobs->map [{:id "success"
+                                            :status :success}]))
+                 (sut/job-end)
+                 first
+                 :status))))
+    
+    (testing "marks remaining pending jobs as skipped"
+      (let [jobs (jobs->map [{:id "first"
+                              :status :error}
+                             {:id "second"
+                              :status :pending
+                              :dependencies ["first"]}])]
+        (is (= ["second"]
+               (->> (-> {:event {:type :job/end
+                                 :status :error}}
+                        (sut/set-jobs jobs)
+                        (sut/job-end))
+                    (filter (comp (partial = :job/skipped) :type))
+                    (map :job-id))))))))
