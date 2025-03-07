@@ -1,27 +1,21 @@
 (ns monkey.ci.containers.oci-test
-  (:require
-   [babashka.fs :as fs]
-   [clj-yaml.core :as yaml]
-   [clojure.java.io :as io]
-   [clojure.spec.alpha :as spec]
-   [clojure.test :refer [deftest is testing]]
-   [manifold.deferred :as md]
-   [medley.core :as mc]
-   [monkey.ci.common.preds :as cp]
-   [monkey.ci.containers :as mcc]
-   [monkey.ci.containers.oci :as sut]
-   [monkey.ci.cuid :as cuid]
-   [monkey.ci.events.core :as ec]
-   [monkey.ci.oci :as oci]
-   [monkey.ci.protocols :as p]
-   [monkey.ci.runtime :as rt]
-   [monkey.ci.sidecar.config :as cs]
-   [monkey.ci.spec.events :as se]
-   [monkey.ci.spec.sidecar :as ss]
-   [monkey.ci.test.helpers :as h]
-   [monkey.ci.test.runtime :as trt]
-   [monkey.ci.utils :as u]
-   [monkey.ci.version :as v]))
+  (:require [babashka.fs :as fs]
+            [clj-yaml.core :as yaml]
+            [clojure.java.io :as io]
+            [clojure.spec.alpha :as spec]
+            [clojure.test :refer [deftest is testing]]
+            [medley.core :as mc]
+            [monkey.ci
+             [cuid :as cuid]
+             [oci :as oci]
+             [utils :as u]]
+            [monkey.ci.common.preds :as cp]
+            [monkey.ci.containers.oci :as sut]
+            [monkey.ci.sidecar.config :as cs]
+            [monkey.ci.spec.sidecar :as ss]
+            [monkey.ci.test
+             [helpers :as h]
+             [runtime :as trt]]))
 
 (defn- find-volume-entry [vol n]
   (->> vol :configs (filter (comp (partial = n) :file-name)) first))
@@ -455,43 +449,68 @@
                 (map :type))))))
 
 (deftest container-end
-  (testing "fires `job/executed` if sidecar has also ended"
-    (is (= :job/executed
-           (-> {:event {:job-id "test-job"}}
-               ((:enter sut/set-sidecar-end))
-               (sut/container-end)
-               first
-               :type))))
+  (let [se (:enter sut/set-sidecar-status)]
+    (testing "fires `job/executed` if sidecar has also ended"
+      (is (= :job/executed
+             (-> {:event {:job-id "test-job"
+                          :result
+                          {:status :success}}}
+                 (se)
+                 (sut/container-end)
+                 first
+                 :type))))
 
-  (testing "`nil` if sidecar is still running"
-    (is (nil? (sut/container-end {:event {:job-id "test-job"}}))))
+    (testing "`nil` if sidecar is still running"
+      (is (nil? (sut/container-end {:event {:job-id "test-job"}}))))
 
-  (testing "handles multiple jobs"
-    (let [[job-1 job-2] (repeatedly 2 random-uuid)
-          se (:enter sut/set-sidecar-end)]
-      (is (nil?
-           (-> {:event {:job-id job-1}}
-               (se) ; Mark sidecar end for job-1, but not job-2
-               (assoc :event {:job-id job-2})
-               (sut/container-end)))))))
+    (testing "handles multiple jobs"
+      (let [[job-1 job-2] (repeatedly 2 random-uuid)]
+        (is (nil?
+             (-> {:event {:job-id job-1}}
+                 (se) ; Mark sidecar end for job-1, but not job-2
+                 (assoc :event {:job-id job-2})
+                 (sut/container-end))))))
+
+    (testing "uses container event status"
+      (is (= :success
+             (-> {:event {:job-id "test-job"
+                          :result
+                          {:status :success}}}
+                 (se)
+                 (sut/container-end)
+                 first
+                 :status))))))
 
 (deftest sidecar-end
-  (testing "fires `job/executed` if container has also ended"
-    (is (= :job/executed
-           (-> {:event {:job-id "test-job"}}
-               ((:enter sut/set-container-end))
-               (sut/sidecar-end)
-               first
-               :type))))
+  (let [{set-status :enter} sut/set-container-status]
+    (testing "fires `job/executed` if container has also ended"
+      (is (= :job/executed
+             (-> {:event {:job-id "test-job"
+                          :result
+                          {:status :success}}}
+                 (set-status)
+                 (sut/sidecar-end)
+                 first
+                 :type))))
 
-  (testing "`nil` if container is still running"
-    (is (nil? (sut/sidecar-end {:event {:job-id "test-job"}}))))
+    (testing "`nil` if container is still running"
+      (is (nil? (sut/sidecar-end {:event {:job-id "test-job"}}))))
 
-  (testing "handles multiple jobs"
-    (let [[job-1 job-2] (repeatedly 2 random-uuid)
-          ce (:enter sut/set-container-end)]
-      (is (nil?
-           (-> {:event {:job-id job-1}}
-               (ce) ; Mark container end for job-1, but not job-2
-               (assoc :event {:job-id job-2})
-               (sut/container-end)))))))
+    (testing "handles multiple jobs"
+      (let [[job-1 job-2] (repeatedly 2 random-uuid)]
+        (is (nil?
+             (-> {:event {:job-id job-1
+                          :result {:status :success}}}
+                 (set-status) ; Mark container end for job-1, but not job-2
+                 (assoc :event {:job-id job-2})
+                 (sut/container-end))))))
+
+    (testing "uses container status"
+      (is (= :success
+             (-> {:event {:job-id "test-job"
+                          :result {:status :success}}}
+                 (set-status)
+                 (assoc-in [:event :result :status] :irrelevant)
+                 (sut/sidecar-end)
+                 first
+                 :status))))))

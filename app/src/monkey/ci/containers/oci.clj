@@ -292,11 +292,14 @@
   [ctx f & args]
   (apply emi/update-state ctx update-in [::jobs (job-id ctx)] f args))
 
-(defn container-ended? [ctx]
-  (job-state ctx (comp true? :container-end)))
+(defn get-container-status [ctx]
+  (job-state ctx :container-status))
+
+(def container-ended? 
+  (comp some? get-container-status))
 
 (defn sidecar-ended? [ctx]
-  (job-state ctx (comp true? :sidecar-end)))
+  (job-state ctx (comp some? :sidecar-status)))
 
 (defn get-instance-id [ctx]
   (job-state ctx :instance-id))
@@ -323,15 +326,17 @@
    :enter (fn [ctx]
             (set-credit-multiplier ctx (oci/credit-multiplier (oci/get-ci-config ctx))))})
 
-(def set-container-end
-  {:name ::set-container-end
+(def set-container-status
+  {:name ::set-container-status
    :enter (fn [ctx]
-            (update-job-state ctx assoc :container-end true))})
+            ;; FIXME container event is inconsistent, status should be in event, not in result
+            (update-job-state ctx assoc :container-status (get-in ctx [:event :result :status])))})
 
-(def set-sidecar-end
-  {:name ::set-sidecar-end
+(def set-sidecar-status
+  {:name ::set-sidecar-status
    :enter (fn [ctx]
-            (update-job-state ctx assoc :sidecar-end true))})
+            ;; FIXME Status field is also in this event inconsistent
+            (update-job-state ctx assoc :sidecar-status (get-in ctx [:event :result :status])))})
 
 (def save-instance-id
   "Stores instance id taken from the instance creation response in the job state."
@@ -357,7 +362,10 @@
   [(j/job-start-evt (job-id ctx) (build-sid ctx))])
 
 (defn- job-executed-evt [{:keys [event] :as ctx}]
-  (j/job-executed-evt (job-id ctx) (build-sid ctx) (assoc (:result event) :status (:status event))))
+  (let [status (or (get-container-status ctx)
+                   ;; Normally this is taken care of by interceptor, but it's more resilient
+                   (get-in ctx [:event :result :status]))]
+    (j/job-executed-evt (job-id ctx) (build-sid ctx) (assoc (:result event) :status status))))
 
 (defn container-end
   "Indicates job script has terminated.  If the sidecar has also ended, the job has been
@@ -402,13 +410,13 @@
      [:container/end
       [{:handler container-end
         :interceptors [state
-                       set-container-end]}]]
+                       set-container-status]}]]
      
      ;; Sidecar terminated, artifacts have been stored
      [:sidecar/end
       [{:handler sidecar-end
         :interceptors [state
-                       set-sidecar-end]}]]
+                       set-sidecar-status]}]]
 
      ;; Job executed, we can delete the container instance
      [:job/executed

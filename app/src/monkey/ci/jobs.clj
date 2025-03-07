@@ -46,11 +46,11 @@
   (satisfies? p/JobResolvable x))
 
 (def pending? (comp (some-fn nil? (partial = :pending)) status))
-(def queued? (comp (partial = :queued) status))
+(def queued?  (comp (partial = :queued) status))
 (def running? (comp (partial = :running) status))
-(def failed?  (comp (partial = :failure) status))
+(def failed?  (comp #{:error :failure} status))
 (def success? (comp (partial = :success) status))
-(def active? (comp #{:queued :initializing :running} status))
+(def active?  (comp #{:queued :initializing :running} status))
 
 (def as-serializable eb/job->event)
 (def job->event eb/job->event)
