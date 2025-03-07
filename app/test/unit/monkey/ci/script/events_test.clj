@@ -3,7 +3,9 @@
             [clojure.test :refer [deftest is testing]]
             [manifold.deferred :as md]
             [medley.core :as mc]
-            [monkey.ci.build.core :as bc]
+            [monkey.ci.build
+             [api :as ba]
+             [core :as bc]]
             [monkey.ci.events.mailman :as em]
             [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.ci.jobs :as j]
@@ -218,7 +220,7 @@
       (let [fake-loader {:name ::sut/load-jobs
                          :enter (fn [ctx]
                                   (cond-> ctx
-                                    (= ::test-client (-> ctx (sut/get-initial-job-ctx) :api :client))
+                                    (= ::test-client (-> ctx (sut/get-initial-job-ctx) (ba/ctx->api-client)))
                                     (sut/set-jobs {"test-job" {:id "test-job"}})))}
             r (-> (sut/make-routes {:api-client ::test-client})
                   (mmc/router)

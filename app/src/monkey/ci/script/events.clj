@@ -91,11 +91,12 @@
    and adds them to the state."
   {:name ::load-jobs
    :enter (fn [ctx]
-            (->> (s/load-jobs (get-build ctx)
-                              (select-keys (get-initial-job-ctx ctx) [:build :api]))
-                 (group-by j/job-id)
-                 (mc/map-vals first)
-                 (set-jobs ctx)))})
+            (let [job-ctx (select-keys (get-initial-job-ctx ctx) [:build :api])]
+              (log/debug "Loading script jobs using context" job-ctx)
+              (->> (s/load-jobs (get-build ctx) job-ctx)
+                   (group-by j/job-id)
+                   (mc/map-vals first)
+                   (set-jobs ctx))))})
 
 (def add-job-ctx
   "Interceptor that adds the job context, taken from state.  An initial context should
@@ -264,10 +265,10 @@
 
 (defn- make-job-ctx
   "Constructs job context object from the route configuration"
-  [ctx]
-  (-> ctx
+  [conf]
+  (-> conf
       (select-keys [:artifacts :cache :mailman :build])
-      (assoc :api {:client (:api-client ctx)})))
+      (assoc :api {:client (:api-client conf)})))
 
 (defn make-routes [{:keys [build] :as conf}]
   (let [state (emi/with-state (atom {:build build
