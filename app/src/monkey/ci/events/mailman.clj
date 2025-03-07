@@ -89,6 +89,7 @@
 
   (stop [this]
     (when broker
+      (.close broker)
       (mj/disconnect broker))
     (-> this
         (assoc :broker nil)

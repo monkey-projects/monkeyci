@@ -44,13 +44,20 @@
               (is (nil? (:bridge s))))))
 
         (testing "`stop`"
-          (let [closed? (atom false)]
+          (let [closed? (atom false)
+                disconnected? (atom false)
+                broker (reify java.lang.AutoCloseable
+                         (close [_]
+                           (reset! closed? true)))]
             (with-redefs [jms/disconnect (fn [_]
-                                           (reset! closed? true))]
-              (let [s (-> (sut/map->JmsComponent {:broker ::test-broker})
+                                           (reset! disconnected? true))]
+              (let [s (-> (sut/map->JmsComponent {:broker broker})
                           (co/stop))]
                 (testing "disconnects from broker"
                   (is (nil? (:broker s)))
+                  (is (true? @disconnected?)))
+
+                (testing "closes broker"
                   (is (true? @closed?)))
 
                 (testing "unregisters listeners"))))))

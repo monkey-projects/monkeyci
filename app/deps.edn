@@ -22,7 +22,7 @@
         com.monkeyprojects/aero-ext {:mvn/version "0.3.0"}
         com.monkeyprojects/clompress {:mvn/version "0.1.2"}
         com.monkeyprojects/mailman-core {:mvn/version "0.2.2-SNAPSHOT"}
-        com.monkeyprojects/mailman-jms {:mvn/version "0.2.2-SNAPSHOT"}
+        com.monkeyprojects/mailman-jms {:mvn/version "0.2.3-SNAPSHOT"}
         com.monkeyprojects/mailman-manifold {:mvn/version "0.2.2-SNAPSHOT"}
         com.monkeyprojects/monkey-jms-artemis {:mvn/version "0.3.0"}
         com.monkeyprojects/oci-container-instance {:mvn/version "0.2.2"}

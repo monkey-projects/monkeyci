@@ -149,7 +149,8 @@
   (fn [evt]
     (when (evts-to-fwd (:type evt))
       (log/debug "Forwarding event:" evt)
-      (em/post-events dest [evt]))
+      (when (empty? (em/post-events dest [evt]))
+        (log/warn "Unable to forward event:" evt)))
     nil))
 
 (defn- to-event-stream [stream evt]
