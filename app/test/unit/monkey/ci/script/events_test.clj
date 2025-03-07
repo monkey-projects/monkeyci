@@ -164,6 +164,25 @@
                   (em/get-result)
                   (map :type)))))))
 
+(deftest mark-canceled
+  (let [{:keys [enter] :as i} sut/mark-canceled
+        build-sid ["test" "build"]]
+    (is (keyword? (:name i)))
+    
+    (testing "sets build canceled in state"
+      (is (sut/build-canceled?
+           (-> {:event
+                {:sid build-sid}}
+               (emi/set-state {:build {:sid build-sid}})
+               (enter)))))
+
+    (testing "ignores events for other builds"
+      (is (not (sut/build-canceled?
+                (-> {:event
+                     {:sid ["other" "build"]}}
+                    (emi/set-state {:build {:sid build-sid}})
+                    (enter))))))))
+
 (deftest routes
   (let [types [:script/initializing
                :script/start
@@ -171,7 +190,8 @@
                :action/job-queued
                :job/queued
                :job/executed
-               :job/end]
+               :job/end
+               :build/canceled]
         routes (->> (sut/make-routes {})
                     (into {}))]
     (doseq [t types]
@@ -296,7 +316,20 @@
                     :status :success}}
                   (sut/set-jobs jobs)
                   (sut/job-end))]
-        (is (empty? r)))))
+        (is (empty? r))))
+
+    (testing "returns `script/end` with status `canceled` if build canceled"
+      (let [r (-> {:event
+                   {:type :job/end
+                    :job-id "first"
+                    :status :success}}
+                  (sut/set-jobs (jobs->map [{:id "first" :status :success}
+                                            {:id "second" :dependencies ["first"]}]))
+                  (sut/set-build-canceled)
+                  (sut/job-end))]
+        (is (= [:script/end
+                :job/skipped]
+               (map :type r))))))
 
   (testing "when no more jobs to run"
     (testing "returns `script/end` event"

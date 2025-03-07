@@ -6,7 +6,9 @@
    [manifold.deferred :as md]
    [manifold.stream :as ms]
    [monkey.ci.events.mailman.interceptors :as sut]
-   [monkey.ci.test.helpers :as h]))
+   [monkey.ci.test
+    [helpers :as h]
+    [mailman :as tm]]))
 
 (deftest add-time
   (let [{:keys [leave] :as i} sut/add-time]
@@ -113,3 +115,14 @@
         (is (= ::test-cmd (-> {:result ::test-cmd}
                               (leave)
                               (sut/get-process))))))))
+
+(deftest forwarder
+  (let [dest (tm/test-component)
+        {:keys [enter] :as i} (sut/forwarder ::test dest)]
+    (is (= ::test (:name i)))
+
+    (testing "`enter` forwards received event to destination broker"
+      (let [evt {:type ::test-event}
+            ctx {:event evt}]
+        (is (= ctx (enter ctx)))
+        (is (= [evt] (tm/get-posted dest)))))))

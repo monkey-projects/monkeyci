@@ -128,11 +128,12 @@
   (unregister-listener [this]
     (reset! (:unreg? this) true)))
 
-(deftest event-forwarder
+(deftest local-to-global-forwarder
   (testing "`start` registers listeners in broker"
     (let [broker (em/make-component {:type :manifold})
-          r (-> (sut/map->EventForwarder {:mailman broker
-                                          :event-stream (ms/stream)})
+          r (-> (sut/new-local-to-global-forwarder)
+                (assoc :mailman broker
+                       :event-stream (ms/stream))
                 (co/start))]
       (is (not-empty (:listeners r)))
       (is (every? (partial satisfies? mmc/Listener) (:listeners r)))
@@ -140,7 +141,8 @@
 
   (testing "`stop` unregisters listeners"
     (let [unreg? (atom false)]
-      (is (nil? (-> (sut/map->EventForwarder {:listeners [(->TestListener unreg?)]})
+      (is (nil? (-> (sut/new-local-to-global-forwarder)
+                    (assoc :listeners [(->TestListener unreg?)])
                     (co/stop)
                     :listeners)))
       (is (true? @unreg?))))
@@ -149,15 +151,37 @@
                    (co/start))
         global (tm/test-component)
         stream (ms/stream 1)
-        fw (-> (sut/map->EventForwarder {:mailman local
-                                         :global-mailman global
-                                         :event-stream stream})
+        fw (-> (sut/new-local-to-global-forwarder)
+               (assoc :mailman local
+                      :global-mailman global
+                      :event-stream stream)
                (co/start))
-        evt {:type ::test-event}]
-    (is (= [evt] @(em/post-events local [evt])))
+        [acc :as evts] [{:type :script/initializing}
+                        {:type ::other-event}]]
+    (is (= evts @(em/post-events local evts)))
 
-    (testing "forwards event from local to global mailman"
-      (is (= [evt] (tm/get-posted global))))
+    (testing "forwards only accepted event types from local to global mailman"
+      (is (= [acc] (tm/get-posted global))))
 
     (testing "forwards to event stream"
-      (is (= evt (deref (ms/take! stream) 100 :timeout))))))
+      (is (= evts (->> stream
+                       (ms/stream->seq)
+                       (take (count evts))))))
+
+    (is (nil? (ms/close! stream)))))
+
+(deftest global-to-local-routes
+  (let [global (em/make-component {:type :manifold})
+        local (tm/test-component)
+        c (-> (sut/global-to-local-routes)
+              (assoc :mailman global
+                     :local-mailman local)
+              (co/start))
+        [cancel :as evts] [{:type :build/canceled
+                            :sid ["test" "build"]}
+                           [:type :build/end]]]
+    (is (some? c))
+    (is (= evts @(em/post-events global evts)))
+    
+    (testing "forwards only build/canceled to local mailman"
+      (is (= [cancel] (tm/get-posted local))))))

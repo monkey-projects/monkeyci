@@ -14,7 +14,8 @@
             [monkey.ci.build.core :as bc]
             [monkey.ci.events
              [builders :as eb]
-             [core :as ec]]))
+             [core :as ec]]
+            [monkey.mailman.core :as mmc]))
 
 (def get-result :result)
 
@@ -146,3 +147,11 @@
    :enter (fn [ctx]
             (cond-> ctx
               (pred ctx) (pi/terminate)))})
+
+(defn forwarder
+  "Interceptor that forwards events to another broker"
+  [id dest]
+  {:name id
+   :enter (fn [ctx]
+            (mmc/post-events (:broker dest) [(:event ctx)])
+            ctx)})

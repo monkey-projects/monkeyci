@@ -6,7 +6,7 @@
 (defn make-dest [prefix fmt]
   (format fmt prefix))
 
-(def ^:private destination-types
+(def destination-types
   {"queue://%s.builds"
    [:build/triggered :build/pending :build/initializing :build/start :build/end :build/canceled]
    "queue://%s.scripts"

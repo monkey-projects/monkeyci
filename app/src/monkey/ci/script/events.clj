@@ -69,6 +69,13 @@
 (defn set-job-ctx [ctx job-ctx]
   (emi/update-state ctx assoc-in [::job-ctx (job-id ctx)] job-ctx))
 
+(defn set-build-canceled [ctx]
+  (emi/update-state ctx assoc ::build-canceled true))
+
+(defn build-canceled? [ctx]
+  (log/debug "Canceling build" (build-sid ctx))
+  (true? (::build-canceled (emi/get-state ctx))))
+
 ;;; Event builders
 
 (defn- base-event
@@ -179,6 +186,14 @@
                                                    (-> bc/failure
                                                        (bc/with-message (ex-message ex)))))]))})
 
+(def mark-canceled
+  "Marks build as canceled, so no other jobs will be enqueued."
+  {:name ::mark-canceled
+   :enter (fn [ctx]
+            (cond-> ctx
+              (= (build-sid ctx) (b/sid (get-build ctx)))
+              (set-build-canceled)))})
+
 ;;; Handlers
 
 (defn script-init
@@ -238,13 +253,14 @@
 
 (defn job-end
   "Queues jobs that have their dependencies resolved, or ends the script
-   if all jobs have been executed."
+   if all jobs have been executed, or the build has been canceled."
   [ctx]
   ;; Enqueue jobs that have become ready to run
   (let [all-jobs (vals (get-jobs ctx))
         next-jobs (j/next-jobs all-jobs)
         active-jobs (j/filter-jobs j/active? all-jobs)]
-    (if (and (empty? next-jobs) (empty? active-jobs))
+    (if (or (build-canceled? ctx)
+            (and (empty? next-jobs) (empty? active-jobs)))
       ;; No more jobs eligible for execution, end the script
       (->> (pending-jobs ctx)
            (map #(j/job-skipped-evt (j/job-id %) (build-sid ctx)))
@@ -309,4 +325,9 @@
       [{:handler job-end
         :interceptors [state
                        enqueue-jobs
-                       set-job-result]}]]]))
+                       set-job-result]}]]
+
+     [:build/canceled
+      [{:handler (constantly nil)
+        :interceptors [state
+                       mark-canceled]}]]]))
