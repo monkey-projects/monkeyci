@@ -228,6 +228,7 @@
    next to that a sidecar that is responsible for capturing the output
    and dispatching events.  If configured, it also "
   [{:keys [job build oci] :as conf}]
+  (log/debug "Setting up container instance for job using config:" conf)
   (let [ic (oci/instance-config oci)
         sc (-> (sidecar-container ic)
                (update :volume-mounts conj (config-mount)))
@@ -349,6 +350,10 @@
    :enter (fn [ctx]
             (oci/set-ci-id ctx (get-instance-id ctx)))})
 
+(def filter-container-job
+  "Terminates processing when there is no instance id in the state, so it's not a container job."
+  (emi/terminate-when ::filter-container-job (comp nil? get-instance-id)))
+
 ;;; Event handlers
 
 (defn job-queued [ctx]
@@ -389,8 +394,7 @@
 
 (defn make-routes [conf build]
   (let [client (make-ci-context conf)
-        state (emi/with-state (atom {:build build
-                                     :config conf}))]
+        state (emi/with-state (atom {:build build}))]
     [[:container/job-queued
       ;; Job picked up, start the container instance
       [{:handler job-queued
@@ -423,4 +427,5 @@
       [{:handler (constantly nil)
         :interceptors [state
                        load-instance-id
+                       filter-container-job
                        (oci/delete-ci-interceptor client)]}]]]))
