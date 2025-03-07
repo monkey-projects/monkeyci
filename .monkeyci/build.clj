@@ -13,7 +13,7 @@
 
 ;; Version assigned when building main branch
 ;; TODO Read this from app/deps.edn
-(def snapshot-version "0.15.3-SNAPSHOT")
+(def snapshot-version "0.15.4-SNAPSHOT")
 
 (def tag-regex #"^refs/tags/(\d+\.\d+\.\d+(\.\d+)?$)")
 

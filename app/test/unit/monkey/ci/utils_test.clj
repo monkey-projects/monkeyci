@@ -34,7 +34,7 @@
   (testing "deletes all files in directory recursively"
     (h/with-tmp-dir dir
       (is (nil? (spit (io/file dir "test.txt") "some test")))
-      (is (nil? (sut/delete-dir dir)))
+      (is (some? (sut/delete-dir dir)))
       (is (false? (.exists (io/file dir)))))))
 
 (deftest load-privkey

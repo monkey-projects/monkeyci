@@ -1,22 +1,21 @@
 (ns monkey.ci.utils
   (:require [babashka.fs :as fs]
             [buddy.core
-             [hash :as bch]
-             [codecs :as bcc]]
+             [codecs :as bcc]
+             [hash :as bch]]
             [buddy.core.keys.pem :as pem]
-            [clojure.walk :as cw]
-            [clojure.java.io :as io]
-            [clojure.tools.logging :as log]
             [clojure
              [math :as math]
-             [repl :as cr]]
+             [repl :as cr]
+             [walk :as cw]]
+            [clojure.java.io :as io]
+            [clojure.tools.logging :as log]
             [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
              [edn :as ce]
              [sid :as sid]
-             [time :as t]])
-  (:import org.apache.commons.io.FileUtils))
+             [time :as t]]))
 
 (defn cwd
   "Returns current directory"
@@ -28,19 +27,21 @@
    will just return `b`."
   ([a b]
    (if a
-     (if (.isAbsolute (io/file b))
+     (if (fs/absolute? b)
        b
-       (str (io/file a b)))
+       (str (fs/path a b)))
      b))
   ([p]
    (some-> p
-           (io/file)
-           (.getCanonicalPath))))
+           (fs/canonicalize)
+           (str))))
 
 (defn combine
   "Returns the canonical path of combining `a` and `b`"
   [a b]
-  (.getCanonicalPath (io/file a b)))
+  (-> (fs/path a b)
+      (fs/canonicalize)
+      (str)))
 
 (defn rebase-path
   "Given two absolute paths, recalculates p so that it becomes relative to `to` instead
@@ -83,20 +84,21 @@
   ([prefix suffix]
    (tmp-file (str prefix (random-uuid) suffix)))
   ([name]
-   (-> (io/file (tmp-dir) name)
-       (.getAbsolutePath))))
+   (-> (fs/path (tmp-dir) name)
+       (fs/absolutize)
+       (str))))
 
 (defn delete-dir
   "Deletes directory recursively"
   [dir]
-  (FileUtils/deleteDirectory (io/file dir)))
+  (fs/delete-tree dir))
 
 (defn load-privkey
   "Load private key from file or from string"
   [f]
   (letfn [(->reader [x]
-            (if (.exists (io/file x))
-              (io/reader x)
+            (if (fs/exists? x)
+              (io/reader (fs/file x))
               (java.io.StringReader. x)))]
     (if (instance? java.security.PrivateKey f)
       f
@@ -150,10 +152,9 @@
 (defn try-slurp
   "Reads the file if it exists, or just returns x"
   [x]
-  (when-let [f (some-> x (io/file))]
-    (if (.exists f)
-      (slurp f)
-      x)))
+  (if (fs/exists? x)
+    (slurp x)
+    x))
 
 (def now t/now)
 
