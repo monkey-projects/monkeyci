@@ -236,6 +236,11 @@
     (testing "returns success when action returns `nil`"
       (is (= bc/success @(sut/execute! (bc/action-job "nil-job" (constantly nil)) ctx))))
 
+    (testing "drops invalid result, adds warning"
+      (let [r @(sut/execute! (bc/action-job "invalid-job" (constantly "invalid result")) ctx)]
+        (is (bc/success? r))
+        (is (= 1 (count (bc/warnings r))))))
+
     (testing "captures output to stdout"
       (let [msg "test output"
             job (bc/action-job "outputting-job" (fn [_]

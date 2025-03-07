@@ -35,6 +35,13 @@
 (defn with-message [r msg]
   (assoc r :message msg))
 
+(defn add-warning [r w]
+  (update r :warnings (fnil conj []) w))
+
+(def warnings
+  "Gets result warnings"
+  :warnings)
+
 ;; Job that executes a function
 (defrecord ActionJob [id status action])
 

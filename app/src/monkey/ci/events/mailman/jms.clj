@@ -14,7 +14,7 @@
    "queue://%s.jobs"
    [:job/pending :job/initializing :job/start :job/end :job/skipped :job/executed]
    "queue://%s.jobs.containers"
-   [:container/pending :container/initializing :container/start :container/end]
+   [:container/pending :container/initializing :container/start :container/end :sidecar/start :sidecar/end]
    "queue://%s.jobs.commands"
    [:command/start :command/end]
    ;; All things that need to be run in a container go here

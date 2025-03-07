@@ -32,7 +32,9 @@
                  :container/start
                  :container/end
                  :command/start
-                 :command/end]]
+                 :command/end
+                 :sidecar/start
+                 :sidecar/end]]
       (doseq [t types] 
         (is (contains? dests t)
             (str "should map " t))))))

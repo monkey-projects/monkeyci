@@ -109,6 +109,7 @@
            (binding [*out* writer] ; Capture output
              (action (rt->context rt)))) ; Only pass necessary info
          (fn [r]
+           (log/debug "Action result:" r)
            (cond
              ;; `nil` is treated as a success
              (nil? r) (add-output bc/success writer)
@@ -117,7 +118,12 @@
              (resolvable? r) (when-let [child (some-> (p/resolve-jobs r rt)
                                                       first
                                                       (assign-id))]
-                               (execute! child (assoc rt :job child))))))))))
+                               (execute! child (assoc rt :job child)))
+             ;; Treat any other result as a success, but add a warning
+             :else (-> bc/success
+                       (bc/add-warning {:message "Invalid action result"
+                                        :result r})
+                       (add-output writer)))))))))
 
 (extend-protocol Job
   monkey.ci.build.core.ActionJob
@@ -139,7 +145,7 @@
           (a)
           (md/chain
            (fn [r]
-             (log/debug "Action job" (:job-id job) "executed with result:" r)
+             (log/debug "Action job" (job-id job) "executed with result:" r)
              (md/chain
               (em/post-events (:mailman ctx) [(job-executed-evt (job-id job) build-sid r)])
               (constantly r)))))))
