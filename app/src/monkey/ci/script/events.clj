@@ -44,12 +44,6 @@
 (def job-id (comp :job-id :event))
 (def build-sid (comp :sid :event))
 
-(defn job-ctx
-  "Creates a job execution context from the event context"
-  [ctx]
-  {:build (get-build ctx)
-   :api (:api ctx)})
-
 (defn- get-job-from-state
   "Gets current job from the jobs stored in the state"
   [ctx]
@@ -98,7 +92,7 @@
   {:name ::load-jobs
    :enter (fn [ctx]
             (->> (s/load-jobs (get-build ctx)
-                              (job-ctx ctx))
+                              (select-keys (get-initial-job-ctx ctx) [:build :api]))
                  (group-by j/job-id)
                  (mc/map-vals first)
                  (set-jobs ctx)))})

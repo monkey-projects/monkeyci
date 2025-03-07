@@ -7,11 +7,14 @@
             [monkey.ci.events.mailman :as em]
             [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.ci.jobs :as j]
-            [monkey.ci.script.events :as sut]
+            [monkey.ci.script
+             [core :as sc]
+             [events :as sut]]
             [monkey.ci.spec.events :as se]
             [monkey.ci.test
              [helpers :as h]
-             [mailman :as tm]]))
+             [mailman :as tm]]
+            [monkey.mailman.core :as mmc]))
 
 (defn- jobs->map [jobs]
   (->> jobs
@@ -31,7 +34,20 @@
         (is (not-empty loaded))
         (is (map? loaded))))
 
-    (is (some? (remove-ns 'build)))))
+    (is (some? (remove-ns 'build)))
+
+    (testing "passes initial job ctx"
+      (let [init-ctx {::key ::value
+                      :build ::test-build}
+            job-ctx (atom nil)]
+        (with-redefs [sc/load-jobs (fn [_ ctx]
+                                     (reset! job-ctx ctx)
+                                     [])]
+          (is (some? (-> {}
+                         (sut/set-initial-job-ctx init-ctx)
+                         (enter))))
+          (is (= {:build ::test-build}
+                 @job-ctx)))))))
 
 (deftest add-job-ctx
   (let [{:keys [enter] :as i} sut/add-job-ctx
@@ -196,7 +212,21 @@
                     (into {}))]
     (doseq [t types]
       (testing (format "handles `%s` event type" t)
-        (is (contains? routes t))))))
+        (is (contains? routes t))))
+
+    (testing "`script/initializing` passes api client for loading"
+      (let [fake-loader {:name ::sut/load-jobs
+                         :enter (fn [ctx]
+                                  (cond-> ctx
+                                    (= ::test-client (-> ctx (sut/get-initial-job-ctx) :api :client))
+                                    (sut/set-jobs {"test-job" {:id "test-job"}})))}
+            r (-> (sut/make-routes {:api-client ::test-client})
+                  (mmc/router)
+                  (mmc/replace-interceptors [fake-loader]))]
+        (is (not-empty (-> (r {:type :script/initializing})
+                           (first)
+                           :result
+                           :jobs)))))))
 
 (deftest script-init
   (testing "fires `script/start` event with pending jobs"
