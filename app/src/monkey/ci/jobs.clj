@@ -139,6 +139,7 @@
           (a)
           (md/chain
            (fn [r]
+             (log/debug "Action job" (:job-id job) "executed with result:" r)
              (md/chain
               (em/post-events (:mailman ctx) [(job-executed-evt (job-id job) build-sid r)])
               (constantly r)))))))

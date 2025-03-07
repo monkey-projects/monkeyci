@@ -256,7 +256,13 @@
              (map :type r)))
       (is (= :success (-> r first :status)))))
 
-  (testing "executes 'after' extensions"))
+  (testing "treats `nil` status as success"
+    (is (= :success
+           (-> {:event
+                {:job-id "job-without-status"}}
+               (sut/job-executed)
+               first
+               :status)))))
 
 (deftest job-end
   (testing "when more jobs to run"

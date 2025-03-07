@@ -1,18 +1,17 @@
 (ns monkey.ci.jobs-test
-  (:require
-   [clojure.spec.alpha :as spec]
-   [clojure.test :refer [deftest is testing]]
-   [manifold.deferred :as md]
-   [monkey.ci.artifacts :as art]
-   [monkey.ci.build.core :as bc]
-   [monkey.ci.cache :as cache]
-   [monkey.ci.containers :as co]
-   [monkey.ci.credits :as cr]
-   [monkey.ci.edn :as edn]
-   [monkey.ci.jobs :as sut]
-   [monkey.ci.spec.events :as se]
-   [monkey.ci.test.helpers :as h]
-   [monkey.ci.test.mailman :as tm]))
+  (:require [clojure.spec.alpha :as spec]
+            [clojure.test :refer [deftest is testing]]
+            [monkey.ci
+             [artifacts :as art]
+             [cache :as cache]
+             [credits :as cr]
+             [edn :as edn]
+             [jobs :as sut]]
+            [monkey.ci.build.core :as bc]
+            [monkey.ci.spec.events :as se]
+            [monkey.ci.test
+             [helpers :as h]
+             [mailman :as tm]]))
 
 (defn dummy-job
   ([id & [opts]]

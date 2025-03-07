@@ -221,7 +221,10 @@
   "Runs any extensions for the job in interceptors, then ends the job."
   [ctx]
   (let [{:keys [job-id sid status result]} (:event ctx)]
-    [(j/job-end-evt job-id sid (assoc result :status status))]))
+    ;; Safeguard: treat `nil` states as success, otherwise the job is re-queued
+    (when (nil? status)
+      (log/warn "Got job/executed event without status, treating it as a success"))
+    [(j/job-end-evt job-id sid (assoc result :status (or status :success)))]))
 
 (defn- script-status
   "Determines script status according to the status of all jobs"
