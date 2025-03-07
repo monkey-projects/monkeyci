@@ -226,7 +226,7 @@
                 [:metrics])
    :global-mailman (new-mailman config)
    :routes     (co/using
-                (global-to-local-routes config)
+                (global-to-local-routes)
                 {:mailman :global-mailman
                  :local-mailman :mailman})
    :mailman (new-local-mailman)

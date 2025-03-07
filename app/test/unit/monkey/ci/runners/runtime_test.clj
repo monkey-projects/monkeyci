@@ -73,8 +73,8 @@
         (is (= (get-in sys [:api-config :token])
                (-> sys :container-routes :api :token)))))
 
-    (testing "provides event forwarder"
-      (is (some? (:event-forwarder sys))))
+    (testing "provides global forwarder"
+      (is (some? (:global-forwarder sys))))
 
     (testing "provides workspace"
       (is (some? (:workspace rt))))
