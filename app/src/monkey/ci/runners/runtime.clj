@@ -166,7 +166,7 @@
    script processes for running container jobs." 
   [conf]
   (letfn [(make-routes [c]
-            (-> (merge c (select-keys conf [:containers]))
+            (-> (merge c (select-keys conf [:containers :promtail]))
                 (make-container-routes)))]
     (em/map->RouteComponent {:make-routes make-routes})))
 

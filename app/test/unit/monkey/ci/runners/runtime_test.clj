@@ -54,14 +54,6 @@
     (testing "provides build cache"
       (is (some? (:build-cache rt))))
 
-    #_(testing "passes api config to oci container runner"
-      (let [sys (-> runner-config
-                    (assoc :containers {:type :oci})
-                    (sut/with-runner-system identity))]
-        (with-redefs [cco/run-container :api]
-          (is (= (get-in sys [:api-config :token])
-                 (:token (p/run-container (:containers sys) {})))))))
-
     (testing "provides global mailman"
       (is (some? (:global-mailman sys))))
 
@@ -73,6 +65,13 @@
 
     (testing "provides container routes"
       (is (some? (:container-routes sys))))
+
+    (testing "passes api config to oci container routes"
+      (let [sys (-> runner-config
+                    (assoc :containers {:type :oci})
+                    (sut/with-runner-system identity))]
+        (is (= (get-in sys [:api-config :token])
+               (-> sys :container-routes :api :token)))))
 
     (testing "provides event forwarder"
       (is (some? (:event-forwarder sys))))
