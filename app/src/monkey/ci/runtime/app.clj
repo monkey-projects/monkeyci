@@ -106,7 +106,8 @@
 (defmethod make-server-runner :oci [config]
   (letfn [(make-routes [c]
             (ro/make-routes (:runner config)
-                            (:vault c)))]
+                            (:storage c)
+                            (:vault c))]
     (em/map->RouteComponent {:make-routes make-routes
                              :destinations (emj/queue-destinations (:mailman config))})))
 
