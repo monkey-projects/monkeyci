@@ -6,7 +6,6 @@
    handlers that follow the flow."
   (:require [clojure.java.io :as io]
             [clojure.tools.logging :as log]
-            [com.stuartsierra.component :as co]
             [io.pedestal.interceptor.chain :as pi]
             [medley.core :as mc]
             [meta-merge.core :as mm]
@@ -19,15 +18,11 @@
              [utils :as u]
              [version :as v]]
             [monkey.ci.build.api-server :as bas]
-            [monkey.ci.events.mailman :as em]
             [monkey.ci.events.mailman
              [db :as emd]
              [interceptors :as emi]]
             [monkey.ci.script.config :as sc]
             [monkey.ci.web.auth :as auth]
-            [monkey.mailman
-             [core :as mmc]
-             [interceptors :as mmi]]
             [monkey.oci.container-instance.core :as ci]))
 
 ;; Necessary to be able to write to the shared volume
@@ -314,12 +309,15 @@
 
 (defn make-routes
   "Creates event handling routes for the given oci configuration"
-  [conf vault]
-  (let [client (make-ci-context (:containers conf))]
+  [conf storage vault]
+  (let [client (make-ci-context (:containers conf))
+        use-db (emd/use-db storage)]
     ;; TODO Timeout handling
     [[:build/queued
       [{:handler initialize-build
-        :interceptors [(decrypt-ssh-keys vault)
+        :interceptors [emi/handle-build-error
+                       use-db
+                       (decrypt-ssh-keys vault)
                        (prepare-ci-config conf)
                        (oci/start-ci-interceptor client)
                        save-runner-details
@@ -327,30 +325,8 @@
 
      [:build/end
       [{:handler (constantly nil)
-        :interceptors [load-instance-id
+        :interceptors [emi/handle-build-error
+                       use-db
+                       load-instance-id
                        (oci/delete-ci-interceptor client)]}]]]))
 
-(defn- make-interceptors [storage]
-  [emi/trace-evt
-   (emd/use-db storage)
-   (mmi/sanitize-result)
-   emi/handle-build-error])
-
-(defn make-router [conf storage vault]
-  (mmc/router (make-routes conf vault)
-              {:interceptors (make-interceptors storage)}))
-
-;; This component is used by the app runtime to enable oci runner
-(defrecord OciRunner [storage mailman vault]
-  co/Lifecycle
-  (start [{:keys [config] :as this}]
-    (-> this
-        (assoc :listeners (em/add-router mailman
-                                         (make-routes config vault)
-                                         {:interceptors (make-interceptors storage)}))
-        (dissoc :config)))
-
-  (stop [{:keys [listeners] :as this}]
-    (doseq [l listeners]
-      (mmc/unregister-listener l))
-    (dissoc this :listeners)))

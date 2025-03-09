@@ -1,11 +1,10 @@
 (ns monkey.ci.events.mailman-test
-  (:require
-   [clojure.test :refer [deftest is testing]]
-   [com.stuartsierra.component :as co]
-   [monkey.ci.events.mailman :as sut]
-   [monkey.ci.test.helpers :as h]
-   [monkey.jms :as jms]
-   [monkey.mailman.core :as mmc]))
+  (:require [clojure.test :refer [deftest is testing]]
+            [com.stuartsierra.component :as co]
+            [monkey.ci.events.mailman :as sut]
+            [monkey.ci.test.mailman :as tm]
+            [monkey.jms :as jms]
+            [monkey.mailman.core :as mmc]))
 
 (deftest make-component
   (testing "manifold"
@@ -27,21 +26,14 @@
     (with-redefs [jms/connect (constantly ::connected)
                   jms/make-consumer (constantly ::consumer)
                   jms/set-listener (constantly nil)]
-      (let [c (-> (sut/make-component {:type :jms})
-                  (assoc :routes {:routes [[:build/start [{:handler (constantly nil)}]]]}))]
+      (let [c (sut/make-component {:type :jms})]
         (testing "can make component"
           (is (some? c)))
 
         (testing "`start`"
           (let [s (co/start c)]
             (testing "connects to broker"
-              (is (= ::connected (get-in s [:broker :context]))))
-
-            (testing "registers listeners"
-              (is (not-empty (:listeners s))))
-
-            (testing "does not registers compatibility bridge if not configured"
-              (is (nil? (:bridge s))))))
+              (is (= ::connected (get-in s [:broker :context]))))))
 
         (testing "`stop`"
           (let [closed? (atom false)
@@ -62,23 +54,26 @@
 
                 (testing "unregisters listeners"))))))
 
-      (testing "with compatibility bridge"
-        (let [c (->  {:type :jms
-                      :bridge {:dest "queue://legacy-dest"}}
-                     (sut/make-component)
-                     (co/start))]
-          (testing "registers listener at start"
-            (is (some? (:bridge c))))))
+      (testing "`add-router`"
+        (testing "adds one listener per destination"
+          (let [c (-> (sut/make-component {:type :jms})
+                      (co/start))
+                l (sut/add-router c
+                                  [[:build/start [{:handler (constantly nil)}]]
+                                   [:build/end [{:handler (constantly nil)}]]]
+                                  {})]
+            (is (= 1 (count l)))
+            (is (every? (partial satisfies? mmc/Listener) l))))
 
-      (testing "`add-router` adds one listener per destination"
-        (let [c (-> (sut/make-component {:type :jms})
-                    (co/start))
-              l (sut/add-router c
-                                [[:build/start [{:handler (constantly nil)}]]
-                                 [:build/end [{:handler (constantly nil)}]]]
-                                {})]
-          (is (= 1 (count l)))
-          (is (every? (partial satisfies? mmc/Listener) l)))))))
+        (testing "allows custom destinations"
+          (let [c (-> (sut/make-component {:type :jms
+                                           :prefix "test"})
+                      (co/start))
+                l (sut/add-router c
+                                  [[:build/start [{:handler (constantly nil)}]]]
+                                  {:destinations {:build/start "test-dest"}})]
+            (is (= 1 (count l)))
+            (is (= "test-dest" (-> l first :destination)))))))))
 
 (defrecord TestListener [unreg?]
   mmc/Listener
@@ -91,7 +86,7 @@
         api-config {:port 12342
                     :token "test-token"}]
     (testing "`start`"
-      (let [c (-> (sut/->RouteComponent [] (constantly [] )mailman)
+      (let [c (-> (sut/->RouteComponent [] (constantly []) mailman)
                   (co/start))]
         (testing "registers a listener"
           (is (some? (:listeners c))))))
@@ -101,7 +96,18 @@
         (is (nil? (-> (sut/map->RouteComponent {:listeners [(->TestListener unreg?)]})
                       (co/stop)
                       :listeners)))
-        (is (true? @unreg?))))))
+        (is (true? @unreg?))))
+
+    (testing "passes destinations to router"
+      (let [c (-> (sut/map->RouteComponent {:make-routes (constantly [])
+                                            :mailman (tm/test-component)
+                                            :destinations {::test-evt "test-dest"}})
+                  (co/start))]
+        (is (= "test-dest" (-> (:listeners c)
+                               first
+                               :opts
+                               :destinations
+                               ::test-evt)))))))
 
 (deftest merge-routes
   (testing "merges handlers together per type"

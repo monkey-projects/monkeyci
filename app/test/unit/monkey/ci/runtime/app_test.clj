@@ -68,9 +68,3 @@
         (let [r (sut/->ProcessReaper {:runner {:type :some-other}})]
           (is (empty? (r))))))))
 
-(deftest app-event-routes-component
-  (testing "`start` creates routes"
-    (is (not-empty (-> (sut/new-app-routes)
-                       (assoc :storage (st/make-memory-storage))
-                       (co/start)
-                       :routes)))))

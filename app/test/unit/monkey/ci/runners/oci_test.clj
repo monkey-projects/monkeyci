@@ -294,7 +294,7 @@
                (sut/initialize-build)
                :type)))))
 
-(deftest make-router
+(deftest routes
   (let [build (h/gen-build)
         st (st/make-memory-storage)
         conf {:api {:private-key (h/generate-private-key)}}]
@@ -305,7 +305,8 @@
                              :enter (fn [ctx]
                                       (oci/set-ci-response ctx {:status 200
                                                                 :body {:id "test-instance"}}))}
-              router (-> (sut/make-router conf st (h/fake-vault))
+              router (-> (sut/make-routes conf st (h/fake-vault))
+                         (mmc/router)
                          (mmc/replace-interceptors [fake-start-ci]))
 
               r (router {:type :build/queued
@@ -323,7 +324,8 @@
                              :enter (fn [ctx]
                                       (oci/set-ci-response ctx {:status 500
                                                                 :body {:id "test-instance"}}))}
-              router (-> (sut/make-router conf st (h/fake-vault))
+              router (-> (sut/make-routes conf st (h/fake-vault))
+                         (mmc/router)
                          (mmc/replace-interceptors [fail-start-ci]))
 
               r (router {:type :build/queued
@@ -342,18 +344,3 @@
   (unregister-listener [this]
     (reset! unreg? true)))
 
-(deftest runner-component
-  (let [mm (-> (em/make-component {:type :manifold})
-               (co/start))]
-    (testing "`start` registers broker listeners"
-      (is (not-empty (-> (sut/map->OciRunner {:mailman mm})
-                         (co/start)
-                         :listeners))))
-
-    (testing "`stop` unregisters broker listeners"
-      (let [unreg? (atom false)
-            l (->FakeListener unreg?)]
-        (is (nil? (-> (sut/map->OciRunner {:listeners [l]})
-                      (co/stop)
-                      :listeners)))
-        (is (true? @unreg?))))))

@@ -3,31 +3,51 @@
    queue and topic configurations and listeners."
   (:require [medley.core :as mc]))
 
-(defn make-dest [prefix fmt]
-  (format fmt prefix))
+(def topic-prefix "topic://")
 
 (def destination-types
-  {"queue://%s.builds"
+  {"%s.builds"
    [:build/triggered :build/pending :build/initializing :build/start :build/end :build/canceled]
-   "queue://%s.scripts"
+   "%s.scripts"
    [:script/initializing :script/start :script/end]
-   "queue://%s.jobs"
+   "%s.jobs"
    [:job/pending :job/initializing :job/start :job/end :job/skipped :job/executed]
-   "queue://%s.jobs.containers"
+   "%s.jobs.containers"
    [:container/pending :container/initializing :container/start :container/end :sidecar/start :sidecar/end]
-   "queue://%s.jobs.commands"
+   "%s.jobs.commands"
    [:command/start :command/end]
-   ;; All things that need to be run in a container go here
-   "queue://%s.containers"
+   ;; All things that need to be run in a container go here.
+   "%s.containers"
    [:build/queued :job/queued]
-   "topic://%s.build.updates"
+   "%s.build.updates"
    [:build/updated]})
 
-(defn event-destinations [conf]
-  "Maps event types to destinations.  This is used by the mapper for outgoing events.
-   A prefix is applied according to configuration."
-  (->> destination-types
+(defn- make-dest [prefix dest]
+  (format dest prefix))
+
+(defn- types-to-destinations [dest-types make-dest]
+  (->> dest-types
        (mapcat (fn [[fmt types]]
                  (map #(vector % fmt) types)))
        (into {})
-       (mc/map-vals (partial make-dest (:prefix conf)))))
+       (mc/map-vals make-dest)))
+
+(defn topic-destinations [conf]
+  "Maps event types to topic destinations.  This is used by the mapper for outgoing events.
+   A prefix is applied according to configuration."
+  (types-to-destinations destination-types
+                         (comp (partial str topic-prefix)
+                               (partial make-dest (:prefix conf)))))
+
+(def ^:deprecated event-destinations topic-destinations)
+
+(defn queue-destinations
+  "Similar to `topic-destinations`, but specifies a unique queue for each destination.
+   This allows consumers to read from that queue only, ensuring each event is only
+   processed once."
+  [{:keys [prefix suffix]
+    :or {suffix ".q"}}]
+  (types-to-destinations destination-types
+                         (fn [dest]
+                           (let [f (make-dest prefix dest)]
+                             (str topic-prefix f "::" f suffix)))))

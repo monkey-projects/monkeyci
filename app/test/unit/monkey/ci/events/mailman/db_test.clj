@@ -416,7 +416,6 @@
                      :build/start
                      :build/end
                      :build/canceled
-                     :build/updated
                      :script/initializing
                      :script/start
                      :script/end

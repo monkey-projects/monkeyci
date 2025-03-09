@@ -3,7 +3,6 @@
   (:require [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
             [monkey.ci.events.mailman
-             [bridge :as emb]
              [interceptors :as emi]
              [jms :as emj]]
             [monkey.mailman
@@ -64,28 +63,16 @@
 (defmethod make-component :manifold [_]
   (make-generic-component (mm/manifold-broker {})))
 
-(defrecord JmsComponent [broker routes]
+(defrecord JmsComponent [broker]
   co/Lifecycle
   (start [{:keys [config] :as this}]
-    (let [broker (mj/jms-broker (assoc config
-                                       :destination-mapper (comp (emj/event-destinations config) :type)))
-          router (make-router (:routes routes))
-          bridge-dest (get-in config [:bridge :dest])
-          dests (emj/event-destinations config)
-          add-listeners (fn [{:keys [destinations] :as c}]
-                          (assoc c :listeners (add-router c
-                                                          (:routes routes)
-                                                          {:interceptors global-interceptors})))]
-      ;; TODO Add listeners for each destination referred to by route event types
-      ;; but split up the routes so only those for the destination are added
-      (cond-> this
-        true (dissoc :config) ; no longer needed
-        true (assoc :broker broker
-                    :destinations dests)
-        true (add-listeners)
-        ;; Listen to legacy events, if configured
-        bridge-dest (assoc :bridge (mmc/add-listener broker {:destination bridge-dest
-                                                             :handler (mmc/router emb/bridge-routes)})))))
+    (let [dests (emj/topic-destinations config)
+          broker (mj/jms-broker (assoc config
+                                       :destination-mapper (comp dests :type)))]
+      (-> this
+          (dissoc :config)           ; no longer needed
+          (assoc :broker broker
+                 :destinations dests))))
 
   (stop [this]
     (when broker
@@ -93,14 +80,16 @@
       (mj/disconnect broker))
     (-> this
         (assoc :broker nil)
-        (dissoc :bridge :listeners)))
+        (dissoc :bridge)))
 
   AddRouter
   (add-router [{:keys [destinations]} routes opts]
     (let [router (mmc/router routes opts)]
+      ;; TODO Add listeners for each destination referred to by route event types
+      ;; but split up the routes so only those for the destination are added
       (->> routes
            (map first)
-           (map destinations)
+           (map (or (:destinations opts) destinations))
            (distinct)
            (map (partial hash-map :handler router :destination))
            (map (partial mmc/add-listener broker))
@@ -117,7 +106,8 @@
       (log/debug "Registering" (count routes) "routes in broker:" (map first routes))
       (assoc this
              :routes routes
-             :listeners (add-router mailman routes {:interceptors global-interceptors}))))
+             :listeners (add-router mailman routes (-> {:interceptors global-interceptors}
+                                                       (merge (select-keys this [:destinations])))))))
 
   (stop [{:keys [listeners] :as this}]
     (when listeners

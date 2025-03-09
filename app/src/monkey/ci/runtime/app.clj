@@ -11,7 +11,10 @@
              [storage :as s]
              [vault :as v]]
             [monkey.ci.events.mailman :as em]
-            [monkey.ci.events.mailman.db :as emd]
+            [monkey.ci.events.mailman
+             [db :as emd]
+             [interceptors :as emi]
+             [jms :as emj]]
             [monkey.ci.runners.oci :as ro]
             [monkey.ci.runtime.common :as rc]
             [monkey.ci.storage.sql]  ; Required for multimethods
@@ -37,7 +40,7 @@
   (m/make-metrics))
 
 (defn new-mailman
-  "Creates new mailman event broker component.  This will replace the old events."
+  "Creates new mailman event broker component."
   [config]
   (em/make-component (:mailman config)))
 
@@ -84,21 +87,28 @@
 (defn- new-process-reaper [conf]
   (->ProcessReaper conf))
 
-(defrecord AppEventRoutes [storage update-bus]
-  co/Lifecycle
-  (start [this]
-    (assoc this :routes (emd/make-routes storage update-bus)))
+(defn new-app-routes [conf]
+  (letfn [(make-routes [{:keys [storage update-bus]}]
+            (emd/make-routes storage update-bus))]
+    (em/map->RouteComponent {:make-routes make-routes
+                             ;; Make sure to read from queues, not topics to avoid duplicate
+                             ;; processing when multiple replicas
+                             :destinations (emj/queue-destinations (:mailman conf))})))
 
-  (stop [this]
-    (dissoc this :routes)))
+(defn new-update-routes []
+  (letfn [(make-routes [c]
+            [[:build/updated [{:handler (constantly nil)
+                               :interceptors [(emi/update-bus (:update-bus c))]}]]])]
+    (em/map->RouteComponent {:make-routes make-routes})))
 
-(defn new-app-routes []
-  (map->AppEventRoutes {}))
-
-(defmulti make-server-runner :type)
+(defmulti make-server-runner (comp :type :runner))
 
 (defmethod make-server-runner :oci [config]
-  (ro/map->OciRunner {:config config}))
+  (letfn [(make-routes [c]
+            (ro/make-routes (:runner config)
+                            (:vault c)))]
+    (em/map->RouteComponent {:make-routes make-routes
+                             :destinations (emj/queue-destinations (:mailman config))})))
 
 ;; TODO Add other runners
 
@@ -106,7 +116,7 @@
   {})
 
 (defn- new-server-runner [config]
-  (make-server-runner (:runner config)))
+  (make-server-runner config))
 
 (defn make-server-system
   "Creates a component system that can be used to start an application server."
@@ -129,12 +139,13 @@
    :metrics   (new-metrics)
    :process-reaper (new-process-reaper config)
    :vault     (new-vault config)
-   :mailman   (co/using
-               (new-mailman config)
-               {:routes :mailman-routes})
+   :mailman   (new-mailman config)
    :mailman-routes (co/using
-                    (new-app-routes)
-                    [:storage :update-bus])
+                    (new-app-routes config)
+                    [:mailman :storage])
+   :update-routes (co/using
+                   (new-update-routes)
+                   [:mailman :update-bus])
    :update-bus (mb/event-bus)))
 
 (defn with-server-system [config f]

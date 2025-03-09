@@ -19,7 +19,8 @@
 (defrecord TestComponent [broker]
   em/AddRouter
   (add-router [this r opts]
-    nil))
+    [{:routes r
+      :opts opts}]))
 
 (defn test-component []
   (->TestComponent (test-broker)))

@@ -7,8 +7,7 @@
              [jobs :as j]
              [storage :as st]
              [time :as t]]
-            [monkey.ci.events.mailman :as em]
-            [monkey.ci.events.mailman.interceptors :as mi]))
+            [monkey.ci.events.mailman :as em]))
 
 (def get-db ::db)
 
@@ -262,10 +261,6 @@
         :interceptors [use-db
                        save-credit-consumption
                        with-build]}]]
-
-     [:build/updated
-      [{:handler (constantly nil)
-        :interceptors [(mi/update-bus bus)]}]]
 
      [:script/initializing
       [{:handler script-init

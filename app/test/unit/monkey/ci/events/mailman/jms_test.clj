@@ -2,15 +2,15 @@
   (:require [clojure.test :refer [deftest testing is]]
             [monkey.ci.events.mailman.jms :as sut]))
 
-(deftest event-destinations
+(deftest topic-destinations
   (testing "applies configured prefix"
-    (is (= "queue://monkeyci.test.builds"
+    (is (= "topic://monkeyci.test.builds"
            (-> {:prefix "monkeyci.test"}
-               (sut/event-destinations)
+               (sut/topic-destinations)
                (get :build/pending)))))
 
   (testing "maps known event types"
-    (let [dests (sut/event-destinations {:prefix "monkeyci.test"})
+    (let [dests (sut/topic-destinations {:prefix "monkeyci.test"})
           types [:build/triggered
                  :build/pending
                  :build/queued
@@ -38,3 +38,10 @@
       (doseq [t types] 
         (is (contains? dests t)
             (str "should map " t))))))
+
+(deftest queue-destinations
+  (testing "adds queue suffix to each destination"
+    (is (= "topic://monkeyci.test.builds::monkeyci.test.builds.q"
+           (-> {:prefix "monkeyci.test"}
+               (sut/queue-destinations)
+               (get :build/pending))))))
