@@ -271,10 +271,10 @@
               (cond-> ctx
                 (>= (:status resp) 400)
                 (-> (assoc :result
-                           (b/build-end-evt
-                            (assoc build
-                                   :message
-                                   (str "Failed to create container instance: " (get-in resp [:body :message])))))
+                           [(b/build-end-evt
+                             (assoc build
+                                    :message
+                                    (str "Failed to create container instance: " (get-in resp [:body :message]))))])
                     ;; Do not proceed
                     (pi/terminate)))))})
 
@@ -301,7 +301,7 @@
                  (oci/set-ci-id ctx)))})
 
 (defn initialize-build [ctx]
-  (b/build-init-evt (get-in ctx [:event :build])))
+  [(b/build-init-evt (get-in ctx [:event :build]))])
 
 (defn- make-ci-context [conf]
   (-> (ci/make-context conf)

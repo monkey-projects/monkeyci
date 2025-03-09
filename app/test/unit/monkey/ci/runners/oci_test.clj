@@ -292,12 +292,15 @@
     (is (= :build/initializing
            (-> {:event {:build {:sid ::test-build}}}
                (sut/initialize-build)
+               first
                :type)))))
 
 (deftest routes
   (let [build (h/gen-build)
         st (st/make-memory-storage)
-        conf {:api {:private-key (h/generate-private-key)}}]
+        conf {:api {:private-key (h/generate-private-key)}}
+        router (-> (sut/make-routes conf st (h/fake-vault))
+                   (mmc/router))]
     
     (testing "`build/queued`"
       (testing "returns `build/initializing` event"
@@ -305,9 +308,7 @@
                              :enter (fn [ctx]
                                       (oci/set-ci-response ctx {:status 200
                                                                 :body {:id "test-instance"}}))}
-              router (-> (sut/make-routes conf st (h/fake-vault))
-                         (mmc/router)
-                         (mmc/replace-interceptors [fake-start-ci]))
+              router (mmc/replace-interceptors router [fake-start-ci])
 
               r (router {:type :build/queued
                          :sid (st/ext-build-sid build)
@@ -320,13 +321,11 @@
           (is (= :build/initializing (:type res)))))
 
       (testing "when instance creation fails, returns `build/end` event"
-        (let [fail-start-ci {:name ::sut/start-ci
+        (let [fail-start-ci {:name ::oci/start-ci
                              :enter (fn [ctx]
                                       (oci/set-ci-response ctx {:status 500
                                                                 :body {:id "test-instance"}}))}
-              router (-> (sut/make-routes conf st (h/fake-vault))
-                         (mmc/router)
-                         (mmc/replace-interceptors [fail-start-ci]))
+              router (mmc/replace-interceptors router [fail-start-ci])
 
               r (router {:type :build/queued
                          :sid (st/ext-build-sid build)
