@@ -107,7 +107,7 @@
   (letfn [(make-routes [c]
             (ro/make-routes (:runner config)
                             (:storage c)
-                            (:vault c))]
+                            (:vault c)))]
     (em/map->RouteComponent {:make-routes make-routes
                              :destinations (emj/queue-destinations (:mailman config))})))
 
