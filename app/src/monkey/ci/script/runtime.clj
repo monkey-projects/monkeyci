@@ -8,21 +8,16 @@
              [build :as b]
              [cache :as cache]
              [errors :as err]
-             [runtime :as rt]
              [spec :as spec]]
             [monkey.ci.build.api :as api]
-            [monkey.ci.containers.build-api :as cba]
             [monkey.ci.events
              [builders :as eb]
              [mailman :as em]]
             [monkey.ci.events.mailman.build-api :as emba]
-            [monkey.ci.runtime.common :as rc]
             [monkey.ci.script
              [config :as sc]
-             [core :as s]
              [events :as se]]
-            [monkey.ci.spec.script :as ss]
-            [monkey.mailman.core :as mmc]))
+            [monkey.ci.spec.script :as ss]))
 
 (defn- client-url [{:keys [url port]}]
   (if port
