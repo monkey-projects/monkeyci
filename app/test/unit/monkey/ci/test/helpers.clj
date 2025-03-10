@@ -271,15 +271,6 @@
 (defn gen-invoice []
   (gen-entity :entity/invoice))
 
-(defrecord FakeContainerRunner [credit-consumer runs result]
-  p/ContainerRunner
-  (run-container [this job]
-    (swap! runs (fnil conj []) job)
-    (md/success-deferred result)))
-
-(defn fake-container-runner [& [result]]
-  (->FakeContainerRunner (constantly 0) (atom []) (or result {:exit 0})))
-
 (defn gen-build-sid []
   (repeatedly 3 cuid/random-cuid))
 

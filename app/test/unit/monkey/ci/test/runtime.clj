@@ -35,9 +35,6 @@
 (defn set-jwk [rt k]
   (assoc rt :jwk k))
 
-(defn set-containers [rt c]
-  (assoc rt :containers c))
-
 (defn set-runner [rt r]
   (assoc rt :runner r))
 
@@ -56,7 +53,6 @@
       (set-mailman (tmm/test-broker))
       (set-storage (s/make-memory-storage))
       (set-jwk (auth/keypair->rt (auth/generate-keypair)))
-      (set-containers (h/fake-container-runner))
       (set-runner (constantly (md/success-deferred 0)))
       (set-process-reaper (constantly []))
       (set-vault (h/fake-vault))))
