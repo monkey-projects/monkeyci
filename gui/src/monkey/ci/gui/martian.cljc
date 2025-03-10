@@ -428,10 +428,12 @@
                                        disable-with-credentials
                                        mh/perform-request])})]))
 
+(defn- set-token [opts t]
+  (cond-> opts
+    t (assoc :authorization (str "Bearer " t))))
+
 (defn- add-token [db opts]
-  (let [t (get db :auth/token)]
-    (cond-> opts
-      t (assoc :authorization (str "Bearer " t)))))
+  (set-token opts (get db :auth/token)))
 
 (rf/reg-event-fx
  ::error-handler
@@ -462,15 +464,20 @@
 (rf/reg-event-fx
  ::refresh-token--success
  [(rf/inject-cofx :local-storage ldb/storage-token-id)]
- (fn [{:keys [db local-storage]} [_ orig-evt {:keys [body]}]]
-   {:db (-> db
-            (ldb/set-token (:token body))
-            (ldb/set-provider-token (or (:github-token body) (:bitbucket-token body))))
-    :dispatch orig-evt
-    ;; Update local storage with new tokens
-    :local-storage [ldb/storage-token-id
-                    (merge local-storage
-                           (select-keys body [:token :refresh-token :github-token :bitbucket-token]))]}))
+ (fn [{:keys [db local-storage]} [_ orig-evt {{:keys [token] :as body} :body}]]
+   (letfn [(update-token [evt t]
+             (vec (concat (take 2 evt)
+                          [(set-token (nth evt 2) t)]
+                          (drop 3 evt))))]
+     (log/debug "Token successfully refreshed, dispatching original event:" (str orig-evt))
+     {:db (-> db
+              (ldb/set-token token)
+              (ldb/set-provider-token (or (:github-token body) (:bitbucket-token body))))
+      :dispatch (update-token orig-evt token)
+      ;; Update local storage with new tokens
+      :local-storage [ldb/storage-token-id
+                      (merge local-storage
+                             (select-keys body [:token :refresh-token :github-token :bitbucket-token]))]})))
 
 (rf/reg-event-fx
  ::refresh-token--failed

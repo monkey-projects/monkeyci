@@ -74,12 +74,12 @@
      (is (some? (reset! app-db (-> {}
                                    (ldb/set-token "old-token")
                                    (ldb/set-github-token "test-github-token")))))
-     (rf/reg-event-db ::orig-req #(assoc % ::orig-invoked? true))
+     (rf/reg-event-db ::martian-request #(assoc % ::orig-invoked? true))
      (rf/reg-cofx :local-storage (fn [cofx id]
                                    (assoc cofx :local-storage {:user-id "test-id"
                                                                :token "old-token"})))
      (rf/dispatch [::sut/refresh-token--success
-                   [::orig-req]
+                   [::martian-request ::orig-req {} [::on-success] [::on-failure]]
                    {:body
                     {:token "new-token"
                      :github-token "new-github-token"}}])

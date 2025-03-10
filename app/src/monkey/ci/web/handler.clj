@@ -6,6 +6,7 @@
             [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
             [manifold.deferred :as md]
+            [medley.core :as mc]
             [monkey.ci
              [metrics :as metrics]
              [runtime :as rt]
@@ -465,16 +466,17 @@
      ;;:compile rc/compile-request-coercers
      :reitit.middleware/registry
      ;; TODO Move the dev-mode checks into the runtime startup code
-     {:github-security
-      (non-dev rt [github/validate-security])
-      :github-app-security
-      (non-dev rt [github/validate-security (constantly (get-in (rt/config rt) [:github :webhook-secret]))])
-      :bitbucket-security
-      (non-dev rt [bitbucket/validate-security])
-      :customer-check
-      (non-dev rt [auth/customer-authorization])
-      :sysadmin-check
-      (non-dev rt [auth/sysadmin-authorization])}}))
+     (->> {:github-security
+           [github/validate-security]
+           :github-app-security
+           [github/validate-security (constantly (get-in (rt/config rt) [:github :webhook-secret]))]
+           :bitbucket-security
+           [bitbucket/validate-security]
+           :customer-check
+           [auth/customer-authorization]
+           :sysadmin-check
+           [auth/sysadmin-authorization]}
+          (mc/map-vals (partial non-dev rt)))}))
   ([rt]
    (make-router rt routes)))
 
