@@ -69,8 +69,9 @@
         (is (some? c))
 
         (testing "runs monkeyci controller main"
-          (let [args (:arguments c)]
-            (is (= "controller" (last args)))))
+          (let [cmd (:command c)]
+            (is (= ["java" "-cp" "monkeyci.jar"] (take 3 cmd)))
+            (is (= "controller" (last cmd)))))
 
         (testing "has config volume mount"
           (let [vm (oci/find-mount c "config")]

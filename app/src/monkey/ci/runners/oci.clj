@@ -173,7 +173,9 @@
 (defn controller-container [config]
   (-> default-container
       (assoc :display-name "controller"
-             :arguments ["-c" (str config-path "/" config-file) "controller"]
+             :command (oci/make-cmd
+                       "-c" (str config-path "/" config-file)
+                       "controller")
              :volume-mounts [config-mount])
       (add-ssh-keys-mount (:build config))))
 

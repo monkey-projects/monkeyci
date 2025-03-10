@@ -194,6 +194,15 @@
   {:file-name n
    :data (u/->base64 v)})
 
+(def base-cmd
+  "Base command line for app processes"
+  ["java" "-cp" "monkeyci.jar"
+   "-Dlogback.configurationFile=config/logback.xml"
+   "monkey.ci.core"])
+
+(defn make-cmd [& args]
+  (vec (concat base-cmd args)))
+
 (defn checkout-subdir
   "Returns the path for `n` as a subdir of the checkout dir"
   [n]

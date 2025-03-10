@@ -95,12 +95,13 @@
 (defn- sidecar-container [{[c] :containers}]
   (assoc c
          :display-name sidecar-container-name
-         :arguments ["-c" (str config-dir "/" config-file)
-                     "sidecar"
-                     ;; TODO Move this to config file
-                     "--events-file" event-file
-                     "--start-file" start-file
-                     "--abort-file" abort-file]
+         :command (oci/make-cmd
+                   "-c" (str config-dir "/" config-file)
+                   "sidecar"
+                   ;; TODO Move this to config file
+                   "--events-file" event-file
+                   "--start-file" start-file
+                   "--abort-file" abort-file)
          ;; Run as root, because otherwise we can't write to the shared volumes
          :security-context {:security-context-type "LINUX"
                             :run-as-user 0}))

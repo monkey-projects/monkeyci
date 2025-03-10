@@ -239,24 +239,29 @@
                   (sut/instance-config))
           sc (->> ic
                   :containers
-                  (mc/find-first (cp/prop-pred :display-name "sidecar")))]
+                  (mc/find-first (cp/prop-pred :display-name "sidecar")))
+          cmd (:command sc)]
+
+      (testing "invokes java"
+        (is (= "java" (first cmd))))
 
       (testing "passes config file as arg"
-        (is (= "/home/monkeyci/config/config.edn" (second (:arguments sc)))))
+        (is (h/contains-subseq? cmd
+                                ["-c" "/home/monkeyci/config/config.edn"])))
       
       (testing "starts sidecar"
-        (is (= "sidecar" (nth (:arguments sc) 2))))
+        (is (h/contains-subseq? cmd ["sidecar"])))
 
       (testing "passes events-file as arg"
-        (is (h/contains-subseq? (:arguments sc)
+        (is (h/contains-subseq? cmd
                                 ["--events-file" sut/event-file])))
 
       (testing "passes start-file as arg"
-        (is (h/contains-subseq? (:arguments sc)
+        (is (h/contains-subseq? cmd
                                 ["--start-file" sut/start-file])))
 
       (testing "passes abort-file as arg"
-        (is (h/contains-subseq? (:arguments sc)
+        (is (h/contains-subseq? cmd
                                 ["--abort-file" sut/abort-file])))
 
       (testing "config volume"
