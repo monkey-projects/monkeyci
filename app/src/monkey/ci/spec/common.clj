@@ -39,13 +39,10 @@
                #(gen/fmap (partial format "http://%s") (gen/string-alphanumeric))))
 
 (s/def ::storage (partial satisfies? p/Storage))
-(s/def ::events (partial satisfies? p/EventPoster))
 (s/def ::blob-store (partial satisfies? p/BlobStore))
 (s/def ::artifacts ::blob-store)
 (s/def ::cache ::blob-store)
 (s/def ::workspace (partial satisfies? p/Workspace))
-(s/def ::containers p/container-runner?)
-;;(s/def ::build-containers (partial satisfies? p/BuildContainerRunner))
 (s/def ::params (partial satisfies? p/BuildParams))
 (s/def ::mailman #(contains? % :broker))
 

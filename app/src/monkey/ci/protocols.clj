@@ -19,18 +19,6 @@
   "Able to resolve into jobs (zero or more)"
   (resolve-jobs [x rt]))
 
-(defprotocol EventBuilder
-  "Used to construct an event from an object"
-  (->event [this event-type]))
-
-(defprotocol EventPoster
-  (post-events [poster evt]
-    "Posts one or more events.  Returns a deferred that realizes when the events have been posted."))
-
-(defprotocol EventReceiver
-  (add-listener [recv ef l] "Add the given filter with a listener to the receiver")
-  (remove-listener [recv ef l] "Removes the listener for the filter from the receiver"))
-
 (defprotocol BlobStore
   "Protocol for blob store abstraction, used to save and compress files or directories
    to some blob store, possibly remote."
@@ -41,12 +29,6 @@
   (get-blob-info [store src] "Gets details about a stored blob"))
 
 (def blob-store? (partial satisfies? BlobStore))
-
-(defprotocol ContainerRunner
-  (run-container [this job]
-    "Runs the given container job.  Returns a deferred that will hold the result."))
-
-(def container-runner? (partial satisfies? ContainerRunner))
 
 (defprotocol Workspace
   (restore-workspace [this]
