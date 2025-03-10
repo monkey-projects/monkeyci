@@ -9,6 +9,7 @@
              [jobs :as j]]
             [monkey.ci.build.core :as bc]
             [monkey.ci.events
+             [builders :as eb]
              [core :as ec]
              [mailman :as em]]
             [monkey.ci.events.mailman.interceptors :as emi]
@@ -197,7 +198,7 @@
   (letfn [(mark-pending [job]
             (assoc job :status :pending))]
     (-> (base-event (get-build ctx) :script/start)
-        (assoc :jobs (map (comp mark-pending j/job->event) (vals (get-jobs ctx)))))))
+        (assoc :jobs (map (comp mark-pending eb/job->event) (vals (get-jobs ctx)))))))
 
 (defn script-start
   "Queues all jobs that have no dependencies"

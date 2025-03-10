@@ -242,7 +242,21 @@
       (is (= :script/start (:type r)))
       (is (= ["test-job"]
              (->> r :jobs (map bc/job-id))))
-      (is (every? (comp (partial = :pending) :status) (:jobs r))))))
+      (is (every? (comp (partial = :pending) :status) (:jobs r)))))
+
+  (testing "includes extra properties for jobs"
+    (let [job (bc/container-job "extended-job"
+                                {:image "test-img"
+                                 :script ["test-cmd"]
+                                 :ext-key :ext-value})
+          r (-> {}
+                (sut/set-build (h/gen-build))
+                (sut/set-jobs (jobs->map [job]))
+                (sut/script-init))]
+      (is (spec/valid? ::se/event r)
+          (spec/explain-str ::se/event r))
+      (is (= "test-img" (-> r :jobs first :image)))
+      (is (= :ext-value (-> r :jobs first :ext-key))))))
 
 (deftest script-start
   (let [jobs (jobs->map [{:id "start"

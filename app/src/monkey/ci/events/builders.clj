@@ -21,11 +21,10 @@
   (letfn [(art->ser [a]
             (select-keys a [:id :path]))]
     (-> job
-        (select-keys (concat [:status :start-time :end-time :dependencies :labels
-                              :extensions :credit-multiplier :script
-                              :memory :cpus :arch :work-dir
-                              :save-artifacts :restore-artifacts :caches]
-                             co/props))
+        ;; Keep everything except the action, which is a function
+        (dissoc :action)
+        ;; Force into map because records are not serializable
+        (as-> m (into {} m))
         (mc/update-existing :save-artifacts (partial map art->ser))
         (mc/update-existing :restore-artifacts (partial map art->ser))
         (mc/update-existing :caches (partial map art->ser))
