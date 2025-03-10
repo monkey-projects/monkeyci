@@ -4,7 +4,6 @@
             [monkey.ci
              [artifacts :as art]
              [cache :as cache]
-             [credits :as cr]
              [edn :as edn]
              [jobs :as sut]]
             [monkey.ci.build.core :as bc]
@@ -269,40 +268,11 @@
         (is (some? evt))
         (is (spec/valid? ::se/event evt))
         (is (= (sut/job-id job) (:job-id evt)))
-        (is (= evt (edn/edn-> (edn/->edn evt))) "Event should be serializable to edn"))))
-
-  (testing "uses runner credit consumer"
-    (let [cr (constantly 666)
-          job (bc/action-job "test-job" (constantly bc/success))]
-      (is (= 666 (cr/credit-multiplier job {:runner {:credit-consumer cr}}))))))
+        (is (= evt (edn/edn-> (edn/->edn evt))) "Event should be serializable to edn")))))
 
 (deftest container-job
   (testing "is a job"
-    (is (sut/job? (bc/container-job ::test-job {:container/image "test-img"}))))
-
-  (testing "runs container on execution"
-    (let [runner (h/fake-container-runner)]
-      (is (bc/success? (-> (bc/container-job ::test-job {})
-                           (sut/execute! {:containers runner})
-                           (deref))))
-      (is (= 1 (count @(:runs runner))))))
-
-  (testing "adds status according to exit code"
-    (is (bc/failed? (-> (bc/container-job ::test-job {})
-                        (sut/execute! {:containers (h/fake-container-runner {:exit 1})})
-                        (deref)))))
-
-  (testing "uses containers credit consumer"
-    (let [cr (constantly 555)
-          job (bc/container-job ::cr-job {})]
-      (is (= 555 (cr/credit-multiplier job {:containers {:credit-consumer cr}})))))
-
-  (testing "adds message to result"
-    (let [runner (h/fake-container-runner {:exit 0 :message "test message"})
-          job (bc/container-job ::msg-job {})
-          r @(sut/execute! job {:containers runner})]
-      (is (bc/success? r))
-      (is (= "test message" (:message r))))))
+    (is (sut/job? (bc/container-job ::test-job {:container/image "test-img"})))))
 
 (deftest filter-jobs
   (testing "applies filter to jobs"

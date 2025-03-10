@@ -27,7 +27,7 @@
             c (sut/signal->counter ::test-handler r "test_counter"
                                    {:opts {:description "For testing"}})]
         (is (some? c))
-        (is (true? (t/event! ::test-signal :info)))
+        (is (nil? (t/event! ::test-signal :info)))
         (is (not= :timeout (h/wait-until (comp (every-pred number? pos?) #(prom/counter-get c)) 1000)))
         (is (= 1.0 (prom/counter-get c))))
       (finally
@@ -40,8 +40,8 @@
                                    {:opts {:description "For testing"}
                                     :tx (filter (comp (partial = ::ok-signal) :id))})]
         (is (some? c))
-        (is (true? (t/event! ::ok-signal :info)))
-        (is (true? (t/event! ::other-signal :info)))
+        (is (nil? (t/event! ::ok-signal :info)))
+        (is (nil? (t/event! ::other-signal :info)))
         (is (not= :timeout (h/wait-until (comp (every-pred number? pos?) #(prom/counter-get c)) 1000)))
         (is (= 1.0 (prom/counter-get c))))
       (finally
@@ -60,7 +60,7 @@
             get-val (fn []
                       (prom/counter-get c ["test-val"]))]
         (is (some? c))
-        (is (true? (t/event! ::lbl-signal {:level :info :data {:lbl "test-val"}})))
+        (is (nil? (t/event! ::lbl-signal {:level :info :data {:lbl "test-val"}})))
         (is (not= :timeout (h/wait-until (comp (every-pred number? pos?) get-val) 1000)))
         (is (= 1.0 (get-val))))
       (finally

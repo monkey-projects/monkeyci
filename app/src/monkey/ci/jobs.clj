@@ -1,22 +1,18 @@
 (ns monkey.ci.jobs
   "Handles job execution and ordering in a build"
-  (:require [clojure.tools.logging :as log]
-            [clojure.set :as cs]
-            [manifold
-             [deferred :as md]
-             [stream :as ms]]
+  (:require [clojure.set :as cs]
+            [clojure.tools.logging :as log]
+            [manifold.deferred :as md]
             [medley.core :as mc]
-            [monkey.ci.build.core :as bc]
             [monkey.ci
              [artifacts :as art]
              [build :as build]
              [cache :as cache]
-             [containers :as co]
-             [credits :as cr]
              [labels :as lbl]
              [protocols :as p]
              [time :as t]
              [utils :as u]]
+            [monkey.ci.build.core :as bc]
             [monkey.ci.events
              [builders :as eb]
              [core :as ec]
@@ -151,16 +147,8 @@
               (constantly r)))))))
 
   monkey.ci.build.core.ContainerJob
-  (execute! [this ctx]
-    (md/chain
-     (p/run-container (:containers ctx) this)
-     (fn [r]
-       (log/debug "Container job finished with result:" r)
-       ;; Don't add the full result otherwise it will be sent out as an event
-       (-> (if (= 0 (:exit r))
-             bc/success
-             bc/failure)
-           (merge (select-keys r [:exit :message])))))))
+  (execute! [this]
+    (throw (ex-info "Container job's can be run this way, use events" {:job this}))))
 
 (defn- find-dependents
   "Finds all jobs that are dependent on this job"
@@ -312,15 +300,6 @@
        (filter resolvable?)
        (mapcat #(resolve-jobs % rt))
        (filter job?)))
-
-(extend-protocol cr/CreditConsumer
-  monkey.ci.build.core.ActionJob
-  (credit-multiplier [job rt]
-    ((cr/runner-credit-consumer-fn rt) job))
-
-  monkey.ci.build.core.ContainerJob
-  (credit-multiplier [job rt]
-    ((cr/container-credit-consumer-fn rt) job)))
 
 (defn set-credit-multiplier [job cm]
   (assoc job :credit-multiplier cm))
