@@ -175,6 +175,7 @@
       (assoc :display-name "controller"
              :command (oci/make-cmd
                        "-c" (str config-path "/" config-file)
+                       "internal"
                        "controller")
              :volume-mounts [config-mount])
       (add-ssh-keys-mount (:build config))))

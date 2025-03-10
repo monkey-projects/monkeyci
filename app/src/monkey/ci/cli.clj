@@ -69,21 +69,21 @@
 (def build-cmd
   {:command "build"
    :description "Build commands"
-   :opts [{:option "server"
-           :short "s"
-           :as "Server URL"
-           :type :string}
-          {:as "Customer id"
-           :option "customer-id"
-           :short "c"
-           :type :string}
-          {:as "Repository id"
-           :option "repo-id"
-           :short "r"
-           :type :string}]
+   ;; :opts [{:option "server"
+   ;;         :short "s"
+   ;;         :as "Server URL"
+   ;;         :type :string}
+   ;;        {:as "Customer id"
+   ;;         :option "customer-id"
+   ;;         :short "c"
+   ;;         :type :string}
+   ;;        {:as "Repository id"
+   ;;         :option "repo-id"
+   ;;         :short "r"
+   ;;         :type :string}]
    :subcommands [run-build-cmd
                  verify-build-cmd
-                 ;; Disbled until refactored
+                 ;; Disabled until refactored
                  #_list-build-cmd
                  #_watch-cmd
                  test-cmd]})
@@ -130,6 +130,13 @@
    :description "Runs as controller (for internal use)"
    :runs {:command cmd/controller
           :app-mode :script}})
+
+(def internal-cmd
+  {:command "internal"
+   :description "Commands for internal use"
+   :subcommands [server-cmd
+                 controller-cmd
+                 sidecar-cmd]})
 
 (def issue-creds-cmd
   {:command "issue"
@@ -186,9 +193,7 @@
            :type :string
            :multiple true}]
    :subcommands [build-cmd
-                 server-cmd
-                 sidecar-cmd
-                 controller-cmd
+                 internal-cmd
                  admin-cmd]})
 
 (defn set-invoker

@@ -97,6 +97,7 @@
          :display-name sidecar-container-name
          :command (oci/make-cmd
                    "-c" (str config-dir "/" config-file)
+                   "internal"
                    "sidecar"
                    ;; TODO Move this to config file
                    "--events-file" event-file
