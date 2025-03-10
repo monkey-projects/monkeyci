@@ -2,15 +2,8 @@
   (:require [clojure.test :refer [deftest is testing]]
             [monkey.ci.build.core :as bc]
             [monkey.ci.events.mailman.interceptors :as emi]
-            [monkey.ci.extensions :as sut]))
-
-(defmacro with-extensions [& body]
-  `(let [ext# @sut/registered-extensions]
-     (try
-       (reset! sut/registered-extensions sut/new-register)
-       ~@body
-       (finally
-         (reset! sut/registered-extensions ext#)))))
+            [monkey.ci.extensions :as sut]
+            [monkey.ci.test.extensions :refer [with-extensions]]))
 
 (deftest register!
   (testing "adds to registered extensions"

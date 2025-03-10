@@ -8,12 +8,15 @@
              [core :as bc]]
             [monkey.ci.events.mailman :as em]
             [monkey.ci.events.mailman.interceptors :as emi]
-            [monkey.ci.jobs :as j]
+            [monkey.ci
+             [extensions :as ext]
+             [jobs :as j]]
             [monkey.ci.script
              [core :as sc]
              [events :as sut]]
             [monkey.ci.spec.events :as se]
             [monkey.ci.test
+             [extensions :as te]
              [helpers :as h]
              [mailman :as tm]]
             [monkey.mailman.core :as mmc]))
@@ -228,7 +231,33 @@
         (is (not-empty (-> (r {:type :script/initializing})
                            (first)
                            :result
-                           :jobs)))))))
+                           :jobs)))))
+
+    (testing "`job/executed` adds result from extensions to event"
+      (let [ext-id ::test-ext
+            test-ext {:key ext-id
+                      :after (fn [rt]
+                               (ext/set-value rt ext-id (str (:value (ext/get-config rt ext-id)) " - updated")))}
+            job {:id "test-job"
+                 ext-id {:value "test"}
+                 :status :success
+                 :result {:message "test message"}}
+            test-state (emi/with-state (atom {:jobs (jobs->map [job])
+                                              ::sut/job-ctx {(:id job) (select-keys job [:status :result])}}))
+            r (-> (sut/make-routes {:api-client ::test-client})
+                  (mmc/router)
+                  (mmc/replace-interceptors [test-state]))]
+        (te/with-extensions
+          (is (some? (ext/register! test-ext)))
+          (is (= "test - updated"
+                 (-> {:type :job/executed
+                      :job-id (:id job)}
+                     (r)
+                     first
+                     :result
+                     first
+                     :result
+                     ext-id))))))))
 
 (deftest script-init
   (testing "fires `script/start` event with pending jobs"
