@@ -111,3 +111,6 @@
 
 (def credit-issue-all-failed
   (error-msg "Failed to issue credits for all subscriptions"))
+
+(def clean-proc-failed
+  (error-msg "Failed to clean dangling processes"))

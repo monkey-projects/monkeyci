@@ -1,10 +1,21 @@
 (ns monkey.ci.gui.table
-  "Table functionality"
+  "Table functionality.  The main workhorse here is `paged-table`, which renders a component
+   that takes its values from a sub and renders them according to the configured columns.
+   It also allows sorting."
   (:require [clojure.math :as cm]
             [medley.core :as mc]
             [monkey.ci.gui.components :as co]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
+
+(comment
+  [paged-table
+   {:id ::test-table
+    :items-sub [:test/items]
+    :columns [{:label "Id"
+               :value :id}
+              {:label "Name"
+               :value (comp :name :customer)}]}])
 
 (defn nav-link [item-opts link-opts content]
   [:li.page-item item-opts

@@ -46,7 +46,7 @@
 (s/def :script/job
   (-> (s/keys :req-un [:job/id]
               :opt-un [:job/type :job/dependencies :job/caches :job/save-artifacts :job/restore-artifacts
-                       :job/script :job/memory :job/cpus :job/arch :job/status
+                       :job/script :job/memory :job/cpus :job/arch :job/status ::c/timeout
                        :job/credit-multiplier])))
 
 (s/def :script/jobs (s/coll-of :script/job))
@@ -103,5 +103,5 @@
   (-> (s/keys :req-un [:build/customer-id :build/repo-id :build/build-id :build/sid
                        :build/source]
               :opt-un [:build/git :build/cleanup? :build/webhook-id :build/script :build/checkout-dir
-                       :build/changes :build/workspace :build/status])
+                       :build/changes :build/workspace :build/status ::c/timeout])
       (s/merge ::generic-entity)))

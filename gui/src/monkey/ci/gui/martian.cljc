@@ -357,6 +357,11 @@
                     (s/optional-key :repo-slug) s/Str
                     (s/optional-key :bitbucket-id) s/Str}})
 
+   (api-route
+    {:route-name :admin-reaper
+     :method :post
+     :path-parts ["/admin/reaper"]})
+
    (public-route
     {:route-name :get-version
      :method :get

@@ -6,9 +6,10 @@
             [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.martian :as m]
             [monkey.ci.gui.routing :as r]
+            [monkey.ci.gui.admin.clean.views :as clean]
             [monkey.ci.gui.admin.credits.views :as credits]
             [monkey.ci.gui.admin.invoicing.views :as inv]
-            [monkey.ci.gui.admin.login.views :as login]
+            [monkey.ci.gui.admin.login.views :as login]            
             [re-frame.core :as rf]))
 
 (defn action-card [icon title desc link url]
@@ -76,7 +77,8 @@
    :admin/credits credits/overview
    :admin/cust-credits credits/customer-credits
    :admin/invoicing inv/page
-   :admin/cust-invoices inv/customer-invoices})
+   :admin/cust-invoices inv/customer-invoices
+   :admin/clean-builds clean/page})
 
 (defn render-page [route]
   (let [p (get pages (r/route-name route) not-implemented)]

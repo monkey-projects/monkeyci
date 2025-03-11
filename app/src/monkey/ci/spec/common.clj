@@ -46,6 +46,8 @@
 (s/def ::params (partial satisfies? p/BuildParams))
 (s/def ::mailman #(contains? % :broker))
 
+(s/def ::timeout (s/and int? pos?))
+
 (s/def :credit/type #{:subscription :user})
 
 ;; Bitbucket specific
