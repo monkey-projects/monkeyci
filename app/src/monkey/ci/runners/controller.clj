@@ -24,12 +24,10 @@
   (em/post-events (:mailman rt) evt))
 
 (defn- post-init-evt
-  "Post both build/start and script/initializing events.  Indicates the build has started,
-   but the script is not running yet."
+  "Post `build/start` event.  Indicates the build has started, but the script is not running yet.
+   When the script container is running, the `script/initializing` event is posted."
   [{:keys [build] :as rt}]
-  (post-events rt [(b/build-start-evt build)
-                   ;; TODO Remove this, script init should be fired in the script itself
-                   (eb/script-init-evt (b/sid build) (b/script-dir build))])
+  (post-events rt [(b/build-start-evt build)])
   rt)
 
 (defn- create-run-file [rt]

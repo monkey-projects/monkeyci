@@ -59,9 +59,6 @@
       (testing "posts `build/start` event"
         (is (some? (first-evt-by-type :build/start))))
       
-      (testing "posts `script/initializing` event"
-        (is (some? (first-evt-by-type :script/initializing))))
-      
       (testing "performs git clone"
         (is (true? @cloned?)))
       
