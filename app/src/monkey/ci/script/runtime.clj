@@ -105,6 +105,7 @@
     err/error-script-failure))
 
 (defn exit! [exit-code]
+  (log/debug "Exiting script process with code" exit-code)
   (System/exit exit-code))
 
 (defn run-script!

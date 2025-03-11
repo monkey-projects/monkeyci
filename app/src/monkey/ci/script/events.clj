@@ -214,6 +214,7 @@
         (map #(j/job-queued-evt % build-sid) next-jobs)))))
 
 (defn script-end [ctx]
+  (log/debug "Script ended, realizing deferred")
   ;; Just set the event in the result, so it can be passed to the deferred
   (:event ctx))
 
