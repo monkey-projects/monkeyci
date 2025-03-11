@@ -78,10 +78,9 @@
 (defrecord ProcessReaper [config]
   clojure.lang.IFn
   (invoke [this]
-    (let [rc (:runner config)]
+    (let [{:keys [containers] :as rc} (:runner config)]
       (if (#{:oci} (:type rc))
-        ;; FIXME Compartment id seems to be nil here
-        (oci/delete-stale-instances (ci/make-context rc) (get-in rc [:containers :compartment-id]))
+        (oci/delete-stale-instances (ci/make-context containers) (:compartment-id containers))
         []))))
 
 (defn- new-process-reaper [conf]

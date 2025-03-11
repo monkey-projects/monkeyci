@@ -183,6 +183,8 @@
                          :token-name "Bearer"
                          :options {:alg :rs256}
                          :authfn (partial resolve-token rt)})]
+    (when-not pk
+      (log/warn "No public key configured"))
     (-> app
         (bmw/wrap-authentication backend)
         ;; Also check authorization query arg, because in some cases it's not possible

@@ -232,6 +232,7 @@
                    :exit-path (file-path ".exit"))]
     (-> (oci/instance-config (:containers config))      
         (assoc :display-name bid)
+        (update :freeform-tags merge (oci/sid->tags (b/sid build)))
         (update :containers make-containers ctx)
         (update :volumes concat (->> [(config-volume ctx build)
                                       (script-volume ctx)

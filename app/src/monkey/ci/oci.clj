@@ -3,7 +3,9 @@
   (:require [babashka.fs :as fs]
             [clojure.tools.logging :as log]
             [java-time.api :as jt]
-            [manifold.deferred :as md]
+            [manifold
+             [deferred :as md]
+             [time :as mt]]
             [martian.interceptors :as mi]
             [medley.core :as mc]
             [monkey.ci
@@ -245,14 +247,20 @@
               resp)
             (delete-instance [ci]
               (log/warn "Deleting stale container instance:" (:id ci))
-              @(md/chain
-                (ci/delete-container-instance client {:instance-id (:id ci)})
-                check-errors
-                (constantly ci)))
+              (md/chain
+               (ci/delete-container-instance client {:instance-id (:id ci)})
+               check-errors
+               (constantly ci)))
+            (with-delay [ds]
+              (->> (rest ds)
+                   (map (partial mt/in 1000))
+                   (into [(first ds)])
+                   (remove nil?)))
             (->out [ci]
               (-> (select-keys (:freeform-tags ci) [:customer-id :repo-id])
                   (assoc :build-id (:display-name ci)
                          :instance-id (:id ci))))]
+      (log/debug "Deleting stale container instances in compartment" cid)
       (->> @(ci/list-container-instances client {:compartment-id cid
                                                  :lifecycle-state "ACTIVE"})
            (check-errors)
@@ -260,6 +268,9 @@
            :items
            (filter (every-pred build? stale?))
            (map delete-instance)
+           ;; Add a delay between calls, otherwise 429 may result
+           (with-delay)
+           (map deref)
            (mapv ->out)))))
 
 ;;; Interceptors

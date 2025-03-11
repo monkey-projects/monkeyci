@@ -28,7 +28,9 @@
            (h/base64->)))
 
 (deftest instance-config
-  (let [build {:build-id "test-build"
+  (let [build {:customer-id "test-cust"
+               :repo-id "test-repo"
+               :build-id "test-build"
                :git {:ssh-keys [{:private-key "test-privkey"
                                  :public-key "test-pubkey"}]}}
         ic (sut/instance-config {:log-config "test-log-config"
@@ -54,7 +56,10 @@
     (testing "containers run as root"
       (is (every? zero? (map (comp :run-as-user :security-context) co))))
 
-    (testing "assigns freeform tags containing build info")
+    (testing "assigns freeform tags containing build info"
+      (is (= {"customer-id" "test-cust"
+              "repo-id" "test-repo"}
+             (:freeform-tags ic))))
 
     (testing "uses configured shape"
       (is (= "test-shape" (:shape ic))))
