@@ -418,7 +418,7 @@
     
     (testing "set job/end event in result"
       (let [r (-> {:event
-                   {:type :job/initializing
+                   {:type :container/job-queued
                     :job-id "test-job"
                     :sid ["test" "sid"]}}
                   (oci/set-ci-response {:status 400
