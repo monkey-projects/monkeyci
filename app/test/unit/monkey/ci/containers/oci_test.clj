@@ -3,6 +3,7 @@
             [clj-yaml.core :as yaml]
             [clojure.java.io :as io]
             [clojure.spec.alpha :as spec]
+            [clojure.string :as cstr]
             [clojure.test :refer [deftest is testing]]
             [medley.core :as mc]
             [monkey.ci
@@ -11,6 +12,7 @@
              [utils :as u]]
             [monkey.ci.common.preds :as cp]
             [monkey.ci.containers.oci :as sut]
+            [monkey.ci.events.mailman :as em]
             [monkey.ci.sidecar.config :as cs]
             [monkey.ci.spec.sidecar :as ss]
             [monkey.ci.test
@@ -409,6 +411,26 @@
                     (sut/set-build {:checkout-dir "test/dir"})
                     (enter)
                     (oci/get-ci-config)))))))
+
+(deftest end-on-ci-failure
+  (let [{:keys [enter] :as i} sut/end-on-ci-failure]
+    (is (keyword? (:name i)))
+    
+    (testing "set job/end event in result"
+      (let [r (-> {:event
+                   {:type :job/initializing
+                    :job-id "test-job"
+                    :sid ["test" "sid"]}}
+                  (oci/set-ci-response {:status 400
+                                        :body
+                                        {:message "test error"}})
+                  (enter)
+                  (em/get-result)
+                  first)]
+        (is (some? r))
+        (is (= :job/end (:type r)))
+        (is (= :failure (:status r)))
+        (is (cstr/includes? (-> r :result :message) "test error"))))))
 
 (deftest calc-credit-multiplier
   (let [{:keys [enter] :as i} sut/calc-credit-multiplier]

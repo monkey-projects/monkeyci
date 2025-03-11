@@ -4,6 +4,7 @@
             [clojure.java.io :as io]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
+            [io.pedestal.interceptor.chain :as pi]
             [medley.core :as mc]
             [monkey.ci
              [build :as b]
@@ -13,6 +14,7 @@
              [oci :as oci]
              [utils :as u]]
             [monkey.ci.containers.promtail :as pt]
+            [monkey.ci.events.builders :as eb]
             [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.ci.sidecar.config :as cos]
             [monkey.oci.container-instance.core :as ci]))
@@ -329,6 +331,23 @@
    :enter (fn [ctx]
             (set-credit-multiplier ctx (oci/credit-multiplier (oci/get-ci-config ctx))))})
 
+(def end-on-ci-failure
+  "Fails the job when we can't create a container instance"
+  {:name ::end-on-ci-failure
+   :enter (fn [ctx]
+            (let [resp (oci/get-ci-response ctx)]
+              (cond-> ctx
+                (>= (:status resp) 400)
+                (-> (assoc :result
+                           [(eb/job-end-evt
+                             (job-id ctx)
+                             (build-sid ctx)
+                             {:status :failure
+                              :message
+                              (str "Failed to create container instance: " (get-in resp [:body :message]))})])
+                    ;; Do not proceed
+                    (pi/terminate)))))})
+
 (def set-container-status
   {:name ::set-container-status
    :enter (fn [ctx]
@@ -406,6 +425,7 @@
                        prepare-instance-config
                        calc-credit-multiplier
                        (oci/start-ci-interceptor client)
+                       end-on-ci-failure
                        save-instance-id]}]]
 
      ;; Container script has started along with the sidecar (which forwards events)

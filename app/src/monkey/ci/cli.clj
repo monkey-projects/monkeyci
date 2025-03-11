@@ -187,7 +187,7 @@
            :option "dev-mode"
            :type :with-flag
            :default false}
-          {:as "Configuration file"
+          {:as "Configuration files"
            :option "config-file"
            :short "c"
            :type :string
