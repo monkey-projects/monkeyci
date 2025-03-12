@@ -13,8 +13,8 @@
     [:secure-request
      :admin-reaper
      {}
-     [:admin/clean--success]
-     [:admin/clean--failed]])))
+     [::clean--success]
+     [::clean--failed]])))
 
 (rf/reg-event-db
  ::clean--success

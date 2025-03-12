@@ -8,9 +8,9 @@
             [manifold.deferred :as md]
             [medley.core :as mc]
             [monkey.ci
-             [metrics :as metrics]
              [runtime :as rt]
              [version :as v]]
+            [monkey.ci.metrics.core :as metrics]
             [monkey.ci.web
              [admin :as admin]
              [api :as api]

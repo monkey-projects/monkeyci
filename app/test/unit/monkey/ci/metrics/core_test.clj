@@ -1,12 +1,12 @@
-(ns monkey.ci.metrics-test
-  (:require
-   [clojure.string :as cs]
-   [clojure.test :refer [deftest is testing]]
-   [com.stuartsierra.component :as co]
-   [monkey.ci.metrics :as sut]
-   [monkey.ci.prometheus :as prom]
-   [monkey.ci.test.helpers :as h]
-   [taoensso.telemere :as t]))
+(ns monkey.ci.metrics.core-test
+  (:require [clojure
+             [string :as cs]
+             [test :refer [deftest is testing]]]
+            [com.stuartsierra.component :as co]
+            [monkey.ci.metrics.core :as sut]
+            [monkey.ci.prometheus :as prom]
+            [monkey.ci.test.helpers :as h]
+            [taoensso.telemere :as t]))
 
 (deftest metrics
   (testing "can make metrics registry"
@@ -19,6 +19,10 @@
     (is (some? (-> (sut/make-registry)
                    (co/start)
                    (co/stop))))))
+
+(deftest counter-id
+  (testing "builds metrics name from parts"
+    (is (= "monkeyci_test_metric" (sut/counter-id [:test :metric])))))
 
 (deftest signal->counter
   (testing "creates a gauge that holds signal recv count"
@@ -80,7 +84,7 @@
                                {:data {:kind :test-event}
                                 :level :info}))
                    :id)))
-        (is (not= :timeout (h/wait-until #(cs/includes? (sut/scrape (:registry co)) "monkey_oci_calls")
+        (is (not= :timeout (h/wait-until #(cs/includes? (sut/scrape (:registry co)) "monkeyci_oci_calls")
                                          1000))))
       
       (finally

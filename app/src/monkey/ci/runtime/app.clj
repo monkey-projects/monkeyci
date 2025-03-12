@@ -5,7 +5,6 @@
             [monkey.ci
              [blob :as blob]
              [build :as b]
-             [metrics :as m]
              [oci :as oci]
              [reporting :as rep]
              [storage :as s]
@@ -15,9 +14,12 @@
              [db :as emd]
              [interceptors :as emi]
              [jms :as emj]]
+            [monkey.ci.metrics
+             [core :as m]
+             [events :as me]]
             [monkey.ci.runners.oci :as ro]
             [monkey.ci.runtime.common :as rc]
-            [monkey.ci.storage.sql]  ; Required for multimethods
+            [monkey.ci.storage.sql]
             [monkey.ci.web.handler :as wh]
             [monkey.oci.container-instance.core :as ci]))
 
@@ -38,6 +40,11 @@
 
 (defn- new-metrics []
   (m/make-metrics))
+
+(defn- new-metrics-routes []
+  (em/map->RouteComponent
+   {:make-routes (fn [c]
+                   (me/make-routes (get-in c [:metrics :registry])))}))
 
 (defn new-mailman
   "Creates new mailman event broker component."
@@ -137,6 +144,9 @@
                [:vault])
    :jwk       (new-jwk config)
    :metrics   (new-metrics)
+   :metrics-routes (co/using
+                    (new-metrics-routes)
+                    [:metrics :mailman])
    :process-reaper (new-process-reaper config)
    :vault     (new-vault config)
    :mailman   (new-mailman config)
