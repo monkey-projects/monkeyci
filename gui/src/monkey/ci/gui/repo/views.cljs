@@ -116,7 +116,7 @@
               @loaded?)
        [:p "This repository has no builds yet."]
        [table/paged-table
-        {:id ::builds
+        {:id [::builds (:id @repo)]     ; Make table unique to the repo
          :items-sub [:repo/builds]
          :columns (table/add-sorting table-columns 0 :desc)
          :loading {:sub [:builds/init-loading?]}
