@@ -66,19 +66,6 @@
                       :tx (id-filter :oci/invocation)})
     reg))
 
-(defn- add-build-metrics [reg]
-  (signal->counter :build/triggered reg "monkeyci_builds_triggered"
-                   {:description "Number of triggered builds"
-                    :tx (id-filter :build/triggered)})
-  (signal->counter :build/started reg "monkeyci_builds_started"
-                   {:description "Number of started builds"
-                    :tx (id-filter :build/started)})
-  (signal->counter :build/completed reg "monkeyci_builds_completed"
-                   ;; TODO Include build result as tag
-                   {:description "Number of completed builds"
-                    :tx (id-filter :build/completed)})
-  reg)
-
 (defn- remove-signal-handlers []
   (let [handlers [::oci-calls
                   :build/triggered
@@ -90,10 +77,8 @@
 (defrecord Metrics []
   co/Lifecycle
   (start [this]
-    ;; TODO Add build labels if present
     (assoc this :registry (-> (make-registry)
-                              (add-oci-metrics)
-                              (add-build-metrics))))
+                              (add-oci-metrics))))
 
   (stop [this]
     (remove-signal-handlers)

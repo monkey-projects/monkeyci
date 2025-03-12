@@ -38,6 +38,9 @@
         (is (some? (get sys :metrics)))
         (is (some? (get-in sys [:http :rt :metrics]))))
 
+      (testing "provides metrics routes"
+        (is (some? (:metrics-routes sys))))
+
       (testing "provides process reaper in runtime"
         (is (ifn? (get-in sys [:http :rt :process-reaper]))))
 

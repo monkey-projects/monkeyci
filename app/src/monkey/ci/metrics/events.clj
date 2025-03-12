@@ -17,28 +17,53 @@
             (->> (prom/counter-inc counter 1 (get-label-vals ctx))
                  (set-counter ctx)))})
 
-(def ctx->customer-id (comp vector first :sid :event))
+(def ctx->customer-id (comp first :sid :event))
+(def ctx->status (comp name :status :event))
 
 (defn make-evt-counter
   "Creates a counter for given event type"
-  [reg evt]
+  [reg evt labels]
   (prom/make-counter (c/counter-id ((juxt namespace name) evt))
                      reg
-                     {:labels ["customer"]}))
+                     {:labels labels}))
 
-(defn cust-evt-handler
-  "Creates an event handler that updates an event counter with customer label"
-  [reg type]
+(defn- evt-route [reg type labels get-label-vals]
   [type
    [{:handler (constantly nil)
-     :interceptors [(evt-counter (make-evt-counter reg type)
-                                 ctx->customer-id)]}]])
+     :interceptors [(evt-counter (make-evt-counter reg type labels)
+                                 get-label-vals)]}]])
+
+(defn cust-evt-route
+  "Creates an event route that updates an event counter with customer label"
+  [reg type]
+  (evt-route reg
+             type
+             ["customer"]
+             (comp vector ctx->customer-id)))
+
+(defn status-evt-route
+  "Creates an event route that updates an event counter with customer label
+   and status"
+  [reg type]
+  (evt-route reg
+             type
+             ["customer" "status"]
+             (juxt ctx->customer-id
+                   ctx->status)))
 
 (defn make-routes
   "Creates mailman routes that update metrics on received events"
   [reg]
-  (->> [:build/triggered
-        :build/queued
-        :build/start
-        :build/end]
-       (mapv (partial cust-evt-handler reg))))
+  (concat
+   (mapv (partial cust-evt-route reg)
+         [:build/triggered
+          :build/queued
+          :build/start
+          :script/start
+          :job/queued
+          :job/start])
+   (mapv (partial status-evt-route reg)
+         [:build/end
+          :script/end
+          :job/executed
+          :job/end])))
