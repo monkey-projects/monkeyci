@@ -53,7 +53,7 @@
              [:kind])
             ([signal]
              [(name (get-in signal [:data :kind]))]))]
-    (signal->counter ::oci-calls reg "monkey_oci_calls"
+    (signal->counter ::oci-calls reg "monkeyci_oci_calls"
                      {:description "Number of calls to OCI API endpoints"
                       :tags tags
                       :tx (id-filter :oci/invocation)})
