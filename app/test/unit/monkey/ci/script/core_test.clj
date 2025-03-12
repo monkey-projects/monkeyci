@@ -11,9 +11,8 @@
 
 (deftest resolve-jobs
   (testing "invokes fn"
-    (let [job (dummy-job)
-          p (bc/pipeline {:jobs [job]})]
-      (is (= [job] (sut/resolve-jobs (constantly p) {})))))
+    (let [job (dummy-job)]
+      (is (= [job] (sut/resolve-jobs (constantly [job]) {})))))
 
   (testing "auto-assigns ids to jobs"
     (let [jobs (repeat 10 (bc/action-job nil (constantly ::test)))
@@ -30,9 +29,8 @@
                          bc/job-id)))))
 
   (testing "does not overwrite existing id"
-    (is (= ::test-id (-> {:jobs [{:id ::test-id
-                                  :action (constantly :ok)}]}
-                         (bc/pipeline)
+    (is (= ::test-id (-> [(bc/action-job ::test-id
+                                         (constantly :ok))]
                          (sut/resolve-jobs {})
                          first
                          bc/job-id))))

@@ -36,61 +36,6 @@
                (sut/with-message "test message")
                :message)))))
 
-(deftest step->job
-  (testing "converts map with action into action job"
-    (is (sut/action-job? (sut/step->job {:action (constantly sut/success)}))))
-
-  (testing "converts map with container into container job"
-    (is (sut/container-job? (sut/step->job {:container/image "test-img"}))))
-
-  (testing "maps image"
-    (is (= "test-img" (-> {:container/image "test-img"}
-                          (sut/step->job)
-                          :image)))))
-
-(deftest pipeline
-  (testing "creates pipeline object"
-    (is (sut/pipeline? (sut/pipeline {:jobs []}))))
-
-  (testing "fails if config not conforming to spec"
-    (is (thrown? AssertionError (sut/pipeline {:steps "invalid"}))))
-
-  (testing "function is valid job"
-    (is (s/valid? :ci/job (constantly "ok"))))
-
-  (testing "map is valid job"
-    (is (s/valid? :ci/job {:action (constantly "ok")})))
-
-  (testing "accepts container image"
-    (let [p {:jobs [{:container/image "test-image"
-                     :script ["first" "second"]}]}]
-      (is (s/valid? :ci/job (-> p :jobs (first))))
-      (is (sut/pipeline? (sut/pipeline p)))))
-
-  (testing "converts maps to jobs"
-    (let [p (sut/pipeline {:jobs [{:action (constantly "test")}]})]
-      (is (sut/action-job? (-> p :jobs first)))))
-
-  (testing "uses name as job id"
-    (let [p (sut/pipeline {:jobs [{:action (constantly "test")
-                                   :name "test-job"}]})]
-      (is (= "test-job" (-> p :jobs first sut/job-id)))))
-
-  (testing "processes steps for backwards compatibility"
-    (let [job {:id ::test
-               :action (constantly ::test)}
-          p (sut/pipeline {:steps [job]})]
-      (is (= (:id job) (-> p :jobs first :id))))))
-
-(deftest defpipeline
-  (testing "declares def with pipeline"
-    (let [jobs [(constantly ::ok)]]
-      (sut/defpipeline test-pipeline jobs)
-      (is (sut/pipeline? test-pipeline))
-      (is (= "test-pipeline" (:name test-pipeline)))
-      (is (= 1 (count (:jobs test-pipeline))))
-      (ns-unalias *ns* 'test-pipeline))))
-
 (deftest defjob
   (testing "declares var with action job"
     (sut/defjob test-job [_] (constantly ::ok))

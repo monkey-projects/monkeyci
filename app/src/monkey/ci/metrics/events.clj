@@ -59,6 +59,7 @@
          [:build/triggered
           :build/queued
           :build/start
+          :build/canceled
           :script/start
           :job/queued
           :job/start])

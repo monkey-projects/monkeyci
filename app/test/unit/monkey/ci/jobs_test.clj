@@ -74,6 +74,14 @@
   (testing "resolves `nil` to empty"
     (is (empty? (sut/resolve-jobs nil {}))))
 
+  (testing "resolves action job as itself"
+    (let [job (bc/action-job "test-job" (constantly nil))]
+      (is (= [job] (sut/resolve-jobs job {})))))
+
+  (testing "resolves container job as itself"
+    (let [job (bc/container-job "test-job" {:image "test-img"})]
+      (is (= [job] (sut/resolve-jobs job {})))))
+
   (testing "resolves vector into multiple jobs"
     (let [jobs (repeatedly 2 dummy-job)
           v (mapv constantly jobs)]
@@ -91,50 +99,7 @@
                 [(dummy-job)]]
           r (sut/resolve-jobs jobs {})]
       (is (= 2 (count r)))
-      (is (every? bc/action-job? r))))
-
-  (testing "pipelines"
-    (testing "returns jobs from pipeline vector"
-      (let [[a b :as jobs] (repeatedly 2 dummy-job)]
-        (is (= jobs (sut/resolve-jobs [(bc/pipeline {:jobs [a]})
-                                       (bc/pipeline {:jobs [b]})]
-                                      {})))))
-
-    (testing "returns jobs from single pipeline"
-      (let [job (dummy-job)
-            p (bc/pipeline {:jobs [job]})]
-        (is (= [job] (sut/resolve-jobs p {})))))
-    
-    (testing "makes each job dependent on the previous"
-      (let [[a b :as jobs] [{:id ::first
-                             :action (constantly ::first)}
-                            {:id ::second
-                             :action (constantly ::second)}]
-            p (sut/resolve-jobs (bc/pipeline {:jobs jobs}) {})]
-        (is (= [::first] (-> p second :dependencies)))))
-
-    (testing "adds pipeline name as label"
-      (is (= "test-pipeline" (-> {:jobs [(dummy-job)]
-                                  :name "test-pipeline"}
-                                 (bc/pipeline)
-                                 (sut/resolve-jobs {})
-                                 first
-                                 sut/labels
-                                 (get "pipeline")))))
-
-    (testing "converts functions that return legacy actions to jobs"
-      (is (bc/action-job? (-> (constantly {:action (constantly bc/success)
-                                           :name "legacy-step"})
-                              (sut/resolve-jobs {})
-                              first))))
-
-    (testing "converts pipelines with functions that return legacy actions to jobs"
-      (is (bc/action-job? (-> {:jobs [(constantly {:action (constantly bc/success)
-                                                   :name "legacy-step"})]
-                               :name "test-pipeline"}
-                              (bc/pipeline)
-                              (sut/resolve-jobs {})
-                              first))))))
+      (is (every? bc/action-job? r)))))
 
 (deftest action-job
   (let [job (bc/action-job ::test-job (constantly bc/success))
@@ -220,15 +185,18 @@
 
     (testing "recursion"
 
-      (testing "executes actions that return another legacy action"
+      (testing "executes actions that return another action"
         (let [result (assoc bc/success :message "recursive result")
               job (bc/action-job "recursing-job"
-                                 (constantly {:action (constantly result)}))]
+                                 (constantly {:type :action
+                                              :action (constantly result)}))]
           (is (= result @(sut/execute! job ctx)))))
 
       (testing "assigns id of parent job to child job"
         (let [job (bc/action-job "parent-job"
-                                 (constantly {:action (fn [rt] (assoc bc/success :job-id (get-in rt [:job :id])))}))]
+                                 (constantly
+                                  {:type :action
+                                   :action (fn [rt] (assoc bc/success :job-id (get-in rt [:job :id])))}))]
           (is (= "parent-job" (-> @(sut/execute! job ctx)
                                   :job-id))))))
 

@@ -42,66 +42,26 @@
   "Gets result warnings"
   :warnings)
 
-;; Job that executes a function
-(defrecord ActionJob [id status action])
-
 (defn action-job
   "Creates a new job"
   ([id action opts]
-   (map->ActionJob (merge opts {:id id :action action})))
+   (merge opts {:id id :action action :type :action}))
   ([id action]
    (action-job id action {})))
 
-(def action-job? (partial instance? ActionJob))
-
-;; Job that runs in a container
-(defrecord ContainerJob [id status image script])
+(def action-job? (comp (partial = :action) :type))
 
 (defn container-job
   "Creates a job that executes in a container"
   [id props]
-  (map->ContainerJob (assoc props :id id)))
+  (assoc props
+         :type :container
+         :id id))
 
-(def container-job? (partial instance? ContainerJob))
-
-(defn step->job
-  "Converts legacy map jobs into job records"
-  [m]
-  (cond
-    (action-job? m) m
-    (container-job? m) m
-    (some? (:action m)) (map->ActionJob (mc/assoc-some m :id (:name m)))
-    (some? (:container/image m)) (map->ContainerJob (assoc m :image (:container/image m)))
-    (fn? m) m
-    :else nil))
-
-(defrecord Pipeline [jobs name])
-
-(defn pipeline? [x]
-  (instance? Pipeline x))
+(def container-job? (comp (partial = :container) :type))
 
 (defn job-id [x]
   (or (:id x) (:job/id (meta x))))
-
-(defn pipeline
-  "Create a pipeline with given config"
-  [config]
-  {:pre [(s/valid? :ci/pipeline config)]}
-  (-> config
-      ;; Convert steps into jobs, backwards compatibility
-      (mc/assoc-some :jobs (:steps config))
-      (dissoc :steps)
-      (update :jobs (partial map step->job))
-      (map->Pipeline)))
-
-(defmacro defpipeline
-  "Convenience macro that declares a var for a pipeline with the given name 
-   with specified jobs"
-  [n jobs]
-  `(def ~n
-     (pipeline
-      {:name ~(name n)
-       :jobs ~jobs})))
 
 (defn as-job
   "Marks fn `f` as a job"

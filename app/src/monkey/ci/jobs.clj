@@ -27,16 +27,17 @@
 
 (def max-job-timeout (* 20 60 1000))
 
-(defprotocol Job
-  "Base job protocol that is able to execute it, taking the runtime as argument."
-  (execute! [job rt]))
+(def job-types
+  "Known job types"
+  #{:action :container})
 
 (defn job?
   "Checks if object is a job"
   [x]
   ;; Can't use def with partial here, for some reason the compiler always says false.
   ;; Perhaps because partial does a closure on declaration.
-  (satisfies? Job x))
+  #_(satisfies? Job x)
+  (and (map? x) (job-types (:type x))))
 
 (defn resolvable? [x]
   (satisfies? p/JobResolvable x))
@@ -89,6 +90,8 @@
     (cond-> r
       (not-empty out) (assoc :output out))))
 
+(declare execute!)
+
 (defn- recurse-action
   "An action may return another job definition, especially in legacy builds.
    This function checks the result, and if it's not a regular response, it
@@ -102,7 +105,7 @@
         (md/chain
          ;; Ensure this executes async by wrapping it in a future
          (md/future
-           (binding [*out* writer] ; Capture output
+           (binding [*out* writer]       ; Capture output
              (action (rt->context rt)))) ; Only pass necessary info
          (fn [r]
            (log/debug "Action result:" r)
@@ -121,9 +124,9 @@
                                         :result r})
                        (add-output writer)))))))))
 
-(extend-protocol Job
-  monkey.ci.build.core.ActionJob
-  (execute! [job ctx]
+(defn execute!
+  "Executes the given action job"
+  [job ctx]
     (let [build (:build ctx)
           build-sid (build/sid build)
           a (-> (recurse-action job)
@@ -145,10 +148,6 @@
              (md/chain
               (em/post-events (:mailman ctx) [(job-executed-evt (job-id job) build-sid r)])
               (constantly r)))))))
-
-  monkey.ci.build.core.ContainerJob
-  (execute! [this]
-    (throw (ex-info "Container job's can be run this way, use events" {:job this}))))
 
 (defn- find-dependents
   "Finds all jobs that are dependent on this job"
@@ -225,14 +224,6 @@
     name (map #(assoc-in % [labels "pipeline"] name))))
 
 (extend-protocol p/JobResolvable
-  monkey.ci.build.core.ActionJob
-  (resolve-jobs [job _]
-    [job])
-
-  monkey.ci.build.core.ContainerJob
-  (resolve-jobs [job _]
-    [job])
-  
   clojure.lang.IFn
   (resolve-jobs [f rt]
     ;; Recursively resolve job, unless this is a job fn in itself
@@ -254,19 +245,11 @@
 
   clojure.lang.PersistentArrayMap
   (resolve-jobs [m rt]
-    ;; Legacy step, as a result of a function
-    (p/resolve-jobs (bc/step->job m) rt))
+    (when (job? m) [m]))
 
   clojure.lang.LazySeq
   (resolve-jobs [v rt]
-    (resolve-sequential v rt))
-
-  monkey.ci.build.core.Pipeline
-  (resolve-jobs [p rt]
-    (-> (:jobs p)
-        (p/resolve-jobs rt)
-        (add-dependencies)
-        (add-pipeline-name-lbl p))))
+    (resolve-sequential v rt)))
 
 (def resolve-jobs p/resolve-jobs)
 
