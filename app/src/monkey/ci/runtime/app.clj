@@ -5,7 +5,6 @@
             [monkey.ci
              [blob :as blob]
              [build :as b]
-             [metrics :as m]
              [oci :as oci]
              [reporting :as rep]
              [storage :as s]
@@ -15,9 +14,10 @@
              [db :as emd]
              [interceptors :as emi]
              [jms :as emj]]
+            [monkey.ci.metrics.core :as m]
             [monkey.ci.runners.oci :as ro]
             [monkey.ci.runtime.common :as rc]
-            [monkey.ci.storage.sql]  ; Required for multimethods
+            [monkey.ci.storage.sql]
             [monkey.ci.web.handler :as wh]
             [monkey.oci.container-instance.core :as ci]))
 
