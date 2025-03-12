@@ -155,6 +155,11 @@
    :runs {:command cmd/issue-creds
           :app-mode :cli}})
 
+(def reaper-cmd
+  {:command "reaper"
+   :description "Cancel dangling builds"
+   :runs {:command cmd/cancel-dangling-builds}})
+
 (def admin-cmd
   {:command "admin"
    :description "Administrative actions"
@@ -173,7 +178,8 @@
            :short "a"
            :type :string
            :default "https://api.monkeyci.com/v1"}]
-   :subcommands [issue-creds-cmd]})
+   :subcommands [issue-creds-cmd
+                 reaper-cmd]})
 
 (def base-config
   {:name "monkey-ci"

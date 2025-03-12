@@ -55,7 +55,9 @@
 (defn sign-jwt [payload pk]
   (jwt/sign payload pk {:alg :rs256 :header {:kid kid}}))
 
-(def default-token-expiration (jt/days 1))
+(def default-token-expiration
+  "Default token expiration period, one day"
+  (jt/days 1))
 
 (defn augment-payload [payload]
   (assoc payload

@@ -122,6 +122,7 @@
   [req]
   (let [rt (c/req->rt req)]
     (letfn [(to-event [b]
+              ;; TODO Only cancel build if not already canceled or otherwise ended
               (ec/make-event :build/canceled {:sid (b/sid b)
                                               :src :reaper}))
             (dispatch [evts]

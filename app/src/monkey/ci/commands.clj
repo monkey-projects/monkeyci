@@ -188,30 +188,41 @@
                   (auth/augment-payload))]
     (auth/sign-jwt token pk)))
 
-(defn issue-creds
-  "Issues credits.  Mainly used by cronjobs to automatically issue credits according
-   to active subscriptions."
-  [{:keys [args]}]
-  (log/debug "Issuing credits using arguments:" args)
-  (let [{:keys [api]} args
-        date (jt/format
-              :iso-date
-              (or (some-> (:date args) (jt/local-date))
-                  (jt/local-date)))
-        token (generate-admin-token args)]
+(defn- admin-request [{:keys [api] :as conf} path body]
+  (let [token (generate-admin-token conf)
+        url (str api path)]
     (letfn [(print-result [res]
               (log/info (json/generate-string res))
               res)
             (->exit-code [res]
               (if (< (:status res) 400)
                 0 1))]
-      (log/info "Issuing credits to" api "for date" date)
-      (log/debug "Using token:" token)
-      (-> @(http/post (str api "/admin/credits/issue")
-                      {:headers { ;;:authorization (str "Bearer " (generate-admin-token args))
-                                 :content-type "application/json"}
-                       :oauth-token token
-                       :body (json/generate-string {:date date})})
+      (log/debug "Invoking API endpoint at" url "using token:" token)
+      (-> @(http/post url
+                      (cond-> {:headers {:content-type "application/json"}
+                               :oauth-token token}
+                        body (assoc :body (json/generate-string body))))
           (mc/update-existing :body bs/to-string)
           (print-result)
           (->exit-code)))))
+
+(defn issue-creds
+  "Issues credits.  Mainly used by cronjobs to automatically issue credits according
+   to active subscriptions."
+  [{:keys [args]}]
+  (let [date (jt/format
+              :iso-date
+              (or (some-> (:date args) (jt/local-date))
+                  (jt/local-date)))]
+    (log/debug "Issuing credits using arguments:" args)
+    (admin-request args
+                   "/admin/credits/issue"
+                   {:date date})))
+
+(defn cancel-dangling-builds
+  "Invokes the reaper endpoint of the configured api, using and admin token."
+  [{:keys [args]}]
+  (log/debug "Canceling dangling builds using args:" args)
+  (admin-request args
+                 "/admin/reaper"
+                 nil))

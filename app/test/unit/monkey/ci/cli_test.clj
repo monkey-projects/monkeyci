@@ -160,7 +160,11 @@
 
       (testing "`admin` command"
         (testing "`issue` runs issue-creds command"
-          (is (= cmd/issue-creds (:cmd (run-cli "admin" "-u" "testuser" "-k" "test-key" "issue")))))))))
+          (is (= cmd/issue-creds (:cmd (run-cli "admin" "-u" "testuser" "-k" "test-key" "issue")))))
+
+        (testing "`reaper` runs cancel-dangling-builds command"
+          (is (= cmd/cancel-dangling-builds
+                 (:cmd (run-cli "admin" "-u" "testuser" "-k" "test-key" "reaper")))))))))
 
 (deftest set-invoker
   (testing "applies invoker to `runs` in commands"

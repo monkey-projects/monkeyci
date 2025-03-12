@@ -159,8 +159,26 @@
               pk-file (str (fs/path dir "test-key"))]
           (is (nil? (spit pk-file (pem/private-key->pem pk))))
           (is (zero?
-               (sut/issue-creds {:args
-                                 {:all true
-                                  :username "testuser"
-                                  :private-key pk-file
-                                  :api "http://test"}}))))))))
+               (sut/issue-creds
+                {:args
+                 {:all true
+                  :username "testuser"
+                  :private-key pk-file
+                  :api "http://test"}}))))))))
+
+(deftest cancel-dangling-builds
+  (testing "sends http request to api endpoint"
+    (h/with-tmp-dir dir
+      (at/with-fake-http [{:url "http://test/admin/reaper"
+                           :request-method :post}
+                          {:status 200}]
+        (let [pk (h/generate-private-key)
+              pk-file (str (fs/path dir "test-key"))]
+          (is (nil? (spit pk-file (pem/private-key->pem pk))))
+          (is (zero?
+               (sut/cancel-dangling-builds
+                {:args
+                 {:all true
+                  :username "testuser"
+                  :private-key pk-file
+                  :api "http://test"}}))))))))
