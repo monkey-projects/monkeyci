@@ -20,6 +20,10 @@
                    (co/start)
                    (co/stop))))))
 
+(deftest counter-id
+  (testing "builds metrics name from parts"
+    (is (= "monkeyci_test_metric" (sut/counter-id [:test :metric])))))
+
 (deftest signal->counter
   (testing "creates a gauge that holds signal recv count"
     (try

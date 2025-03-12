@@ -1,5 +1,6 @@
 (ns monkey.ci.metrics.core
-  (:require [clojure.tools.logging :as log]
+  (:require [clojure.string :as cs]
+            [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
             [medley.core :as mc]
             [monkey.ci.common.preds :as cp]
@@ -13,6 +14,12 @@
   "Creates a string that can be used by Prometheus for scraping"
   [r]
   (prom/scrape r))
+
+(defn counter-id [parts]
+  (->> parts
+       (map name)
+       (cs/join "_")
+       (str "monkeyci_")))
 
 (defn signal->counter
   "Registers a signal handler that creates a counter in the registry that counts 
