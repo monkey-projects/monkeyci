@@ -3,10 +3,9 @@
             [clojure.test :refer [deftest is testing]]
             [com.stuartsierra.component :as co]
             [manifold.stream :as ms]
-            [monkey.ci
-             [metrics :as m]
-             [prometheus :as prom]]
             [monkey.ci.events.mailman :as em]
+            [monkey.ci.metrics.core :as m]
+            [monkey.ci.prometheus :as prom]
             [monkey.ci.runners.runtime :as sut]
             [monkey.ci.spec.runner :as sr]
             [monkey.ci.test

@@ -7,7 +7,6 @@
             [monkey.ci
              [blob :as blob]
              [git :as git]
-             [metrics :as m]
              [prometheus :as prom]
              [protocols :as p]
              [utils :as u]
@@ -18,6 +17,7 @@
             [monkey.ci.events.mailman
              [interceptors :as emi]
              [jms :as emj]]
+            [monkey.ci.metrics.core :as m]
             [monkey.ci.runtime.common :as rc]
             [monkey.mailman.core :as mmc]))
 
