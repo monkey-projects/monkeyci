@@ -257,6 +257,7 @@
   (let [all-jobs (vals (get-jobs ctx))
         next-jobs (j/next-jobs all-jobs)
         active-jobs (j/filter-jobs j/active? all-jobs)]
+    (log/debug "Active jobs:" (map j/job-id active-jobs))
     (if (or (build-canceled? ctx)
             (and (empty? next-jobs) (empty? active-jobs)))
       ;; No more jobs eligible for execution, end the script
