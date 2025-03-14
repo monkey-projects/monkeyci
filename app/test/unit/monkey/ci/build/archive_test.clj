@@ -75,6 +75,22 @@
                   (sut/extract+read is #".*-2.txt$"))]
           (is (= "another file" r)))))))
 
+(deftest extract+read-all
+  (testing "returns lazy seq of matching files"
+    (h/with-tmp-dir dir
+      (let [subdir (io/file dir "sub")
+            ex-dir (io/file dir "extract")
+            arch (io/file dir "archive.tgz")]
+        (is (.mkdirs subdir))
+        (spit (io/file subdir "file-1.txt") "first file")
+        (spit (io/file subdir "file-2.txt") "another file")
+        (spit (io/file subdir "another-file.txt") "yet another file")
+        (is (some? (blob/make-archive subdir arch)))
+        (let [r (with-open [in (io/input-stream arch)]
+                  (sut/extract+read-all in #"sub/file.*\.txt$"))]
+          (is (= 2 (count r)))
+          (is (= #{"first file" "another file"} (set r))))))))
+
 (deftest file-mode
   (testing "can convert from posix permissions to file mode and back"
     (let [mode (Integer/parseInt "755" 8)

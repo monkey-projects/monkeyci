@@ -114,6 +114,8 @@
              (nil? r) (add-output bc/success writer)
              ;; Valid response
              (bc/status? r) (add-output r writer)
+             ;; XXX This is not really supported by the user interface right now, but it
+             ;; would be quite powerful.
              (resolvable? r) (when-let [child (some-> (p/resolve-jobs r rt)
                                                       first
                                                       (assign-id))]

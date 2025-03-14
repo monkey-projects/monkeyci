@@ -84,6 +84,7 @@
                      (log/debug "Decompressing source:" src)
                      (try 
                        (cc/decompress
+                        ;; TODO Delete when no longer needed
                         (copy-to-tmp src)
                         os
                         compression-type)
@@ -146,6 +147,33 @@
               ai (archive-stream ds)]
     (extract-loop ai (constantly true) (constantly nil))))
 
+(defn- read-entry [ai]
+  (with-open [w (java.io.StringWriter.)]
+    (io/copy ai w)
+    (.toString w)))
+
+(defn extract+read-all
+  "Extracts the given source archive, and returns the contents of all files
+   that match predicate `pred` as a sequence.  Since the stream needs to be
+   closed afterwards, we can't be lazy about it."
+  [src pred]
+  (with-open [dc (decompress src)
+              ai (archive-stream dc)]
+    (let [p (bc/->pred pred)]
+      (letfn [(matches? [e]
+                (and (.isFile e) (p (.getName e))))]
+        (loop [e (next-entry ai)
+               r []]
+          (if e
+            (let [f (when (matches? e)
+                      ;; Found match
+                      (read-entry ai))]
+              ;; Go to next entry
+              (recur (next-entry ai)
+                     (cond-> r f (conj f))))
+            ;; End of archive reached
+            r))))))
+
 (defn extract+read
   "Extracts the given source archive, and returns the contents of the first
    file that matches predicate `pred`, or `nil` if there were no matches."
@@ -157,7 +185,7 @@
         (if e
           (if (and (.isFile e) (p (.getName e)))
             ;; Found match
-            (slurp ai)
+            (read-entry ai)
             ;; Go to next entry
             (recur (next-entry ai)))
           ;; Done without match
