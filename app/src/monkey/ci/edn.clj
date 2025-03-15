@@ -20,6 +20,17 @@
 (defn- read-pk [edn]
   (pem/pem->private-key edn))
 
+(def regex-sym 'regex)
+
+(defmethod print-method java.util.regex.Pattern [p w]
+  (.write w "#")
+  (.write w (str regex-sym))
+  (.write w " ")
+  (.write w (pr-str (str p))))
+
+(defn- read-regex [edn]
+  (re-pattern edn))
+
 (defn ->edn [x]
   (pr-str x))
 
@@ -28,7 +39,8 @@
     (java.io.StringReader. x)
     (bs/to-reader x)))
 
-(def default-opts {:readers {pk-sym read-pk}})
+(def default-opts {:readers {pk-sym read-pk
+                             regex-sym read-regex}})
 
 (defn edn-> [edn & [opts]]
   (let [opts (merge opts default-opts)]

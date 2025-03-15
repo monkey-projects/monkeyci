@@ -22,8 +22,14 @@
                 (let [pk (h/generate-private-key)]
                   {:private-key pk})]]
       (doseq [o objs]
-        (is (= o (sut/edn-> (sut/->edn o)))
-            (str "Could not convert:" o))))))
+        (is (.equals o (sut/edn-> (sut/->edn o)))
+            (str "Could not convert: " o)))))
+
+  (testing "can convert regexes"
+    (let [re #"test-regex"]
+      ;; Need to convert to string, equals is false
+      (is (= (str re)
+             (str (sut/edn-> (sut/->edn re))))))))
 
 (deftest version
   (testing "replaces `#version` with app version"
