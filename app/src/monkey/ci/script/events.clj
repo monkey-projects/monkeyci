@@ -65,10 +65,10 @@
   (emi/update-state ctx assoc-in [::job-ctx (job-id ctx)] job-ctx))
 
 (defn set-build-canceled [ctx]
+  (log/debug "Canceling build" (build-sid ctx))
   (emi/update-state ctx assoc ::build-canceled true))
 
 (defn build-canceled? [ctx]
-  (log/debug "Canceling build" (build-sid ctx))
   (true? (::build-canceled (emi/get-state ctx))))
 
 ;;; Event builders

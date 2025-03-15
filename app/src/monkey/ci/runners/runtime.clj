@@ -3,7 +3,9 @@
   (:require [clojure.set :as cs]
             [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
-            [manifold.stream :as ms]
+            [manifold
+             [deferred :as md]
+             [stream :as ms]]
             [monkey.ci
              [blob :as blob]
              [git :as git]
@@ -154,7 +156,12 @@
     nil))
 
 (defn- to-event-stream [stream evt]
-  (ms/put! stream evt)
+  (-> (ms/put! stream evt)
+      (md/chain
+       (fn [r]
+         (if r
+           (log/debug "Event pushed to internal stream")
+           (log/warn "Failed to push event to internal stream")))))
   nil)
 
 (defn new-local-to-global-forwarder

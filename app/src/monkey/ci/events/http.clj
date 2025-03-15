@@ -22,6 +22,7 @@
       (rur/header "cache-control" "no-cache")))
 
 (defn- ->sse [evt]
+  (log/trace "Converting to SSE:" evt)
   ;; Format according to sse specs, with double newline at the end
   (str evt-prefix (pr-str evt) "\n\n"))
 
@@ -94,7 +95,7 @@
     (let [in (cond->> stream
                pred (ms/filter pred)
                true (ms/transform (map ->sse)))]
-      (ms/connect in out {:upstream? true}))
+      (ms/connect in out))
     (stream-response out)))
 
 (defn parse-event-line [line]
