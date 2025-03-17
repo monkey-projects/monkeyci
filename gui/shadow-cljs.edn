@@ -21,7 +21,8 @@
   :test/browser
   {:target :browser-test
    :test-dir "target/js/test-kaocha"
-   :runner-ns kaocha.cljs2.shadow-runner
+;;   :runner-ns kaocha.cljs2.shadow-runner
+   :runner-ns monkey.ci.gui.shadow-runner
    :ns-regexp ".*-test$"
    :devtools {:http-port 8001
               :http-root "target/js/test-kaocha"

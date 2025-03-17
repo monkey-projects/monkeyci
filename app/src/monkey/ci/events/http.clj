@@ -96,6 +96,8 @@
                pred (ms/filter pred)
                true (ms/transform (map ->sse)))]
       (ms/connect in out))
+    ;; Make sure not to close the upstream here, otherwise other SSE listeners won't
+    ;; receive anything anymore.
     (stream-response out)))
 
 (defn parse-event-line [line]
