@@ -90,17 +90,31 @@
                                  :message "test error"})))))
 
 (deftest print-verify
-  (testing "prints error on error"
-    (is (not-empty (capture-out {:type :verify/result
-                                 :result {:summary {:error 1}}}))))
-  
-  (testing "prints warnings"
-    (is (not-empty (capture-out {:type :verify/result
-                                 :result {:summary {:warning 1}}}))))
+  (testing "clj linter"
+    (testing "prints error on error"
+      (is (not-empty (capture-out {:type :verify/result
+                                   :result [{:type :clj
+                                             :result :errors
+                                             :details {:summary {:error 1}}}]}))))
+    
+    (testing "prints warnings"
+      (is (not-empty (capture-out {:type :verify/result
+                                   :result [{:type :clj
+                                             :result :warnings
+                                             :details {:summary {:warning 1}}}]})))))
+
+  (testing "yaml"
+    (testing "prints errors"
+      (is (not-empty (capture-out {:type :verify/result
+                                   :result [{:type :yaml
+                                             :result :errors
+                                             :details {:errors ["test error"]}}]})))))
 
   (testing "prints success when no errors"
     (is (not-empty (capture-out {:type :verify/result
-                                 :result {:summary {:error 0}}})))))
+                                 :result [{:type :clj
+                                           :result :success
+                                           :details {:summary {:error 0}}}]})))))
 
 (deftest print-test-starting
   (testing "prints message"

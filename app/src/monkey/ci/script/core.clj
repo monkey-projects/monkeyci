@@ -2,6 +2,7 @@
   (:require [babashka.fs :as fs]
             [camel-snake-kebab.core :as csk]
             [cheshire.core :as json]
+            [clj-kondo.core :as clj-kondo]
             [clj-yaml.core :as yaml]
             [clojure.java.io :as io]
             [clojure.tools.logging :as log]
@@ -16,7 +17,7 @@
 
 (def extensions
   "Accepted script extensions, in order of processing"
-  ["yaml" "json" "edn" "clj"])
+  ["yaml" "yml" "json" "edn" "clj"])
 
 (defn- infer-type [job]
   ;; Currently, only container jobs are supported in non-clj files
@@ -100,3 +101,50 @@
   (-> (load-scripts (build/script-dir build))
       (resolve-jobs rt)))
 
+(defn- verify-clj [dir]
+  (let [{:keys [summary] :as r} (clj-kondo/run! {:lint [dir]})]
+    {:details r
+     :type :clj
+     :result (cond
+               (pos? (:error summary)) :errors
+               (pos? (:warning summary)) :warnings
+               :else :success)}))
+
+(defn- try-parse [parser type ext dir]
+  (let [f (fs/file dir (str "build." ext))]
+    (when (fs/exists? f)
+      (-> (try
+            (if (some? (parser f))
+              {:result :success}
+              {:result :warnings
+               :details {:warnings ["File contents is empty"]}})
+            (catch Exception ex
+              {:result :errors
+               :details {:errors [(ex-message ex)]}}))
+          (assoc :type type)))))
+
+(defn- verify-edn [dir]
+  (try-parse edn/edn-> :edn "edn" dir))
+
+(defn- verify-json [dir]
+  (try-parse (comp json/parse-string slurp) :json "json" dir))
+
+(defn- verify-yaml [ext dir]
+  (try-parse load-yaml :yaml ext dir))
+
+(def verifiers
+  {"clj"  verify-clj
+   "edn"  verify-edn
+   "json" verify-json
+   "yaml" (partial verify-yaml "yaml")
+   "yml"  (partial verify-yaml "yml")})
+
+(defn verify
+  "Verifies all scripts found in the directory.  For clj, it runs a linter, for other
+   types it tries to parse them.  Returns verification results per file type."
+  [dir]
+  (->> extensions
+       (map (fn [ext]
+              (when-let [v (get verifiers ext)]
+                (v dir))))
+       (filter some?)))

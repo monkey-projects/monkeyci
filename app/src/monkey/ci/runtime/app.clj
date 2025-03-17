@@ -17,6 +17,7 @@
             [monkey.ci.metrics
              [core :as m]
              [events :as me]]
+            [monkey.ci.reporting.print]
             [monkey.ci.runners.oci :as ro]
             [monkey.ci.runtime.common :as rc]
             [monkey.ci.storage.sql]

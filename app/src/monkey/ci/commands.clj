@@ -11,6 +11,7 @@
             [medley.core :as mc]
             [monkey.ci
              [build :as b]
+             [errors :as errors]
              [jobs :as jobs]
              [pem :as pem]
              [process :as proc]
@@ -27,8 +28,9 @@
              [controller :as rc]
              [runtime :as rr]]
             [monkey.ci.runtime.app :as ra]
+            [monkey.ci.script.core :as script]
             [monkey.ci.sidecar
-             [core :as sidecar]
+             [core :as sc]
              [runtime :as rs]]
             [monkey.ci.spec.sidecar :as ss]
             [monkey.ci.web
@@ -59,15 +61,17 @@
                                            :build build))))
 
 (defn verify-build
-  "Runs a linter agains the build script to catch any grammatical errors."
+  "Runs a linter on the build script to catch any grammatical errors."
   [conf]
   (ra/with-cli-runtime conf
     (fn [rt]
-      (let [res (clj-kondo/run! {:lint [(get-in rt [:build :script :script-dir])]})]
+      (let [res (script/verify (get-in rt [:build :script :script-dir]))]
         (rt/report rt {:type :verify/result :result res})
-        (-> res
-            :summary
-            :error)))))
+        (if (->> res
+                 (map :result)
+                 (every? (partial = :success)))
+          0
+          errors/error-script-failure)))))
 
 (defn run-tests
   "Runs unit tests declared in the build"
@@ -141,7 +145,7 @@
                   :job-id (jobs/job-id job)}
         result (try
                  (em/post-events mailman [(ec/make-event :sidecar/start base-evt)])
-                 (let [r @(sidecar/run rt)
+                 (let [r @(sc/run rt)
                        e (:exit r)]
                    (ec/make-result (b/exit-code->status e) e (:message r)))
                  (catch Throwable t

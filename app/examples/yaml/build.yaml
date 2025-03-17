@@ -1,0 +1,4 @@
+- id: list-job
+  image: docker.io/alpine:latest
+  script:
+    - ls -l

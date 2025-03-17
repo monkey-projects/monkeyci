@@ -123,20 +123,32 @@
 (defn- print-finding [{:keys [row col message filename] :as f}]
   (printf "%s - at %d:%d: %s%n" (fs/file-name filename) row col message))
 
-(defmethod printer :verify/result [{:keys [result]}]
-  (let [{e :error w :warning} (:summary result)
+(defmulti print-verification-result :type)
+
+(defmethod print-verification-result :clj [{d :details}]
+  (let [{e :error w :warning} (:summary d)
         e? (and e (pos? e))
         w? (and w (pos? w))]
     (when e?
       (println (c/error (str "Got " e " error(s)"))))
     (when w?
       (println (c/warning (str "Got " w " warning(s)"))))
-    (when (not (or e? w?))
-      (println (c/success "Build script is valid!")))
-    (doseq [f (:findings result)]
-      (print-finding f))
-    ;; Ensure printed stuff is actually sent to stdout
-    (flush)))
+    (doseq [f (:findings d)]
+      (print-finding f))))
+
+(defmethod print-verification-result :default [{:keys [details]}]
+  (doseq [w (:warnings details)]
+    (println (c/warning (str "Warning: " w))))
+  (doseq [e (:errors details)]
+    (println (c/error (str "Error: " e)))))
+
+(defmethod printer :verify/result [{:keys [result]}]
+  (if (every? (partial = :success) (map :result result))
+    (println (c/success "Build script is valid!"))
+    (doseq [r result]
+      (print-verification-result r)))
+  ;; Ensure printed stuff is actually sent to stdout
+  (flush))
 
 (defmethod printer :test/starting [{:keys [build]}]
   (println (c/accent "Starting unit tests for build..."))
