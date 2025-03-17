@@ -75,8 +75,16 @@
                                                                      :image "test-img"}]))))
         (is (= 1 (count (sut/load-jobs build {}))))))
 
+    (testing "loads single job from edn file"
+      (let [sd (fs/file (fs/create-dir (fs/path dir "edn-single")))
+            build (b/set-script-dir {} sd)]
+        (is (nil? (spit (fs/file (fs/path sd "build.edn")) (pr-str {:id "test-job"
+                                                                    :type :container
+                                                                    :image "test-img"}))))
+        (is (= 1 (count (sut/load-jobs build {}))))))
+
     (testing "always container jobs for non-clj files"
-      (let [sd (fs/file (fs/create-dir (fs/path dir "edn2")))
+      (let [sd (fs/file (fs/create-dir (fs/path dir "edn-3")))
             build (b/set-script-dir {} sd)]
         (is (nil? (spit (fs/file (fs/path sd "build.edn")) (pr-str [{:id "test-job"
                                                                      :image "test-img"}]))))

@@ -10,7 +10,8 @@
              [build :as build]
              [edn :as edn]
              [jobs :as j]
-             [protocols :as p]]
+             [protocols :as p]
+             [utils :as u]]
             [monkey.ci.build.core :as bc]))
 
 ;;; Script loading
@@ -23,14 +24,19 @@
   ;; Currently, only container jobs are supported in non-clj files
   (assoc job :type :container))
 
-(defn- load-edn [path]
-  (->> (edn/edn-> path)
+(defn- normalize [jobs]
+  (->> jobs
+       (u/->seq)
        (map infer-type)))
+
+(defn- load-edn [path]
+  (-> (edn/edn-> path)
+      (normalize)))
 
 (defn- load-json [path]
   (with-open [r (io/reader path)]
-    (->> (json/parse-stream r csk/->kebab-case-keyword)
-         (map infer-type))))
+    (-> (json/parse-stream r csk/->kebab-case-keyword)
+        (normalize))))
 
 ;; Required for yaml
 (extend-type flatland.ordered.map.OrderedMap
@@ -41,7 +47,7 @@
 (defn- load-yaml [path]
   (-> (slurp path)
       (yaml/parse-string :key-fn (comp csk/->kebab-case-keyword :key))
-      (as-> x (map infer-type x))))
+      (normalize)))
 
 (defn- load-clj
   "Loads the jobs from the build script, by reading the script files dynamically."
