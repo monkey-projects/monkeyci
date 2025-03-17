@@ -226,7 +226,7 @@
     name (map #(assoc-in % [labels "pipeline"] name))))
 
 (extend-protocol p/JobResolvable
-  clojure.lang.IFn
+  clojure.lang.Fn
   (resolve-jobs [f rt]
     ;; Recursively resolve job, unless this is a job fn in itself
     (if (job-fn? f)

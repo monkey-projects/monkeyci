@@ -8,7 +8,8 @@
             [monkey.ci
              [build :as build]
              [edn :as edn]
-             [jobs :as j]]
+             [jobs :as j]
+             [protocols :as p]]
             [monkey.ci.build.core :as bc]))
 
 ;;; Script loading
@@ -29,6 +30,12 @@
   (with-open [r (io/reader path)]
     (->> (json/parse-stream r csk/->kebab-case-keyword)
          (map infer-type))))
+
+;; Required for yaml
+(extend-type flatland.ordered.map.OrderedMap
+  p/JobResolvable
+  (resolve-jobs [m rt]
+    (when (j/job? m) [m])))
 
 (defn- load-yaml [path]
   (-> (slurp path)
@@ -59,7 +66,6 @@
   (let [f (fs/path dir (str "build." ext))
         l (get loaders ext)]
     (when (fs/exists? f)
-      (log/debug "Loading jobs from" f)
       (l (fs/file f)))))
 
 (defn- load-scripts [dir]
@@ -83,6 +89,7 @@
    that returns either.  This function resolves the jobs by processing the script
    return value."
   [p rt]
+  (log/debug "Resolving:" p)
   (-> (j/resolve-jobs p rt)
       ;; TODO Wrap errors and extensions here?
       (assign-ids)))
