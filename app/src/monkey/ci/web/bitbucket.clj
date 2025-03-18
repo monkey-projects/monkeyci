@@ -118,6 +118,7 @@
   (log/debug "Deleting Bitbucket webhook:" wh)
   @(-> (auth-req {:path (format "/repositories/%s/%s/hooks/%s"
                                 (:workspace wh) (:repo-slug wh) (:bitbucket-id wh))
+                  :headers {"Accept" "application/json"}
                   :request-method :delete}
                  (:token (c/body req)))
        (md/chain c/parse-body)))
@@ -194,7 +195,6 @@
                :start-time (t/now)
                :status :pending
                :idx idx
-               :cleanup? true
                ;; TODO Changed files
                :git (cond-> {:url (:url repo)
                              :ref (git-ref body)}
@@ -209,9 +209,12 @@
         wh (st/find-webhook st webhook-id)]
     (if wh
       (let [build (make-build req wh)]
-        (-> (rur/response (select-keys build [:build-id]))
-            (r/add-event (b/build-pending-evt build))
-            (rur/status 202)))
+        (if (st/save-build st build)
+          (-> (rur/response (select-keys build [:build-id]))
+              (r/add-event (b/build-pending-evt build))
+              (rur/status 202))
+          (-> (rur/response {:message "Unable to create build in database"})
+              (rur/status 500))))
       (c/error-response "Webhook not found" 404))))
 
 (defn- handle-unsupported [type]

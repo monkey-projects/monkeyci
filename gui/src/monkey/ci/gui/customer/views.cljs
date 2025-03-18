@@ -336,11 +336,12 @@
         :on-change (u/form-evt-handler [:customer/ext-repo-filter-changed])}]]]))
 
 (defn add-repo-page
-  [table]
+  [intro table]
   (let [route (rf/subscribe [:route/current])]
     (l/default
      [:<>
       [:h3 "Add Repository to Watch"]
+      intro
       [co/alerts [:customer/repo-alerts]]
       [ext-repo-filter]
       [:div.card.mb-2
@@ -351,12 +352,16 @@
 
 (defn add-github-repo-page []
   (rf/dispatch [:github/load-repos])
-  [add-repo-page github-repo-table])
+  [add-repo-page
+   [:p "In order to be able to watch a Github repository, the "
+    [:a {:href "https://github.com/apps/monkeyci-app"} "MonkeyCI Github app needs to be configured"]
+    " on your organization."]
+   github-repo-table])
 
 (defn add-bitbucket-repo-page []
   (rf/dispatch [:bitbucket/load-repos])
   (rf/dispatch [:customer/load-bb-webhooks])
-  [add-repo-page bitbucket-repo-table])
+  [add-repo-page nil bitbucket-repo-table])
 
 (defn page-new
   "New customer page"

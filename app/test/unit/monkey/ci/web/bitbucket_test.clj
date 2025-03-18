@@ -244,11 +244,14 @@
                              :name "main"}
                             :target
                             {:message "Test commit"}}]}}}))]
-    
-    (testing "triggers build for webhook"
-      (let [resp (sut/webhook req)]
-        (is (= 202 (:status resp)))
-        (is (re-matches #"^build-\d+$" (get-in resp [:body :build-id])))
+
+    (let [resp (sut/webhook req)]
+      (is (= 202 (:status resp)))
+
+      (testing "returns build id"
+        (is (re-matches #"^build-\d+$" (get-in resp [:body :build-id]))))
+      
+      (testing "triggers build for webhook"
         (let [evts (r/get-events resp)
               {:keys [git] :as build} (:build (first evts))]
           (is (= 1 (count evts)))
@@ -257,7 +260,11 @@
               (spec/explain-str ::sb/build build))
           (is (some? git) "contains git info")
           (is (= "http://test-url" (:url git)))
-          (is (= "refs/heads/main" (:ref git))))))
+          (is (= "refs/heads/main" (:ref git)))))
+
+      (testing "creates build in storage"
+        (let [b (st/find-build s [(:id cust) (:id repo) (get-in resp [:body :build-id])])]
+          (is (some? b)))))
 
     (testing "adds configured encrypted ssh key matching repo labels"
       (let [iv (v/generate-iv)
