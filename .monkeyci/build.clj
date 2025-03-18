@@ -159,7 +159,7 @@
 
 (defn build-gui-image [ctx]
   (when (publish-gui? ctx)
-    (kaniko/multi-platform-image-jobs
+    (kaniko/multi-platform-image
      {:subdir "gui"
       :dockerfile "Dockerfile"
       :target-img (str gui-img ":" (image-version ctx))
@@ -172,7 +172,8 @@
         :restore-artifacts [(update gui-release-artifact :path (partial str "gui/"))]
         :dependencies ["release-gui"]}}
       :manifest
-      {:job-id "gui-img-manifest"}})))
+      {:job-id "gui-img-manifest"}}
+     ctx)))
 
 (defn publish 
   "Executes script in clojure container that has clojars publish env vars"
@@ -277,17 +278,18 @@
 ;; build process.
 
 ;; List of jobs
-[test-app
- test-gui
- test-test-lib
- 
- app-uberjar
- publish-app
- publish-test-lib
- github-release
- 
- build-gui-release
- build-app-image
- build-gui-image
- deploy
- notify]
+(def jobs
+  [test-app
+   test-gui
+   test-test-lib
+           
+   app-uberjar
+   publish-app
+   publish-test-lib
+   github-release
+           
+   build-gui-release
+   build-app-image
+   build-gui-image
+   deploy
+   notify])

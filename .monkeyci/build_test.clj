@@ -80,7 +80,7 @@
                   (mt/with-git-ref "refs/tags/0.1.0"))]
       (is (nil? (sut/deploy ctx))))))
 
-(deftest gui-image
+(deftest build-gui-image
   (mt/with-build-params {}
     (testing "no jobs if no release or gui not changed on main"
       (is (nil? (-> mt/test-ctx
@@ -91,11 +91,28 @@
         (let [ctx (-> mt/test-ctx
                       (mt/with-git-ref "refs/heads/main")
                       (mt/with-changes (mt/modified ["gui/deps.edn"])))
-              jobs ((sut/build-gui-image ctx) ctx)
+              jobs (sut/build-gui-image ctx)
               job-ids (set (map b/job-id jobs))]
-          (testing "creates publish jobs"
-            (is (contains? job-ids "publish-gui-img-amd"))
-            (is (contains? job-ids "publish-gui-img-arm")))
+          (testing "creates publish job for each arch"
+            (doseq [a sut/archs]
+              (is (contains? job-ids (str "publish-gui-img-" (name a))))))
 
           (testing "creates manifest job"
             (is (contains? job-ids "gui-img-manifest"))))))))
+
+(deftest jobs
+  (mt/with-build-params {}
+    (testing "with release tag"
+      (let [jobs (mt/resolve-jobs
+                  sut/jobs
+                  (-> mt/test-ctx
+                      (mt/with-git-ref "refs/tags/0.16.4")))
+            ids (set (map b/job-id jobs))]
+        (testing "contains pushover job"
+          (is (contains? ids "pushover")))
+
+        (testing "contains gui img publishing job"
+          (is (contains? ids "publish-gui-img-amd")))
+
+        (testing "contains gui img manifest job"
+          (is (contains? ids "gui-img-manifest")))))))
