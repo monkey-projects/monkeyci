@@ -211,7 +211,7 @@
       (let [build (make-build req wh)]
         (if (st/save-build st build)
           (-> (rur/response (select-keys build [:build-id]))
-              (r/add-event (b/build-pending-evt build))
+              (r/add-event (b/build-triggered-evt build))
               (rur/status 202))
           (-> (rur/response {:message "Unable to create build in database"})
               (rur/status 500))))

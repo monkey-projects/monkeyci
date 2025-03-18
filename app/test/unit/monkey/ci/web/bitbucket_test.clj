@@ -255,7 +255,7 @@
         (let [evts (r/get-events resp)
               {:keys [git] :as build} (:build (first evts))]
           (is (= 1 (count evts)))
-          (is (= :build/pending (-> evts first :type)))
+          (is (= :build/triggered (-> evts first :type)))
           (is (spec/valid? ::sb/build build)
               (spec/explain-str ::sb/build build))
           (is (some? git) "contains git info")

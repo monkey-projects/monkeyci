@@ -385,14 +385,15 @@
                      first
                      (f)))))]
       
-      (testing "posts build/pending event"
+      (testing "posts `build/triggered` event"
         (verify-response
          {}
          (fn [{:keys [response]}]
-           (is (= :build/pending (-> response
-                                     (r/get-events)
-                                     first
-                                     :type))))))
+           (is (= :build/triggered
+                  (-> response
+                      (r/get-events)
+                      first
+                      :type))))))
       
       (testing "looks up url in repo config"
         (with-repo

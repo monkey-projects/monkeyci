@@ -167,8 +167,8 @@
              build
              :build build))
 
-(defn build-pending-evt [build]
-  (with-build-evt :build/pending build))
+(defn build-triggered-evt [build]
+  (with-build-evt :build/triggered build))
 
 (defn build-init-evt [build]
   (with-build-evt :build/initializing build))

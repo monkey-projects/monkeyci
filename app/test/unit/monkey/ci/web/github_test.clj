@@ -16,7 +16,7 @@
    [ring.mock.request :as mock]))
 
 (deftest webhook
-  (testing "posts `build/pending` event"
+  (testing "posts `build/triggered` event"
     (let [cid (cuid/random-cuid)
           {st :storage :as rt} (trt/test-runtime)
           _ (st/save-webhook st {:id "test-hook"
@@ -31,7 +31,7 @@
                                       {:head-commit {:id "test-id"}}}))
           resp (sut/webhook req)]
       (is (= 202 (:status resp)))
-      (is (= [:build/pending] (->> resp (r/get-events) (map :type))))))
+      (is (= [:build/triggered] (->> resp (r/get-events) (map :type))))))
 
   (testing "ignores non-push events"
     (let [req (-> (trt/test-runtime)
@@ -76,7 +76,7 @@
       (is (some? (st/find-repo s (st/ext-repo-sid sid))))
       (is (= 202 (:status resp)))
       (is (= 1 (-> resp :body :builds count)))
-      (is (= [:build/pending] (->> resp (r/get-events) (map :type))))))
+      (is (= [:build/triggered] (->> resp (r/get-events) (map :type))))))
 
   (testing "ignores non-push events"
     (let [gid "test-id"
@@ -255,20 +255,6 @@
           (is (= [{:id (:id ssh-key)
                    :private-key "encrypted-key"}]
                  (get-in r [:git :ssh-keys])))))))
-
-  (testing "sets cleanup flag"
-    (h/with-memory-store s
-      (let [wh (test-webhook)
-            cid (:customer-id wh)
-            rid (:repo-id wh)]
-        (is (st/sid? (st/save-webhook s wh)))
-        (is (st/sid? (st/save-repo s {:customer cid
-                                      :id rid})))
-        (let [r (sut/create-webhook-build {:storage s}
-                                          (:id wh)
-                                          {:ref "test-ref"
-                                           :repository {:master-branch "test-main"}})]
-          (is (true? (:cleanup? r)))))))
 
   (testing "assigns idx"
     (h/with-memory-store s

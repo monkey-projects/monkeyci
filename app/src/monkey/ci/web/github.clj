@@ -51,7 +51,7 @@
 (defn create-build
   "Looks up details for the given github webhook.  If the webhook refers to a valid 
    configuration, a build entity is created and a build structure is returned, which
-   eventually will be passed on to the runner."
+   will be sent in a `build/triggered` event and eventually passed on to a runner."
   [{st :storage :as rt} {:keys [customer-id repo-id] :as init-build} payload]
   (let [{:keys [master-branch clone-url ssh-url private]} (:repository payload)
         ;; TODO Ensure idx uniqueness over repo
@@ -74,7 +74,6 @@
                          :status :pending
                          :build-id build-id
                          :idx idx
-                         :cleanup? true
                          :changes (file-changes payload)))]
     (when (s/save-build st build)
       ;; Add the sid, cause it's used downstream
@@ -116,7 +115,7 @@
     (let [rt (c/req->rt req)]
       (if-let [build (create-webhook-build rt (get-in p [:path :id]) (body req))]
         (-> (rur/response (select-keys build [:build-id]))
-            (r/add-event (b/build-pending-evt build))
+            (r/add-event (b/build-triggered-evt build))
             (rur/status 202))
         ;; No valid webhook found
         (rur/not-found {:message "No valid webhook configuration found"})))
@@ -136,7 +135,7 @@
           (as-> b (->> (map #(select-keys % [:build-id]) b)
                        (hash-map :builds)))
           (rur/response)
-          (r/add-events (map b/build-pending-evt builds))
+          (r/add-events (map b/build-triggered-evt builds))
           (rur/status (if (empty? builds) 204 202))))
     ;; Don't trigger build, just say fine
     (rur/status 204)))

@@ -236,7 +236,7 @@
   (if (st/save-build (c/rt->storage rt) build)
     (do
       (-> (rur/response (select-keys build [:build-id]))
-          (r/add-event (b/build-pending-evt build))
+          (r/add-event (b/build-triggered-evt build))
           (rur/status 202)))
     (-> (rur/response {:message "Unable to create build"})
         (rur/status 500))))
