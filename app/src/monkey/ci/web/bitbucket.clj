@@ -183,18 +183,15 @@
 (defn- make-build [req {:keys [customer-id repo-id] :as wh}]
   (let [st (c/req->storage req)
         rsid [customer-id repo-id]
-        idx (st/find-next-build-idx st rsid)
-        build-id (c/new-build-id idx)
-        sid (conj rsid build-id)
         body (c/body req)
         repo (st/find-repo st rsid)
         ssh-keys (c/find-ssh-keys st repo)]
-    (-> (zipmap [:customer-id :repo-id :build-id] sid)
-        (assoc :sid sid
+    (-> (zipmap [:customer-id :repo-id] rsid)
+        (assoc :id (st/new-id)
+               :sid rsid ; Return repo sid, because build-id is only assigned in the build/triggered event handler
                :source :bitbucket-webhook
                :start-time (t/now)
                :status :pending
-               :idx idx
                ;; TODO Changed files
                :git (cond-> {:url (:url repo)
                              :ref (git-ref body)}
@@ -209,12 +206,9 @@
         wh (st/find-webhook st webhook-id)]
     (if wh
       (let [build (make-build req wh)]
-        (if (st/save-build st build)
-          (-> (rur/response (select-keys build [:build-id]))
-              (r/add-event (b/build-pending-evt build))
-              (rur/status 202))
-          (-> (rur/response {:message "Unable to create build in database"})
-              (rur/status 500))))
+        (-> (rur/response (select-keys build [:id]))
+            (r/add-event (b/build-triggered-evt build))
+            (rur/status 202)))
       (c/error-response "Webhook not found" 404))))
 
 (defn- handle-unsupported [type]

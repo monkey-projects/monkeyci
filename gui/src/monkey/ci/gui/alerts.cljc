@@ -55,6 +55,12 @@
 (def builds-load-failed
   (error-msg "Failed to load builds"))
 
+(def build-trigger-success
+  (alert-msg :info (constantly "A new build has been triggered.")))
+
+(def build-trigger-failed
+  (error-msg "Failed to trigger a new build"))
+
 (def cust-search-failed
   (error-msg "Failed to search for customers"))
 

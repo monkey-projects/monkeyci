@@ -118,15 +118,13 @@
  :repo/trigger-build--success
  (fn [db [_ {:keys [body]}]]
    (-> db
-       (db/set-alerts [{:type :info
-                        :message (str "Build " (:build-id body) " started.")}])
+       (db/set-alerts [(a/build-trigger-success)])
        (db/set-show-trigger-form nil))))
 
 (rf/reg-event-db
  :repo/trigger-build--failed
  (fn [db [_ err]]
-   (db/set-alerts db [{:type :danger
-                       :message (str "Could not start build: " (u/error-msg err))}])))
+   (db/set-alerts db [(a/build-trigger-failed err)])))
 
 (rf/reg-event-fx
  :repo/load+edit

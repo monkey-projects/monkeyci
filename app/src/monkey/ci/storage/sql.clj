@@ -450,7 +450,8 @@
   (when-let [repo-id (er/repo-for-build-sid conn (:customer-id build) (:repo-id build))]
     (let [{:keys [id] :as ins} (ec/insert-build conn (-> (build->db build)
                                                          (assoc :repo-id repo-id)))]
-      (insert-jobs conn (-> build :script :jobs vals) id)
+      (when (contains? (:script build) :jobs)
+        (insert-jobs conn (-> build :script :jobs vals) id))
       ins)))
 
 (defn- update-build [conn build existing]

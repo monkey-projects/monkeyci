@@ -248,23 +248,21 @@
     (let [resp (sut/webhook req)]
       (is (= 202 (:status resp)))
 
-      (testing "returns build id"
-        (is (re-matches #"^build-\d+$" (get-in resp [:body :build-id]))))
+      (testing "returns id"
+        (is (cuid/cuid? (get-in resp [:body :id]))))
       
       (testing "triggers build for webhook"
         (let [evts (r/get-events resp)
               {:keys [git] :as build} (:build (first evts))]
           (is (= 1 (count evts)))
-          (is (= :build/pending (-> evts first :type)))
-          (is (spec/valid? ::sb/build build)
-              (spec/explain-str ::sb/build build))
+          (is (= :build/triggered (-> evts first :type)))
+          (is (some? build))
           (is (some? git) "contains git info")
           (is (= "http://test-url" (:url git)))
           (is (= "refs/heads/main" (:ref git)))))
 
-      (testing "creates build in storage"
-        (let [b (st/find-build s [(:id cust) (:id repo) (get-in resp [:body :build-id])])]
-          (is (some? b)))))
+      (testing "does not create build in storage"
+        (is (nil? (st/find-build s [(:id cust) (:id repo) (get-in resp [:body :build-id])])))))
 
     (testing "adds configured encrypted ssh key matching repo labels"
       (let [iv (v/generate-iv)

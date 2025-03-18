@@ -198,31 +198,20 @@
   (some-fn (as-ref :branch "heads")
            (as-ref :tag "tags")))
 
-(defn- assign-build-id [build req]
-  (let [idx (st/find-next-build-idx (c/req->storage req) (c/repo-sid req))
-        bid (str "build-" idx)
-        build (assoc build :build-id bid)]
-    (-> build
-        (assoc :idx idx
-               :sid (st/ext-build-sid build)))))
-
 (defn- initialize-build [build rt]
   (assoc build
+         :id (st/new-id)
          :source :api
          :start-time (t/now)
-         :status :pending
-         :cleanup? (not (rt/dev-mode? rt))))
+         :status :pending))
 
 (defn make-build-ctx
   "Creates a build object from the request for the repo"
   [{p :parameters :as req} repo]
-  (let [acc (:path p)
-        {st :storage :as rt} (c/req->rt req)
-        ssh-keys (c/find-ssh-keys st repo)
-        {bid :build-id :as build} (-> acc
-                                      (select-keys [:customer-id :repo-id])
-                                      (assign-build-id req))]
-    (-> build
+  (let [{st :storage :as rt} (c/req->rt req)
+        ssh-keys (c/find-ssh-keys st repo)]
+    (-> (:path p)
+        (select-keys [:customer-id :repo-id])
         (initialize-build rt)
         (assoc :git (-> (:query p)
                         (select-keys [:commit-id :branch :tag])
@@ -232,14 +221,10 @@
                                        :ssh-keys ssh-keys
                                        :main-branch (:main-branch repo)))))))
 
-(defn- save-and-run-build [rt build]
-  (if (st/save-build (c/rt->storage rt) build)
-    (do
-      (-> (rur/response (select-keys build [:build-id]))
-          (r/add-event (b/build-pending-evt build))
-          (rur/status 202)))
-    (-> (rur/response {:message "Unable to create build"})
-        (rur/status 500))))
+(defn- build-triggered-response [build]
+  (-> (rur/response (select-keys build [:id]))
+      (r/add-event (b/build-triggered-evt build))
+      (rur/status 202)))
 
 (defn trigger-build [req]
   (let [{p :parameters} req
@@ -249,7 +234,7 @@
         build (make-build-ctx req repo)]
     (log/debug "Triggering build for repo sid:" repo-sid)
     (if repo
-      (save-and-run-build (c/req->rt req) build)
+      (build-triggered-response build)
       (rur/not-found {:message "Repository does not exist"}))))
 
 (defn retry-build
@@ -259,11 +244,10 @@
         existing (st/find-build st (c/build-sid req))
         rt (c/req->rt req)
         build (some-> existing
-                      (dissoc :start-time :end-time :script)
-                      (assign-build-id req)
+                      (dissoc :start-time :end-time :script :build-id :idx)
                       (initialize-build rt))]
     (if build
-      (save-and-run-build rt build)
+      (build-triggered-response build)
       (rur/not-found {:message "Build not found"}))))
 
 (defn cancel-build

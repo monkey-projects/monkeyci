@@ -52,12 +52,23 @@
    :enter (fn [ctx]
             (set-build ctx (st/find-build (get-db ctx) (get-in ctx [:event :sid]))))})
 
+(defn- maybe-assign-build-idx [build db]
+  (letfn [(assign-build-idx [build]
+            (let [idx (st/find-next-build-idx db (take 2 (b/sid build)))]
+              (assoc build
+                     :idx idx
+                     :build-id (str "build-" idx))))]
+    (cond-> build
+      (nil? (:idx build)) (assign-build-idx))))
+
 (def save-build
   {:name ::save-build
    :leave (fn [ctx]
-            (let [build (let [b (:build (em/get-result ctx))]
+            (let [db (get-db ctx)
+                  build (let [b (some-> (:build (em/get-result ctx))
+                                        (maybe-assign-build-idx db))]
                           (when (and b #_(spec/valid? :entity/build b)
-                                     (st/save-build (get-db ctx) b))
+                                     (st/save-build db b))
                             b))]
               (cond-> ctx
                 (some? build) (set-build build))))})
@@ -234,6 +245,7 @@
                  load-build
                  with-job]]
     [[:build/triggered
+      ;; Checks if the customer has credits available, and creates the build in db
       [{:handler check-credits
         :interceptors [use-db
                        customer-credits
