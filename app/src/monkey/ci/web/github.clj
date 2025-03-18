@@ -50,17 +50,16 @@
 
 (defn create-build
   "Looks up details for the given github webhook.  If the webhook refers to a valid 
-   configuration, a build entity is created and a build structure is returned, which
-   will be sent in a `build/triggered` event and eventually passed on to a runner."
+   configuration, a build structure is returned, which will be sent in a `build/triggered`
+   event and eventually passed on to a runner.  Creating the entity in the database is
+   up to the event handler, to ensure uniqueness of assigned ids."
   [{st :storage :as rt} {:keys [customer-id repo-id] :as init-build} payload]
   (let [{:keys [master-branch clone-url ssh-url private]} (:repository payload)
-        ;; TODO Ensure idx uniqueness over repo
-        idx (s/find-next-build-idx st [customer-id repo-id])
-        build-id (c/new-build-id idx)
         commit-id (get-in payload [:head-commit :id])
         ssh-keys (find-ssh-keys rt customer-id repo-id)
         build (-> init-build
-                  (assoc :git (-> payload
+                  (assoc :id (s/new-id)
+                         :git (-> payload
                                   :head-commit
                                   (select-keys [:message :author])
                                   (assoc :url (if private ssh-url clone-url)
@@ -72,12 +71,10 @@
                          ;; this is still the time of the last commit, not of the tag creation.
                          :start-time (u/now)
                          :status :pending
-                         :build-id build-id
-                         :idx idx
                          :changes (file-changes payload)))]
-    (when (s/save-build st build)
-      ;; Add the sid, cause it's used downstream
-      (assoc build :sid (s/ext-build-sid build)))))
+    ;; Add the sid, cause it's used downstream.  In this case it's the repo id, because
+    ;; the build id still needs to be assigned.
+    (assoc build :sid [customer-id repo-id])))
 
 (defn create-webhook-build [{st :storage :as rt} id payload]
   (if-let [details (s/find-webhook st id)]
@@ -114,7 +111,7 @@
   (if (should-trigger-build? req)
     (let [rt (c/req->rt req)]
       (if-let [build (create-webhook-build rt (get-in p [:path :id]) (body req))]
-        (-> (rur/response (select-keys build [:build-id]))
+        (-> (rur/response (select-keys build [:id]))
             (r/add-event (b/build-triggered-evt build))
             (rur/status 202))
         ;; No valid webhook found
@@ -123,7 +120,7 @@
     (rur/status 204)))
 
 (defn app-webhook [req]
-  (log/debug "Got github app webhook event:" (pr-str (body req)))
+  (log/trace "Got github app webhook event:" (pr-str (body req)))
   (log/debug "Event type:" (get-in req [:headers "x-github-event"]))
   (if (should-trigger-build? req)
     (let [github-id (get-in (body req) [:repository :id])
@@ -132,7 +129,7 @@
                              (create-app-build (c/req->rt req) repo (body req)))))]
       (log/debug "Found" (count builds) "watched builds for id" github-id)
       (-> builds
-          (as-> b (->> (map #(select-keys % [:build-id]) b)
+          (as-> b (->> (map #(select-keys % [:id]) b)
                        (hash-map :builds)))
           (rur/response)
           (r/add-events (map b/build-triggered-evt builds))

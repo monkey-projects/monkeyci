@@ -787,13 +787,13 @@
           (is (= build-id (:build-id (first b))) "should contain build id")))))
   
   (testing "`POST /trigger`"
-    (testing "posts `build/pending` event"
+    (testing "posts `build/triggered` event"
       (with-repo
         (fn [{:keys [app path] :as ctx}]
           (is (= 202 (-> (mock/request :post (str path "/trigger"))
                          (app)
                          :status)))
-          (is (= [:build/pending]
+          (is (= [:build/triggered]
                  (->> ctx
                       (trt/get-mailman)
                       (tmm/get-posted)
@@ -833,6 +833,8 @@
               (is (not-empty l))
               (is (= 200 (:status l)))
               (is (= build-id (:build-id b)))))
+
+          (testing "retrieves build by cuid when no build-id given")
 
           (testing "404 when build does not exist"
             (let [sid (generate-build-sid)

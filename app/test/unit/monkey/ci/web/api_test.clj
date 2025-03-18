@@ -1,19 +1,20 @@
 (ns monkey.ci.web.api-test
-  (:require
-   [clojure.spec.alpha :as spec]
-   [clojure.string :as cs]
-   [clojure.test :refer [deftest is testing]]
-   [manifold.bus :as mb]
-   [manifold.stream :as ms]
-   [monkey.ci.events.core :as ec]
-   [monkey.ci.protocols :as p]
-   [monkey.ci.spec.events :as se]
-   [monkey.ci.storage :as st]
-   [monkey.ci.test.helpers :as h]
-   [monkey.ci.test.runtime :as trt]
-   [monkey.ci.utils :as u]
-   [monkey.ci.web.api :as sut]
-   [monkey.ci.web.response :as r]))
+  (:require [clojure.spec.alpha :as spec]
+            [clojure.test :refer [deftest is testing]]
+            [manifold
+             [bus :as mb]
+             [stream :as ms]]
+            [monkey.ci
+             [cuid :as cuid]
+             [storage :as st]
+             [utils :as u]]
+            [monkey.ci.spec.events :as se]
+            [monkey.ci.test
+             [helpers :as h]
+             [runtime :as trt]]
+            [monkey.ci.web
+             [api :as sut]
+             [response :as r]]))
 
 (defn- parse-edn [s]
   (with-open [r (java.io.StringReader. s)]
@@ -296,19 +297,7 @@
                (h/->req)
                (sut/make-build-ctx {:main-branch "main"})
                :git
-               :ref))))
-
-  (testing "sets cleanup flag when not in dev mode"
-    (is (true? (:cleanup? (sut/make-build-ctx (-> (trt/test-runtime)
-                                                  (assoc-in [:config :dev-mode] false)
-                                                  (h/->req))
-                                              {})))))
-
-  (testing "does not set cleanup flag when in dev mode"
-    (is (false? (:cleanup? (sut/make-build-ctx (-> (trt/test-runtime)
-                                                   (assoc-in [:config :dev-mode] true)
-                                                   (h/->req))
-                                               {}))))))
+               :ref)))))
 
 (deftest update-user
   (testing "updates user in storage"
@@ -436,49 +425,34 @@
            (is (= "refs/tags/test-tag"
                   (-> build :git :ref))))))
 
-      (testing "adds `sid` to build props"
+      (testing "adds `sid` to event"
         (verify-response
          {}
          (fn [{:keys [sid response]}]
-           (let [bsid (-> response (r/get-events) first :build :sid)]
-             (is (= 3 (count bsid)) "expected sid to contain repo path and build id")
-             (is (= (take 2 sid) (take 2 bsid)))
-             (is (= (-> response (r/get-events) first :build :build-id)
-                    (last bsid)))))))
+           (is (= 2 (count sid)) "expected sid to contain customer and repo id"))))
       
-      (testing "creates build in storage"
+      (testing "does not create build in storage"
         (verify-trigger
          {:query {:branch "test-branch"}}
          (fn [evt]
            (let [bsid (:sid evt)
                  build (st/find-build st bsid)]
-             (is (some? build))
-             (is (= :api (:source build)))
-             (is (= "refs/heads/test-branch" (get-in build [:git :ref])))))))
+             (is (nil? build))))))
 
-      (testing "assigns index to build"
+      (testing "assigns unique id"
         (verify-trigger
          {}
-         (fn [{:keys [sid]}]
-           (let [build (st/find-build st sid)]
-             (is (number? (:idx build)))))))
-
-      (testing "build id incorporates index"
-        (verify-trigger
-         {}
-         (fn [{:keys [sid]}]
-           (let [build (st/find-build st sid)]
-             (is (= (str "build-" (:idx build))
-                    (:build-id build)))))))
+         (fn [evt]
+           (is (cuid/cuid? (get-in evt [:build :id]))))))
       
-      (testing "returns build id"
+      (testing "returns id"
         (with-repo
           (fn [cust repo]
-            (is (string? (-> (make-req {:path {:customer-id (:id cust)
-                                               :repo-id (:id repo)}})
-                             (sut/trigger-build)
-                             :body
-                             :build-id))))))
+            (is (cuid/cuid? (-> (make-req {:path {:customer-id (:id cust)
+                                                  :repo-id (:id repo)}})
+                                (sut/trigger-build)
+                                :body
+                                :id))))))
 
       (testing "returns 404 (not found) when repo does not exist"
         (is (= 404 (-> (make-req {:path {:customer-id "nonexisting"
@@ -501,13 +475,13 @@
       (let [r (-> (make-req (constantly "ok")
                             {:path (select-keys build [:customer-id :repo-id :build-id])})
                   (sut/retry-build))
-            bid (-> r :body :build-id)]
+            bid (-> r :body :id)]
         (testing "returns newly created build id"
           (is (some? bid))
-          (is (not= (:build-id build) bid)))
+          (is (not= (:id build) bid)))
         
         (testing "creates new build with same settings but without script details"
-          (let [new (st/find-build st [(:customer-id build) (:repo-id build) bid])]
+          (let [new (-> r r/get-events first :build)]
             (is (some? new))
             (is (= :pending (:status new)))
             (is (= (:git build) (:git new)))

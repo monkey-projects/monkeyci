@@ -1,15 +1,14 @@
 (ns monkey.ci.events.mailman.db-test
-  (:require
-   [clojure.spec.alpha :as spec]
-   [clojure.test :refer [deftest is testing]]
-   [manifold.bus :as mb]
-   [monkey.ci.cuid :as cuid]
-   [monkey.ci.events.mailman :as em]
-   [monkey.ci.events.mailman.db :as sut]
-   [monkey.ci.spec.entities :as sen]
-   [monkey.ci.spec.events :as se]
-   [monkey.ci.storage :as st]
-   [monkey.ci.test.helpers :as h]))
+  (:require [clojure.spec.alpha :as spec]
+            [clojure.test :refer [deftest is testing]]
+            [manifold.bus :as mb]
+            [monkey.ci
+             [cuid :as cuid]
+             [storage :as st]]
+            [monkey.ci.events.mailman :as em]
+            [monkey.ci.events.mailman.db :as sut]
+            [monkey.ci.spec.events :as se]
+            [monkey.ci.test.helpers :as h]))
 
 (defn- validate-spec [spec obj]
   (is (spec/valid? spec obj)
@@ -43,16 +42,31 @@
 
 (deftest save-build
   (h/with-memory-store s
-    (testing "`leave` saves build from result event"
-      (let [{:keys [leave] :as i} sut/save-build
-            build (h/gen-build)
-            get-sid (apply juxt st/build-sid-keys)]
-        (is (keyword? (:name i)))
+    (let [{:keys [leave] :as i} sut/save-build
+          build (h/gen-build)
+          get-sid (apply juxt st/build-sid-keys)]
+      (is (keyword? (:name i)))
+
+      (testing "`leave` saves build from result event"
         (is (= build (-> {:result {:build build}}
                          (sut/set-db s)
                          (leave)
                          (sut/get-build))))
-        (is (= build (st/find-build s (get-sid build))))))))
+        (is (= build (st/find-build s (get-sid build)))))
+
+      (testing "assigns build index, unique to the repo"
+        (let [repo (h/gen-repo)
+              cust (-> (h/gen-cust)
+                       (assoc :repos {(:id repo) repo}))
+              build {:customer-id (:id cust)
+                     :repo-id (:id repo)}]
+          (is (some? (st/save-customer s cust)))
+          (let [r (-> {:result {:build build}}
+                      (sut/set-db s)
+                      (leave)
+                      (sut/get-build))]
+            (is (some? (:build-id r)))
+            (is (number? (:idx r)))))))))
 
 (deftest load-build
   (h/with-memory-store s
