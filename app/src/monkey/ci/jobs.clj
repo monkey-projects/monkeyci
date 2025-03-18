@@ -249,6 +249,10 @@
   (resolve-jobs [m rt]
     (when (job? m) [m]))
 
+  clojure.lang.PersistentHashMap
+  (resolve-jobs [m rt]
+    (when (job? m) [m]))
+
   clojure.lang.LazySeq
   (resolve-jobs [v rt]
     (resolve-sequential v rt)))
