@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.build.events
-  (:require [monkey.ci.gui.build.db :as db]
+  (:require [monkey.ci.gui.alerts :as a]
+            [monkey.ci.gui.build.db :as db]
             [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.utils :as u]
@@ -133,18 +134,10 @@
 (rf/reg-event-db
  :build/retry--success
  (fn [db [_ resp]]
-   (let [build-id (get-in resp [:body :build-id])]
-     (-> db
-         (db/reset-retrying)
-         (db/set-alerts
-          [{:type :info
-            :message [:span "The build is being restarted as "
-                      [:a
-                       {:href (r/path-for :page/build (-> (r/current db)
-                                                          (r/path-params)
-                                                          (assoc :build-id build-id)))}
-                       [:b.text-white build-id]]
-                      "."]}])))))
+   (-> db
+       (db/reset-retrying)
+       (db/set-alerts
+        [(a/build-retry-success (:body resp))]))))
 
 (rf/reg-event-db
  :build/retry--failed
@@ -152,5 +145,4 @@
    (-> db
        (db/reset-retrying)
        (db/set-alerts
-        [{:type :danger
-          :message (str "Unable to restart this build: " (u/error-msg err))}]))))
+        [(a/build-retry-failed err)]))))

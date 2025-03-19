@@ -5,7 +5,8 @@
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]
             #?@(:node [] ; Exclude ansi_up when building for node
-                :cljs [["ansi_up" :refer [AnsiUp]]])))
+                :cljs [["ansi_up" :refer [AnsiUp]]
+                       [reagent.core :as rc]])))
 
 (defn logo []
   (templ/logo))
@@ -183,14 +184,14 @@
    (do
      (def ansi-up (AnsiUp.))
      (defn- ansi->html [l]
-       (.ansi_to_html ansi-up l))))
+       (rc/unsafe-html (.ansi_to_html ansi-up l)))))
 
 (defn ->html
   "Converts raw string to html"
   [l]
   (if (string? l)
     [:span
-     {:dangerouslySetInnerHTML {:__html (ansi->html l)}}]
+     {:dangerouslySetInnerHTML (ansi->html l)}]
     l))
 
 (defn colored [s color]

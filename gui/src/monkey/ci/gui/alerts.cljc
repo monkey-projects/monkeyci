@@ -61,6 +61,12 @@
 (def build-trigger-failed
   (error-msg "Failed to trigger a new build"))
 
+(def build-retry-success
+  (alert-msg :info (constantly "The build has been re-triggered.")))
+
+(def build-retry-failed
+  (error-msg "Unable to restart this build"))
+
 (def cust-search-failed
   (error-msg "Failed to search for customers"))
 
