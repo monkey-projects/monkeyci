@@ -29,7 +29,7 @@
 (defn set-job [ctx job]
   (assoc ctx ::job job))
 
-(def build->sid st/ext-build-sid)
+(def build->sid b/sid)
 
 ;;; Interceptors for side effects
 
@@ -130,16 +130,14 @@
   "Checks if credits are available.  Returns either a build/pending or a build/failed."
   [ctx]
   (let [has-creds? (let [c (get-credits ctx)]
-                     (and (some? c) (pos? c)))]
-    (cond-> {:type :build/pending
-             :sid (build->sid (get-in ctx [:event :build]))
-             :build (-> (get-in ctx [:event :build])
-                        ;; TODO Build lifecycle property
-                        (assoc :status :pending))}
-      (not has-creds?) (assoc :type :build/end
-                              :status :error
-                              ;; TODO Failure cause keyword
-                              :message "No credits available"))))
+                     (and (some? c) (pos? c)))
+        build (get-in ctx [:event :build])]
+    (if has-creds?
+      (b/build-pending-evt build)
+      (-> (b/build-end-evt build)
+          (assoc :status :error
+                 ;; TODO Failure cause keyword
+                 :message "No credits available")))))
 
 (defn queue-build
   "Adds the build to the build queue, where it will be picked up by a runner when

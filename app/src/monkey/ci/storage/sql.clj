@@ -99,7 +99,10 @@
 
 (defn- insert-repo [conn re repo]
   (let [re (ec/insert-repo conn re)]
-    (insert-repo-labels conn (:labels repo) re)))
+    (insert-repo-labels conn (:labels repo) re)
+    ;; Also create an initial repo idx record for build index calculation
+    (ec/insert-repo-idx conn {:repo-id (:id re)
+                              :next-idx 1})))
 
 (defn- update-repo [conn re repo existing]
   (when (not= re existing)
@@ -557,10 +560,8 @@
   (->> (eb/select-latest-builds conn cust-id)
        (map db->build)))
 
-(defn- select-max-build-idx [{:keys [conn]} [cust-id repo-id]]
-  ;; TODO Use repo-indices table instead
-  ;; TODO Lock table for update
-  (eb/select-max-idx conn cust-id repo-id))
+(defn- select-next-build-idx [{:keys [conn]} [cust-id repo-id]]
+  (er/next-repo-idx conn cust-id repo-id))
 
 (defn- insert-job [conn job build-sid]
   (when-let [build (apply eb/select-build-by-sid conn build-sid)]
@@ -1079,7 +1080,7 @@
     :find-latest-builds select-latest-customer-builds}
    :repo
    {:list-display-ids select-repo-display-ids
-    :find-next-build-idx (comp (fnil inc 0) select-max-build-idx)
+    :find-next-build-idx select-next-build-idx
     :find-webhooks select-repo-webhooks
     :delete delete-repo}
    :user

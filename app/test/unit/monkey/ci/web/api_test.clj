@@ -27,31 +27,27 @@
       (throw (ex-info "Invalid event payload" {:event evt})))))
 
 (deftest create-repo
-  (testing "generates id from repo name"
-    (let [repo {:name "Test repo"
-                :customer-id (st/new-id)}
-          {st :storage :as rt} (trt/test-runtime)
-          r (-> rt
-                (h/->req)
-                (h/with-body repo)
-                (sut/create-repo)
-                :body)]
-      (is (= "test-repo" (:id r)))))
+  (let [repo {:name "Test repo"
+              :customer-id (st/new-id)}
+        {st :storage :as rt} (trt/test-runtime)]
+    
+    (testing "generates id from repo name"
+      (let [r (-> rt
+                  (h/->req)
+                  (h/with-body repo)
+                  (sut/create-repo)
+                  :body)]
+        (is (= "test-repo" (:id r)))))
 
-  (testing "on id collision, appends index"
-    (let [repo {:name "Test repo"
-                :customer-id (st/new-id)}
-          {st :storage :as rt} (trt/test-runtime)
-          _ (st/save-repo st (-> repo
-                                 (select-keys [:customer-id])
-                                 (assoc :id "test-repo"
-                                        :name "Existing repo")))
-          r (-> rt
-                (h/->req)
-                (h/with-body repo)
-                (sut/create-repo)
-                :body)]
-      (is (= "test-repo-2" (:id r))))))
+    (testing "on id collision, appends index"
+      (let [new-repo {:name "Test repo"
+                      :customer-id (:customer-id repo)}
+            r (-> rt
+                  (h/->req)
+                  (h/with-body new-repo)
+                  (sut/create-repo)
+                  :body)]
+        (is (= "test-repo-2" (:id r)))))))
 
 (deftest create-webhook
   (testing "assigns secret key"

@@ -107,7 +107,12 @@
 (defn- declare-entity-cruds
   "Declares basic functions used for CRUD and simple selects."
   [n opts extra-opts]
-  (let [pl (str (name n) "s")
+  (let [pl (or (:plural extra-opts)
+               (:plural opts)
+               (str (name n) "s"))
+        table (or (:table extra-opts)
+                  (:table opts)
+                  (keyword pl))
         default-opts {:before-insert identity
                       :after-insert  identity
                       :before-update identity
@@ -120,22 +125,22 @@
         id-col (get extra-opts :id-col :id)]
     (intern *ns* (symbol (str "insert-" (name n)))
             (fn [conn e]
-              (first (ai [(insert-entity conn (keyword pl) (bi e)) e]))))
+              (first (ai [(insert-entity conn table (bi e)) e]))))
     (intern *ns* (symbol (str "update-" (name n)))
             (fn [conn e]
               (let [upd (bu e)]
-                (when (pos? (update-entity conn (keyword pl) upd id-col))
+                (when (pos? (update-entity conn table upd id-col))
                   (first (au [upd e]))))))
     (intern *ns* (symbol (str "delete-" pl))
             (fn [conn f]
-              (delete-entities conn (keyword pl) f)))
+              (delete-entities conn table f)))
     (intern *ns* (symbol (str "select-" (name n)))
             (fn [conn f]
-              (some-> (select-entity conn (keyword pl) f)
+              (some-> (select-entity conn table f)
                       (as))))
     (intern *ns* (symbol (str "select-" pl))
             (fn [conn f]
-              (->> (select-entities conn (keyword pl) f)
+              (->> (select-entities conn table f)
                    (map as))))))
 
 (defmacro defentity
@@ -419,3 +424,7 @@
    :before-update prepare-runner-details
    :after-update  convert-runner-details
    :after-select  convert-runner-details-select})
+
+(defaggregate repo-idx
+  {:plural "repo-indices"
+   :id-col :repo-id})
