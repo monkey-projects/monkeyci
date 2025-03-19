@@ -56,10 +56,13 @@
   "Wraps interceptor fn `f` in a transaction"
   [f]
   (fn [ctx]
-    (st/transact
-     (get-db ctx)
-     (fn [db]
-       (f (set-db ctx db))))))
+    (let [orig-db (get-db ctx)]
+      (-> orig-db
+          (st/transact
+           (fn [db]
+             (f (set-db ctx db))))
+          ;; Restore original db conn
+          (set-db orig-db)))))
 
 (def assign-build-idx
   "Interceptor that assigns a new index to the build"

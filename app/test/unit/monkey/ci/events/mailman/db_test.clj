@@ -485,7 +485,9 @@
                      (-> res first :type))))
 
             (testing "saves build in db"
-              (is (some? (st/find-build st (-> res first :sid))))))))
+              (let [b (st/find-build st (-> res first :sid))]
+                (is (some? b))
+                (is (number? (:idx b)) "build has an index assigned"))))))
 
       (testing "when no credits"
         (let [cust (h/gen-cust)]
