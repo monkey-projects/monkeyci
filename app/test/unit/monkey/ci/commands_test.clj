@@ -133,7 +133,9 @@
                            (cs/set-api {:url "http://test"
                                         :token (str (random-uuid))})
                            (cs/set-job job)
-                           (cs/set-build {:build-id "test-build"
+                           (cs/set-build {:customer-id "test-cust"
+                                          :repo-id "test-repo"
+                                          :build-id "test-build"
                                           :workspace "test-ws"}))
                 recv (atom [])]
             (is (spec/valid? ::ss/config config)

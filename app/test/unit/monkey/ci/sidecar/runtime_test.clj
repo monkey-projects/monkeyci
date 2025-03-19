@@ -16,7 +16,9 @@
       (sc/set-workspace {:type :disk
                          :dir "test-dir"})
       (sc/set-job {:id "test-job"})
-      (sc/set-build {:build-id "test-build"
+      (sc/set-build {:customer-id "test-cust"
+                     :repo-id "test-repo"
+                     :build-id "test-build"
                      :workspace "test/workspace"})))
 
 (deftest make-system

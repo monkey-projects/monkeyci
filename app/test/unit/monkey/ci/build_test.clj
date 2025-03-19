@@ -105,20 +105,6 @@
       (is (= "/tmp/checkout-base/test-build"
              (sut/calc-checkout-dir rt build))))))
 
-(deftest get-sid
-  (testing "returns build sid"
-    (is (= ::build-sid (sut/get-sid {:build {:sid ::build-sid}}))))
-
-  (testing "constructs sid from account"
-    (is (= [:a :c] (sut/get-sid {:config
-                                 {:account
-                                  {:customer-id :a
-                                   :repo-id :c}}}))))
-
-  (testing "`nil` if incomplete account"
-    (is (nil? (sut/get-sid {:config {:account {:repo-id "r"}}})))
-    (is (nil? (sut/get-sid {:config {:account {:customer-id "c"}}})))))
-
 (deftest job-work-dir
   (testing "returns job work dir as absolute path"
     (is (= "/job/work/dir"

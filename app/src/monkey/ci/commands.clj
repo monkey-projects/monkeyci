@@ -139,8 +139,8 @@
     ;; Return a deferred that only resolves when the event stream stops
     d))
 
-(defn- run-sidecar [{:keys [mailman job] :as rt}]
-  (let [sid (b/get-sid rt)
+(defn- run-sidecar [{:keys [mailman build job] :as rt}]
+  (let [sid (b/sid build)
         base-evt {:sid sid
                   :job-id (jobs/job-id job)}
         result (try

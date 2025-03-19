@@ -1,4 +1,5 @@
 (ns monkey.ci.events.mailman.db
+  "Event handlers that write stuff to the database"
   (:require #_[clojure.spec.alpha :as spec]
             [clojure.tools.logging :as log]
             [medley.core :as mc]

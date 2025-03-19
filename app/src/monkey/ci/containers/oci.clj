@@ -185,7 +185,7 @@
   [{:keys [build job] :as conf}]
   (-> {}
       (cos/set-build (-> build
-                         (select-keys [:build-id :sid :workspace])
+                         (select-keys (conj b/sid-props :workspace))
                          (assoc :checkout-dir (checkout-dir build))))
       (cos/set-job (-> job
                        (select-keys [:id :save-artifacts :restore-artifacts :caches :dependencies])

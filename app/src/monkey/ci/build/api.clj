@@ -45,7 +45,7 @@
 
 (defn- fetch-params* [ctx]
   (let [client (ctx->api-client ctx)]
-    (log/debug "Fetching repo params for" (b/get-sid ctx))
+    (log/debug "Fetching repo params for" (-> ctx :build b/sid))
     (->> @(client (as-edn {:path "/params"
                            :method :get}))
          :body
@@ -60,7 +60,7 @@
    stream that can then be written to disk, or unzipped using archive functions."
   [ctx id]
   (let [client (ctx->api-client ctx)]
-    (log/debug "Downloading artifact for build" (b/get-sid ctx) ":" id)
+    (log/debug "Downloading artifact for build" (-> ctx :build b/sid) ":" id)
     (-> @(client {:path (str "/artifact/" id)
                   :method :get})
         :body)))
