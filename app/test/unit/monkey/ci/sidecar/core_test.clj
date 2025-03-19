@@ -194,7 +194,9 @@
         (let [stored (atom {})
               path "test-path"
               _ (fs/create-file (fs/path dir path))
-              build {:build-id "test-build"
+              build {:customer-id "test-cust"
+                     :repo-id "test-repo"
+                     :build-id "test-build"
                      :checkout-dir dir
                      :workspace "test-ws"}
               cache (ca/make-blob-repository (h/fake-blob-store stored) build)
@@ -215,8 +217,9 @@
     (testing "restores artifacts if configured"
       (h/with-tmp-dir dir
         (let [stored (atom {"test-cust/test-repo/test-build/test-artifact.tgz" "/tmp/checkout"})
-              build {:build-id "test-build"
-                     :sid ["test-cust" "test-repo" "test-build"]
+              build {:customer-id "test-cust"
+                     :repo-id "test-repo"
+                     :build-id "test-build"
                      :checkout-dir "/tmp/checkout"
                      :workspace "test-ws"}
               repo (art/make-blob-repository (h/fake-blob-store stored) build)
@@ -240,8 +243,9 @@
         (let [stored (atom {})
               path "test-artifact"
               _ (fs/create-file (fs/path dir path))
-              build {:build-id "test-build"
-                     :sid ["test-cust" "test-repo" "test-build"]
+              build {:customer-id "test-cust"
+                     :repo-id "test-repo"
+                     :build-id "test-build"
                      :checkout-dir dir
                      :workspace "test-ws"}
               repo (art/make-blob-repository (h/fake-blob-store stored) build)

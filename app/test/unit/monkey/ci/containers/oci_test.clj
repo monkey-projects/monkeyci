@@ -231,7 +231,9 @@
                          :save-artifacts [{:id "test-artifact"
                                            :path "somewhere"}]
                          :work-dir "sub"}
-                   :build {:build-id "test-build"
+                   :build {:customer-id "test-cust"
+                           :repo-id "test-repo"
+                           :build-id "test-build"
                            :checkout-dir "/tmp/test-checkout"
                            :workspace "test-build-ws"}
                    :events {:type :manifold}

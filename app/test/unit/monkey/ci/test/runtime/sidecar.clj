@@ -1,6 +1,8 @@
 (ns monkey.ci.test.runtime.sidecar
   "Helper functions for working with sidecar runtimes"
-  (:require [monkey.ci.logging :as l]
+  (:require [monkey.ci
+             [cuid :as cuid]
+             [logging :as l]]
             [monkey.ci.test.mailman :as tm]))
 
 (defn set-log-maker [rt e]
@@ -36,7 +38,9 @@
       (set-start-file "test-start")
       (set-abort-file "test-abort")
       (set-poll-interval 100)
-      (set-build {:build-id (str "test-build-" (random-uuid))
+      (set-build {:customer-id (cuid/random-cuid)
+                  :repo-id (cuid/random-cuid)
+                  :build-id (str "test-build-" (random-uuid))
                   :workspace "test-ws"})
       (set-job {:id (str "test-job-" (random-uuid))})
       (set-mailman (tm/test-component))
