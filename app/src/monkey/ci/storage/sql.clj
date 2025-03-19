@@ -99,7 +99,10 @@
 
 (defn- insert-repo [conn re repo]
   (let [re (ec/insert-repo conn re)]
-    (insert-repo-labels conn (:labels repo) re)))
+    (insert-repo-labels conn (:labels repo) re)
+    ;; Also create an initial repo idx record for build index calculation
+    (ec/insert-repo-idx conn {:repo-id (:id re)
+                              :next-idx 1})))
 
 (defn- update-repo [conn re repo existing]
   (when (not= re existing)
@@ -454,32 +457,37 @@
         (insert-jobs conn (-> build :script :jobs vals) id))
       ins)))
 
+(defn- update-build-jobs
+  "Updates build jobs, but only when there are jobs in the build script."
+  [conn build existing]
+  (when-let [jobs (get-in build [:script :jobs])]
+    (let [ex-jobs (ec/select-jobs conn (ec/by-build (:id existing)))
+          new-ids (set (keys jobs))
+          existing-ids (set (map :display-id ex-jobs))
+          to-delete (cset/difference existing-ids new-ids)
+          to-insert (apply dissoc jobs existing-ids)
+          to-update (reduce (fn [r ej]
+                              (let [n (get jobs (:display-id ej))]
+                                (cond-> r
+                                  ;; TODO Only update modified jobs
+                                  n (conj [n ej]))))
+                            []
+                            ex-jobs)]
+      (when-not (empty? to-delete)
+        ;; Delete all removed jobs (although this is a situation that probably never happens)
+        (ec/delete-jobs conn [:and
+                              [:= :build-id (:id existing)]
+                              [:in :display-id to-delete]]))
+      (when-not (empty? to-update)
+        (update-jobs conn to-update))
+      (when-not (empty? to-insert)
+        ;; Insert new jobs
+        (insert-jobs conn (vals to-insert) (:id existing))))))
+
 (defn- update-build [conn build existing]
   (ec/update-build conn (merge existing (build->db build)))
-  (let [jobs (get-in build [:script :jobs])
-        ex-jobs (ec/select-jobs conn (ec/by-build (:id existing)))
-        new-ids (set (keys jobs))
-        existing-ids (set (map :display-id ex-jobs))
-        to-delete (cset/difference existing-ids new-ids)
-        to-insert (apply dissoc jobs existing-ids)
-        to-update (reduce (fn [r ej]
-                            (let [n (get jobs (:display-id ej))]
-                              (cond-> r
-                                ;; TODO Only update modified jobs
-                                n (conj [n ej]))))
-                          []
-                          ex-jobs)]
-    (when-not (empty? to-delete)
-      ;; Delete all removed jobs (although this is a situation that probably never happens)
-      (ec/delete-jobs conn [:and
-                            [:= :build-id (:id existing)]
-                            [:in :display-id to-delete]]))
-    (when-not (empty? to-update)
-      (update-jobs conn to-update))
-    (when-not (empty? to-insert)
-      ;; Insert new jobs
-      (insert-jobs conn (vals to-insert) (:id existing)))
-    build))
+  (update-build-jobs conn build existing)
+  build)
 
 (defn- upsert-build [conn build]
   ;; Fetch build by customer cuild and repo and build display ids
@@ -557,10 +565,8 @@
   (->> (eb/select-latest-builds conn cust-id)
        (map db->build)))
 
-(defn- select-max-build-idx [{:keys [conn]} [cust-id repo-id]]
-  ;; TODO Use repo-indices table instead
-  ;; TODO Lock table for update
-  (eb/select-max-idx conn cust-id repo-id))
+(defn- select-next-build-idx [{:keys [conn]} [cust-id repo-id]]
+  (er/next-repo-idx conn cust-id repo-id))
 
 (defn- insert-job [conn job build-sid]
   (when-let [build (apply eb/select-build-by-sid conn build-sid)]
@@ -1079,7 +1085,7 @@
     :find-latest-builds select-latest-customer-builds}
    :repo
    {:list-display-ids select-repo-display-ids
-    :find-next-build-idx (comp (fnil inc 0) select-max-build-idx)
+    :find-next-build-idx select-next-build-idx
     :find-webhooks select-repo-webhooks
     :delete delete-repo}
    :user

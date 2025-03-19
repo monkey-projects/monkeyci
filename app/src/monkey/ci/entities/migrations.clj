@@ -2,7 +2,9 @@
   (:require [clojure.tools.logging :as log]
             [honey.sql :as sql]
             [honey.sql.helpers :as h]            
-            [monkey.ci.entities.core :as ec]
+            [monkey.ci.entities
+             [build :as eb]
+             [core :as ec]]
             [monkey.ci
              [protocols :as mp]
              [vault :as vault]]
@@ -186,6 +188,24 @@
           (map (partial decrypt-single-ssh-key conn))
           (doall)))))
 
+(defn calc-next-idx
+  "For all repos, calculates next build idx and stores it in the `repo-indices` table."
+  [idx]
+  (->FunctionMigration
+   (str idx "-calc-next-idx")
+   (fn [conn]
+     (letfn [(insert-repo-idx [{:keys [repo-id last-idx]}]
+               (ec/insert-repo-idx conn {:repo-id repo-id
+                                         :next-idx (inc last-idx)}))]
+       (->> (ec/select conn {:select [:b.repo-id [:%max.idx :last-idx]]
+                             :from [[:builds :b]]
+                             :group-by [:b.repo-id]})
+            (map insert-repo-idx)
+            (doall))))
+   (fn [conn]
+     ;; Delete them all
+     (ec/delete-repo-indices conn [:> :next-idx 0]))))
+
 (def migrations
   [(entity-table-migration
     1 :customers
@@ -301,6 +321,7 @@
      (col-idx :join-requests :user-id)])
 
    (table-migration
+    ;; Holds the next available build index per repo
     14 :repo-indices
     [[:repo-id :integer [:not nil] [:primary-key]]
      (fk :repo-id :repos :id)]
@@ -359,7 +380,7 @@
      amount-col
      [:from-time :timestamp]
      [:type [:varchar 20]]
-     [:user-id :integer]                ; can be nil
+     [:user-id :integer]             ; can be nil if subscription type
      [:subscription-id :integer]
      [:reason [:varchar 300]]
      fk-customer
@@ -441,7 +462,16 @@
      [:runner [:varchar 50] [:not nil]]
      [:details :text]
      (fk :build-id :builds :id)]
-    [(col-idx :build-runner-details :build-id)])])
+    [(col-idx :build-runner-details :build-id)])
+
+   (migration
+    (mig-id 34 :repo-indices-next-idx)
+    [{:alter-table :repo-indices
+      :add-column [:next-idx :integer [:not nil]]}]
+    [{:alter-table :repo-indices
+      :drop-column :next-idx}])
+
+   (calc-next-idx 35)])
 
 (defn prepare-migrations
   "Prepares all migrations by formatting to sql, creates a ragtime migration object from it."

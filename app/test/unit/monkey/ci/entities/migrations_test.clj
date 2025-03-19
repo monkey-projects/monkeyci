@@ -1,12 +1,12 @@
 (ns monkey.ci.entities.migrations-test
-  (:require
-   [clojure.test :refer [deftest is testing]]
-   [honey.sql :as sql]
-   [monkey.ci.entities.core :as ec]
-   [monkey.ci.entities.helpers :as eh]
-   [monkey.ci.entities.migrations :as sut]
-   [monkey.ci.test.helpers :as h]
-   [monkey.ci.vault :as v]))
+  (:require [clojure.test :refer [deftest is testing]]
+            [honey.sql :as sql]
+            [monkey.ci.entities
+             [core :as ec]
+             [helpers :as eh]
+             [migrations :as sut]]
+            [monkey.ci.test.helpers :as h]
+            [monkey.ci.vault :as v]))
 
 (deftest fk
   (testing "creates foreign key constraint with cascading"
@@ -23,7 +23,7 @@
                sql/format
                first)))))
 
-(deftest customer-ivs
+(deftest ^:sql customer-ivs
   (testing "creates crypto record for each customer that does not have one yet"
     (eh/with-prepared-db conn
       (let [mig (sut/customer-ivs 1)
@@ -33,7 +33,7 @@
         (is (nil? ((:up mig) conn)))
         (is (= 1 (count (ec/select-cryptos conn (ec/by-customer cust-id)))))))))
 
-(deftest encrypt-params
+(deftest ^:sql encrypt-params
   (eh/with-prepared-db conn
     (let [mig (sut/encrypt-params 1)
           vault (h/dummy-vault (constantly "encrypted")
@@ -66,7 +66,7 @@
                                first
                                :value)))))))
 
-(deftest encrypt-ssh-keys
+(deftest ^:sql encrypt-ssh-keys
   (eh/with-prepared-db conn
     (let [mig (sut/encrypt-ssh-keys 1)
           vault (h/dummy-vault (constantly "encrypted")
@@ -95,3 +95,27 @@
         (is (= "decrypted" (-> (ec/select-ssh-keys conn [:= :customer-id cust-id])
                                first
                                :private-key)))))))
+
+(deftest ^:sql calc-next-idx
+  (eh/with-prepared-db conn
+    (let [mig (sut/calc-next-idx 1)
+          cust (eh/gen-customer)
+          cust-id (:id (ec/insert-customer conn cust))
+          repo (-> (eh/gen-repo)
+                   (assoc :customer-id cust-id))
+          repo-id (:id (ec/insert-repo conn repo))]
+
+      (is (some? (ec/insert-build
+                  conn
+                  (assoc (eh/gen-build)
+                         :repo-id repo-id
+                         :idx 100))))
+
+      (testing "`up` creates repo-indices record for each repo with next build idx"
+        (is (some? ((:up mig) conn)))
+        (let [all (ec/select-repo-indices conn nil)]
+          (is (= 1 (count all)))))
+
+      (testing "`down` deletes all records in repo-indices table"
+        (is (some? ((:down mig) conn)))
+        (is (empty? (ec/select-repo-indices conn nil)))))))

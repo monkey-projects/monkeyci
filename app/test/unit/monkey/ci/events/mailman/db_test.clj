@@ -179,7 +179,6 @@
                     (sut/set-credits 100M)
                     (sut/check-credits))]
         (validate-spec :entity/build (:build res))
-        (is (= :pending (get-in res [:build :status])))
         (is (= :build/pending (:type res)))))
 
     (testing "returns `build/end` event with status `error` if no credits available"

@@ -1,7 +1,9 @@
 (ns monkey.ci.entities.repo
   "Repository specific query functions"
   (:require [medley.core :as mc]
-            [monkey.ci.entities.core :as ec]))
+            [monkey.ci.entities
+             [build :as eb]
+             [core :as ec]]))
 
 (defn repos-with-labels
   "Selects repositories with labels according to filter `f`."
@@ -36,3 +38,30 @@
                    :join [[:customers :c] [:= :c.id :r.customer-id]]
                    :where [:= :c.cuid cust-id]})
        (map :display-id)))
+
+(defn- select-repo-idx [conn cust-id repo-id]
+  (->> (ec/select conn
+                  {:select [:ri.*]
+                   :from [[:repo-indices :ri]]
+                   :for :update
+                   :join [[:repos :r] [:= :r.id :ri.repo-id]
+                          [:customers :c] [:= :r.customer-id :c.id]]
+                   :where [:and
+                           [:= :c.cuid cust-id]
+                           [:= :r.display-id repo-id]]})
+       (first)))
+
+(defn next-repo-idx
+  "Retrieves next repo index, and updates the repo-indices table accordingly.
+   The repo-idx record is fetched for update, so it should work atomically."
+  [conn cust-id repo-id]
+  (if-let [m (select-repo-idx conn cust-id repo-id)]
+    (do
+      (ec/update-repo-idx conn (update m :next-idx inc))
+      (:next-idx m))
+    ;; No match found, create one using the current max build idx
+    (let [id (repo-for-build-sid conn cust-id repo-id)
+          next-idx (inc (or (eb/select-max-idx conn cust-id repo-id) 0))]
+      (ec/insert-repo-idx conn {:repo-id id
+                                :next-idx (inc next-idx)})
+      next-idx)))

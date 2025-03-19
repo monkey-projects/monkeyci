@@ -38,7 +38,7 @@
 (s/def :job/memory int?)
 (s/def :job/cpus int?)
 (s/def :job/arch #{:arm :amd})
-(s/def :job/credit-multiplier int?)
+(s/def :job/credit-multiplier (s/with-gen int? #(gen/choose 1 10)))
 
 (s/def :job/command string?)
 (s/def :job/script (s/coll-of :job/command))

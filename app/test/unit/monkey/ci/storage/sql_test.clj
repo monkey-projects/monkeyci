@@ -152,6 +152,12 @@
       (testing "lists display ids"
         (is (= ["test-repo" "new-repo"] (st/list-repo-display-ids s (:id cust)))))
 
+      (testing "inserts repo-idx"
+        (let [r (ec/select-repo conn [:= :display-id (:id repo)])
+              ri (ec/select-repo-idx conn [:= :repo-id (:id r)])]
+          (is (some? ri))
+          (is (= 1 (:next-idx ri)))))
+
       (testing "delete repo"
         (is (true? (st/delete-repo s sid)))
         
@@ -344,6 +350,12 @@
                                            :from :jobs}))))
           (is (= jobs (-> (st/find-build s build-sid) :script :jobs)))))
 
+      (testing "when no jobs, leaves existing jobs as-is"
+        (is (sid/sid? (st/save-build s (update build :script dissoc :jobs))))
+        (is (not-empty (-> (st/find-build s build-sid)
+                           :script
+                           :jobs)))) 
+
       (testing "can update jobs"
         (let [job (assoc (h/gen-job) :status :pending)
               jobs {(:id job) job}
@@ -387,11 +399,8 @@
           (is (some? (st/save-repo s repo)))
           (is (= 1 (st/find-next-build-idx s repo-sid))
               "initial index is one")
-          (is (some? (st/save-build s (-> (h/gen-build)
-                                          (assoc :customer-id (:id cust)
-                                                 :repo-id (:id repo)
-                                                 :idx 100)))))
-          (is (= 101 (st/find-next-build-idx s repo-sid)))))
+          (is (= 2 (st/find-next-build-idx s repo-sid))
+              "increases on each invocation")))
 
       (testing "can list builds since timestamp"
         (let [repo (h/gen-repo)

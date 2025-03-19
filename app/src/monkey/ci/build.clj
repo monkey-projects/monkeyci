@@ -172,6 +172,9 @@
       ;; sid at this point is only repo sid, since the build id still needs to be assigned
       (assoc :sid [(:customer-id build) (:repo-id build)])))
 
+(defn build-pending-evt [build]
+  (with-build-evt :build/pending build))
+
 (defn build-init-evt [build]
   (with-build-evt :build/initializing build))
 
