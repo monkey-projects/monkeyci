@@ -52,21 +52,31 @@
                          (sut/set-db s)
                          (leave)
                          (sut/get-build))))
-        (is (= build (st/find-build s (get-sid build)))))
+        (is (= build (st/find-build s (get-sid build))))))))
 
-      (testing "assigns build index, unique to the repo"
+(deftest assign-build-idx
+  (h/with-memory-store s
+    (let [{:keys [enter] :as i} sut/assign-build-idx
+          build (h/gen-build)
+          get-sid (apply juxt st/build-sid-keys)]
+      (is (keyword? (:name i)))
+      
+      (testing "`enter` assigns build index, unique to the repo"
         (let [repo (h/gen-repo)
               cust (-> (h/gen-cust)
                        (assoc :repos {(:id repo) repo}))
               build {:customer-id (:id cust)
                      :repo-id (:id repo)}]
           (is (some? (st/save-customer s cust)))
-          (let [r (-> {:result {:build build}}
+          (let [r (-> {:event {:build build
+                               :sid [(:id cust) (:id repo)]}}
                       (sut/set-db s)
-                      (leave)
-                      (sut/get-build))]
-            (is (some? (:build-id r)))
-            (is (number? (:idx r)))))))))
+                      (enter)
+                      :event)]
+            (is (some? (get-in r [:build :build-id])))
+            (is (number? (get-in r [:build :idx])))
+            (is (= [(:id cust) (:id repo) (get-in r [:build :build-id])]
+                   (:sid r)))))))))
 
 (deftest load-build
   (h/with-memory-store s
@@ -451,15 +461,21 @@
     (testing "`build/triggered`"
       (testing "with available credits"
         (let [cust (h/gen-cust)
+              repo (-> (h/gen-repo)
+                       (assoc :customer-id (:id cust)))
               creds {:id (cuid/random-cuid)
                      :customer-id (:id cust)
                      :amount 100M}]
           (is (some? (st/save-customer st cust)))
           (is (some? (st/save-customer-credit st creds)))
+          (is (some? (st/save-repo st repo)))
           
           (let [res (-> {:type :build/triggered
                          :build (-> (h/gen-build)
-                                    (assoc :customer-id (:id cust)))}
+                                    (assoc :customer-id (:id cust)
+                                           :repo-id (:id repo))
+                                    ;; At this point, builds don't have an index
+                                    (dissoc :idx :build-id))}
                         (router)
                         first
                         :result)]

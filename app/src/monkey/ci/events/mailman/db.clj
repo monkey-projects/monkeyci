@@ -52,28 +52,40 @@
    :enter (fn [ctx]
             (set-build ctx (st/find-build (get-db ctx) (get-in ctx [:event :sid]))))})
 
-(defn- maybe-assign-build-idx [build db]
-  (letfn [(assign-build-idx [build]
-            (let [idx (st/find-next-build-idx db (take 2 (b/sid build)))]
-              (assoc build
-                     :idx idx
-                     :build-id (str "build-" idx))))]
-    (cond-> build
-      (nil? (:idx build)) (assign-build-idx))))
+(defn- transactional
+  "Wraps interceptor fn `f` in a transaction"
+  [f]
+  (fn [ctx]
+    (st/transact
+     (get-db ctx)
+     (fn [db]
+       (f (set-db ctx db))))))
+
+(def assign-build-idx
+  "Interceptor that assigns a new index to the build"
+  {:name ::assign-build-idx
+   :enter (transactional
+           (fn [ctx]
+             (let [db (get-db ctx)
+                   idx (st/find-next-build-idx db (get-in ctx [:event :sid]))
+                   build-id (str "build-" idx)]
+               (-> ctx
+                   ;; Maybe it's a bad idea to patch the incoming event?
+                   (update-in [:event :build] merge {:idx idx
+                                                     :build-id build-id})
+                   (update-in [:event :sid] (comp #(conj % build-id) vec))))))})
 
 (def save-build
   {:name ::save-build
-   :leave (fn [ctx]
-            (st/transact
-             (get-db ctx)
-             (fn [db]
-               (let [build (let [b (some-> (:build (em/get-result ctx))
-                                           (maybe-assign-build-idx db))]
-                             (when (and b #_(spec/valid? :entity/build b)
-                                        (st/save-build db b))
-                               b))]
-                 (cond-> ctx
-                   (some? build) (set-build build))))))})
+   :leave (transactional
+           (fn [ctx]
+             (let [db (get-db ctx)
+                   build (let [b (:build (em/get-result ctx))]
+                           (when (and b #_(spec/valid? :entity/build b)
+                                      (st/save-build db b))
+                             b))]
+               (cond-> ctx
+                 (some? build) (set-build build)))))})
 
 (def with-build
   "Combines `load-build` and `save-build` interceptors.  Note that this does not work
@@ -258,6 +270,7 @@
       [{:handler check-credits
         :interceptors [use-db
                        customer-credits
+                       assign-build-idx
                        save-build]}]]
 
      [:build/pending
