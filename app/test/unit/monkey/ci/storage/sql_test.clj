@@ -350,6 +350,12 @@
                                            :from :jobs}))))
           (is (= jobs (-> (st/find-build s build-sid) :script :jobs)))))
 
+      (testing "when no jobs, leaves existing jobs as-is"
+        (is (sid/sid? (st/save-build s (update build :script dissoc jobs))))
+        (is (not-empty (-> (st/find-build s build-sid)
+                           :script
+                           :jobs)))) 
+
       (testing "can update jobs"
         (let [job (assoc (h/gen-job) :status :pending)
               jobs {(:id job) job}

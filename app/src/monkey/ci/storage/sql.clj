@@ -457,32 +457,37 @@
         (insert-jobs conn (-> build :script :jobs vals) id))
       ins)))
 
+(defn- update-build-jobs
+  "Updates build jobs, but only when there are jobs in the build script."
+  [conn build existing]
+  (when-let [jobs (get-in build [:script :jobs])]
+    (let [ex-jobs (ec/select-jobs conn (ec/by-build (:id existing)))
+          new-ids (set (keys jobs))
+          existing-ids (set (map :display-id ex-jobs))
+          to-delete (cset/difference existing-ids new-ids)
+          to-insert (apply dissoc jobs existing-ids)
+          to-update (reduce (fn [r ej]
+                              (let [n (get jobs (:display-id ej))]
+                                (cond-> r
+                                  ;; TODO Only update modified jobs
+                                  n (conj [n ej]))))
+                            []
+                            ex-jobs)]
+      (when-not (empty? to-delete)
+        ;; Delete all removed jobs (although this is a situation that probably never happens)
+        (ec/delete-jobs conn [:and
+                              [:= :build-id (:id existing)]
+                              [:in :display-id to-delete]]))
+      (when-not (empty? to-update)
+        (update-jobs conn to-update))
+      (when-not (empty? to-insert)
+        ;; Insert new jobs
+        (insert-jobs conn (vals to-insert) (:id existing))))))
+
 (defn- update-build [conn build existing]
   (ec/update-build conn (merge existing (build->db build)))
-  (let [jobs (get-in build [:script :jobs])
-        ex-jobs (ec/select-jobs conn (ec/by-build (:id existing)))
-        new-ids (set (keys jobs))
-        existing-ids (set (map :display-id ex-jobs))
-        to-delete (cset/difference existing-ids new-ids)
-        to-insert (apply dissoc jobs existing-ids)
-        to-update (reduce (fn [r ej]
-                            (let [n (get jobs (:display-id ej))]
-                              (cond-> r
-                                ;; TODO Only update modified jobs
-                                n (conj [n ej]))))
-                          []
-                          ex-jobs)]
-    (when-not (empty? to-delete)
-      ;; Delete all removed jobs (although this is a situation that probably never happens)
-      (ec/delete-jobs conn [:and
-                            [:= :build-id (:id existing)]
-                            [:in :display-id to-delete]]))
-    (when-not (empty? to-update)
-      (update-jobs conn to-update))
-    (when-not (empty? to-insert)
-      ;; Insert new jobs
-      (insert-jobs conn (vals to-insert) (:id existing)))
-    build))
+  (update-build-jobs conn build existing)
+  build)
 
 (defn- upsert-build [conn build]
   ;; Fetch build by customer cuild and repo and build display ids

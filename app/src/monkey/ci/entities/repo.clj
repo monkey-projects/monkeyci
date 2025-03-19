@@ -1,7 +1,9 @@
 (ns monkey.ci.entities.repo
   "Repository specific query functions"
   (:require [medley.core :as mc]
-            [monkey.ci.entities.core :as ec]))
+            [monkey.ci.entities
+             [build :as eb]
+             [core :as ec]]))
 
 (defn repos-with-labels
   "Selects repositories with labels according to filter `f`."
@@ -57,8 +59,9 @@
     (do
       (ec/update-repo-idx conn (update m :next-idx inc))
       (:next-idx m))
-    ;; No match found, create one
-    (let [id (repo-for-build-sid conn cust-id repo-id)]
+    ;; No match found, create one using the current max build idx
+    (let [id (repo-for-build-sid conn cust-id repo-id)
+          next-idx (inc (or (eb/select-max-idx conn cust-id repo-id) 0))]
       (ec/insert-repo-idx conn {:repo-id id
-                                :next-idx 2})
-      1)))
+                                :next-idx (inc next-idx)})
+      next-idx)))

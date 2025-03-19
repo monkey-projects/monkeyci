@@ -64,19 +64,20 @@
 (def save-build
   {:name ::save-build
    :leave (fn [ctx]
-            (let [db (get-db ctx)
-                  build (let [b (some-> (:build (em/get-result ctx))
-                                        (maybe-assign-build-idx db))]
-                          (when (and b #_(spec/valid? :entity/build b)
-                                     (st/save-build db b))
-                            b))]
-              (cond-> ctx
-                (some? build) (set-build build))))})
+            (st/transact
+             (get-db ctx)
+             (fn [db]
+               (let [build (let [b (some-> (:build (em/get-result ctx))
+                                           (maybe-assign-build-idx db))]
+                             (when (and b #_(spec/valid? :entity/build b)
+                                        (st/save-build db b))
+                               b))]
+                 (cond-> ctx
+                   (some? build) (set-build build))))))})
 
 (def with-build
   "Combines `load-build` and `save-build` interceptors.  Note that this does not work
    atomically."
-  ;; TODO Check if we should lock the build records first
   {:name ::with-build
    :enter (:enter load-build)
    :leave (:leave save-build)})
@@ -155,6 +156,13 @@
         (patch ctx)
         (build-update-evt))))
 
+(defn- without-jobs
+  "Removes the jobs from the build, ensuring they are not updated.  This eliminates
+   unnecessary update and query operations and reduces risk of stale data with
+   multiple replicas."
+  [build]
+  (update build :script dissoc :jobs))
+
 (def build-initializing
   "Updates build state to `initializing`.  Returns a consolidated `build/updated` event."
   (build-update (fn [b _] (assoc b :status :initializing))))
@@ -162,26 +170,28 @@
 (def build-start
   "Marks build as running."
   (build-update (fn [b {:keys [event]}]
-                  (assoc b
-                         :status :running
-                         :start-time (:time event)
-                         :credit-multiplier (:credit-multiplier event)))))
+                  (-> b
+                      (without-jobs)
+                      (assoc :status :running
+                             :start-time (:time event)
+                             :credit-multiplier (:credit-multiplier event))))))
 
 (def build-end
   (build-update (fn [b {:keys [event]}]
                   (-> b
+                      (without-jobs)
                       (assoc :status (:status event)
                              :end-time (:time event)
                              :credits (b/calc-credits b))
                       (mc/assoc-some :message (:message event))))))
 
-
 (def build-canceled
   (build-update (fn [b {:keys [event]}]
-                  (assoc b
-                         :status :canceled
-                         :end-time (:time event)
-                         :credits (b/calc-credits b)))))
+                  (-> b
+                      (without-jobs)
+                      (assoc :status :canceled
+                             :end-time (:time event)
+                             :credits (b/calc-credits b))))))
 
 (def script-init
   (build-update (fn [b ctx]
