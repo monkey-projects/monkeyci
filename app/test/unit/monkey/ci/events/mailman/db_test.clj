@@ -508,38 +508,44 @@
               (is (some? (st/find-build st (-> res first :sid)))))))))
 
     (testing "`build/end`"
-      (testing "creates credit consumption"
-        (let [job {:id "test-job"
-                   :start-time 1000
-                   :end-time 2000
-                   :status :success
-                   :credit-multiplier 1}
-              repo (h/gen-repo)
-              cust (-> (h/gen-cust)
-                       (assoc :repos {(:id repo) repo}))
-              build (-> (h/gen-build)
-                        (assoc :customer-id (:id cust)
-                               :repo-id (:id repo)
-                               :credit-multiplier 1
-                               :start-time 1000
-                               :script
-                               {:jobs {(:id job) job}}))]
-          (is (some? (st/save-customer st cust)))
-          (is (some? (st/save-repo st repo)))
-          (is (some? (st/save-build st build)))
-          (is (some? (st/save-customer-credit st {:customer-id (:id cust)
-                                                  :amount 100
-                                                  :type :user})))
+      (let [job {:id "test-job"
+                 :start-time 1000
+                 :end-time 2000
+                 :status :success
+                 :credit-multiplier 1}
+            repo (h/gen-repo)
+            cust (-> (h/gen-cust)
+                     (assoc :repos {(:id repo) repo}))
+            build (-> (h/gen-build)
+                      (assoc :customer-id (:id cust)
+                             :repo-id (:id repo)
+                             :credit-multiplier 1
+                             :start-time 1000
+                             :script
+                             {:jobs {(:id job) job}}))]
+        (is (some? (st/save-customer st cust)))
+        (is (some? (st/save-repo st repo)))
+        (is (some? (st/save-build st build)))
+        (is (some? (st/save-customer-credit st {:customer-id (:id cust)
+                                                :amount 100
+                                                :type :user})))
 
-          (let [res (-> {:type :build/end
-                         :build build
-                         :time 2000
-                         :sid (sut/build->sid build)}
-                        (router)
-                        first
-                        :result)
-                match (st/find-build st (-> res first :sid))
-                cc (st/list-customer-credit-consumptions st (:id cust))]
-            (is (= (:id build) (:id match)))
-            (is (= 1 (count cc)))
-            (is (= 1 (:amount (first cc))))))))))
+        (let [res (-> {:type :build/end
+                       :build build
+                       :time 2000
+                       :sid (sut/build->sid build)}
+                      (router)
+                      first
+                      :result)
+              match (st/find-build st (-> res first :sid))]
+          (is (= (:id build) (:id match)))
+          
+          (testing "creates credit consumption"
+            (let [cc (st/list-customer-credit-consumptions st (:id cust))]
+              (is (= 1 (count cc)))
+              (is (= 1 (:amount (first cc))))))
+
+          (testing "fires `build/updated` event with jobs"
+            (let [evt (first res)]
+              (is (= :build/updated (:type evt)))
+              (is (= 1 (-> evt :build :script :jobs count))))))))))

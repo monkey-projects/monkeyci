@@ -168,9 +168,17 @@
 
 (defn- build-update [patch]
   (fn [ctx]
-    (-> (get-build ctx)
-        (patch ctx)
-        (build-update-evt))))
+    (let [build (get-build ctx)
+          get-jobs (comp :jobs :script)
+          jobs (get-jobs build)
+          re-add-jobs (fn [b]
+                        (cond-> b
+                          (nil? (get-jobs b)) (update :script assoc :jobs jobs)))]
+      (-> build
+          (patch ctx)
+          ;; Add the original jobs, in case they were removed, so they appear in the update event
+          (re-add-jobs)
+          (build-update-evt)))))
 
 (defn- without-jobs
   "Removes the jobs from the build, ensuring they are not updated.  This eliminates
