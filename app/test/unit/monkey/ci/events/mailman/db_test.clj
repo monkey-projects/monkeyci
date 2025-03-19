@@ -182,9 +182,10 @@
         (is (= :pending (get-in res [:build :status])))
         (is (= :build/pending (:type res)))))
 
-    (testing "returns `build/failed` event if no credits available"
-      (is (= :build/failed (-> (sut/check-credits ctx)
-                               :type))))))
+    (testing "returns `build/end` event with status `error` if no credits available"
+      (let [r (sut/check-credits ctx)]
+        (is (= :build/end (:type r)))
+        (is (= :error (:status r)))))))
 
 (deftest queue-build
   (testing "returns `build/queued` event"
@@ -482,8 +483,9 @@
                         first
                         :result)]
             
-            (testing "results in `build/failed` event"
-              (is (= :build/failed (-> res first :type))))
+            (testing "results in `build/end` event"
+              (is (= :build/end (-> res first :type)))
+              (is (= :error (-> res first :status))))
 
             (testing "saves build in db"
               (is (some? (st/find-build st (-> res first :sid)))))))))

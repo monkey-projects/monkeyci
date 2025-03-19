@@ -136,7 +136,8 @@
              :build (-> (get-in ctx [:event :build])
                         ;; TODO Build lifecycle property
                         (assoc :status :pending))}
-      (not has-creds?) (assoc :type :build/failed
+      (not has-creds?) (assoc :type :build/end
+                              :status :error
                               ;; TODO Failure cause keyword
                               :message "No credits available"))))
 
