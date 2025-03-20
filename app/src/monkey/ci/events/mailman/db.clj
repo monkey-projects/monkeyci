@@ -108,8 +108,10 @@
   {:name ::save-job
    :leave (fn [{{:keys [sid job-id]} :event :as ctx}]
             (let [job (let [j (-> ctx (em/get-result) (get-in [:build :script :jobs job-id]))]
-                        (when (and j (st/save-job (get-db ctx) sid j))
-                          j))]
+                        (if (and j (st/save-job (get-db ctx) sid j))
+                          (do (log/debug "Updated job in db:" j)
+                              j)
+                          (log/warn "Failed to update job in db:" j)))]
               (cond-> ctx
                 job (set-job job))))})
 
