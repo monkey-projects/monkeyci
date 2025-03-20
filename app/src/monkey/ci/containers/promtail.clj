@@ -14,7 +14,7 @@
 
 ;; Default promtail settings
 (def promtail-image "docker.io/grafana/promtail")
-(def promtail-version "2.9.2")
+(def promtail-version "3.4")
 
 (defn promtail-config
   "Generates config structure that can be passed to promtail.  The structure should
@@ -66,13 +66,4 @@
       (merge (b/sid->props build))
       (assoc :job-id (j/job-id job))))
 
-(defn ^:deprecated rt->config
-  "Extracts necessary values from the runtime to create a promtail config map, that
-   can be passed to `promtail-config`."
-  [rt]
-  (let [pt-config (get-in rt [:config :promtail])]
-    (make-config (-> pt-config
-                     (mc/assoc-some :token (-> (rt/config rt) :api :token)))
-                 (:job rt)
-                 (rt/build rt))))
 

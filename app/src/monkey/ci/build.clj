@@ -30,8 +30,8 @@
 
 (defn sid->props
   "Constructs map of `customer-id`, `repo-id` and `build-id` from the build or it's sid"
-  [b]
-  (if-let [{:keys [sid]} b]
+  [{:keys [sid] :as b}]
+  (if sid
     (zipmap sid-props sid)
     (select-keys b sid-props)))
 
