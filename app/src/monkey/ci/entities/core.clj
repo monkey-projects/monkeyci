@@ -28,17 +28,19 @@
   "Batch inserts multiple entities at once.  The records are assumed to
    be vectors of values."
   [{:keys [ds sql-opts]} table cols recs]
-  (->> (jdbc/execute! ds
-                      (h/format {:insert-into table
-                                 :columns cols
-                                 :values recs}
-                                sql-opts)
-                      insert-opts)
-       (map extract-id)
-       (zipmap recs)
-       (map (fn [[r id]]
-              (-> (zipmap cols r)
-                  (assoc :id id))))))
+  (let [sql (h/format {:insert-into table
+                       :columns cols
+                       :values recs}
+                      sql-opts)]
+    (log/trace "Executing insert:" sql)
+    (->> (jdbc/execute! ds
+                        sql
+                        insert-opts)
+         (map extract-id)
+         (zipmap recs)
+         (map (fn [[r id]]
+                (-> (zipmap cols r)
+                    (assoc :id id)))))))
 
 (defn insert-entity [{:keys [ds sql-opts] :as conn} table rec]
   ;; Both work, maybe the first is a little bit more efficient.
@@ -56,11 +58,10 @@
 (def update-opts default-opts)
 
 (defn- execute-update [{:keys [ds sql-opts]} query]
-  (-> (jdbc/execute-one! ds
-                         (h/format query
-                                   sql-opts)
-                         update-opts)
-      ::jdbc/update-count))
+  (let [sql (h/format query sql-opts)]
+    (log/trace "Executing update:" sql)
+    (-> (jdbc/execute-one! ds sql update-opts)
+        ::jdbc/update-count)))
 
 (defn update-entity
   "Updates entity by id, returns the number of records updated (should be either 0 or 1)."

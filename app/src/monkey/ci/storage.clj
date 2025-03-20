@@ -367,7 +367,7 @@
           (assoc :legacy? true))
       (p/read-obj s (concat [builds] sid)))))
 
-(def update-build
+(def ^:deprecated update-build
   "Atomically updates build by retrieving it, applying `f` to it, and then saving it back"
   (override-or
    [:build :update]
