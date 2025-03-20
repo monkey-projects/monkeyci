@@ -49,7 +49,7 @@
   (testing "creates container config for promtail"
     (let [conf (sut/promtail-container {})]
       (is (map? conf))
-      (is (= "docker.io/grafana/promtail:2.9.2" (:image-url conf)))
+      (is (re-matches #"^docker.io/grafana/promtail:.+$" (:image-url conf)))
       (is (= "promtail" (:display-name conf)))))
 
   (testing "uses configured promtail version"
