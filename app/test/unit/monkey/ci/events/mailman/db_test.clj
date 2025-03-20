@@ -149,10 +149,8 @@
           ;; Build must exist otherwise jobs won't be saved
           (is (some? (st/save-build s build)))
           (is (some? (-> {:event
-                          {:build
-                           {:script
-                            {:jobs
-                             {(:id job) job}}}
+                          {:type :script/start
+                           :jobs [job]
                            :sid sid}}
                          (sut/set-db s)
                          (enter))))

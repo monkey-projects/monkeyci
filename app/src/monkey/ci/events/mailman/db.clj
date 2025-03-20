@@ -110,10 +110,9 @@
 (def create-jobs
   "Creates jobs in the db, as found in the event"
   {:name ::create-jobs
-   :enter (fn [ctx]
-            (let [sid (get-in ctx [:event :sid])]
-              (doseq [j (-> ctx :event :build :script :jobs vals)]
-                (st/save-job (get-db ctx) sid j)))
+   :enter (fn [{{:keys [sid jobs]} :event :as ctx}]
+            (doseq [j jobs]
+              (st/save-job (get-db ctx) sid j))
             ctx)})
 
 (def load-job
