@@ -32,6 +32,13 @@
 
 (def build->sid b/sid)
 
+(defn- without-jobs
+  "Removes the jobs from the build, ensuring they are not updated.  This eliminates
+   unnecessary update and query operations and reduces risk of stale data with
+   multiple replicas."
+  [build]
+  (update build :script dissoc :jobs))
+
 ;;; Interceptors for side effects
 
 (defn use-db
@@ -80,13 +87,15 @@
                    (update-in [:event :sid] (comp #(conj % build-id) vec))))))})
 
 (def save-build
+  "Interceptor that saves the build as found in the context result, but does not
+   update the jobs."
   {:name ::save-build
    :leave (transactional
            (fn [ctx]
              (let [db (get-db ctx)
                    build (let [b (:build (em/get-result ctx))]
                            (when (and b #_(spec/valid? :entity/build b)
-                                      (st/save-build db b))
+                                      (st/save-build db (without-jobs b)))
                              b))]
                (cond-> ctx
                  (some? build) (set-build build)))))})
@@ -97,6 +106,15 @@
   {:name ::with-build
    :enter (:enter load-build)
    :leave (:leave save-build)})
+
+(def create-jobs
+  "Creates jobs in the db, as found in the event"
+  {:name ::create-jobs
+   :enter (fn [ctx]
+            (let [sid (get-in ctx [:event :sid])]
+              (doseq [j (-> ctx :event :build :script :jobs vals)]
+                (st/save-job (get-db ctx) sid j)))
+            ctx)})
 
 (def load-job
   {:name ::load-job
@@ -172,24 +190,10 @@
 
 (defn- build-update [patch]
   (fn [ctx]
-    (let [build (get-build ctx)
-          get-jobs (comp :jobs :script)
-          jobs (get-jobs build)
-          re-add-jobs (fn [b]
-                        (cond-> b
-                          (nil? (get-jobs b)) (update :script assoc :jobs jobs)))]
+    (let [build (get-build ctx)]
       (-> build
           (patch ctx)
-          ;; Add the original jobs, in case they were removed, so they appear in the update event
-          (re-add-jobs)
           (build-update-evt)))))
-
-(defn- without-jobs
-  "Removes the jobs from the build, ensuring they are not updated.  This eliminates
-   unnecessary update and query operations and reduces risk of stale data with
-   multiple replicas."
-  [build]
-  (update build :script dissoc :jobs))
 
 (def build-initializing
   "Updates build state to `initializing`.  Returns a consolidated `build/updated` event."
@@ -198,16 +202,14 @@
 (def build-start
   "Marks build as running."
   (build-update (fn [b {:keys [event]}]
-                  (-> b
-                      (without-jobs)
-                      (assoc :status :running
-                             :start-time (:time event)
-                             :credit-multiplier (:credit-multiplier event))))))
+                  (assoc b
+                         :status :running
+                         :start-time (:time event)
+                         :credit-multiplier (:credit-multiplier event)))))
 
 (def build-end
   (build-update (fn [b {:keys [event]}]
                   (-> b
-                      (without-jobs)
                       (assoc :status (:status event)
                              :end-time (:time event)
                              :credits (b/calc-credits b))
@@ -215,11 +217,10 @@
 
 (def build-canceled
   (build-update (fn [b {:keys [event]}]
-                  (-> b
-                      (without-jobs)
-                      (assoc :status :canceled
-                             :end-time (:time event)
-                             :credits (b/calc-credits b))))))
+                  (assoc b
+                         :status :canceled
+                         :end-time (:time event)
+                         :credits (b/calc-credits b)))))
 
 (def script-init
   (build-update (fn [b ctx]
@@ -318,7 +319,7 @@
 
      [:script/start
       [{:handler script-start
-        :interceptors build-int}]]
+        :interceptors (conj build-int create-jobs)}]]
 
      [:script/end
       [{:handler script-end

@@ -226,7 +226,8 @@
                                              :repos {repo-id {:id repo-id}}})))
         (is (sid/sid? (sut/save-build st old-build)))
         (is (sid/sid? (sut/save-build st new-build)))
-        (is (= [new-build] (sut/list-builds-since st cust-id 150)))))))
+        (is (= [new-build] (->> (sut/list-builds-since st cust-id 150)
+                                (map #(select-keys % (keys new-build))))))))))
 
 (deftest find-next-build-idx
   (testing "max build idx plus one for this repo"

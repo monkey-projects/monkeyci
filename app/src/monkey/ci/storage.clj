@@ -351,11 +351,6 @@
   [s sid]
   (p/obj-exists? s (build-metadata-sid sid)))
 
-(defn save-build
-  "Creates or updates the build entity"
-  [s build]
-  (p/write-obj s (build-sid build) build))
-
 (defn find-build
   "Finds build by sid"
   [s sid]
@@ -366,6 +361,17 @@
           (merge (find-build-results s sid))
           (assoc :legacy? true))
       (p/read-obj s (concat [builds] sid)))))
+
+(defn save-build
+  "Creates or updates the build entity.  If jobs are specified, those will be saved as well."
+  [s build]
+  (let [get-jobs (comp :jobs :script)
+        orig (find-build s (ext-build-sid build))
+        upd (cond-> build
+              (and orig
+                   (nil? (get-jobs build)))
+              (update :script assoc :jobs (get-jobs orig)))]
+    (p/write-obj s (build-sid build) upd)))
 
 (defn- update-build
   "Atomically updates build by retrieving it, applying `f` to it, and then saving it back"

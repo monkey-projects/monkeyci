@@ -40,20 +40,6 @@
                      (enter)
                      (sut/get-credits)))))))))
 
-(deftest save-build
-  (h/with-memory-store s
-    (let [{:keys [leave] :as i} sut/save-build
-          build (h/gen-build)
-          get-sid (apply juxt st/build-sid-keys)]
-      (is (keyword? (:name i)))
-
-      (testing "`leave` saves build from result event"
-        (is (= build (-> {:result {:build build}}
-                         (sut/set-db s)
-                         (leave)
-                         (sut/get-build))))
-        (is (= build (st/find-build s (get-sid build))))))))
-
 (deftest assign-build-idx
   (h/with-memory-store s
     (let [{:keys [enter] :as i} sut/assign-build-idx
@@ -78,6 +64,37 @@
             (is (= [(:id cust) (:id repo) (get-in r [:build :build-id])]
                    (:sid r)))))))))
 
+(deftest save-build
+  (h/with-memory-store s
+    (let [{:keys [leave] :as i} sut/save-build
+          build (-> (h/gen-build)
+                    (assoc :script nil))
+          get-sid (apply juxt st/build-sid-keys)]
+      (is (keyword? (:name i)))
+
+      (testing "`leave` saves build from result event"
+        (is (= build (-> {:result {:build build}}
+                         (sut/set-db s)
+                         (leave)
+                         (sut/get-build))))
+        (is (= build (st/find-build s (get-sid build)))))
+
+      (testing "does not overwrite jobs"
+        (let [job {:id "test-job"
+                   :type :container}]
+          (is (some? (st/save-job s (get-sid build) job)))
+          (is (some? (-> {:result
+                          {:build
+                           (assoc build 
+                                  :script
+                                  {:jobs {"other-job" {:id "other-job"}}})}}
+                         (sut/set-db s)
+                         (leave))))
+          (is (= [job] (-> (st/find-build s (get-sid build))
+                           :script
+                           :jobs
+                           vals))))))))
+
 (deftest load-build
   (h/with-memory-store s
     (let [sid-keys [:customer-id :repo-id :build-id]
@@ -99,7 +116,8 @@
     (let [sid-keys [:customer-id :repo-id :build-id]
           sid (repeatedly 3 cuid/random-cuid)
           build (-> (h/gen-build)
-                    (merge (zipmap sid-keys sid)))
+                    (merge (zipmap sid-keys sid))
+                    (update :script assoc :jobs {}))
           {:keys [enter leave] :as i} sut/with-build]
       (is (some? (st/save-build s build)))
       (is (keyword? (:name i)))
@@ -110,13 +128,36 @@
                          (enter)
                          (sut/get-build)))))
 
-      (testing "`leave` saves build from result event"
-        (let [upd (assoc build :status :success)]
-          (is (= upd (-> {:result {:build upd}}
+      (testing "`leave`"
+        (testing "saves build from result event"
+          (let [upd (assoc build :status :success)]
+            (is (= upd (-> {:result {:build upd}}
+                           (sut/set-db s)
+                           (leave)
+                           (sut/get-build))))
+            (is (= upd (st/find-build s (sut/build->sid build))))))))))
+
+(deftest create-jobs
+  (h/with-memory-store s
+    (let [{:keys [enter] :as i} sut/create-jobs]
+      (is (keyword? (:name i)))
+
+      (testing "`enter` saves all jobs in event in db"
+        (let [sid (vec (repeatedly 3 cuid/random-cuid))
+              job {:id "test-job"}
+              build (zipmap st/build-sid-keys sid)]
+          ;; Build must exist otherwise jobs won't be saved
+          (is (some? (st/save-build s build)))
+          (is (some? (-> {:event
+                          {:build
+                           {:script
+                            {:jobs
+                             {(:id job) job}}}
+                           :sid sid}}
                          (sut/set-db s)
-                         (leave)
-                         (sut/get-build))))
-          (is (= upd (st/find-build s (sut/build->sid build)))))))))
+                         (enter))))
+          (is (some? (st/find-build s sid)))
+          (is (= job (st/find-job s (conj sid (:id job))))))))))
 
 (deftest load-job
   (h/with-memory-store s
