@@ -474,18 +474,7 @@
             (is (= #{"build-2" "build-4"}
                    (->> latest
                         (map :build-id)
-                        (set)))))))
-
-      (testing "can update atomically"
-        (let [build (-> (h/gen-build)
-                        (assoc :status :initializing
-                               :customer-id (:id cust)
-                               :repo-id (:id repo)))
-              sid (b/sid build)]
-          (is (sid/sid? (st/save-build s build)))
-          (is (sid/sid? (st/update-build s sid assoc :status :running)))
-          (is (= :running (-> (st/find-build s sid)
-                              :status))))))))
+                        (set))))))))))
 
 (deftest ^:sql jobs
   (with-storage conn s

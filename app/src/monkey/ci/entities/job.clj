@@ -19,12 +19,3 @@
            first
            (ec/convert-job-select)))
 
-(defn select-for-update
-  "Selects a number of job records for updating"
-  [conn f]
-  (->> {:select :*
-        :from [:jobs]
-        :for :update
-        :where f}
-       (ec/select conn)
-       (map ec/convert-job-select)))

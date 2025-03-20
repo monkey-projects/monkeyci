@@ -33,15 +33,6 @@
           (first)
           (ec/convert-build-select)))
 
-(defn select-build-by-sid-for-update
-  [conn cust-cuid repo-id build-id]
-  (some-> (ec/select conn
-                     (-> (build-query cust-cuid repo-id)
-                         (update :where conj [:= :b.display-id build-id])
-                         (assoc :for :update)))
-          (first)
-          (ec/convert-build-select)))
-
 (defn select-max-idx [conn cust-cuid repo-id]
   (-> (ec/select conn
                  (-> (build-query cust-cuid repo-id)

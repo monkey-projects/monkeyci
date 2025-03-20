@@ -495,19 +495,16 @@
     (update-build conn build existing)
     (insert-build conn build)))
 
-(defn- select-jobs [conn build-id for-update? & [query-fn]]
-  (let [fetcher (if for-update?
-                  ej/select-for-update 
-                  ec/select-jobs)]
-    (->> (fetcher conn (ec/by-build build-id))
-         (map db->job)
-         (map (fn [j] [(:id j) j]))
-         (into {}))))
+(defn- select-jobs [conn build-id]
+  (->> (ec/select-jobs conn (ec/by-build build-id))
+       (map db->job)
+       (map (fn [j] [(:id j) j]))
+       (into {})))
 
 (defn- hydrate-build
   "Fetches jobs related to the build"
-  [conn [cust-id repo-id] build for-update?]
-  (let [jobs (select-jobs conn (:id build) for-update?)]
+  [conn [cust-id repo-id] build]
+  (let [jobs (select-jobs conn (:id build))]
     (cond-> (-> (db->build build)
                 (assoc :customer-id cust-id
                        :repo-id repo-id)
@@ -515,24 +512,9 @@
                 (drop-nil))
       (not-empty jobs) (assoc-in [:script :jobs] jobs))))
 
-(defn- update-build-atomically
-  "Updates build atomically by locking build and job records."
-  [{:keys [conn]} sid f & args]
-  (when-let [b (apply eb/select-build-by-sid-for-update conn sid)]
-    ;; Since this operation also fetches and updates jobs, it could still be that
-    ;; stale data is written to the database, if in the meantime another process/thread
-    ;; modifies any job in the build.  In order to prevent this, we'd either have to lock
-    ;; all relevant job records, or only update jobs if they are actually modified (but
-    ;; this is difficult to determine).  We could also keep a version property, and check
-    ;; that before writing the update.  Currently, we have chosen to just lock the job
-    ;; records during the transaction.
-    (let [h (hydrate-build conn sid b true)]
-      (when (update-build conn (apply f h args) b)
-        sid))))
-
 (defn- select-build [conn [cust-id repo-id :as sid]]
   (when-let [build (apply eb/select-build-by-sid conn sid)]
-    (hydrate-build conn sid build false)))
+    (hydrate-build conn sid build)))
 
 (defn- select-repo-builds
   "Retrieves all builds and their details for given repository"
@@ -1094,8 +1076,7 @@
    :join-request
    {:list-user select-user-join-requests}
    :build
-   {:update update-build-atomically
-    :list select-repo-builds
+   {:list select-repo-builds
     :list-since select-customer-builds-since
     :find-latest select-latest-build}
    :job
