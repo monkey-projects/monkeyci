@@ -1,6 +1,27 @@
 (ns monkey.ci.gui.alerts
   "Centralization of alerts.  This to avoid having to put hardcoded strings in events."
-  (:require [monkey.ci.gui.utils :as u]))
+  (:require [monkey.ci.gui.utils :as u]
+            [re-frame.core :as rf]))
+
+(defn render-alert [{:keys [type message]}]
+  [:div.d-flex
+   {:class (str "alert alert-dismissable alert-" (name type))
+    :role :alert}
+   message
+   [:button.btn-close.ms-auto
+    {:type :button
+     :data-bs-dismiss :alert
+     :aria-label "Close"}]])
+
+(defn component
+  "Renders an alerts component with given id."
+  [id]
+  (let [s (rf/subscribe id)]
+    ;; TODO Allow user to close notifications
+    (when (not-empty @s)
+      (->> @s
+           (map render-alert)
+           (into [:<>])))))
 
 (def gh-installation-url
   "URL that Github uses to configure app integrations"

@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.components
-  (:require [monkey.ci.gui.template :as templ]
+  (:require [monkey.ci.gui.alerts :as a]
+            [monkey.ci.gui.template :as templ]
             [monkey.ci.gui.time :as t]
             [monkey.ci.gui.subs]
             [monkey.ci.gui.utils :as u]
@@ -11,15 +12,8 @@
 (defn logo []
   (templ/logo))
 
-(defn render-alert [{:keys [type message]}]
-  [:div {:class (str "alert alert-" (name type))} message])
-
-(defn alerts [id]
-  (let [s (rf/subscribe id)]
-    (when (not-empty @s)
-      (->> @s
-           (map render-alert)
-           (into [:<>])))))
+(def render-alert a/render-alert)
+(def alerts a/component)
 
 (defn user-avatar [{:keys [avatar-url] :as u}]
   (when avatar-url
