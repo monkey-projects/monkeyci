@@ -440,53 +440,14 @@
       (assoc :id (:display-id job))
       (drop-nil)))
 
-(defn- insert-jobs [conn jobs build-id]
-  (doseq [j jobs]
-    (ec/insert-job conn (assoc (job->db j) :build-id build-id))))
-
-(defn- update-jobs [conn jobs]
-  (doseq [[upd ex] jobs]
-    (let [upd (merge ex (job->db upd))]
-      (ec/update-job conn upd))))
-
 (defn- insert-build [conn build]
   (when-let [repo-id (er/repo-for-build-sid conn (:customer-id build) (:repo-id build))]
     (let [{:keys [id] :as ins} (ec/insert-build conn (-> (build->db build)
                                                          (assoc :repo-id repo-id)))]
-      (when (contains? (:script build) :jobs)
-        (insert-jobs conn (-> build :script :jobs vals) id))
       ins)))
 
-(defn- update-build-jobs
-  "Updates build jobs, but only when there are jobs in the build script."
-  [conn build existing]
-  (when-let [jobs (get-in build [:script :jobs])]
-    (let [ex-jobs (ec/select-jobs conn (ec/by-build (:id existing)))
-          new-ids (set (keys jobs))
-          existing-ids (set (map :display-id ex-jobs))
-          to-delete (cset/difference existing-ids new-ids)
-          to-insert (apply dissoc jobs existing-ids)
-          to-update (reduce (fn [r ej]
-                              (let [n (get jobs (:display-id ej))]
-                                (cond-> r
-                                  ;; TODO Only update modified jobs
-                                  n (conj [n ej]))))
-                            []
-                            ex-jobs)]
-      (when-not (empty? to-delete)
-        ;; Delete all removed jobs (although this is a situation that probably never happens)
-        (ec/delete-jobs conn [:and
-                              [:= :build-id (:id existing)]
-                              [:in :display-id to-delete]]))
-      (when-not (empty? to-update)
-        (update-jobs conn to-update))
-      (when-not (empty? to-insert)
-        ;; Insert new jobs
-        (insert-jobs conn (vals to-insert) (:id existing))))))
-
 (defn- update-build [conn build existing]
-  (ec/update-build conn (merge existing (build->db build)))
-  (update-build-jobs conn build existing)
+  (ec/update-build conn (merge existing (build->db build)))  
   build)
 
 (defn- upsert-build [conn build]

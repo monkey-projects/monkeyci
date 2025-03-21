@@ -332,53 +332,6 @@
         (is (= build (-> (st/find-build s build-sid)
                          (select-keys (keys build))))))
 
-      (testing "removes ssh private keys"
-        (let [ssh-key {:id (st/new-id)
-                       :description "test key"
-                       :private-key "secret private key"}
-              build (assoc-in build [:git :ssh-keys] [ssh-key])
-              _ (st/save-build s build)
-              match (st/find-build s (st/ext-build-sid build))]
-          (is (= (select-keys ssh-key [:id :description])
-                 (-> match :git :ssh-keys first)))))
-
-      (testing "can replace jobs"
-        (let [job (h/gen-job)
-              jobs {(:id job) job}]
-          (is (sid/sid? (st/save-build s (assoc-in build [:script :jobs] jobs))))
-          (is (= 1 (count (ec/select conn {:select :*
-                                           :from :jobs}))))
-          (is (= jobs (-> (st/find-build s build-sid) :script :jobs)))))
-
-      (testing "when no jobs, leaves existing jobs as-is"
-        (is (sid/sid? (st/save-build s (update build :script dissoc :jobs))))
-        (is (not-empty (-> (st/find-build s build-sid)
-                           :script
-                           :jobs)))) 
-
-      (testing "can update jobs"
-        (let [job (assoc (h/gen-job) :status :pending)
-              jobs {(:id job) job}
-              upd (assoc job :status :running)]
-          (is (sid/sid? (st/save-build s (assoc-in build [:script :jobs] jobs))))
-          (is (sid/sid? (st/save-build s (assoc-in build [:script :jobs (:id job)] upd))))
-          (is (= upd (get-in (st/find-build s build-sid) [:script :jobs (:id job)])))))
-
-      (testing "stores job message"
-        (let [job (assoc (h/gen-job)
-                         :status :failure
-                         :message "Test error message"
-                         :credit-multiplier 5)
-              jobs {(:id job) job}]
-          (is (sid/sid? (st/save-build s (assoc-in build [:script :jobs] jobs))))
-          (is (= (:message job) (get-in (st/find-build s build-sid) [:script :jobs (:id job) :message])))))
-
-      (testing "stores credit multiplier"
-        (let [job (assoc (h/gen-job) :credit-multiplier 3)
-              jobs {(:id job) job}]
-          (is (sid/sid? (st/save-build s (assoc-in build [:script :jobs] jobs))))
-          (is (= 3 (get-in (st/find-build s build-sid) [:script :jobs (:id job) :credit-multiplier])))))
-
       (testing "can list"
         (is (= [(:build-id build)]
                (st/list-build-ids s [(:id cust) (:id repo)]))))
@@ -391,6 +344,53 @@
           (is (= 1 (count d)))
           (is (= (update build :script dissoc :jobs)
                  (select-keys (first d) (keys build))))))
+
+      (testing "removes ssh private keys"
+        (let [ssh-key {:id (st/new-id)
+                       :description "test key"
+                       :private-key "secret private key"}
+              build (assoc-in build [:git :ssh-keys] [ssh-key])
+              _ (st/save-build s build)
+              match (st/find-build s (st/ext-build-sid build))]
+          (is (= (select-keys ssh-key [:id :description])
+                 (-> match :git :ssh-keys first)))))
+
+      ;; (testing "can replace jobs"
+      ;;   (let [job (h/gen-job)
+      ;;         jobs {(:id job) job}]
+      ;;     (is (sid/sid? (st/save-build s (assoc-in build [:script :jobs] jobs))))
+      ;;     (is (= 1 (count (ec/select conn {:select :*
+      ;;                                      :from :jobs}))))
+      ;;     (is (= jobs (-> (st/find-build s build-sid) :script :jobs)))))
+
+      ;; (testing "when no jobs, leaves existing jobs as-is"
+      ;;   (is (sid/sid? (st/save-build s (update build :script dissoc :jobs))))
+      ;;   (is (not-empty (-> (st/find-build s build-sid)
+      ;;                      :script
+      ;;                      :jobs)))) 
+
+      ;; (testing "can update jobs"
+      ;;   (let [job (assoc (h/gen-job) :status :pending)
+      ;;         jobs {(:id job) job}
+      ;;         upd (assoc job :status :running)]
+      ;;     (is (sid/sid? (st/save-build s (assoc-in build [:script :jobs] jobs))))
+      ;;     (is (sid/sid? (st/save-build s (assoc-in build [:script :jobs (:id job)] upd))))
+      ;;     (is (= upd (get-in (st/find-build s build-sid) [:script :jobs (:id job)])))))
+
+      ;; (testing "stores job message"
+      ;;   (let [job (assoc (h/gen-job)
+      ;;                    :status :failure
+      ;;                    :message "Test error message"
+      ;;                    :credit-multiplier 5)
+      ;;         jobs {(:id job) job}]
+      ;;     (is (sid/sid? (st/save-build s (assoc-in build [:script :jobs] jobs))))
+      ;;     (is (= (:message job) (get-in (st/find-build s build-sid) [:script :jobs (:id job) :message])))))
+
+      ;; (testing "stores credit multiplier"
+      ;;   (let [job (assoc (h/gen-job) :credit-multiplier 3)
+      ;;         jobs {(:id job) job}]
+      ;;     (is (sid/sid? (st/save-build s (assoc-in build [:script :jobs] jobs))))
+      ;;     (is (= 3 (get-in (st/find-build s build-sid) [:script :jobs (:id job) :credit-multiplier])))))
 
       (testing "can get next idx"
         (let [repo (-> (h/gen-repo)

@@ -363,13 +363,12 @@
       (p/read-obj s (concat [builds] sid)))))
 
 (defn save-build
-  "Creates or updates the build entity.  If jobs are specified, those will be saved as well."
+  "Creates or updates the build entity. without the jobs."
   [s build]
   (let [get-jobs (comp :jobs :script)
         orig (find-build s (ext-build-sid build))
         upd (cond-> build
-              (and orig
-                   (nil? (get-jobs build)))
+              orig
               (update :script assoc :jobs (get-jobs orig)))]
     (p/write-obj s (build-sid build) upd)))
 
@@ -377,7 +376,7 @@
   "Atomically updates build by retrieving it, applying `f` to it, and then saving it back"
   [s sid f & args]
   (when-let [b (find-build s sid)]
-    (save-build s (apply f b args))))
+    (p/write-obj s (->sid (concat [builds] sid)) (apply f b args))))
 
 (defn list-build-ids
   "Lists the ids of the builds for given repo sid"
@@ -435,7 +434,7 @@
   (override-or
    [:job :save]
    (fn [s build-sid job]
-     (update-build s build-sid assoc-in [:script :jobs (:id job)] job))))
+     (update-build s (->sid build-sid) assoc-in [:script :jobs (:id job)] job))))
 
 (def find-job
   "Finds job by it's sid, which is the build sid with the job id added"
