@@ -78,11 +78,15 @@
                   (assoc :headers {"x-github-event" "push"}
                          :parameters {:body
                                       {:repository {:id gid}}}))
+          repo-sid (st/ext-repo-sid sid)
           resp (sut/app-webhook req)]
-      (is (some? (st/find-repo s (st/ext-repo-sid sid))))
+      (is (some? (st/find-repo s repo-sid)))
       (is (= 202 (:status resp)))
       (is (= 1 (-> resp :body :builds count)))
-      (is (= [:build/triggered] (->> resp (r/get-events) (map :type))))))
+      (let [[evt :as evts] (r/get-events resp)]
+        (is (= [:build/triggered] (map :type evts)))
+        (is (some? (:build evt)))
+        (is (= repo-sid (:sid evt))))))
 
   (testing "ignores non-push events"
     (let [gid (cuid/random-cuid)

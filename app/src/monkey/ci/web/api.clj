@@ -198,7 +198,7 @@
   (some-fn (as-ref :branch "heads")
            (as-ref :tag "tags")))
 
-(defn- initialize-build [build rt]
+(defn- initialize-build [build]
   (assoc build
          :id (st/new-id)
          :source :api
@@ -212,7 +212,7 @@
         ssh-keys (c/find-ssh-keys st repo)]
     (-> (:path p)
         (select-keys [:customer-id :repo-id])
-        (initialize-build rt)
+        (initialize-build)
         (assoc :git (-> (:query p)
                         (select-keys [:commit-id :branch :tag])
                         (assoc :url (:url repo))
@@ -245,7 +245,7 @@
         rt (c/req->rt req)
         build (some-> existing
                       (dissoc :start-time :end-time :script :build-id :idx)
-                      (initialize-build rt))]
+                      (initialize-build))]
     (if build
       (build-triggered-response build)
       (rur/not-found {:message "Build not found"}))))
