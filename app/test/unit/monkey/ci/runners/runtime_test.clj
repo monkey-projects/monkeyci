@@ -36,7 +36,7 @@
         (is (string? (:token conf)))
         (is (int? (:port conf)))))))
 
-(deftest with-runner-runtime
+(deftest with-runner-system
   (let [sys (sut/with-runner-system runner-config identity)
         rt (:runtime sys)]
     
@@ -64,6 +64,9 @@
 
     (testing "provides container routes"
       (is (some? (:container-routes sys))))
+
+    (testing "provides controller routes"
+      (is (some? (:controller-routes sys))))
 
     (testing "passes api config to oci container routes"
       (let [sys (-> runner-config

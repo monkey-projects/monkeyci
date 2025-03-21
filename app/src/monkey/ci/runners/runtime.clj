@@ -20,6 +20,7 @@
              [interceptors :as emi]
              [jms :as emj]]
             [monkey.ci.metrics.core :as m]
+            [monkey.ci.runners.controller :as rco]
             [monkey.ci.runtime.common :as rc]
             [monkey.mailman.core :as mmc]))
 
@@ -201,6 +202,10 @@
                 (make-container-routes)))]
     (em/map->RouteComponent {:make-routes make-routes})))
 
+(defn new-controller-routes
+  [conf]
+  (em/map->RouteComponent {:make-routes (comp rco/make-routes :script-exit)}))
+
 (defn new-event-stream []
   (ms/stream))
 
@@ -213,13 +218,14 @@
   (co/system-map
    :runtime    (co/using
                 (new-runtime config)
-                [:mailman :artifacts :cache :workspace :git :build :api-config :build-cache])
+                [:mailman :artifacts :cache :workspace :git :build :api-config :build-cache :script-exit])
    :build      (prepare-build config)
    :event-stream (new-event-stream)
    :artifacts  (new-artifacts config)
    :cache      (new-cache config)
    :build-cache (new-build-cache config)
    :workspace  (new-workspace config)
+   :script-exit (md/deferred)
    :git        (new-git)
    :api-config (new-api-config config) ; Necessary to avoid circular dependency between routes and api server
    :api-server (co/using
@@ -245,7 +251,10 @@
                        :api :api-config})
    :global-forwarder (co/using
                       (new-local-to-global-forwarder)
-                      [:global-mailman :mailman :event-stream])))
+                      [:global-mailman :mailman :event-stream])
+   :controller-routes (co/using
+                       (new-controller-routes config)
+                       [:mailman :script-exit])))
 
 (defn with-runner-system [config f]
   (rc/with-system (make-runner-system config) f))
