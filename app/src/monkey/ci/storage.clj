@@ -343,7 +343,7 @@
   "Checks efficiently if the build exists.  This is cheaper than trying to fetch it
    and checking if the result is `nil`."
   [s sid]
-  (p/obj-exists? s (concat [builds] sid)))
+  (p/obj-exists? s (into [builds] sid)))
 
 (defn legacy-build-exists?
   "Similar to `build-exists?` but for legacy builds that consist of metadata and 
@@ -360,7 +360,7 @@
       (-> (find-build-metadata s sid)
           (merge (find-build-results s sid))
           (assoc :legacy? true))
-      (p/read-obj s (concat [builds] sid)))))
+      (p/read-obj s (into [builds] sid)))))
 
 (defn save-build
   "Creates or updates the build entity. without the jobs."
@@ -376,12 +376,12 @@
   "Atomically updates build by retrieving it, applying `f` to it, and then saving it back"
   [s sid f & args]
   (when-let [b (find-build s sid)]
-    (p/write-obj s (->sid (concat [builds] sid)) (apply f b args))))
+    (p/write-obj s (into [builds] sid) (apply f b args))))
 
 (defn list-build-ids
   "Lists the ids of the builds for given repo sid"
   [s sid]
-  (p/list-obj s (concat [builds] sid)))
+  (p/list-obj s (into [builds] sid)))
 
 (def list-builds
   "Lists all builds for the repo, and fetches the build details, similar to `find-build`

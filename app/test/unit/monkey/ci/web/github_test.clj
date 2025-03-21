@@ -152,9 +152,7 @@
         (is (st/sid? (st/save-webhook s wh)))
         (let [r (sut/create-webhook-build {:storage s}
                                           (:id wh)
-                                          {:head-commit {:message "test message"}})
-              id (:sid r)]
-          (is (st/sid? id))
+                                          {:head-commit {:message "test message"}})]
           (is (= "test message" (get-in r [:git :message])))))))
 
   (testing "adds start time as current epoch millis"

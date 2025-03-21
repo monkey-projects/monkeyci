@@ -56,25 +56,22 @@
   [{st :storage :as rt} {:keys [customer-id repo-id] :as init-build} payload]
   (let [{:keys [master-branch clone-url ssh-url private]} (:repository payload)
         commit-id (get-in payload [:head-commit :id])
-        ssh-keys (find-ssh-keys rt customer-id repo-id)
-        build (-> init-build
-                  (assoc :id (s/new-id)
-                         :git (-> payload
-                                  :head-commit
-                                  (select-keys [:message :author])
-                                  (assoc :url (if private ssh-url clone-url)
-                                         :main-branch master-branch
-                                         :ref (:ref payload)
-                                         :commit-id commit-id)
-                                  (mc/assoc-some :ssh-keys ssh-keys))
-                         ;; Do not use the commit timestamp, because when triggered from a tag
-                         ;; this is still the time of the last commit, not of the tag creation.
-                         :start-time (u/now)
-                         :status :pending
-                         :changes (file-changes payload)))]
-    ;; Add the sid, cause it's used downstream.  In this case it's the repo id, because
-    ;; the build id still needs to be assigned.
-    (assoc build :sid [customer-id repo-id])))
+        ssh-keys (find-ssh-keys rt customer-id repo-id)]
+    (-> init-build
+        (assoc :id (s/new-id)
+               :git (-> payload
+                        :head-commit
+                        (select-keys [:message :author])
+                        (assoc :url (if private ssh-url clone-url)
+                               :main-branch master-branch
+                               :ref (:ref payload)
+                               :commit-id commit-id)
+                        (mc/assoc-some :ssh-keys ssh-keys))
+               ;; Do not use the commit timestamp, because when triggered from a tag
+               ;; this is still the time of the last commit, not of the tag creation.
+               :start-time (u/now)
+               :status :pending
+               :changes (file-changes payload)))))
 
 (defn create-webhook-build [{st :storage :as rt} id payload]
   (if-let [details (s/find-webhook st id)]

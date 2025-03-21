@@ -521,7 +521,10 @@
             (testing "results in `build/pending` event"
               (validate-spec ::se/event (first res))
               (is (= :build/pending
-                     (-> res first :type))))
+                     (-> res first :type)))
+              (let [{:keys [build sid]} (first res)]
+                (is (= 3 (count sid)))
+                (is (= (:build-id build) (last sid)))))
 
             (testing "saves build in db"
               (let [b (st/find-build st (-> res first :sid))]
