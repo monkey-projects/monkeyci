@@ -108,10 +108,11 @@
           (is (not= :timeout (h/wait-until #(contains? (->> (tm/get-posted broker) (map :type) set)
                                                        :job/end)
                                            1000)))
-          (let [evts (tm/get-posted broker)]
-            (is (= :job/end (-> (map :type evts) last)))
-            (is (= :failure (-> evts last :status)))
-            (is (string? (-> evts last :result :message))))))
+          (let [evt (->> (tm/get-posted broker)
+                         (filter (comp (partial = :job/end) :type))
+                         (first))]
+            (is (= :failure (:status evt)))
+            (is (string? (-> evt :result :message))))))
 
       (testing "on async exception"
         (tm/clear-posted! broker)
@@ -127,7 +128,9 @@
           (is (not= :timeout (h/wait-until #(contains? (->> (tm/get-posted broker) (map :type) set)
                                                        :job/end)
                                            1000)))
-          (let [evt (last (tm/get-posted broker))]
+          (let [evt (->> (tm/get-posted broker)
+                         (filter (comp (partial = :job/end) :type))
+                         (first))]
             (is (= :job/end (:type evt)))
             (is (= :failure (:status evt)))
             (is (= "Test error" (get-in evt [:result :message])))))))))

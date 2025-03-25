@@ -87,6 +87,7 @@
     (let [router (mmc/router routes opts)]
       ;; TODO Add listeners for each destination referred to by route event types
       ;; but split up the routes so only those for the destination are added
+      ;; TODO Allow specifying a selector for efficiency
       (->> routes
            (map first)
            (map (or (:destinations opts) destinations))

@@ -227,6 +227,7 @@
     (let [job (get-job-from-state ctx)]
       (cond
         (bc/action-job? job) [(job-queued-evt :action/job-queued job)]
+        ;; TODO Change to container/job-pending events, so the dispatcher can assign it
         (bc/container-job? job) [(job-queued-evt :container/job-queued job)]))))
 
 (defn job-executed

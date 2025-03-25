@@ -21,10 +21,10 @@
         com.github.seancorfield/next.jdbc {:mvn/version "1.3.1002"}
         com.monkeyprojects/aero-ext {:mvn/version "0.3.0"}
         com.monkeyprojects/clompress {:mvn/version "0.1.2"}
-        com.monkeyprojects/mailman-core {:mvn/version "0.2.3"}
-        com.monkeyprojects/mailman-jms {:mvn/version "0.2.4"}
-        com.monkeyprojects/mailman-manifold {:mvn/version "0.2.3"}
-        com.monkeyprojects/monkey-jms-artemis {:mvn/version "0.3.0"}
+        com.monkeyprojects/mailman-core {:mvn/version "0.2.5-SNAPSHOT"}
+        com.monkeyprojects/mailman-jms {:mvn/version "0.2.5-SNAPSHOT"}
+        com.monkeyprojects/mailman-manifold {:mvn/version "0.2.5-SNAPSHOT"}
+        com.monkeyprojects/monkey-jms-artemis {:mvn/version "0.3.2-SNAPSHOT"}
         com.monkeyprojects/oci-container-instance {:mvn/version "0.2.2"}
         com.monkeyprojects/oci-os {:mvn/version "0.4.1"}
         com.monkeyprojects/oci-sign {:mvn/version "0.1.4"}
