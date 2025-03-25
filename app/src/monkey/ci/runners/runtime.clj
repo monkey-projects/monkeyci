@@ -176,6 +176,8 @@
 (defn global-to-local-routes
   "Creates new event handler routes, that handle events received from the global broker."
   []
+  ;; TODO Also receive dispatcher events for container jobs
+  ;; TODO Filter events by build sid using a selector (when on jms)
   (em/map->RouteComponent
    {:make-routes (fn [{:keys [local-mailman]}]
                    [[:build/canceled [{:handler (constantly nil)

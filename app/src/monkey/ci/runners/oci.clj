@@ -316,7 +316,9 @@
   [conf storage vault]
   (let [client (make-ci-context (:containers conf))
         use-db (emd/use-db storage)]
-    [[:build/queued     ; Perhaps this should be renamed :build/scheduled?
+    [[;;:oci/build-scheduled
+      ;; TODO Replace with build-schedules when dispatcher works
+      :build/queued
       [{:handler initialize-build
         :interceptors [emi/handle-build-error
                        use-db
@@ -327,6 +329,7 @@
                        end-on-ci-failure]}]]
 
      [:build/end
+      ;; TODO Filter oci builds
       [{:handler (constantly nil)
         :interceptors [emi/handle-build-error
                        use-db

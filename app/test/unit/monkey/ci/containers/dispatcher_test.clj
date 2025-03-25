@@ -145,6 +145,31 @@
             {:cpus 1
              :memory 2})))))
 
+(deftest release-runner-resources
+  (testing "increases available k8s resources"
+    (is (= {:id :k8s
+            :archs [:amd]
+            :memory 6
+            :cpus 3}
+           (sut/release-runner-resources
+            {:id :k8s
+             :archs [:amd]
+             :memory 4
+             :cpus 2}
+            {:cpus 1
+             :memory 2}))))
+
+  (testing "increases available oci resources"
+    (is (= {:id :oci
+            :archs [:amd]
+            :count 7}
+           (sut/release-runner-resources
+            {:id :oci
+             :archs [:amd]
+             :count 6}
+            {:cpus 1
+             :memory 2})))))
+
 (deftest make-routes
   (let [r (sut/make-routes {})]
     (doseq [e [:container/job-queued :build/queued :job/end :build/end]]
@@ -187,7 +212,9 @@
                 (sut/set-assignment {:runner :k8s})
                 (sut/build-queued))]
       (is (= [:k8s/build-scheduled]
-             (->> r (map :type)))))))
+             (->> r (map :type))))))
+
+  (testing "when no assignment, fails build"))
 
 (deftest add-build-task
   (let [{:keys [enter] :as i} sut/add-build-task]
@@ -243,3 +270,54 @@
                  :memory 4
                  :cpus 1}]
                r))))))
+
+(deftest release-resources
+  (let [{:keys [enter] :as i} sut/release-resources]
+    (is (keyword? (:name i)))
+    
+    (testing "`enter` updates runner state according to consumed resources by task"
+      (let [r (-> {}
+                  (sut/set-assignment {:runner :k8s
+                                       :resources {:memory 2
+                                                   :cpus 1}})
+                  (sut/set-runners [{:id :k8s
+                                     :memory 3
+                                     :cpus 2}])
+                  (enter)
+                  (sut/get-runners))]
+        (is (= [{:id :k8s
+                 :memory 5
+                 :cpus 3}]
+               r))))))
+
+(deftest save-assignment
+  (let [{:keys [leave] :as i} (sut/save-assignment :id)]
+    (is (keyword? (:name i)))
+
+    (testing "`leave` saves assignment to state"
+      (let [a ::test-assignment]
+        (is (= a (-> {:event {:id ::test-id}}
+                     (sut/set-assignment a)
+                     (leave)
+                     (sut/get-state-assignment ::test-id))))))))
+
+(deftest load-assignment
+  (let [{:keys [enter] :as i} (sut/load-assignment :id)]
+    (is (keyword? (:name i)))
+
+    (testing "`enter` gets assignment from state"
+      (let [a ::test-assignment]
+        (is (= a (-> {:event {:id ::test-id}}
+                     (sut/set-state-assignment ::test-id a)
+                     (enter)
+                     (sut/get-assignment))))))))
+
+(deftest clear-assignment
+  (let [{:keys [leave] :as i} (sut/clear-assignment :id)]
+    (is (keyword? (:name i)))
+
+    (testing "`leave` removes assignment from state"
+      (is (nil? (-> {:event {:id ::test-id}}
+                    (sut/set-state-assignment ::test-id ::test-assignment)
+                    (leave)
+                    (sut/get-state-assignment ::test-id)))))))
