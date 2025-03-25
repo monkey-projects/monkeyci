@@ -316,8 +316,7 @@
   [conf storage vault]
   (let [client (make-ci-context (:containers conf))
         use-db (emd/use-db storage)]
-    ;; TODO Timeout handling
-    [[:build/queued
+    [[:build/queued     ; Perhaps this should be renamed :build/scheduled?
       [{:handler initialize-build
         :interceptors [emi/handle-build-error
                        use-db
