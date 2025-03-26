@@ -9,7 +9,10 @@
       (is (some? (:http-server sys))))
 
     (testing "provides http app"
-      (is (some? (:http-app sys))))))
+      (is (some? (:http-app sys))))
+
+    (testing "provides metrics"
+      (is (some? (:metrics sys))))))
 
 (deftest http-app
   (testing "`start` creates handler fn"

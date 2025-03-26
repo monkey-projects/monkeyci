@@ -1,11 +1,11 @@
 (ns monkey.ci.dispatcher.runtime
   "Runtime components for executing the dispatcher"
   (:require [com.stuartsierra.component :as co]
+            [monkey.ci.dispatcher.http :as dh]
+            [monkey.ci.metrics.core :as metrics]
             [monkey.ci.web.http :as http]))
 
 ;; Should connect to the JMS message broker
-;; Should provide a http endpoint for metrics and health checks
-;; Should provide a deferred that can be waited upon for termination
 ;; Should register a shutdown hook
 
 (defn new-http-server [conf]
@@ -14,8 +14,7 @@
 (defrecord HttpApp []
   co/Lifecycle
   (start [this]
-    ;; TODO
-    (assoc this :handler (constantly {:status 404})))
+    (assoc this :handler (dh/make-handler this)))
 
   (stop [this]
     this))
@@ -23,10 +22,15 @@
 (defn new-http-app []
   (map->HttpApp {}))
 
+(defn new-metrics []
+  (metrics/make-registry))
+
 (defn make-system [conf]
-  ;; TODO
   (co/system-map
    :http-server (co/using
                  (new-http-server (:http conf))
                  {:app :http-app})
-   :http-app {}))
+   :http-app (co/using
+              (new-http-app)
+              [:metrics])
+   :metrics (new-metrics)))
