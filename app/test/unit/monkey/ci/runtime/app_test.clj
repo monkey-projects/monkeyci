@@ -25,27 +25,32 @@
         (is (some? (:http sys)))
         (is (some? (get-in sys [:http :server]))))
 
-      (testing "http server has runtime"
-        (is (map? (get-in sys [:http :rt]))))
+      (testing "provides http app"
+        (is (some? (:http-app sys))))
 
-      (testing "runtime has storage"
-        (is (satisfies? p/Storage (get-in sys [:http :rt :storage]))))
+      (testing "runtime"
+        (let [rt (get-in sys [:http-app :runtime])]
+          (testing "http app has runtime"
+            (is (map? rt)))
 
-      (testing "provides empty jwk if not configured"
-        (is (nil? (get-in sys [:http :rt :jwk]))))
+          (testing "runtime has storage"
+            (is (satisfies? p/Storage (:storage rt))))
 
-      (testing "provides metrics"
-        (is (some? (get sys :metrics)))
-        (is (some? (get-in sys [:http :rt :metrics]))))
+          (testing "provides empty jwk if not configured"
+            (is (nil? (:jwk rt))))
+
+          (testing "provides metrics"
+            (is (some? (get sys :metrics)))
+            (is (some? (:metrics rt))))
+
+          (testing "provides process reaper"
+            (is (ifn? (:process-reaper rt))))
+
+          (testing "provides vault"
+            (is (p/vault? (:vault rt))))))
 
       (testing "provides metrics routes"
         (is (some? (:metrics-routes sys))))
-
-      (testing "provides process reaper in runtime"
-        (is (ifn? (get-in sys [:http :rt :process-reaper]))))
-
-      (testing "provides vault in runtime"
-        (is (p/vault? (get-in sys [:http :rt :vault]))))
 
       (testing "provides mailman"
         (is (some? (:mailman sys))))

@@ -18,6 +18,7 @@
              [bitbucket :as bitbucket]
              [common :as c]
              [github :as github]
+             [http :as wh]
              [middleware :as wm]]
             [monkey.ci.web.api
              [customer :as cust-api]
@@ -31,20 +32,16 @@
             [ring.util.response :as rur]
             [schema.core :as s]))
 
-(defn- text-response [txt]
-  (-> (rur/response txt)
-      (rur/content-type "text/plain")))
-
 (defn health [_]
   ;; TODO Make this more meaningful
-  (text-response "ok"))
+  (wh/text-response "ok"))
 
 (defn version [_]
-  (text-response (v/version)))
+  (wh/text-response (v/version)))
 
 (defn metrics [req]
   (if-let [m (c/from-rt req :metrics)]
-    (text-response (metrics/scrape m))
+    (wh/text-response (metrics/scrape m))
     (rur/status 204)))
 
 (def Id c/Id)
@@ -484,34 +481,3 @@
   (-> (make-router rt)
       (c/make-app)
       (auth/secure-ring-app rt)))
-
-(defn start-server
-  "Starts http server.  Returns a server object that can be passed to
-   `stop-server`."
-  [rt]
-  (let [http-opts (merge {:port 3000} (:http (rt/config rt)))]
-    (log/info "Starting HTTP server at port" (:port http-opts))
-    (aleph/start-server (make-app rt) http-opts)))
-
-(defn stop-server [s]
-  (when s
-    (log/info "Shutting down HTTP server...")
-    (.close s)))
-
-(defrecord HttpServer [rt]
-  co/Lifecycle
-  (start [this]
-    (assoc this :server (start-server rt)))
-  (stop [{:keys [server] :as this}]
-    (when server
-      (stop-server server))
-    (dissoc this :server))
-  
-  clojure.lang.IFn
-  (invoke [this]
-    (co/stop this)))
-
-(defn on-server-close
-  "Returns a deferred that resolves when the server shuts down."
-  [server]
-  (md/future (netty/wait-for-close (:server server))))
