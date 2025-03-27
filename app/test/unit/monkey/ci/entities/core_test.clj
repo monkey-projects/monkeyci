@@ -397,3 +397,19 @@
       (testing "can select by customer id"
         (is (= inv (-> (sut/select-invoice conn (sut/by-customer (:id cust)))
                        (dissoc :id))))))))
+
+(deftest ^:sql retry-task
+  (eh/with-prepared-db conn
+    (let [task (eh/gen-retry-task)]
+      (testing "can insert"
+        (is (number? (:id (sut/insert-retry-task conn task)))))
+
+      (testing "can list"
+        (let [m (sut/select-retry-tasks conn nil)]
+          (is (= 1 (count m)))
+          (is (= task (select-keys (first m) (keys task))))
+          (is (number? (:id (first m))))))
+
+      (testing "can delete"
+        (is (= 1 (sut/delete-retry-tasks conn (sut/by-cuid (:cuid task)))))
+        (is (empty? (sut/select-retry-tasks conn nil)))))))

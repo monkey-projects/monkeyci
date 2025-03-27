@@ -471,7 +471,13 @@
     [{:alter-table :repo-indices
       :drop-column :next-idx}])
 
-   (calc-next-idx 35)])
+   (calc-next-idx 35)
+
+   (entity-table-migration
+    36 :retry-tasks
+    [[:details :text]
+     [:creation-time :timestamp]]
+    [])])
 
 (defn prepare-migrations
   "Prepares all migrations by formatting to sql, creates a ragtime migration object from it."

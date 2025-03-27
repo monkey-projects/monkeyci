@@ -429,3 +429,20 @@
 (defaggregate repo-idx
   {:plural "repo-indices"
    :id-col :repo-id})
+
+(def prepare-retry-task
+  (comp (partial prop->edn :details)
+        (partial int->time :creation-time)))
+(def convert-retry-task
+  (comp (partial copy-prop :details)
+        (partial time->int :creation-time)))
+(def convert-retry-task-select
+  (comp (partial edn->prop :details)
+        (partial time->int :creation-time)))
+
+(defentity retry-task
+  {:before-insert prepare-retry-task
+   :after-insert  convert-retry-task
+   :before-update prepare-retry-task
+   :after-update  convert-retry-task
+   :after-select  convert-retry-task-select})

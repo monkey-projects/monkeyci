@@ -784,6 +784,17 @@
           (is (= upd (-> (st/find-runner-details st sid)
                          (select-keys [:details])))))))))
 
+(deftest ^:sql retry-tasks
+  (with-storage conn st
+    (let [task (h/gen-retry-task)]
+      (testing "can save and list"
+        (is (sid/sid? (st/save-retry-task st task)))
+        (is (= [task] (st/list-retry-tasks st))))
+
+      (testing "can delete"
+        (is (true? (st/delete-retry-task st (:id task))))
+        (is (empty? (st/list-retry-tasks st)))))))
+
 (deftest make-storage
   (testing "creates sql storage object using connection settings"
     (let [s (st/make-storage {:storage {:type :sql

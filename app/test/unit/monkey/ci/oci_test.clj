@@ -1,16 +1,15 @@
 (ns monkey.ci.oci-test
-  (:require
-   [clojure.test :refer [deftest is testing]]
-   [java-time.api :as jt]
-   [manifold.deferred :as md]
-   [monkey.ci.config :as c]
-   [monkey.ci.oci :as sut]
-   [monkey.ci.time :as t]
-   [monkey.oci.container-instance.core :as ci]
-   [monkey.oci.os.stream :as os]
-   [taoensso.telemere :as tt])
-  (:import
-   (java.io ByteArrayInputStream)))
+  (:require [clojure.test :refer [deftest is testing]]
+            [java-time.api :as jt]
+            [manifold.deferred :as md]
+            [monkey.ci
+             [config :as c]
+             [oci :as sut]
+             [time :as t]]
+            [monkey.oci.container-instance.core :as ci]
+            [monkey.oci.os.stream :as os]
+            [taoensso.telemere :as tt])
+  (:import (java.io ByteArrayInputStream)))
 
 (deftest stream-to-bucket
   (testing "pipes input stream to multipart"
@@ -181,6 +180,35 @@
                                                (md/success-deferred
                                                 {:status 500}))]
       (is (thrown? Exception (sut/delete-stale-instances ::test-client "test-compartment"))))))
+
+(deftest list-instance-shapes
+  (testing "sends request to oci"
+    (let [cid (str (random-uuid))]
+      (with-redefs [ci/list-container-instance-shapes (fn [_ opts]
+                                                        (md/success-deferred
+                                                         (if (= cid (:compartment-id opts))
+                                                           {:status 200
+                                                            :body
+                                                            {:items
+                                                             [{:name "CI.Standard.E4.Flex"}]}}
+                                                           {:status 404})))]
+        (is (= [{:arch :amd
+                 :shape "CI.Standard.E4.Flex"}]
+               @(sut/list-instance-shapes ::test-client cid))))))
+
+  (testing "marks unknown shapes as `unknown` arch"
+    (with-redefs [ci/list-container-instance-shapes (fn [_ _]
+                                                      (md/success-deferred
+                                                       {:status 200
+                                                        :body
+                                                        {:items
+                                                         [{:name "CI.Standard.E4.Flex"}
+                                                          {:name "Unknown-Shape"}]}}))]
+      (is (= [{:arch :amd
+               :shape "CI.Standard.E4.Flex"}
+              {:arch :unknown
+               :shape "Unknown-Shape"}]
+             @(sut/list-instance-shapes ::test-client "test-cid"))))))
 
 (deftest credit-multiplier
   (testing "calculates value according to job settings"

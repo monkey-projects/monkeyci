@@ -193,3 +193,7 @@
 
 (s/def :entity/runner-details
   (s/keys :req-un [:entity/runner :runner/details]))
+
+(s/def :entity/retry-task
+  (-> (s/keys :req-un [:retry-task/creation-time :retry-task/details])
+      (s/merge :entity/common)))

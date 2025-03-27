@@ -105,11 +105,28 @@
 
 ;; Routes
 
-(defn make-routes
+(defn listener-routes
   "Makes mailman routes for event handling that perform actual dispatching and resource
-   management."
-  [conf]
-  (let [with-state (emi/with-state (atom conf))]
+   management.  These routes are responsible for releasing assigned resources and as
+   such should share state with the poll routes."
+  [state]
+  (let [with-state (emi/with-state state)]
+    [[:build/end
+      ;; Frees consumed resources
+      [{:handler (constantly nil)
+        :interceptors [with-state
+                       (load-assignment :sid)
+                       (clear-assignment :sid)
+                       release-resources]}]]
+
+     ;; TODO Events received from build jobs
+     [:job/end []]]))
+
+(defn poll-routes
+  "Creates routes to be used when polling.  We use polling because we don't want to pick
+   container tasks from the queues if we know there is no capacity available."
+  [state]
+  (let [with-state (emi/with-state state)]
     [[:build/queued
       ;; Determines the runner to use and updates resources
       [{:handler build-queued
@@ -119,14 +136,5 @@
                        (save-assignment :sid)
                        consume-resources]}]]
 
-     [:build/end
-      ;; Frees consumed resources
-      [{:handler (constantly nil)
-        :interceptors [with-state
-                       (load-assignment :sid)
-                       (clear-assignment :sid)
-                       release-resources]}]]
-
-     ;; TODO Events received from builds
-     [:container/job-queued []]
-     [:job/end []]]))
+     ;; TODO Events received from build jobs
+     [:container/job-queued []]]))

@@ -1,15 +1,19 @@
 (ns monkey.ci.dispatcher.runtime
   "Runtime components for executing the dispatcher"
   (:require [com.stuartsierra.component :as co]
-            [monkey.ci.dispatcher.http :as dh]
+            [monkey.ci.dispatcher
+             [events :as de]
+             [http :as dh]]
+            [monkey.ci.events.mailman :as em]
             [monkey.ci.metrics.core :as metrics]
-            [monkey.ci.web.http :as http]))
+            [monkey.ci.oci :as oci]
+            [monkey.ci.web.http :as http]
+            [monkey.oci.container-instance.core :as ci]))
 
 ;; Should connect to the JMS message broker
-;; Should register a shutdown hook
 
 (defn new-http-server [conf]
-  (http/->HttpServer conf nil))
+  (http/->HttpServer (:http conf) nil))
 
 (defrecord HttpApp []
   co/Lifecycle
@@ -25,12 +29,65 @@
 (defn new-metrics []
   (metrics/make-registry))
 
+(defn new-mailman [conf]
+  (em/make-component (:mailman conf)))
+
+(defn new-event-routes [_]
+  (letfn [(make-routes [c]
+            (de/listener-routes (:state c)))]
+    (em/map->RouteComponent {:make-routes make-routes})))
+
+(defn load-initial
+  "Loads the initial runner resources.  Returns a list of runners with their resources."
+  [conf loaders]
+  (->> conf
+       (map (fn [[type lc]]
+              (when-let [l (get loaders type)]
+                (l lc))))
+       (remove nil?)
+       (vec)))
+
+(defn load-oci [{:keys [oci]}]  
+  (->> (oci/list-instance-shapes (ci/make-context oci)
+                                 (select-keys oci [:compartment-id]))
+       (deref)
+       (map :arch)
+       (remove (partial = :unknown))
+       ;; Max number of concurrenct instances is 6, when using pay-as-you-go
+       (hash-map :id :oci :count 6 :archs)))
+
+(defn load-k8s [conf]
+  ;; TODO
+  )
+
+(def runner-loaders
+  {:oci load-oci
+   :k8s load-k8s})
+
+(defrecord Runners [config loaders]
+  co/Lifecycle
+  (start [this]
+    (assoc this :runners (load-initial config loaders)))
+
+  (stop [this]
+    this))
+
+(defn new-runners [conf]
+  (map->Runners {:config (:runners conf)
+                 :loaders runner-loaders}))
+
 (defn make-system [conf]
   (co/system-map
-   :http-server (co/using
-                 (new-http-server (:http conf))
-                 {:app :http-app})
-   :http-app (co/using
-              (new-http-app)
-              [:metrics])
-   :metrics (new-metrics)))
+   :http-server  (co/using
+                  (new-http-server conf)
+                  {:app :http-app})
+   :http-app     (co/using
+                  (new-http-app)
+                  [:metrics])
+   :metrics      (new-metrics)
+   :mailman      (new-mailman conf)
+   :event-routes (co/using
+                  (new-event-routes conf)
+                  [:mailman :runners :state])
+   :runners      (new-runners conf)
+   :state        (atom conf)))

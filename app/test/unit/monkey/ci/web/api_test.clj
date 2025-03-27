@@ -200,7 +200,6 @@
           _ (ms/consume (partial swap! sent conj) (:body f))
           evt {:type :build/updated}]
       (is (true? (publish bus evt)))
-      ;;(is (not-empty @sent))
       (is (not= :timeout
                 (h/wait-until #(contains? (->> @sent
                                                (map parse-event)
@@ -223,10 +222,12 @@
                                :sid ["other-customer" "test-repo" "test-build"]})))
       (is (true? (publish bus {:type :build/updated
                                :sid [cid "test-repo" "test-build"]})))
-      (is (some (comp (partial = "test-customer")
-                      first
-                      :sid)
-                @sent))))
+      (is (not= :timeout
+                (h/wait-until #(some (comp (partial = "test-customer")
+                                           first
+                                           :sid)
+                                     @sent)
+                              1000)))))
 
   (testing "sets `x-accel-buffering` header for nginx proxying"
     (let [r (-> (h/->req {:update-bus (mb/event-bus)})

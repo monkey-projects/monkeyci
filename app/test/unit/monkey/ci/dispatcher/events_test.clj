@@ -4,9 +4,16 @@
             [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.mailman.core :as mmc]))
 
-(deftest make-routes
-  (let [r (sut/make-routes {})]
-    (doseq [e [:container/job-queued :build/queued :job/end :build/end]]
+(deftest listener-routes
+  (let [r (sut/listener-routes (atom {}))]
+    (doseq [e [:job/end :build/end]]
+      (testing (format "handles `%s`" e)
+        (is (contains? (set (map first r)) e))))))
+
+(deftest poll-routes
+  (let [evts [:container/job-queued :build/queued]
+        r (sut/poll-routes (atom {}))]
+    (doseq [e evts]
       (testing (format "handles `%s`" e)
         (is (contains? (set (map first r)) e)))))
 
@@ -17,7 +24,8 @@
                               {:id :oci
                                :archs [:amd]
                                :count 10}]}
-                   (sut/make-routes)
+                   (atom)
+                   (sut/poll-routes)
                    (mmc/router))]
     (testing "`:build/queued`"
       (testing "returns `k8s/build-scheduled` when capacity"

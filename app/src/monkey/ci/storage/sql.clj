@@ -851,10 +851,30 @@
   (some-> (eb/select-runner-details conn (eb/by-build-sid sid))
           (dissoc :build-id)))
 
+(defn- insert-retry-task [conn task]
+  (ec/insert-retry-task conn (id->cuid task)))
+
+(defn- update-retry-task [conn task existing]
+  (ec/update-retry-task conn (merge existing (id->cuid task))))
+
+(defn- upsert-retry-task [conn cuid task]
+  (if-let [match (ec/select-retry-task conn (ec/by-cuid cuid))]
+    (update-retry-task conn task match)
+    (insert-retry-task conn task)))
+
+(defn- select-retry-tasks [{:keys [conn]}]
+  (->> (ec/select-retry-tasks conn nil)
+       (map cuid->id)))
+
+(defn- delete-retry-task [conn cuid]
+  (ec/delete-retry-tasks conn (ec/by-cuid cuid)))
+
 (defn- sid-pred [t sid]
   (t sid))
 
 (def runner-details? (partial global-sid? st/runner-details))
+
+(def retry-task? (partial global-sid? st/retry-task))
 
 (defrecord SqlStorage [conn vault]
   p/Storage
@@ -927,6 +947,8 @@
             (upsert-invoice conn obj)
             runner-details?
             (upsert-runner-details conn (runner-details-sid->build-sid sid) obj)
+            retry-task?
+            (upsert-retry-task conn (last sid) obj)
             (log/warn "Unrecognized sid when writing:" sid))
       sid))
 
@@ -949,6 +971,8 @@
        (delete-webhook conn (last sid))
        credit-subscription?
        (delete-credit-subscription conn (last sid))
+       retry-task?
+       (delete-retry-task conn (last sid))
        (log/warn "Deleting entity" sid "is not supported"))))
 
   (list-obj [_ sid]
@@ -1056,7 +1080,9 @@
    {:find-for-webhook select-bb-webhook-for-webhook
     :search-webhooks select-bb-webhooks-by-filter}
    :invoice
-   {:list-for-customer select-invoices-for-customer}})
+   {:list-for-customer select-invoices-for-customer}
+   :retry-task
+   {:list select-retry-tasks}})
 
 (defn make-storage [conn]
   (map->SqlStorage {:conn conn

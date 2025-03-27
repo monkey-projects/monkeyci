@@ -60,3 +60,6 @@
 (s/def :invoice/currency string?)
 (s/def :invoice/kind #{:invoice :creditnote})
 (s/def :invoice/date date?)
+
+(s/def :retry-task/creation-time ts?)
+(s/def :retry-task/details map?)

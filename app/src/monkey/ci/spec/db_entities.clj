@@ -178,3 +178,7 @@
 
 (s/def :db/runner-details
   (s/keys :req-un [:db/runner :runner/details]))
+
+(s/def :db/retry-task
+  (-> (s/keys :req-un [:retry-task/creation-time :retry-task/details])
+      (s/merge :db/common)))
