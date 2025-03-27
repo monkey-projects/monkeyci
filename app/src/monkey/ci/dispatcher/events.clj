@@ -50,6 +50,9 @@
 (defn set-queued [ctx task]
   (assoc ctx ::queued task))
 
+(defn get-queued-list [ctx]
+  (::queued-list (emi/get-state ctx)))
+
 ;; Interceptors
 
 (def add-build-task
@@ -64,7 +67,9 @@
    :enter (fn [ctx]
             (let [t (get-task ctx)
                   runners (get-runners ctx)
-                  m (dc/assign-runner t runners)]
+                  ;; Only assign to a runner if the queue is empty
+                  m (when (empty? (get-queued-list ctx))
+                      (dc/assign-runner t runners))]
               (if m
                 (set-assignment ctx {:runner (:id m)
                                      :resources (select-keys t [:memory :cpus])})

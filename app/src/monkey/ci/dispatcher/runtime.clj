@@ -82,6 +82,10 @@
 (defn new-storage [conf]
   (st/make-storage conf))
 
+(defn new-state [conf]
+  ;; TODO Load state from db
+  (atom conf))
+
 (defn make-system [conf]
   (co/system-map
    :http-server  (co/using
@@ -96,5 +100,5 @@
                   (new-event-routes conf)
                   [:mailman :runners :state :storage])
    :runners      (new-runners conf)
-   :state        (atom conf)
+   :state        (new-state conf)
    :storage      (new-storage conf)))

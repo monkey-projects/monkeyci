@@ -89,28 +89,54 @@
         (is (number? (:cpus t)))
         (is (number? (:memory t)))))))
 
-(deftest assign-runner
+(deftest add-runner-assignment
   (let [{:keys [enter] :as i} sut/add-runner-assignment]
     (is (keyword? (:name i)))
 
-    (testing "`enter` assigns runner according to task requirements"
-      (is (= {:runner :oci
-              :resources {:memory 2
-                          :cpus 1}}
-             (-> {}
-                 (sut/set-runners [{:id :k8s
-                                    :archs [:arm]
-                                    :memory 6
-                                    :cpus 2}
-                                   {:id :oci
-                                    :count 10
-                                    :archs [:amd]}])
-                 (sut/set-task {:type :build
-                                :arch :amd
-                                :memory 2
-                                :cpus 1})
-                 (enter)
-                 (sut/get-assignment)))))))
+    (testing "`enter`"
+      (testing "assigns runner according to task requirements"
+        (is (= {:runner :oci
+                :resources {:memory 2
+                            :cpus 1}}
+               (-> {}
+                   (sut/set-runners [{:id :k8s
+                                      :archs [:arm]
+                                      :memory 6
+                                      :cpus 2}
+                                     {:id :oci
+                                      :count 10
+                                      :archs [:amd]}])
+                   (sut/set-task {:type :build
+                                  :arch :amd
+                                  :memory 2
+                                  :cpus 1})
+                   (enter)
+                   (sut/get-assignment)))))
+
+      (testing "queues task when no runner available"
+        (let [task {:build {}
+                    :memory 2
+                    :cpus 1}
+              ctx (-> {}
+                      (sut/set-task task)
+                      (enter))]
+          (is (nil? (sut/get-assignment ctx)))
+          (is (= task (sut/get-queued ctx)))))
+
+      (testing "queues task when runner available, but other tasks are queued"
+        (let [task {:build {}
+                    :memory 2
+                    :cpus 1}
+              other-task {:memory 2
+                          :cpus 2}
+              ctx (-> {}
+                      (sut/set-task task)
+                      (emi/set-state {::sut/queued-list [other-task]})
+                      (sut/set-runners [{:id :oci
+                                         :count 10}])
+                      (enter))]
+          (is (nil? (sut/get-assignment ctx)))
+          (is (= task (sut/get-queued ctx))))))))
 
 (deftest consume-resources
   (let [{:keys [leave] :as i} sut/consume-resources]
