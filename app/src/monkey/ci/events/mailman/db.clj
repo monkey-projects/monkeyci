@@ -8,12 +8,10 @@
              [jobs :as j]
              [storage :as st]
              [time :as t]]
-            [monkey.ci.events.mailman :as em]))
+            [monkey.ci.events.mailman :as em]
+            [monkey.ci.events.mailman.interceptors :as emi]))
 
-(def get-db ::db)
-
-(defn set-db [ctx db]
-  (assoc ctx ::db db))
+(def get-db emi/get-db)
 
 (def get-credits ::credits)
 
@@ -41,12 +39,6 @@
 
 ;;; Interceptors for side effects
 
-(defn use-db
-  "Adds storage to the context as ::db"
-  [db]
-  {:name ::use-db
-   :enter #(set-db % db)})
-
 (def customer-credits
   "Interceptor that fetches available credits for the customer associated with the build.
    Assumes that the db is in the context."
@@ -68,9 +60,9 @@
       (-> orig-db
           (st/transact
            (fn [db]
-             (f (set-db ctx db))))
+             (f (emi/set-db ctx db))))
           ;; Restore original db conn
-          (set-db orig-db)))))
+          (emi/set-db orig-db)))))
 
 (def assign-build-idx
   "Interceptor that assigns a new index to the build"
@@ -275,7 +267,7 @@
 ;;; Event routing configuration
 
 (defn make-routes [storage bus]
-  (let [use-db (use-db storage)
+  (let [use-db (emi/use-db storage)
         build-int [use-db
                    with-build]
         job-int [use-db

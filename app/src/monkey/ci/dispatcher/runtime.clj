@@ -6,7 +6,10 @@
              [http :as dh]]
             [monkey.ci.events.mailman :as em]
             [monkey.ci.metrics.core :as metrics]
-            [monkey.ci.oci :as oci]
+            [monkey.ci
+             [oci :as oci]
+             [storage :as st]]
+            [monkey.ci.storage.sql]
             [monkey.ci.web.http :as http]
             [monkey.oci.container-instance.core :as ci]))
 
@@ -34,7 +37,7 @@
 
 (defn new-event-routes [_]
   (letfn [(make-routes [c]
-            (de/listener-routes (:state c)))]
+            (de/make-routes (:state c) (:storage c)))]
     (em/map->RouteComponent {:make-routes make-routes})))
 
 (defn load-initial
@@ -76,6 +79,9 @@
   (map->Runners {:config (:runners conf)
                  :loaders runner-loaders}))
 
+(defn new-storage [conf]
+  (st/make-storage conf))
+
 (defn make-system [conf]
   (co/system-map
    :http-server  (co/using
@@ -88,6 +94,7 @@
    :mailman      (new-mailman conf)
    :event-routes (co/using
                   (new-event-routes conf)
-                  [:mailman :runners :state])
+                  [:mailman :runners :state :storage])
    :runners      (new-runners conf)
-   :state        (atom conf)))
+   :state        (atom conf)
+   :storage      (new-storage conf)))

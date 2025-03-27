@@ -1,12 +1,16 @@
 (ns monkey.ci.dispatcher.events
-  (:require [monkey.ci.dispatcher.core :as dc]
-            [monkey.ci.events.mailman.interceptors :as emi]))
+  (:require [clojure.tools.logging :as log]
+            [monkey.ci.dispatcher.core :as dc]
+            [monkey.ci.events.mailman.interceptors :as emi]
+            [monkey.ci
+             [storage :as st]
+             [time :as t]]))
 
 ;; Context management
 
-(defn- build->task [_]
+(defn- build->task [b]
   ;; Default requirements
-  {:memory 2 :cpus 1})
+  {:memory 2 :cpus 1 :build b})
 
 (defn set-runners [ctx r]
   (emi/update-state ctx assoc :runners r))
@@ -41,6 +45,11 @@
 (defn remove-state-assignment [ctx id]
   (emi/update-state ctx update :assignments dissoc id))
 
+(def get-queued ::queued)
+
+(defn set-queued [ctx task]
+  (assoc ctx ::queued task))
+
 ;; Interceptors
 
 (def add-build-task
@@ -56,9 +65,11 @@
             (let [t (get-task ctx)
                   runners (get-runners ctx)
                   m (dc/assign-runner t runners)]
-              (when m
+              (if m
                 (set-assignment ctx {:runner (:id m)
-                                     :resources (select-keys t [:memory :cpus])}))))})
+                                     :resources (select-keys t [:memory :cpus])})
+                ;; If it could not be assigned, it should be queued and we should terminate
+                (set-queued ctx t))))})
 
 (defn- update-runner-resources [updater ctx]
   (let [{:keys [runner resources]} (get-assignment ctx)]
@@ -78,7 +89,9 @@
   "Stores assignment in state, linked to the property extracted from the event"
   {:name ::save-assignment
    :leave (fn [ctx]
-            (set-state-assignment ctx (prop (:event ctx)) (get-assignment ctx)))})
+            (let [a (get-assignment ctx)]
+              (cond-> ctx
+                a (set-state-assignment (prop (:event ctx)) a))))})
 
 (defn load-assignment [prop]
   "Finds assignment in state, using the property extracted from the event"
@@ -96,22 +109,60 @@
    :leave (fn [ctx]
             (remove-state-assignment ctx (prop (:event ctx))))})
 
+(def save-queued
+  "Interceptor that saves a queued task.  These are tasks that could not be assigned
+   immediately due to lack of resources."
+  {:name ::save-queued
+   :leave (fn [ctx]
+            (when-let [q (get-queued ctx)]
+              (log/debug "Saving queued task:" q)
+              (st/save-queued-task (emi/get-db ctx) {:id (st/new-id)
+                                                     :details q
+                                                     :creation-time (t/now)}))
+            ctx)})
+
+(def add-to-queued-list
+  "Interceptor that adds a queued task to the in-memory list in the state."
+  {:name ::add-to-queued-list
+   :leave (fn [ctx]
+            (let [q (get-queued ctx)]
+              (cond-> ctx
+                q (emi/update-state update ::queued-list (fnil conj []) q))))})
+
+#_(def unwrap-events
+  "Takes the `:events` key from the result and puts that in the result instead."
+  {:name ::unwrap-events
+   :leave (fn [ctx]
+            (update ctx :result :events))})
+
 ;; Handlers
 
 (defn build-queued [ctx]
-  (let [a (get-assignment ctx)]
-    ;; TODO Fail build when no assignment (means no available capacity)
+  (when-let [a (get-assignment ctx)]
+    ;; TODO Fail build when it exceeds max capacity
     [{:type (keyword (name (:runner a)) "build-scheduled")}]))
 
 ;; Routes
 
-(defn listener-routes
+(defn make-routes
   "Makes mailman routes for event handling that perform actual dispatching and resource
-   management.  These routes are responsible for releasing assigned resources and as
-   such should share state with the poll routes."
-  [state]
-  (let [with-state (emi/with-state state)]
-    [[:build/end
+   management."
+  [state storage]
+  (let [with-state (emi/with-state state)
+        use-db (emi/use-db storage)]
+    [[:build/queued
+      ;; Determines the runner to use and updates resources
+      [{:handler build-queued
+        :interceptors [with-state
+                       use-db
+                       add-build-task
+                       add-runner-assignment
+                       (save-assignment :sid)
+                       save-queued
+                       add-to-queued-list
+                       consume-resources]}]]
+
+     [:build/end
       ;; Frees consumed resources
       [{:handler (constantly nil)
         :interceptors [with-state
@@ -120,21 +171,6 @@
                        release-resources]}]]
 
      ;; TODO Events received from build jobs
+     [:container/job-queued []]
      [:job/end []]]))
 
-(defn poll-routes
-  "Creates routes to be used when polling.  We use polling because we don't want to pick
-   container tasks from the queues if we know there is no capacity available."
-  [state]
-  (let [with-state (emi/with-state state)]
-    [[:build/queued
-      ;; Determines the runner to use and updates resources
-      [{:handler build-queued
-        :interceptors [with-state
-                       add-build-task
-                       add-runner-assignment
-                       (save-assignment :sid)
-                       consume-resources]}]]
-
-     ;; TODO Events received from build jobs
-     [:container/job-queued []]]))

@@ -100,7 +100,7 @@
 (defn use-runner-resources
   "Updates runner by decreasing available resources"
   [r task]
-  (let [upd (get consumers (:id r) identity)]
+  (let [upd (get consumers (:id r) (fn [r _] r))]
     (upd r task)))
 
 (defn release-k8s [r {:keys [cpus memory] :as res}]

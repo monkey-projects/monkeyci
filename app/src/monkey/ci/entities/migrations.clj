@@ -474,7 +474,7 @@
    (calc-next-idx 35)
 
    (entity-table-migration
-    36 :retry-tasks
+    36 :queued-tasks
     [[:details :text]
      [:creation-time :timestamp]]
     [])])

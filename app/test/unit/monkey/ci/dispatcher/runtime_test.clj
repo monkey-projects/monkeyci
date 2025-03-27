@@ -6,7 +6,8 @@
             [monkey.ci.oci :as oci]))
 
 (deftest make-system
-  (let [sys (sut/make-system {:mailman {:type :manifold}})]
+  (let [sys (sut/make-system {:mailman {:type :manifold}
+                              :storage {:type :memory}})]
     (testing "provides http server"
       (is (some? (:http-server sys))))
 
@@ -27,7 +28,8 @@
     (testing "provides runners"
       (is (some? (:runners sys))))
 
-    (testing "provides storage")))
+    (testing "provides storage"
+      (is (some? (:storage sys))))))
 
 (deftest http-app
   (testing "`start` creates handler fn"

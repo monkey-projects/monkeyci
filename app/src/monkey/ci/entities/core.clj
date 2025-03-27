@@ -430,19 +430,19 @@
   {:plural "repo-indices"
    :id-col :repo-id})
 
-(def prepare-retry-task
+(def prepare-queued-task
   (comp (partial prop->edn :details)
         (partial int->time :creation-time)))
-(def convert-retry-task
+(def convert-queued-task
   (comp (partial copy-prop :details)
         (partial time->int :creation-time)))
-(def convert-retry-task-select
+(def convert-queued-task-select
   (comp (partial edn->prop :details)
         (partial time->int :creation-time)))
 
-(defentity retry-task
-  {:before-insert prepare-retry-task
-   :after-insert  convert-retry-task
-   :before-update prepare-retry-task
-   :after-update  convert-retry-task
-   :after-select  convert-retry-task-select})
+(defentity queued-task
+  {:before-insert prepare-queued-task
+   :after-insert  convert-queued-task
+   :before-update prepare-queued-task
+   :after-update  convert-queued-task
+   :after-select  convert-queued-task-select})

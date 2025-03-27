@@ -61,5 +61,5 @@
 (s/def :invoice/kind #{:invoice :creditnote})
 (s/def :invoice/date date?)
 
-(s/def :retry-task/creation-time ts?)
-(s/def :retry-task/details map?)
+(s/def :queued-task/creation-time ts?)
+(s/def :queued-task/details map?)

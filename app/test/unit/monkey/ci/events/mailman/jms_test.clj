@@ -29,6 +29,7 @@
                  :job/skipped
                  :job/executed
                  :container/pending
+                 :container/job-queued
                  :container/start
                  :container/end
                  :command/start

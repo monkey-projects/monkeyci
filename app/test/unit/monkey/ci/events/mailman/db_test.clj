@@ -6,21 +6,15 @@
              [cuid :as cuid]
              [storage :as st]]
             [monkey.ci.events.mailman :as em]
-            [monkey.ci.events.mailman.db :as sut]
+            [monkey.ci.events.mailman
+             [db :as sut]
+             [interceptors :as emi]]
             [monkey.ci.spec.events :as se]
             [monkey.ci.test.helpers :as h]))
 
 (defn- validate-spec [spec obj]
   (is (spec/valid? spec obj)
       (spec/explain-str spec obj)))
-
-(deftest use-db
-  (testing "adds db to context"
-    (let [i (sut/use-db ::test-db)]
-      (is (= ::sut/use-db (:name i)))
-      (is (fn? (:enter i)))
-      (is (= ::test-db (-> ((:enter i) {})
-                           ::sut/db))))))
 
 (deftest customer-credits
   (h/with-memory-store s
@@ -36,7 +30,7 @@
           (is (= 100M
                  (-> {:event {:build
                               {:customer-id (:id cust)}}}
-                     (sut/set-db s)
+                     (emi/set-db s)
                      (enter)
                      (sut/get-credits)))))))))
 
@@ -56,7 +50,7 @@
           (is (some? (st/save-customer s cust)))
           (let [r (-> {:event {:build build
                                :sid [(:id cust) (:id repo)]}}
-                      (sut/set-db s)
+                      (emi/set-db s)
                       (enter)
                       :event)]
             (is (some? (get-in r [:build :build-id])))
@@ -74,7 +68,7 @@
 
       (testing "`leave` saves build from result event"
         (is (= build (-> {:result {:build build}}
-                         (sut/set-db s)
+                         (emi/set-db s)
                          (leave)
                          (sut/get-build))))
         (is (= build (st/find-build s (get-sid build)))))
@@ -88,7 +82,7 @@
                            (assoc build 
                                   :script
                                   {:jobs {"other-job" {:id "other-job"}}})}}
-                         (sut/set-db s)
+                         (emi/set-db s)
                          (leave))))
           (is (= [job] (-> (st/find-build s (get-sid build))
                            :script
@@ -107,7 +101,7 @@
       
       (testing "`enter` reads build in context using sid"
         (is (= build (-> {:event {:sid sid}}
-                         (sut/set-db s)
+                         (emi/set-db s)
                          (enter)
                          (sut/get-build))))))))
 
@@ -124,7 +118,7 @@
       
       (testing "`enter` reads build in context using sid"
         (is (= build (-> {:event {:sid sid}}
-                         (sut/set-db s)
+                         (emi/set-db s)
                          (enter)
                          (sut/get-build)))))
 
@@ -132,7 +126,7 @@
         (testing "saves build from result event"
           (let [upd (assoc build :status :success)]
             (is (= upd (-> {:result {:build upd}}
-                           (sut/set-db s)
+                           (emi/set-db s)
                            (leave)
                            (sut/get-build))))
             (is (= upd (st/find-build s (sut/build->sid build))))))))))
@@ -152,7 +146,7 @@
                           {:type :script/start
                            :jobs [job]
                            :sid sid}}
-                         (sut/set-db s)
+                         (emi/set-db s)
                          (enter))))
           (is (some? (st/find-build s sid)))
           (is (= job (st/find-job s (conj sid (:id job))))))))))
@@ -170,7 +164,7 @@
       (testing "retrieves job from db"
         (is (= job (-> {:event {:sid sid
                                 :job-id (:id job)}}
-                       (sut/set-db s)
+                       (emi/set-db s)
                        (enter)
                        (sut/get-job))))))))
 
@@ -188,7 +182,7 @@
 
       (testing "`leave` saves job from result in db"
         (is (= job (-> evt
-                       (sut/set-db s)
+                       (emi/set-db s)
                        (em/set-result {:build (assoc-in build [:script :jobs (:id job)] job)})
                        (leave)
                        (sut/get-job))))
@@ -203,7 +197,7 @@
         (let [build (-> (h/gen-build)
                         (assoc :credits 100))
               ctx (-> {:result {:build build}}
-                      (sut/set-db s))]
+                      (emi/set-db s))]
           (is (some? (st/save-customer-credit s {:customer-id (:customer-id build)
                                                  :amount 1000
                                                  :type :user})))
@@ -214,7 +208,7 @@
         (let [build (-> (h/gen-build)
                         (assoc :credits 100))
               ctx (-> {:result {:build build}}
-                      (sut/set-db s))]
+                      (emi/set-db s))]
           (is (= build (-> (leave ctx) :result :build)))
           (is (empty? (st/list-customer-credit-consumptions s (:customer-id build)))))))))
 

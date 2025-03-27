@@ -535,17 +535,17 @@
       (testing "can find by build sid"
         (is (= details (sut/find-runner-details st (build->sid build))))))))
 
-(deftest retry-tasks
+(deftest queued-tasks
   (h/with-memory-store st
     (let [task {:id (cuid/random-cuid)
                 :details ::test-task
                 :creation-time (t/now)}]
       (testing "can save"
-        (is (sid/sid? (sut/save-retry-task st task))))
+        (is (sid/sid? (sut/save-queued-task st task))))
 
       (testing "can list"
-        (is (= [task] (sut/list-retry-tasks st))))
+        (is (= [task] (sut/list-queued-tasks st))))
 
       (testing "can delete"
-        (is (true? (sut/delete-retry-task st (:id task))))
-        (is (empty? (sut/list-retry-tasks st)))))))
+        (is (true? (sut/delete-queued-task st (:id task))))
+        (is (empty? (sut/list-queued-tasks st)))))))

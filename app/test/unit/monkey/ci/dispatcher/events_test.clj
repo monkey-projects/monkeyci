@@ -2,49 +2,66 @@
   (:require [clojure.test :refer [deftest testing is]]
             [monkey.ci.dispatcher.events :as sut]
             [monkey.ci.events.mailman.interceptors :as emi]
+            [monkey.ci.storage :as st]
+            [monkey.ci.test.helpers :as h]
             [monkey.mailman.core :as mmc]))
 
-(deftest listener-routes
-  (let [r (sut/listener-routes (atom {}))]
-    (doseq [e [:job/end :build/end]]
-      (testing (format "handles `%s`" e)
-        (is (contains? (set (map first r)) e))))))
+(deftest make-routes
+  (h/with-memory-store st
+    (let [evts [:container/job-queued :build/queued :job/end :build/end]
+          r (sut/make-routes (atom {}) st)]
+      (doseq [e evts]
+        (testing (format "handles `%s`" e)
+          (is (contains? (set (map first r)) e)))))
 
-(deftest poll-routes
-  (let [evts [:container/job-queued :build/queued]
-        r (sut/poll-routes (atom {}))]
-    (doseq [e evts]
-      (testing (format "handles `%s`" e)
-        (is (contains? (set (map first r)) e)))))
+    (let [state (atom {:runners [{:id :k8s
+                                  :archs [:arm]
+                                  :memory 4
+                                  :cpus 1}
+                                 {:id :oci
+                                  :archs [:amd]
+                                  :count 10}]})
+          router (-> state
+                     (sut/make-routes st)
+                     (mmc/router))]
+      (testing "`:build/queued`"
+        (testing "returns `k8s/build-scheduled` when capacity"
+          (is (= [:k8s/build-scheduled]
+                 (->> {:type :build/queued
+                       :build {}}
+                      (router)
+                      first
+                      :result
+                      (map :type)))))
 
-  (let [router (-> {:runners [{:id :k8s
-                               :archs [:arm]
-                               :memory 4
-                               :cpus 1}
-                              {:id :oci
-                               :archs [:amd]
-                               :count 10}]}
-                   (atom)
-                   (sut/poll-routes)
-                   (mmc/router))]
-    (testing "`:build/queued`"
-      (testing "returns `k8s/build-scheduled` when capacity"
-        (is (= [:k8s/build-scheduled]
-               (->> {:type :build/queued
-                     :build {}}
-                    (router)
-                    first
-                    :result
-                    (map :type)))))
+        (testing "returns `oci/build-scheduled` when no k8s capacity"
+          (is (= [:oci/build-scheduled]
+                 (->> {:type :build/queued
+                       :build {}}
+                      (router)
+                      first
+                      :result
+                      (map :type)))))
 
-      (testing "returns `oci/build-scheduled` when no k8s capacity"
-        (is (= [:oci/build-scheduled]
-               (->> {:type :build/queued
-                     :build {}}
-                    (router)
-                    first
-                    :result
-                    (map :type))))))))
+        (testing "when no capacity"
+          (let [build (h/gen-build)]
+            (is (some? (reset! state {:runners [{:id :oci
+                                                 :archs [:amd]
+                                                 :count 0}]})))
+            (is (nil? (-> {:type :build/queued
+                           :build build}
+                          (router)
+                          first
+                          :result))
+                "does not dispatch event")
+
+            (testing "adds to queued list"
+              (is (= 1 (count (::sut/queued-list @state)))))
+
+            (testing "saves to database"
+              (let [l (st/list-queued-tasks st)]
+                (is (= 1 (count l)))
+                (is (= build (get-in (first l) [:details :build])))))))))))
 
 (deftest build-queued
   (testing "dispatches to available runner according to assignment"
@@ -56,7 +73,8 @@
       (is (= [:k8s/build-scheduled]
              (->> r (map :type))))))
 
-  (testing "when no assignment, fails build"))
+  (testing "when no assignment, returns `nil`"
+    (is (nil? (sut/build-queued {})))))
 
 (deftest add-build-task
   (let [{:keys [enter] :as i} sut/add-build-task]
@@ -136,12 +154,19 @@
   (let [{:keys [leave] :as i} (sut/save-assignment :id)]
     (is (keyword? (:name i)))
 
-    (testing "`leave` saves assignment to state"
-      (let [a ::test-assignment]
-        (is (= a (-> {:event {:id ::test-id}}
-                     (sut/set-assignment a)
-                     (leave)
-                     (sut/get-state-assignment ::test-id))))))))
+    (testing "`leave`"
+      (testing "saves assignment to state"
+        (let [a ::test-assignment]
+          (is (= a (-> {:event {:id ::test-id}}
+                       (sut/set-assignment a)
+                       (leave)
+                       (sut/get-state-assignment ::test-id))))))
+
+      (testing "does not save when no assignment"
+          (is (empty? (-> {:event {:id ::test-id}}
+                          (leave)
+                          (emi/get-state)
+                          :assignments)))))))
 
 (deftest load-assignment
   (let [{:keys [enter] :as i} (sut/load-assignment :id)]

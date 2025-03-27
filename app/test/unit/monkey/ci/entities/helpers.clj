@@ -111,5 +111,5 @@
 (defn gen-invoice []
   (gen-spec :db/invoice))
 
-(defn gen-retry-task []
-  (gen-spec :db/retry-task))
+(defn gen-queued-task []
+  (gen-spec :db/queued-task))

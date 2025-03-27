@@ -12,7 +12,7 @@
              [storage :as st]
              [vault :as v]]
             [monkey.ci.events.mailman :as em]
-            [monkey.ci.events.mailman.db :as emd]
+            [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.ci.runners.oci :as sut]
             [monkey.ci.script.config :as sc]
             [monkey.ci.spec.events :as se]
@@ -238,7 +238,7 @@
               r (-> {:event {:type :build/pending
                              :sid (st/ext-build-sid build)
                              :build build}}
-                    (emd/set-db st)
+                    (emi/set-db st)
                     (enter))]
           (is (= [{:private-key "decrypted-key"
                    :public-key "test-pub"}]
@@ -269,7 +269,7 @@
               ctx (-> {:event {:sid sid}}
                       (oci/set-ci-response {:status 200
                                             :body {:id "test-ocid"}})
-                      (emd/set-db st))
+                      (emi/set-db st))
               r (enter ctx)]
           (is (= ctx r))
           (is (= {:runner :oci
@@ -289,7 +289,7 @@
               _ (st/save-runner-details st sid details)]
           (is (= ocid
                  (-> {:event {:sid sid}}
-                     (emd/set-db st)
+                     (emi/set-db st)
                      (enter)
                      (oci/get-ci-id)))))))))
 
