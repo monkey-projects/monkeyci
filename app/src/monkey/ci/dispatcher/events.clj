@@ -13,12 +13,12 @@
 
 (def evt-sid (comp :sid :event))
 
-(defn- build->task [b]
+(defn build->task [b]
   {:type :build
    :details b
    :resources
    ;; Default requirements
-   {:memory 2 :cpus 1 :build b}})
+   {:memory 2 :cpus 1}})
 
 (defn assignment [runner task]
   {:runner runner :task task})
@@ -63,6 +63,11 @@
 
 (defn get-queued-list [ctx]
   (ds/get-queue (emi/get-state ctx)))
+
+(defmulti get-task-sid :type)
+
+(defmethod get-task-sid :build [r]
+  (-> r :details b/sid))
 
 ;; Interceptors
 
@@ -143,6 +148,30 @@
                                                      :task q}))
             ctx)})
 
+(defn- find-queued-task
+  "Finds a matching task in the list of queued tasks that has the same sid"
+  [qt t]
+  (let [sid (get-task-sid t)]
+    (->> qt
+         (filter (fn [q]
+                   (= (get-task-sid (:task q))
+                      sid)))
+         first)))
+
+(def delete-queued
+  "If the result contains deleted queue items, this interceptor will remove them from
+   the database."
+  {:name ::delete-queued
+   :leave (fn [ctx]
+            (when-let [d (get-in ctx [:result :queue :removed])]
+              (log/debug "Deleting these tasks from queue list:" d)
+              (let [db (emi/get-db ctx)
+                    l (st/list-queued-tasks db)]
+                (doseq [t d]
+                  (when-let [m (find-queued-task l t)]
+                    (st/delete-queued-task db (:id m))))))
+            ctx)})
+
 (def add-to-queued-list
   "Interceptor that adds a queued task to the in-memory list in the state."
   {:name ::add-to-queued-list
@@ -156,7 +185,6 @@
   {:name ::result-assignment
    :leave (fn [ctx]
             (set-assignment ctx (get-in ctx [:result :assignment])))})
-
 
 (def result->queue
   "Updates the queue with values from the result"
@@ -179,9 +207,9 @@
    :sid (b/sid build)})
 
 (defn build-queued [ctx]
-  (when-let [{:keys [build runner]} (get-assignment ctx)]
+  (when-let [{:keys [runner] :as a} (get-assignment ctx)]
     ;; TODO Fail build when it exceeds max capacity
-    {:events [(build-scheduled-evt build runner)]}))
+    {:events [(build-scheduled-evt (get-in a [:task :details]) runner)]}))
 
 (defn build-end
   "When a build ends, resources become available again.  This means we may be able to
@@ -189,12 +217,13 @@
    from the queue.  Since the released resources belong to a specific runner, we can only
    assign the task to that runner."
   [ctx]
+  ;; TODO Don't just pick the first
   (let [t (first (get-queued-list ctx))
         {:keys [runner] :as a} (get-assignment ctx)]
     ;; TODO Safety check in case assignment is not found
     (when (some? t)
       ;; TODO Support jobs as well
-      {:events [(build-scheduled-evt (:build t) runner)]
+      {:events [(build-scheduled-evt (:details t) runner)]
        :assignment (assignment runner t)
        :queue {:removed [t]}})))
 
@@ -224,9 +253,11 @@
       [{:handler build-end
         :interceptors [unwrap-events
                        with-state
+                       use-db
                        (load-assignment :sid)
                        (clear-assignment :sid)
                        with-resources
+                       delete-queued
                        result->assignment
                        result->queue]}]]
 

@@ -6,9 +6,13 @@
             [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.ci
              [build :as b]
+             [cuid :as cuid]
              [storage :as st]]
             [monkey.ci.test.helpers :as h]
             [monkey.mailman.core :as mmc]))
+
+(defn- gen-build []
+  (zipmap st/build-sid-keys (repeatedly cuid/random-cuid)))
 
 (deftest make-routes
   (h/with-memory-store st
@@ -48,7 +52,7 @@
                       (map :type)))))
 
         (testing "when no capacity"
-          (let [build (h/gen-build)]
+          (let [build (gen-build)]
             (is (some? (reset! state {:runners [{:id :oci
                                                  :archs [:amd]
                                                  :count 0}]})))
@@ -68,7 +72,7 @@
                 (is (= build (-> (first l) :task :details))))))))
 
       (testing "`:build/end`"
-        (let [build (h/gen-build)
+        (let [build (gen-build)
               sid (b/sid build)]
           (testing "releases allocated resources for runner"
             (is (some? (reset! state (-> {:runners [{:id :oci
@@ -83,25 +87,34 @@
             (is (= 1 (-> @state :runners first :count))
                 "oci runner should have additional resources"))
 
-          (testing "dispatches next job in waiting queue"
-            (let [next-build (h/gen-build)]
-              (is (some? (reset! state (-> {:runners [{:id :oci
-                                                       :archs [:amd]
-                                                       :count 0}]}
-                                           (ds/set-assignment sid {:runner :oci})
-                                           (ds/set-queue [{:build next-build}])))))
-              (let [[evt :as r] (-> {:type :build/end
-                                     :sid sid}
-                                    (router)
-                                    first
-                                    :result)]
-                (is (= 1 (count r)))
-                (is (= :oci/build-scheduled (:type evt)))
-                (is (= (b/sid next-build) (:sid evt)))
-                (is (empty? (ds/get-queue @state))
-                    "queued build should be scheduled"))))
+          (testing "with waiting queue"
+            (let [next-build (gen-build)
+                  task (sut/build->task next-build)]
+              (is (some? (st/save-queued-task st {:id (cuid/random-cuid)
+                                                  :task task})))
 
-          (testing "deletes dispatched job from db"))))))
+              (testing "dispatches next task in waiting queue"
+                (is (some? (reset! state (-> {:runners [{:id :oci
+                                                         :archs [:amd]
+                                                         :count 0}]}
+                                             (ds/set-assignment sid {:runner :oci})
+                                             (ds/set-queue [task])))))
+                (let [[evt :as r] (-> {:type :build/end
+                                       :sid sid}
+                                      (router)
+                                      first
+                                      :result)]
+                  (is (= 1 (count r)))
+                  (is (= :oci/build-scheduled (:type evt)))
+                  (is (= (b/sid next-build) (:sid evt)))
+                  (is (empty? (ds/get-queue @state))
+                      "queued build should be scheduled")))
+
+              (testing "deletes task from db"
+                (is (not (contains? (->> (st/list-queued-tasks st)
+                                         (map :task)
+                                         set)
+                                    task)))))))))))
 
 (deftest build-queued
   (testing "dispatches to available runner according to assignment"
@@ -257,3 +270,20 @@
                     (sut/set-state-assignment ::test-id ::test-assignment)
                     (leave)
                     (sut/get-state-assignment ::test-id)))))))
+
+(deftest delete-queued
+  (h/with-memory-store st
+    (let [{:keys [leave] :as i} sut/delete-queued]
+      (is (keyword? (:name i)))
+
+      (testing "`leave` deletes removed tasks from db"
+        (let [task {:type :build
+                    :details {}}]
+          (is (some? (st/save-queued-task st {:id (cuid/random-cuid)
+                                              :task task})))
+          (is (some? (-> {:result
+                          {:queue
+                           {:removed [task]}}}
+                         (emi/set-db st)
+                         (leave))))
+          (is (empty? (st/list-queued-tasks st))))))))
