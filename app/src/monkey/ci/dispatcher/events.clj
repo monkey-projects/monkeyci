@@ -217,9 +217,10 @@
    from the queue.  Since the released resources belong to a specific runner, we can only
    assign the task to that runner."
   [ctx]
-  ;; TODO Don't just pick the first
-  (let [t (first (get-queued-list ctx))
-        {:keys [runner] :as a} (get-assignment ctx)]
+  (let [{:keys [runner] :as a} (get-assignment ctx)
+        t (dc/get-next-queued-task (get-queued-list ctx)
+                                   (get-runners ctx)
+                                   runner)]
     ;; TODO Safety check in case assignment is not found
     (when (some? t)
       ;; TODO Support jobs as well

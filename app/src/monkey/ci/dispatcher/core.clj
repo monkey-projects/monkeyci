@@ -31,7 +31,7 @@
    events (`build/start`, `job/start`, `build/end` and `job/end`)."
   (:require [clojure.tools.logging :as log]))
 
-(defn matches-arch? [[{:keys [arch]} {:keys [archs]}]]
+(defn matches-arch? [[{:keys [arch]} {:keys [archs] :as r}]]
   (or (nil? arch)
       (contains? (set archs) arch)))
 
@@ -55,15 +55,16 @@
 (def matchers {:k8s matches-k8s?
                :oci matches-oci?})
 
+(defn- get-matcher [runner-id]
+  (get matchers runner-id (constantly false)))
+
 (defn assign-runner
   "Given a task (either build or container job), determines the runner to use.  The task
    contains cpu and memory requirements, and optional architecture (amd or arm).  The
    runners provide available resources and supported architectures."
   [task runners]
-  (letfn [(get-matcher [{:keys [id]}]
-            (get matchers id (constantly false)))
-          (matches? [r]
-            ((get-matcher r) [task r]))]
+  (letfn [(matches? [r]
+            ((get-matcher (:id r)) [task r]))]
     (->> runners
          (filter matches?)
          (first))))
@@ -106,4 +107,61 @@
   (let [upd (get releasers (:id r) identity)]
     (upd r task)))
 
+(def oldest-first
+  (partial sort-by :creation-time))
 
+(defn- get-runner [runners id]
+  (->> runners
+       (filter (comp (partial = id) :id))
+       first))
+
+(defn arch-filter [runner]
+  (partial filter (comp matches-arch?
+                        #(vector (:task %) runner))))
+
+(defn resource-filter [runner]
+  (partial filter (comp (get-matcher (:id runner))
+                        #(vector (:task %) runner))))
+
+(defn exclusivity-filter
+  "Creates a filter fn that removes all tasks that can be run by other runners, if
+   at least one task is available that can only be run by this runner."
+  [runners runner]
+  (fn [tasks]
+    (letfn [(task-runners [t]
+              (->> runners
+                   (filter (fn [r]
+                             (log/debug "Arch filter for" r)
+                             (matches-arch? [(:task t) r])))
+                   (mapv :id)))]
+      (let [singles (->> tasks
+                         (map (fn [t]
+                                [t (task-runners t)]))
+                         (filter (comp (partial = [(:id runner)]) second))
+                         (map first))]
+        (if (not-empty singles)
+          singles
+          tasks)))))
+
+(defn get-next-queued-task
+  "Finds the next queued task to schedule for the runner.  Tasks are filtered like so:
+    1. Drop all tasks that have mismatching architectures.
+    2. If there are tasks that can only be run on this runner, keep only those.
+    3. Drop tasks that require too many resources.
+    4. Sort oldest first.
+    5. Take the first in the list.
+  
+   Rule (2) is required to avoid large tasks constantly getting pushed back because smaller
+   ones keep getting selected.  If a task that required many resources can only be run on 
+   this specific runner, we should wait until it has sufficient resources available."
+  [qt runners runner-id]
+  (let [runner (get-runner runners runner-id)
+        ;; Rules are applied last to first
+        rules (comp oldest-first
+                    (resource-filter runner)
+                    (exclusivity-filter runners runner)
+                    (arch-filter runner))]
+    ;; Sort the list of tasks according to priority rules, then take the first
+    (->> qt
+         (rules)
+         (first))))
