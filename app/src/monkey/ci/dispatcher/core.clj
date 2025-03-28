@@ -31,30 +31,14 @@
    events (`build/start`, `job/start`, `build/end` and `job/end`)."
   (:require [clojure.tools.logging :as log]))
 
-(defn dispatch
-  "Performs a dispatching round using the given configuration.  The configuration
-   consists of functions that provide the current tasks to execute, the executors
-   to which tasks can be assigned, a strategy that determines the executor for a
-   task and a function that actually executes the task.
-
-   Returns a list of execution results for each assigned task."
-  [{:keys [get-tasks get-executors execute-task strategy]}]
-  (letfn [(assign-task [task]
-            (when-let [e (strategy task (get-executors))]
-              (execute-task task e)))]
-    (->> (get-tasks)
-         (map assign-task)
-         (remove nil?)
-         (doall))))
-
 (defn matches-arch? [[{:keys [arch]} {:keys [archs]}]]
   (or (nil? arch)
       (contains? (set archs) arch)))
 
-(defn matches-cpus? [[{:keys [cpus]} {avail :cpus}]]
+(defn matches-cpus? [[{{:keys [cpus]} :resources} {avail :cpus}]]
   (<= cpus avail))
 
-(defn matches-mem? [[{:keys [memory]} {avail :memory}]]
+(defn matches-mem? [[{{:keys [memory]} :resources} {avail :memory}]]
   (<= memory avail))
 
 (def matches-k8s?
@@ -122,4 +106,4 @@
   (let [upd (get releasers (:id r) identity)]
     (upd r task)))
 
-;;; Mailman event routing
+

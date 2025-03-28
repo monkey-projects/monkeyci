@@ -1,8 +1,12 @@
 (ns monkey.ci.dispatcher.events-test
   (:require [clojure.test :refer [deftest testing is]]
-            [monkey.ci.dispatcher.events :as sut]
+            [monkey.ci.dispatcher
+             [events :as sut]
+             [state :as ds]]
             [monkey.ci.events.mailman.interceptors :as emi]
-            [monkey.ci.storage :as st]
+            [monkey.ci
+             [build :as b]
+             [storage :as st]]
             [monkey.ci.test.helpers :as h]
             [monkey.mailman.core :as mmc]))
 
@@ -56,12 +60,48 @@
                 "does not dispatch event")
 
             (testing "adds to queued list"
-              (is (= 1 (count (::sut/queued-list @state)))))
+              (is (= 1 (count (ds/get-queue @state)))))
 
             (testing "saves to database"
               (let [l (st/list-queued-tasks st)]
                 (is (= 1 (count l)))
-                (is (= build (get-in (first l) [:details :build])))))))))))
+                (is (= build (-> (first l) :task :details))))))))
+
+      (testing "`:build/end`"
+        (let [build (h/gen-build)
+              sid (b/sid build)]
+          (testing "releases allocated resources for runner"
+            (is (some? (reset! state (-> {:runners [{:id :oci
+                                                     :archs [:amd]
+                                                     :count 0}]}
+                                         (ds/set-assignment sid {:runner :oci})))))
+            (is (nil? (-> {:type :build/end
+                           :sid sid}
+                          (router)
+                          first
+                          :result)))
+            (is (= 1 (-> @state :runners first :count))
+                "oci runner should have additional resources"))
+
+          (testing "dispatches next job in waiting queue"
+            (let [next-build (h/gen-build)]
+              (is (some? (reset! state (-> {:runners [{:id :oci
+                                                       :archs [:amd]
+                                                       :count 0}]}
+                                           (ds/set-assignment sid {:runner :oci})
+                                           (ds/set-queue [{:build next-build}])))))
+              (let [[evt :as r] (-> {:type :build/end
+                                     :sid sid}
+                                    (router)
+                                    first
+                                    :result)]
+                (is (= 1 (count r)))
+                (is (= :oci/build-scheduled (:type evt)))
+                (is (= (b/sid next-build) (:sid evt)))
+                (is (empty? (ds/get-queue @state))
+                    "queued build should be scheduled"))))
+
+          (testing "deletes dispatched job from db"))))))
 
 (deftest build-queued
   (testing "dispatches to available runner according to assignment"
@@ -71,7 +111,7 @@
                 (sut/set-assignment {:runner :k8s})
                 (sut/build-queued))]
       (is (= [:k8s/build-scheduled]
-             (->> r (map :type))))))
+             (->> r :events (map :type))))))
 
   (testing "when no assignment, returns `nil`"
     (is (nil? (sut/build-queued {})))))
@@ -86,8 +126,9 @@
                   (enter)
                   (sut/get-task))]
         (is (some? t))
-        (is (number? (:cpus t)))
-        (is (number? (:memory t)))))))
+        (is (= :build (:type t)))
+        (is (number? (-> t :resources :cpus)))
+        (is (number? (-> t :resources :memory)))))))
 
 (deftest add-runner-assignment
   (let [{:keys [enter] :as i} sut/add-runner-assignment]
@@ -95,28 +136,29 @@
 
     (testing "`enter`"
       (testing "assigns runner according to task requirements"
-        (is (= {:runner :oci
-                :resources {:memory 2
-                            :cpus 1}}
-               (-> {}
-                   (sut/set-runners [{:id :k8s
-                                      :archs [:arm]
-                                      :memory 6
-                                      :cpus 2}
-                                     {:id :oci
-                                      :count 10
-                                      :archs [:amd]}])
-                   (sut/set-task {:type :build
-                                  :arch :amd
-                                  :memory 2
-                                  :cpus 1})
-                   (enter)
-                   (sut/get-assignment)))))
+        (let [task {:type :build
+                    :arch :amd
+                    :resources {:memory 2
+                                :cpus 1}}]
+          (is (= {:runner :oci
+                  :task task}
+                 (-> {}
+                     (sut/set-runners [{:id :k8s
+                                        :archs [:arm]
+                                        :memory 6
+                                        :cpus 2}
+                                       {:id :oci
+                                        :count 10
+                                        :archs [:amd]}])
+                     (sut/set-task task)
+                     (enter)
+                     (sut/get-assignment))))))
 
       (testing "queues task when no runner available"
-        (let [task {:build {}
-                    :memory 2
-                    :cpus 1}
+        (let [task {:type :build
+                    :details {}
+                    :resources {:memory 2
+                                :cpus 1}}
               ctx (-> {}
                       (sut/set-task task)
                       (enter))]
@@ -124,14 +166,15 @@
           (is (= task (sut/get-queued ctx)))))
 
       (testing "queues task when runner available, but other tasks are queued"
-        (let [task {:build {}
-                    :memory 2
-                    :cpus 1}
-              other-task {:memory 2
-                          :cpus 2}
+        (let [task {:type :build
+                    :details {}
+                    :resources {:memory 2
+                                :cpus 1}}
+              other-task {:resources {:memory 2
+                                      :cpus 2}}
               ctx (-> {}
                       (sut/set-task task)
-                      (emi/set-state {::sut/queued-list [other-task]})
+                      (emi/set-state (ds/set-queue {} [other-task]))
                       (sut/set-runners [{:id :oci
                                          :count 10}])
                       (enter))]
@@ -145,8 +188,8 @@
     (testing "`leave` updates runner resources in state"
       (let [r (-> {}
                   (sut/set-assignment {:runner :k8s
-                                       :resources {:memory 2
-                                                   :cpus 1}})
+                                       :task {:resources {:memory 2
+                                                          :cpus 1}}})
                   (sut/set-runners [{:id :k8s
                                      :memory 6
                                      :cpus 2}])
@@ -164,8 +207,8 @@
     (testing "`enter` updates runner state according to consumed resources by task"
       (let [r (-> {}
                   (sut/set-assignment {:runner :k8s
-                                       :resources {:memory 2
-                                                   :cpus 1}})
+                                       :task {:resources {:memory 2
+                                                          :cpus 1}}})
                   (sut/set-runners [{:id :k8s
                                      :memory 3
                                      :cpus 2}])
@@ -192,7 +235,7 @@
           (is (empty? (-> {:event {:id ::test-id}}
                           (leave)
                           (emi/get-state)
-                          :assignments)))))))
+                          (ds/get-assignments))))))))
 
 (deftest load-assignment
   (let [{:keys [enter] :as i} (sut/load-assignment :id)]

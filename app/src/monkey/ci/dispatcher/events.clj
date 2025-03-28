@@ -1,16 +1,27 @@
 (ns monkey.ci.dispatcher.events
   (:require [clojure.tools.logging :as log]
-            [monkey.ci.dispatcher.core :as dc]
+            [monkey.ci.dispatcher
+             [core :as dc]
+             [state :as ds]]
             [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.ci
+             [build :as b]
              [storage :as st]
              [time :as t]]))
 
 ;; Context management
 
+(def evt-sid (comp :sid :event))
+
 (defn- build->task [b]
-  ;; Default requirements
-  {:memory 2 :cpus 1 :build b})
+  {:type :build
+   :details b
+   :resources
+   ;; Default requirements
+   {:memory 2 :cpus 1 :build b}})
+
+(defn assignment [runner task]
+  {:runner runner :task task})
 
 (defn set-runners [ctx r]
   (emi/update-state ctx assoc :runners r))
@@ -37,13 +48,13 @@
   (assoc ctx ::task a))
 
 (defn set-state-assignment [ctx id a]
-  (emi/update-state ctx assoc-in [:assignments id] a))
+  (emi/update-state ctx ds/set-assignment id a))
 
 (defn get-state-assignment [ctx id]
-  (get-in (emi/get-state ctx) [:assignments id]))
+  (ds/get-assignment (emi/get-state ctx) id))
 
 (defn remove-state-assignment [ctx id]
-  (emi/update-state ctx update :assignments dissoc id))
+  (emi/update-state ctx ds/remove-assignment id))
 
 (def get-queued ::queued)
 
@@ -51,7 +62,7 @@
   (assoc ctx ::queued task))
 
 (defn get-queued-list [ctx]
-  (::queued-list (emi/get-state ctx)))
+  (ds/get-queue (emi/get-state ctx)))
 
 ;; Interceptors
 
@@ -71,14 +82,14 @@
                   m (when (empty? (get-queued-list ctx))
                       (dc/assign-runner t runners))]
               (if m
-                (set-assignment ctx {:runner (:id m)
-                                     :resources (select-keys t [:memory :cpus])})
+                (set-assignment ctx (assignment (:id m) t))
                 ;; If it could not be assigned, it should be queued and we should terminate
                 (set-queued ctx t))))})
 
 (defn- update-runner-resources [updater ctx]
-  (let [{:keys [runner resources]} (get-assignment ctx)]
-    (update-runner ctx runner updater resources)))
+  (let [{:keys [runner] {:keys [resources]} :task :as a} (get-assignment ctx)]
+    (cond-> ctx
+      a (update-runner runner updater resources))))
 
 (def consume-resources
   "Updates state to consume resources according to scheduled task"
@@ -90,6 +101,11 @@
   {:name ::release-resources
    :enter (partial update-runner-resources dc/release-runner-resources)})
 
+(def with-resources
+  {:name ::with-resources
+   :enter (:enter release-resources)
+   :leave (:leave consume-resources)})
+
 (defn save-assignment [prop]
   "Stores assignment in state, linked to the property extracted from the event"
   {:name ::save-assignment
@@ -99,7 +115,8 @@
                 a (set-state-assignment (prop (:event ctx)) a))))})
 
 (defn load-assignment [prop]
-  "Finds assignment in state, using the property extracted from the event"
+  "Finds assignment in state, using the property extracted from the event, and
+   sets it in the context."
   {:name ::load-assignment
    :enter (fn [ctx]
             (->> ctx
@@ -122,8 +139,8 @@
             (when-let [q (get-queued ctx)]
               (log/debug "Saving queued task:" q)
               (st/save-queued-task (emi/get-db ctx) {:id (st/new-id)
-                                                     :details q
-                                                     :creation-time (t/now)}))
+                                                     :creation-time (t/now)
+                                                     :task q}))
             ctx)})
 
 (def add-to-queued-list
@@ -132,9 +149,23 @@
    :leave (fn [ctx]
             (let [q (get-queued ctx)]
               (cond-> ctx
-                q (emi/update-state update ::queued-list (fnil conj []) q))))})
+                q (emi/update-state ds/update-queue (fnil conj []) q))))})
 
-#_(def unwrap-events
+(def result->assignment
+  "Replaces the assignment in the context with the one from the result"
+  {:name ::result-assignment
+   :leave (fn [ctx]
+            (set-assignment ctx (get-in ctx [:result :assignment])))})
+
+
+(def result->queue
+  "Updates the queue with values from the result"
+  {:name ::result-queue
+   :leave (fn [ctx]
+            (let [{:keys [removed]} (get-in ctx [:result :queue])]
+              (emi/update-state ctx ds/update-queue (partial remove (set removed)))))})
+
+(def unwrap-events
   "Takes the `:events` key from the result and puts that in the result instead."
   {:name ::unwrap-events
    :leave (fn [ctx]
@@ -142,10 +173,30 @@
 
 ;; Handlers
 
+(defn- build-scheduled-evt [build runner]
+  {:type (keyword (name runner) "build-scheduled")
+   :build build
+   :sid (b/sid build)})
+
 (defn build-queued [ctx]
-  (when-let [a (get-assignment ctx)]
+  (when-let [{:keys [build runner]} (get-assignment ctx)]
     ;; TODO Fail build when it exceeds max capacity
-    [{:type (keyword (name (:runner a)) "build-scheduled")}]))
+    {:events [(build-scheduled-evt build runner)]}))
+
+(defn build-end
+  "When a build ends, resources become available again.  This means we may be able to
+   schedule another task from the queue.  If so, we assign it here, and remove that task
+   from the queue.  Since the released resources belong to a specific runner, we can only
+   assign the task to that runner."
+  [ctx]
+  (let [t (first (get-queued-list ctx))
+        {:keys [runner] :as a} (get-assignment ctx)]
+    ;; TODO Safety check in case assignment is not found
+    (when (some? t)
+      ;; TODO Support jobs as well
+      {:events [(build-scheduled-evt (:build t) runner)]
+       :assignment (assignment runner t)
+       :queue {:removed [t]}})))
 
 ;; Routes
 
@@ -158,7 +209,8 @@
     [[:build/queued
       ;; Determines the runner to use and updates resources
       [{:handler build-queued
-        :interceptors [with-state
+        :interceptors [unwrap-events
+                       with-state
                        use-db
                        add-build-task
                        add-runner-assignment
@@ -168,12 +220,15 @@
                        consume-resources]}]]
 
      [:build/end
-      ;; Frees consumed resources
-      [{:handler (constantly nil)
-        :interceptors [with-state
+      ;; Frees consumed resources and schedules queued tasks
+      [{:handler build-end
+        :interceptors [unwrap-events
+                       with-state
                        (load-assignment :sid)
                        (clear-assignment :sid)
-                       release-resources]}]]
+                       with-resources
+                       result->assignment
+                       result->queue]}]]
 
      ;; TODO Events received from build jobs
      [:container/job-queued []]

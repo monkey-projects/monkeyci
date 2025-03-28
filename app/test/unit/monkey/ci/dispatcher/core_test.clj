@@ -2,64 +2,10 @@
   (:require [clojure.test :refer [deftest testing is]]
             [monkey.ci.dispatcher.core :as sut]))
 
-(deftest dispatch
-  (testing "executes tasks according to strategy"
-    (let [assignments (atom [])
-          conf {:get-tasks
-                (constantly
-                 [::task-1 ::task-2])
-                :get-executors
-                (constantly
-                 [::executor-1 ::executor-2])
-                :execute-task
-                (fn [task exec]
-                  (swap! assignments conj {:task task
-                                           :executor exec}))
-                :strategy
-                (constantly ::executor-1)}]
-      (is (= 2 (count (sut/dispatch conf))))
-      (is (= [{:task ::task-1
-               :executor ::executor-1}
-              {:task ::task-2
-               :executor ::executor-1}]
-             @assignments))))
-
-  (testing "empty when no tasks can be executed"
-    (let [conf {:get-tasks
-                (constantly
-                 [::task-1 ::task-2])
-                :get-executors
-                (constantly
-                 [::executor-1 ::executor-2])
-                :execute-task
-                (fn [t e]
-                  (throw (ex-info "Should not be executed" {:task t :executor e})))
-                :strategy
-                (constantly nil)}]
-      (is (empty? (sut/dispatch conf)))))
-
-  (testing "gets executor state with each assignment"
-    (let [exec (atom [::executor-1 ::executor-2])
-          conf {:get-tasks
-                (constantly
-                 [::task-1 ::task-2 ::task-3])
-                :get-executors
-                (fn [] @exec)
-                :execute-task
-                (fn [_ e]
-                  ;; Remove the executor from the list of available executors
-                  (swap! exec (partial remove (partial = e)))
-                  e)
-                :strategy
-                ;; Just pick the first executor
-                (fn [_ e] (first e))}]
-      (is (= [::executor-1 ::executor-2] (sut/dispatch conf)))
-      (is (empty? @exec)))))
-
 (deftest assign-runner
   (testing "assigns to k8s runner when capacity is available"
-    (let [task {:cpus 1
-                :memory 2}
+    (let [task {:resources {:cpus 1
+                            :memory 2}}
           runners [{:id :oci
                     :archs [:amd]
                     :count 0}
@@ -70,8 +16,8 @@
       (is (= (second runners) (sut/assign-runner task runners)))))
 
   (testing "assigns to oci runner when k8s has no capacity"
-    (let [task {:cpus 1
-                :memory 2}
+    (let [task {:resources {:cpus 1
+                            :memory 2}}
           runners [{:id :k8s
                     :archs [:arm :amd]
                     :cpus 1
@@ -82,8 +28,9 @@
       (is (= (second runners) (sut/assign-runner task runners)))))
 
   (testing "`nil` when neither runner has capacity"
-    (let [task {:cpus 1
-                :memory 2}
+    (let [task {:resources
+                {:cpus 1
+                 :memory 2}}
           runners [{:id :k8s
                     :archs [:arm :amd]
                     :cpus 1
@@ -94,8 +41,8 @@
       (is (nil? (sut/assign-runner task runners)))))
 
   (testing "assigns to runner that supports platform"
-    (let [task {:cpus 1
-                :memory 2
+    (let [task {:resources {:cpus 1
+                            :memory 2}
                 :arch :amd}
           runners [{:id :k8s
                     :archs [:arm]
@@ -107,8 +54,9 @@
       (is (= (second runners) (sut/assign-runner task runners)))))
 
   (testing "prefers the first runner"
-    (let [task {:cpus 1
-                :memory 2}
+    (let [task {:resources
+                {:cpus 1
+                 :memory 2}}
           runners [{:id :k8s
                     :archs [:arm :amd]
                     :cpus 4
