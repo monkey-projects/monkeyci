@@ -314,9 +314,9 @@
   [conf storage vault]
   (let [client (make-ci-context (:containers conf))
         use-db (emi/use-db storage)]
-    [[;;:oci/build-scheduled
-      ;; TODO Replace with build-schedules when dispatcher works
+    [[;; TODO Replace with build/scheduled when dispatcher works
       :build/queued
+      ;;:oci/build-scheduled
       [{:handler initialize-build
         :interceptors [emi/handle-build-error
                        use-db
