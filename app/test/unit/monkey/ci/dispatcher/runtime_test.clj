@@ -3,7 +3,8 @@
             [com.stuartsierra.component :as co]
             [manifold.deferred :as md]
             [monkey.ci.dispatcher.runtime :as sut]
-            [monkey.ci.oci :as oci]))
+            [monkey.ci.oci :as oci]
+            [monkey.oci.container-instance.core :as ci]))
 
 (deftest make-system
   (let [sys (sut/make-system {:mailman {:type :manifold}
@@ -47,11 +48,28 @@
                :runners)))))
 
 (deftest load-oci
-  (testing "fetches available compute shapes"
-    (with-redefs [oci/list-instance-shapes (constantly (md/success-deferred
-                                                        [{:arch :amd
-                                                          :shape "Test-Amd-Shape"}]))]
-      (is (= {:id :oci
-              :archs [:amd]
-              :count 6}
-             (sut/load-oci {}))))))
+  (let [[cust-id repo-id build-id job-id] (repeatedly (comp str random-uuid))]
+    (with-redefs [oci/list-instance-shapes
+                  (constantly (md/success-deferred
+                               [{:arch :amd
+                                 :shape "Test-Amd-Shape"}]))
+                  ci/list-container-instances
+                  (constantly (md/success-deferred
+                               [{:id "build-1"
+                                 :freeform-tags {"customer-id" cust-id
+                                                 "repo-id" repo-id
+                                                 "build-id" build-id}
+                                 :lifecycle-state "ACTIVE"}
+                                {:id "build-job-1"
+                                 :freeform-tags {"customer-id" cust-id
+                                                 "repo-id" repo-id
+                                                 "build-id" build-id
+                                                 "job-id" job-id}
+                                 :lifecycle-state "CREATING"}]))]
+      (testing "fetches available compute shapes and running containers"
+        (is (= {:id :oci
+                :archs [:amd]
+                :count 4}
+               (sut/load-oci {}))))
+
+      (testing "calculates current running builds and jobs from freeform tags"))))

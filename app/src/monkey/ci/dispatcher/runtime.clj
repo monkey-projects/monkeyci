@@ -1,6 +1,7 @@
 (ns monkey.ci.dispatcher.runtime
   "Runtime components for executing the dispatcher"
   (:require [com.stuartsierra.component :as co]
+            [manifold.deferred :as md]
             [monkey.ci.dispatcher
              [events :as de]
              [http :as dh]]
@@ -51,14 +52,28 @@
        (vec)))
 
 (defn load-oci [{:keys [oci]}]
-  ;; TODO Fetch current running containers to make state up to date
-  (->> (oci/list-instance-shapes (ci/make-context oci)
+  (letfn [(active? [ci]
+            (contains? #{"CREATING" "ACTIVE"} (:lifecycle-state ci)))]
+    (let [ctx (ci/make-context oci)
+          [shapes active] (-> (md/zip
+                               (md/chain
+                                (oci/list-instance-shapes
+                                 ctx
                                  (select-keys oci [:compartment-id]))
-       (deref)
-       (map :arch)
-       (remove (partial = :unknown))
-       ;; Max number of concurrenct instances is 6, when using pay-as-you-go
-       (hash-map :id :oci :count 6 :archs)))
+                                (partial map :arch)
+                                (partial remove (partial = :unknown)))
+                               (md/chain
+                                (ci/list-container-instances
+                                 ctx
+                                 (select-keys oci [:compartment-id]))
+                                (partial filter active?)))
+                              (deref))
+          ;; Max number of container instances with pay-as-you-go credits
+          max (get oci :max-instances 6)]
+      ;; TODO Extract running build info from freeform tags and update state accordingly
+      {:id :oci
+       :count (- max (count active))
+       :archs shapes})))
 
 (defn load-k8s [conf]
   ;; TODO Fetch max cpu and memory and current running containers

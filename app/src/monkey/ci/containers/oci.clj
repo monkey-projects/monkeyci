@@ -243,7 +243,10 @@
     (-> ic
         (assoc :containers [sc jc]
                :display-name (display-name job build))
-        (update :freeform-tags merge (oci/sid->tags (b/sid build)))
+        (update :freeform-tags (fn [t]
+                                 (-> t
+                                     (merge (oci/sid->tags (b/sid build)))
+                                     (assoc "job-id" (j/job-id job)))))
         (update :volumes concat
                 (filter some? [(script-vol-config job)
                                (config-vol-config conf)]))

@@ -62,12 +62,15 @@
                 :display-name))))
 
   (testing "has tags from sid"
-    (let [tags (->> {:build {:sid ["test-cust" "test-repo"]
-                             :checkout-dir "/tmp"}}
+    (let [tags (->> {:build {:sid ["test-cust" "test-repo" "test-build"]
+                             :checkout-dir "/tmp"}
+                     :job {:id "test-job"}}
                     (sut/instance-config)
                     :freeform-tags)]
       (is (= "test-cust" (get tags "customer-id")))
-      (is (= "test-repo" (get tags "repo-id")))))
+      (is (= "test-repo" (get tags "repo-id")))
+      (is (= "test-build" (get tags "build-id")))
+      (is (= "test-job" (get tags "job-id")))))
 
   (testing "merges in existing tags"
     (let [tags (->> {:build {:sid ["test-cust" "test-repo"]

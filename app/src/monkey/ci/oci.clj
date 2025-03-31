@@ -172,7 +172,7 @@
 (defn sid->tags [sid]
   (->> sid
        (remove nil?)
-       (zipmap ["customer-id" "repo-id"])))
+       (zipmap ["customer-id" "repo-id" "build-id"])))
 
 (defn find-mount
   "Finds mount with given volume name in the container"
