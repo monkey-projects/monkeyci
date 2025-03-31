@@ -195,5 +195,5 @@
   (s/keys :req-un [:entity/runner :runner/details]))
 
 (s/def :entity/queued-task
-  (-> (s/keys :req-un [:queued-task/creation-time :queued-task/details])
+  (-> (s/keys :req-un [:queued-task/creation-time :queued-task/task])
       (s/merge :entity/common)))

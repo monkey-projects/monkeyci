@@ -475,7 +475,7 @@
 
    (entity-table-migration
     36 :queued-tasks
-    [[:details :text]
+    [[:task :text]
      [:creation-time :timestamp]]
     [])])
 

@@ -29,7 +29,7 @@
     (testing "provides event poller")
 
     (testing "provides initial state"
-      (is (some? (:state sys))))
+      (is (some? (:init-state sys))))
 
     (testing "provides storage"
       (is (some? (:storage sys))))))
@@ -47,6 +47,7 @@
                 :config {:test-runner {}}}
                (sut/map->InitialState)
                (co/start)
+               :state
                :runners)))))
 
 (deftest load-oci

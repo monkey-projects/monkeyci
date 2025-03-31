@@ -180,5 +180,5 @@
   (s/keys :req-un [:db/runner :runner/details]))
 
 (s/def :db/queued-task
-  (-> (s/keys :req-un [:queued-task/creation-time :queued-task/details])
+  (-> (s/keys :req-un [:queued-task/creation-time :queued-task/task])
       (s/merge :db/common)))

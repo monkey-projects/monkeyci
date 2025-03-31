@@ -40,7 +40,7 @@
 
 (defn new-event-routes [_]
   (letfn [(make-routes [c]
-            (de/make-routes (:state c) (:storage c)))]
+            (de/make-routes (atom (get-in c [:init-state :state])) (:storage c)))]
     (em/map->RouteComponent {:make-routes make-routes})))
 
 (defn ci->task
@@ -69,7 +69,7 @@
                                (md/chain
                                 (oci/list-instance-shapes
                                  ctx
-                                 (select-keys oci [:compartment-id]))
+                                 (:compartment-id oci))
                                 (partial map :arch)
                                 (partial remove (partial = :unknown)))
                                (md/chain
@@ -112,7 +112,7 @@
 (defrecord InitialState [config loaders]
   co/Lifecycle
   (start [this]
-    (merge this (load-initial config loaders)))
+    (assoc this :state (load-initial config loaders)))
 
   (stop [this]
     this))
@@ -137,6 +137,6 @@
    :mailman      (new-mailman conf)
    :event-routes (co/using
                   (new-event-routes conf)
-                  [:mailman :state :storage])
-   :state        (new-state conf)
+                  [:mailman :init-state :storage])
+   :init-state   (new-state conf)
    :storage      (new-storage conf)))

@@ -62,4 +62,4 @@
 (s/def :invoice/date date?)
 
 (s/def :queued-task/creation-time ts?)
-(s/def :queued-task/details map?)
+(s/def :queued-task/task map?)

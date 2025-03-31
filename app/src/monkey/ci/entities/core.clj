@@ -431,13 +431,13 @@
    :id-col :repo-id})
 
 (def prepare-queued-task
-  (comp (partial prop->edn :details)
+  (comp (partial prop->edn :task)
         (partial int->time :creation-time)))
 (def convert-queued-task
-  (comp (partial copy-prop :details)
+  (comp (partial copy-prop :task)
         (partial time->int :creation-time)))
 (def convert-queued-task-select
-  (comp (partial edn->prop :details)
+  (comp (partial edn->prop :task)
         (partial time->int :creation-time)))
 
 (defentity queued-task
