@@ -58,7 +58,8 @@
 
     (testing "assigns freeform tags containing build info"
       (is (= {"customer-id" "test-cust"
-              "repo-id" "test-repo"}
+              "repo-id" "test-repo"
+              "build-id" "test-build"}
              (:freeform-tags ic))))
 
     (testing "uses configured shape"
