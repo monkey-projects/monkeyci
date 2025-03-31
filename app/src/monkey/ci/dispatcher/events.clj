@@ -1,24 +1,35 @@
 (ns monkey.ci.dispatcher.events
   (:require [clojure.tools.logging :as log]
+            [medley.core :as mc]
             [monkey.ci.dispatcher
              [core :as dc]
              [state :as ds]]
             [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.ci
              [build :as b]
+             [jobs :as j]
              [storage :as st]
              [time :as t]]))
 
 ;; Context management
 
 (def evt-sid (comp :sid :event))
+(def default-resources {:memory 2 :cpus 1})
 
 (defn build->task [b]
   {:type :build
    :details b
    :resources
    ;; Default requirements
-   {:memory 2 :cpus 1}})
+   default-resources})
+
+(defn job->task [job sid]
+  (-> {:type :job
+       :details (assoc-in job [:build :sid] sid)
+       :resources
+       (merge {:memory 2 :cpus 1}
+              (select-keys job [:memory :cpus]))}
+      (mc/assoc-some :arch (:arch job))))
 
 (defn assignment [runner task]
   {:runner runner :task task})
@@ -69,6 +80,10 @@
 (defmethod get-task-sid :build [r]
   (-> r :details b/sid))
 
+(defmethod get-task-sid :job [r]
+  (let [job (:details r)]
+    [(-> job :build :sid) (j/job-id job)]))
+
 ;; Interceptors
 
 (def add-build-task
@@ -76,6 +91,12 @@
   {:name ::add-build-task
    :enter (fn [ctx]
             (set-task ctx (build->task (get-in ctx [:event :build]))))})
+
+(def add-job-task
+  "Adds a task for the job found in the incoming event"
+  {:name ::add-job-task
+   :enter (fn [ctx]
+            (set-task ctx (job->task (get-in ctx [:event :job]) (evt-sid ctx))))})
 
 (def add-runner-assignment
   "Interceptor that assigns a runner to the task stored in context"
@@ -206,12 +227,31 @@
    :build build
    :sid (b/sid build)})
 
+(defn- job-scheduled-evt [job runner sid]
+  {:type (keyword (name runner) "job-scheduled")
+   :job job
+   :job-id (j/job-id job)
+   :sid sid})
+
+(defmulti task-scheduled-evt (fn [task _] (:type task)))
+
+(defmethod task-scheduled-evt :build [task runner]
+  (build-scheduled-evt (:details task) runner))
+
+(defmethod task-scheduled-evt :job [task runner]
+  (job-scheduled-evt (:details task) runner (get-in task [:details :build :sid])))
+
 (defn build-queued [ctx]
   (when-let [{:keys [runner] :as a} (get-assignment ctx)]
     ;; TODO Fail build when it exceeds max capacity
     {:events [(build-scheduled-evt (get-in a [:task :details]) runner)]}))
 
-(defn build-end
+(defn job-queued [ctx]
+  (when-let [{:keys [runner] :as a} (get-assignment ctx)]
+    ;; TODO Fail job when it exceeds max capacity
+    {:events [(job-scheduled-evt (get-in a [:task :details]) runner (evt-sid ctx))]}))
+
+(defn task-end
   "When a build ends, resources become available again.  This means we may be able to
    schedule another task from the queue.  If so, we assign it here, and remove that task
    from the queue.  Since the released resources belong to a specific runner, we can only
@@ -221,10 +261,13 @@
         t (dc/get-next-queued-task (get-queued-list ctx)
                                    (get-runners ctx)
                                    runner)]
-    ;; TODO Safety check in case assignment is not found
+    ;; What to do in case assignment is not found?  For now, we just proceed, since
+    ;; actual resources will become available.  But it could be that no new queued task
+    ;; can be assigned, if internal state is inaccurate.
+    (when-not a
+      (log/warn "Task ended, but no matching assignment was found in state"))
     (when (some? t)
-      ;; TODO Support jobs as well
-      {:events [(build-scheduled-evt (:details t) runner)]
+      {:events [(task-scheduled-evt t runner)]
        :assignment (assignment runner t)
        :queue {:removed [t]}})))
 
@@ -235,7 +278,8 @@
    management."
   [state storage]
   (let [with-state (emi/with-state state)
-        use-db (emi/use-db storage)]
+        use-db (emi/use-db storage)
+        job-task-id (juxt :sid :job-id)]
     [[:build/queued
       ;; Determines the runner to use and updates resources
       [{:handler build-queued
@@ -251,7 +295,7 @@
 
      [:build/end
       ;; Frees consumed resources and schedules queued tasks
-      [{:handler build-end
+      [{:handler task-end
         :interceptors [unwrap-events
                        with-state
                        use-db
@@ -262,7 +306,27 @@
                        result->assignment
                        result->queue]}]]
 
-     ;; TODO Events received from build jobs
-     [:container/job-queued []]
-     [:job/end []]]))
+     ;; Events received from build jobs
+     [:container/job-queued
+      [{:handler job-queued
+        :interceptors [unwrap-events
+                       with-state
+                       use-db
+                       add-job-task
+                       add-runner-assignment
+                       (save-assignment job-task-id)
+                       save-queued
+                       add-to-queued-list
+                       consume-resources]}]]
+     [:job/end
+      [{:handler task-end
+        :interceptors [unwrap-events
+                       with-state
+                       use-db
+                       (load-assignment job-task-id)
+                       (clear-assignment job-task-id)
+                       with-resources
+                       delete-queued
+                       result->assignment
+                       result->queue]}]]]))
 

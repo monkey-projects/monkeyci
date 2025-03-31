@@ -71,6 +71,47 @@
                 (is (= 1 (count l)))
                 (is (= build (-> (first l) :task :details))))))))
 
+      (testing "`:container/job-queued`"
+        (testing "returns `k8s/job-scheduled` when capacity"
+          (is (some? (reset! state {:runners [{:id :k8s
+                                               :memory 10
+                                               :cpus 4
+                                               :archs [:arm :amd]}
+                                              {:id :oci
+                                               :count 10
+                                               :archs [:amd]}]})))
+          (is (= [:k8s/job-scheduled]
+                 (->> {:type :container/job-queued
+                       :job {}
+                       :job-id "test-job"
+                       :sid ["test-build"]}
+                      (router)
+                      first
+                      :result
+                      (map :type)))))
+
+        (testing "returns `k8s/job-scheduled` when arch match"
+          (is (= [:k8s/job-scheduled]
+                 (->> {:type :container/job-queued
+                       :job {:arch :arm}
+                       :job-id "test-job"
+                       :sid ["test-build"]}
+                      (router)
+                      first
+                      :result
+                      (map :type)))))
+
+        (testing "returns `oci/job-scheduled` when no k8s capacity"
+          (is (= [:oci/job-scheduled]
+                 (->> {:type :container/job-queued
+                       :job {:cpus 3}
+                       :job-id "test-job"
+                       :sid ["test-build"]}
+                      (router)
+                      first
+                      :result
+                      (map :type))))))
+
       (testing "`:build/end`"
         (let [build (gen-build)
               sid (b/sid build)]
@@ -114,7 +155,66 @@
                 (is (not (contains? (->> (st/list-queued-tasks st)
                                          (map :task)
                                          set)
-                                    task)))))))))))
+                                    task))))
+
+              (testing "dispatches job task"
+                (let [new-sid (repeatedly 3 cuid/random-cuid)
+                      job-task (sut/job->task {:id "test-job"} new-sid)]
+                  (is (some? (reset! state (-> {:runners [{:id :oci
+                                                           :archs [:amd]
+                                                           :count 0}]}
+                                               (ds/set-assignment sid {:runner :oci})
+                                               (ds/set-queue [job-task])))))
+                  (let [[evt :as r] (-> {:type :build/end
+                                         :sid sid}
+                                        (router)
+                                        first
+                                        :result)]
+                    (is (= 1 (count r)))
+                    (is (= :oci/job-scheduled (:type evt)))
+                    (is (= new-sid (:sid evt)))
+                    (is (= "test-job" (:job-id evt)))
+                    (is (empty? (ds/get-queue @state))
+                        "queued job should be scheduled"))))))))
+
+      (testing "`:job/end`"
+        (let [sid (repeatedly 3 cuid/random-cuid)
+              job-id (cuid/random-cuid)]
+          (testing "releases allocated resources for runner"
+            (is (some? (reset! state (-> {:runners [{:id :oci
+                                                     :archs [:amd]
+                                                     :count 0}]}
+                                         (ds/set-assignment [sid job-id] {:runner :oci})))))
+            (is (nil? (-> {:type :job/end
+                           :sid sid
+                           :job-id job-id}
+                          (router)
+                          first
+                          :result)))
+            (is (= 1 (-> @state :runners first :count))
+                "oci runner should have additional resources"))
+
+          (testing "dispatches next task in queue"
+            (let [build (h/gen-build)
+                  task (sut/build->task build)
+                  sid (repeatedly 3 cuid/random-cuid)
+                  job-id (cuid/random-cuid)]
+              (is (some? (reset! state (-> {:runners [{:id :oci
+                                                       :archs [:amd]
+                                                       :count 0}]}
+                                           (ds/set-assignment [sid job-id] {:runner :oci})
+                                           (ds/set-queue [task])))))
+              (let [[evt :as r] (-> {:type :job/end
+                                     :sid sid
+                                     :job-id job-id}
+                                    (router)
+                                    first
+                                    :result)]
+                (is (= 1 (count r)))
+                (is (= :oci/build-scheduled (:type evt)))
+                (is (= (b/sid build) (:sid evt)))
+                (is (empty? (ds/get-queue @state))
+                    "queued build should be scheduled")))))))))
 
 (deftest build-queued
   (testing "dispatches to available runner according to assignment"

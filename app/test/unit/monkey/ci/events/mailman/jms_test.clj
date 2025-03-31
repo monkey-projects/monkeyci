@@ -35,7 +35,11 @@
                  :command/start
                  :command/end
                  :sidecar/start
-                 :sidecar/end]]
+                 :sidecar/end
+                 :oci/build-scheduled
+                 :oci/job-scheduled
+                 :k8s/build-scheduled
+                 :k8s/job-scheduled]]
       (doseq [t types] 
         (is (contains? dests t)
             (str "should map " t))))))

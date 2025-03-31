@@ -19,7 +19,11 @@
    ;; All things that need to be run in a container go here.
    "%s.containers"
    [:build/queued :container/job-queued]
-   ;; TODO Topics for oci and k8s
+   ;; Topics for oci and k8s container tasks
+   "%s.tasks.oci"
+   [:oci/build-scheduled :oci/job-scheduled]
+   "%s.tasks.k8s"
+   [:k8s/build-scheduled :k8s/job-scheduled]
    ;; Consolidated build events
    "%s.build.updates"
    [:build/updated]})
