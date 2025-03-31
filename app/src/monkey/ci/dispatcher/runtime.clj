@@ -50,7 +50,8 @@
        (remove nil?)
        (vec)))
 
-(defn load-oci [{:keys [oci]}]  
+(defn load-oci [{:keys [oci]}]
+  ;; TODO Fetch current running containers to make state up to date
   (->> (oci/list-instance-shapes (ci/make-context oci)
                                  (select-keys oci [:compartment-id]))
        (deref)
@@ -60,7 +61,7 @@
        (hash-map :id :oci :count 6 :archs)))
 
 (defn load-k8s [conf]
-  ;; TODO
+  ;; TODO Fetch max cpu and memory and current running containers
   )
 
 (def runner-loaders
