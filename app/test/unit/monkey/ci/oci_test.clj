@@ -11,6 +11,13 @@
             [taoensso.telemere :as tt])
   (:import (java.io ByteArrayInputStream)))
 
+(deftest shape->arch
+  (testing "returns arch according to shape"
+    (is (= :amd (sut/shape->arch "CI.Standard.E4.Flex"))))
+
+  (testing "`nil` for unknown shapes"
+    (is (nil? (sut/shape->arch "unknown")))))
+
 (deftest stream-to-bucket
   (testing "pipes input stream to multipart"
     (with-redefs [os/input-stream->multipart (fn [ctx opts]

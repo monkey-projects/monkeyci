@@ -44,6 +44,11 @@
        (filter (comp (partial = shape-name) :shape))
        (first)))
 
+(defn shape->arch [shape-name]
+  (->> arch-shapes
+       (filter (comp (partial = shape-name) :shape second))
+       (ffirst)))
+
 (defn invocation-interceptor
   "A Martian interceptor that dispatches telemere events for each invocation.  Useful
    for metrics to know how many api calls were done."

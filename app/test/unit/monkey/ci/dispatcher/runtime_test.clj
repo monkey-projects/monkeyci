@@ -2,7 +2,9 @@
   (:require [clojure.test :refer [deftest testing is]]
             [com.stuartsierra.component :as co]
             [manifold.deferred :as md]
-            [monkey.ci.dispatcher.runtime :as sut]
+            [monkey.ci.dispatcher
+             [runtime :as sut]
+             [state :as ds]]
             [monkey.ci.oci :as oci]
             [monkey.oci.container-instance.core :as ci]))
 
@@ -26,8 +28,8 @@
 
     (testing "provides event poller")
 
-    (testing "provides runners"
-      (is (some? (:runners sys))))
+    (testing "provides initial state"
+      (is (some? (:state sys))))
 
     (testing "provides storage"
       (is (some? (:storage sys))))))
@@ -38,17 +40,17 @@
                  (co/start)
                  :handler)))))
 
-(deftest runners
+(deftest initial-state
   (testing "`start` loads initial resources per type"
     (is (= [::start-res]
-           (-> {:loaders {:test-runner (constantly ::start-res)}
+           (-> {:loaders {:test-runner (constantly {:runners [::start-res]})}
                 :config {:test-runner {}}}
-               (sut/map->Runners)
+               (sut/map->InitialState)
                (co/start)
                :runners)))))
 
 (deftest load-oci
-  (let [[cust-id repo-id build-id job-id] (repeatedly (comp str random-uuid))]
+  (let [[cust-id repo-id build-id job-id :as sid] (repeatedly 4 (comp str random-uuid))]
     (with-redefs [oci/list-instance-shapes
                   (constantly (md/success-deferred
                                [{:arch :amd
@@ -66,10 +68,43 @@
                                                  "build-id" build-id
                                                  "job-id" job-id}
                                  :lifecycle-state "CREATING"}]))]
-      (testing "fetches available compute shapes and running containers"
-        (is (= {:id :oci
-                :archs [:amd]
-                :count 4}
-               (sut/load-oci {}))))
+      (let [s (sut/load-oci {})]
+        (testing "fetches available compute shapes and running containers"
+          (is (= [{:id :oci
+                   :archs [:amd]
+                   :count 4}]
+                 (:runners s))))
 
-      (testing "calculates current running builds and jobs from freeform tags"))))
+        (testing "calculates current running builds and jobs from freeform tags"
+          (let [build-sid (take 3 sid)]
+            (is (= :oci (-> s (ds/get-assignment build-sid) :runner)))
+            (is (= :oci (-> s (ds/get-assignment [build-sid (last sid)]) :runner)))))))))
+
+(deftest ci->task
+  (testing "sets resources from shape config"
+    (is (= {:memory 2
+            :cpus 1}
+           (-> {:shape-config {:ocpus 1
+                               :memory-in-g-bs 2}}
+               (sut/ci->task)
+               (select-keys [:memory :cpus])))))
+
+  (testing "sets arch from shape"
+    (is (= :amd (:arch (sut/ci->task
+                        {:shape "CI.Standard.E4.Flex"}))))))
+
+(deftest ci->task-id
+  (testing "extracts build sid from freeform tags"
+    (is (= ["test-cust" "test-repo" "test-build"]
+           (sut/ci->task-id {:freeform-tags
+                             {"customer-id" "test-cust"
+                              "repo-id" "test-repo"
+                              "build-id" "test-build"}}))))
+
+  (testing "extracts job id"
+    (is (= [["test-cust" "test-repo" "test-build"] "test-job"]
+           (sut/ci->task-id {:freeform-tags
+                             {"customer-id" "test-cust"
+                              "repo-id" "test-repo"
+                              "build-id" "test-build"
+                              "job-id" "test-job"}})))))

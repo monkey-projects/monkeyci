@@ -35,10 +35,10 @@
   {:runner runner :task task})
 
 (defn set-runners [ctx r]
-  (emi/update-state ctx assoc :runners r))
+  (emi/update-state ctx ds/set-runners r))
 
 (defn get-runners [ctx]
-  (:runners (emi/get-state ctx)))
+  (ds/get-runners (emi/get-state ctx)))
 
 (defn update-runner [ctx id f & args]
   (letfn [(replace-runner [runners]
@@ -329,4 +329,3 @@
                        delete-queued
                        result->assignment
                        result->queue]}]]]))
-

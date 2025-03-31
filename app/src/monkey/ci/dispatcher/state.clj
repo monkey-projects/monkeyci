@@ -20,3 +20,8 @@
 
 (defn update-queue [s f & args]
   (apply update s :queued-list f args))
+
+(def get-runners :runners)
+
+(defn set-runners [s r]
+  (assoc s :runners r))
