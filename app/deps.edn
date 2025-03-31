@@ -86,7 +86,9 @@
    :main-opts ["-m" "kaocha.runner"
                "-c" "kaocha/coverage.edn"]}
 
-  :watch ; Use in combination with :test, watches for changes
+  :watch
+  ;; clj -X:test:watch
+  ;; Use in combination with :test, watches for changes
   {:extra-deps {org.clojure/tools.namespace {:mvn/version "1.5.0"}}
    :exec-fn monkey.test/watch
    ;; Skip integration and slow tests
@@ -96,7 +98,12 @@
                :kaocha.plugin.notifier/command "notify-send -a Kaocha %{title} %{message} -i %{icon} -u %{urgency}"}}
   
   :run
+  ;; clj -M:run
   {:main-opts ["-m" "monkey.ci.core"]}
+
+  :dispatcher
+  ;; clj -M:dispatcher
+  {:main-opts ["-m" "monkey.ci.dispatcher.main"]}
 
   :jar
   {:extra-deps {com.monkeyprojects/build {:mvn/version "0.3.1"

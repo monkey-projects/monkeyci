@@ -429,3 +429,20 @@
 (defaggregate repo-idx
   {:plural "repo-indices"
    :id-col :repo-id})
+
+(def prepare-queued-task
+  (comp (partial prop->edn :details)
+        (partial int->time :creation-time)))
+(def convert-queued-task
+  (comp (partial copy-prop :details)
+        (partial time->int :creation-time)))
+(def convert-queued-task-select
+  (comp (partial edn->prop :details)
+        (partial time->int :creation-time)))
+
+(defentity queued-task
+  {:before-insert prepare-queued-task
+   :after-insert  convert-queued-task
+   :before-update prepare-queued-task
+   :after-update  convert-queued-task
+   :after-select  convert-queued-task-select})

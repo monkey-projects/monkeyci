@@ -18,9 +18,7 @@
              [utils :as u]
              [version :as v]]
             [monkey.ci.build.api-server :as bas]
-            [monkey.ci.events.mailman
-             [db :as emd]
-             [interceptors :as emi]]
+            [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.ci.script.config :as sc]
             [monkey.ci.web.auth :as auth]
             [monkey.oci.container-instance.core :as ci]))
@@ -259,7 +257,7 @@
                          mc/update-existing
                          :ssh-keys
                          (partial decrypt-keys
-                                  (comp :iv #(st/find-crypto (emd/get-db ctx) (-> ctx :event :sid first))))))}))
+                                  (comp :iv #(st/find-crypto (emi/get-db ctx) (-> ctx :event :sid first))))))}))
 
 (defn prepare-ci-config [config]
   "Creates the ci config to run the required containers for the build."
@@ -291,7 +289,7 @@
                   details {:runner :oci
                            :details {:instance-id (get-in (oci/get-ci-response ctx) [:body :id])}}]
               (log/debug "Saving runner details:" details)
-              (st/save-runner-details (emd/get-db ctx) sid details)
+              (st/save-runner-details (emi/get-db ctx) sid details)
               ctx))})
 
 (def load-instance-id
@@ -299,7 +297,7 @@
    This assumes the db is present in the context."
   {:name ::load-instance-id
    :enter (fn [ctx]
-            (->> (st/find-runner-details (emd/get-db ctx) (get-in ctx [:event :sid]))
+            (->> (st/find-runner-details (emi/get-db ctx) (get-in ctx [:event :sid]))
                  :details
                  :instance-id
                  (oci/set-ci-id ctx)))})
@@ -315,10 +313,10 @@
   "Creates event handling routes for the given oci configuration"
   [conf storage vault]
   (let [client (make-ci-context (:containers conf))
-        use-db (emd/use-db storage)]
-    [[;;:oci/build-scheduled
-      ;; TODO Replace with build-schedules when dispatcher works
+        use-db (emi/use-db storage)]
+    [[;; TODO Replace with build/scheduled when dispatcher works
       :build/queued
+      ;;:oci/build-scheduled
       [{:handler initialize-build
         :interceptors [emi/handle-build-error
                        use-db

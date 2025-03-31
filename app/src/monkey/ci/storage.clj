@@ -803,3 +803,29 @@
   "Retrieves runner details for given build sid"
   [st sid]
   (p/read-obj st (runner-details-sid sid)))
+
+(def queued-task :queued-task)
+(defn queued-task-sid [& [task-id]]
+  (cond-> [global (name queued-task)]
+    task-id (conj task-id)))
+
+(defn save-queued-task
+  "Saves retry task, which is used by the dispatcher to reschedule tasks that could not be
+   executed immediately."
+  [st task]
+  (p/write-obj st (queued-task-sid (:id task)) task))
+
+(defn find-queued-task
+  [st id]
+  (p/read-obj st (queued-task-sid id)))
+
+(def list-queued-tasks
+  (override-or
+   [:queued-task :list]
+   (fn [st]
+     (->> (p/list-obj st (queued-task-sid))
+          (map (partial find-queued-task st))))))
+
+(defn delete-queued-task
+  [st id]
+  (p/delete-obj st (queued-task-sid id)))

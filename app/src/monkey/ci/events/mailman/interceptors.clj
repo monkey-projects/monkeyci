@@ -155,3 +155,14 @@
    :enter (fn [ctx]
             (mmc/post-events (:broker dest) [(:event ctx)])
             ctx)})
+
+(def get-db ::db)
+
+(defn set-db [ctx db]
+  (assoc ctx ::db db))
+
+(defn use-db
+  "Adds storage to the context as ::db"
+  [db]
+  {:name ::use-db
+   :enter #(set-db % db)})

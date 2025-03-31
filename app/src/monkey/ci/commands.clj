@@ -4,7 +4,6 @@
             [babashka.fs :as fs]
             [cheshire.core :as json]
             [clj-commons.byte-streams :as bs]
-            [clj-kondo.core :as clj-kondo]
             [clojure.tools.logging :as log]
             [java-time.api :as jt]
             [manifold.deferred :as md]
@@ -35,7 +34,7 @@
             [monkey.ci.spec.sidecar :as ss]
             [monkey.ci.web
              [auth :as auth]
-             [handler :as h]]))
+             [http :as wh]]))
 
 (defn run-build-local
   "Run a build locally, normally from local source but can also be from a git checkout.
@@ -104,7 +103,7 @@
                         (select-keys [:http])
                         (assoc :type :server/started)))
       ;; Wait for server to stop
-      (h/on-server-close http))))
+      (wh/on-server-close http))))
 
 (defn ^:deprecated watch
   "Starts listening for events and prints the results.  The arguments determine

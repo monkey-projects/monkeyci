@@ -96,7 +96,7 @@
                   (h/->req)
                   (assoc-in [:parameters :body :date] at)
                   (sut/issue-auto-credits)))]
-      (let [now   (t/now)
+      (let [now   (jt/to-millis-from-epoch (jt/zoned-date-time 2025 3 10 10 0 0 0 "UTC"))
             today (ts->date-str now)
             from  (- now 1000)
             until (+ now (t/hours->millis (* 24 40)))
@@ -140,20 +140,35 @@
 
         (testing "when month has fewer days, also creates credits for missing days"
           (let [cust (h/gen-cust)
-                date (-> (jt/offset-date-time 2024 1 31)
+                date (-> (jt/offset-date-time 2024 1 30)
                          (jt/with-offset 0) ; force UTC
                          (jt/to-millis-from-epoch))
                 cs {:id (cuid/random-cuid)
-                    ;; Create a sub in the past, so it won't interfere with other tests
                     :valid-from date
                     :valid-until (+ date (t/hours->millis (* 24 100)))
                     :customer-id (:id cust)
                     :amount 100}]
             (is (some? (st/save-customer st cust)))
             (is (some? (st/save-credit-subscription st cs)))
-            (is (not-empty (->> (issue-at "2024-02-28")
+            (is (not-empty (->> (issue-at "2024-02-29")
                                 :body
                                 :credits)))))
+
+        (testing "does not process when month has max days"
+          (let [cust (h/gen-cust)
+                date (-> (jt/offset-date-time 2025 3 31)
+                         (jt/with-offset 0) ; force UTC
+                         (jt/to-millis-from-epoch))
+                cs {:id (cuid/random-cuid)
+                    :valid-from date
+                    :valid-until (+ date (t/hours->millis (* 24 100)))
+                    :customer-id (:id cust)
+                    :amount 150}]
+            (is (some? (st/save-customer st cust)))
+            (is (some? (st/save-credit-subscription st cs)))
+            (is (empty? (->> (issue-at "2024-04-01")
+                             :body
+                             :credits)))))
         
         (testing "ignores ad-hoc credit issuances"
           (is (st/save-customer-credit st {:customer-id (:id cust)

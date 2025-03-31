@@ -1,15 +1,10 @@
 (ns monkey.ci.web.handler-test
-  (:require [aleph
-             [http :as aleph]
-             [netty :as netty]]
-            [buddy.core
+  (:require [buddy.core
              [codecs :as codecs]
              [mac :as mac]]
-            [clj-commons.byte-streams :as bs]
             [clojure
              [string :as cs]
              [test :refer [deftest is testing]]]
-            [clojure.core.async :as ca]
             [meta-merge.core :as mm]
             [monkey.ci
              [artifacts :as a]
@@ -22,16 +17,13 @@
             [monkey.ci.metrics.core :as m]
             [monkey.ci.test
              [aleph-test :as at]
-             [helpers :as h :refer [try-take]]
+             [helpers :as h]
              [mailman :as tmm]
              [runtime :as trt]]
             [monkey.ci.web
              [auth :as auth]
-             [github :as github]
              [handler :as sut]]
-            [reitit
-             [core :as rc]
-             [ring :as ring]]
+            [reitit.ring :as ring]
             [ring.mock.request :as mock]))
 
 (deftest make-app
@@ -51,34 +43,6 @@
    (sut/make-app (test-rt))))
 
 (def test-app (make-test-app))
-
-(deftest start-server
-  (with-redefs [aleph/start-server (fn [h opts]
-                                     {:handler h
-                                      :opts opts})]
-    
-    (testing "starts http server with default port"
-      (is (number? (-> (sut/start-server {})
-                       :opts
-                       :port))))
-
-    (testing "passes args as opts"
-      (is (= 1234 (-> (sut/start-server {:config {:http {:port 1234}}})
-                      :opts
-                      :port))))
-
-    (testing "handler is a fn"
-      (is (fn? (:handler (sut/start-server {})))))))
-
-(deftest stop-server
-  (testing "stops the server"
-    (let [stopped? (atom false)
-          s (h/->FakeServer stopped?)]
-      (is (nil? (sut/stop-server s)))
-      (is (true? @stopped?))))
-
-  (testing "does nothing when server is `nil`"
-    (is (nil? (sut/stop-server nil)))))
 
 (deftest http-routes
   (testing "health check at `/health`"
@@ -1132,14 +1096,6 @@
       (is (= 204 (-> (mock/request :get "/metrics")
                      (test-app)
                      :status))))))
-
-(deftest on-server-close
-  (testing "waits until netty server closes"
-    (with-redefs [netty/wait-for-close (fn [s]
-                                         (if (= ::server s)
-                                           ::closed
-                                           ::invalid-arg))]
-      (is (= ::closed @(sut/on-server-close (sut/map->HttpServer {:server ::server})))))))
 
 (deftest artifacts-endpoints
   (let [[cust-id repo-id build-id :as sid] (repeatedly 3 st/new-id)

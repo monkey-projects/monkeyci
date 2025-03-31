@@ -28,6 +28,7 @@
 
 (def arch-shapes
   "Architectures mapped to OCI shapes"
+  ;; TODO Make this configurable
   {arch-arm
    {:shape "CI.Standard.A1.Flex"
     :credits 1}
@@ -171,7 +172,7 @@
 (defn sid->tags [sid]
   (->> sid
        (remove nil?)
-       (zipmap ["customer-id" "repo-id"])))
+       (zipmap ["customer-id" "repo-id" "build-id"])))
 
 (defn find-mount
   "Finds mount with given volume name in the container"
@@ -272,6 +273,33 @@
            (with-delay)
            (map deref)
            (mapv ->out)))))
+
+(defn list-instance-shapes
+  "Lists available container instance shapes for given compartment id.  Returns a
+   deferred of list of maps, containing `arch` and `shape`.  Any unknown shape is
+   marked `unknown`."
+  [client cid]
+  (-> (ci/list-container-instance-shapes client {:compartment-id cid})
+      (md/chain
+       (fn [{:keys [status] :as r}]
+         (when (or (nil? status) (<= 400 status))
+           (throw (ex-info "Unable to list instance shapes" {:response r})))
+         r)
+       :body
+       :items
+       (fn [items]
+         (let [by-shape (->> arch-shapes
+                             (map (fn [[a {:keys [shape]}]]
+                                    [shape a]))
+                             (into {}))]
+           (->> items
+                (map (fn [{:keys [name]}]
+                       {:shape name
+                        :arch
+                        (if-let [m (get by-shape name)]
+                          m
+                          :unknown)}))
+                (remove nil?)))))))
 
 ;;; Interceptors
 

@@ -94,15 +94,17 @@
                (t/day-start)
                (jt/to-millis-from-epoch))
         st (c/req->storage req)
-        max-dom (-> date
-                    (jt/property :day-of-month)
-                    (jt/max-value))]
+        last-dom (-> date
+                     (jt/adjust :last-day-of-month)
+                     (jt/as :day-of-month))
+        cur-dom (jt/as date :day-of-month)]
     (letfn [(should-process? [time]
               ;; Process the subscription if it's on the same day of month, or
-              ;; the max has been reached
+              ;; this month does not have that many days.
               (or (t/same-dom? time ts)
                   (let [dom (jt/as (t/epoch->date time) :day-of-month)]
-                    (< max-dom dom))))]
+                    (and (< last-dom dom)
+                         (= cur-dom last-dom)))))]
       ;; TODO Allow filtering by customer, if specified
       (log/info "Auto-issuing new credits for date" date " (timestamp" ts ")")
       ;; List all subscriptions that have become active on that day, so move ts to end of day

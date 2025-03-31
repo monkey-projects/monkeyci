@@ -126,3 +126,12 @@
             ctx {:event evt}]
         (is (= ctx (enter ctx)))
         (is (= [evt] (tm/get-posted dest)))))))
+
+(deftest use-db
+  (testing "adds db to context"
+    (let [i (sut/use-db ::test-db)]
+      (is (= ::sut/use-db (:name i)))
+      (is (fn? (:enter i)))
+      (is (= ::test-db (-> ((:enter i) {})
+                           ::sut/db))))))
+

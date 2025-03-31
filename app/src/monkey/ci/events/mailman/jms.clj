@@ -11,14 +11,20 @@
    "%s.scripts"
    [:script/initializing :script/start :script/end]
    "%s.jobs"
-   [:job/pending :job/initializing :job/start :job/end :job/skipped :job/executed]
+   [:job/pending :job/queued :job/initializing :job/start :job/end :job/skipped :job/executed]
    "%s.jobs.containers"
    [:container/pending :container/initializing :container/start :container/end :sidecar/start :sidecar/end]
    "%s.jobs.commands"
    [:command/start :command/end]
    ;; All things that need to be run in a container go here.
    "%s.containers"
-   [:build/queued :job/queued]
+   [:build/queued :container/job-queued]
+   ;; Topics for oci and k8s container tasks
+   "%s.tasks.oci"
+   [:oci/build-scheduled :oci/job-scheduled]
+   "%s.tasks.k8s"
+   [:k8s/build-scheduled :k8s/job-scheduled]
+   ;; Consolidated build events
    "%s.build.updates"
    [:build/updated]})
 

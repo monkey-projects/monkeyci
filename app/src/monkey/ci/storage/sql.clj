@@ -851,10 +851,30 @@
   (some-> (eb/select-runner-details conn (eb/by-build-sid sid))
           (dissoc :build-id)))
 
+(defn- insert-queued-task [conn task]
+  (ec/insert-queued-task conn (id->cuid task)))
+
+(defn- update-queued-task [conn task existing]
+  (ec/update-queued-task conn (merge existing (id->cuid task))))
+
+(defn- upsert-queued-task [conn cuid task]
+  (if-let [match (ec/select-queued-task conn (ec/by-cuid cuid))]
+    (update-queued-task conn task match)
+    (insert-queued-task conn task)))
+
+(defn- select-queued-tasks [{:keys [conn]}]
+  (->> (ec/select-queued-tasks conn nil)
+       (map cuid->id)))
+
+(defn- delete-queued-task [conn cuid]
+  (ec/delete-queued-tasks conn (ec/by-cuid cuid)))
+
 (defn- sid-pred [t sid]
   (t sid))
 
 (def runner-details? (partial global-sid? st/runner-details))
+
+(def queued-task? (partial global-sid? st/queued-task))
 
 (defrecord SqlStorage [conn vault]
   p/Storage
@@ -927,6 +947,8 @@
             (upsert-invoice conn obj)
             runner-details?
             (upsert-runner-details conn (runner-details-sid->build-sid sid) obj)
+            queued-task?
+            (upsert-queued-task conn (last sid) obj)
             (log/warn "Unrecognized sid when writing:" sid))
       sid))
 
@@ -949,6 +971,8 @@
        (delete-webhook conn (last sid))
        credit-subscription?
        (delete-credit-subscription conn (last sid))
+       queued-task?
+       (delete-queued-task conn (last sid))
        (log/warn "Deleting entity" sid "is not supported"))))
 
   (list-obj [_ sid]
@@ -1056,7 +1080,9 @@
    {:find-for-webhook select-bb-webhook-for-webhook
     :search-webhooks select-bb-webhooks-by-filter}
    :invoice
-   {:list-for-customer select-invoices-for-customer}})
+   {:list-for-customer select-invoices-for-customer}
+   :queued-task
+   {:list select-queued-tasks}})
 
 (defn make-storage [conn]
   (map->SqlStorage {:conn conn

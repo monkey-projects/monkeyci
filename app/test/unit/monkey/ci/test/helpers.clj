@@ -271,6 +271,9 @@
 (defn gen-invoice []
   (gen-entity :entity/invoice))
 
+(defn gen-queued-task []
+  (gen-entity :entity/queued-task))
+
 (defn gen-build-sid []
   (repeatedly 3 cuid/random-cuid))
 

@@ -68,6 +68,8 @@
   (start [{:keys [config] :as this}]
     (let [dests (emj/topic-destinations config)
           broker (mj/jms-broker (assoc config
+                                       ;; We can specify a serializer that adds sid here
+                                       ;;:serializer custom-serializer
                                        :destination-mapper (comp dests :type)))]
       (-> this
           (dissoc :config)           ; no longer needed
@@ -87,7 +89,7 @@
     (let [router (mmc/router routes opts)]
       ;; TODO Add listeners for each destination referred to by route event types
       ;; but split up the routes so only those for the destination are added
-      ;; TODO Allow specifying a selector for efficiency
+      ;; TODO Allow specifying an sid selector for efficiency
       (->> routes
            (map first)
            (map (or (:destinations opts) destinations))

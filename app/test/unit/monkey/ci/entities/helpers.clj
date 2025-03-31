@@ -110,3 +110,6 @@
 
 (defn gen-invoice []
   (gen-spec :db/invoice))
+
+(defn gen-queued-task []
+  (gen-spec :db/queued-task))

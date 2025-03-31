@@ -1,13 +1,11 @@
 (ns monkey.ci.storage-test
-  (:require
-   [clojure.string :as cs]
-   [clojure.test :refer [deftest is testing]]
-   [monkey.ci.cuid :as cuid]
-   [monkey.ci.protocols :as p]
-   [monkey.ci.sid :as sid]
-   [monkey.ci.storage :as sut]
-   [monkey.ci.test.helpers :as h]
-   [monkey.ci.time :as t]))
+  (:require [clojure.test :refer [deftest is testing]]
+            [monkey.ci
+             [cuid :as cuid]
+             [sid :as sid]
+             [storage :as sut]
+             [time :as t]]
+            [monkey.ci.test.helpers :as h]))
 
 (deftest transaction
   (testing "executes target"
@@ -536,3 +534,18 @@
 
       (testing "can find by build sid"
         (is (= details (sut/find-runner-details st (build->sid build))))))))
+
+(deftest queued-tasks
+  (h/with-memory-store st
+    (let [task {:id (cuid/random-cuid)
+                :details ::test-task
+                :creation-time (t/now)}]
+      (testing "can save"
+        (is (sid/sid? (sut/save-queued-task st task))))
+
+      (testing "can list"
+        (is (= [task] (sut/list-queued-tasks st))))
+
+      (testing "can delete"
+        (is (true? (sut/delete-queued-task st (:id task))))
+        (is (empty? (sut/list-queued-tasks st)))))))

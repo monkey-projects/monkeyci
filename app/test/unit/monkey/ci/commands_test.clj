@@ -20,7 +20,7 @@
              [config :as tc]
              [helpers :as h]
              [mailman :as tm]]
-            [monkey.ci.web.handler :as wh]))
+            [monkey.ci.web.http :as wh]))
 
 (deftest run-build-local
   (testing "creates event broker and posts `build/pending` event"

@@ -784,6 +784,17 @@
           (is (= upd (-> (st/find-runner-details st sid)
                          (select-keys [:details])))))))))
 
+(deftest ^:sql queued-tasks
+  (with-storage conn st
+    (let [task (h/gen-queued-task)]
+      (testing "can save and list"
+        (is (sid/sid? (st/save-queued-task st task)))
+        (is (= [task] (st/list-queued-tasks st))))
+
+      (testing "can delete"
+        (is (true? (st/delete-queued-task st (:id task))))
+        (is (empty? (st/list-queued-tasks st)))))))
+
 (deftest make-storage
   (testing "creates sql storage object using connection settings"
     (let [s (st/make-storage {:storage {:type :sql

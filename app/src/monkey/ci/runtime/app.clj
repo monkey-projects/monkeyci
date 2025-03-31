@@ -21,7 +21,9 @@
             [monkey.ci.runners.oci :as ro]
             [monkey.ci.runtime.common :as rc]
             [monkey.ci.storage.sql]
-            [monkey.ci.web.handler :as wh]
+            [monkey.ci.web
+             [handler :as wh]
+             [http :as http]]
             [monkey.oci.container-instance.core :as ci]))
 
 (defn- new-artifacts [config]
@@ -57,8 +59,19 @@
     (s/make-storage config)
     (s/make-memory-storage)))
 
-(defn- new-http-server [_]
-  (wh/->HttpServer nil))
+(defn- new-http-server [config]
+  (http/->HttpServer (:http config) nil))
+
+(defrecord HttpApp [runtime]
+  co/Lifecycle
+  (start [this]
+    (assoc this :handler (wh/make-app runtime)))
+  
+  (stop [this]
+    this))
+
+(defn- new-http-app []
+  (->HttpApp nil))
 
 (defn- new-reporter [conf]
   (rep/make-reporter (:reporter conf)))
@@ -133,7 +146,10 @@
    :artifacts (new-artifacts config)
    :http      (co/using
                (new-http-server config)
-               {:rt :runtime})
+               {:app :http-app})
+   :http-app  (co/using
+               (new-http-app)
+               [:runtime])
    :runner    (co/using
                (new-server-runner config)
                [:storage :vault :mailman])
