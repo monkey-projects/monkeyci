@@ -6,17 +6,24 @@
 
 (deftest prepare-pod-config
   (let [actions (sut/prepare-pod-config {:ns "builds"
-                                         :build {:build-id "test-build"}
+                                         :build {:build-id "test-build"
+                                                 :checkout-dir "checkout"}
                                          :job {:id "test-job"
                                                :type :container
                                                :image "job-img"
-                                               :script ["test" "script"]}
+                                               :script ["test" "script"]
+                                               :container/env {"test_var" "test val"}
+                                               :memory 2
+                                               :cpus 1}
                                          :sidecar
                                          {:image-url "test-image"
-                                          :image-tag "test-tag"}})]
+                                          :image-tag "test-tag"
+                                          :log-config "test-log"}})]
     (is (sequential? actions))
 
-    (let [pc (first actions)]
+    (let [pc (->> actions
+                  (filter (comp (partial = :Job) :kind))
+                  (first))]
       (testing "creates job creation request"
         (is (= :Job (:kind pc)))
         (is (= :create (:action pc))))
@@ -93,4 +100,60 @@
                     (is (contains? (set (map :name vm)) "scripts")))
 
                   (testing "has checkout mount"
-                    (is (contains? (set (map :name vm)) "checkout"))))))))))))
+                    (is (contains? (set (map :name vm)) "checkout")))))
+
+              (testing "env vars"
+                (letfn [(find-var [n]
+                          (->> (:env c)
+                               (filter (comp (partial = n) :name))
+                               (first)))]
+                  (testing "contains configured on job"
+                    (is (= {:name "test_var"
+                            :value "test val"}
+                           (find-var "test_var"))))
+
+                  (testing "contains additional"
+                    (is (string? (:value (find-var "MONKEYCI_WORK_DIR"))))
+                    (is (string? (:value (find-var "MONKEYCI_SCRIPT_DIR"))))
+                    (is (string? (:value (find-var "MONKEYCI_EVENT_FILE")))))))
+
+              (testing "requests job resources"
+                (is (= "2G" (get-in c [:resources :requests :memory])))
+                (is (= 1 (get-in c [:resources :requests :cpu])))))))))
+
+    (testing "configmaps"
+      (letfn [(find-cm [n]
+                (->> actions
+                     (filter (every-pred (comp (partial = :ConfigMap) :kind)
+                                         (comp (partial = n) :name :metadata :body :request)))
+                     (first)))]
+        (testing "job config"
+          (let [c (find-cm "job-config")
+                cc (get-in c [:request :body :data])]
+            (is (some? c))
+
+            (testing "contains shell script"
+              (is (some? (get cc "job.sh"))))
+
+            (testing "contains script per line"
+              (is (= "test" (get cc "0")))
+              (is (= "script" (get cc "1"))))))
+
+        (testing "promtail config"
+          (let [c (find-cm "promtail-config")
+                cc (get-in c [:request :body :data])]
+            (is (some? c))
+
+            (testing "contains config yaml"
+              (is (some? (get cc "config.yml"))))))
+
+        (testing "sidecar config"
+          (let [c (find-cm "sidecar-config")
+                cc (get-in c [:request :body :data])]
+            (is (some? c))
+
+            (testing "contains logback config"
+              (is (some? (get cc "logback.xml"))))
+
+            (testing "contains config edn"
+              (is (some? (get cc "config.edn"))))))))))

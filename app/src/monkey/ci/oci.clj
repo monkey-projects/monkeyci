@@ -203,20 +203,15 @@
   {:file-name n
    :data (u/->base64 v)})
 
-(defn checkout-subdir
+(def checkout-subdir
   "Returns the path for `n` as a subdir of the checkout dir"
-  [n]
-  (str checkout-dir "/" n))
+  cc/checkout-subdir)
 
-(def work-dir (checkout-subdir "work"))
+(def work-dir cc/work-dir)
 
-(defn base-work-dir
+(def base-work-dir
   "Determines the base work dir to use inside the container"
-  [build]
-  (some->> (b/checkout-dir build)
-           (fs/file-name)
-           (fs/path work-dir)
-           (str)))
+  cc/base-work-dir)
 
 (defn credit-multiplier
   "Calculates the credit multiplier that needs to be applied for the container

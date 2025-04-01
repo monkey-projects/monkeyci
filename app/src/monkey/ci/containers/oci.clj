@@ -1,7 +1,6 @@
 (ns monkey.ci.containers.oci
   "Container runner implementation that uses OCI container instances."
-  (:require [babashka.fs :as fs]
-            [clojure.java.io :as io]
+  (:require [clojure.java.io :as io]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [io.pedestal.interceptor.chain :as pi]
@@ -11,43 +10,20 @@
              [containers :as mcc]
              [edn :as edn]
              [jobs :as j]
-             [oci :as oci]
-             [utils :as u]]
+             [oci :as oci]]
             [monkey.ci.containers
-             [common :refer :all]
+             [common :as c :refer :all]
              [promtail :as pt]]
             [monkey.ci.events.builders :as eb]
             [monkey.ci.events.mailman.interceptors :as emi]
-            [monkey.ci.sidecar.config :as cos]
             [monkey.oci.container-instance.core :as ci]))
 
 ;; TODO Get this information from the OCI shapes endpoint
 (def max-pod-memory "Max memory that can be assigned to a pod, in gbs" 64)
 (def max-pod-cpus "Max number of cpu's to assign to a pod" 16)
 
-(def work-dir oci/work-dir)
-(def script-dir oci/script-dir)
-(def log-dir (oci/checkout-subdir "log"))
-(def events-dir (oci/checkout-subdir "events"))
-(def start-file (str events-dir "/start"))
-(def abort-file (str events-dir "/abort"))
-(def event-file (str events-dir "/events.edn"))
-
 (defn- job-arch [job]
   (get job :arch))
-
-(defn- checkout-dir
-  "Checkout dir for the build in the job container"
-  [build]
-  (u/combine work-dir (fs/file-name (b/checkout-dir build))))
-
-(defn- job-work-dir
-  "The work dir to use for the job in the container.  This is the external job
-   work dir, relative to the container checkout dir."
-  [job build]
-  (let [wd (j/work-dir job)]
-    (cond-> (checkout-dir build)
-      wd (u/combine wd))))
 
 (defn- job-container
   "Configures the job container.  It runs the image as configured in
@@ -87,14 +63,7 @@
 (defn- sidecar-container [{[c] :containers}]
   (assoc c
          :display-name sidecar-container-name
-         :command (mcc/make-cmd
-                   "-c" (str config-dir "/" config-file)
-                   "internal"
-                   "sidecar"
-                   ;; TODO Move this to config file
-                   "--events-file" event-file
-                   "--start-file" start-file
-                   "--abort-file" abort-file)
+         :command c/sidecar-cmd
          ;; Run as root, because otherwise we can't write to the shared volumes
          :security-context {:security-context-type "LINUX"
                             :run-as-user 0}))
@@ -169,24 +138,8 @@
                                   (oci/config-entry (str i) s)))
                    (into [(job-script-entry)]))}))
 
-(defn- make-sidecar-config
-  "Creates a configuration map using the runtime, that can then be passed on to the
-   sidecar container."
-  [{:keys [build job] :as conf}]
-  (-> {}
-      (cos/set-build (-> build
-                         (select-keys (conj b/sid-props :workspace))
-                         (assoc :checkout-dir (checkout-dir build))))
-      (cos/set-job (-> job
-                       (select-keys [:id :save-artifacts :restore-artifacts :caches :dependencies])
-                       (assoc :work-dir (job-work-dir job build))))
-      (cos/set-events-file event-file)
-      (cos/set-start-file start-file)
-      (cos/set-abort-file abort-file)
-      (cos/set-api (:api conf))))
-
 (defn- rt->edn [conf]
-  (edn/->edn (make-sidecar-config conf)))
+  (edn/->edn (c/make-sidecar-config conf)))
 
 (defn- config-vol-config
   "Configuration files for the sidecar (e.g. logging)"
