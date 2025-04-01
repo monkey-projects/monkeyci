@@ -15,6 +15,7 @@
              [time :as t]
              [utils :as u]]
             [monkey.ci.common.preds :as cp]
+            [monkey.ci.containers.common :as cc]
             [monkey.oci.container-instance.core :as ci]
             [monkey.oci.os
              [martian :as os]
@@ -135,11 +136,11 @@
   [client cid]
   (ci/list-container-instances client {:compartment-id cid :lifecycle-state "ACTIVE"}))
 
-(def home-dir "/home/monkeyci")
-(def checkout-vol "checkout")
-(def checkout-dir "/opt/monkeyci/checkout")
-(def script-dir "/opt/monkeyci/script")
-(def key-dir "/opt/monkeyci/keys")
+(def home-dir cc/home-dir)
+(def checkout-vol cc/checkout-vol)
+(def checkout-dir cc/checkout-dir)
+(def script-dir cc/script-dir)
+(def key-dir cc/key-dir)
 
 (defn- container-config [conf]
   ;; The image url must point to a container running monkeyci cli
@@ -201,15 +202,6 @@
   [n v]
   {:file-name n
    :data (u/->base64 v)})
-
-(def base-cmd
-  "Base command line for app processes"
-  ["java" "-cp" "monkeyci.jar"
-   "-Dlogback.configurationFile=config/logback.xml"
-   "monkey.ci.core"])
-
-(defn make-cmd [& args]
-  (vec (concat base-cmd args)))
 
 (defn checkout-subdir
   "Returns the path for `n` as a subdir of the checkout dir"

@@ -11,6 +11,7 @@
             [meta-merge.core :as mm]
             [monkey.ci
              [build :as b]
+             [containers :as co]
              [edn :as edn]
              [oci :as oci]
              [protocols :as p]
@@ -171,7 +172,7 @@
 (defn controller-container [config]
   (-> default-container
       (assoc :display-name "controller"
-             :command (oci/make-cmd
+             :command (co/make-cmd
                        "-c" (str config-path "/" config-file)
                        "internal"
                        "controller")

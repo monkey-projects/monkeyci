@@ -11,7 +11,9 @@
              [oci :as oci]
              [utils :as u]]
             [monkey.ci.common.preds :as cp]
-            [monkey.ci.containers.oci :as sut]
+            [monkey.ci.containers
+             [common :as cc]
+             [oci :as sut]]
             [monkey.ci.events.mailman :as em]
             [monkey.ci.sidecar.config :as cs]
             [monkey.ci.spec.sidecar :as ss]
@@ -278,7 +280,7 @@
           (testing "included in config"
             (is (some? mnt))
             (is (some? v))
-            (is (= sut/config-dir (:mount-path mnt))))
+            (is (= cc/config-dir (:mount-path mnt))))
 
           (testing "config file"
             (let [e (find-volume-entry v "config.edn")

@@ -45,6 +45,7 @@
         metosin/reitit-ring {:mvn/version "0.7.2"}
         metosin/reitit-schema {:mvn/version "0.7.2"}
         metosin/reitit-swagger {:mvn/version "0.7.2"}
+        nubank/k8s-api {:mvn/version "1.0.0"}
         org.apache.activemq/artemis-server {:mvn/version "2.39.0"}
         org.apache.activemq/artemis-amqp-protocol {:mvn/version "2.39.0"}
         org.clojure/core.async {:mvn/version "1.7.701"}

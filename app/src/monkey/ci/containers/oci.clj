@@ -13,7 +13,9 @@
              [jobs :as j]
              [oci :as oci]
              [utils :as u]]
-            [monkey.ci.containers.promtail :as pt]
+            [monkey.ci.containers
+             [common :refer :all]
+             [promtail :as pt]]
             [monkey.ci.events.builders :as eb]
             [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.ci.sidecar.config :as cos]
@@ -30,18 +32,6 @@
 (def start-file (str events-dir "/start"))
 (def abort-file (str events-dir "/abort"))
 (def event-file (str events-dir "/events.edn"))
-(def script-vol "scripts")
-(def job-script "job.sh")
-(def config-vol "config")
-(def config-dir "/home/monkeyci/config")
-(def job-container-name "job")
-(def config-file "config.edn")
-
-(def sidecar-container-name "sidecar")
-
-(def promtail-config-vol "promtail-config")
-(def promtail-config-dir "/etc/promtail")
-(def promtail-config-file "config.yml")
 
 (defn- job-arch [job]
   (get job :arch))
@@ -97,7 +87,7 @@
 (defn- sidecar-container [{[c] :containers}]
   (assoc c
          :display-name sidecar-container-name
-         :command (oci/make-cmd
+         :command (mcc/make-cmd
                    "-c" (str config-dir "/" config-file)
                    "internal"
                    "sidecar"
@@ -420,6 +410,8 @@
   (let [client (make-ci-context conf)
         state (emi/with-state (atom {:build build}))]
     [[:container/job-queued
+      ;; TODO Switch to this event type when dispatcher works
+      ;;:oci/job-queued
       ;; Job picked up, start the container instance
       [{:handler job-queued
         :interceptors [emi/handle-job-error
