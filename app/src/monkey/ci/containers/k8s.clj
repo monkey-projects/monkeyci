@@ -163,5 +163,9 @@
             {:name c/promtail-config-vol
              :config-map {:name pt-config-name}}]}}}}})]))
 
+;; TODO Interceptors
+
 ;; TODO Event handlers
-;; TODO Create pods for jobs, similar to oci container instances
+
+;; TODO Event routing
+;; Very similar to oci jobs

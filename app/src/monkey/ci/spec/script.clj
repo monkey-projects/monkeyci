@@ -1,9 +1,7 @@
 (ns monkey.ci.spec.script
   (:require [clojure.spec.alpha :as s]
             [manifold.deferred :as md]
-            [monkey.ci
-             [artifacts :as art]
-             [protocols :as p]]
+            [monkey.ci.protocols :as p]
             [monkey.ci.spec
              [build-api :as ba]
              [common :as c]]))
@@ -17,8 +15,8 @@
   (s/keys :req [::api ::build]
           :opt [::result]))
 
-(s/def ::artifacts art/repo?)
-(s/def ::cache art/repo?)
+(s/def ::artifacts p/repo?)
+(s/def ::cache p/repo?)
 (s/def ::mailman ::c/mailman)
 
 (s/def ::runtime

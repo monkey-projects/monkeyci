@@ -2,7 +2,6 @@
   (:require [babashka.fs :as fs]
             [monkey.ci
              [build :as b]
-             [jobs :as j]
              [utils :as u]]
             [monkey.ci.containers :as c]
             [monkey.ci.sidecar.config :as sc]))
@@ -50,7 +49,7 @@
   "The work dir to use for the job in the container.  This is the external job
    work dir, relative to the container checkout dir."
   [job build]
-  (let [wd (j/work-dir job)]
+  (let [wd (:work-dir job)]
     (cond-> (base-work-dir build)
       wd (u/combine wd))))
 

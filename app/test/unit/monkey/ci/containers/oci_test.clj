@@ -158,13 +158,13 @@
                   (find-job-container))]
       
       (testing "uses shell mounted script"
-        (is (= ["/bin/sh" (str sut/script-dir "/job.sh")] (:command jc)))
+        (is (= ["/bin/sh" (str cc/script-dir "/job.sh")] (:command jc)))
         (is (= ["0" "1"] (:arguments jc))))
 
       (testing "includes a script volume"
         (let [v (oci/find-mount jc "scripts")]
           (is (some? v))
-          (is (= sut/script-dir (:mount-path v)))))
+          (is (= cc/script-dir (:mount-path v)))))
 
       (testing "uses shell from job config"
         (let [jc (->> {:job {:script ["test-script"]
@@ -263,15 +263,15 @@
 
       (testing "passes events-file as arg"
         (is (h/contains-subseq? cmd
-                                ["--events-file" sut/event-file])))
+                                ["--events-file" cc/event-file])))
 
       (testing "passes start-file as arg"
         (is (h/contains-subseq? cmd
-                                ["--start-file" sut/start-file])))
+                                ["--start-file" cc/start-file])))
 
       (testing "passes abort-file as arg"
         (is (h/contains-subseq? cmd
-                                ["--abort-file" sut/abort-file])))
+                                ["--abort-file" cc/abort-file])))
 
       (testing "config volume"
         (let [mnt (oci/find-mount sc "config")
@@ -299,10 +299,10 @@
                 (is (some? (cs/build data))))
 
               (testing "build checkout dir parent is container work dir"
-                (is (= sut/work-dir (-> (cs/build data)
-                                        :checkout-dir
-                                        (fs/parent)
-                                        str))))
+                (is (= cc/work-dir (-> (cs/build data)
+                                       :checkout-dir
+                                       (fs/parent)
+                                       str))))
 
               (testing "recalculates job work dir"
                 (is (= "/opt/monkeyci/checkout/work/test-checkout/sub"
@@ -377,7 +377,7 @@
                                 yaml/parse-string)]
           (is (some? v))
           (is (map? contents))
-          (is (= (str sut/log-dir "/*.log")
+          (is (= (str cc/log-dir "/*.log")
                  (-> contents
                      :scrape_configs
                      first

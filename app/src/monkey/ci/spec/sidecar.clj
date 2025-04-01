@@ -1,7 +1,7 @@
 (ns monkey.ci.spec.sidecar
   "Specs for sidecar configuration"
   (:require [clojure.spec.alpha :as s]
-            [monkey.ci.artifacts :as art]
+            [monkey.ci.protocols :as p]
             [monkey.ci.spec
              [build :as b]
              [build-api :as ba]
@@ -37,8 +37,8 @@
   (s/keys :req-un [::events-file ::start-file ::abort-file]))
 
 (s/def ::workspace ::c/workspace)
-(s/def ::artifacts art/repo?)
-(s/def ::cache art/repo?)
+(s/def ::artifacts p/repo?)
+(s/def ::cache p/repo?)
 
 (s/def ::runtime
   (s/keys :req-un [::job ::build ::paths]

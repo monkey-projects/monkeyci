@@ -1,18 +1,20 @@
 (ns monkey.ci.artifacts-test
-  (:require
-   [babashka.fs :as fs]
-   [clojure.java.io :as io]
-   [clojure.string :as cs]
-   [clojure.test :refer [deftest is testing]]
-   [clojure.tools.logging :as log]
-   [manifold.deferred :as md]
-   [monkey.ci.artifacts :as sut]
-   [monkey.ci.blob :as blob]
-   [monkey.ci.build.api :as api]
-   [monkey.ci.build.api-server :as bas]
-   [monkey.ci.test.api-server :as ta]
-   [monkey.ci.test.blob :as tb]
-   [monkey.ci.test.helpers :as h]))
+  (:require [babashka.fs :as fs]
+            [clojure
+             [string :as cs]
+             [test :refer [deftest is testing]]]
+            [clojure.java.io :as io]
+            [monkey.ci
+             [artifacts :as sut]
+             [blob :as blob]
+             [protocols :as p]]
+            [monkey.ci.build
+             [api :as api]
+             [api-server :as bas]]
+            [monkey.ci.test
+             [api-server :as ta]
+             [blob :as tb]
+             [helpers :as h]]))
 
 (deftest save-artifacts
   (testing "saves path using blob store, relative to job work dir"
@@ -77,11 +79,11 @@
         art-id (str (random-uuid))]
 
     (testing "uploads artifact to blob store"
-      (is (some? @(sut/save-artifact repo art-id src-art)))
+      (is (some? @(p/save-artifact repo art-id src-art)))
       (is (= 1 (-> store :stored deref count))))
     
     (testing "downloads artifact via blob store"
-      (is (some? @(sut/restore-artifact repo art-id ::test-destination)))
+      (is (some? @(p/restore-artifact repo art-id ::test-destination)))
 
       (is (empty? (-> store :stored deref))))))
 
@@ -104,14 +106,14 @@
           repo (sut/make-build-api-repository client)]
       (with-open [s (:server server)]
         (testing "uploads artifact using api"
-          (is (= art-id (:artifact-id @(sut/save-artifact repo art-id (str in-dir))))))
+          (is (= art-id (:artifact-id @(p/save-artifact repo art-id (str in-dir))))))
         
         (testing "downloads artifact using api"
-          (is (some? @(sut/restore-artifact repo art-id (str out-dir))))
+          (is (some? @(p/restore-artifact repo art-id (str out-dir))))
           (is (fs/exists? (fs/path out-dir "input" "test.txt"))))
 
         (testing "does nothing if artifact does not exist"
-          (is (nil? @(sut/restore-artifact repo "nonexisting" (str out-dir)))))))))
+          (is (nil? @(p/restore-artifact repo "nonexisting" (str out-dir)))))))))
 
 (deftest restore-interceptor
   (let [blob (tb/test-store {"test/build/test-art.tgz" {:file "/tmp/test.txt"}})
