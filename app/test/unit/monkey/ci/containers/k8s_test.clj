@@ -1,6 +1,8 @@
 (ns monkey.ci.containers.k8s-test
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.string :as cs]
+            [kubernetes-api.core :as k8s-api]
+            [monkey.mailman.core :as mmc]
             [medley.core :as mc]
             [monkey.ci.containers.k8s :as sut]))
 
@@ -171,19 +173,58 @@
 
 (deftest run-k8s-actions
   (let [client ::test-client
-        {:keys [enter] :as i} (sut/run-k8s-actions client)]
+        {:keys [leave] :as i} (sut/run-k8s-actions client)
+        action {:kind :TestAction
+                :action :create}]
     (is (keyword? (:name i)))
     
-    (testing "`enter` invokes action on client")))
+    (testing "`leave` invokes action on client"
+      (with-redefs [k8s-api/invoke (fn [client action]
+                                     {:client client
+                                      :action action})]
+        (is (= [{:client client
+                 :action action}]
+               (-> {}
+                   (sut/set-k8s-actions [action])
+                   (leave)
+                   (sut/get-k8s-results))))))))
+
+(deftest job-queued
+  (let [build {:build-id "test-build"}
+        job {:id "test-job"}
+        res (-> {:event
+                 {:type :k8s/job-queued
+                  :job job}}
+                (sut/set-build build)
+                (sut/job-queued))]
+    (testing "sets k8s actions to create job"
+      (is (not-empty (sut/get-k8s-actions res))))))
 
 (deftest make-routes
-  (testing "handles required events"
-    (let [r (sut/make-routes {})
-          exp [:k8s/job-queued
-               :container/start
-               :container/end
-               :sidecar/end
-               :job/executed]]
-      (doseq [t exp]
-        (is (contains? (set (map first r)) t)
-            (str "Should handle event " t))))))
+  (let [test-conf {:k8s {:client ::test-client}
+                   :build {:build-id "test-build"}}]
+    (testing "handles required events"
+      (let [r (sut/make-routes test-conf)
+            exp [:k8s/job-queued
+                 :container/start
+                 :container/end
+                 :sidecar/end
+                 :job/executed]]
+        (doseq [t exp]
+          (is (contains? (set (map first r)) t)
+              (str "Should handle event " t)))))
+
+    (testing "`k8s/job-queued`"
+      (let [k8s-actions (atom [])
+            fake-k8s {:name ::sut/run-k8s-actions
+                      :leave (fn [ctx]
+                               (reset! k8s-actions (sut/get-k8s-actions ctx))
+                               ctx)}
+            r (-> (sut/make-routes test-conf)
+                  (mmc/router)
+                  (mmc/replace-interceptors [fake-k8s]))
+            res (r {:type :k8s/job-queued
+                    :job {}})]
+        
+        (testing "creates kubernetes job"
+          (is (not-empty @k8s-actions)))))))

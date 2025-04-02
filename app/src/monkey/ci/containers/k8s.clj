@@ -1,6 +1,7 @@
 (ns monkey.ci.containers.k8s
   "Kubernetes implementation to run container jobs."
   (:require [clojure.java.io :as io]
+            [kubernetes-api.core :as k8s-api]
             [monkey.ci
              [build :as b]
              [edn :as edn]
@@ -8,7 +9,8 @@
             [monkey.ci.containers :as co]
             [monkey.ci.containers
              [common :as c]
-             [promtail :as pt]]))
+             [promtail :as pt]]
+            [monkey.ci.events.mailman.interceptors :as emi]))
 
 (def checkout-mount
   {:name c/checkout-vol
@@ -180,24 +182,54 @@
 (defn set-k8s-actions [ctx a]
   (assoc ctx ::k8s-actions a))
 
+(def get-k8s-results ::k8s-results)
+
+(defn set-k8s-results [ctx a]
+  (assoc ctx ::k8s-results a))
+
+(def get-build ::build)
+
+(defn set-build [ctx b]
+  (assoc ctx ::build b))
+
 ;;; Interceptors
 
 (defn run-k8s-actions [client]
   "Executes k8s actions stored in the context"
   {:name ::run-k8s-actions
-   :enter (fn [ctx]
-            ;; TODO
-            )})
+   :leave (fn [ctx]
+            (->> (get-k8s-actions ctx)
+                 (map (partial k8s-api/invoke client))
+                 (doall)
+                 (set-k8s-results ctx)))})
 
-;;; TODO Event handlers
+(defn add-build [build]
+  {:name ::add-build
+   :enter (fn [ctx]
+            (set-build ctx build))})
+
+;;; Event handlers
+
+(defn job-queued [ctx]
+  (let [job (get-in ctx [:event :job])
+        build (get-build ctx)]
+    ;; TODO Build k8s config
+    (set-k8s-actions ctx (prepare-pod-config {:job job
+                                              :build build}))))
 
 ;;; Event routing
 
 ;; Very similar to oci jobs
 
-(defn make-routes [conf]
-  [[:k8s/job-queued []]
-   [:container/start []]
-   [:container/end []]
-   [:sidecar/end []]
-   [:job/executed []]])
+(defn make-routes [{:keys [build] :as conf}]
+  (let [state (emi/with-state (atom {}))]
+    [[:k8s/job-queued
+      [{:handler job-queued
+        :interceptors [state
+                       (add-build build)
+                       (run-k8s-actions (get-in conf [:k8s :client]))]}]]
+     
+     [:container/start []]
+     [:container/end []]
+     [:sidecar/end []]
+     [:job/executed []]]))
