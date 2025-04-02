@@ -114,6 +114,15 @@
                                (edn/->edn))}
       lc (assoc "logback.xml" lc))))
 
+(defn- select-node-arch
+  "When `arch` is specified, adds a node selector to make sure the pod is run on a
+   node with that architecture."
+  [spec arch]
+  (letfn [(get-arch-lbl [arch]
+            (str (name arch) "64"))]
+    (cond-> spec
+      arch (assoc-in [:node-selector "kubernetes.io/arch"] (get-arch-lbl arch)))))
+
 (defn prepare-pod-config
   "Prepares a list of create actions that can be used to run a container job."
   [conf]
@@ -149,23 +158,46 @@
         {:backoff-limit 1
          :template
          {:spec
-          {:containers
-           [(job-container conf)
-            (sidecar-container conf)
-            (promtail-container conf)]
-           :volumes
-           [{:name c/checkout-vol
-             :empty-dir {}}
-            {:name c/config-vol
-             :config-map {:name sidecar-config-name}}
-            {:name c/script-vol
-             :config-map {:name job-config-name}}
-            {:name c/promtail-config-vol
-             :config-map {:name pt-config-name}}]}}}}})]))
+          (-> {:containers
+               [(job-container conf)
+                (sidecar-container conf)
+                (promtail-container conf)]
+               :volumes
+               [{:name c/checkout-vol
+                 :empty-dir {}}
+                {:name c/config-vol
+                 :config-map {:name sidecar-config-name}}
+                {:name c/script-vol
+                 :config-map {:name job-config-name}}
+                {:name c/promtail-config-vol
+                 :config-map {:name pt-config-name}}]}
+              (select-node-arch (get-in conf [:job :arch])))}}}})]))
 
-;; TODO Interceptors
+;;; Context management
 
-;; TODO Event handlers
+(def get-k8s-actions ::k8s-actions)
 
-;; TODO Event routing
+(defn set-k8s-actions [ctx a]
+  (assoc ctx ::k8s-actions a))
+
+;;; Interceptors
+
+(defn run-k8s-actions [client]
+  "Executes k8s actions stored in the context"
+  {:name ::run-k8s-actions
+   :enter (fn [ctx]
+            ;; TODO
+            )})
+
+;;; TODO Event handlers
+
+;;; Event routing
+
 ;; Very similar to oci jobs
+
+(defn make-routes [conf]
+  [[:k8s/job-queued []]
+   [:container/start []]
+   [:container/end []]
+   [:sidecar/end []]
+   [:job/executed []]])

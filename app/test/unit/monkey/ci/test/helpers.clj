@@ -272,7 +272,9 @@
   (gen-entity :entity/invoice))
 
 (defn gen-queued-task []
-  (gen-entity :entity/queued-task))
+  (-> (gen-entity :entity/queued-task)
+      ;; Fixed task, to avoid brittle tests
+      (assoc :task {:key :value})))
 
 (defn gen-build-sid []
   (repeatedly 3 cuid/random-cuid))

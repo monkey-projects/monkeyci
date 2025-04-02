@@ -14,7 +14,8 @@
                                                :script ["test" "script"]
                                                :container/env {"test_var" "test val"}
                                                :memory 2
-                                               :cpus 1}
+                                               :cpus 1
+                                               :arch :arm}
                                          :sidecar
                                          {:image-url "test-image"
                                           :image-tag "test-tag"
@@ -119,7 +120,17 @@
 
               (testing "requests job resources"
                 (is (= "2G" (get-in c [:resources :requests :memory])))
-                (is (= 1 (get-in c [:resources :requests :cpu])))))))))
+                (is (= 1 (get-in c [:resources :requests :cpu]))))))
+
+          (testing "selects node based on arch"
+            (is (= "arm64"
+                   (-> req
+                       :body
+                       :spec
+                       :template
+                       :spec
+                       :node-selector
+                       (get "kubernetes.io/arch"))))))))
 
     (testing "configmaps"
       (letfn [(find-cm [n]
@@ -157,3 +168,22 @@
 
             (testing "contains config edn"
               (is (some? (get cc "config.edn"))))))))))
+
+(deftest run-k8s-actions
+  (let [client ::test-client
+        {:keys [enter] :as i} (sut/run-k8s-actions client)]
+    (is (keyword? (:name i)))
+    
+    (testing "`enter` invokes action on client")))
+
+(deftest make-routes
+  (testing "handles required events"
+    (let [r (sut/make-routes {})
+          exp [:k8s/job-queued
+               :container/start
+               :container/end
+               :sidecar/end
+               :job/executed]]
+      (doseq [t exp]
+        (is (contains? (set (map first r)) t)
+            (str "Should handle event " t))))))
