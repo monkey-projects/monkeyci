@@ -4,9 +4,9 @@
             [com.stuartsierra.component :as csc]
             [manifold.deferred :as md]
             [monkey.ci
-             [artifacts :as art]
              [blob :as blob]
              [cache :as cache]
+             [protocols :as p]
              [storage :as st]]
             [monkey.ci.build
              [api-server :as bas]
@@ -61,5 +61,5 @@
   (let [repo (cache/make-build-api-repository client)
         dest (fs/file (fs/create-temp-dir))]
     (md/chain
-     (art/restore-artifact repo id dest)
+     (p/restore-artifact repo id dest)
      #(assoc % :dest dest))))

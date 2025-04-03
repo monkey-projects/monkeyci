@@ -1,11 +1,9 @@
 (ns monkey.ci.script.runtime-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [clj-commons.byte-streams :as bs]
+  (:require [clj-commons.byte-streams :as bs]
+            [clojure.test :refer [deftest is testing]]
             [com.stuartsierra.component :as co]
             [manifold.deferred :as md]
-            [monkey.ci
-             [artifacts :as art]
-             [protocols :as p]]
+            [monkey.ci.protocols :as p]
             [monkey.ci.script
              [config :as sc]
              [runtime :as sut]]
@@ -31,10 +29,10 @@
         (is (some? (:routes sys))))
 
       (testing "adds artifact repo"
-        (is (art/repo? (:artifacts sys))))
+        (is (p/repo? (:artifacts sys))))
 
       (testing "adds cache repo"
-        (is (art/repo? (:cache sys))))
+        (is (p/repo? (:cache sys))))
 
       (testing "adds event stream"
         (is (some? (:event-stream sys))))

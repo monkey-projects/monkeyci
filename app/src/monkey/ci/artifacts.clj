@@ -13,21 +13,11 @@
              [blob :as blob]
              [build :as b]
              [oci :as oci]
+             [protocols :as p]
              [utils :as u]]
             [monkey.ci.build
              [api :as api]
              [archive :as archive]]))
-
-(defprotocol ArtifactRepository
-  (restore-artifact [this id dest]
-    "Downloads and extracts artifact with given id to the specified destination 
-     directory.  Returns the destination.")
-  (save-artifact [this id src]
-    "Creates an archive and uploads the artifact with given id from `src`, which 
-     can be a directory or file."))
-
-(defn repo? [x]
-  (satisfies? ArtifactRepository x))
 
 (defn- do-with-blobs
   "Fetches blobs configurations from the job using the job key, then
@@ -56,7 +46,7 @@
   (let [fullp (b/job-relative-dir job build path)]
     (log/debug "Saving blob:" id "at path" path "(full path:" fullp ")")
     (md/chain
-     (save-artifact repo id fullp)
+     (p/save-artifact repo id fullp)
      (fn [{:keys [dest entries] :as r}]
        (if (not-empty entries)
          (log/debugf "Zipped %d entries to %s (%.2f MB)" (count entries) dest (mb dest))
@@ -69,13 +59,13 @@
 (defn restore-blob [{:keys [repo job build]} {:keys [id path]}]
   (log/debug "Restoring blob:" id "to path" path)
   (md/chain
-   (restore-artifact repo
-                     id
-                     ;; Restore to the parent path because the dir name will be in the archive
-                     (-> (b/job-relative-dir job build path)
-                         (fs/parent)
-                         (fs/canonicalize)
-                         (str)))
+   (p/restore-artifact repo
+                       id
+                       ;; Restore to the parent path because the dir name will be in the archive
+                       (-> (b/job-relative-dir job build path)
+                           (fs/parent)
+                           (fs/canonicalize)
+                           (str)))
    (fn [{:keys [entries src dest] :as r}]
      (let [r (-> r
                  (mc/update-existing :src (comp str fs/canonicalize))
@@ -91,7 +81,7 @@
 ;;; Protocol implementations
 
 (defrecord BlobArtifactRepository [store path-fn]
-  ArtifactRepository
+  p/ArtifactRepository
   (restore-artifact [this id dest]
     (blob/restore store (path-fn id) dest))
 
@@ -99,7 +89,7 @@
     (blob/save store src (path-fn id))))
 
 (defrecord BuildApiArtifactRepository [client base-path]
-  ArtifactRepository
+  p/ArtifactRepository
   (restore-artifact [this id dest]
     (log/debug "Restoring artifact using build API:" id "to" dest)
     (u/log-deferred-elapsed

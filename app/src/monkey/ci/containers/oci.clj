@@ -1,7 +1,6 @@
 (ns monkey.ci.containers.oci
   "Container runner implementation that uses OCI container instances."
-  (:require [babashka.fs :as fs]
-            [clojure.java.io :as io]
+  (:require [clojure.java.io :as io]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [io.pedestal.interceptor.chain :as pi]
@@ -11,53 +10,20 @@
              [containers :as mcc]
              [edn :as edn]
              [jobs :as j]
-             [oci :as oci]
-             [utils :as u]]
-            [monkey.ci.containers.promtail :as pt]
+             [oci :as oci]]
+            [monkey.ci.containers
+             [common :as c :refer :all]
+             [promtail :as pt]]
             [monkey.ci.events.builders :as eb]
             [monkey.ci.events.mailman.interceptors :as emi]
-            [monkey.ci.sidecar.config :as cos]
             [monkey.oci.container-instance.core :as ci]))
 
 ;; TODO Get this information from the OCI shapes endpoint
 (def max-pod-memory "Max memory that can be assigned to a pod, in gbs" 64)
 (def max-pod-cpus "Max number of cpu's to assign to a pod" 16)
 
-(def work-dir oci/work-dir)
-(def script-dir oci/script-dir)
-(def log-dir (oci/checkout-subdir "log"))
-(def events-dir (oci/checkout-subdir "events"))
-(def start-file (str events-dir "/start"))
-(def abort-file (str events-dir "/abort"))
-(def event-file (str events-dir "/events.edn"))
-(def script-vol "scripts")
-(def job-script "job.sh")
-(def config-vol "config")
-(def config-dir "/home/monkeyci/config")
-(def job-container-name "job")
-(def config-file "config.edn")
-
-(def sidecar-container-name "sidecar")
-
-(def promtail-config-vol "promtail-config")
-(def promtail-config-dir "/etc/promtail")
-(def promtail-config-file "config.yml")
-
 (defn- job-arch [job]
   (get job :arch))
-
-(defn- checkout-dir
-  "Checkout dir for the build in the job container"
-  [build]
-  (u/combine work-dir (fs/file-name (b/checkout-dir build))))
-
-(defn- job-work-dir
-  "The work dir to use for the job in the container.  This is the external job
-   work dir, relative to the container checkout dir."
-  [job build]
-  (let [wd (j/work-dir job)]
-    (cond-> (checkout-dir build)
-      wd (u/combine wd))))
 
 (defn- job-container
   "Configures the job container.  It runs the image as configured in
@@ -97,14 +63,7 @@
 (defn- sidecar-container [{[c] :containers}]
   (assoc c
          :display-name sidecar-container-name
-         :command (oci/make-cmd
-                   "-c" (str config-dir "/" config-file)
-                   "internal"
-                   "sidecar"
-                   ;; TODO Move this to config file
-                   "--events-file" event-file
-                   "--start-file" start-file
-                   "--abort-file" abort-file)
+         :command c/sidecar-cmd
          ;; Run as root, because otherwise we can't write to the shared volumes
          :security-context {:security-context-type "LINUX"
                             :run-as-user 0}))
@@ -179,24 +138,8 @@
                                   (oci/config-entry (str i) s)))
                    (into [(job-script-entry)]))}))
 
-(defn- make-sidecar-config
-  "Creates a configuration map using the runtime, that can then be passed on to the
-   sidecar container."
-  [{:keys [build job] :as conf}]
-  (-> {}
-      (cos/set-build (-> build
-                         (select-keys (conj b/sid-props :workspace))
-                         (assoc :checkout-dir (checkout-dir build))))
-      (cos/set-job (-> job
-                       (select-keys [:id :save-artifacts :restore-artifacts :caches :dependencies])
-                       (assoc :work-dir (job-work-dir job build))))
-      (cos/set-events-file event-file)
-      (cos/set-start-file start-file)
-      (cos/set-abort-file abort-file)
-      (cos/set-api (:api conf))))
-
 (defn- rt->edn [conf]
-  (edn/->edn (make-sidecar-config conf)))
+  (edn/->edn (c/make-sidecar-config conf)))
 
 (defn- config-vol-config
   "Configuration files for the sidecar (e.g. logging)"
@@ -266,8 +209,8 @@
 
 ;;; Context accessors
 
-(def job-id (comp :job-id :event))
-(def build-sid (comp :sid :event))
+(def job-id c/ctx->job-id)
+(def build-sid c/ctx->build-sid)
 
 (def get-credit-multiplier ::credit-multiplier)
 
@@ -283,31 +226,6 @@
 
 (defn set-config [ctx c]
   (assoc ctx ::config c))
-
-(defn- get-job-state
-  "Retrieves state for the job indicated by `job-id` in the event."
-  [ctx]
-  (-> (emi/get-state ctx)
-      (get-in [::jobs (job-id ctx)])))
-
-(defn- job-state
-  "Applies `f` to job state.  Does not update state."
-  [ctx f]
-  (f (get-job-state ctx)))
-
-(defn- update-job-state
-  "Applies `f` to job state, updates state."
-  [ctx f & args]
-  (apply emi/update-state ctx update-in [::jobs (job-id ctx)] f args))
-
-(defn get-container-status [ctx]
-  (job-state ctx :container-status))
-
-(def container-ended? 
-  (comp some? get-container-status))
-
-(defn sidecar-ended? [ctx]
-  (job-state ctx (comp some? :sidecar-status)))
 
 (defn get-instance-id [ctx]
   (job-state ctx :instance-id))
@@ -351,23 +269,11 @@
                     ;; Do not proceed
                     (pi/terminate)))))})
 
-(def set-container-status
-  {:name ::set-container-status
-   :enter (fn [ctx]
-            ;; FIXME container event is inconsistent, status should be in event, not in result
-            (update-job-state ctx assoc :container-status (get-in ctx [:event :result :status])))})
-
-(def set-sidecar-status
-  {:name ::set-sidecar-status
-   :enter (fn [ctx]
-            ;; FIXME Status field is also in this event inconsistent
-            (update-job-state ctx assoc :sidecar-status (get-in ctx [:event :result :status])))})
-
 (def save-instance-id
   "Stores instance id taken from the instance creation response in the job state."
   {:name ::save-instance-id
    :enter (fn [ctx]
-            (update-job-state ctx assoc :instance-id (-> ctx (oci/get-ci-response) :body :id)))})
+            (c/update-job-state ctx assoc :instance-id (-> ctx (oci/get-ci-response) :body :id)))})
 
 (def load-instance-id
   {:name ::load-instance-id
@@ -390,26 +296,6 @@
   [ctx]
   [(j/job-start-evt (job-id ctx) (build-sid ctx))])
 
-(defn- job-executed-evt [{:keys [event] :as ctx}]
-  (let [status (or (get-container-status ctx)
-                   ;; Normally this is taken care of by interceptor, but it's more resilient
-                   (get-in ctx [:event :result :status]))]
-    (j/job-executed-evt (job-id ctx) (build-sid ctx) (assoc (:result event) :status status))))
-
-(defn container-end
-  "Indicates job script has terminated.  If the sidecar has also ended, the job has been
-   executed"
-  [ctx]
-  (when (sidecar-ended? ctx)
-    [(job-executed-evt ctx)]))
-
-(defn sidecar-end
-  "Indicates job sidecar has terminated.  If the container script has also ended, the job
-   has been executed"
-  [ctx]
-  (when (container-ended? ctx)
-    [(job-executed-evt ctx)]))
-
 ;;; Route configuration
 
 (defn- make-ci-context [conf]
@@ -420,10 +306,13 @@
   (let [client (make-ci-context conf)
         state (emi/with-state (atom {:build build}))]
     [[:container/job-queued
+      ;; TODO Switch to this event type when dispatcher works
+      ;;:oci/job-queued
       ;; Job picked up, start the container instance
       [{:handler job-queued
         :interceptors [emi/handle-job-error
                        state
+                       c/register-job
                        (add-config conf)
                        prepare-instance-config
                        calc-credit-multiplier
@@ -433,24 +322,29 @@
 
      ;; Container script has started along with the sidecar (which forwards events)
      [:container/start
-      [{:handler container-start}]]
+      [{:handler container-start
+        :interceptors [state
+                       c/ignore-unknown-job]}]]
      
      ;; Container script has ended, all commands executed
      [:container/end
-      [{:handler container-end
+      [{:handler c/container-end
         :interceptors [state
-                       set-container-status]}]]
+                       c/ignore-unknown-job
+                       c/set-container-status]}]]
      
      ;; Sidecar terminated, artifacts have been stored
      [:sidecar/end
-      [{:handler sidecar-end
+      [{:handler c/sidecar-end
         :interceptors [state
-                       set-sidecar-status]}]]
+                       c/ignore-unknown-job
+                       c/set-sidecar-status]}]]
 
      ;; Job executed, we can delete the container instance
      [:job/executed
       [{:handler (constantly nil)
         :interceptors [state
+                       c/ignore-unknown-job
                        load-instance-id
                        filter-container-job
                        (oci/delete-ci-interceptor client)]}]]]))

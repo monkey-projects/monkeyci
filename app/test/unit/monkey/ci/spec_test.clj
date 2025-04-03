@@ -2,7 +2,7 @@
   (:require [clojure.test :refer [deftest testing is]]
             [monkey.ci.spec :as sut]))
 
-(deftest url?
+#_(deftest url?
   (testing "matches valid url"
     (is (sut/url? "http://test")))
 

@@ -12,3 +12,12 @@
 (def props
   "Serializable properties for container jobs"
   [:image :container/image env cmd args entrypoint])
+
+(def base-cmd
+  "Base command line for app processes"
+  ["java" "-cp" "monkeyci.jar"
+   "-Dlogback.configurationFile=config/logback.xml"
+   "monkey.ci.core"])
+
+(defn make-cmd [& args]
+  (vec (concat base-cmd args)))

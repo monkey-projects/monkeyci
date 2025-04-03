@@ -45,3 +45,14 @@
   (decrypt [this iv obj] "Decrypts given data using initialization vector"))
 
 (def vault? (partial satisfies? Vault))
+
+(defprotocol ArtifactRepository
+  (restore-artifact [this id dest]
+    "Downloads and extracts artifact with given id to the specified destination 
+     directory.  Returns the destination.")
+  (save-artifact [this id src]
+    "Creates an archive and uploads the artifact with given id from `src`, which 
+     can be a directory or file."))
+
+(defn repo? [x]
+  (satisfies? ArtifactRepository x))

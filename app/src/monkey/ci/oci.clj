@@ -15,6 +15,7 @@
              [time :as t]
              [utils :as u]]
             [monkey.ci.common.preds :as cp]
+            [monkey.ci.containers.common :as cc]
             [monkey.oci.container-instance.core :as ci]
             [monkey.oci.os
              [martian :as os]
@@ -22,19 +23,19 @@
             [taoensso.telemere :as tt]))
 
 ;; Cpu architectures
-(def arch-arm :arm)
-(def arch-amd :amd)
-(def valid-architectures #{arch-arm arch-amd})
+(def arch-arm cc/arch-arm)
+(def arch-amd cc/arch-amd)
+(def valid-architectures cc/valid-architectures)
 
 (def arch-shapes
   "Architectures mapped to OCI shapes"
   ;; TODO Make this configurable
   {arch-arm
    {:shape "CI.Standard.A1.Flex"
-    :credits 1}
+    :credits (get cc/arch-credits arch-arm)}
    arch-amd
    {:shape "CI.Standard.E4.Flex"
-    :credits 2}})
+    :credits (get cc/arch-credits arch-amd)}})
 
 (def default-arch arch-arm)
 
@@ -135,11 +136,11 @@
   [client cid]
   (ci/list-container-instances client {:compartment-id cid :lifecycle-state "ACTIVE"}))
 
-(def home-dir "/home/monkeyci")
-(def checkout-vol "checkout")
-(def checkout-dir "/opt/monkeyci/checkout")
-(def script-dir "/opt/monkeyci/script")
-(def key-dir "/opt/monkeyci/keys")
+(def home-dir cc/home-dir)
+(def checkout-vol cc/checkout-vol)
+(def checkout-dir cc/checkout-dir)
+(def script-dir cc/script-dir)
+(def key-dir cc/key-dir)
 
 (defn- container-config [conf]
   ;; The image url must point to a container running monkeyci cli
@@ -202,38 +203,22 @@
   {:file-name n
    :data (u/->base64 v)})
 
-(def base-cmd
-  "Base command line for app processes"
-  ["java" "-cp" "monkeyci.jar"
-   "-Dlogback.configurationFile=config/logback.xml"
-   "monkey.ci.core"])
-
-(defn make-cmd [& args]
-  (vec (concat base-cmd args)))
-
-(defn checkout-subdir
+(def checkout-subdir
   "Returns the path for `n` as a subdir of the checkout dir"
-  [n]
-  (str checkout-dir "/" n))
+  cc/checkout-subdir)
 
-(def work-dir (checkout-subdir "work"))
+(def work-dir cc/work-dir)
 
-(defn base-work-dir
+(def base-work-dir
   "Determines the base work dir to use inside the container"
-  [build]
-  (some->> (b/checkout-dir build)
-           (fs/file-name)
-           (fs/path work-dir)
-           (str)))
+  cc/base-work-dir)
 
 (defn credit-multiplier
   "Calculates the credit multiplier that needs to be applied for the container
    instance.  This varies depending on the architecture, number of cpu's and 
    amount of memory."
   ([arch cpus mem]
-   (+ (* cpus
-         (get-in arch-shapes [arch :credits] 1))
-      mem))
+   (cc/credit-multiplier arch cpus mem))
   ([{:keys [shape shape-config]}]
    (let [a (find-shape shape)]
      (+ (* (:credits a) (:ocpus shape-config))
