@@ -312,6 +312,7 @@
       [{:handler job-queued
         :interceptors [emi/handle-job-error
                        state
+                       c/register-job
                        (add-config conf)
                        prepare-instance-config
                        calc-credit-multiplier
@@ -321,24 +322,29 @@
 
      ;; Container script has started along with the sidecar (which forwards events)
      [:container/start
-      [{:handler container-start}]]
+      [{:handler container-start
+        :interceptors [state
+                       c/ignore-unknown-job]}]]
      
      ;; Container script has ended, all commands executed
      [:container/end
       [{:handler c/container-end
         :interceptors [state
+                       c/ignore-unknown-job
                        c/set-container-status]}]]
      
      ;; Sidecar terminated, artifacts have been stored
      [:sidecar/end
       [{:handler c/sidecar-end
         :interceptors [state
+                       c/ignore-unknown-job
                        c/set-sidecar-status]}]]
 
      ;; Job executed, we can delete the container instance
      [:job/executed
       [{:handler (constantly nil)
         :interceptors [state
+                       c/ignore-unknown-job
                        load-instance-id
                        filter-container-job
                        (oci/delete-ci-interceptor client)]}]]]))

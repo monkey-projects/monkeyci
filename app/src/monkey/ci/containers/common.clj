@@ -110,7 +110,7 @@
   "Retrieves state for the job indicated by `job-id` in the event."
   [ctx]
   (-> (emi/get-state ctx)
-      (get-in [::jobs (ctx->job-id ctx)])))
+      (get-in [::jobs (ctx->build-sid ctx) (ctx->job-id ctx)])))
 
 (defn job-state
   "Applies `f` to job state.  Does not update state."
@@ -120,7 +120,7 @@
 (defn update-job-state
   "Applies `f` to job state, updates state."
   [ctx f & args]
-  (apply emi/update-state ctx update-in [::jobs (ctx->job-id ctx)] f args))
+  (apply emi/update-state ctx update-in [::jobs (ctx->build-sid ctx) (ctx->job-id ctx)] f args))
 
 (defn get-container-status [ctx]
   (job-state ctx :container-status))
@@ -142,6 +142,23 @@
    :enter (fn [ctx]
             ;; FIXME Status field is also in this event inconsistent
             (update-job-state ctx assoc :sidecar-status (get-in ctx [:event :result :status])))})
+
+(def register-job
+  "Interceptor that registers the job referred to in the event in the state, indicating
+   that it's being handled by this runner.  Requires state."
+  {:name ::register-job
+   :enter (fn [ctx]
+            (let [job (get-in ctx [:event :job])]
+              (cond-> ctx
+                job (update-job-state assoc :job job))))})
+
+(def ignore-unknown-job
+  "Interceptor that aborts processing if the job indicated in the event is not found in the
+   state.  This means the job was handled by another container runner, and should be ignored.
+   Requires state and works in conjunction with `register-job`."
+  (emi/terminate-when
+   ::ignore-unknown-job
+   (comp nil? :job get-job-state)))
 
 ;;; Common event handlers
 

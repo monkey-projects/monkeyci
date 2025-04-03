@@ -255,22 +255,27 @@
       [{:handler job-queued
         :interceptors [state
                        (add-build build)
+                       c/register-job
                        (run-k8s-actions (get-in conf [:k8s :client]))
                        unwrap-result]}]]
      
      [:container/start
-      [{:handler container-start}]]
+      [{:handler container-start
+        :interceptors [state
+                       c/ignore-unknown-job]}]]
      
      [:container/end
       [{:handler c/container-end
         :interceptors [state
+                       c/ignore-unknown-job
                        c/set-container-status]}]]
      
      [:sidecar/end
       [{:handler c/sidecar-end
         :interceptors [state
+                       c/ignore-unknown-job
                        c/set-sidecar-status]}]]
      
      [:job/executed
-      ;; TODO Delete job and related configmaps
+      ;; TODO Delete job and related configmaps?
       []]]))
