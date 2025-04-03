@@ -198,7 +198,7 @@
                 (sut/set-build build)
                 (sut/job-queued))]
     (testing "sets k8s actions to create job"
-      (is (not-empty (sut/get-k8s-actions res))))))
+      (is (not-empty (:k8s-actions res))))))
 
 (deftest container-start
   (testing "returns `job/start`"
