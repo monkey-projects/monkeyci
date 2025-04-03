@@ -200,6 +200,13 @@
     (testing "sets k8s actions to create job"
       (is (not-empty (sut/get-k8s-actions res))))))
 
+(deftest container-start
+  (testing "returns `job/start`"
+    (is (= [:job/start]
+           (->> {:event {:type :container/start}}
+                (sut/container-start)
+                (map :type))))))
+
 (deftest make-routes
   (let [test-conf {:k8s {:client ::test-client}
                    :build {:build-id "test-build"}}]
@@ -227,4 +234,11 @@
                     :job {}})]
         
         (testing "creates kubernetes job"
-          (is (not-empty @k8s-actions)))))))
+          (is (not-empty @k8s-actions)))
+
+        (testing "returns `job/initializing` event"
+          (is (= [:job/initializing]
+                 (->> res first :result (map :type))))
+
+          (testing "with credit multiplier according to job arch"
+            (is (pos? (-> res first :result first :credit-multiplier)))))))))

@@ -12,6 +12,10 @@
              [promtail :as pt]]
             [monkey.ci.events.mailman.interceptors :as emi]))
 
+(def default-arch :arm)
+(def default-cpus 1)
+(def default-mem 2)
+
 (def checkout-mount
   {:name c/checkout-vol
    :mount-point c/checkout-dir})
@@ -27,6 +31,15 @@
 
 (defn- job-env [job]
   (->env (co/env job)))
+
+(defn job-cpus [job]
+  (get job :cpus default-cpus))
+
+(defn job-mem [job]
+  (get job :memory default-mem))
+
+(defn job-arch [job]
+  (get job :arch default-arch))
 
 (defn- job-container [{:keys [job build]}]
   (let [wd (c/job-work-dir job build)]
@@ -44,8 +57,8 @@
               checkout-mount]
              :resources
              {:requests
-              {:cpu (get job :cpus 1)
-               :memory (str (get job :memory 2) "G")}}}
+              {:cpu (job-cpus job)
+               :memory (str (job-mem job) "G")}}}
       (:script job) (-> (assoc :command [(get job :shell "/bin/sh") (str c/script-dir "/" c/job-script)]
                                ;; One file arg per script line, with index as name
                                :arguments (->> (count (:script job))
@@ -156,7 +169,6 @@
         {:name (pod-name conf)
          :labels {}}
         :spec
-        ;; TODO Set node affinity using labels according to job arch
         {:backoff-limit 1
          :template
          {:spec
@@ -173,7 +185,8 @@
                  :config-map {:name job-config-name}}
                 {:name c/promtail-config-vol
                  :config-map {:name pt-config-name}}]}
-              (select-node-arch (get-in conf [:job :arch])))}}}})]))
+              ;; Set node affinity using labels according to job arch
+              (select-node-arch (job-arch (:job conf))))}}}})]))
 
 ;;; Context management
 
@@ -208,18 +221,33 @@
    :enter (fn [ctx]
             (set-build ctx build))})
 
+(def unwrap-result
+  {:name ::unwrap-result
+   :leave (fn [ctx]
+            (let [r (:result ctx)]
+              (-> ctx
+                  (set-k8s-actions (:k8s-actions r))
+                  (assoc :result (:events r)))))})
+
 ;;; Event handlers
+
+(defn- calc-credit-multiplier [job]
+  (let [props ((->> [job-arch job-cpus job-mem]
+                    (apply juxt)) job)]
+    (apply c/credit-multiplier props)))
 
 (defn job-queued [ctx]
   (let [job (get-in ctx [:event :job])
         build (get-build ctx)]
-    ;; TODO Build k8s config
-    (set-k8s-actions ctx (prepare-pod-config {:job job
-                                              :build build}))))
+    ;; Instead of events, we return a structure which is then unwrapped
+    {:k8s-actions (prepare-pod-config {:job job
+                                       :build build})
+     :events [(j/job-initializing-evt (j/job-id job) (b/sid build) (calc-credit-multiplier job))]}))
+
+(defn container-start [{{:keys [job-id sid]} :event}]
+  [(j/job-start-evt job-id sid)])
 
 ;;; Event routing
-
-;; Very similar to oci jobs
 
 (defn make-routes [{:keys [build] :as conf}]
   (let [state (emi/with-state (atom {}))]
@@ -227,9 +255,22 @@
       [{:handler job-queued
         :interceptors [state
                        (add-build build)
-                       (run-k8s-actions (get-in conf [:k8s :client]))]}]]
+                       (run-k8s-actions (get-in conf [:k8s :client]))
+                       unwrap-result]}]]
      
-     [:container/start []]
-     [:container/end []]
-     [:sidecar/end []]
-     [:job/executed []]]))
+     [:container/start
+      [{:handler container-start}]]
+     
+     [:container/end
+      [{:handler c/container-end
+        :interceptors [state
+                       c/set-container-status]}]]
+     
+     [:sidecar/end
+      [{:handler c/sidecar-end
+        :interceptors [state
+                       c/set-sidecar-status]}]]
+     
+     [:job/executed
+      ;; TODO Delete job and related configmaps
+      []]]))

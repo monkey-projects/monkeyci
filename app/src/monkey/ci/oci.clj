@@ -23,19 +23,19 @@
             [taoensso.telemere :as tt]))
 
 ;; Cpu architectures
-(def arch-arm :arm)
-(def arch-amd :amd)
-(def valid-architectures #{arch-arm arch-amd})
+(def arch-arm cc/arch-arm)
+(def arch-amd cc/arch-amd)
+(def valid-architectures cc/valid-architectures)
 
 (def arch-shapes
   "Architectures mapped to OCI shapes"
   ;; TODO Make this configurable
   {arch-arm
    {:shape "CI.Standard.A1.Flex"
-    :credits 1}
+    :credits (get cc/arch-credits arch-arm)}
    arch-amd
    {:shape "CI.Standard.E4.Flex"
-    :credits 2}})
+    :credits (get cc/arch-credits arch-amd)}})
 
 (def default-arch arch-arm)
 
@@ -218,9 +218,7 @@
    instance.  This varies depending on the architecture, number of cpu's and 
    amount of memory."
   ([arch cpus mem]
-   (+ (* cpus
-         (get-in arch-shapes [arch :credits] 1))
-      mem))
+   (cc/credit-multiplier arch cpus mem))
   ([{:keys [shape shape-config]}]
    (let [a (find-shape shape)]
      (+ (* (:credits a) (:ocpus shape-config))

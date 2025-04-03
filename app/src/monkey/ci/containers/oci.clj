@@ -209,8 +209,8 @@
 
 ;;; Context accessors
 
-(def job-id (comp :job-id :event))
-(def build-sid (comp :sid :event))
+(def job-id c/ctx->job-id)
+(def build-sid c/ctx->build-sid)
 
 (def get-credit-multiplier ::credit-multiplier)
 
@@ -226,31 +226,6 @@
 
 (defn set-config [ctx c]
   (assoc ctx ::config c))
-
-(defn- get-job-state
-  "Retrieves state for the job indicated by `job-id` in the event."
-  [ctx]
-  (-> (emi/get-state ctx)
-      (get-in [::jobs (job-id ctx)])))
-
-(defn- job-state
-  "Applies `f` to job state.  Does not update state."
-  [ctx f]
-  (f (get-job-state ctx)))
-
-(defn- update-job-state
-  "Applies `f` to job state, updates state."
-  [ctx f & args]
-  (apply emi/update-state ctx update-in [::jobs (job-id ctx)] f args))
-
-(defn get-container-status [ctx]
-  (job-state ctx :container-status))
-
-(def container-ended? 
-  (comp some? get-container-status))
-
-(defn sidecar-ended? [ctx]
-  (job-state ctx (comp some? :sidecar-status)))
 
 (defn get-instance-id [ctx]
   (job-state ctx :instance-id))
@@ -294,23 +269,11 @@
                     ;; Do not proceed
                     (pi/terminate)))))})
 
-(def set-container-status
-  {:name ::set-container-status
-   :enter (fn [ctx]
-            ;; FIXME container event is inconsistent, status should be in event, not in result
-            (update-job-state ctx assoc :container-status (get-in ctx [:event :result :status])))})
-
-(def set-sidecar-status
-  {:name ::set-sidecar-status
-   :enter (fn [ctx]
-            ;; FIXME Status field is also in this event inconsistent
-            (update-job-state ctx assoc :sidecar-status (get-in ctx [:event :result :status])))})
-
 (def save-instance-id
   "Stores instance id taken from the instance creation response in the job state."
   {:name ::save-instance-id
    :enter (fn [ctx]
-            (update-job-state ctx assoc :instance-id (-> ctx (oci/get-ci-response) :body :id)))})
+            (c/update-job-state ctx assoc :instance-id (-> ctx (oci/get-ci-response) :body :id)))})
 
 (def load-instance-id
   {:name ::load-instance-id
@@ -332,26 +295,6 @@
    the sidecar is running."
   [ctx]
   [(j/job-start-evt (job-id ctx) (build-sid ctx))])
-
-(defn- job-executed-evt [{:keys [event] :as ctx}]
-  (let [status (or (get-container-status ctx)
-                   ;; Normally this is taken care of by interceptor, but it's more resilient
-                   (get-in ctx [:event :result :status]))]
-    (j/job-executed-evt (job-id ctx) (build-sid ctx) (assoc (:result event) :status status))))
-
-(defn container-end
-  "Indicates job script has terminated.  If the sidecar has also ended, the job has been
-   executed"
-  [ctx]
-  (when (sidecar-ended? ctx)
-    [(job-executed-evt ctx)]))
-
-(defn sidecar-end
-  "Indicates job sidecar has terminated.  If the container script has also ended, the job
-   has been executed"
-  [ctx]
-  (when (container-ended? ctx)
-    [(job-executed-evt ctx)]))
 
 ;;; Route configuration
 
@@ -382,15 +325,15 @@
      
      ;; Container script has ended, all commands executed
      [:container/end
-      [{:handler container-end
+      [{:handler c/container-end
         :interceptors [state
-                       set-container-status]}]]
+                       c/set-container-status]}]]
      
      ;; Sidecar terminated, artifacts have been stored
      [:sidecar/end
-      [{:handler sidecar-end
+      [{:handler c/sidecar-end
         :interceptors [state
-                       set-sidecar-status]}]]
+                       c/set-sidecar-status]}]]
 
      ;; Job executed, we can delete the container instance
      [:job/executed
