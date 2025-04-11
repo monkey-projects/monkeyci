@@ -136,34 +136,40 @@
            (s/optional-key :until) s/Int}})
 
 (def webhook-routes
-  ["/webhook"
-   (-> (c/generic-routes
-        {:creator api/create-webhook
-         :updater api/update-webhook
-         :getter  api/get-webhook
-         :new-schema NewWebhook
-         :update-schema UpdateWebhook
-         :id-key :webhook-id})
-       (conj ["/github"
-              {:conflicting true}
-              [[""
-                {:post {:handler github/app-webhook
-                        :parameters {:body s/Any}}
-                 :middleware [:github-app-security]}]
-               ["/app"
-                {:post {:handler github/app-webhook
-                        :parameters {:body s/Any}}
-                 :middleware [:github-app-security]}]
-               ["/:id"
-                {:post {:handler github/webhook
+  (letfn [(mark-conflicting [whr]
+            (let [r (second whr)
+                  u (assoc (second r) :conflicting true)]
+              (mc/replace-nth 1 (mc/replace-nth 1 u r) whr)))]
+    ["/webhook"
+     (-> (c/generic-routes
+          {:creator api/create-webhook
+           :updater api/update-webhook
+           :getter  api/get-webhook
+           :new-schema NewWebhook
+           :update-schema UpdateWebhook
+           :id-key :webhook-id})
+         (mark-conflicting)
+         (conj ["/github"
+                {:conflicting true}
+                [[""
+                  {:post {:handler github/app-webhook
+                          :parameters {:body s/Any}}
+                   :middleware [:github-app-security]}]
+                 ["/app"
+                  {:post {:handler github/app-webhook
+                          :parameters {:body s/Any}}
+                   :middleware [:github-app-security]}]
+                 ["/:id"
+                  {:conflicting true
+                   :post {:handler github/webhook
+                          :parameters {:path {:id Id}
+                                       :body s/Any}}
+                   :middleware [:github-security]}]]]
+               ["/bitbucket/:id"
+                {:post {:handler bitbucket/webhook
                         :parameters {:path {:id Id}
                                      :body s/Any}}
-                 :middleware [:github-security]}]]]
-             ["/bitbucket/:id"
-              {:post {:handler bitbucket/webhook
-                      :parameters {:path {:id Id}
-                                   :body s/Any}}
-               :middleware [:bitbucket-security]}]))])
+                 :middleware [:bitbucket-security]}]))]))
 
 (def customer-parameter-routes
   ["/param"
