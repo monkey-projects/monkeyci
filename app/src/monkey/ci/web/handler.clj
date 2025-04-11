@@ -146,7 +146,11 @@
          :id-key :webhook-id})
        (conj ["/github"
               {:conflicting true}
-              [["/app"
+              [[""
+                {:post {:handler github/app-webhook
+                        :parameters {:body s/Any}}
+                 :middleware [:github-app-security]}]
+               ["/app"
                 {:post {:handler github/app-webhook
                         :parameters {:body s/Any}}
                  :middleware [:github-app-security]}]
