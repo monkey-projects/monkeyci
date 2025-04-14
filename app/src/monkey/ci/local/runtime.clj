@@ -1,5 +1,7 @@
 (ns monkey.ci.local.runtime
-  "Set up runtime for local builds"
+  "Set up runtime for local builds.  These are builds where the api server is run
+   in the same process, and the build scripts as child processes (either native or
+   as containers)."
   (:require [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
             [manifold
