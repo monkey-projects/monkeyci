@@ -2,7 +2,10 @@
   "Sets up the runtime that is used by a build agent."
   (:require [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
-            [monkey.ci.agent.api-server :as aa]
+            [monkey.ci.agent
+             [api-server :as aa]
+             [events :as e]]
+            [monkey.ci.events.mailman :as em]
             [monkey.ci.runners.runtime :as rr]))
 
 (defrecord ApiServer [builds api-config]
@@ -17,6 +20,12 @@
 
 (defn new-api-server [config]
   (map->ApiServer (select-keys config [:api-config])))
+
+(defn new-agent-routes [config]
+  (letfn [(make-routes [co]
+            (e/make-routes (-> (select-keys config [:work-dir])
+                               (merge (select-keys co [:git :mailman :builds :api-server])))))]
+    (em/map->RouteComponent {:make-routes make-routes})))
 
 (defn make-system [conf]
   (co/system-map
@@ -37,4 +46,7 @@
    :global-to-local (co/using
                      (rr/global-to-local-routes #{:build/queued :build/canceled})
                      {:mailman :global-mailman
-                      :local-mailman :mailman})))
+                      :local-mailman :mailman})
+   :agent-routes (co/using
+                  (new-agent-routes conf)
+                  [:mailman :api-server :git :builds])))

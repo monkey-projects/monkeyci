@@ -28,4 +28,7 @@
       (is (some? (:api-server sys))))
 
     (testing "provides git clone fn"
-      (is (fn? (-> sys :git :clone))))))
+      (is (fn? (-> sys :git :clone))))
+
+    (testing "provides agent routes"
+      (is (some? (:agent-routes sys))))))

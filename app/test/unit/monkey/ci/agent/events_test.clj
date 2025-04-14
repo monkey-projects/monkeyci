@@ -22,25 +22,29 @@
                        t)))))
 
   (testing "`build/queued`"
-    (testing "starts build container"
-      (let [procs (atom [])
-            fake-proc {:name (:name emi/start-process)
-                       :leave (fn [ctx]
-                                (swap! procs conj (:result ctx))
-                                ctx)}
-            router (-> {}
-                       (sut/make-routes)
-                       (mmc/router)
-                       (mmc/replace-interceptors [fake-proc]))
-            build (h/gen-build)]
-        (is (some? (router {:type :build/queued
-                            :sid (b/sid build)
-                            :build build})))
-        (is (= 1 (count @procs)))))
+    (let [procs (atom [])
+          builds (atom {})
+          fake-proc {:name (:name emi/start-process)
+                     :leave (fn [ctx]
+                              (swap! procs conj (:result ctx))
+                              ctx)}
+          router (-> {:git {:clone (constantly nil)}
+                      :builds builds}
+                     (sut/make-routes)
+                     (mmc/router)
+                     (mmc/replace-interceptors [fake-proc]))
+          build (h/gen-build)]
+      (is (some? (router {:type :build/queued
+                          :sid (b/sid build)
+                          :build build})))
 
-    (testing "clones git repo")
+      (testing "starts build container"
+        (is (= 1 (count @procs))))
 
-    (testing "saves workspace")))
+      (testing "adds token to builds"
+        (is (= 1 (count @builds))))
+
+      (testing "saves workspace"))))
 
 (deftest add-config
   (let [{:keys [enter] :as i} (sut/add-config ::config)]
@@ -49,6 +53,22 @@
     (testing "`enter` sets config in context"
       (is (= ::config (-> (enter {})
                           (sut/get-config)))))))
+
+(deftest git-clone
+  (let [{:keys [enter] :as i} sut/git-clone]
+    (is (keyword? (:name i)))
+    
+    (testing "`enter` invokes git clone fn with build git details"
+      (let [args (atom nil)
+            clone (partial reset! args)]
+        (is (some? (-> {:event
+                        {:build {:git {:ssh-keys ::test-keys}}}}
+                       (sut/set-config {:work-dir "/tmp/test-dir"
+                                        :git {:clone clone}})
+                       (enter))))
+        (is (= {:ssh-keys ::test-keys
+                :dir "/tmp/test-dir/checkout"}
+               @args))))))
 
 (deftest prepare-build-cmd
   (h/with-tmp-dir dir
@@ -93,8 +113,9 @@
 
 (deftest generate-script-config
   (testing "builds script config"
-    (let [conf (sut/generate-script-config {:api {:port 1234
-                                                  :token "very-secret"}}
-                                           (h/gen-build))]
+    (let [conf (-> {:event {:build (h/gen-build)}}
+                   (sut/set-config {:api-server {:port 1234}})
+                   (sut/set-token "test-token")
+                   (sut/generate-script-config))]
       (is (spec/valid? ::ss/config conf)
           (spec/explain-str ::ss/config conf)))))

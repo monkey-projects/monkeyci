@@ -6,6 +6,7 @@
             [monkey.ci
              [build :as b]
              [process :as p]]
+            [monkey.ci.build.api-server :as bas]
             [monkey.ci.events.mailman :as em]
             [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.ci.script.config :as sc]))
@@ -14,6 +15,13 @@
   (assoc ctx ::config conf))
 
 (def get-config ::config)
+
+(defn set-token [ctx token]
+  (assoc ctx ::token token))
+
+(def get-token ::token)
+
+(def get-build (comp :build :event))
 
 (defn- build-work-dir [{:keys [work-dir]} sid]
   (str (apply fs/path work-dir sid)))
@@ -31,14 +39,14 @@
   (-> (p/generate-deps script-dir lib-version)
       (p/update-alias assoc :exec-args {:config conf})))
 
-(defn generate-script-config [{:keys [api]} build]
+(defn generate-script-config [ctx]
   (-> sc/empty-config
       ;; TODO Set credit multiplier
-      (sc/set-build build)
+      (sc/set-build (get-build ctx))
       ;; TODO This will only work if the container is in the host network
       ;; Ideally, we could use UDS but netty does not support this (yet)
-      (sc/set-api {:url (format "http://localhost:" (:port api))
-                   :token (:token api)})))
+      (sc/set-api {:url (format "http://localhost:" (-> ctx (get-config) :api-server :port))
+                   :token (get-token ctx)})))
 
 ;;; Interceptors
 
@@ -47,15 +55,34 @@
    :enter (fn [ctx]
             (set-config ctx conf))})
 
+(def add-token
+  {:name ::add-token
+   :enter (fn [ctx]
+            (let [token (bas/generate-token)]
+              (swap! (:builds (get-config ctx)) assoc token (get-build ctx))
+              (set-token ctx token)))})
+
+(def git-clone
+  "Clones the repository configured in the build into the build checkout dir"
+  {:name ::git-clone
+   :enter (fn [ctx]
+            (let [conf (get-config ctx)
+                  clone (-> conf :git :clone)
+                  build (get-build ctx)
+                  opts (-> build
+                           :git
+                           (assoc :dir (checkout-dir (build-work-dir conf (get-in ctx [:event :sid])))))]
+              (assoc ctx ::checkout-dir (clone opts))))})
+
 ;;; Event handlers
 
 (defn prepare-build-cmd [ctx]
   (let [conf (get-config ctx)
-        build (get-in ctx [:event :build])
+        build (get-build ctx)
         wd (build-work-dir conf (get-in ctx [:event :sid]))
         sd (b/calc-script-dir (checkout-dir wd) (b/script-dir build))
         cd (config-dir wd)
-        deps (generate-deps sd nil (generate-script-config conf build))]
+        deps (generate-deps sd nil (generate-script-config ctx))]
     {:cmd ["podman"
            (:image conf)
            "clojure"
@@ -77,7 +104,8 @@
       [{:handler prepare-build-cmd
         :interceptors [with-state
                        (add-config conf)
-                       #_git-clone
+                       add-token
+                       git-clone
                        #_upload-workspace
                        emi/start-process]}]]
 
