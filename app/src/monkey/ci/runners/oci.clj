@@ -14,6 +14,7 @@
              [containers :as co]
              [edn :as edn]
              [oci :as oci]
+             [process :as proc]
              [protocols :as p]
              [storage :as st]
              [utils :as u]
@@ -66,11 +67,6 @@
   (when-let [c (:log-config config)]
     (oci/config-entry log-config-file c)))
 
-(defn- build->out [build]
-  (-> build
-      (dissoc :status :cleanup?)
-      (update :git dissoc :ssh-keys)))
-
 (defn- add-api-token
   "Generates a new API token that can be used by the build runner to invoke
    certain API calls."
@@ -110,7 +106,7 @@
 (defn- config-volume [config build]
   (let [conf (-> config
                  (add-api-token build)
-                 (update :build build->out)
+                 (update :build sc/build->out)
                  (add-ssh-keys-dir (:build config))
                  (assoc :m2-cache-path m2-cache-dir)
                  ;; Remove stuff we don't need
@@ -135,8 +131,7 @@
                         (assoc :credit-multiplier (oci/credit-multiplier
                                                    oci/default-arch
                                                    oci/default-cpu-count
-                                                   oci/default-memory-gb))
-                        (build->out)))
+                                                   oci/default-memory-gb))))
       (sc/set-api {:url (format "http://localhost:%d" (:api-port runner))
                    :token (:api-token runner)})))
 
@@ -147,15 +142,11 @@
   (b/calc-script-dir (checkout-dir build) (b/script-dir build)))
 
 (defn- generate-deps [{:keys [build lib-version] :as config}]
-  {:paths [(script-dir build)]
-   :aliases
-   {:monkeyci/build
-    (cond-> {:exec-fn 'monkey.ci.script.runtime/run-script!
-             :extra-deps {'com.monkeyci/app {:mvn/version (or lib-version (v/version))}}
-             :exec-args {:config (script-config config)}}
-      (:log-config config) (assoc :jvm-opts
-                                  [(str "-Dlogback.configurationFile=" config-path "/" log-config-file)]))}
-   :mvn/local-repo m2-cache-dir})
+  (cond-> (proc/generate-deps (script-dir build) lib-version)
+    (:log-config config) (proc/update-alias assoc :jvm-opts
+                                            [(str "-Dlogback.configurationFile=" config-path "/" log-config-file)])
+    true (proc/update-alias assoc :exec-args {:config (script-config config)})
+    true (assoc :mvn/local-repo m2-cache-dir)))
 
 (defn- script-volume
   "Creates a volume that holds necessary files to run the build script"

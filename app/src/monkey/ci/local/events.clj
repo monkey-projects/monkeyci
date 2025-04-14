@@ -20,6 +20,7 @@
             [monkey.ci
              [build :as b]
              [git :as git]
+             [process :as p]
              [utils :as u]]
             [monkey.ci.events.mailman :as em]
             [monkey.ci.events.mailman.interceptors :as emi]
@@ -143,15 +144,12 @@
                      :token token}))))
 
 (defn generate-deps [script-dir {:keys [lib-coords log-config m2-cache-dir]}]
-  {:paths [script-dir]
-   :aliases
-   {:monkeyci/build
-    (cond-> {:exec-fn 'monkey.ci.script.runtime/run-script!
-             :extra-deps {'com.monkeyci/app lib-coords}}
-      log-config (assoc :jvm-opts
-                        [(str "-Dlogback.configurationFile=" log-config)]))
+  (cond-> (p/generate-deps script-dir nil)
+    true (assoc-in [:aliases :monkeyci/build :exta-deps] {'com.monkeyci/app lib-coords})
+    log-config (p/update-alias assoc :jvm-opts
+                               [(str "-Dlogback.configurationFile=" log-config)]))
     ;; m2 cache dir?
-    }})
+  )
 
 (defn prepare-child-cmd
   "Initializes child process command line"

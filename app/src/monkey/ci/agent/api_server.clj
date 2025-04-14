@@ -58,5 +58,5 @@
 (defn start-server [conf]
   (-> (http/start-server
        (c/make-app (make-router conf))
-       {:port 0})
+       {:port (get conf :port 0)})
       (bas/server-with-port)))

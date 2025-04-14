@@ -175,7 +175,7 @@
 (deftest global-to-local-routes
   (let [global (em/make-component {:type :manifold})
         local (tm/test-component)
-        c (-> (sut/global-to-local-routes)
+        c (-> (sut/global-to-local-routes #{:build/canceled})
               (assoc :mailman global
                      :local-mailman local)
               (co/start))

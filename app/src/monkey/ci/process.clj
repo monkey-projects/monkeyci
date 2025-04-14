@@ -10,6 +10,18 @@
              [utils :as utils]
              [version :as v]]))
 
+(defn generate-deps [script-dir lib-version]
+  {:paths [script-dir]
+   :aliases
+   {:monkeyci/build
+    {:exec-fn 'monkey.ci.script.runtime/run-script!
+     :extra-deps {'com.monkeyci/app {:mvn/version (or lib-version (v/version))}}}}})
+
+(defn update-alias
+  "Updates the monkeyci/build alias in the given deps"
+  [deps f & args]
+  (apply update-in deps [:aliases :monkeyci/build] f args))
+
 (defn- version-or [dev? f]
   (if dev?
     {:local/root (f)}

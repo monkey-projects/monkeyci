@@ -2,8 +2,7 @@
   "Helper functions for app configs")
 
 (def base-config
-  {:events      {:type :manifold}
-   :artifacts   {:type :disk
+  {:artifacts   {:type :disk
                  :dir  "/tmp"}
    :cache       {:type :disk
                  :dir  "/tmp"}

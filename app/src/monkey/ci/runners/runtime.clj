@@ -31,10 +31,10 @@
 (defn- new-runtime [config]
   (map->ControllerRuntime {:config config}))
 
-(defn- new-artifacts [config]
+(defn new-artifacts [config]
   (blob/make-blob-store config :artifacts))
 
-(defn- new-cache [config]
+(defn new-cache [config]
   (blob/make-blob-store config :cache))
 
 (defn- new-build-cache [config]
@@ -43,10 +43,10 @@
   ;; determined by the user's cache configurations.
   (blob/make-blob-store config :build-cache))
 
-(defn- new-workspace [config]
+(defn new-workspace [config]
   (blob/make-blob-store config :workspace))
 
-(defn- new-git []
+(defn new-git []
   {:clone (fn default-git-clone [opts]
             (git/clone+checkout opts)
             ;; Return the checkout dir
@@ -175,15 +175,17 @@
 
 (defn global-to-local-routes
   "Creates new event handler routes, that handle events received from the global broker."
-  []
+  [types]
   ;; TODO Also receive dispatcher events for container jobs
   ;; TODO Filter events by build sid using a selector (when on jms)
   (em/map->RouteComponent
    {:make-routes (fn [{:keys [local-mailman]}]
-                   [[:build/canceled [{:handler (constantly nil)
-                                       :interceptors [(emi/forwarder
-                                                       ::forward-to-local
-                                                       local-mailman)]}]]])}))
+                   (-> (fn [t]
+                         [t [{:handler (constantly nil)
+                              :interceptors [(emi/forwarder
+                                              ::forward-to-local
+                                              local-mailman)]}]])
+                       (mapv types)))}))
 
 (defmulti make-container-routes (comp :type :containers))
 
@@ -242,7 +244,7 @@
                 [:metrics])
    :global-mailman (new-mailman config)
    :routes     (co/using
-                (global-to-local-routes)
+                (global-to-local-routes global-to-local-events)
                 {:mailman :global-mailman
                  :local-mailman :mailman})
    :mailman (new-local-mailman)
