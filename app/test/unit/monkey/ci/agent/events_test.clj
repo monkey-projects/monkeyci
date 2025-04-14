@@ -1,6 +1,7 @@
 (ns monkey.ci.agent.events-test
   (:require [clojure.test :refer [deftest testing is]]
             [clojure.spec.alpha :as spec]
+            [clojure.string :as cs]
             [babashka.fs :as fs]
             [monkey.ci.agent.events :as sut]
             [monkey.ci.build :as b]
@@ -21,22 +22,29 @@
                             (set))
                        t)))))
 
-  (testing "`build/queued`"
-    (let [procs (atom [])
-          builds (atom {})
-          fake-proc {:name (:name emi/start-process)
-                     :leave (fn [ctx]
-                              (swap! procs conj (:result ctx))
-                              ctx)}
-          router (-> {:git {:clone (constantly nil)}
-                      :builds builds}
-                     (sut/make-routes)
-                     (mmc/router)
-                     (mmc/replace-interceptors [fake-proc]))
-          build (h/gen-build)]
-      (is (some? (router {:type :build/queued
-                          :sid (b/sid build)
-                          :build build})))
+  (let [build (h/gen-build)
+        procs (atom [])
+        builds (atom {})
+        fake-proc {:name (:name emi/start-process)
+                   :leave (fn [ctx]
+                            (swap! procs conj (:result ctx))
+                            ctx)}
+        ws (h/fake-blob-store)
+        router (-> {:git {:clone (constantly "test-checkout")}
+                    :workspace ws
+                    :builds builds}
+                   (sut/make-routes)
+                   (mmc/router)
+                   (mmc/replace-interceptors [fake-proc]))]
+    (testing "`build/queued`"
+      (is (= [:build/initializing]
+             (->> (router {:type :build/queued
+                           :sid (b/sid build)
+                           :build build})
+                  first
+                  :result
+                  (map :type)))
+          "fires build/initializing")
 
       (testing "starts build container"
         (is (= 1 (count @procs))))
@@ -44,7 +52,14 @@
       (testing "adds token to builds"
         (is (= 1 (count @builds))))
 
-      (testing "saves workspace"))))
+      (testing "saves workspace"
+        (is (= {(str (cs/join "/" (b/sid build)) ".tgz") "test-checkout"} @(:stored ws)))))
+
+    (testing "`build/end`"
+      (testing "removes token from builds"
+        (is (some? (router {:type :build/end
+                            :sid (b/sid build)})))
+        (is (empty? @builds))))))
 
 (deftest add-config
   (let [{:keys [enter] :as i} (sut/add-config ::config)]

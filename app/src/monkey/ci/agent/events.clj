@@ -3,9 +3,11 @@
    scripts in child container processes."
   (:require [babashka.fs :as fs]
             [clojure.tools.logging :as log]
+            [medley.core :as mc]
             [monkey.ci
              [build :as b]
-             [process :as p]]
+             [process :as p]
+             [workspace :as ws]]
             [monkey.ci.build.api-server :as bas]
             [monkey.ci.events.mailman :as em]
             [monkey.ci.events.mailman.interceptors :as emi]
@@ -56,11 +58,23 @@
             (set-config ctx conf))})
 
 (def add-token
+  "Generates a new token and adds it to the current build list.  This is used by the
+   http server to verify client requests."
   {:name ::add-token
    :enter (fn [ctx]
             (let [token (bas/generate-token)]
               (swap! (:builds (get-config ctx)) assoc token (get-build ctx))
               (set-token ctx token)))})
+
+(def remove-token
+  "Removes the token associated with the build in the event sid"
+  {:name ::remove-token
+   :leave (fn [ctx]
+            (swap! (:builds (get-config ctx)) (partial mc/filter-vals
+                                                       (complement
+                                                        (comp (partial = (get-in ctx [:event :sid]))
+                                                              b/sid))))
+            ctx)})
 
 (def git-clone
   "Clones the repository configured in the build into the build checkout dir"
@@ -73,6 +87,18 @@
                            :git
                            (assoc :dir (checkout-dir (build-work-dir conf (get-in ctx [:event :sid])))))]
               (assoc ctx ::checkout-dir (clone opts))))})
+
+(def save-workspace
+  {:name ::save-workspace
+   :enter (fn [ctx]
+            (assoc ctx ::build (-> (get-build ctx)
+                                   (b/set-checkout-dir (::checkout-dir ctx))
+                                   (ws/create-workspace (get-config ctx)))))})
+
+(def result-build-init-evt
+  {:name ::result-build-init-evt
+   :leave (fn [ctx]
+            (assoc ctx :result [(b/build-init-evt (::build ctx))]))})
 
 ;;; Event handlers
 
@@ -99,16 +125,16 @@
 ;;; Routing
 
 (defn make-routes [conf]
-  (let [with-state (emi/with-state (atom {}))]
-    [[:build/queued
-      [{:handler prepare-build-cmd
-        :interceptors [with-state
-                       (add-config conf)
-                       add-token
-                       git-clone
-                       #_upload-workspace
-                       emi/start-process]}]]
+  [[:build/queued
+    [{:handler prepare-build-cmd
+      :interceptors [(add-config conf)
+                     add-token
+                     git-clone
+                     save-workspace
+                     result-build-init-evt
+                     emi/start-process]}]]
 
-     [:build/end
-      [{:handler (constantly nil)
-        :interceptors [with-state]}]]]))
+   [:build/end
+    [{:handler (constantly nil)
+      :interceptors [(add-config conf)
+                     remove-token]}]]])
