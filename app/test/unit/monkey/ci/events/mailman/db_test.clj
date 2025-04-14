@@ -526,22 +526,25 @@
                 (is (number? (:idx b)) "build has an index assigned"))))))
 
       (testing "when no credits"
-        (let [cust (h/gen-cust)]
+        (let [cust (h/gen-cust)
+              build (-> (h/gen-build)
+                        (assoc :customer-id (:id cust))
+                        (dissoc :build-id))]
           (is (some? (st/save-customer st cust)))
 
-          (let [res (-> {:type :build/triggered
-                         :build (-> (h/gen-build)
-                                    (assoc :customer-id (:id cust)))}
-                        (router)
-                        first
-                        :result)]
+          (let [[res] (-> {:type :build/triggered
+                           :build build
+                           :sid [(:id cust) (:repo-id build)]}
+                          (router)
+                          first
+                          :result)]
             
             (testing "results in `build/end` event"
-              (is (= :build/end (-> res first :type)))
-              (is (= :error (-> res first :status))))
+              (is (= :build/end (-> res :type)))
+              (is (= :error (-> res :status))))
 
             (testing "saves build in db"
-              (is (some? (st/find-build st (-> res first :sid)))))))))
+              (is (some? (st/find-build st (-> res :sid)))))))))
 
     (testing "`build/end`"
       (let [job {:id "test-job"

@@ -188,7 +188,6 @@
         ssh-keys (c/find-ssh-keys st repo)]
     (-> (zipmap [:customer-id :repo-id] rsid)
         (assoc :id (st/new-id)
-               :sid rsid ; Return repo sid, because build-id is only assigned in the build/triggered event handler
                :source :bitbucket-webhook
                :start-time (t/now)
                :status :pending
