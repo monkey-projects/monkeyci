@@ -61,9 +61,7 @@
   {:image-url (str (or image-url promtail-image) ":" (or image-tag promtail-version))
    :display-name "promtail"})
 
-(defn make-config [pt-config job build]
+(defn make-config [pt-config job sid]
   (-> pt-config
-      (merge (b/sid->props build))
+      (merge (zipmap b/sid-props sid))
       (assoc :job-id (j/job-id job))))
-
-

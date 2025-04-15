@@ -74,11 +74,11 @@
              :loki-url "http://loki"
              :token "test-token"}
             {:id "test-job"}
-            {:sid ["test-cust" "test-repo" "test-build"]}))))
+            ["test-cust" "test-repo" "test-build"]))))
 
-  (testing "extracts id props from build"
-    (let [props (->> (repeatedly cuid/random-cuid)
-                     (zipmap b/sid-props))]
-      (is (= props (-> (sut/make-config {} {} props)
-                       (select-keys b/sid-props)))))))
+  (testing "makes id props from build sid"
+    (let [sid (repeatedly 3 cuid/random-cuid)]
+      (is (= (zipmap b/sid-props sid)
+             (-> (sut/make-config {} {} sid)
+                 (select-keys b/sid-props)))))))
 

@@ -57,15 +57,15 @@
 
   (testing "display name contains build id, pipeline index and job index"
     (is (= "test-build-test-job"
-           (->> {:build {:build-id "test-build"
-                         :checkout-dir "/tmp"}
+           (->> {:build {:checkout-dir "/tmp"}
+                 :sid ["test-cust" "test-repo" "test-build"]
                  :job {:id "test-job"}}
                 (sut/instance-config)
                 :display-name))))
 
   (testing "has tags from sid"
-    (let [tags (->> {:build {:sid ["test-cust" "test-repo" "test-build"]
-                             :checkout-dir "/tmp"}
+    (let [tags (->> {:build {:checkout-dir "/tmp"}
+                     :sid ["test-cust" "test-repo" "test-build"]
                      :job {:id "test-job"}}
                     (sut/instance-config)
                     :freeform-tags)]
@@ -75,8 +75,8 @@
       (is (= "test-job" (get tags "job-id")))))
 
   (testing "merges in existing tags"
-    (let [tags (->> {:build {:sid ["test-cust" "test-repo"]
-                             :checkout-dir "/tmp"}
+    (let [tags (->> {:build {:checkout-dir "/tmp"}
+                     :sid ["test-cust" "test-repo"]
                      :oci {:freeform-tags {"env" "test"}}}
                     (sut/instance-config)
                     :freeform-tags)]
@@ -352,6 +352,7 @@
                     :work-dir "sub"}
                    :build
                    {:checkout-dir "/tmp/test-build"}
+                   :sid (repeatedly 3 cuid/random-cuid)
                    :promtail
                    {:loki-url "http://loki"}}
                   (sut/instance-config))

@@ -28,13 +28,6 @@
   "Gets the sid from the build"
   (some-fn :sid props->sid))
 
-(defn sid->props
-  "Constructs map of `customer-id`, `repo-id` and `build-id` from the build or it's sid"
-  [{:keys [sid] :as b}]
-  (if sid
-    (zipmap sid-props sid)
-    (select-keys b sid-props)))
-
 (def build-id (some-fn :build-id (constantly "unknown-build")))
 
 (defn get-job-sid

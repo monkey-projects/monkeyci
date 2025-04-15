@@ -95,8 +95,8 @@
 (defn- add-promtail-container
   "Adds promtail container configuration to the existing instance config.
    It will be configured to push all logs from the script log dir."
-  [ic {:keys [promtail job build]}]
-  (let [conf (pt/make-config promtail job build)
+  [ic {:keys [promtail job sid]}]
+  (let [conf (pt/make-config promtail job sid)
         add? (some? (:loki-url conf))]
     (cond-> ic
       add?
@@ -105,8 +105,8 @@
                                                               (promtail-config-mount)])))
           (update :volumes conj (promtail-config-vol-config conf))))))
 
-(defn- display-name [job build]
-  (cs/join "-" [(:build-id build)
+(defn- display-name [job sid]
+  (cs/join "-" [(last sid)
                 (j/job-id job)]))
 
 (defn- script-mount [job]
@@ -174,7 +174,7 @@
    a container that runs the job, as configured in the `:job`, and
    next to that a sidecar that is responsible for capturing the output
    and dispatching events.  If configured, it also "
-  [{:keys [job build oci] :as conf}]
+  [{:keys [job build oci sid] :as conf}]
   (log/debug "Setting up container instance for job using config:" conf)
   (let [ic (oci/instance-config oci)
         sc (-> (sidecar-container ic)
@@ -185,10 +185,10 @@
                                                     (script-mount job)])))]
     (-> ic
         (assoc :containers [sc jc]
-               :display-name (display-name job build))
+               :display-name (display-name job sid))
         (update :freeform-tags (fn [t]
                                  (-> t
-                                     (merge (oci/sid->tags (b/sid build)))
+                                     (merge (oci/sid->tags sid))
                                      (assoc "job-id" (j/job-id job)))))
         (update :volumes concat
                 (filter some? [(script-vol-config job)
@@ -242,6 +242,7 @@
    :enter (fn [ctx]
             (-> (get-config ctx)
                 (assoc :build (get-build ctx)
+                       :sid (get-in ctx [:event :sid])
                        :job (get-in ctx [:event :job]))
                 (instance-config)
                 (as-> c (oci/set-ci-config ctx c))))})

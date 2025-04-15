@@ -36,12 +36,10 @@
   ;; FIXME This expects a single build
   (-> deps
       (assoc :oci conf)
-      (c-oci/make-routes)))
+      (c-oci/make-routes {})))
 
 (defmethod make-container-routes :podman [conf deps]
-  ;; FIXME This expects a single build
-  (-> deps
-      (c-podman/make-routes)))
+  (c-podman/make-routes deps))
 
 (defmethod make-container-routes :default [conf]
   (log/warn "Unknown container runner type:" (:type conf))

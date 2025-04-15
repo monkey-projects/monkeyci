@@ -43,12 +43,12 @@
 (defn restore
   "Restores the workspace as configured in the build"
   [{:keys [build] ws :workspace :as rt}]
-  (letfn [(->workspace [x build]
+  (letfn [(->workspace [x]
             (cond-> x
               (not (p/workspace? x))
               (->BlobWorkspace build)))]
     (md/chain
-     (p/restore-workspace (->workspace ws build))
+     (p/restore-workspace (->workspace ws))
      (fn [r?]
        (cond-> rt
          r? (assoc-in [:build :workspace/restored?] true))))))
