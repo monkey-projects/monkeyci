@@ -174,7 +174,7 @@
               (is (some? deps)))
 
             (testing "uses script dir as source path"
-              (is (= (cstr/join "/" [oci/work-dir (:build-id build) ".monkeyci"])
+              (is (= "."
                      (-> deps :paths first))))
 
             (testing "runs script"

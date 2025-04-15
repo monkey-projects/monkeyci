@@ -19,13 +19,15 @@
       (.close srv))))
 
 (defn new-api-server [config]
-  (map->ApiServer (select-keys config [:api-config])))
+  (->ApiServer nil (:agent config)))
 
 (defn new-agent-routes [config]
   (letfn [(make-routes [co]
-            (e/make-routes (-> (select-keys config [:work-dir])
-                               (merge (select-keys co [:git :mailman :builds :api-server])))))]
+            (e/make-routes (-> (:agent config)
+                               (merge co))))]
     (em/map->RouteComponent {:make-routes make-routes})))
+
+(def global-to-local-events #{:build/queued :build/canceled})
 
 (defn make-system [conf]
   (co/system-map
@@ -37,16 +39,17 @@
    :git (rr/new-git)
    :api-server (co/using
                 (new-api-server conf)
-                [:builds :artifacts :cache :workspace :mailman :event-stream])
+                [:builds :artifacts :cache :workspace :mailman :event-stream :params])
    :mailman (rr/new-local-mailman)
    :global-mailman (rr/new-mailman conf)
    :local-to-global (co/using
-                     (rr/new-local-to-global-forwarder)
+                     (rr/new-local-to-global-forwarder global-to-local-events)
                      [:global-mailman :mailman :event-stream])
    :global-to-local (co/using
-                     (rr/global-to-local-routes #{:build/queued :build/canceled})
+                     (rr/global-to-local-routes global-to-local-events)
                      {:mailman :global-mailman
                       :local-mailman :mailman})
    :agent-routes (co/using
                   (new-agent-routes conf)
-                  [:mailman :api-server :git :builds])))
+                  [:mailman :api-server :git :builds :workspace])
+   :params (rr/new-params conf)))

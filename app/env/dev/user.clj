@@ -1,12 +1,15 @@
 (ns user
-  (:require
-   [babashka.fs :as fs]
-   [clojure.tools.namespace.repl :as nr]
-   [config :as c]
-   [instances :as i]
-   [monkey.ci.commands :as cmd]
-   [monkey.ci.utils :as u]
-   [server :as server]))
+  (:require [babashka.fs :as fs]
+            [clojure.tools.namespace.repl :as nr]
+            [config :as c]
+            [instances :as i]
+            [manifold.deferred :as md]
+            [monkey.ci
+             [commands :as cmd]
+             [config :as config]
+             [utils :as u]]
+            [monkey.ci.agent.main :as am]
+            [server :as server]))
 
 (defn global-config []
   @c/global-config)
@@ -41,3 +44,9 @@
                         :dir sd
                         :lib-coords {:local/root (u/cwd)}
                         :log-config (str (fs/absolutize "dev-resources/logback-script.xml"))}))
+
+(defn run-agent []
+  (let [d (md/deferred)]
+    (am/run-agent (config/load-config-file "dev-resources/config/agent.edn")
+                  (constantly d))
+    d))

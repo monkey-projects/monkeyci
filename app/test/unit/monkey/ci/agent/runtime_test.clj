@@ -31,4 +31,7 @@
       (is (fn? (-> sys :git :clone))))
 
     (testing "provides agent routes"
-      (is (some? (:agent-routes sys))))))
+      (is (some? (:agent-routes sys))))
+
+    (testing "provides build params"
+      (is (some? (:params sys))))))

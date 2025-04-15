@@ -13,6 +13,10 @@
             [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.ci.script.config :as sc]))
 
+(def m2-cache-path
+  "Location of the m2 cache path in the container"
+  "/opt/monkeyci/m2")
+
 (defn set-config [ctx conf]
   (assoc ctx ::config conf))
 
@@ -29,17 +33,24 @@
   (str (apply fs/path work-dir sid)))
 
 (defn- checkout-dir [wd]
-  (str (fs/path wd "checkout")))
+  (str (fs/create-dirs (fs/path wd "checkout"))))
+
+(defn- m2-cache [wd]
+  (str (fs/create-dirs (fs/path wd "m2"))))
 
 (defn- config-dir [wd]
   (str (fs/path wd "config")))
 
+(defn- log-dir [wd]
+  (fs/create-dirs (fs/path wd "logs")))
+
 (defn- log-file [wd f]
-  (str (fs/path wd "logs" f)))
+  (str (fs/path (log-dir wd) f)))
 
 (defn generate-deps [script-dir lib-version conf]
   (-> (p/generate-deps script-dir lib-version)
-      (p/update-alias assoc :exec-args {:config conf})))
+      (p/update-alias assoc :exec-args {:config conf})
+      (assoc :mvn/local-repo m2-cache-path)))
 
 (defn generate-script-config [ctx]
   (-> sc/empty-config
@@ -47,7 +58,7 @@
       (sc/set-build (get-build ctx))
       ;; TODO This will only work if the container is in the host network
       ;; Ideally, we could use UDS but netty does not support this (yet)
-      (sc/set-api {:url (format "http://localhost:" (-> ctx (get-config) :api-server :port))
+      (sc/set-api {:url (str "http://localhost:" (-> ctx (get-config) :api-server :port))
                    :token (get-token ctx)})))
 
 ;;; Interceptors
@@ -107,11 +118,19 @@
         build (get-build ctx)
         wd (build-work-dir conf (get-in ctx [:event :sid]))
         lwd "/home/monkeyci"
-        sd (b/calc-script-dir lwd (b/script-dir build))
+        checkout (checkout-dir wd)
+        script-dir #(b/calc-script-dir % (b/script-dir build))
+        sd (script-dir checkout)
         cd (config-dir wd)
-        deps (generate-deps sd nil (generate-script-config ctx))]
+        deps (generate-deps sd (:version conf) (generate-script-config ctx))]
     {:cmd ["podman"
-           "-v" (str (checkout-dir wd) ":" lwd)
+           "run"
+           "--name" (:build-id build)
+           "-v" (str checkout ":" lwd)
+           ;; m2 cache is common for the all repo builds
+           "-v" (str (m2-cache (fs/parent wd)) ":" m2-cache-path)
+           "--workdir" (script-dir lwd)
+           "--network=host"
            (:image conf)
            "clojure"
            "-Sdeps" (pr-str deps)
