@@ -85,7 +85,9 @@
    :leave (transactional
            (fn [ctx]
              (let [db (get-db ctx)
-                   build (let [b (:build (em/get-result ctx))]
+                   res (em/get-result ctx)
+                   build (let [b (-> (:build res)
+                                     (mc/assoc-some :message (:message res)))]
                            (when (and b #_(spec/valid? :entity/build b)
                                       (st/save-build db (without-jobs b)))
                              b))]
