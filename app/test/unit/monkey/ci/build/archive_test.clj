@@ -1,13 +1,11 @@
 (ns monkey.ci.build.archive-test
-  (:require
-   [babashka.fs :as fs]
-   [clojure.java.io :as io]
-   [clojure.test :refer [deftest is testing]]
-   [monkey.ci.blob :as blob]
-   [monkey.ci.build.archive :as sut]
-   [monkey.ci.test.helpers :as h])
-  (:import
-   (java.nio.file.attribute PosixFilePermission)))
+  (:require [babashka.fs :as fs]
+            [clojure.java.io :as io]
+            [clojure.test :refer [deftest is testing]]
+            [monkey.ci.blob :as blob]
+            [monkey.ci.build.archive :as sut]
+            [monkey.ci.test.helpers :as h])
+  (:import (java.nio.file.attribute PosixFilePermission)))
 
 (deftest list-files
   (testing "lists files in archive"
@@ -21,8 +19,8 @@
                      :entries
                      count))
             "entry for each file and the dir")
-        (is (= #{"sub/file-1.txt"
-                 "sub/file-2.txt"}
+        (is (= #{"file-1.txt"
+                 "file-2.txt"}
                (set (sut/list-files arch))))))))
 
 (deftest extract
@@ -37,10 +35,10 @@
         (is (some? (blob/make-archive subdir arch)))
         (let [r (with-open [is (io/input-stream arch)]
                   (sut/extract is ex-dir #".*-2.txt$"))]
-          (is (= ["sub/file-2.txt"]
+          (is (= ["file-2.txt"]
                  (:entries r)))
-          (is (fs/exists? (fs/path ex-dir "sub/file-2.txt")))
-          (is (not (fs/exists? (fs/path ex-dir "sub/file-1.txt"))))))))
+          (is (fs/exists? (fs/path ex-dir "file-2.txt")))
+          (is (not (fs/exists? (fs/path ex-dir "file-1.txt"))))))))
 
   (testing "retains file permissions"
     (h/with-tmp-dir dir
@@ -57,9 +55,9 @@
         (is (some? (blob/make-archive subdir arch)))
         (let [r (with-open [is (io/input-stream arch)]
                   (sut/extract is ex-dir))]
-          (is (= ["sub/testfile"]
+          (is (= ["testfile"]
                  (:entries r)))
-          (is (fs/executable? (fs/path ex-dir "sub/testfile"))))))))
+          (is (fs/executable? (fs/path ex-dir "testfile"))))))))
 
 (deftest extract+read
   (testing "extracts single file from archive into memory"
@@ -87,7 +85,7 @@
         (spit (io/file subdir "another-file.txt") "yet another file")
         (is (some? (blob/make-archive subdir arch)))
         (let [r (with-open [in (io/input-stream arch)]
-                  (sut/extract+read-all in #"sub/file.*\.txt$"))]
+                  (sut/extract+read-all in #"file.*\.txt$"))]
           (is (= 2 (count r)))
           (is (= #{"first file" "another file"} (set r))))))))
 

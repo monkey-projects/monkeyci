@@ -61,9 +61,7 @@
   (md/chain
    (p/restore-artifact repo
                        id
-                       ;; Restore to the parent path because the dir name will be in the archive
                        (-> (b/job-relative-dir job build path)
-                           (fs/parent)
                            (fs/canonicalize)
                            (str)))
    (fn [{:keys [entries src dest] :as r}]

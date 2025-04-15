@@ -1,6 +1,5 @@
 (ns monkey.ci.workspace
-  (:require [babashka.fs :as fs]
-            [clojure.string :as cs]
+  (:require [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [manifold.deferred :as md]
             [monkey.ci
@@ -22,17 +21,11 @@
         (b/save ws checkout-dir dest)   ; TODO Check for errors
         (constantly (assoc build :workspace dest))))))
 
-(defn- checkout-dir [build]
-  ;; Check out to the parent because the archive contains the directory
-  (some-> (:checkout-dir build)
-          (fs/parent)
-          str))
-
 (defrecord BlobWorkspace [store build]
   p/Workspace
   (restore-workspace [_]
     (let [ws (:workspace build)
-          checkout (checkout-dir build)]
+          checkout (build/checkout-dir build)]
       (if (and store ws checkout)
         (do
           (log/info "Restoring workspace" ws)
@@ -61,6 +54,6 @@
      (client {:path "/workspace"
               :method :get})
      :body
-     #(arch/extract % (checkout-dir build)))))
+     #(arch/extract % (build/checkout-dir build)))))
 
 (def make-build-api-workspace ->BuildApiWorkspace)

@@ -1,18 +1,17 @@
 (ns monkey.ci.blob-test
-  (:require
-   [babashka.fs :as fs]
-   [clj-commons.byte-streams :as bs]
-   [clojure.java.io :as io]
-   [clojure.test :refer [deftest is testing]]
-   [clompress.archivers :as ca]
-   [manifold.deferred :as md]
-   [monkey.ci.blob :as sut]
-   [monkey.ci.protocols :as p]
-   [monkey.ci.test.helpers :as h]
-   [monkey.ci.utils :as u]
-   [monkey.oci.os.core :as os]
-   [monkey.oci.os.martian :as om]
-   [monkey.oci.os.stream :as oss]))
+  (:require [babashka.fs :as fs]
+            [clj-commons.byte-streams :as bs]
+            [clojure.java.io :as io]
+            [clojure.test :refer [deftest is testing]]
+            [manifold.deferred :as md]
+            [monkey.ci
+             [blob :as sut]
+             [protocols :as p]
+             [utils :as u]]
+            [monkey.ci.test.helpers :as h]
+            [monkey.oci.os
+             [martian :as om]
+             [stream :as oss]]))
 
 (defmacro with-disk-blob [dir blob & body]
   `(h/with-tmp-dir ~dir
@@ -34,7 +33,7 @@
 
   (testing "can restore single file archive"
     (with-disk-blob dir blob
-      (let [n "out.txt"
+      (let [n "single.txt"
             f (io/file dir n)
             arch "dest.tar.gz"
             dest (io/file dir "extract")
@@ -60,10 +59,10 @@
           (let [af (io/file src f)]
             (is (true? (.mkdirs (.getParentFile af))))
             (is (nil? (spit af c)))))
-        (is (some? @(sut/save blob src arch)))
+        (is (not-empty (:entries @(sut/save blob src arch))))
         (is (some? @(sut/restore blob arch restore-dir)))
         (doseq [[f c] files]
-          (let [in (io/file restore-dir "src" f)]
+          (let [in (io/file restore-dir f)]
             (is (fs/exists? in))
             (is (= c (slurp in))))))))
 
@@ -183,7 +182,7 @@
               (is (= "remote/path" (:src res)))
               (is (fs/exists? (:dest res)))
               (doseq [[f v] files]
-                (let [p (io/file (:dest res) "orig" f)]
+                (let [p (io/file (:dest res) f)]
                   (is (fs/exists? p))
                   (is (= v (slurp p))))))
 

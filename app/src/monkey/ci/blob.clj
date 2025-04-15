@@ -44,8 +44,10 @@
    We only want the file name without the base directory, so that's what
    this resolver does."
   [base-dir path]
-  ;; Skip the /
-  (subs path (inc (count base-dir))))
+  (if (= path base-dir)
+    "."
+    ;; Skip the /
+    (subs path (inc (count base-dir)))))
 
 (defn- entry-gathering-resolver
   "Adds artifact entries to the given atom"
@@ -65,8 +67,12 @@
   "Archives the `src` directory or file into `dest`, which should be something
    that can be converted into an `OutputStream`."
   [src dest]
+  ;; The prefix to drop is the directory where the files are in.  If the source is
+  ;; a single file, we mean its containing directory, otherwise the entire directory
+  ;; should be dropped.
   (let [prefix (u/abs-path
-                (fs/file (fs/parent src)))
+                (cond-> src
+                  (not (fs/directory? src)) (fs/parent)))
         entries (atom [])
         gatherer (entry-gathering-resolver entries)]
     (log/debug "Archiving" src "and stripping prefix" prefix)
