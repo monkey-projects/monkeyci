@@ -106,8 +106,16 @@
       (testing "uses configured image"
         (is (contains? (set (:cmd cmd)) "test-img")))
 
+      (testing "mounts checkout dir"
+        (let [m (->> cmd
+                     :cmd
+                     (drop-while (partial not= "-v"))
+                     (fnext))]
+          (is (some? m))
+          (is (cs/ends-with? m "/home/monkeyci"))))
+
       (testing "sets work dir to script dir"
-        (is (= (str (apply fs/path dir (conj (b/sid build) "checkout/.monkeyci")))
+        (is (= "/home/monkeyci/.monkeyci"
                (:dir cmd))))
 
       (testing "on exit, fires `build/end` event"

@@ -62,7 +62,7 @@
 
 (defrecord ApiBuildParams [api-config build]
   p/BuildParams
-  (get-build-params [this]
+  (get-build-params [this _]
     (bas/get-params-from-api api-config build)))
 
 (defn new-params [config]

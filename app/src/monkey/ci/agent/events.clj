@@ -106,10 +106,12 @@
   (let [conf (get-config ctx)
         build (get-build ctx)
         wd (build-work-dir conf (get-in ctx [:event :sid]))
-        sd (b/calc-script-dir (checkout-dir wd) (b/script-dir build))
+        lwd "/home/monkeyci"
+        sd (b/calc-script-dir lwd (b/script-dir build))
         cd (config-dir wd)
         deps (generate-deps sd nil (generate-script-config ctx))]
     {:cmd ["podman"
+           "-v" (str (checkout-dir wd) ":" lwd)
            (:image conf)
            "clojure"
            "-Sdeps" (pr-str deps)
@@ -127,6 +129,7 @@
 (defn make-routes [conf]
   [[:build/queued
     [{:handler prepare-build-cmd
+      ;; TODO Restore build cache
       :interceptors [(add-config conf)
                      add-token
                      git-clone
@@ -136,5 +139,6 @@
 
    [:build/end
     [{:handler (constantly nil)
+      ;; TODO Save build cache
       :interceptors [(add-config conf)
                      remove-token]}]]])

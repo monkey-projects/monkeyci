@@ -108,7 +108,7 @@
       (rur/status 500)))
 
 (defn get-params [req]
-  (rur/response @(p/get-build-params (req->params req))))
+  (rur/response @(p/get-build-params (req->params req) (req->build req))))
 
 (defn get-all-ip-addresses
   "Lists all non-loopback, non-virtual site local ip addresses"
