@@ -204,4 +204,6 @@
   nil)
 
 (defn make-routes [r]
+  ;; We could also wait for the build/end event to be received, which would give us
+  ;; certainty that the event was actually posted.
   [[:script/end [{:handler (partial script-exit r)}]]])

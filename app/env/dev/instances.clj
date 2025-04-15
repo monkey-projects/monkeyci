@@ -33,10 +33,10 @@
       (ci/make-context)))
 
 (defn print-container-logs
-  ([client cid]
+  ([client cid opts]
    (println "Fetching logs for container" cid)
    (md/chain
-    (ci/retrieve-logs client {:container-id cid})
+    (ci/retrieve-logs client (merge opts {:container-id cid}))
     (fn [{:keys [status] :as r}]
       (if (= 200 status)
         (println "Logs:" (:body r))

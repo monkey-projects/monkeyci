@@ -60,13 +60,13 @@
                             (:checkout-base-dir config)
                             (u/combine (:build-id build))))))
 
-(defrecord ApiBuildParams [api-config build]
+(defrecord ApiBuildParams [api-config]
   p/BuildParams
   (get-build-params [this]
     (bas/get-params-from-api api-config build)))
 
 (defn new-params [config]
-  (->ApiBuildParams (:api config) nil))
+  (->ApiBuildParams (:api config)))
 
 (defrecord ApiServer [build api-config]
   co/Lifecycle
@@ -161,8 +161,8 @@
       (md/chain
        (fn [r]
          (if r
-           (log/debug "Event pushed to internal stream")
-           (log/warn "Failed to push event to internal stream")))))
+           (log/debug "Event pushed to internal stream:" (:type evt))
+           (log/warn "Failed to push event to internal stream:" (:type evt))))))
   nil)
 
 (defn new-local-to-global-forwarder
@@ -233,9 +233,7 @@
    :api-server (co/using
                 (new-api-server config)
                 [:artifacts :cache :workspace :build :params :api-config :event-stream :mailman])
-   :params     (co/using
-                (new-params config)
-                [:build])
+   :params     (new-params config)
    :metrics    (new-metrics)
    :push-gw    (co/using
                 (new-push-gw config)
@@ -256,7 +254,9 @@
                       [:global-mailman :mailman :event-stream])
    :controller-routes (co/using
                        (new-controller-routes config)
-                       [:mailman :script-exit])))
+                       ;; Use global mailman to ensure events are posted before shutdown
+                       {:mailman :global-mailman
+                        :script-exit :script-exit})))
 
 (defn with-runner-system [config f]
   (rc/with-system (make-runner-system config) f))
