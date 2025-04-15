@@ -5,6 +5,9 @@
             [monkey.ci.agent
              [api-server :as aa]
              [events :as e]]
+            [monkey.ci.containers
+             [oci :as c-oci]
+             [podman :as c-podman]]
             [monkey.ci.events.mailman :as em]
             [monkey.ci.runners.runtime :as rr]))
 
@@ -27,9 +30,27 @@
                                (merge co))))]
     (em/map->RouteComponent {:make-routes make-routes})))
 
-(defn new-container-routes [config]
-  ;; TODO
+(defmulti make-container-routes :type)
+
+(defmethod make-container-routes :oci [conf deps]
+  ;; FIXME This expects a single build
+  (-> deps
+      (assoc :oci conf)
+      (c-oci/make-routes)))
+
+(defmethod make-container-routes :podman [conf deps]
+  ;; FIXME This expects a single build
+  (-> deps
+      (c-podman/make-routes)))
+
+(defmethod make-container-routes :default [conf]
+  (log/warn "Unknown container runner type:" (:type conf))
   {})
+
+(defn new-container-routes [config]
+  (em/map->RouteComponent
+   {:make-routes (fn [co]
+                   (make-container-routes (:containers config) co))}))
 
 (def global-to-local-events #{:build/queued :build/canceled})
 
@@ -57,4 +78,6 @@
                   (new-agent-routes conf)
                   [:mailman :api-server :git :builds :workspace])
    :params (rr/new-params conf)
-   :container-routes (new-container-routes conf)))
+   :container-routes (co/using
+                      (new-container-routes conf)
+                      [:mailman :artifacts :cache :workspace :api-server])))

@@ -12,7 +12,7 @@
              [jobs :as j]
              [oci :as oci]]
             [monkey.ci.containers
-             [common :as c :refer :all]
+             [common :as c]
              [promtail :as pt]]
             [monkey.ci.events.builders :as eb]
             [monkey.ci.events.mailman.interceptors :as emi]
@@ -31,9 +31,9 @@
    custom shell script that also redirects the output and dispatches
    events to a file, that are then picked up by the sidecar."
   [job build]
-  (let [wd (job-work-dir job build)]
+  (let [wd (c/job-work-dir job build)]
     (cond-> {:image-url (mcc/image job)
-             :display-name job-container-name
+             :display-name c/job-container-name
              ;; In container instances, command or entrypoint are treated the same
              ;; Note that when using container commands directly, the job will most
              ;; likely start without the workspace being restored.  This is a limitation
@@ -46,7 +46,7 @@
              :environment-variables (mcc/env job)
              :working-directory wd}
       ;; Override some props if script is specified
-      (:script job) (-> (assoc :command [(get job :shell "/bin/sh") (str script-dir "/" job-script)]
+      (:script job) (-> (assoc :command [(get job :shell "/bin/sh") (str c/script-dir "/" c/job-script)]
                                ;; One file arg per script line, with index as name
                                :arguments (->> (count (:script job))
                                                (range)
@@ -54,15 +54,15 @@
                         (update :environment-variables
                                 merge
                                 {"MONKEYCI_WORK_DIR" wd
-                                 "MONKEYCI_LOG_DIR" log-dir
-                                 "MONKEYCI_SCRIPT_DIR" script-dir
-                                 "MONKEYCI_START_FILE" start-file
-                                 "MONKEYCI_ABORT_FILE" abort-file
-                                 "MONKEYCI_EVENT_FILE" event-file})))))
+                                 "MONKEYCI_LOG_DIR" c/log-dir
+                                 "MONKEYCI_SCRIPT_DIR" c/script-dir
+                                 "MONKEYCI_START_FILE" c/start-file
+                                 "MONKEYCI_ABORT_FILE" c/abort-file
+                                 "MONKEYCI_EVENT_FILE" c/event-file})))))
 
 (defn- sidecar-container [{[c] :containers}]
   (assoc c
-         :display-name sidecar-container-name
+         :display-name c/sidecar-container-name
          :command c/sidecar-cmd
          ;; Run as root, because otherwise we can't write to the shared volumes
          :security-context {:security-context-type "LINUX"
@@ -77,19 +77,19 @@
 (defn- promtail-container [conf]
   (-> conf
       (pt/promtail-container)
-      (assoc :arguments ["-config.file" (str promtail-config-dir "/" promtail-config-file)])))
+      (assoc :arguments ["-config.file" (str c/promtail-config-dir "/" c/promtail-config-file)])))
 
 (defn- promtail-config-mount []
-  {:volume-name promtail-config-vol
+  {:volume-name c/promtail-config-vol
    :is-read-only true
    :mount-path "/etc/promtail"})
 
 (defn- promtail-config-vol-config [conf]
   (let [conf (-> conf
-                 (assoc :paths [(str log-dir "/*.log")]))]
-    {:name promtail-config-vol
+                 (assoc :paths [(str c/log-dir "/*.log")]))]
+    {:name c/promtail-config-vol
      :volume-type "CONFIGFILE"
-     :configs [(oci/config-entry promtail-config-file
+     :configs [(oci/config-entry c/promtail-config-file
                                  (pt/yaml-config conf))]}))
 
 (defn- add-promtail-container
@@ -111,17 +111,17 @@
 
 (defn- script-mount [job]
   (when (:script job)
-    {:volume-name script-vol
+    {:volume-name c/script-vol
      :is-read-only false
-     :mount-path script-dir}))
+     :mount-path c/script-dir}))
 
 (defn- config-mount []
-  {:volume-name config-vol
+  {:volume-name c/config-vol
    :is-read-only true
-   :mount-path config-dir})
+   :mount-path c/config-dir})
 
 (defn- job-script-entry []
-  (oci/config-entry job-script (slurp (io/resource job-script))))
+  (oci/config-entry c/job-script (slurp (io/resource c/job-script))))
 
 (defn- script-vol-config
   "Adds the job script and a file for each script line as a configmap volume."
@@ -131,7 +131,7 @@
       (log/debug "Executing script lines in container:")
       (doseq [l script]
         (log/debug "  " l)))
-    {:name script-vol
+    {:name c/script-vol
      :volume-type "CONFIGFILE"
      :configs (->> script
                    (map-indexed (fn [i s]
@@ -143,11 +143,11 @@
 
 (defn- config-vol-config
   "Configuration files for the sidecar (e.g. logging)"
-  [{:keys [job build sidecar] :as conf}]
+  [{:keys [job sidecar] :as conf}]
   (let [{:keys [log-config]} sidecar]
-    {:name config-vol
+    {:name c/config-vol
      :volume-type "CONFIGFILE"
-     :configs (cond-> [(oci/config-entry config-file (rt->edn conf))]
+     :configs (cond-> [(oci/config-entry c/config-file (rt->edn conf))]
                 log-config (conj (oci/config-entry "logback.xml" log-config)))}))
 
 (defn- set-pod-shape [ic job]
@@ -228,7 +228,7 @@
   (assoc ctx ::config c))
 
 (defn get-instance-id [ctx]
-  (job-state ctx :instance-id))
+  (c/job-state ctx :instance-id))
 
 ;;; Interceptors
 
