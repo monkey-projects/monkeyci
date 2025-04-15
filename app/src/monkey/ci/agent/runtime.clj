@@ -27,6 +27,10 @@
                                (merge co))))]
     (em/map->RouteComponent {:make-routes make-routes})))
 
+(defn new-container-routes [config]
+  ;; TODO
+  {})
+
 (def global-to-local-events #{:build/queued :build/canceled})
 
 (defn make-system [conf]
@@ -52,4 +56,5 @@
    :agent-routes (co/using
                   (new-agent-routes conf)
                   [:mailman :api-server :git :builds :workspace])
-   :params (rr/new-params conf)))
+   :params (rr/new-params conf)
+   :container-routes (new-container-routes conf)))

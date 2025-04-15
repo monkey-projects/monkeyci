@@ -34,4 +34,7 @@
       (is (some? (:agent-routes sys))))
 
     (testing "provides build params"
-      (is (some? (:params sys))))))
+      (is (some? (:params sys))))
+
+    (testing "provides container routes"
+      (is (some? (:container-routes sys))))))

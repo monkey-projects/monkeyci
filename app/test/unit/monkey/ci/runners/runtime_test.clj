@@ -133,7 +133,7 @@
 (deftest local-to-global-forwarder
   (testing "`start` registers listeners in broker"
     (let [broker (em/make-component {:type :manifold})
-          r (-> (sut/new-local-to-global-forwarder)
+          r (-> (sut/new-local-to-global-forwarder #{:build/canceled})
                 (assoc :mailman broker
                        :event-stream (ms/stream))
                 (co/start))]
@@ -143,7 +143,7 @@
 
   (testing "`stop` unregisters listeners"
     (let [unreg? (atom false)]
-      (is (nil? (-> (sut/new-local-to-global-forwarder)
+      (is (nil? (-> (sut/new-local-to-global-forwarder #{})
                     (assoc :listeners [(->TestListener unreg?)])
                     (co/stop)
                     :listeners)))
@@ -153,7 +153,7 @@
                    (co/start))
         global (tm/test-component)
         stream (ms/stream 1)
-        fw (-> (sut/new-local-to-global-forwarder)
+        fw (-> (sut/new-local-to-global-forwarder #{:build/canceled})
                (assoc :mailman local
                       :global-mailman global
                       :event-stream stream)
