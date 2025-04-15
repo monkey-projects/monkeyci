@@ -49,9 +49,12 @@
   [req]
   (get-in req [:reitit.core/match :data context]))
 
+(defn set-build [req build]
+  (assoc req ::build build))
+
 (def req->build
   "Gets current build configuration from the request"
-  (comp :build req->ctx))
+  ::build)
 
 (def req->event-stream
   (comp :event-stream req->ctx))
@@ -105,7 +108,7 @@
       (rur/status 500)))
 
 (defn get-params [req]
-  (rur/response @(p/get-build-params (req->params req))))
+  (rur/response @(p/get-build-params (req->params req) (req->build req))))
 
 (defn get-all-ip-addresses
   "Lists all non-loopback, non-virtual site local ip addresses"
@@ -278,11 +281,18 @@
         (handler req)
         (rur/status 401)))))
 
+(defn build-middleware [handler build]
+  (fn [req]
+    (-> req
+        (set-build build)
+        (handler))))
+
 (defn make-router
   ([opts routes]
    (ring/router
     routes
-    {:data {:middleware (concat [[security-middleware (:token opts)]]
+    {:data {:middleware (concat [[security-middleware (:token opts)]
+                                 [build-middleware (:build opts)]]
                                 wm/default-middleware)
             :muuntaja (c/make-muuntaja)
             :coercion reitit.coercion.schema/coercion
@@ -294,25 +304,28 @@
   {:pre [(spec/valid? ::aspec/app-config opts)]}
   (c/make-app (make-router opts)))
 
+(defn server-with-port [srv]
+  {:server srv
+   :port (an/port srv)})
+
 (defn start-server
-  "Starts a build API server with a randomly generated token.  Returns the server
-   and token."
+  "Starts a build API server, associated with a single build.  If no token is specified,
+   one is randomly generated.  Returns the server and token."
   [{:keys [port token] :or {port 0} :as conf}]
   {:pre [(spec/valid? ::aspec/config conf)]}
   (log/debug "Starting API server at ip address" (get-ip-addr) "and port" port)
-  (let [token (or token (generate-token))
-        srv (http/start-server
-             (make-app (assoc conf :token token))
-             {:port port})]
-    {:server srv
-     :port (an/port srv)
-     :token token}))
+  (let [token (or token (generate-token))]
+    (-> (http/start-server
+         (make-app (assoc conf :token token))
+         {:port port})
+        (server-with-port)
+        (assoc :token token))))
 
 (defn with-build [conf b]
   (assoc conf :build b))
 
 (defn srv->api-config
-  "Creates a configuration object that can be passed to build runners, that includes the url"
+  "Creates a configuration object that can be passed to build runners that includes the url"
   [{:keys [port] :as conf}]
   (-> conf
       (select-keys [:port :token])

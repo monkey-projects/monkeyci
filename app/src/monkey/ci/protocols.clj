@@ -37,7 +37,7 @@
 (def workspace? (partial satisfies? Workspace))
 
 (defprotocol BuildParams
-  (get-build-params [this]
+  (get-build-params [this build]
     "Retrieves build parameters for this build"))
 
 (defprotocol Vault

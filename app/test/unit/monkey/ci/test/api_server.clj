@@ -10,7 +10,7 @@
 
 (defrecord EmptyParams []
   p/BuildParams
-  (get-build-params [_]
+  (get-build-params [_ _]
     (md/success-deferred [])))
 
 (defn test-config

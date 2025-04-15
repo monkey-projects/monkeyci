@@ -12,8 +12,13 @@
 
 (def build ::ss/build)
 
+(defn build->out [build]
+  (-> build
+      (dissoc :status :cleanup?)
+      (update :git dissoc :ssh-keys)))
+
 (defn set-build [c b]
-  (assoc c build b))
+  (assoc c build (build->out b)))
 
 (def result ::ss/result)
 

@@ -1,19 +1,17 @@
 (ns monkey.ci.build.api-server-test
-  (:require
-   [aleph.http :as http]
-   [clj-commons.byte-streams :as bs]
-   [clojure.spec.alpha :as s]
-   [clojure.test :refer [deftest is testing]]
-   [manifold.deferred :as md]
-   [monkey.ci.build.api-server :as sut]
-   [monkey.ci.protocols :as p]
-   [monkey.ci.spec.api-server :as aspec]
-   [monkey.ci.storage :as st]
-   [monkey.ci.test.aleph-test :as at]
-   [monkey.ci.test.api-server :as tas]
-   [monkey.ci.test.helpers :as h]
-   [monkey.ci.test.runtime :as trt]
-   [ring.mock.request :as mock]))
+  (:require [aleph.http :as http]
+            [clj-commons.byte-streams :as bs]
+            [clojure.spec.alpha :as s]
+            [clojure.test :refer [deftest is testing]]
+            [manifold.deferred :as md]
+            [monkey.ci.build.api-server :as sut]
+            [monkey.ci.protocols :as p]
+            [monkey.ci.spec.api-server :as aspec]
+            [monkey.ci.test
+             [aleph-test :as at]
+             [api-server :as tas]
+             [helpers :as h]]
+            [ring.mock.request :as mock]))
 
 (def test-config (tas/test-config))
 
@@ -44,12 +42,7 @@
   (let [{:keys [token] :as s} (sut/start-server test-config)
         base-url (format "http://localhost:%d" (:port s))
         make-url (fn [path]
-                   (str base-url "/" path))
-        make-req (fn [opts]
-                   (-> {:url (make-url (:path opts))
-                        :headers {"Authorization" (str "Bearer " token)}}
-                       (merge opts)
-                       (dissoc :path)))]
+                   (str base-url "/" path))]
     (with-open [srv (:server s)]
 
       (testing "returns 401 if no token given"
@@ -67,6 +60,15 @@
                         :throw-exceptions false}
                        (http/request)
                        deref
+                       :status))))
+
+      (testing "returns 200 if valid token given"
+        (is (= 200 (-> {:url (make-url "test")
+                        :method :get
+                        :headers {"Authorization" (str "Bearer " token)}
+                        :throw-exceptions false}
+                       (http/request)
+                       deref
                        :status)))))))
 
 (defn- ->req
@@ -76,7 +78,7 @@
 
 (defrecord FakeParams [params]
   p/BuildParams
-  (get-build-params [_]
+  (get-build-params [_ _]
     (md/success-deferred params)))
 
 (deftest get-params
@@ -127,9 +129,9 @@
   (testing "returns workspace as stream"
     (let [ws-path "test/workspace"
           ws (h/fake-blob-store (atom {ws-path "Dummy contents"}))
-          res (-> {:workspace ws
-                   :build {:workspace ws-path}}
+          res (-> {:workspace ws}
                   (->req)
+                  (sut/set-build {:workspace ws-path})
                   (sut/download-workspace))]
       (is (= 200 (:status res)))
       (is (not-empty (slurp (:body res)))))))
@@ -156,9 +158,9 @@
 (deftest download-artifact
   (let [build {:sid ["test-cust" "test-repo" "test-build"]}]
     (testing "returns 404 not found if no artifact"
-      (is (= 404 (-> {:artifacts (h/fake-blob-store)
-                      :build build}
+      (is (= 404 (-> {:artifacts (h/fake-blob-store)}
                      (->req)
+                     (sut/set-build build)
                      (assoc-in [:parameters :path :artifact-id] "nonexisting")
                      (sut/download-artifact)
                      :status))))
@@ -166,9 +168,9 @@
     (testing "returns artifact as stream"
       (let [art-id "test-artifact"
             bs (h/fake-blob-store (atom {(str "test-cust/test-repo/test-build/" art-id ".tgz") "Dummy contents"}))
-            res (-> {:artifacts bs
-                     :build build}
+            res (-> {:artifacts bs}
                     (->req)
+                    (sut/set-build build)
                     (assoc-in [:parameters :path :artifact-id] art-id)
                     (sut/download-artifact))]
         (is (= 200 (:status res)))
@@ -196,9 +198,9 @@
 (deftest download-cache
   (let [build {:sid ["test-cust" "test-repo" "test-build"]}]
     (testing "returns 404 not found if no cache"
-      (is (= 404 (-> {:cache (h/fake-blob-store)
-                      :build build}
+      (is (= 404 (-> {:cache (h/fake-blob-store)}
                      (->req)
+                     (sut/set-build build)
                      (assoc-in [:parameters :path :cache-id] "nonexisting")
                      (sut/download-cache)
                      :status))))
@@ -206,9 +208,9 @@
     (testing "returns cache as stream"
       (let [cache-id "test-cache"
             bs (h/fake-blob-store (atom {(str "test-cust/test-repo/" cache-id ".tgz") "Dummy contents"}))
-            res (-> {:cache bs
-                     :build build}
+            res (-> {:cache bs}
                     (->req)
+                     (sut/set-build build)
                     (assoc-in [:parameters :path :cache-id] cache-id)
                     (sut/download-cache))]
         (is (= 200 (:status res)))
@@ -291,4 +293,3 @@
                          (auth)
                          (app)
                          :status))))))))
-
