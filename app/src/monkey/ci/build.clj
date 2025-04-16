@@ -182,21 +182,21 @@
 (defn job-work-dir
   "Given a job and a build, determines the job working directory.  This is either the
    work dir as configured on the job, or the build checkout dir, or the process dir."
-  [job build]
+  [job checkout-dir]
   (-> (if-let [jwd (:work-dir job)]
         (if (fs/absolute? jwd)
           jwd
-          (if-let [cd (checkout-dir build)]
-            (fs/path cd jwd)
+          (if checkout-dir
+            (fs/path checkout-dir jwd)
             jwd))
-        (or (checkout-dir build) (u/cwd)))
+        (or checkout-dir (u/cwd)))
       (fs/canonicalize)
       (str)))
 
 (defn job-relative-dir
   "Calculates path `p` as relative to the work dir for the current job"
-  [job build p]
-  (u/abs-path (job-work-dir job build) p))
+  [job checkout-dir p]
+  (u/abs-path (job-work-dir job checkout-dir) p))
 
 (def all-jobs "Retrieves all jobs known to the build"
   (comp vals :jobs :script))

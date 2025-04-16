@@ -211,17 +211,20 @@
   [(j/job-executed-evt job-id sid (assoc result :status status))])
 
 (defn- make-job-ctx [conf]
-  (select-keys conf [:build :artifacts :cache]))
+  (-> (select-keys conf [:artifacts :cache])
+      (assoc :checkout-dir (b/checkout-dir (:build conf)))))
 
 (defn make-routes [{:keys [workspace work-dir mailman] :as conf}]
   (let [state (emi/with-state (atom {}))
-        job-ctx (make-job-ctx conf)]
+        job-ctx (make-job-ctx conf)
+        wd (or work-dir (str (fs/create-temp-dir)))]
+    (log/info "Creating podman container routes using work dir" wd)
     [[:container/job-queued
       [{:handler prepare-child-cmd
         :interceptors [emi/handle-job-error
                        state
                        save-job
-                       (copy-ws workspace work-dir)
+                       (copy-ws workspace wd)
                        (emi/add-mailman mailman)
                        (add-job-ctx job-ctx)
                        (cache/restore-interceptor emi/get-job-ctx)

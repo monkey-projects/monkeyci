@@ -99,7 +99,7 @@
                (sut/job-work-dir {:work-dir "job-dir"}))))))
 
 (deftest make-routes
-  (let [routes (sut/make-routes {})
+  (let [routes (sut/make-routes {:work-dir "/tmp"})
         expected [:container/job-queued
                   :job/initializing
                   :podman/job-executed]]

@@ -10,6 +10,7 @@
             [monkey.ci
              [artifacts :as a]
              [blob :as blob]
+             [build :as b]
              [cache :as c]
              [protocols :as p]]
             [monkey.ci.containers.podman :as cp]
@@ -37,12 +38,13 @@
 
 (defn- new-podman-routes [conf]
   (letfn [(make-routes [{:keys [config build] :as c}]
-            (-> (select-keys c [:mailman :artifacts :cache])
-                (update :artifacts a/make-blob-repository build)
-                (update :cache c/make-blob-repository build)
-                (assoc :workspace (lc/get-workspace config)
-                       :work-dir (lc/get-jobs-dir config))
-                (cp/make-routes)))]
+            (let [sid (b/sid build)]
+              (-> (select-keys c [:mailman :artifacts :cache])
+                  (update :artifacts a/make-blob-repository sid)
+                  (update :cache c/make-blob-repository sid)
+                  (assoc :workspace (lc/get-workspace config)
+                         :work-dir (lc/get-jobs-dir config))
+                  (cp/make-routes))))]
     (em/map->RouteComponent {:config conf :make-routes make-routes})))
 
 (defn- blob-store [dir]

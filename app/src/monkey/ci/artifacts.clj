@@ -40,10 +40,10 @@
 
 (defn- save-blob
   "Saves a single blob path, using the blob configuration and artifact info."
-  [{:keys [job build repo]} {:keys [path id]}]
+  [{:keys [job checkout-dir repo]} {:keys [path id]}]
   ;; TODO Make paths relative to checkout dir because using job work dir can be wrong
   ;; when the work dir of the saving job is not the same as the restoring job.
-  (let [fullp (b/job-relative-dir job build path)]
+  (let [fullp (b/job-relative-dir job checkout-dir path)]
     (log/debug "Saving blob:" id "at path" path "(full path:" fullp ")")
     (md/chain
      (p/save-artifact repo id fullp)
@@ -56,12 +56,13 @@
 (defn save-generic [conf]
   (do-with-blobs conf (partial save-blob conf)))
 
-(defn restore-blob [{:keys [repo job build]} {:keys [id path]}]
+(defn restore-blob [{:keys [repo job checkout-dir]} {:keys [id path]}]
   (log/debug "Restoring blob:" id "to path" path)
   (md/chain
    (p/restore-artifact repo
                        id
-                       (-> (b/job-relative-dir job build path)
+                       ;; FIXME Get rid of the build, we only need checkout dir
+                       (-> (b/job-relative-dir job checkout-dir path)
                            (fs/canonicalize)
                            (str)))
    (fn [{:keys [entries src dest] :as r}]
@@ -136,11 +137,14 @@
   ;; The blob archive path is the build sid with the blob id added.
   (build-sid->artifact-path (b/sid build) id))
 
-(defn- rt->config
+(defn rt->config
   "Creates a configuration object for artifacts from the runtime"
   [rt]
-  (-> (select-keys rt [:job :build])
-      (assoc :repo (:artifacts rt))))
+  (-> (select-keys rt [:job])
+      (assoc :repo (:artifacts rt)
+             ;; Need to support both build or checkout dir, depending on context
+             :checkout-dir (or (:checkout-dir rt)
+                               (b/checkout-dir (:build rt))))))
 
 (defn save-artifacts
   "Saves all artifacts according to the job configuration."
@@ -173,8 +177,8 @@
         (save-artifacts rt)
         (constantly r))))))
 
-(defn make-blob-repository [store build]
-  (->BlobArtifactRepository store (partial artifact-archive-path build)))
+(defn make-blob-repository [store sid]
+  (->BlobArtifactRepository store (partial build-sid->artifact-path sid)))
 
 (defn make-build-api-repository [client]
   (->BuildApiArtifactRepository client "/artifact/"))

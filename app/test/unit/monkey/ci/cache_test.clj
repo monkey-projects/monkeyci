@@ -11,10 +11,9 @@
   (testing "saves path using blob store"
     (let [stored (atom {})
           bs (h/fake-blob-store stored)
-          build {:sid ["test-cust" "test-build"]}
-          repo (sut/make-blob-repository bs build)
+          sid ["test-cust" "test-build"]
+          repo (sut/make-blob-repository bs sid)
           ctx {:cache repo
-               :build build
                :job {:work-dir "work"
                      :caches [{:id "test-cache"
                                :path "test-path"}]}}]
@@ -31,10 +30,9 @@
   (testing "restores path using blob store"
     (let [stored (atom {"test-cust/test-cache.tgz" ::dest})
           bs (h/fake-blob-store stored)
-          build {:sid ["test-cust" "test-build"]}
-          repo (sut/make-blob-repository bs build)
+          sid ["test-cust" "test-build"]
+          repo (sut/make-blob-repository bs sid)
           ctx {:cache repo
-               :build build
                :job {:work-dir "work"
                      :caches [{:id "test-cache"
                                :path "test-path"}]}}]
@@ -43,18 +41,17 @@
 
 (deftest restore-interceptor
   (let [blob (tb/test-store {"test/test-cache.tgz" {:file "/tmp/test.txt"}})
-        build {:sid ["test" "build"]
-               :checkout-dir "/test/dir"}
+        sid ["test" "build"]
         job {:id "test-job"
              :caches [{:id "test-cache"
                        :path "test/path"}]}
-        cache (sut/make-blob-repository blob build)
+        cache (sut/make-blob-repository blob sid)
         {:keys [enter] :as i} (sut/restore-interceptor ::job-ctx)]
     (is (keyword? (:name i)))
     
     (testing "`enter` restores caches for job using repository"
       (let [r (-> {::job-ctx {:job job
-                              :build build
+                              :checkout-dir "/tmp"
                               :cache cache}}
                   (enter)
                   (sut/get-restored)
@@ -64,12 +61,11 @@
 
 (deftest save-interceptor
   (let [blob (tb/test-store)
-        build {:sid ["test" "build"]
-               :checkout-dir "/tmp"}
+        sid ["test" "build"]
         job {:id "test-job"
              :caches [{:id "test-cache"
                        :path "test/path"}]}
-        cache (sut/make-blob-repository blob build)
+        cache (sut/make-blob-repository blob sid)
         {:keys [enter] :as i} (sut/save-interceptor ::job-ctx)]
     (is (keyword? (:name i)))
     
@@ -77,7 +73,7 @@
       (is (= 1 
              (-> {::job-ctx {:job job
                              :cache cache
-                             :build build}}
+                             :checkout-dir "/tmp"}}
                  (enter)
                  (sut/get-saved)
                  (count))))

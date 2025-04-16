@@ -22,11 +22,10 @@
       (let [p (doto (fs/path dir "test-path")
                 (fs/create-file))
             stored (atom {})
-            build {:sid ["test-cust" "test-build"]}
+            sid ["test-cust" "test-build"]
             bs (h/fake-blob-store stored)
-            repo (sut/make-blob-repository bs build)
+            repo (sut/make-blob-repository bs sid)
             ctx {:artifacts repo
-                 :build build
                  :job {:work-dir dir
                        :save-artifacts [{:id "test-artifact"
                                          :path "test-path"}]}}]
@@ -49,9 +48,8 @@
           stored (atom {"test-cust/test-build/test-artifact.tgz" (str (fs/canonicalize
                                                                        (fs/path (:work-dir job) "test-path")))})
           bs (h/strict-fake-blob-store stored)
-          build {:sid ["test-cust" "test-build"]}
-          ctx {:artifacts (sut/make-blob-repository bs build)
-               :build build
+          sid ["test-cust" "test-build"]
+          ctx {:artifacts (sut/make-blob-repository bs sid)
                :job job}]
       (is (not-empty @(sut/restore-artifacts ctx)))
       (is (empty? @stored) "expected entry to be restored"))))
@@ -60,10 +58,10 @@
   (testing "returns paths as strings and entry count"
     (let [dest (io/file "dest")
           art-id "test-artifact"
-          build {:sid ["test-sid"]}
+          sid ["test-sid"]
           src (io/file "test-sid" (str art-id ".tgz"))
-          bs (h/fake-blob-store (atom {src dest}))
-          art (sut/make-blob-repository bs build)
+          bs (h/fake-blob-store (atom {src dest}))   
+          art (sut/make-blob-repository bs sid)
           r @(sut/restore-blob {:repo art}
                                {:id art-id
                                 :path "dest"})]
@@ -73,9 +71,9 @@
       (is (number? (:entries r))))))
 
 (deftest blob-artifact-repository
-  (let [build {:sid (take 3 (repeatedly (comp str random-uuid)))}
+  (let [sid (repeatedly 3 (comp str random-uuid))
         store (h/fake-blob-store)
-        repo (sut/make-blob-repository store build)
+        repo (sut/make-blob-repository store sid)
         src-art "test source artifact"
         art-id (str (random-uuid))]
 
@@ -118,18 +116,16 @@
 
 (deftest restore-interceptor
   (let [blob (tb/test-store {"test/build/test-art.tgz" {:file "/tmp/test.txt"}})
-        build {:sid ["test" "build"]
-               :checkout-dir "/test/dir"}
+        sid ["test" "build"]
         job {:id "test-job"
              :restore-artifacts [{:id "test-art"
                                   :path "test/path"}]}
-        art (sut/make-blob-repository blob build)
+        art (sut/make-blob-repository blob sid)
         {:keys [enter] :as i} (sut/restore-interceptor ::job-ctx)]
     (is (keyword? (:name i)))
     
     (testing "`enter` restores artifacts for job using repository"
       (let [r (-> {::job-ctx {:job job
-                              :build build
                               :artifacts art}}
                   (enter)
                   (sut/get-restored)
@@ -139,20 +135,19 @@
 
 (deftest save-interceptor
   (let [blob (tb/test-store)
-        build {:sid ["test" "build"]
-               :checkout-dir "/tmp"}
+        sid ["test" "build"]
         job {:id "test-job"
              :save-artifacts [{:id "test-art"
                                :path "test/path"}]}
-        art (sut/make-blob-repository blob build)
+        art (sut/make-blob-repository blob sid)
         {:keys [enter] :as i} (sut/save-interceptor ::job-ctx)]
     (is (keyword? (:name i)))
     
     (testing "`enter` saves artifacts for job using repository"
       (is (= 1 
              (-> {::job-ctx {:job job
-                             :artifacts art
-                             :build build}}
+                             :checkout-dir "/tmp"
+                             :artifacts art}}
                  (enter)
                  (sut/get-saved)
                  (count))))

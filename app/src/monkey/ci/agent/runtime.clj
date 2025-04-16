@@ -38,6 +38,8 @@
       (c-oci/make-routes)))
 
 (defmethod make-container-routes :podman [conf deps]
+  ;; FIXME Podman routes expect a directory as workspace
+  ;; Also caches and artifacts should be an artifact repository, not a blob repo
   (-> deps
       (merge conf)
       (c-podman/make-routes)))

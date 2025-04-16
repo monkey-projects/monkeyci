@@ -149,7 +149,8 @@
   [[:build/queued
     [{:handler prepare-build-cmd
       ;; TODO Restore build cache
-      :interceptors [(add-config conf)
+      :interceptors [emi/handle-build-error
+                     (add-config conf)
                      add-token
                      git-clone
                      save-workspace

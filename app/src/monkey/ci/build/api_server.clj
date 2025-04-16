@@ -204,7 +204,7 @@
   (fn [req]
     (let [store (req->cache req)
           id (get-in req [:parameters :path :cache-id])
-          path (when id (cache/cache-archive-path (req->build req) id))]
+          path (when id (cache/cache-archive-path (build/sid (req->build req)) id))]
       (f req store path id))))
 
 (def upload-cache

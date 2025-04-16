@@ -210,7 +210,7 @@
             bs (h/fake-blob-store (atom {(str "test-cust/test-repo/" cache-id ".tgz") "Dummy contents"}))
             res (-> {:cache bs}
                     (->req)
-                     (sut/set-build build)
+                    (sut/set-build build)
                     (assoc-in [:parameters :path :cache-id] cache-id)
                     (sut/download-cache))]
         (is (= 200 (:status res)))

@@ -114,16 +114,16 @@
   (testing "returns checkout dir when no job dir given"
     (is (= "/checkout/dir"
            (sut/job-work-dir {}
-                             {:checkout-dir "/checkout/dir"}))))
+                             "/checkout/dir"))))
 
   (testing "returns current working dir when no job or checkout dir given"
     (is (= (u/cwd)
-           (sut/job-work-dir { }{}))))
+           (sut/job-work-dir {} nil))))
 
   (testing "returns work dir as relative dir of checkout dir"
     (is (= "/checkout/job-dir"
            (sut/job-work-dir {:work-dir "job-dir"}
-                             {:checkout-dir "/checkout"})))))
+                             "/checkout")))))
 
 (deftest build-end-evt
   (testing "creates build/end event with status completed"

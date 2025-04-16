@@ -201,7 +201,7 @@
                      :checkout-dir dir
                      :workspace "test-ws"}
               sid (b/sid build)
-              cache (ca/make-blob-repository (h/fake-blob-store stored) build)
+              cache (ca/make-blob-repository (h/fake-blob-store stored) sid)
               r (sut/run
                   (trs/make-test-rt
                    {:sid sid
@@ -225,7 +225,7 @@
                      :checkout-dir "/tmp/checkout"
                      :workspace "test-ws"}
               sid (b/sid build)
-              repo (art/make-blob-repository (h/fake-blob-store stored) build)
+              repo (art/make-blob-repository (h/fake-blob-store stored) sid)
               tr (sut/run
                   (trs/make-test-rt
                    {:containers {:type :podman}
@@ -252,7 +252,7 @@
                      :checkout-dir dir
                      :workspace "test-ws"}
               sid (b/sid build)
-              repo (art/make-blob-repository (h/fake-blob-store stored) build)
+              repo (art/make-blob-repository (h/fake-blob-store stored) sid)
               r (sut/run
                   (trs/make-test-rt
                    {:containers {:type :podman}
@@ -269,7 +269,7 @@
 
     (testing "waits until artifacts have been stored"
       ;; Set up blob saving so it takes a while
-      (is (= ::timeout (-> {:artifacts (art/make-blob-repository (->SlowBlobStore 1000) {})
+      (is (= ::timeout (-> {:artifacts (art/make-blob-repository (->SlowBlobStore 1000) [])
                             :job {:id "test-job"
                                   :save-artifacts [{:id "test-artifact"
                                                     :path "test-path"}]}}
@@ -291,7 +291,7 @@
 
     (testing "blocks until caches have been stored"
       ;; Set up blob saving so it takes a while
-      (is (= ::timeout (-> {:cache (ca/make-blob-repository (->SlowBlobStore 1000) {})
+      (is (= ::timeout (-> {:cache (ca/make-blob-repository (->SlowBlobStore 1000) [])
                             :job {:id "test-job"
                                   :caches [{:id "test-artifact"
                                             :path "test-path"}]}}

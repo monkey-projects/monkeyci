@@ -114,6 +114,7 @@
 
   (stop [{:keys [listeners] :as this}]
     (when listeners
+      (log/debug "Unregistering" (count listeners) "listeners")
       (doseq [l listeners]
         (mmc/unregister-listener l)))
     (dissoc this :listeners)))

@@ -10,13 +10,13 @@
              [build :as b]
              [oci :as oci]]))
 
-(defn cache-archive-path [build id]
+(defn cache-archive-path [sid id]
   ;; The cache archive path is the repo sid with the cache id added.
   ;; Build id is not used since caches are meant to supersede builds.
-  (str (cs/join "/" (concat (butlast (b/sid build)) [id])) blob/extension))
+  (str (cs/join "/" (concat (butlast sid) [id])) blob/extension))
 
 (defn- rt->config [rt]
-  (-> (select-keys rt [:job :build])
+  (-> (art/rt->config rt)
       (assoc :repo (:cache rt)
              :job-key :caches
              :build-path (partial cache-archive-path (:build rt)))))
@@ -45,8 +45,8 @@
         (save-caches rt)
         (constantly r))))))
 
-(defn make-blob-repository [store build]
-  (art/->BlobArtifactRepository store (partial cache-archive-path build)))
+(defn make-blob-repository [store sid]
+  (art/->BlobArtifactRepository store (partial cache-archive-path sid)))
 
 (defn make-build-api-repository
   "Creates an `ArtifactRepository` that can be used to upload/download caches"
