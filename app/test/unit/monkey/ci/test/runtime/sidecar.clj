@@ -20,8 +20,8 @@
 (defn set-poll-interval [rt i]
   (assoc rt :poll-interval i))
 
-(defn set-build [rt b]
-  (assoc rt :build b))
+(defn set-sid [rt sid]
+  (assoc rt :sid sid))
 
 (defn set-job [rt job]
   (assoc rt :job job))
@@ -38,10 +38,7 @@
       (set-start-file "test-start")
       (set-abort-file "test-abort")
       (set-poll-interval 100)
-      (set-build {:customer-id (cuid/random-cuid)
-                  :repo-id (cuid/random-cuid)
-                  :build-id (str "test-build-" (random-uuid))
-                  :workspace "test-ws"})
+      (set-sid [(cuid/random-cuid) (cuid/random-cuid) (str "test-build-" (random-uuid))])
       (set-job {:id (str "test-job-" (random-uuid))})
       (set-mailman (tm/test-component))
       (merge conf)))

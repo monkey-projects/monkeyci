@@ -25,7 +25,12 @@
 (defn set-build [conf build]
   (assoc-in conf [::ss/job-config ::ss/build] build))
 
-(def build (comp ::ss/build ::ss/job-config))
+(def ^:deprecated build (comp ::ss/build ::ss/job-config))
+
+(defn set-sid [conf sid]
+  (assoc-in conf [::ss/job-config ::ss/sid] sid))
+
+(def sid (comp ::ss/sid ::ss/job-config))
 
 (def api ::ss/api)
 

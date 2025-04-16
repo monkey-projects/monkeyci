@@ -46,14 +46,13 @@
        (cond-> rt
          r? (assoc-in [:build :workspace/restored?] true))))))
 
-(defrecord BuildApiWorkspace [client build]
+(defrecord BuildApiWorkspace [client dir]
   p/Workspace
   (restore-workspace [_]
-    (log/info "Restoring workspace for build" (build/sid build) "using build api")
     (md/chain
      (client {:path "/workspace"
               :method :get})
      :body
-     #(arch/extract % (build/checkout-dir build)))))
+     #(arch/extract % dir))))
 
 (def make-build-api-workspace ->BuildApiWorkspace)

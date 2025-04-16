@@ -6,10 +6,8 @@
             [manifold.deferred :as md]
             [monkey.ci
              [artifacts :as art]
-             [build :as b]
              [cache :as cache]
              [jobs :as j]
-             [logging :as l]
              [spec :as spec]
              [utils :as u]
              [workspace :as ws]]
@@ -44,36 +42,36 @@
     (create-file-with-dirs f))
   f)
 
-(defn- upload-log [logger path]
-  (when (and path logger)
-    (let [size (fs/size path)]
-      (when (pos? size)
-        (log/debug "Uploading log file" path "(" size "bytes)")
-        (with-open [is (io/input-stream path)]
-          (let [capt (logger [(fs/file-name path)])
-                d (l/handle-stream capt is)]
-            (when  (md/deferred? d)
-              @d)))))))
+;; (defn- upload-log [logger path]
+;;   (when (and path logger)
+;;     (let [size (fs/size path)]
+;;       (when (pos? size)
+;;         (log/debug "Uploading log file" path "(" size "bytes)")
+;;         (with-open [is (io/input-stream path)]
+;;           (let [capt (logger [(fs/file-name path)])
+;;                 d (l/handle-stream capt is)]
+;;             (when  (md/deferred? d)
+;;               @d)))))))
 
-(defn upload-logs
-  "Uploads log files referenced in the event, if any"
-  [evt logger]
-  (doseq [l ((juxt :stdout :stderr) evt)]
-    (when l
-      (upload-log logger l)
-      (log/debug "File uploaded:" l))))
+;; (defn upload-logs
+;;   "Uploads log files referenced in the event, if any"
+;;   [evt logger]
+;;   (doseq [l ((juxt :stdout :stderr) evt)]
+;;     (when l
+;;       (upload-log logger l)
+;;       (log/debug "File uploaded:" l))))
 
-(defn- get-logger [{:keys [build job log-maker]}]
-  (let [log-base (b/get-job-sid job build)]
-    (when log-maker (comp (partial log-maker build)
-                          (partial concat log-base)))))
+;; (defn- get-logger [{:keys [sid job log-maker]}]
+;;   (let [log-base (conj sid (j/job-id job))]
+;;     (when log-maker (comp (partial log-maker build)
+;;                           (partial concat log-base)))))
 
-(defn- make-evt [evt {:keys [job build]}]
+(defn- make-evt [evt {:keys [job sid]}]
   (ec/make-event
    (:type evt)
    (assoc evt
           :src :job
-          :sid (b/sid build)
+          :sid sid
           :job-id (j/job-id job))))
 
 (defn poll-events
@@ -83,7 +81,7 @@
         read-next (fn [r]
                     (u/parse-edn r {:eof ::eof}))
         interval (get rt :poll-interval cs/default-poll-interval)
-        logger (get-logger rt)
+        ;;logger (get-logger rt)
         set-exit (fn [v] (assoc rt :exit v))]
     (log/info "Polling events from" f)
     (md/future
@@ -100,10 +98,11 @@
                         true)
                       (do
                         (log/debug "Read next event:" evt)
-                        (when (contains? evt :exit)
-                          ;; TODO Start uploading logs as soon as the file is created instead
-                          ;; of when the command has finished.
-                          (upload-logs evt logger))
+                        ;; Disabled log uploads, we're using promtail now
+                        #_(when (contains? evt :exit)
+                            ;; TODO Start uploading logs as soon as the file is created instead
+                            ;; of when the command has finished.
+                            (upload-logs evt logger))
                         (em/post-events mailman [(make-evt evt rt)])))
                 (if (:done? evt)
                   (set-exit 0)

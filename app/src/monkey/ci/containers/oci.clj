@@ -30,8 +30,8 @@
    the job, but the script that's being executed is replaced by a
    custom shell script that also redirects the output and dispatches
    events to a file, that are then picked up by the sidecar."
-  [job build]
-  (let [wd (c/job-work-dir job build)]
+  [job]
+  (let [wd (c/job-work-dir job)]
     (cond-> {:image-url (mcc/image job)
              :display-name c/job-container-name
              ;; In container instances, command or entrypoint are treated the same
@@ -174,12 +174,12 @@
    a container that runs the job, as configured in the `:job`, and
    next to that a sidecar that is responsible for capturing the output
    and dispatching events.  If configured, it also "
-  [{:keys [job build oci sid] :as conf}]
+  [{:keys [job oci sid] :as conf}]
   (log/debug "Setting up container instance for job using config:" conf)
   (let [ic (oci/instance-config oci)
         sc (-> (sidecar-container ic)
                (update :volume-mounts conj (config-mount)))
-        jc (-> (job-container job build)
+        jc (-> (job-container job)
                ;; Use common volume for logs and events
                (assoc :volume-mounts (filter some? [(find-checkout-vol ic)
                                                     (script-mount job)])))]
@@ -217,11 +217,6 @@
 (defn set-credit-multiplier [ctx cm]
   (assoc ctx ::credit-multiplier cm))
 
-(def get-build (comp :build emi/get-state))
-
-(defn set-build [ctx b]
-  (emi/update-state ctx assoc :build b))
-
 (def get-config ::config)
 
 (defn set-config [ctx c]
@@ -241,8 +236,7 @@
   {:name ::prepare-instance
    :enter (fn [ctx]
             (-> (get-config ctx)
-                (assoc :build (get-build ctx)
-                       :sid (get-in ctx [:event :sid])
+                (assoc :sid (get-in ctx [:event :sid])
                        :job (get-in ctx [:event :job]))
                 (instance-config)
                 (as-> c (oci/set-ci-config ctx c))))})
@@ -303,9 +297,9 @@
   (-> (ci/make-context (:oci conf))
       (oci/add-inv-interceptor :containers)))
 
-(defn make-routes [conf build]
+(defn make-routes [conf]
   (let [client (make-ci-context conf)
-        state (emi/with-state (atom {:build build}))]
+        state (emi/with-state (atom {}))]
     [[:container/job-queued
       ;; TODO Switch to this event type when dispatcher works
       ;;:oci/job-queued

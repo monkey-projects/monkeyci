@@ -203,7 +203,7 @@
       (testing "environment"
         (let [env (:environment-variables jc)]
           (testing "sets work dir to job work dir"
-            (is (= "/opt/monkeyci/checkout/work/test-build/sub" (get env "MONKEYCI_WORK_DIR"))))
+            (is (= "/opt/monkeyci/checkout/work/sub" (get env "MONKEYCI_WORK_DIR"))))
 
           (testing "handles relative work dir"
             (let [env (->> {:job {:script ["first" "second"]
@@ -214,7 +214,7 @@
                            :containers
                            (mc/find-first (cp/prop-pred :display-name "job"))
                            :environment-variables)]
-              (is (= "/opt/monkeyci/checkout/work/test-build/sub" (get env "MONKEYCI_WORK_DIR")))))
+              (is (= "/opt/monkeyci/checkout/work/sub" (get env "MONKEYCI_WORK_DIR")))))
 
           (testing "sets log dir"
             (is (string? (get env "MONKEYCI_LOG_DIR"))))
@@ -226,7 +226,7 @@
             (is (= "test-val" (get env "TEST_ENV"))))))
 
       (testing "sets working dir to job work dir"
-        (is (= "/opt/monkeyci/checkout/work/test-build/sub"
+        (is (= "/opt/monkeyci/checkout/work/sub"
                (:working-directory jc))))))
 
   (testing "sidecar container"
@@ -236,11 +236,7 @@
                          :save-artifacts [{:id "test-artifact"
                                            :path "somewhere"}]
                          :work-dir "sub"}
-                   :build {:customer-id "test-cust"
-                           :repo-id "test-repo"
-                           :build-id "test-build"
-                           :checkout-dir "/tmp/test-checkout"
-                           :workspace "test-build-ws"}
+                   :sid ["test-cust" "test-repo" "test-build"]
                    :events {:type :manifold}
                    :api {:url "http://test-api"
                          :token "test-token"}
@@ -295,17 +291,11 @@
               (testing "contains job details"
                 (is (some? (cs/job data))))
 
-              (testing "contains build details"
-                (is (some? (cs/build data))))
-
-              (testing "build checkout dir parent is container work dir"
-                (is (= cc/work-dir (-> (cs/build data)
-                                       :checkout-dir
-                                       (fs/parent)
-                                       str))))
+              (testing "contains sid"
+                (is (some? (cs/sid data))))
 
               (testing "recalculates job work dir"
-                (is (= "/opt/monkeyci/checkout/work/test-checkout/sub"
+                (is (= "/opt/monkeyci/checkout/work/sub"
                        (-> data
                            (cs/job)
                            :work-dir))))))))
@@ -399,7 +389,7 @@
                      (mc/find-first (cp/prop-pred :display-name "promtail"))))))))
 
 (deftest make-routes
-  (let [routes (sut/make-routes {} (h/gen-build))
+  (let [routes (sut/make-routes {})
         expected [:container/job-queued
                   :container/start
                   :container/end

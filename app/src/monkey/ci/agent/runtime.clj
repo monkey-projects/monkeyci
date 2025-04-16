@@ -33,10 +33,9 @@
 (defmulti make-container-routes :type)
 
 (defmethod make-container-routes :oci [conf deps]
-  ;; FIXME This expects a single build
   (-> deps
       (assoc :oci conf)
-      (c-oci/make-routes {})))
+      (c-oci/make-routes)))
 
 (defmethod make-container-routes :podman [conf deps]
   (c-podman/make-routes deps))

@@ -45,11 +45,10 @@
             dest (fs/create-dirs (fs/path dir "dest"))
             arch (fs/path dir "archive.tgz")
             contents "This is a test file"
-            build {:checkout-dir (str dest)}
             client (fn [_]
                      (md/success-deferred {:status 200
                                            :body (io/input-stream (fs/file arch))}))
-            ws (sut/make-build-api-workspace client build)]
+            ws (sut/make-build-api-workspace client (str dest))]
         (is (nil? (spit (fs/file (fs/path src "test.txt")) contents)))
         (is (not-empty (:entries (blob/make-archive (fs/file src) (fs/file arch)))))
         (is (fs/exists? arch))
