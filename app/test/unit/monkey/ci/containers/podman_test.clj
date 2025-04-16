@@ -107,19 +107,18 @@
       (testing (format "handles `%s`" t)
         (is (contains? (set (map first routes)) t))))))
 
-(deftest copy-ws
+(deftest restore-ws
   (h/with-tmp-dir dir
-    (let [ws (fs/create-dir (fs/path dir "workspace"))
-          wd (fs/create-dir (fs/path dir "workdir"))
-          {:keys [enter] :as i} (sut/copy-ws ws wd)]
+    (let [ws (h/fake-blob-store (atom {"test-build.tgz" "test-dest"}))
+          wd (fs/create-dir (fs/path dir "workdir"))          
+          {:keys [enter] :as i} (sut/restore-ws ws wd)]
       (is (keyword? (:name i)))
-
-      (is (nil? (spit (fs/file (fs/path ws "test.txt")) "test file")))
 
       (testing "`enter`"
         (let [r (-> {:event
-                      {:job-id "test-job"}}
-                     (enter))]
+                     {:sid ["test-build"]
+                      :job-id "test-job"}}
+                    (enter))]
           (testing "adds work dir to context"
             (is (= (fs/path wd "test-job/work")
                    (sut/get-work-dir r))))
@@ -129,9 +128,7 @@
                    (sut/get-log-dir r))))
           
           (testing "copies files from workspace to job work dir"
-            (let [p (fs/path wd "test-job/work/test.txt")]
-              (is (fs/exists? p))
-              (is (= "test file" (slurp (fs/file p)))))))))))
+            (is (empty? @(:stored ws)))))))))
 
 (deftest filter-container-job
   (let [{:keys [enter] :as i} sut/filter-container-job

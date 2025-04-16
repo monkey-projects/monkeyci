@@ -42,6 +42,7 @@
               (-> (select-keys c [:mailman :artifacts :cache])
                   (update :artifacts a/make-blob-repository sid)
                   (update :cache c/make-blob-repository sid)
+                  ;; FIXME Workspace should be a BlobRepository
                   (assoc :workspace (lc/get-workspace config)
                          :work-dir (lc/get-jobs-dir config))
                   (cp/make-routes))))]

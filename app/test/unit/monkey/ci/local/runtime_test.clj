@@ -1,17 +1,17 @@
 (ns monkey.ci.local.runtime-test
-  (:require
-   [clojure.test :refer [deftest is testing]]
-   [com.stuartsierra.component :as co]
-   [manifold.deferred :as md]
-   [manifold.stream :as ms]
-   [monkey.ci.artifacts :as a]
-   [monkey.ci.events.mailman :as em]
-   [monkey.ci.local.config :as lc]
-   [monkey.ci.local.runtime :as sut]
-   [monkey.ci.protocols :as p]
-   [monkey.ci.test.helpers :as h]
-   [monkey.ci.test.mailman :as tm]
-   [monkey.mailman.core :as mmc]))
+  (:require [clojure.test :refer [deftest is testing]]
+            [com.stuartsierra.component :as co]
+            [manifold
+             [deferred :as md]
+             [stream :as ms]]
+            [monkey.ci.events.mailman :as em]
+            [monkey.ci.local
+             [config :as lc]
+             [runtime :as sut]]
+            [monkey.ci.protocols :as p]
+            [monkey.ci.test
+             [helpers :as h]
+             [mailman :as tm]]))
 
 (deftest start-and-post
   (h/with-tmp-dir dir

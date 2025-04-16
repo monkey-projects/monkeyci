@@ -12,7 +12,9 @@
              [cache :as cache]
              [containers :as mcc]
              [jobs :as j]
-             [utils :as u]]
+             [protocols :as p]
+             [utils :as u]
+             [workspace :as ws]]
             [monkey.ci.build.core :as bc]
             [monkey.ci.events.mailman :as em]
             [monkey.ci.events.mailman.interceptors :as emi]))
@@ -124,20 +126,20 @@
 
 ;;; Interceptors
 
-(defn copy-ws
-  "Prepares the job working directory by copying all files from `src`."
-  [src wd]
-  {:name ::copy-ws
+(defn restore-ws
+  "Prepares the job working directory by restoring the files from the workspace."
+  [workspace wd]
+  {:name ::restore-ws
    :enter (fn [ctx]
             (let [job-dir (fs/path wd (get-in ctx [:event :job-id]))
-                  dest (fs/create-dirs (fs/path job-dir "work"))]
-              (log/debug "Copying workspace from" src "to" dest)
-              (fs/copy-tree src dest)
+                  dest (fs/create-dirs (fs/path job-dir "work"))
+                  ws (ws/->BlobWorkspace workspace dest)]
+              (log/debug "Restoring workspace to" dest)
+              #_(fs/copy-tree src dest)
               (-> ctx
+                  (assoc ::workspace @(p/restore-workspace ws (get-in ctx [:event :sid])))
                   (set-work-dir dest)
                   (set-log-dir (fs/create-dirs (fs/path job-dir "logs"))))))})
-
-
 
 (def filter-container-job
   "Interceptor that terminates when the job in the event is not a container job"
@@ -224,7 +226,7 @@
         :interceptors [emi/handle-job-error
                        state
                        save-job
-                       (copy-ws workspace wd)
+                       (restore-ws workspace wd)
                        (emi/add-mailman mailman)
                        (add-job-ctx job-ctx)
                        (cache/restore-interceptor emi/get-job-ctx)
