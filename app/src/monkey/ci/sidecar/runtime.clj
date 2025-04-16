@@ -21,7 +21,8 @@
           paths (juxt cs/events-file cs/start-file cs/abort-file)]
       (-> this
           (merge (zipmap [:job :sid :poll-interval] (props config)))
-          (assoc :paths (zipmap [:events-file :start-file :abort-file] (paths config))))))
+          (assoc :paths (zipmap [:events-file :start-file :abort-file] (paths config))
+                 :checkout-dir cc/work-dir))))
   
   (stop [this]
     this))

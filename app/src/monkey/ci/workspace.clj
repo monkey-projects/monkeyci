@@ -10,45 +10,40 @@
 
 (defn workspace-dest
   "Determines the workspace destination path for this build"
-  [build]
-  (str (cs/join "/" (build/sid build)) b/extension))
+  [sid]
+  (str (cs/join "/" sid) b/extension))
 
 (defn create-workspace [{:keys [checkout-dir] :as build} {ws :workspace}]
-  (let [dest (workspace-dest build)]
+  (let [dest (workspace-dest (build/sid build))]
     (when checkout-dir
       (log/info "Creating workspace using files from" checkout-dir)
       @(md/chain
         (b/save ws checkout-dir dest)   ; TODO Check for errors
         (constantly (assoc build :workspace dest))))))
 
-(defrecord BlobWorkspace [store build]
+(defrecord BlobWorkspace [store dir]
   p/Workspace
-  (restore-workspace [_]
-    (let [ws (:workspace build)
-          checkout (build/checkout-dir build)]
-      (if (and store ws checkout)
-        (do
-          (log/info "Restoring workspace" ws)
-          (b/restore store ws checkout))
-        ;; Did nothing if not configured
-        (md/success-deferred nil)))))
+  (restore-workspace [_ sid]
+    (if (and store sid dir)
+      (let [src (workspace-dest sid)]
+        (log/info "Restoring workspace" src)
+        (b/restore store src dir))
+      ;; Did nothing if not configured
+      (md/success-deferred nil))))
 
 (defn restore
   "Restores the workspace as configured in the build"
-  [{:keys [build] ws :workspace :as rt}]
-  (letfn [(->workspace [x]
-            (cond-> x
-              (not (p/workspace? x))
-              (->BlobWorkspace build)))]
-    (md/chain
-     (p/restore-workspace (->workspace ws))
-     (fn [r?]
-       (cond-> rt
-         r? (assoc-in [:build :workspace/restored?] true))))))
+  [{:keys [sid] ws :workspace :as rt}]
+  (md/chain
+   (p/restore-workspace ws sid)
+   (fn [r?]
+     (cond-> rt
+       r? (assoc :workspace/restored? true)))))
 
 (defrecord BuildApiWorkspace [client dir]
   p/Workspace
-  (restore-workspace [_]
+  (restore-workspace [_ _]
+    ;; sid unused, it's already known via the api request
     (md/chain
      (client {:path "/workspace"
               :method :get})

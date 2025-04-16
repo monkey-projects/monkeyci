@@ -9,6 +9,7 @@
 
 (def home-dir "/home/monkeyci")
 (def checkout-vol "checkout")
+;; TODO Rename to work-dir
 (def checkout-dir "/opt/monkeyci/checkout")
 (def script-dir "/opt/monkeyci/script")
 (def key-dir "/opt/monkeyci/keys")
@@ -31,6 +32,7 @@
   [n]
   (str checkout-dir "/" n))
 
+;; TODO Rename to checkout-dir
 (def work-dir (checkout-subdir "work"))
 (def log-dir (checkout-subdir "log"))
 (def events-dir (checkout-subdir "events"))

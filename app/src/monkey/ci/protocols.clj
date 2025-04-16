@@ -31,8 +31,8 @@
 (def blob-store? (partial satisfies? BlobStore))
 
 (defprotocol Workspace
-  (restore-workspace [this]
-    "Restores the workspace associated with the current build"))
+  (restore-workspace [this sid]
+    "Restores the workspace associated with the given build sid"))
 
 (def workspace? (partial satisfies? Workspace))
 

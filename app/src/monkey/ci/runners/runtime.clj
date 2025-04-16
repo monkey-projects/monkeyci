@@ -8,6 +8,7 @@
              [stream :as ms]]
             [monkey.ci
              [blob :as blob]
+             [build :as b]
              [git :as git]
              [prometheus :as prom]
              [protocols :as p]
@@ -55,7 +56,7 @@
 (defn- prepare-build [{:keys [build] :as config}]
   (-> build
       ;; Checkout paths for git
-      (assoc :workspace (ws/workspace-dest build)
+      (assoc :workspace (ws/workspace-dest (b/sid build))
              :checkout-dir (some->
                             (:checkout-base-dir config)
                             (u/combine (:build-id build))))))

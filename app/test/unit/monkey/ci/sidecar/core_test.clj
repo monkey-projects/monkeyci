@@ -178,146 +178,153 @@
   (restore-blob [_ _ _]
     (md/success-deferred nil)))
 
+(defrecord TestWorkspace []
+  p/Workspace
+  (restore-workspace [this sid]
+    (md/success-deferred "ok")))
+
 (deftest run
-  (with-redefs [sut/mark-start identity
-                sut/poll-events (fn [rt]
-                                  (md/success-deferred (assoc rt :exit-code 0)))]
-    
-    (testing "restores src from workspace"
-      (with-redefs [ws/restore (constantly {:stage ::restored})
-                    sut/poll-events (fn [rt]
-                                      (when (= ::restored (:stage rt))
-                                        {:stage ::polling}))]
-        (is (= ::polling (:stage @(sut/run (trs/make-test-rt)))))))
+  (let [test-rt (trs/make-test-rt
+                 {:workspace (->TestWorkspace)})]
+    (with-redefs [sut/mark-start identity
+                  sut/poll-events (fn [rt]
+                                    (md/success-deferred (assoc rt :exit-code 0)))]
+      
+      (testing "restores src from workspace"
+        (with-redefs [ws/restore (constantly {:stage ::restored})
+                      sut/poll-events (fn [rt]
+                                        (when (= ::restored (:stage rt))
+                                          {:stage ::polling}))]
+          (is (= ::polling (:stage @(sut/run (trs/make-test-rt)))))))
 
-    (testing "restores and saves caches if configured"
-      (h/with-tmp-dir dir
-        (let [stored (atom {})
-              path "test-path"
-              _ (fs/create-file (fs/path dir path))
-              build {:customer-id "test-cust"
-                     :repo-id "test-repo"
-                     :build-id "test-build"
-                     :checkout-dir dir
-                     :workspace "test-ws"}
-              sid (b/sid build)
-              cache (ca/make-blob-repository (h/fake-blob-store stored) sid)
-              r (sut/run
-                  (trs/make-test-rt
-                   {:sid sid
-                    :logging {:maker (l/make-logger {})}
-                    :cache cache
-                    :job 
-                    {:id "test-job"
-                     :container/image "test-img"
-                     :script ["first" "second"]
-                     :caches [{:id "test-cache"
-                               :path path}]}}))]
-          (is (map? (deref r 500 :timeout)))
-          (is (not-empty @stored)))))
-    
-    (testing "restores artifacts if configured"
-      (h/with-tmp-dir dir
-        (let [stored (atom {"test-cust/test-repo/test-build/test-artifact.tgz" "/tmp/checkout"})
-              build {:customer-id "test-cust"
-                     :repo-id "test-repo"
-                     :build-id "test-build"
-                     :checkout-dir "/tmp/checkout"
-                     :workspace "test-ws"}
-              sid (b/sid build)
-              repo (art/make-blob-repository (h/fake-blob-store stored) sid)
-              tr (sut/run
-                  (trs/make-test-rt
-                   {:containers {:type :podman}
-                    :sid sid
-                    :work-dir dir
-                    :logging {:maker (l/make-logger {})}
-                    :artifacts repo
-                    :job 
-                    {:id "test-job"
-                     :container/image "test-img"
-                     :script ["first" "second"]
-                     :restore-artifacts [{:id "test-artifact"
-                                          :path "test-path"}]}}))]
-          (is (empty? @stored)))))
-
-    (testing "saves artifacts if configured"
-      (h/with-tmp-dir dir
-        (let [stored (atom {})
-              path "test-artifact"
-              _ (fs/create-file (fs/path dir path))
-              build {:customer-id "test-cust"
-                     :repo-id "test-repo"
-                     :build-id "test-build"
-                     :checkout-dir dir
-                     :workspace "test-ws"}
-              sid (b/sid build)
-              repo (art/make-blob-repository (h/fake-blob-store stored) sid)
-              r (sut/run
-                  (trs/make-test-rt
-                   {:containers {:type :podman}
-                    :sid sid
-                    :logging {:maker (l/make-logger {})}
-                    :artifacts repo
-                    :job 
-                    {:id "test-job"
-                     :container/image "test-img"
-                     :script ["first" "second"]
-                     :save-artifacts [{:id "test-artifact"
-                                       :path path}]}}))]
-          (is (not-empty @stored)))))
-
-    (testing "waits until artifacts have been stored"
-      ;; Set up blob saving so it takes a while
-      (is (= ::timeout (-> {:artifacts (art/make-blob-repository (->SlowBlobStore 1000) [])
-                            :job {:id "test-job"
-                                  :save-artifacts [{:id "test-artifact"
-                                                    :path "test-path"}]}}
-                           (trs/make-test-rt)
-                           (sut/run)
-                           (deref 100 ::timeout)))
-          "expected timeout while waiting for blobs to save"))
-
-    (testing "restores artifacts and caches before creating start file"
-      (let [actions (atom [])
-            mark-action (fn [t]
-                          (fn [rt]
-                            (swap! actions conj t)
-                            rt))]
-        (with-redefs [sut/mark-start (mark-action ::started)
-                      art/restore-artifacts (mark-action ::restore-artifacts)]
-          (is (some? (deref (sut/run (trs/make-test-rt)))))
-          (is (= [::restore-artifacts ::started] @actions)))))
-
-    (testing "blocks until caches have been stored"
-      ;; Set up blob saving so it takes a while
-      (is (= ::timeout (-> {:cache (ca/make-blob-repository (->SlowBlobStore 1000) [])
-                            :job {:id "test-job"
-                                  :caches [{:id "test-artifact"
-                                            :path "test-path"}]}}
-                           (trs/make-test-rt)
-                           (sut/run)
-                           (deref 100 ::timeout)))))
-
-    (testing "aborts on async error"
-      (with-redefs [sut/poll-events (constantly (md/error-deferred (ex-info "test error" {})))]
+      (testing "restores and saves caches if configured"
         (h/with-tmp-dir dir
-          (let [abort-file (io/file dir "abort")]
-            (is (some? (-> (trs/make-test-rt)
-                           (trs/set-abort-file (str abort-file))
-                           (sut/run)
-                           deref
-                           :exception)))
-            (is (fs/exists? abort-file))))))
-
-    (testing "aborts on exception thrown"
-      (with-redefs [ws/restore (fn [_] (throw (ex-info "test error" {})))]
+          (let [stored (atom {})
+                path "test-path"
+                _ (fs/create-file (fs/path dir path))
+                sid (repeatedly 3 cuid/random-cuid)
+                cache (ca/make-blob-repository (h/fake-blob-store stored) sid)
+                r (sut/run
+                    (merge
+                     test-rt
+                     {:sid sid
+                      :checkout-dir dir
+                      :logging {:maker (l/make-logger {})}
+                      :cache cache
+                      :job 
+                      {:id "test-job"
+                       :container/image "test-img"
+                       :script ["first" "second"]
+                       :caches [{:id "test-cache"
+                                 :path path}]}}))]
+            (is (map? (deref r 500 :timeout)))
+            (is (not-empty @stored)))))
+      
+      (testing "restores artifacts if configured"
         (h/with-tmp-dir dir
-          (let [abort-file (io/file dir "abort")]
-            (is (some? (-> (trs/make-test-rt)
-                           (trs/set-abort-file (str abort-file))
-                           (sut/run)
-                           deref
-                           :exception)))
-            (is (fs/exists? abort-file))))))))
+          (let [stored (atom {"test-cust/test-repo/test-build/test-artifact.tgz" "/tmp/checkout"})
+                build {:customer-id "test-cust"
+                       :repo-id "test-repo"
+                       :build-id "test-build"
+                       :checkout-dir "/tmp/checkout"
+                       :workspace "test-ws"}
+                sid (b/sid build)
+                repo (art/make-blob-repository (h/fake-blob-store stored) sid)
+                tr (sut/run
+                     (merge
+                      test-rt
+                      {:containers {:type :podman}
+                       :sid sid
+                       :work-dir dir
+                       :logging {:maker (l/make-logger {})}
+                       :artifacts repo
+                       :job 
+                       {:id "test-job"
+                        :container/image "test-img"
+                        :script ["first" "second"]
+                        :restore-artifacts [{:id "test-artifact"
+                                             :path "test-path"}]}}))]
+            (is (empty? @stored)))))
+
+      (testing "saves artifacts if configured"
+        (h/with-tmp-dir dir
+          (let [stored (atom {})
+                path "test-artifact"
+                _ (fs/create-file (fs/path dir path))
+                build {:customer-id "test-cust"
+                       :repo-id "test-repo"
+                       :build-id "test-build"
+                       :checkout-dir dir
+                       :workspace "test-ws"}
+                sid (b/sid build)
+                repo (art/make-blob-repository (h/fake-blob-store stored) sid)
+                r (sut/run
+                    (merge
+                     test-rt
+                     {:containers {:type :podman}
+                      :sid sid
+                      :logging {:maker (l/make-logger {})}
+                      :artifacts repo
+                      :job 
+                      {:id "test-job"
+                       :container/image "test-img"
+                       :script ["first" "second"]
+                       :save-artifacts [{:id "test-artifact"
+                                         :path path}]}}))]
+            (is (not-empty @stored)))))
+
+      (testing "waits until artifacts have been stored"
+        ;; Set up blob saving so it takes a while
+        (is (= ::timeout (-> {:artifacts (art/make-blob-repository (->SlowBlobStore 1000) [])
+                              :workspace (->TestWorkspace)
+                              :job {:id "test-job"
+                                    :save-artifacts [{:id "test-artifact"
+                                                      :path "test-path"}]}}
+                             (trs/make-test-rt)
+                             (sut/run)
+                             (deref 100 ::timeout)))
+            "expected timeout while waiting for blobs to save"))
+
+      (testing "restores artifacts and caches before creating start file"
+        (let [actions (atom [])
+              mark-action (fn [t]
+                            (fn [rt]
+                              (swap! actions conj t)
+                              rt))]
+          (with-redefs [sut/mark-start (mark-action ::started)
+                        art/restore-artifacts (mark-action ::restore-artifacts)]
+            (is (some? (deref (sut/run test-rt))))
+            (is (= [::restore-artifacts ::started] @actions)))))
+
+      (testing "blocks until caches have been stored"
+        ;; Set up blob saving so it takes a while
+        (is (= ::timeout (-> test-rt
+                             (merge {:cache (ca/make-blob-repository (->SlowBlobStore 1000) [])
+                                     :job {:id "test-job"
+                                           :caches [{:id "test-artifact"
+                                                     :path "test-path"}]}})
+                             (sut/run)
+                             (deref 100 ::timeout)))))
+
+      (testing "aborts on async error"
+        (with-redefs [sut/poll-events (constantly (md/error-deferred (ex-info "test error" {})))]
+          (h/with-tmp-dir dir
+            (let [abort-file (io/file dir "abort")]
+              (is (some? (-> test-rt
+                             (trs/set-abort-file (str abort-file))
+                             (sut/run)
+                             deref
+                             :exception)))
+              (is (fs/exists? abort-file))))))
+
+      (testing "aborts on exception thrown"
+        (with-redefs [ws/restore (fn [_] (throw (ex-info "test error" {})))]
+          (h/with-tmp-dir dir
+            (let [abort-file (io/file dir "abort")]
+              (is (some? (-> test-rt
+                             (trs/set-abort-file (str abort-file))
+                             (sut/run)
+                             deref
+                             :exception)))
+              (is (fs/exists? abort-file)))))))))
 

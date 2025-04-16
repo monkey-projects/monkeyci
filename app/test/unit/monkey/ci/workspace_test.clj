@@ -10,32 +10,15 @@
             [monkey.ci.test.helpers :as h]))
 
 (deftest restore
-  (testing "nothing if no workspace in build"
-    (let [rt {}]
-      (is (= rt @(sut/restore rt)))))
-
-  (testing "restores using blob with the workspace path in build into checkout dir"
-    (let [stored (atom {"path/to/workspace" "local"})
+  (testing "restores to checkout dir"
+    (let [stored (atom {"test-cust/test-repo.tgz" "local"})
           store (h/strict-fake-blob-store stored)
-          rt {:build {:workspace "path/to/workspace"
-                      :checkout-dir "local"}
-              :workspace store}]
-      (is (true? (-> (sut/restore rt)
-                     (deref)
-                     (get-in [:build :workspace/restored?]))))
-      (is (empty? @stored))))
-
-  (testing "restores using workspace given"
-    (let [stored (atom {"path/to/workspace" "local"})
-          store (h/strict-fake-blob-store stored)
-          build {:workspace "path/to/workspace"
-                 :checkout-dir "local"}
-          ws (sut/->BlobWorkspace store build)
-          rt {:build build
+          ws (sut/->BlobWorkspace store "local")
+          rt {:sid ["test-cust" "test-repo"]
               :workspace ws}]
       (is (true? (-> (sut/restore rt)
                      (deref)
-                     (get-in [:build :workspace/restored?]))))
+                     :workspace/restored?)))
       (is (empty? @stored)))))
 
 (deftest build-api-workspace
@@ -52,5 +35,5 @@
         (is (nil? (spit (fs/file (fs/path src "test.txt")) contents)))
         (is (not-empty (:entries (blob/make-archive (fs/file src) (fs/file arch)))))
         (is (fs/exists? arch))
-        (is (not-empty (:entries @(p/restore-workspace ws))))
+        (is (not-empty (:entries @(p/restore-workspace ws nil))))
         (is (fs/exists? (fs/path dest "test.txt")))))))
