@@ -1,9 +1,8 @@
 (ns monkey.ci.containers.common
-  (:require [babashka.fs :as fs]
-            [monkey.ci
+  (:require [monkey.ci
              [build :as b]
+             [containers :as c]
              [utils :as u]]
-            [monkey.ci.containers :as c]
             [monkey.ci.events.builders :as eb]
             [monkey.ci.events.mailman.interceptors :as emi]
             [monkey.ci.sidecar.config :as sc]))
@@ -39,20 +38,11 @@
 (def abort-file (str events-dir "/abort"))
 (def event-file (str events-dir "/events.edn"))
 
-(defn base-work-dir
-  "Determines the base work dir to use inside the container"
-  [build]
-  (some->> (b/checkout-dir build)
-           (fs/file-name)
-           (fs/path work-dir)
-           (str)))
-
 (defn job-work-dir
-  "The work dir to use for the job in the container.  This is the external job
-   work dir, relative to the container checkout dir."
-  [job build]
+  "The work dir to use for the job in the container."
+  [job]
   (let [wd (:work-dir job)]
-    (cond-> (base-work-dir build)
+    (cond-> work-dir
       wd (u/combine wd))))
 
 (def sidecar-cmd
@@ -69,14 +59,12 @@
 (defn make-sidecar-config
   "Creates a configuration map using the runtime, that can then be passed on to the
    sidecar container."
-  [{:keys [build job] :as conf}]
+  [{:keys [sid job] :as conf}]
   (-> {}
-      (sc/set-build (-> build
-                        (select-keys (conj b/sid-props :workspace))
-                        (assoc :checkout-dir (base-work-dir build))))
+      (sc/set-sid sid)
       (sc/set-job (-> job
                       (select-keys [:id :save-artifacts :restore-artifacts :caches :dependencies])
-                      (assoc :work-dir (job-work-dir job build))))
+                      (assoc :work-dir (job-work-dir job))))
       (sc/set-events-file event-file)
       (sc/set-start-file start-file)
       (sc/set-abort-file abort-file)

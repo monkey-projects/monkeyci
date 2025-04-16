@@ -16,12 +16,17 @@
             [monkey.ci.runtime.common :as rc]
             [monkey.ci.web.http :as wh]))
 
+(defn run-agent [conf waiter]
+  (log/info "Starting build agent")
+  (rc/with-system-async
+    (ar/make-system conf)
+    (fn [{:keys [api-server] :as  sys}]
+      (log/debug "API server started at port" (:port api-server))
+      (waiter sys))))
+
 (defn -main [& args]
   (try
-    (log/info "Starting build agent")
-    (rc/with-system
-      (ar/make-system (c/load-config-file (first args)))
-      (fn [sys]
-        (wh/on-server-close (:api-server sys))))
+    @(run-agent (c/load-config-file (first args))
+                (comp wh/on-server-close :api-server))
     (finally
       (log/info "Build agent terminated."))))

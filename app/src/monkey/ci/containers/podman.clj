@@ -2,27 +2,19 @@
   "Functions for running containers using Podman.  We don't use the api here, because
    it requires a socket, which is not always available.  Instead, we invoke the podman
    command as a child process and communicate with it using the standard i/o streams."
-  (:require [babashka
-             [fs :as fs]
-             [process :as bp]]
+  (:require [babashka.fs :as fs]
             [cheshire.core :as json]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
-            [manifold.deferred :as md]
             [monkey.ci
              [artifacts :as art]
              [build :as b]
              [cache :as cache]
              [containers :as mcc]
              [jobs :as j]
-             [logging :as l]
-             [protocols :as p]
-             [runtime :as rt]
              [utils :as u]]
             [monkey.ci.build.core :as bc]
-            [monkey.ci.events
-             [core :as ec]
-             [mailman :as em]]
+            [monkey.ci.events.mailman :as em]
             [monkey.ci.events.mailman.interceptors :as emi]))
 
 ;;; Process commandline configuration
@@ -91,6 +83,7 @@
       ;; TODO Execute script command per command
       (make-script-cmd (:script job)))))
   ([job {:keys [build] :as conf}]
+   ;; Deprecated
    (build-cmd-args job
                    (b/get-job-sid job build)
                    (b/checkout-dir build)
@@ -99,11 +92,6 @@
 ;;; Mailman event handling
 
 ;;; Context management
-
-(def get-build (comp :build emi/get-state))
-
-(defn set-build [ctx b]
-  (emi/update-state ctx assoc :build b))
 
 (defn get-job
   ([ctx id]
@@ -187,13 +175,12 @@
 (defn prepare-child-cmd
   "Prepares podman command to execute as child process"
   [ctx]
-  (let [build (get-build ctx)
-        job (get-in ctx [:event :job])
+  (let [job (get-in ctx [:event :job])
         log-file (comp fs/file (partial fs/path (get-log-dir ctx)))
         {:keys [job-id sid]} (:event ctx)]
     ;; TODO Prepare job script in separate dir and mount it in the container for execution
     {:cmd (build-cmd-args job
-                          (b/get-job-sid job build)
+                          (conj sid job-id)
                           (get-work-dir ctx)
                           {})
      :dir (job-work-dir ctx job)
@@ -226,9 +213,8 @@
 (defn- make-job-ctx [conf]
   (select-keys conf [:build :artifacts :cache]))
 
-(defn make-routes [{:keys [build workspace work-dir mailman] :as conf}]
-  (log/debug "Creating podman event routes for build" build)
-  (let [state (emi/with-state (atom {:build build}))
+(defn make-routes [{:keys [workspace work-dir mailman] :as conf}]
+  (let [state (emi/with-state (atom {}))
         job-ctx (make-job-ctx conf)]
     [[:container/job-queued
       [{:handler prepare-child-cmd

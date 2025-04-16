@@ -1,10 +1,10 @@
 (ns monkey.ci.sidecar.runtime-test
-  (:require
-   [clojure.spec.alpha :as spec]
-   [clojure.test :refer [deftest is testing]]
-   [monkey.ci.sidecar.config :as sc]
-   [monkey.ci.sidecar.runtime :as sut]
-   [monkey.ci.spec.sidecar :as ss]))
+  (:require [clojure.spec.alpha :as spec]
+            [clojure.test :refer [deftest is testing]]
+            [monkey.ci.sidecar
+             [config :as sc]
+             [runtime :as sut]]
+            [monkey.ci.spec.sidecar :as ss]))
 
 (def config
   (-> {}
@@ -16,10 +16,7 @@
       (sc/set-workspace {:type :disk
                          :dir "test-dir"})
       (sc/set-job {:id "test-job"})
-      (sc/set-build {:customer-id "test-cust"
-                     :repo-id "test-repo"
-                     :build-id "test-build"
-                     :workspace "test/workspace"})))
+      (sc/set-sid ["test-cust" "test-repo" "test-build"])))
 
 (deftest make-system
   (testing "creates system map with runtime"

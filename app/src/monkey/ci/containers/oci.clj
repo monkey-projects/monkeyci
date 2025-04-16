@@ -12,7 +12,7 @@
              [jobs :as j]
              [oci :as oci]]
             [monkey.ci.containers
-             [common :as c :refer :all]
+             [common :as c]
              [promtail :as pt]]
             [monkey.ci.events.builders :as eb]
             [monkey.ci.events.mailman.interceptors :as emi]
@@ -30,10 +30,10 @@
    the job, but the script that's being executed is replaced by a
    custom shell script that also redirects the output and dispatches
    events to a file, that are then picked up by the sidecar."
-  [job build]
-  (let [wd (job-work-dir job build)]
+  [job]
+  (let [wd (c/job-work-dir job)]
     (cond-> {:image-url (mcc/image job)
-             :display-name job-container-name
+             :display-name c/job-container-name
              ;; In container instances, command or entrypoint are treated the same
              ;; Note that when using container commands directly, the job will most
              ;; likely start without the workspace being restored.  This is a limitation
@@ -46,7 +46,7 @@
              :environment-variables (mcc/env job)
              :working-directory wd}
       ;; Override some props if script is specified
-      (:script job) (-> (assoc :command [(get job :shell "/bin/sh") (str script-dir "/" job-script)]
+      (:script job) (-> (assoc :command [(get job :shell "/bin/sh") (str c/script-dir "/" c/job-script)]
                                ;; One file arg per script line, with index as name
                                :arguments (->> (count (:script job))
                                                (range)
@@ -54,15 +54,15 @@
                         (update :environment-variables
                                 merge
                                 {"MONKEYCI_WORK_DIR" wd
-                                 "MONKEYCI_LOG_DIR" log-dir
-                                 "MONKEYCI_SCRIPT_DIR" script-dir
-                                 "MONKEYCI_START_FILE" start-file
-                                 "MONKEYCI_ABORT_FILE" abort-file
-                                 "MONKEYCI_EVENT_FILE" event-file})))))
+                                 "MONKEYCI_LOG_DIR" c/log-dir
+                                 "MONKEYCI_SCRIPT_DIR" c/script-dir
+                                 "MONKEYCI_START_FILE" c/start-file
+                                 "MONKEYCI_ABORT_FILE" c/abort-file
+                                 "MONKEYCI_EVENT_FILE" c/event-file})))))
 
 (defn- sidecar-container [{[c] :containers}]
   (assoc c
-         :display-name sidecar-container-name
+         :display-name c/sidecar-container-name
          :command c/sidecar-cmd
          ;; Run as root, because otherwise we can't write to the shared volumes
          :security-context {:security-context-type "LINUX"
@@ -77,26 +77,26 @@
 (defn- promtail-container [conf]
   (-> conf
       (pt/promtail-container)
-      (assoc :arguments ["-config.file" (str promtail-config-dir "/" promtail-config-file)])))
+      (assoc :arguments ["-config.file" (str c/promtail-config-dir "/" c/promtail-config-file)])))
 
 (defn- promtail-config-mount []
-  {:volume-name promtail-config-vol
+  {:volume-name c/promtail-config-vol
    :is-read-only true
    :mount-path "/etc/promtail"})
 
 (defn- promtail-config-vol-config [conf]
   (let [conf (-> conf
-                 (assoc :paths [(str log-dir "/*.log")]))]
-    {:name promtail-config-vol
+                 (assoc :paths [(str c/log-dir "/*.log")]))]
+    {:name c/promtail-config-vol
      :volume-type "CONFIGFILE"
-     :configs [(oci/config-entry promtail-config-file
+     :configs [(oci/config-entry c/promtail-config-file
                                  (pt/yaml-config conf))]}))
 
 (defn- add-promtail-container
   "Adds promtail container configuration to the existing instance config.
    It will be configured to push all logs from the script log dir."
-  [ic {:keys [promtail job build]}]
-  (let [conf (pt/make-config promtail job build)
+  [ic {:keys [promtail job sid]}]
+  (let [conf (pt/make-config promtail job sid)
         add? (some? (:loki-url conf))]
     (cond-> ic
       add?
@@ -105,23 +105,23 @@
                                                               (promtail-config-mount)])))
           (update :volumes conj (promtail-config-vol-config conf))))))
 
-(defn- display-name [job build]
-  (cs/join "-" [(:build-id build)
+(defn- display-name [job sid]
+  (cs/join "-" [(last sid)
                 (j/job-id job)]))
 
 (defn- script-mount [job]
   (when (:script job)
-    {:volume-name script-vol
+    {:volume-name c/script-vol
      :is-read-only false
-     :mount-path script-dir}))
+     :mount-path c/script-dir}))
 
 (defn- config-mount []
-  {:volume-name config-vol
+  {:volume-name c/config-vol
    :is-read-only true
-   :mount-path config-dir})
+   :mount-path c/config-dir})
 
 (defn- job-script-entry []
-  (oci/config-entry job-script (slurp (io/resource job-script))))
+  (oci/config-entry c/job-script (slurp (io/resource c/job-script))))
 
 (defn- script-vol-config
   "Adds the job script and a file for each script line as a configmap volume."
@@ -131,7 +131,7 @@
       (log/debug "Executing script lines in container:")
       (doseq [l script]
         (log/debug "  " l)))
-    {:name script-vol
+    {:name c/script-vol
      :volume-type "CONFIGFILE"
      :configs (->> script
                    (map-indexed (fn [i s]
@@ -143,11 +143,11 @@
 
 (defn- config-vol-config
   "Configuration files for the sidecar (e.g. logging)"
-  [{:keys [job build sidecar] :as conf}]
+  [{:keys [job sidecar] :as conf}]
   (let [{:keys [log-config]} sidecar]
-    {:name config-vol
+    {:name c/config-vol
      :volume-type "CONFIGFILE"
-     :configs (cond-> [(oci/config-entry config-file (rt->edn conf))]
+     :configs (cond-> [(oci/config-entry c/config-file (rt->edn conf))]
                 log-config (conj (oci/config-entry "logback.xml" log-config)))}))
 
 (defn- set-pod-shape [ic job]
@@ -174,21 +174,21 @@
    a container that runs the job, as configured in the `:job`, and
    next to that a sidecar that is responsible for capturing the output
    and dispatching events.  If configured, it also "
-  [{:keys [job build oci] :as conf}]
+  [{:keys [job oci sid] :as conf}]
   (log/debug "Setting up container instance for job using config:" conf)
   (let [ic (oci/instance-config oci)
         sc (-> (sidecar-container ic)
                (update :volume-mounts conj (config-mount)))
-        jc (-> (job-container job build)
+        jc (-> (job-container job)
                ;; Use common volume for logs and events
                (assoc :volume-mounts (filter some? [(find-checkout-vol ic)
                                                     (script-mount job)])))]
     (-> ic
         (assoc :containers [sc jc]
-               :display-name (display-name job build))
+               :display-name (display-name job sid))
         (update :freeform-tags (fn [t]
                                  (-> t
-                                     (merge (oci/sid->tags (b/sid build)))
+                                     (merge (oci/sid->tags sid))
                                      (assoc "job-id" (j/job-id job)))))
         (update :volumes concat
                 (filter some? [(script-vol-config job)
@@ -217,18 +217,13 @@
 (defn set-credit-multiplier [ctx cm]
   (assoc ctx ::credit-multiplier cm))
 
-(def get-build (comp :build emi/get-state))
-
-(defn set-build [ctx b]
-  (emi/update-state ctx assoc :build b))
-
 (def get-config ::config)
 
 (defn set-config [ctx c]
   (assoc ctx ::config c))
 
 (defn get-instance-id [ctx]
-  (job-state ctx :instance-id))
+  (c/job-state ctx :instance-id))
 
 ;;; Interceptors
 
@@ -241,7 +236,7 @@
   {:name ::prepare-instance
    :enter (fn [ctx]
             (-> (get-config ctx)
-                (assoc :build (get-build ctx)
+                (assoc :sid (get-in ctx [:event :sid])
                        :job (get-in ctx [:event :job]))
                 (instance-config)
                 (as-> c (oci/set-ci-config ctx c))))})
@@ -302,9 +297,9 @@
   (-> (ci/make-context (:oci conf))
       (oci/add-inv-interceptor :containers)))
 
-(defn make-routes [conf build]
+(defn make-routes [conf]
   (let [client (make-ci-context conf)
-        state (emi/with-state (atom {:build build}))]
+        state (emi/with-state (atom {}))]
     [[:container/job-queued
       ;; TODO Switch to this event type when dispatcher works
       ;;:oci/job-queued

@@ -41,8 +41,8 @@
 (defn job-arch [job]
   (get job :arch default-arch))
 
-(defn- job-container [{:keys [job build]}]
-  (let [wd (c/job-work-dir job build)]
+(defn- job-container [{:keys [job]}]
+  (let [wd (c/job-work-dir job)]
     (cond-> {:name c/job-container-name
              :restart-policy "Never"
              :image (co/image job)

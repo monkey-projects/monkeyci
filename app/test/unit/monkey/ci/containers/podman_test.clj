@@ -241,7 +241,6 @@
                       :image "test-image"}
                 :job-id "test-job"
                 :sid ["test" "build"]}
-               (sut/set-build (h/gen-build))
                (sut/prepare-child-cmd)
                :cmd
                first)))))

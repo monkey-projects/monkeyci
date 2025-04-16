@@ -8,6 +8,7 @@
              [spec :as spec]
              [workspace :as ws]]
             [monkey.ci.build.api :as api]
+            [monkey.ci.containers.common :as cc]
             [monkey.ci.events.mailman.build-api :as eba]
             [monkey.ci.runtime.common :as rc]
             [monkey.ci.sidecar.config :as cs]
@@ -16,10 +17,10 @@
 (defrecord SidecarRuntime [mailman log-maker workspace artifacts cache]
   co/Lifecycle
   (start [{:keys [config] :as this}]
-    (let [props (juxt cs/job cs/build cs/poll-interval)
+    (let [props (juxt cs/job cs/sid cs/poll-interval)
           paths (juxt cs/events-file cs/start-file cs/abort-file)]
       (-> this
-          (merge (zipmap [:job :build :poll-interval] (props config)))
+          (merge (zipmap [:job :sid :poll-interval] (props config)))
           (assoc :paths (zipmap [:events-file :start-file :abort-file] (paths config))))))
   
   (stop [this]
@@ -38,8 +39,8 @@
 (defn- new-log-maker [config]
   (l/make-logger {:logging (cs/log-maker config)}))
 
-(defn- new-workspace [config]
-  (ws/make-build-api-workspace nil (cs/build config)))
+(defn- new-workspace [_]
+  (ws/make-build-api-workspace nil cc/work-dir))
 
 (defn- new-artifacts []
   (art/make-build-api-repository nil))

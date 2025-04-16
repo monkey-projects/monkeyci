@@ -1,6 +1,7 @@
 (ns monkey.ci.runtime.app
   "Functions for setting up a runtime for application (cli or server)"
-  (:require [com.stuartsierra.component :as co]
+  (:require [clojure.tools.logging :as log]
+            [com.stuartsierra.component :as co]
             [manifold.bus :as mb]
             [monkey.ci
              [blob :as blob]
@@ -130,6 +131,11 @@
                             (:vault c)))]
     (em/map->RouteComponent {:make-routes make-routes
                              :destinations (emj/queue-destinations (:mailman config))})))
+
+(defmethod make-server-runner :agent [_]
+  ;; Agent is a separate process, so don't do anything here.
+  (log/debug "Agent runner configured, make sure one or more agents are running.")
+  {})
 
 ;; TODO Add other runners
 

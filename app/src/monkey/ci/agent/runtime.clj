@@ -5,6 +5,9 @@
             [monkey.ci.agent
              [api-server :as aa]
              [events :as e]]
+            [monkey.ci.containers
+             [oci :as c-oci]
+             [podman :as c-podman]]
             [monkey.ci.events.mailman :as em]
             [monkey.ci.runners.runtime :as rr]))
 
@@ -19,13 +22,34 @@
       (.close srv))))
 
 (defn new-api-server [config]
-  (map->ApiServer (select-keys config [:api-config])))
+  (->ApiServer nil (:agent config)))
 
 (defn new-agent-routes [config]
   (letfn [(make-routes [co]
-            (e/make-routes (-> (select-keys config [:work-dir])
-                               (merge (select-keys co [:git :mailman :builds :api-server])))))]
+            (e/make-routes (-> (:agent config)
+                               (merge co))))]
     (em/map->RouteComponent {:make-routes make-routes})))
+
+(defmulti make-container-routes :type)
+
+(defmethod make-container-routes :oci [conf deps]
+  (-> deps
+      (assoc :oci conf)
+      (c-oci/make-routes)))
+
+(defmethod make-container-routes :podman [conf deps]
+  (c-podman/make-routes deps))
+
+(defmethod make-container-routes :default [conf]
+  (log/warn "Unknown container runner type:" (:type conf))
+  {})
+
+(defn new-container-routes [config]
+  (em/map->RouteComponent
+   {:make-routes (fn [co]
+                   (make-container-routes (:containers config) co))}))
+
+(def global-to-local-events #{:build/queued :build/canceled})
 
 (defn make-system [conf]
   (co/system-map
@@ -37,16 +61,20 @@
    :git (rr/new-git)
    :api-server (co/using
                 (new-api-server conf)
-                [:builds :artifacts :cache :workspace :mailman :event-stream])
+                [:builds :artifacts :cache :workspace :mailman :event-stream :params])
    :mailman (rr/new-local-mailman)
    :global-mailman (rr/new-mailman conf)
    :local-to-global (co/using
-                     (rr/new-local-to-global-forwarder)
+                     (rr/new-local-to-global-forwarder global-to-local-events)
                      [:global-mailman :mailman :event-stream])
    :global-to-local (co/using
-                     (rr/global-to-local-routes #{:build/queued :build/canceled})
+                     (rr/global-to-local-routes global-to-local-events)
                      {:mailman :global-mailman
                       :local-mailman :mailman})
    :agent-routes (co/using
                   (new-agent-routes conf)
-                  [:mailman :api-server :git :builds])))
+                  [:mailman :api-server :git :builds :workspace])
+   :params (rr/new-params conf)
+   :container-routes (co/using
+                      (new-container-routes conf)
+                      [:mailman :artifacts :cache :workspace :api-server])))

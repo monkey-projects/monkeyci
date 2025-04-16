@@ -9,7 +9,7 @@
 
 (deftest main
   (with-redefs [wh/on-server-close (fn [s]
-                                     (.close (:server s)))]
+                                     (future (.close (:server s))))]
     (h/with-tmp-dir dir
       (let [config-file (fs/path dir "config.edn")]
         (is (nil? (spit (fs/file config-file) (pr-str tc/base-config))))

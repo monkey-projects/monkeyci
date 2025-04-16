@@ -54,18 +54,19 @@
 
 (defn mkdirs! [f]
   (if (and f (fs/exists? f))
-    (when-not (.isDirectory f)
+    (when-not (fs/directory? f)
       (throw (ex-info "Directory cannot be created, already exists as a file" {:dir f})))
-    (when-not (.mkdirs f)
+    (when-not (fs/create-dirs f)
       (throw (ex-info "Unable to create directory" {:dir f}))))
   f)
 
 (defn ensure-dir-exists!
   "If `f` is a file, ensures that the directory containing `f` exists."
-  [^java.io.File f]
-  (when f
-    (mkdirs! (.getParentFile f))
-    f))
+  [f]
+  (let [p (some-> f fs/parent)]
+    (when p
+      (mkdirs! p)))
+  f)
 
 (defn add-shutdown-hook!
   "Executes `h` when the JVM shuts down.  Returns the thread that will

@@ -209,10 +209,6 @@
 
 (def work-dir cc/work-dir)
 
-(def base-work-dir
-  "Determines the base work dir to use inside the container"
-  cc/base-work-dir)
-
 (defn credit-multiplier
   "Calculates the credit multiplier that needs to be applied for the container
    instance.  This varies depending on the architecture, number of cpu's and 

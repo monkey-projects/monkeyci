@@ -25,7 +25,7 @@
         com.monkeyprojects/mailman-jms {:mvn/version "0.2.5"}
         com.monkeyprojects/mailman-manifold {:mvn/version "0.2.5"}
         com.monkeyprojects/monkey-jms-artemis {:mvn/version "0.3.2"}
-        com.monkeyprojects/oci-container-instance {:mvn/version "0.2.4-SNAPSHOT"}
+        com.monkeyprojects/oci-container-instance {:mvn/version "0.2.4"}
         com.monkeyprojects/oci-os {:mvn/version "0.4.1"}
         com.monkeyprojects/oci-sign {:mvn/version "0.1.4"}
         com.monkeyprojects/oci-vault {:mvn/version "0.2.1"}
@@ -106,13 +106,17 @@
   ;; clj -M:dispatcher
   {:main-opts ["-m" "monkey.ci.dispatcher.main"]}
 
+  :agent
+  ;; clj -M:agent
+  {:main-opts ["-m" "monkey.ci.agent.main"]}
+
   :jar
   {:extra-deps {com.monkeyprojects/build {:mvn/version "0.3.1"
                                           :exclusions [org.slf4j/slfj4-nop]}}
    :exec-fn monkey.build/jar
    :exec-args {:jar "target/monkeyci.jar"
                :lib com.monkeyci/app
-               :version [[:env "MONKEYCI_VERSION"] "0.16.8-SNAPSHOT"]
+               :version [[:env "MONKEYCI_VERSION"] "0.16.10-SNAPSHOT"]
                :main "monkey.ci.core"
                :scm {:url "https://github.com/monkey-projects/monkeyci"}
                :pom-data [[:licenses

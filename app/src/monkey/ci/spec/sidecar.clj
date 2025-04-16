@@ -14,7 +14,7 @@
 
 ;; TODO Remove this, unnecessary
 (s/def ::job-config
-  (s/keys :req [::job ::build]))
+  (s/keys :req [::job ::sid]))
 
 (s/def ::job
   (s/keys :req-un [:job/id]
@@ -26,6 +26,8 @@
 (s/def ::build
   (s/keys :req-un [:build/workspace :build/customer-id :build/repo-id :build/build-id]
           :opt-un [::checkout-dir]))
+
+(s/def ::sid (s/coll-of string?))
 
 (s/def ::api ::ba/api)
 
@@ -41,5 +43,5 @@
 (s/def ::cache p/repo?)
 
 (s/def ::runtime
-  (s/keys :req-un [::job ::build ::paths]
+  (s/keys :req-un [::job ::paths ::sid]
           :opt-un [::workspace ::artifacts ::cache ::log-maker ::poll-interval ::c/mailman]))

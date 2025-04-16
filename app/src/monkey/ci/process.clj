@@ -11,7 +11,7 @@
              [version :as v]]))
 
 (defn generate-deps [script-dir lib-version]
-  {:paths [script-dir]
+  {:paths ["."]
    :aliases
    {:monkeyci/build
     {:exec-fn 'monkey.ci.script.runtime/run-script!

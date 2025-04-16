@@ -46,7 +46,8 @@
     (let [job {:work-dir "work"
                :restore-artifacts [{:id "test-artifact"
                                     :path "test-path"}]}
-          stored (atom {"test-cust/test-build/test-artifact.tgz" (str (fs/canonicalize (:work-dir job)))})
+          stored (atom {"test-cust/test-build/test-artifact.tgz" (str (fs/canonicalize
+                                                                       (fs/path (:work-dir job) "test-path")))})
           bs (h/strict-fake-blob-store stored)
           build {:sid ["test-cust" "test-build"]}
           ctx {:artifacts (sut/make-blob-repository bs build)
@@ -65,10 +66,10 @@
           art (sut/make-blob-repository bs build)
           r @(sut/restore-blob {:repo art}
                                {:id art-id
-                                :path "test-path"})]
+                                :path "dest"})]
       (is (map? r))
-      (is (= (.getCanonicalPath src) (:src r)))
-      (is (= (.getCanonicalPath (.getParentFile (.getAbsoluteFile dest))) (:dest r)))
+      (is (= (str (fs/canonicalize src)) (:src r)))
+      (is (= (.getCanonicalPath (.getAbsoluteFile dest)) (:dest r)))
       (is (number? (:entries r))))))
 
 (deftest blob-artifact-repository
@@ -110,7 +111,7 @@
         
         (testing "downloads artifact using api"
           (is (some? @(p/restore-artifact repo art-id (str out-dir))))
-          (is (fs/exists? (fs/path out-dir "input" "test.txt"))))
+          (is (fs/exists? (fs/path out-dir "test.txt"))))
 
         (testing "does nothing if artifact does not exist"
           (is (nil? @(p/restore-artifact repo "nonexisting" (str out-dir)))))))))

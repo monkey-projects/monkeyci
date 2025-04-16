@@ -40,7 +40,7 @@
 
 (def default-config
   {:runtime default-rt
-   :build (:build default-rt)})
+   :sid (random-build-sid)})
 
 (deftest instance-config
   (testing "creates configuration map"
@@ -57,15 +57,15 @@
 
   (testing "display name contains build id, pipeline index and job index"
     (is (= "test-build-test-job"
-           (->> {:build {:build-id "test-build"
-                         :checkout-dir "/tmp"}
+           (->> {:build {:checkout-dir "/tmp"}
+                 :sid ["test-cust" "test-repo" "test-build"]
                  :job {:id "test-job"}}
                 (sut/instance-config)
                 :display-name))))
 
   (testing "has tags from sid"
-    (let [tags (->> {:build {:sid ["test-cust" "test-repo" "test-build"]
-                             :checkout-dir "/tmp"}
+    (let [tags (->> {:build {:checkout-dir "/tmp"}
+                     :sid ["test-cust" "test-repo" "test-build"]
                      :job {:id "test-job"}}
                     (sut/instance-config)
                     :freeform-tags)]
@@ -75,8 +75,8 @@
       (is (= "test-job" (get tags "job-id")))))
 
   (testing "merges in existing tags"
-    (let [tags (->> {:build {:sid ["test-cust" "test-repo"]
-                             :checkout-dir "/tmp"}
+    (let [tags (->> {:build {:checkout-dir "/tmp"}
+                     :sid ["test-cust" "test-repo"]
                      :oci {:freeform-tags {"env" "test"}}}
                     (sut/instance-config)
                     :freeform-tags)]
@@ -203,7 +203,7 @@
       (testing "environment"
         (let [env (:environment-variables jc)]
           (testing "sets work dir to job work dir"
-            (is (= "/opt/monkeyci/checkout/work/test-build/sub" (get env "MONKEYCI_WORK_DIR"))))
+            (is (= "/opt/monkeyci/checkout/work/sub" (get env "MONKEYCI_WORK_DIR"))))
 
           (testing "handles relative work dir"
             (let [env (->> {:job {:script ["first" "second"]
@@ -214,7 +214,7 @@
                            :containers
                            (mc/find-first (cp/prop-pred :display-name "job"))
                            :environment-variables)]
-              (is (= "/opt/monkeyci/checkout/work/test-build/sub" (get env "MONKEYCI_WORK_DIR")))))
+              (is (= "/opt/monkeyci/checkout/work/sub" (get env "MONKEYCI_WORK_DIR")))))
 
           (testing "sets log dir"
             (is (string? (get env "MONKEYCI_LOG_DIR"))))
@@ -226,7 +226,7 @@
             (is (= "test-val" (get env "TEST_ENV"))))))
 
       (testing "sets working dir to job work dir"
-        (is (= "/opt/monkeyci/checkout/work/test-build/sub"
+        (is (= "/opt/monkeyci/checkout/work/sub"
                (:working-directory jc))))))
 
   (testing "sidecar container"
@@ -236,11 +236,7 @@
                          :save-artifacts [{:id "test-artifact"
                                            :path "somewhere"}]
                          :work-dir "sub"}
-                   :build {:customer-id "test-cust"
-                           :repo-id "test-repo"
-                           :build-id "test-build"
-                           :checkout-dir "/tmp/test-checkout"
-                           :workspace "test-build-ws"}
+                   :sid ["test-cust" "test-repo" "test-build"]
                    :events {:type :manifold}
                    :api {:url "http://test-api"
                          :token "test-token"}
@@ -295,17 +291,11 @@
               (testing "contains job details"
                 (is (some? (cs/job data))))
 
-              (testing "contains build details"
-                (is (some? (cs/build data))))
-
-              (testing "build checkout dir parent is container work dir"
-                (is (= cc/work-dir (-> (cs/build data)
-                                       :checkout-dir
-                                       (fs/parent)
-                                       str))))
+              (testing "contains sid"
+                (is (some? (cs/sid data))))
 
               (testing "recalculates job work dir"
-                (is (= "/opt/monkeyci/checkout/work/test-checkout/sub"
+                (is (= "/opt/monkeyci/checkout/work/sub"
                        (-> data
                            (cs/job)
                            :work-dir))))))))
@@ -352,6 +342,7 @@
                     :work-dir "sub"}
                    :build
                    {:checkout-dir "/tmp/test-build"}
+                   :sid (repeatedly 3 cuid/random-cuid)
                    :promtail
                    {:loki-url "http://loki"}}
                   (sut/instance-config))
@@ -398,7 +389,7 @@
                      (mc/find-first (cp/prop-pred :display-name "promtail"))))))))
 
 (deftest make-routes
-  (let [routes (sut/make-routes {} (h/gen-build))
+  (let [routes (sut/make-routes {})
         expected [:container/job-queued
                   :container/start
                   :container/end
@@ -414,8 +405,7 @@
 
     (testing "adds ci config to context"
       (is (map? (-> {}
-                    (sut/set-config default-config)
-                    (sut/set-build {:checkout-dir "test/dir"})
+                    (sut/set-config default-config)                    
                     (enter)
                     (oci/get-ci-config)))))))
 
