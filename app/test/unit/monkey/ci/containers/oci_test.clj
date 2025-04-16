@@ -40,7 +40,7 @@
 
 (def default-config
   {:runtime default-rt
-   :build (:build default-rt)})
+   :sid (random-build-sid)})
 
 (deftest instance-config
   (testing "creates configuration map"
@@ -405,8 +405,7 @@
 
     (testing "adds ci config to context"
       (is (map? (-> {}
-                    (sut/set-config default-config)
-                    (sut/set-build {:checkout-dir "test/dir"})
+                    (sut/set-config default-config)                    
                     (enter)
                     (oci/get-ci-config)))))))
 
