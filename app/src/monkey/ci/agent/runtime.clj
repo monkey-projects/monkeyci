@@ -38,7 +38,9 @@
       (c-oci/make-routes)))
 
 (defmethod make-container-routes :podman [conf deps]
-  (c-podman/make-routes deps))
+  (-> deps
+      (merge conf)
+      (c-podman/make-routes)))
 
 (defmethod make-container-routes :default [conf]
   (log/warn "Unknown container runner type:" (:type conf))

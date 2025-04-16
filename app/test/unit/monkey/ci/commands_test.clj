@@ -7,6 +7,7 @@
             [manifold.deferred :as md]
             [monkey.ci
              [commands :as sut]
+             [cuid :as cuid]
              [edn :as edn]
              [pem :as pem]
              [process :as proc]]
@@ -122,7 +123,13 @@
                   (testing "events contain job id from config"
                     (is (= (:id job) (-> (recv)
                                          first
-                                         :job-id))))))]
+                                         :job-id))))
+
+                  (testing "events contain sid id from config"
+                    (is (= (cs/sid config)
+                           (-> (recv)
+                               first
+                               :sid))))))]
         
         (testing "from sidecar-specific config"
           (let [job {:id (str (random-uuid))}
@@ -133,7 +140,7 @@
                            (cs/set-api {:url "http://test"
                                         :token (str (random-uuid))})
                            (cs/set-job job)
-                           (cs/set-sid ["test-cust" "test-repo" "test-build"]))
+                           (cs/set-sid (repeatedly 3 cuid/random-cuid)))
                 recv (atom [])]
             (is (spec/valid? ::ss/config config)
                 (spec/explain-str ::ss/config config))
