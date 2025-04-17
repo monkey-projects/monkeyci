@@ -40,13 +40,13 @@
 
 (defn- save-blob
   "Saves a single blob path, using the blob configuration and artifact info."
-  [{:keys [job checkout-dir repo]} {:keys [path id]}]
+  [{:keys [job sid checkout-dir repo]} {:keys [path id]}]
   ;; TODO Make paths relative to checkout dir because using job work dir can be wrong
   ;; when the work dir of the saving job is not the same as the restoring job.
   (let [fullp (b/job-relative-dir job checkout-dir path)]
     (log/debug "Saving blob:" id "at path" path "(full path:" fullp ")")
     (md/chain
-     (p/save-artifact repo id fullp)
+     (p/save-artifact repo sid id fullp)
      (fn [{:keys [dest entries] :as r}]
        (if (not-empty entries)
          (log/debugf "Zipped %d entries to %s (%.2f MB)" (count entries) dest (mb dest))
@@ -56,12 +56,12 @@
 (defn save-generic [conf]
   (do-with-blobs conf (partial save-blob conf)))
 
-(defn restore-blob [{:keys [repo job checkout-dir]} {:keys [id path]}]
+(defn restore-blob [{:keys [repo job sid checkout-dir]} {:keys [id path]}]
   (log/debug "Restoring blob:" id "to path" path)
   (md/chain
    (p/restore-artifact repo
+                       sid
                        id
-                       ;; FIXME Get rid of the build, we only need checkout dir
                        (-> (b/job-relative-dir job checkout-dir path)
                            (fs/canonicalize)
                            (str)))
@@ -81,15 +81,15 @@
 
 (defrecord BlobArtifactRepository [store path-fn]
   p/ArtifactRepository
-  (restore-artifact [this id dest]
-    (blob/restore store (path-fn id) dest))
+  (restore-artifact [this sid id dest]
+    (blob/restore store (path-fn sid id) dest))
 
-  (save-artifact [this id src]
-    (blob/save store src (path-fn id))))
+  (save-artifact [this sid id src]
+    (blob/save store src (path-fn sid id))))
 
 (defrecord BuildApiArtifactRepository [client base-path]
   p/ArtifactRepository
-  (restore-artifact [this id dest]
+  (restore-artifact [this _ id dest]
     (log/debug "Restoring artifact using build API:" id "to" dest)
     (u/log-deferred-elapsed
      (-> (client {:method :get
@@ -104,7 +104,7 @@
                        (throw ex)))))
      (str "Restored artifact from build API: " id)))
 
-  (save-artifact [this id src]
+  (save-artifact [this _ id src]
     (let [tmp (fs/create-temp-file)
           ;; TODO Skip the tmp file intermediate step, it takes up disk space and is slower
           arch (blob/make-archive src (fs/file tmp))
@@ -131,7 +131,7 @@
   [sid id]
   (str (cs/join "/" (concat sid [id])) blob/extension))
 
-(defn artifact-archive-path
+(defn ^:deprecated artifact-archive-path
   "Returns path for the archive in the given build"
   [build id]
   ;; The blob archive path is the build sid with the blob id added.
@@ -140,7 +140,7 @@
 (defn rt->config
   "Creates a configuration object for artifacts from the runtime"
   [rt]
-  (-> (select-keys rt [:job])
+  (-> (select-keys rt [:job :sid])
       (assoc :repo (:artifacts rt)
              ;; Need to support both build or checkout dir, depending on context
              :checkout-dir (or (:checkout-dir rt)
@@ -177,8 +177,13 @@
         (save-artifacts rt)
         (constantly r))))))
 
-(defn make-blob-repository [store sid]
-  (->BlobArtifactRepository store (partial build-sid->artifact-path sid)))
+(defn make-blob-repository
+  "Creates an artifact repository that uses a blob repo as it's target.  If an sid is
+   specified, it is used instead of the one passed in by the artifact repo."
+  ([store sid]
+   (->BlobArtifactRepository store (fn [_ id] (build-sid->artifact-path sid id))))
+  ([store]
+   (->BlobArtifactRepository store build-sid->artifact-path)))
 
 (defn make-build-api-repository [client]
   (->BuildApiArtifactRepository client "/artifact/"))
@@ -191,7 +196,7 @@
   (assoc ctx ::restored r))
 
 (defn restore-interceptor
-  "Interceptor that restores artifacts using the given repo, build and job retrieved
+  "Interceptor that restores artifacts using the given repo, build sid and job retrieved
    from the context using `get-job-ctx`.  Adds details about the restored artifacts to
    the context."
   [get-job-ctx]

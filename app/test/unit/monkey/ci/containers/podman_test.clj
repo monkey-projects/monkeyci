@@ -120,11 +120,11 @@
                       :job-id "test-job"}}
                     (enter))]
           (testing "adds work dir to context"
-            (is (= (fs/path wd "test-job/work")
+            (is (= (fs/path wd "test-build/test-job/work")
                    (sut/get-work-dir r))))
 
           (testing "adds log dir to context"
-            (is (= (fs/path wd "test-job/logs")
+            (is (= (fs/path wd "test-build/test-job/logs")
                    (sut/get-log-dir r))))
           
           (testing "copies files from workspace to job work dir"
@@ -182,12 +182,13 @@
 
 (deftest add-job-ctx
   (let [job {:id "test-job"}
-        {:keys [enter] :as i} (sut/add-job-ctx {:build {:checkout-dir "/orig/dir"}})]
+        {:keys [enter] :as i} (sut/add-job-ctx {:checkout-dir "/orig/dir"})]
     (is (keyword? (:name i)))
 
     (testing "`enter`"
       (let [r (-> {:event
-                   {:job-id (:id job)}}
+                   {:sid ["test-build"]
+                    :job-id (:id job)}}
                   (sut/set-job job)
                   (sut/set-work-dir "/new/dir")
                   (enter))]
@@ -197,9 +198,8 @@
         (testing "adds job from state to job context"
           (is (= job (:job (emi/get-job-ctx r)))))
 
-        (testing "sets build checkout dir to workspace dir"
+        (testing "sets checkout dir to workspace dir"
           (is (= "/new/dir" (-> (emi/get-job-ctx r)
-                                :build
                                 :checkout-dir))))))))
 
 (deftest job-queued
