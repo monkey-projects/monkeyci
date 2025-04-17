@@ -47,10 +47,10 @@
 (def vault? (partial satisfies? Vault))
 
 (defprotocol ArtifactRepository
-  (restore-artifact [this id dest]
-    "Downloads and extracts artifact with given id to the specified destination 
-     directory.  Returns the destination.")
-  (save-artifact [this id src]
+  (restore-artifact [this sid id dest]
+    "Downloads and extracts artifact with given build sid and artifact id to 
+     the specified destination directory.  Returns the destination.")
+  (save-artifact [this sid id src]
     "Creates an archive and uploads the artifact with given id from `src`, which 
      can be a directory or file."))
 

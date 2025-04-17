@@ -45,8 +45,11 @@
         (save-caches rt)
         (constantly r))))))
 
-(defn make-blob-repository [store sid]
-  (art/->BlobArtifactRepository store (partial cache-archive-path sid)))
+(defn make-blob-repository
+  ([store sid]
+   (art/->BlobArtifactRepository store (fn [_ id] (cache-archive-path sid id))))
+  ([store]
+   (art/->BlobArtifactRepository store cache-archive-path)))
 
 (defn make-build-api-repository
   "Creates an `ArtifactRepository` that can be used to upload/download caches"

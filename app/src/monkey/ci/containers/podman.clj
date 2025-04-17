@@ -95,15 +95,17 @@
 
 ;;; Context management
 
+(def build-sid (comp :sid :event))
+
 (defn get-job
   ([ctx id]
    (some-> (emi/get-state ctx)
-           (get-in [:jobs id])))
+           (get-in [:jobs (build-sid ctx) id])))
   ([ctx]
    (get-job ctx (get-in ctx [:event :job-id]))))
 
 (defn set-job [ctx job]
-  (emi/update-state ctx assoc-in [:jobs (:id job)] job))
+  (emi/update-state ctx assoc-in [:jobs (build-sid ctx) (:id job)] job))
 
 (def get-work-dir
   "The directory where the container process is run"
@@ -131,13 +133,12 @@
   [workspace wd]
   {:name ::restore-ws
    :enter (fn [ctx]
-            (let [job-dir (fs/path wd (get-in ctx [:event :job-id]))
+            (let [job-dir (apply fs/path wd (conj (build-sid ctx) (get-in ctx [:event :job-id])))
                   dest (fs/create-dirs (fs/path job-dir "work"))
-                  ws (ws/->BlobWorkspace workspace dest)]
+                  ws (ws/->BlobWorkspace workspace (str dest))]
               (log/debug "Restoring workspace to" dest)
-              #_(fs/copy-tree src dest)
               (-> ctx
-                  (assoc ::workspace @(p/restore-workspace ws (get-in ctx [:event :sid])))
+                  (assoc ::workspace @(p/restore-workspace ws (build-sid ctx)))
                   (set-work-dir dest)
                   (set-log-dir (fs/create-dirs (fs/path job-dir "logs"))))))})
 
@@ -164,8 +165,9 @@
    :enter (fn [ctx]
             (-> ctx
                 (emi/set-job-ctx (-> initial-ctx
-                                     (assoc :job (get-job ctx))
-                                     (assoc-in [:build :checkout-dir] (get-work-dir ctx))))))})
+                                     (assoc :job (get-job ctx)
+                                            :sid (build-sid ctx)
+                                            :checkout-dir (get-work-dir ctx))))))})
 
 ;;; Event handlers
 

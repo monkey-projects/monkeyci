@@ -2,6 +2,9 @@
   "Sets up the runtime that is used by a build agent."
   (:require [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
+            [monkey.ci
+             [artifacts :as a]
+             [cache :as c]]
             [monkey.ci.agent
              [api-server :as aa]
              [events :as e]]
@@ -38,9 +41,10 @@
       (c-oci/make-routes)))
 
 (defmethod make-container-routes :podman [conf deps]
-  ;; FIXME caches and artifacts should be an artifact repository, not a blob repo
   (-> deps
       (merge conf)
+      (update :artifacts a/make-blob-repository)
+      (update :cache c/make-blob-repository)
       (c-podman/make-routes)))
 
 (defmethod make-container-routes :default [conf]

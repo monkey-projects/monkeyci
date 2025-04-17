@@ -2,7 +2,8 @@
   "Set up runtime for local builds.  These are builds where the api server is run
    in the same process, and the build scripts as child processes (either native or
    as containers)."
-  (:require [clojure.tools.logging :as log]
+  (:require [babashka.fs :as fs]
+            [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
             [manifold
              [deferred :as md]
@@ -39,12 +40,10 @@
 (defn- new-podman-routes [conf]
   (letfn [(make-routes [{:keys [config build] :as c}]
             (let [sid (b/sid build)]
-              (-> (select-keys c [:mailman :artifacts :cache])
+              (-> (select-keys c [:mailman :artifacts :cache :workspace])
                   (update :artifacts a/make-blob-repository sid)
                   (update :cache c/make-blob-repository sid)
-                  ;; FIXME Workspace should be a BlobRepository
-                  (assoc :workspace (lc/get-workspace config)
-                         :work-dir (lc/get-jobs-dir config))
+                  (assoc :work-dir (lc/get-jobs-dir config))
                   (cp/make-routes))))]
     (em/map->RouteComponent {:config conf :make-routes make-routes})))
 
@@ -92,6 +91,16 @@
   []
   (map->EventPipe {}))
 
+(defrecord CopyStore [src]
+  p/BlobStore
+  ;; Only suitable for restoring workspaces
+  (restore-blob [this _ dest]
+    {:src (str src)
+     :dest (str (fs/copy-tree src dest))}))
+
+(defn copy-store [conf]
+  (->CopyStore (lc/get-workspace conf)))
+
 (defn make-system
   "Creates a component system that can be used for local builds"
   [conf]
@@ -103,9 +112,10 @@
                   [:mailman :api-config])
    :podman       (co/using
                   (new-podman-routes conf)
-                  [:mailman :artifacts :cache])
+                  [:mailman :artifacts :cache :workspace])
    :artifacts    (new-artifacts conf)
    :cache        (new-cache conf)
+   :workspace    (copy-store conf)
    :params       (new-params conf)
    :api-config   (rr/new-api-config {})
    :api-server   (co/using

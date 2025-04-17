@@ -1,5 +1,6 @@
 (ns monkey.ci.local.runtime-test
   (:require [clojure.test :refer [deftest is testing]]
+            [babashka.fs :as fs]
             [com.stuartsierra.component :as co]
             [manifold
              [deferred :as md]
@@ -84,3 +85,19 @@
       (let [s (co/stop c)]
         (is (nil? (:listener s)))
         (is (empty? (-> broker :broker (.listeners) deref)))))))
+
+(deftest copy-store
+  (h/with-tmp-dir dir
+    (testing "copies from src to dest"
+      (let [src (fs/create-dirs (fs/path dir "src"))
+            dest (fs/path dir "dest")
+            conf (lc/set-work-dir lc/empty-config src)
+            ws (sut/copy-store conf)]
+        (is (nil? (-> conf
+                      (lc/get-workspace)
+                      (fs/create-dirs)
+                      (fs/path "test.txt")
+                      (fs/file)
+                      (spit "test file"))))
+        (is (some? (p/restore-blob ws "test-src" dest)))
+        (is (= "test file" (slurp (fs/file (fs/path dest "test.txt")))))))))
