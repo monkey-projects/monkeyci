@@ -119,7 +119,7 @@
                      (drop-while (partial not= "-v"))
                      (fnext))]
           (is (some? m))
-          (is (cs/ends-with? m "/home/monkeyci"))))
+          (is (cs/ends-with? m "/home/monkeyci:Z"))))
 
       (testing "sets container work dir to script dir"
         (is (= "/home/monkeyci/.monkeyci"

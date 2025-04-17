@@ -126,9 +126,9 @@
     {:cmd ["podman"
            "run"
            "--name" (:build-id build)
-           "-v" (str checkout ":" lwd)
+           "-v" (str checkout ":" lwd ":Z")
            ;; m2 cache is common for the all repo builds
-           "-v" (str (m2-cache (fs/parent wd)) ":" m2-cache-path)
+           "-v" (str (m2-cache (fs/parent wd)) ":" m2-cache-path ":Z")
            "--workdir" (script-dir lwd)
            "--network=host"
            (:image conf)
