@@ -7,6 +7,7 @@
             [monkey.ci
              [build :as b]
              [process :as p]
+             [time :as t]
              [workspace :as ws]]
             [monkey.ci.build.api-server :as bas]
             [monkey.ci.events.mailman :as em]
@@ -125,7 +126,8 @@
         deps (generate-deps sd (:version conf) (generate-script-config ctx))]
     {:cmd ["podman"
            "run"
-           "--name" (:build-id build)
+           "--name" (str (:build-id build) "-" (t/now))
+           "--rm"
            "-v" (str checkout ":" lwd ":Z")
            ;; m2 cache is common for the all repo builds
            "-v" (str (m2-cache (fs/parent wd)) ":" m2-cache-path ":Z")
@@ -138,7 +140,8 @@
      :dir sd
      :out (log-file wd "out.log")
      :err (log-file wd "err.log")
-     :on-exit (fn [{:keys [exit]}]
+     :exit-fn (fn [{:keys [exit]}]
+                ;; TODO Clean up build files
                 (log/info "Build container exited with code:" exit)
                 (em/post-events (:mailman conf)
                                 [(b/build-end-evt build exit)]))}))

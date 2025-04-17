@@ -152,7 +152,7 @@
               (is (re-matches #"^http://localhost:\d+$" (:url (sc/api args))))))))
 
       (testing "on exit, fires `build/end` event"
-        (let [on-exit (:on-exit cmd)]
+        (let [on-exit (:exit-fn cmd)]
           (is (fn? on-exit))
           (is (some? (on-exit {:exit 0})))
           (is (= [:build/end]

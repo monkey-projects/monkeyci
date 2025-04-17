@@ -4,19 +4,26 @@
             [com.stuartsierra.component :as co]
             [monkey.ci
              [artifacts :as a]
-             [cache :as c]]
+             [build :as b]
+             [cache :as c]
+             [protocols :as p]]
             [monkey.ci.agent
              [api-server :as aa]
              [events :as e]]
+            [monkey.ci.build.api-server :as bas]
             [monkey.ci.containers
              [oci :as c-oci]
              [podman :as c-podman]]
             [monkey.ci.events.mailman :as em]
-            [monkey.ci.runners.runtime :as rr]))
+            [monkey.ci.runners.runtime :as rr]
+            [monkey.ci.web.auth :as auth]))
 
 (defrecord ApiServer [builds api-config]
   co/Lifecycle
   (start [this]
+    ;; FIXME Api server needs a token to send requests to the global api, but this
+    ;; is ideally generated for each build separately, with limited permissions and
+    ;; expiration time.  For this we would need the private key of the global api.
     (merge this (aa/start-server (merge this (select-keys api-config [:port])))))
 
   (stop [this]
@@ -32,6 +39,16 @@
             (e/make-routes (-> (:agent config)
                                (merge co))))]
     (em/map->RouteComponent {:make-routes make-routes})))
+
+(defrecord ApiBuildParams [api-config pk]
+  p/BuildParams
+  (get-build-params [this build]
+    (let [token (-> (auth/build-token (b/sid build))
+                    (auth/generate-and-sign-jwt pk))]
+      (bas/get-params-from-api (assoc api-config :token token) build))))
+
+(defn new-params [config]
+  (->ApiBuildParams (:api config) (get-in config [:jwk :priv])))
 
 (defmulti make-container-routes :type)
 
@@ -81,7 +98,7 @@
    :agent-routes (co/using
                   (new-agent-routes conf)
                   [:mailman :api-server :git :builds :workspace])
-   :params (rr/new-params conf)
+   :params (new-params conf)
    :container-routes (co/using
                       (new-container-routes conf)
                       [:mailman :artifacts :cache :workspace :api-server])))
