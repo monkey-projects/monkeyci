@@ -61,5 +61,5 @@
   (let [repo (cache/make-build-api-repository client)
         dest (fs/file (fs/create-temp-dir))]
     (md/chain
-     (p/restore-artifact repo id dest)
+     (p/restore-artifact repo nil id dest)
      #(assoc % :dest dest))))

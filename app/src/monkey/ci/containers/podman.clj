@@ -135,7 +135,7 @@
    :enter (fn [ctx]
             (let [job-dir (apply fs/path wd (conj (build-sid ctx) (get-in ctx [:event :job-id])))
                   dest (fs/create-dirs (fs/path job-dir "work"))
-                  ws (ws/->BlobWorkspace workspace dest)]
+                  ws (ws/->BlobWorkspace workspace (str dest))]
               (log/debug "Restoring workspace to" dest)
               (-> ctx
                   (assoc ::workspace @(p/restore-workspace ws (build-sid ctx)))
