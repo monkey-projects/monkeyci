@@ -30,8 +30,16 @@
 
 (def get-build (comp :build :event))
 
+(def get-ssh-keys ::ssh-keys)
+
+(defn set-ssh-keys [ctx k]
+  (assoc ctx ::ssh-keys k))
+
 (defn- build-work-dir [{:keys [work-dir]} sid]
   (str (apply fs/path work-dir sid)))
+
+(defn- ctx->wd [ctx]
+  (build-work-dir (get-config ctx) (get-in ctx [:event :sid])))
 
 (defn- checkout-dir [wd]
   (str (fs/create-dirs (fs/path wd "checkout"))))
@@ -47,6 +55,9 @@
 
 (defn- log-file [wd f]
   (str (fs/path (log-dir wd) f)))
+
+(defn- ssh-keys-dir [wd]
+  (fs/create-dirs (fs/path wd "ssh")))
 
 (defn generate-deps [script-dir lib-version conf]
   (-> (p/generate-deps script-dir lib-version)
@@ -88,6 +99,11 @@
                                                               b/sid))))
             ctx)})
 
+(defn fetch-ssh-keys [fetcher]
+  {:name ::fetch-ssh-keys
+   :enter (fn [ctx]
+            (set-ssh-keys ctx (fetcher (get-in ctx [:event :sid]))))})
+
 (def git-clone
   "Clones the repository configured in the build into the build checkout dir"
   {:name ::git-clone
@@ -95,9 +111,15 @@
             (let [conf (get-config ctx)
                   clone (-> conf :git :clone)
                   build (get-build ctx)
+                  wd (build-work-dir conf (get-in ctx [:event :sid]))
                   opts (-> build
                            :git
-                           (assoc :dir (checkout-dir (build-work-dir conf (get-in ctx [:event :sid])))))]
+                           (assoc :dir (checkout-dir wd)
+                                  :ssh-keys-dir (str (ssh-keys-dir wd))
+                                  ;; Do not pass the ssh keys we receive in the event, because
+                                  ;; they are encrypted.  Instead, fetch keys from api.
+                                  :ssh-keys (->> (get-ssh-keys ctx)
+                                                 (map (partial hash-map :private-key)))))]
               (assoc ctx ::checkout-dir (clone opts))))})
 
 (def save-workspace
@@ -155,6 +177,7 @@
       :interceptors [emi/handle-build-error
                      (add-config conf)
                      add-token
+                     (fetch-ssh-keys (:ssh-keys-fetcher conf))
                      git-clone
                      save-workspace
                      result-build-init-evt

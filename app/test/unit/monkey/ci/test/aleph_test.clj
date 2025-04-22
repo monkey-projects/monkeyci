@@ -8,7 +8,7 @@
 
 (defn ->pred [x]
   (cond
-    (string? x) (comp (partial = x) :url)
+    (string? x) (comp (partial = x) (some-fn :url :request-url))
     (fn? x) x
     (map? x) (partial map-pred x)
     :else (throw (ex-info "Don't know how to turn this into a predicate" {:arg x}))))

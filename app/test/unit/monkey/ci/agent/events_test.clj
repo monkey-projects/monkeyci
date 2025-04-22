@@ -37,7 +37,8 @@
           router (-> {:git {:clone (constantly "test-checkout")}
                       :workspace ws
                       :builds builds
-                      :work-dir dir}
+                      :work-dir dir
+                      :ssh-keys-fetcher (constantly nil)}
                      (sut/make-routes)
                      (mmc/router)
                      (mmc/replace-interceptors [fake-proc]))]
@@ -74,21 +75,40 @@
       (is (= ::config (-> (enter {})
                           (sut/get-config)))))))
 
+(deftest fetch-ssh-keys
+  (let [{:keys [enter] :as i} (sut/fetch-ssh-keys identity)]
+    (is (keyword? (:name i)))
+
+    (testing "`enter` fetches keys for repo sid"
+      (let [sid (repeatedly 3 (comp str random-uuid))]
+        (is (= sid
+               (-> {:event {:sid sid}}
+                   (enter)
+                   (sut/get-ssh-keys))))))))
+
 (deftest git-clone
   (let [{:keys [enter] :as i} sut/git-clone]
     (is (keyword? (:name i)))
     
-    (testing "`enter` invokes git clone fn with build git details"
+    (testing "`enter`"      
       (let [args (atom nil)
             clone (partial reset! args)]
         (is (some? (-> {:event
-                        {:build {:git {:ssh-keys ::test-keys}}}}
+                        {:build {:git {:ssh-keys [{:private-key "old-pk"}]}}}}
                        (sut/set-config {:work-dir "/tmp/test-dir"
                                         :git {:clone clone}})
+                       (sut/set-ssh-keys ["fetched-pk"])
                        (enter))))
-        (is (= {:ssh-keys ::test-keys
-                :dir "/tmp/test-dir/checkout"}
-               @args))))))
+
+        (testing "invokes git clone fn with build git details"
+          (is (= "/tmp/test-dir/checkout"
+                 (:dir @args))))
+
+        (testing "passes fetched ssh keys"
+          (is (= [{:private-key "fetched-pk"}] (:ssh-keys @args))))
+
+        (testing "configures `ssh-keys-dir`"
+          (is (string? (:ssh-keys-dir @args))))))))
 
 (deftest prepare-build-cmd
   (h/with-tmp-dir dir

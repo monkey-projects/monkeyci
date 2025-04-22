@@ -4,6 +4,7 @@
             [monkey.ci.build.api-server :as bas]
             [monkey.ci.protocols :as p]
             [monkey.ci.test
+             [aleph-test :as ta]
              [config :as tc]
              [helpers :as h]]))
 
@@ -34,6 +35,9 @@
     (testing "provides git clone fn"
       (is (fn? (-> sys :git :clone))))
 
+    (testing "provides ssh keys fetcher fn"
+      (is (fn? (:ssh-keys-fetcher sys))))
+
     (testing "provides agent routes"
       (is (some? (:agent-routes sys))))
 
@@ -57,3 +61,15 @@
         (let [req (-> @requests last :conf)]
           (is (some? (:token req)))
           (is (= "http://test-api" (:url req))))))))
+
+(deftest ssh-keys-fetcher
+  (testing "retrieves from global api for repo"
+    (ta/with-fake-http
+        ["http://test-api/customer/test-cust/repo/test-repo/ssh-keys"
+         (fn [req]
+           {:status 200
+            :body (pr-str ["test-key"])})]
+      (let [sid ["test-cust" "test-repo" "test-build"]
+            fetcher (sut/new-ssh-keys-fetcher {:api {:url "http://test-api"}
+                                               :jwk {:priv (h/generate-private-key)}})]
+        (is (= ["test-key"] (fetcher sid)))))))
