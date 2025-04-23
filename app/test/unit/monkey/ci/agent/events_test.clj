@@ -175,6 +175,7 @@
         (let [on-exit (:exit-fn cmd)]
           (is (fn? on-exit))
           (is (some? (on-exit {:exit 0})))
+          (is (not (= :timeout (h/wait-until #(not-empty (tm/get-posted broker)) 1000))))
           (is (= [:build/end]
                  (->> (tm/get-posted broker)
                       (map :type)))))))))

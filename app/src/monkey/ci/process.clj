@@ -4,6 +4,7 @@
   (:require [babashka
              [fs :as fs]
              [process :as bp]]
+            [manifold.deferred :as md]
             [monkey.ci
              [build :as b]
              [runtime :as rt]
@@ -54,3 +55,13 @@
       :out :inherit
       :err :inherit
       :dir (b/script-dir build)})))
+
+(defn exit-fn
+  "Due to a strange issue with the onExit functionality in java.lang.Process, the
+   classloaders get messed up and stuff doesn't work in there.  So we use a promise
+   to trigger the on-exit indirectly.  This function wraps `f` and returns another
+   function that can be passed safely to the Process onExit."
+  [f]
+  (let [exit (promise)]
+    (md/chain exit f)
+    (partial deliver exit)))

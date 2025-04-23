@@ -162,11 +162,12 @@
      :dir sd
      :out (log-file wd "out.log")
      :err (log-file wd "err.log")
-     :exit-fn (fn [{:keys [exit]}]
-                ;; TODO Clean up build files
-                (log/info "Build container exited with code:" exit)
-                (em/post-events (:mailman conf)
-                                [(b/build-end-evt build exit)]))}))
+     :exit-fn (p/exit-fn
+               (fn [{:keys [exit]}]
+                 ;; TODO Clean up build files
+                 (log/info "Build container exited with code:" exit)
+                 (em/post-events (:mailman conf)
+                                 [(b/build-end-evt build exit)])))}))
 
 ;;; Routing
 
