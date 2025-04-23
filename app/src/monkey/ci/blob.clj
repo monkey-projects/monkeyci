@@ -3,7 +3,9 @@
    or entire directories."
   (:require [babashka.fs :as fs]
             [clj-commons.byte-streams :as bs]
-            [clojure.java.io :as io]
+            [clojure.java
+             [classpath :as cp]
+             [io :as io]]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [clompress.archivers :as ca]
