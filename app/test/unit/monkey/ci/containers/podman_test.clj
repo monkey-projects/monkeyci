@@ -87,15 +87,15 @@
 
 (deftest job-work-dir
   (testing "returns context work dir"
-    (is (= "test-wd"
+    (is (= "test-wd/work"
            (-> {}
-               (sut/set-work-dir "test-wd")
+               (sut/set-job-dir "test-wd")
                (sut/job-work-dir {})))))
 
   (testing "combines job work dir with context wd"
-    (is (= "/test/wd/job-dir"
+    (is (= "/test/wd/work/job-dir"
            (-> {}
-               (sut/set-work-dir "/test/wd")
+               (sut/set-job-dir "/test/wd")
                (sut/job-work-dir {:work-dir "job-dir"}))))))
 
 (deftest make-routes
@@ -107,26 +107,34 @@
       (testing (format "handles `%s`" t)
         (is (contains? (set (map first routes)) t))))))
 
+(deftest add-job-dir
+  (let [{:keys [enter] :as i} (sut/add-job-dir "/test/dir")]
+    (is (keyword? (:name i)))
+
+    (testing "`enter` sets calculated work dir in ctx"
+      (is (= "/test/dir/test-cust/test-repo/test-build/test-job"
+             (-> {:event
+                  {:sid ["test-cust" "test-repo" "test-build"]
+                   :job-id "test-job"}}
+                 (enter)
+                 (sut/get-job-dir)))))))
+
 (deftest restore-ws
   (h/with-tmp-dir dir
     (let [ws (h/fake-blob-store (atom {"test-build.tgz" "test-dest"}))
-          wd (fs/create-dir (fs/path dir "workdir"))          
-          {:keys [enter] :as i} (sut/restore-ws ws wd)]
+          wd (fs/create-dir (fs/path dir "workdir"))
+          {:keys [enter] :as i} (sut/restore-ws ws)]
       (is (keyword? (:name i)))
 
       (testing "`enter`"
         (let [r (-> {:event
                      {:sid ["test-build"]
                       :job-id "test-job"}}
+                    (sut/set-job-dir wd)
                     (enter))]
-          (testing "adds work dir to context"
-            (is (= (fs/path wd "test-build/test-job/work")
-                   (sut/get-work-dir r))))
+          (testing "adds workspace to context"
+            (is (some? (::sut/workspace r))))
 
-          (testing "adds log dir to context"
-            (is (= (fs/path wd "test-build/test-job/logs")
-                   (sut/get-log-dir r))))
-          
           (testing "copies files from workspace to job work dir"
             (is (empty? @(:stored ws)))))))))
 
@@ -190,7 +198,7 @@
                    {:sid ["test-build"]
                     :job-id (:id job)}}
                   (sut/set-job job)
-                  (sut/set-work-dir "/new/dir")
+                  (sut/set-job-dir "/new/dir")
                   (enter))]
         (testing "adds job context to context"
           (is (some? (emi/get-job-ctx r))))
@@ -199,8 +207,9 @@
           (is (= job (:job (emi/get-job-ctx r)))))
 
         (testing "sets checkout dir to workspace dir"
-          (is (= "/new/dir" (-> (emi/get-job-ctx r)
-                                :checkout-dir))))))))
+          (is (= "/new/dir/work"
+                 (-> (emi/get-job-ctx r)
+                     :checkout-dir))))))))
 
 (deftest job-queued
   (testing "returns `job/initializing` event"

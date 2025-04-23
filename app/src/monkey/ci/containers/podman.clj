@@ -108,40 +108,47 @@
 (defn set-job [ctx job]
   (emi/update-state ctx assoc-in [:jobs (build-sid ctx) (:id job)] job))
 
+(def get-job-dir
+  "The directory where files for this job are put"
+  (comp ::job-dir emi/get-state))
+
+(defn set-job-dir [ctx wd]
+  (emi/update-state ctx assoc ::job-dir wd))
+
 (def get-work-dir
   "The directory where the container process is run"
-  (comp ::work-dir emi/get-state))
-
-(defn set-work-dir [ctx wd]
-  (emi/update-state ctx assoc ::work-dir wd))
+  (comp #(fs/path % "work") get-job-dir))
 
 (def get-log-dir
   "The directory where container output is written to"
-  ::log-dir)
-
-(defn set-log-dir [ctx wd]
-  (assoc ctx ::log-dir wd))
+  (comp #(fs/path % "logs") get-job-dir))
 
 (defn job-work-dir [ctx job]
   (let [wd (j/work-dir job)]
-    (cond-> (get-work-dir ctx)
+    (cond-> (str (get-work-dir ctx))
       wd (u/abs-path wd))))
 
 ;;; Interceptors
 
+(defn add-job-dir
+  "Adds the directory for the job files in the event to the context"
+  [wd]
+  {:name ::add-job-dir
+   :enter (fn [ctx]
+            (->> (conj (build-sid ctx) (get-in ctx [:event :job-id]))
+                 (apply fs/path wd)
+                 (str)
+                 (set-job-dir ctx)))})
+
 (defn restore-ws
   "Prepares the job working directory by restoring the files from the workspace."
-  [workspace wd]
+  [workspace]
   {:name ::restore-ws
    :enter (fn [ctx]
-            (let [job-dir (apply fs/path wd (conj (build-sid ctx) (get-in ctx [:event :job-id])))
-                  dest (fs/create-dirs (fs/path job-dir "work"))
+            (let [dest (fs/create-dirs (get-work-dir ctx))
                   ws (ws/->BlobWorkspace workspace (str dest))]
               (log/debug "Restoring workspace to" dest)
-              (-> ctx
-                  (assoc ::workspace @(p/restore-workspace ws (build-sid ctx)))
-                  (set-work-dir dest)
-                  (set-log-dir (fs/create-dirs (fs/path job-dir "logs"))))))})
+              (assoc ctx ::workspace @(p/restore-workspace ws (build-sid ctx)))))})
 
 (def filter-container-job
   "Interceptor that terminates when the job in the event is not a container job"
@@ -168,7 +175,7 @@
                 (emi/set-job-ctx (-> initial-ctx
                                      (assoc :job (get-job ctx)
                                             :sid (build-sid ctx)
-                                            :checkout-dir (get-work-dir ctx))))))})
+                                            :checkout-dir (str (get-work-dir ctx)))))))})
 
 ;;; Event handlers
 
@@ -181,7 +188,7 @@
   "Prepares podman command to execute as child process"
   [ctx]
   (let [job (get-in ctx [:event :job])
-        log-file (comp fs/file (partial fs/path (get-log-dir ctx)))
+        log-file (comp fs/file fs/create-dirs (partial fs/path (get-log-dir ctx)))
         {:keys [job-id sid]} (:event ctx)]
     ;; TODO Prepare job script in separate dir and mount it in the container for execution
     {:cmd (build-cmd-args job
@@ -230,7 +237,8 @@
         :interceptors [emi/handle-job-error
                        state
                        save-job
-                       (restore-ws workspace wd)
+                       (add-job-dir wd)
+                       (restore-ws workspace)
                        (emi/add-mailman mailman)
                        (add-job-ctx job-ctx)
                        (cache/restore-interceptor emi/get-job-ctx)
@@ -249,6 +257,7 @@
       [{:handler job-exec
         :interceptors [emi/handle-job-error
                        state
+                       (add-job-dir wd)
                        (add-job-ctx job-ctx)
                        (art/save-interceptor emi/get-job-ctx)
                        (cache/save-interceptor emi/get-job-ctx)]}]]]))
