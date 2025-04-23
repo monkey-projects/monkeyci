@@ -188,7 +188,7 @@
   "Prepares podman command to execute as child process"
   [ctx]
   (let [job (get-in ctx [:event :job])
-        log-file (comp fs/file fs/create-dirs (partial fs/path (get-log-dir ctx)))
+        log-file (comp fs/file (partial fs/path (fs/create-dirs (get-log-dir ctx))))
         {:keys [job-id sid]} (:event ctx)]
     ;; TODO Prepare job script in separate dir and mount it in the container for execution
     {:cmd (build-cmd-args job
