@@ -155,7 +155,15 @@
   "Initializes child process command line"
   [ctx]
   (let [build (ctx->build ctx)
-        log-file (comp fs/file (partial fs/path (get-log-dir ctx)))]
+        log-file (comp fs/file (partial fs/path (get-log-dir ctx)))
+        on-exit (fn [{:keys [exit]}]
+                  ;; On exit, post build/end event
+                  (log/info "Child process exited with exit code" exit)
+                  (try
+                    (em/post-events (get-mailman ctx)
+                                    [(b/build-end-evt build exit)])
+                    (catch Exception ex
+                      (log/error "Unable to post build/end event" ex))))]
     {:dir (b/calc-script-dir (b/checkout-dir build) (b/script-dir build))
      :cmd ["clojure"
            "-Sdeps" (pr-str (generate-deps (b/script-dir build)
@@ -164,14 +172,7 @@
            (pr-str {:config (child-config ctx)})]
      :out (log-file "out.log")
      :err (log-file "err.log")
-     ;; On exit, post build/end event
-     :exit-fn (fn [{:keys [exit]}]
-                (log/info "Child process exited with exit code" exit)
-                (try
-                  (em/post-events (get-mailman ctx)
-                                  [(b/build-end-evt build exit)])
-                  (catch Exception ex
-                    (log/error "Unable to post build/end event" ex))))}))
+     :exit-fn (p/exit-fn on-exit)}))
 
 (defn build-init [ctx]
   (b/build-start-evt (ctx->build ctx)))

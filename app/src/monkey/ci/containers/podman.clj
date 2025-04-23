@@ -12,6 +12,7 @@
              [cache :as cache]
              [containers :as mcc]
              [jobs :as j]
+             [process :as proc]
              [protocols :as p]
              [utils :as u]
              [workspace :as ws]]
@@ -190,13 +191,14 @@
      :dir (job-work-dir ctx job)
      :out (log-file "out.log")
      :err (log-file "err.log")
-     :exit-fn (fn [{:keys [exit]}]
-                (log/info "Container job exited with code" exit)
-                (try
-                  (em/post-events (emi/get-mailman ctx)
-                                  [(job-executed-evt job-id sid (if (= 0 exit) bc/success bc/failure))])
-                  (catch Exception ex
-                    (log/error "Failed to post job/executed event" ex))))}))
+     :exit-fn (proc/exit-fn
+               (fn [{:keys [exit]}]
+                 (log/info "Container job exited with code" exit)
+                 (try
+                   (em/post-events (emi/get-mailman ctx)
+                                   [(job-executed-evt job-id sid (if (= 0 exit) bc/success bc/failure))])
+                   (catch Exception ex
+                     (log/error "Failed to post job/executed event" ex)))))}))
 
 (defn job-queued [ctx]
   (let [{:keys [job-id sid]} (:event ctx)]

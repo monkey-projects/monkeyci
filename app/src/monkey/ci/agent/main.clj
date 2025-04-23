@@ -20,7 +20,7 @@
   (log/info "Starting build agent")
   (rc/with-system-async
     (ar/make-system conf)
-    (fn [{:keys [api-server] :as  sys}]
+    (fn [{:keys [api-server] :as sys}]
       (log/debug "API server started at port" (:port api-server))
       (waiter sys))))
 
@@ -30,3 +30,4 @@
                 (comp wh/on-server-close :api-server))
     (finally
       (log/info "Build agent terminated."))))
+

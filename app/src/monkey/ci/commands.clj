@@ -39,7 +39,7 @@
 (defn run-build-local
   "Run a build locally, normally from local source but can also be from a git checkout.
    Returns a deferred that will hold zero if the build succeeds, nonzero if it fails."
-  [{:keys [workdir dir] :as config}]
+  [{{:keys [workdir dir]} :args :as config}]
   (let [wd (fs/create-temp-dir) ; TODO Use subdir of current dir .monkeyci?
         cwd (u/cwd)
         build (cond-> {:checkout-dir (or (some->> workdir

@@ -150,11 +150,15 @@
         (set))
    exclude-types))
 
+(defn- maybe-deref [x]
+  (cond-> x
+    (md/deferred? x) (deref)))
+
 (defn- broker-forwarder [evts-to-fwd dest]
   (fn [evt]
     (when (evts-to-fwd (:type evt))
       (log/debug "Forwarding event:" evt)
-      (when (empty? (em/post-events dest [evt]))
+      (when (empty? (maybe-deref (em/post-events dest [evt])))
         (log/warn "Unable to forward event:" evt)))
     nil))
 
