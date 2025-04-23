@@ -1,6 +1,7 @@
 (ns monkey.ci.agent.test
   "Test functionality provided to debug the class not found issue (github #269)"
-  (:require [clojure.tools.logging :as log]
+  (:require [babashka.fs :as fs]
+            [clojure.tools.logging :as log]
             [manifold.deferred :as md]
             [monkey.ci.agent
              [main :as am]
@@ -17,8 +18,12 @@
    exits."
   [opts]
   (let [conf (c/load-config-file (:config opts))
-        evt (edn/edn-> (slurp (:event opts)))]
-    (am/run-agent
+        evt (edn/edn-> (slurp (:event opts)))
+        cd (get-in conf [:agent :work-dir])]
+    (when (fs/exists? cd)
+      (log/debug "Work dir" cd "exists, deleting it first")
+      (fs/delete-tree cd))
+    (am/run-agent 
      conf
      (fn [sys]
        (let [done (md/deferred)
