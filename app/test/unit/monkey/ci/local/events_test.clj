@@ -161,7 +161,8 @@
     (testing "exit fn fires `build/end`"
       (let [exit-fn (:exit-fn r)]
         (is (fn? exit-fn))
-        (is (some? (exit-fn ::process-result)))
+        (is (some? (exit-fn {:exit ::process-result})))
+        (is (not (= :timeout (h/wait-until #(not-empty (tm/get-posted mailman)) 1000))))
         (is (= [:build/end] (->> (tm/get-posted mailman)
                                  (map :type))))))))
 

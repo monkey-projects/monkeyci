@@ -17,6 +17,7 @@
    server-side builds."
   (:require [babashka.fs :as fs]
             [clojure.tools.logging :as log]
+            [manifold.deferred :as md]
             [monkey.ci
              [build :as b]
              [git :as git]
@@ -155,7 +156,19 @@
   "Initializes child process command line"
   [ctx]
   (let [build (ctx->build ctx)
-        log-file (comp fs/file (partial fs/path (get-log-dir ctx)))]
+        log-file (comp fs/file (partial fs/path (get-log-dir ctx)))
+        exit (promise)
+        on-exit (fn [{:keys [exit]}]
+                  ;; On exit, post build/end event
+                  (log/info "Child process exited with exit code" exit)
+                  (try
+                    (em/post-events (get-mailman ctx)
+                                    [(b/build-end-evt build exit)])
+                    (catch Exception ex
+                      (log/error "Unable to post build/end event" ex))))]
+    (md/chain
+     exit
+     on-exit)
     {:dir (b/calc-script-dir (b/checkout-dir build) (b/script-dir build))
      :cmd ["clojure"
            "-Sdeps" (pr-str (generate-deps (b/script-dir build)
@@ -164,14 +177,10 @@
            (pr-str {:config (child-config ctx)})]
      :out (log-file "out.log")
      :err (log-file "err.log")
-     ;; On exit, post build/end event
-     :exit-fn (fn [{:keys [exit]}]
-                (log/info "Child process exited with exit code" exit)
-                (try
-                  (em/post-events (get-mailman ctx)
-                                  [(b/build-end-evt build exit)])
-                  (catch Exception ex
-                    (log/error "Unable to post build/end event" ex))))}))
+     ;; Due to a strange issue with the onExit functionality in java.lang.Process, the
+     ;; classloaders get messed up and stuff doesn't work in there.  So we use a promise
+     ;; to trigger the on-exit indirectly.
+     :exit-fn (partial deliver exit)}))
 
 (defn build-init [ctx]
   (b/build-start-evt (ctx->build ctx)))
