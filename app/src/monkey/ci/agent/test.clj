@@ -12,17 +12,23 @@
             [monkey.ci.events.mailman :as em]
             [monkey.ci.runtime.common :as rc]))
 
+(defn- clean-dir [d]
+  (when (and d (fs/exists? d))
+    (log/debug "Cleaning" d)
+    (fs/delete-tree d)))
+
 (defn run-test
   "Runs a test sequence by loading the given config and posting the specified
    event (supposedly a `build/queued` type).  Waits for `build/end` and then 
    exits."
   [opts]
   (let [conf (c/load-config-file (:config opts))
-        evt (edn/edn-> (slurp (:event opts)))
+        evt (-> (:event opts)
+                (slurp)
+                (edn/edn->))
         cd (get-in conf [:agent :work-dir])]
-    (when (fs/exists? cd)
-      (log/debug "Work dir" cd "exists, deleting it first")
-      (fs/delete-tree cd))
+    (clean-dir cd)
+    (clean-dir (get-in conf [:containers :work-dir]))
     (am/run-agent 
      conf
      (fn [sys]
