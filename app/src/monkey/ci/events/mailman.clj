@@ -75,6 +75,7 @@
       (assoc this
              :routes routes
              :listeners (add-router mailman routes (-> {:interceptors global-interceptors}
+                                                       ;; FIXME Destinations is implementation specific
                                                        (merge (select-keys this [:destinations])))))))
 
   (stop [{:keys [listeners] :as this}]

@@ -108,6 +108,7 @@
             (let [cmd (get-result ctx)]
               (log/debug "Starting child process:" cmd)
               (cond-> ctx
+                ;; TODO See if we can replace bp with clojure.java.process
                 cmd (set-process (bp/process cmd)))))})
 
 (def get-mailman ::mailman)

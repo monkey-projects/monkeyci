@@ -83,7 +83,7 @@
       (entrypoint job)
       [(mcc/image job)]
       (make-cmd job)
-      ;; TODO Execute script command per command
+      ;; TODO Execute script command per command, similar to oci containers
       (make-script-cmd (:script job)))))
   ([job {:keys [build] :as conf}]
    ;; Deprecated
