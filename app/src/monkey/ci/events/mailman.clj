@@ -10,7 +10,6 @@
             [monkey.mailman
              [core :as mmc]
              [interceptors :as mi]
-             [jms :as mj]
              [manifold :as mm]]))
 
 (def get-result :result)
@@ -64,41 +63,8 @@
 (defmethod make-component :manifold [_]
   (make-generic-component (mm/manifold-broker {})))
 
-(defrecord JmsComponent [broker]
-  co/Lifecycle
-  (start [{:keys [config] :as this}]
-    (let [dests (emj/topic-destinations config)
-          broker (mj/jms-broker (assoc config
-                                       ;; We can specify a serializer that adds sid here
-                                       ;;:serializer custom-serializer
-                                       :destination-mapper (comp dests :type)))]
-      (-> this
-          (dissoc :config)           ; no longer needed
-          (assoc :broker broker
-                 :destinations dests))))
-
-  (stop [this]
-    (when broker
-      (.close broker)
-      (mj/disconnect broker))
-    (assoc this :broker nil))
-
-  p/AddRouter
-  (add-router [{:keys [destinations]} routes opts]
-    (let [router (mmc/router routes opts)]
-      ;; TODO Add listeners for each destination referred to by route event types
-      ;; but split up the routes so only those for the destination are added
-      ;; TODO Allow specifying an sid selector for efficiency
-      (->> routes
-           (map first)
-           (map (or (:destinations opts) destinations))
-           (distinct)
-           (map (partial hash-map :handler router :destination))
-           (map (partial mmc/add-listener broker))
-           (doall)))))
-
 (defmethod make-component :jms [config]
-  (map->JmsComponent {:config config}))
+  (emj/map->JmsComponent {:config config}))
 
 ;; Generic component that can be used to add a new route listener to mailman
 (defrecord RouteComponent [routes make-routes mailman]

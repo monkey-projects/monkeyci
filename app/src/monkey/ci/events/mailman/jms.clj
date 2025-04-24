@@ -1,7 +1,12 @@
 (ns monkey.ci.events.mailman.jms
   "JMS-specific functionality for handling events.  This has mainly to do with
    queue and topic configurations and listeners."
-  (:require [medley.core :as mc]))
+  (:require [com.stuartsierra.component :as co]
+            [medley.core :as mc]
+            [monkey.ci.protocols :as p]
+            [monkey.mailman
+             [core :as mmc]
+             [jms :as mj]]))
 
 (def topic-prefix "topic://")
 
@@ -57,3 +62,36 @@
                          (fn [dest]
                            (let [f (make-dest prefix dest)]
                              (str topic-prefix f "::" f suffix)))))
+
+(defrecord JmsComponent [broker]
+  co/Lifecycle
+  (start [{:keys [config] :as this}]
+    (let [dests (topic-destinations config)
+          broker (mj/jms-broker (assoc config
+                                       ;; We can specify a serializer that adds sid here
+                                       ;;:serializer custom-serializer
+                                       :destination-mapper (comp dests :type)))]
+      (-> this
+          (dissoc :config)           ; no longer needed
+          (assoc :broker broker
+                 :destinations dests))))
+
+  (stop [this]
+    (when broker
+      (.close broker)
+      (mj/disconnect broker))
+    (assoc this :broker nil))
+
+  p/AddRouter
+  (add-router [{:keys [destinations]} routes opts]
+    (let [router (mmc/router routes opts)]
+      ;; TODO Add listeners for each destination referred to by route event types
+      ;; but split up the routes so only those for the destination are added
+      ;; TODO Allow specifying an sid selector for efficiency
+      (->> routes
+           (map first)
+           (map (or (:destinations opts) destinations))
+           (distinct)
+           (map (partial hash-map :handler router :destination))
+           (map (partial mmc/add-listener broker))
+           (doall)))))
