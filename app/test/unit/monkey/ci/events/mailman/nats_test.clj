@@ -1,5 +1,8 @@
 (ns monkey.ci.events.mailman.nats-test
-  (:require [clojure.test :refer [deftest testing is]]
+  (:require [clj-nats-async.core :as nats]
+            [clojure.test :refer [deftest testing is]]
+            [com.stuartsierra.component :as co]
+            [monkey.ci.events.mailman :as em]
             [monkey.ci.events.mailman.nats :as sut]))
 
 (deftest types-to-subjects
@@ -37,3 +40,44 @@
         (verify-types [:container/pending
                        :container/initializing
                        :container/job-queued])))))
+
+(deftest nats-component
+  (with-redefs [nats/create-nats (constantly ::nats)]
+    (testing "`start`"
+      (let [s (co/start (sut/map->NatsComponent {:config {:prefix "test"}}))]
+        (testing "creates connection"
+          (is (= ::nats (get-in s [:broker :nats])))
+          (is (= ::nats (:conn s))))
+
+        (testing "adds subjects according to prefix"
+          (is (map? (:subjects s))))))
+
+    (testing "`stop`"
+      (let [stopped? (atom false)
+            closed? (atom false)
+            make-closeable (fn [a]
+                             (reify java.lang.AutoCloseable
+                               (close [_]
+                                 (reset! a true)
+                                 nil)))
+            broker (make-closeable stopped?)
+            conn (make-closeable closed?)
+            c (-> (sut/map->NatsComponent 
+                   {:broker broker
+                    :conn conn})
+                  (co/stop))]
+        (testing "stops broker"
+          (is (true? @stopped?))
+          (is (nil? (:broker c))))
+
+        (testing "disconnects"
+          (is (true? @closed?))
+          (is (nil? (:conn c))))))
+
+    (testing "`add-router`"
+      (with-redefs [nats/create-nats-subscription (constantly ::test-sub)]
+        (testing "registers listener per subject"
+          (let [c (-> (sut/map->NatsComponent {:config {:prefix "test"}})
+                      (co/start))
+                l (em/add-router c [[::test []]] {})]
+            (is (some? l))))))))

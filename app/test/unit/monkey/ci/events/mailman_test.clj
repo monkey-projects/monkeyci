@@ -1,5 +1,6 @@
 (ns monkey.ci.events.mailman-test
   (:require [clojure.test :refer [deftest is testing]]
+            [clj-nats-async.core :as nats]
             [com.stuartsierra.component :as co]
             [monkey.ci.events.mailman :as sut]
             [monkey.ci.test.mailman :as tm]
@@ -73,7 +74,12 @@
                                   [[:build/start [{:handler (constantly nil)}]]]
                                   {:destinations {:build/start "test-dest"}})]
             (is (= 1 (count l)))
-            (is (= "test-dest" (-> l first :destination)))))))))
+            (is (= "test-dest" (-> l first :destination))))))))
+
+  (testing "nats"
+    (let [c (sut/make-component {:type :nats})]
+      (testing "can make component"
+        (is (some? c))))))
 
 (defrecord TestListener [unreg?]
   mmc/Listener

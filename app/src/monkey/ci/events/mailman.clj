@@ -4,7 +4,9 @@
             [com.stuartsierra.component :as co]
             [monkey.ci.events.mailman
              [interceptors :as emi]
-             [jms :as emj]]
+             [jms :as emj]
+             [nats :as emn]]
+            [monkey.ci.protocols :as p]
             [monkey.mailman
              [core :as mmc]
              [interceptors :as mi]
@@ -37,8 +39,7 @@
 
 ;;; Components
 
-(defprotocol AddRouter
-  (add-router [broker routes opts] "Registers a listener for given routes in the broker"))
+(def add-router p/add-router)
 
 (defmulti make-component :type)
 
@@ -53,7 +54,7 @@
       (mmc/unregister-listener listener))
     (dissoc this :listener))
 
-  AddRouter
+  p/AddRouter
   (add-router [this routes opts]
     [(mmc/add-listener broker (mmc/router routes opts))]))
 
@@ -80,11 +81,9 @@
     (when broker
       (.close broker)
       (mj/disconnect broker))
-    (-> this
-        (assoc :broker nil)
-        (dissoc :bridge)))
+    (assoc this :broker nil))
 
-  AddRouter
+  p/AddRouter
   (add-router [{:keys [destinations]} routes opts]
     (let [router (mmc/router routes opts)]
       ;; TODO Add listeners for each destination referred to by route event types
@@ -128,5 +127,4 @@
           (mmc/post-events events)))
 
 (defmethod make-component :nats [config]
-  ;; TODO
-  )
+  (emn/map->NatsComponent {:config config}))

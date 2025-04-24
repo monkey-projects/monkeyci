@@ -7,7 +7,7 @@
              [deferred :as md]
              [stream :as ms]]
             [monkey.ci.build.api :as api]
-            [monkey.ci.events.mailman :as em]
+            [monkey.ci.protocols :as p]
             [monkey.mailman
              [core :as mmc]
              [manifold :as mmm]
@@ -77,6 +77,6 @@
   (stop [this]
     this)
 
-  em/AddRouter
+  p/AddRouter
   (add-router [this routes opts]
     [(mmc/add-listener (:broker this) (mmc/router routes opts))]))
