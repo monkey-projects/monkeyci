@@ -20,6 +20,7 @@
              [oci :as c-oci]
              [podman :as c-podman]]
             [monkey.ci.events.mailman :as em]
+            [monkey.ci.metrics.core :as mc]
             [monkey.ci.runners.runtime :as rr]
             [monkey.ci.web.auth :as auth]))
 
@@ -113,7 +114,7 @@
    :ssh-keys-fetcher (new-ssh-keys-fetcher conf)
    :api-server (co/using
                 (new-api-server conf)
-                [:builds :artifacts :cache :workspace :mailman :event-stream :params])
+                [:builds :artifacts :cache :workspace :mailman :event-stream :params :metrics])
    :mailman (rr/new-local-mailman)
    :global-mailman (rr/new-mailman conf)
    :local-to-global (co/using
@@ -129,4 +130,5 @@
    :params (new-params conf)
    :container-routes (co/using
                       (new-container-routes conf)
-                      [:mailman :artifacts :cache :workspace :api-server])))
+                      [:mailman :artifacts :cache :workspace :api-server])
+   :metrics (mc/make-metrics)))

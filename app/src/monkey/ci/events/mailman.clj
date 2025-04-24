@@ -126,3 +126,7 @@
   (some-> mm
           :broker
           (mmc/post-events events)))
+
+(defmethod make-component :nats [config]
+  ;; TODO
+  )

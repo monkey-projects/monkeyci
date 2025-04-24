@@ -42,4 +42,11 @@
                         :throw-exceptions false}
                        (http/request)
                        deref
+                       :status))))
+
+      (testing "provides metrics"
+        (is (= 204 (-> {:url (make-url "metrics")
+                        :method :get}
+                       (http/request)
+                       deref
                        :status)))))))

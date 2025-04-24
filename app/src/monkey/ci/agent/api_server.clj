@@ -5,8 +5,10 @@
    request handlers to determine the build associated with the request."
   (:require [aleph.http :as http]
             [monkey.ci.build.api-server :as bas]
+            [monkey.ci.metrics.core :as mc]
             [monkey.ci.web
              [common :as c]
+             [http :as wh]
              [middleware :as wm]]
             [reitit.ring :as ring]
             [ring.util.response :as rur]))
@@ -45,12 +47,19 @@
           (bas/set-build b)
           (handler)))))
 
+(defn metrics [req]
+  (if-let [m (-> (bas/req->ctx req) :metrics :registry)]
+    (wh/text-response (mc/scrape m))
+    (rur/status 204)))
+
 (defn make-router [{:keys [builds] :as conf}]
   (ring/router
-   bas/routes
-   {:data {:middleware (concat [[security-middleware builds]
-                                [build-middleware builds]]
-                               wm/default-middleware)
+   ["" [["/metrics" {:get metrics}]
+        [""
+         {:middleware [[security-middleware builds]
+                       [build-middleware builds]]}
+         bas/routes]]]
+   {:data {:middleware wm/default-middleware
            :muuntaja (c/make-muuntaja)
            :coercion reitit.coercion.schema/coercion
            bas/context conf}}))
