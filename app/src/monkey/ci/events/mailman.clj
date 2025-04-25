@@ -67,7 +67,7 @@
   (emj/map->JmsComponent {:config config}))
 
 ;; Generic component that can be used to add a new route listener to mailman
-(defrecord RouteComponent [routes make-routes mailman]
+(defrecord RouteComponent [routes make-routes mailman options]
   co/Lifecycle
   (start [this]
     (let [routes (make-routes this)]
@@ -75,8 +75,7 @@
       (assoc this
              :routes routes
              :listeners (add-router mailman routes (-> {:interceptors global-interceptors}
-                                                       ;; FIXME Destinations is implementation specific
-                                                       (merge (select-keys this [:destinations])))))))
+                                                       (merge (:options this)))))))
 
   (stop [{:keys [listeners] :as this}]
     (when listeners

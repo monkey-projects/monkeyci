@@ -27,6 +27,9 @@
              [http :as http]]
             [monkey.oci.container-instance.core :as ci]))
 
+(defn- as-map [deps]
+  (zipmap deps deps))
+
 (defn- new-artifacts [config]
   (blob/make-blob-store config :artifacts))
 
@@ -108,14 +111,27 @@
 (defn- new-process-reaper [conf]
   (->ProcessReaper conf))
 
+(defmulti make-queue-options :type)
+
+(defmethod make-queue-options :jms [conf]
+  ;; Make sure to read from queues, not topics to avoid duplicate
+  ;; processing when multiple replicas
+  {:destinations (emj/queue-destinations conf)})
+
+(defmethod make-queue-options :nats [conf]
+  ;; Use a queue name, if so configured
+  (select-keys conf [:queue]))
+
+(defn new-queue-options
+  "Configures messaging queues.  This is implementation specific, so it differs depending
+   on the mailman broker type."
+  [conf]
+  (make-queue-options (:mailman conf)))
+
 (defn new-app-routes [conf]
   (letfn [(make-routes [{:keys [storage update-bus]}]
             (emd/make-routes storage update-bus))]
-    ;; FIXME Don't refer to jms implementation, make it agnostic
-    (em/map->RouteComponent {:make-routes make-routes
-                             ;; Make sure to read from queues, not topics to avoid duplicate
-                             ;; processing when multiple replicas
-                             :destinations (emj/queue-destinations (:mailman conf))})))
+    (em/map->RouteComponent {:make-routes make-routes})))
 
 (defn new-update-routes []
   (letfn [(make-routes [c]
@@ -130,9 +146,7 @@
             (ro/make-routes (:runner config)
                             (:storage c)
                             (:vault c)))]
-    ;; FIXME Don't refer to jms implementation, make it agnostic
-    (em/map->RouteComponent {:make-routes make-routes
-                             :destinations (emj/queue-destinations (:mailman config))})))
+    (em/map->RouteComponent {:make-routes make-routes})))
 
 (defmethod make-server-runner :agent [_]
   ;; Agent is a separate process, so don't do anything here.
@@ -160,7 +174,8 @@
                [:runtime])
    :runner    (co/using
                (new-server-runner config)
-               [:storage :vault :mailman])
+               (-> (as-map [:storage :vault :mailman])
+                   (assoc :options :queue-options)))
    :runtime   (co/using
                (new-server-runtime config)
                [:artifacts :metrics :storage :jwk :process-reaper :vault :mailman :update-bus])
@@ -175,9 +190,11 @@
    :process-reaper (new-process-reaper config)
    :vault     (new-vault config)
    :mailman   (new-mailman config)
+   :queue-options (new-queue-options config)
    :mailman-routes (co/using
                     (new-app-routes config)
-                    [:mailman :storage])
+                    (-> (as-map [:mailman :storage])
+                        (assoc :options :queue-options)))
    :update-routes (co/using
                    (new-update-routes)
                    [:mailman :update-bus])
