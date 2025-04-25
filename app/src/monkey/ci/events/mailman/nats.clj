@@ -1,6 +1,7 @@
 (ns monkey.ci.events.mailman.nats
   "Configuration for NATS subjects"
   (:require [clj-nats-async.core :as nats]
+            [clojure.tools.logging :as log]
             [com.stuartsierra.component :as co]
             [medley.core :as mc]
             [monkey.ci.events.mailman.jms :as jms]
@@ -27,6 +28,7 @@
 (defrecord NatsComponent [broker]
   co/Lifecycle
   (start [this]
+    (log/debug "Connecting to NATS broker at" (get-in this [:config :urls]))
     (let [conf (:config this)
           conn (nats/create-nats conf)
           subjects (types-to-subjects (:prefix conf))]

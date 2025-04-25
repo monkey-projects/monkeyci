@@ -122,6 +122,9 @@
   ;; Use a queue name, if so configured
   (select-keys conf [:queue]))
 
+(defmethod make-queue-options :default [_]
+  nil)
+
 (defn new-queue-options
   "Configures messaging queues.  This is implementation specific, so it differs depending
    on the mailman broker type."
