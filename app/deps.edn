@@ -24,7 +24,8 @@
         com.monkeyprojects/mailman-core {:mvn/version "0.2.6-SNAPSHOT"}
         com.monkeyprojects/mailman-jms {:mvn/version "0.2.6-SNAPSHOT"}
         com.monkeyprojects/mailman-manifold {:mvn/version "0.2.6-SNAPSHOT"}
-        com.monkeyprojects/mailman-nats {:mvn/version "0.2.6-SNAPSHOT"}
+        com.monkeyprojects/mailman-nats {:mvn/version "0.2.6-SNAPSHOT"
+                                         :exclusions [org.bouncycastle/bcprov-lts8on]}
         com.monkeyprojects/monkey-jms-artemis {:mvn/version "0.3.2"}
         com.monkeyprojects/oci-container-instance {:mvn/version "0.2.4"}
         com.monkeyprojects/oci-os {:mvn/version "0.4.1"}
