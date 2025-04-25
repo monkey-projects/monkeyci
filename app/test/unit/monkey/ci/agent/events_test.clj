@@ -16,7 +16,7 @@
             [monkey.mailman.core :as mmc]))
 
 (deftest routes
-  (let [evts [:build/queued :build/end]
+  (let [evts [:build/queued :build/end :script/initializing]
         routes (sut/make-routes {})]
     (doseq [t evts]
       (testing (str "handles " t)
@@ -60,6 +60,15 @@
 
         (testing "saves workspace"
           (is (= {(str (cs/join "/" (b/sid build)) ".tgz") "test-checkout"} @(:stored ws)))))
+
+      (testing "`script/initializing`"
+        (testing "fires `build/start`"
+          (is (= [:build/start]
+                 (->> (router {:type :script/initializing
+                               :sid (b/sid build)})
+                      first
+                      :result
+                      (map :type))))))
 
       (testing "`build/end`"
         (testing "removes token from builds"
@@ -199,3 +208,16 @@
                    (sut/generate-script-config))]
       (is (spec/valid? ::ss/config conf)
           (spec/explain-str ::ss/config conf)))))
+
+(deftest script-init
+  (let [sid (repeatedly 3 (comp str random-uuid))
+        r (sut/script-init {:credit-multiplier ::cm}
+                           {:event {:sid sid}})]
+    (testing "returns `build/start`"
+      (is (= :build/start (-> r first :type))))
+
+    (testing "uses correct sid"
+      (is (= sid (-> r first :sid))))
+
+    (testing "adds credit multiplier from config"
+      (is (= ::cm (-> r first :credit-multiplier))))))

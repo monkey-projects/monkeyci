@@ -169,6 +169,14 @@
                  (em/post-events (:mailman conf)
                                  [(b/build-end-evt build exit)])))}))
 
+(defn script-init [conf ctx]
+  ;; Fire build/start.  We don't really have a way to determine the process has
+  ;; started, except for capturing script/initializing event, so we use that to fire
+  ;; the build/start.
+  [(b/build-start-evt (-> conf
+                          (select-keys [:credit-multiplier])
+                          (assoc :sid (get-in ctx [:event :sid]))))])
+
 ;;; Routing
 
 (defn make-routes [conf]
@@ -183,6 +191,8 @@
                      save-workspace
                      result-build-init-evt
                      emi/start-process]}]]
+
+   [:script/initializing [{:handler (partial script-init conf)}]]
 
    [:build/end
     [{:handler (constantly nil)

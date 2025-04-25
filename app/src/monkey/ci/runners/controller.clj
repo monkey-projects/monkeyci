@@ -25,7 +25,7 @@
 (defn- post-events [rt evt]
   (em/post-events (:mailman rt) evt))
 
-(defn- post-init-evt
+(defn- post-start-evt
   "Post `build/start` event.  Indicates the build has started, but the script is not running yet.
    When the script container is running, the `script/initializing` event is posted."
   [{:keys [build] :as rt}]
@@ -117,12 +117,6 @@
   (md/future
     (let [rp (run-path rt)]
       (log/debug "Waiting until run file has been deleted at:" rp)
-      ;; It can happen sporadically that the run file never gets deleted, even though the
-      ;; script process has actually exited.  Cause unknown, and very hard to determine
-      ;; because it's running in a cloud container.  So, in addition, we also capture
-      ;; the `script/end` event, which is also an indication that the script has ended.
-      ;; We still keep monitoring the run file, because in case of error, the `script/end`
-      ;; event may never be posted.
       (while (fs/exists? rp)
         (Thread/sleep 500))
       (log/debug "Run file deleted, build script finished."))))
@@ -147,6 +141,12 @@
   [rt]
   (set-result
    rt
+   ;; It can happen sporadically that the run file never gets deleted, even though the
+   ;; script process has actually exited.  Cause unknown, and very hard to determine
+   ;; because it's running in a cloud container.  So, in addition, we also capture
+   ;; the `script/end` event, which is also an indication that the script has ended.
+   ;; We still keep monitoring the run file, because in case of error, the `script/end`
+   ;; event may never be posted.
    (-> (md/alt
         (md/chain
          (wait-until-run-file-deleted rt)
@@ -178,7 +178,7 @@
 (defn run-controller [rt]
   (try
     (-> rt
-        (post-init-evt)
+        (post-start-evt)
         (download-and-store-src)
         (restore-build-cache)
         (create-run-file)
@@ -187,6 +187,8 @@
         ;; Post the end event last, because it's the trigger for deleting the container.
         ;; This may cause builds to run slightly longer if the cache needs to be re-uploaded
         ;; so we may consider using the :script/end event to calculate credits instead.
+        ;; TODO If still happens that build/end is never received by other components, so check
+        ;; if it can happen that the event is never sent because the system has shut down too fast.
         (post-end-evt)
         (get-result)
         :exit-code)

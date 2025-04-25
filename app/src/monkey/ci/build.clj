@@ -164,9 +164,7 @@
 (defn build-start-evt [build]
   (build-evt :build/start
              build
-             :credit-multiplier (credit-multiplier build)
-             ;; TODO Remove this
-             :build (assoc build :start-time (t/now))))
+             :credit-multiplier (credit-multiplier build)))
 
 (defn build-end-evt
   "Creates a `build/end` event"
