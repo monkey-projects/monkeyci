@@ -56,10 +56,15 @@
         (is (some? (:mailman sys))))
 
       (testing "provides mailman routes"
-        (is (some? (:mailman-routes sys))))
+        (is (some? (:mailman-routes sys)))
+        (is (some? (-> sys :mailman-routes :options))
+            "has queue options"))
 
       (testing "provides update bus"
-        (is (some? (:update-bus sys)))))))
+        (is (some? (:update-bus sys))))
+
+      (testing "provides queue options"
+        (is (some? (:queue-options sys)))))))
 
 (deftest process-reaper
   (testing "returns empty list when no oci runner"
@@ -84,3 +89,17 @@
         (let [r (sut/->ProcessReaper {:runner {:type :some-other}})]
           (is (empty? (r))))))))
 
+(deftest queue-options
+  (testing "`jms` configures destinations"
+    (is (map? (-> {:mailman
+                   {:type :jms}}
+                  (sut/new-queue-options)
+                  :destinations))))
+
+  (testing "`nats` configures queue"
+    (is (= "test-queue"
+           (-> {:mailman
+                {:type :nats
+                 :queue "test-queue"}}
+               (sut/new-queue-options)
+               :queue)))))

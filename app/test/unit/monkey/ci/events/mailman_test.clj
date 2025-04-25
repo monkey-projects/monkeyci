@@ -42,7 +42,7 @@
         api-config {:port 12342
                     :token "test-token"}]
     (testing "`start`"
-      (let [c (-> (sut/->RouteComponent [] (constantly []) mailman)
+      (let [c (-> (sut/->RouteComponent [] (constantly []) mailman {})
                   (co/start))]
         (testing "registers a listener"
           (is (some? (:listeners c))))))
@@ -54,10 +54,10 @@
                       :listeners)))
         (is (true? @unreg?))))
 
-    (testing "passes destinations to router"
+    (testing "passes options to router"
       (let [c (-> (sut/map->RouteComponent {:make-routes (constantly [])
                                             :mailman (tm/test-component)
-                                            :destinations {::test-evt "test-dest"}})
+                                            :options {:destinations {::test-evt "test-dest"}}})
                   (co/start))]
         (is (= "test-dest" (-> (:listeners c)
                                first
