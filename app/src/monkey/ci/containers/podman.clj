@@ -207,10 +207,10 @@
                    (catch Exception ex
                      (log/error "Failed to post job/executed event" ex)))))}))
 
-(defn job-queued [ctx]
+(defn job-queued [conf ctx]
   (let [{:keys [job-id sid]} (:event ctx)]
     ;; Podman runs locally, so no credits consumed
-    [(j/job-initializing-evt job-id sid 0)]))
+    [(j/job-initializing-evt job-id sid (:credit-multiplier conf))]))
 
 (defn job-init [ctx]
   (let [{:keys [job-id sid]} (:event ctx)]
@@ -244,7 +244,7 @@
                        (cache/restore-interceptor emi/get-job-ctx)
                        (art/restore-interceptor emi/get-job-ctx)
                        emi/start-process]}
-       {:handler job-queued}]]
+       {:handler (partial job-queued conf)}]]
 
      [:job/initializing
       ;; TODO Start sidecar event polling

@@ -217,8 +217,15 @@
            (->> {:event
                  {:type :job/queued
                   :job-id "test-job"}}
-                (sut/job-queued)
-                (map :type))))))
+                (sut/job-queued {})
+                (map :type)))))
+
+  (testing "adds credit multiplier from config"
+    (is (= ::cm
+           (-> {:credit-multiplier ::cm}
+               (sut/job-queued {:event {:type :job/queued}})
+               first
+               :credit-multiplier)))))
 
 (deftest job-init
   (testing "returns `job/start` event"
