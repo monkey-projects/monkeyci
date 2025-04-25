@@ -123,7 +123,7 @@
   (select-keys conf [:queue]))
 
 (defmethod make-queue-options :default [_]
-  nil)
+  {})
 
 (defn new-queue-options
   "Configures messaging queues.  This is implementation specific, so it differs depending
