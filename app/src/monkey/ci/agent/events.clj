@@ -192,7 +192,8 @@
                      result-build-init-evt
                      emi/start-process]}]]
 
-   [:script/initializing [{:handler (partial script-init conf)}]]
+   [:script/initializing
+    [{:handler (partial script-init conf)}]]
 
    [:build/end
     [{:handler (constantly nil)
