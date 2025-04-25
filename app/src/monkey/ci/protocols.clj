@@ -56,3 +56,6 @@
 
 (defn repo? [x]
   (satisfies? ArtifactRepository x))
+
+(defprotocol AddRouter
+  (add-router [broker routes opts] "Registers a listener for given routes in the broker"))

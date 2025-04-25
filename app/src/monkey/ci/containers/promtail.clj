@@ -14,7 +14,7 @@
 
 ;; Default promtail settings
 (def promtail-image "docker.io/grafana/promtail")
-(def promtail-version "3.4")
+(def promtail-version "3.5")
 
 (defn promtail-config
   "Generates config structure that can be passed to promtail.  The structure should

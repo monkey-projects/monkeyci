@@ -111,6 +111,7 @@
 (defn new-app-routes [conf]
   (letfn [(make-routes [{:keys [storage update-bus]}]
             (emd/make-routes storage update-bus))]
+    ;; FIXME Don't refer to jms implementation, make it agnostic
     (em/map->RouteComponent {:make-routes make-routes
                              ;; Make sure to read from queues, not topics to avoid duplicate
                              ;; processing when multiple replicas
@@ -129,6 +130,7 @@
             (ro/make-routes (:runner config)
                             (:storage c)
                             (:vault c)))]
+    ;; FIXME Don't refer to jms implementation, make it agnostic
     (em/map->RouteComponent {:make-routes make-routes
                              :destinations (emj/queue-destinations (:mailman config))})))
 

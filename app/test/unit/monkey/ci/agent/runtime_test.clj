@@ -45,7 +45,10 @@
       (is (some? (:params sys))))
 
     (testing "provides container routes"
-      (is (some? (:container-routes sys))))))
+      (is (some? (:container-routes sys))))
+
+    (testing "provides metris"
+      (is (some? (:metrics sys))))))
 
 (deftest params
   (let [params (sut/new-params {:api {:url "http://test-api"}

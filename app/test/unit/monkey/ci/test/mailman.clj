@@ -1,6 +1,6 @@
 (ns monkey.ci.test.mailman
   "Functionality for testing mailman events"
-  (:require [monkey.ci.events.mailman :as em]
+  (:require [monkey.ci.protocols :as p]
             [monkey.mailman.core :as mmc]))
 
 (defrecord TestBroker [posted]
@@ -17,7 +17,7 @@
   (->TestBroker (atom [])))
 
 (defrecord TestComponent [broker]
-  em/AddRouter
+  p/AddRouter
   (add-router [this r opts]
     [{:routes r
       :opts opts}]))
