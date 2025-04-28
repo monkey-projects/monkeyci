@@ -24,16 +24,16 @@
 
 ;;; Process commandline configuration
 
-(defn- make-script-cmd [script]
+(defn- make-script-cmd [script sd]
   (->> (range (count script))
        (map str)
-       (into ["/bin/sh" cc/job-script])))
+       (into [(str sd "/" cc/job-script)])))
 
-(defn- make-cmd [job]
+(defn- make-cmd [job sd]
   (if-let [cmd (mcc/cmd job)]
     cmd
     ;; When no command is given, run the script
-    (make-script-cmd (:script job))))
+    (make-script-cmd (:script job) sd)))
 
 (defn- mounts [job]
   (mapcat (fn [[h c]]
@@ -76,32 +76,38 @@
 
 (defn build-cmd-args
   "Builds command line args for the podman executable"
-  [{:keys [job sid] wd :work-dir sd :script-dir :as opts}]
+  [{:keys [job sid] base :work-dir sd :script-dir :as opts}]
   (let [cn (get-job-id sid)
         cwd "/home/monkeyci"
         ext-dir "/opt/monkeyci"
         csd (str ext-dir "/script")
         cld (str ext-dir "/logs")
+        wd (if-let [jwd (j/work-dir job)]
+             (str (fs/path cwd jwd))
+             cwd)
+        start "start"
         base-cmd (cond-> ["/usr/bin/podman" "run"
                           "-t"
                           "--name" cn
-                          "-v" (vol-mnt wd cwd)
+                          "-v" (vol-mnt base cwd)
                           "-v" (vol-mnt sd csd)
                           "-v" (vol-mnt (:log-dir opts) cld)
-                          "-w" (if-let [jwd (j/work-dir job)]
-                                 (str (fs/path cwd jwd))
-                                 cwd)]
+                          "-w" wd]
                    ;; Do not delete container in dev mode
                    (not (:dev-mode opts)) (conj "--rm"))
-        env {"MONKEYCI_WORK_DIR" cwd
+        env {"MONKEYCI_WORK_DIR" wd
              "MONKEYCI_SCRIPT_DIR" csd
              "MONKEYCI_LOG_DIR" cld
-             "MONKEYCI_START_FILE" (str csd "/start")
+             "MONKEYCI_START_FILE" (str csd "/" start)
              "MONKEYCI_ABORT_FILE" (str csd "/abort")
              "MONKEYCI_EVENT_FILE" (str csd "/events.edn")}]
     (when-let [s (:script job)]
       (script->files s sd)
-      (io/copy (slurp (io/resource cc/job-script)) (fs/file (fs/path sd cc/job-script))))
+      (io/copy (slurp (io/resource cc/job-script)) (fs/file (fs/path sd cc/job-script)))
+      ;; Auto start, so touch the start file immediately
+      (let [sf (fs/path sd start)]
+        (when-not (fs/exists? sf)
+          (fs/create-file sf))))
     (concat
      base-cmd
      (mounts job)
@@ -109,7 +115,7 @@
      (platform job opts)
      (entrypoint job)
      [(mcc/image job)]
-     (make-cmd job))))
+     (make-cmd job csd))))
 
 ;;; Mailman event handling
 
@@ -270,7 +276,7 @@
        {:handler (partial job-queued conf)}]]
 
      [:job/initializing
-      ;; TODO Start sidecar event polling
+      ;; TODO Start polling for events from events.edn
       [{:handler job-init
         :interceptors [emi/handle-job-error
                        state

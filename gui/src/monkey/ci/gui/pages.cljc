@@ -34,6 +34,7 @@
   (log/debug "Rendering page for route:" (str (r/route-name route)))
   (if-let [p (get pages (r/route-name route))]
     [p route]
+    ;; TODO Replace with the general "not found" page
     [:div.alert.alert-warning
      [:h3 "Page not found"]
      [:p "No page exists for route " [:b (str (r/route-name route))]]]))

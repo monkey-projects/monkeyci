@@ -38,8 +38,8 @@
             (is (fs/exists? (fs/path sd "job.sh"))))
 
           (testing "invokes job script"
-            (is (= ["/bin/sh" "job.sh" "0" "1"]
-                   (take-last 4 r))))
+            (is (= ["/opt/monkeyci/script/job.sh" "0" "1"]
+                   (take-last 3 r))))
 
           (testing "sets sidecar env vars"
             (is (contains-subseq? r ["-e" "MONKEYCI_SCRIPT_DIR=/opt/monkeyci/script"]))
@@ -47,7 +47,10 @@
             (is (contains-subseq? r ["-e" "MONKEYCI_WORK_DIR=/home/monkeyci"]))
             (is (contains-subseq? r ["-e" "MONKEYCI_START_FILE=/opt/monkeyci/script/start"]))
             (is (contains-subseq? r ["-e" "MONKEYCI_ABORT_FILE=/opt/monkeyci/script/abort"]))
-            (is (contains-subseq? r ["-e" "MONKEYCI_EVENT_FILE=/opt/monkeyci/script/events.edn"])))))
+            (is (contains-subseq? r ["-e" "MONKEYCI_EVENT_FILE=/opt/monkeyci/script/events.edn"])))
+
+          (testing "creates start file initially"
+            (is (fs/exists? (fs/path dir "script/start"))))))
       
       (testing "cmd overrides sh command"
         (let [r (sut/build-cmd-args (assoc-in base-conf [:job :container/cmd] ["test-entry"]))]
