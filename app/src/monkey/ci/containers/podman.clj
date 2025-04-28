@@ -4,6 +4,7 @@
    command as a child process and communicate with it using the standard i/o streams."
   (:require [babashka.fs :as fs]
             [cheshire.core :as json]
+            [clojure.java.io :as io]
             [clojure.string :as cs]
             [clojure.tools.logging :as log]
             [monkey.ci
@@ -17,19 +18,22 @@
              [utils :as u]
              [workspace :as ws]]
             [monkey.ci.build.core :as bc]
+            [monkey.ci.containers.common :as cc]
             [monkey.ci.events.mailman :as em]
             [monkey.ci.events.mailman.interceptors :as emi]))
 
 ;;; Process commandline configuration
 
 (defn- make-script-cmd [script]
-  [(cs/join " && " script)])
+  (->> (range (count script))
+       (map str)
+       (into ["/bin/sh" cc/job-script])))
 
 (defn- make-cmd [job]
   (if-let [cmd (mcc/cmd job)]
     cmd
-    ;; When no command is given, use /bin/sh as entrypoint and fail on errors
-    ["-ec"]))
+    ;; When no command is given, run the script
+    (make-script-cmd (:script job))))
 
 (defn- mounts [job]
   (mapcat (fn [[h c]]
@@ -37,10 +41,10 @@
             ["-v" (str h ":" c)])
           (mcc/mounts job)))
 
-(defn- env-vars [job]
+(defn- env-vars [env]
   (mapcat (fn [[k v]]
             ["-e" (str k "=" v)])
-          (mcc/env job)))
+          env))
 
 (defn- platform [job conf]
   (when-let [p (or (mcc/platform job)
@@ -60,37 +64,52 @@
   [job-sid]
   (cs/join "-" job-sid))
 
+(defn- vol-mnt [from to]
+  (str from ":" to ":Z"))
+
+(defn- script->files [script dest]
+  (fs/create-dirs dest)
+  (->> script
+       (map-indexed (fn [idx l]
+                      (spit (fs/file (fs/path dest (str idx))) l)))
+       (doall)))
+
 (defn build-cmd-args
   "Builds command line args for the podman executable"
-  ([job job-sid wd opts]
-   (let [cn (get-job-id job-sid)
-         cwd "/home/monkeyci"
-         base-cmd (cond-> ["/usr/bin/podman" "run"
-                           "-t"
-                           "--name" cn
-                           "-v" (str wd ":" cwd ":Z")
-                           "-w" (if-let [jwd (j/work-dir job)]
-                                  (str (fs/path cwd jwd))
-                                  cwd)]
-                    ;; Do not delete container in dev mode
-                    (not (:dev-mode opts)) (conj "--rm"))]
-     (concat
-      ;; TODO Allow for more options to be passed in
-      base-cmd
-      (mounts job)
-      (env-vars job)
-      (platform job opts)
-      (entrypoint job)
-      [(mcc/image job)]
-      (make-cmd job)
-      ;; TODO Execute script command per command, similar to oci containers
-      (make-script-cmd (:script job)))))
-  ([job {:keys [build] :as conf}]
-   ;; Deprecated
-   (build-cmd-args job
-                   (b/get-job-sid job build)
-                   (b/checkout-dir build)
-                   conf)))
+  [{:keys [job sid] wd :work-dir sd :script-dir :as opts}]
+  (let [cn (get-job-id sid)
+        cwd "/home/monkeyci"
+        ext-dir "/opt/monkeyci"
+        csd (str ext-dir "/script")
+        cld (str ext-dir "/logs")
+        base-cmd (cond-> ["/usr/bin/podman" "run"
+                          "-t"
+                          "--name" cn
+                          "-v" (vol-mnt wd cwd)
+                          "-v" (vol-mnt sd csd)
+                          "-v" (vol-mnt (:log-dir opts) cld)
+                          "-w" (if-let [jwd (j/work-dir job)]
+                                 (str (fs/path cwd jwd))
+                                 cwd)]
+                   ;; Do not delete container in dev mode
+                   (not (:dev-mode opts)) (conj "--rm"))
+        env {"MONKEYCI_WORK_DIR" cwd
+             "MONKEYCI_SCRIPT_DIR" csd
+             "MONKEYCI_LOG_DIR" cld
+             "MONKEYCI_START_FILE" (str csd "/start")
+             "MONKEYCI_ABORT_FILE" (str csd "/abort")
+             "MONKEYCI_EVENT_FILE" (str csd "/events.edn")}]
+    (when-let [s (:script job)]
+      (script->files s sd)
+      (io/copy (slurp (io/resource cc/job-script)) (fs/file (fs/path sd cc/job-script))))
+    (concat
+     base-cmd
+     (mounts job)
+     (env-vars (merge (mcc/env job) env))
+     (platform job opts)
+     (entrypoint job)
+     [(mcc/image job)]
+     (make-cmd job))))
 
 ;;; Mailman event handling
 
@@ -122,6 +141,10 @@
 (def get-log-dir
   "The directory where container output is written to"
   (comp #(fs/path % "logs") get-job-dir))
+
+(def get-script-dir
+  "The directory where script files are stored"
+  (comp #(fs/path % "script") get-job-dir))
 
 (defn job-work-dir [ctx job]
   (let [wd (j/work-dir job)]
@@ -190,11 +213,11 @@
   (let [job (get-in ctx [:event :job])
         log-file (comp fs/file (partial fs/path (fs/create-dirs (get-log-dir ctx))))
         {:keys [job-id sid]} (:event ctx)]
-    ;; TODO Prepare job script in separate dir and mount it in the container for execution
-    {:cmd (build-cmd-args job
-                          (conj sid job-id)
-                          (get-work-dir ctx)
-                          {})
+    {:cmd (build-cmd-args {:job job
+                           :sid (conj sid job-id)
+                           :work-dir (get-work-dir ctx)
+                           :log-dir (get-log-dir ctx)
+                           :script-dir (get-script-dir ctx)})
      :dir (job-work-dir ctx job)
      :out (log-file "out.log")
      :err (log-file "err.log")

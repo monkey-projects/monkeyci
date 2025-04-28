@@ -16,7 +16,7 @@ Check out the [official documentation site](https://docs.monkeyci.com).
 
 ### Why? ###
 
-Why build another CI tool is so many already exist?  Well, throughout my career I've
+Why build another CI tool if so many already exist?  Well, throughout my career I've
 used quite a few: Jenkins, Travis, GCP build, Bitbucket, Gitlab, Teamcity, Tekton...
 All have their strong points, and all have their weak points.  But almost all have the
 same issue: their scripting is not powerful enough for my needs.  And since my pipelines
@@ -42,6 +42,7 @@ the "real world": you can write in an elegant language _and_ your code is actual
 usable!  And that's also why I think it could be a nice fit for some kind of scripting
 (see also [Babashka](https://github.com/babashka/babashka)).  You don't need complicated
 syntax and directory structures, a Clojure program can be as simple as a single file.
+See also [this explainer](https://docs.monkeyci.com/articles/why-clojure/).
 
 So that's the aim here: to provide the full power of Clojure to build pipelines, and
 also introduce coding best-practices to the build process.  By that I mean things like

@@ -82,6 +82,7 @@
   [req]
   (let [st (c/req->storage req)
         cid (c/customer-id req)]
+    ;; TODO Should also fetch latest x builds, in case no recent builds were found.
     (if (st/find-customer st cid)
       (rur/response (st/list-builds-since st cid (or (query->since req)
                                                      (hours-ago 24))))
