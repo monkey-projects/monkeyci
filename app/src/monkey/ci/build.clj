@@ -174,6 +174,7 @@
              ;; TODO Remove this
              :build (-> build
                         (assoc :end-time (u/now))
+                        (mc/update-existing :git dissoc :ssh-keys)
                         (mc/assoc-some :status (exit-code->status exit-code))))
       (mc/assoc-some :message (:message build))))
 
