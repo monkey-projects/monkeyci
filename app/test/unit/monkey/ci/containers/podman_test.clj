@@ -94,15 +94,15 @@
         (let [r (sut/build-cmd-args base-conf)]
           (is (contains-subseq? r ["--entrypoint" "/bin/sh"]))))
 
-      (testing "adds platform if specified"
+      (testing "adds arch if specified"
         (let [r (-> base-conf 
-                    (assoc-in [:job :container/platform] "linux/arm64")
+                    (assoc-in [:job :arch] :arm)
                     (sut/build-cmd-args))]
-          (is (contains-subseq? r ["--platform" "linux/arm64"]))))
+          (is (contains-subseq? r ["--arch" "arm64"]))))
 
-      (testing "adds default platform from app config"
-        (is (contains-subseq? (sut/build-cmd-args (assoc base-conf :platform "test-platform"))
-                              ["--platform" "test-platform"])))
+      (testing "adds default arch from app config"
+        (is (contains-subseq? (sut/build-cmd-args (assoc base-conf :arch :arm))
+                              ["--arch" "arm64"])))
 
       (testing "uses build and job id as container name"
         (is (contains-subseq? (sut/build-cmd-args base-conf)

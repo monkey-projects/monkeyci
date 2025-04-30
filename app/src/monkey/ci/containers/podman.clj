@@ -46,10 +46,13 @@
             ["-e" (str k "=" v)])
           env))
 
-(defn- platform [job conf]
-  (when-let [p (or (mcc/platform job)
-                   (:platform conf))]
-    ["--platform" p]))
+(defn arch-arg [arch]
+  (str (name arch) "64"))
+
+(defn- arch [job conf]
+  (when-let [a (or (mcc/arch job)
+                   (mcc/arch conf))]
+    ["--arch" (arch-arg a)]))
 
 (defn- entrypoint [job]
   (let [ep (mcc/entrypoint job)]
@@ -112,7 +115,7 @@
      base-cmd
      (mounts job)
      (env-vars (merge (mcc/env job) env))
-     (platform job opts)
+     (arch job opts)
      (entrypoint job)
      [(mcc/image job)]
      (make-cmd job csd))))
@@ -283,6 +286,7 @@
                        require-job]}]]
 
      [:podman/job-executed
+      ;; TODO Clean up files
       [{:handler job-exec
         :interceptors [emi/handle-job-error
                        state

@@ -149,7 +149,11 @@
            :update-schema UpdateWebhook
            :id-key :webhook-id})
          (mark-conflicting)
-         (conj ["/github"
+         (conj ["/health"
+                {:conflicting true}
+                [["" {:get
+                      {:handler (constantly (rur/status 200))}}]]]
+               ["/github"
                 {:conflicting true}
                 [[""
                   {:post {:handler github/app-webhook
