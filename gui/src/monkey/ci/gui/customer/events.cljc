@@ -215,7 +215,8 @@
   (fn [_ _ [_ cust-id]]
     [:secure-request
      :get-recent-builds
-     {:customer-id cust-id}
+     {:customer-id cust-id
+      :n 10}
      [:customer/load-recent-builds--success]
      [:customer/load-recent-builds--failed]])))
 

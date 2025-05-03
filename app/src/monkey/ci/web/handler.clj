@@ -300,14 +300,15 @@
   ["/builds"
    [["/recent"
      {:get {:handler cust-api/recent-builds
-            :parameters since-params}}]
+            :parameters (assoc-in since-params
+                                  [:query (s/optional-key :n)] s/Int)}}]
     ["/latest"
      {:get {:handler cust-api/latest-builds}}]]])
 
 (def stats-routes
   ["/stats" {:get {:handler cust-api/stats
-                   :parameters (assoc since-params
-                                      (s/optional-key :zone-offset) s/Str)}}])
+                   :parameters (assoc-in since-params
+                                         [:query (s/optional-key :zone-offset)] s/Str)}}])
 
 (def credit-routes
   ["/credits" {:get {:handler cust-api/credits}}])

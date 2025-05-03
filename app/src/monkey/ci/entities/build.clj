@@ -74,6 +74,14 @@
                                            [:= :latest.repo-id :b.repo-id]]])))
        (map ec/convert-build-select)))
 
+(defn select-latest-n-builds [conn cust-cuid n]
+  (->> (ec/select conn (-> basic-query
+                           (assoc :select [:b.* [:r.display-id :repo-display-id] [:c.cuid :customer-cuid]]
+                                  :where [:= :c.cuid cust-cuid]
+                                  :order-by [[:start-time :desc]]
+                                  :limit n)))
+       (map ec/convert-build-select)))
+
 (defn select-runner-details [conn f]
   (some->> {:select [:rd.*]
             :from [[:build-runner-details :rd]]

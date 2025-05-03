@@ -11,6 +11,8 @@
             [monkey.ci.web.common :as c]
             [ring.util.response :as rur]))
 
+(def query-params (comp :query :parameters))
+
 (defn- repo->out [r]
   (dissoc r :customer-id))
 
@@ -61,35 +63,40 @@
           reply)))))
 
 (defn search-customers [req]
-  (let [f (get-in req [:parameters :query])]
+  (let [f (query-params req)]
     (if (empty? f)
       (-> (rur/response {:message "Query must be specified"})
           (rur/status 400))
       (rur/response (st/search-customers (c/req->storage req) f)))))
 
-(defn- query->since [req]
-  (get-in req [:parameters :query :since]))
+(def query->since (comp :since query-params))
 
-(defn- query->until [req]
-  (get-in req [:parameters :query :until]))
+(def query->until (comp :until query-params))
 
 (defn- hours-ago [h]
   (- (t/now) (t/hours->millis h)))
 
 (defn recent-builds
   "Fetches all builds for the customer that were executed in the past 24 hours, or since
-   a given query parameter."
+   a given query parameter.  Or the last x builds.  If both query parameters are provided,
+   it will do a logical `and` (meaning: the builds from the recent period, and the last 
+   number of builds)."
   [req]
   (let [st (c/req->storage req)
-        cid (c/customer-id req)]
-    ;; TODO Should also fetch latest x builds, in case no recent builds were found.
+        cid (c/customer-id req)
+        n (:n (query-params req))]
     (if (st/find-customer st cid)
-      (rur/response (st/list-builds-since st cid (or (query->since req)
-                                                     (hours-ago 24))))
+      (let [rb (st/list-builds-since st cid (or (query->since req)
+                                                (hours-ago 24)))
+            nb (when (number? n) (st/find-latest-n-builds st cid n))]
+        (->> (concat rb nb)
+             (distinct)
+             (rur/response)))
       (rur/not-found {:message "Customer not found"}))))
 
 (defn latest-builds
-  "Fetches the latest build for each repo for the customer"
+  "Fetches the latest build for each repo for the customer.  This is used in the customer
+   overview screen."
   [req]
   (-> (st/find-latest-builds (c/req->storage req)
                              (c/customer-id req))

@@ -416,6 +416,21 @@
             (map (comp (partial vector cust-id) :id))
             (map (partial find-latest-build s)))))))
 
+(def find-latest-n-builds
+  "Retrieves the latest `n` builds, over all repos for the customer."
+  (override-or
+   [:customer :find-latest-n-builds]
+   (fn [s cust-id n]
+     (let [cust (find-customer s cust-id)]
+       (->> cust
+            :repos
+            vals
+            (map (comp (partial vector cust-id) :id))
+            (mapcat (partial list-builds s))
+            (sort-by :start-time)
+            (reverse)
+            (take n))))))
+
 (def list-builds-since
   "Retrieves all builds for customer since the given timestamp"
   (override-or

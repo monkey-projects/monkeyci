@@ -437,7 +437,41 @@
             (is (= #{"build-2" "build-4"}
                    (->> latest
                         (map :build-id)
-                        (set))))))))))
+                        (set)))))))
+
+      (testing "can find latest n for customer"
+        (let [repos (repeatedly 2 h/gen-repo)
+              cust (-> (h/gen-cust)
+                       (assoc :repos (->> repos
+                                          (map (fn [r] [(:id r) r]))
+                                          (into {}))))
+              builds (->> [{:idx 1
+                            :build-id "build-1"
+                            :repo-id (:id (first repos))
+                            :start-time 100}
+                           {:idx 2
+                            :build-id "build-2"
+                            :repo-id (:id (first repos))
+                            :start-time 200}
+                           {:idx 3
+                            :build-id "build-3"
+                            :repo-id (:id (second repos))
+                            :start-time 300}
+                           {:idx 4
+                            :build-id "build-4"
+                            :repo-id (:id (second repos))
+                            :start-time 400}]
+                          (map #(assoc % :customer-id (:id cust))))]
+          (is (sid/sid? (st/save-customer s cust)))
+          (doseq [b builds]
+            (is (sid/sid? (st/save-build s b))))
+          (let [latest (st/find-latest-n-builds s (:id cust) 2)]
+            (is (= #{"build-3" "build-4"}
+                   (->> latest
+                        (map :build-id)
+                        (set))))
+            (is (= (:id (second repos))
+                   (-> latest first :repo-id)))))))))
 
 (deftest ^:sql jobs
   (with-storage conn s

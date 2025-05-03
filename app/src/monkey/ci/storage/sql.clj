@@ -508,6 +508,10 @@
   (->> (eb/select-latest-builds conn cust-id)
        (map db->build)))
 
+(defn- select-latest-n-customer-builds [{:keys [conn]} cust-id n]
+  (->> (eb/select-latest-n-builds conn cust-id n)
+       (map db->build)))
+
 (defn- select-next-build-idx [{:keys [conn]} [cust-id repo-id]]
   (er/next-repo-idx conn cust-id repo-id))
 
@@ -1049,7 +1053,8 @@
     :list-credit-subscriptions select-customer-credit-subs
     :list-credit-consumptions select-customer-credit-cons
     :list-credit-consumptions-since select-customer-credit-cons-since
-    :find-latest-builds select-latest-customer-builds}
+    :find-latest-builds select-latest-customer-builds
+    :find-latest-n-builds select-latest-n-customer-builds}
    :repo
    {:list-display-ids select-repo-display-ids
     :find-next-build-idx select-next-build-idx

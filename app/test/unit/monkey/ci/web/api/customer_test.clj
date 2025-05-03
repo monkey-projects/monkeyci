@@ -1,15 +1,14 @@
 (ns monkey.ci.web.api.customer-test
-  (:require
-   [clojure.test :refer [deftest is testing]]
-   [java-time.api :as jt]
-   [monkey.ci.cuid :as cuid]
-   [monkey.ci.protocols :as p]
-   [monkey.ci.sid :as sid]
-   [monkey.ci.storage :as st]
-   [monkey.ci.test.helpers :as h]
-   [monkey.ci.test.runtime :as trt]
-   [monkey.ci.utils :as u]
-   [monkey.ci.web.api.customer :as sut]))
+  (:require [clojure.test :refer [deftest is testing]]
+            [java-time.api :as jt]
+            [monkey.ci
+             [cuid :as cuid]
+             [sid :as sid]
+             [storage :as st]]
+            [monkey.ci.test
+             [helpers :as h]
+             [runtime :as trt]]
+            [monkey.ci.web.api.customer :as sut]))
 
 (deftest get-customer
   (testing "returns customer in body"
@@ -154,18 +153,22 @@
             cust (-> (h/gen-cust)
                      (assoc :repos {(:id repo) repo}))
             now (jt/instant)
-            old-build (-> (h/gen-build)
-                          (assoc :customer-id (:id cust)
-                                 :repo-id (:id repo)
-                                 :start-time (-> now
-                                                 (jt/minus (jt/days 2))
-                                                 (jt/to-millis-from-epoch))))
-            new-build (-> (h/gen-build)
-                          (assoc :customer-id (:id cust)
-                                 :repo-id (:id repo)
-                                 :start-time (-> now
-                                                 (jt/minus (jt/hours 2))
-                                                 (jt/to-millis-from-epoch))))]
+            old-build {:customer-id (:id cust)
+                       :repo-id (:id repo)
+                       :build-id "build-1"
+                       :idx 1
+                       :start-time (-> now
+                                       (jt/minus (jt/days 2))
+                                       (jt/to-millis-from-epoch))
+                       :script {:jobs nil}}
+            new-build {:customer-id (:id cust)
+                       :repo-id (:id repo)
+                       :build-id "build-2"
+                       :idx 2
+                       :start-time (-> now
+                                       (jt/minus (jt/hours 2))
+                                       (jt/to-millis-from-epoch))
+                       :script {:jobs nil}}]
         (is (some? (st/save-customer st cust)))
         (is (some? (st/save-build st old-build)))
         (is (some? (st/save-build st new-build)))
@@ -193,7 +196,21 @@
                                          (jt/minus (jt/days 3))
                                          (jt/to-millis-from-epoch))}})
                      (sut/recent-builds)
-                     :body))))))))
+                     :body))))
+
+        (testing "latest `n` builds"
+          (is (= [old-build
+                  new-build]
+                 (-> {:storage st}
+                     (h/->req)
+                     (assoc :parameters
+                            {:path
+                             {:customer-id (:id cust)}
+                             :query
+                             {:n 10}})
+                     (sut/recent-builds)
+                     :body
+                     (as-> x (sort-by :start-time x))))))))))
 
 (deftest latest-builds
   (testing "returns latest build for each customer repo"

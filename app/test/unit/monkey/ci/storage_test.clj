@@ -209,6 +209,29 @@
         (is (= [(last builds)]
                (sut/find-latest-builds st (first repo-sid))))))))
 
+(deftest find-latest-n-builds
+  (h/with-memory-store st
+    (let [repos (repeatedly 2 h/gen-repo)
+          cust (-> (h/gen-cust)
+                   (assoc :repos (->> repos
+                                      (map (fn [r] [(:id r) r]))
+                                      (into {}))))
+          now (t/now)
+          start (- now (t/hours->millis 100))]
+      (is (sid/sid? (sut/save-customer st cust)))
+      ;; Create 10 builds for each repo
+      (doseq [n (range 10)]
+        (doseq [r repos]
+          (is (sid/sid? (sut/save-build st {:customer-id (:id cust)
+                                            :repo-id (:id r)
+                                            :build-id (format "build-%d" n)
+                                            :idx n
+                                            :start-time (+ start (* n (t/hours->millis 1)))})))))
+      (let [m (sut/find-latest-n-builds st (:id cust) 10)]
+        (is (= 10 (count m)))
+        (is (every? (comp (partial = 5) count)
+                    (vals (group-by :repo-id m))))))))
+
 (deftest list-builds-since
   (testing "retrieves builds since given timestamp"
     (h/with-memory-store st

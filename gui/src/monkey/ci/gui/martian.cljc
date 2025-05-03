@@ -125,7 +125,9 @@
    (api-route
     {:route-name :get-recent-builds
      :path-parts (into customer-path ["/builds/recent"])
-     :path-schema customer-schema})
+     :path-schema customer-schema
+     :query-schema {(s/optional-key :since) s/Int
+                    (s/optional-key :n) s/Int}})
 
    (api-route
     {:route-name :get-customer-latest-builds
