@@ -213,7 +213,9 @@
 
 (defn new-controller-routes
   [conf]
-  (em/map->RouteComponent {:make-routes (comp rco/make-routes :script-exit)}))
+  (em/map->RouteComponent {:make-routes (fn [{:keys [script-exit]}]
+                                          (rco/make-routes (b/sid (:build conf))
+                                                           :script-exit))}))
 
 (defn new-event-stream []
   (ms/stream))

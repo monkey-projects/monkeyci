@@ -15,7 +15,8 @@
              [workspace :as ws]]
             [monkey.ci.events
              [builders :as eb]
-             [mailman :as em]]))
+             [mailman :as em]]
+            [monkey.ci.events.mailman.interceptors :as emi]))
 
 (def run-path (comp :run-path :config))
 (def abort-path (comp :abort-path :config))
@@ -205,7 +206,12 @@
   (md/success! r (:event ctx))
   nil)
 
-(defn make-routes [r]
+(defn filter-sid [sid]
+  (emi/terminate-when ::filter-sid (comp (partial not= sid) :sid :event)))
+
+(defn make-routes [sid r]
   ;; We could also wait for the build/end event to be received, which would give us
   ;; certainty that the event was actually posted.
-  [[:script/end [{:handler (partial script-exit r)}]]])
+  [[:script/end [{:handler (partial script-exit r)
+                  ;; Only process events for this build
+                  :interceptors [(filter-sid sid)]}]]])

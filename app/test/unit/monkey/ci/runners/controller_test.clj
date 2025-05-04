@@ -215,8 +215,31 @@
       (is (= evt (deref r 100 :timeout))))))
 
 (deftest make-routes
-  (testing "handles `:script/end` event"
-    (is (contains? (->> (sut/make-routes (md/deferred))
-                        (map first)
-                        set)
-                   :script/end))))
+  (testing "`:script/end` event"
+    (testing "is handled"
+      (is (contains? (->> (sut/make-routes [] (md/deferred))
+                          (map first)
+                          set)
+                     :script/end)))
+
+    (let [make-sid #(repeatedly 3 (comp str random-uuid))
+          sid (make-sid)]
+      (testing "sets script exit for same build"
+        (let [exit (md/deferred)
+              r (mmc/router (sut/make-routes sid exit))]
+          (is (nil? (->  {:type :script/end
+                          :sid sid}
+                         (r)
+                         first
+                         :result)))
+          (is (realized? exit))))
+
+      (testing "is ignored for other build"
+        (let [exit (md/deferred)
+              r (mmc/router (sut/make-routes sid exit))]
+          (is (nil? (->  {:type :script/end
+                          :sid (make-sid)}
+                         (r)
+                         first
+                         :result)))
+          (is (not (realized? exit))))))))

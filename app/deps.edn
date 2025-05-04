@@ -20,11 +20,11 @@
         com.github.seancorfield/honeysql {:mvn/version "2.7.1295"}
         com.github.seancorfield/next.jdbc {:mvn/version "1.3.1002"}
         com.monkeyprojects/aero-ext {:mvn/version "0.3.0"}
-        com.monkeyprojects/clompress {:mvn/version "0.1.3-SNAPSHOT"}
-        com.monkeyprojects/mailman-core {:mvn/version "0.2.6-SNAPSHOT"}
-        com.monkeyprojects/mailman-jms {:mvn/version "0.2.6-SNAPSHOT"}
-        com.monkeyprojects/mailman-manifold {:mvn/version "0.2.6-SNAPSHOT"}
-        com.monkeyprojects/mailman-nats {:mvn/version "0.2.6-SNAPSHOT"
+        com.monkeyprojects/clompress {:mvn/version "0.1.3"}
+        com.monkeyprojects/mailman-core {:mvn/version "0.2.6"}
+        com.monkeyprojects/mailman-jms {:mvn/version "0.2.6"}
+        com.monkeyprojects/mailman-manifold {:mvn/version "0.2.6"}
+        com.monkeyprojects/mailman-nats {:mvn/version "0.2.6"
                                          :exclusions [org.bouncycastle/bcprov-lts8on]}
         com.monkeyprojects/monkey-jms-artemis {:mvn/version "0.3.2"}
         com.monkeyprojects/oci-container-instance {:mvn/version "0.2.4"}
