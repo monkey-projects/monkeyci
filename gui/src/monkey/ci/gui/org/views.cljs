@@ -242,13 +242,13 @@
   "Displays tab pages for various organization overview screens"
   [id]
   [tabs/tabs ::overview
-   [{:id :overview
-     :header [:span [:span.me-2 co/overview-icon] "Overview"]
-     :contents [org-stats id]}
-    {:id :recent
-     :header [:span [:span.me-2 co/build-icon] "Recent Builds"]
+   [{:id :activity
+     :header [:span [:span.me-2 [co/icon :activity]] "Activity"]
      :contents [recent-builds id]
      :current? true}
+    {:id :stats
+     :header [:span [:span.me-2 [co/icon :bar-chart]] "Statistics"]
+     :contents [org-stats id]}
     {:id :repos
      :header [:span [:span.me-2 co/repo-icon] "Repositories"]
      :contents [org-repos]}]])
