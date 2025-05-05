@@ -1,10 +1,10 @@
-(ns monkey.ci.gui.test.customer.subs-test
+(ns monkey.ci.gui.test.org.subs-test
   (:require #?(:cljs [cljs.test :refer-macros [deftest testing is use-fixtures]]
                :clj [clojure.test :refer [deftest testing is use-fixtures]])
             [monkey.ci.gui.apis.bitbucket :as bb]
             [monkey.ci.gui.apis.github :as github]
-            [monkey.ci.gui.customer.db :as db]
-            [monkey.ci.gui.customer.subs :as sut]
+            [monkey.ci.gui.org.db :as db]
+            [monkey.ci.gui.org.subs :as sut]
             [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.test.fixtures :as f]
             [monkey.ci.gui.test.helpers :as h]

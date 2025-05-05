@@ -1,5 +1,5 @@
 (ns monkey.ci.gui.repo.subs
-  (:require [monkey.ci.gui.customer.subs]
+  (:require [monkey.ci.gui.org.subs]
             [monkey.ci.gui.repo.db :as db]
             [monkey.ci.gui.time :as t]
             [monkey.ci.gui.utils :as u]

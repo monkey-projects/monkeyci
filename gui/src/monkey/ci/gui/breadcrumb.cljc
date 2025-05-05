@@ -1,6 +1,6 @@
 (ns monkey.ci.gui.breadcrumb
   (:require [medley.core :as mc]
-            [monkey.ci.gui.customer.db :as cdb]
+            [monkey.ci.gui.org.db :as cdb]
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))

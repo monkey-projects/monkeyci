@@ -1,6 +1,6 @@
 (ns monkey.ci.gui.repo.events
   (:require [monkey.ci.gui.alerts :as a]
-            [monkey.ci.gui.customer.db :as cdb]
+            [monkey.ci.gui.org.db :as cdb]
             [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.repo.db :as db]
             [monkey.ci.gui.routing :as r]

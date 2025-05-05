@@ -3,7 +3,7 @@
                :cljs [cljs.test :refer-macros [deftest testing is use-fixtures]])
             [day8.re-frame.test :as rft]
             [monkey.ci.gui.breadcrumb :as sut]
-            [monkey.ci.gui.customer.db :as cdb]
+            [monkey.ci.gui.org.db :as cdb]
             [monkey.ci.gui.routing :as r]
             [monkey.ci.gui.test.fixtures :as f]
             [monkey.ci.gui.test.helpers :as h]
@@ -38,7 +38,7 @@
                                           {:customer-id "test-cust"}}})
                          (cdb/set-customer {:name "Test customer"})))
       (is (= 2 (count @p)))
-      (is (= {:url "/c/test-cust"
+      (is (= {:url "/o/test-cust"
               :name "Test customer"}
              (second @p))))
 
@@ -52,7 +52,7 @@
                                             :repos [{:id "test-repo"
                                                      :name "Test repo"}]})))
       (is (= 3 (count @p)))
-      (is (= {:url "/c/test-cust/r/test-repo"
+      (is (= {:url "/o/test-cust/r/test-repo"
               :name "Test repo"}
              (last @p))))
 
@@ -67,7 +67,7 @@
                                             :repos [{:id "test-repo"
                                                      :name "Test repo"}]})))
       (is (= 4 (count @p)))
-      (is (= {:url "/c/test-cust/r/test-repo/b/test-build"
+      (is (= {:url "/o/test-cust/r/test-repo/b/test-build"
               :name "test-build"}
              (last @p))))
 
@@ -83,7 +83,7 @@
                                             :repos [{:id "test-repo"
                                                      :name "Test repo"}]})))
       (is (= 5 (count @p)))
-      (is (= {:url "/c/test-cust/r/test-repo/b/test-build/j/test-job"
+      (is (= {:url "/o/test-cust/r/test-repo/b/test-build/j/test-job"
               :name "test-job"}
              (last @p))))
 
@@ -98,7 +98,7 @@
                                             :repos [{:id "test-repo"
                                                      :name "Test repo"}]})))
       (is (= 3 (count @p)))
-      (is (= {:url "/c/test-cust/params"
+      (is (= {:url "/o/test-cust/params"
               :name "Parameters"}
              (last @p))))))
 

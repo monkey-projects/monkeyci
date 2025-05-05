@@ -10,8 +10,8 @@
             [monkey.ci.gui.admin.search :as as]
             [monkey.ci.gui.admin.credits.events]
             [monkey.ci.gui.admin.credits.subs]
-            [monkey.ci.gui.customer.events]
-            [monkey.ci.gui.customer.subs]
+            [monkey.ci.gui.org.events]
+            [monkey.ci.gui.org.subs]
             [re-frame.core :as rf]))
 
 (defn- issue-all

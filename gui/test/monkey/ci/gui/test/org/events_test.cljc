@@ -1,9 +1,9 @@
-(ns monkey.ci.gui.test.customer.events-test
+(ns monkey.ci.gui.test.org.events-test
   (:require #?(:cljs [cljs.test :refer-macros [deftest testing is use-fixtures async]]
                :clj [clojure.test :refer [deftest testing is use-fixtures]])
             [day8.re-frame.test :as rf-test]
-            [monkey.ci.gui.customer.db :as db]
-            [monkey.ci.gui.customer.events :as sut]
+            [monkey.ci.gui.org.db :as db]
+            [monkey.ci.gui.org.events :as sut]
             [monkey.ci.gui.home.db :as hdb]
             [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.login.db :as ldb]

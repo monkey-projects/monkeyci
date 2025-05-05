@@ -1,10 +1,10 @@
-(ns monkey.ci.gui.customer.events
+(ns monkey.ci.gui.org.events
   (:require [medley.core :as mc]
             [monkey.ci.gui.alerts :as a]
             [monkey.ci.gui.home.db :as hdb]
             [monkey.ci.gui.logging :as log]
             [monkey.ci.gui.martian]
-            [monkey.ci.gui.customer.db :as db]
+            [monkey.ci.gui.org.db :as db]
             [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.login.db :as ldb]
             [monkey.ci.gui.routing :as r]

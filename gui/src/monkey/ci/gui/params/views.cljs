@@ -1,6 +1,6 @@
 (ns monkey.ci.gui.params.views
   (:require [monkey.ci.gui.components :as co]
-            [monkey.ci.gui.customer.events]
+            [monkey.ci.gui.org.events]
             [monkey.ci.gui.labels :as lbl]
             [monkey.ci.gui.layout :as l]
             [monkey.ci.gui.logging :as log]

@@ -1,7 +1,7 @@
 (ns monkey.ci.gui.admin.invoicing.views
   (:require [monkey.ci.gui.admin.search :as as]
-            [monkey.ci.gui.customer.events]
-            [monkey.ci.gui.customer.subs]
+            [monkey.ci.gui.org.events]
+            [monkey.ci.gui.org.subs]
             [monkey.ci.gui.layout :as l]
             [monkey.ci.gui.routing :as r]
             [re-frame.core :as rf]))

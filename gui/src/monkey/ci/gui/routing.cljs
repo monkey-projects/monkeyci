@@ -53,20 +53,20 @@
   (f/router
    [["/" :page/root]
     ["/login" :page/login]
-    ["/c/join" {:conflicting true
+    ["/o/join" {:conflicting true
                 :name :page/customer-join}]
-    ["/c/new" {:conflicting true
+    ["/o/new" {:conflicting true
                :name :page/customer-new}]
-    ["/c/:customer-id" {:conflicting true
+    ["/o/:customer-id" {:conflicting true
                         :name :page/customer}]
-    ["/c/:customer-id/add-repo/github" :page/add-github-repo]
-    ["/c/:customer-id/add-repo/bitbucket" :page/add-bitbucket-repo]
-    ["/c/:customer-id/params" :page/customer-params]
-    ["/c/:customer-id/ssh-keys" :page/customer-ssh-keys]
-    ["/c/:customer-id/r/:repo-id" :page/repo]
-    ["/c/:customer-id/r/:repo-id/edit" :page/repo-edit]
-    ["/c/:customer-id/r/:repo-id/b/:build-id" :page/build]
-    ["/c/:customer-id/r/:repo-id/b/:build-id/j/:job-id" :page/job]
+    ["/o/:customer-id/add-repo/github" :page/add-github-repo]
+    ["/o/:customer-id/add-repo/bitbucket" :page/add-bitbucket-repo]
+    ["/o/:customer-id/params" :page/customer-params]
+    ["/o/:customer-id/ssh-keys" :page/customer-ssh-keys]
+    ["/o/:customer-id/r/:repo-id" :page/repo]
+    ["/o/:customer-id/r/:repo-id/edit" :page/repo-edit]
+    ["/o/:customer-id/r/:repo-id/b/:build-id" :page/build]
+    ["/o/:customer-id/r/:repo-id/b/:build-id/j/:job-id" :page/job]
     ["/github/callback" :page/github-callback]
     ["/bitbucket/callback" :page/bitbucket-callback]]))
 

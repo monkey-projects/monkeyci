@@ -1,8 +1,8 @@
-(ns monkey.ci.gui.customer.subs
+(ns monkey.ci.gui.org.subs
   (:require [clojure.string :as cs]
             [monkey.ci.gui.apis.bitbucket]
             [monkey.ci.gui.apis.github]
-            [monkey.ci.gui.customer.db :as db]
+            [monkey.ci.gui.org.db :as db]
             [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))

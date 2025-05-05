@@ -1,4 +1,4 @@
-(ns monkey.ci.gui.customer.db
+(ns monkey.ci.gui.org.db
   (:require [monkey.ci.gui.loader :as lo]))
 
 (def customer ::customer)

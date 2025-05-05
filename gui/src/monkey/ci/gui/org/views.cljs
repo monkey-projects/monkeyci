@@ -1,10 +1,9 @@
-(ns monkey.ci.gui.customer.views
+(ns monkey.ci.gui.org.views
   (:require [monkey.ci.gui.charts :as charts]
-            [monkey.ci.gui.colors :as colors]
             [monkey.ci.gui.components :as co]
-            [monkey.ci.gui.customer.db :as db]
-            [monkey.ci.gui.customer.events]
-            [monkey.ci.gui.customer.subs]
+            [monkey.ci.gui.org.db :as db]
+            [monkey.ci.gui.org.events]
+            [monkey.ci.gui.org.subs]
             [monkey.ci.gui.forms :as f]
             [monkey.ci.gui.apis.bitbucket]
             [monkey.ci.gui.apis.github]
