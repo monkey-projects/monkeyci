@@ -2,7 +2,7 @@
   (:require #?(:cljs [cljs.test :refer-macros [deftest testing is use-fixtures]]
                :clj [clojure.test :refer [deftest testing is use-fixtures]])
             [day8.re-frame.test :as rft]
-            [monkey.ci.gui.customer.db :as cdb]
+            [monkey.ci.gui.org.db :as cdb]
             [monkey.ci.gui.build.db :as db]
             [monkey.ci.gui.build.events :as sut]
             [monkey.ci.gui.loader :as lo]
@@ -22,7 +22,8 @@
 
 (defn- build->params [build]
   {:parameters
-   {:path (select-keys build [:customer-id :repo-id :build-id])}})
+   {:path (-> (select-keys build [:repo-id :build-id])
+              (assoc :org-id (:customer-id build)))}})
 
 (def build-keys [:customer-id :repo-id :build-id])
 (def sid (apply juxt build-keys))
@@ -35,7 +36,7 @@
 (deftest build-init
   (letfn [(mock-handlers []
             (rf/reg-event-db :build/load (constantly nil))
-            (rf/reg-event-db :customer/maybe-load (constantly nil))
+            (rf/reg-event-db :org/maybe-load (constantly nil))
             (rf/reg-event-db :event-stream/start (constantly nil))
             (rf/reg-event-db :route/on-page-leave (constantly nil)))]
 
@@ -53,11 +54,11 @@
              (rf/dispatch [:build/init])
              (is (= 1 (count @c))))))
 
-        (testing "dispatches customer load event"
+        (testing "dispatches org load event"
           (rft/run-test-sync
            (let [c (atom [])]
              (mock-handlers)
-             (rf/reg-event-db :customer/maybe-load (fn [_ evt] (swap! c conj evt)))
+             (rf/reg-event-db :org/maybe-load (fn [_ evt] (swap! c conj evt)))
              (rf/dispatch [:build/init])
              (is (= 1 (count @c))))))
         
@@ -114,7 +115,7 @@
                        {}
                        {:parameters
                         {:path 
-                         {:customer-id "test-cust"
+                         {:org-id "test-org"
                           :repo-id "test-repo"
                           :build-id "test-build"}}}))
        (h/initialize-martian {:get-build {:body "test-build"
@@ -150,16 +151,16 @@
             {:jobs {"test-job" {:id "test-job"}}}}
            (db/get-build @app-db))))
 
-  (testing "adds customer and repo id from route"
+  (testing "adds org and repo id from route"
     (let [[_ _ build-id :as sid] (build-sid)]
       (is (some? (reset! app-db (r/set-current
                                  {}
                                  {:parameters
-                                  {:path (zipmap [:customer-id :repo-id :build-id] sid)}}))))
+                                  {:path (zipmap [:org-id :repo-id :build-id] sid)}}))))
       (rf/dispatch-sync [:build/load--success {:body {:build-id build-id}}])
       (is (= sid
              (-> (db/get-build @app-db)
-                 (select-keys [:customer-id :repo-id :build-id])
+                 (select-keys [:org-id :repo-id :build-id])
                  (vals))))))
 
   (testing "starts event stream when build is running")

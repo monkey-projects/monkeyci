@@ -1,45 +1,45 @@
-(ns monkey.ci.gui.customer.subs
+(ns monkey.ci.gui.org.subs
   (:require [clojure.string :as cs]
             [monkey.ci.gui.apis.bitbucket]
             [monkey.ci.gui.apis.github]
-            [monkey.ci.gui.customer.db :as db]
+            [monkey.ci.gui.org.db :as db]
             [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
-(u/db-sub :customer/create-alerts db/create-alerts)
-(u/db-sub :customer/creating? db/customer-creating?)
-(u/db-sub :customer/group-by-lbl db/get-group-by-lbl)
-(u/db-sub :customer/repo-filter db/get-repo-filter)
-(u/db-sub :customer/ext-repo-filter db/get-ext-repo-filter)
-(u/db-sub :customer/bb-webhooks db/bb-webhooks)
+(u/db-sub :org/create-alerts db/create-alerts)
+(u/db-sub :org/creating? db/org-creating?)
+(u/db-sub :org/group-by-lbl db/get-group-by-lbl)
+(u/db-sub :org/repo-filter db/get-repo-filter)
+(u/db-sub :org/ext-repo-filter db/get-ext-repo-filter)
+(u/db-sub :org/bb-webhooks db/bb-webhooks)
 
 (rf/reg-sub
- :customer/info
- :<- [:loader/value db/customer]
+ :org/info
+ :<- [:loader/value db/org]
  identity)
 
 (rf/reg-sub
- :customer/loading?
- :<- [:loader/loading? db/customer]
+ :org/loading?
+ :<- [:loader/loading? db/org]
  identity)
 
 (rf/reg-sub
- :customer/alerts
+ :org/alerts
  (fn [db _]
    (db/get-alerts db)))
 
 (rf/reg-sub
- :customer/repos
- :<- [:customer/info]
+ :org/repos
+ :<- [:org/info]
  (fn [ci _]
    (:repos ci)))
 
 (rf/reg-sub
- :customer/github-repos
- :<- [:customer/repos]
+ :org/github-repos
+ :<- [:org/repos]
  :<- [:github/repos]
- :<- [:customer/ext-repo-filter]
+ :<- [:org/ext-repo-filter]
  (fn [[cr gr f] _]
    (letfn [(watched-repo [r]
              (->> cr
@@ -62,10 +62,10 @@
           (sort-by :name)))))
 
 (rf/reg-sub
- :customer/bitbucket-repos
+ :org/bitbucket-repos
  :<- [:bitbucket/repos]
- :<- [:customer/ext-repo-filter]
- :<- [:customer/bb-webhooks]
+ :<- [:org/ext-repo-filter]
+ :<- [:org/bb-webhooks]
  (fn [[r ef wh] _]
    (let [wh-by-id (group-by (juxt :workspace :repo-slug) wh)
          watched? (->> (keys wh-by-id)
@@ -85,8 +85,8 @@
             (sort-by :name))))))
 
 (rf/reg-sub
- :customer/recent-builds
- :<- [:loader/value db/customer]
+ :org/recent-builds
+ :<- [:loader/value db/org]
  :<- [:loader/value db/recent-builds]
  (fn [[cust rb] _]
    (let [repos (->> cust
@@ -100,19 +100,19 @@
           (map add-repo)))))
 
 (rf/reg-sub
- :customer/stats
+ :org/stats
  :<- [:loader/value db/stats]
  identity)
 
 (rf/reg-sub
- :customer/credits
+ :org/credits
  :<- [:loader/value db/credits]
  identity)
 
 (rf/reg-sub
- :customer/credit-stats
- :<- [:customer/stats]
- :<- [:customer/credits]
+ :org/credit-stats
+ :<- [:org/stats]
+ :<- [:org/credits]
  (fn [[stats creds] _]
    (when (and stats creds)
      {:available (:available creds)
@@ -121,8 +121,8 @@
                      (reduce + 0))})))
 
 (rf/reg-sub
- :customer/labels
- :<- [:customer/info]
+ :org/labels
+ :<- [:org/info]
  (fn [cust _]
    (->> cust
         :repos
@@ -139,10 +139,10 @@
          :value)))
 
 (rf/reg-sub
- :customer/grouped-repos
- :<- [:customer/repos]
- :<- [:customer/group-by-lbl]
- :<- [:customer/repo-filter]
+ :org/grouped-repos
+ :<- [:org/repos]
+ :<- [:org/group-by-lbl]
+ :<- [:org/repo-filter]
  (fn [[repos lbl rf] _]
    (letfn [(matches-filter? [{:keys [name]}]
              (or (empty? rf)
@@ -155,13 +155,13 @@
 (u/db-sub ::repo-alerts db/repo-alerts)
 
 (rf/reg-sub
- :customer/repo-alerts
+ :org/repo-alerts
  :<- [::repo-alerts]
  :<- [:github/alerts]
  (fn [[ra ga] _]
    (concat ra ga)))
 
 (rf/reg-sub
- :customer/latest-build
+ :org/latest-build
  (fn [db [_ repo-id]]
    (get (db/get-latest-builds db) repo-id)))

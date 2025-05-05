@@ -11,68 +11,68 @@
 
 (defn- create-cust-btn []
   [:a.btn.btn-primary
-   {:href (r/path-for :page/customer-new)}
-   [:span.me-2 [co/icon :plus-square]] "Create New Customer"])
+   {:href (r/path-for :page/org-new)}
+   [:span.me-2 [co/icon :plus-square]] "Create New Organization"])
 
 (defn- join-cust-btn []
   [:a.btn.btn-primary
-   {:href (r/path-for :page/customer-join)}
-   [:span.me-2 [co/icon :arrow-right-square]] "Join Customer"])
+   {:href (r/path-for :page/org-join)}
+   [:span.me-2 [co/icon :arrow-right-square]] "Join Organization"])
 
 (defn- cust-item [{:keys [id name owner?]}]
   [:div.card
    {:style {:width "20em"}
-    :on-click #(rf/dispatch [:route/goto :page/customer {:customer-id id}])}
+    :on-click #(rf/dispatch [:route/goto :page/org {:org-id id}])}
    [:div.card-header {:style {:font-size "5em"}}
-    co/customer-icon]
+    co/org-icon]
    [:div.card-body
     [:div.card-title
      [:h5
-      [:a {:href (r/path-for :page/customer {:customer-id id})}
+      [:a {:href (r/path-for :page/org {:org-id id})}
        name
        (when owner?
          [:span.badge.text-bg-success.ms-2 "owner"])]]]]])
 
-(defn- linked-customers [cust]
+(defn- linked-orgs [cust]
   [:div
    (->> (map cust-item cust)
         (into [:div.d-flex.gap-3.mb-3]))
-   [:p "You can join any number of customers, as long as a customer administrator approves your request."]
+   [:p "You can join any number of organizations, as long as an organization administrator approves your request."]
    [join-cust-btn]])
 
 ;; TODO Configure centrally somewhere
 (def free-credits 5000)
 
-(defn customers []
-  (let [c (rf/subscribe [:user/customers])]
+(defn orgs []
+  (let [c (rf/subscribe [:user/orgs])]
     (when @c
       [:<>
-       [:h3 [:span.me-2 co/overview-icon] "Your Linked Customers"]
-       [:p "Welcome! This screen shows all customers linked to your user account."]
+       [:h3 [:span.me-2 co/overview-icon] "Your Linked Organizations"]
+       [:p "Welcome! This screen shows all organizations linked to your user account."]
        (if (empty? @c)
          [:<>
-          [:p "No customers have been linked to your account yet.  You could either "
-           [:a {:href (r/path-for :page/customer-new)} "create a new one"]
+          [:p "No organizations have been linked to your account yet.  You could either "
+           [:a {:href (r/path-for :page/org-new)} "create a new one"]
            " or "
-           [:a {:href (r/path-for :page/customer-join)} "request to join an existing one"] "."]
+           [:a {:href (r/path-for :page/org-join)} "request to join an existing one"] "."]
           [:div.mb-2
            [:span.me-2 [create-cust-btn]]
            [join-cust-btn]]
           [:p
-           "You can create one customer per user account." [:b.mx-1 "Creating a customer is free,"]
-           "a credit card is not required.  Each customer gets" [:b.mx-1 free-credits " free credits"]
+           "You can create one organization per user account." [:b.mx-1 "Creating an organization is free,"]
+           "a credit card is not required.  Each organization gets" [:b.mx-1 free-credits " free credits"]
            "per month. "
            "One credit can be spent on one cpu minute, or one memory GB per minute. "
-           "You can join an unlimited number of customers.  See more details in "
+           "You can join an unlimited number of organizations.  See more details in "
            ;; TODO Make docs url configurable per env
            [:a {:href "https://docs.monkeyci.com" :target :_blank} "the documentation."]]]
-         [linked-customers @c])])))
+         [linked-orgs @c])])))
 
 (defn user-home [u]
   (rf/dispatch [:home/initialize])
   [:<>
    [co/alerts [:user/alerts]]
-   [customers]])
+   [orgs]])
 
 (defn redirect-to-login []
   [:p "One moment, redirecting you to the login page"]
@@ -90,18 +90,18 @@
         [redirect-to-login])]]))
 
 (defn- search-btn []
-  (let [busy? (rf/subscribe [:customer/searching?])]
+  (let [busy? (rf/subscribe [:org/searching?])]
     [:button.btn.btn-primary {:disabled @busy?} [:span.me-2 [co/icon :search]] "Search"]))
 
-(defn- search-customer []
+(defn- search-org []
   [:form
-   {:on-submit (f/submit-handler [:customer/search])}
+   {:on-submit (f/submit-handler [:org/search])}
    [:div.row
     [:div.col
-     [:label.form-label {:for :customer-search} "Search customer"]
+     [:label.form-label {:for :org-search} "Search organization"]
      [:input.form-control.mb-3
-      {:id :customer-search
-       :name :customer-search
+      {:id :org-search
+       :name :org-search
        :placeholder "Name or id"}]]]
    [:div.row
     [:div.col
@@ -110,7 +110,7 @@
 
 (defn- join-btn [{:keys [id]} disabled?]
   [:button.btn.btn-sm.btn-success
-   {:on-click #(rf/dispatch [:customer/join id])
+   {:on-click #(rf/dispatch [:org/join id])
     :disabled disabled?}
    [:span.me-2 [co/icon :arrow-right-square]] "Join"])
 
@@ -118,7 +118,7 @@
   (case status
     :joined
     [:span.badge.text-bg-success
-     {:title "You have already joined this customer"}
+     {:title "You have already joined this organization"}
      "joined"]
     :pending
     [:span.badge.text-bg-warning
@@ -126,28 +126,28 @@
      "pending"]
     [join-btn cust (= :joining status)]))
 
-(defn customers-table []
-  (letfn [(customer-name [{:keys [id name joined?]}]
+(defn orgs-table []
+  (letfn [(org-name [{:keys [id name joined?]}]
             (if joined?
-              ;; Display link to go to customer if already joined
-              [:a {:href (r/path-for :page/customer {:customer-id id})} name]
+              ;; Display link to go to org if already joined
+              [:a {:href (r/path-for :page/org {:org-id id})} name]
               name))]
     [t/paged-table
-     {:id :customer/search-results
-      :items-sub [:customer/join-list]
+     {:id :org/search-results
+      :items-sub [:org/join-list]
       :columns [{:label "Name"
-                 :value customer-name}
+                 :value org-name}
                 {:label "Actions"
                  :value join-actions}]}]))
 
 (defn search-results []
-  (let [r (rf/subscribe [:customer/join-list])]
+  (let [r (rf/subscribe [:org/join-list])]
     (when @r
       (if (empty? @r)
         [:p "No matches found, you could try another query."]
         [:div
-         [:p "Found " (count @r) " matching " (u/pluralize "customer" (count @r)) "."]
-         [customers-table]]))))
+         [:p "Found " (count @r) " matching " (u/pluralize "org" (count @r)) "."]
+         [orgs-table]]))))
 
 (defn- request-status [{:keys [status]}]
   (let [cl (condp = status
@@ -165,8 +165,8 @@
     [t/paged-table
      {:id :user/join-requests
       :items-sub [:user/join-requests]
-      :columns [{:label "Customer"
-                 :value (comp :name :customer)}
+      :columns [{:label "Organization"
+                 :value (comp :name :org)}
                 {:label "Status"
                  :value request-status}
                 {:label "Actions"
@@ -184,21 +184,21 @@
          [join-requests-table]))]))
 
 (defn page-join
-  "Displays the 'join customer' page"
+  "Displays the 'join organization' page"
   []
-  (rf/dispatch-sync [:customer/join-init])
+  (rf/dispatch-sync [:org/join-init])
   (fn []
     [l/default
      [:div.row
       [:div.col-lg-6
        [:div.card
         [:div.card-body
-         [:h3.card-title "Join Existing Customer"]
+         [:h3.card-title "Join Existing Organization"]
          [:p
-          "On this page you can search for a customer and request to join it.  A user "
-          "with administrator permissions for that customer can approve your request."]
-         [co/alerts [:customer/join-alerts]]
-         [search-customer]
+          "On this page you can search for an organization and request to join it.  A user "
+          "with administrator permissions for that organization can approve your request."]
+         [co/alerts [:org/join-alerts]]
+         [search-org]
          [:div.mt-2
           [search-results]]]]]
       [:div.col-lg-6

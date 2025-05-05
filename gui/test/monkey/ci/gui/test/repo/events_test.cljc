@@ -2,7 +2,7 @@
   (:require #?(:cljs [cljs.test :refer-macros [deftest testing is use-fixtures]]
                :clj [clojure.test :refer [deftest testing is use-fixtures]])
             [day8.re-frame.test :as rft]
-            [monkey.ci.gui.customer.db :as cdb]
+            [monkey.ci.gui.org.db :as cdb]
             [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.repo.db :as db]
             [monkey.ci.gui.repo.events :as sut]
@@ -14,21 +14,21 @@
 
 (use-fixtures :each f/reset-db)
 
-(defn- set-repo-path [db cust repo]
+(defn- set-repo-path [db org repo]
   (r/set-current db {:parameters
                      {:path 
-                      {:customer-id cust
+                      {:org-id org
                        :repo-id repo}}}))
 
-(defn- set-repo-path! [cust repo]
-  (swap! app-db set-repo-path cust repo))
+(defn- set-repo-path! [org repo]
+  (swap! app-db set-repo-path org repo))
 
 (defn- test-repo-path!
-  "Generate random ids for customer, repo and build, and sets the current
+  "Generate random ids for org, repo and build, and sets the current
    route to the generated path.  Returns the generated ids."
   []
-  (let [[cust repo _ :as r] (repeatedly 3 random-uuid)]
-    (set-repo-path! cust repo)
+  (let [[org repo _ :as r] (repeatedly 3 random-uuid)]
+    (set-repo-path! org repo)
     r))
 
 (deftest repo-init
@@ -36,7 +36,7 @@
     (rft/run-test-sync
      (let [c (h/catch-fx :martian.re-frame/request)]
        (reset! app-db (lo/set-initialized {} db/id))
-       (h/initialize-martian {:get-customer {:error-code :unexpected}})
+       (h/initialize-martian {:get-org {:error-code :unexpected}})
 
        (rf/dispatch [:repo/init])
        (is (empty? @c)))))
@@ -44,7 +44,7 @@
   (testing "when not initialized"
     (rft/run-test-sync
      (let [c (h/catch-fx :martian.re-frame/request)]
-       (h/initialize-martian {:get-customer {:body {}
+       (h/initialize-martian {:get-org {:body {}
                                              :error-code :no-error}})
        (rf/dispatch [:repo/init])
        
@@ -55,29 +55,29 @@
          (is (lo/initialized? @app-db db/id)))))))
 
 (deftest repo-load
-  (testing "loads customer if not existing"
+  (testing "loads org if not existing"
     (rft/run-test-sync
      (let [c (h/catch-fx :martian.re-frame/request)]
-       (h/initialize-martian {:get-customer {:body {:name "test customer"}
+       (h/initialize-martian {:get-org {:body {:name "test org"}
                                              :error-code :no-error}})
        
-       (rf/dispatch [:repo/load "test-customer-id"])
+       (rf/dispatch [:repo/load "test-org-id"])
        (is (= 1 (count @c)))
-       (is (= :get-customer (-> @c first (nth 2)))))))
+       (is (= :get-org (-> @c first (nth 2)))))))
 
-  (testing "does not load customer if already loaded"
+  (testing "does not load org if already loaded"
     (rft/run-test-sync
      (let [c (h/catch-fx :martian.re-frame/request)]
-       (reset! app-db (cdb/set-customer {} {:name "existing customer"}))
-       (h/initialize-martian {:get-customer {:body {:name "test customer"}
+       (reset! app-db (cdb/set-org {} {:name "existing org"}))
+       (h/initialize-martian {:get-org {:body {:name "test org"}
                                              :error-code :no-error}})
        
-       (rf/dispatch [:repo/load "test-customer-id"])
+       (rf/dispatch [:repo/load "test-org-id"])
        (is (empty? @c)))))
 
   (testing "clears builds"
     (is (some? (reset! app-db (db/set-builds {} ::test-builds))))
-    (rf/dispatch-sync [:repo/load "other-customer-id"])
+    (rf/dispatch-sync [:repo/load "other-org-id"])
     (is (nil? (db/get-builds @app-db)))))
 
 (deftest repo-leave
@@ -90,7 +90,7 @@
   (testing "fetches builds from backend"
     (rft/run-test-sync
      (let [c (h/catch-fx :martian.re-frame/request)]
-       (set-repo-path! "test-cust" "test-repo")
+       (set-repo-path! "test-org" "test-repo")
        (h/initialize-martian {:get-builds {:body [{:id "test-build"}]
                                            :error-code :no-error}})
        (rf/dispatch [:builds/load])
@@ -110,9 +110,9 @@
 
 (deftest handle-event
   (testing "ignores events for other repos"
-    (let [[cust] (test-repo-path!)]
+    (let [[org] (test-repo-path!)]
       (is (nil? (rf/dispatch-sync [:repo/handle-event {:type :build/start
-                                                       :build {:customer-id cust
+                                                       :build {:org-id org
                                                                :repo-id "other-repo"
                                                                :build-id "other-build"
                                                                :git {:ref "main"}}}])))
@@ -120,14 +120,14 @@
 
   (testing "updates build list when build is started"
     (reset! app-db {})
-    (let [[cust repo build] (test-repo-path!)]
+    (let [[org repo build] (test-repo-path!)]
       (is (empty? (db/get-builds @app-db)))
       (is (nil? (rf/dispatch-sync [:repo/handle-event {:type :build/start
-                                                       :build {:customer-id cust
+                                                       :build {:org-id org
                                                                :repo-id repo
                                                                :build-id build
                                                                :git {:ref "main"}}}])))
-      (is (= [{:customer-id cust
+      (is (= [{:org-id org
                :repo-id repo
                :build-id build
                :git {:ref "main"}}]
@@ -135,14 +135,14 @@
 
   (testing "updates build list when build is pending"
     (reset! app-db {})
-    (let [[cust repo build] (test-repo-path!)]
+    (let [[org repo build] (test-repo-path!)]
       (is (empty? (db/get-builds @app-db)))
       (is (nil? (rf/dispatch-sync [:repo/handle-event {:type :build/pending
-                                                       :build {:customer-id cust
+                                                       :build {:org-id org
                                                                :repo-id repo
                                                                :build-id build
                                                                :git {:ref "main"}}}])))
-      (is (= [{:customer-id cust
+      (is (= [{:org-id org
                :repo-id repo
                :build-id build
                :git {:ref "main"}}]
@@ -150,13 +150,13 @@
 
   (testing "updates build list when build has updated"
     (reset! app-db {})
-    (let [[cust repo build] (test-repo-path!)
-          upd {:customer-id cust
+    (let [[org repo build] (test-repo-path!)
+          upd {:org-id org
                :repo-id repo
                :build-id build
                :git {:ref "main"}
                :status :success}]
-      (is (some? (swap! app-db db/set-builds [{:customer-id cust
+      (is (some? (swap! app-db db/set-builds [{:org-id org
                                                :repo-id repo
                                                :build-id build}])))
       (is (nil? (rf/dispatch-sync [:repo/handle-event {:type :build/updated
@@ -183,7 +183,7 @@
   (testing "invokes build trigger endpoint with params"
     (rft/run-test-sync
      (let [c (h/catch-fx :martian.re-frame/request)]
-       (is (some? (set-repo-path! "test-cust" "test-repo")))
+       (is (some? (set-repo-path! "test-org" "test-repo")))
        (h/initialize-martian {:trigger-build {:body {:build-id "test-build"}
                                               :error-code :no-error}})
        (rf/dispatch [:repo/trigger-build {:trigger-type ["branch"]
@@ -191,7 +191,7 @@
        
        (is (= 1 (count @c)))
        (is (= {:branch "main"
-               :customer-id "test-cust"
+               :org-id "test-org"
                :repo-id "test-repo"}
               (-> @c first (nth 3)))))))
 
@@ -221,15 +221,15 @@
          [_ repo-id _] (test-repo-path!)
          repo {:id repo-id
                :name "test repo"}
-         cust {:repos [repo]}]
+         org {:repos [repo]}]
      (reset! app-db (db/set-edit-alerts {} [{:type :warning}]))
-     (h/initialize-martian {:get-customer {:body cust
+     (h/initialize-martian {:get-org {:body org
                                            :error-code :no-error}})
      (rf/dispatch [:repo/load+edit])
 
-     (testing "loads customer from backend"
+     (testing "loads org from backend"
        (is (= 1 (count @c)))
-       (is (= :get-customer (-> @c first (nth 2)))))
+       (is (= :get-org (-> @c first (nth 2)))))
 
      (testing "clears alerts"
        (is (empty? (db/edit-alerts @app-db)))))))
@@ -239,12 +239,12 @@
    (let [[_ repo-id] (test-repo-path!)
          repo {:id repo-id
                :name "test repo"}
-         cust {:repos [repo]}]
+         org {:repos [repo]}]
 
-     (rf/dispatch [:repo/load+edit--success {:body cust}])
+     (rf/dispatch [:repo/load+edit--success {:body org}])
      
-     (testing "sets current customer"
-       (is (= cust (lo/get-value @app-db cdb/customer))))
+     (testing "sets current org"
+       (is (= org (lo/get-value @app-db cdb/org))))
      
      (testing "sets repo for editing"
        (is (= repo (db/editing @app-db)))))))
@@ -308,7 +308,7 @@
 (deftest repo-save
   (rft/run-test-sync
    (let [c (h/catch-fx :martian.re-frame/request)
-         [cust-id repo-id] (test-repo-path!)]
+         [org-id repo-id] (test-repo-path!)]
      (swap! app-db #(-> %
                         (db/set-editing {:name "updated repo name"})
                         (db/set-edit-alerts [{:type :warning}])))
@@ -321,16 +321,16 @@
      (testing "updates repo in backend"
        (is (= 1 (count @c))))
 
-     (testing "adds customer and repo id to body"
+     (testing "adds org and repo id to body"
        (let [args (-> @c first (nth 3) :repo)]
          (is (map? args))
-         (is (= cust-id (:customer-id args)))
+         (is (= org-id (:org-id args)))
          (is (= repo-id (:id args)))))
 
-     (testing "adds customer and repo id to params"
+     (testing "adds org and repo id to params"
        (let [args (-> @c first (nth 3))]
          (is (map? args))
-         (is (= cust-id (:customer-id args)))
+         (is (= org-id (:org-id args)))
          (is (= repo-id (:repo-id args)))))
 
      (testing "marks saving"
@@ -341,15 +341,15 @@
 
 (deftest repo-save--success
   (testing "updates repo in db"
-    (reset! app-db (cdb/set-customer {}
-                                     {:name "test customer"
-                                      :repos [{:id "test-repo"
-                                               :name "original repo"}]}))
+    (reset! app-db (cdb/set-org {}
+                                {:name "test org"
+                                 :repos [{:id "test-repo"
+                                          :name "original repo"}]}))
     (rf/dispatch-sync [:repo/save--success {:body {:id "test-repo"
                                                    :name "updated repo"}}])
     (is (= "updated repo"
            (-> @app-db
-               (lo/get-value cdb/customer)
+               (lo/get-value cdb/org)
                :repos
                first
                :name))))
@@ -382,7 +382,7 @@
 (deftest repo-delete
   (rft/run-test-sync
    (let [c (h/catch-fx :martian.re-frame/request)
-         [cust-id repo-id] (test-repo-path!)]
+         [org-id repo-id] (test-repo-path!)]
      (swap! app-db #(db/set-editing % {:id "test-repo"}))
      (h/initialize-martian {:delete-repo {:error-code :no-error}})
 
@@ -398,31 +398,31 @@
 (deftest repo-delete--success
   (rft/run-test-sync
    (let [repo {:id "test-repo"}
-         cust {:id "test-cust"
+         org {:id "test-org"
                :repos [repo]}
          e (h/catch-fx :route/goto)]
      (is (some? (reset! app-db (-> {}
-                                   (set-repo-path (:id cust) (:id repo))
-                                   (cdb/set-customer cust)
+                                   (set-repo-path (:id org) (:id repo))
+                                   (cdb/set-org org)
                                    (db/mark-deleting)))))
      (rf/dispatch [:repo/delete--success])
      
      (testing "removes repo from db"
-       (is (empty? (-> (cdb/get-customer @app-db) :repos))))
+       (is (empty? (-> (cdb/get-org @app-db) :repos))))
 
      (testing "unmarks deleting"
        (is (not (db/deleting? @app-db))))
 
-     (testing "sets customer alert"
+     (testing "sets org alert"
        (is (= :info (-> (cdb/get-alerts @app-db)
                         first
                         :type))))
 
-     (testing "redirects to customer page"
+     (testing "redirects to org page"
        (is (= 1 (count @e)))))))
 
 (deftest repo-delete--failed
-  (is (some? (set-repo-path! "test-cust" "test-repo")))
+  (is (some? (set-repo-path! "test-org" "test-repo")))
   (is (some? (swap! app-db db/mark-deleting)))
   (rf/dispatch-sync [:repo/delete--failed])
   

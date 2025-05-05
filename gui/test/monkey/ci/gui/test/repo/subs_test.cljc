@@ -1,7 +1,7 @@
 (ns monkey.ci.gui.test.repo.subs-test
   (:require #?(:cljs [cljs.test :refer-macros [deftest testing is use-fixtures]]
                :clj [clojure.test :refer [deftest testing is use-fixtures]])
-            [monkey.ci.gui.customer.db :as cdb]
+            [monkey.ci.gui.org.db :as cdb]
             [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.repo.db :as db]
             [monkey.ci.gui.repo.subs :as sut]
@@ -21,7 +21,7 @@
     
     (testing "returns repo by id from customer"
       (is (nil? @r))
-      (is (map? (reset! app-db (cdb/set-customer
+      (is (map? (reset! app-db (cdb/set-org
                                 {}
                                 {:repos
                                  [{:id "test-repo"

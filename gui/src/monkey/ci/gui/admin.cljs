@@ -39,8 +39,8 @@
     [:div.row.mb-5.mb-sm-5
      [action-card
       :piggy-bank
-      "Customer Credits"
-      "Manage recurring or one-time customer credits."
+      "Organization Credits"
+      "Manage recurring or one-time organization credits."
       "Manage credits"
       (r/path-for :admin/credits)]
 
@@ -75,9 +75,9 @@
   {:admin/root admin-root
    :admin/login login/page
    :admin/credits credits/overview
-   :admin/cust-credits credits/customer-credits
+   :admin/cust-credits credits/org-credits
    :admin/invoicing inv/page
-   :admin/cust-invoices inv/customer-invoices
+   :admin/cust-invoices inv/org-invoices
    :admin/clean-builds clean/page})
 
 (defn render-page [route]

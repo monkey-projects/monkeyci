@@ -77,9 +77,9 @@
       (and redir (not= "/" redir))
       ;; If a redirect path was stored, go there
       [:route/goto-path redir]
-      ;; If the user only has one customer, go directly there
+      ;; If the user only has one org, go directly there
       (= 1 (count (:customers user)))
-      [:route/goto :page/customer {:customer-id (first (:customers user))}]
+      [:route/goto :page/org {:org-id (first (:customers user))}]
       ;; Any other case, go to the root page
       :else
       [:route/goto :page/root])))

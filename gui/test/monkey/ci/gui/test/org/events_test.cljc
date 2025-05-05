@@ -1,9 +1,9 @@
-(ns monkey.ci.gui.test.customer.events-test
+(ns monkey.ci.gui.test.org.events-test
   (:require #?(:cljs [cljs.test :refer-macros [deftest testing is use-fixtures async]]
                :clj [clojure.test :refer [deftest testing is use-fixtures]])
             [day8.re-frame.test :as rf-test]
-            [monkey.ci.gui.customer.db :as db]
-            [monkey.ci.gui.customer.events :as sut]
+            [monkey.ci.gui.org.db :as db]
+            [monkey.ci.gui.org.events :as sut]
             [monkey.ci.gui.home.db :as hdb]
             [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.login.db :as ldb]
@@ -19,123 +19,123 @@
 ;; Not using run-test-async cause it tends to block and there are issues when
 ;; there are multiple async blocks in one test.
 
-(deftest customer-init
+(deftest org-init
   (rf-test/run-test-sync
-   (rf/reg-event-db :customer/load (fn [db _] (assoc db ::loading? true)))
-   (rf/dispatch [:customer/init "test-customer"])
+   (rf/reg-event-db :org/load (fn [db _] (assoc db ::loading? true)))
+   (rf/dispatch [:org/init "test-org"])
    
-   (testing "loads customer"
+   (testing "loads org"
      (is (true? (::loading? @app-db))))
 
    (testing "marks initialized"
-     (is (true? (lo/initialized? @app-db db/customer))))))
+     (is (true? (lo/initialized? @app-db db/org))))))
 
-(deftest customer-load
+(deftest org-load
   (testing "sets state to loading"
     (rf-test/run-test-sync
-     (rf/dispatch [:customer/load "load-customer"])
-     (is (true? (lo/loading? @app-db db/customer)))))
+     (rf/dispatch [:org/load "load-org"])
+     (is (true? (lo/loading? @app-db db/org)))))
 
-  (testing "sends request to api and sets customer"
+  (testing "sends request to api and sets org"
     (rf-test/run-test-sync
-     (let [cust {:name "test customer"}
+     (let [org {:name "test org"}
            c (h/catch-fx :martian.re-frame/request)]
-       (h/initialize-martian {:get-customer {:status 200
-                                             :body cust
-                                             :error-code :no-error}})
+       (h/initialize-martian {:get-org {:status 200
+                                        :body org
+                                        :error-code :no-error}})
        (is (some? (:martian.re-frame/martian @app-db)))
-       (rf/dispatch [:customer/load "test-customer"])
+       (rf/dispatch [:org/load "test-org"])
        (is (= 1 (count @c)))
-       (is (= :get-customer (-> @c first (nth 2))))))))
+       (is (= :get-org (-> @c first (nth 2))))))))
 
-(deftest customer-maybe-load
-  (testing "loads customer if not in db"
+(deftest org-maybe-load
+  (testing "loads org if not in db"
     (rf-test/run-test-sync
-     (let [cust {:id "test-cust"
-                 :name "Test customer"}
+     (let [org {:id "test-org"
+                :name "Test org"}
            c (h/catch-fx :martian.re-frame/request)]
-       (h/initialize-martian {:get-customer {:status 200
-                                             :body cust
-                                             :error-code :no-error}})
-       (rf/dispatch [:customer/maybe-load (:id cust)])
+       (h/initialize-martian {:get-org {:status 200
+                                        :body org
+                                        :error-code :no-error}})
+       (rf/dispatch [:org/maybe-load (:id org)])
        (is (= 1 (count @c))))))
 
   (testing "does not load if already in db"
     (rf-test/run-test-sync
-     (let [cust {:id "test-cust"
-                 :name "Test customer"}
+     (let [org {:id "test-org"
+                :name "Test org"}
            c (h/catch-fx :martian.re-frame/request)]
-       (reset! app-db (db/set-customer {} cust))
-       (h/initialize-martian {:get-customer {:status 200
-                                             :body cust
-                                             :error-code :no-error}})
-       (rf/dispatch [:customer/maybe-load (:id cust)])
+       (reset! app-db (db/set-org {} org))
+       (h/initialize-martian {:get-org {:status 200
+                                        :body org
+                                        :error-code :no-error}})
+       (rf/dispatch [:org/maybe-load (:id org)])
        (is (empty? @c)))))
 
   (testing "loads if id differs from id in db"
     (rf-test/run-test-sync
-     (let [cust {:id "test-cust"
-                 :name "Test customer"}
+     (let [org {:id "test-org"
+                :name "Test org"}
            c (h/catch-fx :martian.re-frame/request)]
-       (reset! app-db (db/set-customer {} {:id "other-cust"}))
-       (h/initialize-martian {:get-customer {:status 200
-                                             :body cust
-                                             :error-code :no-error}})
-       (rf/dispatch [:customer/maybe-load (:id cust)])
+       (reset! app-db (db/set-org {} {:id "other-org"}))
+       (h/initialize-martian {:get-org {:status 200
+                                        :body org
+                                        :error-code :no-error}})
+       (rf/dispatch [:org/maybe-load (:id org)])
        (is (= 1 (count @c))))))
 
   (testing "takes id from current route if not specified"
     (rf-test/run-test-sync
-     (let [cust {:id "test-cust"
-                 :name "Test customer"}
+     (let [org {:id "test-org"
+                :name "Test org"}
            c (h/catch-fx :martian.re-frame/request)]
-       (reset! app-db (r/set-current {} {:path "/c/test-cust"
-                                         :parameters {:path {:customer-id "test-cust"}}}))
-       (h/initialize-martian {:get-customer {:status 200
-                                             :body cust
-                                             :error-code :no-error}})
-       (rf/dispatch [:customer/maybe-load])
+       (reset! app-db (r/set-current {} {:path "/o/test-org"
+                                         :parameters {:path {:org-id "test-org"}}}))
+       (h/initialize-martian {:get-org {:status 200
+                                        :body org
+                                        :error-code :no-error}})
+       (rf/dispatch [:org/maybe-load])
        (is (= 1 (count @c)))))))
 
-(deftest customer-load--success
+(deftest org-load--success
   (testing "unmarks loading"
-    (is (map? (reset! app-db (lo/set-loading {} db/customer))))
-    (rf/dispatch-sync [:customer/load--success "test-customer"])
-    (is (not (lo/loading? @app-db db/customer))))
+    (is (map? (reset! app-db (lo/set-loading {} db/org))))
+    (rf/dispatch-sync [:org/load--success "test-org"])
+    (is (not (lo/loading? @app-db db/org))))
 
-  (testing "sets customer value"
-    (rf/dispatch-sync [:customer/load--success {:body ::test-customer}])
-    (is (= ::test-customer (lo/get-value @app-db db/customer)))))
+  (testing "sets org value"
+    (rf/dispatch-sync [:org/load--success {:body ::test-org}])
+    (is (= ::test-org (lo/get-value @app-db db/org)))))
 
-(deftest customer-load--failed
+(deftest org-load--failed
   (testing "sets error alert"
-    (rf/dispatch-sync [:customer/load--failed "test-cust" "test error"])
-    (let [[err] (lo/get-alerts @app-db db/customer)]
+    (rf/dispatch-sync [:org/load--failed "test-org" "test error"])
+    (let [[err] (lo/get-alerts @app-db db/org)]
       (is (= :danger (:type err)))
-      (is (re-matches #".*test-cust.*" (:message err)))))
+      (is (re-matches #".*test-org.*" (:message err)))))
 
   (testing "unmarks loading"
-    (is (map? (reset! app-db (lo/set-loading {} db/customer))))
-    (rf/dispatch-sync [:customer/load--failed "test-id" "test-customer"])
-    (is (not (lo/loading? @app-db db/customer)))))
+    (is (map? (reset! app-db (lo/set-loading {} db/org))))
+    (rf/dispatch-sync [:org/load--failed "test-id" "test-org"])
+    (is (not (lo/loading? @app-db db/org)))))
 
-(deftest customer-load-latest-builds
+(deftest org-load-latest-builds
   (testing "requests from backend"
     (rf-test/run-test-sync
-     (let [cust {:id "test-cust"
-                 :name "Test customer"}
+     (let [org {:id "test-org"
+                :name "Test org"}
            c (h/catch-fx :martian.re-frame/request)]
-       (reset! app-db (r/set-current {} {:path "/c/test-cust"
-                                         :parameters {:path {:customer-id "test-cust"}}}))
-       (h/initialize-martian {:get-customer-latest-builds {:status 200
-                                                           :body []
-                                                           :error-code :no-error}})
-       (rf/dispatch [:customer/load-latest-builds])
+       (reset! app-db (r/set-current {} {:path "/c/test-org"
+                                         :parameters {:path {:org-id "test-org"}}}))
+       (h/initialize-martian {:get-org-latest-builds {:status 200
+                                                      :body []
+                                                      :error-code :no-error}})
+       (rf/dispatch [:org/load-latest-builds])
        (is (= 1 (count @c)))))))
 
-(deftest customer-load-latest-builds--success
+(deftest org-load-latest-builds--success
   (testing "sets latest builds in db by repo"
-    (rf/dispatch-sync [:customer/load-latest-builds--success
+    (rf/dispatch-sync [:org/load-latest-builds--success
                        {:body [{:repo-id "repo-1"
                                 :build-id "build-1"}
                                {:repo-id "repo-2"
@@ -146,35 +146,35 @@
                       :build-id "build-2"}}
            (db/get-latest-builds @app-db)))))
 
-(deftest customer-load-latest-builds--failed
+(deftest org-load-latest-builds--failed
   (testing "sets error alert"
-    (rf/dispatch-sync [:customer/load-latest-builds--failed "test error"])
-    (let [[err] (lo/get-alerts @app-db db/customer)]
+    (rf/dispatch-sync [:org/load-latest-builds--failed "test error"])
+    (let [[err] (lo/get-alerts @app-db db/org)]
       (is (= :danger (:type err))))))
 
-(deftest customer-load-bb-webhooks
+(deftest org-load-bb-webhooks
   (testing "sends request to api"
     (rf-test/run-test-sync
-     (let [cust {:name "test customer"
-                 :id "test-cust"}
+     (let [org {:name "test org"
+                :id "test-org"}
            c (h/catch-fx :martian.re-frame/request)]
        (h/initialize-martian {:search-bitbucket-webhooks
                               {:status 200
-                               :body cust
+                               :body org
                                :error-code :no-error}})
        (is (some? (:martian.re-frame/martian @app-db)))
-       (rf/dispatch [:customer/load-bb-webhooks])
+       (rf/dispatch [:org/load-bb-webhooks])
        (is (= 1 (count @c)))
        (is (= :search-bitbucket-webhooks (-> @c first (nth 2))))))))
 
-(deftest customer-load-bb-webhooks--success
+(deftest org-load-bb-webhooks--success
   (testing "sets bitbucket webhooks in db"
-    (rf/dispatch-sync [:customer/load-bb-webhooks--success {:body [::test-wh]}])
+    (rf/dispatch-sync [:org/load-bb-webhooks--success {:body [::test-wh]}])
     (is (= [::test-wh] (db/bb-webhooks @app-db)))))
 
-(deftest customer-load-bb-webhooks--failed
+(deftest org-load-bb-webhooks--failed
   (testing "sets repo alert error"
-    (rf/dispatch-sync [:customer/load-bb-webhooks--failed "test error"])
+    (rf/dispatch-sync [:org/load-bb-webhooks--failed "test error"])
     (is (= [:danger] (->> (db/repo-alerts @app-db)
                           (map :type))))))
 
@@ -211,11 +211,11 @@
        (is (= "https://test-url" (-> @c first (nth 3) :repo :url)))))))
 
 (deftest repo-watch--success
-  (testing "adds repo to customer"
-    (is (some? (reset! app-db (db/set-customer {} {:repos []}))))
+  (testing "adds repo to org"
+    (is (some? (reset! app-db (db/set-org {} {:repos []}))))
     (rf/dispatch-sync [:repo/watch--success {:body {:id "test-repo"}}])
     (is (= {:repos [{:id "test-repo"}]}
-           (lo/get-value @app-db db/customer)))))
+           (lo/get-value @app-db db/org)))))
 
 (deftest repo-watch--failed
   (testing "sets error alert"
@@ -228,7 +228,7 @@
   (testing "invokes github unwatch endpoint"  
     (rf-test/run-test-sync
      (let [c (h/catch-fx :martian.re-frame/request)]
-       (is (some? (reset! app-db (r/set-current {} {:parameters {:path {:customer-id "test-cust"}}}))))
+       (is (some? (reset! app-db (r/set-current {} {:parameters {:path {:org-id "test-org"}}}))))
        (h/initialize-martian {:unwatch-github-repo {:status 200
                                                     :error-code :no-error}})
        (is (some? (:martian.re-frame/martian @app-db)))
@@ -238,36 +238,36 @@
            "invokes correct endpoint")
        (is (= "test-repo" (-> @c first (nth 3) :repo-id))
            "passes repo id")
-       (is (= "test-cust" (-> @c first (nth 3) :customer-id))
-           "passes customer id")))))
+       (is (= "test-org" (-> @c first (nth 3) :org-id))
+           "passes org id")))))
 
 (deftest repo-unwatch-bitbucket
   (testing "invokes bitbucket unwatch endpoint"  
     (rf-test/run-test-sync
      (let [c (h/catch-fx :martian.re-frame/request)]
-       (is (some? (reset! app-db (r/set-current {} {:parameters {:path {:customer-id "test-cust"}}}))))
+       (is (some? (reset! app-db (r/set-current {} {:parameters {:path {:org-id "test-org"}}}))))
        (h/initialize-martian {:unwatch-bitbucket-repo {:status 200
                                                        :error-code :no-error}})
        (is (some? (:martian.re-frame/martian @app-db)))
        (rf/dispatch [:repo/unwatch-bitbucket {:monkeyci/webhook
-                                              {:customer-id "test-cust"
+                                              {:org-id "test-org"
                                                :repo-id "test-repo"}}])
        (is (= 1 (count @c)))
        (is (= :unwatch-bitbucket-repo (-> @c first (nth 2)))
            "invokes correct endpoint")
        (is (= "test-repo" (-> @c first (nth 3) :repo-id))
            "passes repo id")
-       (is (= "test-cust" (-> @c first (nth 3) :customer-id))
-           "passes customer id")))))
+       (is (= "test-org" (-> @c first (nth 3) :org-id))
+           "passes org id")))))
 
 (deftest repo-unwatch--success
   (testing "updates repo in db"
     (let [repo-id "test-repo"]
-      (is (some? (reset! app-db (db/set-customer {} {:repos [{:id repo-id
-                                                              :github-id "test-github-id"}]}))))
+      (is (some? (reset! app-db (db/set-org {} {:repos [{:id repo-id
+                                                         :github-id "test-github-id"}]}))))
       (rf/dispatch-sync [:repo/unwatch--success {:body {:id repo-id}}])
       (is (= {:repos [{:id "test-repo"}]}
-             (lo/get-value @app-db db/customer))))))
+             (lo/get-value @app-db db/org))))))
 
 (deftest repo-unwatch--failed
   (testing "sets error alert"
@@ -276,68 +276,68 @@
       (is (= 1 (count a)))
       (is (= :danger (:type (first a)))))))
 
-(deftest customer-create
+(deftest org-create
   (testing "posts request to backend"
     (rf-test/run-test-sync
-     (let [cust {:name "test customer"}
+     (let [org {:name "test org"}
            c (h/catch-fx :martian.re-frame/request)]
-       (h/initialize-martian {:create-customer {:status 200
-                                                :body cust
-                                                :error-code :no-error}})
+       (h/initialize-martian {:create-org {:status 200
+                                           :body org
+                                           :error-code :no-error}})
        (is (some? (:martian.re-frame/martian @app-db)))
-       (rf/dispatch [:customer/create {:name ["test customer"]}])
+       (rf/dispatch [:org/create {:name ["test org"]}])
        (is (= 1 (count @c)))
-       (is (= :create-customer (-> @c first (nth 2))))
-       (is (= {:customer cust} (-> @c first (nth 3)))))))
+       (is (= :create-org (-> @c first (nth 2))))
+       (is (= {:org org} (-> @c first (nth 3)))))))
 
   (testing "marks creating"
-    (is (nil? (rf/dispatch-sync [:customer/create {:name "new customer"}])))
-    (is (true? (db/customer-creating? @app-db))))
+    (is (nil? (rf/dispatch-sync [:org/create {:name "new org"}])))
+    (is (true? (db/org-creating? @app-db))))
 
   (testing "clears alerts"
     (is (some? (reset! app-db (db/set-create-alerts {} [{:type :info}]))))
-    (is (nil? (rf/dispatch-sync [:customer/create {:name "new customer"}])))
+    (is (nil? (rf/dispatch-sync [:org/create {:name "new org"}])))
     (is (empty? (db/create-alerts @app-db)))))
 
-(deftest customer-create--success
+(deftest org-create--success
   (h/catch-fx :route/goto)
   
   (testing "unmarks creating"
-    (is (some? (reset! app-db (db/mark-customer-creating {}))))
-    (rf/dispatch-sync [:customer/create--success {:body {:id "test-cust"}}])
-    (is (not (db/customer-creating? @app-db))))
+    (is (some? (reset! app-db (db/mark-org-creating {}))))
+    (rf/dispatch-sync [:org/create--success {:body {:id "test-org"}}])
+    (is (not (db/org-creating? @app-db))))
 
-  (let [cust {:id "test-cust"}]
+  (let [org {:id "test-org"}]
     (is (empty? (reset! app-db {})))
-    (rf/dispatch-sync [:customer/create--success {:body cust}])
+    (rf/dispatch-sync [:org/create--success {:body org}])
 
-    (testing "sets customer in db"
-      (is (= cust (lo/get-value @app-db db/customer))))
+    (testing "sets org in db"
+      (is (= org (lo/get-value @app-db db/org))))
 
-    (testing "adds to user customers"
-      (is (= [cust] (hdb/get-customers @app-db)))))
+    (testing "adds to user orgs"
+      (is (= [org] (hdb/get-orgs @app-db)))))
 
-  (testing "redirects to customer page"
+  (testing "redirects to org page"
     (rf-test/run-test-sync
      (let [e (h/catch-fx :route/goto)]
-       (rf/dispatch [:customer/create--success {:body {:id "test-cust"}}])
+       (rf/dispatch [:org/create--success {:body {:id "test-org"}}])
        (is (= 1 (count @e)))
-       (is (= (r/path-for :page/customer {:customer-id "test-cust"}) (first @e))))))
+       (is (= (r/path-for :page/org {:org-id "test-org"}) (first @e))))))
 
-  (testing "sets success alert for customer"
-    (let [a (lo/get-alerts @app-db db/customer)]
-      (rf/dispatch-sync [:customer/create--success {:body {:name "test customer"}}])
+  (testing "sets success alert for org"
+    (let [a (lo/get-alerts @app-db db/org)]
+      (rf/dispatch-sync [:org/create--success {:body {:name "test org"}}])
       (is (not-empty a))
       (is (= :success (-> a first :type))))))
 
-(deftest customer-create--failed
+(deftest org-create--failed
   (testing "sets error alert"
-    (rf/dispatch-sync [:customer/create--failed {:message "test error"}])
+    (rf/dispatch-sync [:org/create--failed {:message "test error"}])
     (let [a (db/create-alerts @app-db)]
       (is (= 1 (count a)))
       (is (= :danger (:type (first a)))))))
 
-(deftest customer-load-recent-builds
+(deftest org-load-recent-builds
   (testing "sends request to backend"
     (rf-test/run-test-sync
      (let [c (h/catch-fx :martian.re-frame/request)]
@@ -345,97 +345,97 @@
                                                   :body []
                                                   :error-code :no-error}})
        (is (some? (:martian.re-frame/martian @app-db)))
-       (rf/dispatch [:customer/load-recent-builds "test-customer"])
+       (rf/dispatch [:org/load-recent-builds "test-org"])
        (is (= 1 (count @c)))
        (is (= :get-recent-builds (-> @c first (nth 2))))))))
 
-(deftest customer-load-recent-builds--success
+(deftest org-load-recent-builds--success
   (testing "sets builds in db"
     (let [builds [{:id ::test-build}]]
-      (rf/dispatch-sync [:customer/load-recent-builds--success {:body builds}])
+      (rf/dispatch-sync [:org/load-recent-builds--success {:body builds}])
       (is (= builds (lo/get-value @app-db db/recent-builds))))))
 
-(deftest customer-load-recent-builds--failed
+(deftest org-load-recent-builds--failed
   (testing "sets error in db"
-    (rf/dispatch-sync [:customer/load-recent-builds--failed "test error"])
+    (rf/dispatch-sync [:org/load-recent-builds--failed "test error"])
     (is (= [:danger] (->> (lo/get-alerts @app-db db/recent-builds)
                           (map :type))))))
 
-(deftest customer-load-stats
+(deftest org-load-stats
   (testing "sends request to backend"
     (rf-test/run-test-sync
      (let [c (h/catch-fx :martian.re-frame/request)]
-       (h/initialize-martian {:get-customer-stats {:status 200
-                                                   :body {:stats ::test}
-                                                   :error-code :no-error}})
+       (h/initialize-martian {:get-org-stats {:status 200
+                                              :body {:stats ::test}
+                                              :error-code :no-error}})
        (is (some? (:martian.re-frame/martian @app-db)))
-       (rf/dispatch [:customer/load-stats "test-customer"])
+       (rf/dispatch [:org/load-stats "test-org"])
        (is (= 1 (count @c)))
-       (is (= :get-customer-stats (-> @c first (nth 2)))))))
+       (is (= :get-org-stats (-> @c first (nth 2)))))))
 
   (testing "adds `since` query param if days given"
     (rf-test/run-test-sync
      (let [c (h/catch-fx :martian.re-frame/request)]
-       (h/initialize-martian {:get-customer-stats {:status 200
-                                                   :body {}
-                                                   :error-code :no-error}})
+       (h/initialize-martian {:get-org-stats {:status 200
+                                              :body {}
+                                              :error-code :no-error}})
        (is (some? (:martian.re-frame/martian @app-db)))
-       (rf/dispatch [:customer/load-stats "test-customer" 10])
+       (rf/dispatch [:org/load-stats "test-org" 10])
        (is (number? (-> @c first (nth 3) :since)))))))
 
-(deftest customer-load-stats--success
+(deftest org-load-stats--success
   (testing "sets builds in db"
     (let [stats [{:stats {:elapsed-seconds []}}]]
-      (rf/dispatch-sync [:customer/load-stats--success {:body stats}])
+      (rf/dispatch-sync [:org/load-stats--success {:body stats}])
       (is (= stats (lo/get-value @app-db db/stats))))))
 
-(deftest customer-load-stats--failed
+(deftest org-load-stats--failed
   (testing "sets error in db"
-    (rf/dispatch-sync [:customer/load-stats--failed "test error"])
+    (rf/dispatch-sync [:org/load-stats--failed "test error"])
     (is (= [:danger] (->> (lo/get-alerts @app-db db/stats)
                           (map :type))))))
 
-(deftest customer-load-credits
+(deftest org-load-credits
   (testing "sends request to backend"
     (rf-test/run-test-sync
      (let [c (h/catch-fx :martian.re-frame/request)]
-       (h/initialize-martian {:get-customer-credits
+       (h/initialize-martian {:get-org-credits
                               {:status 200
                                :body {:available 100}
                                :error-code :no-error}})
        (is (some? (:martian.re-frame/martian @app-db)))
-       (rf/dispatch [:customer/load-credits "test-customer"])
+       (rf/dispatch [:org/load-credits "test-org"])
        (is (= 1 (count @c)))
-       (is (= :get-customer-credits (-> @c first (nth 2))))))))
+       (is (= :get-org-credits (-> @c first (nth 2))))))))
 
-(deftest customer-load-credits--success
+(deftest org-load-credits--success
   (testing "sets credit info in db"
-    (rf/dispatch-sync [:customer/load-credits--success {:body {:available 100}}])
+    (rf/dispatch-sync [:org/load-credits--success {:body {:available 100}}])
     (is (= {:available 100} (db/get-credits @app-db)))))
 
-(deftest customer-load-credits--failed
+(deftest org-load-credits--failed
   (testing "sets error in db"
-    (rf/dispatch-sync [:customer/load-credits--failed "test error"])
+    (rf/dispatch-sync [:org/load-credits--failed "test error"])
     (is (= [:danger] (->> (lo/get-alerts @app-db db/credits)
                           (map :type))))))
 
-(deftest customer-event
+(deftest org-event
   (testing "does nothing when recent builds not loaded"
-    (rf/dispatch-sync [:customer/handle-event {:type :build/updated
-                                               :build {:id "test-build"}}])
+    (rf/dispatch-sync [:org/handle-event {:type :build/updated
+                                          :build {:id "test-build"}}])
     (is (empty? @app-db)))
   
   (testing "adds build to recent builds"
     (let [build {:id "test-build"}]
       (is (some? (reset! app-db (lo/set-loaded {} db/recent-builds))))
-      (rf/dispatch-sync [:customer/handle-event {:type :build/updated
-                                                 :build build}])
+      (rf/dispatch-sync [:org/handle-event {:type :build/updated
+                                            :build build}])
       (is (= [build] (lo/get-value @app-db db/recent-builds)))))
 
   (testing "updates build in recent builds"
     (let [make-build (fn [opts]
                        (merge {:id (random-uuid)
-                               :customer-id "test-cust"
+                               :customer-id "test-org"
                                :repo-id "test-repo"
                                :build-id (random-uuid)}
                               opts))
@@ -450,8 +450,8 @@
                                     (lo/set-loaded db/recent-builds)
                                     (lo/set-value db/recent-builds [build
                                                                     other-build])))))
-      (rf/dispatch-sync [:customer/handle-event {:type :build/updated
-                                                 :build upd}])
+      (rf/dispatch-sync [:org/handle-event {:type :build/updated
+                                            :build upd}])
       (is (= [upd
               other-build]
              (lo/get-value @app-db db/recent-builds))))))
@@ -459,17 +459,17 @@
 (deftest group-by-lbl-changed
   (testing "updates group-by-lbl in db"
     (is (nil? (db/group-by-lbl @app-db)))
-    (rf/dispatch-sync [:customer/group-by-lbl-changed "new-label"])
+    (rf/dispatch-sync [:org/group-by-lbl-changed "new-label"])
     (is (= "new-label" (db/group-by-lbl @app-db)))))
 
 (deftest repo-filter-changed
   (testing "updates repo filter in db"
     (is (nil? (db/get-repo-filter @app-db)))
-    (rf/dispatch-sync [:customer/repo-filter-changed "test-filter"])
+    (rf/dispatch-sync [:org/repo-filter-changed "test-filter"])
     (is (= "test-filter" (db/get-repo-filter @app-db)))))
 
 (deftest ext-repo-filter-changed
   (testing "updates ext repo filter in db"
     (is (nil? (db/get-ext-repo-filter @app-db)))
-    (rf/dispatch-sync [:customer/ext-repo-filter-changed "test-filter"])
+    (rf/dispatch-sync [:org/ext-repo-filter-changed "test-filter"])
     (is (= "test-filter" (db/get-ext-repo-filter @app-db)))))

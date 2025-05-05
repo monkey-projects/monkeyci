@@ -32,7 +32,7 @@
 (def overview-icon
   [icon :house])
 
-(def customer-icon
+(def org-icon
   [icon :people-fill])
 
 (def repo-icon

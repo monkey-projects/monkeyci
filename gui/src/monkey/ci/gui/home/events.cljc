@@ -1,5 +1,6 @@
 (ns monkey.ci.gui.home.events
-  (:require [monkey.ci.gui.home.db :as db]
+  (:require [monkey.ci.gui.alerts :as a]
+            [monkey.ci.gui.home.db :as db]
             [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.login.db :as ldb]
             [monkey.ci.gui.utils :as u]
@@ -11,63 +12,63 @@
    (lo/on-initialize
     db
     db/id
-    {:init-events [[:user/load-customers]]})))
+    {:init-events [[:user/load-orgs]]})))
 
 (rf/reg-event-fx
- :user/load-customers
+ :user/load-orgs
  (lo/loader-evt-handler
   db/id
   (fn [id {:keys [db]} _]
     [:secure-request
-     :get-user-customers
+     :get-user-orgs
      {:user-id (:id (ldb/user db))}
-     [:user/load-customers--success]
-     [:user/load-customers--failed]])))
+     [:user/load-orgs--success]
+     [:user/load-orgs--failed]])))
 
 (rf/reg-event-db
- :user/load-customers--success
+ :user/load-orgs--success
  (fn [db [_ resp]]
    (lo/on-success db db/id resp)))
 
 (rf/reg-event-db
- :user/load-customers--failed
+ :user/load-orgs--failed
  (fn [db [_ err]]
-   (lo/on-failure db db/id "Could not retrieve linked customers: " err)))
+   (lo/on-failure db db/id a/user-load-orgs-failed err)))
 
 (rf/reg-event-db
- :customer/join-init
+ :org/join-init
  (fn [db _]
    (-> db
        (db/set-search-results nil)
        (db/set-join-requests nil)
-       (db/clear-customer-joining))))
+       (db/clear-org-joining))))
 
 (rf/reg-event-fx
- :customer/search
- (fn [{:keys [db]} [_ {:keys [customer-search]}]]
+ :org/search
+ (fn [{:keys [db]} [_ {:keys [org-search]}]]
    {:dispatch [:secure-request
-               :search-customers
-               {:name (first customer-search)}
-               [:customer/search--success]
-               [:customer/search--failed]]
+               :search-orgs
+               {:name (first org-search)}
+               [:org/search--success]
+               [:org/search--failed]]
     :db (-> db
-            (db/set-customer-searching true)
+            (db/set-org-searching true)
             (db/clear-join-alerts))}))
 
 (rf/reg-event-db
- :customer/search--success
+ :org/search--success
  (fn [db [_ {:keys [body]}]]
    (-> db
-       (db/reset-customer-searching)
+       (db/reset-org-searching)
        (db/set-search-results body))))
 
 (rf/reg-event-db
- :customer/search--failed
+ :org/search--failed
  (fn [db [_ err]]
    (-> db
-       (db/reset-customer-searching)
+       (db/reset-org-searching)
        (db/set-join-alerts [{:type :danger
-                             :message (str "Failed to search for customers: " (u/error-msg err))}]))))
+                             :message (str "Failed to search for orgs: " (u/error-msg err))}]))))
 
 (rf/reg-event-fx
  :join-request/load
@@ -93,29 +94,29 @@
                              :message (str "Failed to retrieve requests: " (u/error-msg err))}]))))
 
 (rf/reg-event-fx
- :customer/join
+ :org/join
  (fn [{:keys [db]} [_ cust-id]]
    (let [user (ldb/user db)]
      {:dispatch [:secure-request
                  :create-user-join-request
                  {:join-request
-                  {:customer-id cust-id}
+                  {:org-id cust-id}
                   :user-id (:id user)}
-                 [:customer/join--success]
-                 [:customer/join--failed cust-id]]
-      :db (db/mark-customer-joining db cust-id)})))
+                 [:org/join--success]
+                 [:org/join--failed cust-id]]
+      :db (db/mark-org-joining db cust-id)})))
 
 (rf/reg-event-db
- :customer/join--success
+ :org/join--success
  (fn [db [_ {:keys [body]}]]
    (-> db
-       (db/unmark-customer-joining (:customer-id body))
+       (db/unmark-org-joining (:org-id body))
        (db/update-join-requests (fnil conj []) body))))
 
 (rf/reg-event-db
- :customer/join--failed
+ :org/join--failed
  (fn [db [_ cust-id err]]
    (-> db
-       (db/unmark-customer-joining cust-id)
+       (db/unmark-org-joining cust-id)
        (db/set-join-alerts [{:type :danger
                              :message (str "Failed to send join request: " (u/error-msg err))}]))))

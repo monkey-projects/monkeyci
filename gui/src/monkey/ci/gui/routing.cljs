@@ -15,9 +15,9 @@
 (defn set-current [db r]
   (assoc db current r))
 
-(def customer-id
-  "Retrieve current customer id from app db"
-  (comp :customer-id :path :parameters current))
+(def org-id
+  "Retrieve current org id from app db"
+  (comp :org-id :path :parameters current))
 
 (def repo-id
   "Retrieve current repo id from app db"
@@ -53,20 +53,20 @@
   (f/router
    [["/" :page/root]
     ["/login" :page/login]
-    ["/c/join" {:conflicting true
-                :name :page/customer-join}]
-    ["/c/new" {:conflicting true
-               :name :page/customer-new}]
-    ["/c/:customer-id" {:conflicting true
-                        :name :page/customer}]
-    ["/c/:customer-id/add-repo/github" :page/add-github-repo]
-    ["/c/:customer-id/add-repo/bitbucket" :page/add-bitbucket-repo]
-    ["/c/:customer-id/params" :page/customer-params]
-    ["/c/:customer-id/ssh-keys" :page/customer-ssh-keys]
-    ["/c/:customer-id/r/:repo-id" :page/repo]
-    ["/c/:customer-id/r/:repo-id/edit" :page/repo-edit]
-    ["/c/:customer-id/r/:repo-id/b/:build-id" :page/build]
-    ["/c/:customer-id/r/:repo-id/b/:build-id/j/:job-id" :page/job]
+    ["/o/join" {:conflicting true
+                :name :page/org-join}]
+    ["/o/new" {:conflicting true
+               :name :page/org-new}]
+    ["/o/:org-id" {:conflicting true
+                   :name :page/org}]
+    ["/o/:org-id/add-repo/github" :page/add-github-repo]
+    ["/o/:org-id/add-repo/bitbucket" :page/add-bitbucket-repo]
+    ["/o/:org-id/params" :page/org-params]
+    ["/o/:org-id/ssh-keys" :page/org-ssh-keys]
+    ["/o/:org-id/r/:repo-id" :page/repo]
+    ["/o/:org-id/r/:repo-id/edit" :page/repo-edit]
+    ["/o/:org-id/r/:repo-id/b/:build-id" :page/build]
+    ["/o/:org-id/r/:repo-id/b/:build-id/j/:job-id" :page/job]
     ["/github/callback" :page/github-callback]
     ["/bitbucket/callback" :page/bitbucket-callback]]))
 
@@ -75,11 +75,11 @@
    [["/" :admin/root]
     ["/login" :admin/login]
     ["/credits" :admin/credits]
-    ["/credits/:customer-id" :admin/cust-credits]
+    ["/credits/:org-id" :admin/org-credits]
     ["/builds/clean" :admin/clean-builds]
     ["/forget" :admin/forget-users]
     ["/invoicing" :admin/invoicing]
-    ["/invoicing/:customer-id" :admin/cust-invoices]]))
+    ["/invoicing/:org-id" :admin/org-invoices]]))
 
 (defonce router (atom main-router))
 

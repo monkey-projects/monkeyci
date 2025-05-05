@@ -12,31 +12,31 @@
 
 (use-fixtures :each f/reset-db)
 
-(deftest customer-load-params
+(deftest org-load-params
   (testing "sends request to backend"
     (rf-test/run-test-sync
      (let [params [{:parameters [{:name "test-param" :value "test-val"}]}]
            c (h/catch-fx :martian.re-frame/request)]
-       (h/initialize-martian {:get-customer-params {:status 200
-                                                    :body params
-                                                    :error-code :no-error}})
+       (h/initialize-martian {:get-org-params {:status 200
+                                               :body params
+                                               :error-code :no-error}})
        (is (some? (:martian.re-frame/martian @app-db)))
-       (rf/dispatch [:params/load "test-customer"])
+       (rf/dispatch [:params/load "test-org"])
        (is (= 1 (count @c)))
-       (is (= :get-customer-params (-> @c first (nth 2)))))))
+       (is (= :get-org-params (-> @c first (nth 2)))))))
   
   (testing "marks loading"
-    (rf/dispatch-sync [:params/load "test-cust"])
+    (rf/dispatch-sync [:params/load "test-org"])
     (is (true? (db/loading? @app-db))))
 
   (testing "clears alerts"
     (is (some? (reset! app-db (db/set-alerts {} ::test-alerts))))
-    (rf/dispatch-sync [:params/load "test-cust"])
+    (rf/dispatch-sync [:params/load "test-org"])
     (is (nil? (db/alerts @app-db))))
 
   (testing "clears editing"
     (is (some? (reset! app-db (db/set-editing {} ::test-id ::test-params))))
-    (rf/dispatch-sync [:params/load "test-cust"])
+    (rf/dispatch-sync [:params/load "test-org"])
     (is (nil? (db/get-editing @app-db ::test-id)))))
 
 (deftest load-params--success
@@ -209,7 +209,7 @@
     (rf/dispatch-sync [:params/cancel-all])
     (is (nil? (db/edit-sets @app-db))))
 
-  (testing "redirects to customer page"
+  (testing "redirects to org page"
     (let [e (h/catch-fx :route/goto)]
       (rf-test/run-test-sync
        (rf/dispatch [:params/cancel-all])

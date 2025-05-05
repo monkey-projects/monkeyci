@@ -12,95 +12,95 @@
 
 (use-fixtures :each f/reset-db)
 
-(deftest user-load-customers
+(deftest user-load-orgs
   (testing "sends request to api"
     (rf-test/run-test-sync
-     (let [cust [{:name "test customer"}]
+     (let [cust [{:name "test org"}]
            c (h/catch-fx :martian.re-frame/request)]
-       (h/initialize-martian {:get-user-customers {:status 200
+       (h/initialize-martian {:get-user-orgs {:status 200
                                                    :body cust
                                                    :error-code :no-error}})
        (is (some? (:martian.re-frame/martian @app-db)))
-       (rf/dispatch [:user/load-customers])
+       (rf/dispatch [:user/load-orgs])
        (is (= 1 (count @c)))
-       (is (= :get-user-customers (-> @c first (nth 2))))))))
+       (is (= :get-user-orgs (-> @c first (nth 2))))))))
 
-(deftest user-load-customers--success
-  (testing "sets customers in db"
-    (rf/dispatch-sync [:user/load-customers--success {:body ::customers}])
-    (is (= ::customers (db/get-customers @app-db)))))
+(deftest user-load-orgs--success
+  (testing "sets orgs in db"
+    (rf/dispatch-sync [:user/load-orgs--success {:body ::orgs}])
+    (is (= ::orgs (db/get-orgs @app-db)))))
 
-(deftest user-load-customers--failed
+(deftest user-load-orgs--failed
   (testing "sets error alert"
-    (rf/dispatch-sync [:user/load-customers--failed {:message "test error"}])
+    (rf/dispatch-sync [:user/load-orgs--failed {:message "test error"}])
     (is (= :danger (-> (db/get-alerts @app-db)
                        first
                        :type)))))
 
-(deftest customer-join-init
+(deftest org-join-init
   (testing "clears search results"
     (is (some? (reset! app-db (db/set-search-results {} ::results))))
-    (rf/dispatch-sync [:customer/join-init])
+    (rf/dispatch-sync [:org/join-init])
     (is (nil? (db/search-results @app-db))))
 
   (testing "clears join requests"
     (is (some? (reset! app-db (db/set-join-requests {} ::results))))
-    (rf/dispatch-sync [:customer/join-init])
+    (rf/dispatch-sync [:org/join-init])
     (is (nil? (db/join-requests @app-db))))
 
   (testing "clears joining flags"
-    (is (some? (reset! app-db (db/mark-customer-joining {} "test-cust"))))
-    (rf/dispatch-sync [:customer/join-init])
-    (is (not (db/customer-joining? @app-db "test-cust")))))
+    (is (some? (reset! app-db (db/mark-org-joining {} "test-cust"))))
+    (rf/dispatch-sync [:org/join-init])
+    (is (not (db/org-joining? @app-db "test-cust")))))
 
-(deftest customer-search
+(deftest org-search
   (testing "sends request to api"
     (rf-test/run-test-sync
-     (let [cust [{:name "test customer"}]
+     (let [cust [{:name "test org"}]
            c (h/catch-fx :martian.re-frame/request)]
-       (h/initialize-martian {:search-customers {:status 200
+       (h/initialize-martian {:search-orgs {:status 200
                                                  :body cust
                                                  :error-code :no-error}})
        (is (some? (:martian.re-frame/martian @app-db)))
-       (rf/dispatch [:customer/search {:customer-search ["test customer"]}])
+       (rf/dispatch [:org/search {:org-search ["test org"]}])
        (is (= 1 (count @c)))
-       (is (= :search-customers (-> @c first (nth 2)))))))
+       (is (= :search-orgs (-> @c first (nth 2)))))))
 
   (testing "marks searching in db"
-    (rf/dispatch-sync [:customer/search {}])
-    (is (true? (db/customer-searching? @app-db))))
+    (rf/dispatch-sync [:org/search {}])
+    (is (true? (db/org-searching? @app-db))))
 
   (testing "clears alerts"
     (is (some? (reset! app-db (db/set-join-alerts {} [{:type :info}]))))
-    (rf/dispatch-sync [:customer/search {}])
+    (rf/dispatch-sync [:org/search {}])
     (is (nil? (db/join-alerts @app-db)))))
 
-(deftest customer-search--success
+(deftest org-search--success
   (testing "unmarks seaching"
-    (is (some? (reset! app-db (db/set-customer-searching {} true))))
-    (rf/dispatch-sync [:customer/search--success {:body [{:name "test customer"}]}])
-    (is (not (db/customer-searching? @app-db))))
+    (is (some? (reset! app-db (db/set-org-searching {} true))))
+    (rf/dispatch-sync [:org/search--success {:body [{:name "test org"}]}])
+    (is (not (db/org-searching? @app-db))))
 
   (testing "sets search result in db"
-    (let [matches [{:name "test customer"}]]
-      (rf/dispatch-sync [:customer/search--success {:body matches}])
+    (let [matches [{:name "test org"}]]
+      (rf/dispatch-sync [:org/search--success {:body matches}])
       (is (= matches (db/search-results @app-db))))))
 
-(deftest customer-search--failed
+(deftest org-search--failed
   (testing "unmarks seaching"
-    (is (some? (reset! app-db (db/set-customer-searching {} true))))
-    (rf/dispatch-sync [:customer/search--failed "test error"])
-    (is (not (db/customer-searching? @app-db))))
+    (is (some? (reset! app-db (db/set-org-searching {} true))))
+    (rf/dispatch-sync [:org/search--failed "test error"])
+    (is (not (db/org-searching? @app-db))))
 
   (testing "sets error alert"
-    (rf/dispatch-sync [:customer/search--failed "test error"])
+    (rf/dispatch-sync [:org/search--failed "test error"])
     (is (= 1 (count (db/join-alerts @app-db))))
     (is (= :danger (-> (db/join-alerts @app-db) first :type)))))
 
 (deftest join-request-load
   (testing "sends request to api using current user id"
     (rf-test/run-test-sync
-     (let [jr [{:customer-id "test-cust"}]
+     (let [jr [{:org-id "test-cust"}]
            c (h/catch-fx :martian.re-frame/request)]
        (is (some? (reset! app-db (ldb/set-user {} {:id "test-user"}))))
        (h/initialize-martian {:get-user-join-requests {:status 200
@@ -127,47 +127,47 @@
     (is (= 1 (count (db/join-alerts @app-db))))
     (is (= :danger (-> (db/join-alerts @app-db) first :type)))))
 
-(deftest customer-join
+(deftest org-join
   (rf-test/run-test-sync
-   (let [cust-id "test-customer"
+   (let [cust-id "test-org"
          c (h/catch-fx :martian.re-frame/request)]
      (is (some? (reset! app-db (ldb/set-user {} {:id "test-user"}))))
      (h/initialize-martian {:create-user-join-requests {:status 200
-                                                        :body {:customer-id cust-id}
+                                                        :body {:org-id cust-id}
                                                         :error-code :no-error}})
      (is (some? (:martian.re-frame/martian @app-db)))
-     (rf/dispatch [:customer/join cust-id])
+     (rf/dispatch [:org/join cust-id])
      (testing "sends request to backend"
        (is (= 1 (count @c)))
        (is (= "test-user" (-> @c first (nth 3) :user-id))))
      
-     (testing "marks customer joining"
-       (is (db/customer-joining? @app-db cust-id))))))
+     (testing "marks org joining"
+       (is (db/org-joining? @app-db cust-id))))))
 
-(deftest customer-join--success
-  (testing "unmarks customer joining"
+(deftest org-join--success
+  (testing "unmarks org joining"
     (let [cust-id "test-id"]
-      (is (some? (reset! app-db (db/mark-customer-joining {} cust-id))))
-      (rf/dispatch-sync [:customer/join--success {:body {:customer-id cust-id}}])
-      (is (not (db/customer-joining? @app-db cust-id)))))
+      (is (some? (reset! app-db (db/mark-org-joining {} cust-id))))
+      (rf/dispatch-sync [:org/join--success {:body {:org-id cust-id}}])
+      (is (not (db/org-joining? @app-db cust-id)))))
   
   (testing "updates join request list"
     (let [jr {:id "test-id"
-              :customer-id "test-cust"
+              :org-id "test-cust"
               :user-id "test-user"}]
       (is (empty? (reset! app-db {})))
-      (rf/dispatch-sync [:customer/join--success {:body jr}])
+      (rf/dispatch-sync [:org/join--success {:body jr}])
       (is (= [jr] (db/join-requests @app-db))))))
 
-(deftest customer-join--failed
-  (testing "unmarks customer joining"
+(deftest org-join--failed
+  (testing "unmarks org joining"
     (let [cust-id "test-cust"]
-      (is (some? (reset! app-db (db/mark-customer-joining {} cust-id))))
-      (rf/dispatch-sync [:customer/join--failed cust-id "test error"])
-      (is (not (db/customer-joining? @app-db cust-id)))))
+      (is (some? (reset! app-db (db/mark-org-joining {} cust-id))))
+      (rf/dispatch-sync [:org/join--failed cust-id "test error"])
+      (is (not (db/org-joining? @app-db cust-id)))))
 
   (testing "sets error alert"
-    (rf/dispatch-sync [:customer/join--failed "test-cust" "test error"])
+    (rf/dispatch-sync [:org/join--failed "test-cust" "test error"])
     (is (= 1 (count (db/join-alerts @app-db))))
     (is (= :danger (-> (db/join-alerts @app-db) first :type)))))
 

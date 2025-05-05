@@ -1,10 +1,11 @@
 (ns monkey.ci.gui.test.cards.customer-cards
   (:require [devcards.core :refer-macros [defcard-rg]]
-            [monkey.ci.gui.customer.views :as sut]
             [monkey.ci.gui.charts :as charts]
-            [reagent.core]
-            [re-frame.core :as rf]
-            [re-frame.db :as rdb]))
+            [monkey.ci.gui.org.views :as sut]
+            [re-frame
+             [core :as rf]
+             [db :as rdb]]
+            [reagent.core]))
 
 (defcard-rg build-stats
   "Customer build statistics"

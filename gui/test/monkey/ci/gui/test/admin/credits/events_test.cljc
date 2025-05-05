@@ -12,14 +12,14 @@
             [re-frame.db :refer [app-db]]))
 
 (deftest credits-load-issues
-  (testing "fetches customer credit issues from backend"
+  (testing "fetches org credit issues from backend"
     (rf-test/run-test-sync
      (let [c (h/catch-fx :martian.re-frame/request)]
        (h/initialize-martian {:get-credit-issues
                               {:status 200
                                :body []
                                :error-code :no-error}})
-       (rf/dispatch [:credits/load-issues {:customer-id "test-cust"}])
+       (rf/dispatch [:credits/load-issues {:org-id "test-org"}])
        (is (= 1 (count @c)))))))
 
 (deftest credits-load-issues--success
@@ -48,7 +48,7 @@
    (let [c (h/catch-fx :martian.re-frame/request)]
      (is (some? (reset! app-db (r/set-current {} {:parameters
                                                   {:path
-                                                   {:customer-id "test-cust"}}}))))
+                                                   {:org-id "test-org"}}}))))
      (h/initialize-martian {:create-credit-issue
                             {:status 200
                              :body {}
@@ -68,9 +68,9 @@
                 (select-keys params [:amount :reason])))
          (is (number? (:from-time params)))))
 
-     (testing "adds customer id"
-       (is (= "test-cust"
-              (-> @c first (nth 3) :customer-id))))
+     (testing "adds org id"
+       (is (= "test-org"
+              (-> @c first (nth 3) :org-id))))
 
      (testing "marks saving"
        (is (db/issue-saving? @app-db))))))
@@ -108,14 +108,14 @@
     (is (not (db/issue-saving? @app-db)))))
 
 (deftest credits-load-subs
-  (testing "fetches customer credit subs from backend"
+  (testing "fetches org credit subs from backend"
     (rf-test/run-test-sync
      (let [c (h/catch-fx :martian.re-frame/request)]
        (h/initialize-martian {:get-credit-subs
                               {:status 200
                                :body []
                                :error-code :no-error}})
-       (rf/dispatch [:credits/load-subs {:customer-id "test-cust"}])
+       (rf/dispatch [:credits/load-subs {:org-id "test-org"}])
        (is (= 1 (count @c)))))))
 
 (deftest credits-load-subs--success
@@ -144,7 +144,7 @@
    (let [c (h/catch-fx :martian.re-frame/request)]
      (is (some? (reset! app-db (r/set-current {} {:parameters
                                                   {:path
-                                                   {:customer-id "test-cust"}}}))))
+                                                   {:org-id "test-org"}}}))))
      (h/initialize-martian {:create-credit-sub
                             {:status 200
                              :body {}
@@ -166,9 +166,9 @@
        (testing "does not pass empty `valid-until` date"
          (is (not (contains? params :valid-until)))))
 
-     (testing "adds customer id"
-       (is (= "test-cust"
-              (-> @c first (nth 3) :customer-id))))
+     (testing "adds org id"
+       (is (= "test-org"
+              (-> @c first (nth 3) :org-id))))
 
      (testing "marks saving"
        (is (db/sub-saving? @app-db))))))

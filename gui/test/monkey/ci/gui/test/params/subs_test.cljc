@@ -13,19 +13,19 @@
 
 (rf/clear-subscription-cache!)
 
-(deftest customer-params
-  (h/verify-sub [:customer/params]
+(deftest org-params
+  (h/verify-sub [:org/params]
                 #(db/set-params % [::test-params])
                 [::test-params]
                 nil))
 
-(deftest customer-param
+(deftest org-param
   (let [id (random-uuid)
-        cp (rf/subscribe [:customer/param id 0])]
+        cp (rf/subscribe [:org/param id 0])]
     (testing "exists"
       (is (some? cp)))
 
-    (testing "returns customer param in set"
+    (testing "returns org param in set"
       (is (some? (reset! app-db (db/set-editing {} id {:id id
                                                        :parameters
                                                        [{:name "param name"

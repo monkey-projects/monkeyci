@@ -1,6 +1,6 @@
 (ns monkey.ci.gui.repo.events
   (:require [monkey.ci.gui.alerts :as a]
-            [monkey.ci.gui.customer.db :as cdb]
+            [monkey.ci.gui.org.db :as cdb]
             [monkey.ci.gui.loader :as lo]
             [monkey.ci.gui.repo.db :as db]
             [monkey.ci.gui.routing :as r]
@@ -15,7 +15,7 @@
  (fn [{:keys [db]} _]
    (lo/on-initialize
     db db/id
-    {:init-events         [[:repo/load (r/customer-id db)]]
+    {:init-events         [[:repo/load (r/org-id db)]]
      :leave-event         [:repo/leave]
      :event-handler-event [:repo/handle-event]})))
 
@@ -28,12 +28,12 @@
 
 (rf/reg-event-fx
  :repo/load
- ;; Since repos are part of the customer, this actually loads the customer.
+ ;; Since repos are part of the org, this actually loads the org.
  (fn [{:keys [db]} [_ cust-id]]
-   (let [existing (cdb/customer db)]
+   (let [existing (cdb/org db)]
      (cond-> {:db (db/set-builds db nil)}
        (not existing)
-       (assoc :dispatch [:customer/load cust-id])))))
+       (assoc :dispatch [:org/load cust-id])))))
 
 (rf/reg-event-fx
  :builds/load
@@ -43,7 +43,7 @@
     (let [params (get-in db [:route/current :parameters :path])]
       [:secure-request
        :get-builds
-       (select-keys params [:customer-id :repo-id])
+       (select-keys params [:org-id :repo-id])
        [:builds/load--success]
        [:builds/load--failed]]))))
 
@@ -70,7 +70,7 @@
     (should-handle-evt? (:type evt)) (db/update-build (:build evt))))
 
 (defn- for-repo? [db evt]
-  (let [get-id (juxt :customer-id :repo-id)]
+  (let [get-id (juxt :org-id :repo-id)]
     (= (get-id (:build evt))
        (-> (r/current db)
            (r/path-params)
@@ -109,7 +109,7 @@
               (db/reset-alerts))
       :dispatch [:secure-request
                  :trigger-build
-                 (-> (select-keys params [:customer-id :repo-id])
+                 (-> (select-keys params [:org-id :repo-id])
                      (add-ref form-vals))
                  [:repo/trigger-build--success]
                  [:repo/trigger-build--failed]]})))
@@ -129,10 +129,10 @@
 (rf/reg-event-fx
  :repo/load+edit
  (fn [{:keys [db]} _]
-   (let [cust-id (r/customer-id db)]
+   (let [cust-id (r/org-id db)]
      {:dispatch [:secure-request
-                 :get-customer
-                 {:customer-id cust-id}
+                 :get-org
+                 {:org-id cust-id}
                  [:repo/load+edit--success]
                  [:repo/load+edit--failed]]
       :db (-> db
@@ -143,7 +143,7 @@
  :repo/load+edit--success
  (fn [{:keys [db]} [_ resp]]
    (let [repo-id (r/repo-id db)]
-     {:dispatch [:customer/load--success resp]
+     {:dispatch [:org/load--success resp]
       :db (db/set-editing db (->> (:body resp)
                                   :repos
                                   (filter (comp (partial = repo-id) :id))
@@ -195,13 +195,13 @@
  (fn [{:keys [db]} _]
    (let [params (-> (r/current db)
                     (r/path-params)
-                    (select-keys [:customer-id :repo-id]))]
+                    (select-keys [:org-id :repo-id]))]
      {:dispatch [:secure-request
                  :update-repo
                  (-> params
                      (assoc :repo (-> (db/editing db)
                                       (assoc :id (:repo-id params)
-                                             :customer-id (:customer-id params)))))
+                                             :org-id (:org-id params)))))
                  [:repo/save--success]
                  [:repo/save--failed]]
       :db (-> db
@@ -243,14 +243,14 @@
  (fn [{:keys [db]} _]
    (let [params (-> (r/current db) (r/path-params))
          repo-id (:repo-id params)
-         repo (u/find-by-id repo-id (:repos (cdb/get-customer db)))]
+         repo (u/find-by-id repo-id (:repos (cdb/get-org db)))]
      {:db (-> db
               (db/unmark-deleting)
-              (cdb/update-customer remove-repo repo-id)
+              (cdb/update-org remove-repo repo-id)
               (cdb/set-alerts
                [{:type :info
                  :message (str "Repository " (:name repo) " has been deleted.")}]))
-      :dispatch [:route/goto :page/customer (select-keys params [:customer-id])]})))
+      :dispatch [:route/goto :page/org (select-keys params [:org-id])]})))
 
 (rf/reg-event-db
  :repo/delete--failed

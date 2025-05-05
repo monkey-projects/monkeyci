@@ -172,3 +172,10 @@
                          :branch branch
                          :sid (co/account->sid)}}]
         (runner (assoc rt :build build))))))
+
+(defn delete-stale
+  ([{:keys [containers]}]
+   (oci/delete-stale-instances (ci/make-context containers)
+                               (:compartment-id containers)))
+  ([]
+   (delete-stale @co/global-config)))

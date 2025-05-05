@@ -1,33 +1,33 @@
 (ns monkey.ci.gui.admin.credits.db
   (:require [monkey.ci.gui.loader :as lo]))
 
-(def cust-by-name ::cust-by-name)
-(def cust-by-id ::cust-by-id)
+(def org-by-name ::org-by-name)
+(def org-by-id ::org-by-id)
 (def issues ::issues)
 (def subscriptions ::subs)
 
-(defn get-customers-by-name [db]
-  (lo/get-value db cust-by-name))
+(defn get-orgs-by-name [db]
+  (lo/get-value db org-by-name))
 
-(defn get-customers-by-id [db]
-  (lo/get-value db cust-by-id))
+(defn get-orgs-by-id [db]
+  (lo/get-value db org-by-id))
 
-(defn get-customers [db]
-  (concat (get-customers-by-name db)
-          (get-customers-by-id db)))
+(defn get-orgs [db]
+  (concat (get-orgs-by-name db)
+          (get-orgs-by-id db)))
 
-(defn reset-customers [db]
+(defn reset-orgs [db]
   (-> db
-      (lo/set-value cust-by-name [])
-      (lo/set-value cust-by-id [])))
+      (lo/set-value org-by-name [])
+      (lo/set-value org-by-id [])))
 
-(defn customers-loading? [db]
-  (or (lo/loading? db cust-by-name)
-      (lo/loading? db cust-by-id)))
+(defn orgs-loading? [db]
+  (or (lo/loading? db org-by-name)
+      (lo/loading? db org-by-id)))
 
-(defn customers-loaded? [db]
-  (or (lo/loaded? db cust-by-name)
-      (lo/loaded? db cust-by-id)))
+(defn orgs-loaded? [db]
+  (or (lo/loaded? db org-by-name)
+      (lo/loaded? db org-by-id)))
 
 (defn get-issues [db]
   (lo/get-value db issues))

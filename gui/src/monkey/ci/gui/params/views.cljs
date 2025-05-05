@@ -1,6 +1,6 @@
 (ns monkey.ci.gui.params.views
   (:require [monkey.ci.gui.components :as co]
-            [monkey.ci.gui.customer.events]
+            [monkey.ci.gui.org.events]
             [monkey.ci.gui.labels :as lbl]
             [monkey.ci.gui.layout :as l]
             [monkey.ci.gui.logging :as log]
@@ -11,7 +11,7 @@
             [re-frame.core :as rf]))
 
 (defn- param-form [set-id param-idx]
-  (let [{:keys [name value]} @(rf/subscribe [:customer/param set-id param-idx])]
+  (let [{:keys [name value]} @(rf/subscribe [:org/param set-id param-idx])]
     [:div.row.mb-2
      [:div.col-md-3
       [:input.form-control
@@ -42,7 +42,7 @@
                [:b.mx-1 "AND"])
              (str label " = " value)])]
     (if (empty? lf)
-      [:i "Applies to all builds for this customer."]
+      [:i "Applies to all builds for this organization."]
       [:<>
        [:i "Applies to all builds where:"]
        (->> lf
@@ -154,7 +154,7 @@
 
 (defn- params-list []
   (let [loading? (rf/subscribe [:params/loading?])
-        params (rf/subscribe [:customer/params])
+        params (rf/subscribe [:org/params])
         new-sets (rf/subscribe [:params/new-sets])]
     (if @loading?
       [loading-card]
@@ -167,10 +167,10 @@
          [global-actions]]]])))
 
 (defn page
-  "Customer parameters overview"
+  "Organization parameters overview"
   [route]
-  (let [id (-> route (r/path-params) :customer-id)]
-    (rf/dispatch [:customer/maybe-load id])
+  (let [id (-> route (r/path-params) :org-id)]
+    (rf/dispatch [:org/maybe-load id])
     (rf/dispatch [:params/load id])
     (l/default
      [:<>
