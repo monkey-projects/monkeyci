@@ -4,7 +4,7 @@
 
 (def id ::build-id)
 
-(def params->sid (juxt :customer-id :repo-id :build-id))
+(def params->sid (juxt :org-id :repo-id :build-id))
 
 (def r->sid (comp params->sid r/path-params r/current))
 
