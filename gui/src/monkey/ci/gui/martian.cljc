@@ -9,31 +9,31 @@
             [re-frame.core :as rf]
             [schema.core :as s]))
 
-(def customer-path ["/customer/" :customer-id])
-(def repo-path (into customer-path ["/repo/" :repo-id]))
+(def org-path ["/customer/" :org-id])
+(def repo-path (into org-path ["/repo/" :repo-id]))
 (def build-path (into repo-path ["/builds/" :build-id]))
-(def param-path (into customer-path ["/param/" :param-id]))
+(def param-path (into org-path ["/param/" :param-id]))
 (def user-path ["/user/" :user-id])
 
-(def customer-schema
-  {:customer-id s/Str})
+(def org-schema
+  {:org-id s/Str})
 
 (def repo-schema
-  (assoc customer-schema
+  (assoc org-schema
          :repo-id s/Str))
 
 (def build-schema
   (assoc repo-schema :build-id s/Str))
 
 (def param-schema
-  (assoc customer-schema
+  (assoc org-schema
          :param-id s/Str))
 
 (def user-schema
   {:user-id s/Str})
 
 ;; TODO Use the same source as backend for this
-(s/defschema NewCustomer
+(s/defschema NewOrg
   {:name s/Str})
 
 (s/defschema Label
@@ -41,7 +41,7 @@
    :value s/Str})
 
 (s/defschema UpdateRepo
-  {:customer-id s/Str
+  {:org-id s/Str
    :name s/Str
    :url s/Str
    (s/optional-key :main-branch) s/Str
@@ -106,50 +106,50 @@
 
 (def routes
   [(api-route
-    {:route-name :get-customer
-     :path-parts customer-path
-     :path-schema customer-schema})
+    {:route-name :get-org
+     :path-parts org-path
+     :path-schema org-schema})
 
    (api-route
-    {:route-name :create-customer
+    {:route-name :create-org
      :method :post
-     :path-parts ["/customer"]
-     :body-schema {:customer NewCustomer}})
+     :path-parts ["/org"]
+     :body-schema {:org NewOrg}})
 
    (api-route
-    {:route-name :search-customers
-     :path-parts ["/customer"]
+    {:route-name :search-orgs
+     :path-parts ["/org"]
      :query-schema {(s/optional-key :name) s/Str
                     (s/optional-key :id) s/Str}})
 
    (api-route
     {:route-name :get-recent-builds
-     :path-parts (into customer-path ["/builds/recent"])
-     :path-schema customer-schema
+     :path-parts (into org-path ["/builds/recent"])
+     :path-schema org-schema
      :query-schema {(s/optional-key :since) s/Int
                     (s/optional-key :n) s/Int}})
 
    (api-route
-    {:route-name :get-customer-latest-builds
-     :path-parts (into customer-path ["/builds/latest"])
-     :path-schema customer-schema})
+    {:route-name :get-org-latest-builds
+     :path-parts (into org-path ["/builds/latest"])
+     :path-schema org-schema})
 
    (api-route
-    {:route-name :get-customer-params
-     :path-parts (into customer-path ["/param"])
-     :path-schema customer-schema})
+    {:route-name :get-org-params
+     :path-parts (into org-path ["/param"])
+     :path-schema org-schema})
 
    (api-route
-    {:route-name :update-customer-params
-     :path-parts (into customer-path ["/param"])
-     :path-schema customer-schema
+    {:route-name :update-org-params
+     :path-parts (into org-path ["/param"])
+     :path-schema org-schema
      :method :post
      :body-schema {:params [UpdateParamSet]}})
 
    (api-route
     {:route-name :create-param-set
-     :path-parts (into customer-path ["/param"])
-     :path-schema customer-schema
+     :path-parts (into org-path ["/param"])
+     :path-schema org-schema
      :method :post
      :body-schema {:params NewParamSet}})
 
@@ -167,41 +167,41 @@
      :method :delete})
 
    (api-route
-    {:route-name :get-customer-ssh-keys
-     :path-parts (into customer-path ["/ssh-keys"])
-     :path-schema customer-schema})
+    {:route-name :get-org-ssh-keys
+     :path-parts (into org-path ["/ssh-keys"])
+     :path-schema org-schema})
 
    (api-route
-    {:route-name :update-customer-ssh-keys
-     :path-parts (into customer-path ["/ssh-keys"])
-     :path-schema customer-schema
+    {:route-name :update-org-ssh-keys
+     :path-parts (into org-path ["/ssh-keys"])
+     :path-schema org-schema
      :method :put
      :body-schema {:ssh-keys [SshKey]}})
 
    (api-route
-    {:route-name :get-customer-stats
-     :path-parts (into customer-path ["/stats"])
-     :path-schema customer-schema
+    {:route-name :get-org-stats
+     :path-parts (into org-path ["/stats"])
+     :path-schema org-schema
      :query-schema {(s/optional-key :since) s/Int
                     (s/optional-key :until) s/Int}
      :method :get})
 
    (api-route
-    {:route-name :get-customer-credits
-     :path-parts (into customer-path ["/credits"])
-     :path-schema customer-schema
+    {:route-name :get-org-credits
+     :path-parts (into org-path ["/credits"])
+     :path-schema org-schema
      :method :get})
 
    (api-route
     {:route-name :get-credit-issues
-     :path-parts ["/admin/credits/" :customer-id]
-     :path-schema customer-schema
+     :path-parts ["/admin/credits/" :org-id]
+     :path-schema org-schema
      :method :get})
 
    (api-route
     {:route-name :create-credit-issue
-     :path-parts ["/admin/credits/" :customer-id "/issue"]
-     :path-schema customer-schema
+     :path-parts ["/admin/credits/" :org-id "/issue"]
+     :path-schema org-schema
      :body-schema {:credits UserCredits}
      :method :post})
 
@@ -213,19 +213,19 @@
 
    (api-route
     {:route-name :get-credit-subs
-     :path-parts ["/admin/credits/" :customer-id "/subscription"]
-     :path-schema customer-schema
+     :path-parts ["/admin/credits/" :org-id "/subscription"]
+     :path-schema org-schema
      :method :get})
 
    (api-route
     {:route-name :create-credit-sub
-     :path-parts ["/admin/credits/" :customer-id "/subscription"]
-     :path-schema customer-schema
+     :path-parts ["/admin/credits/" :org-id "/subscription"]
+     :path-schema org-schema
      :body-schema {:sub CreditSubscription}
      :method :post})
 
    (api-route
-    {:route-name :get-user-customers
+    {:route-name :get-user-orgs
      :path-parts (into user-path ["/customers"])
      :path-schema user-schema})
 
@@ -240,7 +240,7 @@
      :path-parts (into user-path "/join-request")
      :path-schema user-schema
      :body-schema {:join-request
-                   {:customer-id s/Str}}})
+                   {:org-id s/Str}}})
 
    (api-route
     {:route-name :get-repo
@@ -294,44 +294,44 @@
 
    (api-route
     {:route-name :download-log
-     :path-parts ["/logs/" :customer-id "/entries"]
-     :path-schema customer-schema
+     :path-parts ["/logs/" :org-id "/entries"]
+     :path-schema org-schema
      :query-schema log-query-schema
      :produces #{"application/json"}})
 
    (api-route
     {:route-name :get-log-stats
-     :path-parts ["/logs/" :customer-id "/stats"]
-     :path-schema customer-schema
+     :path-parts ["/logs/" :org-id "/stats"]
+     :path-schema org-schema
      :query-schema log-query-schema
      :produces #{"application/json"}})
 
    (api-route
     {:route-name :get-log-label-values
-     :path-parts ["/logs/" :customer-id "/label/" :label "/values"]
-     :path-schema (assoc customer-schema :label s/Str)
+     :path-parts ["/logs/" :org-id "/label/" :label "/values"]
+     :path-schema (assoc org-schema :label s/Str)
      :query-schema log-query-schema
      :produces #{"application/json"}})
    
    (api-route
     {:route-name :watch-github-repo
      :method :post
-     :path-parts (conj customer-path "/repo/github/watch")
-     :path-schema customer-schema
+     :path-parts (conj org-path "/repo/github/watch")
+     :path-schema org-schema
      :body-schema {:repo {:name s/Str
                           :url s/Str
-                          :customer-id s/Str
+                          :org-id s/Str
                           :github-id s/Int}}
      :consumes ["application/edn"]})
 
    (api-route
     {:route-name :watch-bitbucket-repo
      :method :post
-     :path-parts (conj customer-path "/repo/bitbucket/watch")
-     :path-schema customer-schema
+     :path-parts (conj org-path "/repo/bitbucket/watch")
+     :path-schema org-schema
      :body-schema {:repo {:name s/Str
                           :url s/Str
-                          :customer-id s/Str
+                          :org-id s/Str
                           :workspace s/Str
                           :repo-slug s/Str
                           :token s/Str}}
@@ -352,8 +352,8 @@
 
    (api-route
     {:route-name :search-bitbucket-webhooks
-     :path-parts (conj customer-path "/webhook/bitbucket")
-     :path-schema customer-schema
+     :path-parts (conj org-path "/webhook/bitbucket")
+     :path-schema org-schema
      :query-schema {(s/optional-key :repo-id) s/Str
                     (s/optional-key :workspace) s/Str
                     (s/optional-key :repo-slug) s/Str

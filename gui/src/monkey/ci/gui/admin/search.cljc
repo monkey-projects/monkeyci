@@ -7,111 +7,111 @@
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
-(def cust-by-name ::cust-by-name)
-(def cust-by-id ::cust-by-id)
+(def org-by-name ::org-by-name)
+(def org-by-id ::org-by-id)
 
-(defn get-customers-by-name [db]
-  (lo/get-value db cust-by-name))
+(defn get-orgs-by-name [db]
+  (lo/get-value db org-by-name))
 
-(defn get-customers-by-id [db]
-  (lo/get-value db cust-by-id))
+(defn get-orgs-by-id [db]
+  (lo/get-value db org-by-id))
 
-(defn get-customers [db]
-  (concat (get-customers-by-name db)
-          (get-customers-by-id db)))
+(defn get-orgs [db]
+  (concat (get-orgs-by-name db)
+          (get-orgs-by-id db)))
 
-(defn reset-customers [db]
+(defn reset-orgs [db]
   (-> db
-      (lo/set-value cust-by-name [])
-      (lo/set-value cust-by-id [])))
+      (lo/set-value org-by-name [])
+      (lo/set-value org-by-id [])))
 
-(defn customers-loading? [db]
-  (or (lo/loading? db cust-by-name)
-      (lo/loading? db cust-by-id)))
+(defn orgs-loading? [db]
+  (or (lo/loading? db org-by-name)
+      (lo/loading? db org-by-id)))
 
-(defn customers-loaded? [db]
-  (or (lo/loaded? db cust-by-name)
-      (lo/loaded? db cust-by-id)))
+(defn orgs-loaded? [db]
+  (or (lo/loaded? db org-by-name)
+      (lo/loaded? db org-by-id)))
 
 (rf/reg-event-fx
- :admin/customer-search
+ :admin/org-search
  (fn [{:keys [db]} [_ details]]
-   (let [f (-> details (get :customer-filter) first)]
+   (let [f (-> details (get :org-filter) first)]
      ;; Search by name and id
-     {:dispatch-n [[:admin/customer-search-by-name details]
-                   [:admin/customer-search-by-id details]]
-      :db (reset-customers db)})))
+     {:dispatch-n [[:admin/org-search-by-name details]
+                   [:admin/org-search-by-id details]]
+      :db (reset-orgs db)})))
 
-(def cust-filter (comp first :customer-filter))
+(def org-filter (comp first :org-filter))
 
 (def id->key
-  {cust-by-id :id
-   cust-by-name :name})
+  {org-by-id :id
+   org-by-name :name})
 
-(defn- search-customer-req [id _ [_ details]]
+(defn- search-org-req [id _ [_ details]]
   [:secure-request
-   :search-customers
-   {(id->key id) (cust-filter details)}
-   [:admin/customer-search--success id]
-   [:admin/customer-search--failed id]])
+   :search-orgs
+   {(id->key id) (org-filter details)}
+   [:admin/org-search--success id]
+   [:admin/org-search--failed id]])
 
 (rf/reg-event-fx
- :admin/customer-search-by-name
+ :admin/org-search-by-name
  (lo/loader-evt-handler
-  cust-by-name
-  search-customer-req))
+  org-by-name
+  search-org-req))
 
 (rf/reg-event-fx
- :admin/customer-search-by-id
+ :admin/org-search-by-id
  (lo/loader-evt-handler
-  cust-by-id
-  search-customer-req))
+  org-by-id
+  search-org-req))
 
 (rf/reg-event-db
- :admin/customer-search--success
+ :admin/org-search--success
  (fn [db [_ id resp]]
    (lo/on-success db id resp)))
 
 (rf/reg-event-db
- :admin/customer-search--failed
+ :admin/org-search--failed
  (fn [db [_ id resp]]
-   (lo/on-failure db id a/cust-search-failed resp)))
+   (lo/on-failure db id a/org-search-failed resp)))
 
-(u/db-sub :admin/customers-loading? customers-loading?)
-(u/db-sub :admin/customers-loaded? customers-loaded?)
-(u/db-sub :admin/customers get-customers)
+(u/db-sub :admin/orgs-loading? orgs-loading?)
+(u/db-sub :admin/orgs-loaded? orgs-loaded?)
+(u/db-sub :admin/orgs get-orgs)
 
-(defn cust-search-btn []
-  (let [l (rf/subscribe [:admin/customers-loading?])]
+(defn org-search-btn []
+  (let [l (rf/subscribe [:admin/orgs-loading?])]
     [:button.btn.btn-primary.btn-icon
      {:type :submit
-      :on-click (f/submit-handler [:admin/customer-search] :customer-search)
+      :on-click (f/submit-handler [:admin/org-search] :org-search)
       :disabled @l}
      [:i.bi-search]]))
 
-(defn search-customer-form []
+(defn search-org-form []
   [:div.bg-primary-dark.overflow-hidden
    [:div.container.position-relative.content-space-1
     ;; Search form, does nothing for now
     [:div.w-lg-75.mx-lg-auto
-     [:form#customer-search
+     [:form#org-search
       [:div.input-card
        [:div.input-card-form
-        [:label.form-label.visually-hidden {:for :customer-filter}
-         "Search for customer"]
+        [:label.form-label.visually-hidden {:for :org-filter}
+         "Search for org"]
         [:input.form-control {:type :text
-                              :name :customer-filter
-                              :id :customer-filter
-                              :placeholder "Search for customer"
-                              :aria-label "Search for customer"}]]
-       [cust-search-btn]]]]]])
+                              :name :org-filter
+                              :id :org-filter
+                              :placeholder "Search for org"
+                              :aria-label "Search for org"}]]
+       [org-search-btn]]]]]])
 
-(defn- customers-table [get-route]
+(defn- orgs-table [get-route]
   (letfn [(render-id [{:keys [id] :as obj}]
             [:a {:href (apply r/path-for (get-route obj))} id])]
     [t/paged-table
-     {:id ::customers
-      :items-sub [:admin/customers]
+     {:id ::orgs
+      :items-sub [:admin/orgs]
       :columns (-> [{:label "Id"
                      :value render-id
                      :sorter (t/prop-sorter :id)}
@@ -119,20 +119,20 @@
                      :value :name
                      :sorter (t/prop-sorter :name)}]
                    (t/add-sorting 1 :asc))
-      :loading {:sub [:admin/customers-loading?]}
+      :loading {:sub [:admin/orgs-loading?]}
       :on-row-click #(rf/dispatch (into [:route/goto] (get-route %)))}]))
 
 (defn search-results [opts]
-  (let [loaded? (rf/subscribe [:admin/customers-loaded?])]
+  (let [loaded? (rf/subscribe [:admin/orgs-loaded?])]
     [:div.card
      [:div.card-body
       (if @loaded?
-        [customers-table (:get-route opts)]
+        [orgs-table (:get-route opts)]
         (or
          (:init-view opts)
-         [:p.card-text "Search for a customer."]))]]))
+         [:p.card-text "Search for a org."]))]]))
 
-(defn search-customers [opts]
+(defn search-orgs [opts]
   [:<>
-   [search-customer-form]
+   [search-org-form]
    [search-results opts]])

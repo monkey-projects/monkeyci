@@ -18,13 +18,13 @@
   (repeatedly 3 (comp str random-uuid)))
 
 (defn- gen-build []
-  (zipmap [:customer-id :repo-id :build-id] (build-sid)))
+  (zipmap [:org-id :repo-id :build-id] (build-sid)))
 
 (defn- build->params [build]
   {:parameters
-   {:path (select-keys build [:customer-id :repo-id :build-id])}})
+   {:path (select-keys build [:org-id :repo-id :build-id])}})
 
-(def build-keys [:customer-id :repo-id :build-id])
+(def build-keys [:org-id :repo-id :build-id])
 (def sid (apply juxt build-keys))
 
 (defn- set-build-path
@@ -35,7 +35,7 @@
 (deftest build-init
   (letfn [(mock-handlers []
             (rf/reg-event-db :build/load (constantly nil))
-            (rf/reg-event-db :customer/maybe-load (constantly nil))
+            (rf/reg-event-db :org/maybe-load (constantly nil))
             (rf/reg-event-db :event-stream/start (constantly nil))
             (rf/reg-event-db :route/on-page-leave (constantly nil)))]
 
@@ -53,11 +53,11 @@
              (rf/dispatch [:build/init])
              (is (= 1 (count @c))))))
 
-        (testing "dispatches customer load event"
+        (testing "dispatches org load event"
           (rft/run-test-sync
            (let [c (atom [])]
              (mock-handlers)
-             (rf/reg-event-db :customer/maybe-load (fn [_ evt] (swap! c conj evt)))
+             (rf/reg-event-db :org/maybe-load (fn [_ evt] (swap! c conj evt)))
              (rf/dispatch [:build/init])
              (is (= 1 (count @c))))))
         
@@ -114,7 +114,7 @@
                        {}
                        {:parameters
                         {:path 
-                         {:customer-id "test-cust"
+                         {:org-id "test-org"
                           :repo-id "test-repo"
                           :build-id "test-build"}}}))
        (h/initialize-martian {:get-build {:body "test-build"
@@ -150,16 +150,16 @@
             {:jobs {"test-job" {:id "test-job"}}}}
            (db/get-build @app-db))))
 
-  (testing "adds customer and repo id from route"
+  (testing "adds org and repo id from route"
     (let [[_ _ build-id :as sid] (build-sid)]
       (is (some? (reset! app-db (r/set-current
                                  {}
                                  {:parameters
-                                  {:path (zipmap [:customer-id :repo-id :build-id] sid)}}))))
+                                  {:path (zipmap [:org-id :repo-id :build-id] sid)}}))))
       (rf/dispatch-sync [:build/load--success {:body {:build-id build-id}}])
       (is (= sid
              (-> (db/get-build @app-db)
-                 (select-keys [:customer-id :repo-id :build-id])
+                 (select-keys [:org-id :repo-id :build-id])
                  (vals))))))
 
   (testing "starts event stream when build is running")
@@ -200,7 +200,7 @@
 
 (defn- test-build []
   (->> (repeatedly 3 (comp str random-uuid))
-       (zipmap [:customer-id :repo-id :build-id])))
+       (zipmap [:org-id :repo-id :build-id])))
 
 (deftest handle-event
   (testing "ignores events for other builds"

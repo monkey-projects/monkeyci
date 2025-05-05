@@ -9,57 +9,57 @@
             [re-frame.core :as rf]))
 
 (rf/reg-event-fx
- :credits/customer-search
+ :credits/org-search
  (fn [{:keys [db]} [_ details]]
-   (let [f (-> details (get :customer-filter) first)]
+   (let [f (-> details (get :org-filter) first)]
      ;; Search by name and id
-     {:dispatch-n [[:credits/customer-search-by-name details]
-                   [:credits/customer-search-by-id details]]
-      :db (db/reset-customers db)})))
+     {:dispatch-n [[:credits/org-search-by-name details]
+                   [:credits/org-search-by-id details]]
+      :db (db/reset-orgs db)})))
 
-(def cust-filter (comp first :customer-filter))
+(def org-filter (comp first :org-filter))
 
 (def id->key
-  {db/cust-by-id :id
-   db/cust-by-name :name})
+  {db/org-by-id :id
+   db/org-by-name :name})
 
-(defn- search-customer-req [id _ [_ details]]
+(defn- search-org-req [id _ [_ details]]
   [:secure-request
-   :search-customers
-   {(id->key id) (cust-filter details)}
-   [:credits/customer-search--success id]
-   [:credits/customer-search--failed id]])
+   :search-orgs
+   {(id->key id) (org-filter details)}
+   [:credits/org-search--success id]
+   [:credits/org-search--failed id]])
 
 (rf/reg-event-fx
- :credits/customer-search-by-name
+ :credits/org-search-by-name
  (lo/loader-evt-handler
-  db/cust-by-name
-  search-customer-req))
+  db/org-by-name
+  search-org-req))
 
 (rf/reg-event-fx
- :credits/customer-search-by-id
+ :credits/org-search-by-id
  (lo/loader-evt-handler
-  db/cust-by-id
-  search-customer-req))
+  db/org-by-id
+  search-org-req))
 
 (rf/reg-event-db
- :credits/customer-search--success
+ :credits/org-search--success
  (fn [db [_ id resp]]
    (lo/on-success db id resp)))
 
 (rf/reg-event-db
- :credits/customer-search--failed
+ :credits/org-search--failed
  (fn [db [_ id resp]]
-   (lo/on-failure db id a/cust-search-failed resp)))
+   (lo/on-failure db id a/org-search-failed resp)))
 
 (rf/reg-event-fx
  :credits/load-issues
  (lo/loader-evt-handler
   db/issues
-  (fn [_ _ [_ cust-id]]
+  (fn [_ _ [_ org-id]]
     [:secure-request
      :get-credit-issues
-     {:customer-id cust-id}
+     {:org-id org-id}
      [:credits/load-issues--success]
      [:credits/load-issues--failed]])))
 
@@ -94,7 +94,7 @@
                 (-> (select-keys params [:reason :amount :from-time])
                     (as-> t (mc/map-vals first t))
                     (mc/update-existing :from-time date->epoch))
-                :customer-id (r/customer-id db)}
+                :org-id (r/org-id db)}
                [:credits/save-issue--success]
                [:credits/save-issue--failed]]
     :db (-> db
@@ -121,10 +121,10 @@
  :credits/load-subs
  (lo/loader-evt-handler
   db/subscriptions
-  (fn [_ _ [_ cust-id]]
+  (fn [_ _ [_ org-id]]
     [:secure-request
      :get-credit-subs
-     {:customer-id cust-id}
+     {:org-id org-id}
      [:credits/load-subs--success]
      [:credits/load-subs--failed]])))
 
@@ -159,7 +159,7 @@
                     (mc/update-existing :valid-from date->epoch)
                     (mc/update-existing :valid-until date->epoch)
                     (as-> t (mc/filter-vals some? t)))
-                :customer-id (r/customer-id db)}
+                :org-id (r/org-id db)}
                [:credits/save-sub--success]
                [:credits/save-sub--failed]]
     :db (-> db

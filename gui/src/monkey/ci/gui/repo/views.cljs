@@ -134,7 +134,7 @@
          [:span.me-2 co/repo-icon] 
          "Repository: " (:name @r)
          [:span.fs-6.p-1
-          [cl/clipboard-copy (u/->sid p :customer-id :repo-id) "Click to save the sid to clipboard"]]]
+          [cl/clipboard-copy (u/->sid p :org-id :repo-id) "Click to save the sid to clipboard"]]]
         [:p "Repository url: " [:a {:href (:url @r) :target :_blank} (:url @r)]]
         [co/alerts [:repo/alerts]]
         [:div.card
@@ -255,7 +255,7 @@
         [save-btn]
         [co/close-btn [:route/goto :page/repo (-> route
                                                   (r/path-params)
-                                                  (select-keys [:repo-id :customer-id]))]]
+                                                  (select-keys [:repo-id :org-id]))]]
         [:span.ms-auto [delete-btn]]]]]]))
 
 (defn edit

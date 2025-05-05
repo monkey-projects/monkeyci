@@ -38,7 +38,7 @@
  (fn [{:keys [db]} _]
    {:db (-> db
             (set-repos nil)
-            (set-alerts [(a/cust-fetch-github-repos)]))
+            (set-alerts [(a/org-fetch-github-repos)]))
     :dispatch-n [[::load-user-repos]
                  [::load-orgs]]}))
 
@@ -82,7 +82,7 @@
  ::load-orgs--failed
  (u/req-error-handler-db
   (fn [db [_ err]]
-    (set-alerts db [(a/cust-user-orgs-failed err)]))))
+    (set-alerts db [(a/org-user-orgs-failed err)]))))
 
 (rf/reg-event-db
  :github/load-repos--success
@@ -92,13 +92,13 @@
      (-> db
          ;; Add to existing repos since we're doing multiple calls
          (set-repos all)
-         (set-alerts [(a/cust-github-repos-success (count all))])))))
+         (set-alerts [(a/org-github-repos-success (count all))])))))
 
 (rf/reg-event-fx
  :github/load-repos--failed
  (u/req-error-handler-db
   (fn [db [_ err]]
-    (set-alerts db [(a/cust-github-repos-failed err)]))))
+    (set-alerts db [(a/org-github-repos-failed err)]))))
 
 (u/db-sub :github/alerts alerts)
 (u/db-sub :github/repos repos)

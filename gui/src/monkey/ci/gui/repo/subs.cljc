@@ -7,9 +7,9 @@
 
 (rf/reg-sub
  :repo/info
- :<- [:customer/info]
+ :<- [:org/info]
  (fn [c [_ repo-id]]
-   ;; TODO Optimize customer structure for faster lookup
+   ;; TODO Optimize org structure for faster lookup
    (some->> c
             :repos
             (u/find-by-id repo-id))))

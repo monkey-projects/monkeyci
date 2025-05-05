@@ -41,7 +41,7 @@
           [:span.me-2 [co/icon :card-checklist]] "Issue All"]]]
        [:div.col-6
         [:p
-         "Here you can issue credits for all customers that have active subscriptions on the given date. "
+         "Here you can issue credits for all organizations that have active subscriptions on the given date. "
          "Only subscriptions that have become active on the same day of the month, and for which no existing "
          "credits exist are being processed."]]]
       [co/alerts [:credits/issue-all-alerts]]]]))
@@ -51,9 +51,9 @@
    [:<>
     [:h3 "Credit Management"]
     [:div.mt-3
-     [as/search-customers
-      {:get-route #(vector :admin/cust-credits {:customer-id (:id %)})
-       :init-view [:p.card-text "Search for a customer to manage their credits."]}]]
+     [as/search-orgs
+      {:get-route #(vector :admin/cust-credits {:org-id (:id %)})
+       :init-view [:p.card-text "Search for a org to manage their credits."]}]]
     [:div.mt-3
      [issue-all]]]])
 
@@ -108,7 +108,7 @@
   [:form
    {:on-submit (f/submit-handler [:credits/save-issue])}
    [form-input :amount "Credit amount" :number]
-   [form-input :reason "Reason" :text "Optional informational message for the customer."]
+   [form-input :reason "Reason" :text "Optional informational message for the org."]
    [form-input :from-time "Available from" :date "The date the credits become available for use."]
    [:div.d-flex.gap-2
     [issue-save-btn]
@@ -120,7 +120,7 @@
       [:div.card
        [:div.card-body
         [:h5 "Issue Credits"]
-        [:p "Create a new credit issuance for this customer.  One time only."]
+        [:p "Create a new credit issuance for this org.  One time only."]
         [issue-credits-form]]])))
 
 (defn- issue-credits-btn []
@@ -187,7 +187,7 @@
       [:div.card
        [:div.card-body
         [:h5 "Credit Subscription"]
-        [:p "Create a new repeating credit issuance subscription for this customer."]
+        [:p "Create a new repeating credit issuance subscription for this org."]
         [sub-credits-form]]])))
 
 (defn- subscriptions
@@ -214,14 +214,14 @@
      :contents [subscriptions cust-id]}]])
 
 (defn- title []
-  (let [cust (rf/subscribe [:customer/info])]
+  (let [cust (rf/subscribe [:org/info])]
     [:h3.mb-3 (:name @cust) ": Credit Overview"]))
 
-(defn customer-credits
-  "Displays credit overview for a single customer"
+(defn org-credits
+  "Displays credit overview for a single org"
   [route]
-  (let [cust-id (:customer-id (r/path-params route))]
-    (rf/dispatch [:customer/load cust-id])
+  (let [cust-id (:org-id (r/path-params route))]
+    (rf/dispatch [:org/load cust-id])
     (fn [route]
       [l/default
        [:<>

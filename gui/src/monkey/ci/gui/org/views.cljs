@@ -17,8 +17,8 @@
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
-(defn customer-icon []
-  [:span.me-2 co/customer-icon])
+(defn org-icon []
+  [:span.me-2 co/org-icon])
 
 (defn build-chart-config [{:keys [elapsed-seconds consumed-credits]}]
   (let [dates (->> (concat (map :date elapsed-seconds)
@@ -44,8 +44,8 @@
         :stacked true}}}}))
 
 (defn history-chart []
-  (let [stats (rf/subscribe [:customer/stats])]
-    [charts/chart-component :customer/builds (build-chart-config (:stats @stats))]))
+  (let [stats (rf/subscribe [:org/stats])]
+    [charts/chart-component :org/builds (build-chart-config (:stats @stats))]))
 
 (defn credits-chart-config [stats]
   (when-let [{:keys [consumed available]} stats]
@@ -58,16 +58,16 @@
               :data [available consumed]}]}}))
 
 (defn credits-chart []
-  (let [stats (rf/subscribe [:customer/credit-stats])]
+  (let [stats (rf/subscribe [:org/credit-stats])]
     (when @stats
-      [charts/chart-component :customer/credits (credits-chart-config @stats)])))
+      [charts/chart-component :org/credits (credits-chart-config @stats)])))
 
 (def stats-period-days 30)
 
-(defn customer-stats [cust-id]
-  (rf/dispatch [:customer/load-stats cust-id stats-period-days])
-  (rf/dispatch [:customer/load-credits cust-id])
-  (fn [cust-id]
+(defn org-stats [org-id]
+  (rf/dispatch [:org/load-stats org-id stats-period-days])
+  (rf/dispatch [:org/load-credits org-id])
+  (fn [org-id]
     [:div.row
      [:div.col-8
       [:div.card
@@ -83,14 +83,14 @@
         [credits-chart]]]]]))
 
 (defn- latest-build [r]
-  (let [build (rf/subscribe [:customer/latest-build (:id r)])]
+  (let [build (rf/subscribe [:org/latest-build (:id r)])]
     (when @build
       [:a {:title (str "Latest build: " (:build-id @build))
            :href (r/path-for :page/build @build)}
        [co/build-result (:status @build)]])))
 
 (defn- show-repo [c r]
-  (let [repo-path (r/path-for :page/repo {:customer-id (:id c)
+  (let [repo-path (r/path-for :page/repo {:org-id (:id c)
                                           :repo-id (:id r)})]
     [:div.card-body.border-top
      [:div.d-flex.flex-row.align-items-start
@@ -104,62 +104,62 @@
        {:href repo-path}
        [co/icon :three-dots-vertical] " Details"]]]))
 
-(defn- repo-group-card [cust title repos]
+(defn- repo-group-card [org title repos]
   (->> repos
        (sort-by :name)
-       (map (partial show-repo cust))
+       (map (partial show-repo org))
        (into
         [:div.card.mb-3
          [:div.card-header
           (when title
             [:h5.card-header-title [:span.me-2 co/repo-group-icon] title])]])))
 
-(defn- show-repo-group [cust [p repos]]
-  (repo-group-card cust (or p "(No value)") repos))
+(defn- show-repo-group [org [p repos]]
+  (repo-group-card org (or p "(No value)") repos))
 
 (defn- add-github-repo-btn [id]
   (when @(rf/subscribe [:login/github-user?])
     [:a.btn.btn-outline-dark.bg-light.link-dark
-     {:href (r/path-for :page/add-github-repo {:customer-id id})
+     {:href (r/path-for :page/add-github-repo {:org-id id})
       :title "Link an existing GitHub repository"}
      [:span.me-1 [co/icon :github]] "Watch Repository"]))
 
 (defn- add-bitbucket-repo-btn [id]
   (when @(rf/subscribe [:login/bitbucket-user?])
     [:a.btn.btn-outline-dark.bg-light.link-dark
-     {:href (r/path-for :page/add-bitbucket-repo {:customer-id id})
+     {:href (r/path-for :page/add-bitbucket-repo {:org-id id})
       :title "Link an existing Bitbucket repository"}
      [:img.me-2 {:src "/img/mark-gradient-blue-bitbucket.svg" :height "25px"}]
      "Watch Repository"]))
 
 (defn- params-btn [id]
   [:a.btn.btn-soft-primary
-   {:href (r/path-for :page/customer-params {:customer-id id})
+   {:href (r/path-for :page/org-params {:org-id id})
     :title "Configure build parameters"}
    [:span.me-2 [co/icon :gear]] "Parameters"])
 
 (defn- ssh-keys-btn [id]
   [:a.btn.btn-soft-primary
-   {:href (r/path-for :page/customer-ssh-keys {:customer-id id})
+   {:href (r/path-for :page/org-ssh-keys {:org-id id})
     :title "Configure ssh keys to access private repositories"}
    [:span.me-2 [co/icon :key]] "SSH Keys"])
 
-(defn- customer-actions [id]
+(defn- org-actions [id]
   [:<>
    [add-github-repo-btn id]
    [add-bitbucket-repo-btn id]
    [params-btn id]
    [ssh-keys-btn id]])
 
-(defn- customer-header []
-  (let [c (rf/subscribe [:customer/info])]
+(defn- org-header []
+  (let [c (rf/subscribe [:org/info])]
     [:div.d-flex.gap-2
-     [:h3.me-auto [customer-icon] (:name @c)]
-     [customer-actions (:id @c)]]))
+     [:h3.me-auto [org-icon] (:name @c)]
+     [org-actions (:id @c)]]))
 
 (defn- label-selector []
-  (let [l (rf/subscribe [:customer/labels])
-        sel (rf/subscribe [:customer/group-by-lbl])]
+  (let [l (rf/subscribe [:org/labels])
+        sel (rf/subscribe [:org/group-by-lbl])]
     (->> @l
          (map (fn [v]
                 [:option {:value v} (str "Group by " v)]))
@@ -167,59 +167,59 @@
                 {:id :group-by-label
                  :aria-label "Label selector"
                  :value @sel
-                 :on-change (u/form-evt-handler [:customer/group-by-lbl-changed])}
+                 :on-change (u/form-evt-handler [:org/group-by-lbl-changed])}
                 [:option {:value nil} "Ungrouped"]]))))
 
 (defn- repo-name-filter []
-  (let [f (rf/subscribe [:customer/repo-filter])]
+  (let [f (rf/subscribe [:org/repo-filter])]
     [co/filter-input
      {:id :repo-name-filter
-      :on-change (u/form-evt-handler [:customer/repo-filter-changed])
+      :on-change (u/form-evt-handler [:org/repo-filter-changed])
       :placeholder "Repository name"
       :value @f}]))
 
 (defn- repos-action-bar
   "Display a small form on top of the repositories overview to group and filter repos."
-  [cust]
+  [org]
   [:div.d-flex.flex-row.mb-2
-   [:form.row.row-cols-lg-auto.g-2.align-items-center
+   [:div.row.row-cols-lg-auto.g-2.align-items-center
     [:label.col {:for :group-by-label} "Repository overview"]
     [:div.col
      [label-selector]]
     [:div.col
      [repo-name-filter]]]
    [:div.ms-auto
-    [co/reload-btn-sm [:customer/load (:id cust)]]]])
+    [co/reload-btn-sm [:org/load (:id org)]]]])
 
-(defn- repos-list [cust]
-  (let [r (rf/subscribe [:customer/grouped-repos])]
-    (into [:<> [repos-action-bar cust]]
+(defn- repos-list [org]
+  (let [r (rf/subscribe [:org/grouped-repos])]
+    (into [:<> [repos-action-bar org]]
           (if (= 1 (count @r))
-            [(repo-group-card cust "All Repositories" (first (vals  @r)))]
+            [(repo-group-card org "All Repositories" (first (vals  @r)))]
             (->> @r
                  (sort-by first)
-                 (map (partial show-repo-group cust)))))))
+                 (map (partial show-repo-group org)))))))
 
-(defn- customer-repos
-  "Displays a list of customer repositories, grouped by selected label"
+(defn- org-repos
+  "Displays a list of org repositories, grouped by selected label"
   []
-  (rf/dispatch [:customer/load-latest-builds])
-  (let [c (rf/subscribe [:customer/info])]
+  (rf/dispatch [:org/load-latest-builds])
+  (let [c (rf/subscribe [:org/info])]
     (if (empty? (:repos @c))
       [:p "No repositories configured for this organization.  You can start by"
-       [:a.mx-1 {:href (r/path-for :page/add-github-repo {:customer-id (:id @c)})} "watching one."]]
+       [:a.mx-1 {:href (r/path-for :page/add-github-repo {:org-id (:id @c)})} "watching one."]]
       [repos-list @c])))
 
 (defn- with-recent-reload [id msg]
   [:div.d-flex
    [:p msg]
-   [:div.ms-auto [co/reload-btn-sm [:customer/load-recent-builds id]]]])
+   [:div.ms-auto [co/reload-btn-sm [:org/load-recent-builds id]]]])
 
 (defn- recent-builds [id]
-  (rf/dispatch [:customer/load-recent-builds id])
+  (rf/dispatch [:org/load-recent-builds id])
   (fn [id]
     (let [loaded? (rf/subscribe [:loader/loaded? db/recent-builds])
-          recent (rf/subscribe [:customer/recent-builds])]
+          recent (rf/subscribe [:org/recent-builds])]
       (if (and @loaded? (empty? @recent))
         [with-recent-reload id "No recent builds found for this organization."]
         [:<>
@@ -230,10 +230,11 @@
           [:div.card-body
            [t/paged-table
             {:id ::recent-builds
-             :items-sub [:customer/recent-builds]
+             :items-sub [:org/recent-builds]
              :columns (concat [{:label "Repository"
                                 :value (fn [b]
-                                         [:a {:href (r/path-for :page/repo b)} (get-in b [:repo :name])])}]
+                                         [:a {:href (r/path-for :page/repo (u/cust->org b))}
+                                          (get-in b [:repo :name])])}]
                               rv/table-columns)
              :loading {:sub [:loader/init-loading? db/recent-builds]}}]]]]))))
 
@@ -243,29 +244,29 @@
   [tabs/tabs ::overview
    [{:id :overview
      :header [:span [:span.me-2 co/overview-icon] "Overview"]
-     :contents [customer-stats id]}
+     :contents [org-stats id]}
     {:id :recent
      :header [:span [:span.me-2 co/build-icon] "Recent Builds"]
      :contents [recent-builds id]
      :current? true}
     {:id :repos
      :header [:span [:span.me-2 co/repo-icon] "Repositories"]
-     :contents [customer-repos]}]])
+     :contents [org-repos]}]])
 
-(defn- customer-details [id]
+(defn- org-details [id]
   [:<>
-   [customer-header]
+   [org-header]
    [overview-tabs id]])
 
 (defn page
   "Organization overview page"
   [route]
-  (let [id (-> route (r/path-params) :customer-id)]
-    (rf/dispatch [:customer/init id])
+  (let [id (-> route (r/path-params) :org-id)]
+    (rf/dispatch [:org/init id])
     (l/default
      [:<>
-      [co/alerts [:customer/alerts]]
-      [customer-details id]])))
+      [co/alerts [:org/alerts]]
+      [org-details id]])))
 
 (defn- ext-repo-actions [watch-evt unwatch-evt {:keys [:monkeyci/watched?] :as repo}]
   (if watched?
@@ -286,7 +287,7 @@
              visibility])]
     [t/paged-table
      {:id ::repos
-      :items-sub [:customer/github-repos]
+      :items-sub [:org/github-repos]
       :columns [{:label "Name"
                  :value name+url}
                 {:label "Owner"
@@ -310,7 +311,7 @@
              (if is-private "private" "public")])]
     [t/paged-table
      {:id ::repos
-      :items-sub [:customer/bitbucket-repos]
+      :items-sub [:org/bitbucket-repos]
       :columns [{:label "Name"
                  :value name+url}
                 {:label "Workspace"
@@ -325,14 +326,14 @@
                                  :repo/unwatch-bitbucket)}]}]))
 
 (defn ext-repo-filter []
-  (let [v (rf/subscribe [:customer/ext-repo-filter])]
+  (let [v (rf/subscribe [:org/ext-repo-filter])]
     [:form.row.row-cols-lg-auto.g-2.align-items-center.mb-2
      [:div.col
       [co/filter-input
        {:id :github-repo-name
         :placeholder "Repository name"
         :value @v
-        :on-change (u/form-evt-handler [:customer/ext-repo-filter-changed])}]]]))
+        :on-change (u/form-evt-handler [:org/ext-repo-filter-changed])}]]]))
 
 (defn add-repo-page
   [intro table]
@@ -341,12 +342,12 @@
      [:<>
       [:h3 "Add Repository to Watch"]
       intro
-      [co/alerts [:customer/repo-alerts]]
+      [co/alerts [:org/repo-alerts]]
       [ext-repo-filter]
       [:div.card.mb-2
        [:div.card-body
         [table]]]
-      [:a {:href (r/path-for :page/customer (r/path-params @route))}
+      [:a {:href (r/path-for :page/org (r/path-params @route))}
        [:span.me-1 [co/icon :chevron-left]] "Back to organization"]])))
 
 (defn add-github-repo-page []
@@ -359,7 +360,7 @@
 
 (defn add-bitbucket-repo-page []
   (rf/dispatch [:bitbucket/load-repos])
-  (rf/dispatch [:customer/load-bb-webhooks])
+  (rf/dispatch [:org/load-bb-webhooks])
   [add-repo-page nil bitbucket-repo-table])
 
 (defn page-new
@@ -367,9 +368,9 @@
   []
   (l/default
    [:<>
-    [:h3 [customer-icon] "New Organization"]
+    [:h3 [org-icon] "New Organization"]
     [:form.mb-3
-     {:on-submit (f/submit-handler [:customer/create])}
+     {:on-submit (f/submit-handler [:org/create])}
      [:div.mb-3
       [:label.form-label {:for :name} "Name"]
       [:input#name.form-control {:aria-describedby :name-help :name :name}]
@@ -377,4 +378,4 @@
      [:div
       [:button.btn.btn-primary.me-2 {:type :submit} [:span.me-2 [co/icon :save]] "Create Organization"]
       [co/cancel-btn [:route/goto :page/root]]]]
-    [co/alerts [:customer/create-alerts]]]))
+    [co/alerts [:org/create-alerts]]]))

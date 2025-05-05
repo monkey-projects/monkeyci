@@ -130,7 +130,7 @@
       (update :dispatch-n (fnil conj []) [:route/on-page-leave leave-event])
 
       event-handler-event
-      (update :dispatch-n (fnil conj []) [:event-stream/start id (r/customer-id db) event-handler-event]))))
+      (update :dispatch-n (fnil conj []) [:event-stream/start id (r/org-id db) event-handler-event]))))
 
 (defn on-leave
   "Creates a context for an leave fx handler that clears the initialized flag

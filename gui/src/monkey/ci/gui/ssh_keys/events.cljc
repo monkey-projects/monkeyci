@@ -9,18 +9,18 @@
 
 (rf/reg-event-fx
  :ssh-keys/initialize
- (fn [{:keys [db]} [_ cust-id]]
+ (fn [{:keys [db]} [_ org-id]]
    (lo/on-initialize db db/id
-                     {:init-events [[:ssh-keys/load cust-id]]})))
+                     {:init-events [[:ssh-keys/load org-id]]})))
 
 (rf/reg-event-fx
  :ssh-keys/load
  (lo/loader-evt-handler
   db/id
-  (fn [_ _ [_ cust-id]]
+  (fn [_ _ [_ org-id]]
     [:secure-request
-     :get-customer-ssh-keys
-     {:customer-id cust-id}
+     :get-org-ssh-keys
+     {:org-id org-id}
      [:ssh-keys/load--success]
      [:ssh-keys/load--failed]])))
 
@@ -32,7 +32,7 @@
 (rf/reg-event-db
  :ssh-keys/load--failed
  (fn [db [_ err]]
-   (lo/on-failure db db/id a/cust-ssh-keys-failed err)))
+   (lo/on-failure db db/id a/org-ssh-keys-failed err)))
 
 (rf/reg-event-db
  :ssh-keys/new
@@ -66,15 +66,15 @@
 (rf/reg-event-fx
  :ssh-keys/save-set
  (fn [{:keys [db]} [_ ks]]
-   (let [cust-id (r/customer-id db)
+   (let [org-id (r/org-id db)
          all (db/get-value db)
          orig (->> all
                    (filter (db/same-id? (set-id ks)))
                    (first))
          ks (add-filters db ks)]
      {:dispatch [:secure-request
-                 :update-customer-ssh-keys
-                 {:customer-id cust-id
+                 :update-org-ssh-keys
+                 {:org-id org-id
                   :ssh-keys (cond->> all
                               orig (replace {orig ks})
                               (not orig) (concat [ks])
@@ -93,7 +93,7 @@
 (rf/reg-event-db
  :ssh-keys/save-set--failed
  (fn [db [_ _ err]]
-   (db/set-alerts db [(a/cust-save-ssh-keys-failed err)])))
+   (db/set-alerts db [(a/org-save-ssh-keys-failed err)])))
 
 (rf/reg-event-db
  :ssh-keys/edit-set
@@ -103,11 +103,11 @@
 (rf/reg-event-fx
  :ssh-keys/delete-set
  (fn [{:keys [db]} [_ ks]]
-   (let [cust-id (r/customer-id db)
+   (let [org-id (r/org-id db)
          all (db/get-value db)]
      {:dispatch [:secure-request
-                 :update-customer-ssh-keys
-                 {:customer-id cust-id
+                 :update-org-ssh-keys
+                 {:org-id org-id
                   :ssh-keys (remove (db/same-id? (set-id ks)) all)}
                  [:ssh-keys/save-set--success ks]
                  [:ssh-keys/save-set--failed ks]]})))

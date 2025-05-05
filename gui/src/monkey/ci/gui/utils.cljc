@@ -113,3 +113,10 @@
   (if (and (string? x) (> (count x) len))
     (str (subs x 0 len) "...")
     x))
+
+(defn cust->org
+  "For compatibility purposes, renames customer-id to org-id"
+  [x]
+  (-> x
+      (dissoc :customer-id)
+      (assoc :org-id (:customer-id x))))

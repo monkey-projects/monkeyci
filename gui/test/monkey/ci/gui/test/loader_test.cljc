@@ -121,10 +121,10 @@
                  (sut/on-initialize id {:leave-event [::leave-evt]})
                  :dispatch-n))))
 
-    (testing "dispatches stream start event for customer if handler provided"
-      (is (= [[:event-stream/start id "test-customer" [::handler-evt]]]
+    (testing "dispatches stream start event for org if handler provided"
+      (is (= [[:event-stream/start id "test-org" [::handler-evt]]]
              (-> {}
-                 (r/set-current {:parameters {:path {:customer-id "test-customer"}}}) 
+                 (r/set-current {:parameters {:path {:org-id "test-org"}}}) 
                  (sut/on-initialize id {:event-handler-event [::handler-evt]})
                  :dispatch-n))))))
 

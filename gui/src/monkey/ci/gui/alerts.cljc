@@ -35,19 +35,19 @@
 (defn error-msg [msg]
   (alert-msg :danger #(str msg ": " (u/error-msg %))))
 
-(defn cust-details-failed [id]
+(defn org-details-failed [id]
   (error-msg (str "Could not load details for organization " id)))
 
-(def cust-fetch-github-repos
+(def org-fetch-github-repos
   (alert-msg :info (constantly "Fetching repositories from Github...")))
 
-(def cust-user-orgs-failed
+(def org-user-orgs-failed
   (error-msg "Unable to fetch user organizations from Github"))
 
-(def cust-github-repos-success
+(def org-github-repos-success
   (alert-msg :success #(str "Found " % " repositories in Github.")))
 
-(def cust-github-repos-failed
+(def org-github-repos-failed
   (alert-msg :danger
              (fn [err]
                [:<>
@@ -88,31 +88,31 @@
 (def build-retry-failed
   (error-msg "Unable to restart this build"))
 
-(def cust-search-failed
+(def org-search-failed
   (error-msg "Failed to search for organizations"))
 
-(def cust-create-success
+(def org-create-success
   (alert-msg :success (fn [body] [:span "Organization " [:b (:name body)] " has been created."])))
 
-(def cust-create-failed
+(def org-create-failed
   (error-msg "Failed to create organization"))
 
-(def cust-recent-builds-failed
+(def org-recent-builds-failed
   (error-msg "Failed to load recent builds"))
 
-(def cust-latest-builds-failed
+(def org-latest-builds-failed
   (error-msg "Failed to load latest builds"))
 
-(def cust-stats-failed
+(def org-stats-failed
   (error-msg "Failed to load statistics"))
 
-(def cust-credits-failed
+(def org-credits-failed
   (error-msg "Failed to load credit information"))
 
-(def cust-ssh-keys-failed
+(def org-ssh-keys-failed
   (error-msg "Failed to load SSH keys"))
 
-(def cust-save-ssh-keys-failed
+(def org-save-ssh-keys-failed
   (error-msg "Failed to save SSH keys"))
 
 (def admin-login-failed
@@ -147,3 +147,6 @@
 
 (def clean-proc-failed
   (error-msg "Failed to clean dangling processes"))
+
+(def user-load-orgs-failed
+  (error-msg "Could not retrieve linked organizations"))

@@ -10,16 +10,16 @@
   [l/default
    [:<>
     [:h3 "Invoicing"]
-    [as/search-customers
-     {:get-route #(vector :admin/cust-invoices {:customer-id (:id %)})
-      :init-view [:p.card-text "Search for a customer to view or manage their invoices."]}]]])
+    [as/search-orgs
+     {:get-route #(vector :admin/cust-invoices {:org-id (:id %)})
+      :init-view [:p.card-text "Search for an organization to view or manage its invoices."]}]]])
 
 (defn- title []
-  (let [cust (rf/subscribe [:customer/info])]
+  (let [cust (rf/subscribe [:org/info])]
     [:h3 (:name @cust) ": Invoices"]))
 
-(defn customer-invoices [route]
-  (rf/dispatch [:customer/maybe-load (r/customer-id route)])
+(defn org-invoices [route]
+  (rf/dispatch [:org/maybe-load (r/org-id route)])
   (fn [route]
     [l/default
      [:<>

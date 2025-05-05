@@ -1,25 +1,25 @@
 (ns monkey.ci.gui.org.db
   (:require [monkey.ci.gui.loader :as lo]))
 
-(def customer ::customer)
+(def org ::org)
 
-(defn set-customer [db i]
-  (lo/set-value db customer i))
+(defn set-org [db i]
+  (lo/set-value db org i))
 
-(defn get-customer [db]
-  (lo/get-value db customer))
+(defn get-org [db]
+  (lo/get-value db org))
 
 (defn get-alerts [db]
-  (lo/get-alerts db customer))
+  (lo/get-alerts db org))
 
 (defn set-alerts [db a]
-  (lo/set-alerts db customer a))
+  (lo/set-alerts db org a))
 
-(defn update-customer [db f & args]
-  (apply lo/update-value db customer f args))
+(defn update-org [db f & args]
+  (apply lo/update-value db org f args))
 
 (defn replace-repo
-  "Updates customer repos by replacing the existing repo with the same id."
+  "Updates org repos by replacing the existing repo with the same id."
   [db updated-repo]
   (letfn [(replace-with [repos]
             (if-let [match (->> repos
@@ -27,7 +27,7 @@
                                 (first))]
               (replace {match updated-repo} repos)
               (conj repos updated-repo)))]
-    (update-customer db update :repos replace-with)))
+    (update-org db update :repos replace-with)))
 
 (def repo-alerts ::repo-alerts)
 
@@ -37,13 +37,13 @@
 (defn reset-repo-alerts [db]
   (dissoc db repo-alerts))
 
-(def customer-creating? ::customer-creating)
+(def org-creating? ::org-creating)
 
-(defn mark-customer-creating [db]
-  (assoc db customer-creating? true))
+(defn mark-org-creating [db]
+  (assoc db org-creating? true))
 
-(defn unmark-customer-creating [db]
-  (dissoc db customer-creating?))
+(defn unmark-org-creating [db]
+  (dissoc db org-creating?))
 
 (def create-alerts ::create-alerts)
 

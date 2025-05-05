@@ -20,15 +20,15 @@
                       :private-key "test-private"
                       :public-key "test-public"}]
            c (h/catch-fx :martian.re-frame/request)]
-       (h/initialize-martian {:get-customer-ssh-keys {:status 200
-                                                      :body ssh-keys
-                                                      :error-code :no-error}})
+       (h/initialize-martian {:get-org-ssh-keys {:status 200
+                                                 :body ssh-keys
+                                                 :error-code :no-error}})
        (is (some? (:martian.re-frame/martian @app-db)))
-       (rf/dispatch [:ssh-keys/load "test-customer"])
+       (rf/dispatch [:ssh-keys/load "test-org"])
        (is (= 1 (count @c)))
-       (is (= :get-customer-ssh-keys
+       (is (= :get-org-ssh-keys
               (-> @c first (nth 2))))
-       (is (= {:customer-id "test-customer"}
+       (is (= {:org-id "test-org"}
               (-> @c first (nth 3))))))))
 
 (deftest ssh-keys-load--success
@@ -78,10 +78,10 @@
    (is (some? (reset! app-db (-> {}
                                  (r/set-current {:parameters
                                                  {:path
-                                                  {:customer-id "test-customer"}}})))))
-   (h/initialize-martian {:update-customer-ssh-keys {:status 200
-                                                     :body []
-                                                     :error-code :no-error}})
+                                                  {:org-id "test-org"}}})))))
+   (h/initialize-martian {:update-org-ssh-keys {:status 200
+                                                :body []
+                                                :error-code :no-error}})
    (is (some? (:martian.re-frame/martian @app-db)))
 
    (testing "saves all ssh keys to backend with updated set"
@@ -98,9 +98,9 @@
 
        (rf/dispatch [:ssh-keys/save-set upd])
        (is (= 1 (count @c)))
-       (is (= :update-customer-ssh-keys
+       (is (= :update-org-ssh-keys
               (-> @c first (nth 2))))
-       (is (= {:customer-id "test-customer"
+       (is (= {:org-id "test-org"
                :ssh-keys [(assoc upd :label-filters [])]}
               (-> @c first (nth 3))))))
 
@@ -116,9 +116,9 @@
                                       (db/set-editing-keys [ks]))))))
        (rf/dispatch [:ssh-keys/save-set ks])
        (is (= 1 (count @c)))
-       (is (= :update-customer-ssh-keys
+       (is (= :update-org-ssh-keys
               (-> @c first (nth 2))))
-       (is (= {:customer-id "test-customer"
+       (is (= {:org-id "test-org"
                :ssh-keys [(-> ks
                               (dissoc :temp-id)
                               (assoc :label-filters []))]}
@@ -178,13 +178,13 @@
        (is (some? (reset! app-db (-> {}
                                      (r/set-current {:parameters
                                                      {:path
-                                                      {:customer-id "test-customer"}}})
+                                                      {:org-id "test-org"}}})
                                      (db/set-value ksets)
                                      (db/set-editing-keys [set-2])))))
-       (h/initialize-martian {:update-customer-ssh-keys {:status 200
-                                                         :body []
-                                                         :error-code :no-error}})
+       (h/initialize-martian {:update-org-ssh-keys {:status 200
+                                                    :body []
+                                                    :error-code :no-error}})
        (is (some? (:martian.re-frame/martian @app-db)))
        (rf/dispatch [:ssh-keys/delete-set set-2])
-       (is (= :update-customer-ssh-keys (-> @c first (nth 2))))
+       (is (= :update-org-ssh-keys (-> @c first (nth 2))))
        (is (= [set-1] (-> @c first (nth 3) :ssh-keys)))))))

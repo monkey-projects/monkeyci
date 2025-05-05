@@ -11,7 +11,7 @@
             [re-frame.core :as rf]))
 
 (defn- param-form [set-id param-idx]
-  (let [{:keys [name value]} @(rf/subscribe [:customer/param set-id param-idx])]
+  (let [{:keys [name value]} @(rf/subscribe [:org/param set-id param-idx])]
     [:div.row.mb-2
      [:div.col-md-3
       [:input.form-control
@@ -154,7 +154,7 @@
 
 (defn- params-list []
   (let [loading? (rf/subscribe [:params/loading?])
-        params (rf/subscribe [:customer/params])
+        params (rf/subscribe [:org/params])
         new-sets (rf/subscribe [:params/new-sets])]
     (if @loading?
       [loading-card]
@@ -169,8 +169,8 @@
 (defn page
   "Organization parameters overview"
   [route]
-  (let [id (-> route (r/path-params) :customer-id)]
-    (rf/dispatch [:customer/maybe-load id])
+  (let [id (-> route (r/path-params) :org-id)]
+    (rf/dispatch [:org/maybe-load id])
     (rf/dispatch [:params/load id])
     (l/default
      [:<>

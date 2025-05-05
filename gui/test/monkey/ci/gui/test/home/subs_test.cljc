@@ -11,15 +11,15 @@
 (use-fixtures :each f/reset-db)
 (rf/clear-subscription-cache!)
 
-(deftest user-customers
-  (let [uc (rf/subscribe [:user/customers])]
+(deftest user-orgs
+  (let [uc (rf/subscribe [:user/orgs])]
     (testing "exists"
       (is (some? uc)))
 
-    (testing "returns user customers"
+    (testing "returns user orgs"
       (is (nil? @uc))
-      (is (some? (reset! app-db (db/set-customers {} ::customers))))
-      (is (= ::customers @uc)))))
+      (is (some? (reset! app-db (db/set-orgs {} ::orgs))))
+      (is (= ::orgs @uc)))))
 
 (deftest alerts
   (let [a (rf/subscribe [:user/alerts])]
@@ -32,57 +32,57 @@
       (is (= ::alerts @a)))))
 
 (deftest join-alerts
-  (let [a (rf/subscribe [:customer/join-alerts])]
+  (let [a (rf/subscribe [:org/join-alerts])]
     (testing "exists"
       (is (some? a)))
 
-    (testing "returns customer join alerts"
+    (testing "returns org join alerts"
       (is (nil? @a))
       (is (some? (reset! app-db (db/set-join-alerts {} ::alerts))))
       (is (= ::alerts @a)))))
 
-(deftest customer-searching?
-  (let [s (rf/subscribe [:customer/searching?])]
+(deftest org-searching?
+  (let [s (rf/subscribe [:org/searching?])]
     (testing "exists"
       (is (some? s)))
 
-    (testing "returns customer search status"
+    (testing "returns org search status"
       (is (false? @s))
-      (is (some? (reset! app-db (db/set-customer-searching {} true))))
+      (is (some? (reset! app-db (db/set-org-searching {} true))))
       (is (true? @s)))))
 
-(deftest customer-search-results
-  (let [r (rf/subscribe [:customer/search-results])]
+(deftest org-search-results
+  (let [r (rf/subscribe [:org/search-results])]
     (testing "exists"
       (is (some? r)))
 
-    (testing "returns customer search results"
+    (testing "returns org search results"
       (is (nil? @r))
       (is (some? (reset! app-db (db/set-search-results {} ::results))))
       (is (= ::results @r)))))
 
-(deftest customer-join-list
-  (let [r (rf/subscribe [:customer/join-list])]
+(deftest org-join-list
+  (let [r (rf/subscribe [:org/join-list])]
     (testing "exists"
       (is (some? r)))
 
     (testing "contains search results"
       (is (nil? @r))
-      (is (some? (reset! app-db (db/set-search-results {} [{:id "test customer"}]))))
-      (is (= ["test customer"] (map :id @r))))
+      (is (some? (reset! app-db (db/set-search-results {} [{:id "test org"}]))))
+      (is (= ["test org"] (map :id @r))))
 
     (testing "sets status to `:joined` if user is already linked"
       (is (some? (reset! app-db (-> {}
-                                    (db/set-search-results [{:id "joined-cust"}])
+                                    (db/set-search-results [{:id "joined-org"}])
                                     (ldb/set-user {:id "test-user"
-                                                   :customers ["joined-cust"]})))))
+                                                   :orgs ["joined-org"]})))))
       (is (= :joined (-> @r first :status))))
 
     (testing "sets status to `:joining` if join request is being sent"
-      (let [cust-id "test-customer"]
+      (let [org-id "test-org"]
         (is (some? (reset! app-db (-> {}
-                                      (db/set-search-results [{:id "test-customer"}])
-                                      (db/mark-customer-joining "test-customer")))))
+                                      (db/set-search-results [{:id "test-org"}])
+                                      (db/mark-org-joining "test-org")))))
         (is (= :joining (-> @r first :status)))))))
 
 (deftest user-join-requests
@@ -95,16 +95,16 @@
       (is (some? (reset! app-db (db/set-join-requests {} ::results))))
       (is (= ::results @r)))))
 
-(deftest customer-joining?
-  (let [cust-id "test-customer"
-        c (rf/subscribe [:customer/joining? cust-id])]
+(deftest org-joining?
+  (let [org-id "test-org"
+        c (rf/subscribe [:org/joining? org-id])]
     (testing "exists"
       (is (some? c)))
 
-    (testing "`true` if currently joining customer"
+    (testing "`true` if currently joining org"
       (is (false? @c))
-      (is (some? (reset! app-db (db/mark-customer-joining {} cust-id))))
+      (is (some? (reset! app-db (db/mark-org-joining {} org-id))))
       (is (true? @c)))
 
-    (testing "returns all when no customer id given"
-      (is (= #{cust-id} @(rf/subscribe [:customer/joining?]))))))
+    (testing "returns all when no org id given"
+      (is (= #{org-id} @(rf/subscribe [:org/joining?]))))))

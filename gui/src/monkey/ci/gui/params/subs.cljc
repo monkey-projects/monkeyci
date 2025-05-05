@@ -4,7 +4,7 @@
             [monkey.ci.gui.utils :as u]
             [re-frame.core :as rf]))
 
-(u/db-sub :customer/params db/params)
+(u/db-sub :org/params db/params)
 (u/db-sub :params/alerts db/alerts)
 (u/db-sub :params/loading? (comp true? db/loading?))
 (u/db-sub :params/saving? (comp true? db/saving?))
@@ -14,7 +14,7 @@
 (u/db-sub :params/editing db/get-editing)
 
 (rf/reg-sub
- :customer/param
+ :org/param
  (fn [db [_ set-id param-idx]]
    (some-> (db/get-editing db set-id)
            :parameters

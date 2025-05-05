@@ -9,22 +9,22 @@
            :name "Home"})
 
 (defn default-breadcrumb [db]
-  (let [{:keys [customer-id repo-id build-id job-id] :as p} (r/path-params (r/current db))
-        ci (cdb/get-customer db)]
+  (let [{:keys [org-id repo-id build-id job-id] :as p} (r/path-params (r/current db))
+        ci (cdb/get-org db)]
     (cond-> [home]
-      customer-id
-      (conj {:url (r/path-for :page/customer (select-keys p [:customer-id]))
+      org-id
+      (conj {:url (r/path-for :page/org (select-keys p [:org-id]))
              :name (:name ci)})
       
       repo-id
-      (conj {:url (r/path-for :page/repo (select-keys p [:customer-id :repo-id]))
+      (conj {:url (r/path-for :page/repo (select-keys p [:org-id :repo-id]))
              :name (->> ci
                         :repos
                         (u/find-by-id repo-id)
                         :name)})
 
       build-id
-      (conj {:url (r/path-for :page/build (select-keys p [:customer-id :repo-id :build-id]))
+      (conj {:url (r/path-for :page/build (select-keys p [:org-id :repo-id :build-id]))
              :name build-id})
 
       job-id
@@ -33,12 +33,12 @@
 
 (defn- params-breadcrumb [db]
   (conj (default-breadcrumb db)
-        {:url (r/path-for :page/customer-params (r/path-params (r/current db)))
+        {:url (r/path-for :page/org-params (r/path-params (r/current db)))
          :name "Parameters"}))
 
 (defn- ssh-keys-breadcrumb [db]
   (conj (default-breadcrumb db)
-        {:url (r/path-for :page/customer-ssh-keys (r/path-params (r/current db)))
+        {:url (r/path-for :page/org-ssh-keys (r/path-params (r/current db)))
          :name "SSH Keys"}))
 
 (defn- repo-edit-breadcrumb [db]
@@ -66,8 +66,8 @@
 (def routes
   "Breadcrumb configuration per route.  If no match is found, the default behaviour
    is applied."
-  {:page/customer-params params-breadcrumb
-   :page/customer-ssh-keys ssh-keys-breadcrumb
+  {:page/org-params params-breadcrumb
+   :page/org-ssh-keys ssh-keys-breadcrumb
    :page/repo-edit repo-edit-breadcrumb
    :page/add-repo cust-watch-repo
    :admin/credits credits-breadcrumb

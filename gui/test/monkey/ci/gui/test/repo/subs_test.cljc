@@ -21,7 +21,7 @@
     
     (testing "returns repo by id from customer"
       (is (nil? @r))
-      (is (map? (reset! app-db (cdb/set-customer
+      (is (map? (reset! app-db (cdb/set-org
                                 {}
                                 {:repos
                                  [{:id "test-repo"

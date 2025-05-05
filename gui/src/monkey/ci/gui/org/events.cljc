@@ -14,86 +14,86 @@
             [re-frame.core :as rf]))
 
 (rf/reg-event-fx
- :customer/init
+ :org/init
  (fn [{:keys [db]} [_ id]]
    (lo/on-initialize
-    db db/customer
-    {:init-events         [[:customer/load id]]
-     :leave-event         [:customer/leave]
-     :event-handler-event [:customer/handle-event]})))
+    db db/org
+    {:init-events         [[:org/load id]]
+     :leave-event         [:org/leave]
+     :event-handler-event [:org/handle-event]})))
 
 (rf/reg-event-fx
- :customer/leave
+ :org/leave
  (fn [{:keys [db]} _]
-   (lo/on-leave db db/customer)))
+   (lo/on-leave db db/org)))
 
 (rf/reg-event-fx
- :customer/load
+ :org/load
  (lo/loader-evt-handler
-  db/customer
+  db/org
   (fn [_ _ [_ id]]
     [:secure-request
-     :get-customer
-     {:customer-id id}
-     [:customer/load--success]
-     [:customer/load--failed id]])))
+     :get-org
+     {:org-id id}
+     [:org/load--success]
+     [:org/load--failed id]])))
 
 (rf/reg-event-fx
- :customer/maybe-load
+ :org/maybe-load
  (fn [{:keys [db]} [_ id]]
-   (let [existing (db/get-customer db)
-         id (or id (r/customer-id db))]
+   (let [existing (db/get-org db)
+         id (or id (r/org-id db))]
      (when-not (= (:id existing) id)
-       {:dispatch [:customer/load id]}))))
+       {:dispatch [:org/load id]}))))
 
 (rf/reg-event-db
- :customer/load--success
+ :org/load--success
  (fn [db [_ resp]]
-   (lo/on-success db db/customer resp)))
+   (lo/on-success db db/org resp)))
 
 (rf/reg-event-db
- :customer/load--failed
+ :org/load--failed
  (fn [db [_ id err]]
-   (lo/on-failure db db/customer (a/cust-details-failed id) err)))
+   (lo/on-failure db db/org (a/org-details-failed id) err)))
 
 (rf/reg-event-fx
- :customer/load-latest-builds
+ :org/load-latest-builds
  (fn [{:keys [db]} _]
    {:dispatch [:secure-request
-               :get-customer-latest-builds
-               {:customer-id (r/customer-id db)}
-               [:customer/load-latest-builds--success]
-               [:customer/load-latest-builds--failed]]}))
+               :get-org-latest-builds
+               {:org-id (r/org-id db)}
+               [:org/load-latest-builds--success]
+               [:org/load-latest-builds--failed]]}))
 
 (rf/reg-event-db
- :customer/load-latest-builds--success
+ :org/load-latest-builds--success
  (fn [db [_ {:keys [body]}]]
    (db/set-latest-builds db (->> body
                                  (group-by :repo-id)
                                  (mc/map-vals first)))))
 
 (rf/reg-event-db
- :customer/load-latest-builds--failed
+ :org/load-latest-builds--failed
  (fn [db [_ err]]
-   (db/set-alerts db [(a/cust-latest-builds-failed err)])))
+   (db/set-alerts db [(a/org-latest-builds-failed err)])))
 
 (rf/reg-event-fx
- :customer/load-bb-webhooks
+ :org/load-bb-webhooks
  (fn [{:keys [db]} _]
-   (let [cust (db/get-customer db)]
+   (let [org (db/get-org db)]
      {:dispatch [:secure-request
                  :search-bitbucket-webhooks
-                 {:customer-id (:id cust)}
-                 [:customer/load-bb-webhooks--success]
-                 [:customer/load-bb-webhooks--failed]]})))
+                 {:org-id (:id org)}
+                 [:org/load-bb-webhooks--success]
+                 [:org/load-bb-webhooks--failed]]})))
 
 (rf/reg-event-db
- :customer/load-bb-webhooks--success
+ :org/load-bb-webhooks--success
  (fn [db [_ {:keys [body]}]]
    (db/set-bb-webhooks db body)))
 
 (rf/reg-event-db
- :customer/load-bb-webhooks--failed
+ :org/load-bb-webhooks--failed
  (fn [db [_ err]]
    (db/set-repo-alerts db [(a/bitbucket-webhooks-failed err)])))
 
@@ -101,15 +101,15 @@
  :repo/watch-github
  (fn [{:keys [db]} [_ repo]]
    (log/debug "Watching repo:" repo)
-   (let [cust-id (r/customer-id db)]
+   (let [org-id (r/org-id db)]
      {:dispatch [:secure-request
                  :watch-github-repo
                  {:repo {:name (:name repo)
                          :url (:clone-url repo)
-                         :customer-id cust-id
+                         :org-id org-id
                          :github-id (:id repo)
                          :token (ldb/bitbucket-token db)}
-                  :customer-id cust-id}
+                  :org-id org-id}
                  [:repo/watch--success]
                  [:repo/watch--failed]]})))
 
@@ -124,24 +124,24 @@
  :repo/watch-bitbucket
  (fn [{:keys [db]} [_ repo]]
    (log/debug "Watching repo:" (str repo))
-   (let [cust-id (r/customer-id db)
+   (let [org-id (r/org-id db)
          token (ldb/bitbucket-token db)]
      {:dispatch [:secure-request
                  :watch-bitbucket-repo
                  {:repo {:name (:name repo)
                          :url (clone-url repo)
-                         :customer-id cust-id
+                         :orgomer-id org-id
                          :workspace (get-in repo [:workspace :slug])
                          :repo-slug (:slug repo)
                          :token token}
-                  :customer-id cust-id}
+                  :org-id org-id}
                  [:repo/watch--success]
                  [:repo/watch--failed]]})))
 
 (rf/reg-event-db
  :repo/watch--success
  (fn [db [_ {:keys [body]}]]
-   (db/update-customer db update :repos conj body)))
+   (db/update-org db update :repos conj body)))
 
 (rf/reg-event-db
  :repo/watch--failed
@@ -154,7 +154,7 @@
    {:dispatch [:secure-request
                :unwatch-github-repo
                {:repo-id (:id repo)
-                :customer-id (r/customer-id db)}
+                :org-id (r/org-id db)}
                [:repo/unwatch--success]
                [:repo/unwatch--failed]]}))
 
@@ -164,7 +164,7 @@
    (let [wh (:monkeyci/webhook repo)]
      {:dispatch [:secure-request
                  :unwatch-bitbucket-repo
-                 (-> (select-keys wh [:customer-id :repo-id])
+                 (-> (select-keys wh [:org-id :repo-id])
                      (assoc-in [:repo :token] (ldb/bitbucket-token db)))
                  [:repo/unwatch--success]
                  [:repo/unwatch--failed]]})))
@@ -180,107 +180,107 @@
    (db/set-repo-alerts db [(a/repo-unwatch-failed err)])))
 
 (rf/reg-event-fx
- :customer/create
- (fn [{:keys [db]} [_ cust]]
+ :org/create
+ (fn [{:keys [db]} [_ org]]
    {:dispatch [:secure-request
-               :create-customer
-               {:customer (mc/map-vals first cust)}
-               [:customer/create--success]
-               [:customer/create--failed]]
+               :create-org
+               {:org (mc/map-vals first org)}
+               [:org/create--success]
+               [:org/create--failed]]
     :db (-> db
-            (db/mark-customer-creating)
+            (db/mark-org-creating)
             (db/reset-create-alerts))}))
 
 (rf/reg-event-fx
- :customer/create--success
+ :org/create--success
  (fn [{:keys [db]} [_ {:keys [body]}]]
    {:db (-> db
-            (db/unmark-customer-creating)
-            (db/set-customer body)
-            (hdb/set-customers (conj (vec (hdb/get-customers db)) body))
-            (lo/set-alerts db/customer
-                           [(a/cust-create-success body)]))
-    ;; Redirect to customer page
-    :dispatch [:route/goto :page/customer {:customer-id (:id body)}]}))
+            (db/unmark-org-creating)
+            (db/set-org body)
+            (hdb/set-orgs (conj (vec (hdb/get-orgs db)) body))
+            (lo/set-alerts db/org
+                           [(a/org-create-success body)]))
+    ;; Redirect to org page
+    :dispatch [:route/goto :page/org {:org-id (:id body)}]}))
 
 (rf/reg-event-db
- :customer/create--failed
+ :org/create--failed
  (fn [db [_ err]]
-   (db/set-create-alerts db [(a/cust-create-failed err)])))
+   (db/set-create-alerts db [(a/org-create-failed err)])))
 
 (rf/reg-event-fx
- :customer/load-recent-builds
+ :org/load-recent-builds
  (lo/loader-evt-handler
   db/recent-builds
-  (fn [_ _ [_ cust-id]]
+  (fn [_ _ [_ org-id]]
     [:secure-request
      :get-recent-builds
-     {:customer-id cust-id
+     {:org-id org-id
       :n 10}
-     [:customer/load-recent-builds--success]
-     [:customer/load-recent-builds--failed]])))
+     [:org/load-recent-builds--success]
+     [:org/load-recent-builds--failed]])))
 
 (rf/reg-event-db
- :customer/load-recent-builds--success
+ :org/load-recent-builds--success
  (fn [db [_ resp]]
    (lo/on-success db db/recent-builds resp)))
 
 (rf/reg-event-db
- :customer/load-recent-builds--failed
+ :org/load-recent-builds--failed
  (fn [db [_ err]]
-   (lo/on-failure db db/recent-builds a/cust-recent-builds-failed err)))
+   (lo/on-failure db db/recent-builds a/org-recent-builds-failed err)))
 
 (rf/reg-event-fx
- :customer/load-stats
+ :org/load-stats
  [(rf/inject-cofx :time/now)]
  (lo/loader-evt-handler
   db/stats
-  (fn [_ ctx [_ cust-id days]]
+  (fn [_ ctx [_ org-id days]]
     [:secure-request
-     :get-customer-stats
-     (cond-> {:customer-id cust-id}
+     :get-org-stats
+     (cond-> {:org-id org-id}
        days (assoc :since (-> (:time/now ctx) (t/parse-epoch) (t/minus-days days) (t/to-epoch))))
-     [:customer/load-stats--success]
-     [:customer/load-stats--failed]])))
+     [:org/load-stats--success]
+     [:org/load-stats--failed]])))
 
 (rf/reg-event-db
- :customer/load-stats--success
+ :org/load-stats--success
  (fn [db [_ resp]]
    (lo/on-success db db/stats resp)))
 
 (rf/reg-event-db
- :customer/load-stats--failed
+ :org/load-stats--failed
  (fn [db [_ err]]
-   (lo/on-failure db db/stats a/cust-stats-failed err)))
+   (lo/on-failure db db/stats a/org-stats-failed err)))
 
 (rf/reg-event-fx
- :customer/load-credits
+ :org/load-credits
  (lo/loader-evt-handler
   db/credits
-  (fn [_ ctx [_ cust-id days]]
+  (fn [_ ctx [_ org-id days]]
     [:secure-request
-     :get-customer-credits
-     {:customer-id cust-id}
-     [:customer/load-credits--success]
-     [:customer/load-credits--failed]])))
+     :get-org-credits
+     {:org-id org-id}
+     [:org/load-credits--success]
+     [:org/load-credits--failed]])))
 
 (rf/reg-event-db
- :customer/load-credits--success
+ :org/load-credits--success
  (fn [db [_ resp]]
    (lo/on-success db db/credits resp)))
 
 (rf/reg-event-db
- :customer/load-credits--failed
+ :org/load-credits--failed
  (fn [db [_ err]]
-   (lo/on-failure db db/credits a/cust-credits-failed err)))
+   (lo/on-failure db db/credits a/org-credits-failed err)))
 
 (rf/reg-event-db
- :customer/handle-event
+ :org/handle-event
  (fn [db [_ {:keys [build] :as evt}]]
    (when (and (= :build/updated (:type evt))
               (lo/loaded? db db/recent-builds))
      (letfn [(update-build [builds]
-               (let [sid (juxt :customer-id :repo-id :build-id)]
+               (let [sid (juxt :org-id :repo-id :build-id)]
                  (->> (if-let [match (->> builds
                                           (filter (comp (partial = (sid build)) sid))
                                           (first))]
@@ -291,16 +291,16 @@
        (lo/update-value db db/recent-builds update-build)))))
 
 (rf/reg-event-db
- :customer/group-by-lbl-changed
+ :org/group-by-lbl-changed
  (fn [db [_ val]]
    (db/set-group-by-lbl db val)))
 
 (rf/reg-event-db
- :customer/repo-filter-changed
+ :org/repo-filter-changed
  (fn [db [_ val]]
    (db/set-repo-filter db val)))
 
 (rf/reg-event-db
- :customer/ext-repo-filter-changed
+ :org/ext-repo-filter-changed
  (fn [db [_ val]]
    (db/set-ext-repo-filter db val)))

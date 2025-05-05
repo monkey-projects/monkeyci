@@ -18,11 +18,11 @@
    :page/login login/page
    :page/github-callback login/github-callback
    :page/bitbucket-callback login/bitbucket-callback
-   :page/customer org/page
-   :page/customer-new org/page-new
-   :page/customer-join home/page-join
-   :page/customer-params params/page
-   :page/customer-ssh-keys ssh-keys/page
+   :page/org org/page
+   :page/org-new org/page-new
+   :page/org-join home/page-join
+   :page/org-params params/page
+   :page/org-ssh-keys ssh-keys/page
    :page/add-github-repo org/add-github-repo-page
    :page/add-bitbucket-repo org/add-bitbucket-repo-page
    :page/repo repo/page

@@ -63,12 +63,12 @@
            (sut/path-for :page/login))))
 
   (testing "sets path parameters"
-    (is (= "/o/test-customer"
-           (sut/path-for :page/customer {:customer-id "test-customer"}))))
+    (is (= "/o/test-org"
+           (sut/path-for :page/org {:org-id "test-org"}))))
 
   (testing "sets multiple path parameters"
-    (is (= "/o/cust/r/repo"
-           (sut/path-for :page/repo {:customer-id "cust"
+    (is (= "/o/org/r/repo"
+           (sut/path-for :page/repo {:org-id "org"
                                      :repo-id "repo"})))))
 
 (deftest route-goto

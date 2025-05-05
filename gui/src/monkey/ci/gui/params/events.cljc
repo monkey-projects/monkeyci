@@ -12,14 +12,14 @@
 
 (rf/reg-event-fx
  :params/load
- (fn [{:keys [db]} [_ cust-id]]
+ (fn [{:keys [db]} [_ org-id]]
    {:db (-> db
             (db/mark-loading)
             (db/clear-alerts)
             (db/clear-editing))
     :dispatch [:secure-request
-               :get-customer-params
-               {:customer-id cust-id}
+               :get-org-params
+               {:org-id org-id}
                [:params/load--success]
                [:params/load--failed]]}))
 
@@ -35,7 +35,7 @@
  (fn [db [_ err]]
    (-> db
        (db/set-alerts [{:type :danger
-                        :message (str "Failed to load customer params: " (u/error-msg err))}])
+                        :message (str "Failed to load organization params: " (u/error-msg err))}])
        (db/unmark-loading))))
 
 (def new-set? (comp (some-fn nil? db/temp-id?) :id))
@@ -70,7 +70,7 @@
  (fn [{:keys [db]} [_ id]]
    {:dispatch [:secure-request
                :delete-param-set
-               {:customer-id (r/customer-id db)
+               {:org-id (r/org-id db)
                 :param-id id}
                [:params/delete-set--success id]
                [:params/delete-set--failed id]]
@@ -110,7 +110,7 @@
  :params/cancel-all
  (fn [{:keys [db]} _]
    {:db (db/clear-editing db)
-    :dispatch [:route/goto :page/customer {:customer-id (r/customer-id db)}]}))
+    :dispatch [:route/goto :page/org {:org-id (r/org-id db)}]}))
 
 (rf/reg-event-db
  :params/description-changed
@@ -137,7 +137,7 @@
      (log/debug "Saving parameter set:" (str param))
      {:dispatch [:secure-request
                  (if new? :create-param-set :update-param-set)
-                 (cond-> {:customer-id (r/customer-id db)
+                 (cond-> {:org-id (r/org-id db)
                           :params param}
                    (not new?) (assoc :param-id id)
                    new? (update :params dissoc :id))

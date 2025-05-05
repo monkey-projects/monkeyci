@@ -12,7 +12,7 @@
    (lo/on-initialize
     db (db/get-id db)
     {:init-events         [[:build/load]
-                           [:customer/maybe-load (r/customer-id db)]]
+                           [:org/maybe-load (r/org-id db)]]
      :leave-event         [:build/leave]
      :event-handler-event [:build/handle-event]})))
 
@@ -31,7 +31,7 @@
 (defn- same-build?
   "True if the build in db is the same as referred to by the current route"
   [db]
-  (let [id (juxt :customer-id :repo-id :build-id)]
+  (let [id (juxt :org-id :repo-id :build-id)]
     (= (id (r/path-params (r/current db)))
        (id (db/get-build db)))))
 
@@ -61,9 +61,9 @@
        (lo/on-success (db/get-id db) resp)
        ;; Override build with conversion
        (db/set-build (-> (convert-build build)
-                         ;; Also add customer and repo id because they don't come in the reply
+                         ;; Also add org and repo id because they don't come in the reply
                          (merge (select-keys (r/path-params (r/current db))
-                                             [:customer-id :repo-id])))))))
+                                             [:org-id :repo-id])))))))
 
 (rf/reg-event-db
  :build/load--failed
@@ -77,7 +77,7 @@
     :db (lo/set-loading db (db/get-id db))}))
 
 (defn- for-build? [db evt]
-  (let [get-id (juxt :customer-id :repo-id :build-id)]
+  (let [get-id (juxt :org-id :repo-id :build-id)]
     (= (:sid evt)
        (-> (r/current db)
            (r/path-params)

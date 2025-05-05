@@ -136,7 +136,7 @@
                [:b.mx-1 "AND"])
              (str label " = " value)])]
     (if (empty? lf)
-      [:i "Applies to all builds for this customer."]
+      [:i "Applies to all builds for this organization."]
       [:<>
        [:i "Applies to all builds where:"]
        (->> lf

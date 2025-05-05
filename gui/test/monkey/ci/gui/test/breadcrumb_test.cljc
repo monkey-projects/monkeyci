@@ -31,28 +31,28 @@
                :name "Home"}]
              @p)))
 
-    (testing "home and customer when `customer-id` in path"
+    (testing "home and org when `org-id` in path"
       (reset! app-db (-> {}
                          (r/set-current {:parameters
                                          {:path
-                                          {:customer-id "test-cust"}}})
-                         (cdb/set-customer {:name "Test customer"})))
+                                          {:org-id "test-org"}}})
+                         (cdb/set-org {:name "Test org"})))
       (is (= 2 (count @p)))
-      (is (= {:url "/o/test-cust"
-              :name "Test customer"}
+      (is (= {:url "/o/test-org"
+              :name "Test org"}
              (second @p))))
 
     (testing "includes repository when `repo-id` in path"
       (reset! app-db (-> {}
                          (r/set-current {:parameters
                                          {:path
-                                          {:customer-id "test-cust"
+                                          {:org-id "test-org"
                                            :repo-id "test-repo"}}})
-                         (cdb/set-customer {:name "Test customer"
-                                            :repos [{:id "test-repo"
-                                                     :name "Test repo"}]})))
+                         (cdb/set-org {:name "Test org"
+                                       :repos [{:id "test-repo"
+                                                :name "Test repo"}]})))
       (is (= 3 (count @p)))
-      (is (= {:url "/o/test-cust/r/test-repo"
+      (is (= {:url "/o/test-org/r/test-repo"
               :name "Test repo"}
              (last @p))))
 
@@ -60,14 +60,14 @@
       (reset! app-db (-> {}
                          (r/set-current {:parameters
                                          {:path
-                                          {:customer-id "test-cust"
+                                          {:org-id "test-org"
                                            :repo-id "test-repo"
                                            :build-id "test-build"}}})
-                         (cdb/set-customer {:name "Test customer"
-                                            :repos [{:id "test-repo"
-                                                     :name "Test repo"}]})))
+                         (cdb/set-org {:name "Test org"
+                                       :repos [{:id "test-repo"
+                                                :name "Test repo"}]})))
       (is (= 4 (count @p)))
-      (is (= {:url "/o/test-cust/r/test-repo/b/test-build"
+      (is (= {:url "/o/test-org/r/test-repo/b/test-build"
               :name "test-build"}
              (last @p))))
 
@@ -75,30 +75,30 @@
       (reset! app-db (-> {}
                          (r/set-current {:parameters
                                          {:path
-                                          {:customer-id "test-cust"
+                                          {:org-id "test-org"
                                            :repo-id "test-repo"
                                            :build-id "test-build"
                                            :job-id "test-job"}}})
-                         (cdb/set-customer {:name "Test customer"
-                                            :repos [{:id "test-repo"
-                                                     :name "Test repo"}]})))
+                         (cdb/set-org {:name "Test org"
+                                       :repos [{:id "test-repo"
+                                                :name "Test repo"}]})))
       (is (= 5 (count @p)))
-      (is (= {:url "/o/test-cust/r/test-repo/b/test-build/j/test-job"
+      (is (= {:url "/o/test-org/r/test-repo/b/test-build/j/test-job"
               :name "test-job"}
              (last @p))))
 
-    (testing "applies custom calculator for params"
+    (testing "applies orgom calculator for params"
       (reset! app-db (-> {}
                          (r/set-current {:parameters
                                          {:path
-                                          {:customer-id "test-cust"}}
+                                          {:org-id "test-org"}}
                                          :data
-                                         {:name :page/customer-params}})
-                         (cdb/set-customer {:name "Test customer"
-                                            :repos [{:id "test-repo"
-                                                     :name "Test repo"}]})))
+                                         {:name :page/org-params}})
+                         (cdb/set-org {:name "Test org"
+                                       :repos [{:id "test-repo"
+                                                :name "Test repo"}]})))
       (is (= 3 (count @p)))
-      (is (= {:url "/o/test-cust/params"
+      (is (= {:url "/o/test-org/params"
               :name "Parameters"}
              (last @p))))))
 

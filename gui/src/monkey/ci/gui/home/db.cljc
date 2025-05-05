@@ -3,10 +3,10 @@
 
 (def id ::home)
 
-(defn get-customers [db]
+(defn get-orgs [db]
   (lo/get-value db id))
 
-(defn set-customers [db c]
+(defn set-orgs [db c]
   (lo/set-value db id c))
 
 (defn get-alerts [db]
@@ -18,13 +18,13 @@
 (defn clear-alerts [db]
   (lo/reset-alerts db id))
 
-(def customer-searching? ::customer-searching?)
+(def org-searching? ::org-searching?)
 
-(defn set-customer-searching [db v]
-  (assoc db customer-searching? v))
+(defn set-org-searching [db v]
+  (assoc db org-searching? v))
 
-(defn reset-customer-searching [db]
-  (dissoc db customer-searching?))
+(defn reset-org-searching [db]
+  (dissoc db org-searching?))
 
 (def join-alerts ::join-alerts)
 
@@ -47,19 +47,19 @@
 (defn update-join-requests [db f & args]
   (apply update db join-requests f args))
 
-(defn customer-joining?
-  "Checks if we're in the process of sending a join request to the given customer."
+(defn org-joining?
+  "Checks if we're in the process of sending a join request to the given org."
   ([db cust-id]
-   (some? (when-let [ids (::customer-joining db)]
+   (some? (when-let [ids (::org-joining db)]
             (ids cust-id))))
   ([db]
-   (::customer-joining db)))
+   (::org-joining db)))
 
-(defn mark-customer-joining [db cust-id]
-  (update db ::customer-joining (fnil conj #{}) cust-id))
+(defn mark-org-joining [db cust-id]
+  (update db ::org-joining (fnil conj #{}) cust-id))
 
-(defn unmark-customer-joining [db cust-id]
-  (update db ::customer-joining disj cust-id))
+(defn unmark-org-joining [db cust-id]
+  (update db ::org-joining disj cust-id))
 
-(defn clear-customer-joining [db]
-  (dissoc db ::customer-joining))
+(defn clear-org-joining [db]
+  (dissoc db ::org-joining))

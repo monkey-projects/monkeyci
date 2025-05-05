@@ -86,7 +86,7 @@
          (into [:div.mb-2
                 [:p "Found " (count @v) " configured SSH keys."]]))))
 
-(defn- global-actions [cust-id]
+(defn- global-actions [org-id]
   [:div.d-flex.gap-2.mt-2
    [:button.btn.btn-outline-success
     {:title "Adds a new SSK key pair"
@@ -94,7 +94,7 @@
     [:span.me-2 [co/icon :plus-square]] "Add New"]
    [:a.btn.btn-outline-danger
     {:title "Close this screen"
-     :href (r/path-for :page/customer {:customer-id cust-id})}
+     :href (r/path-for :page/org {:org-id org-id})}
     [:span.me-2 [co/icon :x-square]] "Close"]])
 
 (defn ssh-keys-loader []
@@ -106,13 +106,13 @@
       [ssh-keys])))
 
 (defn page [route]
-  (let [cust-id (:customer-id (r/path-params route))]
-    (rf/dispatch [:ssh-keys/initialize cust-id])
+  (let [org-id (:org-id (r/path-params route))]
+    (rf/dispatch [:ssh-keys/initialize org-id])
     (l/default
      [:<>
       [:div.d-flex
        [:h3 "SSH Keys"]
-       [co/reload-btn-sm [:ssh-keys/load cust-id] {:class :ms-auto}]]
+       [co/reload-btn-sm [:ssh-keys/load org-id] {:class :ms-auto}]]
       [:p
        "SSH keys are used to access private repositories.  When a build is triggered from a "
        "private repo, any SSH keys that are" [:b.mx-1 "configured on the organization with matching labels"]
@@ -120,9 +120,11 @@
       [:p
        "SSH key pairs consist of a" [:b.mx-1 "private and public key"] "and can take an optional "
        "description, which can be useful for your users.  Similar to"
-       [:a.ms-1 {:href (r/path-for :page/customer-params (r/path-params route))} "parameters"]
+       [:a.ms-1 {:href (r/path-for :page/org-params (r/path-params route))} "parameters"]
        ", they can have any labels set on them which allow them to be accessed by builds for "
        "repositories with the same labels."]
       [co/alerts [:ssh-keys/alerts]]
       [ssh-keys-loader]
-      [global-actions cust-id]])))
+      [:div.card
+       [:div.card-body
+        [global-actions org-id]]]])))
