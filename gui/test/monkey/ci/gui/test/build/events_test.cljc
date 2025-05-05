@@ -18,13 +18,14 @@
   (repeatedly 3 (comp str random-uuid)))
 
 (defn- gen-build []
-  (zipmap [:org-id :repo-id :build-id] (build-sid)))
+  (zipmap [:customer-id :repo-id :build-id] (build-sid)))
 
 (defn- build->params [build]
   {:parameters
-   {:path (select-keys build [:org-id :repo-id :build-id])}})
+   {:path (-> (select-keys build [:repo-id :build-id])
+              (assoc :org-id (:customer-id build)))}})
 
-(def build-keys [:org-id :repo-id :build-id])
+(def build-keys [:customer-id :repo-id :build-id])
 (def sid (apply juxt build-keys))
 
 (defn- set-build-path
@@ -200,7 +201,7 @@
 
 (defn- test-build []
   (->> (repeatedly 3 (comp str random-uuid))
-       (zipmap [:org-id :repo-id :build-id])))
+       (zipmap [:customer-id :repo-id :build-id])))
 
 (deftest handle-event
   (testing "ignores events for other builds"
