@@ -115,7 +115,7 @@
        [co/reload-btn-sm [:ssh-keys/load cust-id] {:class :ms-auto}]]
       [:p
        "SSH keys are used to access private repositories.  When a build is triggered from a "
-       "private repo, any SSH keys that are" [:b.mx-1 "configured on the customer with matching labels"]
+       "private repo, any SSH keys that are" [:b.mx-1 "configured on the organization with matching labels"]
        "are exposed to the build script."]
       [:p
        "SSH key pairs consist of a" [:b.mx-1 "private and public key"] "and can take an optional "

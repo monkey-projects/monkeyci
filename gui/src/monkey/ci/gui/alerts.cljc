@@ -36,7 +36,7 @@
   (alert-msg :danger #(str msg ": " (u/error-msg %))))
 
 (defn cust-details-failed [id]
-  (error-msg (str "Could not load details for customer " id)))
+  (error-msg (str "Could not load details for organization " id)))
 
 (def cust-fetch-github-repos
   (alert-msg :info (constantly "Fetching repositories from Github...")))
@@ -89,13 +89,13 @@
   (error-msg "Unable to restart this build"))
 
 (def cust-search-failed
-  (error-msg "Failed to search for customers"))
+  (error-msg "Failed to search for organizations"))
 
 (def cust-create-success
-  (alert-msg :success (fn [body] [:span "Customer " [:b (:name body)] " has been created."])))
+  (alert-msg :success (fn [body] [:span "Organization " [:b (:name body)] " has been created."])))
 
 (def cust-create-failed
-  (error-msg "Failed to create customer"))
+  (error-msg "Failed to create organization"))
 
 (def cust-recent-builds-failed
   (error-msg "Failed to load recent builds"))

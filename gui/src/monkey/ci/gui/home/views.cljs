@@ -12,12 +12,12 @@
 (defn- create-cust-btn []
   [:a.btn.btn-primary
    {:href (r/path-for :page/customer-new)}
-   [:span.me-2 [co/icon :plus-square]] "Create New Customer"])
+   [:span.me-2 [co/icon :plus-square]] "Create New Organization"])
 
 (defn- join-cust-btn []
   [:a.btn.btn-primary
    {:href (r/path-for :page/customer-join)}
-   [:span.me-2 [co/icon :arrow-right-square]] "Join Customer"])
+   [:span.me-2 [co/icon :arrow-right-square]] "Join Organization"])
 
 (defn- cust-item [{:keys [id name owner?]}]
   [:div.card
@@ -37,7 +37,7 @@
   [:div
    (->> (map cust-item cust)
         (into [:div.d-flex.gap-3.mb-3]))
-   [:p "You can join any number of customers, as long as a customer administrator approves your request."]
+   [:p "You can join any number of organizations, as long as an organization administrator approves your request."]
    [join-cust-btn]])
 
 ;; TODO Configure centrally somewhere
@@ -47,11 +47,11 @@
   (let [c (rf/subscribe [:user/customers])]
     (when @c
       [:<>
-       [:h3 [:span.me-2 co/overview-icon] "Your Linked Customers"]
-       [:p "Welcome! This screen shows all customers linked to your user account."]
+       [:h3 [:span.me-2 co/overview-icon] "Your Linked Organizations"]
+       [:p "Welcome! This screen shows all organizations linked to your user account."]
        (if (empty? @c)
          [:<>
-          [:p "No customers have been linked to your account yet.  You could either "
+          [:p "No organizations have been linked to your account yet.  You could either "
            [:a {:href (r/path-for :page/customer-new)} "create a new one"]
            " or "
            [:a {:href (r/path-for :page/customer-join)} "request to join an existing one"] "."]
@@ -59,11 +59,11 @@
            [:span.me-2 [create-cust-btn]]
            [join-cust-btn]]
           [:p
-           "You can create one customer per user account." [:b.mx-1 "Creating a customer is free,"]
-           "a credit card is not required.  Each customer gets" [:b.mx-1 free-credits " free credits"]
+           "You can create one organization per user account." [:b.mx-1 "Creating an organization is free,"]
+           "a credit card is not required.  Each organization gets" [:b.mx-1 free-credits " free credits"]
            "per month. "
            "One credit can be spent on one cpu minute, or one memory GB per minute. "
-           "You can join an unlimited number of customers.  See more details in "
+           "You can join an unlimited number of organizations.  See more details in "
            ;; TODO Make docs url configurable per env
            [:a {:href "https://docs.monkeyci.com" :target :_blank} "the documentation."]]]
          [linked-customers @c])])))
@@ -98,7 +98,7 @@
    {:on-submit (f/submit-handler [:customer/search])}
    [:div.row
     [:div.col
-     [:label.form-label {:for :customer-search} "Search customer"]
+     [:label.form-label {:for :customer-search} "Search organization"]
      [:input.form-control.mb-3
       {:id :customer-search
        :name :customer-search
@@ -118,7 +118,7 @@
   (case status
     :joined
     [:span.badge.text-bg-success
-     {:title "You have already joined this customer"}
+     {:title "You have already joined this organization"}
      "joined"]
     :pending
     [:span.badge.text-bg-warning
@@ -165,7 +165,7 @@
     [t/paged-table
      {:id :user/join-requests
       :items-sub [:user/join-requests]
-      :columns [{:label "Customer"
+      :columns [{:label "Organization"
                  :value (comp :name :customer)}
                 {:label "Status"
                  :value request-status}
@@ -184,7 +184,7 @@
          [join-requests-table]))]))
 
 (defn page-join
-  "Displays the 'join customer' page"
+  "Displays the 'join organization' page"
   []
   (rf/dispatch-sync [:customer/join-init])
   (fn []
@@ -193,10 +193,10 @@
       [:div.col-lg-6
        [:div.card
         [:div.card-body
-         [:h3.card-title "Join Existing Customer"]
+         [:h3.card-title "Join Existing Organization"]
          [:p
-          "On this page you can search for a customer and request to join it.  A user "
-          "with administrator permissions for that customer can approve your request."]
+          "On this page you can search for an organization and request to join it.  A user "
+          "with administrator permissions for that organization can approve your request."]
          [co/alerts [:customer/join-alerts]]
          [search-customer]
          [:div.mt-2

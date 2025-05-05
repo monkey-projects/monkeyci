@@ -207,7 +207,7 @@
   (rf/dispatch [:customer/load-latest-builds])
   (let [c (rf/subscribe [:customer/info])]
     (if (empty? (:repos @c))
-      [:p "No repositories configured for this customer.  You can start by"
+      [:p "No repositories configured for this organization.  You can start by"
        [:a.mx-1 {:href (r/path-for :page/add-github-repo {:customer-id (:id @c)})} "watching one."]]
       [repos-list @c])))
 
@@ -222,7 +222,7 @@
     (let [loaded? (rf/subscribe [:loader/loaded? db/recent-builds])
           recent (rf/subscribe [:customer/recent-builds])]
       (if (and @loaded? (empty? @recent))
-        [with-recent-reload id "No recent builds found for this customer."]
+        [with-recent-reload id "No recent builds found for this organization."]
         [:<>
          (if @loaded?
            [with-recent-reload id "Recent builds for all repositories."]
@@ -239,7 +239,7 @@
              :loading {:sub [:loader/init-loading? db/recent-builds]}}]]]]))))
 
 (defn- overview-tabs
-  "Displays tab pages for various customer overview screens"
+  "Displays tab pages for various organization overview screens"
   [id]
   [tabs/tabs ::overview
    [{:id :overview
@@ -259,7 +259,7 @@
    [overview-tabs id]])
 
 (defn page
-  "Customer overview page"
+  "Organization overview page"
   [route]
   (let [id (-> route (r/path-params) :customer-id)]
     (rf/dispatch [:customer/init id])
@@ -348,7 +348,7 @@
        [:div.card-body
         [table]]]
       [:a {:href (r/path-for :page/customer (r/path-params @route))}
-       [:span.me-1 [co/icon :chevron-left]] "Back to customer"]])))
+       [:span.me-1 [co/icon :chevron-left]] "Back to organization"]])))
 
 (defn add-github-repo-page []
   (rf/dispatch [:github/load-repos])
@@ -364,18 +364,18 @@
   [add-repo-page nil bitbucket-repo-table])
 
 (defn page-new
-  "New customer page"
+  "New org page"
   []
   (l/default
    [:<>
-    [:h3 [customer-icon] "New Customer"]
+    [:h3 [customer-icon] "New Organization"]
     [:form.mb-3
      {:on-submit (f/submit-handler [:customer/create])}
      [:div.mb-3
       [:label.form-label {:for :name} "Name"]
       [:input#name.form-control {:aria-describedby :name-help :name :name}]
-      [:div#name-help.form-text "The customer name.  We recommend to make it as unique as possible."]]
+      [:div#name-help.form-text "The organization name.  We recommend to make it as unique as possible."]]
      [:div
-      [:button.btn.btn-primary.me-2 {:type :submit} [:span.me-2 [co/icon :save]] "Create Customer"]
+      [:button.btn.btn-primary.me-2 {:type :submit} [:span.me-2 [co/icon :save]] "Create Organization"]
       [co/cancel-btn [:route/goto :page/root]]]]
     [co/alerts [:customer/create-alerts]]]))

@@ -42,7 +42,7 @@
                [:b.mx-1 "AND"])
              (str label " = " value)])]
     (if (empty? lf)
-      [:i "Applies to all builds for this customer."]
+      [:i "Applies to all builds for this organization."]
       [:<>
        [:i "Applies to all builds where:"]
        (->> lf
@@ -167,7 +167,7 @@
          [global-actions]]]])))
 
 (defn page
-  "Customer parameters overview"
+  "Organization parameters overview"
   [route]
   (let [id (-> route (r/path-params) :customer-id)]
     (rf/dispatch [:customer/maybe-load id])
