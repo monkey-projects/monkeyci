@@ -134,8 +134,8 @@
   "Saves the repository by updating the customer it belongs to"
   (override-or
    [:repo :save]
-   (fn [s {:keys [customer-id id] :as r}]
-     (-> (update-obj s (customer-sid customer-id) assoc-in [:repos id] r)
+   (fn [s {:keys [org-id id] :as r}]
+     (-> (update-obj s (customer-sid org-id) assoc-in [:repos id] r)
          ;; Return repo sid
          (conj id)))))
 
@@ -147,7 +147,7 @@
      [s [cust-id id]]
      (some-> (find-customer s cust-id)
              (get-in [:repos id])
-             (assoc :customer-id cust-id)))))
+             (assoc :org-id cust-id)))))
 
 (def update-repo
   "Applies `f` to the repo with given sid"
@@ -175,7 +175,7 @@
        ;; Delete webhooks
        (->> (p/list-obj s (webhook-sid))
             (map (partial find-webhook s))
-            (filter (comp (partial = sid) (juxt :customer-id :repo-id)))
+            (filter (comp (partial = sid) (juxt :org-id :repo-id)))
             (map (comp (partial p/delete-obj s) webhook-sid :id))
             (doall))
        true))))
@@ -205,7 +205,7 @@
    repo entity and returns it."
   (override-or
    [:watched-github-repos :watch]
-   (fn [s {:keys [customer-id id github-id] :as r}]
+   (fn [s {:keys [org-id id github-id] :as r}]
      (let [repo-sid (save-repo s r)]
        ;; Add the repo sid to the list of watched repos for the github id
        (update-obj s (watched-sid github-id) (fnil conj []) (ext-repo-sid repo-sid))
@@ -247,7 +247,7 @@
    (fn [s sid]
      (->> (p/list-obj s (webhook-sid))
           (map (partial find-webhook s))
-          (filter (comp (partial = sid) (juxt :customer-id :repo-id)))
+          (filter (comp (partial = sid) (juxt :org-id :repo-id)))
           (map (comp (partial find-webhook s) :id))
           (doall)))))
 
@@ -266,13 +266,13 @@
 
 (def search-bb-webhooks
   "Retrieves bitbucket webhook that match given filter, and adds customer and repo ids."
-  (let [wh-props #{:customer-id :repo-id}]
+  (let [wh-props #{:org-id :repo-id}]
     (override-or
      [:bitbucket :search-webhooks]
      (fn [s f]
        (letfn [(add-webhook [bb-wh]
                  (merge bb-wh (-> (find-webhook s (:webhook-id bb-wh))
-                                  (select-keys [:customer-id :repo-id]))))
+                                  (select-keys [:org-id :repo-id]))))
                (matches-filter? [bb-wh]
                  (= f (select-keys bb-wh (keys f))))]
          (->> (p/list-obj s (bb-webhook-sid))
@@ -287,10 +287,10 @@
    (fn [s wh-id]
      (some-> (search-bb-webhooks s {:webhook-id wh-id})
              (first)
-             (dissoc :customer-id :repo-id)))))
+             (dissoc :org-id :repo-id)))))
 
 (def builds "builds")
-(def build-sid-keys [:customer-id :repo-id :build-id])
+(def build-sid-keys [:org-id :repo-id :build-id])
 ;; Build sid, for external representation
 (def ext-build-sid (apply juxt build-sid-keys))
 (def build-sid (comp (partial into [builds])
@@ -459,9 +459,9 @@
      (some-> (find-build s (sid/->sid (take 3 job-sid)))
              (get-in [:script :jobs (nth job-sid 3)])))))
 
-(defn params-sid [customer-id & [param-id]]
+(defn params-sid [org-id & [param-id]]
   ;; All parameters for a customer are stored together
-  (cond-> ["build-params" customer-id]
+  (cond-> ["build-params" org-id]
     param-id (conj param-id)))
 
 (defn find-params [s cust-id]
@@ -485,31 +485,31 @@
   "Saves a single customer parameter"
   (override-or
    [:param :save]
-   (fn [s {:keys [customer-id] :as p}]
-     (let [all (find-params s customer-id)
+   (fn [s {:keys [org-id] :as p}]
+     (let [all (find-params s org-id)
            match (->> all
                       (filter (cp/prop-pred :id (:id p)))
                       (first))]
        (when (save-params
               s
-              customer-id
+              org-id
               (if match
                 (replace {match p} all)
                 (conj (vec all) p)))
-         (params-sid customer-id (:id p)))))))
+         (params-sid org-id (:id p)))))))
 
 (def delete-param
   "Deletes a single parameter set by sid"
   (override-or
    [:param :delete]
-   (fn [s [_ customer-id param-id]]
-     (let [all (find-params s customer-id)
+   (fn [s [_ org-id param-id]]
+     (let [all (find-params s org-id)
            matcher (cp/prop-pred :id param-id)
            exists? (some matcher all)]
        (when exists?
          (save-params
           s
-          customer-id
+          org-id
           (remove matcher all))
          true)))))
 
@@ -594,7 +594,7 @@
   "Retrieves all customer join requests for that customer"
   (override-or
    [:join-request :list-customer]
-   #(list-join-requests %1 (comp (partial = %2) :customer-id))))
+   #(list-join-requests %1 (comp (partial = %2) :org-id))))
 
 (def delete-join-request
   (override-or
@@ -657,7 +657,7 @@
    (fn [s cust-id]
      (->> (p/list-obj s (customer-credit-sid))
           (map (partial find-customer-credit s))
-          (filter (cp/prop-pred :customer-id cust-id))))))
+          (filter (cp/prop-pred :org-id cust-id))))))
 
 (def list-customer-credits-since
   "Lists all customer credits for the customer since given timestamp.  
@@ -666,7 +666,7 @@
    [:customer :list-credits-since]
    (fn [s cust-id ts]
      (->> (list-customer-credits s cust-id)
-          (filter (every-pred (cp/prop-pred :customer-id cust-id)
+          (filter (every-pred (cp/prop-pred :org-id cust-id)
                               (comp (some-fn nil? (partial <= ts)) :from-time)))))))
 
 (def credit-subscriptions :credit-subscriptions)
@@ -674,7 +674,7 @@
   (into [global (name credit-subscriptions)] parts))
 
 (defn save-credit-subscription [s cs]
-  (p/write-obj s (credit-sub-sid (:customer-id cs) (:id cs)) cs))
+  (p/write-obj s (credit-sub-sid (:org-id cs) (:id cs)) cs))
 
 (defn find-credit-subscription [s sid]
   (p/read-obj s (apply credit-sub-sid sid)))
@@ -709,7 +709,7 @@
   (into [global (name credit-consumptions)] parts))
 
 (defn save-credit-consumption [s cs]
-  (p/write-obj s (credit-cons-sid (:customer-id cs) (:id cs)) cs))
+  (p/write-obj s (credit-cons-sid (:org-id cs) (:id cs)) cs))
 
 (defn find-credit-consumption [s sid]
   (p/read-obj s sid))
@@ -771,7 +771,7 @@
   (into [global (name crypto)] parts))
 
 (defn save-crypto [st crypto]
-  (p/write-obj st (crypto-sid (:customer-id crypto)) crypto))
+  (p/write-obj st (crypto-sid (:org-id crypto)) crypto))
 
 (defn find-crypto [st cust-id]
   (p/read-obj st (crypto-sid cust-id)))
@@ -791,7 +791,7 @@
   (into [global (name invoice)] parts))
 
 (defn save-invoice [st invoice]
-  (p/write-obj st (invoice-sid (:customer-id invoice) (:id invoice)) invoice))
+  (p/write-obj st (invoice-sid (:org-id invoice) (:id invoice)) invoice))
 
 (defn find-invoice [st sid]
   (p/read-obj st (apply invoice-sid sid)))

@@ -152,7 +152,7 @@
     (when-let [build (some->> sub
                               (sid/parse-sid)
                               (st/find-build storage))]
-      (assoc build :customers #{(:customer-id build)}))))
+      (assoc build :customers #{(:org-id build)}))))
 
 (defmethod resolve-token role-sysadmin [{:keys [storage]} {:keys [sub] :as token}]
   (when (and (not (expired? token)) sub)
@@ -201,13 +201,13 @@
   "Checks if the request identity grants access to the customer specified in 
    the parameters path."
   [req]
-  (when-let [cid (get-in req [:parameters :path :customer-id])]
+  (when-let [cid (get-in req [:parameters :path :org-id])]
     (when-not (and (ba/authenticated? req)
                    (or (sysadmin? (:identity req))
                        (contains? (get-in req [:identity :customers]) cid)))
       (throw (ex-info "Credentials do not grant access to this customer"
                       {:type :auth/unauthorized
-                       :customer-id cid})))))
+                       :org-id cid})))))
 
 (defn customer-authorization
   "Middleware that verifies the identity token to check if the user or build has

@@ -38,7 +38,7 @@
       (is (sid/sid? (sut/save-webhook st wh)))
       
       (testing "can find for repo"
-        (is (= [wh] (sut/find-webhooks-for-repo st [(:customer-id wh) (:repo-id wh)]))))
+        (is (= [wh] (sut/find-webhooks-for-repo st [(:org-id wh) (:repo-id wh)]))))
 
       (testing "can delete"
         (is (true? (sut/delete-webhook st (:id wh))))
@@ -50,13 +50,13 @@
       (let [build-id (cuid/random-cuid)
             md {:build-id build-id
                 :repo-id "test-repo"
-                :customer-id "test-cust"}]
+                :org-id "test-cust"}]
         (is (sid/sid? (sut/create-build-metadata st md)))
         (is (= md (sut/find-build-metadata st md)))))))
 
 (deftest build-sid
   (testing "starts with builds"
-    (is (= "builds" (first (sut/build-sid {:customer-id "cust"
+    (is (= "builds" (first (sut/build-sid {:org-id "cust"
                                            :repo-id "repo"
                                            :build-id "test-build"}))))))
 
@@ -66,7 +66,7 @@
       (let [build-id (cuid/random-cuid)
             md {:build-id build-id
                 :repo-id "test-repo"
-                :customer-id "test-cust"}]
+                :org-id "test-cust"}]
         (is (sid/sid? (sut/save-build-results st md {:status :success})))
         (is (= :success (:status (sut/find-build-results st md))))))))
 
@@ -85,7 +85,7 @@
   (testing "creates new build"
     (h/with-memory-store st
       (let [[cust-id repo-id build-id :as sid] (test-build-sid)
-            build (-> (zipmap [:customer-id :repo-id :build-id] sid)
+            build (-> (zipmap [:org-id :repo-id :build-id] sid)
                       (assoc :start-time 100))]
         (is (sid/sid? (sut/save-build st build)))
         (is (true? (sut/build-exists? st sid)))
@@ -95,21 +95,21 @@
   (testing "`nil` if sid is `nil`"
     (h/with-memory-store st
       (let [[cust-id repo-id build-id :as sid] (test-build-sid)
-            build (zipmap [:customer-id :repo-id :build-id] sid)]
+            build (zipmap [:org-id :repo-id :build-id] sid)]
         (is (sid/sid? (sut/save-build st build)))
         (is (nil? (sut/find-build st nil))))))
 
   (testing "retrieves regular build"
     (h/with-memory-store st
       (let [build {:build-id "test-build"
-                   :customer-id "test-cust"
+                   :org-id "test-cust"
                    :repo-id "test-repo"}]
         (is (sid/sid? (sut/save-build st build)))
         (is (= build (sut/find-build st (sut/ext-build-sid build)))))))
 
   (testing "retrieves legacy build"
     (h/with-memory-store st
-      (let [md {:customer-id "test-cust"
+      (let [md {:org-id "test-cust"
                 :repo-id "test-repo"
                 :build-id "test-build"}
             results {:jobs {"test-job" {:status :success}}}
@@ -118,7 +118,7 @@
         (is (sid/sid? (sut/save-build-results st sid results)))
         (let [r (sut/find-build st (sut/ext-build-sid md))]
           (is (some? (:jobs r)))
-          (is (= "test-cust" (:customer-id r)))
+          (is (= "test-cust" (:org-id r)))
           (is (true? (:legacy? r))))))))
 
 (deftest parameters
@@ -138,7 +138,7 @@
   (testing "can store and fetch single param"
     (h/with-memory-store st
       (let [param (h/gen-customer-params)
-            cid (:customer-id param)]
+            cid (:org-id param)]
         (is (some? cid))
         (is (sid/sid? (sut/save-param st param)))
         (is (= param (sut/find-param st (sut/params-sid cid (:id param))))))))
@@ -146,7 +146,7 @@
   (testing "can delete param"
     (h/with-memory-store st
       (let [param (h/gen-customer-params)
-            cid (:customer-id param)
+            cid (:org-id param)
             sid (sut/params-sid cid (:id param))]
         (is (some? cid))
         (is (sid/sid? (sut/save-param st param)))
@@ -164,7 +164,7 @@
           (let [sid (conj repo-sid b)]
             (is (sid/sid? (sut/save-build
                            st
-                           (zipmap [:customer-id :repo-id :build-id] sid))))))
+                           (zipmap [:org-id :repo-id :build-id] sid))))))
         (let [l (sut/list-build-ids st repo-sid)]
           (is (= (count builds) (count l)))
           (is (= builds l)))))))
@@ -180,7 +180,7 @@
           (let [sid (conj repo-sid b)]
             (is (sid/sid? (sut/save-build
                            st
-                           (zipmap [:customer-id :repo-id :build-id] sid))))))
+                           (zipmap [:org-id :repo-id :build-id] sid))))))
         (let [l (sut/list-builds st repo-sid)]
           (is (= (count builds) (count l)))
           (is (= builds (map :build-id l))))))))
@@ -194,7 +194,7 @@
           build-idxs (range 2)
           builds (->> build-idxs
                       (map (fn [idx]
-                             (-> (zipmap [:customer-id :repo-id] repo-sid)
+                             (-> (zipmap [:org-id :repo-id] repo-sid)
                                  (assoc :build-id (format "build-%d" idx)
                                         :idx idx)))))]
       (is (sid/sid? (sut/save-customer st cust)))
@@ -222,7 +222,7 @@
       ;; Create 10 builds for each repo
       (doseq [n (range 10)]
         (doseq [r repos]
-          (is (sid/sid? (sut/save-build st {:customer-id (:id cust)
+          (is (sid/sid? (sut/save-build st {:org-id (:id cust)
                                             :repo-id (:id r)
                                             :build-id (format "build-%d" n)
                                             :idx n
@@ -237,10 +237,10 @@
     (h/with-memory-store st
       (let [cust-id (sut/new-id)
             repo-id (sut/new-id)
-            old-build {:customer-id cust-id
+            old-build {:org-id cust-id
                        :repo-id repo-id
                        :start-time 100}
-            new-build {:customer-id cust-id
+            new-build {:org-id cust-id
                        :repo-id repo-id
                        :start-time 200}]
         (is (sid/sid? (sut/save-customer st {:id cust-id
@@ -259,7 +259,7 @@
                            (take 2))
             builds (->> (range)
                         (map (fn [idx]
-                               (-> (zipmap [:customer-id :repo-id :build-id]
+                               (-> (zipmap [:org-id :repo-id :build-id]
                                            (conj repo-sid (format "build-%d" idx)))
                                    (assoc :idx (inc idx)))))
                         (take 10))]
@@ -277,7 +277,7 @@
     (testing "can save and retrieve"
       (let [[cust-id repo-id build-id :as sid] (repeatedly 3 cuid/random-cuid)
             build (-> (h/gen-build)
-                      (assoc :customer-id cust-id
+                      (assoc :org-id cust-id
                              :repo-id repo-id
                              :build-id build-id
                              :script {}))
@@ -322,7 +322,7 @@
       (let [[cid rid] (repeatedly sut/new-id)]
         (is (some? (sut/save-customer st {:id cid})))
         (is (some? (sut/save-repo st {:id rid
-                                      :customer-id cid
+                                      :org-id cid
                                       :url "http://test-repo"})))
         (is (some? (sut/update-repo st [cid rid] assoc :url "updated-url")))
         (is (= "updated-url" (:url (sut/find-repo st [cid rid]))))))))
@@ -333,10 +333,10 @@
           cust (-> (h/gen-cust)
                    (assoc-in [:repos (:id repo)] repo))
           build (-> (h/gen-build)
-                    (assoc :customer-id (:id cust)
+                    (assoc :org-id (:id cust)
                            :repo-id (:id repo)))
           wh (-> (h/gen-webhook)
-                 (assoc :customer-id (:id cust)
+                 (assoc :org-id (:id cust)
                         :repo-id (:id repo)))
           repo-sid [(:id cust) (:id repo)]]
       (is (sid/sid? (sut/save-customer st cust)))
@@ -358,7 +358,7 @@
   (h/with-memory-store st
     (let [[cid rid gid] (repeatedly sut/new-id)
           repo {:id rid
-                :customer-id cid
+                :org-id cid
                 :github-id gid
                 :url "http://test-repo"}]
 
@@ -381,7 +381,7 @@
   (h/with-memory-store st
     (let [[cid rid gid] (repeatedly sut/new-id)
           repo {:id rid
-                :customer-id cid
+                :org-id cid
                 :github-id gid
                 :url "http://test-repo"}
           _ (sut/watch-github-repo st repo)
@@ -399,7 +399,7 @@
 (deftest join-requests
   (h/with-memory-store st
     (let [req (->> (repeatedly 3 sut/new-id)
-                   (zipmap [:id :user-id :customer-id]))]
+                   (zipmap [:id :user-id :org-id]))]
       (testing "can save and find"
         (is (sid/sid? (sut/save-join-request st req)))
         (is (= req (sut/find-join-request st (:id req)))))
@@ -410,7 +410,7 @@
                        (select-keys (keys req))))))
 
       (testing "can list for customer"
-        (is (= [req] (sut/list-customer-join-requests st (:customer-id req))))))))
+        (is (= [req] (sut/list-customer-join-requests st (:org-id req))))))))
 
 (deftest credit-subscriptions
   (h/with-memory-store st
@@ -422,10 +422,10 @@
                     (dissoc :valid-until))]
       (testing "can save and find"
         (is (sid/sid? (sut/save-credit-subscription st cs)))
-        (is (= cs (sut/find-credit-subscription st [(:customer-id cs) (:id cs)]))))
+        (is (= cs (sut/find-credit-subscription st [(:org-id cs) (:id cs)]))))
 
       (testing "can list for customer"
-        (is (= [cs] (sut/list-customer-credit-subscriptions st (:customer-id cs)))))
+        (is (= [cs] (sut/list-customer-credit-subscriptions st (:org-id cs)))))
 
       (is (sid/sid? (sut/save-credit-subscription st other)))              
 
@@ -438,10 +438,10 @@
     (let [cs (h/gen-credit-cons)]
       (testing "can save and find"
         (is (sid/sid? (sut/save-credit-consumption st cs)))
-        (is (= cs (sut/find-credit-consumption st (sut/credit-cons-sid (:customer-id cs) (:id cs))))))
+        (is (= cs (sut/find-credit-consumption st (sut/credit-cons-sid (:org-id cs) (:id cs))))))
 
       (testing "can list for customer"
-        (is (= [cs] (sut/list-customer-credit-consumptions st (:customer-id cs))))))))
+        (is (= [cs] (sut/list-customer-credit-consumptions st (:org-id cs))))))))
 
 (deftest customer-credits
   (h/with-memory-store st
@@ -449,7 +449,7 @@
           cred (-> (h/gen-cust-credit)
                    (assoc :from-time now
                           :amount 100M))
-          cid (:customer-id cred)
+          cid (:org-id cred)
           repo (h/gen-repo)
           rid (:id repo)
           cust {:id cid
@@ -467,7 +467,7 @@
         (is (sid/sid? (sut/save-credit-consumption
                        st
                        {:id (cuid/random-cuid)
-                        :customer-id cid
+                        :org-id cid
                         :repo-id rid
                         :credit-id (:id cred)
                         :amount 20M})))
@@ -486,7 +486,7 @@
           (is (sid/sid? (sut/save-credit-consumption
                          st
                          {:id (cuid/random-cuid)
-                          :customer-id cid
+                          :org-id cid
                           :repo-id rid
                           :credit-id (:id cred)
                           :amount 80M})))
@@ -508,20 +508,20 @@
         (is (= bb (sut/find-bb-webhook-for-webhook st (:webhook-id bb)))))
 
       (testing "can search using filter"
-        (is (= [(merge bb (select-keys wh [:customer-id :repo-id]))]
+        (is (= [(merge bb (select-keys wh [:org-id :repo-id]))]
                (sut/search-bb-webhooks st (select-keys bb [:webhook-id])))
             "search by webhook id")
-        (is (= [(:id bb)] (->> (sut/search-bb-webhooks st (select-keys wh [:customer-id]))
+        (is (= [(:id bb)] (->> (sut/search-bb-webhooks st (select-keys wh [:org-id]))
                                (map :id)))
             "search by customer id")
-        (is (empty? (sut/search-bb-webhooks st {:customer-id "nonexisting"})))))))
+        (is (empty? (sut/search-bb-webhooks st {:org-id "nonexisting"})))))))
 
 (deftest crypto
   (h/with-memory-store st
     (let [crypto (h/gen-crypto)]
       (testing "can save and find"
         (is (sid/sid? (sut/save-crypto st crypto)))
-        (is (= crypto (sut/find-crypto st (:customer-id crypto))))))))
+        (is (= crypto (sut/find-crypto st (:org-id crypto))))))))
 
 (deftest sysadmin
   (h/with-memory-store st
@@ -535,7 +535,7 @@
   (h/with-memory-store st
     (let [cust (h/gen-cust)
           inv (-> (h/gen-invoice)
-                  (assoc :customer-id (:id cust)))]
+                  (assoc :org-id (:id cust)))]
       (testing "can save and find by id"
         (is (sid/sid? (sut/save-invoice st inv)))
         (is (= inv (sut/find-invoice st [(:id cust) (:id inv)]))))

@@ -21,7 +21,7 @@
   "Retrieves customer info for the current config"
   []
   (s/find-customer (make-storage)
-                   (get-in @c/global-config [:account :customer-id])))
+                   (get-in @c/global-config [:account :org-id])))
 
 (defn update-customer
   [upd]

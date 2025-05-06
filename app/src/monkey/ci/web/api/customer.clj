@@ -14,7 +14,7 @@
 (def query-params (comp :query :parameters))
 
 (defn- repo->out [r]
-  (dissoc r :customer-id))
+  (dissoc r :org-id))
 
 (defn- repos->out
   "Converts the project repos into output format"
@@ -30,7 +30,7 @@
     (st/save-customer st (repos->map cust))))
 
 (c/make-entity-endpoints "customer"
-                         {:get-id (c/id-getter :customer-id)
+                         {:get-id (c/id-getter :org-id)
                           :getter (comp repos->out st/find-customer)
                           :saver save-customer})
 
@@ -45,12 +45,12 @@
 (defn- create-subscription [st cust-id]
   (let [ts (t/now)
         cs {:id (cuid/random-cuid)
-            :customer-id cust-id
+            :org-id cust-id
             :amount config/free-credits
             :valid-from ts}]
     (when (st/save-credit-subscription st cs)
       (st/save-customer-credit st {:id (cuid/random-cuid)
-                                   :customer-id cust-id
+                                   :org-id cust-id
                                    :subscription-id (:id cs)
                                    :type :subscription
                                    :amount (:amount cs)
@@ -90,7 +90,7 @@
    number of builds)."
   [req]
   (let [st (c/req->storage req)
-        cid (c/customer-id req)
+        cid (c/org-id req)
         n (:n (query-params req))]
     (if (st/find-customer st cid)
       (let [rb (st/list-builds-since st cid (or (query->since req)
@@ -106,7 +106,7 @@
    overview screen."
   [req]
   (-> (st/find-latest-builds (c/req->storage req)
-                             (c/customer-id req))
+                             (c/org-id req))
       (rur/response)))
 
 (def default-tz "Z")
@@ -166,7 +166,7 @@
                        (t/now))
           dates    (->> (t/date-seq (jt/offset-date-time since zone))
                         (take-while (partial jt/after? (jt/offset-date-time until zone))))
-          cid      (c/customer-id req)
+          cid      (c/org-id req)
           builds   (st/list-builds-since st cid since)
           ccos     (st/list-customer-credit-consumptions-since st cid since)
           elapsed  (-> (group-by-date dates zone builds :start-time)
@@ -186,6 +186,6 @@
   "Returns details of customer credits"
   [req]
   (let [s (c/req->storage req)
-        cust-id (c/customer-id req)
+        cust-id (c/org-id req)
         avail (st/calc-available-credits s cust-id)]
     (rur/response {:available avail})))

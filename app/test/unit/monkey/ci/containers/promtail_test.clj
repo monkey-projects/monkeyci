@@ -9,7 +9,7 @@
   (let [conf {:loki-url "http://loki-test"
               :token "test-token"
               :paths ["/test/dir"]
-              :customer-id "test-cust"
+              :org-id "test-cust"
               :repo-id "test-repo"
               :build-id "test-build"
               :job-id "test-job"}
@@ -36,13 +36,13 @@
           (is (= 1 (count (:static-configs sc)))))
 
         (testing "with build ids as labels"
-          (let [keys [:customer-id :repo-id :build-id :job-id]]
+          (let [keys [:org-id :repo-id :build-id :job-id]]
             (is (= (select-keys conf keys)
                    (-> sc :static-configs first :labels (select-keys keys))))))))))
 
 (deftest yaml-config
   (testing "generates yaml config"
-    (is (.contains (sut/yaml-config {:customer-id "test-cust"})
+    (is (.contains (sut/yaml-config {:org-id "test-cust"})
                    "tenant_id: test-cust" ))))
 
 (deftest promtail-container
@@ -63,7 +63,7 @@
     (is (= {:image-url "promtail-img"
             :image-tag "promtail-version"
             :loki-url "http://loki"
-            :customer-id "test-cust"
+            :org-id "test-cust"
             :repo-id "test-repo"
             :build-id "test-build"
             :job-id "test-job"

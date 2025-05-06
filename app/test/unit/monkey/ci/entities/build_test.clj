@@ -12,7 +12,7 @@
             repo (ec/insert-repo conn
                                  {:display-id "test-repo"
                                   :name "test repo"
-                                  :customer-id (:id cust)})
+                                  :org-id (:id cust)})
             build (ec/insert-build conn
                                    {:display-id "test-build"
                                     :idx 1

@@ -3,7 +3,7 @@
             [monkey.ci.web.common :as c]
             [ring.util.response :as rur]))
 
-(def invoice-sid (juxt c/customer-id (comp :invoice-id :path :parameters)))
+(def invoice-sid (juxt c/org-id (comp :invoice-id :path :parameters)))
 
 (c/make-entity-endpoints
  "invoice"
@@ -15,5 +15,5 @@
   [req]
   ;; TODO Apply filter
   (let [inv (st/list-invoices-for-customer (c/req->storage req)
-                                           (c/customer-id req))]
+                                           (c/org-id req))]
     (rur/response inv)))

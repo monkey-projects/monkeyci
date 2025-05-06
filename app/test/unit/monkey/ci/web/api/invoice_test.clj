@@ -12,7 +12,7 @@
           inv (h/gen-invoice)]
       (is (some? (st/save-invoice st inv)))
       (is (= inv (-> (h/->req rt)
-                     (assoc-in [:parameters :path] {:customer-id (:customer-id inv)
+                     (assoc-in [:parameters :path] {:org-id (:org-id inv)
                                                     :invoice-id (:id inv)})
                      (sut/get-invoice)
                      :body))))))
@@ -25,7 +25,7 @@
                                :net-amount 100M
                                :vat-perc 21M}]
                              (map (partial merge (h/gen-invoice)))
-                             (map #(assoc % :customer-id (:id cust)))
+                             (map #(assoc % :org-id (:id cust)))
                              (remove nil?))]
     (is (some? (st/save-customer st cust)))
     (is (some? (->> inv
@@ -34,7 +34,7 @@
     
     (testing "when no filter given, returns all customer invoices"
       (is (= inv (-> (h/->req rt)
-                     (assoc-in [:parameters :path :customer-id] (:id cust))
+                     (assoc-in [:parameters :path :org-id] (:id cust))
                      (sut/search-invoices)
                      :body))))
 

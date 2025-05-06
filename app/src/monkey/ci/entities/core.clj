@@ -163,8 +163,10 @@
 (defn by-cuid [cuid]
   [:= :cuid cuid])
 
-(defn by-customer [id]
-  [:= :customer-id id])
+(defn by-org [id]
+  [:= :org-id id])
+
+(def ^:deprecated by-customer by-org)
 
 (defn by-repo [id]
   [:= :repo-id id])
@@ -186,7 +188,13 @@
 
 ;;; Basic entities
 
-(defentity customer)
+(defentity org)
+;; Provided for compatibility purposes
+(def ^:deprecated insert-customer insert-org)
+(def ^:deprecated update-customer update-org)
+(def ^:deprecated delete-customers delete-orgs)
+(def ^:deprecated select-customers select-orgs)
+
 (defentity repo)
 (defentity webhook)
 (defentity user)
@@ -314,7 +322,7 @@
   [conn user-id cust-ids]
   (when-not (empty? cust-ids)
     (insert-entities conn :user-customers
-                     [:user-id :customer-id]
+                     [:user-id :org-id]
                      (map (partial conj [user-id]) cust-ids))))
 
 (defaggregate customer-param-value)
@@ -390,7 +398,7 @@
 (defn update-crypto [conn crypto]
   (execute-update conn {:update :cryptos
                         :set crypto
-                        :where [:= :customer-id (:customer-id crypto)]}))
+                        :where [:= :org-id (:org-id crypto)]}))
 
 (defaggregate sysadmin)
 

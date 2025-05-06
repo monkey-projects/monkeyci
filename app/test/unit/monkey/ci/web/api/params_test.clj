@@ -21,7 +21,7 @@
   (testing "empty vector if no params"
     (is (= [] (-> (trt/test-runtime)
                   (h/->req)
-                  (h/with-path-params {:customer-id (st/new-id)})
+                  (h/with-path-params {:org-id (st/new-id)})
                   (sut/get-customer-params)
                   :body))))
 
@@ -36,7 +36,7 @@
       (is (= params
              (-> rt
                  (h/->req)
-                 (h/with-path-params {:customer-id cust-id})
+                 (h/with-path-params {:org-id cust-id})
                  (sut/get-customer-params)
                  :body)))))
 
@@ -52,7 +52,7 @@
       (is (= "decrypted"
              (-> rt
                  (h/->req)
-                 (h/with-path-params {:customer-id cust-id})
+                 (h/with-path-params {:org-id cust-id})
                  (sut/get-customer-params)
                  :body
                  first
@@ -75,7 +75,7 @@
     (testing "empty list if no params"
       (is (= [] (-> rt
                     (h/->req)
-                    (h/with-path-params {:customer-id cust-id
+                    (h/with-path-params {:org-id cust-id
                                          :repo-id repo-id})
                     (sut/get-repo-params)
                     :body))))
@@ -90,7 +90,7 @@
         (is (= [{:name "test-param" :value "test-value"}]
                (-> rt
                    (h/->req)
-                   (h/with-path-params {:customer-id cust-id
+                   (h/with-path-params {:org-id cust-id
                                         :repo-id repo-id})
                    (sut/get-repo-params)
                    :body)))))
@@ -106,13 +106,13 @@
                    [{:name "test-param"
                      :value (p/encrypt vault iv "test-value")}]}
             _ (st/save-customer st cust)
-            _ (st/save-crypto st {:customer-id cust-id
+            _ (st/save-crypto st {:org-id cust-id
                                   :iv iv})
             _ (st/save-params st cust-id [param])
             res (-> rt
                     (trt/set-vault vault)
                     (h/->req)
-                    (h/with-path-params {:customer-id cust-id
+                    (h/with-path-params {:org-id cust-id
                                          :repo-id (:id repo)})
                     (sut/get-repo-params))]
         (is (= [{:name "test-param"
@@ -123,7 +123,7 @@
       (is (= 404
              (-> rt
                  (h/->req)
-                 (h/with-path-params {:customer-id cust-id
+                 (h/with-path-params {:org-id cust-id
                                       :repo-id "other-repo"})
                  (sut/get-repo-params)
                  :status))))))
@@ -144,9 +144,9 @@
                   (h/->req)
                   (assoc :parameters
                          {:path
-                          {:customer-id cust-id
+                          {:org-id cust-id
                            :param-id (:id params)}}))]
-      (is (some? (st/save-crypto st {:customer-id cust-id
+      (is (some? (st/save-crypto st {:org-id cust-id
                                      :iv iv})))
       (is (= "test-val"
              (-> (sut/get-param req)
@@ -164,7 +164,7 @@
                   (h/->req)
                   (assoc :parameters
                          {:path
-                          {:customer-id cust-id}
+                          {:org-id cust-id}
                           :body
                           {:parameters [{:name "test-param"
                                          :value "test-val"}]}}))]
@@ -186,7 +186,7 @@
                   (h/->req)
                   (assoc :parameters
                          {:path
-                          {:customer-id "test-cust"}
+                          {:org-id "test-cust"}
                           :body
                           [{:parameters [{:name "test-param"
                                           :value "test-val"}]}]}))]

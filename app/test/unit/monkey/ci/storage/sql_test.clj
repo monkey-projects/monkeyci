@@ -47,18 +47,18 @@
     (testing "can write and read with repos"
       (let [cust (h/gen-cust)
             repo {:name "test repo"
-                  :customer-id (:id cust)
+                  :org-id (:id cust)
                   :id "test-repo"
                   :url "http://test-repo"}]
         (is (sid/sid? (st/save-customer s cust)))
         (is (sid/sid? (st/save-repo s repo)))
-        (is (= (assoc cust :repos {(:id repo) (dissoc repo :customer-id)})
+        (is (= (assoc cust :repos {(:id repo) (dissoc repo :org-id)})
                (st/find-customer s (:id cust))))))
 
     (testing "can delete with repos"
       (let [cust (h/gen-cust)
             repo {:name "test repo"
-                  :customer-id (:id cust)
+                  :org-id (:id cust)
                   :id "test-repo"
                   :url "http://test-repo"}]
         (is (sid/sid? (st/save-customer s cust)))
@@ -104,11 +104,11 @@
       
       (testing "saved with customer"
         (is (sid/sid? (st/save-customer s cust)))
-        (is (= (assoc repo :customer-id (:id cust))
+        (is (= (assoc repo :org-id (:id cust))
                (st/find-repo s sid))))
 
       (testing "saved with `save-repo`"
-        (let [r (assoc repo :customer-id (:id cust))
+        (let [r (assoc repo :org-id (:id cust))
               sid (vec (take-last 2 (st/save-repo s r)))]
           (is (sid/sid? sid))
           (is (= [(:id cust) (:id repo)] sid))
@@ -139,7 +139,7 @@
                        :value "test value"}]
               saved-sid (st/save-repo s {:name "new repo"
                                          :id "new-repo"
-                                         :customer-id (:id cust)
+                                         :org-id (:id cust)
                                          :labels labels})
               sid [(:id cust) "new-repo"]]
           (is (= sid (take-last 2 saved-sid)))
@@ -174,7 +174,7 @@
           repo {:name "github test"
                 :id "github-test"
                 :url "http://github.com/test"
-                :customer-id (:id cust)
+                :org-id (:id cust)
                 :github-id github-id}]
       (is (sid/sid? (st/save-customer s cust)))
       
@@ -195,7 +195,7 @@
   (with-storage conn s
     (testing "ssh keys"
       (let [{cust-id :id :as cust} (h/gen-cust)
-            k (assoc (h/gen-ssh-key) :customer-id cust-id)]
+            k (assoc (h/gen-ssh-key) :org-id cust-id)]
         (is (sid/sid? (st/save-customer s cust)))
         
         (testing "can create and retrieve"
@@ -219,9 +219,9 @@
     (testing "webhooks"
       (let [cust (h/gen-cust)
             repo (-> (h/gen-repo)
-                     (assoc :customer-id (:id cust)))
+                     (assoc :org-id (:id cust)))
             wh (-> (h/gen-webhook)
-                   (assoc :customer-id (:id cust)
+                   (assoc :org-id (:id cust)
                           :repo-id (:id repo)
                           :secret-key (auth/generate-secret-key)))]
         (is (some? (st/save-customer s (assoc-in cust [:repos (:id repo)] repo))))
@@ -240,7 +240,7 @@
 (deftest ^:sql customer-params
   (with-storage conn s
     (let [{cust-id :id :as cust} (h/gen-cust)
-          params (assoc (h/gen-customer-params) :customer-id cust-id)
+          params (assoc (h/gen-customer-params) :org-id cust-id)
           sid (st/params-sid cust-id (:id params))]
       (is (sid/sid? (st/save-customer s cust)))
       
@@ -316,7 +316,7 @@
           cust (-> (h/gen-cust)
                    (assoc-in [:repos (:id repo)] repo))
           build (-> (h/gen-build)
-                    (assoc :customer-id (:id cust)
+                    (assoc :org-id (:id cust)
                            :repo-id (:id repo)
                            :script {:script-dir "test-dir"}
                            :start-time (t/now)
@@ -357,7 +357,7 @@
 
       (testing "can get next idx"
         (let [repo (-> (h/gen-repo)
-                       (assoc :customer-id (:id cust)))
+                       (assoc :org-id (:id cust)))
               repo-sid [(:id cust) (:id repo)]]
           (is (some? (st/save-repo s repo)))
           (is (= 1 (st/find-next-build-idx s repo-sid))
@@ -370,12 +370,12 @@
               cust (-> (h/gen-cust)
                        (assoc :repos {(:id repo) repo}))
               old-build (-> (h/gen-build)
-                            (assoc :customer-id (:id cust)
+                            (assoc :org-id (:id cust)
                                    :repo-id (:id repo)
                                    :start-time 100)
                             (dissoc :script))
               new-build (-> (h/gen-build)
-                            (assoc :customer-id (:id cust)
+                            (assoc :org-id (:id cust)
                                    :repo-id (:id repo)
                                    :start-time 200)
                             (dissoc :script))]
@@ -384,7 +384,7 @@
           (is (sid/sid? (st/save-build s new-build)))
           (let [r (st/list-builds-since s (:id cust) 150)]
             (is (= [(:build-id new-build)] (map :build-id r)))
-            (is (= (:id cust) (:customer-id (first r))))
+            (is (= (:id cust) (:org-id (first r))))
             (is (= (:id repo) (:repo-id (first r)))))))
 
       (testing "can find latest by build index"
@@ -392,14 +392,14 @@
               cust (-> (h/gen-cust)
                        (assoc :repos {(:id repo) repo}))
               old-build (-> (h/gen-build)
-                            (assoc :customer-id (:id cust)
+                            (assoc :org-id (:id cust)
                                    :repo-id (:id repo)
                                    :start-time 100
                                    :idx 9
                                    :build-id "build-9")
                             (dissoc :script))
               new-build (-> (h/gen-build)
-                            (assoc :customer-id (:id cust)
+                            (assoc :org-id (:id cust)
                                    :repo-id (:id repo)
                                    :start-time 200
                                    :idx 10
@@ -429,7 +429,7 @@
                            {:idx 4
                             :build-id "build-4"
                             :repo-id (:id (second repos))}]
-                          (map #(assoc % :customer-id (:id cust))))]
+                          (map #(assoc % :org-id (:id cust))))]
           (is (sid/sid? (st/save-customer s cust)))
           (doseq [b builds]
             (is (sid/sid? (st/save-build s b))))
@@ -461,7 +461,7 @@
                             :build-id "build-4"
                             :repo-id (:id (second repos))
                             :start-time 400}]
-                          (map #(assoc % :customer-id (:id cust))))]
+                          (map #(assoc % :org-id (:id cust))))]
           (is (sid/sid? (st/save-customer s cust)))
           (doseq [b builds]
             (is (sid/sid? (st/save-build s b))))
@@ -478,10 +478,10 @@
     (let [cust (-> (h/gen-cust)
                    (assoc :repos {}))
           repo (-> (h/gen-repo)
-                   (assoc :customer-id (:id cust)))
+                   (assoc :org-id (:id cust)))
           build (-> (h/gen-build)
                     (assoc :script {}
-                           :customer-id (:id cust)
+                           :org-id (:id cust)
                            :repo-id (:id repo)))
           sid [(:id cust) (:id repo) (:build-id build)]
           job {:id "test-job"}]
@@ -513,7 +513,7 @@
           _ (st/save-user s user)
           jr (-> (h/gen-join-request)
                  (assoc :user-id (:id user)
-                        :customer-id (:id cust)
+                        :org-id (:id cust)
                         :status :pending
                         :request-msg "test request")
                  (dissoc :response-msg))]
@@ -556,7 +556,7 @@
     (let [cust (h/gen-cust)
           now (t/now)
           cs (-> (h/gen-credit-subs)
-                 (assoc :customer-id (:id cust)
+                 (assoc :org-id (:id cust)
                         :valid-from (- now 1000)
                         :valid-until (+ now 1000)))
           sid (st/credit-sub-sid (:id cust) (:id cs))]
@@ -588,7 +588,7 @@
           cust (-> (h/gen-cust)
                    (assoc :repos {(:id repo) repo}))
           cred (-> (h/gen-cust-credit)
-                   (assoc :customer-id (:id cust)
+                   (assoc :org-id (:id cust)
                           :amount 100M)
                    (dissoc :user-id :subscription-id))]
       (is (sid/sid? (st/save-customer s cust)))
@@ -602,12 +602,12 @@
               _ (st/save-customer s other-cust)
               sids (->> [(assoc cred :from-time 1000)
                          (-> (h/gen-cust-credit)
-                             (assoc :customer-id (:id cust)
+                             (assoc :org-id (:id cust)
                                     :from-time 2000
                                     :amount 200M)
                              (dissoc :user-id :subscription-id))
                          (-> (h/gen-cust-credit)
-                             (assoc :customer-id (:id other-cust)
+                             (assoc :org-id (:id other-cust)
                                     :from-time 1000)
                              (dissoc :user-id :subscription-id))]
                         (mapv (partial st/save-customer-credit s)))]
@@ -625,10 +625,10 @@
 
       (testing "calculates available credits using credit consumptions"
         (let [build (-> (h/gen-build)
-                        (assoc :customer-id (:id cust)
+                        (assoc :org-id (:id cust)
                                :repo-id (:id repo)
                                :credits 25M))
-              ccons {:customer-id (:id cust)
+              ccons {:org-id (:id cust)
                      :repo-id (:id repo)
                      :build-id (:build-id build)
                      :credit-id (:id cred)
@@ -650,14 +650,14 @@
                    (assoc :repos {(:id repo) repo}))
           build (-> (h/gen-build)
                     (assoc :repo-id (:id repo)
-                           :customer-id (:id cust)))
+                           :org-id (:id cust)))
           credit (-> (h/gen-cust-credit)
-                     (assoc :customer-id (:id cust))
+                     (assoc :org-id (:id cust))
                      (dissoc :user-id :subscription-id))
           cc (-> (h/gen-credit-cons)
                  (assoc :build-id (:build-id build)
                         :repo-id (:id repo)
-                        :customer-id (:id cust)
+                        :org-id (:id cust)
                         :credit-id (:id credit)
                         :consumed-at now))]
       (is (sid/sid? (st/save-customer s cust)))
@@ -686,7 +686,7 @@
                        (assoc :type :user
                               :user-id (:id user)
                               :reason "testing"
-                              :customer-id (:id cust)
+                              :org-id (:id cust)
                               :amount 1000M)
                        (dissoc :subscription-id))]
           (is (sid/sid? (st/save-user s user)))
@@ -695,12 +695,12 @@
 
       (testing "can create for subscription"
         (let [cs (-> (h/gen-credit-subs)
-                     (assoc :customer-id (:id cust)
+                     (assoc :org-id (:id cust)
                             :amount 1000M))
               cred (-> (h/gen-cust-credit)
                        (assoc :type :subscription
                               :subscription-id (:id cs)
-                              :customer-id (:id cust)
+                              :org-id (:id cust)
                               :amount 1000M)
                        (dissoc :user-id))]
           (is (sid/sid? (st/save-credit-subscription s cs)))
@@ -713,7 +713,7 @@
           cust (-> (h/gen-cust)
                    (assoc :repos {(:id repo) repo}))
           wh (-> (h/gen-webhook)
-                 (assoc :customer-id (:id cust)
+                 (assoc :org-id (:id cust)
                         :repo-id (:id repo)))
           bb-wh (-> (h/gen-bb-webhook)
                     (assoc :webhook-id (:id wh)))]
@@ -727,23 +727,23 @@
         (is (= bb-wh (st/find-bb-webhook-for-webhook st (:id wh)))))
 
       (testing "can search by filter"
-        (is (= [(merge bb-wh (select-keys wh [:customer-id :repo-id]))]
-               (st/search-bb-webhooks st {:customer-id (:id cust)})))
+        (is (= [(merge bb-wh (select-keys wh [:org-id :repo-id]))]
+               (st/search-bb-webhooks st {:org-id (:id cust)})))
         (is (= [(:id bb-wh)]
                (->> (st/search-bb-webhooks st {:webhook-id (:id wh)})
                     (map :id))))
-        (is (empty? (st/search-bb-webhooks st {:customer-id "nonexisting"})))))))
+        (is (empty? (st/search-bb-webhooks st {:org-id "nonexisting"})))))))
 
 (deftest ^:sql crypto
   (with-storage conn st
     (let [cust (h/gen-cust)
           crypto (-> (h/gen-crypto)
-                     (assoc :customer-id (:id cust)))]
+                     (assoc :org-id (:id cust)))]
       (testing "can save and find by customer id"
         (is (sid/sid? (st/save-customer st cust)))
         (is (sid/sid? (st/save-crypto st crypto)))
         (let [m (st/find-crypto st (:id cust))]
-          (is (= (:customer-id crypto) (:customer-id m)))
+          (is (= (:org-id crypto) (:org-id m)))
           (is (java.util.Arrays/equals (:iv crypto) (:iv m)))))
 
       (testing "can update"
@@ -766,7 +766,7 @@
   (with-storage conn st
     (let [cust (h/gen-cust)
           inv (-> (h/gen-invoice)
-                  (assoc :customer-id (:id cust)
+                  (assoc :org-id (:id cust)
                          :kind :invoice
                          :currency "EUR"
                          :net-amount 100M
@@ -800,7 +800,7 @@
           cust (-> (h/gen-cust)
                    (assoc :repos {(:id repo) repo}))
           build (-> (h/gen-build)
-                    (assoc :customer-id (:id cust)
+                    (assoc :org-id (:id cust)
                            :repo-id (:id repo)))
           sid (st/ext-build-sid build)]
       (is (sid/sid? (st/save-customer st cust)))

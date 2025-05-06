@@ -36,10 +36,10 @@
       (s/merge :db/common)))
 
 (s/def :db/display-id string?)
-(s/def :db/customer-id id?)
+(s/def :db/org-id id?)
 
 (s/def :db/repo
-  (-> (s/keys :req-un [:db/display-id :db/customer-id :db/name]
+  (-> (s/keys :req-un [:db/display-id :db/org-id :db/name]
               :opt-un [:git/url :git/main-branch])
       (s/merge :db/common)))
 
@@ -68,7 +68,7 @@
       (s/merge :db/common)))
 
 (s/def :db/ssh-key
-  (s/keys :req-un [:db/customer-id :ssh/private-key :ssh/public-key :db/description]))
+  (s/keys :req-un [:db/org-id :ssh/private-key :ssh/public-key :db/description]))
 
 (s/def :label/label string?)
 (s/def :label/value string?)
@@ -80,7 +80,7 @@
 (s/def :db/label-filters (s/coll-of :db/label-filter-conjunction))
 
 (s/def :db/customer-param
-  (s/keys :req-un [:db/customer-id]
+  (s/keys :req-un [:db/org-id]
           :opt-un [:db/label-filters :db/description]))
 
 (s/def :db/params-id id?)
@@ -106,7 +106,7 @@
 (s/def :join-request-db/response-msg string?)
 
 (s/def :db/join-request
-  (-> (s/keys :req-un [:db/user-id :db/customer-id :join-request-db/status]
+  (-> (s/keys :req-un [:db/user-id :db/org-id :join-request-db/status]
               :opt-un [:join-request-db/request-msg :join-request-db/response-msg])
       (s/merge :db/common)))
 
@@ -122,7 +122,7 @@
 (s/def :db/amount (s/int-in 0 1000000))
 
 (s/def :db/credit-subscription
-  (-> (s/keys :req-un [:db/customer-id :db/amount :db/valid-from]
+  (-> (s/keys :req-un [:db/org-id :db/amount :db/valid-from]
               :opt-un [:db/valid-until])
       (s/merge :db/common)))
 
@@ -130,7 +130,7 @@
 (s/def :db/reason string?)
 
 (s/def :db/customer-credit
-  (-> (s/keys :req-un [:db/customer-id :db/amount :credit/type]
+  (-> (s/keys :req-un [:db/org-id :db/amount :credit/type]
               :opt-un [:db/from-time :db/user-id :db/subscription-id :db/reason])
       (s/merge :db/common)))
 
@@ -154,7 +154,7 @@
                 #(sg/fixed-byte-array 16)))
 
 (s/def :db/crypto
-  (s/keys :req-un [:db/customer-id :db/iv]))
+  (s/keys :req-un [:db/org-id :db/iv]))
 
 (s/def :db/password string?)
 
@@ -162,7 +162,7 @@
   (s/keys :req-un [:db/user-id :db/password]))
 
 (s/def :db/invoice
-  (-> (s/keys :req-un [:db/customer-id :invoice/kind :invoice/invoice-nr :invoice/date
+  (-> (s/keys :req-un [:db/org-id :invoice/kind :invoice/invoice-nr :invoice/date
                        :invoice/currency :invoice/net-amount :invoice/vat-perc
                        :db-invoice/details])
       (s/merge :db/common)))

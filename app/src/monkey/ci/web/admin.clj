@@ -34,8 +34,8 @@
    [["/issue"
      {:post api/issue-auto-credits
       :parameters {:body AutoCredits}}]
-    ["/:customer-id"
-     {:parameters {:path {:customer-id c/Id}}}
+    ["/:org-id"
+     {:parameters {:path {:org-id c/Id}}}
      [[""
        ;; TODO Move this under issuances
        {:get api/list-customer-credits}]

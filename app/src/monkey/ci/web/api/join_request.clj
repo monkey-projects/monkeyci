@@ -29,17 +29,17 @@
                    st/find-join-request))
 
 (defn- add-customers [st jrs]
-  (let [custs (->> (st/find-customers st (map :customer-id jrs))
+  (let [custs (->> (st/find-customers st (map :org-id jrs))
                    (group-by :id)
                    (mc/map-vals first))]
     (->> jrs
          (map (fn [jr]
-                (assoc jr :customer (get custs (:customer-id jr))))))))
+                (assoc jr :customer (get custs (:org-id jr))))))))
 
 (defn search-join-requests
   "Retrieves join requests for the user or customer, depending on parameters"
   [req]
-  (let [{:keys [user-id customer-id]} (get-in req [:parameters :path])
+  (let [{:keys [user-id org-id]} (get-in req [:parameters :path])
         st (c/req->storage req)]
     (log/debug "User id:" user-id)
     (-> (cond
@@ -57,7 +57,7 @@
   ;; TODO Add user details
   (rur/response (st/list-customer-join-requests
                  (c/req->storage req)
-                 (get-in req [:parameters :path :customer-id]))))
+                 (get-in req [:parameters :path :org-id]))))
 
 (defn- find-join-request
   "Retrieves join request by id from storage.  Returns `nil` if not found,
@@ -65,14 +65,14 @@
    the join request."
   [req]
   (let [st (c/req->storage req)
-        {:keys [request-id customer-id]} (get-in req [:parameters :path])
+        {:keys [request-id org-id]} (get-in req [:parameters :path])
         jr (st/find-join-request st request-id)]
-    (when (and jr (= customer-id (:customer-id jr)))
+    (when (and jr (= org-id (:org-id jr)))
       jr)))
 
 (defn- add-user-customer [st jr]
   (when-let [u (st/find-user st (:user-id jr))]
-    (->> (update u :customers (comp distinct conj) (:customer-id jr))
+    (->> (update u :customers (comp distinct conj) (:org-id jr))
          (st/save-user st))))
 
 (defn- respond-to-join-request [new-status action req]

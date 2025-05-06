@@ -10,7 +10,7 @@
     (h/with-prepared-db conn
       (let [cust (c/insert-customer conn {:name "test customer"})
             repos (->> (range 3)
-                       (map #(c/insert-repo conn {:customer-id (:id cust)
+                       (map #(c/insert-repo conn {:org-id (:id cust)
                                                   :display-id (str "repo-" %)
                                                   :name (str "repo-" %)}))
                        (doall))

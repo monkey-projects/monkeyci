@@ -70,7 +70,7 @@
                                            :name "test customer"
                                            :repos [{:id rid
                                                     :name "test repo"}]})))
-        (is (st/sid? (st/save-build st {:customer-id cid
+        (is (st/sid? (st/save-build st {:org-id cid
                                         :repo-id rid
                                         :build-id bid})))
         (is (some? (-> req
@@ -104,7 +104,7 @@
       (testing "if identity allows access to customer id"
         (is (= ::ok (auth {:parameters
                            {:path
-                            {:customer-id "test-cust"}}
+                            {:org-id "test-cust"}}
                            :identity
                            {:customers
                             #{"test-cust"}}}))))
@@ -112,7 +112,7 @@
       (testing "if sysadmin token"
         (is (= ::ok (auth {:parameters
                            {:path
-                            {:customer-id "test-cust"}}
+                            {:org-id "test-cust"}}
                            :identity
                            {:type :sysadmin}})))))
 
@@ -121,7 +121,7 @@
         (is (thrown? Exception
                      (auth {:parameters
                             {:path
-                             {:customer-id "test-cust"}}
+                             {:org-id "test-cust"}}
                             :identity
                             {:customers #{"other-cust"}}}))))
 
@@ -129,7 +129,7 @@
         (is (thrown? Exception
                      (auth {:parameters
                             {:path
-                             {:customer-id "test-cust"}}})))))))
+                             {:org-id "test-cust"}}})))))))
 
 (deftest sysadmin-authorization
   (let [h (constantly ::ok)

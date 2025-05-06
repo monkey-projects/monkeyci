@@ -75,6 +75,7 @@
   [col :integer [:not nil]])
 
 (def customer-col (fk-col :customer-id))
+(def org-col (fk-col :org-id))
 (def repo-col (fk-col :repo-id))
 (def user-col (fk-col :user-id))
 
@@ -85,6 +86,7 @@
     (not no-cascade?) (conj :on-delete-cascade)))
 
 (def fk-customer (fk :customer-id :customers :id))
+(def fk-org (fk :org-id :customers :id))
 (def fk-repo (fk :repo-id :repos :id))
 (def fk-user (fk :user-id :users :id))
 
@@ -477,7 +479,35 @@
     36 :queued-tasks
     [[:task :text]
      [:creation-time :timestamp]]
-    [])])
+    [])
+
+   (migration
+    (mig-id 37 :rename-table-cust-to-org)
+    [{:alter-table :customers
+      :rename-table :orgs}]
+    [{:alter-table :orgs
+      :rename-table :customers}])
+
+   (let [tables [:repos
+                 :customer-params
+                 :ssh-keys
+                 :user-customers
+                 :join-requests
+                 :credit-subscriptions
+                 :customer-credits
+                 :invoices
+                 :available-credits
+                 :cryptos]]
+     (migration
+      (mig-id 38 :rename-col-cust-to-org)
+      (->> tables
+           (map (fn [t]
+                  {:alter-table t
+                   :rename-column [:customer-id :org-id]})))
+      (->> tables
+           (map (fn [t]
+                  {:alter-table t
+                   :rename-column [:org-id :customer-id]})))))])
 
 (defn prepare-migrations
   "Prepares all migrations by formatting to sql, creates a ragtime migration object from it."

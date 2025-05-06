@@ -25,10 +25,13 @@
 
 (deftest ^:sql customer-ivs
   (testing "creates crypto record for each customer that does not have one yet"
+    ;; FIXME Does not work after renaming customers to orgs.  We should run all migrations up to the
+    ;; one we're testing here
     (eh/with-prepared-db conn
       (let [mig (sut/customer-ivs 1)
             cust (eh/gen-customer)
-            cust-id (:id (ec/insert-customer conn cust))]
+            cust-id (:id #_(ec/insert-customer conn cust)
+                         (ec/insert-entity conn :customers cust))]
         (is (number? cust-id))
         (is (nil? ((:up mig) conn)))
         (is (= 1 (count (ec/select-cryptos conn (ec/by-customer cust-id)))))))))
@@ -43,7 +46,7 @@
           cust-id (:id (ec/insert-customer conn cust))
           param (ec/insert-customer-param
                  conn
-                 {:customer-id cust-id})
+                 {:org-id cust-id})
           pv {:name "test-param"
               :value "test-value"}]
       (is (some? (ec/insert-customer-param-value
@@ -51,7 +54,7 @@
                   (assoc pv :params-id (:id param)))))
       (is (some? (ec/insert-crypto
                   conn
-                  {:customer-id cust-id
+                  {:org-id cust-id
                    :iv (v/generate-iv)})))
       
       (testing "`up` encrypts all customer parameter values"
@@ -78,21 +81,21 @@
                    :public-key "test-pubkey"}]
       (is (some? (ec/insert-ssh-key
                   conn
-                  (assoc ssh-key :customer-id cust-id))))
+                  (assoc ssh-key :org-id cust-id))))
       (is (some? (ec/insert-crypto
                   conn
-                  {:customer-id cust-id
+                  {:org-id cust-id
                    :iv (v/generate-iv)})))
       
       (testing "`up` encrypts all customer parameter values"
         (is (some? ((:up mig) conn)))
-        (is (= "encrypted" (-> (ec/select-ssh-keys conn [:= :customer-id cust-id])
+        (is (= "encrypted" (-> (ec/select-ssh-keys conn [:= :org-id cust-id])
                                first
                                :private-key))))
 
       (testing "`down` decrypts all customer parameter values"
         (is (some? ((:down mig) conn)))
-        (is (= "decrypted" (-> (ec/select-ssh-keys conn [:= :customer-id cust-id])
+        (is (= "decrypted" (-> (ec/select-ssh-keys conn [:= :org-id cust-id])
                                first
                                :private-key)))))))
 
@@ -102,7 +105,7 @@
           cust (eh/gen-customer)
           cust-id (:id (ec/insert-customer conn cust))
           repo (-> (eh/gen-repo)
-                   (assoc :customer-id cust-id))
+                   (assoc :org-id cust-id))
           repo-id (:id (ec/insert-repo conn repo))]
 
       (is (some? (ec/insert-build

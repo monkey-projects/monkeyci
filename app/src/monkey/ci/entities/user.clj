@@ -7,7 +7,7 @@
   (->> (ec/select conn
                   {:select [:c.cuid]
                    :from [[:customers :c]]
-                   :join [[:user-customers :uc] [:= :uc.customer-id :c.id]]
+                   :join [[:user-customers :uc] [:= :uc.org-id :c.id]]
                    :where [:= :uc.user-id user-id]})
        (map :cuid)))
 
@@ -18,7 +18,7 @@
   (ec/select conn
              {:select [:c.*]
               :from [[:customers :c]]
-              :join [[:user-customers :uc] [:= :uc.customer-id :c.id]
+              :join [[:user-customers :uc] [:= :uc.org-id :c.id]
                      [:users :u] [:= :u.id :uc.user-id]]
               :where [:= :u.cuid user-cuid]}))
 

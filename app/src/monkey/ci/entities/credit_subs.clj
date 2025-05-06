@@ -4,7 +4,7 @@
 (defn select-credit-subs [conn f]
   (->> {:select [:cs.* [:c.cuid :cust-cuid]]
         :from [[:credit-subscriptions :cs]]
-        :join [[:customers :c] [:= :c.id :cs.customer-id]]
+        :join [[:customers :c] [:= :c.id :cs.org-id]]
         :where f}
        (ec/select conn)
        (map ec/convert-credit-sub-select)
@@ -12,7 +12,7 @@
               (-> r
                   (dissoc :cuid :cust-cuid)
                   (assoc :id (:cuid r)
-                         :customer-id (:cust-cuid r)))))))
+                         :org-id (:cust-cuid r)))))))
 
 (defn by-cuid [id]
   [:= :cs.cuid id])

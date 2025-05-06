@@ -70,7 +70,7 @@
 (s/def :build/sid (s/coll-of id? :count 3))
 (s/def :build/cleanup? boolean?)
 (s/def :build/webhook-id id?)
-(s/def :build/customer-id id?)
+(s/def :build/org-id id?)
 (s/def :build/repo-id id?)
 (s/def :build/source #{:github-webhook :github-app :api :bitbucket-webhook})
 (s/def :build/checkout-dir path?)
@@ -100,7 +100,7 @@
   (s/keys :opt-un [:changes/added :changes/removed :changes/modified]))
 
 (s/def ::build
-  (-> (s/keys :req-un [:build/customer-id :build/repo-id :build/build-id :build/sid
+  (-> (s/keys :req-un [:build/org-id :build/repo-id :build/build-id :build/sid
                        :build/source]
               :opt-un [:build/git :build/cleanup? :build/webhook-id :build/script :build/checkout-dir
                        :build/changes :build/workspace :build/status ::c/timeout])

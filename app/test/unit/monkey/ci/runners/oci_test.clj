@@ -28,7 +28,7 @@
            (h/base64->)))
 
 (deftest instance-config
-  (let [build {:customer-id "test-cust"
+  (let [build {:org-id "test-cust"
                :repo-id "test-repo"
                :build-id "test-build"
                :git {:ssh-keys [{:private-key "test-privkey"
@@ -57,7 +57,7 @@
       (is (every? zero? (map (comp :run-as-user :security-context) co))))
 
     (testing "assigns freeform tags containing build info"
-      (is (= {"customer-id" "test-cust"
+      (is (= {"org-id" "test-cust"
               "repo-id" "test-repo"
               "build-id" "test-build"}
              (:freeform-tags ic))))
@@ -231,10 +231,10 @@
         (let [ssh-key "decrypted-key"
               cust (h/gen-cust)
               build (-> (h/gen-build)
-                        (assoc :customer-id (:id cust))
+                        (assoc :org-id (:id cust))
                         (assoc-in [:git :ssh-keys] [{:private-key (p/encrypt vault iv ssh-key)
                                                      :public-key "test-pub"}]))
-              _ (st/save-crypto st {:customer-id (:id cust)
+              _ (st/save-crypto st {:org-id (:id cust)
                                     :iv iv})
               r (-> {:event {:type :build/pending
                              :sid (st/ext-build-sid build)

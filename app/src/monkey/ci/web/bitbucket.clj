@@ -130,13 +130,13 @@
   [req]
   (let [s (c/req->storage req)
         body (c/body req)
-        cust-id (c/customer-id req)
+        cust-id (c/org-id req)
         cust (st/find-customer s cust-id)]
     (if cust
       (let [repo (-> body
-                     (select-keys [:customer-id :name :url :main-branch])
+                     (select-keys [:org-id :name :url :main-branch])
                      (assoc :id (c/gen-repo-display-id s body)))
-            wh {:customer-id cust-id
+            wh {:org-id cust-id
                 :repo-id (:id repo)
                 :id (cuid/random-cuid)
                 :secret-key (auth/generate-secret-key)}]
@@ -155,7 +155,7 @@
   "Unwatches Bitbucket repo by deactivating any existing webhook."
   [req]
   (let [s (c/req->storage req)
-        cust-and-repo (comp (juxt :customer-id :repo-id) :path :parameters)
+        cust-and-repo (comp (juxt :org-id :repo-id) :path :parameters)
         repo-sid (cust-and-repo req)
         repo (st/find-repo s repo-sid)]
     (if repo
@@ -180,13 +180,13 @@
       "branch" (str "refs/heads/" name)
       "tag" (str "refs/tags/" name))))
 
-(defn- make-build [req {:keys [customer-id repo-id] :as wh}]
+(defn- make-build [req {:keys [org-id repo-id] :as wh}]
   (let [st (c/req->storage req)
-        rsid [customer-id repo-id]
+        rsid [org-id repo-id]
         body (c/body req)
         repo (st/find-repo st rsid)
         ssh-keys (c/find-ssh-keys st repo)]
-    (-> (zipmap [:customer-id :repo-id] rsid)
+    (-> (zipmap [:org-id :repo-id] rsid)
         (assoc :id (st/new-id)
                :source :bitbucket-webhook
                :start-time (t/now)
@@ -226,7 +226,7 @@
 (defn list-webhooks
   "Lists all bitbucket webhooks for customer, possibly filtered by repo"
   [req]
-  (let [cust-id (c/customer-id req)
+  (let [cust-id (c/org-id req)
         st (c/req->storage req)
         params (:parameters req)
         matches (st/search-bb-webhooks st (merge (:path params) (:query params)))]

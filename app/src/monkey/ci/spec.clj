@@ -103,11 +103,11 @@
 (s/def :conf/url url?)
 
 ;; Account configuration
-(s/def :conf/customer-id string?)
+(s/def :conf/org-id string?)
 (s/def :conf/project-id string?)
 (s/def :conf/repo-id string?)
 (s/def :conf/build-id string?)
-(s/def :conf/account (s/keys :req-un [:conf/customer-id]
+(s/def :conf/account (s/keys :req-un [:conf/org-id]
                              :opt-un [:conf/url :conf/project-id :conf/repo-id]))
 
 (s/def :conf/socket string?)

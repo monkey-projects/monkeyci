@@ -24,7 +24,7 @@
   (-> (ec/select conn
                  {:select [:r.id]
                   :from [[:repos :r]]
-                  :join [[:customers :c] [:= :c.id :r.customer-id]]
+                  :join [[:customers :c] [:= :c.id :r.org-id]]
                   :where [:and
                           [:= :c.cuid cust-cuid]
                           [:= :r.display-id display-id]]})
@@ -35,7 +35,7 @@
   (->> (ec/select conn
                   {:select [:r.display-id]
                    :from [[:repos :r]]
-                   :join [[:customers :c] [:= :c.id :r.customer-id]]
+                   :join [[:customers :c] [:= :c.id :r.org-id]]
                    :where [:= :c.cuid cust-id]})
        (map :display-id)))
 
@@ -45,7 +45,7 @@
                    :from [[:repo-indices :ri]]
                    :for :update
                    :join [[:repos :r] [:= :r.id :ri.repo-id]
-                          [:customers :c] [:= :r.customer-id :c.id]]
+                          [:customers :c] [:= :r.org-id :c.id]]
                    :where [:and
                            [:= :c.cuid cust-id]
                            [:= :r.display-id repo-id]]})

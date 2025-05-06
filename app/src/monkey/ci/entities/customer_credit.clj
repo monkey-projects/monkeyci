@@ -5,7 +5,7 @@
 
 (def base-query
   {:from [[:customer-credits :cc]]
-   :join [[:customers :c] [:= :c.id :cc.customer-id]]
+   :join [[:customers :c] [:= :c.id :cc.org-id]]
    :left-join [[:credit-subscriptions :cs] [:= :cs.id :cc.subscription-id]
                [:users :u] [:= :u.id :cc.user-id]]})
 
@@ -13,7 +13,7 @@
   (->> (assoc base-query
               :select [:cc.amount :cc.from-time :cc.type :cc.reason
                        [:cc.cuid :id]
-                       [:c.cuid :customer-id]
+                       [:c.cuid :org-id]
                        [:cs.cuid :subscription-id]
                        [:u.cuid :user-id]]
               :where f)
@@ -43,7 +43,7 @@
         conn
         {:select [:cc.amount :cc.from-time :cc.type :cc.reason
                   [:cc.cuid :id]
-                  [:c.cuid :customer-id]
+                  [:c.cuid :org-id]
                   [:cs.cuid :subscription-id]
                   [:u.cuid :user-id]
                   [:cco.amount :used]]
@@ -51,7 +51,7 @@
          :left-join [[:customer-credits :cc] [:= :cc.id :cco.credit-id]
                      [:credit-subscriptions :cs] [:= :cs.id :cc.subscription-id]
                      [:users :u] [:= :u.id :cc.user-id]
-                     [:customers :c] [:= :c.id :cc.customer-id]]
+                     [:customers :c] [:= :c.id :cc.org-id]]
          :where [:= :c.cuid cust-id]
          ;; Group by amount required by mysql
          :group-by [:cc.id :cco.amount]

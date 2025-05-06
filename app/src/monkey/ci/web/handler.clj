@@ -65,14 +65,14 @@
    (s/optional-key :id) s/Str})
 
 (s/defschema NewWebhook
-  {:customer-id Id
+  {:org-id Id
    :repo-id Id})
 
 (s/defschema UpdateWebhook
   (assoc-id NewWebhook))
 
 (s/defschema NewRepo
-  {:customer-id Id
+  {:org-id Id
    :name Name
    :url s/Str
    (s/optional-key :main-branch) Id
@@ -108,14 +108,14 @@
 
 (s/defschema Parameters
   {(s/optional-key :id) Id
-   (s/optional-key :customer-id) Id
+   (s/optional-key :org-id) Id
    :parameters [ParameterValue]
    (s/optional-key :description) s/Str
    :label-filters [LabelFilter]})
 
 (s/defschema SshKeys
   {(s/optional-key :id) Id
-   (s/optional-key :customer-id) Id
+   (s/optional-key :org-id) Id
    :private-key s/Str
    :public-key s/Str ; TODO It may be possible to extract public key from private
    (s/optional-key :description) s/Str
@@ -274,7 +274,7 @@
        (conj watch-routes))])
 
 (s/defschema JoinRequestSchema
-  {:customer-id Id
+  {:org-id Id
    (s/optional-key :message) s/Str})
 
 (s/defschema JoinRequestResponse
@@ -349,7 +349,7 @@
      :new-schema NewCustomer
      :update-schema UpdateCustomer
      :search-schema SearchCustomer
-     :id-key :customer-id
+     :id-key :org-id
      :child-routes [repo-routes
                     customer-parameter-routes
                     customer-ssh-keys-routes

@@ -93,13 +93,13 @@
                   :dir))))
 
   (testing "takes account settings from args"
-    (is (= {:customer-id "test-customer"
+    (is (= {:org-id "test-customer"
             :repo-id "arg-repo"}
            (-> (sut/app-config {}
-                               {:customer-id "test-customer"
+                               {:org-id "test-customer"
                                 :repo-id "arg-repo"})
                :account
-               (select-keys [:customer-id :repo-id])))))
+               (select-keys [:org-id :repo-id])))))
 
   (testing "uses `server` arg as account url"
     (is (= "http://test"

@@ -113,9 +113,9 @@
                            :headers {"host" "localhost"}
                            :parameters
                            {:path
-                            {:customer-id (:id cust)}
+                            {:org-id (:id cust)}
                             :body
-                            {:customer-id (:id cust)
+                            {:org-id (:id cust)
                              :workspace ws
                              :repo-slug slug
                              :url "http://bitbucket.org/test-repo"
@@ -155,7 +155,7 @@
     (testing "404 if customer not found"
       (is (= 404 (-> {:storage st}
                      (h/->req)
-                     (assoc-in [:parameters :path :customer-id] "invalid-customer")
+                     (assoc-in [:parameters :path :org-id] "invalid-customer")
                      (assoc :scheme :http
                             :headers {"host" "localhost"}
                             :uri "/customer")
@@ -170,7 +170,7 @@
           repo (h/gen-repo)
           cust (-> (h/gen-cust)
                    (assoc :repos {(:id repo) repo}))
-          wh {:customer-id (:id cust)
+          wh {:org-id (:id cust)
               :repo-id (:id repo)
               :id (cuid/random-cuid)}
           bb-wh {:id (cuid/random-cuid)
@@ -195,7 +195,7 @@
                        (h/->req)
                        (assoc :parameters
                               {:path
-                               {:customer-id (:id cust)
+                               {:org-id (:id cust)
                                 :repo-id (:id repo)}})
                        (sut/unwatch-repo)
                        :status)))
@@ -226,9 +226,9 @@
         _ (st/save-customer s cust)
         wh {:id (cuid/random-cuid)
             :repo-id (:id repo)
-            :customer-id (:id cust)}
+            :org-id (:id cust)}
         _ (st/save-webhook s wh)
-        _ (st/save-customer-credit s {:customer-id (:id cust)
+        _ (st/save-customer-credit s {:org-id (:id cust)
                                       :amount 1000})
         req (-> rt
                 (h/->req)
@@ -271,7 +271,7 @@
         (is (st/sid? (st/save-repo s (assoc repo :labels [{:name "ssh-lbl"
                                                            :value "lbl-val"}]))))
         (is (st/sid? (st/save-ssh-keys s (:id cust) [ssh-key])))
-        (is (st/sid? (st/save-crypto s {:customer-id (:id cust)
+        (is (st/sid? (st/save-crypto s {:org-id (:id cust)
                                         :iv iv})))
         (let [evts (-> (sut/webhook req)
                        (r/get-events))]

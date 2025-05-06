@@ -45,7 +45,7 @@
   {:name ::customer-credits
    :enter (fn [ctx]
             (set-credits ctx (st/calc-available-credits (get-db ctx)
-                                                        (get-in ctx [:event :build :customer-id]))))})
+                                                        (get-in ctx [:event :build :org-id]))))})
 
 (def load-build
   {:name ::load-build
@@ -138,19 +138,19 @@
   {:name ::save-credit-consumption
    :leave (transactional
            (fn [ctx]
-             (let [{:keys [credits customer-id] :as build} (or (get-build ctx)
+             (let [{:keys [credits org-id] :as build} (or (get-build ctx)
                                                                (:build (em/get-result ctx)))
                    storage (get-db ctx)]
                (when (and (some? credits) (pos? credits))
                  (log/debug "Consumed credits for build" (build->sid build) ":" credits)
-                 (let [avail (st/list-available-credits storage customer-id)]
+                 (let [avail (st/list-available-credits storage org-id)]
                    ;; TODO To avoid problems when there are no available credits at this point, we should
                    ;; consider "reserving" one at the start of the build.  We have to do a check at that
                    ;; point anyway.
                    (if (empty? avail)
                      (log/warn "No available customer credits for build" (build->sid build))
                      (st/save-credit-consumption storage
-                                                 (-> (select-keys build [:customer-id :repo-id :build-id])
+                                                 (-> (select-keys build [:org-id :repo-id :build-id])
                                                      (assoc :amount credits
                                                             :consumed-at (t/now)
                                                             :credit-id (-> avail first :id)))))))

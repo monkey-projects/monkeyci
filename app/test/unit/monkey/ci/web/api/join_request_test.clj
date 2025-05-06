@@ -15,7 +15,7 @@
         (is (sid/sid? (st/save-user st u)))
         (is (sid/sid? (st/save-customer st cust)))
         (is (sid/sid? (st/save-join-request st {:user-id (:id u)
-                                                :customer-id (:id cust)})))
+                                                :org-id (:id cust)})))
         
         (testing "adds customer name"
           (let [r (-> {:storage st}
@@ -33,7 +33,7 @@
           cust (h/gen-cust)
           jr {:id (cuid/random-cuid)
               :user-id (:id u)
-              :customer-id (:id cust)
+              :org-id (:id cust)
               :status :pending}]
 
       (is (sid/sid? (st/save-user st u)))
@@ -42,7 +42,7 @@
       (let [r (-> {:storage st}
                   (h/->req)
                   (assoc :parameters {:path {:request-id (:id jr)
-                                             :customer-id (:id cust)}
+                                             :org-id (:id cust)}
                                       :body {:message "request approved"}})
                   (sut/approve-join-request))]
         (is (= 200 (:status r)))
@@ -60,7 +60,7 @@
         (is (= 400 (-> {:storage st}
                        (h/->req)
                        (assoc :parameters {:path {:request-id (:id jr)
-                                                  :customer-id (:id cust)}
+                                                  :org-id (:id cust)}
                                            :body {:message "request approved"}})
                        (sut/approve-join-request)
                        :status)))))))
@@ -72,7 +72,7 @@
           cust (h/gen-cust)
           jr {:id (cuid/random-cuid)
               :user-id (:id u)
-              :customer-id (:id cust)
+              :org-id (:id cust)
               :status :pending}]
 
       (is (sid/sid? (st/save-user st u)))
@@ -81,7 +81,7 @@
       (let [r (-> {:storage st}
                   (h/->req)
                   (assoc :parameters {:path {:request-id (:id jr)
-                                             :customer-id (:id cust)}
+                                             :org-id (:id cust)}
                                       :body {:message "request approved"}})
                   (sut/reject-join-request))]
         (is (= 200 (:status r)))

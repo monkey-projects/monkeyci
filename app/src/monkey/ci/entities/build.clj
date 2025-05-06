@@ -6,7 +6,7 @@
   {:select [:b.*]
    :from [[:builds :b]]
    :join [[:repos :r] [:= :r.id :b.repo-id]
-          [:customers :c] [:= :c.id :r.customer-id]]})
+          [:customers :c] [:= :c.id :r.org-id]]})
 
 (defn- build-query
   [cust-cuid repo-id]
@@ -87,7 +87,7 @@
             :from [[:build-runner-details :rd]]
             :join [[:builds :b] [:= :b.id :rd.build-id]
                    [:repos :r] [:= :r.id :b.repo-id]
-                   [:customers :c] [:= :c.id :r.customer-id]]
+                   [:customers :c] [:= :c.id :r.org-id]]
             :where f}
            (ec/select conn)
            (first)

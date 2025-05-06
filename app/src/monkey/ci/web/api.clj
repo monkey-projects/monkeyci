@@ -24,7 +24,7 @@
 
 (c/make-entity-endpoints "repo"
                          ;; The repo is part of the customer, so combine the ids
-                         {:get-id (c/id-getter (juxt :customer-id :repo-id))
+                         {:get-id (c/id-getter (juxt :org-id :repo-id))
                           :getter st/find-repo
                           :saver st/save-repo
                           :deleter st/delete-repo
@@ -58,7 +58,7 @@
 (def create-webhook (comp (c/entity-creator st/save-webhook c/default-id)
                           assign-webhook-secret))
 
-(def customer-id c/customer-id)
+(def org-id c/org-id)
 
 (def get-customer-ssh-keys
   (partial c/get-list-for-customer (comp c/drop-ids st/find-ssh-keys)))
@@ -211,7 +211,7 @@
   (let [{st :storage :as rt} (c/req->rt req)
         ssh-keys (c/find-ssh-keys st repo)]
     (-> (:path p)
-        (select-keys [:customer-id :repo-id])
+        (select-keys [:org-id :repo-id])
         (initialize-build)
         (assoc :git (-> (:query p)
                         (select-keys [:commit-id :branch :tag])
@@ -283,7 +283,7 @@
   [req]
   (eh/bus-stream (c/from-rt req :update-bus)
                  #{:build/updated}
-                 (comp (partial = (customer-id req)) first :sid)))
+                 (comp (partial = (org-id req)) first :sid)))
 
 (c/make-entity-endpoints "email-registration"
                          {:get-id (c/id-getter :email-registration-id)

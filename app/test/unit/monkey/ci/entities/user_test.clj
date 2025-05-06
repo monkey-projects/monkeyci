@@ -12,5 +12,5 @@
                                    (map (partial ec/insert-customer conn)))
             user (ec/insert-user conn (eh/gen-user))
             _ (ec/insert-user-customer conn {:user-id (:id user)
-                                             :customer-id (:id cust)})]
+                                             :org-id (:id cust)})]
         (is (= [cust] (sut/select-user-customers conn (:cuid user))))))))

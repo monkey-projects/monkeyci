@@ -4,7 +4,7 @@
 (def base-query
   {:select [:i.* [:c.cuid :customer-cuid]]
    :from [[:invoices :i]]
-   :join [[:customers :c] [:= :c.id :i.customer-id]]})
+   :join [[:customers :c] [:= :c.id :i.org-id]]})
 
 (defn select-invoice-with-customer [conn cuid]
   (->> (assoc base-query

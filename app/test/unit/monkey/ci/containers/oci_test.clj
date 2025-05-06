@@ -69,7 +69,7 @@
                      :job {:id "test-job"}}
                     (sut/instance-config)
                     :freeform-tags)]
-      (is (= "test-cust" (get tags "customer-id")))
+      (is (= "test-cust" (get tags "org-id")))
       (is (= "test-repo" (get tags "repo-id")))
       (is (= "test-build" (get tags "build-id")))
       (is (= "test-job" (get tags "job-id")))))
@@ -80,7 +80,7 @@
                      :oci {:freeform-tags {"env" "test"}}}
                     (sut/instance-config)
                     :freeform-tags)]
-      (is (= "test-cust" (get tags "customer-id")))
+      (is (= "test-cust" (get tags "org-id")))
       (is (= "test" (get tags "env")))))
 
   (testing "all containers have checkout volume"

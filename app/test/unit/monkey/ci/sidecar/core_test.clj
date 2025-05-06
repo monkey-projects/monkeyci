@@ -223,7 +223,7 @@
       (testing "restores artifacts if configured"
         (h/with-tmp-dir dir
           (let [stored (atom {"test-cust/test-repo/test-build/test-artifact.tgz" "/tmp/checkout"})
-                build {:customer-id "test-cust"
+                build {:org-id "test-cust"
                        :repo-id "test-repo"
                        :build-id "test-build"
                        :checkout-dir "/tmp/checkout"
@@ -251,7 +251,7 @@
           (let [stored (atom {})
                 path "test-artifact"
                 _ (fs/create-file (fs/path dir path))
-                build {:customer-id "test-cust"
+                build {:org-id "test-cust"
                        :repo-id "test-repo"
                        :build-id "test-build"
                        :checkout-dir dir

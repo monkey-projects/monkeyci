@@ -24,11 +24,11 @@
   "Retrieves request body"
   (comp :body :parameters))
 
-(def customer-id (comp :customer-id :path :parameters))
+(def org-id (comp :org-id :path :parameters))
 
 (def repo-sid
   "Retrieves repo sid from the request"
-  (comp (juxt :customer-id :repo-id)
+  (comp (juxt :org-id :repo-id)
         :path
         :parameters))
 
@@ -166,14 +166,14 @@
          (map make-ep)
          (doall))))
 
-(def drop-ids (partial map #(dissoc % :customer-id)))
+(def drop-ids (partial map #(dissoc % :org-id)))
 
 (defn get-list-for-customer
   "Utility function that uses the `finder` to fetch a list of things from storage
    using the customer id from the request.  Returns the result as a http response."
   [finder req]
   (-> (req->storage req)
-      (finder (customer-id req))
+      (finder (org-id req))
       (or [])
       (rur/response)))
 
@@ -187,7 +187,7 @@
         p (->> (body req)
                (map assign-id))]
     ;; TODO Allow patching values so we don't have to send back all secrets to client
-    (when (updater (req->storage req) (customer-id req) p)
+    (when (updater (req->storage req) (org-id req) p)
       (rur/response p))))
 
 (defn get-for-repo-by-label
@@ -199,7 +199,7 @@
         sid (repo-sid req)
         repo (st/find-repo st sid)]
     (if repo
-      (->> (finder st (customer-id req))
+      (->> (finder st (org-id req))
            (lbl/filter-by-label repo)
            (into [] tx)
            (rur/response))
@@ -210,7 +210,7 @@
    and generates an id from the name.  If the display id is already taken, it adds
    an index."
   [st obj]
-  (let [existing? (-> (:customer-id obj)
+  (let [existing? (-> (:org-id obj)
                       (as-> cid (st/list-repo-display-ids st cid))
                       (set))
         ;; TODO Check what happens with special chars
@@ -265,22 +265,22 @@
        (:iv crypto)
        (let [iv (v/generate-iv)]
          (log/debug "No crypto record found for customer" cust-id ", generating a new one")
-         (when (st/save-crypto st {:customer-id cust-id
+         (when (st/save-crypto st {:org-id cust-id
                                    :iv iv})
            iv))))
   ([req]
-   (let [cust-id (customer-id req)
+   (let [cust-id (org-id req)
          st (req->storage req)]
      (crypto-iv st cust-id))))
 
 (defn find-ssh-keys
   "Finds ssh keys for the given repo, and if the vault is specified, also decrypts them."
   ([st repo]
-   (let [cust-id (:customer-id repo)]
+   (let [cust-id (:org-id repo)]
      (->> (st/find-ssh-keys st cust-id)
           (lbl/filter-by-label repo))))
   ([st vault repo]
-   (let [cust-id (:customer-id repo)
+   (let [cust-id (:org-id repo)
          iv (crypto-iv st cust-id)]
      (->> (find-ssh-keys st repo)
           (map #(update % :private-key (partial p/decrypt vault iv)))))))

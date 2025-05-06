@@ -8,7 +8,7 @@
   (ec/select conn
              {:select [:p.* [:c.cuid :customer-cuid]]
               :from [[:customer-params :p]]
-              :join [[:customers :c] [:= :c.id :p.customer-id]]
+              :join [[:customers :c] [:= :c.id :p.org-id]]
               :where f}))
 
 (defn- select-params-with-values
@@ -21,7 +21,7 @@
                    (map (fn [p]
                           (-> (select-keys p [:description :label-filters])
                               (assoc :id (:cuid p)
-                                     :customer-id (:customer-cuid p)
+                                     :org-id (:customer-cuid p)
                                      :parameters (map ->param-vals (get pvs (:id p))))
                               (ec/convert-label-filters-select)
                               (as-> x (mc/remove-vals nil? x))))

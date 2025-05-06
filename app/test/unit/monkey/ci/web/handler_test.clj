@@ -264,7 +264,7 @@
               user (h/gen-user)
               jr {:id (st/new-id)
                   :status "pending"
-                  :customer-id (:id cust)
+                  :org-id (:id cust)
                   :user-id (:id user)}]
           (is (some? (st/save-customer st cust)))
           (is (some? (st/save-user st user)))
@@ -367,7 +367,7 @@
           (let [repo (h/gen-repo)
                 cust (assoc cust :repos {(:id repo) repo})
                 wh {:id (cuid/random-cuid)
-                    :customer-id (:id cust)
+                    :org-id (:id cust)
                     :repo-id (:id repo)
                     :secret "test secret"}
                 bb {:webhook-id (:id wh)
@@ -391,7 +391,7 @@
 
             (testing "contains customer and repo id"
               (let [r (-> (search "") first)]
-                (is (= (:id cust) (:customer-id r)))
+                (is (= (:id cust) (:org-id r)))
                 (is (= (:id repo) (:repo-id r)))))
             
             (testing "allows filtering by query params"
@@ -401,7 +401,7 @@
 
         (testing "`/invoice`"
           (let [inv (-> (h/gen-invoice)
-                        (assoc :customer-id (:id cust)))]
+                        (assoc :org-id (:id cust)))]
             (is (some? (st/save-invoice st inv)))
             
             (testing "`GET` searches invoices"
@@ -463,7 +463,7 @@
     (verify-entity-endpoints {:name "repository"
                               :path (format "/customer/%s/repo" cust-id)
                               :base-entity {:name "test repo"
-                                            :customer-id cust-id
+                                            :org-id cust-id
                                             :url "http://test-repo"
                                             :labels [{:name "app" :value "test-app"}]}
                               :updated-entity {:name "updated repo"}
@@ -476,7 +476,7 @@
           (is (= 200 (-> (h/json-request :post
                                          (str "/customer/" cust-id "/repo/github/watch")
                                          {:github-id 12324
-                                          :customer-id cust-id
+                                          :org-id cust-id
                                           :name "test-repo"
                                           :url "http://test"})
                          (test-app)
@@ -486,7 +486,7 @@
           (let [st (st/make-memory-storage)
                 app (make-test-app st)
                 repo-id (st/new-id)
-                _ (st/watch-github-repo st {:customer-id cust-id
+                _ (st/watch-github-repo st {:org-id cust-id
                                             :id repo-id
                                             :github-id 1234})]
             (is (= 200 (-> (mock/request :post
@@ -501,7 +501,7 @@
           (testing "`/watch` starts watching bitbucket repo"
             (is (= 201 (-> (h/json-request :post
                                            (str "/customer/" cust-id "/repo/bitbucket/watch")
-                                           {:customer-id cust-id
+                                           {:org-id cust-id
                                             :name "test-repo"
                                             :url "http://test"
                                             :workspace "test-ws"
@@ -517,7 +517,7 @@
                   wh-id (st/new-id)
                   _ (st/save-customer st {:id cust-id
                                           :repos {repo-id {:id repo-id}}})
-                  _ (st/save-webhook st {:customer-id cust-id
+                  _ (st/save-webhook st {:org-id cust-id
                                          :repo-id repo-id
                                          :id wh-id
                                          :secret (str (random-uuid))})
@@ -531,7 +531,7 @@
 
 (deftest webhook-endpoints
   (verify-entity-endpoints {:name "webhook"
-                            :base-entity {:customer-id "test-cust"
+                            :base-entity {:org-id "test-cust"
                                           :repo-id "test-repo"}
                             :updated-entity {:repo-id "updated-repo"}
                             :creator st/save-webhook}))
@@ -587,7 +587,7 @@
           
           (testing "`POST` create new join request"
             (let [r (-> (h/json-request :post base-path 
-                                        {:customer-id (:id cust)})
+                                        {:org-id (:id cust)})
                         (app))]
               (is (= 201 (:status r)))
               (let [created (h/reply->json r)]
@@ -622,7 +622,7 @@
           (-> (h/json-request :put path entity)
               (app)))]
 
-    (testing "/customer/:customer-id"
+    (testing "/customer/:org-id"
       
       (testing path
         (let [cust-id (st/new-id)
@@ -675,7 +675,7 @@
         param {:parameters [{:name "test-param"
                              :value "test value"}]
                :description "original desc"
-               :customer-id cust-id
+               :org-id cust-id
                :label-filters []}]
     (verify-entity-endpoints
      {:name "customer param"
@@ -683,7 +683,7 @@
       :base-entity param
       :updated-entity {:description "updated description"}
       :creator (fn [s p]
-                 (st/save-param s (assoc p :customer-id cust-id)))
+                 (st/save-param s (assoc p :org-id cust-id)))
       :can-delete? true})))
 
 (deftest ssh-keys-endpoints
@@ -701,7 +701,7 @@
           ssh-key {:private-key "test-private-key"
                    :public-key "test-public-key"
                    :description "original desc"
-                   :customer-id cust-id
+                   :org-id cust-id
                    :label-filters []}]
       (verify-entity-endpoints
        {:name "customer ssh key"
@@ -709,7 +709,7 @@
         :base-entity ssh-key
         :updated-entity {:description "updated description"}
         :creator (fn [s p]
-                   (st/save-ssh-key s (assoc p :customer-id cust-id)))
+                   (st/save-ssh-key s (assoc p :org-id cust-id)))
         :can-delete? true})))
 
 (defn- generate-build-sid []
@@ -733,7 +733,7 @@
                                   (mm/meta-merge rt))
         app (sut/make-app trt)
         [_ repo-id _ :as sid] (generate-build-sid)
-        build (-> (zipmap [:customer-id :repo-id :build-id] sid)
+        build (-> (zipmap [:org-id :repo-id :build-id] sid)
                   (assoc :status :success
                          :message "test msg"
                          :git {:message "test meta"}))
@@ -742,7 +742,7 @@
                                        :repos {repo-id {:id repo-id
                                                         :name "test repo"}}})))
     (is (st/sid? (st/save-build st build)))
-    (is (st/sid? (st/save-customer-credit st {:customer-id (first sid)
+    (is (st/sid? (st/save-customer-credit st {:org-id (first sid)
                                               :amount 1000})))
     (f (assoc trt
               :sid sid
@@ -858,7 +858,7 @@
                 (is (= 404 (:status l)))))))))))
 
 (deftest event-stream
-  (testing "`GET /customer/:customer-id/events` exists"
+  (testing "`GET /customer/:org-id/events` exists"
     (is (not= 404
               (-> (mock/request :get "/customer/test-cust/events")
                   (test-app)
@@ -1153,7 +1153,7 @@
 (deftest admin-routes
   (testing "`/admin`"
     (testing "`/credits`"
-      (testing "`/:customer-id`"
+      (testing "`/:org-id`"
         (let [cust (h/gen-cust)
               make-path (fn [& [path]]
                           (cond-> (str "/admin/credits/" (:id cust))

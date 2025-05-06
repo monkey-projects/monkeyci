@@ -56,7 +56,7 @@
   [ci]
   (let [{job-id "job-id" :as tags} (:freeform-tags ci)]
     (cond-> (-> tags
-                (select-keys ["customer-id" "repo-id" "build-id"])
+                (select-keys ["org-id" "repo-id" "build-id"])
                 (vals))
       job-id (-> (vector)
                  (conj job-id)))))

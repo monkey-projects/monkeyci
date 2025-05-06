@@ -10,7 +10,7 @@
    :from [[:credit-consumptions :cc]]
    :join [[:builds :b] [:= :b.id :cc.build-id]
           [:repos :r] [:= :r.id :b.repo-id]
-          [:customers :c] [:= :c.id :r.customer-id]
+          [:customers :c] [:= :c.id :r.org-id]
           [:customer-credits :cred] [:= :cred.id :cc.credit-id]]})
 
 (defn select-credit-cons [conn f]
@@ -21,7 +21,7 @@
               (-> r
                   (dissoc :cuid :cust-cuid :repo-did :build-did :cred-cuid)
                   (assoc :id (:cuid r)
-                         :customer-id (:cust-cuid r)
+                         :org-id (:cust-cuid r)
                          :repo-id (:repo-did r)
                          :build-id (:build-did r)
                          :credit-id (:cred-cuid r)))))))

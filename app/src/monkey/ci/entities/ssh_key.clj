@@ -9,10 +9,10 @@
                             :k.public-key
                             :k.description
                             :k.label-filters
-                            [:c.cuid :customer-id]]
+                            [:c.cuid :org-id]]
                    :from [[:ssh-keys :k]
                           [:customers :c]]
                    :where [:and
                            [:= :c.cuid customer-cuid]
-                           [:= :c.id :k.customer-id]]})
+                           [:= :c.id :k.org-id]]})
        (map ec/convert-label-filters-select)))

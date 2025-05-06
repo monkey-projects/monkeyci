@@ -42,7 +42,7 @@
   (c/get-list-for-customer (comp (partial decrypt req) c/drop-ids st/find-params) req))
 
 (defn- get-param-id [req]
-  (st/params-sid (c/customer-id req)
+  (st/params-sid (c/org-id req)
                  (get-in req [:parameters :path :param-id])))
 
 (c/make-entity-endpoints
@@ -50,8 +50,8 @@
  {:get-id get-param-id
   :deleter st/delete-param})
 
-(defn- assign-customer-id [req]
-  (update-in req [:parameters :body] assoc :customer-id (c/customer-id req)))
+(defn- assign-org-id [req]
+  (update-in req [:parameters :body] assoc :org-id (c/org-id req)))
 
 (defn get-param [req]
   (let [getter (c/entity-getter get-param-id (comp (partial decrypt-one req)
@@ -60,7 +60,7 @@
 
 (def create-param 
   (comp (c/entity-creator st/save-param c/default-id)
-        assign-customer-id
+        assign-org-id
         encrypt-one))
 
 (def update-param 

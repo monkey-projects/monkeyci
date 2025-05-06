@@ -75,7 +75,7 @@
           builds {:key "value"}
           rt {:reporter (partial swap! reported conj)
               :config {:account {:url "http://server/api"
-                                 :customer-id "test-cust"
+                                 :org-id "test-cust"
                                  :repo-id "test-repo"}}}]
       (with-redefs [http/request (constantly (md/success-deferred {:body (pr-str builds)}))]
         (is (some? (sut/list-builds rt)))

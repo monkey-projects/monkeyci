@@ -46,7 +46,7 @@
 
 (defn- ->db [cust-id e]
   (assoc e
-         :customer-id cust-id
+         :org-id cust-id
          :id (s/new-id)))
 
 (defn- migrate-params [{:keys [src dest]} from-id to-id]
@@ -71,7 +71,7 @@
             (let [mb (-> (s/find-build src [(:id from) repo-id build])
                          ;; Add job id
                          (update-in [:script :jobs] set-job-id)
-                         (assoc :customer-id to-id
+                         (assoc :org-id to-id
                                 :idx (inc idx))
                          (update :status (fn [s]
                                            (if (or (nil? s) (= :running s))
@@ -106,13 +106,13 @@
 (defn- migrate-webhook [{:keys [src dest] :as state} id]
   (let [state (new-id-mapping state id)
         in (s/find-webhook src id)
-        mig-cust (new-id state (:customer-id in))]
+        mig-cust (new-id state (:org-id in))]
     (log/debug "Migrating webhook:" in)
     (if (some? mig-cust)
       (s/save-webhook dest (assoc in
-                                  :customer-id mig-cust
+                                  :org-id mig-cust
                                   :id (new-id state id)))
-      (log/warn "Unable to migrate webhook" id ", no matching customer found for" (:customer-id in)))
+      (log/warn "Unable to migrate webhook" id ", no matching customer found for" (:org-id in)))
     state))
 
 (defn- migrate-webhooks [{:keys [src] :as state}]
@@ -222,7 +222,7 @@
                               (remove nil?)
                               (reduce + 0))
               [rem cred-id] (if (neg? (- creds repo-creds))
-                              (let [cred {:customer-id cust-id
+                              (let [cred {:org-id cust-id
                                           :id (cuid/random-cuid)
                                           :amount cred-amount
                                           :type :user}]
@@ -232,7 +232,7 @@
                               [creds cred-id])]
           (log/info "Creating credit consumptions for" (count builds) "builds, totaling" repo-creds "credits.")
           (doseq [b (filter (comp (fnil pos? 0) :credits) builds)]
-            (s/save-credit-consumption st (-> (select-keys b [:build-id :repo-id :customer-id])
+            (s/save-credit-consumption st (-> (select-keys b [:build-id :repo-id :org-id])
                                               (assoc :credit-id cred-id
                                                      :id (cuid/random-cuid)
                                                      :amount (:credits b)

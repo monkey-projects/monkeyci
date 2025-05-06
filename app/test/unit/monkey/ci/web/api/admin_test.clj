@@ -53,14 +53,14 @@
   (let [{st :storage :as rt} (trt/test-runtime)
         cust (h/gen-cust)
         cred (-> (h/gen-cust-credit)
-                 (assoc :customer-id (:id cust)))]
+                 (assoc :org-id (:id cust)))]
     (is (sid/sid? (st/save-customer st cust)))
     (is (sid/sid? (st/save-customer-credit st cred)))
     
     (testing "returns list of issued credits for customer"
       (let [resp (-> rt
                      (h/->req)
-                     (assoc-in [:parameters :path :customer-id] (:id cust))
+                     (assoc-in [:parameters :path :org-id] (:id cust))
                      (sut/list-customer-credits))]
         (is (= 200 (:status resp)))
         (is (not-empty (:body resp)))))))
@@ -75,7 +75,7 @@
                        (h/with-identity user)
                        (assoc :parameters
                               {:path
-                               {:customer-id (:id cust)}
+                               {:org-id (:id cust)}
                                :body
                                {:amount 1000M}})
                        (sut/issue-credits))]
@@ -102,7 +102,7 @@
             until (+ now (t/hours->millis (* 24 40)))
             cust  (h/gen-cust)
             sub   (-> (h/gen-credit-subs)
-                      (assoc :customer-id (:id cust)
+                      (assoc :org-id (:id cust)
                              :amount 200M
                              :valid-from from
                              :valid-until until))]
@@ -146,7 +146,7 @@
                 cs {:id (cuid/random-cuid)
                     :valid-from date
                     :valid-until (+ date (t/hours->millis (* 24 100)))
-                    :customer-id (:id cust)
+                    :org-id (:id cust)
                     :amount 100}]
             (is (some? (st/save-customer st cust)))
             (is (some? (st/save-credit-subscription st cs)))
@@ -162,7 +162,7 @@
                 cs {:id (cuid/random-cuid)
                     :valid-from date
                     :valid-until (+ date (t/hours->millis (* 24 100)))
-                    :customer-id (:id cust)
+                    :org-id (:id cust)
                     :amount 150}]
             (is (some? (st/save-customer st cust)))
             (is (some? (st/save-credit-subscription st cs)))
@@ -171,12 +171,12 @@
                              :credits)))))
         
         (testing "ignores ad-hoc credit issuances"
-          (is (st/save-customer-credit st {:customer-id (:id cust)
+          (is (st/save-customer-credit st {:org-id (:id cust)
                                            :type :user
                                            :amount 1000M
                                            :valid-from (+ now 2000)}))
           (is (st/save-credit-subscription st (-> (h/gen-credit-subs)
-                                                  (assoc :customer-id (:id cust)
+                                                  (assoc :org-id (:id cust)
                                                          :amount 300M
                                                          :valid-from from
                                                          :valid-until until))))
@@ -207,7 +207,7 @@
     (let [sid (repeatedly 3 cuid/random-cuid)
           rt (-> (trt/test-runtime)
                  (trt/set-process-reaper
-                  (constantly [(zipmap [:customer-id :repo-id :build-id] sid)])))
+                  (constantly [(zipmap [:org-id :repo-id :build-id] sid)])))
           resp (-> rt
                    (h/->req)
                    (sut/cancel-dangling-builds))]
@@ -223,7 +223,7 @@
     (let [{st :storage :as rt} (trt/test-runtime)
           cust (h/gen-cust)
           cs {:id (cuid/random-cuid)
-              :customer-id (:id cust)
+              :org-id (:id cust)
               :valid-from (+ (t/now) 1000)
               :amount 1000}]
       (is (sid/sid? (st/save-customer st cust)))
@@ -231,7 +231,7 @@
       (is (= 204 (-> (h/->req rt)
                      (assoc :parameters
                             {:path
-                             {:customer-id (:id cust)
+                             {:org-id (:id cust)
                               :subscription-id (:id cs)}})
                      (sut/cancel-credit-subscription)
                      :status)))

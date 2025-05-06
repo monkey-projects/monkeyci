@@ -35,7 +35,7 @@
 (defn list-customer-credits
   "Returns overview of the issued credits to a customer"
   [req]
-  (let [cust-id (c/customer-id req)
+  (let [cust-id (c/org-id req)
         creds (s/list-customer-credits (c/req->storage req) cust-id)]
     (rur/response creds)))
 
@@ -43,10 +43,10 @@
   "Issues ad-hoc credits to a customer."
   [req]
   (let [st (c/req->storage req)
-        cid (c/customer-id req)
+        cid (c/org-id req)
         creds (-> (c/body req)
                   (assoc :id (cuid/random-cuid)
-                         :customer-id cid
+                         :org-id cid
                          :type :user
                          :user-id (auth/user-id req)))]
     (if-let [sid (s/save-customer-credit st creds)]
@@ -68,7 +68,7 @@
                 (when (empty? sc)
                   (log/info "Creating new customer credit for sub" (:id sub) ", amount" (:amount sub))
                   (s/save-customer-credit st (-> sub
-                                                 (select-keys [:customer-id :amount])
+                                                 (select-keys [:org-id :amount])
                                                  (assoc :id (cuid/random-cuid)
                                                         :type :subscription
                                                         :subscription-id (:id sub)
@@ -111,7 +111,7 @@
       (->> (s/list-active-credit-subscriptions st (+ ts (t/hours->millis 24)))
            ;; TODO Filter in the query instead of here
            (filter (comp should-process? :valid-from))
-           (group-by :customer-id)
+           (group-by :org-id)
            (mapcat (partial issue-credits-for-subs st ts))
            ;; Return list of issued credit ids
            (map last)
@@ -138,7 +138,7 @@
         (rur/response {:message "No process reaper configured"})))))
 
 (defn- req->subscription-sid [req]
-  [(c/customer-id req)
+  [(c/org-id req)
    (get-in req [:parameters :path :subscription-id])])
 
 (c/make-entity-endpoints
@@ -149,13 +149,13 @@
 (defn create-credit-subscription [req]
   (let [creator (c/entity-creator s/save-credit-subscription c/default-id)]
     (-> req
-        (update-in [:parameters :body] assoc :customer-id (c/customer-id req))
+        (update-in [:parameters :body] assoc :org-id (c/org-id req))
         (creator))))
 
 (defn list-credit-subscriptions [req]
   (-> req
       (c/req->storage)
-      (s/list-customer-credit-subscriptions (c/customer-id req))
+      (s/list-customer-credit-subscriptions (c/org-id req))
       (rur/response)))
 
 (defn cancel-credit-subscription

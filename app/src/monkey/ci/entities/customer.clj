@@ -14,7 +14,7 @@
          (mc/map-vals first)
          (assoc cust :repos))))
 
-(defn customer-ids-by-cuids
+(defn org-ids-by-cuids
   "Fetches all customer ids for given cuids"
   [conn cuids]
   (when (not-empty cuids)
@@ -28,7 +28,7 @@
   (some-> (ec/select conn
                      {:select [:cr.*]
                       :from [[:cryptos :cr]]
-                      :join [[:customers :c] [:= :c.id :cr.customer-id]]
+                      :join [[:customers :c] [:= :c.id :cr.org-id]]
                       :where [:= :c.cuid cuid]})
           (first)
-          (assoc :customer-id cuid)))
+          (assoc :org-id cuid)))

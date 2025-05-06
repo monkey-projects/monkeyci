@@ -49,7 +49,7 @@
   (eh/with-prepared-db conn
     (let [cust (sut/insert-customer conn (eh/gen-customer))
           r (sut/insert-repo conn (-> (eh/gen-repo)
-                                      (assoc :customer-id (:id cust))))]
+                                      (assoc :org-id (:id cust))))]
       (testing "can insert"
         (is (some? (:cuid r)))
         (is (number? (:id r)))
@@ -79,7 +79,7 @@
                 conn
                 {:name "test repo"
                  :display-id "test-repo"
-                 :customer-id (:id cust)
+                 :org-id (:id cust)
                  :url "http://test"})
           lbl  (sut/insert-repo-label
                 conn
@@ -106,7 +106,7 @@
                  (eh/gen-customer))
           param (sut/insert-customer-param
                  conn
-                 (assoc (eh/gen-customer-param) :customer-id (:id cust)))]
+                 (assoc (eh/gen-customer-param) :org-id (:id cust)))]
       (testing "can insert"
         (is (number? (:id param))))
 
@@ -125,7 +125,7 @@
                  (eh/gen-customer))
           param (sut/insert-customer-param
                  conn
-                 (assoc (eh/gen-customer-param) :customer-id (:id cust)))
+                 (assoc (eh/gen-customer-param) :org-id (:id cust)))
           value (sut/insert-customer-param-value
                  conn
                  (assoc (eh/gen-param-value) :params-id (:id param)))]
@@ -148,7 +148,7 @@
                 conn
                 {:name "test repo"
                  :display-id "test-repo"
-                 :customer-id (:id cust)}) 
+                 :org-id (:id cust)}) 
           wh   (sut/insert-webhook
                 conn
                 {:repo-id (:id repo)
@@ -170,7 +170,7 @@
                 (eh/gen-customer))
           key  (sut/insert-ssh-key
                 conn
-                (assoc (eh/gen-ssh-key) :customer-id (:id cust)))]
+                (assoc (eh/gen-ssh-key) :org-id (:id cust)))]
       (testing "can insert"
         (is (number? (:id key))))
 
@@ -189,7 +189,7 @@
           repo  (sut/insert-repo
                  conn
                  (-> (eh/gen-repo)
-                     (assoc :customer-id (:id cust))))
+                     (assoc :org-id (:id cust))))
           build (sut/insert-build
                  conn
                  (-> (eh/gen-build)
@@ -221,7 +221,7 @@
           repo  (sut/insert-repo
                  conn
                  (-> (eh/gen-repo)
-                     (assoc :customer-id (:id cust))))
+                     (assoc :org-id (:id cust))))
           build (sut/insert-build
                 conn
                 (-> (eh/gen-build)
@@ -264,12 +264,12 @@
 
       (testing "can link to customer"
         (is (some? (sut/insert-user-customer conn {:user-id (:id user)
-                                                   :customer-id (:id cust)}))))
+                                                   :org-id (:id cust)}))))
 
       (testing "can delete"
         (is (= 1 (sut/delete-user-customers conn [:and
                                                   [:= :user-id (:id user)]
-                                                  [:= :customer-id (:id cust)]])))
+                                                  [:= :org-id (:id cust)]])))
         (is (= 1 (sut/delete-users conn (sut/by-id (:id user)))))
         (is (empty? (sut/select-users conn (sut/by-id (:id user)))))))))
 
@@ -282,7 +282,7 @@
                            conn
                            (-> (eh/gen-join-request)
                                (assoc :user-id (:id user)
-                                      :customer-id (:id cust))))))))
+                                      :org-id (:id cust))))))))
 
       (testing "can select by user id"
         (is (some? (sut/select-join-request conn (sut/by-user (:id user))))))
@@ -309,7 +309,7 @@
   (eh/with-prepared-db conn
     (let [cust (sut/insert-customer conn (eh/gen-customer))
           cred (-> (eh/gen-cust-credit)
-                   (assoc :customer-id (:id cust))
+                   (assoc :org-id (:id cust))
                    (dissoc :subscription-id :user-id))]
       (testing "can insert"
         (is (number? (:id (sut/insert-customer-credit conn cred)))))
@@ -323,7 +323,7 @@
   (eh/with-prepared-db conn
     (let [cust (sut/insert-customer conn (eh/gen-customer))
           cred (-> (eh/gen-credit-subscription)
-                   (assoc :customer-id (:id cust)))]
+                   (assoc :org-id (:id cust)))]
       (testing "can insert"
         (is (number? (:id (sut/insert-credit-subscription conn cred)))))
 
@@ -336,13 +336,13 @@
   (eh/with-prepared-db conn
     (let [cust (sut/insert-customer conn (eh/gen-customer))
           repo (sut/insert-repo conn (assoc (eh/gen-repo)
-                                            :customer-id (:id cust)))
+                                            :org-id (:id cust)))
           build (sut/insert-build conn (assoc (eh/gen-build)
                                               :repo-id (:id repo)))
           cred (sut/insert-customer-credit
                 conn
                 (-> (eh/gen-cust-credit)
-                    (assoc :customer-id (:id cust))
+                    (assoc :org-id (:id cust))
                     (dissoc :user-id :subscription-id)))
           ccons (-> (eh/gen-credit-consumption)
                     (assoc :build-id (:id build)
@@ -359,7 +359,7 @@
   (eh/with-prepared-db conn
     (let [cust (sut/insert-customer conn (eh/gen-customer))
           repo (sut/insert-repo conn (assoc (eh/gen-repo)
-                                            :customer-id (:id cust)))
+                                            :org-id (:id cust)))
           wh (sut/insert-webhook conn (-> (eh/gen-webhook)
                                           (assoc :repo-id (:id repo))))
           bb-wh (-> (eh/gen-bb-webhook)
@@ -380,7 +380,7 @@
   (eh/with-prepared-db conn
     (let [cust (sut/insert-customer conn (eh/gen-customer))
           inv (-> (eh/gen-invoice)
-                  (assoc :customer-id (:id cust)
+                  (assoc :org-id (:id cust)
                          :net-amount 100M
                          :vat-perc 21M
                          :details [{:net-amount 100M

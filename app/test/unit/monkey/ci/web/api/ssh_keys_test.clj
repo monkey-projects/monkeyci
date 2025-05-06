@@ -19,7 +19,7 @@
           _ (st/save-ssh-keys st cust-id [ssh-key])
           res (-> rt
                   (h/->req)
-                  (assoc-in [:parameters :path :customer-id] cust-id)
+                  (assoc-in [:parameters :path :org-id] cust-id)
                   (sut/get-customer-ssh-keys))]
       (is (= 200 (:status res)))
       (is (= "decrypted" (-> res
@@ -42,7 +42,7 @@
           _ (st/save-ssh-keys st cust-id [ssh-key])
           res (-> rt
                   (h/->req)
-                  (assoc-in [:parameters :path] {:customer-id cust-id
+                  (assoc-in [:parameters :path] {:org-id cust-id
                                                  :repo-id (:id repo)})
                   (sut/get-repo-ssh-keys))]
       (is (= 200 (:status res)))
@@ -63,7 +63,7 @@
                   (assoc
                    :parameters
                    {:path
-                    {:customer-id cust-id}
+                    {:org-id cust-id}
                     :body
                     [{:private-key "test-pk"
                       :public-key "test-pub"}]})

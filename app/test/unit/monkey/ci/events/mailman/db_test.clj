@@ -20,7 +20,7 @@
   (h/with-memory-store s
     (let [cust (h/gen-cust)]
       (is (some? (st/save-customer s cust)))
-      (is (some? (st/save-customer-credit s {:customer-id (:id cust)
+      (is (some? (st/save-customer-credit s {:org-id (:id cust)
                                              :amount 100})))
       
       (testing "adds available customer credits to context"
@@ -29,7 +29,7 @@
           (is (fn? enter))
           (is (= 100M
                  (-> {:event {:build
-                              {:customer-id (:id cust)}}}
+                              {:org-id (:id cust)}}}
                      (emi/set-db s)
                      (enter)
                      (sut/get-credits)))))))))
@@ -45,7 +45,7 @@
         (let [repo (h/gen-repo)
               cust (-> (h/gen-cust)
                        (assoc :repos {(:id repo) repo}))
-              build {:customer-id (:id cust)
+              build {:org-id (:id cust)
                      :repo-id (:id repo)}]
           (is (some? (st/save-customer s cust)))
           (let [r (-> {:event {:build build
@@ -91,7 +91,7 @@
 
 (deftest load-build
   (h/with-memory-store s
-    (let [sid-keys [:customer-id :repo-id :build-id]
+    (let [sid-keys [:org-id :repo-id :build-id]
           sid (repeatedly 3 cuid/random-cuid)
           build (-> (h/gen-build)
                     (merge (zipmap sid-keys sid)))
@@ -107,7 +107,7 @@
 
 (deftest with-build
   (h/with-memory-store s
-    (let [sid-keys [:customer-id :repo-id :build-id]
+    (let [sid-keys [:org-id :repo-id :build-id]
           sid (repeatedly 3 cuid/random-cuid)
           build (-> (h/gen-build)
                     (merge (zipmap sid-keys sid))
@@ -198,11 +198,11 @@
                         (assoc :credits 100))
               ctx (-> {:result {:build build}}
                       (emi/set-db s))]
-          (is (some? (st/save-customer-credit s {:customer-id (:customer-id build)
+          (is (some? (st/save-customer-credit s {:org-id (:org-id build)
                                                  :amount 1000
                                                  :type :user})))
           (is (= build (-> (leave ctx) :result :build)))
-          (is (= 1 (count (st/list-customer-credit-consumptions s (:customer-id build)))))))
+          (is (= 1 (count (st/list-customer-credit-consumptions s (:org-id build)))))))
 
       (testing "when no credits, does not inserts credit consumption"
         (let [build (-> (h/gen-build)
@@ -210,7 +210,7 @@
               ctx (-> {:result {:build build}}
                       (emi/set-db s))]
           (is (= build (-> (leave ctx) :result :build)))
-          (is (empty? (st/list-customer-credit-consumptions s (:customer-id build)))))))))
+          (is (empty? (st/list-customer-credit-consumptions s (:org-id build)))))))))
 
 (deftest check-credits
   (let [build (h/gen-build)
@@ -495,9 +495,9 @@
       (testing "with available credits"
         (let [cust (h/gen-cust)
               repo (-> (h/gen-repo)
-                       (assoc :customer-id (:id cust)))
+                       (assoc :org-id (:id cust)))
               creds {:id (cuid/random-cuid)
-                     :customer-id (:id cust)
+                     :org-id (:id cust)
                      :amount 100M}]
           (is (some? (st/save-customer st cust)))
           (is (some? (st/save-customer-credit st creds)))
@@ -505,7 +505,7 @@
           
           (let [res (-> {:type :build/triggered
                          :build (-> (h/gen-build)
-                                    (assoc :customer-id (:id cust)
+                                    (assoc :org-id (:id cust)
                                            :repo-id (:id repo))
                                     ;; At this point, builds don't have an index
                                     (dissoc :idx :build-id))}
@@ -528,7 +528,7 @@
       (testing "when no credits"
         (let [cust (h/gen-cust)
               build (-> (h/gen-build)
-                        (assoc :customer-id (:id cust))
+                        (assoc :org-id (:id cust))
                         (dissoc :build-id))]
           (is (some? (st/save-customer st cust)))
 
@@ -556,7 +556,7 @@
             cust (-> (h/gen-cust)
                      (assoc :repos {(:id repo) repo}))
             build (-> (h/gen-build)
-                      (assoc :customer-id (:id cust)
+                      (assoc :org-id (:id cust)
                              :repo-id (:id repo)
                              :credit-multiplier 1
                              :start-time 1000
@@ -565,7 +565,7 @@
         (is (some? (st/save-customer st cust)))
         (is (some? (st/save-repo st repo)))
         (is (some? (st/save-build st build)))
-        (is (some? (st/save-customer-credit st {:customer-id (:id cust)
+        (is (some? (st/save-customer-credit st {:org-id (:id cust)
                                                 :amount 100
                                                 :type :user})))
 

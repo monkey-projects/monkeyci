@@ -9,7 +9,7 @@
             :from [[:jobs :j]]
             :join [[:builds :b] [:= :b.id :j.build-id]
                    [:repos :r] [:= :r.id :b.repo-id]
-                   [:customers :c] [:= :c.id :r.customer-id]]
+                   [:customers :c] [:= :c.id :r.org-id]]
             :where [:and
                     [:= :c.cuid cust-cuid]
                     [:= :r.display-id repo-id]
