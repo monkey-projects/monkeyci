@@ -102,6 +102,24 @@
               :name "updated"}
              (:body (sut/update-customer req))))))
 
+  (testing "can update with repos"
+    (let [cust {:id "other-cust"
+                :name "Other customer"
+                :repos {"test-repo" {:id "test-repo"}}}
+          {st :storage :as rt} (trt/test-runtime)
+          req (-> rt
+                  (h/->req)
+                  (h/with-path-param :customer-id (:id cust))
+                  (h/with-body {:name "updated"}))]
+      (is (sid/sid? (st/save-customer st cust)))
+      (is (= "updated" (-> req
+                           (sut/update-customer)
+                           :body
+                           :name)))
+      (is (= ["test-repo"] (-> (st/find-customer st (:id cust))
+                               :repos
+                               (keys))))))
+
   (testing "404 not found when no match"
     (is (= 404 (-> (trt/test-runtime)
                    (h/->req)
