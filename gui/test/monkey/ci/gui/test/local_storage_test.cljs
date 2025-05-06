@@ -1,11 +1,14 @@
 (ns monkey.ci.gui.test.local-storage-test
-  (:require [cljs.test :refer-macros [deftest testing is]]
+  (:require [cljs.test :refer-macros [deftest testing is use-fixtures]]
             [day8.re-frame.test :as rf-test]
             [monkey.ci.gui.local-storage :as sut]
+            [monkey.ci.gui.test.fixtures :as f]
             [re-frame.core :as rf]
             [re-frame.db :refer [app-db]]))
 
 (rf/clear-subscription-cache!)
+
+(use-fixtures :each f/restore-rf)
 
 ;; Local browser storage is not available in node
 (when (sut/local-storage-enabled?)

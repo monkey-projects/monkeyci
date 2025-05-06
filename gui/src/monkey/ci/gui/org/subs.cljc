@@ -9,6 +9,7 @@
 
 (u/db-sub :org/create-alerts db/create-alerts)
 (u/db-sub :org/creating? db/org-creating?)
+(u/db-sub :org/edit-alerts db/edit-alerts)
 (u/db-sub :org/group-by-lbl db/get-group-by-lbl)
 (u/db-sub :org/repo-filter db/get-repo-filter)
 (u/db-sub :org/ext-repo-filter db/get-ext-repo-filter)

@@ -53,6 +53,14 @@
 (defn reset-create-alerts [db]
   (dissoc db create-alerts))
 
+(def edit-alerts ::edit-alerts)
+
+(defn set-edit-alerts [db a]
+  (assoc db edit-alerts a))
+
+(defn reset-edit-alerts [db]
+  (dissoc db edit-alerts))
+
 (def recent-builds ::recent-builds)
 
 (def stats ::stats)

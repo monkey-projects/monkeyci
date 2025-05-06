@@ -9,7 +9,7 @@
             [re-frame.core :as rf]
             [re-frame.db :refer [app-db]]))
 
-(use-fixtures :each f/reset-db)
+(use-fixtures :each f/reset-db f/restore-rf)
 
 (deftest initialize-db
   (testing "clears db"

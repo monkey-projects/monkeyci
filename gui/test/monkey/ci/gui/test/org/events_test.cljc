@@ -473,3 +473,65 @@
     (is (nil? (db/get-ext-repo-filter @app-db)))
     (rf/dispatch-sync [:org/ext-repo-filter-changed "test-filter"])
     (is (= "test-filter" (db/get-ext-repo-filter @app-db)))))
+
+(deftest org-save
+  (testing "posts request to backend"
+    (rf-test/run-test-sync
+     (let [org {:name "test org"}
+           c (h/catch-fx :martian.re-frame/request)]
+       (is (some? (reset! app-db (r/set-current
+                                  {}
+                                  {:parameters
+                                   {:path
+                                    {:org-id "test-org"}}}))))
+       (h/initialize-martian {:update-org {:status 200
+                                           :body org
+                                           :error-code :no-error}})
+       (is (some? (:martian.re-frame/martian @app-db)))
+       (rf/dispatch [:org/save {:name ["test org"]}])
+       (is (= 1 (count @c)))
+       (is (= :update-org (-> @c first (nth 2))))
+       (is (= {:org
+               {:name "test org"
+                :id "test-org"}
+               :org-id "test-org"}
+              (-> @c first (nth 3)))))))
+
+  #_(testing "marks creating"
+    (is (nil? (rf/dispatch-sync [:org/save {:name "new org"}])))
+    (is (true? (db/org-creating? @app-db))))
+
+  (testing "clears alerts"
+    (is (some? (reset! app-db (db/set-edit-alerts {} [{:type :info}]))))
+    (is (nil? (rf/dispatch-sync [:org/save {:name "new org"}])))
+    (is (empty? (db/edit-alerts @app-db)))))
+
+(deftest org-save--success
+  (h/catch-fx :route/goto)
+  
+  (let [org {:id "test-org"}]
+    (is (empty? (reset! app-db {})))
+    (rf/dispatch-sync [:org/save--success {:body org}])
+
+    (testing "sets org in db"
+      (is (= org (lo/get-value @app-db db/org)))))
+
+  (testing "redirects to org page"
+    (rf-test/run-test-sync
+     (let [e (h/catch-fx :route/goto)]
+       (rf/dispatch [:org/save--success {:body {:id "test-org"}}])
+       (is (= 1 (count @e)))
+       (is (= (r/path-for :page/org {:org-id "test-org"}) (first @e))))))
+
+  (testing "sets success alert for org"
+    (let [a (lo/get-alerts @app-db db/org)]
+      (rf/dispatch-sync [:org/save--success {:body {:name "test org"}}])
+      (is (not-empty a))
+      (is (= :success (-> a first :type))))))
+
+(deftest org-save--failed
+  (testing "sets error alert"
+    (rf/dispatch-sync [:org/save--failed {:message "test error"}])
+    (let [a (db/edit-alerts @app-db)]
+      (is (= 1 (count a)))
+      (is (= :danger (:type (first a)))))))
