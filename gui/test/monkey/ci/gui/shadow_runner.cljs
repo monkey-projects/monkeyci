@@ -7,6 +7,11 @@
             [lambdaisland.chui.ui :as ui]
             [reagent.dom.client :as rd]))
 
+(defn ^:dev/after-load start []
+  ;; FIXME There's a problem with test data.  Not all tests show up, and test results
+  ;; are incomplete.
+  (kcs/start))
+
 (defn render! [el]
   (ui/set-state-from-location)
   (rd/render el [ui/app]))
@@ -17,4 +22,4 @@
     (gdom/setProperties app #js {:id "chui-container"})
     (gdom/append js/document.body app)
     (render! root))
-  (kcs/start))
+  (start))

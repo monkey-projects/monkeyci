@@ -22,10 +22,17 @@
   (some-> p
           (mc/update-existing :repos (comp (partial map repo->out) vals))))
 
+(defn- save-customer [st cust]
+  ;; Since the getter converts repos to a list, convert it back here before saving
+  (letfn [(repos->map [{:keys [repos] :as cust}]
+            (cond-> cust
+              (sequential? repos) (update :repos (partial zipmap (map :id repos)))))]
+    (st/save-customer st (repos->map cust))))
+
 (c/make-entity-endpoints "customer"
                          {:get-id (c/id-getter :customer-id)
                           :getter (comp repos->out st/find-customer)
-                          :saver st/save-customer})
+                          :saver save-customer})
 
 (defn- maybe-link-user [req st cust-id]
   (let [user (:identity req)

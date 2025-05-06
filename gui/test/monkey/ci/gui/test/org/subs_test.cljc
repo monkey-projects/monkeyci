@@ -80,8 +80,8 @@
                                                        :ssh-url "ssh@ssh-url"
                                                        :clone-url "https://clone-url"}])
                                    (db/set-org {:repos [{:url "ssh@ssh-url"
-                                                              :id "test-repo"
-                                                              :github-id "github-repo-id"}]})))))
+                                                         :id "test-repo"
+                                                         :github-id "github-repo-id"}]})))))
       (is (= "test-repo" (-> @r first :monkeyci/repo :id))))
 
     (testing "applies filter"
@@ -152,6 +152,17 @@
       (let [a [{:type :info
                 :message "Test alert"}]]
         (is (map? (reset! app-db (db/set-create-alerts {} a))))
+        (is (= a @s))))))
+
+(deftest edit-alerts
+  (let [s (rf/subscribe [:org/edit-alerts])]
+    (testing "exists"
+      (is (some? s)))
+
+    (testing "returns alerts from db"
+      (let [a [{:type :info
+                :message "Test alert"}]]
+        (is (map? (reset! app-db (db/set-edit-alerts {} a))))
         (is (= a @s))))))
 
 (deftest org-creating?

@@ -97,6 +97,12 @@
 (def org-create-failed
   (error-msg "Failed to create organization"))
 
+(def org-save-success
+  (alert-msg :success (fn [body] [:span "Organization " [:b (:name body)] " has been updated."])))
+
+(def org-save-failed
+  (error-msg "Failed to update organization"))
+
 (def org-recent-builds-failed
   (error-msg "Failed to load recent builds"))
 

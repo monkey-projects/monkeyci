@@ -12,16 +12,18 @@
   "Retrieves name of given route"
   (comp :name :data))
 
+(def path-params (comp :path :parameters))
+
 (defn set-current [db r]
   (assoc db current r))
 
 (def org-id
   "Retrieve current org id from app db"
-  (comp :org-id :path :parameters current))
+  (comp :org-id path-params current))
 
 (def repo-id
   "Retrieve current repo id from app db"
-  (comp :repo-id :path :parameters current))
+  (comp :repo-id path-params current))
 
 (rf/reg-sub
  :route/current
@@ -61,6 +63,7 @@
                    :name :page/org}]
     ["/o/:org-id/add-repo/github" :page/add-github-repo]
     ["/o/:org-id/add-repo/bitbucket" :page/add-bitbucket-repo]
+    ["/o/:org-id/edit" :page/org-edit]
     ["/o/:org-id/params" :page/org-params]
     ["/o/:org-id/ssh-keys" :page/org-ssh-keys]
     ["/o/:org-id/r/:repo-id" :page/repo]
@@ -107,8 +110,6 @@
           :path)
   ;; Only works after start!
   #_(rfe/href id params))
-
-(def path-params (comp :path :parameters))
 
 (defn origin
   "Retrieves the origin of the current location"

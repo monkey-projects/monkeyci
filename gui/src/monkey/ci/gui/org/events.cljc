@@ -209,6 +209,36 @@
    (db/set-create-alerts db [(a/org-create-failed err)])))
 
 (rf/reg-event-fx
+ :org/save
+ (fn [{:keys [db]} [_ org]]
+   (let [id (r/org-id db)]
+     {:dispatch [:secure-request
+                 :update-org
+                 {:org (-> (mc/map-vals first org)
+                           (assoc :id id))
+                  :org-id id}
+                 [:org/save--success]
+                 [:org/save--failed]]
+      :db (-> db
+              #_(db/mark-org-creating)
+              (db/reset-edit-alerts))})))
+
+(rf/reg-event-fx
+ :org/save--success
+ (fn [{:keys [db]} [_ {:keys [body]}]]
+   {:db (-> db
+            (db/set-org body)
+            (lo/set-alerts db/org
+                           [(a/org-save-success body)]))
+    ;; Redirect to org page
+    :dispatch [:route/goto :page/org {:org-id (:id body)}]}))
+
+(rf/reg-event-db
+ :org/save--failed
+ (fn [db [_ err]]
+   (db/set-edit-alerts db [(a/org-save-failed err)])))
+
+(rf/reg-event-fx
  :org/load-recent-builds
  (lo/loader-evt-handler
   db/recent-builds

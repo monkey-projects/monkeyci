@@ -20,6 +20,7 @@
    :page/bitbucket-callback login/bitbucket-callback
    :page/org org/page
    :page/org-new org/page-new
+   :page/org-edit org/page-edit
    :page/org-join home/page-join
    :page/org-params params/page
    :page/org-ssh-keys ssh-keys/page
