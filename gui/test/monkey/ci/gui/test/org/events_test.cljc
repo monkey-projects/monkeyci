@@ -479,15 +479,14 @@
     (rf-test/run-test-sync
      (let [org {:name "test org"}
            c (h/catch-fx :martian.re-frame/request)]
-       (is (some? (reset! app-db (r/set-current
-                                  {}
-                                  {:parameters
-                                   {:path
-                                    {:org-id "test-org"}}}))))
        (h/initialize-martian {:update-org {:status 200
                                            :body org
                                            :error-code :no-error}})
        (is (some? (:martian.re-frame/martian @app-db)))
+       (is (some? (swap! app-db r/set-current
+                         {:parameters
+                          {:path
+                           {:org-id "test-org"}}})))
        (rf/dispatch [:org/save {:name ["test org"]}])
        (is (= 1 (count @c)))
        (is (= :update-org (-> @c first (nth 2))))
@@ -496,10 +495,6 @@
                 :id "test-org"}
                :org-id "test-org"}
               (-> @c first (nth 3)))))))
-
-  #_(testing "marks creating"
-    (is (nil? (rf/dispatch-sync [:org/save {:name "new org"}])))
-    (is (true? (db/org-creating? @app-db))))
 
   (testing "clears alerts"
     (is (some? (reset! app-db (db/set-edit-alerts {} [{:type :info}]))))

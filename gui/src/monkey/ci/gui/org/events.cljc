@@ -208,7 +208,7 @@
  (fn [db [_ err]]
    (db/set-create-alerts db [(a/org-create-failed err)])))
 
-(rf/reg-event-db
+(rf/reg-event-fx
  :org/save
  (fn [{:keys [db]} [_ org]]
    (let [id (r/org-id db)]
@@ -219,9 +219,7 @@
                   :org-id id}
                  [:org/save--success]
                  [:org/save--failed]]
-      :db (-> db
-              #_(db/mark-org-creating)
-              (db/reset-edit-alerts))})))
+      :db (db/reset-edit-alerts db)})))
 
 (rf/reg-event-fx
  :org/save--success
