@@ -36,6 +36,10 @@
 (s/defschema NewOrg
   {:name s/Str})
 
+(s/defschema UpdateOrg
+  {:id s/Str
+   :name s/Str})
+
 (s/defschema Label
   {:name s/Str
    :value s/Str})
@@ -119,6 +123,19 @@
    (api-route
     {:route-name :search-orgs
      :path-parts ["/org"]
+     :body-schema {:org NewOrg}})
+
+   (api-route
+    {:route-name :update-org
+     :method :put
+     :path-parts org-path
+     :path-schema org-schema
+     :body-schema {:org UpdateOrg}})
+
+   (api-route
+    {:route-name :search-orgs
+     :path-parts ["/customer"]
+>>>>>>> main
      :query-schema {(s/optional-key :name) s/Str
                     (s/optional-key :id) s/Str}})
 

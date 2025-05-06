@@ -7,7 +7,7 @@
                                 DoughnutController ArcElement
                                 LineController PointElement LineElement
                                 CategoryScale LinearScale
-                                Colors Legend
+                                Colors Legend Tooltip
                                 Chart]]))
 
 ;; Necessary otherwise chartjs won't be able to use these
@@ -15,7 +15,7 @@
                            DoughnutController ArcElement
                            LineController PointElement LineElement
                            CategoryScale LinearScale
-                           Colors Legend]))
+                           Colors Legend Tooltip]))
 
 (defn ^Object get-data [chart]
   (oc/oget chart "data"))

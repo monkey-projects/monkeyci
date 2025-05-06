@@ -7,5 +7,5 @@
 
 (def restore-rf
   (let [r (atom nil)]
-    {:before (reset! r (rf/make-restore-fn))
-     :after (@r)}))
+    {:before #(reset! r (rf/make-restore-fn))
+     :after #(@r)}))

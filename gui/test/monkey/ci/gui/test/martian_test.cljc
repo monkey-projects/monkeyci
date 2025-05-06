@@ -9,6 +9,8 @@
             [re-frame.core :as rf]
             [re-frame.db :refer [app-db]]))
 
+(use-fixtures :once f/restore-rf)
+
 (deftest init
   (testing "initializes default martian in db"
     (sut/init)

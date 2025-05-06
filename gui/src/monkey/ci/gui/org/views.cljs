@@ -73,7 +73,8 @@
       [:div.card
        [:div.card-body
         [:h5 "History"]
-        [:p (str "Build elapsed times and consumed credits over the past " stats-period-days " days.")]
+        [:p
+         (str "Build elapsed times and consumed credits over the past " stats-period-days " days.")]
         [history-chart]]]]
      [:div.col-4
       [:div.card
@@ -132,6 +133,12 @@
      [:img.me-2 {:src "/img/mark-gradient-blue-bitbucket.svg" :height "25px"}]
      "Watch Repository"]))
 
+(defn- edit-btn [id]
+  [:a.btn.btn-outline-primary
+   {:href (r/path-for :page/org-edit {:org-id id})
+    :title "Edit Organization"}
+   [:span.me-2 [co/icon :pencil]] "Edit"])
+
 (defn- params-btn [id]
   [:a.btn.btn-soft-primary
    {:href (r/path-for :page/org-params {:org-id id})
@@ -146,6 +153,7 @@
 
 (defn- org-actions [id]
   [:<>
+   [edit-btn id]
    [add-github-repo-btn id]
    [add-bitbucket-repo-btn id]
    [params-btn id]
@@ -242,13 +250,13 @@
   "Displays tab pages for various organization overview screens"
   [id]
   [tabs/tabs ::overview
-   [{:id :overview
-     :header [:span [:span.me-2 co/overview-icon] "Overview"]
-     :contents [org-stats id]}
-    {:id :recent
-     :header [:span [:span.me-2 co/build-icon] "Recent Builds"]
+   [{:id :activity
+     :header [:span [:span.me-2 [co/icon :activity]] "Activity"]
      :contents [recent-builds id]
      :current? true}
+    {:id :stats
+     :header [:span [:span.me-2 [co/icon :bar-chart]] "Statistics"]
+     :contents [org-stats id]}
     {:id :repos
      :header [:span [:span.me-2 co/repo-icon] "Repositories"]
      :contents [org-repos]}]])
@@ -363,6 +371,15 @@
   (rf/dispatch [:org/load-bb-webhooks])
   [add-repo-page nil bitbucket-repo-table])
 
+(defn- org-name-input [org]
+  [:<>
+   [:label.form-label {:for :name} "Name"]
+   [:input#name.form-control {:aria-describedby :name-help
+                              :name :name
+                              :default-value (:name org)}]
+   [:div#name-help.form-text
+    "The organization name.  We recommend to make it as unique as possible."]])
+
 (defn page-new
   "New org page"
   []
@@ -372,10 +389,24 @@
     [:form.mb-3
      {:on-submit (f/submit-handler [:org/create])}
      [:div.mb-3
-      [:label.form-label {:for :name} "Name"]
-      [:input#name.form-control {:aria-describedby :name-help :name :name}]
-      [:div#name-help.form-text "The organization name.  We recommend to make it as unique as possible."]]
+      [org-name-input {}]]
      [:div
       [:button.btn.btn-primary.me-2 {:type :submit} [:span.me-2 [co/icon :save]] "Create Organization"]
       [co/cancel-btn [:route/goto :page/root]]]]
     [co/alerts [:org/create-alerts]]]))
+
+(defn page-edit
+  "Edit organization page"
+  [route]
+  (let [org (rf/subscribe [:org/info])]
+    (l/default
+     [:<>
+      [:h3 [org-icon] "Edit Organization: " (:name @org)]
+      [:form.mb-3
+       {:on-submit (f/submit-handler [:org/save])}
+       [:div.mb-3
+        [org-name-input @org]]
+       [:div
+        [:button.btn.btn-primary.me-2 {:type :submit} [:span.me-2 [co/icon :save]] "Save Changes"]
+        [co/cancel-btn [:route/goto :page/org (r/path-params route)]]]]
+      [co/alerts [:org/edit-alerts]]])))

@@ -119,16 +119,13 @@
                  :junit {:artifact-id (:id junit-artifact)
                          :path "junit.xml"})))))
 
-(def uberjar-artifact
-  {:id "uberjar"
-   :path "app/target/monkeyci-standalone.jar"})
-
 (defn app-uberjar [ctx]
   (when (publish-app? ctx)
     (-> (clj-container "app-uberjar" "app" "-X:jar:uber")
         (assoc 
          :container/env {"MONKEYCI_VERSION" (lib-version ctx)}
-         :save-artifacts [uberjar-artifact])
+         :save-artifacts [{:id "uberjar"
+                           :path "app/target/monkeyci-standalone.jar"}])
         (core/depends-on ["test-app"]))))
 
 (def img-base "fra.ocir.io/frjdhmocn5qi")
@@ -147,7 +144,8 @@
       :image
       {:job-id "publish-app-img"
        :container-opts
-       {:restore-artifacts [uberjar-artifact]
+       {:restore-artifacts [{:id "uberjar"
+                             :path "app/target"}]
         :dependencies ["app-uberjar"]}}
       :manifest
       {:job-id "app-img-manifest"}}

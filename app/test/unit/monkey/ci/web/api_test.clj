@@ -459,15 +459,19 @@
 
 (deftest retry-build
   (h/with-memory-store st
-    (let [build (-> (h/gen-build)
+    (let [repo (h/gen-repo)
+          build (-> (h/gen-build)
                     (assoc :start-time 100
-                           :end-time 200))
+                           :end-time 200
+                           :customer-id (:customer-id repo)
+                           :repo-id (:id repo)))
           make-req (fn [runner params]
                      (-> {:storage st
                           :runner runner}
                          (h/->req)
                          (assoc :parameters params)))]
       (is (some? (st/save-build st build)))
+      (is (some? (st/save-repo st repo)))
 
       (let [r (-> (make-req (constantly "ok")
                             {:path (select-keys build [:customer-id :repo-id :build-id])})
@@ -486,6 +490,17 @@
             (is (nil? (:end-time new)))
             (is (nil? (:script new)))
             (is (empty? (get-in new [:script :jobs]))))))
+
+      (testing "adds ssh keys"
+        (let [ssh-keys [{:private-key "test-priv"
+                         :public-key "test-pub"}]]
+          (is (some? (st/save-ssh-keys st (:customer-id build) ssh-keys)))
+          (let [r (-> (make-req (constantly "ok")
+                                {:path (select-keys build [:customer-id :repo-id :build-id])})
+                      (sut/retry-build))
+                b (-> r r/get-events first :build)]
+            (is (some? b))
+            (is (= ssh-keys (-> b :git :ssh-keys))))))
 
       (testing "returns 404 if build not found"
         (is (= 404 (-> (make-req (constantly "ok")

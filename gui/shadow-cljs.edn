@@ -2,7 +2,8 @@
 {:deps {:aliases [:dev :test]}
  :dev-http {8080 ["target/js/frontend" "dev-resources/sites/public" "resources/public"]
             8081 ["target/js/frontend" "dev-resources/sites/admin" "resources/public"]
-            8002 ["dev-resources/devcards" "target/js/frontend" "resources/public"]}
+            8002 ["dev-resources/devcards" "target/js/frontend" "resources/public"]
+            8003 ["target/js/test-shadow"]}
 
  :builds
  {:frontend
@@ -21,12 +22,15 @@
   :test/browser
   {:target :browser-test
    :test-dir "target/js/test-kaocha"
-;;   :runner-ns kaocha.cljs2.shadow-runner
    :runner-ns monkey.ci.gui.shadow-runner
    :ns-regexp ".*-test$"
    :devtools {:http-port 8001
               :http-root "target/js/test-kaocha"
               :preloads [lambdaisland.chui.remote]}}
+
+  :test
+  {:target :browser-test
+   :test-dir "target/js/test-shadow"}
 
   ;; Autorun disabled, because it always returns a zero exit code
   :test/node

@@ -85,10 +85,12 @@
           (is (= builds (:builds r))))))))
 
 (deftest http-server
-  (with-redefs [wh/on-server-close (constantly (md/success-deferred nil))]
+  (with-redefs [http/start-server (constantly (reify java.lang.AutoCloseable
+                                                (close [this] nil)))
+                wh/on-server-close (constantly (md/success-deferred ::done))]
     (testing "starts the server and waits for close"
       (let [r (sut/http-server tc/app-config)]
-        (is (nil? r))))))
+        (is (= ::done r))))))
 
 (deftest watch
   (testing "sends request and returns deferred"

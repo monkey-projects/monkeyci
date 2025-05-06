@@ -241,11 +241,16 @@
   "Re-triggers existing build by id"
   [req]
   (let [st (c/req->storage req)
-        existing (st/find-build st (c/build-sid req))
+        sid (c/build-sid req)
+        existing (st/find-build st sid)
         rt (c/req->rt req)
+        repo (st/find-repo st (take 2 sid))
+        ssh-keys (c/find-ssh-keys st repo)
         build (some-> existing
                       (dissoc :start-time :end-time :script :build-id :idx)
-                      (initialize-build))]
+                      (initialize-build)
+                      (cond-> (not-empty ssh-keys)
+                        (assoc-in [:git :ssh-keys] ssh-keys)))]
     (if build
       (build-triggered-response build)
       (rur/not-found {:message "Build not found"}))))

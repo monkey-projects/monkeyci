@@ -19,4 +19,4 @@
  (fn [cofx id]
    (assoc cofx :local-storage #?(:cljs (when (local-storage-enabled?)
                                          (edn/read-string (.getItem js/localStorage (str id))))
-                                 :clj nil))))
+                                 :clj :not-available))))
