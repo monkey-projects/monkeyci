@@ -74,7 +74,7 @@
 
 (def table-columns
   [{:label "Build"
-    :value (fn [b] [:a {:href (r/path-for :page/build b)} (:idx b)])
+    :value (fn [b] [:a {:href (r/path-for :page/build (u/cust->org b))} (:idx b)])
     :sorter (table/prop-sorter :idx)}
    {:label "Time"
     :value (fn [b]

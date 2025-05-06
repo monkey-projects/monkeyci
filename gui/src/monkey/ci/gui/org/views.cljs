@@ -73,7 +73,8 @@
       [:div.card
        [:div.card-body
         [:h5 "History"]
-        [:p (str "Build elapsed times and consumed credits over the past " stats-period-days " days.")]
+        [:p
+         (str "Build elapsed times and consumed credits over the past " stats-period-days " days.")]
         [history-chart]]]]
      [:div.col-4
       [:div.card
