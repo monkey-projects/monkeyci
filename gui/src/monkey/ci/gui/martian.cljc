@@ -117,12 +117,12 @@
    (api-route
     {:route-name :create-org
      :method :post
-     :path-parts ["/org"]
+     :path-parts ["/customer"]
      :body-schema {:org NewOrg}})
 
    (api-route
     {:route-name :search-orgs
-     :path-parts ["/org"]
+     :path-parts ["/customer"]
      :body-schema {:org NewOrg}})
 
    (api-route
@@ -135,7 +135,6 @@
    (api-route
     {:route-name :search-orgs
      :path-parts ["/customer"]
->>>>>>> main
      :query-schema {(s/optional-key :name) s/Str
                     (s/optional-key :id) s/Str}})
 
