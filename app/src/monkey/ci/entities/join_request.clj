@@ -7,7 +7,7 @@
             [:jr.cuid :id] [:u.cuid :user-id] [:c.cuid :org-id]]
    :from [[:join-requests :jr]]
    :join [[:users :u] [:= :u.id :jr.user-id]
-          [:customers :c] [:= :c.id :jr.org-id]]})
+          [:orgs :c] [:= :c.id :jr.org-id]]})
 
 (defn select-join-request-as-entity [conn cuid]
   (some-> (ec/select

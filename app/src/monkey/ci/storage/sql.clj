@@ -12,8 +12,8 @@
              [core :as ec]
              [credit-cons :as eccon]
              [credit-subs :as ecsub]
-             [customer :as ecu]
-             [customer-credit :as ecc]
+             [org :as ecu]
+             [org-credit :as ecc]
              [invoice :as ei]
              [job :as ej]
              [join-request :as jr]
@@ -55,12 +55,12 @@
 
 (defn- repo->db
   "Converts the repository into an entity that can be sent to the database."
-  [r cust-id]
+  [r org-id]
   (-> r
       (select-keys [:name :url :main-branch :github-id])
       (dissoc :id)
       (assoc :display-id (:id r)
-             :org-id cust-id)))
+             :org-id org-id)))
 
 (defn- db->repo
   "Converts the repo entity (a db record) into a repository.  If `f` is provided,
@@ -72,7 +72,7 @@
           (assoc :id (:display-id re))
           (mc/update-existing :labels db->labels)
           (drop-nil))
-      f (f re)))
+    f (f re)))
 
 (defn- insert-repo-labels [conn labels re]
   (when-not (empty? labels)
@@ -110,97 +110,97 @@
       (ec/update-repo conn re)
       (sync-repo-labels conn (:labels repo) re))))
 
-(defn- select-repo-id-by-sid [conn [cust-id repo-id]]
-  (er/repo-for-build-sid conn cust-id repo-id))
+(defn- select-repo-id-by-sid [conn [org-id repo-id]]
+  (er/repo-for-build-sid conn org-id repo-id))
 
-(defn- upsert-repo [conn repo cust-id]
+(defn- upsert-repo [conn repo org-id]
   (spec/valid? :entity/repo repo)
-  (let [re (repo->db repo cust-id)]
+  (let [re (repo->db repo org-id)]
     (spec/valid? :db/repo re)
     (if-let [existing (ec/select-repo conn [:and
-                                            (ec/by-customer cust-id)
+                                            (ec/by-org org-id)
                                             (ec/by-display-id (:id repo))])]
       (update-repo conn re repo existing)
       (insert-repo conn re repo))))
 
-(defn- upsert-repos [conn {:keys [repos]} cust-id]
+(defn- upsert-repos [conn {:keys [repos]} org-id]
   (doseq [[_ r] repos]
-    (upsert-repo conn r cust-id)))
+    (upsert-repo conn r org-id)))
 
 (defn- delete-repo [{:keys [conn]} sid]
   (when-let [repo-id (select-repo-id-by-sid conn sid)]
     ;; Other records are deleted by cascading
     (pos? (ec/delete-repos conn (ec/by-id repo-id)))))
 
-(defn- select-repo-display-ids [{:keys [conn]} cust-id]
-  (er/repo-display-ids conn cust-id))
+(defn- select-repo-display-ids [{:keys [conn]} org-id]
+  (er/repo-display-ids conn org-id))
 
-(defn- cust->db [cust]
-  (-> cust
+(defn- org->db [org]
+  (-> org
       (id->cuid)
       (select-keys [:cuid :name])))
 
-(def db->cust cuid->id)
+(def db->org cuid->id)
 
-(defn- db->cust-with-repos [c]
+(defn- db->org-with-repos [c]
   (letfn [(entities->repos [repos]
             (reduce-kv (fn [r _ v]
                          (assoc r (:display-id v) (db->repo v)))
                        {}
                        repos))]
     (-> c
-        (db->cust)
+        (db->org)
         (mc/update-existing :repos entities->repos))))
 
-(defn- insert-customer [conn cust]
-  (let [cust-id (:id (ec/insert-customer conn (cust->db cust)))]
-    (upsert-repos conn cust cust-id)
-    cust))
+(defn- insert-org [conn org]
+  (let [org-id (:id (ec/insert-org conn (org->db org)))]
+    (upsert-repos conn org org-id)
+    org))
 
-(defn- update-customer [conn cust existing]
-  (let [ce (cust->db cust)]
+(defn- update-org [conn org existing]
+  (let [ce (org->db org)]
     (spec/valid? :db/customer ce)
     (when (not= ce existing)
-      (ec/update-customer conn (merge existing ce)))
-    (upsert-repos conn cust (:id existing))
-    cust))
+      (ec/update-org conn (merge existing ce)))
+    (upsert-repos conn org (:id existing))
+    org))
 
-(defn- upsert-customer [conn cust]
-  (spec/valid? :entity/customer cust)
-  (if-let [existing (ec/select-customer conn (ec/by-cuid (:id cust)))]
-    (update-customer conn cust existing)
-    (insert-customer conn cust)))
+(defn- upsert-org [conn org]
+  (spec/valid? :entity/customer org)
+  (if-let [existing (ec/select-org conn (ec/by-cuid (:id org)))]
+    (update-org conn org existing)
+    (insert-org conn org)))
 
-(defn- select-customer [conn cuid]
+(defn- select-org [conn cuid]
   (when cuid
-    (some-> (ecu/customer-with-repos conn (ec/by-cuid cuid))
-            (db->cust-with-repos))))
+    (some-> (ecu/org-with-repos conn (ec/by-cuid cuid))
+            (db->org-with-repos))))
 
-(defn- customer-exists? [conn cuid]
-  (some? (ec/select-customer conn (ec/by-cuid cuid))))
+(defn- org-exists? [conn cuid]
+  (some? (ec/select-org conn (ec/by-cuid cuid))))
 
-(defn- delete-customer [conn cuid]
+(defn- delete-org [conn cuid]
   (when cuid
-    (ec/delete-customers conn (ec/by-cuid cuid))))
+    (ec/delete-orgs conn (ec/by-cuid cuid))))
 
-(defn- select-customers
-  "Finds customers by filter"
+(defn- select-orgs
+  "Finds orgs by filter"
   [{:keys [conn]} {:keys [id name]}]
   (let [query (cond
                 id (ec/by-cuid id)
                 ;; By default, this will use case insensitive search (depends on collation)
                 name [:like :name (str "%" name "%")])]
-    (->> (ec/select-customers conn query)
-         (map db->cust-with-repos))))
+    (->> (ec/select-orgs conn query)
+         (map db->org-with-repos))))
 
-(defn- select-customers-by-id [{:keys [conn]} ids]
-  (->> (ec/select-customers conn [:in :cuid (distinct ids)])
-       (map db->cust)))
+(defn- select-orgs-by-id [{:keys [conn]} ids]
+  (->> (ec/select-orgs conn [:in :cuid (distinct ids)])
+       (map db->org)))
 
 (defn- global-sid? [type sid]
   (= [st/global (name type)] (take 2 sid)))
 
-(def customer? (partial global-sid? :customers))
+(def org? (partial global-sid? :customers))
 (def webhook? (partial global-sid? :webhooks))
 
 (defn- global-sid->cuid [sid]
@@ -226,8 +226,8 @@
   (-> (ewh/select-webhooks-as-entity conn (ewh/by-cuid cuid))
       (first)))
 
-(defn- select-repo-webhooks [{:keys [conn]} [cust-id repo-id]]
-  (ewh/select-webhooks-as-entity conn (ewh/by-repo cust-id repo-id)))
+(defn- select-repo-webhooks [{:keys [conn]} [org-id repo-id]]
+  (ewh/select-webhooks-as-entity conn (ewh/by-repo org-id repo-id)))
 
 (defn- delete-webhook [conn cuid]
   (ec/delete-webhooks conn (ec/by-cuid cuid)))
@@ -243,28 +243,28 @@
       (id->cuid)
       (dissoc :org-id)))
 
-(defn- insert-ssh-key [conn ssh-key cust-id]
+(defn- insert-ssh-key [conn ssh-key org-id]
   (log/debug "Inserting ssh key:" ssh-key)
   (ec/insert-ssh-key conn (-> ssh-key
                               (ssh-key->db)
-                              (assoc :org-id cust-id))))
+                              (assoc :org-id org-id))))
 
 (defn- update-ssh-key [conn ssh-key existing]
   (log/debug "Updating ssh key:" ssh-key)
   (ec/update-ssh-key conn (merge existing (ssh-key->db ssh-key))))
 
-(defn- upsert-ssh-key [conn cust-id ssh-key]
+(defn- upsert-ssh-key [conn org-id ssh-key]
   (spec/valid? :entity/ssh-key ssh-key)
   (if-let [existing (ec/select-ssh-key conn (ec/by-cuid (:id ssh-key)))]
     (update-ssh-key conn ssh-key existing)
-    (insert-ssh-key conn ssh-key cust-id)))
+    (insert-ssh-key conn ssh-key org-id)))
 
-(defn- upsert-ssh-keys [conn cust-cuid ssh-keys]
+(defn- upsert-ssh-keys [conn org-cuid ssh-keys]
   (when (not-empty ssh-keys)
-    (if-let [{cust-id :id} (ec/select-customer conn (ec/by-cuid cust-cuid))]
+    (if-let [{org-id :id} (ec/select-org conn (ec/by-cuid org-cuid))]
       (doseq [k ssh-keys]
-        (upsert-ssh-key conn cust-id k))
-      (throw (ex-info "Customer not found when upserting ssh keys" {:org-id cust-cuid})))
+        (upsert-ssh-key conn org-id k))
+      (throw (ex-info "Org not found when upserting ssh keys" {:org-id org-cuid})))
     ssh-keys))
 
 (defn- select-ssh-keys [conn org-id]
@@ -278,62 +278,62 @@
          (map (fn [v]
                 (-> (select-keys v [:name :value])
                     (assoc :params-id param-id))))
-         (ec/insert-customer-param-values conn))))
+         (ec/insert-org-param-values conn))))
 
 (defn- update-param-values [conn values]
   (doseq [pv values]
-    (ec/update-customer-param-value conn pv)))
+    (ec/update-org-param-value conn pv)))
 
 (defn- delete-param-values [conn values]
   (when-not (empty? values)
-    (ec/delete-customer-param-values conn [:in :id (map :id values)])))
+    (ec/delete-org-param-values conn [:in :id (map :id values)])))
 
-(defn- param->db [param cust-id]
+(defn- param->db [param org-id]
   (-> param
       (id->cuid)
       (select-keys [:cuid :description :label-filters])
-      (assoc :org-id cust-id)))
+      (assoc :org-id org-id)))
 
-(defn- insert-param [conn param cust-id]
-  (let [{:keys [id]} (ec/insert-customer-param conn (param->db param cust-id))]
+(defn- insert-param [conn param org-id]
+  (let [{:keys [id]} (ec/insert-org-param conn (param->db param org-id))]
     (insert-param-values conn (:parameters param) id)))
 
-(defn- update-param [conn param cust-id existing]
-  (ec/update-customer-param conn (merge existing (param->db param cust-id)))
-  (let [ex-vals (ec/select-customer-param-values conn (ec/by-params (:id existing)))
+(defn- update-param [conn param org-id existing]
+  (ec/update-org-param conn (merge existing (param->db param org-id)))
+  (let [ex-vals (ec/select-org-param-values conn (ec/by-params (:id existing)))
         r (lbl/reconcile-labels ex-vals (:parameters param))]
     (log/debug "Reconciled param values:" r)
     (insert-param-values conn (:insert r) (:id existing))
     (update-param-values conn (:update r))
     (delete-param-values conn (:delete r))))
 
-(defn- upsert-param [conn param cust-id]
+(defn- upsert-param [conn param org-id]
   (spec/valid? :entity/customer-params param)
-  (if-let [existing (ec/select-customer-param conn (ec/by-cuid (:id param)))]
-    (update-param conn param cust-id existing)
-    (insert-param conn param cust-id)))
+  (if-let [existing (ec/select-org-param conn (ec/by-cuid (:id param)))]
+    (update-param conn param org-id existing)
+    (insert-param conn param org-id)))
 
-(defn- upsert-params [conn cust-cuid params]
+(defn- upsert-params [conn org-cuid params]
   (when-not (empty? params)
-    (let [{cust-id :id} (ec/select-customer conn (ec/by-cuid cust-cuid))]
+    (let [{org-id :id} (ec/select-org conn (ec/by-cuid org-cuid))]
       (doseq [p params]
-        (upsert-param conn p cust-id))
+        (upsert-param conn p org-id))
       params)))
 
 (defn- select-params [conn org-id]
-  ;; Select customer params and values for customer cuid
-  (eparam/select-customer-params-with-values conn org-id))
+  ;; Select org params and values for org cuid
+  (eparam/select-org-params-with-values conn org-id))
 
-(defn- upsert-customer-param [{:keys [conn]} {:keys [org-id] :as param}]
-  (when-let [{db-id :id} (ec/select-customer conn (ec/by-cuid org-id))]
+(defn- upsert-org-param [{:keys [conn]} {:keys [org-id] :as param}]
+  (when-let [{db-id :id} (ec/select-org conn (ec/by-cuid org-id))]
     (upsert-param conn param db-id)
     (st/params-sid org-id (:id param))))
 
-(defn- select-customer-param [{:keys [conn]} [_ _ param-id]]
+(defn- select-org-param [{:keys [conn]} [_ _ param-id]]
   (eparam/select-param-with-values conn param-id))
 
-(defn- delete-customer-param [{:keys [conn]} [_ _ param-id]]
-  (pos? (ec/delete-customer-params conn (ec/by-cuid param-id))))
+(defn- delete-org-param [{:keys [conn]} [_ _ param-id]]
+  (pos? (ec/delete-org-params conn (ec/by-cuid param-id))))
 
 (defn user? [sid]
   (and (= 4 (count sid))
@@ -354,20 +354,20 @@
 
 (defn- insert-user [conn user]
   (let [{:keys [id] :as ins} (ec/insert-user conn (user->db user))
-        ids (ecu/org-ids-by-cuids conn (:customers user))]
-    (ec/insert-user-customers conn id ids)
+        ids (ecu/org-ids-by-cuids conn (:orgs user))]
+    (ec/insert-user-orgs conn id ids)
     ins))
 
 (defn- update-user [conn user {user-id :id :as existing}]
   (when (ec/update-user conn (merge existing (user->db user)))
-    ;; Update user/customer links
-    (let [existing-cust (set (eu/select-user-customer-cuids conn user-id))
-          new-cust (set (:customers user))
-          to-add (cset/difference new-cust existing-cust)
-          to-remove (cset/difference existing-cust new-cust)]
-      (ec/insert-user-customers conn user-id (ecu/org-ids-by-cuids conn to-add))
+    ;; Update user/org links
+    (let [existing-org (set (eu/select-user-org-cuids conn user-id))
+          new-org (set (:orgs user))
+          to-add (cset/difference new-org existing-org)
+          to-remove (cset/difference existing-org new-org)]
+      (ec/insert-user-orgs conn user-id (ecu/org-ids-by-cuids conn to-add))
       (when-not (empty? to-remove)
-        (ec/delete-user-customers conn [:in :org-id (ecu/org-ids-by-cuids conn to-remove)]))
+        (ec/delete-user-orgs conn [:in :org-id (ecu/org-ids-by-cuids conn to-remove)]))
       user)))
 
 (defn- upsert-user [conn user]
@@ -377,10 +377,10 @@
 
 (defn- select-user-by-filter [conn f]
   (when-let [r (ec/select-user conn f)]
-    (let [cust (eu/select-user-customer-cuids conn (:id r))]
+    (let [org (eu/select-user-org-cuids conn (:id r))]
       (cond-> (db->user r)
         true (drop-nil)
-        (not-empty cust) (assoc :customers cust)))))
+        (not-empty org) (assoc :orgs org)))))
 
 (defn- select-user-by-type [conn [type type-id]]
   (select-user-by-filter conn [:and
@@ -390,9 +390,9 @@
 (defn- select-user [{:keys [conn]} id]
   (select-user-by-filter conn (ec/by-cuid id)))
 
-(defn- select-user-customers [{:keys [conn]} id]
-  (->> (eu/select-user-customers conn id)
-       (map db->cust-with-repos)))
+(defn- select-user-orgs [{:keys [conn]} id]
+  (->> (eu/select-user-orgs conn id)
+       (map db->org-with-repos)))
 
 (defn build? [sid]
   (and (= "builds" (first sid))
@@ -421,7 +421,7 @@
       (assoc :build-id (:display-id build)
              :script (select-keys build [:script-dir]))
       (update :credits (fnil int 0))
-      (mc/assoc-some :org-id (:customer-cuid build)
+      (mc/assoc-some :org-id (:org-cuid build)
                      :repo-id (:repo-display-id build))
       (drop-nil)))
 
@@ -451,7 +451,7 @@
   build)
 
 (defn- upsert-build [conn build]
-  ;; Fetch build by customer cuild and repo and build display ids
+  ;; Fetch build by org cuild and repo and build display ids
   (if-let [existing (eb/select-build-by-sid conn (:org-id build) (:repo-id build) (:build-id build))]
     (update-build conn build existing)
     (insert-build conn build)))
@@ -464,29 +464,29 @@
 
 (defn- hydrate-build
   "Fetches jobs related to the build"
-  [conn [cust-id repo-id] build]
+  [conn [org-id repo-id] build]
   (let [jobs (select-jobs conn (:id build))]
     (cond-> (-> (db->build build)
-                (assoc :org-id cust-id
+                (assoc :org-id org-id
                        :repo-id repo-id)
                 (update :script drop-nil)
                 (drop-nil))
       (not-empty jobs) (assoc-in [:script :jobs] jobs))))
 
-(defn- select-build [conn [cust-id repo-id :as sid]]
+(defn- select-build [conn [org-id repo-id :as sid]]
   (when-let [build (apply eb/select-build-by-sid conn sid)]
     (hydrate-build conn sid build)))
 
 (defn- select-repo-builds
   "Retrieves all builds and their details for given repository"
-  [{:keys [conn]} [cust-id repo-id]]
+  [{:keys [conn]} [org-id repo-id]]
   (letfn [(add-ids [b]
             (assoc b
-                   :org-id cust-id
+                   :org-id org-id
                    :repo-id repo-id))]
     ;; Fetch all build details, don't include jobs since we don't need them at this point
     ;; and they can become a very large dataset.
-    (->> (eb/select-builds-for-repo conn cust-id repo-id)
+    (->> (eb/select-builds-for-repo conn org-id repo-id)
          (map db->build)
          (map add-ids))))
 
@@ -496,24 +496,24 @@
 (defn- select-repo-build-ids [conn sid]
   (apply eb/select-build-ids-for-repo conn sid))
 
-(defn- select-customer-builds-since [{:keys [conn]} cust-id ts]
-  (->> (eb/select-builds-for-customer-since conn cust-id ts)
+(defn- select-org-builds-since [{:keys [conn]} org-id ts]
+  (->> (eb/select-builds-for-org-since conn org-id ts)
        (map db->build)))
 
-(defn- select-latest-build [{:keys [conn]} [cust-id repo-id]]
-  (some-> (eb/select-latest-build conn cust-id repo-id)
+(defn- select-latest-build [{:keys [conn]} [org-id repo-id]]
+  (some-> (eb/select-latest-build conn org-id repo-id)
           (db->build)))
 
-(defn- select-latest-customer-builds [{:keys [conn]} cust-id]
-  (->> (eb/select-latest-builds conn cust-id)
+(defn- select-latest-org-builds [{:keys [conn]} org-id]
+  (->> (eb/select-latest-builds conn org-id)
        (map db->build)))
 
-(defn- select-latest-n-customer-builds [{:keys [conn]} cust-id n]
-  (->> (eb/select-latest-n-builds conn cust-id n)
+(defn- select-latest-n-org-builds [{:keys [conn]} org-id n]
+  (->> (eb/select-latest-n-builds conn org-id n)
        (map db->build)))
 
-(defn- select-next-build-idx [{:keys [conn]} [cust-id repo-id]]
-  (er/next-repo-idx conn cust-id repo-id))
+(defn- select-next-build-idx [{:keys [conn]} [org-id repo-id]]
+  (er/next-repo-idx conn org-id repo-id))
 
 (defn- insert-job [conn job build-sid]
   (when-let [build (apply eb/select-build-by-sid conn build-sid)]
@@ -524,11 +524,11 @@
 
 (defn- update-job [conn job existing]
   (let [upd (-> existing
-                (dissoc :cust-cuid :repo-display-id :build-display-id)
+                (dissoc :org-cuid :repo-display-id :build-display-id)
                 (merge (job->db job)))]
     (when (ec/update-job conn upd)
       ;; Return build sid
-      ((juxt :cust-cuid :repo-display-id :build-display-id) existing))))
+      ((juxt :org-cuid :repo-display-id :build-display-id) existing))))
 
 (defn- upsert-job [{:keys [conn]} build-sid job]
   (if-let [existing (ej/select-by-sid conn (concat build-sid [(:id job)]))]
@@ -543,12 +543,12 @@
 
 (defn- insert-join-request [conn jr]
   (let [user (ec/select-user conn (ec/by-cuid (:user-id jr)))
-        cust (ec/select-customer conn (ec/by-cuid (:org-id jr)))
+        org (ec/select-org conn (ec/by-cuid (:org-id jr)))
         e (-> jr
               (id->cuid)
               (select-keys [:cuid :status :request-msg :response-msg])
               (update :status name)
-              (assoc :org-id (:id cust)
+              (assoc :org-id (:id org)
                      :user-id (:id user)))]
     (ec/insert-join-request conn e)))
 
@@ -607,9 +607,9 @@
   (mc/filter-vals some? cs))
 
 (defn- insert-credit-subscription [conn cs]
-  (let [cust (ec/select-customer conn (ec/by-cuid (:org-id cs)))]
+  (let [org (ec/select-org conn (ec/by-cuid (:org-id cs)))]
     (ec/insert-credit-subscription conn (assoc (credit-sub->db cs)
-                                               :org-id (:id cust)))))
+                                               :org-id (:id org)))))
 
 (defn- update-credit-subscription [conn cs existing]
   (ec/update-credit-subscription conn (merge existing
@@ -633,62 +633,62 @@
   (->> (ecsub/select-credit-subs conn f)
        (map db->credit-sub)))
 
-(defn- select-customer-credit-subs [{:keys [conn]} cust-id]
-  (select-credit-subs conn (ecsub/by-cust cust-id)))
+(defn- select-org-credit-subs [{:keys [conn]} org-id]
+  (select-credit-subs conn (ecsub/by-org org-id)))
 
 (defn- select-active-credit-subs [{:keys [conn]} at]
   (select-credit-subs conn (ecsub/active-at at)))
 
-(def customer-credit? (partial global-sid? st/customer-credits))
+(def org-credit? (partial global-sid? st/customer-credits))
 
-(defn- customer-credit->db [cred]
+(defn- org-credit->db [cred]
   (id->cuid cred))
 
-(defn- db->customer-credit [cred]
+(defn- db->org-credit [cred]
   (mc/filter-vals some? cred))
 
-(defn- insert-customer-credit [conn {:keys [subscription-id user-id] :as cred}]
-  (let [cust (ec/select-customer conn (ec/by-cuid (:org-id cred)))
+(defn- insert-org-credit [conn {:keys [subscription-id user-id] :as cred}]
+  (let [org (ec/select-org conn (ec/by-cuid (:org-id cred)))
         cs   (when subscription-id
                (or (ec/select-credit-subscription conn (ec/by-cuid subscription-id))
                    (throw (ex-info "Subscription not found" cred))))
         user (when user-id
                (or (ec/select-user conn (ec/by-cuid user-id))
                    (throw (ex-info "User not found" cred))))]
-    (ec/insert-customer-credit conn (-> cred
-                                        (customer-credit->db)
-                                        (assoc :org-id (:id cust)
-                                               :subscription-id (:id cs)
-                                               :user-id (:id user))))))
+    (ec/insert-org-credit conn (-> cred
+                                   (org-credit->db)
+                                   (assoc :org-id (:id org)
+                                          :subscription-id (:id cs)
+                                          :user-id (:id user))))))
 
-(defn- update-customer-credit [conn cred existing]
-  (ec/update-customer-credit conn (merge existing (select-keys cred [:amount :from-time]))))
+(defn- update-org-credit [conn cred existing]
+  (ec/update-org-credit conn (merge existing (select-keys cred [:amount :from-time]))))
 
-(defn- upsert-customer-credit [conn cred]
-  (if-let [existing (ec/select-customer-credit conn (ec/by-cuid (:id cred)))]
-    (update-customer-credit conn cred existing)
-    (insert-customer-credit conn cred)))
+(defn- upsert-org-credit [conn cred]
+  (if-let [existing (ec/select-org-credit conn (ec/by-cuid (:id cred)))]
+    (update-org-credit conn cred existing)
+    (insert-org-credit conn cred)))
 
-(defn- select-customer-credit [conn id]
-  (some->> (ecc/select-customer-credits conn (ecc/by-cuid id))
+(defn- select-org-credit [conn id]
+  (some->> (ecc/select-org-credits conn (ecc/by-cuid id))
            (first)
-           (db->customer-credit)))
+           (db->org-credit)))
 
-(defn- select-customer-credits-since [{:keys [conn]} cust-id since]
-  (->> (ecc/select-customer-credits conn (ecc/by-cust-since cust-id since))
-       (map db->customer-credit)))
+(defn- select-org-credits-since [{:keys [conn]} org-id since]
+  (->> (ecc/select-org-credits conn (ecc/by-org-since org-id since))
+       (map db->org-credit)))
 
-(defn- select-customer-credits [{:keys [conn]} cust-id]
-  (->> (ecc/select-customer-credits conn (ecc/by-cust cust-id))
-       (map db->customer-credit)))
+(defn- select-org-credits [{:keys [conn]} org-id]
+  (->> (ecc/select-org-credits conn (ecc/by-org org-id))
+       (map db->org-credit)))
 
-(defn- select-avail-credits-amount [{:keys [conn]} cust-id]
+(defn- select-avail-credits-amount [{:keys [conn]} org-id]
   ;; TODO Use the available-credits table for faster lookup
-  (ecc/select-avail-credits-amount conn cust-id))
+  (ecc/select-avail-credits-amount conn org-id))
 
-(defn- select-avail-credits [{:keys [conn]} cust-id]
-  (->> (ecc/select-avail-credits conn cust-id)
-       (map db->customer-credit)))
+(defn- select-avail-credits [{:keys [conn]} org-id]
+  (->> (ecc/select-avail-credits conn org-id)
+       (map db->org-credit)))
 
 (def credit-consumption? (partial global-sid? st/credit-consumptions))
 
@@ -703,11 +703,11 @@
 
 (defn- insert-credit-consumption [conn cc]
   (let [build (apply eb/select-build-by-sid conn (build-sid cc))
-        credit (ec/select-customer-credit conn (ec/by-cuid (:credit-id cc)))]
+        credit (ec/select-org-credit conn (ec/by-cuid (:credit-id cc)))]
     (when-not build
       (throw (ex-info "Build not found" cc)))
     (when-not credit
-      (throw (ex-info "Customer credit not found" cc)))
+      (throw (ex-info "Org credit not found" cc)))
     (ec/insert-credit-consumption conn (assoc (credit-cons->db cc)
                                               :build-id (:id build)
                                               :credit-id (:id credit)))))
@@ -728,12 +728,12 @@
            (first)
            (db->credit-cons)))
 
-(defn- select-customer-credit-cons [{:keys [conn]} cust-id]
-  (->> (eccon/select-credit-cons conn (eccon/by-cust cust-id))
+(defn- select-org-credit-cons [{:keys [conn]} org-id]
+  (->> (eccon/select-credit-cons conn (eccon/by-org org-id))
        (map db->credit-cons)))
 
-(defn- select-customer-credit-cons-since [{:keys [conn]} cust-id since]
-  (->> (eccon/select-credit-cons conn (eccon/by-cust-since cust-id since))
+(defn- select-org-credit-cons-since [{:keys [conn]} org-id since]
+  (->> (eccon/select-credit-cons conn (eccon/by-org-since org-id since))
        (map db->credit-cons)))
 
 (def bb-webhook? (partial global-sid? st/bb-webhooks))
@@ -762,22 +762,22 @@
 
 (def crypto? (partial global-sid? st/crypto))
 
-(defn- insert-crypto [conn crypto cust-id]
+(defn- insert-crypto [conn crypto org-id]
   (ec/insert-crypto conn (-> crypto
-                             (assoc :org-id cust-id))))
+                             (assoc :org-id org-id))))
 
 (defn- update-crypto [conn crypto existing]
   (ec/update-crypto conn (merge crypto (select-keys existing [:org-id]))))
 
 (defn- upsert-crypto [conn crypto]
-  (let [cust (ec/select-customer conn (ec/by-cuid (:org-id crypto)))
-        existing (ec/select-crypto conn (ec/by-customer (:id cust)))]
+  (let [org (ec/select-org conn (ec/by-cuid (:org-id crypto)))
+        existing (ec/select-crypto conn (ec/by-org (:id org)))]
     (if existing
       (update-crypto conn crypto existing)
-      (insert-crypto conn crypto (:id cust)))))
+      (insert-crypto conn crypto (:id org)))))
 
-(defn- select-crypto [conn cust-cuid]
-  (ecu/crypto-by-cust-cuid conn cust-cuid))
+(defn- select-crypto [conn org-cuid]
+  (ecu/crypto-by-org-cuid conn org-cuid))
 
 (def sysadmin? (partial global-sid? st/sysadmin))
 
@@ -805,22 +805,22 @@
 (defn- db->invoice [inv]
   (-> inv
       (cuid->id)
-      (assoc :org-id (:customer-cuid inv))
-      (dissoc :customer-cuid)))
+      (assoc :org-id (:org-cuid inv))
+      (dissoc :org-cuid)))
 
 (defn- select-invoice [conn cuid]
-  (some-> (ei/select-invoice-with-customer conn cuid)
+  (some-> (ei/select-invoice-with-org conn cuid)
           db->invoice))
 
-(defn- select-invoices-for-customer [{:keys [conn]} cust-cuid]
-  (->> (ei/select-invoices-for-customer conn cust-cuid)
+(defn- select-invoices-for-org [{:keys [conn]} org-cuid]
+  (->> (ei/select-invoices-for-org conn org-cuid)
        (map db->invoice)))
 
 (defn- insert-invoice [conn inv]
-  (when-let [cust (ec/select-customer conn (ec/by-cuid (:org-id inv)))]
+  (when-let [org (ec/select-org conn (ec/by-cuid (:org-id inv)))]
     (ec/insert-invoice conn (-> inv
                                 (id->cuid)
-                                (assoc :org-id (:id cust))))))
+                                (assoc :org-id (:id org))))))
 
 (defn- update-invoice [conn inv existing]
   (ec/update-invoice conn (merge existing
@@ -884,8 +884,8 @@
   p/Storage
   (read-obj [_ sid]
     (condp sid-pred sid
-      customer?
-      (select-customer conn (global-sid->cuid sid))
+      org?
+      (select-org conn (global-sid->cuid sid))
       user?
       (select-user-by-type conn (drop 2 sid))
       build?
@@ -904,8 +904,8 @@
       (select-credit-subscription conn (last sid))
       credit-consumption?
       (select-credit-consumption conn (last sid))
-      customer-credit?
-      (select-customer-credit conn (global-sid->cuid sid))
+      org-credit?
+      (select-org-credit conn (global-sid->cuid sid))
       bb-webhook?
       (select-bb-webhook conn (last sid))
       crypto?
@@ -919,8 +919,8 @@
   
   (write-obj [_ sid obj]
     (when (condp sid-pred sid
-            customer?
-            (upsert-customer conn obj)
+            org?
+            (upsert-org conn obj)
             user?
             (upsert-user conn obj)
             join-request?
@@ -939,8 +939,8 @@
             (upsert-credit-subscription conn obj)
             credit-consumption?
             (upsert-credit-consumption conn obj)
-            customer-credit?
-            (upsert-customer-credit conn obj)
+            org-credit?
+            (upsert-org-credit conn obj)
             bb-webhook?
             (upsert-bb-webhook conn obj)
             crypto?
@@ -958,8 +958,8 @@
 
   (obj-exists? [_ sid]
     (condp sid-pred sid
-      customer?
-      (customer-exists? conn (global-sid->cuid sid))
+      org?
+      (org-exists? conn (global-sid->cuid sid))
       build?
       (build-exists? conn (rest sid))
       nil))
@@ -967,8 +967,8 @@
   (delete-obj [_ sid]
     (deleted?
      (condp sid-pred sid
-       customer?
-       (delete-customer conn (global-sid->cuid sid))
+       org?
+       (delete-org conn (global-sid->cuid sid))
        email-registration?
        (delete-email-registration conn (global-sid->cuid sid))
        webhook?
@@ -1010,31 +1010,31 @@
 
 (defn select-watched-github-repos [{:keys [conn]} github-id]
   (let [matches (ec/select-repos conn [:= :github-id github-id])
-        ;; Select all customer records for the repos
-        customers (when (not-empty matches)
-                    (->> matches
-                         (map :org-id)
-                         (distinct)
-                         (vector :in :id)
-                         (ec/select-customers conn)
-                         (group-by :id)
-                         (mc/map-vals first)))
-        add-cust-cuid (fn [r e]
-                        (assoc r :org-id (str (get-in customers [(:org-id e) :cuid]))))
+        ;; Select all org records for the repos
+        orgs (when (not-empty matches)
+               (->> matches
+                    (map :org-id)
+                    (distinct)
+                    (vector :in :id)
+                    (ec/select-orgs conn)
+                    (group-by :id)
+                    (mc/map-vals first)))
+        add-org-cuid (fn [r e]
+                       (assoc r :org-id (str (get-in orgs [(:org-id e) :cuid]))))
         convert (fn [e]
-                  (db->repo e add-cust-cuid))]
+                  (db->repo e add-org-cuid))]
     (map convert matches)))
 
 (defn watch-github-repo [{:keys [conn]} {:keys [org-id] :as repo}]
-  (when-let [cust (ec/select-customer conn (ec/by-cuid org-id))]
-    (let [r (ec/insert-repo conn (repo->db repo (:id cust)))]
+  (when-let [org (ec/select-org conn (ec/by-cuid org-id))]
+    (let [r (ec/insert-repo conn (repo->db repo (:id org)))]
       (sid/->sid [org-id (:display-id r)]))))
 
 (defn unwatch-github-repo [{:keys [conn]} [org-id repo-id]]
   ;; TODO Use a single query with join
-  (some? (when-let [cust (ec/select-customer conn (ec/by-cuid org-id))]
+  (some? (when-let [org (ec/select-org conn (ec/by-cuid org-id))]
            (when-let [repo (ec/select-repo conn [:and
-                                                 [:= :org-id (:id cust)]
+                                                 [:= :org-id (:id org)]
                                                  [:= :display-id repo-id]])]
              (ec/update-repo conn (assoc repo :github-id nil))))))
 
@@ -1044,17 +1044,17 @@
     :watch watch-github-repo
     :unwatch unwatch-github-repo}
    :customer
-   {:search select-customers
-    :find-multiple select-customers-by-id
-    :list-credits-since select-customer-credits-since
-    :list-credits select-customer-credits
+   {:search select-orgs
+    :find-multiple select-orgs-by-id
+    :list-credits-since select-org-credits-since
+    :list-credits select-org-credits
     :get-available-credits select-avail-credits-amount
     :list-available-credits select-avail-credits
-    :list-credit-subscriptions select-customer-credit-subs
-    :list-credit-consumptions select-customer-credit-cons
-    :list-credit-consumptions-since select-customer-credit-cons-since
-    :find-latest-builds select-latest-customer-builds
-    :find-latest-n-builds select-latest-n-customer-builds}
+    :list-credit-subscriptions select-org-credit-subs
+    :list-credit-consumptions select-org-credit-cons
+    :list-credit-consumptions-since select-org-credit-cons-since
+    :find-latest-builds select-latest-org-builds
+    :find-latest-n-builds select-latest-n-org-builds}
    :repo
    {:list-display-ids select-repo-display-ids
     :find-next-build-idx select-next-build-idx
@@ -1062,12 +1062,12 @@
     :delete delete-repo}
    :user
    {:find select-user
-    :customers select-user-customers}
+    :customers select-user-orgs}
    :join-request
    {:list-user select-user-join-requests}
    :build
    {:list select-repo-builds
-    :list-since select-customer-builds-since
+    :list-since select-org-builds-since
     :find-latest select-latest-build}
    :job
    {:save upsert-job
@@ -1076,16 +1076,16 @@
    {:list select-email-registrations
     :find-by-email select-email-registration-by-email}
    :param
-   {:save upsert-customer-param
-    :find select-customer-param
-    :delete delete-customer-param}
+   {:save upsert-org-param
+    :find select-org-param
+    :delete delete-org-param}
    :credit
    {:list-active-subscriptions select-active-credit-subs}
    :bitbucket
    {:find-for-webhook select-bb-webhook-for-webhook
     :search-webhooks select-bb-webhooks-by-filter}
    :invoice
-   {:list-for-customer select-invoices-for-customer}
+   {:list-for-customer select-invoices-for-org}
    :queued-task
    {:list select-queued-tasks}})
 

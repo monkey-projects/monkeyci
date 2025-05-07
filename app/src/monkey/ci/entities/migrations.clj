@@ -138,8 +138,10 @@
        (ec/select conn)))
 
 (defn- update-single-param [conn updater pv]
-  (ec/update-customer-param-value conn {:id (:id pv)
-                                        :value (updater (:iv pv) (:value pv))}))
+  (ec/update-entity conn
+                    :customer-param-values
+                    {:id (:id pv)
+                     :value (updater (:iv pv) (:value pv))}))
 
 (defn- encrypt-single-param [{:keys [vault] :as conn} pv]
   (update-single-param conn (partial mp/encrypt vault) pv))
@@ -507,7 +509,35 @@
       (->> tables
            (map (fn [t]
                   {:alter-table t
-                   :rename-column [:org-id :customer-id]})))))])
+                   :rename-column [:org-id :customer-id]})))))
+
+   (migration
+    (mig-id 39 :rename-table-cust-credits-to-org-credits)
+    [{:alter-table :customer-credits
+      :rename-table :org-credits}]
+    [{:alter-table :org-credits
+      :rename-table :customer-credits}])
+
+   (migration
+    (mig-id 40 :rename-table-cust-params-to-org-params)
+    [{:alter-table :customer-params
+      :rename-table :org-params}]
+    [{:alter-table :org-params
+      :rename-table :customer-params}])
+
+   (migration
+    (mig-id 41 :rename-table-cust-param-values-to-org-param-values)
+    [{:alter-table :customer-param-values
+      :rename-table :org-param-values}]
+    [{:alter-table :org-param-values
+      :rename-table :customer-param-values}])
+
+   (migration
+    (mig-id 42 :rename-table-user-custs-to-user-orgs)
+    [{:alter-table :user-customers
+      :rename-table :user-orgs}]
+    [{:alter-table :user-orgs
+      :rename-table :user-customers}])])
 
 (defn prepare-migrations
   "Prepares all migrations by formatting to sql, creates a ragtime migration object from it."
@@ -524,7 +554,7 @@
 
 (defn- load-and-run-migrations [conn]
   (let [[db mig idx :as r] (load-migrations conn)]
-    (log/info "Applying" (count mig) "migrations")
+    (log/info "Applying" (count mig) "migrations with db" db)
     (rt/migrate-all db idx mig)
     r))
 

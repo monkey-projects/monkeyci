@@ -27,8 +27,8 @@
     (testing "can write and read"
       (let [cust (h/gen-cust)]
         (is (sid/sid? (st/save-customer s cust)))
-        (is (= 1 (count (ec/select-customers conn [:is :id [:not nil]]))))
-        (is (some? (ec/select-customer conn (ec/by-cuid (:id cust)))))
+        (is (= 1 (count (ec/select-orgs conn [:is :id [:not nil]]))))
+        (is (some? (ec/select-org conn (ec/by-cuid (:id cust)))))
         (is (= (assoc cust :repos {})
                (st/find-customer s (:id cust))))))
 
@@ -36,7 +36,7 @@
       (st/with-transaction s tx
         (let [cust (h/gen-cust)]
           (is (sid/sid? (st/save-customer tx cust)))
-          (is (some? (ec/select-customer (:conn tx) (ec/by-cuid (:id cust)))))
+          (is (some? (ec/select-org (:conn tx) (ec/by-cuid (:id cust)))))
           (is (= (assoc cust :repos {})
                  (st/find-customer tx (:id cust)))))))
 
@@ -199,9 +199,9 @@
         (is (sid/sid? (st/save-customer s cust)))
         
         (testing "can create and retrieve"
-          (let [ce (ec/select-customer conn (ec/by-cuid cust-id))]
+          (let [ce (ec/select-org conn (ec/by-cuid cust-id))]
             (is (sid/sid? (st/save-ssh-keys s cust-id [k])))
-            (is (= 1 (count (ec/select-ssh-keys conn (ec/by-customer (:id ce))))))
+            (is (= 1 (count (ec/select-ssh-keys conn (ec/by-org (:id ce))))))
             (is (= k (->> (st/find-ssh-keys s cust-id)
                           (first)
                           (mc/remove-vals nil?))))))
@@ -245,12 +245,12 @@
       (is (sid/sid? (st/save-customer s cust)))
       
       (testing "can create and retrieve multiple"
-        (let [ce (ec/select-customer conn (ec/by-cuid cust-id))]
+        (let [ce (ec/select-org conn (ec/by-cuid cust-id))]
           (is (sid/sid? (st/save-params s cust-id [params])))
           (is (= [params] (st/find-params s cust-id)))))
 
       (testing "can create and retrieve single"
-        (let [ce (ec/select-customer conn (ec/by-cuid cust-id))]
+        (let [ce (ec/select-org conn (ec/by-cuid cust-id))]
           (is (sid/sid? (st/save-param s params)))
           (is (= params (st/find-param s sid)))))
       
@@ -286,7 +286,7 @@
 (deftest ^:sql users
   (with-storage conn s
     (let [user (-> (h/gen-user)
-                   (dissoc :customers))
+                   (dissoc :orgs :customers))
           user->id (juxt :type :type-id)]
       (testing "can save and find"
         (is (sid/sid? (st/save-user s user)))
@@ -297,18 +297,18 @@
 
       (testing "can link to customer"
         (let [cust (h/gen-cust)
-              user (assoc user :customers [(:id cust)])]
+              user (assoc user :orgs [(:id cust)])]
           (is (sid/sid? (st/save-customer s cust)))
           (is (sid/sid? (st/save-user s user)))
-          (is (= (:customers user)
-                 (-> (st/find-user s (:id user)) :customers)))))
+          (is (= (:orgs user)
+                 (-> (st/find-user s (:id user)) :orgs)))))
 
       (testing "can find customers"
         (is (not-empty (st/list-user-customers s (:id user)))))
       
       (testing "can unlink from customer"
-        (is (sid/sid? (st/save-user s (dissoc user :customers))))
-        (is (empty? (-> (st/find-user s (:id user)) :customers)))))))
+        (is (sid/sid? (st/save-user s (dissoc user :orgs))))
+        (is (empty? (-> (st/find-user s (:id user)) :orgs)))))))
 
 (deftest ^:sql builds
   (with-storage conn s

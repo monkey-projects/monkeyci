@@ -1,34 +1,34 @@
-(ns monkey.ci.entities.customer
-  "Customer specific query functions"
+(ns monkey.ci.entities.org
+  "Organization specific query functions"
   (:require [medley.core :as mc]
             [monkey.ci.entities
              [core :as ec]
              [repo :as r]]))
 
-(defn customer-with-repos
-  "Selects customer by filter with all its repos"
+(defn org-with-repos
+  "Selects org by filter with all its repos"
   [conn f]
-  (when-let [cust (ec/select-customer conn f)]
-    (->> (r/repos-with-labels conn (ec/by-customer (:id cust)))
+  (when-let [org (ec/select-org conn f)]
+    (->> (r/repos-with-labels conn (ec/by-org (:id org)))
          (group-by :cuid)
          (mc/map-vals first)
-         (assoc cust :repos))))
+         (assoc org :repos))))
 
 (defn org-ids-by-cuids
-  "Fetches all customer ids for given cuids"
+  "Fetches all org ids for given cuids"
   [conn cuids]
   (when (not-empty cuids)
     (->> (ec/select conn
                     {:select [:c.id]
-                     :from [[:customers :c]]
+                     :from [[:orgs :c]]
                      :where [:in :c.cuid cuids]})
          (map :id))))
 
-(defn crypto-by-cust-cuid [conn cuid]
+(defn crypto-by-org-cuid [conn cuid]
   (some-> (ec/select conn
                      {:select [:cr.*]
                       :from [[:cryptos :cr]]
-                      :join [[:customers :c] [:= :c.id :cr.org-id]]
+                      :join [[:orgs :c] [:= :c.id :cr.org-id]]
                       :where [:= :c.cuid cuid]})
           (first)
           (assoc :org-id cuid)))

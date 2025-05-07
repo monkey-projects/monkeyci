@@ -1,16 +1,12 @@
 (ns monkey.ci.entities.helpers
   "Helper functions for testing database entities"
-  (:require
-   [clojure.spec.alpha :as s]
-   [clojure.spec.gen.alpha :as gen]
-   [config.core :as cc]
-   [monkey.ci.entities.migrations :as m]
-   [monkey.ci.spec.entities]
-   [monkey.ci.test.helpers :as h]
-   [next.jdbc :as jdbc]
-   [next.jdbc.connection :as conn])
-  (:import
-   (com.zaxxer.hikari HikariDataSource)))
+  (:require [clojure.spec.alpha :as s]
+            [clojure.spec.gen.alpha :as gen]
+            [config.core :as cc]
+            [monkey.ci.entities.migrations :as m]
+            [monkey.ci.test.helpers :as h]
+            [next.jdbc.connection :as conn])
+  (:import (com.zaxxer.hikari HikariDataSource)))
 
 (defn db-config
   "Takes db config from env"
@@ -46,11 +42,14 @@
 (defn with-memory-db* [f]
   (with-test-db* f h2-config))
 
+(defn add-vault [conn]
+  (assoc conn :vault (h/dummy-vault)))
+
 (defn with-prepared-db* [f]
   (with-test-db*
     (fn [conn]
       ;; Vault is needed by migrations
-      (m/with-migrations (assoc conn :vault (h/dummy-vault))
+      (m/with-migrations (add-vault conn)
         #(f conn)))))
 
 (defmacro with-prepared-db [conn & body]
@@ -63,8 +62,10 @@
       ;; id is auto generated
       (dissoc :id)))
 
-(defn gen-customer []
+(defn gen-org []
   (gen-spec :db/customer))
+
+(def ^:deprecated gen-customer gen-org)
 
 (defn gen-repo []
   (gen-spec :db/repo))
@@ -81,8 +82,10 @@
 (defn gen-ssh-key []
   (gen-spec :db/ssh-key))
 
-(defn gen-customer-param []
+(defn gen-org-param []
   (gen-spec :db/customer-param))
+
+(def ^:deprecated gen-customer-param gen-org-param)
 
 (defn gen-param-value []
   (gen-spec :db/parameter-value))

@@ -2,18 +2,18 @@
   (:require [monkey.ci.entities.core :as ec]))
 
 (def base-query
-  {:select [:i.* [:c.cuid :customer-cuid]]
+  {:select [:i.* [:c.cuid :org-cuid]]
    :from [[:invoices :i]]
-   :join [[:customers :c] [:= :c.id :i.org-id]]})
+   :join [[:orgs :c] [:= :c.id :i.org-id]]})
 
-(defn select-invoice-with-customer [conn cuid]
+(defn select-invoice-with-org [conn cuid]
   (->> (assoc base-query
               :where [:= :i.cuid cuid])
        (ec/select conn)
        (map ec/convert-inv-select)
        first))
 
-(defn select-invoices-for-customer [conn cust-cuid]
+(defn select-invoices-for-org [conn cust-cuid]
   (->> (assoc base-query
               :where [:= :c.cuid cust-cuid])
        (ec/select conn)

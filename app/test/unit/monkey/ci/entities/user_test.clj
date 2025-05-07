@@ -5,12 +5,12 @@
              [user :as sut]]
             [monkey.ci.entities.helpers :as eh]))
 
-(deftest select-user-customers
+(deftest select-user-orgs
   (eh/with-prepared-db conn
-    (testing "retrieves all customers linked to a user"
-      (let [[cust other-cust] (->> (repeatedly 2 eh/gen-customer)
-                                   (map (partial ec/insert-customer conn)))
+    (testing "retrieves all orgs linked to a user"
+      (let [[org other-org] (->> (repeatedly 2 eh/gen-org)
+                                 (map (partial ec/insert-org conn)))
             user (ec/insert-user conn (eh/gen-user))
-            _ (ec/insert-user-customer conn {:user-id (:id user)
-                                             :org-id (:id cust)})]
-        (is (= [cust] (sut/select-user-customers conn (:cuid user))))))))
+            _ (ec/insert-user-org conn {:user-id (:id user)
+                                        :org-id (:id org)})]
+        (is (= [org] (sut/select-user-orgs conn (:cuid user))))))))

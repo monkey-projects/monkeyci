@@ -8,8 +8,8 @@
 (deftest ^:sql repos-with-labels
   (eh/with-prepared-db conn
     (testing "selects repos and their labels"
-      (let [cust (ec/insert-customer conn {:name "test customer"})
-            repo (ec/insert-repo conn {:org-id (:id cust)
+      (let [org (ec/insert-org conn {:name "test org"})
+            repo (ec/insert-repo conn {:org-id (:id org)
                                        :display-id "test-repo"
                                        :name "test repo"})]
         (is (= 2 (count (ec/insert-repo-labels

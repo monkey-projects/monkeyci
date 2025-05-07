@@ -19,7 +19,7 @@
        (map db->entity)))
 
 (defn select-bb-webhooks-with-repos
-  "Selects bitbucket webhook including customers and repos"
+  "Selects bitbucket webhook including orgs and repos"
   [conn f]
   (->> (-> base-query
            (assoc :select [:bb.*
@@ -28,7 +28,7 @@
                            [:r.display-id :repo-id]]
                   :where f)
            (update :join concat [[:repos :r] [:= :r.id :wh.repo-id]
-                                 [:customers :c] [:= :c.id :r.org-id]]))
+                                 [:orgs :c] [:= :c.id :r.org-id]]))
        (ec/select conn)
        (map db->entity)))
 

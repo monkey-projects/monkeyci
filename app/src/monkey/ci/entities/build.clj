@@ -6,62 +6,62 @@
   {:select [:b.*]
    :from [[:builds :b]]
    :join [[:repos :r] [:= :r.id :b.repo-id]
-          [:customers :c] [:= :c.id :r.org-id]]})
+          [:orgs :c] [:= :c.id :r.org-id]]})
 
 (defn- build-query
-  [cust-cuid repo-id]
+  [org-cuid repo-id]
   (assoc basic-query
          :where [:and
-                 [:= :c.cuid cust-cuid]
+                 [:= :c.cuid org-cuid]
                  [:= :r.display-id repo-id]]))
 
-(defn select-builds-for-repo [conn cust-cuid repo-id]
-  (->> (ec/select conn (build-query cust-cuid repo-id))
+(defn select-builds-for-repo [conn org-cuid repo-id]
+  (->> (ec/select conn (build-query org-cuid repo-id))
        (map ec/convert-build-select)))
 
-(defn select-build-ids-for-repo [conn cust-cuid repo-id]
-  (->> (ec/select conn (-> (build-query cust-cuid repo-id)
+(defn select-build-ids-for-repo [conn org-cuid repo-id]
+  (->> (ec/select conn (-> (build-query org-cuid repo-id)
                            (assoc :select [:b.display-id])))
        (map :display-id)))
 
 (defn select-build-by-sid
-  "Finds build for customer, repo and display id"
-  [conn cust-cuid repo-id build-id]
+  "Finds build for org, repo and display id"
+  [conn org-cuid repo-id build-id]
   (some-> (ec/select conn
-                     (-> (build-query cust-cuid repo-id)
+                     (-> (build-query org-cuid repo-id)
                          (update :where conj [:= :b.display-id build-id])))
           (first)
           (ec/convert-build-select)))
 
-(defn select-max-idx [conn cust-cuid repo-id]
+(defn select-max-idx [conn org-cuid repo-id]
   (-> (ec/select conn
-                 (-> (build-query cust-cuid repo-id)
+                 (-> (build-query org-cuid repo-id)
                      (assoc :select [[:%max.idx :last]])))
       first
       :last))
 
-(defn select-builds-for-customer-since [conn cust-cuid ts]
+(defn select-builds-for-org-since [conn org-cuid ts]
   (->> (ec/select conn (assoc basic-query
-                              :select [:b.* [:r.display-id :repo-display-id] [:c.cuid :customer-cuid]]
+                              :select [:b.* [:r.display-id :repo-display-id] [:c.cuid :org-cuid]]
                               :where [:and
-                                      [:= :c.cuid cust-cuid]
+                                      [:= :c.cuid org-cuid]
                                       [:>= :b.start-time (ec/->ts ts)]]))
        (map ec/convert-build-select)))
 
-(defn select-latest-build [conn cust-cuid repo-id]
-  (some-> (ec/select conn (-> (build-query cust-cuid repo-id)
+(defn select-latest-build [conn org-cuid repo-id]
+  (some-> (ec/select conn (-> (build-query org-cuid repo-id)
                               (assoc :order-by [[:idx :desc]]
                                      :limit 1)))
           (first)
           (ec/convert-build-select)))
 
 (defn select-latest-builds
-  "Fetches all latest for all repos for a customer"
-  [conn cust-cuid]
+  "Fetches all latest for all repos for a org"
+  [conn org-cuid]
   (->> (ec/select conn
                   (-> basic-query
-                      (assoc :select [:b.* [:r.display-id :repo-display-id] [:c.cuid :customer-cuid]]
-                             :where [:= :c.cuid cust-cuid]
+                      (assoc :select [:b.* [:r.display-id :repo-display-id] [:c.cuid :org-cuid]]
+                             :where [:= :c.cuid org-cuid]
                              ;; Find the max idx using a group-by subselect.
                              ;; We use the idx instead of the start time for performance (since idx
                              ;; is indexed)
@@ -74,10 +74,10 @@
                                            [:= :latest.repo-id :b.repo-id]]])))
        (map ec/convert-build-select)))
 
-(defn select-latest-n-builds [conn cust-cuid n]
+(defn select-latest-n-builds [conn org-cuid n]
   (->> (ec/select conn (-> basic-query
-                           (assoc :select [:b.* [:r.display-id :repo-display-id] [:c.cuid :customer-cuid]]
-                                  :where [:= :c.cuid cust-cuid]
+                           (assoc :select [:b.* [:r.display-id :repo-display-id] [:c.cuid :org-cuid]]
+                                  :where [:= :c.cuid org-cuid]
                                   :order-by [[:start-time :desc]]
                                   :limit n)))
        (map ec/convert-build-select)))
@@ -87,14 +87,14 @@
             :from [[:build-runner-details :rd]]
             :join [[:builds :b] [:= :b.id :rd.build-id]
                    [:repos :r] [:= :r.id :b.repo-id]
-                   [:customers :c] [:= :c.id :r.org-id]]
+                   [:orgs :c] [:= :c.id :r.org-id]]
             :where f}
            (ec/select conn)
            (first)
            (ec/convert-runner-details-select)))
 
-(defn by-build-sid [[cust-id repo-id build-id]]
+(defn by-build-sid [[org-id repo-id build-id]]
   [:and
-   [:= :c.cuid cust-id]
+   [:= :c.cuid org-id]
    [:= :r.display-id repo-id]
    [:= :b.display-id build-id]])
