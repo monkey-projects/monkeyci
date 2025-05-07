@@ -243,16 +243,16 @@
              (.getBytes)
              (java.io.ByteArrayInputStream.))))
 
-(deftest customer-endpoints
-  (verify-entity-endpoints {:name "customer"
-                            :base-entity {:name "test customer"}
-                            :updated-entity {:name "updated customer"}
-                            :creator st/save-customer})
+(deftest org-endpoints
+  (verify-entity-endpoints {:name "org"
+                            :base-entity {:name "test org"}
+                            :updated-entity {:name "updated org"}
+                            :creator st/save-org})
 
-  (testing "`GET /customer` searches for customer"
+  (testing "`GET /org` searches for org"
     (h/with-memory-store st
       (let [app (make-test-app st)]
-        (is (= 200 (-> (mock/request :get "/customer" {:name "test"})
+        (is (= 200 (-> (mock/request :get "/org" {:name "test"})
                        (app)
                        :status))))))
 
@@ -266,15 +266,15 @@
                   :status "pending"
                   :org-id (:id cust)
                   :user-id (:id user)}]
-          (is (some? (st/save-customer st cust)))
+          (is (some? (st/save-org st cust)))
           (is (some? (st/save-user st user)))
           (is (some? (st/save-join-request st jr)))
 
-          (testing "`POST` returns 400 when user has already joined that customer")
+          (testing "`POST` returns 400 when user has already joined that org")
           
-          (testing "`GET` retrieves join requests for customer"
+          (testing "`GET` retrieves join requests for org"
             (is (= [jr]
-                   (-> (mock/request :get (str "/customer/" (:id cust) "/join-request"))
+                   (-> (mock/request :get (str "/org/" (:id cust) "/join-request"))
                        (app)
                        (h/reply->json)))))
 
@@ -284,7 +284,7 @@
             (testing "approves join request with message"
               (is (= 200
                      (-> (h/json-request
-                          :post (str "/customer/" (:id cust) "/join-request/" (:id jr) "/approve")
+                          :post (str "/org/" (:id cust) "/join-request/" (:id jr) "/approve")
                           {:message "Very well"})
                          (app)
                          :status)))
@@ -295,15 +295,15 @@
             (testing "returns 404 not found for non existing request"
               (is (= 404
                      (-> (h/json-request
-                          :post (str "/customer/" (:id cust) "/join-request/" (st/new-id) "/approve")
+                          :post (str "/org/" (:id cust) "/join-request/" (st/new-id) "/approve")
                           {})
                          (app)
                          :status))))
 
-            (testing "returns 404 not found when customer id does not match request"
+            (testing "returns 404 not found when org id does not match request"
               (is (= 404
                      (-> (h/json-request
-                          :post (str "/customer/" (st/new-id) "/join-request/" (:id jr) "/approve")
+                          :post (str "/org/" (st/new-id) "/join-request/" (:id jr) "/approve")
                           {})
                          (app)
                          :status)))))
@@ -312,7 +312,7 @@
             (testing "rejects join request with message"
               (is (= 200
                      (-> (h/json-request
-                          :post (str "/customer/" (:id cust) "/join-request/" (:id jr) "/reject")
+                          :post (str "/org/" (:id cust) "/join-request/" (:id jr) "/reject")
                           {:message "No way"})
                          (app)
                          :status)))
@@ -323,15 +323,15 @@
             (testing "returns 404 not found for non existing request"
               (is (= 404
                      (-> (h/json-request
-                          :post (str "/customer/" (:id cust) "/join-request/" (st/new-id) "/reject")
+                          :post (str "/org/" (:id cust) "/join-request/" (st/new-id) "/reject")
                           {})
                          (app)
                          :status))))
 
-            (testing "returns 404 not found when customer id does not match request"
+            (testing "returns 404 not found when org id does not match request"
               (is (= 404
                      (-> (h/json-request
-                          :post (str "/customer/" (st/new-id) "/join-request/" (:id jr) "/reject")
+                          :post (str "/org/" (st/new-id) "/join-request/" (:id jr) "/reject")
                           {})
                          (app)
                          :status))))))))
@@ -339,27 +339,27 @@
     (h/with-memory-store st
       (let [app (make-test-app st)
             cust (h/gen-cust)]
-        (is (some? (st/save-customer st cust)))
+        (is (some? (st/save-org st cust)))
         
         (testing "`/builds`"
           (testing "`/recent` retrieves builds from latest 24h"
-            (is (= 200 (-> (mock/request :get (str "/customer/" (:id cust) "/builds/recent"))
+            (is (= 200 (-> (mock/request :get (str "/org/" (:id cust) "/builds/recent"))
                            (app)
                            :status))))
 
           (testing "`/latest` retrieves latest builds for each repo"
-            (is (= 200 (-> (mock/request :get (str "/customer/" (:id cust) "/builds/latest"))
+            (is (= 200 (-> (mock/request :get (str "/org/" (:id cust) "/builds/latest"))
                            (app)
                            :status)))))
 
-        (testing "`GET /stats` retrieves customer statistics"
-          (is (= 200 (-> (mock/request :get (str "/customer/" (:id cust) "/stats"))
+        (testing "`GET /stats` retrieves org statistics"
+          (is (= 200 (-> (mock/request :get (str "/org/" (:id cust) "/stats"))
                          (app)
                          :status))))
 
         (testing "`/credits`"
-          (testing "`GET` retrieves customer credit details"
-            (is (= 200 (-> (mock/request :get (str "/customer/" (:id cust) "/credits"))
+          (testing "`GET` retrieves org credit details"
+            (is (= 200 (-> (mock/request :get (str "/org/" (:id cust) "/credits"))
                            (app)
                            :status)))))
 
@@ -375,21 +375,21 @@
                     :repo-slug "test-repo"
                     :bitbucket-id (str (random-uuid))}
                 search (fn [path]
-                         (-> (mock/request :get (str (format "/customer/%s/webhook/bitbucket" (:id cust)) path))
+                         (-> (mock/request :get (str (format "/org/%s/webhook/bitbucket" (:id cust)) path))
                              (app)
                              :body
                              slurp
                              (h/parse-json)))
                 select-props #(select-keys % (keys bb))]
-            (is (some? (st/save-customer st cust)))
+            (is (some? (st/save-org st cust)))
             (is (some? (st/save-webhook st wh)))
             (is (some? (st/save-bb-webhook st bb)))
             
-            (testing "`GET` lists bitbucket webhooks for customer"
+            (testing "`GET` lists bitbucket webhooks for org"
               (is (= [bb] (->> (search "")
                                (map select-props)))))
 
-            (testing "contains customer and repo id"
+            (testing "contains org and repo id"
               (let [r (-> (search "") first)]
                 (is (= (:id cust) (:org-id r)))
                 (is (= (:id repo) (:repo-id r)))))
@@ -405,12 +405,12 @@
             (is (some? (st/save-invoice st inv)))
             
             (testing "`GET` searches invoices"
-              (is (= 200 (-> (mock/request :get (str "/customer/" (:id cust) "/invoice"))
+              (is (= 200 (-> (mock/request :get (str "/org/" (:id cust) "/invoice"))
                              (app)
                              :status))))
 
             (testing "`GET /:id` retrieves by id"
-              (is (= 200 (-> (mock/request :get (str "/customer/" (:id cust) "/invoice/" (:id inv)))
+              (is (= 200 (-> (mock/request :get (str "/org/" (:id cust) "/invoice/" (:id inv)))
                              (app)
                              :status)))))))))
 
@@ -428,31 +428,31 @@
           make-token (fn [ti]
                        (auth/sign-jwt ti (.getPrivate kp)))
           token (make-token token-info)
-          _ (st/save-customer st {:id cust-id
-                                  :name "test customer"})
+          _ (st/save-org st {:id cust-id
+                                  :name "test org"})
           _ (st/save-user st {:type "github"
                               :type-id github-id
-                              :customers [cust-id]})]
+                              :orgs [cust-id]})]
 
-      (testing "ok if user has access to customer"
-        (is (= 200 (-> (mock/request :get (str "/customer/" cust-id))
+      (testing "ok if user has access to org"
+        (is (= 200 (-> (mock/request :get (str "/org/" cust-id))
                        (mock/header "authorization" (str "Bearer " token))
                        (app)
                        :status))))
 
-      (testing "unauthorized if user does not have access to customer"
-        (is (= 403 (-> (mock/request :get (str "/customer/" (st/new-id)))
+      (testing "unauthorized if user does not have access to org"
+        (is (= 403 (-> (mock/request :get (str "/org/" (st/new-id)))
                        (mock/header "authorization" (str "Bearer " token))
                        (app)
                        :status))))
       
       (testing "unauthenticated if no user credentials"
-        (is (= 401 (-> (mock/request :get (str "/customer/" cust-id))
+        (is (= 401 (-> (mock/request :get (str "/org/" cust-id))
                        (app)
                        :status))))
 
       (testing "unauthenticated if token expired"
-        (is (= 401 (-> (mock/request :get (str "/customer/" cust-id))
+        (is (= 401 (-> (mock/request :get (str "/org/" cust-id))
                        (mock/header "authorization" (str "Bearer " (make-token
                                                                     (assoc token-info :exp (- (u/now) 1000)))))
                        (app)
@@ -461,7 +461,7 @@
 (deftest repository-endpoints
   (let [cust-id (st/new-id)]
     (verify-entity-endpoints {:name "repository"
-                              :path (format "/customer/%s/repo" cust-id)
+                              :path (format "/org/%s/repo" cust-id)
                               :base-entity {:name "test repo"
                                             :org-id cust-id
                                             :url "http://test-repo"
@@ -470,11 +470,11 @@
                               :creator st/save-repo
                               :can-delete? true})
     
-    (testing "`/customer/:id`"
+    (testing "`/org/:id`"
       (testing "`/github`"
         (testing "`/watch` starts watching repo"
           (is (= 200 (-> (h/json-request :post
-                                         (str "/customer/" cust-id "/repo/github/watch")
+                                         (str "/org/" cust-id "/repo/github/watch")
                                          {:github-id 12324
                                           :org-id cust-id
                                           :name "test-repo"
@@ -490,7 +490,7 @@
                                             :id repo-id
                                             :github-id 1234})]
             (is (= 200 (-> (mock/request :post
-                                         (format "/customer/%s/repo/%s/github/unwatch" cust-id repo-id))
+                                         (format "/org/%s/repo/%s/github/unwatch" cust-id repo-id))
                            (app)
                            :status))))))
 
@@ -500,7 +500,7 @@
                                                :body "{}"}]
           (testing "`/watch` starts watching bitbucket repo"
             (is (= 201 (-> (h/json-request :post
-                                           (str "/customer/" cust-id "/repo/bitbucket/watch")
+                                           (str "/org/" cust-id "/repo/bitbucket/watch")
                                            {:org-id cust-id
                                             :name "test-repo"
                                             :url "http://test"
@@ -515,7 +515,7 @@
                   app (make-test-app st)
                   repo-id (st/new-id)
                   wh-id (st/new-id)
-                  _ (st/save-customer st {:id cust-id
+                  _ (st/save-org st {:id cust-id
                                           :repos {repo-id {:id repo-id}}})
                   _ (st/save-webhook st {:org-id cust-id
                                          :repo-id repo-id
@@ -524,7 +524,7 @@
                   _ (st/save-bb-webhook st {:webhook-id wh-id
                                             :bitbucket-id (str (random-uuid))})]
               (is (= 200 (-> (h/json-request :post
-                                             (format "/customer/%s/repo/%s/bitbucket/unwatch" cust-id repo-id)
+                                             (format "/org/%s/repo/%s/bitbucket/unwatch" cust-id repo-id)
                                              {:token "test-token"})
                              (app)
                              :status))))))))))
@@ -565,14 +565,14 @@
           (is (= 200 (:status r)))
           (is (= "updated@monkeyci.com" (some-> r (h/reply->json) :email)))))
 
-      (testing "`GET /customers` retrieves customers for user"
+      (testing "`GET /orgs` retrieves orgs for user"
         (let [user (st/find-user-by-type st (user->sid user))
               user-id (:id user)
               cust {:id (st/new-id)
-                    :name "test customer"}]
-          (is (some? (st/save-customer st cust)))
-          (is (some? (st/save-user st (assoc user :customers [(:id cust)]))))
-          (is (= [cust] (-> (mock/request :get (str "/user/" user-id "/customers"))
+                    :name "test org"}]
+          (is (some? (st/save-org st cust)))
+          (is (some? (st/save-user st (assoc user :orgs [(:id cust)]))))
+          (is (= [cust] (-> (mock/request :get (str "/user/" user-id "/orgs"))
                             (app)
                             (h/reply->json))))))
 
@@ -580,10 +580,10 @@
         (let [user (st/find-user-by-type st (user->sid user))
               user-id (:id user)
               cust {:id (st/new-id)
-                    :name "joining customer"}
+                    :name "joining org"}
               base-path (str "/user/" user-id "/join-request")]
 
-          (is (some? (st/save-customer st cust)))
+          (is (some? (st/save-org st cust)))
           
           (testing "`POST` create new join request"
             (let [r (-> (h/json-request :post base-path 
@@ -622,11 +622,11 @@
           (-> (h/json-request :put path entity)
               (app)))]
 
-    (testing "/customer/:org-id"
+    (testing "/org/:org-id"
       
       (testing path
         (let [cust-id (st/new-id)
-              full-path (format "/customer/%s%s" cust-id path)]
+              full-path (format "/org/%s%s" cust-id path)]
           
           (testing (str "empty when no " desc)
             (is (empty? (get-entity full-path))))
@@ -646,8 +646,8 @@
 
       (testing (str "/repo/:repo-id" path)
         (let [[cust-id repo-id] (repeatedly st/new-id)
-              full-path (format "/customer/%s/repo/%s%s" cust-id repo-id path)
-              _ (st/save-customer st {:id cust-id
+              full-path (format "/org/%s/repo/%s%s" cust-id repo-id path)
+              _ (st/save-org st {:id cust-id
                                       :repos {repo-id {:name "test repo"}}})]
           
           (testing (str "empty when no " desc)
@@ -678,8 +678,8 @@
                :org-id cust-id
                :label-filters []}]
     (verify-entity-endpoints
-     {:name "customer param"
-      :path (format "/customer/%s/param" cust-id)
+     {:name "org param"
+      :path (format "/org/%s/param" cust-id)
       :base-entity param
       :updated-entity {:description "updated description"}
       :creator (fn [s p]
@@ -704,8 +704,8 @@
                    :org-id cust-id
                    :label-filters []}]
       (verify-entity-endpoints
-       {:name "customer ssh key"
-        :path (format "/customer/%s/ssh-keys" cust-id)
+       {:name "org ssh key"
+        :path (format "/org/%s/ssh-keys" cust-id)
         :base-entity ssh-key
         :updated-entity {:description "updated description"}
         :creator (fn [s p]
@@ -720,7 +720,7 @@
 (defn- repo-path [sid]
   (str (->> sid
             (drop-last)
-            (interleave ["/customer" "repo"])
+            (interleave ["/org" "repo"])
             (cs/join "/"))
        "/builds"))
 
@@ -738,11 +738,11 @@
                          :message "test msg"
                          :git {:message "test meta"}))
         path (repo-path sid)]
-    (is (st/sid? (st/save-customer st {:id (first sid)
+    (is (st/sid? (st/save-org st {:id (first sid)
                                        :repos {repo-id {:id repo-id
                                                         :name "test repo"}}})))
     (is (st/sid? (st/save-build st build)))
-    (is (st/sid? (st/save-customer-credit st {:org-id (first sid)
+    (is (st/sid? (st/save-org-credit st {:org-id (first sid)
                                               :amount 1000})))
     (f (assoc trt
               :sid sid
@@ -858,9 +858,9 @@
                 (is (= 404 (:status l)))))))))))
 
 (deftest event-stream
-  (testing "`GET /customer/:org-id/events` exists"
+  (testing "`GET /org/:org-id/events` exists"
     (is (not= 404
-              (-> (mock/request :get "/customer/test-cust/events")
+              (-> (mock/request :get "/org/test-cust/events")
                   (test-app)
                   :status)))))
 
@@ -1110,7 +1110,7 @@
 
 (deftest artifacts-endpoints
   (let [[cust-id repo-id build-id :as sid] (repeatedly 3 st/new-id)
-        base-path (format "/customer/%s/repo/%s/builds/%s" cust-id repo-id build-id)
+        base-path (format "/org/%s/repo/%s/builds/%s" cust-id repo-id build-id)
         art-id "test-artifact"
         artifacts (atom {(a/build-sid->artifact-path sid "test-artifact") "test.txt"})
         art-store (h/fake-blob-store artifacts)
@@ -1163,7 +1163,7 @@
                            (test-app)
                            :status))))
           
-          (testing "POST `/issue` issues new credits to specific customer"
+          (testing "POST `/issue` issues new credits to specific org"
             (is (= 201 (-> (h/json-request :post
                                            (make-path "/issue")
                                            {:amount 100
@@ -1207,7 +1207,7 @@
                   (is (= (:id created)
                          (:id (h/reply->json reply))))))))))
 
-      (testing "POST `/issue` issues new credits to all customers with subscriptions"
+      (testing "POST `/issue` issues new credits to all orgs with subscriptions"
         (is (= 200 (-> (h/json-request :post "/admin/credits/issue"
                                        {:date "2025-01-16"})
                        (test-app)

@@ -23,7 +23,7 @@
 (def repo-id c/gen-repo-display-id)
 
 (c/make-entity-endpoints "repo"
-                         ;; The repo is part of the customer, so combine the ids
+                         ;; The repo is part of the org, so combine the ids
                          {:get-id (c/id-getter (juxt :org-id :repo-id))
                           :getter st/find-repo
                           :saver st/save-repo
@@ -41,12 +41,12 @@
                           :getter st/find-user-by-type
                           :saver st/save-user})
 
-(defn get-user-customers
-  "Retrieves all users linked to the customer in the request path"
+(defn get-user-orgs
+  "Retrieves all users linked to the org in the request path"
   [req]
   (let [user-id (get-in req [:parameters :path :user-id])
         st (c/req->storage req)]
-    (rur/response (st/list-user-customers st user-id))))
+    (rur/response (st/list-user-orgs st user-id))))
 
 ;; Override webhook creation
 (defn- assign-webhook-secret
@@ -60,14 +60,14 @@
 
 (def org-id c/org-id)
 
-(def get-customer-ssh-keys
-  (partial c/get-list-for-customer (comp c/drop-ids st/find-ssh-keys)))
+(def get-org-ssh-keys
+  (partial c/get-list-for-org (comp c/drop-ids st/find-ssh-keys)))
 
 (def get-repo-ssh-keys
   (partial c/get-for-repo-by-label (comp c/drop-ids st/find-ssh-keys) (map :private-key)))
 
 (def update-ssh-keys
-  (partial c/update-for-customer st/save-ssh-keys))
+  (partial c/update-for-org st/save-ssh-keys))
 
 (defn- add-index [[idx p]]
   (assoc p :index idx))
@@ -278,7 +278,7 @@
       (rur/not-found nil))))
 
 (defn event-stream
-  "Sets up an event stream for all `build/updated` events for the customer specified in the
+  "Sets up an event stream for all `build/updated` events for the org specified in the
    request path."
   [req]
   (eh/bus-stream (c/from-rt req :update-bus)

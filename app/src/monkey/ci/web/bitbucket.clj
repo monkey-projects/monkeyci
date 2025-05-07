@@ -84,7 +84,7 @@
   (rur/response {:client-id (c/from-rt req (comp :client-id :bitbucket rt/config))}))
 
 (defn- ext-webhook-url [req wh]
-  (str (c/req->ext-uri req "/customer") "/webhook/bitbucket/" (:id wh)))
+  (str (c/req->ext-uri req "/org") "/webhook/bitbucket/" (:id wh)))
 
 (defn- create-bb-webhook [req wh]
   (log/debug "Creating Bitbucket webhook for internal webhook" (:id wh))
@@ -131,7 +131,7 @@
   (let [s (c/req->storage req)
         body (c/body req)
         cust-id (c/org-id req)
-        cust (st/find-customer s cust-id)]
+        cust (st/find-org s cust-id)]
     (if cust
       (let [repo (-> body
                      (select-keys [:org-id :name :url :main-branch])
@@ -149,7 +149,7 @@
               (c/error-response "Unable to create bitbucket webhook" 500))
             (c/error-response "Unable to save webhook" 500))
           (c/error-response "Unable to save repository" 500)))
-      (c/error-response "Customer not found" 404))))
+      (c/error-response "Org not found" 404))))
 
 (defn unwatch-repo
   "Unwatches Bitbucket repo by deactivating any existing webhook."
@@ -224,7 +224,7 @@
       (handle-unsupported type))))
 
 (defn list-webhooks
-  "Lists all bitbucket webhooks for customer, possibly filtered by repo"
+  "Lists all bitbucket webhooks for org, possibly filtered by repo"
   [req]
   (let [cust-id (c/org-id req)
         st (c/req->storage req)

@@ -145,14 +145,14 @@
       (when (= 2 (count id))
         (log/trace "Looking up user with id" id)
         (some-> (st/find-user-by-type storage id)
-                (update :customers set))))))
+                (update :orgs set))))))
 
 (defmethod resolve-token role-build [{:keys [storage]} {:keys [sub] :as token}]
   (when-not (expired? token)
     (when-let [build (some->> sub
                               (sid/parse-sid)
                               (st/find-build storage))]
-      (assoc build :customers #{(:org-id build)}))))
+      (assoc build :orgs #{(:org-id build)}))))
 
 (defmethod resolve-token role-sysadmin [{:keys [storage]} {:keys [sub] :as token}]
   (when (and (not (expired? token)) sub)
@@ -198,20 +198,20 @@
   (some-> user :type name (= role-sysadmin)))
 
 (defn- check-cust-authorization!
-  "Checks if the request identity grants access to the customer specified in 
+  "Checks if the request identity grants access to the org specified in 
    the parameters path."
   [req]
   (when-let [cid (get-in req [:parameters :path :org-id])]
     (when-not (and (ba/authenticated? req)
                    (or (sysadmin? (:identity req))
-                       (contains? (get-in req [:identity :customers]) cid)))
-      (throw (ex-info "Credentials do not grant access to this customer"
+                       (contains? (get-in req [:identity :orgs]) cid)))
+      (throw (ex-info "Credentials do not grant access to this org"
                       {:type :auth/unauthorized
                        :org-id cid})))))
 
-(defn customer-authorization
+(defn org-authorization
   "Middleware that verifies the identity token to check if the user or build has
-   access to the given customer."
+   access to the given org."
   [h]
   (fn [req]
     (check-cust-authorization! req)

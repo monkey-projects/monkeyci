@@ -308,7 +308,7 @@
 (deftest ^:sql org-credits
   (eh/with-prepared-db conn
     (let [cust (sut/insert-org conn (eh/gen-org))
-          cred (-> (eh/gen-cust-credit)
+          cred (-> (eh/gen-org-credit)
                    (assoc :org-id (:id cust))
                    (dissoc :subscription-id :user-id))]
       (testing "can insert"

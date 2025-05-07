@@ -159,14 +159,14 @@
 
 (defn- update-org [conn org existing]
   (let [ce (org->db org)]
-    (spec/valid? :db/customer ce)
+    (spec/valid? :db/org ce)
     (when (not= ce existing)
       (ec/update-org conn (merge existing ce)))
     (upsert-repos conn org (:id existing))
     org))
 
 (defn- upsert-org [conn org]
-  (spec/valid? :entity/customer org)
+  (spec/valid? :entity/org org)
   (if-let [existing (ec/select-org conn (ec/by-cuid (:id org)))]
     (update-org conn org existing)
     (insert-org conn org)))
@@ -200,7 +200,7 @@
 (defn- global-sid? [type sid]
   (= [st/global (name type)] (take 2 sid)))
 
-(def org? (partial global-sid? :customers))
+(def org? (partial global-sid? :orgs))
 (def webhook? (partial global-sid? :webhooks))
 
 (defn- global-sid->cuid [sid]
@@ -308,7 +308,7 @@
     (delete-param-values conn (:delete r))))
 
 (defn- upsert-param [conn param org-id]
-  (spec/valid? :entity/customer-params param)
+  (spec/valid? :entity/org-params param)
   (if-let [existing (ec/select-org-param conn (ec/by-cuid (:id param)))]
     (update-param conn param org-id existing)
     (insert-param conn param org-id)))
@@ -639,7 +639,7 @@
 (defn- select-active-credit-subs [{:keys [conn]} at]
   (select-credit-subs conn (ecsub/active-at at)))
 
-(def org-credit? (partial global-sid? st/customer-credits))
+(def org-credit? (partial global-sid? st/org-credits))
 
 (defn- org-credit->db [cred]
   (id->cuid cred))
@@ -1043,7 +1043,7 @@
    {:find select-watched-github-repos
     :watch watch-github-repo
     :unwatch unwatch-github-repo}
-   :customer
+   :org
    {:search select-orgs
     :find-multiple select-orgs-by-id
     :list-credits-since select-org-credits-since
@@ -1062,7 +1062,7 @@
     :delete delete-repo}
    :user
    {:find select-user
-    :customers select-user-orgs}
+    :orgs select-user-orgs}
    :join-request
    {:list-user select-user-join-requests}
    :build
@@ -1085,7 +1085,7 @@
    {:find-for-webhook select-bb-webhook-for-webhook
     :search-webhooks select-bb-webhooks-by-filter}
    :invoice
-   {:list-for-customer select-invoices-for-org}
+   {:list-for-org select-invoices-for-org}
    :queued-task
    {:list select-queued-tasks}})
 

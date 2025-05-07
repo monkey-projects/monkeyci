@@ -63,7 +63,7 @@
       (dissoc :id)))
 
 (defn gen-org []
-  (gen-spec :db/customer))
+  (gen-spec :db/org))
 
 (def ^:deprecated gen-customer gen-org)
 
@@ -83,7 +83,7 @@
   (gen-spec :db/ssh-key))
 
 (defn gen-org-param []
-  (gen-spec :db/customer-param))
+  (gen-spec :db/org-param))
 
 (def ^:deprecated gen-customer-param gen-org-param)
 
@@ -96,8 +96,10 @@
 (defn gen-email-registration []
   (gen-spec :db/email-registration))
 
-(defn gen-cust-credit []
-  (gen-spec :db/customer-credit))
+(defn gen-org-credit []
+  (gen-spec :db/org-credit))
+
+(def ^:deprecated gen-cust-credit gen-org-credit)
 
 (defn gen-credit-subscription []
   (gen-spec :db/credit-subscription))

@@ -31,7 +31,7 @@
   (-> (s/keys :opt-un [:db/start-time :db/end-time])
       (s/merge :db/common)))
 
-(s/def :db/customer
+(s/def :db/org
   (-> (s/keys :req-un [:db/name])
       (s/merge :db/common)))
 
@@ -79,7 +79,7 @@
 (s/def :db/label-filter-conjunction (s/coll-of :db/label-filter))
 (s/def :db/label-filters (s/coll-of :db/label-filter-conjunction))
 
-(s/def :db/customer-param
+(s/def :db/org-param
   (s/keys :req-un [:db/org-id]
           :opt-un [:db/label-filters :db/description]))
 
@@ -129,7 +129,7 @@
 (s/def :db/subscription-id int?)
 (s/def :db/reason string?)
 
-(s/def :db/customer-credit
+(s/def :db/org-credit
   (-> (s/keys :req-un [:db/org-id :db/amount :credit/type]
               :opt-un [:db/from-time :db/user-id :db/subscription-id :db/reason])
       (s/merge :db/common)))

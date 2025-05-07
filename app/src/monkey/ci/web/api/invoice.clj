@@ -11,9 +11,9 @@
   :getter st/find-invoice})
 
 (defn search-invoices
-  "Searches customer invoices"
+  "Searches org invoices"
   [req]
   ;; TODO Apply filter
-  (let [inv (st/list-invoices-for-customer (c/req->storage req)
-                                           (c/org-id req))]
+  (let [inv (st/list-invoices-for-org (c/req->storage req)
+                                      (c/org-id req))]
     (rur/response inv)))

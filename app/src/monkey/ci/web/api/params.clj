@@ -36,10 +36,10 @@
   (->> (decrypt req [param])
        first))
 
-(defn get-customer-params
-  "Retrieves all parameters configured on the customer.  This is for administration purposes."
+(defn get-org-params
+  "Retrieves all parameters configured on the org.  This is for administration purposes."
   [req]
-  (c/get-list-for-customer (comp (partial decrypt req) c/drop-ids st/find-params) req))
+  (c/get-list-for-org (comp (partial decrypt req) c/drop-ids st/find-params) req))
 
 (defn- get-param-id [req]
   (st/params-sid (c/org-id req)
@@ -74,5 +74,5 @@
   (c/get-for-repo-by-label (comp (partial decrypt req) st/find-params) (mapcat :parameters) req))
 
 (def update-params
-  (comp (partial c/update-for-customer st/save-params)
+  (comp (partial c/update-for-org st/save-params)
         encrypt-all))

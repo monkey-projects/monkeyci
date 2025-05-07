@@ -21,8 +21,8 @@
   (let [iv (c/crypto-iv req)]
     (map (partial decrypt req iv) ssh-keys)))
 
-(defn get-customer-ssh-keys [req]
-  (c/get-list-for-customer (comp (partial decrypt-all req) c/drop-ids st/find-ssh-keys) req))
+(defn get-org-ssh-keys [req]
+  (c/get-list-for-org (comp (partial decrypt-all req) c/drop-ids st/find-ssh-keys) req))
 
 (defn get-repo-ssh-keys [req]
   (let [iv (c/crypto-iv req)]
@@ -35,4 +35,4 @@
   (letfn [(encrypt-and-save [st cust-id ssh-keys]
             (->> (encrypt-all req ssh-keys)
                  (st/save-ssh-keys st cust-id)))]
-    (c/update-for-customer encrypt-and-save req)))
+    (c/update-for-org encrypt-and-save req)))

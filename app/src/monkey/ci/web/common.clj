@@ -168,17 +168,17 @@
 
 (def drop-ids (partial map #(dissoc % :org-id)))
 
-(defn get-list-for-customer
+(defn get-list-for-org
   "Utility function that uses the `finder` to fetch a list of things from storage
-   using the customer id from the request.  Returns the result as a http response."
+   using the org id from the request.  Returns the result as a http response."
   [finder req]
   (-> (req->storage req)
       (finder (org-id req))
       (or [])
       (rur/response)))
 
-(defn update-for-customer
-  "Uses the `updater` to save the request body using the customer id.  Returns the 
+(defn update-for-org
+  "Uses the `updater` to save the request body using the org id.  Returns the 
    body with an id as a http response."
   [updater req]
   (let [assign-id (fn [{:keys [id] :as obj}]
@@ -258,13 +258,13 @@
   (str "build-" idx))
 
 (defn crypto-iv
-  "Looks up crypto initialization vector for the customer associated with the
+  "Looks up crypto initialization vector for the org associated with the
    request.  If no crypto record is found, one is generated."
   ([st cust-id]
      (if-let [crypto (st/find-crypto st cust-id)]
        (:iv crypto)
        (let [iv (v/generate-iv)]
-         (log/debug "No crypto record found for customer" cust-id ", generating a new one")
+         (log/debug "No crypto record found for org" cust-id ", generating a new one")
          (when (st/save-crypto st {:org-id cust-id
                                    :iv iv})
            iv))))

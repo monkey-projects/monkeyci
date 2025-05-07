@@ -54,7 +54,7 @@
     (let [{st :storage :as rt} (trt/test-runtime)
           r (-> rt
                 (h/->req)
-                (h/with-body {:org-id "test-customer"})
+                (h/with-body {:org-id "test-org"})
                 (sut/create-webhook))]
       (is (= 201 (:status r)))
       (is (string? (get-in r [:body :secret-key]))))))
@@ -208,9 +208,9 @@
                                           :ping)
                               1000)))))
 
-  (testing "only sends events for customer specified in path"
+  (testing "only sends events for org specified in path"
     (let [sent (atom [])
-          cid "test-customer"
+          cid "test-org"
           bus (mb/event-bus)
           f (-> (h/->req {:update-bus bus})
                 (assoc-in [:parameters :path :org-id] cid)
@@ -219,11 +219,11 @@
                           (swap! sent conj (parse-event evt)))
                         (:body f))]
       (is (true? (publish bus {:type :build/updated
-                               :sid ["other-customer" "test-repo" "test-build"]})))
+                               :sid ["other-org" "test-repo" "test-build"]})))
       (is (true? (publish bus {:type :build/updated
                                :sid [cid "test-repo" "test-build"]})))
       (is (not= :timeout
-                (h/wait-until #(some (comp (partial = "test-customer")
+                (h/wait-until #(some (comp (partial = "test-org")
                                            first
                                            :sid)
                                      @sent)
@@ -269,7 +269,7 @@
                 :org-id cid}
           ssh-key {:private-key "enc-private-key"
                    :public-key "public-key"}]
-      (is (st/sid? (st/save-customer st {:id cid
+      (is (st/sid? (st/save-org st {:id cid
                                          :repos {rid repo}})))
       (is (st/sid? (st/save-ssh-keys st cid [ssh-key])))
       (is (= [ssh-key]
@@ -333,8 +333,8 @@
                     cust (-> (h/gen-cust)
                              (assoc :id cust-id
                                     :repos {(:id repo) repo}))]
-                (st/save-customer st cust)
-                (st/save-customer-credit st {:org-id cust-id
+                (st/save-org st cust)
+                (st/save-org-credit st {:org-id cust-id
                                              :amount 1000})
                 (f cust repo)))
 
@@ -384,7 +384,7 @@
       (testing "looks up url in repo config"
         (with-repo
           (fn [{org-id :id} {repo-id :id}]
-            (is (some? (st/save-customer st {:id org-id
+            (is (some? (st/save-org st {:id org-id
                                              :repos
                                              {repo-id
                                               {:id repo-id
@@ -426,7 +426,7 @@
         (verify-response
          {}
          (fn [{:keys [sid response]}]
-           (is (= 2 (count sid)) "expected sid to contain customer and repo id"))))
+           (is (= 2 (count sid)) "expected sid to contain org and repo id"))))
       
       (testing "does not create build in storage"
         (verify-trigger

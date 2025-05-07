@@ -26,7 +26,7 @@
 (s/def :entity/timed
   (s/keys :opt-un [:entity/start-time :entity/end-time]))
 
-(s/def :entity/customer
+(s/def :entity/org
   (-> (s/keys :req-un [:entity/name])
       (s/merge :entity/common)))
 
@@ -92,7 +92,7 @@
               :opt-un [:entity/label-filters])
       (s/merge :entity/common)))
 
-(s/def :entity/customer-params
+(s/def :entity/org-params
   (-> (s/keys :req-un [:entity/org-id :entity/parameters]
               :opt-un [:entity/description :entity/label-filters])
       (s/merge :entity/common)))
@@ -105,11 +105,11 @@
 (s/def :user/type #{:github :bitbucket})
 (s/def :user/type-id string?)
 (s/def :entity/email string?)
-(s/def :user/customers (s/coll-of :entity/id))
+(s/def :user/orgs (s/coll-of :entity/id))
 
 (s/def :entity/user
   (-> (s/keys :req-un [:user/type :user/type-id]
-              :opt-un [:entity/email :user/customers])
+              :opt-un [:entity/email :user/orgs])
       (s/merge :entity/common)))
 
 (s/def :entity/user-id ::c/cuid)
@@ -141,7 +141,7 @@
 (s/def :entity/reason string?)
 (s/def :entity/subscription-id ::c/cuid)
 
-(s/def :entity/customer-credit
+(s/def :entity/org-credit
   (-> (s/keys :req-un [:entity/org-id :entity/amount :credit/type]
               :opt-un [:entity/from-time :entity/user-id :entity/subscription-id :entity/reason])
       (s/merge :entity/common)))

@@ -1,10 +1,10 @@
 (ns monkey.ci.web.api.invoice-test
-  (:require
-   [clojure.test :refer [deftest is testing]]
-   [monkey.ci.storage :as st]
-   [monkey.ci.test.helpers :as h]
-   [monkey.ci.test.runtime :as trt]
-   [monkey.ci.web.api.invoice :as sut]))
+  (:require [clojure.test :refer [deftest is testing]]
+            [monkey.ci.storage :as st]
+            [monkey.ci.test
+             [helpers :as h]
+             [runtime :as trt]]
+            [monkey.ci.web.api.invoice :as sut]))
 
 (deftest get-invoice
   (testing "retrieves single invoice by id"
@@ -27,12 +27,12 @@
                              (map (partial merge (h/gen-invoice)))
                              (map #(assoc % :org-id (:id cust)))
                              (remove nil?))]
-    (is (some? (st/save-customer st cust)))
+    (is (some? (st/save-org st cust)))
     (is (some? (->> inv
                     (map (partial st/save-invoice st))
                     (doall))))
     
-    (testing "when no filter given, returns all customer invoices"
+    (testing "when no filter given, returns all org invoices"
       (is (= inv (-> (h/->req rt)
                      (assoc-in [:parameters :path :org-id] (:id cust))
                      (sut/search-invoices)

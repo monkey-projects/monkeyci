@@ -38,7 +38,7 @@
      {:parameters {:path {:org-id c/Id}}}
      [[""
        ;; TODO Move this under issuances
-       {:get api/list-customer-credits}]
+       {:get api/list-org-credits}]
       ["/issue"
        {:post api/issue-credits
         :parameters {:body UserCredits}}]

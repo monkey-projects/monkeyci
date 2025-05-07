@@ -32,15 +32,15 @@
       ;; Invalid credentials
       (rur/status 403))))
 
-(defn list-customer-credits
-  "Returns overview of the issued credits to a customer"
+(defn list-org-credits
+  "Returns overview of the issued credits to a org"
   [req]
   (let [cust-id (c/org-id req)
-        creds (s/list-customer-credits (c/req->storage req) cust-id)]
+        creds (s/list-org-credits (c/req->storage req) cust-id)]
     (rur/response creds)))
 
 (defn issue-credits
-  "Issues ad-hoc credits to a customer."
+  "Issues ad-hoc credits to a org."
   [req]
   (let [st (c/req->storage req)
         cid (c/org-id req)
@@ -49,16 +49,16 @@
                          :org-id cid
                          :type :user
                          :user-id (auth/user-id req)))]
-    (if-let [sid (s/save-customer-credit st creds)]
+    (if-let [sid (s/save-org-credit st creds)]
       (rur/created (last sid) creds)
       (rur/status 500))))
 
 (defn issue-credits-for-subs
-  "Given a customer id and list of subscriptions, issues any credits for the given 
-   timestamp.  Returns a list of issued customer credit sids."
+  "Given a org id and list of subscriptions, issues any credits for the given 
+   timestamp.  Returns a list of issued org credit sids."
   [st ts [cust-id cust-subs]]
-  (log/debug "Found" (count cust-subs) "subscriptions for customer" cust-id)
-  (let [credits (->> (s/list-customer-credits-since st cust-id (- ts 100))
+  (log/debug "Found" (count cust-subs) "subscriptions for org" cust-id)
+  (let [credits (->> (s/list-org-credits-since st cust-id (- ts 100))
                      ;; TODO Filter in the query
                      (filter (cp/prop-pred :type :subscription))
                      (group-by :subscription-id))]
@@ -66,20 +66,20 @@
               (let [sc (->> (get credits (:id sub))
                             (filter (comp (partial t/same-date? ts) :from-time)))]
                 (when (empty? sc)
-                  (log/info "Creating new customer credit for sub" (:id sub) ", amount" (:amount sub))
-                  (s/save-customer-credit st (-> sub
-                                                 (select-keys [:org-id :amount])
-                                                 (assoc :id (cuid/random-cuid)
-                                                        :type :subscription
-                                                        :subscription-id (:id sub)
-                                                        :from-time ts))))))]
+                  (log/info "Creating new org credit for sub" (:id sub) ", amount" (:amount sub))
+                  (s/save-org-credit st (-> sub
+                                            (select-keys [:org-id :amount])
+                                            (assoc :id (cuid/random-cuid)
+                                                   :type :subscription
+                                                   :subscription-id (:id sub)
+                                                   :from-time ts))))))]
       (->> cust-subs
            (map issue-credits-for-sub)
            (remove nil?)
            (doall)))))
 
 (defn issue-auto-credits
-  "Issues new credits to all customers that have active subscriptions that match
+  "Issues new credits to all orgs that have active subscriptions that match
    the specified date.  This means all subscriptions where the `valid-from` date
    has the same day-of-month.  To avoid issuing credits multiple times, credits 
    are only issued if none exist for that subscription with the same month/year
@@ -105,7 +105,7 @@
                   (let [dom (jt/as (t/epoch->date time) :day-of-month)]
                     (and (< last-dom dom)
                          (= cur-dom last-dom)))))]
-      ;; TODO Allow filtering by customer, if specified
+      ;; TODO Allow filtering by org, if specified
       (log/info "Auto-issuing new credits for date" date " (timestamp" ts ")")
       ;; List all subscriptions that have become active on that day, so move ts to end of day
       (->> (s/list-active-credit-subscriptions st (+ ts (t/hours->millis 24)))
@@ -155,7 +155,7 @@
 (defn list-credit-subscriptions [req]
   (-> req
       (c/req->storage)
-      (s/list-customer-credit-subscriptions (c/org-id req))
+      (s/list-org-credit-subscriptions (c/org-id req))
       (rur/response)))
 
 (defn cancel-credit-subscription
@@ -173,5 +173,5 @@
         (let [upd (assoc match :valid-until until)]
           (s/save-credit-subscription st upd)
           (rur/response upd)))
-      ;; Subscription or customer not found
+      ;; Subscription or org not found
       (rur/status 404))))
