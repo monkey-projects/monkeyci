@@ -68,7 +68,7 @@
 (deftest ssh-keys-fetcher
   (testing "retrieves from global api for repo"
     (ta/with-fake-http
-        ["http://test-api/customer/test-cust/repo/test-repo/ssh-keys"
+        ["http://test-api/org/test-cust/repo/test-repo/ssh-keys"
          (fn [req]
            {:status 200
             :body (pr-str ["test-key"])})]

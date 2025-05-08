@@ -66,7 +66,7 @@
   (let [client (ahmw/wrap-request http/request)]
     (fn [[cust-id repo-id :as sid]]
       (log/debug "Retrieving ssh keys for" sid)
-      (-> {:url (format "%s/customer/%s/repo/%s/ssh-keys"
+      (-> {:url (format "%s/org/%s/repo/%s/ssh-keys"
                         (get-in config [:api :url])
                         cust-id
                         repo-id)

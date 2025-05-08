@@ -100,7 +100,7 @@
         (md/catch handle-error))))
 
 (defn get-params-from-api [api build]
-  (api-request api {:path (format "/customer/%s/repo/%s/param" (:org-id build) (:repo-id build))
+  (api-request api {:path (format "/org/%s/repo/%s/param" (:org-id build) (:repo-id build))
                     :method :get}))
 
 (defn- invalid-config [& _]

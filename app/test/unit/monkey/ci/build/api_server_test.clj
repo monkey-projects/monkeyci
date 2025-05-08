@@ -83,11 +83,11 @@
 
 (deftest get-params
   (let [repo (h/gen-repo)
-        cust (-> (h/gen-cust)
-                 (assoc :repos {(:id repo) repo}))
+        org (-> (h/gen-org)
+                (assoc :repos {(:id repo) repo}))
         param-values [{:name "test-param"
                        :value "test value"}]
-        build {:org-id (:id cust)
+        build {:org-id (:id org)
                :repo-id (:id repo)}]
     
     (testing "fetches params using build params"
@@ -99,16 +99,16 @@
 
 (deftest get-params-from-api
   (let [repo (h/gen-repo)
-        cust (-> (h/gen-cust)
-                 (assoc :repos {(:id repo) repo}))
+        org (-> (h/gen-org)
+                (assoc :repos {(:id repo) repo}))
         param-values [{:name "test-param"
                        :value "test value"}]
-        build {:org-id (:id cust)
+        build {:org-id (:id org)
                :repo-id (:id repo)}]
     
     (testing "retrieves from remote api"
       ;; Requests look different because of applied middleware
-      (at/with-fake-http [{:request-url (format "http://test-api/customer/%s/repo/%s/param" (:id cust) (:id repo))
+      (at/with-fake-http [{:request-url (format "http://test-api/org/%s/repo/%s/param" (:id org) (:id repo))
                            :request-method :get}
                           {:status 200
                            :body (pr-str param-values)
@@ -156,7 +156,7 @@
                      :status))))))
 
 (deftest download-artifact
-  (let [build {:sid ["test-cust" "test-repo" "test-build"]}]
+  (let [build {:sid ["test-org" "test-repo" "test-build"]}]
     (testing "returns 404 not found if no artifact"
       (is (= 404 (-> {:artifacts (h/fake-blob-store)}
                      (->req)
@@ -167,7 +167,7 @@
 
     (testing "returns artifact as stream"
       (let [art-id "test-artifact"
-            bs (h/fake-blob-store (atom {(str "test-cust/test-repo/test-build/" art-id ".tgz") "Dummy contents"}))
+            bs (h/fake-blob-store (atom {(str "test-org/test-repo/test-build/" art-id ".tgz") "Dummy contents"}))
             res (-> {:artifacts bs}
                     (->req)
                     (sut/set-build build)
@@ -196,7 +196,7 @@
                      :status))))))
 
 (deftest download-cache
-  (let [build {:sid ["test-cust" "test-repo" "test-build"]}]
+  (let [build {:sid ["test-org" "test-repo" "test-build"]}]
     (testing "returns 404 not found if no cache"
       (is (= 404 (-> {:cache (h/fake-blob-store)}
                      (->req)
@@ -207,7 +207,7 @@
 
     (testing "returns cache as stream"
       (let [cache-id "test-cache"
-            bs (h/fake-blob-store (atom {(str "test-cust/test-repo/" cache-id ".tgz") "Dummy contents"}))
+            bs (h/fake-blob-store (atom {(str "test-org/test-repo/" cache-id ".tgz") "Dummy contents"}))
             res (-> {:cache bs}
                     (->req)
                     (sut/set-build build)
@@ -225,7 +225,7 @@
   (let [token (sut/generate-token)
         config (-> test-config
                    (assoc :token token
-                          :build {:sid ["test-cust" "test-repo" "test-build"]}))
+                          :build {:sid ["test-org" "test-repo" "test-build"]}))
         app (sut/make-app config)
         auth (fn [req]
                (mock/header req "Authorization" (str "Bearer " token)))]
@@ -237,8 +237,8 @@
 
     (testing "`GET /params` retrieves build params"
       (let [r (-> (mock/request :get "/params")
-                     (auth)
-                     (app))]
+                  (auth)
+                  (app))]
         (is (= 200 (:status r))
             (bs/to-string (:body r)))))
 
