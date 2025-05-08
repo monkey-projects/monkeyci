@@ -215,7 +215,7 @@
   [conf]
   (em/map->RouteComponent {:make-routes (fn [{:keys [script-exit]}]
                                           (rco/make-routes (b/sid (:build conf))
-                                                           :script-exit))}))
+                                                           script-exit))}))
 
 (defn new-event-stream []
   (ms/stream))
