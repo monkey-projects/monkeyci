@@ -126,9 +126,8 @@
                                                            (bc/with-message (ex-message ex))))]))
           (execute-job [job ctx]
             (let [job-ctx (emi/get-job-ctx ctx)]
-              ;; TODO Capture output
               (-> (j/execute! job job-ctx)
-                  ;; Catch exceptions and mark job failed
+                  ;; Catch exceptions and mark job failed in that case
                   (md/catch (partial post-job-error job (:mailman job-ctx) (:event ctx))))))]
     {:name ::execute-action
      :enter (fn [ctx]

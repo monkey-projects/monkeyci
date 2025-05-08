@@ -107,7 +107,11 @@
   (save-artifact [this _ id src]
     (let [tmp (fs/create-temp-file)
           ;; TODO Skip the tmp file intermediate step, it takes up disk space and is slower
-          arch (blob/make-archive src (fs/file tmp))
+          arch (try
+                 (blob/make-archive src (fs/file tmp))
+                 (catch Exception ex
+                   (log/error "Unable to create archive from" src ex)
+                   (throw ex)))
           stream (io/input-stream (fs/file tmp))]
       (log/debugf "Uploading artifact/cache to api server: %s from %s (compressed size: %.2f MB)" id src (mb arch))
       (u/log-deferred-elapsed
