@@ -155,8 +155,10 @@
      ctx)))
 
 (def gui-release-artifact
-  {:id "gui-release"
-   :path "target"})
+  (m/artifact "gui-release" "target"))
+
+(def scw-gui-config-artifact
+  (m/artifact "scw-gui-config" "gui/resources/public/conf"))
 
 (defn- gui-image-config [id img version]
   {:subdir "gui"
@@ -184,7 +186,8 @@
     (kaniko/multi-platform-image
      (-> (gui-image-config "scw-gui-img" scw-gui-img (image-version ctx))
          (assoc :creds-param "docker-scw-credentials")
-         (assoc-in [:image :dependencies] ["release-gui" "prepare-scw-gui-config"]))
+         (update-in [:image :container-opts :dependencies] conj "prepare-scw-gui-config")
+         (update-in [:image :container-opts :restore-artifacts] conj scw-gui-config-artifact))
      ctx)))
 
 (defn publish 
@@ -256,14 +259,15 @@
    not easy with nginx."
   [ctx]
   (when (publish-gui? ctx)
-    (m/action-job
-     "prepare-scw-gui-config"
-     (fn [ctx]
-       (let [p (api/build-params ctx)
-             dir "gui/resources/public/conf/"]
-         (fs/create-dirs dir)
-         (spit (str dir "config.js") (get p "scw-gui-config"))
-         (spit (str dir "admin-config.js") (get p "scw-gui-admin-config")))))))
+    (-> (m/action-job
+         "prepare-scw-gui-config"
+         (fn [ctx]
+           (let [p (api/build-params ctx)
+                 dir "gui/resources/public/conf/"]
+             (fs/create-dirs dir)
+             (spit (str dir "config.js") (get p "scw-gui-config"))
+             (spit (str dir "admin-config.js") (get p "scw-gui-admin-config")))))
+        (m/save-artifacts [scw-gui-config-artifact]))))
 
 (defn deploy
   "Job that auto-deploys the image to staging by pushing the new image tag to infra repo."
