@@ -59,12 +59,12 @@
                   ci/list-container-instances
                   (constantly (md/success-deferred
                                [{:id "build-1"
-                                 :freeform-tags {"customer-id" cust-id
+                                 :freeform-tags {"org-id" cust-id
                                                  "repo-id" repo-id
                                                  "build-id" build-id}
                                  :lifecycle-state "ACTIVE"}
                                 {:id "build-job-1"
-                                 :freeform-tags {"customer-id" cust-id
+                                 :freeform-tags {"org-id" cust-id
                                                  "repo-id" repo-id
                                                  "build-id" build-id
                                                  "job-id" job-id}
@@ -98,14 +98,14 @@
   (testing "extracts build sid from freeform tags"
     (is (= ["test-cust" "test-repo" "test-build"]
            (sut/ci->task-id {:freeform-tags
-                             {"customer-id" "test-cust"
+                             {"org-id" "test-cust"
                               "repo-id" "test-repo"
                               "build-id" "test-build"}}))))
 
   (testing "extracts job id"
     (is (= [["test-cust" "test-repo" "test-build"] "test-job"]
            (sut/ci->task-id {:freeform-tags
-                             {"customer-id" "test-cust"
+                             {"org-id" "test-cust"
                               "repo-id" "test-repo"
                               "build-id" "test-build"
                               "job-id" "test-job"}})))))

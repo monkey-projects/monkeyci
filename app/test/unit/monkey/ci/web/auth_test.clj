@@ -1,13 +1,13 @@
 (ns monkey.ci.web.auth-test
-  (:require
-   [buddy.core.keys :as bk]
-   [clojure.test :refer [deftest is testing]]
-   [monkey.ci.cuid :as cuid]
-   [monkey.ci.storage :as st]
-   [monkey.ci.test.helpers :as h]
-   [monkey.ci.test.runtime :as trt]
-   [monkey.ci.web.auth :as sut]
-   [ring.mock.request :as mock]))
+  (:require [buddy.core.keys :as bk]
+            [clojure.test :refer [deftest is testing]]
+            [monkey.ci
+             [cuid :as cuid]
+             [storage :as st]]
+            [monkey.ci.test
+             [helpers :as h]
+             [runtime :as trt]]
+            [monkey.ci.web.auth :as sut]))
 
 (deftest generate-secret-key
   (testing "generates random string"
@@ -64,13 +64,13 @@
                                       (sut/generate-jwt req (sut/user-token ["github" "456"]))))))
             "bearer token provided")))
 
-    (testing "with build token, puts build customer and repo in identity"
+    (testing "with build token, puts build org and repo in identity"
       (let [[cid rid bid :as sid] (repeatedly 3 cuid/random-cuid)]
-        (is (st/sid? (st/save-customer st {:id cid
-                                           :name "test customer"
-                                           :repos [{:id rid
-                                                    :name "test repo"}]})))
-        (is (st/sid? (st/save-build st {:customer-id cid
+        (is (st/sid? (st/save-org st {:id cid
+                                      :name "test org"
+                                      :repos [{:id rid
+                                               :name "test repo"}]})))
+        (is (st/sid? (st/save-build st {:org-id cid
                                         :repo-id rid
                                         :build-id bid})))
         (is (some? (-> req
@@ -94,42 +94,42 @@
                             :type-id))
             "bearer token provided")))))
 
-(deftest customer-authorization
+(deftest org-authorization
   (let [h (constantly ::ok)
-        auth (sut/customer-authorization h)]
+        auth (sut/org-authorization h)]
     (testing "invokes target"
-      (testing "if no customer id in request path"
+      (testing "if no org id in request path"
         (is (= ::ok (auth {}))))
 
-      (testing "if identity allows access to customer id"
+      (testing "if identity allows access to org id"
         (is (= ::ok (auth {:parameters
                            {:path
-                            {:customer-id "test-cust"}}
+                            {:org-id "test-org"}}
                            :identity
-                           {:customers
-                            #{"test-cust"}}}))))
+                           {:orgs
+                            #{"test-org"}}}))))
 
       (testing "if sysadmin token"
         (is (= ::ok (auth {:parameters
                            {:path
-                            {:customer-id "test-cust"}}
+                            {:org-id "test-org"}}
                            :identity
                            {:type :sysadmin}})))))
 
     (testing "throws authorization error"
-      (testing "if customer id is not in identity"
+      (testing "if org id is not in identity"
         (is (thrown? Exception
                      (auth {:parameters
                             {:path
-                             {:customer-id "test-cust"}}
+                             {:org-id "test-org"}}
                             :identity
-                            {:customers #{"other-cust"}}}))))
+                            {:orgs #{"other-org"}}}))))
 
       (testing "if not authenticated"
         (is (thrown? Exception
                      (auth {:parameters
                             {:path
-                             {:customer-id "test-cust"}}})))))))
+                             {:org-id "test-org"}}})))))))
 
 (deftest sysadmin-authorization
   (let [h (constantly ::ok)

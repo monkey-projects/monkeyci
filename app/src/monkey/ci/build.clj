@@ -15,9 +15,9 @@
 
 (def default-script-dir ".monkeyci")
 
-(def sid-props [:customer-id :repo-id :build-id])
+(def sid-props [:org-id :repo-id :build-id])
 
-(def account->sid (juxt :customer-id :repo-id))
+(def account->sid (juxt :org-id :repo-id))
 (def props->sid
   "Constructs sid from build properties"
   (apply juxt sid-props))
@@ -74,7 +74,7 @@
                          (concat orig-sid [(local-build-id)])))
         id (or (last sid) (local-build-id))]
     (maybe-set-git-opts
-     {:customer-id (first sid)
+     {:org-id (first sid)
       :repo-id (second sid)
       :build-id id
       :checkout-dir work-dir
@@ -153,7 +153,7 @@
 (defn build-triggered-evt [build]
   (-> (with-build-evt :build/triggered build)
       ;; sid at this point is only repo sid, since the build id still needs to be assigned
-      (assoc :sid [(:customer-id build) (:repo-id build)])))
+      (assoc :sid [(:org-id build) (:repo-id build)])))
 
 (defn build-pending-evt [build]
   (with-build-evt :build/pending build))

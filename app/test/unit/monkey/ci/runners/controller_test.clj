@@ -110,7 +110,7 @@
                                         :abort-path abort-path
                                         :exit-path exit-path
                                         :m2-cache-path (str dir "/m2")})
-                 (update :build merge {:customer-id "test-cust"
+                 (update :build merge {:org-id "test-cust"
                                        :repo-id "test-repo"})
                  (assoc-in [:build :git] {:url "git://test-url"
                                           :branch "main"})

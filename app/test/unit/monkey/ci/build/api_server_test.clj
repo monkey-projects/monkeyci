@@ -87,7 +87,7 @@
                  (assoc :repos {(:id repo) repo}))
         param-values [{:name "test-param"
                        :value "test value"}]
-        build {:customer-id (:id cust)
+        build {:org-id (:id cust)
                :repo-id (:id repo)}]
     
     (testing "fetches params using build params"
@@ -103,7 +103,7 @@
                  (assoc :repos {(:id repo) repo}))
         param-values [{:name "test-param"
                        :value "test value"}]
-        build {:customer-id (:id cust)
+        build {:org-id (:id cust)
                :repo-id (:id repo)}]
     
     (testing "retrieves from remote api"

@@ -17,7 +17,7 @@
             (->> (prom/counter-inc counter 1 (get-label-vals ctx))
                  (set-counter ctx)))})
 
-(def ctx->customer-id (comp first :sid :event))
+(def ctx->org-id (comp first :sid :event))
 (def ctx->status (comp name :status :event))
 
 (defn make-evt-counter
@@ -39,7 +39,7 @@
   (evt-route reg
              type
              ["customer"]
-             (comp vector ctx->customer-id)))
+             (comp vector ctx->org-id)))
 
 (defn status-evt-route
   "Creates an event route that updates an event counter with customer label
@@ -48,7 +48,7 @@
   (evt-route reg
              type
              ["customer" "status"]
-             (juxt ctx->customer-id
+             (juxt ctx->org-id
                    ctx->status)))
 
 (defn make-routes

@@ -39,13 +39,13 @@
 
 ;;; Interceptors for side effects
 
-(def customer-credits
-  "Interceptor that fetches available credits for the customer associated with the build.
+(def org-credits
+  "Interceptor that fetches available credits for the org associated with the build.
    Assumes that the db is in the context."
-  {:name ::customer-credits
+  {:name ::org-credits
    :enter (fn [ctx]
             (set-credits ctx (st/calc-available-credits (get-db ctx)
-                                                        (get-in ctx [:event :build :customer-id]))))})
+                                                        (get-in ctx [:event :build :org-id]))))})
 
 (def load-build
   {:name ::load-build
@@ -134,23 +134,23 @@
 
 (def save-credit-consumption
   "Assuming the result contains a build with credits, creates a credit consumption for
-   the associated customer."
+   the associated org."
   {:name ::save-credit-consumption
    :leave (transactional
            (fn [ctx]
-             (let [{:keys [credits customer-id] :as build} (or (get-build ctx)
-                                                               (:build (em/get-result ctx)))
+             (let [{:keys [credits org-id] :as build} (or (get-build ctx)
+                                                          (:build (em/get-result ctx)))
                    storage (get-db ctx)]
                (when (and (some? credits) (pos? credits))
                  (log/debug "Consumed credits for build" (build->sid build) ":" credits)
-                 (let [avail (st/list-available-credits storage customer-id)]
+                 (let [avail (st/list-available-credits storage org-id)]
                    ;; TODO To avoid problems when there are no available credits at this point, we should
                    ;; consider "reserving" one at the start of the build.  We have to do a check at that
                    ;; point anyway.
                    (if (empty? avail)
-                     (log/warn "No available customer credits for build" (build->sid build))
+                     (log/warn "No available org credits for build" (build->sid build))
                      (st/save-credit-consumption storage
-                                                 (-> (select-keys build [:customer-id :repo-id :build-id])
+                                                 (-> (select-keys build [:org-id :repo-id :build-id])
                                                      (assoc :amount credits
                                                             :consumed-at (t/now)
                                                             :credit-id (-> avail first :id)))))))
@@ -276,10 +276,10 @@
                  load-build
                  with-job]]
     [[:build/triggered
-      ;; Checks if the customer has credits available, and creates the build in db
+      ;; Checks if the org has credits available, and creates the build in db
       [{:handler check-credits
         :interceptors [use-db
-                       customer-credits
+                       org-credits
                        assign-build-idx
                        save-build]}]]
 

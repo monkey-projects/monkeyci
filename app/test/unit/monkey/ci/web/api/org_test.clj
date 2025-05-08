@@ -1,4 +1,4 @@
-(ns monkey.ci.web.api.customer-test
+(ns monkey.ci.web.api.org-test
   (:require [clojure.test :refer [deftest is testing]]
             [java-time.api :as jt]
             [monkey.ci
@@ -8,39 +8,39 @@
             [monkey.ci.test
              [helpers :as h]
              [runtime :as trt]]
-            [monkey.ci.web.api.customer :as sut]))
+            [monkey.ci.web.api.org :as sut]))
 
-(deftest get-customer
-  (testing "returns customer in body"
-    (let [cust {:id "test-customer"
-                :name "Test customer"}
+(deftest get-org
+  (testing "returns org in body"
+    (let [cust {:id "test-org"
+                :name "Test org"}
           {st :storage :as rt} (trt/test-runtime)
           req (-> rt
                   (h/->req)
-                  (h/with-path-param :customer-id (:id cust)))]
-      (is (sid/sid? (st/save-customer st cust)))
-      (is (= cust (:body (sut/get-customer req))))))
+                  (h/with-path-param :org-id (:id cust)))]
+      (is (sid/sid? (st/save-org st cust)))
+      (is (= cust (:body (sut/get-org req))))))
 
   (testing "404 not found when no match"
     (is (= 404 (-> (trt/test-runtime)
                    (h/->req)
-                   (h/with-path-param :customer-id "nonexisting")
-                   (sut/get-customer)
+                   (h/with-path-param :org-id "nonexisting")
+                   (sut/get-org)
                    :status))))
 
   (testing "converts repo map into list"
     (let [cust {:id (st/new-id)
-                :name "Customer with projects"}
+                :name "Org with projects"}
           repo {:id "test-repo"
                 :name "Test repository"
-                :customer-id (:id cust)}
+                :org-id (:id cust)}
           {st :storage :as rt} (trt/test-runtime)]
-      (is (sid/sid? (st/save-customer st cust)))
+      (is (sid/sid? (st/save-org st cust)))
       (is (sid/sid? (st/save-repo st repo)))
       (let [r (-> rt
                   (h/->req)
-                  (h/with-path-param :customer-id (:id cust))
-                  (sut/get-customer)
+                  (h/with-path-param :org-id (:id cust))
+                  (sut/get-org)
                   :body)
             repos (-> r :repos)]
         (is (some? repos))
@@ -48,39 +48,39 @@
         (is (= (select-keys repo [:id :name])
                (first repos)))))))
 
-(deftest create-customer
-  (testing "returns created customer with id"
+(deftest create-org
+  (testing "returns created org with id"
     (let [r (-> (trt/test-runtime)
                 (h/->req)
-                (h/with-body {:name "new customer"})
-                (sut/create-customer)
+                (h/with-body {:name "new org"})
+                (sut/create-org)
                 :body)]
-      (is (= "new customer" (:name r)))
+      (is (= "new org" (:name r)))
       (is (string? (:id r)))))
 
   (let [user (-> (h/gen-user)
-                 (dissoc :customers))
+                 (dissoc :orgs))
         {st :storage :as rt} (trt/test-runtime)
         r (-> rt
               (h/->req)
-              (h/with-body {:name "another customer"})
+              (h/with-body {:name "another org"})
               (h/with-identity user)
-              (sut/create-customer)
+              (sut/create-org)
               :body)]
     (is (some? r))
 
-    (testing "links current user to customer"
+    (testing "links current user to org"
       (is (= [(:id r)] (-> (st/find-user st (:id user))
-                           :customers)))
-      (is (= [r] (st/list-user-customers st (:id user)))))
+                           :orgs)))
+      (is (= [r] (st/list-user-orgs st (:id user)))))
 
     (let [cust-id (:id r)]
       (testing "creates subscription"
-        (is (= 1 (-> (st/list-customer-credit-subscriptions st cust-id)
+        (is (= 1 (-> (st/list-org-credit-subscriptions st cust-id)
                      (count)))))
 
       (testing "issues credits"
-        (let [cc (st/list-customer-credits st cust-id)]
+        (let [cc (st/list-org-credits st cust-id)]
           (is (= 1 (count cc)))
           (is (some? (->> cc
                           first
@@ -88,81 +88,81 @@
                           (vector cust-id)
                           (st/find-credit-subscription st)))))))))
 
-(deftest update-customer
-  (testing "returns customer in body"
-    (let [cust {:id "test-customer"
-                :name "Test customer"}
+(deftest update-org
+  (testing "returns org in body"
+    (let [cust {:id "test-org"
+                :name "Test org"}
           {st :storage :as rt} (trt/test-runtime)
           req (-> rt
                   (h/->req)
-                  (h/with-path-param :customer-id (:id cust))
+                  (h/with-path-param :org-id (:id cust))
                   (h/with-body {:name "updated"}))]
-      (is (sid/sid? (st/save-customer st cust)))
+      (is (sid/sid? (st/save-org st cust)))
       (is (= {:id (:id cust)
               :name "updated"}
-             (:body (sut/update-customer req))))))
+             (:body (sut/update-org req))))))
 
   (testing "can update with repos"
     (let [cust {:id "other-cust"
-                :name "Other customer"
+                :name "Other org"
                 :repos {"test-repo" {:id "test-repo"}}}
           {st :storage :as rt} (trt/test-runtime)
           req (-> rt
                   (h/->req)
-                  (h/with-path-param :customer-id (:id cust))
+                  (h/with-path-param :org-id (:id cust))
                   (h/with-body {:name "updated"}))]
-      (is (sid/sid? (st/save-customer st cust)))
+      (is (sid/sid? (st/save-org st cust)))
       (is (= "updated" (-> req
-                           (sut/update-customer)
+                           (sut/update-org)
                            :body
                            :name)))
-      (is (= ["test-repo"] (-> (st/find-customer st (:id cust))
+      (is (= ["test-repo"] (-> (st/find-org st (:id cust))
                                :repos
                                (keys))))))
 
   (testing "404 not found when no match"
     (is (= 404 (-> (trt/test-runtime)
                    (h/->req)
-                   (h/with-path-param :customer-id "nonexisting")
-                   (sut/update-customer)
+                   (h/with-path-param :org-id "nonexisting")
+                   (sut/update-org)
                    :status)))))
 
-(deftest search-customers
+(deftest search-orgs
   (let [{st :storage :as rt} (trt/test-runtime)
         cust {:id (st/new-id)
-              :name "Test customer"}
-        sid (st/save-customer st cust)]
-    (testing "retrieves customer by id"
+              :name "Test org"}
+        sid (st/save-org st cust)]
+    (testing "retrieves org by id"
       (is (= [cust]
              (-> rt
                  (h/->req)
                  (h/with-query-param :id (:id cust))
-                 (sut/search-customers)
+                 (sut/search-orgs)
                  :body))))
     
-    (testing "searches customers by name"
+    (testing "searches orgs by name"
       (is (= [cust]
              (-> rt
                  (h/->req)
                  (h/with-query-param :name "Test")
-                 (sut/search-customers)
+                 (sut/search-orgs)
                  :body))))
     
     (testing "fails if no query params given"
       (is (= 400
              (-> rt
                  (h/->req)
-                 (sut/search-customers)
+                 (sut/search-orgs)
                  :status))))))
 
 (deftest recent-builds
   (h/with-memory-store st
-    (testing "status `404` if customer does not exist"
+    (testing "status `404` if org does not exist"
       (is (= 404 (-> {:storage st}
                      (h/->req)
                      (assoc :parameters
                             {:path
-                             {:customer-id "non-existing"}})
+                             {:org-id "non-existing"}})
                      (sut/recent-builds)
                      :status))))
 
@@ -171,7 +171,7 @@
             cust (-> (h/gen-cust)
                      (assoc :repos {(:id repo) repo}))
             now (jt/instant)
-            old-build {:customer-id (:id cust)
+            old-build {:org-id (:id cust)
                        :repo-id (:id repo)
                        :build-id "build-1"
                        :idx 1
@@ -179,7 +179,7 @@
                                        (jt/minus (jt/days 2))
                                        (jt/to-millis-from-epoch))
                        :script {:jobs nil}}
-            new-build {:customer-id (:id cust)
+            new-build {:org-id (:id cust)
                        :repo-id (:id repo)
                        :build-id "build-2"
                        :idx 2
@@ -187,7 +187,7 @@
                                        (jt/minus (jt/hours 2))
                                        (jt/to-millis-from-epoch))
                        :script {:jobs nil}}]
-        (is (some? (st/save-customer st cust)))
+        (is (some? (st/save-org st cust)))
         (is (some? (st/save-build st old-build)))
         (is (some? (st/save-build st new-build)))
         
@@ -197,7 +197,7 @@
                      (h/->req)
                      (assoc :parameters
                             {:path
-                             {:customer-id (:id cust)}})
+                             {:org-id (:id cust)}})
                      (sut/recent-builds)
                      :body))))
 
@@ -208,7 +208,7 @@
                      (h/->req)
                      (assoc :parameters
                             {:path
-                             {:customer-id (:id cust)}
+                             {:org-id (:id cust)}
                              :query
                              {:since (-> now
                                          (jt/minus (jt/days 3))
@@ -223,7 +223,7 @@
                      (h/->req)
                      (assoc :parameters
                             {:path
-                             {:customer-id (:id cust)}
+                             {:org-id (:id cust)}
                              :query
                              {:n 10}})
                      (sut/recent-builds)
@@ -231,7 +231,7 @@
                      (as-> x (sort-by :start-time x))))))))))
 
 (deftest latest-builds
-  (testing "returns latest build for each customer repo"
+  (testing "returns latest build for each org repo"
     (h/with-memory-store st
       (let [repos (repeatedly 2 h/gen-repo)
             cust (-> (h/gen-cust)
@@ -242,14 +242,14 @@
             builds (->> repos
                         (map (fn [r]
                                (-> (h/gen-build)
-                                   (assoc :customer-id (:id cust)
+                                   (assoc :org-id (:id cust)
                                           :repo-id (:id r))))))]
-        (is (sid/sid? (st/save-customer st cust)))
+        (is (sid/sid? (st/save-org st cust)))
         (doseq [b builds]
           (is (sid/sid? (st/save-build st b))))
         (let [res (-> {:storage st}
                       (h/->req)
-                      (assoc-in [:parameters :path :customer-id] (:id cust))
+                      (assoc-in [:parameters :path :org-id] (:id cust))
                       (sut/latest-builds))]
           (is (= 200 (:status res)))
           (is (= 2 (count (:body res))))
@@ -270,9 +270,9 @@
                    (h/->req)
                    (assoc :parameters
                           {:path
-                           {:customer-id (:id cust)}}))]
+                           {:org-id (:id cust)}}))]
       
-      (is (some? (st/save-customer st cust)))
+      (is (some? (st/save-org st cust)))
       
       (testing "zero values if no builds"
         (is (every? (comp zero? :seconds)
@@ -303,7 +303,7 @@
         (letfn [(gen-build [start end creds]
                   (-> (h/gen-build)
                       (assoc :repo-id (:id repo)
-                             :customer-id (:id cust)
+                             :org-id (:id cust)
                              :start-time start
                              :end-time end
                              :credits creds)))
@@ -312,19 +312,19 @@
                       (jt/with-offset (jt/zone-offset "Z"))
                       (jt/to-millis-from-epoch)))
                 (insert-cc [cred build]
-                  (st/save-credit-consumption st (-> (select-keys build [:build-id :repo-id :customer-id])
+                  (st/save-credit-consumption st (-> (select-keys build [:build-id :repo-id :org-id])
                                                      (assoc :id (cuid/random-cuid)
                                                             :consumed-at (:end-time build)
                                                             :amount (:credits build)
                                                             :credit-id (:id cred)))))]
           (let [cred (-> (h/gen-cust-credit)
-                         (assoc :customer-id (:id cust)
+                         (assoc :org-id (:id cust)
                                 :type :user
                                 :amount 1000))
                 builds [(gen-build (ts 2024 9 17 10) (ts 2024 9 17 10 5)  10)
                         (gen-build (ts 2024 9 17 11) (ts 2024 9 17 11 20) 20)
                         (gen-build (ts 2024 9 19 15) (ts 2024 9 19 15 30) 30)]]
-            (is (some? (st/save-customer-credit st cred)))
+            (is (some? (st/save-org-credit st cred)))
             (is (->> builds
                      (map (partial st/save-build st))
                      (every? some?)))
@@ -364,18 +364,18 @@
     (let [cust (-> (h/gen-cust)
                    (dissoc :repos))
           user (h/gen-user)]
-      (is (some? (st/save-customer s cust)))
+      (is (some? (st/save-org s cust)))
       (is (some? (st/save-user s user)))
-      (is (some? (st/save-customer-credit s {:customer-id (:id cust)
-                                             :amount 100M
-                                             :type :user
-                                             :user-id (:id user)
-                                             :reason "Testing"})))
+      (is (some? (st/save-org-credit s {:org-id (:id cust)
+                                        :amount 100M
+                                        :type :user
+                                        :user-id (:id user)
+                                        :reason "Testing"})))
       
       (testing "provides available credits"
         (is (= 100M (-> {:storage s}
                         (h/->req)
-                        (assoc-in [:parameters :path :customer-id] (:id cust))
+                        (assoc-in [:parameters :path :org-id] (:id cust))
                         (sut/credits)
                         :body
                         :available))))

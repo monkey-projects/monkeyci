@@ -1,26 +1,25 @@
 (ns monkey.ci.web.api.ssh-keys-test
-  (:require
-   [clojure.test :refer [deftest is testing]]
-   [monkey.ci.cuid :as cuid]
-   [monkey.ci.storage :as st]
-   [monkey.ci.test.helpers :as h]
-   [monkey.ci.test.runtime :as trt]
-   [monkey.ci.web.api.ssh-keys :as sut]))
+  (:require [clojure.test :refer [deftest is testing]]
+            [monkey.ci.storage :as st]
+            [monkey.ci.test
+             [helpers :as h]
+             [runtime :as trt]]
+            [monkey.ci.web.api.ssh-keys :as sut]))
 
-(deftest get-customer-ssh-keys
+(deftest get-org-ssh-keys
   (testing "decrypts private key using vault"
     (let [{st :storage :as rt} (-> (trt/test-runtime)
                                    (trt/set-vault (h/fake-vault (constantly "encrypted")
                                                                 (constantly "decrypted"))))
-          cust (h/gen-cust)
-          cust-id (:id cust)
-          _ (st/save-customer st cust)
+          org (h/gen-org)
+          org-id (:id org)
+          _ (st/save-org st org)
           ssh-key (h/gen-ssh-key)
-          _ (st/save-ssh-keys st cust-id [ssh-key])
+          _ (st/save-ssh-keys st org-id [ssh-key])
           res (-> rt
                   (h/->req)
-                  (assoc-in [:parameters :path :customer-id] cust-id)
-                  (sut/get-customer-ssh-keys))]
+                  (assoc-in [:parameters :path :org-id] org-id)
+                  (sut/get-org-ssh-keys))]
       (is (= 200 (:status res)))
       (is (= "decrypted" (-> res
                              :body
@@ -33,16 +32,16 @@
                                    (trt/set-vault (h/fake-vault (constantly "encrypted")
                                                                 (constantly "decrypted"))))
           repo (h/gen-repo)
-          cust (-> (h/gen-cust)
-                   (assoc :repos {(:id repo) repo}))
-          cust-id (:id cust)
-          _ (st/save-customer st cust)
+          org (-> (h/gen-org)
+                  (assoc :repos {(:id repo) repo}))
+          org-id (:id org)
+          _ (st/save-org st org)
           ssh-key (-> (h/gen-ssh-key)
                       (dissoc :label-filters))
-          _ (st/save-ssh-keys st cust-id [ssh-key])
+          _ (st/save-ssh-keys st org-id [ssh-key])
           res (-> rt
                   (h/->req)
-                  (assoc-in [:parameters :path] {:customer-id cust-id
+                  (assoc-in [:parameters :path] {:org-id org-id
                                                  :repo-id (:id repo)})
                   (sut/get-repo-ssh-keys))]
       (is (= 200 (:status res)))
@@ -55,21 +54,21 @@
     (let [{st :storage :as rt} (-> (trt/test-runtime)
                                    (trt/set-vault (h/fake-vault (constantly "encrypted")
                                                                 (constantly "decrypted"))))
-          cust (h/gen-cust)
-          cust-id (:id cust)
-          _ (st/save-customer st cust)
+          org (h/gen-org)
+          org-id (:id org)
+          _ (st/save-org st org)
           res (-> rt
                   (h/->req)
                   (assoc
                    :parameters
                    {:path
-                    {:customer-id cust-id}
+                    {:org-id org-id}
                     :body
                     [{:private-key "test-pk"
                       :public-key "test-pub"}]})
                   (sut/update-ssh-keys))
           key-id (-> res :body first :id)]
       (is (= 200 (:status res)))
-      (is (= "encrypted" (-> (st/find-ssh-keys st cust-id)
+      (is (= "encrypted" (-> (st/find-ssh-keys st org-id)
                              first
                              :private-key))))))

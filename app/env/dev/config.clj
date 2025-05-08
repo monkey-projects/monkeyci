@@ -53,7 +53,7 @@
   (oci-config :containers))
 
 (defn account->sid []
-  (let [v (juxt :customer-id :repo-id)]
+  (let [v (juxt :org-id :repo-id)]
     (->> @global-config
          :account
          (v)

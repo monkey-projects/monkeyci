@@ -24,7 +24,7 @@
 (s/def ::checkout-dir string?)
 
 (s/def ::build
-  (s/keys :req-un [:build/workspace :build/customer-id :build/repo-id :build/build-id]
+  (s/keys :req-un [:build/workspace :build/org-id :build/repo-id :build/build-id]
           :opt-un [::checkout-dir]))
 
 (s/def ::sid (s/coll-of string?))

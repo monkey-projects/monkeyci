@@ -116,7 +116,7 @@
 
 (defn cust->org
   "For compatibility purposes, renames customer-id to org-id"
-  [x]
-  (-> x
-      (dissoc :customer-id)
-      (assoc :org-id (:customer-id x))))
+  [{:keys [customer-id] :as x}]
+  (cond-> x
+    customer-id (-> (dissoc :customer-id)
+                    (assoc :org-id customer-id))))

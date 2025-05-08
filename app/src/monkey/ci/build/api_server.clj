@@ -75,7 +75,7 @@
   (comp :mailman req->ctx))
 
 (def repo-id
-  (comp (juxt :customer-id :repo-id) req->build))
+  (comp (juxt :org-id :repo-id) req->build))
 
 (def api-client (acmw/wrap-request #'http/request))
 
@@ -100,7 +100,7 @@
         (md/catch handle-error))))
 
 (defn get-params-from-api [api build]
-  (api-request api {:path (format "/customer/%s/repo/%s/param" (:customer-id build) (:repo-id build))
+  (api-request api {:path (format "/customer/%s/repo/%s/param" (:org-id build) (:repo-id build))
                     :method :get}))
 
 (defn- invalid-config [& _]

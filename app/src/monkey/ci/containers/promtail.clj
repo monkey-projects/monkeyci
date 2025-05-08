@@ -27,14 +27,14 @@
    {:filename "/tmp/positions.yaml"}
    :clients
    [(-> {:url (:loki-url conf)
-         :tenant-id (:customer-id conf)}
+         :tenant-id (:org-id conf)}
         (mc/assoc-some :bearer-token (:token conf)))]
    :scrape-configs
    [{:job-name "build-logs"
      :static-configs
      (map (fn [path]
             {:labels (-> conf
-                         (select-keys [:customer-id :repo-id :build-id :job-id])
+                         (select-keys [:org-id :repo-id :build-id :job-id])
                          ;; Add it as a string otherwise case conversion will drop the underscores
                          (assoc "__path__" (str path)))})
           (:paths conf))}]})

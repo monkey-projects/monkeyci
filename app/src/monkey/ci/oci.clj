@@ -178,7 +178,7 @@
 (defn sid->tags [sid]
   (->> sid
        (remove nil?)
-       (zipmap ["customer-id" "repo-id" "build-id"])))
+       (zipmap ["org-id" "repo-id" "build-id"])))
 
 (defn find-mount
   "Finds mount with given volume name in the container"
@@ -226,7 +226,7 @@
     (letfn [(stale? [x]
               (jt/before? (jt/instant (:time-created x)) timeout))
             (build? [x]
-              (let [props ((juxt :customer-id :repo-id) (:freeform-tags x))]
+              (let [props ((juxt :org-id :repo-id) (:freeform-tags x))]
                 (and (not-empty props) (every? some? props))))
             (check-errors [resp]
               (when (>= (:status resp) 400)
@@ -244,7 +244,7 @@
                    (into [(first ds)])
                    (remove nil?)))
             (->out [ci]
-              (-> (select-keys (:freeform-tags ci) [:customer-id :repo-id])
+              (-> (select-keys (:freeform-tags ci) [:org-id :repo-id])
                   (assoc :build-id (:display-name ci)
                          :instance-id (:id ci))))]
       (log/debug "Deleting stale container instances in compartment" cid)

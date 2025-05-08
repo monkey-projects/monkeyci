@@ -75,6 +75,7 @@
   [col :integer [:not nil]])
 
 (def customer-col (fk-col :customer-id))
+(def org-col (fk-col :org-id))
 (def repo-col (fk-col :repo-id))
 (def user-col (fk-col :user-id))
 
@@ -85,6 +86,7 @@
     (not no-cascade?) (conj :on-delete-cascade)))
 
 (def fk-customer (fk :customer-id :customers :id))
+(def fk-org (fk :org-id :customers :id))
 (def fk-repo (fk :repo-id :repos :id))
 (def fk-user (fk :user-id :users :id))
 
@@ -136,8 +138,10 @@
        (ec/select conn)))
 
 (defn- update-single-param [conn updater pv]
-  (ec/update-customer-param-value conn {:id (:id pv)
-                                        :value (updater (:iv pv) (:value pv))}))
+  (ec/update-entity conn
+                    :customer-param-values
+                    {:id (:id pv)
+                     :value (updater (:iv pv) (:value pv))}))
 
 (defn- encrypt-single-param [{:keys [vault] :as conn} pv]
   (update-single-param conn (partial mp/encrypt vault) pv))
@@ -477,7 +481,63 @@
     36 :queued-tasks
     [[:task :text]
      [:creation-time :timestamp]]
-    [])])
+    [])
+
+   (migration
+    (mig-id 37 :rename-table-cust-to-org)
+    [{:alter-table :customers
+      :rename-table :orgs}]
+    [{:alter-table :orgs
+      :rename-table :customers}])
+
+   (let [tables [:repos
+                 :customer-params
+                 :ssh-keys
+                 :user-customers
+                 :join-requests
+                 :credit-subscriptions
+                 :customer-credits
+                 :invoices
+                 :available-credits
+                 :cryptos]]
+     (migration
+      (mig-id 38 :rename-col-cust-to-org)
+      (->> tables
+           (map (fn [t]
+                  {:alter-table t
+                   :rename-column [:customer-id :org-id]})))
+      (->> tables
+           (map (fn [t]
+                  {:alter-table t
+                   :rename-column [:org-id :customer-id]})))))
+
+   (migration
+    (mig-id 39 :rename-table-cust-credits-to-org-credits)
+    [{:alter-table :customer-credits
+      :rename-table :org-credits}]
+    [{:alter-table :org-credits
+      :rename-table :customer-credits}])
+
+   (migration
+    (mig-id 40 :rename-table-cust-params-to-org-params)
+    [{:alter-table :customer-params
+      :rename-table :org-params}]
+    [{:alter-table :org-params
+      :rename-table :customer-params}])
+
+   (migration
+    (mig-id 41 :rename-table-cust-param-values-to-org-param-values)
+    [{:alter-table :customer-param-values
+      :rename-table :org-param-values}]
+    [{:alter-table :org-param-values
+      :rename-table :customer-param-values}])
+
+   (migration
+    (mig-id 42 :rename-table-user-custs-to-user-orgs)
+    [{:alter-table :user-customers
+      :rename-table :user-orgs}]
+    [{:alter-table :user-orgs
+      :rename-table :user-customers}])])
 
 (defn prepare-migrations
   "Prepares all migrations by formatting to sql, creates a ragtime migration object from it."
@@ -494,7 +554,7 @@
 
 (defn- load-and-run-migrations [conn]
   (let [[db mig idx :as r] (load-migrations conn)]
-    (log/info "Applying" (count mig) "migrations")
+    (log/info "Applying" (count mig) "migrations with db" db)
     (rt/migrate-all db idx mig)
     r))
 

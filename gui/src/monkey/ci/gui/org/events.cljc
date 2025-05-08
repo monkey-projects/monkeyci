@@ -219,9 +219,7 @@
                   :org-id id}
                  [:org/save--success]
                  [:org/save--failed]]
-      :db (-> db
-              #_(db/mark-org-creating)
-              (db/reset-edit-alerts))})))
+      :db (db/reset-edit-alerts db)})))
 
 (rf/reg-event-fx
  :org/save--success

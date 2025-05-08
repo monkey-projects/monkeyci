@@ -25,12 +25,12 @@
 
 (deftest cached-storage
   (testing "can write and read object"
-    (let [cust {:id (random-uuid)
-                :name "test customer"}
+    (let [org {:id (random-uuid)
+                :name "test org"}
           src (st/make-memory-storage)
           st (sut/->CachedStorage src (st/make-memory-storage))]
-      (is (st/sid? (st/save-customer st cust)))
-      (is (= cust (st/find-customer st (:id cust))))))
+      (is (st/sid? (st/save-org st org)))
+      (is (= org (st/find-org st (:id org))))))
 
   (testing "does not read from src if cached"
     (let [c (atom {:reads 0})
@@ -40,27 +40,27 @@
                c)
               (st/make-memory-storage))
           id (random-uuid)]
-      (is (st/sid? (st/save-customer cs {:id id
-                                         :name "test customer"})))
+      (is (st/sid? (st/save-org cs {:id id
+                                         :name "test org"})))
       (is (= 0 (:reads @c)))
-      (is (some? (st/find-customer cs id)))
+      (is (some? (st/find-org cs id)))
       (is (= 0 (:reads @c)))
-      (is (some? (st/find-customer cs id)))
+      (is (some? (st/find-org cs id)))
       (is (= 0 (:reads @c)))
       ;; Read another one
-      (is (nil? (st/find-customer cs (random-uuid))))
+      (is (nil? (st/find-org cs (random-uuid))))
       (is (= 1 (:reads @c)))))
 
   (testing "delete also removes from cache"
     (let [id (random-uuid)
-          cust {:id id
-                :name "test customer"}
+          org {:id id
+                :name "test org"}
           src (st/make-memory-storage)
           st (sut/->CachedStorage src (st/make-memory-storage))]
-      (is (st/sid? (st/save-customer st cust)))
-      (is (true? (p/delete-obj st (st/customer-sid id))))
-      (is (nil? (st/find-customer st id)))
-      (is (nil? (st/find-customer (-> st .cache) id)))))
+      (is (st/sid? (st/save-org st org)))
+      (is (true? (p/delete-obj st (st/org-sid id))))
+      (is (nil? (st/find-org st id)))
+      (is (nil? (st/find-org (-> st .cache) id)))))
 
   (testing "checks existing object from src"
     (let [c (atom {:exists 0})
@@ -78,7 +78,7 @@
               c)
           s (sut/->CachedStorage (st/make-memory-storage) cs)
           id (random-uuid)]
-      (is (st/sid? (st/save-customer s {:id id :name "test customer"})))
-      (is (= [id] (p/list-obj s [st/global "customers"])) "list first time")
-      (is (= [id] (p/list-obj s [st/global "customers"])) "list again")
+      (is (st/sid? (st/save-org s {:id id :name "test org"})))
+      (is (= [id] (p/list-obj s [st/global "orgs"])) "list first time")
+      (is (= [id] (p/list-obj s [st/global "orgs"])) "list again")
       (is (= 0 (:lists @c)) "expected no listings from cache"))))
