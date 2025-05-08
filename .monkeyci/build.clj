@@ -266,7 +266,8 @@
                  dir "gui/resources/public/conf/"]
              (fs/create-dirs dir)
              (spit (str dir "config.js") (get p "scw-gui-config"))
-             (spit (str dir "admin-config.js") (get p "scw-gui-admin-config")))))
+             (spit (str dir "admin-config.js") (get p "scw-gui-admin-config"))
+             (println "Created config files in" dir))))
         (m/save-artifacts [scw-gui-config-artifact]))))
 
 (defn deploy
