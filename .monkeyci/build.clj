@@ -3,7 +3,8 @@
   (:require [clojure.string :as cs]
             [monkey.ci.build
              [api :as api]
-             [core :as core]]
+             [core :as core]
+             [v2 :as m]]
             [monkey.ci.ext.junit]
             [monkey.ci.plugin
              [github :as gh]
@@ -30,13 +31,13 @@
         core/trigger-src))
 
 (def should-publish?
-  (some-fn core/main-branch? release?))
+  (some-fn m/main-branch? release?))
 
 (defn- dir-changed?
   "True if files have been touched for the given regex, or the 
    build was triggered from the api."
   [ctx re]
-  (or (core/touched? ctx re)      
+  (or (m/touched? ctx re)      
       (api-trigger? ctx)))
 
 (defn app-changed? [ctx]
@@ -61,7 +62,7 @@
 (defn tag-version
   "Extracts the version from the tag"
   [ctx]
-  (some->> (core/git-ref ctx)
+  (some->> (m/git-ref ctx)
            (re-matches tag-regex)
            (second)))
 
@@ -83,15 +84,15 @@
 (defn clj-container 
   "Executes script in clojure container"
   [id dir & args]
-  (core/container-job
-   id
-   { ;; Alpine based images don't exist for arm, so use debian
-    :image "docker.io/clojure:temurin-21-tools-deps-bookworm-slim"
-    :script [(str "cd " dir
-                  " && "
-                  (cs/join " " (concat ["clojure" "-Sdeps" "'{:mvn/local-repo \"../m2\"}'"] args)))]
-    :caches [{:id "mvn-local-repo"
-              :path "m2"}]}))
+  (-> (m/container-job id)
+      ;; Alpine based images don't exist for arm, so use debian
+      (m/image "docker.io/clojure:temurin-21-tools-deps-bookworm-slim")
+      (m/script
+       [(str "cd " dir
+             " && "
+             (cs/join " " (concat ["clojure" "-Sdeps" "'{:mvn/local-repo \"../m2\"}'"] args)))])
+      (m/caches [{:id "mvn-local-repo"
+                  :path "m2"}])))
 
 (defn- junit-artifact [dir]
   {:id (str dir "-junit")
@@ -126,7 +127,7 @@
          :container/env {"MONKEYCI_VERSION" (lib-version ctx)}
          :save-artifacts [{:id "uberjar"
                            :path "app/target/monkeyci-standalone.jar"}])
-        (core/depends-on ["test-app"]))))
+        (m/depends-on ["test-app"]))))
 
 (def img-base "fra.ocir.io/frjdhmocn5qi")
 (def app-img (str img-base "/monkeyci"))
@@ -156,27 +157,35 @@
   {:id "gui-release"
    :path "target"})
 
-(defn- gui-image-jobs [id img ctx]
+(defn- gui-image-config [id img version]
+  {:subdir "gui"
+   :dockerfile "Dockerfile"
+   :target-img (str img ":" version)
+   :archs archs
+   :image
+   {:job-id (str "publish-" id)
+    :container-opts
+    {:memory 3                      ;GB
+     ;; Restore artifacts but modify the path because work dir is not the same
+     :restore-artifacts [(update gui-release-artifact :path (partial str "gui/"))]
+     :dependencies ["release-gui"]}}
+   :manifest
+   {:job-id (str id "-manifest")}})
+
+(defn build-gui-image [ctx]
   (when (publish-gui? ctx)
     (kaniko/multi-platform-image
-     {:subdir "gui"
-      :dockerfile "Dockerfile"
-      :target-img (str img ":" (image-version ctx))
-      :archs archs
-      :image
-      {:job-id (str "publish-" id)
-       :container-opts
-       {:memory 3                       ;GB
-        ;; Restore artifacts but modify the path because work dir is not the same
-        :restore-artifacts [(update gui-release-artifact :path (partial str "gui/"))]
-        :dependencies ["release-gui"]}}
-      :manifest
-      {:job-id (str id "-manifest")}}
+     (gui-image-config "gui-img" gui-img (image-version ctx))
      ctx)))
 
-(def build-gui-image (partial gui-image-jobs "gui-img" gui-img))
-(def build-scw-image (partial gui-image-jobs "scw-gui-img" scw-gui-img))
- 
+(defn build-scw-image [ctx]
+  (when (publish-gui? ctx)
+    (kaniko/multi-platform-image
+     (-> (gui-image-config "scw-gui-img" scw-gui-img (image-version ctx))
+         (assoc :creds-param "docker-scw-credentials")
+         (assoc-in [:image :dependencies] ["release-gui" "prepare-scw-gui-config"]))
+     ctx)))
+
 (defn publish 
   "Executes script in clojure container that has clojars publish env vars"
   [ctx id dir & [version]]
@@ -190,30 +199,31 @@
 (defn publish-app [ctx]
   (when (publish-app? ctx)
     (some-> (publish ctx "publish-app" "app")
-            (core/depends-on ["test-app"]))))
+            (m/depends-on ["test-app"]))))
 
 (defn publish-test-lib [ctx]
   (when (publish-test-lib? ctx)
     ;; TODO Overwrite monkeyci version if necessary
     ;; (format "-Sdeps '{:override-deps {:mvn/version \"%s\"}}'" (lib-version ctx))
     (some-> (publish ctx "publish-test-lib" "test-lib")
-            (core/depends-on ["test-test-lib"]))))
+            (m/depends-on ["test-test-lib"]))))
 
 (def github-release
   "Creates a release in github"
   (gh/release-job {:dependencies ["publish-app"]}))
 
 (defn- shadow-release [id build]
-  (core/container-job
-   id
-   {:image "docker.io/monkeyci/clojure-node:1.11.4"
-    :work-dir "gui"
-    :script ["npm install"
-             (str "clojure -Sdeps '{:mvn/local-repo \".m2\"}' -M:test -m shadow.cljs.devtools.cli release " build)]
-    :caches [{:id "mvn-gui-repo"
-              :path ".m2"}
-             {:id "node-modules"
-              :path "node_modules"}]}))
+  (-> (m/container-job id)
+      (m/image "docker.io/monkeyci/clojure-node:1.11.4")
+      (m/work-dir "gui")
+      (m/script
+       ["npm install"
+        (str "clojure -Sdeps '{:mvn/local-repo \".m2\"}' -M:test -m shadow.cljs.devtools.cli release "
+             build)])
+      (m/caches [{:id "mvn-gui-repo"
+                  :path ".m2"}
+                 {:id "node-modules"
+                  :path "node_modules"}])))
 
 (defn test-gui [ctx]
   (when (build-gui? ctx)
@@ -233,11 +243,23 @@
 (defn build-gui-release [ctx]
   (when (publish-gui? ctx)
     (-> (shadow-release "release-gui" :frontend)
-        (core/depends-on ["test-gui"])
+        (m/depends-on ["test-gui"])
         ;; Also generate index pages for app and admin sites
         (update :script (partial concat [(gen-idx ctx :main)
                                          (gen-idx ctx :admin)]))
         (assoc :save-artifacts [gui-release-artifact]))))
+
+(defn prepare-scw-gui-config [ctx]
+  "Creates config files to be included in the Scaleway gui image.  This is necessary
+   because Scaleway containers don't support mounting files, and using env vars is
+   not easy with nginx."
+  (when (publish-gui? ctx)
+    (m/action-job
+     "prepare-scw-gui-config"
+     (fn [ctx]
+       (let [p (api/build-params ctx)]
+         (spit "gui/dev-resources/config.js" (get p "scw-gui-config"))
+         (spit "gui/dev-resources/admin-config.js" (get p "scw-gui-admin-config")))))))
 
 (defn deploy
   "Job that auto-deploys the image to staging by pushing the new image tag to infra repo."
@@ -251,20 +273,20 @@
     (when (and (should-publish? ctx)
                (not (release? ctx))
                (not-empty images))
-      (core/action-job
-       "deploy"
-       (fn [ctx]
-         (if-let [token (get (api/build-params ctx) "github-token")]
-           ;; Patch the kustomization file
-           (if (infra/patch+commit! (infra/make-client token)
-                                    :staging ; Only staging for now
-                                    images)
-             core/success
-             (assoc core/failure :message "Unable to patch version in infra repo"))
-           (assoc core/failure :message "No github token provided")))
-       {:dependencies (->> [(when (publish-app? ctx) "app-img-manifest")
-                            (when (publish-gui? ctx) "gui-img-manifest")]
-                           (remove nil?))}))))
+      (-> (m/action-job
+           "deploy"
+           (fn [ctx]
+             (if-let [token (get (api/build-params ctx) "github-token")]
+               ;; Patch the kustomization file
+               (if (infra/patch+commit! (infra/make-client token)
+                                        :staging ; Only staging for now
+                                        images)
+                 m/success
+                 (-> m/failure (m/with-message "Unable to patch version in infra repo")))
+               (-> m/failure (m/with-message "No github token provided")))))
+          (m/depends-on (->> [(when (publish-app? ctx) "app-img-manifest")
+                              (when (publish-gui? ctx) "gui-img-manifest")]
+                             (remove nil?)))))))
 
 (defn notify [ctx]
   (when (release? ctx)
@@ -293,6 +315,9 @@
    build-gui-release
    build-app-image
    build-gui-image
+
+   prepare-scw-gui-config
    build-scw-image
+   
    deploy
    notify])
