@@ -131,6 +131,7 @@
 (def img-base "fra.ocir.io/frjdhmocn5qi")
 (def app-img (str img-base "/monkeyci"))
 (def gui-img (str img-base "/monkeyci-gui"))
+(def scw-gui-img "rg.fr-par.scw.cloud/monkeyci/monkeyci-gui")
 
 ;; Disabled arm because no compute capacity
 (def archs [#_:arm :amd])
@@ -155,24 +156,27 @@
   {:id "gui-release"
    :path "target"})
 
-(defn build-gui-image [ctx]
+(defn- gui-image-jobs [id img ctx]
   (when (publish-gui? ctx)
     (kaniko/multi-platform-image
      {:subdir "gui"
       :dockerfile "Dockerfile"
-      :target-img (str gui-img ":" (image-version ctx))
+      :target-img (str img ":" (image-version ctx))
       :archs archs
       :image
-      {:job-id "publish-gui-img"
+      {:job-id (str "publish-" id)
        :container-opts
        {:memory 3                       ;GB
         ;; Restore artifacts but modify the path because work dir is not the same
         :restore-artifacts [(update gui-release-artifact :path (partial str "gui/"))]
         :dependencies ["release-gui"]}}
       :manifest
-      {:job-id "gui-img-manifest"}}
+      {:job-id (str id "-manifest")}}
      ctx)))
 
+(def build-gui-image (partial gui-image-jobs "gui-img" gui-img))
+(def build-scw-image (partial gui-image-jobs "scw-gui-img" scw-gui-img))
+ 
 (defn publish 
   "Executes script in clojure container that has clojars publish env vars"
   [ctx id dir & [version]]
@@ -289,5 +293,6 @@
    build-gui-release
    build-app-image
    build-gui-image
+   build-scw-image
    deploy
    notify])
