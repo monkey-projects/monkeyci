@@ -1,6 +1,7 @@
 ;; Build script for Monkey-ci itself
 (ns build
-  (:require [clojure.string :as cs]
+  (:require [babashka.fs :as fs]
+            [clojure.string :as cs]
             [monkey.ci.build
              [api :as api]
              [core :as core]
@@ -260,6 +261,7 @@
      (fn [ctx]
        (let [p (api/build-params ctx)
              dir "gui/resources/public/conf/"]
+         (fs/create-dirs dir)
          (spit (str dir "config.js") (get p "scw-gui-config"))
          (spit (str dir "admin-config.js") (get p "scw-gui-admin-config")))))))
 
