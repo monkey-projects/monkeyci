@@ -313,7 +313,7 @@
 (def credit-routes
   ["/credits" {:get {:handler org-api/credits}}])
 
-(def cust-webhook-routes
+(def org-webhook-routes
   ["/webhook"
    [["/bitbucket" {:get {:handler bitbucket/list-webhooks
                          :parameters
@@ -358,7 +358,7 @@
                     org-build-routes
                     stats-routes
                     credit-routes
-                    cust-webhook-routes
+                    org-webhook-routes
                     invoice-routes]})])
 
 (def github-routes

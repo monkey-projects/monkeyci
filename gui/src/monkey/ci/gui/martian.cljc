@@ -9,7 +9,7 @@
             [re-frame.core :as rf]
             [schema.core :as s]))
 
-(def org-path ["/customer/" :org-id])
+(def org-path ["/org/" :org-id])
 (def repo-path (into org-path ["/repo/" :repo-id]))
 (def build-path (into repo-path ["/builds/" :build-id]))
 (def param-path (into org-path ["/param/" :param-id]))
@@ -117,12 +117,12 @@
    (api-route
     {:route-name :create-org
      :method :post
-     :path-parts ["/customer"]
+     :path-parts ["/org"]
      :body-schema {:org NewOrg}})
 
    (api-route
     {:route-name :search-orgs
-     :path-parts ["/customer"]
+     :path-parts ["/org"]
      :body-schema {:org NewOrg}})
 
    (api-route
@@ -134,7 +134,7 @@
 
    (api-route
     {:route-name :search-orgs
-     :path-parts ["/customer"]
+     :path-parts ["/org"]
      :query-schema {(s/optional-key :name) s/Str
                     (s/optional-key :id) s/Str}})
 
@@ -242,7 +242,7 @@
 
    (api-route
     {:route-name :get-user-orgs
-     :path-parts (into user-path ["/customers"])
+     :path-parts (into user-path ["/orgs"])
      :path-schema user-schema})
 
    (api-route
